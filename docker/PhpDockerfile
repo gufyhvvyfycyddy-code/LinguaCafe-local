@@ -1,0 +1,65 @@
+FROM node:20-alpine as node_build
+
+WORKDIR /build
+COPY ./ /build
+RUN npm install && npm run prod
+
+FROM php:8.2-apache
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        curl \
+        libonig-dev \
+        libpng-dev \
+        libxml2-dev \
+        libzip-dev \
+        nodejs \
+        sqlite3 \
+        unzip \
+        zip \
+        zlib1g-dev \
+        supervisor \
+        default-mysql-client \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# install php extensions for laravel
+RUN docker-php-ext-install pdo pdo_mysql fileinfo \
+    && docker-php-ext-configure gd \
+    && docker-php-ext-install "-j$(nproc)" gd \
+    && docker-php-ext-install pdo_mysql \
+    && docker-php-ext-install mysqli \
+    && docker-php-ext-install zip \
+    && docker-php-ext-install pcntl \
+    && docker-php-source delete
+
+#php config
+RUN printf 'max_execution_time = 600\n' >> /usr/local/etc/php/conf.d/uploads.ini \
+    && printf 'upload_max_filesize = 500M\n' >> /usr/local/etc/php/conf.d/uploads.ini \
+    && printf 'post_max_size = 500M\n' >> /usr/local/etc/php/conf.d/uploads.ini \
+    && printf 'memory_limit = 500M\n' >> /usr/local/etc/php/conf.d/uploads.ini
+
+# copy apache config
+COPY ./docker/vhost.conf /etc/apache2/sites-available/000-default.conf
+
+    # enable htaccess
+RUN a2enmod rewrite
+    # install composer
+COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+
+# for some reason i have to install this manually,
+# despite being in the composer.json
+# RUN composer require guzzlehttp/guzzle
+
+COPY ./ /var/www/html
+COPY --from=node_build /build/public /var/www/html/public
+
+RUN addgroup --gid 1000 laravel \
+    && adduser --ingroup laravel --disabled-password --gecos "" --shell /bin/sh laravel \
+    && chown -R laravel /var/www/html
+USER laravel
+
+RUN composer install --optimize-autoloader --no-dev
+
+ENTRYPOINT ["/var/www/html/entrypoint.sh"]
+CMD ["supervisord", "--configuration=/var/www/html/config/supervisord.conf", "--nodaemon"]

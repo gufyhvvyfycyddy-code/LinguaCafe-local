@@ -1,0 +1,97 @@
+#text-reader-glossary .glossary-entry {
+    position: relative;
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 100px;
+
+    &:nth-child(odd) {
+        background-color: var(--v-gray-base);
+    }
+
+    rt {
+        font-size: 13px;
+        color: var(--v-text-base);
+    }
+
+    .glossary-title {
+        height: 50px;
+    }
+
+    .stage {
+        position: relative;
+        display: inline-block;
+        float: left;
+        width: 40px;
+        height: 26px;
+        line-height: 26px;
+        border-radius: 8px;
+        margin-top: 12px;
+        font-size: 12px;
+        font-weight: bold;
+        overflow: hidden;
+        text-align: center;
+        user-select: none;
+
+        &[stage="2"] {
+            background-color: var(--v-newWordBackground-base);
+            color: var(--v-highlightedWordText-base);
+        }
+
+        &[stage^="-"] {
+            color: var(--v-highlightedWordText-base);
+        }
+
+        @for $wordLevel from -7 through -1 {
+            &[stage="#{$wordLevel}"] {
+                background-color: color-mix(in srgb, var(--interactive-text-wordLevel#{$wordLevel}-background-color), transparent var(--interactive-text-wordLevel#{$wordLevel}-background-transparency));
+            }
+        }
+    }
+
+    .word, .reading {
+        display: inline-block;
+        float: left;
+        border-radius: 4px;
+        padding: 1px 5px;
+        margin-left: 10px;
+        font-size: 15px;
+        user-select: none;
+        height: 50px;
+        line-height: 50px;
+        
+        div {
+            display: inline-block;
+        }
+
+        &.word {
+            min-width: 44px;
+        }
+
+        &.reading {
+            color: var(--v-text-base);
+        }
+    }
+
+    .translation {
+        display: block;
+        width: 100%;
+        font-size: 14px;
+        
+        ul {
+            padding-left: 70px;
+        }
+    }
+}
+
+@media (max-width: 650px) {
+    #text-reader-glossary .glossary-entry{
+        .word {
+            font-size: 17px;
+        }
+
+        .translation {
+            font-size: 15px;
+        }
+    }
+}

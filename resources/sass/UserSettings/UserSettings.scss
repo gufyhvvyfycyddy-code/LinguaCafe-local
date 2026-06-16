@@ -1,0 +1,80 @@
+#user-settings-themes {
+    #theme-selection {
+        width: 200px !important;
+        max-width: 200px !important;
+    }
+
+    td, th {
+        text-align: center !important;
+    }
+
+    td:nth-child(1) {
+        text-align: left !important;
+    }
+
+    td:nth-child(2), th:nth-child(2) {
+        width: 100px;
+        min-width: 100px;
+    }
+
+    td:nth-child(3), th:nth-child(3) {
+        width: 180px;
+        min-width: 180px;
+    }
+
+    td:nth-child(4), th:nth-child(4) {
+        width: 70px;
+        min-width: 70px;
+    }
+
+    .sample-text {
+        background-color: var(--v-gray-base);
+    }
+
+    #option-select-inputs {
+        & > div {
+            width: 220px;
+        }
+
+        label {
+            display: none;
+        }
+    }
+}
+
+#user-settings-account {
+    #delete-confirm-text {
+        max-width: 340px;
+    }
+}
+
+@media (max-width: 796px) {
+    #user-settings-themes {
+        #option-select-inputs {
+            & > div {
+                width: 100%;
+            }
+
+            label {
+                display: block;
+            }
+
+            .v-input {
+                width: 100% !important;
+            }
+        }
+    }
+}
+
+@media (max-width: 580px) {
+    #user-settings-themes {
+        #border-positions, #font-options {
+            flex-wrap: wrap;
+
+            .v-input {
+                width: 100%;
+                margin-left: 0px !important;
+            }
+        }
+    }
+}

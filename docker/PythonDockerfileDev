@@ -1,0 +1,61 @@
+FROM ubuntu:22.04
+
+WORKDIR /app
+RUN apt-get update -y \
+        && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python3 \
+        python3-dev \
+        pip \
+        tzdata \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN addgroup --gid 1000 laravel \
+    && adduser --ingroup laravel --disabled-password --gecos "" --shell /bin/sh laravel
+USER laravel
+
+RUN pip install -U --no-cache-dir \
+        setuptools \
+        wheel \
+        lxml \
+        lxml_html_clean \
+#youtube api
+        youtube_transcript_api \
+#ebook library
+        ebooklib \
+#kanji reading
+        pykakasi \
+#bottle
+        bottle \
+#spacy
+        spacy \
+#chinese reading
+        pinyin \
+#subtitle file parser
+        pysub-parser \
+#website text parser
+        newspaper3k
+
+RUN python3 -m spacy download de_core_news_sm \
+    && python3 -m spacy download nb_core_news_sm \
+    && python3 -m spacy download es_core_news_sm \
+    && python3 -m spacy download nl_core_news_sm \
+    && python3 -m spacy download fi_core_news_sm \
+    && python3 -m spacy download fr_core_news_sm \
+    && python3 -m spacy download it_core_news_sm \
+    && python3 -m spacy download sv_core_news_sm \
+    && python3 -m spacy download en_core_web_sm \
+    && python3 -m spacy download el_core_news_sm \
+    && python3 -m spacy download ca_core_news_sm \
+    && python3 -m spacy download hr_core_news_sm \
+    && python3 -m spacy download da_core_news_sm \
+    && python3 -m spacy download lt_core_news_sm \
+    && python3 -m spacy download mk_core_news_sm \
+    && python3 -m spacy download pl_core_news_sm \
+    && python3 -m spacy download pt_core_news_sm \
+    && python3 -m spacy download ro_core_news_sm \
+    && python3 -m spacy download sl_core_news_sm \
+    && python3 -m spacy download xx_ent_wiki_sm
+
+
+CMD [ "export PYTHONPATH=\"${HOME}/.local/bin:${PYTHONPATH}\"" ]

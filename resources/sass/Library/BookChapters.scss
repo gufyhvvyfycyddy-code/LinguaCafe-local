@@ -1,0 +1,28 @@
+.book-chapters {
+    .highlighted-words {
+        background-color: var(--v-highlightedWordBackground-base);
+        color: var(--v-highlightedWordText-base);
+        height: 24px;
+        line-height: 24px;
+        width: 60px;
+        text-align: center;
+    }
+
+    .new-words {
+        background-color: var(--v-newWordBackground-base);
+        color: var(--v-highlightedWordText-base);
+        height: 24px;
+        line-height: 24px;
+        width: 60px;
+        text-align: center
+    }
+
+    .chapter-word-count-skeleton,
+    .chapter-word-count-skeleton div {
+        height: 24px;
+    }
+
+    .importing-text {
+        color: var(--v-warning-base);
+    }
+}

@@ -1,0 +1,1 @@
+This is for migrating LinguaCafe to Vue3 in the future. Currently this is just something I play around with.

@@ -1,0 +1,204 @@
+/* 
+    This is a template file that will have css variables injected into it to avoid having vuejs style bindings on every word.
+*/
+
+.sample-text, .text-block-group {
+    .word {
+        display: inline-block;
+        box-sizing: border-box;
+        height: auto;
+        line-height: 100%;
+        cursor: pointer;
+
+        .rubyword {
+            pointer-events: none;
+        }
+        
+        &.space-after {
+            margin-right: 4px;
+        }
+
+        @for $wordLevel from -7 through 2 {
+            &[stage="#{$wordLevel}"] {
+                // text color
+                color: var(--interactive-text-wordLevel#{$wordLevel}-color);
+                background-color: color-mix(in srgb, var(--interactive-text-wordLevel#{$wordLevel}-background-color), transparent var(--interactive-text-wordLevel#{$wordLevel}-background-transparency));
+
+                
+                // border
+                border-color: var(--interactive-text-wordLevel#{$wordLevel}-border-color);
+                border-style: var(--interactive-text-wordLevel#{$wordLevel}-border-style);
+                border-radius: var(--interactive-text-wordLevel#{$wordLevel}-border-radius);
+                border-top-width: var(--interactive-text-wordLevel#{$wordLevel}-border-top-width);
+                border-bottom-width: var(--interactive-text-wordLevel#{$wordLevel}-border-bottom-width);
+                border-left-width: var(--interactive-text-wordLevel#{$wordLevel}-border-left-width);
+                border-right-width: var(--interactive-text-wordLevel#{$wordLevel}-border-right-width);
+
+                // padding for size consistency with 1px max border
+                padding-top: var(--interactive-text-wordLevel#{$wordLevel}-padding-top);
+                padding-bottom: var(--interactive-text-wordLevel#{$wordLevel}-padding-bottom);
+                padding-left: var(--interactive-text-wordLevel#{$wordLevel}-padding-left);
+                padding-right: var(--interactive-text-wordLevel#{$wordLevel}-padding-right);
+
+                // font styling
+                font-weight: var(--interactive-text-wordLevel#{$wordLevel}-weight);
+                font-style: var(--interactive-text-wordLevel#{$wordLevel}-style);
+                
+                // wavy underline
+                text-decoration: var(--interactive-text-wordLevel#{$wordLevel}-text-decoration) var(--interactive-text-wordLevel#{$wordLevel}-border-color) wavy var(--interactive-text-wordLevel#{$wordLevel}-wave-width);
+                text-decoration-skip-ink: none;
+            }
+
+            &.highlighted, &:hover{
+                background-color: var(--v-readerWordSelection-base);
+                color: var(--v-highlightedWordText-base);
+            }
+
+            &.no-highlight:not([stage="0"]):not([stage="1"]):not(.highlighted):not(:hover) {
+                background-color: unset;
+                color: unset;
+                border: unset;
+                text-decoration: none;
+            }
+        }
+
+        // phrases
+        @for $phraseLevel from -7 through 0 {
+            &.phrase[phrasestage="#{$phraseLevel}"] {
+                // text color
+                color: var(--interactive-text-phraseLevel#{$phraseLevel}-color);
+                background-color: color-mix(in srgb, var(--interactive-text-phraseLevel#{$phraseLevel}-background-color), transparent var(--interactive-text-phraseLevel#{$phraseLevel}-background-transparency));
+                
+                // border
+                border-top-width: var(--interactive-text-phraseLevel#{$phraseLevel}-border-top-width);
+                border-bottom-width: var(--interactive-text-phraseLevel#{$phraseLevel}-border-bottom-width);
+                border-color: var(--interactive-text-phraseLevel#{$phraseLevel}-border-color);
+                border-style: var(--interactive-text-phraseLevel#{$phraseLevel}-border-style);
+                border-bottom-left-radius: 0px;
+                border-top-left-radius: 0px;
+                border-bottom-right-radius: 0px;
+                border-top-right-radius: 0px;
+
+                // padding for size consistency with 1px max border
+                padding-top: var(--interactive-text-phraseLevel#{$phraseLevel}-padding-top);
+                padding-bottom: var(--interactive-text-phraseLevel#{$phraseLevel}-padding-bottom);
+                
+                &.phrase-start {
+                    padding-left: var(--interactive-text-phraseLevel#{$phraseLevel}-padding-left);
+                    border-bottom-left-radius: var(--interactive-text-phraseLevel#{$phraseLevel}-border-radius);
+                    border-top-left-radius: var(--interactive-text-phraseLevel#{$phraseLevel}-border-radius);
+                    border-left-width: var(--interactive-text-phraseLevel#{$phraseLevel}-border-left-width);
+                }
+                
+                &.phrase-end {
+                    padding-right: var(--interactive-text-phraseLevel#{$phraseLevel}-padding-right);
+                    border-bottom-right-radius: var(--interactive-text-phraseLevel#{$phraseLevel}-border-radius);
+                    border-top-right-radius: var(--interactive-text-phraseLevel#{$phraseLevel}-border-radius);
+                    border-right-width: var(--interactive-text-phraseLevel#{$phraseLevel}-border-right-width);
+                }
+                
+                // font styling
+                font-weight: var(--interactive-text-phraseLevel#{$phraseLevel}-weight);
+                font-style: var(--interactive-text-phraseLevel#{$phraseLevel}-style);
+                
+                // wavy underline
+                text-decoration: var(--interactive-text-phraseLevel#{$phraseLevel}-text-decoration) var(--interactive-text-phraseLevel#{$phraseLevel}-border-color) wavy var(--interactive-text-phraseLevel#{$phraseLevel}-wave-width);
+                text-decoration-skip-ink: none;
+
+                // replace margin with padding so background color applies
+                &.space-after:not(.phrase-end) {
+                    margin-right: 0px;
+                    padding-right: 4px;
+                }
+
+                &.no-highlight:not([phrasestage="0"]):not(.highlighted):not(:hover) {
+                    background-color: unset;
+                    color: unset;
+                    border: unset;
+                    text-decoration: none;
+                }
+            }
+
+            &.phrase.highlighted,
+            &.phrase:hover,
+            &.highlighted, &:hover{
+                background-color: var(--v-readerWordSelection-base);
+                border-color: var(--v-readerWordSelection-base);
+                color: var(--v-highlightedWordText-base);
+                border-radius: 0px;
+
+                &.phrase {
+                    border-radius: 0px;
+                }
+            }
+
+            // highlighted rounding
+            &.highlighted:not(.highlighted ~ *) {
+                border-top-left-radius: 4px;
+                border-bottom-left-radius: 4px;
+            }
+
+            &.highlighted:not(:has(~ .highlighted)) {
+                border-top-right-radius: 4px;
+                border-bottom-right-radius: 4px;
+            }
+
+            &.highlighted.space-after:has(~ .highlighted) {
+                margin-right: 0px !important;
+                padding-right: 4px !important;
+            }
+        }
+    }
+
+}
+
+// padding for spaceless languages (Chinese, Japanese, Thai...)
+.sample-text.spaceless-language .word, 
+.text-block-group.spaceless-language .word {
+    @for $wordLevel from -7 through 2 {
+        &[stage="#{$wordLevel}"] {
+            padding-left: var(--interactive-text-wordLevel#{$wordLevel}-spaceless-language-padding-left) !important;
+            padding-right: var(--interactive-text-wordLevel#{$wordLevel}-spaceless-language-padding-right) !important;
+        }
+    }
+
+    @for $phraseLevel from -7 through 0 {
+        &.phrase[phrasestage="#{$phraseLevel}"] {
+            &.phrase-start {
+                padding-left: var(--interactive-text-phraseLevel#{$phraseLevel}-spaceless-language-padding-left) !important;
+            }
+
+            &.phrase-end {
+                padding-right: var(--interactive-text-phraseLevel#{$phraseLevel}-spaceless-language-padding-right) !important;
+            }
+        }
+    }
+}
+
+.text-block-group.spaceless-language.plain-text-mode .word,
+.text-block-group.spaceless-language.plain-text-mode .word:hover {
+    margin-left: none !important;
+    margin-right: none !important;
+    padding-left: none !important;
+    padding-right: none !important;
+    background-color: rgba(0, 0, 0, 0) !important;
+    color: var(--v-text-base) !important;
+    border: none !important;
+    cursor: default !important;
+    user-select: text !important;
+
+    &[stage="-7"], &[stage="-6"], &[stage="-5"], &[stage="-4"], 
+    &[stage="-3"], &[stage="-2"], &[stage="-1"], &[stage="2"], 
+    &.phrase, &.phrase-start, &.phrase-end, &.highlighted, &:hover, 
+    &.space-after, &.space-after.highlighted, &.space-after.phrase {
+        margin-left: 0px !important;
+        margin-right: 0px !important;
+        padding-left: 0px !important;
+        padding-right: 0px !important;
+        background-color: rgba(0, 0, 0, 0) !important;
+        color: var(--v-text-base) !important;
+        border: none !important;
+        cursor: default !important;
+        user-select: text !important;
+    }
+}
