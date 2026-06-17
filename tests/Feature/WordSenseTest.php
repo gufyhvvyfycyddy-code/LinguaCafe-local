@@ -844,6 +844,68 @@ class WordSenseTest extends TestCase
         $this->assertCount(2, $senseIds);
     }
 
+    public function test_make_gpt_package_generates_markdown_with_rules_schema_and_current_senses(): void
+    {
+        $outputPath = 'storage/app/gpt-sense-package-test.md';
+        @unlink(base_path($outputPath));
+        $materialPath = $this->writeMaterial('new-material-package.txt', 'They charge a fee.');
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_zh' => 'charge money']);
+        $this->wordSenseService->createReviewCardForSense($sense);
+        $this->createSense(['sense_key' => 'charge-rejected', 'status' => WordSense::STATUS_REJECTED]);
+        $this->createSense(['sense_key' => 'charge-other-user', 'user_id' => $this->otherUser->id]);
+        $this->createSense(['sense_key' => 'charge-spanish', 'language' => 'spanish', 'language_id' => 'spanish']);
+
+        $this->artisan("senses:make-gpt-package --user_id={$this->user->id} --language=english --input={$materialPath} --output={$outputPath}")
+            ->assertSuccessful();
+
+        $content = file_get_contents(base_path($outputPath));
+        $this->assertStringContainsString('Output strict JSON only', $content);
+        $this->assertStringContainsString('confidence < 0.9', strtolower($content));
+        $this->assertStringContainsString('auto_fsrs_allowed must be false', $content);
+        $this->assertStringContainsString('"sentences"', $content);
+        $this->assertStringContainsString('They charge a fee.', $content);
+        $this->assertStringContainsString('charge-money', $content);
+        $this->assertStringNotContainsString('charge-rejected', $content);
+        $this->assertStringNotContainsString('charge-other-user', $content);
+        $this->assertStringNotContainsString('charge-spanish', $content);
+    }
+
+    public function test_make_gpt_package_generates_json(): void
+    {
+        $outputPath = 'storage/app/gpt-sense-package-test.json';
+        @unlink(base_path($outputPath));
+        $materialPath = $this->writeMaterial('new-material-package-json.txt', 'They charge a fee.');
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_zh' => 'charge money']);
+        $this->wordSenseService->createReviewCardForSense($sense);
+
+        $this->artisan("senses:make-gpt-package --user_id={$this->user->id} --language=english --input={$materialPath} --output={$outputPath} --format=json")
+            ->assertSuccessful();
+
+        $payload = json_decode(file_get_contents(base_path($outputPath)), true);
+        $this->assertSame(1, $payload['package_schema_version']);
+        $this->assertSame($this->user->id, $payload['user_id']);
+        $this->assertSame('english', $payload['language']);
+        $this->assertArrayHasKey('output_schema', $payload);
+        $this->assertArrayHasKey('sentences', $payload['output_schema']);
+        $this->assertSame('They charge a fee.', $payload['new_material']);
+        $this->assertCount(1, $payload['learned_senses']);
+        $this->assertSame($sense->id, $payload['learned_senses'][0]['sense_id']);
+    }
+
+    public function test_example_sense_mapping_and_sentences_schema_validate_and_import(): void
+    {
+        $examplePath = 'docs/examples/sense-mapping.example.json';
+
+        $this->artisan("senses:validate-mapping {$examplePath} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $this->artisan("senses:import-mapping {$examplePath} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $this->assertSame(1, WordSenseOccurrence::count());
+        $this->assertSame(1, WordSense::where('status', WordSense::STATUS_AI_SUGGESTED)->count());
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -940,6 +1002,14 @@ class WordSenseTest extends TestCase
     {
         $relativePath = "storage/app/{$fileName}";
         file_put_contents(base_path($relativePath), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+
+        return $relativePath;
+    }
+
+    private function writeMaterial(string $fileName, string $content): string
+    {
+        $relativePath = "storage/app/{$fileName}";
+        file_put_contents(base_path($relativePath), $content);
 
         return $relativePath;
     }

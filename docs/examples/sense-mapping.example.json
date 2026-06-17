@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "document_id": "example-document",
+  "language": "english",
+  "sentences": [
+    {
+      "sentence_id": "s001",
+      "en": "They charge a fee for late payment.",
+      "zh": "",
+      "matches": [
+        {
+          "type": "word",
+          "surface": "charge",
+          "lemma": "charge",
+          "pos": "verb",
+          "decision": "new_sense",
+          "sense_zh": "charge money",
+          "sense_en": "to ask for money as a price",
+          "confidence": 0.95,
+          "evidence": "The verb is used with a fee, so it means asking for money.",
+          "auto_fsrs_allowed": true
+        }
+      ]
+    }
+  ]
+}

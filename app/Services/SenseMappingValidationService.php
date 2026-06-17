@@ -73,6 +73,10 @@ class SenseMappingValidationService
             return $decoded['items'];
         }
 
+        if (isset($decoded['sentences']) && is_array($decoded['sentences'])) {
+            return $decoded['sentences'];
+        }
+
         if (isset($decoded['sentence_id']) || isset($decoded['matches'])) {
             return [$decoded];
         }
