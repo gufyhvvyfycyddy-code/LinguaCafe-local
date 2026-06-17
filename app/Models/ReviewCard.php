@@ -44,4 +44,9 @@ class ReviewCard extends Model
     {
         return $this->hasMany(ReviewLog::class);
     }
+
+    public function sense()
+    {
+        return $this->belongsTo(WordSense::class, 'target_id');
+    }
 }

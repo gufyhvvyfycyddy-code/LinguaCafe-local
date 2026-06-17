@@ -153,6 +153,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: 'Sense FSRS Review',
+                        url: '/reviews/senses',
+                        icon: 'mdi-brain',
+                        bottomNav: false,
+                    },
+                    {
                         name: 'User settings',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',

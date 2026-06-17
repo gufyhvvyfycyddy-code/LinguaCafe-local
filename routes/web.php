@@ -108,6 +108,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/chapters/create/{bookId}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/chapters/edit/{bookId}/{chapterId}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/review/{practiceMode?}/{bookId?}/{chapterId?}', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);
     Route::get('/senses/review', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);
@@ -169,6 +170,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/reviews', [App\Http\Controllers\ReviewController::class, 'getReviewItems']);
     Route::post('/reviews/rate', [App\Http\Controllers\ReviewController::class, 'rateReviewCard']);
     Route::post('/reviews/update', [App\Http\Controllers\ReviewController::class, 'updateReadWordsGoal']);
+    Route::post('/reviews/senses/{reviewCardId}/rate', [App\Http\Controllers\SenseReviewController::class, 'rate']);
 
     // sense mapping review
     Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);

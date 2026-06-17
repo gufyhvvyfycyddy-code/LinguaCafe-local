@@ -571,6 +571,112 @@ class WordSenseTest extends TestCase
         $response->assertJsonPath('0.sense_id', $sense->id);
     }
 
+    public function test_sense_review_page_route_opens_for_authenticated_user(): void
+    {
+        $this->actingAs($this->user)->get('/reviews/senses')->assertOk();
+    }
+
+    public function test_sense_review_queue_returns_only_current_user_language_confirmed_sense_cards(): void
+    {
+        $confirmed = $this->createSense(['sense_key' => 'charge-money']);
+        $dueSenseCard = $this->wordSenseService->createReviewCardForSense($confirmed);
+        $word = $this->createWord('charge');
+        app(ReviewCardService::class)->ensureWordCard($word);
+
+        $otherUserSense = $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-charge',
+        ]);
+        $this->wordSenseService->createReviewCardForSense($otherUserSense);
+
+        $spanishSense = $this->createSense([
+            'language' => 'spanish',
+            'language_id' => 'spanish',
+            'sense_key' => 'spanish-charge',
+        ]);
+        $this->wordSenseService->createReviewCardForSense($spanishSense);
+
+        $rejected = $this->createSense([
+            'sense_key' => 'charge-rejected',
+            'status' => WordSense::STATUS_REJECTED,
+        ]);
+        $this->forceSenseCard($rejected);
+
+        $suggested = $this->createSense([
+            'sense_key' => 'charge-suggested',
+            'status' => WordSense::STATUS_AI_SUGGESTED,
+        ]);
+        $this->forceSenseCard($suggested);
+
+        $future = $this->createSense(['sense_key' => 'charge-future']);
+        $futureCard = $this->wordSenseService->createReviewCardForSense($future);
+        $futureCard->update(['fsrs_due_at' => now()->addDay()]);
+
+        $response = $this->actingAs($this->user)->getJson('/reviews/senses');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json('cards'));
+        $response->assertJsonPath('cards.0.review_card_id', $dueSenseCard->id);
+        $response->assertJsonPath('cards.0.word_sense_id', $confirmed->id);
+        $response->assertJsonPath('cards.0.lemma', 'charge');
+        $response->assertJsonPath('summary.due_count', 1);
+    }
+
+    public function test_sense_review_rating_updates_sense_card_and_writes_logs_without_touching_word_card(): void
+    {
+        foreach (['again', 'hard', 'good', 'easy'] as $rating) {
+            ReviewLog::query()->delete();
+            ReviewCard::query()->delete();
+            WordSense::query()->delete();
+            EncounteredWord::query()->delete();
+
+            $sense = $this->createSense(['sense_key' => "charge-{$rating}"]);
+            $senseCard = $this->wordSenseService->createReviewCardForSense($sense);
+            $word = $this->createWord("word-{$rating}");
+            $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+
+            $response = $this->actingAs($this->user)->postJson("/reviews/senses/{$senseCard->id}/rate", [
+                'rating' => $rating,
+            ]);
+
+            $response->assertOk();
+            $senseCard->refresh();
+            $wordCard->refresh();
+
+            $this->assertSame(1, $senseCard->fsrs_reps);
+            $this->assertNotNull($senseCard->fsrs_stability);
+            $this->assertSame(0, $wordCard->fsrs_reps);
+            $this->assertNull($wordCard->fsrs_stability);
+
+            $log = ReviewLog::first();
+            $this->assertNotNull($log);
+            $this->assertSame($senseCard->id, $log->review_card_id);
+            $this->assertSame($rating, $log->rating);
+            $this->assertSame('sense_review', $log->source);
+        }
+    }
+
+    public function test_sense_review_rating_rejects_word_card_and_cross_scope_sense_card(): void
+    {
+        $word = $this->createWord('charge');
+        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $otherSense = $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-sense',
+        ]);
+        $otherCard = $this->wordSenseService->createReviewCardForSense($otherSense);
+
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$wordCard->id}/rate", [
+            'rating' => 'good',
+        ])->assertNotFound();
+
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$otherCard->id}/rate", [
+            'rating' => 'good',
+        ])->assertNotFound();
+
+        $this->assertSame(0, ReviewLog::count());
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -629,6 +735,20 @@ class WordSenseTest extends TestCase
             'source' => WordSenseOccurrence::SOURCE_SENSE_MAPPING_IMPORT,
             'raw_payload' => ['decision' => 'uncertain'],
         ], $overrides));
+    }
+
+    private function forceSenseCard(WordSense $sense): ReviewCard
+    {
+        return ReviewCard::forceCreate([
+            'user_id' => $sense->user_id,
+            'language' => $sense->language,
+            'language_id' => $sense->language_id,
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+        ]);
     }
 
     private function senseData(array $overrides): array

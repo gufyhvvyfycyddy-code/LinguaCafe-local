@@ -224,6 +224,7 @@ const Library = require('./components/Library/Library.vue').default;
 const TextReader = require('./components/TextReader/TextReader.vue').default;
 const Review = require('./components/Review/Review.vue').default;
 const SenseMappingReview = require('./components/Senses/SenseMappingReview.vue').default;
+const SenseReview = require('./components/Senses/SenseReview.vue').default;
 const Vocabulary = require('./components/Vocabulary/Vocabulary.vue').default;
 const KanjiList = require('./components/Kanji/KanjiList.vue').default;
 const KanjiDetails = require('./components/Kanji/KanjiDetails.vue').default;
@@ -243,6 +244,7 @@ const router = new VueRouter({
         { path: '/books/:bookId?', component: Library },
         { path: '/chapters/read/:chapterId', component: TextReader },
         { path: '/review/:practiceMode?/:bookId?/:chapterId?', component: Review },
+        { path: '/reviews/senses', component: SenseReview },
         { path: '/senses/review', component: SenseMappingReview },
         { path: '/vocabulary/search', component: Vocabulary },
         { path: '/vocabulary/search/:text/:stage/:book/:chapter/:translation/:phrases/:orderBy/:page', component: Vocabulary },
@@ -276,4 +278,3 @@ const app = new Vue({
     vuetify,
     store,
 });
-
