@@ -5,6 +5,8 @@ namespace App\Services;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
 
 class WordSenseOccurrenceService
@@ -13,6 +15,55 @@ class WordSenseOccurrenceService
         private WordSenseService $wordSenseService,
         private ReviewCardService $reviewCardService,
     ) {
+    }
+
+    public function listOccurrences(int $userId, string $language, array $filters = []): LengthAwarePaginator
+    {
+        $query = WordSenseOccurrence::query()
+            ->with(['wordSense.reviewCard'])
+            ->where('user_id', $userId)
+            ->where('language_id', $language);
+
+        foreach (['status', 'lemma', 'decision'] as $field) {
+            if (!empty($filters[$field])) {
+                $query->where($field, $filters[$field]);
+            }
+        }
+
+        return $query
+            ->orderBy('created_at', 'desc')
+            ->orderBy('id', 'desc')
+            ->paginate(min(max((int) Arr::get($filters, 'per_page', 20), 1), 100));
+    }
+
+    public function statusSummary(int $userId, string $language): array
+    {
+        $counts = WordSenseOccurrence::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->selectRaw('status, count(*) as aggregate')
+            ->groupBy('status')
+            ->pluck('aggregate', 'status');
+
+        return [
+            WordSenseOccurrence::STATUS_PENDING => (int) ($counts[WordSenseOccurrence::STATUS_PENDING] ?? 0),
+            WordSenseOccurrence::STATUS_BOUND => (int) ($counts[WordSenseOccurrence::STATUS_BOUND] ?? 0),
+            WordSenseOccurrence::STATUS_IGNORED => (int) ($counts[WordSenseOccurrence::STATUS_IGNORED] ?? 0),
+            WordSenseOccurrence::STATUS_REJECTED => (int) ($counts[WordSenseOccurrence::STATUS_REJECTED] ?? 0),
+        ];
+    }
+
+    public function candidates(int $userId, string $language, string $lemma, ?string $pos = null)
+    {
+        return WordSense::query()
+            ->with('reviewCard')
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('lemma', mb_strtolower(trim($lemma)))
+            ->when($pos !== null && $pos !== '', fn ($query) => $query->where('pos', $pos))
+            ->orderByRaw("case when status = ? then 0 else 1 end", [WordSense::STATUS_CONFIRMED])
+            ->orderBy('id')
+            ->get();
     }
 
     public function confirmOccurrence(WordSenseOccurrence $occurrence): WordSenseOccurrence
@@ -27,6 +78,17 @@ class WordSenseOccurrenceService
     {
         $occurrence->fill([
             'status' => WordSenseOccurrence::STATUS_REJECTED,
+            'auto_fsrs_allowed' => false,
+            'review_card_id' => null,
+        ])->save();
+
+        return $occurrence->refresh();
+    }
+
+    public function ignoreOccurrence(WordSenseOccurrence $occurrence): WordSenseOccurrence
+    {
+        $occurrence->fill([
+            'status' => WordSenseOccurrence::STATUS_IGNORED,
             'auto_fsrs_allowed' => false,
             'review_card_id' => null,
         ])->save();
@@ -54,7 +116,7 @@ class WordSenseOccurrenceService
         return $occurrence->refresh();
     }
 
-    public function createSenseFromOccurrence(WordSenseOccurrence $occurrence): WordSense
+    public function createSenseFromOccurrence(WordSenseOccurrence $occurrence, array $overrides = []): WordSense
     {
         if ($occurrence->type !== WordSenseOccurrence::TYPE_WORD) {
             throw ValidationException::withMessages([
@@ -62,7 +124,7 @@ class WordSenseOccurrenceService
             ]);
         }
 
-        return $this->wordSenseService->createSense([
+        return $this->wordSenseService->createSense(array_merge([
             'user_id' => $occurrence->user_id,
             'language' => $occurrence->language,
             'language_id' => $occurrence->language_id,
@@ -80,7 +142,21 @@ class WordSenseOccurrenceService
             'sentence_id' => $occurrence->sentence_id,
             'sentence_hash' => $occurrence->sentence_hash,
             'status' => WordSense::STATUS_AI_SUGGESTED,
+        ], $overrides));
+    }
+
+    public function createConfirmedSenseFromOccurrence(WordSenseOccurrence $occurrence, array $data, bool $enableFsrs = false): WordSenseOccurrence
+    {
+        $sense = $this->createSenseFromOccurrence($occurrence, [
+            'sense_zh' => Arr::get($data, 'sense_zh', ''),
+            'sense_en' => Arr::get($data, 'sense_en'),
+            'pos' => Arr::get($data, 'pos', $occurrence->pos),
+            'aliases_zh' => Arr::get($data, 'aliases_zh', []),
+            'collocations' => Arr::get($data, 'collocations', []),
+            'status' => WordSense::STATUS_CONFIRMED,
         ]);
+
+        return $this->bindOccurrenceToSense($occurrence, $sense, $enableFsrs);
     }
 
     public function enableFsrsForConfirmedOccurrence(WordSenseOccurrence $occurrence): ?ReviewCard

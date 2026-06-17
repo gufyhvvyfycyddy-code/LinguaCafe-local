@@ -434,6 +434,143 @@ class WordSenseTest extends TestCase
         $this->assertSame('word', $reviews[0]['type']);
     }
 
+    public function test_occurrence_list_returns_only_current_user_language(): void
+    {
+        $own = $this->createOccurrence();
+        $this->createOccurrence(['user_id' => $this->otherUser->id]);
+        $this->createOccurrence(['language' => 'spanish', 'language_id' => 'spanish']);
+
+        $response = $this->actingAs($this->user)->get('/senses/occurrences?status=pending');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.occurrence_id', $own->id);
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame(1, $response->json('summary.pending'));
+    }
+
+    public function test_sense_mapping_review_page_route_opens_for_authenticated_user(): void
+    {
+        $this->actingAs($this->user)->get('/senses/review')->assertOk();
+    }
+
+    public function test_confirm_can_only_confirm_current_user_language_occurrence(): void
+    {
+        $ownSense = $this->createSense([
+            'sense_key' => 'charge-ai',
+            'status' => WordSense::STATUS_AI_SUGGESTED,
+        ]);
+        $ownOccurrence = $this->createOccurrence([
+            'word_sense_id' => $ownSense->id,
+            'auto_fsrs_allowed' => true,
+        ]);
+        $otherOccurrence = $this->createOccurrence(['user_id' => $this->otherUser->id]);
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$otherOccurrence->id}/confirm")
+            ->assertNotFound();
+        $this->actingAs($this->user)->post("/senses/occurrences/{$ownOccurrence->id}/confirm")
+            ->assertOk();
+
+        $ownSense->refresh();
+        $ownOccurrence->refresh();
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $ownSense->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $ownOccurrence->status);
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $ownSense->id)->exists());
+    }
+
+    public function test_bind_cannot_bind_other_user_or_language_sense(): void
+    {
+        $occurrence = $this->createOccurrence();
+        $otherUserSense = $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-sense',
+        ]);
+        $otherLanguageSense = $this->createSense([
+            'language' => 'spanish',
+            'language_id' => 'spanish',
+            'sense_key' => 'spanish-sense',
+        ]);
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$occurrence->id}/bind", [
+            'sense_id' => $otherUserSense->id,
+        ])->assertNotFound();
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$occurrence->id}/bind", [
+            'sense_id' => $otherLanguageSense->id,
+        ])->assertNotFound();
+
+        $occurrence->refresh();
+        $this->assertNull($occurrence->word_sense_id);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+    }
+
+    public function test_bind_current_sense_can_create_sense_review_card(): void
+    {
+        $occurrence = $this->createOccurrence();
+        $sense = $this->createSense(['sense_key' => 'charge-money']);
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$occurrence->id}/bind", [
+            'sense_id' => $sense->id,
+            'auto_fsrs_allowed' => true,
+        ])->assertOk();
+
+        $occurrence->refresh();
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $occurrence->status);
+        $this->assertSame($sense->id, $occurrence->word_sense_id);
+        $this->assertNotNull($occurrence->review_card_id);
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+    }
+
+    public function test_create_sense_endpoint_creates_confirmed_sense_and_binds_occurrence(): void
+    {
+        $occurrence = $this->createOccurrence();
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$occurrence->id}/create-sense", [
+            'sense_zh' => 'charge money',
+            'sense_en' => 'to ask for money',
+            'pos' => 'verb',
+            'aliases_zh' => 'fee, bill',
+            'collocations' => 'charge a fee',
+            'auto_fsrs_allowed' => true,
+        ])->assertOk();
+
+        $sense = WordSense::where('status', WordSense::STATUS_CONFIRMED)->first();
+        $occurrence->refresh();
+        $this->assertNotNull($sense);
+        $this->assertSame($sense->id, $occurrence->word_sense_id);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $occurrence->status);
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+    }
+
+    public function test_reject_and_ignore_do_not_create_review_cards(): void
+    {
+        $reject = $this->createOccurrence(['sentence_id' => 'reject']);
+        $ignore = $this->createOccurrence(['sentence_id' => 'ignore']);
+
+        $this->actingAs($this->user)->post("/senses/occurrences/{$reject->id}/reject")
+            ->assertOk();
+        $this->actingAs($this->user)->post("/senses/occurrences/{$ignore->id}/ignore")
+            ->assertOk();
+
+        $reject->refresh();
+        $ignore->refresh();
+        $this->assertSame(WordSenseOccurrence::STATUS_REJECTED, $reject->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_IGNORED, $ignore->status);
+        $this->assertSame(0, ReviewCard::count());
+    }
+
+    public function test_candidates_returns_current_user_language_senses_for_lemma(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'charge-money']);
+        $this->createSense(['sense_key' => 'charge-other-user', 'user_id' => $this->otherUser->id]);
+        $this->createSense(['sense_key' => 'charge-spanish', 'language' => 'spanish', 'language_id' => 'spanish']);
+
+        $response = $this->actingAs($this->user)->get('/senses/candidates?lemma=charge&pos=verb');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json());
+        $response->assertJsonPath('0.sense_id', $sense->id);
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -470,6 +607,28 @@ class WordSenseTest extends TestCase
     private function createSense(array $overrides): WordSense
     {
         return $this->wordSenseService->createSense($this->senseData($overrides));
+    }
+
+    private function createOccurrence(array $overrides = []): WordSenseOccurrence
+    {
+        return WordSenseOccurrence::forceCreate(array_merge([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'sentence_id' => 's1',
+            'sentence_en' => 'They charge a fee.',
+            'sentence_zh' => 'They charge a fee.',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => 'charge',
+            'lemma' => 'charge',
+            'pos' => 'verb',
+            'decision' => 'uncertain',
+            'confidence' => 0.5,
+            'auto_fsrs_allowed' => false,
+            'status' => WordSenseOccurrence::STATUS_PENDING,
+            'source' => WordSenseOccurrence::SOURCE_SENSE_MAPPING_IMPORT,
+            'raw_payload' => ['decision' => 'uncertain'],
+        ], $overrides));
     }
 
     private function senseData(array $overrides): array

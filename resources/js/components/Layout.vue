@@ -147,6 +147,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: 'Sense review',
+                        url: '/senses/review',
+                        icon: 'mdi-check-decagram',
+                        bottomNav: false,
+                    },
+                    {
                         name: 'User settings',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',

@@ -108,6 +108,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/chapters/create/{bookId}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/chapters/edit/{bookId}/{chapterId}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/review/{practiceMode?}/{bookId?}/{chapterId?}', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/senses/review', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/kanji/search', [App\Http\Controllers\HomeController::class, 'index']);
@@ -168,6 +169,15 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/reviews', [App\Http\Controllers\ReviewController::class, 'getReviewItems']);
     Route::post('/reviews/rate', [App\Http\Controllers\ReviewController::class, 'rateReviewCard']);
     Route::post('/reviews/update', [App\Http\Controllers\ReviewController::class, 'updateReadWordsGoal']);
+
+    // sense mapping review
+    Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);
+    Route::get('/senses/candidates', [App\Http\Controllers\SenseOccurrenceController::class, 'candidates']);
+    Route::post('/senses/occurrences/{id}/confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'confirm']);
+    Route::post('/senses/occurrences/{id}/bind', [App\Http\Controllers\SenseOccurrenceController::class, 'bind']);
+    Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceController::class, 'createSense']);
+    Route::post('/senses/occurrences/{id}/reject', [App\Http\Controllers\SenseOccurrenceController::class, 'reject']);
+    Route::post('/senses/occurrences/{id}/ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'ignore']);
 
     // anki
     Route::post('/anki/add-card', [App\Http\Controllers\AnkiController::class, 'addCardToAnki']);

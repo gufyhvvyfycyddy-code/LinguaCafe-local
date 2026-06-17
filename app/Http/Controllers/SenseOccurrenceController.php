@@ -1,0 +1,182 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Models\WordSense;
+use App\Models\WordSenseOccurrence;
+use App\Services\WordSenseOccurrenceService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class SenseOccurrenceController extends Controller
+{
+    public function __construct(private WordSenseOccurrenceService $occurrenceService)
+    {
+    }
+
+    public function index(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $occurrences = $this->occurrenceService->listOccurrences($userId, $language, [
+            'status' => $request->query('status'),
+            'lemma' => $request->query('lemma'),
+            'decision' => $request->query('decision'),
+            'per_page' => $request->query('per_page', 20),
+        ]);
+
+        return response()->json([
+            'data' => $occurrences->getCollection()->map(fn (WordSenseOccurrence $occurrence) => $this->serializeOccurrence($occurrence))->values(),
+            'summary' => $this->occurrenceService->statusSummary($userId, $language),
+            'pagination' => [
+                'current_page' => $occurrences->currentPage(),
+                'per_page' => $occurrences->perPage(),
+                'total' => $occurrences->total(),
+                'last_page' => $occurrences->lastPage(),
+            ],
+        ]);
+    }
+
+    public function candidates(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $lemma = (string) $request->query('lemma');
+        if ($lemma === '') {
+            abort(422, 'The lemma parameter is required.');
+        }
+
+        $senses = $this->occurrenceService->candidates($userId, $language, $lemma, $request->query('pos'));
+
+        return response()->json($senses->map(fn (WordSense $sense) => $this->serializeSense($sense))->values());
+    }
+
+    public function confirm(int $id)
+    {
+        $occurrence = $this->findOccurrence($id);
+        $occurrence = $this->occurrenceService->confirmOccurrence($occurrence);
+
+        return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
+    }
+
+    public function bind(int $id, Request $request)
+    {
+        $request->validate([
+            'sense_id' => ['required', 'integer'],
+            'auto_fsrs_allowed' => ['sometimes', 'boolean'],
+        ]);
+
+        $occurrence = $this->findOccurrence($id);
+        $sense = WordSense::where('id', (int) $request->post('sense_id'))
+            ->where('user_id', Auth::user()->id)
+            ->where('language_id', Auth::user()->selected_language)
+            ->firstOrFail();
+
+        $occurrence = $this->occurrenceService->bindOccurrenceToSense(
+            $occurrence,
+            $sense,
+            (bool) $request->post('auto_fsrs_allowed', false),
+        );
+
+        return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
+    }
+
+    public function createSense(int $id, Request $request)
+    {
+        $request->validate([
+            'sense_zh' => ['required', 'string'],
+            'sense_en' => ['nullable', 'string'],
+            'pos' => ['nullable', 'string'],
+            'aliases_zh' => ['nullable'],
+            'collocations' => ['nullable'],
+            'auto_fsrs_allowed' => ['sometimes', 'boolean'],
+        ]);
+
+        $occurrence = $this->findOccurrence($id);
+        $occurrence = $this->occurrenceService->createConfirmedSenseFromOccurrence($occurrence, [
+            'sense_zh' => $request->post('sense_zh'),
+            'sense_en' => $request->post('sense_en'),
+            'pos' => $request->post('pos'),
+            'aliases_zh' => $this->normalizeList($request->post('aliases_zh')),
+            'collocations' => $this->normalizeList($request->post('collocations')),
+        ], (bool) $request->post('auto_fsrs_allowed', false));
+
+        return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
+    }
+
+    public function reject(int $id)
+    {
+        $occurrence = $this->occurrenceService->rejectOccurrence($this->findOccurrence($id));
+
+        return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
+    }
+
+    public function ignore(int $id)
+    {
+        $occurrence = $this->occurrenceService->ignoreOccurrence($this->findOccurrence($id));
+
+        return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
+    }
+
+    private function findOccurrence(int $id): WordSenseOccurrence
+    {
+        return WordSenseOccurrence::where('id', $id)
+            ->where('user_id', Auth::user()->id)
+            ->where('language_id', Auth::user()->selected_language)
+            ->firstOrFail();
+    }
+
+    private function serializeOccurrence(WordSenseOccurrence $occurrence): array
+    {
+        return [
+            'occurrence_id' => $occurrence->id,
+            'sentence_en' => $occurrence->sentence_en,
+            'sentence_zh' => $occurrence->sentence_zh,
+            'surface' => $occurrence->surface,
+            'lemma' => $occurrence->lemma,
+            'pos' => $occurrence->pos,
+            'decision' => $occurrence->decision,
+            'confidence' => $occurrence->confidence,
+            'evidence' => $occurrence->evidence,
+            'status' => $occurrence->status,
+            'auto_fsrs_allowed' => $occurrence->auto_fsrs_allowed,
+            'sense' => $occurrence->wordSense ? $this->serializeSense($occurrence->wordSense) : null,
+            'raw_payload' => $occurrence->raw_payload,
+        ];
+    }
+
+    private function serializeSense(WordSense $sense): array
+    {
+        return [
+            'sense_id' => $sense->id,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'sense_key' => $sense->sense_key,
+            'sense_zh' => $sense->sense_zh,
+            'sense_en' => $sense->sense_en,
+            'aliases_zh' => $sense->aliases_zh ?: [],
+            'collocations' => $sense->collocations ?: [],
+            'status' => $sense->status,
+            'fsrs_state' => $sense->reviewCard?->fsrs_state,
+        ];
+    }
+
+    private function normalizeList(mixed $value): array
+    {
+        if (is_array($value)) {
+            return array_values(array_filter(array_map('trim', $value), fn ($item) => $item !== ''));
+        }
+
+        return array_values(array_filter(array_map('trim', explode(',', (string) $value)), fn ($item) => $item !== ''));
+    }
+}
