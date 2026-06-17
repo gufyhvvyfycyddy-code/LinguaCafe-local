@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
+use App\Models\WordSense;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +28,28 @@ class ReviewCardService
                 'language' => $word->language,
                 'target_type' => ReviewCard::TARGET_WORD,
                 'target_id' => $word->id,
+            ],
+            [
+                'fsrs_state' => 'new',
+                'fsrs_due_at' => Carbon::now(),
+                'fsrs_enabled' => true,
+            ]
+        );
+    }
+
+    public function ensureSenseCard(WordSense $sense): ?ReviewCard
+    {
+        if (!$this->isReviewableSense($sense)) {
+            return null;
+        }
+
+        return ReviewCard::firstOrCreate(
+            [
+                'user_id' => $sense->user_id,
+                'language_id' => $sense->language_id,
+                'language' => $sense->language,
+                'target_type' => ReviewCard::TARGET_SENSE,
+                'target_id' => $sense->id,
             ],
             [
                 'fsrs_state' => 'new',
@@ -70,8 +93,7 @@ class ReviewCardService
                 throw new \Exception('Review card does not exist, is disabled, or belongs to another user.');
             }
 
-            $word = $this->wordForCard($card);
-            if (!$word || $word->language !== $language || !$this->isReviewableWord($word)) {
+            if (!$this->isReviewableTarget($card, $language)) {
                 throw new \Exception('Review card target is no longer reviewable.');
             }
 
@@ -127,9 +149,43 @@ class ReviewCardService
             ->first();
     }
 
+    private function senseForCard(ReviewCard $card): ?WordSense
+    {
+        if ($card->target_type !== ReviewCard::TARGET_SENSE) {
+            return null;
+        }
+
+        return WordSense::where('user_id', $card->user_id)
+            ->where('language_id', $card->language_id)
+            ->where('id', $card->target_id)
+            ->first();
+    }
+
+    private function isReviewableTarget(ReviewCard $card, string $language): bool
+    {
+        if ($card->target_type === ReviewCard::TARGET_WORD) {
+            $word = $this->wordForCard($card);
+
+            return $word !== null && $word->language === $language && $this->isReviewableWord($word);
+        }
+
+        if ($card->target_type === ReviewCard::TARGET_SENSE) {
+            $sense = $this->senseForCard($card);
+
+            return $sense !== null && $sense->language_id === $language && $this->isReviewableSense($sense);
+        }
+
+        return false;
+    }
+
     private function isReviewableWord(EncounteredWord $word): bool
     {
         return $word->stage < 0;
+    }
+
+    private function isReviewableSense(WordSense $sense): bool
+    {
+        return $sense->status === WordSense::STATUS_CONFIRMED;
     }
 
     private function initializableWordsQuery(?int $userId = null, ?string $language = null)
