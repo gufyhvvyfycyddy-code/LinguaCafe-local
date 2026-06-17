@@ -11,20 +11,41 @@
             </div>
 
             <v-row dense>
-                <v-col cols="12" md="3">
+                <v-col cols="12" md="2">
                     <v-select dense filled rounded hide-details label="Status" :items="statuses" v-model="filters.status" @change="reload"></v-select>
                 </v-col>
-                <v-col cols="12" md="3">
+                <v-col cols="12" md="2">
                     <v-text-field dense filled rounded hide-details label="Lemma" v-model="filters.lemma" @keyup.enter="reload"></v-text-field>
                 </v-col>
-                <v-col cols="12" md="3">
+                <v-col cols="12" md="2">
                     <v-select dense filled rounded hide-details clearable label="Decision" :items="decisions" v-model="filters.decision" @change="reload"></v-select>
                 </v-col>
-                <v-col cols="12" md="3" class="d-flex">
+                <v-col cols="12" md="2">
+                    <v-text-field dense filled rounded hide-details label="Confidence min" v-model="filters.confidence_min" @keyup.enter="reload"></v-text-field>
+                </v-col>
+                <v-col cols="12" md="2">
+                    <v-select dense filled rounded hide-details clearable label="Auto FSRS" :items="autoFsrsFilters" v-model="filters.auto_fsrs_allowed" @change="reload"></v-select>
+                </v-col>
+                <v-col cols="12" md="2" class="d-flex">
                     <v-btn depressed rounded color="primary" class="mr-2" @click="reload"><v-icon left>mdi-refresh</v-icon>Refresh</v-btn>
                     <v-btn depressed rounded color="foreground" @click="clearFilters"><v-icon left>mdi-filter-remove</v-icon>Clear</v-btn>
                 </v-col>
             </v-row>
+        </v-card>
+
+        <v-card outlined class="rounded-lg pa-3 mb-3">
+            <div class="d-flex align-center flex-wrap">
+                <v-checkbox dense hide-details class="mr-4" :input-value="allSelected" @change="toggleSelectPage" label="Select page"></v-checkbox>
+                <v-chip class="mr-2" color="foreground">{{ selectedIds.length }} selected</v-chip>
+                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(false)">Bulk confirm</v-btn>
+                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(true)">Confirm + FSRS</v-btn>
+                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('ignore')">Bulk ignore</v-btn>
+                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('reject')">Bulk reject</v-btn>
+                <v-btn small depressed color="warning" class="ma-1" @click="bulkHighConfidence">Confirm high confidence</v-btn>
+            </div>
+            <v-alert v-if="bulkSummary" dense outlined type="info" class="mt-3 mb-0">
+                Processed {{ bulkSummary.processed_count }}, skipped {{ bulkSummary.skipped_count }}, confirmed {{ bulkSummary.confirmed_count }}, ignored {{ bulkSummary.ignored_count }}, rejected {{ bulkSummary.rejected_count }}, review cards {{ bulkSummary.created_review_cards }}.
+            </v-alert>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -37,6 +58,7 @@
             class="rounded-lg pa-4 mb-3"
         >
             <div class="d-flex align-center mb-2">
+                <v-checkbox dense hide-details class="mr-3" v-model="selected" :value="occurrence.occurrence_id"></v-checkbox>
                 <div>
                     <v-chip small class="mr-2">{{ occurrence.status }}</v-chip>
                     <v-chip small class="mr-2">{{ occurrence.decision }}</v-chip>
@@ -92,6 +114,41 @@
                 @input="loadOccurrences"
             ></v-pagination>
         </div>
+
+        <v-card outlined class="rounded-lg pa-4 mb-4">
+            <div class="subheader mb-3 d-flex align-center">
+                Possible duplicates
+                <v-spacer></v-spacer>
+                <v-text-field dense filled rounded hide-details label="Lemma" class="mr-2" v-model="duplicateLemma" @keyup.enter="loadDuplicates"></v-text-field>
+                <v-btn depressed rounded color="foreground" @click="loadDuplicates"><v-icon left>mdi-magnify</v-icon>Find</v-btn>
+            </div>
+            <v-alert v-if="duplicateGroups.length === 0" dense outlined type="info">No possible duplicates loaded.</v-alert>
+            <v-expansion-panels v-else accordion>
+                <v-expansion-panel v-for="(group, index) in duplicateGroups" :key="index">
+                    <v-expansion-panel-header>{{ group.lemma }} / {{ group.pos || 'no pos' }} / {{ group.senses.length }} senses</v-expansion-panel-header>
+                    <v-expansion-panel-content>
+                        <v-simple-table dense>
+                            <thead>
+                                <tr>
+                                    <th>Sense</th>
+                                    <th>Aliases</th>
+                                    <th>Example</th>
+                                    <th>Review card</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr v-for="sense in group.senses" :key="sense.sense_id">
+                                    <td>{{ sense.sense_zh }}</td>
+                                    <td>{{ (sense.aliases_zh || []).join(', ') }}</td>
+                                    <td>{{ sense.example_sentence_en }}</td>
+                                    <td>{{ sense.review_card ? sense.review_card.fsrs_state : 'none' }}</td>
+                                </tr>
+                            </tbody>
+                        </v-simple-table>
+                    </v-expansion-panel-content>
+                </v-expansion-panel>
+            </v-expansion-panels>
+        </v-card>
 
         <v-dialog v-model="bindDialog.active" max-width="780">
             <v-card>
@@ -152,13 +209,24 @@
                 error: '',
                 occurrences: [],
                 candidates: [],
+                selected: [],
+                bulkSummary: null,
+                duplicateLemma: '',
+                duplicateGroups: [],
                 summary: {},
                 statuses: ['pending', 'bound', 'ignored', 'rejected'],
                 decisions: ['match_existing_sense', 'new_sense', 'uncertain', 'ignore', 'phrase_match'],
+                autoFsrsFilters: [
+                    { text: 'Any', value: null },
+                    { text: 'Allowed', value: true },
+                    { text: 'Not allowed', value: false },
+                ],
                 filters: {
                     status: 'pending',
                     lemma: '',
                     decision: null,
+                    confidence_min: '',
+                    auto_fsrs_allowed: null,
                     per_page: 20,
                 },
                 pagination: {
@@ -189,6 +257,14 @@
         mounted() {
             this.loadOccurrences();
         },
+        computed: {
+            selectedIds() {
+                return this.selected;
+            },
+            allSelected() {
+                return this.occurrences.length > 0 && this.occurrences.every((occurrence) => this.selected.includes(occurrence.occurrence_id));
+            },
+        },
         methods: {
             reload() {
                 this.pagination.current_page = 1;
@@ -198,6 +274,8 @@
                 this.filters.status = 'pending';
                 this.filters.lemma = '';
                 this.filters.decision = null;
+                this.filters.confidence_min = '';
+                this.filters.auto_fsrs_allowed = null;
                 this.reload();
             },
             loadOccurrences() {
@@ -208,6 +286,8 @@
                         status: this.filters.status,
                         lemma: this.filters.lemma || undefined,
                         decision: this.filters.decision || undefined,
+                        confidence_min: this.filters.confidence_min || undefined,
+                        auto_fsrs_allowed: this.filters.auto_fsrs_allowed === null ? undefined : this.filters.auto_fsrs_allowed,
                         page: this.pagination.current_page,
                         per_page: this.filters.per_page,
                     }
@@ -215,6 +295,7 @@
                     this.occurrences = response.data.data;
                     this.summary = response.data.summary;
                     this.pagination = response.data.pagination;
+                    this.selected = this.selected.filter((id) => this.occurrences.some((occurrence) => occurrence.occurrence_id === id));
                 }).catch((error) => {
                     this.error = error.response?.data?.message || 'Failed to load occurrences.';
                 }).finally(() => {
@@ -289,6 +370,69 @@
             },
             formatJson(value) {
                 return JSON.stringify(value || {}, null, 2);
+            },
+            toggleSelectPage(value) {
+                if (value) {
+                    this.selected = this.occurrences.map((occurrence) => occurrence.occurrence_id);
+                } else {
+                    this.selected = [];
+                }
+            },
+            bulkConfirm(enableFsrs) {
+                axios.post('/senses/occurrences/bulk-confirm', {
+                    occurrence_ids: this.selectedIds,
+                    auto_fsrs_allowed: enableFsrs,
+                }).then((response) => {
+                    this.bulkSummary = response.data;
+                    this.selected = [];
+                    this.loadOccurrences();
+                }).catch((error) => {
+                    this.error = error.response?.data?.message || 'Bulk confirm failed.';
+                });
+            },
+            bulkSimple(action) {
+                if (!window.confirm(`Bulk ${action} ${this.selectedIds.length} occurrences?`)) {
+                    return;
+                }
+
+                axios.post(`/senses/occurrences/bulk-${action}`, {
+                    occurrence_ids: this.selectedIds,
+                }).then((response) => {
+                    this.bulkSummary = response.data;
+                    this.selected = [];
+                    this.loadOccurrences();
+                }).catch((error) => {
+                    this.error = error.response?.data?.message || `Bulk ${action} failed.`;
+                });
+            },
+            bulkHighConfidence() {
+                if (!window.confirm('Confirm all high-confidence matched existing senses in the current filter scope?')) {
+                    return;
+                }
+
+                axios.post('/senses/occurrences/bulk-confirm-high-confidence', {
+                    confidence_min: this.filters.confidence_min || 0.90,
+                    decision: this.filters.decision || 'match_existing_sense',
+                    lemma: this.filters.lemma || undefined,
+                    only_auto_fsrs_allowed: this.filters.auto_fsrs_allowed === true,
+                }).then((response) => {
+                    this.bulkSummary = response.data;
+                    this.selected = [];
+                    this.loadOccurrences();
+                }).catch((error) => {
+                    this.error = error.response?.data?.message || 'High-confidence confirmation failed.';
+                });
+            },
+            loadDuplicates() {
+                axios.get('/senses/possible-duplicates', {
+                    params: {
+                        lemma: this.duplicateLemma || this.filters.lemma || undefined,
+                    }
+                }).then((response) => {
+                    this.duplicateGroups = response.data;
+                }).catch((error) => {
+                    this.error = error.response?.data?.message || 'Failed to load possible duplicates.';
+                });
             },
         }
     }

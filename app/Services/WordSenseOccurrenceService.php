@@ -30,10 +30,139 @@ class WordSenseOccurrenceService
             }
         }
 
+        if (Arr::get($filters, 'confidence_min') !== null && Arr::get($filters, 'confidence_min') !== '') {
+            $query->where('confidence', '>=', (float) Arr::get($filters, 'confidence_min'));
+        }
+
+        if (Arr::get($filters, 'auto_fsrs_allowed') !== null && Arr::get($filters, 'auto_fsrs_allowed') !== '') {
+            $query->where('auto_fsrs_allowed', filter_var(Arr::get($filters, 'auto_fsrs_allowed'), FILTER_VALIDATE_BOOLEAN));
+        }
+
         return $query
             ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc')
             ->paginate(min(max((int) Arr::get($filters, 'per_page', 20), 1), 100));
+    }
+
+    public function bulkConfirm(int $userId, string $language, array $occurrenceIds, bool $autoFsrsAllowed = false): array
+    {
+        return $this->bulkByIds($userId, $language, $occurrenceIds, function (WordSenseOccurrence $occurrence, array &$summary) use ($autoFsrsAllowed) {
+            if (!in_array($occurrence->status, [WordSenseOccurrence::STATUS_PENDING, WordSenseOccurrence::STATUS_BOUND], true)) {
+                $this->skip($summary, "Occurrence {$occurrence->id}: status {$occurrence->status} cannot be confirmed.");
+                return;
+            }
+
+            $this->confirmExistingBinding($occurrence, $autoFsrsAllowed, $summary);
+        });
+    }
+
+    public function bulkIgnore(int $userId, string $language, array $occurrenceIds): array
+    {
+        return $this->bulkByIds($userId, $language, $occurrenceIds, function (WordSenseOccurrence $occurrence, array &$summary) {
+            $this->ignoreOccurrence($occurrence);
+            $summary['processed_count']++;
+            $summary['ignored_count']++;
+        });
+    }
+
+    public function bulkReject(int $userId, string $language, array $occurrenceIds): array
+    {
+        return $this->bulkByIds($userId, $language, $occurrenceIds, function (WordSenseOccurrence $occurrence, array &$summary) {
+            $this->rejectOccurrence($occurrence);
+            $summary['processed_count']++;
+            $summary['rejected_count']++;
+        });
+    }
+
+    public function bulkConfirmHighConfidence(int $userId, string $language, array $filters = []): array
+    {
+        $confidenceMin = (float) Arr::get($filters, 'confidence_min', 0.90);
+        $decision = Arr::get($filters, 'decision', 'match_existing_sense') ?: 'match_existing_sense';
+        $query = WordSenseOccurrence::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('decision', $decision)
+            ->where('decision', 'match_existing_sense')
+            ->where('confidence', '>=', $confidenceMin)
+            ->whereIn('status', [WordSenseOccurrence::STATUS_PENDING, WordSenseOccurrence::STATUS_BOUND])
+            ->whereNotNull('word_sense_id')
+            ->with('wordSense');
+
+        if (!empty($filters['lemma'])) {
+            $query->where('lemma', $filters['lemma']);
+        }
+
+        if ((bool) Arr::get($filters, 'only_auto_fsrs_allowed', false)) {
+            $query->where('auto_fsrs_allowed', true);
+        }
+
+        $occurrences = $query->get();
+        $summary = $this->emptyBulkSummary($occurrences->count());
+
+        foreach ($occurrences as $occurrence) {
+            $this->confirmExistingBinding($occurrence, $occurrence->auto_fsrs_allowed, $summary);
+        }
+
+        return $summary;
+    }
+
+    public function possibleDuplicates(int $userId, string $language, ?string $lemma = null): array
+    {
+        $senses = WordSense::query()
+            ->with('reviewCard')
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->when($lemma !== null && $lemma !== '', fn ($query) => $query->where('lemma', mb_strtolower(trim($lemma))))
+            ->where('status', '<>', WordSense::STATUS_REJECTED)
+            ->orderBy('lemma')
+            ->orderBy('pos')
+            ->orderBy('id')
+            ->get();
+
+        $groups = [];
+        foreach ($senses->groupBy('lemma') as $lemmaValue => $lemmaSenses) {
+            $lemmaSenses = $lemmaSenses->values();
+            for ($i = 0; $i < $lemmaSenses->count(); $i++) {
+                for ($j = $i + 1; $j < $lemmaSenses->count(); $j++) {
+                    $first = $lemmaSenses[$i];
+                    $second = $lemmaSenses[$j];
+                    if (!$this->sameOrEmptyPos($first->pos, $second->pos)) {
+                        continue;
+                    }
+
+                    if ($this->normalize($first->sense_zh) !== $this->normalize($second->sense_zh)
+                        && count(array_intersect($first->aliases_zh ?: [], $second->aliases_zh ?: [])) === 0) {
+                        continue;
+                    }
+
+                    $key = implode('|', [$lemmaValue, $first->pos ?: $second->pos ?: '', $this->normalize($first->sense_zh)]);
+                    $groups[$key]['lemma'] = $lemmaValue;
+                    $groups[$key]['pos'] = $first->pos ?: $second->pos;
+                    $groups[$key]['senses'][$first->id] = $first;
+                    $groups[$key]['senses'][$second->id] = $second;
+                }
+            }
+        }
+
+        return array_values(array_map(function (array $group) {
+            return [
+                'lemma' => $group['lemma'],
+                'pos' => $group['pos'],
+                'senses' => array_values(array_map(fn (WordSense $sense) => [
+                    'sense_id' => $sense->id,
+                    'lemma' => $sense->lemma,
+                    'pos' => $sense->pos,
+                    'sense_zh' => $sense->sense_zh,
+                    'aliases_zh' => $sense->aliases_zh ?: [],
+                    'example_sentence_en' => $sense->example_sentence_en,
+                    'review_card' => $sense->reviewCard ? [
+                        'id' => $sense->reviewCard->id,
+                        'fsrs_state' => $sense->reviewCard->fsrs_state,
+                        'fsrs_enabled' => $sense->reviewCard->fsrs_enabled,
+                    ] : null,
+                ], $group['senses'])),
+            ];
+        }, $groups));
     }
 
     public function statusSummary(int $userId, string $language): array
@@ -194,5 +323,93 @@ class WordSenseOccurrenceService
                 'sense' => 'The sense does not belong to the occurrence user and language.',
             ]);
         }
+    }
+
+    private function bulkByIds(int $userId, string $language, array $occurrenceIds, callable $callback): array
+    {
+        $ids = array_values(array_unique(array_map('intval', $occurrenceIds)));
+        $summary = $this->emptyBulkSummary(count($ids));
+        $occurrences = WordSenseOccurrence::query()
+            ->with('wordSense')
+            ->whereIn('id', $ids)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($ids as $id) {
+            $occurrence = $occurrences->get($id);
+            if (!$occurrence) {
+                $this->skip($summary, "Occurrence {$id}: not found for current user and language.");
+                continue;
+            }
+
+            $callback($occurrence, $summary);
+        }
+
+        return $summary;
+    }
+
+    private function confirmExistingBinding(WordSenseOccurrence $occurrence, bool $enableFsrs, array &$summary): void
+    {
+        $sense = $occurrence->wordSense;
+        if (!$sense) {
+            $this->skip($summary, "Occurrence {$occurrence->id}: no sense is bound.");
+            return;
+        }
+
+        if ($sense->status === WordSense::STATUS_REJECTED) {
+            $this->skip($summary, "Occurrence {$occurrence->id}: rejected sense cannot be confirmed.");
+            return;
+        }
+
+        if ($sense->status === WordSense::STATUS_AI_SUGGESTED) {
+            $this->wordSenseService->confirmSense($sense);
+        }
+
+        $hadCard = ReviewCard::where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->where('target_id', $sense->id)
+            ->exists();
+
+        $this->bindOccurrenceToSense($occurrence, $sense, $enableFsrs);
+
+        if ($enableFsrs && !$hadCard) {
+            $summary['created_review_cards']++;
+        }
+
+        $summary['processed_count']++;
+        $summary['confirmed_count']++;
+    }
+
+    private function emptyBulkSummary(int $requestedCount): array
+    {
+        return [
+            'requested_count' => $requestedCount,
+            'processed_count' => 0,
+            'skipped_count' => 0,
+            'confirmed_count' => 0,
+            'ignored_count' => 0,
+            'rejected_count' => 0,
+            'created_review_cards' => 0,
+            'errors' => [],
+        ];
+    }
+
+    private function skip(array &$summary, string $error): void
+    {
+        $summary['skipped_count']++;
+        $summary['errors'][] = $error;
+    }
+
+    private function sameOrEmptyPos(?string $first, ?string $second): bool
+    {
+        return $first === $second || $first === null || $first === '' || $second === null || $second === '';
+    }
+
+    private function normalize(?string $value): string
+    {
+        return trim(mb_strtolower((string) $value));
     }
 }

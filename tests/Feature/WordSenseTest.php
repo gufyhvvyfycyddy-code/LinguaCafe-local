@@ -677,6 +677,173 @@ class WordSenseTest extends TestCase
         $this->assertSame(0, ReviewLog::count());
     }
 
+    public function test_bulk_confirm_only_processes_current_user_language_occurrences(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'bulk-confirm']);
+        $own = $this->createOccurrence(['word_sense_id' => $sense->id]);
+        $other = $this->createOccurrence(['user_id' => $this->otherUser->id]);
+        $spanish = $this->createOccurrence(['language' => 'spanish', 'language_id' => 'spanish']);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-confirm', [
+            'occurrence_ids' => [$own->id, $other->id, $spanish->id, 999999],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('requested_count', 4);
+        $response->assertJsonPath('processed_count', 1);
+        $response->assertJsonPath('skipped_count', 3);
+        $own->refresh();
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $own->status);
+    }
+
+    public function test_bulk_confirm_confirms_multiple_pending_and_ai_suggested_senses(): void
+    {
+        $confirmedSense = $this->createSense(['sense_key' => 'bulk-confirmed']);
+        $suggestedSense = $this->createSense([
+            'sense_key' => 'bulk-suggested',
+            'status' => WordSense::STATUS_AI_SUGGESTED,
+        ]);
+        $first = $this->createOccurrence(['word_sense_id' => $confirmedSense->id]);
+        $second = $this->createOccurrence(['sentence_id' => 's2', 'word_sense_id' => $suggestedSense->id]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-confirm', [
+            'occurrence_ids' => [$first->id, $second->id],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('confirmed_count', 2);
+        $suggestedSense->refresh();
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $suggestedSense->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $first->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $second->refresh()->status);
+    }
+
+    public function test_bulk_confirm_with_auto_fsrs_creates_sense_review_cards(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'bulk-fsrs']);
+        $occurrence = $this->createOccurrence(['word_sense_id' => $sense->id]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-confirm', [
+            'occurrence_ids' => [$occurrence->id],
+            'auto_fsrs_allowed' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('created_review_cards', 1);
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+    }
+
+    public function test_bulk_ignore_and_bulk_reject_do_not_create_review_cards(): void
+    {
+        $ignore = $this->createOccurrence(['sentence_id' => 'bulk-ignore']);
+        $reject = $this->createOccurrence(['sentence_id' => 'bulk-reject']);
+
+        $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-ignore', [
+            'occurrence_ids' => [$ignore->id],
+        ])->assertOk()->assertJsonPath('ignored_count', 1);
+
+        $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-reject', [
+            'occurrence_ids' => [$reject->id],
+        ])->assertOk()->assertJsonPath('rejected_count', 1);
+
+        $this->assertSame(WordSenseOccurrence::STATUS_IGNORED, $ignore->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_REJECTED, $reject->refresh()->status);
+        $this->assertSame(0, ReviewCard::count());
+    }
+
+    public function test_bulk_confirm_high_confidence_only_processes_matching_existing_senses_over_threshold(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'high-confidence']);
+        $high = $this->createOccurrence([
+            'word_sense_id' => $sense->id,
+            'decision' => 'match_existing_sense',
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]);
+        $low = $this->createOccurrence([
+            'sentence_id' => 'low',
+            'word_sense_id' => $sense->id,
+            'decision' => 'match_existing_sense',
+            'confidence' => 0.89,
+            'auto_fsrs_allowed' => true,
+        ]);
+        $uncertain = $this->createOccurrence([
+            'sentence_id' => 'uncertain-high',
+            'word_sense_id' => $sense->id,
+            'decision' => 'uncertain',
+            'confidence' => 0.99,
+            'auto_fsrs_allowed' => true,
+        ]);
+        $newSense = $this->createOccurrence([
+            'sentence_id' => 'new-high',
+            'word_sense_id' => $sense->id,
+            'decision' => 'new_sense',
+            'confidence' => 0.99,
+            'auto_fsrs_allowed' => true,
+        ]);
+        $phrase = $this->createOccurrence([
+            'sentence_id' => 'phrase-high',
+            'word_sense_id' => $sense->id,
+            'decision' => 'phrase_match',
+            'type' => WordSenseOccurrence::TYPE_PHRASE,
+            'confidence' => 0.99,
+            'auto_fsrs_allowed' => true,
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/occurrences/bulk-confirm-high-confidence', [
+            'confidence_min' => 0.90,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('processed_count', 1);
+        $response->assertJsonPath('confirmed_count', 1);
+        $response->assertJsonPath('created_review_cards', 1);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $high->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $low->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $uncertain->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $newSense->refresh()->status);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $phrase->refresh()->status);
+    }
+
+    public function test_possible_duplicates_returns_same_lemma_duplicates_without_cross_scope_data(): void
+    {
+        $first = $this->createSense([
+            'sense_key' => 'dup-one',
+            'sense_zh' => 'charge money',
+            'aliases_zh' => ['fee'],
+        ]);
+        $second = $this->createSense([
+            'sense_key' => 'dup-two',
+            'sense_zh' => 'charge money',
+            'aliases_zh' => ['bill'],
+        ]);
+        $this->createSense([
+            'sense_key' => 'not-dup',
+            'sense_zh' => 'attack',
+            'aliases_zh' => ['attack'],
+        ]);
+        $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-dup',
+            'sense_zh' => 'charge money',
+        ]);
+        $this->createSense([
+            'language' => 'spanish',
+            'language_id' => 'spanish',
+            'sense_key' => 'spanish-dup',
+            'sense_zh' => 'charge money',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/senses/possible-duplicates?lemma=charge');
+
+        $response->assertOk();
+        $this->assertCount(1, $response->json());
+        $senseIds = collect($response->json('0.senses'))->pluck('sense_id')->all();
+        $this->assertContains($first->id, $senseIds);
+        $this->assertContains($second->id, $senseIds);
+        $this->assertCount(2, $senseIds);
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([

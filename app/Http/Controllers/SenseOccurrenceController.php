@@ -27,6 +27,8 @@ class SenseOccurrenceController extends Controller
             'status' => $request->query('status'),
             'lemma' => $request->query('lemma'),
             'decision' => $request->query('decision'),
+            'confidence_min' => $request->query('confidence_min'),
+            'auto_fsrs_allowed' => $request->query('auto_fsrs_allowed'),
             'per_page' => $request->query('per_page', 20),
         ]);
 
@@ -59,6 +61,83 @@ class SenseOccurrenceController extends Controller
         $senses = $this->occurrenceService->candidates($userId, $language, $lemma, $request->query('pos'));
 
         return response()->json($senses->map(fn (WordSense $sense) => $this->serializeSense($sense))->values());
+    }
+
+    public function possibleDuplicates(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        return response()->json($this->occurrenceService->possibleDuplicates($userId, $language, $request->query('lemma')));
+    }
+
+    public function bulkConfirm(Request $request)
+    {
+        $request->validate([
+            'occurrence_ids' => ['required', 'array'],
+            'occurrence_ids.*' => ['integer'],
+            'auto_fsrs_allowed' => ['sometimes', 'boolean'],
+        ]);
+
+        return response()->json($this->occurrenceService->bulkConfirm(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $request->post('occurrence_ids', []),
+            (bool) $request->post('auto_fsrs_allowed', false),
+        ));
+    }
+
+    public function bulkIgnore(Request $request)
+    {
+        $request->validate([
+            'occurrence_ids' => ['required', 'array'],
+            'occurrence_ids.*' => ['integer'],
+        ]);
+
+        return response()->json($this->occurrenceService->bulkIgnore(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $request->post('occurrence_ids', []),
+        ));
+    }
+
+    public function bulkReject(Request $request)
+    {
+        $request->validate([
+            'occurrence_ids' => ['required', 'array'],
+            'occurrence_ids.*' => ['integer'],
+        ]);
+
+        return response()->json($this->occurrenceService->bulkReject(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $request->post('occurrence_ids', []),
+        ));
+    }
+
+    public function bulkConfirmHighConfidence(Request $request)
+    {
+        $request->validate([
+            'confidence_min' => ['nullable', 'numeric', 'min:0', 'max:1'],
+            'decision' => ['nullable', 'string'],
+            'lemma' => ['nullable', 'string'],
+            'only_auto_fsrs_allowed' => ['sometimes', 'boolean'],
+        ]);
+
+        return response()->json($this->occurrenceService->bulkConfirmHighConfidence(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            [
+                'confidence_min' => $request->post('confidence_min', 0.90),
+                'decision' => $request->post('decision', 'match_existing_sense'),
+                'lemma' => $request->post('lemma'),
+                'only_auto_fsrs_allowed' => (bool) $request->post('only_auto_fsrs_allowed', false),
+            ],
+        ));
     }
 
     public function confirm(int $id)

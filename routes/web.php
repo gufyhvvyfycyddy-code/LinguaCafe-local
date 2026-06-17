@@ -175,6 +175,11 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // sense mapping review
     Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);
     Route::get('/senses/candidates', [App\Http\Controllers\SenseOccurrenceController::class, 'candidates']);
+    Route::get('/senses/possible-duplicates', [App\Http\Controllers\SenseOccurrenceController::class, 'possibleDuplicates']);
+    Route::post('/senses/occurrences/bulk-confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirm']);
+    Route::post('/senses/occurrences/bulk-ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkIgnore']);
+    Route::post('/senses/occurrences/bulk-reject', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkReject']);
+    Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirmHighConfidence']);
     Route::post('/senses/occurrences/{id}/confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'confirm']);
     Route::post('/senses/occurrences/{id}/bind', [App\Http\Controllers\SenseOccurrenceController::class, 'bind']);
     Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceController::class, 'createSense']);
