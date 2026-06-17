@@ -7,7 +7,9 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
+use App\Models\WordSenseOccurrence;
 use App\Services\ReviewCardService;
+use App\Services\ReviewService;
 use App\Services\WordSenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -223,6 +225,215 @@ class WordSenseTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_import_mapping_dry_run_does_not_write_database(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
+        $path = $this->writeMapping('dry-run-import-sense-mapping.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $sense->id,
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english --dry-run")
+            ->assertSuccessful();
+
+        $this->assertSame(0, WordSenseOccurrence::count());
+        $this->assertSame(0, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count());
+    }
+
+    public function test_import_mapping_binds_high_confidence_existing_sense_and_creates_sense_card(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
+        $path = $this->writeMapping('bound-existing-sense-mapping.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $sense->id,
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertNotNull($occurrence);
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $occurrence->status);
+        $this->assertSame($sense->id, $occurrence->word_sense_id);
+        $this->assertTrue($occurrence->auto_fsrs_allowed);
+        $this->assertNotNull($occurrence->review_card_id);
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+    }
+
+    public function test_import_mapping_keeps_low_confidence_existing_sense_pending(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
+        $path = $this->writeMapping('pending-existing-sense-mapping.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $sense->id,
+            'confidence' => 0.85,
+            'auto_fsrs_allowed' => false,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertSame($sense->id, $occurrence->word_sense_id);
+        $this->assertFalse($occurrence->auto_fsrs_allowed);
+        $this->assertNull($occurrence->review_card_id);
+    }
+
+    public function test_import_mapping_rejects_other_users_matched_sense(): void
+    {
+        $otherSense = $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-charge',
+            'sense_en' => 'other user sense',
+        ]);
+        $path = $this->writeMapping('other-user-import-sense-mapping.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $otherSense->id,
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertFailed();
+
+        $this->assertSame(0, WordSenseOccurrence::count());
+    }
+
+    public function test_import_mapping_rejects_other_language_matched_sense(): void
+    {
+        $spanishSense = $this->createSense([
+            'language' => 'spanish',
+            'language_id' => 'spanish',
+            'sense_key' => 'spanish-charge',
+            'sense_en' => 'spanish sense',
+        ]);
+        $path = $this->writeMapping('other-language-import-sense-mapping.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $spanishSense->id,
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertFailed();
+
+        $this->assertSame(0, WordSenseOccurrence::count());
+    }
+
+    public function test_import_mapping_new_sense_creates_ai_suggested_sense_and_pending_occurrence(): void
+    {
+        $path = $this->writeMapping('new-sense-import-mapping.json', $this->mappingPayload([[
+            'decision' => 'new_sense',
+            'sense_en' => 'to ask for money',
+            'confidence' => 0.92,
+            'auto_fsrs_allowed' => false,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $sense = WordSense::where('status', WordSense::STATUS_AI_SUGGESTED)->first();
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertNotNull($sense);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertSame($sense->id, $occurrence->word_sense_id);
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->exists());
+    }
+
+    public function test_import_mapping_uncertain_creates_pending_occurrence_without_sense(): void
+    {
+        $path = $this->writeMapping('uncertain-import-mapping.json', $this->mappingPayload([[
+            'decision' => 'uncertain',
+            'confidence' => 0.50,
+            'auto_fsrs_allowed' => false,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertSame(0, WordSense::count());
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertNull($occurrence->word_sense_id);
+        $this->assertFalse($occurrence->auto_fsrs_allowed);
+    }
+
+    public function test_import_mapping_ignore_creates_ignored_occurrence_without_review_card(): void
+    {
+        $path = $this->writeMapping('ignore-import-mapping.json', $this->mappingPayload([[
+            'decision' => 'ignore',
+            'confidence' => 1.0,
+            'auto_fsrs_allowed' => false,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertSame(WordSenseOccurrence::STATUS_IGNORED, $occurrence->status);
+        $this->assertSame(0, ReviewCard::count());
+    }
+
+    public function test_import_mapping_phrase_match_creates_pending_phrase_occurrence_without_phrase_card(): void
+    {
+        $path = $this->writeMapping('phrase-import-mapping.json', $this->mappingPayload([[
+            'decision' => 'phrase_match',
+            'surface' => 'charge a fee',
+            'lemma' => 'charge a fee',
+            'confidence' => 0.94,
+            'auto_fsrs_allowed' => false,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertSame(WordSenseOccurrence::TYPE_PHRASE, $occurrence->type);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_PHRASE)->exists());
+    }
+
+    public function test_imported_bound_sense_card_can_be_reviewed(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
+        $path = $this->writeMapping('review-imported-sense-card.json', $this->mappingPayload([[
+            'decision' => 'match_existing_sense',
+            'matched_sense_id' => $sense->id,
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => true,
+        ]]));
+
+        $this->artisan("senses:import-mapping {$path} --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $card = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->first();
+        app(ReviewCardService::class)->recordReview($this->user->id, 'english', $card->id, 'good');
+
+        $card->refresh();
+        $this->assertSame(1, $card->fsrs_reps);
+        $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->count());
+    }
+
+    public function test_word_review_queue_stays_word_only_when_sense_cards_exist(): void
+    {
+        $word = $this->createWord('charge');
+        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
+        $this->wordSenseService->createReviewCardForSense($sense);
+
+        $reviews = app(ReviewService::class)->getReviewItems($this->user->id, 'english', -1, -1, false, []);
+
+        $this->assertCount(1, $reviews);
+        $this->assertSame($word->id, $reviews[0]['id']);
+        $this->assertSame($wordCard->id, $reviews[0]['review_card_id']);
+        $this->assertSame('word', $reviews[0]['type']);
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -285,5 +496,22 @@ class WordSenseTest extends TestCase
         file_put_contents(base_path($relativePath), json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
         return $relativePath;
+    }
+
+    private function mappingPayload(array $matches): array
+    {
+        return [
+            'schema_version' => 1,
+            'items' => [[
+                'sentence_id' => 's1',
+                'en' => 'They charge a fee.',
+                'zh' => 'They charge a fee.',
+                'matches' => array_map(fn (array $match) => array_merge([
+                    'surface' => 'charge',
+                    'lemma' => 'charge',
+                    'pos' => 'verb',
+                ], $match), $matches),
+            ]],
+        ];
     }
 }

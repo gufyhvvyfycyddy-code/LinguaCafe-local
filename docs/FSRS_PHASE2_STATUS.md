@@ -13,6 +13,8 @@
 - Added WordSense feature tests.
 - Confirmed Phase 1 FSRS tests still pass.
 - Confirmed frontend build still passes.
+- Committed Phase 2 as:
+  - `b0929fc phase 2: add sense-level review foundation`
 
 ## Commands run
 
@@ -28,6 +30,8 @@
 - `npm run development`
 - `php artisan list senses`
 - `git status --short`
+- `git add .`
+- `git commit -m "phase 2: add sense-level review foundation"`
 
 ## Command results
 
@@ -48,6 +52,8 @@
 - Artisan sees both new commands:
   - `senses:export-learned`
   - `senses:validate-mapping`
+- Phase 2 commit succeeded:
+  - `b0929fc phase 2: add sense-level review foundation`
 
 ## Modified files
 
@@ -70,5 +76,5 @@
 
 - Do not do Quicker.
 - Do not do GPT/browser automation.
-- Do not import `sense-mapping.json` automatically.
-- Next useful phase would be designing the manual review/confirmation flow for sense mappings.
+- Phase 3 may add real `sense-mapping.json` import into a separate occurrence table.
+- Keep the existing learned-senses export and validate-mapping command behavior stable.
