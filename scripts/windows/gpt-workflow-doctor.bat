@@ -9,7 +9,7 @@ echo Language: %LANGUAGE%
 echo.
 
 cd /d "%PROJECT_DIR%"
-"%PHP_BIN%" artisan senses:gpt-workflow doctor --user_id=%USER_ID% --language=%LANGUAGE%
+"%PHP_EXE%" artisan senses:gpt-workflow doctor --user_id=%USER_ID% --language=%LANGUAGE%
 
 if errorlevel 1 (
     echo.

@@ -1,0 +1,137 @@
+# LinguaCafe Windows 桌面快捷方式
+
+## 第一次使用前
+
+请先确认这些环境可用：
+
+- PHP 8.2 或项目要求的 PHP 版本。
+- Composer 依赖已经安装，即项目根目录存在 `vendor/`。
+- MariaDB / MySQL 已启动，并且 `.env` 数据库配置正确。
+- `fsrs-rs-php` 原生扩展已加载。
+- Node / npm 已安装，用于前端构建。
+
+可以先运行：
+
+```bat
+scripts\windows\linguacafe-doctor.bat
+```
+
+如果 doctor 出现 `FAIL`，先按提示修复。
+
+## 修改配置
+
+统一配置文件：
+
+```text
+scripts/windows/gpt-workflow-config.bat
+```
+
+常用变量：
+
+- `PROJECT_DIR`：项目目录。
+- `PHP_EXE`：PHP 可执行文件，默认 `php`。
+- `NODE_EXE`：Node 可执行文件，默认 `node`。
+- `NPM_EXE`：npm 可执行文件，默认 `npm`。
+- `BROWSER_EXE`：浏览器可执行文件，可空。
+- `APP_URL`：默认 `http://127.0.0.1:8000`。
+- `USER_ID`：默认 `1`。
+- `LANGUAGE`：默认 `english`。
+- `INPUT_FILE`：GPT workflow 的新材料路径。
+
+如果双击脚本提示找不到 PHP，把 `PHP_EXE` 改成完整路径，例如：
+
+```bat
+set "PHP_EXE=C:\path\to\php.exe"
+```
+
+## 创建桌面快捷方式
+
+双击：
+
+```text
+scripts/windows/create-desktop-shortcuts.bat
+```
+
+它会在当前 Windows 用户桌面创建 LinguaCafe 快捷方式。
+
+## 桌面快捷方式用途
+
+- `LinguaCafe 启动`：检查环境、运行迁移、启动 Laravel，并打开首页。
+- `LinguaCafe 停止`：尽量停止监听 8000 端口的 Laravel `artisan serve`。
+- `LinguaCafe 首页`：打开 LinguaCafe 首页。
+- `LinguaCafe Word Review`：打开原 word-only Review 页面。
+- `LinguaCafe Sense Review`：打开词义 FSRS Review 页面。
+- `LinguaCafe 词义确认`：打开 Sense Mapping Review 页面。
+- `LinguaCafe Doctor`：运行 workflow doctor 检查。
+- `LinguaCafe 生成 GPT 包`：生成 `gpt-sense-package.md` 并打开 package 文件夹和 ChatGPT。
+- `LinguaCafe 校验 GPT 下载`：校验 downloads 中最新的 GPT JSON。
+- `LinguaCafe 导入 Dry Run`：预演导入，不写数据库。
+- `LinguaCafe 正式导入`：正式导入最新 validated JSON。
+- `LinguaCafe 打开 ChatGPT`：打开 ChatGPT 网页端。
+
+## 正常使用流程
+
+1. 双击 `LinguaCafe 启动`。
+2. 把新英文材料放入 `storage/app/gpt-workflow/input/new-material.txt`。
+3. 双击 `LinguaCafe 生成 GPT 包`。
+4. 在 ChatGPT 网页端上传或粘贴 package 内容。
+5. 把 GPT 输出保存为 `sense-mapping.json`，放入 `storage/app/gpt-workflow/downloads/`。
+6. 双击 `LinguaCafe 校验 GPT 下载`。
+7. 双击 `LinguaCafe 导入 Dry Run`，检查 summary。
+8. 确认无误后双击 `LinguaCafe 正式导入`。
+9. 双击 `LinguaCafe 词义确认`，处理 pending occurrence。
+10. 双击 `LinguaCafe Sense Review`，复习到期词义卡。
+
+## 常见错误
+
+### php 不在 PATH
+
+现象：脚本提示 PHP 不可用。
+
+处理：修改 `gpt-workflow-config.bat` 的 `PHP_EXE` 为完整路径。
+
+### 8000 端口被占用
+
+现象：启动失败或打开了别的服务。
+
+处理：先双击 `LinguaCafe 停止`。如果它提示不是 Laravel `artisan serve`，请手动确认占用 8000 的程序。
+
+### MariaDB 没启动
+
+现象：迁移失败或页面数据库连接失败。
+
+处理：启动 MariaDB / MySQL，检查 `.env` 中的数据库用户名、密码和端口。
+
+### fsrs-rs-php 未加载
+
+现象：doctor 出现 FSRS 原生扩展 WARN 或 FAIL。
+
+处理：按当前 PHP 版本编译并加载 `fsrs-rs-php`。本地测试可以临时 fallback，但真实使用不应把 fallback 当生产方案。
+
+### sense-mapping.json 放错目录
+
+现象：校验脚本提示找不到 JSON。
+
+处理：把文件放到：
+
+```text
+storage/app/gpt-workflow/downloads/
+```
+
+### validate 失败
+
+现象：校验脚本把文件复制到 `failed/`。
+
+处理：打开同目录的 `.errors.json`，根据错误让 GPT 修正输出。
+
+### 中文显示乱码
+
+现象：命令行中文显示异常。
+
+处理：在 PowerShell 中先运行：
+
+```powershell
+chcp 65001
+```
+
+或使用 Windows Terminal。

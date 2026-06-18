@@ -1,8 +1,37 @@
 @echo off
 set "PROJECT_DIR=%~dp0..\.."
-set "PHP_BIN=php"
+set "PHP_EXE=php"
+set "NODE_EXE=node"
+set "NPM_EXE=npm"
+set "BROWSER_EXE="
+set "APP_URL=http://127.0.0.1:8000"
 set "USER_ID=1"
 set "LANGUAGE=english"
 set "WORKFLOW_DIR=%PROJECT_DIR%\storage\app\gpt-workflow"
 set "INPUT_FILE=%WORKFLOW_DIR%\input\new-material.txt"
-set "LOCAL_APP_URL=http://127.0.0.1:8000"
+
+if /i "%PHP_EXE%"=="php" (
+    where php >nul 2>&1
+    if errorlevel 1 (
+        for /d %%D in ("%LOCALAPPDATA%\Microsoft\WinGet\Packages\PHP.PHP*") do (
+            if exist "%%D\php.exe" (
+                set "PHP_EXE=%%D\php.exe"
+                goto linguacafe_php_found
+            )
+        )
+        for /d %%D in ("%LOCALAPPDATA%\Microsoft\WinGet\Links\PHP*") do (
+            if exist "%%D\php.exe" (
+                set "PHP_EXE=%%D\php.exe"
+                goto linguacafe_php_found
+            )
+        )
+        for /f "delims=" %%P in ('where /r "%LOCALAPPDATA%\Microsoft\WinGet\Packages" php.exe 2^>nul') do (
+            set "PHP_EXE=%%P"
+            goto linguacafe_php_found
+        )
+    )
+)
+:linguacafe_php_found
+
+set "PHP_BIN=%PHP_EXE%"
+set "LOCAL_APP_URL=%APP_URL%"
