@@ -2,7 +2,7 @@
     <v-dialog v-model="value" persistent max-width="600px" height="300px">
         <v-card class="rounded-lg">
             <v-card-title>
-                <v-icon class="mr-2">mdi-lock-reset</v-icon>Change password
+                <v-icon class="mr-2">mdi-lock-reset</v-icon>修改密码
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close"> 
                     <v-icon>mdi-close</v-icon>
@@ -14,14 +14,14 @@
                 <v-form v-model="isFormValid" ref="userForm">
                     <template>
                         <!-- Password -->
-                        <label class="font-weight-bold">New password</label>
+                        <label class="font-weight-bold">新密码</label>
                         <v-text-field
                             v-model="password"
                             type="password"
                             filled
                             dense
                             rounded
-                            placeholder="Password"
+                            placeholder="密码"
                             maxlength="32"
                             style="overflow: hidden;"
                             :rules="[rules.password]"
@@ -30,14 +30,14 @@
                         ></v-text-field>
 
                         <!-- Password confirmation -->
-                        <label class="font-weight-bold">Confirm new password</label>
+                        <label class="font-weight-bold">确认新密码</label>
                         <v-text-field
                             v-model="passwordConfirmation"
                             type="password"
                             filled
                             dense
                             rounded
-                            placeholder="Confirm password"
+                            placeholder="确认密码"
                             maxlength="32"
                             :rules="[rules.passwordMatch]"
                             :disabled="saving"
@@ -65,14 +65,14 @@
                     border="left"
                     dark
                 >
-                    Password changed successfully!
+                    密码已修改成功！
                 </v-alert>
                 
             </v-card-text>
             
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
 
                 <!-- Save button -->
                 <v-btn 
@@ -83,7 +83,7 @@
                     :disabled="!isFormValid || saving || saveResult == 'success'"
                     :loading="saving"
                 >
-                    Change password
+                    修改密码
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -107,13 +107,13 @@
                 rules: {
                     password: value => {
                         if (value.length < 8 || value.length > 32) {
-                            return 'Password must be between 8 and 32 characters.';
+                            return '密码长度必须在 8 到 32 个字符之间。';
                         }
                         
                         return true;
                     },
                     passwordMatch: value => {
-                        return value == this.password || 'Password confirmation does not match the password.';
+                        return value == this.password || '两次输入的密码不一致。';
                     }
                 },
             };

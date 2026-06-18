@@ -26,17 +26,17 @@
         <error-dialog
             v-if="errorDialog.active"
             v-model="errorDialog.active" 
-            content="An error has occurred while deleting the dictionary."
+            content="删除词典时发生错误。"
         />
         
         <!-- Dictionaries list -->
         <div class="d-flex subheader mt-4 mb-4 px-2 ">
-            Dictionaries
+            词典
             <v-spacer/>
             <v-btn rounded dark color="primary" @click="importDialog = true;">
                 <v-icon class="mr-1">mdi-database-plus</v-icon>
-                <span id="import-button-text">Add dictionary</span>
-                <span id="import-button-text-short">Import</span>
+                <span id="import-button-text">添加词典</span>
+                <span id="import-button-text-short">导入</span>
             </v-btn>
         </div>
         <v-card outlined class="rounded-lg pa-2 pb-0 mb-32">
@@ -44,7 +44,7 @@
                 <v-text-field
                     v-model="dictionaryTableFilter"
                     append-icon="mdi-magnify"
-                    label="Search"
+                    label="搜索"
                     filled
                     dense
                     hide-details
@@ -91,7 +91,7 @@
                 <template v-slot:item.actions="{ item }">
                     <v-btn 
                         icon 
-                        title="Edit"
+                        title="编辑"
                         @click="editDictionary(item.id)"
                     >
                         <v-icon>mdi-pencil</v-icon>
@@ -99,7 +99,7 @@
                     <v-btn 
                         v-if="item.name !== 'JMDict'"
                         icon 
-                        title="Delete"
+                        title="删除"
                         color="error"
                         @click="deleteDictionary(item.id, item.name, item.database_table_name)"
                     >
@@ -135,37 +135,37 @@
                 dictionaryTableFilter: '',
                 dictionaryTableHeaders: [
                     {
-                        text: 'Name',
+                        text: '名称',
                         value: 'name',
                         align: 'center',
                     },
                     {
-                        text: 'Records',
+                        text: '记录数',
                         value: 'records',
                         align: 'center',
                     },
                     {
-                        text: 'Database',
+                        text: '数据库表',
                         value: 'database_table_name',
                         align: 'center',
                     },
                     {
-                        text: 'Source',
+                        text: '源语言',
                         value: 'source_language',
                         align: 'center',
                     },
                     {
-                        text: 'Target',
+                        text: '目标语言',
                         value: 'target_language',
                         align: 'center',
                     },
                     {
-                        text: 'Enabled',
+                        text: '启用',
                         value: 'enabled',
                         align: 'center',
                     },
                     {
-                        text: 'Actions',
+                        text: '操作',
                         value: 'actions',
                         align: 'center',
                         width: '110px',

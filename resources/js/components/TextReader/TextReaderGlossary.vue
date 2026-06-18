@@ -44,7 +44,7 @@
 
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded color="primary" @click="close">Close</v-btn>
+                <v-btn rounded color="primary" @click="close">关闭</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>

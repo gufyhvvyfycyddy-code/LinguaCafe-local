@@ -5,12 +5,12 @@
             <v-card-title>
                 <!-- Edit chapter title -->
                 <template v-if="$props.chapterId !== -1">
-                    <v-icon class="mr-2">mdi-text-box-edit</v-icon>Edit chapter
+                    <v-icon class="mr-2">mdi-text-box-edit</v-icon>编辑章节
                 </template>
 
                 <!-- New chapter title -->
                 <template v-if="$props.chapterId == -1">
-                    <v-icon class="mr-2">mdi-text-box-plus</v-icon>Add chapter
+                    <v-icon class="mr-2">mdi-text-box-plus</v-icon>添加章节
                 </template>
 
                 <v-spacer />
@@ -22,7 +22,7 @@
             <!-- Form -->
             <v-card-text>
                 <v-form ref="editChapterForm" v-if="!loading">
-                    <label class="font-weight-bold mt-2">Name</label>
+                    <label class="font-weight-bold mt-2">章节名</label>
                     <v-text-field 
                         ref="chapterName"
                         class="default-font"
@@ -34,7 +34,7 @@
                         :disabled="type !== 'text' || loading"
                     ></v-text-field>
                     
-                    <label class="font-weight-bold mt-2">Text</label>
+                    <label class="font-weight-bold mt-2">文本</label>
                     <v-textarea
                         class="default-font"
                         v-model="text"
@@ -55,7 +55,7 @@
                         type="error"
                         v-if="saveResult == 'error'"
                     >
-                        An error has occurred while saving.
+                        保存时发生错误。
                     </v-alert>
 
                     <v-alert
@@ -64,7 +64,7 @@
                         type="success"
                         v-if="saveResult == 'success'"
                     >
-                        Chapter has been saved successfully.
+                        章节已保存。
                     </v-alert>
 
                     <!-- Subtitle editing is not enabled alert -->
@@ -74,7 +74,7 @@
                         border="left"
                         type="error"
                     >
-                        You cannot edit subtitles yet, it will be implemented in a future update.
+                        目前还不能编辑字幕内容，后续版本会支持。
                     </v-alert>
                 </v-form>
             </v-card-text>
@@ -82,7 +82,7 @@
             <!-- Action buttons -->
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
 
                 <v-btn 
                     rounded 
@@ -92,7 +92,7 @@
                     :disabled="!isFormValid || saving || saveResult == 'success' || type !== 'text'"
                     :loading="saving"
                 >
-                    Save
+                    保存
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -111,12 +111,12 @@
                     chapterName: (value) => {
                         if (!value.length) {
                             this.isFormValid = false;
-                            return 'You must type in a name for the chapter.';
+                            return '请输入章节名。';
                         }
 
                         if (value.length > 128) {
                             this.isFormValid = false;
-                            return 'The chapter name must be below 128 characters.';
+                            return '章节名不能超过 128 个字符。';
                         }
 
                         this.isFormValid = true;

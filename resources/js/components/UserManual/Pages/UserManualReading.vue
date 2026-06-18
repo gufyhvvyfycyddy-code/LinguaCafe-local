@@ -1,59 +1,44 @@
 <template>
     <div id="user-manual-reading" class="ma-4 mb-16">
-        <!-- Library -->
-        <div class="subheader d-flex">Library</div>
+        <div class="subheader d-flex">阅读材料</div>
         <v-card outlined class="rounded-lg pa-4">
-            In LinguaCafe all the texts are arranged into <b>books</b> and <b>chapters</b>. It is just an arbitrary name for them, they can be anything: 
-            books, news articles, podcast transcripts or movie subtitles. You can import and manage your <b>books</b> on the <b>Library</b> page. 
+            LinguaCafe 会把所有文本组织成“书籍”和“章节”。这些名称只是为了方便管理，内容可以是书、新闻文章、播客逐字稿或电影字幕。你可以在“阅读材料”页面导入和管理这些内容。
         </v-card>
 
-        <!-- Reading -->
-        <div class="subheader subheader-margin-top d-flex">Reading</div>
+        <div class="subheader subheader-margin-top d-flex">阅读</div>
         <v-card outlined class="rounded-lg pa-4">
-            When you first start reading a text, all your words will be yellow, which represents new words that you haven't seen before. Click on the words 
-            that you are not familiar with, and select a translation from the dictionary. These words' level will be set to 7, and they will 
-            become green, which represents words that you are currently learning. These words will be highlighted in any text that is imported into your library.
+            第一次阅读文本时，未见过的新词会以黄色显示。点击不熟悉的单词后，可以从词典中选择或填写释义。保存后的单词会进入学习状态，并在之后导入的文本中继续高亮。
 
             <div class="mt-5">
-                Every word has a level, which represents how well you know that word. The closer it is to 0, the better you know it. A word's level can be set manually, 
-                or it will increase automatically by <b>reviewing</b> that word, and eventually it's level will be set to <b>learned</b>.
+                每个单词都有一个等级，用来表示你对它的熟悉程度。数字越接近 0，表示越熟悉。等级可以手动调整，也可以通过复习逐步变化。
             </div>
 
             <div class="mt-5">
-                You can also select multiple words and create <b>phrases</b>. A <b>phrase</b> functions the same way as a word would.
+                你也可以选择多个词创建“短语”。短语在阅读页中的使用方式和单词类似。
             </div>
 
             <div class="mt-5">
-                Click on the <b>Finished reading</b> button when you read the whole <b>chapter</b>. It will set all the new words in the <b>chapter</b> to known,
-                and update your statistics.
+                读完整个章节后，点击“完成阅读”。系统会更新本章阅读统计，并按设置处理新词。
             </div>
         </v-card>
 
-        <!-- Hover vocabulary box -->
-        <div class="subheader subheader-margin-top d-flex">Hover vocabulary box</div>
+        <div class="subheader subheader-margin-top d-flex">悬浮词汇框</div>
         <v-card outlined class="rounded-lg pa-4">
-            <b>Hover vocabulary box</b> is a popup box that appears when you move the cursor over a word. This is the quickest way to retreive translations for a word or phrase.
+            悬浮词汇框会在鼠标移到单词上时出现，用于快速查看单词或短语释义。
             
             <div class="mt-5">
-                It shows 3 types of translations:
+                它会显示几类释义：
                 <ul>
-                    <li>
-                        <v-icon small class="mr-1">mdi-account-edit</v-icon> Translations you added manually.
-                    </li>
-                    <li>
-                        <v-icon small class="mr-1">mdi-list-box</v-icon> Exact matches from every enabled imported dictionary.
-                    </li>
-                    <li>
-                        <v-icon small class="mr-1">mdi-translate</v-icon> DeepL translation.
-                    </li>
+                    <li><v-icon small class="mr-1">mdi-account-edit</v-icon>你手动添加的释义。</li>
+                    <li><v-icon small class="mr-1">mdi-list-box</v-icon>已启用词典中的精确匹配。</li>
+                    <li><v-icon small class="mr-1">mdi-translate</v-icon>DeepL 翻译。</li>
                 </ul>
             </div>
 
-            If you only want to see your manually added translations, you can turn off the <b>Hover vocabulary dictionary search</b> option in the settings.
+            如果只想显示手动添加的释义，可以在设置里关闭悬浮词汇框的词典搜索。
 
             <div class="mt-5">
-                When you move the cursor over a word there is a slight delay before the <b>hover vocabulary box</b> appears. This is done 
-                to increase performance, and to avoid unwanted request to the DeepL server and save monthly limits. You can also adjust this delay in the settings.
+                鼠标移到单词后会有短暂延迟才显示悬浮词汇框，这样可以减少不必要的请求并提升性能。你也可以在设置里调整这个延迟。
             </div>
         </v-card>
     </div>
@@ -86,4 +71,3 @@
         }
     }
 </script>
- 

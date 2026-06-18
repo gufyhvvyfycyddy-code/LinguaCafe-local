@@ -6,7 +6,7 @@
     >
         <!-- Title bar -->
         <v-card-title>
-            <span class="text-h5">Dictionary import</span>
+            <span class="text-h5">导入词典</span>
             <v-spacer></v-spacer>
             <v-btn icon @click="close"> 
                 <v-icon>mdi-close</v-icon>
@@ -19,24 +19,24 @@
                 <!-- Stepper header -->
                 <v-stepper-header>
                     <v-stepper-step :complete="stepperPage > 1" step="1">
-                        Dictionary information
-                        <small>Name, database table, language</small>
+                        词典信息
+                        <small>名称、数据库表、语言</small>
                     </v-stepper-step>
                     <v-divider/>
                     
                     <v-stepper-step :complete="stepperPage > 2" step="2">
-                        Dictionary file
-                        <small>Select the dictionary file</small>
+                        词典文件
+                        <small>选择词典文件</small>
                     </v-stepper-step>
                     <v-divider/>
 
                     <v-stepper-step :complete="stepperPage > 3" step="3">
-                        Overview
-                        <small>Confirm that all data is correct</small>
+                        概览
+                        <small>确认所有数据正确</small>
                     </v-stepper-step>
 
                     <v-stepper-step :complete="stepperPage > 4" step="4">
-                        Finish
+                        完成
                     </v-stepper-step>
                 </v-stepper-header>
 
@@ -45,12 +45,12 @@
                     <v-stepper-content step="1">
                         <div v-if="!configFileLoading">
                             <!-- Source language -->
-                            <label class="font-weight-bold">Source language</label>
+                            <label class="font-weight-bold">源语言</label>
                             <v-select
                                 v-model="dictionary.sourceLanguage"
                                 :items="sourceLanguages"
                                 item-value="name"
-                                placeholder="Source language"
+                                placeholder="源语言"
                                 dense
                                 filled
                                 rounded
@@ -67,12 +67,12 @@
                             </v-select>
 
                             <!-- Target language -->
-                            <label class="font-weight-bold">Target language</label>
+                            <label class="font-weight-bold">目标语言</label>
                             <v-select
                                 v-model="dictionary.targetLanguage"
                                 :items="targetLanguages"
                                 item-value="name"
-                                placeholder="Target language"
+                                placeholder="目标语言"
                                 dense
                                 filled
                                 rounded
@@ -89,13 +89,13 @@
                             </v-select>
 
                             <!-- Dictionary name -->
-                            <label class="font-weight-bold">Dictionary name</label>
+                            <label class="font-weight-bold">词典名称</label>
                             <v-text-field 
                                 v-model="dictionary.name"
                                 filled
                                 dense
                                 rounded
-                                placeholder="Dictionary name"
+                                placeholder="词典名称"
                                 :rules="rules.dictionaryName"
                                 @keyup="updateDatabaseName"
                                 @change="updateDatabaseName"
@@ -103,7 +103,7 @@
                             ></v-text-field>
                             
                             <!-- Database table name -->
-                            <label class="font-weight-bold">Database table name</label>
+                            <label class="font-weight-bold">数据库表名</label>
                             <v-text-field 
                                 v-model="dictionary.databaseName"
                                 class="mb-3"
@@ -112,7 +112,7 @@
                                 dense
                                 rounded
                                 persistent-hint
-                                hint="Can only contain lowercase letters, number and underscore."
+                                hint="只能包含小写字母、数字和下划线。"
                                 placeholder="database_name"
                                 :prefix="dictionary.databasePrefix"
                                 :rules="rules.databaseName"
@@ -120,7 +120,7 @@
                             ></v-text-field>
 
                             <!-- Display color -->
-                            <label class="font-weight-bold">Display color</label>
+                            <label class="font-weight-bold">显示颜色</label>
                             <v-menu
                                 v-model="colorPicker"
                                 width="290px"
@@ -153,9 +153,8 @@
                             border="left"
                             dark
                         >
-                            You can import a custom dictionary from a .csv file. It has to have 2 columns, the first containing a word
-                            and the second containing the translations. You can provide multiple translations for a single word by 
-                            separating them with a semicolon ";" character. Example:<br><br>
+                            你可以从 .csv 文件导入自定义词典。文件必须有两列：第一列是单词，第二列是翻译。
+                            单个单词可以用英文分号 ";" 分隔多个翻译。例如：<br><br>
 
                             Word|Translation<br>
                             å gjøre|to do;to make<br>
@@ -163,34 +162,34 @@
                             å elske|to love
                         </v-alert>
                         
-                        <label class="font-weight-bold">Header</label>
+                        <label class="font-weight-bold">表头</label>
                         <v-switch
                             v-model="dictionary.csvSkipHeader"
                             class="mt-0"
                             color="primary"
-                            label="Skip first line"
+                            label="跳过第一行"
                             @change="fileInputChange"
                         ></v-switch>
 
-                        <label class="font-weight-bold">Delimiter character</label>
+                        <label class="font-weight-bold">分隔符</label>
                         <v-text-field 
                             v-model="dictionary.csvDelimiter"
                             filled
                             dense
                             rounded
-                            placeholder="Delimiter character"
+                            placeholder="分隔符"
                             @change="fileInputChange"
                             maxlength="1"
                             :rules="rules.csvDelimiter"
                         ></v-text-field>
 
-                        <label class="font-weight-bold">Dictionary file</label>
+                        <label class="font-weight-bold">词典文件</label>
                         <v-file-input
                             v-model="dictionary.file"
                             filled
                             dense
                             rounded
-                            placeholder="Select a file"
+                            placeholder="选择文件"
                             accept=".csv"
                             prepend-icon="mdi-file-delimited"
                             @change="fileInputChange"
@@ -203,7 +202,7 @@
                             border="left"
                             dark
                         >
-                            There has been an error reading the file. Please make sure it follows the correct format and try again.
+                            读取文件时发生错误。请确认文件格式正确后重试。
                         </v-alert>
                         <v-alert
                             v-if="dictionary.file && !fileTestLoading && !fileTestError"
@@ -213,17 +212,17 @@
                             border="left"
                             dark
                         >
-                            The file has been tested without any errors. It contains {{ fileRecordCount }} records.
+                            文件检测通过，共包含 {{ fileRecordCount }} 条记录。
                         </v-alert>
                     </v-stepper-content>
                     
                     <!-- Step 3: overview -->
                     <v-stepper-content step="3">
-                        <label class="font-weight-bold">Overview</label>
+                        <label class="font-weight-bold">概览</label>
                         <v-simple-table class="border no-hover rounded-lg" v-if="dictionary.file">
                             <tbody>
                                 <tr>
-                                    <td class="font-weight-bold">Source language:</td>
+                                    <td class="font-weight-bold">源语言：</td>
                                     <td>
                                         <img 
                                             :src="'/images/flags/' + dictionary.sourceLanguage.toLowerCase() + '.png'" 
@@ -235,7 +234,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">Target language:</td>
+                                    <td class="font-weight-bold">目标语言：</td>
                                     <td>
                                         <img 
                                             :src="'/images/flags/' + dictionary.targetLanguage.toLowerCase() + '.png'" 
@@ -247,11 +246,11 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">Dictionary name:</td>
+                                    <td class="font-weight-bold">词典名称：</td>
                                     <td>{{ dictionary.name }} ({{ dictionary.databasePrefix + dictionary.databaseName }})</td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">Color:</td>
+                                    <td class="font-weight-bold">颜色：</td>
                                     <td>
                                         <v-card
                                             class="border"
@@ -263,26 +262,26 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">File:</td>
+                                    <td class="font-weight-bold">文件：</td>
                                     <td>{{ dictionary.file.name }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">Skip csv header:</td>
-                                    <td>{{ dictionary.csvSkipHeader ? 'Yes' : 'No' }}</td>
+                                    <td class="font-weight-bold">跳过 CSV 表头：</td>
+                                    <td>{{ dictionary.csvSkipHeader ? '是' : '否' }}</td>
                                 </tr>
                                 <tr>
-                                    <td class="font-weight-bold">Csv delimiter character:</td>
+                                    <td class="font-weight-bold">CSV 分隔符：</td>
                                     <td>{{ dictionary.csvDelimiter }}</td>
                                 </tr>
                             </tbody>
                         </v-simple-table>
 
-                        <label class="font-weight-bold mt-4">Sample</label>
+                        <label class="font-weight-bold mt-4">示例</label>
                         <v-simple-table dense class="no-hover border rounded-lg">
                             <thead>
                                 <tr>
-                                    <th class="text-center">Word</th>
-                                    <th class="text-center">Translation</th>
+                                    <th class="text-center">单词</th>
+                                    <th class="text-center">翻译</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -304,7 +303,7 @@
                                 border="left"
                                 dark
                             >
-                                Dictionary has been successfully imported.
+                                词典已成功导入。
                             </v-alert>
                         </div>
 
@@ -316,7 +315,7 @@
                                 border="left"
                                 dark
                             >
-                                An error has occurred while importing the dictionary.
+                                导入词典时发生错误。
                             </v-alert>
                         </div>
                         
@@ -334,7 +333,7 @@
                 rounded 
                 text 
                 @click="backToDictionaries"
-            >Back</v-btn>
+            >返回</v-btn>
 
             <v-btn
                 v-if="(stepperPage > 1 && stepperPage < 4) || (stepperPage == 4 && importResult !== 'success')"
@@ -342,7 +341,7 @@
                 text 
                 @click="stepperPage --;"
             >
-                Back
+                返回
             </v-btn>
             <v-btn
                 v-if="stepperPage == 4 && importResult == 'success'"
@@ -350,7 +349,7 @@
                 text 
                 @click="close"
             >
-                Close
+                关闭
             </v-btn>
             <v-btn
                 v-if="stepperPage < 3"
@@ -362,7 +361,7 @@
                 :loading="stepperPage == 2 && fileTestLoading"
                 @click="stepperPage ++;"
             >
-                Continue
+                继续
             </v-btn>
 
             <v-btn
@@ -374,7 +373,7 @@
                 :loading="importing"
                 :disabled="importing"
             >
-                Import
+                导入
             </v-btn>
         </v-card-actions>
     </v-card>

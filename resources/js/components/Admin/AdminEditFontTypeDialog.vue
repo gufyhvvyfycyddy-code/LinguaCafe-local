@@ -5,12 +5,12 @@
             <v-card-title>
                 <!-- Upload font title -->
                 <template v-if="$props.id === -1">
-                    <v-icon class="mr-2">mdi-upload</v-icon>Upload font
+                    <v-icon class="mr-2">mdi-upload</v-icon>上传字体
                 </template>
 
                 <!-- Edit font title -->
                 <template v-else>
-                    <v-icon class="mr-2">mdi-pencil</v-icon>Edit font
+                    <v-icon class="mr-2">mdi-pencil</v-icon>编辑字体
                 </template>
 
                 <!-- Close button -->
@@ -24,7 +24,7 @@
             <v-card-text>
                 <v-form ref="fontForm" v-if="saveResult !== 'success'">
                     <!-- Font file -->
-                    <label class="font-weight-bold" v-if="$props.id === -1">Font file</label><br>
+                    <label class="font-weight-bold" v-if="$props.id === -1">字体文件</label><br>
                     <v-file-input
                         v-if="$props.id === -1"
                         v-model="fontFile"
@@ -33,7 +33,7 @@
                         rounded
                         clearable
                         accept=".otf,.ttf,.woff,.woff2"
-                        placeholder="Font file"
+                        placeholder="字体文件"
                         prepend-icon="mdi-file"
                         :disabled="saving"
                         :rules="[rules.fontFileRule]"
@@ -41,20 +41,20 @@
                     ></v-file-input>
 
                     <!-- Font name -->
-                    <label class="font-weight-bold">Name</label>
+                    <label class="font-weight-bold">名称</label>
                     <v-text-field 
                         v-model="name"
                         filled
                         dense
                         rounded
-                        placeholder="Font name"
+                        placeholder="字体名称"
                         :disabled="$props.default || saving"
                         :rules="[rules.fontName]"
                         @keyup="validateForm"
                     ></v-text-field>
 
                     <!-- Font languages -->
-                    <label class="font-weight-bold d-flex">Languages</label>
+                    <label class="font-weight-bold d-flex">语言</label>
                     <div class="d-flex flex-wrap">
                         <v-checkbox 
                             v-for="(language, index) in languages"
@@ -78,7 +78,7 @@
                     border="left"
                     dark
                 >
-                    Font type has been {{ $props.id === -1 ? 'uploaded' : 'saved'  }} successfully.
+                    字体已成功{{ $props.id === -1 ? '上传' : '保存'  }}。
                 </v-alert>
             </v-card-text>
 
@@ -93,14 +93,14 @@
                     border="left"
                     dark
                 >
-                    An error has occured while {{ $props.id === -1 ? 'uploading' : 'saving'  }} the font type.
+                    {{ $props.id === -1 ? '上传' : '保存'  }}字体时发生错误。
                 </v-alert>
 
                 <!-- Select all checkbox -->
                 <v-checkbox 
                     v-if="saveResult !== 'success'"
                     class="font-weight-normal"
-                    :label="$vuetify.breakpoint.smAndUp ? 'Select all' : 'All'"
+                    :label="$vuetify.breakpoint.smAndUp ? '全选' : '全部'"
                     hide-details
                     dense
                     @change="selectAllChanged"
@@ -117,11 +117,11 @@
                     :disabled="saving"
                     @click="close" 
                 >
-                    Cancel
+                    取消
                 </v-btn>
                 
                 <!-- Close button -->
-                <v-btn rounded text @click="close" v-if="saveResult === 'success'">Close</v-btn>
+                <v-btn rounded text @click="close" v-if="saveResult === 'success'">关闭</v-btn>
 
                 <!-- Upload button -->
                 <v-btn 
@@ -134,7 +134,7 @@
                     @click="uploadFont"
                 >
                     <v-icon class="mr-1">mdi-upload</v-icon>
-                    Upload
+                    上传
                 </v-btn>
 
                 <!-- Save button -->
@@ -147,7 +147,7 @@
                     :disabled="$props.default || !isFormValid || saving"
                     @click="updateFont"
                 >
-                    Save
+                    保存
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -177,24 +177,24 @@
                 rules: {
                     fontFileRule: (value) => {
                         if (value === null || value === undefined) {
-                            return 'You must select a file.';
+                            return '必须选择一个文件。';
                         }
 
                         if (value.name.length > 128) {
-                            return 'File name must be below 128 characters.';
+                            return '文件名必须少于 128 个字符。';
                         }
                         
                         let extension = value.name.split('.');
                         extension = extension[extension.length - 1];
                         if (!["otf", "ttf", "woff", "woff2"].includes(extension)) {
-                            return 'The selected file must a font file(.otf, .ttf, .woff, .woff2).';
+                            return '请选择字体文件（.otf、.ttf、.woff、.woff2）。';
                         }
 
                         return true;
                     },
                     fontName: value => {
                         if (value.length < 2 || value.length > 128) {
-                            return 'Font name must be between 2 and 128 characters.';
+                            return '字体名称长度必须在 2 到 128 个字符之间。';
                         }
                         
                         return true;
@@ -300,4 +300,3 @@
         }
     }
 </script>
-

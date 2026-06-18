@@ -6,7 +6,7 @@
             class="rounded-lg"
         >
             <v-card-title>
-                <span class="text-h5">Chapters</span>
+                <span class="text-h5">章节</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -16,12 +16,12 @@
                     <v-simple-table class="book-info-table no-hover pb-4 mx-auto">
                         <thead>
                             <tr>
-                                <th class="text-center">Name</th>
-                                <th class="text-center">Words</th>
-                                <th class="text-center">Unique</th>
-                                <th class="text-center">Highlighted</th>
-                                <th class="text-center">New</th>
-                                <th class="text-center">Read</th>
+                                <th class="text-center">名称</th>
+                                <th class="text-center">词数</th>
+                                <th class="text-center">唯一词</th>
+                                <th class="text-center">高亮词</th>
+                                <th class="text-center">新词</th>
+                                <th class="text-center">阅读</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -40,7 +40,7 @@
                                         color="primary"
                                         width="80px"
                                         :to="'/chapters/read/' + chapter.id"
-                                    >Read</v-btn>
+                                    >阅读</v-btn>
                                 </td>
                             </tr>
                         </tbody>
@@ -49,7 +49,7 @@
 
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded color="primary" @click="close">Close</v-btn>
+                <v-btn rounded color="primary" @click="close">关闭</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>

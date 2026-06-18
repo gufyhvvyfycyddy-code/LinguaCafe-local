@@ -3,7 +3,7 @@
         <v-card class="rounded-lg" :loading="installing">
             <v-card-title>
                 <v-icon class="mr-2">mdi-download</v-icon>
-                <span class="text-h5">Install language</span>
+                <span class="text-h5">安装语言</span>
                 
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close" :disabled="installing">
@@ -14,7 +14,7 @@
             <v-card-text class="pt-4 pb-6">
                 <!-- Install confirmation message -->
                 <template v-if="!installing && installResult !== 'success'">
-                    Do you want to install {{ $props.language }} language? It will require internet connection, and can take several minutes.
+                    确定要安装 {{ $props.language }} 语言吗？这需要联网，并且可能需要几分钟。
                 </template>
 
                 <!-- Success message -->
@@ -26,7 +26,7 @@
                     type="success"
                     border="left"
                 >
-                    {{ $props.language }} has been successfully installed.
+                    {{ $props.language }} 已成功安装。
                     <div class="w-full d-flex">
                         <v-spacer />
                         <v-btn 
@@ -37,7 +37,7 @@
                             color="foreground" 
                             @click="selectNewLanguage" 
                         >
-                            Switch to {{ $props.language }}
+                            切换到 {{ $props.language }}
                         </v-btn>
                     </div>
                 </v-alert>
@@ -51,12 +51,12 @@
                     type="error"
                     border="left"
                 >
-                    An error has occurred while installing the language.
+                    安装语言时发生错误。
                 </v-alert>
 
                 <!-- Installation in progress message -->
                 <template v-if="installing">
-                    {{ $props.language }} is being installed, it can take several minutes...
+                    正在安装 {{ $props.language }}，可能需要几分钟...
                 </template>
             </v-card-text>
 
@@ -65,18 +65,18 @@
 
                 <!-- Cancel button -->
                 <v-btn rounded text @click="close" :disabled="installing" v-if="installResult !== 'success'">
-                    Cancel
+                    取消
                 </v-btn>
                 
                 <!-- Close button -->
                 <v-btn rounded text @click="close" :disabled="installing" v-if="installResult === 'success'">
-                    Close
+                    关闭
                 </v-btn>
                 
                 <!-- Install button -->
                 <v-btn rounded text @click="install" :disabled="installing" v-if="installResult !== 'success'">
                     <v-icon class="mr-1">mdi-download</v-icon>
-                    Install
+                    安装
                 </v-btn>
             </v-card-actions>
         </v-card>

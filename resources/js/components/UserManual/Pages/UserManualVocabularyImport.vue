@@ -1,48 +1,31 @@
 <template>
     <div id="user-manual-vocabulary-import" class="ma-4 mb-16">
-        <!-- Vocabulary import -->
-        <div class="subheader d-flex">Vocabulary import</div>
+        <div class="subheader d-flex">词汇导入</div>
         <v-card outlined class="rounded-lg pa-4">
-            If you have a list of words that you already know before you started using LinguaCafe, you can import them from a .csv file. 
+            如果你在使用 LinguaCafe 前已经认识一批单词，可以通过 .csv 文件导入。
             
             <div class="mt-5">
-                To import words, go to the <b>Vocabulary</b> page, select the <b>Data</b> dropdown menu, and inside that click on the <b>Import</b> button.
-                On the import dialog you can select your .csv file and a few options. If the <b>Only update</b> option is enabled, no new words will be added to 
-                the system, this enables you to only update fields for words that you have already encountered in LinguaCafe.
+                导入路径：进入“词汇”页面，打开“数据”菜单，然后点击“导入”。在导入弹窗中选择 .csv 文件并设置选项。如果启用“只更新已有词汇”，系统不会新增单词，只会更新已经在 LinguaCafe 中出现过的词。
             </div>
 
             <div class="mt-5">
-                The .csv file can have these columns, in this order: 
+                .csv 文件可以按顺序包含这些列：
                 <ul>
-                    <li>
-                        Word: required, must not contain any spaces.
-                    </li>
-                    <li>
-                        Translation: optional, can be left empty.
-                    </li>
-                    <li>
-                        Lemma: optional, can be left empty.
-                    </li>
-                    <li>
-                        Reading: optional, can be left empty.
-                    </li>
-                    <li>
-                        Lemma reading: optional, can be left empty.
-                    </li>
-                    <li>
-                        Level: optional, cannot be left empty. Accepted values: new, ignored, learned, 1, 2, 3, 4, 5, 6, 7.
-                    </li>
+                    <li>Word：必填，不能包含空格。</li>
+                    <li>Translation：可选，可留空。</li>
+                    <li>Lemma：可选，可留空。</li>
+                    <li>Reading：可选，可留空。</li>
+                    <li>Lemma reading：可选，可留空。</li>
+                    <li>Level：可选，但如果提供该列则不能留空。可用值：new、ignored、learned、1、2、3、4、5、6、7。</li>
                 </ul>
 
-                At least the first column must be present in the .csv file. Any further columns can be added to it in the order 
-                showed above. If a column is not provided, those fields will not be changed in the database. However if a column 
-                is provided, and it's left empty in a row, it will be overwritten in the database with an empty value.
+                文件至少需要第一列。后续列可以按上面的顺序追加；没有提供的列不会更新数据库。如果提供了某一列但某一行留空，该字段会被更新为空值。
 
                 <div class="my-5">
-                    <v-icon large class="mr-2" color="warning">mdi-alert</v-icon> Changes after importing cannot be reverted!
+                    <v-icon large class="mr-2" color="warning">mdi-alert</v-icon>导入后的修改无法撤销。
                 </div>
 
-                After the import is complete, you will see a message about the number of created, updated and rejected words.
+                导入完成后，页面会显示创建、更新和被拒绝的词数。
             </div>
         </v-card>
     </div>
@@ -67,4 +50,3 @@
         }
     }
 </script>
- 

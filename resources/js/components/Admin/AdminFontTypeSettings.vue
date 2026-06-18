@@ -22,12 +22,12 @@
 
         <!-- Title subheader -->
         <div class="d-flex subheader mt-4 mb-4 px-2 ">
-            Fonts
+            字体
 
             <v-spacer />
             <v-btn rounded depressed color="primary" :disabled="!supportedlanguages.length" @click="uploadFont">
                 <v-icon class="mr-1">mdi-upload</v-icon>
-                Upload font
+                上传字体
             </v-btn>
         </div>
 
@@ -36,11 +36,11 @@
             class="ma-4 mb-0 no-hover border"
             :headers="[
                 {
-                    text: 'Font',
+                    text: '字体',
                     value: 'name',
                 },
                 {
-                    text: 'Actions',
+                    text: '操作',
                     value: 'actions',
                     sortable: false,
                     width: '120px',

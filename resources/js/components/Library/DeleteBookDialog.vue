@@ -9,21 +9,21 @@
             ></v-progress-linear>
             <v-card-title>
                 <v-icon large class="mr-2" color="error">mdi-alert-circle</v-icon>
-                <span class="text-h5">Delete book</span>
+                <span class="text-h5">删除书籍</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
             <v-card-text class="pt-4 pb-6">
-                Do you want to delete this book called {{ $props.bookName }}?
+                确定要删除《{{ $props.bookName }}》吗？
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
                 <v-btn rounded :dark="deletionEnabledDelay > 100" color="error" @click="confirm" :disabled="deletionEnabledDelay < 101">
                     <v-icon class="mr-2" color="white">mdi-delete</v-icon>
-                    Delete
+                    删除
                 </v-btn>
             </v-card-actions>
         </v-card>

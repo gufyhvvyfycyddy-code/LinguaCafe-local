@@ -3,7 +3,7 @@
         <v-card class="rounded-lg" :loading="deleting">
             <!-- Card title -->
             <v-card-title>
-                <v-icon color="error" class="mr-2">mdi-delete</v-icon>Delete font
+                <v-icon color="error" class="mr-2">mdi-delete</v-icon>删除字体
 
                 <!-- Close button -->
                 <v-spacer />
@@ -14,7 +14,7 @@
 
             <!-- Card content-->
             <v-card-text>
-                Do you want to delete this font type?
+                确定要删除这个字体吗？
 
                 <!-- Error message -->
                 <v-alert
@@ -25,7 +25,7 @@
                     border="left"
                     dark
                 >
-                    An error has occured while deleting the font type.
+                    删除字体时发生错误。
                 </v-alert>
             </v-card-text>
 
@@ -40,7 +40,7 @@
                     :disabled="deleting"
                     @click="close" 
                 >
-                    Cancel
+                    取消
                 </v-btn>
 
                 <!-- Delete button -->
@@ -52,7 +52,7 @@
                     @click="deleteFont" 
                 >
                     <v-icon>mdi-delete</v-icon>
-                    Delete
+                    删除
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -94,4 +94,3 @@
         }
     }
 </script>
-

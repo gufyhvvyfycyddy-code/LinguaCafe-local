@@ -5,12 +5,12 @@
             <v-card-title>
                 <!-- Edit book title -->
                 <template v-if="$props.bookId !== -1">
-                    <v-icon class="mr-2">mdi-folder-edit</v-icon>Edit book
+                    <v-icon class="mr-2">mdi-folder-edit</v-icon>编辑书籍
                 </template>
 
                 <!-- New book title -->
                 <template v-if="$props.bookId == -1">
-                    <v-icon class="mr-2">mdi-folder-plus</v-icon>Add book
+                    <v-icon class="mr-2">mdi-folder-plus</v-icon>添加书籍
                 </template>
 
                 <v-spacer />
@@ -22,7 +22,7 @@
             <!-- Form -->
             <v-card-text>
                 <v-form ref="bookForm">
-                    <label class="font-weight-bold">Book name</label>
+                    <label class="font-weight-bold">书名</label>
                     <v-text-field 
                         v-model="name"
                         class="default-font"
@@ -30,14 +30,14 @@
                         filled
                         dense
                         rounded
-                        placeholder="Name"
+                        placeholder="书名"
                         :rules="[rules.name]"
                         maxlength="128"
                         @keyup="validateForm"
                     ></v-text-field>
                     
                     
-                    <label class="font-weight-bold mt-2" v-show="editImage">Book cover image</label><br>
+                    <label class="font-weight-bold mt-2" v-show="editImage">书籍封面</label><br>
                     <v-file-input
                         v-show="editImage"
                         v-model="image"
@@ -47,7 +47,7 @@
                         clearable
                         ref="image"
                         accept=".jpg,.jpeg,.png,.webp"
-                        placeholder="Cover image"
+                        placeholder="封面图片"
                         prepend-icon="mdi-image"
                         @change="imageChanged"
                     ></v-file-input>
@@ -69,7 +69,7 @@
                                 @click="uploadImageButton"
                             >
                                 
-                                <h4><v-icon large>mdi-file-upload</v-icon> Change image</h4>
+                                <h4><v-icon large>mdi-file-upload</v-icon> 更换图片</h4>
                             </div>
                         </div>
                     </template>
@@ -80,7 +80,7 @@
                         type="error"
                         v-if="saveResult == 'error'"
                     >
-                        An error has occurred while saving.
+                        保存时发生错误。
                     </v-alert>
 
                     <v-alert
@@ -89,7 +89,7 @@
                         type="success"
                         v-if="saveResult == 'success'"
                     >
-                        Chapter has been saved successfully.
+                        书籍已保存。
                     </v-alert>
                 </v-form>
             </v-card-text>
@@ -97,7 +97,7 @@
             <!-- Action buttons -->
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
 
                 <v-btn 
                     rounded 
@@ -107,7 +107,7 @@
                     :disabled="!isFormValid || saving || saveResult == 'success'"
                     :loading="saving"
                 >
-                    Save
+                    保存
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -128,11 +128,11 @@
                 rules: {
                     name: (value) => {
                         if (value === null || !value.length) {
-                            return 'You must type in a name.'
+                            return '请输入书名。'
                         }
 
                         if (value.length > 128) {
-                            return 'Book name must be below 128 characters..'
+                            return '书名不能超过 128 个字符。'
                         }
 
                         return true;

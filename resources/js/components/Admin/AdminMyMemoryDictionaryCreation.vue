@@ -3,7 +3,7 @@
         <!-- Title -->
         <v-card-title>
             <v-icon class="mr-2">mdi-file-edit</v-icon>
-            <span class="text-h5">Edit dictionary</span>
+            <span class="text-h5">创建 MyMemory 词典</span>
             <v-spacer></v-spacer>
             <v-btn icon @click="close">
                 <v-icon>mdi-close</v-icon>
@@ -47,7 +47,7 @@
                     :items="supportedLanguages"
                     item-value="name"
                     item-name="name"
-                    placeholder="Language"
+                    placeholder="语言"
                     dense
                     filled
                     rounded
@@ -84,7 +84,7 @@
                     :items="supportedLanguages"
                     item-value="name"
                     item-name="name"
-                    placeholder="Language"
+                    placeholder="语言"
                     dense
                     filled
                     rounded
@@ -155,7 +155,7 @@
 
             <!-- Buttons before successfull save -->
             <template v-if="createResult !== 'success'">
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
                 <v-btn 
                     rounded
                     depressed 
@@ -163,12 +163,12 @@
                     :loading="createResult === 'saving'" 
                     :disabled="createResult === 'saving' || !isFormValid || loading"
                     @click="createMyMemoryDictionary"
-                >Create</v-btn>
+                >创建</v-btn>
             </template>
 
             <!-- Buttons after successfull save -->
             <template v-if="createResult === 'success'">
-                <v-btn rounded text @click="close">Close</v-btn>
+                <v-btn rounded text @click="close">关闭</v-btn>
             </template>
         </v-card-actions>
     </v-card>

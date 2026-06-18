@@ -153,7 +153,7 @@
 
                     <!-- Auto add cards label -->
                     <label class="font-weight-bold mt-4 mb-0">
-                        Auto add cards while reading
+                        阅读时自动添加卡片
                         
                         <!-- Auto add cards info box -->
                         <v-menu offset-y nudge-top="-12px">
@@ -161,7 +161,7 @@
                                 <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                             </template>
                             <v-card outlined class="rounded-lg pa-4" width="320px">
-                                Your words and phrases will be sent to Anki automatically when you highlight them (set their level to 1-7).
+                                当你高亮单词或短语（将等级设为 1-7）时，它们会自动发送到 Anki。
                             </v-card>
                         </v-menu>
                     </label>
@@ -173,12 +173,12 @@
                         color="primary"
                         hide-hints
                         dense
-                        label="Auto add cards"
+                        label="自动添加卡片"
                     ></v-switch>
 
                     <!-- Update existing cards label -->
                     <label class="font-weight-bold mt-4 mb-0">
-                        Update existing cards
+                        更新已有卡片
                         
                         <!-- Update existing cards info box -->
                         <v-menu offset-y nudge-top="-12px">
@@ -186,7 +186,7 @@
                                 <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                             </template>
                             <v-card outlined class="rounded-lg pa-4" width="320px">
-                                If you send a word to Anki, and it already exists, then the translation, reading and example sentence fields will be updated.
+                                如果发送到 Anki 的单词已存在，会更新翻译、读音和例句字段。
                             </v-card>
                         </v-menu>
                     </label>
@@ -198,12 +198,12 @@
                         color="primary"
                         hide-hints
                         dense
-                        label="Update existing cards"
+                        label="更新已有卡片"
                     ></v-switch>
                     
                     <!-- Show notifications label -->
                     <label class="font-weight-bold mt-4 mb-0">
-                        Show notifications
+                        显示通知
                         
                         <!-- Show notifications info box -->
                         <v-menu offset-y nudge-top="-12px">
@@ -211,7 +211,7 @@
                                 <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                             </template>
                             <v-card outlined class="rounded-lg pa-4" width="320px">
-                                There will be a notification displayed on the screen when a word or phrase is sent to Anki with a success or error message.
+                                单词或短语发送到 Anki 后，屏幕上会显示成功或错误通知。
                             </v-card>
                         </v-menu>
                     </label>
@@ -223,7 +223,7 @@
                         color="primary"
                         hide-hints
                         dense
-                        label="Show notifications"
+                        label="显示通知"
                     ></v-switch>
                 </v-card-text>
             </v-card>
@@ -233,14 +233,14 @@
             <v-card outlined class="rounded-lg pa-4 pt-0">
                 <v-card-text id="jellyfin-card-text">
                     <label class="font-weight-bold mt-4 mb-0">
-                        Enable Jellyfin
+                        启用 Jellyfin
 
                         <v-menu offset-y nudge-top="-12px">
                             <template v-slot:activator="{ on, attrs }">
                                 <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                             </template>
                             <v-card outlined class="rounded-lg pa-4" width="320px">
-                            You may want to disable Jellyfin if hosting LinguaCafe for multiple users.
+                            如果 LinguaCafe 面向多用户托管，可能需要关闭 Jellyfin。
                             </v-card>
                         </v-menu>
                     </label>
@@ -251,17 +251,17 @@
                         color="primary"
                         hide-hints
                         dense
-                        label="Enable Jellyfin"
+                        label="启用 Jellyfin"
                         :disabled="saving || characterLimitLoading"
                     ></v-switch>
 
-                    <label class="font-weight-bold">Jellyfin host address</label>
+                    <label class="font-weight-bold">Jellyfin 主机地址</label>
                     <v-text-field
                         v-model="settings.jellyfinHost"
                         filled
                         dense
                         rounded
-                        placeholder="Jellyfin host address"
+                        placeholder="Jellyfin 主机地址"
                         :disabled="saving || characterLimitLoading"
                         :rules="[rules.notEmpty]"
                     ></v-text-field>
@@ -288,7 +288,7 @@
                 border="left"
                 dark
             >
-                An error has occurred while saving API settings.
+                    保存 API 设置时发生错误。
             </v-alert>
 
             <!-- Save button -->
@@ -302,7 +302,7 @@
                     :disabled="saving || characterLimitLoading || !isFormValid"
                     :loading="saving || characterLimitLoading"
                 >
-                    Save settings
+                    保存设置
                 </v-btn>
             </div>
         </v-form>

@@ -62,7 +62,7 @@
         >
             <!-- Title bar -->
             <v-card-title>
-                <span class="text-h5">Dictionary import</span>
+                <span class="text-h5">导入词典</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close"> 
                     <v-icon>mdi-close</v-icon>
@@ -78,27 +78,27 @@
                     class="mt-0"
                 >
                     <v-radio
-                        label="Supported dictionary file from the user manual"
+                        label="用户手册中的受支持词典文件"
                         value="supported"
                     ></v-radio>
                     <v-radio
-                        label="Custom .csv dictionary file"
+                        label="自定义 .csv 词典文件"
                         value="custom"
                     ></v-radio>
                     <v-radio
-                        label="DeepL dictionary"
+                        label="DeepL 词典"
                         value="deepl"
                     ></v-radio>
                     <v-radio
-                        label="MyMemory dictionary"
+                        label="MyMemory 词典"
                         value="mymemory"
                     ></v-radio>
                     <v-radio
-                        label="LibreTranslate dictionary"
+                        label="LibreTranslate 词典"
                         value="libretranslate"
                     ></v-radio>
                     <v-radio
-                        label="Custom API dictionary"
+                        label="自定义 API 词典"
                         value="customapi"
                     ></v-radio>
                 </v-radio-group>
@@ -110,7 +110,7 @@
                     depressed
                     color="primary"
                     @click="selectDictionary"
-                >Continue</v-btn>
+                >继续</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>

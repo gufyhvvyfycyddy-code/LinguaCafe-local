@@ -6,7 +6,7 @@
                 <v-text-field
                     v-model="booksTextFilter"
                     append-icon="mdi-magnify"
-                    label="Search"
+                    label="搜索"
                     filled
                     dense
                     hide-details
@@ -19,25 +19,25 @@
                 class="ma-4 mb-0 no-hover"
                 :headers="[
                     {
-                        text: 'Cover',
+                        text: '封面',
                         value: 'cover_image',
                         align: 'center',
                         width: '140px',
                         sortable: false,
                     },
                     {
-                        text: 'Title',
+                        text: '标题',
                         value: 'name',
                         align: 'left',
                     },
                     {
-                        text: 'Length',
+                        text: '词数',
                         value: 'word_count',
                         align: 'center',
                         width: '140px',
                     },
                     {
-                        text: 'Actions',
+                        text: '操作',
                         value: 'actions',
                         align: 'center',
                         width: '140px',
@@ -66,16 +66,16 @@
                 
                 <!-- Actions -->
                 <template v-slot:item.actions="{ item }">
-                    <v-btn icon title="Open book" @click="openBook(item.id)"><v-icon>mdi-book-open</v-icon></v-btn>
+                    <v-btn icon title="打开书籍" @click="openBook(item.id)"><v-icon>mdi-book-open</v-icon></v-btn>
                     <v-menu content-class="book-menu" rounded offset-y bottom left nudge-top="-5">
                         <template v-slot:activator="{ on, attrs }">
-                            <v-btn icon v-bind="attrs" v-on="on"  title="Actions">
+                            <v-btn icon v-bind="attrs" v-on="on"  title="操作">
                                 <v-icon>mdi-dots-horizontal</v-icon>
                             </v-btn>
                         </template>
-                        <v-btn class="menu-button" tile color="white" @click="showEditBookDialog(item)">Edit</v-btn>
-                        <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog(item)">Review</v-btn>
-                        <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog(item)">Delete</v-btn>
+                        <v-btn class="menu-button" tile color="white" @click="showEditBookDialog(item)">编辑</v-btn>
+                        <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog(item)">复习</v-btn>
+                        <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog(item)">删除</v-btn>
                     </v-menu>
                 </template>
 

@@ -7,7 +7,7 @@
     >
         <!-- Title bar -->
         <v-card-title>
-            <span class="text-h5">Dictionary import</span>
+            <span class="text-h5">导入词典</span>
             <v-spacer></v-spacer>
             <v-btn icon @click="close" :disabled="importing"> 
                 <v-icon>mdi-close</v-icon>
@@ -21,17 +21,17 @@
                 <!-- Stepper header -->
                 <v-stepper-header>
                     <v-stepper-step :complete="stepperPage > 1" step="1" :color="stepperPage > 1 ? 'success' : 'primary'">
-                        Upload dictionary file
+                        上传词典文件
                     </v-stepper-step>
                     <v-divider/>
                     
                     <v-stepper-step :complete="stepperPage > 2" step="2" :color="stepperPage > 2 ? 'success' : 'primary'">
-                        Overview
+                        概览
                     </v-stepper-step>
                     <v-divider/>
 
                     <v-stepper-step :complete="stepperPage > 3" step="3" :color="stepperPage > 3 ? 'success' : 'primary'">
-                        Importing
+                        导入中
                     </v-stepper-step>
                 </v-stepper-header>
 
@@ -44,7 +44,7 @@
                             dense
                             rounded
                             clearable
-                            placeholder="Dictionary file"
+                            placeholder="词典文件"
                             prepend-icon="mdi-file"
                             @change="testDictionaryFile"
                         ></v-file-input>
@@ -56,29 +56,29 @@
                             color="error"
                             border="left"
                         >
-                            The selected file is not a supported dictionary file. Please upload a file from the sources listed in the user manual.
+                            选中的文件不是受支持的词典文件。请上传用户手册中列出的来源文件。
                         </v-alert>
                     </v-stepper-content>
 
                     <!-- Import overview information -->
                     <v-stepper-content step="2">
-                        Importing a large dictionary can take several minutes. 
+                        导入大型词典可能需要几分钟。
                         <v-simple-table class="border no-hover mx-auto mt-2" v-if="dictionary !== null">
                             <tbody>
                                 <tr>
-                                    <td>Dictionary name:</td>
+                                    <td>词典名称：</td>
                                     <td>{{ dictionary.name }}</td>
                                 </tr>
                                 <tr>
-                                    <td>Database table name:</td>
+                                    <td>数据库表名：</td>
                                     <td>{{ dictionary.databaseName }}</td>
                                 </tr>
                                 <tr>
-                                    <td>Records:</td>
+                                    <td>记录数：</td>
                                     <td>{{ formatNumber(dictionary.expectedRecordCount) }}</td>
                                 </tr>
                                 <tr>
-                                    <td>Source language:</td>
+                                    <td>源语言：</td>
                                     <td>
                                         <v-img 
                                             class="border" 
@@ -89,7 +89,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td>Target language:</td>
+                                    <td>目标语言：</td>
                                     <td>
                                         <v-img 
                                             class="border" 
@@ -100,7 +100,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td>Color:</td>
+                                    <td>颜色：</td>
                                     <td>
                                         <v-card
                                             class="border"
@@ -112,7 +112,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td>Filename:</td>
+                                    <td>文件名：</td>
                                     <td>
                                         {{ dictionary.fileName }}
                                     </td>
@@ -125,7 +125,7 @@
                     <v-stepper-content step="3">
                         <!-- Import progress -->
                         <template v-if="importing">
-                            The dictionary is being imported. This might take a while.
+                            正在导入词典，可能需要一些时间。
                             <v-progress-linear
                                 color="primary"
                                 height="36"
@@ -147,7 +147,7 @@
                                 border="left"
                                 dark
                             >
-                                The import process has finished successfully. {{ dictionary.name }} has been imported.
+                                导入已成功完成。{{ dictionary.name }} 已导入。
                             </v-alert>
 
                             <!-- error message -->
@@ -159,8 +159,8 @@
                                 border="left"
                                 dark
                             >
-                                    The import process has failed. Please make sure your dictionary files are the correct ones. If the problem 
-                                    still persist, please create a <a href="https://github.com/simjanos-dev/LinguaCafe">GitHub</a> Issue.
+                                    导入失败。请确认词典文件正确。如果问题仍然存在，请创建
+                                    <a href="https://github.com/simjanos-dev/LinguaCafe">GitHub</a> Issue。
                             </v-alert>
                         </template>
                     </v-stepper-content>
@@ -176,14 +176,14 @@
                     rounded 
                     text 
                     @click="back"
-                >Back</v-btn>
+                >返回</v-btn>
                 <v-btn
                     v-if="stepperPage == 2 && importResult === null && dictionaryFile !== null  && dictionaryFile !== undefined"
                     rounded
                     depressed
                     color="primary"
                     @click="startImport"
-                >Import</v-btn>
+                >导入</v-btn>
             </template>
 
             <!-- Buttons after import complete -->
@@ -192,7 +192,7 @@
                     rounded 
                     text 
                     @click="close"
-                >Close</v-btn>
+                >关闭</v-btn>
             </template>
         </v-card-actions>
     </v-card>

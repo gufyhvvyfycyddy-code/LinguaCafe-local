@@ -6,7 +6,7 @@
             class="rounded-lg"
         >
             <v-card-title>
-                <span class="text-h5">Settings</span>
+                <span class="text-h5">阅读设置</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -14,16 +14,16 @@
             </v-card-title>
             <v-card-text class="pb-12" v-if="settingsLoaded" style="height: 800px;">
                 <v-tabs :show-arrows="false" v-model="tab" background-color="foreground" class="rounded-lg border overflow-hidden">
-                    <v-tab>Text</v-tab>
-                    <v-tab>Vocabulary box</v-tab>
-                    <v-tab>Vocabulary hover box</v-tab>
+                    <v-tab>文本</v-tab>
+                    <v-tab>词汇框</v-tab>
+                    <v-tab>悬浮词汇框</v-tab>
                 </v-tabs>
                 <v-tabs-items v-model="tab" elevation="0" class="rounded-lg mt-4 pa-6">
                     <!-- Text section -->
                     <v-tab-item :value="0">
                         <!-- Font type -->
                         <v-row v-if="fontTypes.length">
-                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Font type:</v-col>
+                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">字体：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-select
                                     v-model="selectedFontType"
@@ -41,11 +41,11 @@
 
                         <!-- Line spacing -->
                         <v-row>
-                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">Space between lines:</v-col>
+                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">行距：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
                                     v-model="settings.lineSpacing"
-                                    :tick-labels="['Small', '', '', '', '', '', '', '', '', '', 'Large']"
+                                    :tick-labels="['小', '', '', '', '', '', '', '', '', '', '大']"
                                     :tick-size="0"
                                     :max="10"
                                     thumb-label="always"
@@ -60,11 +60,11 @@
 
                         <!-- Maximum text width -->
                         <v-row>
-                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">Maximum text width:</v-col>
+                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">最大文本宽度：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
                                     v-model="settings.maximumTextWidth"
-                                    :tick-labels="['Small', '', '', '', '', '', 'Full']"
+                                    :tick-labels="['窄', '', '', '', '', '', '全宽']"
                                     :tick-size="0"
                                     :max="6"
                                     thumb-label="always"
@@ -80,11 +80,11 @@
 
                         <!-- Font size -->
                         <v-row>
-                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">Font size:</v-col>
+                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">字号：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
                                     v-model="settings.fontSize"
-                                    :tick-labels="['Small', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Large']"
+                                    :tick-labels="['小', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '大']"
                                     :tick-size="0"
                                     :min="12"
                                     :max="30"
@@ -99,7 +99,7 @@
 
                         <!-- Hide all highlighting -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">Hide all highlighting:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">隐藏所有高亮：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -111,7 +111,7 @@
 
                         <!-- Hide new word highlighting -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">Hide new word highlighting:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">隐藏生词高亮：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -123,7 +123,7 @@
 
                         <!-- Vertical text -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Vertical text:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">竖排文本：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -136,7 +136,7 @@
 
                         <!-- Furigana on highlighted words -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Furigana on highlighted words:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">高亮词显示假名：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -148,7 +148,7 @@
 
                         <!-- Furigana on new words -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Furigana on new words:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">生词显示假名：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -160,14 +160,14 @@
 
                         <!-- Auto move words to known -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Auto move words to known:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">自动把词标为已知：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-menu offset-y left nudge-top="-12px">
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        Clicking the <b>Finish reading</b> button moves new words to known.
+                                        点击<b>完成阅读</b>后，会把新词移动到已知词。
                                     </v-card>
                                 </v-menu>
 
@@ -181,14 +181,14 @@
 
                         <!-- Auto highlight words -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Auto highlight words:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">自动高亮词汇：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-menu offset-y left nudge-top="-12px">
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        Auto highlight words when you add a translation to them.
+                                        为单词添加翻译后自动高亮。
                                     </v-card>
                                 </v-menu>
 
@@ -202,14 +202,14 @@
 
                         <!-- Auto level up words -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Auto level up words:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">自动提升词汇等级：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-menu offset-y left nudge-top="-12px">
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        Clicking the 'Finished reading' button will automatically level up any words and phrases for which you haven't opened the vocabulary box.
+                                        点击“完成阅读”后，会自动提升没有打开过词汇框的单词和短语。
                                     </v-card>
                                 </v-menu>
 
@@ -223,7 +223,7 @@
 
                         <!-- Show subtitle timestamps -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Show subtitle timestamps:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">显示字幕时间戳：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     color="primary"
@@ -235,11 +235,11 @@
 
                         <!-- Space between subtitles -->
                         <v-row>
-                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">Space between subtitles:</v-col>
+                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">字幕间距：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
                                     v-model="settings.spaceBetweenSubtitles"
-                                    :tick-labels="['Small', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', 'Large']"
+                                    :tick-labels="['小', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '大']"
                                     :tick-size="0"
                                     :min="0"
                                     :max="40"
@@ -254,12 +254,12 @@
 
                         <!-- Text to speech section -->
                         <div class="subheader subheader-margin-top d-flex mb-2" v-if="textToSpeechVoices.length">
-                            Text to speech
+                            朗读
                         </div>
 
                         <!-- Text to speech -->
                         <v-row v-if="textToSpeechVoices.length">
-                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">TTS voice:</v-col>
+                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">朗读声音：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-select
                                     v-model="textToSpeechSelectedVoice"
@@ -277,7 +277,7 @@
 
                         <!-- Text to speech speed -->
                         <v-row v-if="textToSpeechVoices.length">
-                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">TTS speed:</v-col>
+                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">朗读速度：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-slider
                                     v-model="settings.textToSpeechSpeed"
@@ -300,7 +300,7 @@
                     <v-tab-item :value="1">
                         <!-- Vocab box scroll into view -->
                         <v-row>
-                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Scroll to vocabulary method:</v-col>
+                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">词汇框滚动方式：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-select
                                     v-model="settings.vocabBoxScrollIntoView"
@@ -319,7 +319,7 @@
                         <!-- Vocabulary sidebar -->
                         <v-row>
                             <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">
-                                Vocabulary sidebar:
+                                词汇侧边栏：
                             </v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <!-- Vocabulary sidebar info box -->
@@ -328,8 +328,8 @@
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        An always visible sidebar vocabulary in a fixed position, that replaces the popup vocabulary. <br><br>
-                                        This option is only available for devices with at least 960px screen width, and it is also only available in subtitle reader if the media controls are hidden.
+                                        固定显示在侧边的词汇框，会替代弹出的词汇框。<br><br>
+                                        这个选项只在屏幕宽度至少 960px 的设备上可用；在字幕阅读器中，还需要隐藏媒体控制栏才可用。
                                     </v-card>
                                 </v-menu>
 
@@ -344,7 +344,7 @@
                         <!-- Vocabulary bottom sheet -->
                         <v-row>
                             <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5 ">
-                                Vocabulary bottom sheet:
+                                底部词汇面板：
                             </v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <!-- Vocabulary sidebar info box -->
@@ -353,8 +353,8 @@
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        A bottom sheet vocabulary designed for mobile screens, that replaces the popup vocabulary. <br><br>
-                                        This option is only available for devices with less than or equal to 768px screen width.
+                                        面向手机屏幕的底部词汇面板，会替代弹出的词汇框。<br><br>
+                                        这个选项只在屏幕宽度小于或等于 768px 的设备上可用。
                                     </v-card>
                                 </v-menu>
 
@@ -371,14 +371,14 @@
                     <v-tab-item :value="2">
                         <!-- Vocabulary hover box -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Hover vocabulary box:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">悬浮词汇框：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-menu offset-y left nudge-top="-12px">
                                     <template v-slot:activator="{ on, attrs }">
                                         <v-icon class="mr-2" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        A minimalistic vocabulary box that appears when you move the mouse over a word or phrase.
+                                        鼠标移到单词或短语上时显示的简洁词汇框。
                                     </v-card>
                                 </v-menu>
 
@@ -392,7 +392,7 @@
 
                         <!-- Hover vocabulary box dictionary search -->
                         <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Hover vocabulary dictionary search:</v-col>
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">悬浮词汇框词典搜索：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     v-model="settings.vocabularyHoverBoxSearch"
@@ -404,7 +404,7 @@
 
                         <!-- Hover vocabulary delay -->
                         <v-row>
-                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">Hover vocabulary delay:</v-col>
+                            <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">悬浮延迟：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
                                     v-model="settings.vocabularyHoverBoxDelay"
@@ -424,7 +424,7 @@
 
                         <!-- Hover vocabulary preferred position -->
                         <v-row>
-                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">Preferred position:</v-col>
+                            <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">优先显示位置：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-select
                                     v-model="settings.vocabularyHoverBoxPreferredPosition"
@@ -446,7 +446,7 @@
 
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded color="primary" @click="close">Close</v-btn>
+                <v-btn rounded color="primary" @click="close">关闭</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -477,25 +477,25 @@
             settings: { ...defaultSettings },
             vocabularyHoverBoxPreferredPositionData: [
                 {
-                    name: 'Below the hovered word',
+                    name: '显示在词下方',
                     value: 'bottom'
                 },
                 {
-                    name: 'Above the hovered word',
+                    name: '显示在词上方',
                     value: 'top'
                 },
             ],
             vocabBoxScrollIntoViewData: [
                 {
-                    name: 'Disabled',
+                    name: '关闭',
                     value: 'disabled'
                 },
                 {
-                    name: 'Scroll into view',
+                    name: '滚动到可见位置',
                     value: 'scroll-into-view'
                 },
                 {
-                    name: 'Scroll into view if needed (does not work everywhere)',
+                    name: '需要时滚动到可见位置（并非所有浏览器都支持）',
                     value: 'scroll-into-view-if-needed'
                 }
             ],

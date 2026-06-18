@@ -334,7 +334,7 @@ LinguaCafe 现在默认使用中文界面，界面语言记为 `uiLanguage=zh-CN
 php artisan user:create --email=test@example.com --password=12345678
 ```
 
-## Loading 卡住排查
+## 加载卡住排查
 
 如果页面一直显示加载中，请先检查：
 

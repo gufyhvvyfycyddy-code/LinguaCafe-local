@@ -22,22 +22,22 @@
     >
         <!-- Vocab box content -->
         <v-alert id="no-word-selected-title" prominent color="foreground" class="text--text" v-if="type == 'empty'">
-            Select a word or a phrase!
+            请选择一个单词或短语
         </v-alert>
 
         <!-- Toolbar -->
         <div class="pa-0 w-full" v-if="type !== 'empty'">
             <!-- Word/phrase info -->
             <div class="vocab-box-subheader d-flex mb-2">
-                <span id="vocab-side-box-title" v-if="type == 'new-phrase'">New phrase</span>
-                <span id="vocab-side-box-title" class="text-capitalize" v-else>{{ type }}</span>
+                <span id="vocab-side-box-title" v-if="type == 'new-phrase'">新短语</span>
+                <span id="vocab-side-box-title" v-else>{{ type === 'word' ? '单词' : '短语' }}</span>
                 <v-spacer />
 
                 <!-- Inflections table button -->
                 <v-btn 
                     v-if="tab == 0 && inflections.length"
                     icon
-                    title="Show inflections"
+                    title="显示变形"
                     @click="tab = 1;"
                 >
                     <v-icon>mdi-list-box</v-icon>
@@ -46,7 +46,7 @@
                 <v-btn 
                     v-if="tab == 0 && $props.textToSpeechAvailable"
                     icon
-                    title="Text to speech"
+                    title="朗读"
                     @click="textToSpeech"
                 >
                     <v-icon>mdi-bullhorn</v-icon>
@@ -56,7 +56,7 @@
                 <v-btn 
                     v-if="tab == 0 && type !== 'new-phrase'"
                     icon
-                    title="Send to anki"
+                    title="发送到 Anki"
                     @mouseup.stop="addSelectedWordToAnki"
                 >
                     <v-icon>mdi-cards</v-icon>
@@ -66,14 +66,14 @@
                 <v-btn 
                     v-if="tab == 1"
                     icon
-                    title="Back to word"
+                    title="返回单词"
                     @click="tab = 0;"
                 >
                     <v-icon>mdi-arrow-left</v-icon>
                 </v-btn>
 
                 <!-- Unselect word button -->
-                <v-btn dark icon title="Unselect word" @click="close">
+                <v-btn dark icon title="取消选择" @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </div>
@@ -87,8 +87,8 @@
                     <v-text-field 
                         :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                         hide-details
-                        placeholder="Lemma"
-                        title="Lemma"
+                        placeholder="词元"
+                        title="词元"
                         filled
                         dense
                         rounded
@@ -100,8 +100,8 @@
                     <v-text-field 
                         :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                         hide-details
-                        placeholder="Word"
-                        title="Word"
+                        placeholder="单词"
+                        title="单词"
                         disabled
                         filled
                         dense
@@ -117,8 +117,8 @@
                     <v-text-field 
                         class="default-font my-2"
                         hide-details
-                        placeholder="Lemma reading"
-                        title="Lemma reading"
+                        placeholder="词元读音"
+                        title="词元读音"
                         filled
                         dense
                         rounded
@@ -130,8 +130,8 @@
                     <v-text-field 
                         class="default-font my-2"
                         hide-details
-                        placeholder="Reading"
-                        title="Reading"
+                        placeholder="读音"
+                        title="读音"
                         filled
                         dense
                         rounded
@@ -145,7 +145,7 @@
                 <v-textarea
                     v-if="type !== 'word'"
                     class="default-font my-2"
-                    label="Phrase"
+                    label="短语"
                     filled
                     dense
                     no-resize
@@ -161,7 +161,7 @@
                 <v-textarea
                     v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')"
                     class="default-font my-2"
-                    label="Reading"
+                    label="读音"
                     filled
                     dense
                     no-resize
@@ -201,12 +201,12 @@
                 
                 <!-- Translation -->
                 <div class="vocab-box-subheader d-flex">
-                    Translation
+                    释义
                 </div>
                 <v-textarea
                     class="mb-2 mt-1"
-                    placeholder="Translation"
-                    title="Translation"
+                    placeholder="释义"
+                    title="释义"
                     filled
                     dense
                     no-resize
@@ -220,7 +220,7 @@
 
                 <!-- Search field -->
                 <v-text-field 
-                    placeholder="Dictionary search"
+                    placeholder="词典搜索"
                     class="dictionary-search-field default-font mt-2 mb-3"
                     width="100%"
                     prepend-inner-icon="mdi-magnify"
@@ -250,14 +250,14 @@
                         color="success"
                         @click="addNewPhrase"
                         v-if="type == 'new-phrase'"
-                    >Save phrase</v-btn>
+                    >保存短语</v-btn>
                     <v-btn 
                         small
                         rounded
                         color="error"
                         @click="deletePhrase"
                         v-if="type == 'phrase'"
-                    >Delete phrase</v-btn>
+                    >删除短语</v-btn>
                 </div>
             </v-tab-item>
             
@@ -269,9 +269,9 @@
                 >
                     <thead>
                         <tr>
-                            <th class="text-center">Form</th>
-                            <th class="text-center">Affirmative</th>
-                            <th class="text-center">Negative</th>
+                            <th class="text-center">形式</th>
+                            <th class="text-center">肯定</th>
+                            <th class="text-center">否定</th>
                         </tr>
                     </thead>
                     <tbody>

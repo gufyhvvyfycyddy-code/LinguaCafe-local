@@ -14,11 +14,11 @@
 
         <!-- Title subheader -->
         <div class="d-flex subheader mt-4 mb-4 px-2 ">
-            Installable languages
+            可安装语言
             <v-spacer />
             <v-btn rounded depressed color="error" @click="uninstallLanguages">
                 <v-icon class="mr-1">mdi-delete</v-icon>
-                Uninstall all
+                卸载全部
             </v-btn>
         </div>
 
@@ -26,8 +26,8 @@
         <v-simple-table class="no-hover border rounded-lg" v-if="languages.length">
             <thead>
                 <tr>
-                    <th class="text-center" colspan="2">Language</th>
-                    <th class="text-center">Install</th>
+                    <th class="text-center" colspan="2">语言</th>
+                    <th class="text-center">安装</th>
                 </tr>
             </thead>
             <tbody>
@@ -64,7 +64,7 @@
                             @click="installLanguage(language.name)"
                         >
                             <v-icon class="mr-1">mdi-download</v-icon>
-                            Install
+                            安装
                         </v-btn>
                     </td>
                 </tr>
@@ -75,8 +75,8 @@
         <v-simple-table class="no-hover border rounded-lg" v-if="!languages.length">
             <thead>
                 <tr>
-                    <th class="text-center" colspan="2">Language</th>
-                    <th class="text-center">Install</th>
+                    <th class="text-center" colspan="2">语言</th>
+                    <th class="text-center">安装</th>
                 </tr>
             </thead>
             <tbody>

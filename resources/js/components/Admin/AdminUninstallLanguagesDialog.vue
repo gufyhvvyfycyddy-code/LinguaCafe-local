@@ -3,7 +3,7 @@
         <v-card class="rounded-lg" :loading="uninstalling">
             <v-card-title>
                 <v-icon class="mr-2" color="error">mdi-delete</v-icon>
-                <span class="text-h5">Uninstall languages</span>
+                <span class="text-h5">卸载语言</span>
                 
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close" :disabled="uninstalling">
@@ -14,7 +14,7 @@
             <v-card-text class="pt-4 pb-6">
                 <!-- Install confirmation message -->
                 <template v-if="!uninstalling && uninstallResult !== 'success'">
-                    Do you want to uninstall every installable language?
+                    确定要卸载所有可安装语言吗？
                 </template>
 
                 <!-- Success message -->
@@ -26,7 +26,7 @@
                     type="success"
                     border="left"
                 >
-                    Languages has been successfully uninstalled.
+                    语言已成功卸载。
                 </v-alert>
 
                 <!-- Error message -->
@@ -38,12 +38,12 @@
                     type="error"
                     border="left"
                 >
-                    An error has occurred while uninstalling the languages. Please wait a few seconds, and try again.
+                    卸载语言时发生错误。请等待几秒后重试。
                 </v-alert>
 
                 <!-- Installation in progress message -->
                 <template v-if="uninstalling">
-                    Languages are being uninstalled, it can take several minutes...
+                    正在卸载语言，可能需要几分钟...
                 </template>
             </v-card-text>
 
@@ -52,18 +52,18 @@
                 
                 <!-- Cancel button -->
                 <v-btn rounded text @click="close" :disabled="uninstalling" v-if="uninstallResult !== 'success'">
-                    Cancel
+                    取消
                 </v-btn>
                 
                 <!-- Close button -->
                 <v-btn rounded text @click="close" :disabled="uninstalling" v-if="uninstallResult === 'success'">
-                    Close
+                    关闭
                 </v-btn>
                 
                 <!-- Install button -->
                 <v-btn rounded depressed color="error" @click="uninstall" :disabled="uninstalling" v-if="uninstallResult !== 'success'">
                     <v-icon class="mr-1">mdi-delete</v-icon>
-                    Uninstall
+                    卸载
                 </v-btn>
             </v-card-actions>
         </v-card>

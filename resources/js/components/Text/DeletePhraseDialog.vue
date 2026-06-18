@@ -3,24 +3,24 @@
         <v-card class="rounded-lg"   @mouseup.stop=";" @touchstart.stop=";" @touchend.stop=";">
             <v-card-title>
                 <v-icon class="mr-2" color="error">mdi-alert-circle</v-icon>
-                <span class="text-h5">Delete phrase</span>
+                <span class="text-h5">删除短语</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
             <v-card-text class="pt-4 pb-6">
-                Do you want to delete the selected phrase?
+                确定要删除选中的短语吗？
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
                 <v-btn rounded text @click="close">
-                    Cancel
+                    取消
                 </v-btn>
 
                 <v-btn rounded depressed color="error" @click="confirm">
                     <v-icon>mdi-delete</v-icon>
-                    Delete
+                    删除
                 </v-btn>
             </v-card-actions>
         </v-card>

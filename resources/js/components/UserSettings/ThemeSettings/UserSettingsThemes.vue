@@ -4,7 +4,7 @@
 
         <!-- Color header -->
         <div class="subheader mt-4 d-flex">
-            Colors
+            颜色
             <v-spacer />
             <div id="theme-selection">
                 <v-select
@@ -26,10 +26,10 @@
             <v-simple-table class="rounded-lg no-hover border mt-2" v-if="!loading">
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Color</th>
+                        <th>名称</th>
+                        <th>颜色</th>
                         <th>Hex</th>
-                        <th>Reset</th>
+                        <th>重置</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -91,7 +91,7 @@
                         <td>
                             <v-btn
                                 icon
-                                title="Restore default"
+                                title="恢复默认"
                                 @click="resetColor(index)"
                             >
                                 <v-icon>mdi-restore</v-icon>
@@ -111,7 +111,7 @@
             border="left"
             dark
         >
-            An error has occurred while saving color theme settings.
+            保存颜色主题设置时发生错误。
         </v-alert>
 
         <!-- Save button -->
@@ -125,7 +125,7 @@
                 :disabled="saving || !isFormValid"
                 @click="save"
             >
-                Save
+                保存
             </v-btn>
         </div>
     </div>
@@ -145,20 +145,20 @@
                 selectedTheme: ThemeService.getCurrentTheme() === 'dark' ? 'dark' : 'light',
                 themes: [
                     {
-                        name: 'Light theme',
+                        name: '浅色主题',
                         value: 'light'
                     },
                     {
-                        name: 'Dark theme',
+                        name: '深色主题',
                         value: 'dark'
                     }
                 ],
                 lightTheme: [],
                 darkTheme: [],
                 colorInformations: {
-                    newWordBackground: 'Used as background for indicating or displaying a new word outside of the interactive text areas.',
-                    highlightedWordBackground: 'Used as background for indicating or displaying a highlighted word outside of the interactive text areas.',
-                    highlightedWordText: 'Used as text color for indicating or displaying a highlighted word outside of the interactive text areas.',
+                    newWordBackground: '用于在互动文本区域之外标记或显示新词背景。',
+                    highlightedWordBackground: '用于在互动文本区域之外标记或显示高亮词背景。',
+                    highlightedWordText: '用于在互动文本区域之外标记或显示高亮词文字颜色。',
                 },
 
                 wordStyling: {
@@ -207,11 +207,11 @@
                 rules: {
                     hex: value => {
                         if (value.length !== 7) {
-                            return 'Invalid hex value.';
+                            return 'Hex 颜色值不正确。';
                         }
 
                         if(!value.match(/^#(?:[0-9a-fA-F]{3}){1,2}$/)) {
-                            return 'Invalid value.';
+                            return '颜色值不正确。';
                         }
 
                         return true;

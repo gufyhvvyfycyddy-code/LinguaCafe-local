@@ -3,7 +3,7 @@
         <v-card id="text-reader-hotkeys" class="rounded-lg" height="500px">
             <!-- Title -->
             <v-card-title>
-                <v-icon class="mr-1">mdi-keyboard-outline</v-icon>Text reader hotkeys
+                <v-icon class="mr-1">mdi-keyboard-outline</v-icon>阅读快捷键
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -12,113 +12,113 @@
             
             <!-- hotkey info -->
             <v-card-text class="px-8">
-                <label class="font-weight-bold mt-2 mb-0">Scrolling</label>
+                <label class="font-weight-bold mt-2 mb-0">滚动</label>
                 <div class="hotkey d-flex mb-2">
-                    Hold Ctrl or Shift while scrolling to increase scroll size.
+                    滚动时按住 Ctrl 或 Shift 可以增大滚动幅度。
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Up arrow</span><span>Scroll up</span>
+                    <span class="primary--text" style="width: 170px;">Up arrow</span><span>向上滚动</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Down arrow</span><span>Scroll down</span>
+                    <span class="primary--text" style="width: 170px;">Down arrow</span><span>向下滚动</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">w</span><span>Scroll up</span>
+                    <span class="primary--text" style="width: 170px;">w</span><span>向上滚动</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">s</span><span>Scroll down</span>
-                </div>
-
-                <label class="font-weight-bold mt-4 mb-0">Text</label>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">i</span><span>Decrease font size</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">o</span><span>Increase font size</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">p</span><span>Toggle plain text mode</span>
+                    <span class="primary--text" style="width: 170px;">s</span><span>向下滚动</span>
                 </div>
 
-                <label class="font-weight-bold mt-4 mb-0">Set level</label>
+                <label class="font-weight-bold mt-4 mb-0">文本</label>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">x</span><span>Set level to ignored</span>
+                    <span class="primary--text" style="width: 170px;">i</span><span>减小字号</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">c</span><span>Set level to new</span>
+                    <span class="primary--text" style="width: 170px;">o</span><span>增大字号</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">0</span><span>Set level to known</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">1</span><span>Set level to 1</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">2</span><span>Set level to 2</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">3</span><span>Set level to 3</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">4</span><span>Set level to 4</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">5</span><span>Set level to 5</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">6</span><span>Set level to 6</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">7</span><span>Set level to 7</span>
+                    <span class="primary--text" style="width: 170px;">p</span><span>切换纯文本模式</span>
                 </div>
 
-                <label class="font-weight-bold mt-4 mb-0">Word selection</label>
+                <label class="font-weight-bold mt-4 mb-0">设置等级</label>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Esc</span><span>Unselect word</span>
+                    <span class="primary--text" style="width: 170px;">x</span><span>设为已忽略</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Left arrow</span><span>Select previous word</span>
+                    <span class="primary--text" style="width: 170px;">c</span><span>设为新词</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Right arrow</span><span>Select next word</span>
+                    <span class="primary--text" style="width: 170px;">0</span><span>设为已知</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Shift + Left arrow</span><span>Select previous highlighted word</span>
+                    <span class="primary--text" style="width: 170px;">1</span><span>设为等级 1</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Shift + Right arrow</span><span>Select next highlighted word</span>
+                    <span class="primary--text" style="width: 170px;">2</span><span>设为等级 2</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Ctrl + Left arrow</span><span>Select previous new word</span>
+                    <span class="primary--text" style="width: 170px;">3</span><span>设为等级 3</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Ctrl + Right arrow</span><span>Select next new word</span>
+                    <span class="primary--text" style="width: 170px;">4</span><span>设为等级 4</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">a</span><span>Select previous word</span>
+                    <span class="primary--text" style="width: 170px;">5</span><span>设为等级 5</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">d</span><span>Select next word</span>
+                    <span class="primary--text" style="width: 170px;">6</span><span>设为等级 6</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Shift + a</span><span>Select previous highlighted word</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Shift + d</span><span>Select next highlighted word</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Ctrl + a</span><span>Select previous new word</span>
-                </div>
-                <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">Ctrl + d</span><span>Select next new word</span>
+                    <span class="primary--text" style="width: 170px;">7</span><span>设为等级 7</span>
                 </div>
 
-                <label class="font-weight-bold mt-4 mb-0">Other</label>
+                <label class="font-weight-bold mt-4 mb-0">选词</label>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">f</span><span>Send word to anki</span>
+                    <span class="primary--text" style="width: 170px;">Esc</span><span>取消选词</span>
                 </div>
                 <div class="hotkey d-flex">
-                    <span class="primary--text" style="width: 170px;">v</span><span>Text to speech</span>
+                    <span class="primary--text" style="width: 170px;">Left arrow</span><span>选择上一个词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Right arrow</span><span>选择下一个词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Shift + Left arrow</span><span>选择上一个高亮词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Shift + Right arrow</span><span>选择下一个高亮词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Ctrl + Left arrow</span><span>选择上一个新词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Ctrl + Right arrow</span><span>选择下一个新词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">a</span><span>选择上一个词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">d</span><span>选择下一个词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Shift + a</span><span>选择上一个高亮词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Shift + d</span><span>选择下一个高亮词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Ctrl + a</span><span>选择上一个新词</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">Ctrl + d</span><span>选择下一个新词</span>
+                </div>
+
+                <label class="font-weight-bold mt-4 mb-0">其他</label>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">f</span><span>发送到 Anki</span>
+                </div>
+                <div class="hotkey d-flex">
+                    <span class="primary--text" style="width: 170px;">v</span><span>朗读</span>
                 </div>
 
             </v-card-text>
@@ -126,7 +126,7 @@
             <!-- Close button -->
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Close</v-btn>
+                <v-btn rounded text @click="close">关闭</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>

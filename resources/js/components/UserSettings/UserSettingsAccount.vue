@@ -8,17 +8,17 @@
 
         <!-- Delete language data -->
         <div class="subheader mt-4 mb-2 d-flex">
-            Account
+            账号
         </div>
         <v-card outlined class="rounded-lg pb-0 mb-32">
             <v-card-text>
                 <v-row>
                     <v-col>
-                        <b>Username:</b> <br>
+                        <b>用户名：</b> <br>
                         {{ this.$store.state.shared.userName }}
                     </v-col>
                     <v-col>
-                        <b>E-mail address:</b> <br>
+                        <b>邮箱：</b> <br>
                         {{ this.$store.state.shared.userEmail }}
                     </v-col>
                 </v-row>
@@ -34,12 +34,12 @@
                         @click="passwordChangeDialog = true;"
                     >
                         <v-icon class="mr-2">mdi-lock-reset</v-icon>
-                        Change password
+                        修改密码
                     </v-btn>
 
                     <!-- Password changed success message -->
                     <v-alert class="mb-0" border="left" color="success" dense v-else>
-                        Your password has been changed successfully.
+                        密码已修改成功。
                     </v-alert>
                 </div>
             </v-card-text>
@@ -51,7 +51,7 @@
                 mdi-alert
             </v-icon>
                 
-            Delete language data
+            删除学习语言数据
             <v-spacer />
             <v-img 
                 eager
@@ -63,29 +63,29 @@
         </div>
         <v-card outlined class="rounded-lg pb-0 mb-32" :loading="deleting">
             <v-card-text>
-                This action will delete <b>all</b> your data in {{ formattedLanguageText }}. Your data in other languages will not be affected. 
+                此操作会删除你在 {{ formattedLanguageText }} 中的<b>全部</b>学习数据，其他学习语言的数据不会受影响。
 
                 <div class="mt-4">
-                    Data to be deleted:
+                    将删除的数据：
                     <ul>
-                        <li>Books</li>
-                        <li>Chapters</li>
-                        <li>Vocabulary</li>
-                        <li>Phrases</li>
-                        <li>Example sentences</li>
-                        <li>Achieved goal statistics</li>
+                        <li>书籍</li>
+                        <li>章节</li>
+                        <li>词汇</li>
+                        <li>短语</li>
+                        <li>例句</li>
+                        <li>已完成目标统计</li>
                     </ul>
                 </div>
 
                 <div id="delete-confirm-text" class="mt-6">
-                    <label class="font-weight-bold">Type "delete all my {{ $props.language }} data"</label>
+                    <label class="font-weight-bold">请输入“delete all my {{ $props.language }} data”确认删除</label>
                     <v-text-field 
                         v-model="confirmText"
                         filled
                         dense
                         rounded
                         hide-details
-                        placeholder="Confirm deletion"
+                        placeholder="确认删除"
                         width="200"
                     ></v-text-field>
                 </div>
@@ -99,7 +99,7 @@
                     border="left"
                     dark
                 >
-                    An error has occurred while deleting your {{ formattedLanguageText }} data.
+                    删除 {{ formattedLanguageText }} 数据时发生错误。
                 </v-alert>
 
                 <!-- Success message -->
@@ -111,7 +111,7 @@
                     border="left"
                     dark
                 >
-                    Your {{ formattedLanguageText }} data has been deleted successfully. 
+                    {{ formattedLanguageText }} 数据已删除。
                 </v-alert>
                 
             </v-card-text>
@@ -125,7 +125,7 @@
                     @click="deleteLanguageData"
                 >
                     <v-icon class="mr-2">mdi-delete</v-icon>
-                    Delete
+                    删除
                 </v-btn>
             </v-card-actions>
         </v-card>

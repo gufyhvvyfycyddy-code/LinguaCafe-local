@@ -3,17 +3,17 @@
         
         <!-- Title subheader -->
         <div class="d-flex subheader mt-4 mb-4 px-2 ">
-            Dashboard
+            概览
             <v-spacer />
         </div>
 
         <!-- Admin dashboard -->
         <v-card outlined class="rounded-lg" :loading="backupCreationRequest.loading">
             <v-card-title>
-                Backups
+                备份
             </v-card-title>
             <v-card-text>
-                You can create a .sql backup of your database here.
+                你可以在这里创建数据库的 .sql 备份。
 
                 <!-- Success message -->
                 <v-alert
@@ -24,7 +24,7 @@
                     border="left"
                     dark
                 >
-                    A backup of your database has been successfully created. Your backup can be found inside the "/storage/backup/{{ backupCreationRequest.fileName }}" directory.
+                    数据库备份已成功创建。备份文件位于 "/storage/backup/{{ backupCreationRequest.fileName }}" 目录中。
                 </v-alert>
 
                 <!-- Error message -->
@@ -36,7 +36,7 @@
                     border="left"
                     dark
                 >
-                    An error has occurred while exporting your database.
+                    导出数据库时发生错误。
                 </v-alert>
 
             </v-card-text>
@@ -50,7 +50,7 @@
                     :disabled="backupCreationRequest.loading"
                 >
                     <v-icon class="mr-2">mdi-database-export</v-icon>
-                    Create backup
+                    创建备份
                 </v-btn>
             </v-card-actions>
         </v-card>

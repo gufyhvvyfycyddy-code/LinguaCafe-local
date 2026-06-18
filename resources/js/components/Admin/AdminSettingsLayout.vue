@@ -1,13 +1,13 @@
 <template>
     <v-container v-if="$store.getters['shared/userAdmin']">
         <v-tabs v-model="tab" background-color="foreground" class="rounded-lg border overflow-hidden" @change="tabChanged">
-            <v-tab>Dashboard</v-tab>
-            <v-tab>Users</v-tab>
-            <v-tab>Languages</v-tab>
-            <v-tab>Dictionaries</v-tab>
-            <v-tab>Fonts</v-tab>
+            <v-tab>概览</v-tab>
+            <v-tab>用户</v-tab>
+            <v-tab>语言</v-tab>
+            <v-tab>词典</v-tab>
+            <v-tab>字体</v-tab>
             <v-tab>API</v-tab>
-            <v-tab>Reviews</v-tab>
+            <v-tab>复习</v-tab>
         </v-tabs>
         <v-tabs-items v-model="tab" id="admin-tab-items" elevation="0" class="no-background rounded-lg mt-4 pa-6">
             <v-tab-item :value="0">
@@ -34,7 +34,7 @@
         </v-tabs-items>
     </v-container>
     <v-container v-else>
-        You do not have permission to access this page.
+        你没有权限访问此页面。
     </v-container>
 </template>
 

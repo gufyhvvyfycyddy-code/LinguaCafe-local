@@ -21,7 +21,7 @@
                     <v-card-text class="pa-0">
                         <!-- Single word -->
                         <template v-if="type === 'word'">
-                            <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">Word</span></div>
+                            <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">单词</span></div>
                             <!-- With base word -->
                             <div class="expression mb-2 text-center default-font" v-if="baseWord !== ''">
                                 <ruby>
@@ -55,7 +55,7 @@
 
                         <!-- Phrase -->
                         <template v-if="type !== 'word'">
-                            <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">Phrase</span></div>
+                            <div class="vocab-box-subheader mb-2 mt-0"><span class="rounded-pill py-1 px-3">短语</span></div>
                             <!-- Phrase text -->
                             <div class="expression mb-2 default-font">
                                 <template v-for="(word, index) in phrase" v-if="word.word !== 'NEWLINE'">
@@ -65,7 +65,7 @@
 
                             <!-- Phrase reading -->
                             <template v-if="($props.language == 'japanese' || $props.language == 'chinese')">
-                                <div class="vocab-box-subheader mb-2 mt-4"><span class="rounded-pill py-1 px-3">Reading</span></div>
+                                <div class="vocab-box-subheader mb-2 mt-4"><span class="rounded-pill py-1 px-3">读音</span></div>
                                 <div class="expression mb-2 mt-4 default-font">{{ reading }}</div>
                             </template>
                         </template>
@@ -73,7 +73,7 @@
                         <!-- Stage buttons-->
                         <template v-if="type !== 'new-phrase'">
                             <div class="vocab-box-subheader d-flex mb-2 mt-4">
-                                <span class="rounded-pill py-1 px-3">Level</span>
+                                <span class="rounded-pill py-1 px-3">等级</span>
                                 <v-spacer />
 
                                 <!-- Level info box -->
@@ -84,14 +84,13 @@
                                         </div>
                                     </template>
                                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                                        A word's or phrase's level represents how well you know it. 
-                                        The closer it is to 0, the closer you are to learn it, and it 
-                                        will appear in reviews less frequently.<br><br>
+                                        单词或短语的等级表示你对它的熟悉程度。
+                                        越接近 0，表示越接近学会，在复习中出现得也越少。<br><br>
 
                                         <v-icon class="mr-2">mdi-check</v-icon>
-                                        represents known words.<br>
+                                        表示已知词。<br>
                                         <v-icon class="mr-2">mdi-close</v-icon>
-                                        represents ignored words. Ignored words do not count in learned word statistics.
+                                        表示已忽略词。已忽略词不会计入已学词统计。
                                     </v-card>
                                 </v-menu>
                             </div>
@@ -122,7 +121,7 @@
                         <!-- Translation -->
                         <v-textarea
                             :class="{'mt-2': $props.language !== 'japanese' && $props.language !== 'chinese'}"
-                            label="Translation"
+                            label="翻译"
                             filled
                             dense
                             no-resize
@@ -136,7 +135,7 @@
 
                         <!-- Search field -->
                         <v-text-field 
-                            placeholder="Dictionary search"
+                            placeholder="词典搜索"
                             class="dictionary-search-field mt-2 mb-3 default-font"
                             filled
                             dense
@@ -166,14 +165,14 @@
                             color="success"
                             @click="addNewPhrase"
                             v-if="type == 'new-phrase'"
-                        >Save phrase</v-btn>
+                        >保存短语</v-btn>
                         <v-btn 
                             small
                             rounded
                             color="error"
                             @click="deletePhrase"
                             v-if="type == 'phrase'"
-                        >Delete phrase</v-btn>
+                        >删除短语</v-btn>
                     </v-card-actions>
                 </v-tab-item>
 
@@ -185,7 +184,7 @@
                             <v-text-field 
                                 :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                                 hide-details
-                                label="Lemma"
+                                label="词元"
                                 filled
                                 dense
                                 rounded
@@ -196,7 +195,7 @@
                             <v-text-field 
                                 :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}"
                                 hide-details
-                                label="Word"
+                                label="单词"
                                 disabled
                                 filled
                                 dense
@@ -212,7 +211,7 @@
                             <v-text-field 
                                 class="my-2 default-font"
                                 hide-details
-                                label="Lemma reading"
+                                label="词元读音"
                                 filled
                                 dense
                                 rounded
@@ -223,7 +222,7 @@
                             <v-text-field 
                                 class="my-2 default-font"
                                 hide-details
-                                label="Reading"
+                                label="读音"
                                 filled
                                 dense
                                 rounded
@@ -237,7 +236,7 @@
                         <v-textarea
                             v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')"
                             class="my-2 default-font"
-                            label="Reading"
+                            label="读音"
                             filled
                             dense
                             no-resize
@@ -259,9 +258,9 @@
                     >
                         <thead>
                             <tr>
-                                <th class="text-center">Form</th>
-                                <th class="text-center">Affirmative</th>
-                                <th class="text-center">Negative</th>
+                                <th class="text-center">形式</th>
+                                <th class="text-center">肯定</th>
+                                <th class="text-center">否定</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -278,12 +277,12 @@
 
         <!-- Vocab box toolbar -->
         <div class="vocab-box-toolbar d-flex flex-column align-center flex-wrap pt-1 rounded-r-lg">
-            <v-btn icon @click="close" title="Close"><v-icon>mdi-close</v-icon></v-btn>
-            <v-btn icon @click="tab = 1;" title="Edit" v-if="tab == 0"><v-icon>mdi-pencil</v-icon></v-btn>
-            <v-btn icon @click="addSelectedWordToAnki" v-if="tab === 0 && type !== 'new-phrase'" title="Send to anki"><v-icon class="mr-1">mdi-cards</v-icon></v-btn>
-            <v-btn icon v-if="tab == 0 && $props.textToSpeechAvailable" title="Text to speech" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
-            <v-btn icon @click="tab = 2;" title="Show inflections" v-if="tab == 0 && inflections.length"><v-icon>mdi-list-box</v-icon></v-btn>
-            <v-btn icon @click="tab = 0;" v-if="tab !== 0" title="Back"><v-icon>mdi-arrow-left</v-icon></v-btn>
+            <v-btn icon @click="close" title="关闭"><v-icon>mdi-close</v-icon></v-btn>
+            <v-btn icon @click="tab = 1;" title="编辑" v-if="tab == 0"><v-icon>mdi-pencil</v-icon></v-btn>
+            <v-btn icon @click="addSelectedWordToAnki" v-if="tab === 0 && type !== 'new-phrase'" title="发送到 Anki"><v-icon class="mr-1">mdi-cards</v-icon></v-btn>
+            <v-btn icon v-if="tab == 0 && $props.textToSpeechAvailable" title="朗读" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+            <v-btn icon @click="tab = 2;" title="显示变形" v-if="tab == 0 && inflections.length"><v-icon>mdi-list-box</v-icon></v-btn>
+            <v-btn icon @click="tab = 0;" v-if="tab !== 0" title="返回"><v-icon>mdi-arrow-left</v-icon></v-btn>
         </div>
     </v-card>
 </template>

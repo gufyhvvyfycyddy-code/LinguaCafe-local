@@ -5,7 +5,7 @@
 
         <!-- Text header -->
         <div class="subheader mt-4 d-flex">
-            Text
+            文本样式
         </div>
 
         <!-- Text content -->
@@ -15,11 +15,11 @@
                 <div id="option-select-inputs" class="w-100 d-flex justify-space-between flex-wrap mb-4">
                     <div class="text-option-input">
                         <label class="mb-0">
-                            Word level
+                            词汇等级
                         </label>
                         <v-select
                             :value="selectedLevel"
-                            label="Level"
+                            label="等级"
                             rounded
                             dense
                             filled
@@ -32,10 +32,10 @@
 
                     <div class="text-option-input">
                         <label class="mb-0 mt-4">
-                            Theme
+                            主题
                         </label>
                         <v-select
-                            label="Theme"
+                            label="主题"
                             :value="selectedTheme"
                             rounded
                             dense
@@ -51,7 +51,7 @@
                 <!-- Horizontal padding -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Horizontal padding
+                        水平内边距
                     </label>
                     <v-slider
                         v-model="textStyling[selectedTheme][selectedLevel].paddingHorizontal"
@@ -67,7 +67,7 @@
                 <!-- Top padding -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Top padding
+                        顶部内边距
                     </label>
                     <v-slider
                         v-model="textStyling[selectedTheme][selectedLevel].paddingTop"
@@ -83,7 +83,7 @@
                 <!-- Bottom padding -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Bottom padding
+                        底部内边距
                     </label>
                     <v-slider
                         v-model="textStyling[selectedTheme][selectedLevel].paddingBottom"
@@ -99,15 +99,14 @@
                 <!-- Padding settings -->
                 <div class="w-100 mb-0">
                     <label class="w-100 mb-0">
-                        Horizontal padding
+                        水平内边距
                         <v-menu offset-y nudge-top="-12px">
                             <template v-slot:activator="{ on, attrs }">
                                 <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle</v-icon>
                             </template>
                             <v-card outlined class="rounded-lg pa-4" width="320px">
-                                Some languages like Chinese, Japanese and Thai do not have spaces between words. This option is for users who prefer having padding 
-                                only for these languages to improve readability, while disabling padding for languages that do have spaces between words to avoid words
-                                slightly moving on the screen when a word's level was changed.
+                                中文、日语、泰语等语言的词之间没有空格。这个选项会只为这些语言启用内边距以提高可读性，
+                                对有空格的语言禁用内边距，避免修改词汇等级时文字轻微移动。
                             </v-card>
                         </v-menu>
                     </label>
@@ -116,7 +115,7 @@
                         hide-details
                         density="compact"
                         class="d-inline-block mt-0"
-                        label="For spaceless languages only"
+                        label="仅用于无空格语言"
                         @change="updateSampleTextStyling"
                     >
                     </v-checkbox>
@@ -125,7 +124,7 @@
                 <!-- Border width -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Border and wave width
+                        边框和波浪线宽度
                     </label>
                     <v-slider
                         v-model="textStyling[selectedTheme][selectedLevel].borderWidth"
@@ -141,7 +140,7 @@
                 <!-- Border radius -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Border radius
+                        边框圆角
                     </label>
                     <v-slider
                         v-model="textStyling[selectedTheme][selectedLevel].borderRadius"
@@ -157,11 +156,11 @@
                 <!-- Border type -->
                 <div class="w-100">
                     <label class="mb-0 mt-4">
-                        Border type
+                        边框类型
                     </label>
                     <v-select
                         v-model="textStyling[selectedTheme][selectedLevel].borderStyle"
-                        label="Border type"
+                        label="边框类型"
                         rounded
                         dense
                         filled
@@ -180,7 +179,7 @@
                 <!-- Border positions -->
                 <div class="w-100 mb-0">
                     <label class="w-100 mb-0 mt-4">
-                        Border positions
+                        边框位置
                     </label>
                     <div id="border-positions" class="d-flex">
                         <v-checkbox
@@ -188,7 +187,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0"
-                            label="Top"
+                            label="顶部"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -197,7 +196,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0 ml-2"
-                            label="Bottom"
+                            label="底部"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -206,7 +205,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0 ml-2"
-                            label="Sides"
+                            label="两侧"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -216,7 +215,7 @@
                 <!-- Font -->
                 <div class="w-100 mb-0">
                     <label class="w-100 mb-0 mt-4">
-                        Font
+                        字体
                     </label>
                     <div id="font-options" class="d-flex">
                         <v-checkbox
@@ -224,7 +223,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0"
-                            label="Bold"
+                            label="加粗"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -233,7 +232,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0 ml-2"
-                            label="Italic"
+                            label="斜体"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -242,7 +241,7 @@
                             hide-details
                             density="compact"
                             class="d-inline-block mt-0 ml-2"
-                            label="Wavy underline (removes borders)"
+                            label="波浪下划线（会移除边框）"
                             @change="updateSampleTextStyling"
                         >
                         </v-checkbox>
@@ -253,15 +252,15 @@
                 <v-simple-table class="rounded-lg no-hover border mt-4" v-if="!loading">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Color</th>
+                            <th>名称</th>
+                            <th>颜色</th>
                             <th>Hex</th>
-                            <th>Reset</th>
+                            <th>重置</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>Border color</td>
+                            <td>边框颜色</td>
                             <td>
                                 <v-menu offset-y :close-on-content-click="false">
                                     <template v-slot:activator="{ on, attrs }">
@@ -299,7 +298,7 @@
                             <td>
                                 <v-btn
                                     icon
-                                    title="Restore default"
+                                    title="恢复默认"
                                     @click="resetColor('borderColor')"
                                 >
                                     <v-icon>mdi-restore</v-icon>
@@ -307,7 +306,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Text color</td>
+                            <td>文字颜色</td>
                             <td>
                                 <v-menu offset-y :close-on-content-click="false">
                                     <template v-slot:activator="{ on, attrs }">
@@ -345,7 +344,7 @@
                             <td>
                                 <v-btn
                                     icon
-                                    title="Restore default"
+                                    title="恢复默认"
                                     @click="resetColor('textColor')"
                                 >
                                     <v-icon>mdi-restore</v-icon>
@@ -353,7 +352,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Background color</td>
+                            <td>背景颜色</td>
                             <td>
                                 <v-menu offset-y :close-on-content-click="false">
                                     <template v-slot:activator="{ on, attrs }">
@@ -391,7 +390,7 @@
                             <td>
                                 <v-btn
                                     icon
-                                    title="Restore default"
+                                    title="恢复默认"
                                     @click="resetColor('backgroundColor')"
                                 >
                                     <v-icon>mdi-restore</v-icon>
@@ -399,7 +398,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Background transparency</td>
+                            <td>背景透明度</td>
                             <td colspan="3">
                                 <div class="px-2">
                                     <v-slider
@@ -424,7 +423,7 @@
                 </div>
 
                 <div class="d-flex justify-end mt-2">
-                    <v-btn rounded depressed color="primary" @click="showResetTextStylingDialog">Reset</v-btn>
+                    <v-btn rounded depressed color="primary" @click="showResetTextStylingDialog">重置</v-btn>
                     <!-- <v-btn rounded depressed color="primary" @click="logTextStylingSettingsObject">Console log settings</v-btn> -->
                 </div>
             </v-container>

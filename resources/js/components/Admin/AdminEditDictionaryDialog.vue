@@ -4,7 +4,7 @@
             <!-- Title -->
             <v-card-title>
                 <v-icon class="mr-2">mdi-file-edit</v-icon>
-                <span class="text-h5">Edit dictionary</span>
+                <span class="text-h5">编辑词典</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -63,7 +63,7 @@
                             :items="supportedMyMemoryLanguages"
                             item-value="name"
                             item-text="name"
-                            placeholder="Language"
+                            placeholder="语言"
                             dense
                             filled
                             rounded
@@ -84,7 +84,7 @@
                             v-model="dictionary.source_language"
                             :items="supportedSourceLanguages"
                             item-value="name"
-                            placeholder="Language"
+                            placeholder="语言"
                             dense
                             filled
                             rounded
@@ -123,7 +123,7 @@
                             v-model="dictionary.target_language"
                             :items="supportedDeeplTargetLanguages"
                             item-value="name"
-                            placeholder="Language"
+                            placeholder="语言"
                             dense
                             filled
                             rounded
@@ -150,7 +150,7 @@
                             :items="supportedMyMemoryLanguages"
                             item-value="name"
                             item-text="name"
-                            placeholder="Language"
+                            placeholder="语言"
                             dense
                             filled
                             rounded
@@ -188,7 +188,7 @@
                             v-model="dictionary.target_language"
                             :items="supportedTargetLanguages"
                             item-value="name"
-                            placeholder="Language"
+                            placeholder="语言"
                             dense
                             filled
                             rounded
@@ -256,7 +256,7 @@
 
                 <!-- Buttons before successfull save -->
                 <template v-if="saveResult !== 'success'">
-                    <v-btn rounded text @click="close">Cancel</v-btn>
+                    <v-btn rounded text @click="close">取消</v-btn>
                     <v-btn 
                         rounded
                         depressed 
@@ -264,12 +264,12 @@
                         :loading="saveResult === 'saving'" 
                         :disabled="saveResult === 'saving'" 
                         @click="save"
-                    >Save</v-btn>
+                    >保存</v-btn>
                 </template>
 
                 <!-- Buttons after successfull save -->
                 <template v-if="saveResult === 'success'">
-                    <v-btn rounded text @click="close">Close</v-btn>
+                    <v-btn rounded text @click="close">关闭</v-btn>
                 </template>
             </v-card-actions>
         </v-card>

@@ -14,11 +14,11 @@
 
         <!-- Title subheader -->
         <div class="d-flex subheader mt-4 mb-4 px-2 ">
-            Users
+            用户
             <v-spacer />
             <v-btn rounded dark color="primary" @click="addUser" >
                 <v-icon class="mr-1">mdi-plus</v-icon>
-                Add user
+                添加用户
             </v-btn>
         </div>
 
@@ -28,7 +28,7 @@
                 <v-text-field
                     v-model="usersFilter"
                     append-icon="mdi-magnify"
-                    label="Search"
+                    label="搜索"
                     filled
                     dense
                     hide-details
@@ -39,11 +39,11 @@
             <v-data-table
                 class="my-4 mb-0 no-hover"
                 :headers="[
-                    { text: 'Name', value: 'name' },
-                    { text: 'E-mail', value: 'email' },
-                    { text: 'Created', value: 'created_at_text', align: 'center' },
-                    { text: 'Admin', value: 'is_admin', align: 'center' },
-                    { text: 'Actions', value: 'actions', align: 'center', sortable: false },
+                    { text: '姓名', value: 'name' },
+                    { text: '邮箱', value: 'email' },
+                    { text: '创建时间', value: 'created_at_text', align: 'center' },
+                    { text: '管理员', value: 'is_admin', align: 'center' },
+                    { text: '操作', value: 'actions', align: 'center', sortable: false },
                 ]"
                 :items="users"
                 :loading="loading"
@@ -51,14 +51,14 @@
             >
                 <!-- Admin -->
                 <template v-slot:item.is_admin="{ item }">
-                    {{ item.is_admin ? 'Yes' : 'No' }}
+                    {{ item.is_admin ? '是' : '否' }}
                 </template>
 
                 <!-- Actions -->
                 <template v-slot:item.actions="{ item }">
                     <v-btn
                         icon
-                        title="Edit"
+                        title="编辑"
                         @click="editUser(item)"
                     >
                         <v-icon>mdi-pencil</v-icon>

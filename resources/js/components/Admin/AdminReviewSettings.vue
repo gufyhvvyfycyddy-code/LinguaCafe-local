@@ -2,26 +2,24 @@
     <div id="admin-review-settings">
         
         <!-- SRS info -->
-        <div class="subheader mt-4">Spaced repetition system</div>
+        <div class="subheader mt-4">间隔重复系统</div>
         <v-alert dark border="left" type="info" color="primary" class="mt-2 mb-4">
-            Numbers represent how many days later words will be reviewed again 
-            after a review or a manual level change.<br><br>
+            数字表示复习或手动调整等级后，单词会在多少天后再次复习。<br><br>
 
-            You can set multiple numbers for a single level by typing in numbers delimited by a comma. 
-            In this case the next review date will be selected based on which day has the least amount of 
-            reviews scheduled at the time of the level change.
+            同一个等级可以填写多个数字，用英文逗号分隔。
+            这种情况下，系统会在等级变化时选择复习任务较少的日期作为下次复习日。
         </v-alert>
 
         <!-- SRS settings -->
         <v-card outlined class="rounded-lg" :loading="!reviewIntervals.length">
             <v-card-text>
-                <label class="font-weight-bold mt-4">SRS settings</label>
+                <label class="font-weight-bold mt-4">SRS 设置</label>
 
                 <v-simple-table dense class="no-hover no-lines">
                     <tbody>
                         <tr v-for="(interval, index) in reviewIntervals" :key="index">
                             <td class="pt-4">
-                                Level {{ interval.name }}:
+                                等级 {{ interval.name }}：
                             </td>
                             <td class="pt-4">
                                 <v-text-field 
@@ -49,7 +47,7 @@
                     :loading="saving"
                     @click="saveSettings"
                 >
-                    Save
+                    保存
                 </v-btn>
             </v-card-actions>
         </v-card>
