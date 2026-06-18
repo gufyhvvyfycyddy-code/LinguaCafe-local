@@ -23,6 +23,7 @@ export const settingNames = {
     mediaControlsVisible: 'media-controls-visible',
     subtitleBlockSpacing: 'subtitle-block-spacing',
     theme: 'theme',
+    uiLanguage: 'ui-language',
     libraryLayout: 'library-layout',
     wordCountDisplayType: 'word-count-display-type',
     textToSpeechSpeed: 'text-to-speech-speed'
@@ -60,6 +61,7 @@ export const defaultSettings = {
 
      // Theme Settings
      theme: 'light',
+     uiLanguage: 'zh-CN',
 
      // Library Layout
      libraryLayout: 'table',

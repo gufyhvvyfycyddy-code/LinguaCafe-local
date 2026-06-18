@@ -23,14 +23,20 @@ class HomeController extends Controller {
     }
 
     public function index() {
-        $selectedLanguage = Auth::user()->selected_language;
+        $user = Auth::user();
+        if (!$user->selected_language) {
+            $user->selected_language = 'english';
+            $user->save();
+        }
+
+        $selectedLanguage = $user->selected_language;
         $userCount = User::count();
-        $userName = Auth::user()->name;
-        $userEmail = Auth::user()->email;
-        $isAdmin = Auth::user()->is_admin === 1;
+        $userName = $user->name;
+        $userEmail = $user->email;
+        $isAdmin = $user->is_admin === 1;
         $theme = $_COOKIE['theme'] ?? 'dark';
         $themeSettings = $this->settingsService->getUserSettingsByName(
-            Auth::user()->id,
+            $user->id,
             ['textStyling', 'vuetifyThemes']
         );
         
@@ -42,7 +48,7 @@ class HomeController extends Controller {
             'isAdmin' => $isAdmin,
             'theme' => $theme,
             'themeSettings' => $themeSettings,
-            'userUuid' => Auth::user()->uuid,
+            'userUuid' => $user->uuid,
         ]);
     }
 

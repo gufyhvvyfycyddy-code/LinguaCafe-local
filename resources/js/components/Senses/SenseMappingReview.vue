@@ -2,54 +2,54 @@
     <v-container id="sense-mapping-review">
         <v-card outlined class="rounded-lg px-4 pb-4 my-4" :loading="loading">
             <div class="subheader my-4 d-flex align-center">
-                Sense mapping review
+                词义确认
                 <v-spacer></v-spacer>
-                <v-chip class="mx-1" color="foreground">Pending {{ summary.pending || 0 }}</v-chip>
-                <v-chip class="mx-1" color="foreground">Bound {{ summary.bound || 0 }}</v-chip>
-                <v-chip class="mx-1" color="foreground">Ignored {{ summary.ignored || 0 }}</v-chip>
-                <v-chip class="mx-1" color="foreground">Rejected {{ summary.rejected || 0 }}</v-chip>
+                <v-chip class="mx-1" color="foreground">待确认 {{ summary.pending || 0 }}</v-chip>
+                <v-chip class="mx-1" color="foreground">已绑定 {{ summary.bound || 0 }}</v-chip>
+                <v-chip class="mx-1" color="foreground">已忽略 {{ summary.ignored || 0 }}</v-chip>
+                <v-chip class="mx-1" color="foreground">已拒绝 {{ summary.rejected || 0 }}</v-chip>
             </div>
 
             <v-row dense>
                 <v-col cols="12" md="2">
-                    <v-select dense filled rounded hide-details label="Status" :items="statuses" v-model="filters.status" @change="reload"></v-select>
+                    <v-select dense filled rounded hide-details label="状态" :items="statuses" v-model="filters.status" @change="reload"></v-select>
                 </v-col>
                 <v-col cols="12" md="2">
-                    <v-text-field dense filled rounded hide-details label="Lemma" v-model="filters.lemma" @keyup.enter="reload"></v-text-field>
+                    <v-text-field dense filled rounded hide-details label="词元" v-model="filters.lemma" @keyup.enter="reload"></v-text-field>
                 </v-col>
                 <v-col cols="12" md="2">
-                    <v-select dense filled rounded hide-details clearable label="Decision" :items="decisions" v-model="filters.decision" @change="reload"></v-select>
+                    <v-select dense filled rounded hide-details clearable label="GPT 判断" :items="decisions" v-model="filters.decision" @change="reload"></v-select>
                 </v-col>
                 <v-col cols="12" md="2">
-                    <v-text-field dense filled rounded hide-details label="Confidence min" v-model="filters.confidence_min" @keyup.enter="reload"></v-text-field>
+                    <v-text-field dense filled rounded hide-details label="最低置信度" v-model="filters.confidence_min" @keyup.enter="reload"></v-text-field>
                 </v-col>
                 <v-col cols="12" md="2">
-                    <v-select dense filled rounded hide-details clearable label="Auto FSRS" :items="autoFsrsFilters" v-model="filters.auto_fsrs_allowed" @change="reload"></v-select>
+                    <v-select dense filled rounded hide-details clearable label="自动 FSRS" :items="autoFsrsFilters" v-model="filters.auto_fsrs_allowed" @change="reload"></v-select>
                 </v-col>
                 <v-col cols="12" md="2" class="d-flex">
-                    <v-btn depressed rounded color="primary" class="mr-2" @click="reload"><v-icon left>mdi-refresh</v-icon>Refresh</v-btn>
-                    <v-btn depressed rounded color="foreground" @click="clearFilters"><v-icon left>mdi-filter-remove</v-icon>Clear</v-btn>
+                    <v-btn depressed rounded color="primary" class="mr-2" @click="reload"><v-icon left>mdi-refresh</v-icon>刷新</v-btn>
+                    <v-btn depressed rounded color="foreground" @click="clearFilters"><v-icon left>mdi-filter-remove</v-icon>清空</v-btn>
                 </v-col>
             </v-row>
         </v-card>
 
         <v-card outlined class="rounded-lg pa-3 mb-3">
             <div class="d-flex align-center flex-wrap">
-                <v-checkbox dense hide-details class="mr-4" :input-value="allSelected" @change="toggleSelectPage" label="Select page"></v-checkbox>
-                <v-chip class="mr-2" color="foreground">{{ selectedIds.length }} selected</v-chip>
-                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(false)">Bulk confirm</v-btn>
-                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(true)">Confirm + FSRS</v-btn>
-                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('ignore')">Bulk ignore</v-btn>
-                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('reject')">Bulk reject</v-btn>
-                <v-btn small depressed color="warning" class="ma-1" @click="bulkHighConfidence">Confirm high confidence</v-btn>
+                <v-checkbox dense hide-details class="mr-4" :input-value="allSelected" @change="toggleSelectPage" label="选择当前页"></v-checkbox>
+                <v-chip class="mr-2" color="foreground">已选择 {{ selectedIds.length }}</v-chip>
+                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(false)">批量确认</v-btn>
+                <v-btn small depressed color="primary" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkConfirm(true)">批量确认并启用 FSRS</v-btn>
+                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('ignore')">批量忽略</v-btn>
+                <v-btn small depressed color="foreground" class="ma-1" :disabled="selectedIds.length === 0" @click="bulkSimple('reject')">批量拒绝</v-btn>
+                <v-btn small depressed color="warning" class="ma-1" @click="bulkHighConfidence">批量确认高置信度</v-btn>
             </div>
             <v-alert v-if="bulkSummary" dense outlined type="info" class="mt-3 mb-0">
-                Processed {{ bulkSummary.processed_count }}, skipped {{ bulkSummary.skipped_count }}, confirmed {{ bulkSummary.confirmed_count }}, ignored {{ bulkSummary.ignored_count }}, rejected {{ bulkSummary.rejected_count }}, review cards {{ bulkSummary.created_review_cards }}.
+                已处理 {{ bulkSummary.processed_count }}，跳过 {{ bulkSummary.skipped_count }}，确认 {{ bulkSummary.confirmed_count }}，忽略 {{ bulkSummary.ignored_count }}，拒绝 {{ bulkSummary.rejected_count }}，复习卡 {{ bulkSummary.created_review_cards }}。
             </v-alert>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
-        <v-alert v-if="!loading && occurrences.length === 0" type="info" dense outlined>No matching occurrences.</v-alert>
+        <v-alert v-if="!loading && occurrences.length === 0" type="info" dense outlined>没有匹配的词义记录。</v-alert>
 
         <v-card
             v-for="occurrence in occurrences"
@@ -60,35 +60,35 @@
             <div class="d-flex align-center mb-2">
                 <v-checkbox dense hide-details class="mr-3" v-model="selected" :value="occurrence.occurrence_id"></v-checkbox>
                 <div>
-                    <v-chip small class="mr-2">{{ occurrence.status }}</v-chip>
+                    <v-chip small class="mr-2">{{ statusLabel(occurrence.status) }}</v-chip>
                     <v-chip small class="mr-2">{{ occurrence.decision }}</v-chip>
                     <v-chip small>{{ confidenceLabel(occurrence.confidence) }}</v-chip>
                 </div>
                 <v-spacer></v-spacer>
-                <v-btn small depressed color="primary" class="mx-1" @click="confirmOccurrence(occurrence)"><v-icon left small>mdi-check</v-icon>Confirm</v-btn>
-                <v-btn small depressed color="foreground" class="mx-1" @click="openBind(occurrence)"><v-icon left small>mdi-link</v-icon>Bind</v-btn>
-                <v-btn small depressed color="foreground" class="mx-1" @click="openCreate(occurrence)"><v-icon left small>mdi-plus</v-icon>New sense</v-btn>
-                <v-btn small depressed color="foreground" class="mx-1" @click="rejectOccurrence(occurrence)"><v-icon left small>mdi-close</v-icon>Reject</v-btn>
-                <v-btn small depressed color="foreground" class="ml-1" @click="ignoreOccurrence(occurrence)"><v-icon left small>mdi-eye-off</v-icon>Ignore</v-btn>
+                <v-btn small depressed color="primary" class="mx-1" @click="confirmOccurrence(occurrence)"><v-icon left small>mdi-check</v-icon>确认</v-btn>
+                <v-btn small depressed color="foreground" class="mx-1" @click="openBind(occurrence)"><v-icon left small>mdi-link</v-icon>改绑</v-btn>
+                <v-btn small depressed color="foreground" class="mx-1" @click="openCreate(occurrence)"><v-icon left small>mdi-plus</v-icon>新建词义</v-btn>
+                <v-btn small depressed color="foreground" class="mx-1" @click="rejectOccurrence(occurrence)"><v-icon left small>mdi-close</v-icon>拒绝</v-btn>
+                <v-btn small depressed color="foreground" class="ml-1" @click="ignoreOccurrence(occurrence)"><v-icon left small>mdi-eye-off</v-icon>忽略</v-btn>
             </div>
 
             <v-row dense>
                 <v-col cols="12" md="7">
-                    <div class="caption text--secondary">Sentence</div>
+                    <div class="caption text--secondary">句子</div>
                     <div class="default-font mb-1">{{ occurrence.sentence_en }}</div>
                     <div class="text--secondary mb-3">{{ occurrence.sentence_zh }}</div>
 
-                    <div class="caption text--secondary">Token</div>
+                    <div class="caption text--secondary">词项</div>
                     <div class="mb-3">
                         <strong>{{ occurrence.surface }}</strong>
                         <span class="text--secondary"> / {{ occurrence.lemma }} / {{ occurrence.pos || 'no pos' }}</span>
                     </div>
 
-                    <div class="caption text--secondary">Evidence</div>
+                    <div class="caption text--secondary">判断依据</div>
                     <pre class="sense-json">{{ formatJson(occurrence.evidence || occurrence.raw_payload) }}</pre>
                 </v-col>
                 <v-col cols="12" md="5">
-                    <div class="caption text--secondary">Current sense</div>
+                    <div class="caption text--secondary">当前词义</div>
                     <v-sheet outlined rounded class="pa-3" v-if="occurrence.sense">
                         <div class="font-weight-medium">{{ occurrence.sense.sense_zh }}</div>
                         <div class="text--secondary">{{ occurrence.sense.sense_en }}</div>
@@ -97,7 +97,7 @@
                         <v-chip small class="mt-2" v-if="occurrence.sense.fsrs_state">FSRS {{ occurrence.sense.fsrs_state }}</v-chip>
                     </v-sheet>
                     <v-sheet outlined rounded class="pa-3 text--secondary" v-else>
-                        No sense is bound yet.
+                        尚未绑定词义。
                     </v-sheet>
                 </v-col>
             </v-row>
@@ -117,12 +117,12 @@
 
         <v-card outlined class="rounded-lg pa-4 mb-4">
             <div class="subheader mb-3 d-flex align-center">
-                Possible duplicates
+                疑似重复词义
                 <v-spacer></v-spacer>
-                <v-text-field dense filled rounded hide-details label="Lemma" class="mr-2" v-model="duplicateLemma" @keyup.enter="loadDuplicates"></v-text-field>
-                <v-btn depressed rounded color="foreground" @click="loadDuplicates"><v-icon left>mdi-magnify</v-icon>Find</v-btn>
+                <v-text-field dense filled rounded hide-details label="词元" class="mr-2" v-model="duplicateLemma" @keyup.enter="loadDuplicates"></v-text-field>
+                <v-btn depressed rounded color="foreground" @click="loadDuplicates"><v-icon left>mdi-magnify</v-icon>查找</v-btn>
             </div>
-            <v-alert v-if="duplicateGroups.length === 0" dense outlined type="info">No possible duplicates loaded.</v-alert>
+            <v-alert v-if="duplicateGroups.length === 0" dense outlined type="info">还没有加载疑似重复词义。</v-alert>
             <v-expansion-panels v-else accordion>
                 <v-expansion-panel v-for="(group, index) in duplicateGroups" :key="index">
                     <v-expansion-panel-header>{{ group.lemma }} / {{ group.pos || 'no pos' }} / {{ group.senses.length }} senses</v-expansion-panel-header>
@@ -130,10 +130,10 @@
                         <v-simple-table dense>
                             <thead>
                                 <tr>
-                                    <th>Sense</th>
-                                    <th>Aliases</th>
-                                    <th>Example</th>
-                                    <th>Review card</th>
+                                    <th>词义</th>
+                                    <th>近义译法</th>
+                                    <th>例句</th>
+                                    <th>复习卡</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -152,9 +152,9 @@
 
         <v-dialog v-model="bindDialog.active" max-width="780">
             <v-card>
-                <v-card-title>Bind to existing sense</v-card-title>
+                <v-card-title>改绑到已有词义</v-card-title>
                 <v-card-text>
-                    <v-alert v-if="candidates.length === 0" type="info" dense outlined>No candidates found for this lemma.</v-alert>
+                    <v-alert v-if="candidates.length === 0" type="info" dense outlined>没有找到同词元的候选词义。</v-alert>
                     <v-radio-group v-model="bindDialog.senseId">
                         <v-radio
                             v-for="sense in candidates"
@@ -170,31 +170,31 @@
                             </template>
                         </v-radio>
                     </v-radio-group>
-                    <v-checkbox v-model="bindDialog.autoFsrsAllowed" label="Create sense review card"></v-checkbox>
+                    <v-checkbox v-model="bindDialog.autoFsrsAllowed" label="创建词义复习卡"></v-checkbox>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn text @click="bindDialog.active = false">Cancel</v-btn>
-                    <v-btn depressed color="primary" :disabled="!bindDialog.senseId" @click="bindOccurrence">Bind</v-btn>
+                    <v-btn text @click="bindDialog.active = false">取消</v-btn>
+                    <v-btn depressed color="primary" :disabled="!bindDialog.senseId" @click="bindOccurrence">改绑</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
 
         <v-dialog v-model="createDialog.active" max-width="720">
             <v-card>
-                <v-card-title>Create sense</v-card-title>
+                <v-card-title>新建词义</v-card-title>
                 <v-card-text>
-                    <v-text-field filled dense label="Chinese sense" v-model="createDialog.form.sense_zh"></v-text-field>
-                    <v-text-field filled dense label="English sense" v-model="createDialog.form.sense_en"></v-text-field>
-                    <v-text-field filled dense label="Part of speech" v-model="createDialog.form.pos"></v-text-field>
-                    <v-text-field filled dense label="Chinese aliases, comma separated" v-model="createDialog.form.aliases_zh"></v-text-field>
-                    <v-text-field filled dense label="Collocations, comma separated" v-model="createDialog.form.collocations"></v-text-field>
-                    <v-checkbox v-model="createDialog.form.auto_fsrs_allowed" label="Create sense review card"></v-checkbox>
+                    <v-text-field filled dense label="中文释义" v-model="createDialog.form.sense_zh"></v-text-field>
+                    <v-text-field filled dense label="英文释义" v-model="createDialog.form.sense_en"></v-text-field>
+                    <v-text-field filled dense label="词性" v-model="createDialog.form.pos"></v-text-field>
+                    <v-text-field filled dense label="中文近义译法，用逗号分隔" v-model="createDialog.form.aliases_zh"></v-text-field>
+                    <v-text-field filled dense label="搭配，用逗号分隔" v-model="createDialog.form.collocations"></v-text-field>
+                    <v-checkbox v-model="createDialog.form.auto_fsrs_allowed" label="创建词义复习卡"></v-checkbox>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer></v-spacer>
-                    <v-btn text @click="createDialog.active = false">Cancel</v-btn>
-                    <v-btn depressed color="primary" :disabled="!createDialog.form.sense_zh" @click="createSense">Create</v-btn>
+                    <v-btn text @click="createDialog.active = false">取消</v-btn>
+                    <v-btn depressed color="primary" :disabled="!createDialog.form.sense_zh" @click="createSense">新建</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -214,12 +214,23 @@
                 duplicateLemma: '',
                 duplicateGroups: [],
                 summary: {},
-                statuses: ['pending', 'bound', 'ignored', 'rejected'],
-                decisions: ['match_existing_sense', 'new_sense', 'uncertain', 'ignore', 'phrase_match'],
+                statuses: [
+                    { text: '待确认', value: 'pending' },
+                    { text: '已绑定', value: 'bound' },
+                    { text: '已忽略', value: 'ignored' },
+                    { text: '已拒绝', value: 'rejected' },
+                ],
+                decisions: [
+                    { text: '匹配已有词义', value: 'match_existing_sense' },
+                    { text: '新词义', value: 'new_sense' },
+                    { text: '不确定', value: 'uncertain' },
+                    { text: '忽略', value: 'ignore' },
+                    { text: '短语匹配', value: 'phrase_match' },
+                ],
                 autoFsrsFilters: [
-                    { text: 'Any', value: null },
-                    { text: 'Allowed', value: true },
-                    { text: 'Not allowed', value: false },
+                    { text: '全部', value: null },
+                    { text: '允许', value: true },
+                    { text: '不允许', value: false },
                 ],
                 filters: {
                     status: 'pending',
@@ -297,7 +308,7 @@
                     this.pagination = response.data.pagination;
                     this.selected = this.selected.filter((id) => this.occurrences.some((occurrence) => occurrence.occurrence_id === id));
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || 'Failed to load occurrences.';
+                    this.error = error.response?.data?.message || '词义记录加载失败。';
                 }).finally(() => {
                     this.loading = false;
                 });
@@ -334,7 +345,7 @@
                     this.bindDialog.active = false;
                     this.loadOccurrences();
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || 'Failed to bind occurrence.';
+                    this.error = error.response?.data?.message || '改绑失败。';
                 });
             },
             openCreate(occurrence) {
@@ -355,14 +366,14 @@
                         this.createDialog.active = false;
                         this.loadOccurrences();
                     }).catch((error) => {
-                        this.error = error.response?.data?.message || 'Failed to create sense.';
+                        this.error = error.response?.data?.message || '新建词义失败。';
                     });
             },
             postAction(url) {
                 axios.post(url).then(() => {
                     this.loadOccurrences();
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || 'Action failed.';
+                    this.error = error.response?.data?.message || '操作失败。';
                 });
             },
             confidenceLabel(confidence) {
@@ -391,7 +402,7 @@
                 });
             },
             bulkSimple(action) {
-                if (!window.confirm(`Bulk ${action} ${this.selectedIds.length} occurrences?`)) {
+                if (!window.confirm(`确认批量${action === 'ignore' ? '忽略' : '拒绝'} ${this.selectedIds.length} 条记录？`)) {
                     return;
                 }
 
@@ -402,11 +413,11 @@
                     this.selected = [];
                     this.loadOccurrences();
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || `Bulk ${action} failed.`;
+                    this.error = error.response?.data?.message || `批量操作失败。`;
                 });
             },
             bulkHighConfidence() {
-                if (!window.confirm('Confirm all high-confidence matched existing senses in the current filter scope?')) {
+                if (!window.confirm('确认当前筛选范围内所有高置信度已有词义匹配？')) {
                     return;
                 }
 
@@ -420,7 +431,7 @@
                     this.selected = [];
                     this.loadOccurrences();
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || 'High-confidence confirmation failed.';
+                    this.error = error.response?.data?.message || '高置信度批量确认失败。';
                 });
             },
             loadDuplicates() {
@@ -431,8 +442,18 @@
                 }).then((response) => {
                     this.duplicateGroups = response.data;
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || 'Failed to load possible duplicates.';
+                    this.error = error.response?.data?.message || '疑似重复词义加载失败。';
                 });
+            },
+            statusLabel(status) {
+                const labels = {
+                    pending: '待确认',
+                    bound: '已绑定',
+                    ignored: '已忽略',
+                    rejected: '已拒绝',
+                };
+
+                return labels[status] || status;
             },
         }
     }

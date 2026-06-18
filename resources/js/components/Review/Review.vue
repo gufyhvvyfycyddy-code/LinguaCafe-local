@@ -33,12 +33,12 @@
             <template v-if="totalReviews === 0">
                 <!-- Card title -->
                 <v-card-title>
-                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>No cards to be reviewed.
+                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>当前没有到期卡片
                 </v-card-title>
 
                 <!-- Card content -->
                 <v-card-text>
-                    There are no words or phrases to be reviewed.
+                    当前没有需要复习的单词或短语。
                 </v-card-text>
             </template>
 
@@ -46,13 +46,12 @@
             <template v-if="totalReviews > 0">
                 <!-- Card title -->
                 <v-card-title>
-                    <v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>Congratulations!
+                    <v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>复习完成
                 </v-card-title>
 
                 <!-- Card content -->
                 <v-card-text>
-                    You have finished reviewing{{ formatNumber(totalReviews) }} cards. Keep up the good work, and your
-                    <span class="text-capitalize">{{ language }}</span> skills will improve steadily. Consistency is key!
+                    你已经完成 {{ formatNumber(totalReviews) }} 张卡片。保持节奏，{{ language }} 学习会稳步进步。
                 </v-card-text>
             </template>
 
@@ -61,7 +60,7 @@
                 <v-spacer />
                 <v-btn rounded depressed color="primary" to="/">
                     <v-icon class="mr-1">mdi-home</v-icon>
-                    Home
+                    首页
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -269,7 +268,7 @@
 
                             <!-- Reveal button -->
                             <div class="review-button-box">
-                                <v-btn rounded id="review-reveal-button" color="success" @click="reveal" v-if="!revealed && !newCardAnimation && !backToDeckAnimation && !intoTheCorrectDeckAnimation"><v-icon>mdi-rotate-3d-variant</v-icon> Reveal</v-btn>
+                                <v-btn rounded id="review-reveal-button" color="success" @click="reveal" v-if="!revealed && !newCardAnimation && !backToDeckAnimation && !intoTheCorrectDeckAnimation"><v-icon>mdi-rotate-3d-variant</v-icon> 显示答案</v-btn>
                             </div>
                         </div>
 
@@ -341,10 +340,10 @@
 
                             <!-- Answer buttons -->
                             <div class="review-button-box">
-                                <v-btn rounded class="review-rating-button" color="error" @click="rateReview('again')" v-if="revealed">Again</v-btn>
-                                <v-btn rounded class="review-rating-button" color="warning" @click="rateReview('hard')" v-if="revealed">Hard</v-btn>
-                                <v-btn rounded class="review-rating-button" color="success" @click="rateReview('good')" v-if="revealed">Good</v-btn>
-                                <v-btn rounded class="review-rating-button" color="primary" @click="rateReview('easy')" v-if="revealed">Easy</v-btn>
+                                <v-btn rounded class="review-rating-button" color="error" @click="rateReview('again')" v-if="revealed">忘了</v-btn>
+                                <v-btn rounded class="review-rating-button" color="warning" @click="rateReview('hard')" v-if="revealed">勉强记得</v-btn>
+                                <v-btn rounded class="review-rating-button" color="success" @click="rateReview('good')" v-if="revealed">记得</v-btn>
+                                <v-btn rounded class="review-rating-button" color="primary" @click="rateReview('easy')" v-if="revealed">很熟</v-btn>
                             </div>
                         </div>
                     </div>

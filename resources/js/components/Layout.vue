@@ -38,7 +38,7 @@
                     </v-list-item>
                     <v-list-item class="navigation-button" @click="openLogoutDialog">
                         <v-icon> mdi-logout </v-icon>
-                        <span class="pl-6"> Logout </span>
+                        <span class="pl-6"> 退出登录 </span>
                     </v-list-item>
                 </v-list>
 
@@ -49,28 +49,28 @@
                             <!-- Navigation buttons -->
                             <v-list-item class="navigation-button" @click="collapseNavbar">
                                 <v-icon> mdi-arrow-collapse-left </v-icon>
-                                <span class="pl-6"> Hide</span>
+                                <span class="pl-6"> 收起</span>
                             </v-list-item>
                             <v-list-item class="navigation-button" @click="themeSelectionDialog = true;">
                                 <v-icon> mdi-palette </v-icon>
-                                <span class="pl-6"> Theme</span>
+                                <span class="pl-6"> 主题</span>
                             </v-list-item>
                             <v-list-item class="navigation-button" @click="languageSelectionDialog = true;">
                                 <v-img class="border" :src="'/images/flags/' + selectedLanguage.toLowerCase() + '.png'" max-width="26" height="17"></v-img>
-                                <span class="pl-5"> Language</span>
+                                <span class="pl-5"> 学习语言：{{ selectedLanguageName }}</span>
                             </v-list-item>
                         </v-list>
                     </template>
 
                     <!-- Mini navigation drawer -->
                     <template v-else>
-                        <v-btn v-if="$vuetify.breakpoint.lgAndUp" id="collapse" rounded text class="mini-drawer-button" @click="expandNavbar" title="Expand sidebar">
+                        <v-btn v-if="$vuetify.breakpoint.lgAndUp" id="collapse" rounded text class="mini-drawer-button" @click="expandNavbar" title="展开侧栏">
                             <v-icon>mdi-arrow-collapse-right</v-icon>
                         </v-btn>
-                        <v-btn id="theme" rounded text class="mini-drawer-button" @click="themeSelectionDialog = true" title="Theme">
+                        <v-btn id="theme" rounded text class="mini-drawer-button" @click="themeSelectionDialog = true" title="主题">
                             <v-icon>mdi-palette</v-icon>
                         </v-btn>
-                        <v-btn id="language" rounded text class="mini-drawer-button" @click="languageSelectionDialog = true" title="Select language">
+                        <v-btn id="language" rounded text class="mini-drawer-button" @click="languageSelectionDialog = true" :title="'学习语言：' + selectedLanguageName">
                             <v-img :src="'/images/flags/' + selectedLanguage.toLowerCase() + '.png'" max-width="31" height="20"></v-img>
                         </v-btn>
                     </template>
@@ -80,7 +80,7 @@
             <!-- Bottom navigation -->
             <v-bottom-navigation dense grow shift class="d-flex d-sm-flex d-md-none" dark background-color="primary">
                 <v-btn class="text-decoration-none" width="60" style="float: left;" @click="drawer = true;">
-                    <span>More</span>
+                    <span>更多</span>
                     <v-icon>mdi-menu</v-icon>
                 </v-btn><v-spacer></v-spacer>
                 <v-btn
@@ -122,50 +122,50 @@
                 navbarCollapsed: false,
                 navigation: [
                     {
-                        name: 'Home',
+                        name: '首页',
                         url: '/',
                         icon: 'mdi-home',
                         bottomNav: true,
                     },
                     {
-                        name: 'Library',
+                        name: '阅读材料',
                         url: '/books',
                         icon: 'mdi-bookshelf',
                         bottomNav: true,
                     },
                     {
-                        name: 'Vocabulary',
+                        name: '词汇',
                         url: '/vocabulary/search',
                         icon: 'mdi-translate',
                         bottomNav: true,
                     },
                     {
-                        name: 'Review',
+                        name: '单词复习',
                         url: '',
                         click: this.openStartReviewDialog,
                         icon: 'mdi-playlist-check',
                         bottomNav: false,
                     },
                     {
-                        name: 'Sense review',
+                        name: '词义确认',
                         url: '/senses/review',
                         icon: 'mdi-check-decagram',
                         bottomNav: false,
                     },
                     {
-                        name: 'Sense FSRS Review',
+                        name: '词义复习',
                         url: '/reviews/senses',
                         icon: 'mdi-brain',
                         bottomNav: false,
                     },
                     {
-                        name: 'User settings',
+                        name: '设置',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',
                         bottomNav: false,
                     },
                     {
-                        name: 'User manual',
+                        name: '用户手册',
                         url: '/user-manual',
                         icon: 'mdi-account-question',
                         bottomNav: false,
@@ -183,6 +183,22 @@
 
                 const settingsCssObject = TextStylingService.getTextStylingSettingsObject(settingsObject)
                 return settingsCssObject[this.theme]
+            },
+            selectedLanguageName: function() {
+                const names = {
+                    english: '英语',
+                    japanese: '日语',
+                    chinese: '中文',
+                    spanish: '西班牙语',
+                    french: '法语',
+                    german: '德语',
+                    korean: '韩语',
+                    italian: '意大利语',
+                    russian: '俄语',
+                    portuguese: '葡萄牙语',
+                };
+
+                return names[String(this.selectedLanguage || '').toLowerCase()] || this.selectedLanguage;
             }
         },
         props: {
@@ -215,7 +231,7 @@
 
             if (this.$props._selectedLanguage == 'japanese') {
                 this.navigation.splice(3, 0, {
-                    name: 'Kanji',
+                    name: '汉字',
                     url: '/kanji/search',
                     icon: 'mdi-ideogram-cjk',
                     bottomNav: false,
@@ -224,7 +240,7 @@
 
             if(this.$store.getters['shared/userAdmin']) {
                 this.navigation.push({
-                    name: 'Admin settings',
+                    name: '管理员设置',
                     url: '/admin',
                     icon: 'mdi-shield-lock',
                     bottomNav: false,
@@ -240,6 +256,10 @@
             // load navbar status
             const savedNavbarCollapsed = DefaultLocalStorageManager.loadSetting('navbar-collapsed');
             this.navbarCollapsed = savedNavbarCollapsed ? savedNavbarCollapsed === 'true' : false;
+
+            if (!DefaultLocalStorageManager.loadSetting('uiLanguage')) {
+                DefaultLocalStorageManager.saveSetting('uiLanguage', 'zh-CN');
+            }
         },
         mounted() {
             // load default and selected font types into the dom
@@ -290,13 +310,13 @@
                 DefaultLocalStorageManager.saveSetting('navbar-collapsed', this.navbarCollapsed);
             },
             navigationClick(itemName, event) {
-                if (itemName === 'Review') {
+                if (itemName === '单词复习' || itemName === 'Review') {
                     this.startReviewDialog = true;
                     event.preventDefault();
                 }
 
                 // clicked on user manual
-                if (itemName === 'User manual' && this.$router.currentRoute.path !== '/user-manual') {
+                if ((itemName === '用户手册' || itemName === 'User manual') && this.$router.currentRoute.path !== '/user-manual') {
                     this.$router.push({ path: '/user-manual', replace: true });
                 }
 

@@ -4,6 +4,8 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\UserService;
+use App\Services\GoalService;
+use App\Services\SettingsService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -14,15 +16,17 @@ class CreateLocalUser extends Command
         {--email= : Login email address}
         {--password= : Login password, 8 to 32 characters}
         {--name= : Display name, defaults to email}
+        {--study-language=english : Default study language}
         {--admin : Create the user as an admin}';
 
     protected $description = 'Create a local LinguaCafe user for development.';
 
-    public function handle(UserService $userService): int
+    public function handle(UserService $userService, GoalService $goalService, SettingsService $settingsService): int
     {
         $email = trim((string) $this->option('email'));
         $password = (string) $this->option('password');
         $name = trim((string) ($this->option('name') ?: $email));
+        $studyLanguage = strtolower(trim((string) $this->option('study-language'))) ?: 'english';
         $isAdmin = (bool) $this->option('admin') || User::count() === 0;
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -45,13 +49,19 @@ class CreateLocalUser extends Command
 
         try {
             $userService->createUser($name, $email, $password, $isAdmin, true);
+            $user = User::where('email', $email)->firstOrFail();
+            $user->selected_language = $studyLanguage;
+            $user->save();
+            $goalService->createGoalsForLanguage($user->id, $studyLanguage);
+            $settingsService->updateUserSettings($user->id, [
+                'uiLanguage' => 'zh-CN',
+            ]);
         } catch (\Throwable $exception) {
             $this->error($exception->getMessage());
 
             return self::FAILURE;
         }
 
-        $user = User::where('email', $email)->first();
         if (!$user || !Hash::check($password, $user->password) || !Auth::validate(['email' => $email, 'password' => $password])) {
             $this->error('User was created, but the login credentials could not be verified.');
 

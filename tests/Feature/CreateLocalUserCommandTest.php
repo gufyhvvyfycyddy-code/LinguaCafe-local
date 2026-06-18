@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Models\Setting;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -27,11 +28,13 @@ class CreateLocalUserCommandTest extends TestCase
         $this->assertTrue((bool) $user->is_admin);
         $this->assertTrue((bool) $user->password_changed);
         $this->assertNotNull($user->uuid);
+        $this->assertSame('english', $user->selected_language);
         $this->assertTrue(Hash::check('12345678', $user->password));
         $this->assertTrue(Auth::validate([
             'email' => 'test@example.com',
             'password' => '12345678',
         ]));
+        $this->assertSame('zh-CN', json_decode(Setting::where('user_id', $user->id)->where('name', 'uiLanguage')->value('value')));
     }
 
     public function test_user_create_command_rejects_duplicate_email(): void

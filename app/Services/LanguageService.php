@@ -58,10 +58,19 @@ class LanguageService {
     }
     
     public function getInstalledLanguages() {
-        $installedLanguages = Http::get($this->pythonService . ':8678/models/list');
-        $installedLanguages = json_decode($installedLanguages);
-        
-        return $installedLanguages;
+        try {
+            $installedLanguages = Http::timeout(2)->get($this->pythonServiceUrl() . '/models/list');
+
+            if (!$installedLanguages->successful()) {
+                return [];
+            }
+
+            $decodedLanguages = json_decode($installedLanguages->body());
+
+            return is_array($decodedLanguages) ? $decodedLanguages : [];
+        } catch (\Throwable $exception) {
+            return [];
+        }
     }
 
     public function installLanguage($language, $installableLanguages) {
@@ -69,7 +78,7 @@ class LanguageService {
             throw new \Exception('This language does not require install.');
         }
 
-        $installResult = Http::post($this->pythonService . ':8678/models/install', [
+        $installResult = Http::post($this->pythonServiceUrl() . '/models/install', [
             'language' => $language,
         ]);
 
@@ -115,8 +124,17 @@ class LanguageService {
         Storage::deleteDirectory('images/kanjivg');
 
         // delete python language models
-        $uninstallResult = Http::delete($this->pythonService . ':8678/models/remove');
+        $uninstallResult = Http::delete($this->pythonServiceUrl() . '/models/remove');
 
         return $uninstallResult;
+    }
+
+    private function pythonServiceUrl(): string
+    {
+        if (str_starts_with($this->pythonService, 'http://') || str_starts_with($this->pythonService, 'https://')) {
+            return rtrim($this->pythonService, '/');
+        }
+
+        return 'http://' . rtrim($this->pythonService, '/') . ':8678';
     }
 }

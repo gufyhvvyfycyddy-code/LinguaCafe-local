@@ -2,13 +2,22 @@
     <v-dialog content-class="language-selection-dialog" v-model="value" scrollable persistent>
         <v-card class="rounded-lg" :loading="loading">
             <v-card-title>
-                <span class="text-h5">Language</span>
+                <span class="text-h5">学习语言</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
             <v-card-text>
+                <v-alert
+                    v-if="error"
+                    dense
+                    outlined
+                    type="error"
+                    class="rounded-lg mt-2"
+                >
+                    {{ error }}
+                </v-alert>
 
                 <v-alert
                     v-if="notInstalledLanguages"
@@ -21,21 +30,21 @@
                     <v-row align="center">
                         <v-col class="grow">
                             <template v-if="notInstalledLanguages === 1">
-                                There is 1 additional language that can be installed.
+                                还有 1 种学习语言可以安装。
                             </template>
 
                             <template v-else>
-                                There are {{ notInstalledLanguages }} additional languages that can be installed.
+                                还有 {{ notInstalledLanguages }} 种学习语言可以安装。
                             </template>
 
                             <template v-if="!$store.getters['shared/userAdmin']">
-                                Languages can only installed by admin users.
+                                只有管理员可以安装学习语言。
                             </template>
                         </v-col>
                         <v-col class="shrink" v-if="$store.getters['shared/userAdmin']">
                             <v-btn outlined depressed rounded color="foreground" @click="manageLanguages">
                                 <v-icon class="mr-1">mdi-cog</v-icon>
-                                Manage languages
+                                管理语言
                             </v-btn>
                         </v-col>
                     </v-row>
@@ -58,13 +67,13 @@
                             max-width="43" 
                             height="28"
                         ></v-img> 
-                        <span>{{ language }}</span>
+                        <span>{{ languageName(language) }}</span>
                     </v-btn>
                 </div>
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -81,6 +90,7 @@
                 loading: false,
                 supportedLanguages: [],
                 notInstalledLanguages: 0,
+                error: '',
             };
         },
         watch: { 
@@ -103,11 +113,17 @@
             loadLanguages() {
                 this.loading = true;
                 this.notInstalledLanguages = 0;
+                this.error = '';
 
                 // get selected and supported languages
                 axios.get('/languages/get-language-selection-dialog-data').then((response) => {
                     this.supportedLanguages = response.data.languages;
                     this.notInstalledLanguages = response.data.notInstalledLanguages;
+                }).catch((error) => {
+                    this.error = error.response?.data?.message || '学习语言加载失败，请确认已登录且后端服务正在运行。';
+                    this.supportedLanguages = ['English'];
+                    this.notInstalledLanguages = 0;
+                }).finally(() => {
                     this.loading = false;
                 });
             },
@@ -115,8 +131,25 @@
                 var language = newLanguage.toLowerCase();
                 axios.get('/languages/select/' + language).then(function (response) {
                     document.location.href = '/';
-                }.bind(this)).catch(function (error) {}).then(() => {
+                }.bind(this)).catch((error) => {
+                    this.error = error.response?.data?.message || '学习语言切换失败。';
                 });
+            },
+            languageName(language) {
+                const names = {
+                    english: '英语',
+                    japanese: '日语',
+                    chinese: '中文',
+                    spanish: '西班牙语',
+                    french: '法语',
+                    german: '德语',
+                    korean: '韩语',
+                    italian: '意大利语',
+                    russian: '俄语',
+                    portuguese: '葡萄牙语',
+                };
+
+                return names[String(language).toLowerCase()] || language;
             },
             close() {
                 this.$emit('input', false);

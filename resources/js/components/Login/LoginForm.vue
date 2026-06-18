@@ -18,7 +18,7 @@
         <v-card outlined class="rounded-lg mt-16" width="600px">
             <!-- Form title -->
             <v-card-title>
-                <v-icon class="mr-2">mdi-account</v-icon>Login
+                <v-icon class="mr-2">mdi-account</v-icon>登录
                 <v-spacer />
                 <v-btn rounded depressed @click="themeSelectionDialog = true;">
                     <v-icon class="mr-2">mdi-weather-sunny</v-icon> / <v-icon class="ml-2">mdi-weather-night</v-icon>
@@ -36,8 +36,8 @@
                         border="left"
                         dark
                     >
-                        It seems like this is your first time using LinguaCafe after installation. Please create your first user, 
-                        it will be automatically set as admin.
+                        看起来这是安装后第一次使用 LinguaCafe。请先创建第一个本地用户，
+                        该用户会自动成为管理员。
 
                         <div class="d-flex mt-4">
                             <v-spacer />
@@ -49,7 +49,7 @@
                                 @click="addUserDialog = true;"
                             >   
                                 <v-icon color="text" class="mr-2">mdi-account-plus</v-icon>
-                                Create first user
+                                创建第一个用户
                             </v-btn>
                         </div>
                     </v-alert>
@@ -62,23 +62,23 @@
                         border="left"
                         dark
                     >
-                        User account created successfully.
+                        用户账号创建成功。
                     </v-alert>                
 
                     <!-- Forms -->
-                    <label class="font-weight-bold">E-mail address</label>
+                    <label class="font-weight-bold">邮箱</label>
                     <v-text-field
                         v-model="email"
                         rounded
                         filled
                         dense
                         name="linguacafe-email"
-                        placeholder="E-mail address"
+                        placeholder="邮箱"
                         :rules="[rules.email]"
                         @keyup.enter="login"
                     />
 
-                    <label class="font-weight-bold">Password</label>
+                    <label class="font-weight-bold">密码</label>
                     <v-text-field
                         v-model="password"
                         rounded
@@ -86,7 +86,7 @@
                         dense
                         type="password"
                         name="linguacafe-password"
-                        placeholder="Password"
+                        placeholder="密码"
                         :rules="[rules.password]"
                         @keyup.enter="login"
                     />
@@ -115,7 +115,7 @@
                     :loading="loading"
                     @click="login"
                 >
-                    Login
+                    登录
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -142,14 +142,14 @@
                 rules: {
                     password: value => {
                         if (value.length < 1) {
-                            return 'Invalid password.';
+                            return '请输入密码。';
                         }
                         
                         return true;
                     },
                     email: value => {
                         const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
-                        return pattern.test(value) || 'Invalid e-mail.';
+                        return pattern.test(value) || '请输入有效邮箱。';
                     }
                 }
             };
@@ -175,11 +175,11 @@
                     if(response.status === 200) {
                         window.location.href = "/";
                     } else {
-                        this.error = 'Invalid email or password';
+                        this.error = '邮箱或密码不正确';
                         this.loading = false;
                     }
                 }).catch((error) => {
-                    this.error = 'Invalid email or password';
+                    this.error = '邮箱或密码不正确';
                     this.loading = false;
                 });
             },
