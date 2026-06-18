@@ -12,14 +12,16 @@ use Illuminate\Support\Facades\DB;
 // services
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class ImportService {
 
     // stores the python service container's name
     private $pythonService = '';
+    private bool $lastImportUsedFallback = false;
 
     public function __construct() {
-        $this->pythonService = env('PYTHON_CONTAINER_NAME', 'linguacafe-python-service');
+        $this->pythonService = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
     }
 
     public function importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, $file, $bookId, $bookName, $chapterName) {
@@ -35,22 +37,35 @@ class ImportService {
 
         $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName);        
         
-        return 'success';
+        return 'tokenizer';
     }
 
     public function importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName) {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
-        $chunks = $this->postTokenizer('/tokenizer/import-text', [
-            'language' => $selectedLanguage,
-            'importText' => $importText,
-            'chunkSize' => $chunkSize
-        ]);
+        $this->lastImportUsedFallback = false;
+        try {
+            $chunks = $this->postTokenizer('/tokenizer/import-text', [
+                'language' => $selectedLanguage,
+                'importText' => $importText,
+                'chunkSize' => $chunkSize
+            ]);
+        } catch (\Throwable $exception) {
+            if ($selectedLanguage !== 'english') {
+                throw $exception;
+            }
 
-        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName);        
+            Log::warning('Python tokenizer import-text failed; using English fallback chunking.', [
+                'error' => $exception->getMessage(),
+            ]);
+            $chunks = $this->fallbackEnglishChunks($importText, $chunkSize);
+            $this->lastImportUsedFallback = true;
+        }
 
-        return 'success';
+        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, false, $this->lastImportUsedFallback ? 'fallback' : 'tokenizer');        
+
+        return $this->lastImportUsedFallback ? 'fallback' : 'tokenizer';
     }
 
     public function importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName) {
@@ -64,6 +79,8 @@ class ImportService {
         ]);
 
         $this->importChunks($subtitles, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, true);
+
+        return 'tokenizer';
     }
 
     /*
@@ -71,7 +88,7 @@ class ImportService {
         Imports chunks fo raw and tokenized texts. This function
         is used by other import functions to avoid code dupication.
     */
-    private function importChunks($chunks, $userId, $userUuid, $language, $bookName, $bookId, $chapterName, $isSubtitle = false) {
+    private function importChunks($chunks, $userId, $userUuid, $language, $bookName, $bookId, $chapterName, $isSubtitle = false, $processingMode = 'tokenizer') {
         if (!is_array($chunks) || count($chunks) === 0) {
             throw new \Exception('文本处理服务没有返回可导入的章节内容。');
         }
@@ -111,6 +128,9 @@ class ImportService {
             $chapter->subtitle_timestamps = '';
             $chapter->type = $isSubtitle ? 'subtitle' : 'text';
             $chapter->raw_text = $isSubtitle ? json_encode($chunk) : $chunk;
+            if (property_exists($chapter, 'processing_mode') || \Illuminate\Support\Facades\Schema::hasColumn('chapters', 'processing_mode')) {
+                $chapter->processing_mode = $processingMode;
+            }
             $chapter->save();
             
             \App\Jobs\ProcessChapter::dispatch($userId, $userUuid, $chapter->id, $language);
@@ -164,5 +184,38 @@ class ImportService {
         }
 
         return 'http://' . rtrim($this->pythonService, '/') . ':8678';
+    }
+
+    private function fallbackEnglishChunks(string $text, int $chunkSize): array
+    {
+        $normalized = preg_replace("/\r\n|\r|\n/", " ", $text);
+        $normalized = preg_replace('/\s+/', ' ', trim((string) $normalized));
+
+        if ($normalized === '') {
+            throw new \Exception('没有可导入的英文文本。');
+        }
+
+        preg_match_all('/[^.!?]+[.!?]?/u', $normalized, $matches);
+        $sentences = array_values(array_filter(array_map('trim', $matches[0] ?? [])));
+
+        if (count($sentences) === 0) {
+            $sentences = [$normalized];
+        }
+
+        $chunks = [];
+        foreach ($sentences as $sentence) {
+            if ($sentence === '') {
+                continue;
+            }
+
+            $candidate = count($chunks) ? trim($chunks[count($chunks) - 1] . ' ' . $sentence) : $sentence;
+            if (count($chunks) === 0 || mb_strlen($candidate) > $chunkSize) {
+                $chunks[] = $sentence;
+            } else {
+                $chunks[count($chunks) - 1] = $candidate;
+            }
+        }
+
+        return $chunks;
     }
 }

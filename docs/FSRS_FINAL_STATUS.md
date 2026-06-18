@@ -80,3 +80,17 @@ Phase 8：新增本地半自动 GPT workflow 命令、Windows 脚本和 Quicker 
 阅读导入和语言选择已加入失败兜底。Python tokenizer 或接口不可用时，前端会退出 loading 并显示中文错误，不再无限转圈。旧用户缺少 UI language 时，首页会补 `zh-CN`；新用户通过 `user:create` 创建时会初始化 `selected_language=english` 和 `uiLanguage=zh-CN`。
 
 仍需注意：当前环境若 PHP 不在 PATH，则 Laravel 测试、doctor、migration 和浏览器真实后端流程无法执行。前端构建可以单独通过，但真实导入和 Review 接口仍需 PHP/Laravel 环境可用。
+
+## 文本导入 tokenizer 状态
+
+Python tokenizer 位于 `tools/tokenizer.py`，监听端口 `8678`。Windows 启动脚本现在会先检查 tokenizer，再启动 Laravel。
+
+新增脚本：
+
+- `scripts/windows/tokenizer-start.bat`
+- `scripts/windows/tokenizer-stop.bat`
+- `scripts/windows/tokenizer-doctor.bat`
+- `scripts/windows/tokenizer-install-deps.bat`
+- `scripts/windows/tokenizer-requirements.txt`
+
+英文学习语言下新增基础 fallback：tokenizer 不可用时仍能导入英文纯文本，但只做简单切句、分词和小写 lemma。高级词形分析仍需要 Python tokenizer。其他语言 tokenizer 不可用时会给出明确错误。

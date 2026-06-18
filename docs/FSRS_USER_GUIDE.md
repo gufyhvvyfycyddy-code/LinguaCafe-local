@@ -346,4 +346,47 @@ php artisan user:create --email=test@example.com --password=12345678
 
 阅读材料导入依赖文本处理服务。如果服务不可用，页面会退出加载状态并显示“文本处理服务不可用”，不会再无限转圈。
 
+## Python tokenizer 与英文 fallback
+
+LinguaCafe 的高级文本处理服务在：
+
+```text
+tools/tokenizer.py
+```
+
+它监听：
+
+```text
+http://127.0.0.1:8678
+```
+
+Windows 桌面启动脚本会先检查 tokenizer，如果不可访问，会尝试运行：
+
+```bat
+scripts\windows\tokenizer-start.bat
+```
+
+如果提示缺少 Python 依赖，先运行：
+
+```bat
+scripts\windows\tokenizer-install-deps.bat
+```
+
+英文学习语言下，如果 Python tokenizer 不可用，导入纯英文文本会自动使用基础 fallback：按 `. ? !` 切句，按空格和标点做简单分词，lemma 暂时用小写单词。页面会提示“已使用基础英文分词导入。高级词形分析需要 Python tokenizer 服务。”
+
+其他语言仍建议启动 tokenizer，否则会显示明确错误，不会无限加载。
+
+手动检查 tokenizer：
+
+```bat
+scripts\windows\tokenizer-doctor.bat
+```
+
+常见问题：
+
+- Python 不在 PATH：安装 Python 3，或在 `scripts/windows/gpt-workflow-config.bat` 设置 `PYTHON_EXE`。
+- 依赖未安装：运行 `scripts/windows/tokenizer-install-deps.bat`。
+- 端口被占用：检查 8678 端口，或先运行 `scripts/windows/tokenizer-stop.bat`。
+- URL 配置错误：Laravel 默认使用 `http://127.0.0.1:8678`；Docker 环境由 `PYTHON_CONTAINER_NAME` 覆盖。
+
 左下角“学习语言”一直转圈时，通常是学习语言接口失败、用户缺少默认学习语言，或后端服务不可用。现在新用户和旧用户都会兜底使用 `english` 作为学习语言，并使用 `zh-CN` 作为界面语言。

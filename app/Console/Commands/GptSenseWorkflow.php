@@ -8,6 +8,7 @@ use Carbon\Carbon;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Schema;
 
 class GptSenseWorkflow extends Command
@@ -137,6 +138,27 @@ class GptSenseWorkflow extends Command
 
         $this->doctorLine(version_compare(PHP_VERSION, '8.2.0', '>='), 'PHP version: ' . PHP_VERSION, 'Install PHP 8.2 or newer.', $failed);
         $this->doctorLine(
+            $this->pythonAvailable(),
+            'Python is available for tokenizer startup',
+            '安装 Python 3，并确认 python 在 PATH 中；Windows 可在 scripts/windows/gpt-workflow-config.bat 设置 PYTHON_EXE。',
+            $failed,
+            true
+        );
+        $tokenizerUrl = $this->tokenizerUrl();
+        $this->doctorLine(
+            $tokenizerUrl !== '',
+            'tokenizer URL is configured: ' . ($tokenizerUrl ?: '(empty)'),
+            '设置 .env 的 PYTHON_CONTAINER_NAME=http://127.0.0.1:8678，或在 Docker 中使用 linguacafe-python-service。',
+            $failed
+        );
+        $this->doctorLine(
+            $this->tokenizerReachable($tokenizerUrl),
+            'Python tokenizer service is reachable',
+            '运行 scripts/windows/tokenizer-start.bat；若缺少依赖，安装 scripts/windows/tokenizer-requirements.txt 中的包，并安装 en_core_web_sm。',
+            $failed,
+            true
+        );
+        $this->doctorLine(
             extension_loaded('fsrs-rs-php') && class_exists('\fsrs\FSRS') && function_exists('get_default_parameters'),
             'fsrs-rs-php native extension loaded',
             'Build and load fsrs-rs-php. Use fallback only for local tests.',
@@ -250,5 +272,38 @@ class GptSenseWorkflow extends Command
 
         $failed = true;
         $this->error("FAIL {$message}. Fix: {$fix}");
+    }
+
+    private function tokenizerUrl(): string
+    {
+        $configured = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
+        if (str_starts_with($configured, 'http://') || str_starts_with($configured, 'https://')) {
+            return rtrim($configured, '/');
+        }
+
+        return 'http://' . rtrim($configured, '/') . ':8678';
+    }
+
+    private function tokenizerReachable(string $url): bool
+    {
+        if ($url === '') {
+            return false;
+        }
+
+        try {
+            return Http::timeout(3)->get($url . '/models/list')->successful();
+        } catch (\Throwable $exception) {
+            return false;
+        }
+    }
+
+    private function pythonAvailable(): bool
+    {
+        $command = PHP_OS_FAMILY === 'Windows' ? 'where python' : 'command -v python3 || command -v python';
+        $output = [];
+        $exitCode = 1;
+        @exec($command, $output, $exitCode);
+
+        return $exitCode === 0;
     }
 }

@@ -72,7 +72,7 @@ class TextBlockService
     function __construct($userId, $language) {
         $this->userId = $userId;
         $this->language = $language;
-        $this->pythonService = env('PYTHON_CONTAINER_NAME', 'linguacafe-python-service');
+        $this->pythonService = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
     }
 
     /* 
@@ -112,10 +112,22 @@ class TextBlockService
         $text = $this->rawText;
         $text = preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $text));
 
-        $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
-            'raw_text' => $text,
-            'language' => $this->language,
-        ]);
+        try {
+            $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
+                'raw_text' => $text,
+                'language' => $this->language,
+            ]);
+        } catch (\Throwable $exception) {
+            if ($this->language !== 'english') {
+                throw $exception;
+            }
+
+            Log::warning('Python tokenizer failed; using basic English fallback tokenization.', [
+                'user_id' => $this->userId,
+                'error' => $exception->getMessage(),
+            ]);
+            $this->tokenizedWords = $this->fallbackEnglishTokenize($text);
+        }
     }
 
     public function tokenizeRawSubtitles() {
@@ -587,6 +599,43 @@ class TextBlockService
         }
 
         return 'http://' . rtrim($this->pythonService, '/') . ':8678';
+    }
+
+    private function fallbackEnglishTokenize(string $text): array
+    {
+        $tokens = [];
+        $sentenceIndex = 0;
+        $sentences = preg_split('/(?<=[.!?])\s+|(?:\s+NEWLINE\s+)/u', trim($text), -1, PREG_SPLIT_NO_EMPTY);
+
+        foreach ($sentences as $sentence) {
+            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $sentence, $matches);
+
+            foreach ($matches[0] ?? [] as $surface) {
+                if ($surface === '') {
+                    continue;
+                }
+
+                $token = new \stdClass();
+                $token->w = $surface;
+                $token->r = '';
+                $token->l = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)
+                    ? mb_strtolower($surface, 'UTF-8')
+                    : $surface;
+                $token->lr = '';
+                $token->pos = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface) ? 'X' : 'PUNCT';
+                $token->si = $sentenceIndex;
+                $token->g = '';
+                $tokens[] = $token;
+            }
+
+            $sentenceIndex++;
+        }
+
+        if (count($tokens) === 0) {
+            throw new \Exception('基础英文分词没有得到可导入的词。');
+        }
+
+        return $tokens;
     }
 
     /*

@@ -9,6 +9,24 @@ echo.
 
 cd /d "%PROJECT_DIR%"
 
+echo [LinguaCafe] Checking Python tokenizer...
+call "%~dp0tokenizer-doctor.bat" --quiet
+if errorlevel 1 (
+    echo [LinguaCafe] Python tokenizer is not reachable. Starting it now...
+    call "%~dp0tokenizer-start.bat" --no-pause
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "for ($i=0; $i -lt 20; $i++) { try { Invoke-WebRequest -Uri '%TOKENIZER_URL%/models/list' -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { Start-Sleep -Seconds 1 } }; exit 1" >nul 2>&1
+    if errorlevel 1 (
+        echo [LinguaCafe] Python tokenizer still cannot be reached.
+        echo [LinguaCafe] English text import can use the basic fallback, but other languages need the tokenizer.
+        echo [LinguaCafe] Run scripts\windows\tokenizer-doctor.bat for details.
+    ) else (
+        echo [LinguaCafe] Python tokenizer is running.
+    )
+) else (
+    echo [LinguaCafe] Python tokenizer is running.
+)
+echo.
+
 "%PHP_EXE%" --version >nul 2>&1
 if errorlevel 1 (
     echo [LinguaCafe] PHP is not available. Edit scripts\windows\gpt-workflow-config.bat and set PHP_EXE.

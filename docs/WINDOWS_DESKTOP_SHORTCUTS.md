@@ -178,3 +178,31 @@ php artisan user:create --email=test@example.com --password=12345678
 - 学习语言：`english`
 
 如果左下角“学习语言”一直转圈，请检查 Laravel 是否启动、是否已登录、数据库是否有用户，以及后端是否能访问语言接口。导入阅读材料一直加载时，请检查 Python tokenizer 服务是否可用。
+
+## Python tokenizer 启动
+
+阅读材料导入的高级切句、分词、词形还原依赖 Python tokenizer：
+
+```text
+tools/tokenizer.py
+```
+
+桌面快捷方式“LinguaCafe 启动”会先检查：
+
+```text
+http://127.0.0.1:8678/models/list
+```
+
+如果 tokenizer 没启动，会自动调用：
+
+```bat
+scripts\windows\tokenizer-start.bat
+```
+
+如果 Python 或依赖缺失，运行：
+
+```bat
+scripts\windows\tokenizer-install-deps.bat
+```
+
+如果只导入英文文本，即使 tokenizer 没启动，也可以使用基础英文 fallback 完成导入；但日语、中文等其他学习语言仍需要 tokenizer 才能获得正确分词。

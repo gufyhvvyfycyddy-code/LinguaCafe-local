@@ -150,6 +150,10 @@
                             <v-alert dark border="left" type="success" color="success" v-if="importResult === 'success'">
                                 阅读材料和章节已创建成功。章节处理完成后即可阅读。
                             </v-alert>
+
+                            <v-alert dark border="left" type="warning" color="warning" v-if="importResult === 'success' && importWarning">
+                                {{ importWarning }}
+                            </v-alert>
                         </v-stepper-content>
 
                         
@@ -230,6 +234,7 @@
                 importLoading: false,
                 importResult: '',
                 importError: '',
+                importWarning: '',
                 stepperPage: 1  ,
                 isImportSourceValid: false,
                 isImportOptionsValid: false,
@@ -354,10 +359,14 @@
                 this.stepperPage = 5;
                 this.importResult = '';
                 this.importError = '';
+                this.importWarning = '';
 
                 axios.post('/import', data).then((response) => {
                     if (response.status == 200) {
                         this.importResult = 'success';
+                        if (response.data && response.data.processing_mode === 'fallback') {
+                            this.importWarning = '已使用基础英文分词导入。高级词形分析需要 Python tokenizer 服务。';
+                        }
                         this.$emit('import-finished', false);
                     } else {
                         this.importResult = 'error';
@@ -365,7 +374,7 @@
                     }
                 }).catch((error) => {
                     this.importResult = 'error';
-                    this.importError = requestErrorMessage(error, '文本处理服务不可用，请确认后端和 Python tokenizer 服务已经启动。');
+                    this.importError = requestErrorMessage(error, '文本处理服务未启动。请先启动 Python tokenizer，或使用基础英文分词 fallback。');
                 }).finally(() => {
                     this.importLoading = false;
                 });

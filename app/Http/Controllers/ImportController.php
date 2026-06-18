@@ -66,13 +66,13 @@ class ImportController extends Controller {
         try {
             if ($importMethod === 'e-book') {
                 // e-book
-                $this->importService->importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName);
             } else if ($importMethod === 'text') {
                 // text
-                $this->importService->importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName);
             } else if ($importMethod === 'subtitle') {
                 // text
-                $this->importService->importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName);
             }
         } catch (\Exception $e) {
             // delete temp file
@@ -88,7 +88,10 @@ class ImportController extends Controller {
             $this->tempFileService->deleteTempFile($fileName);
         }
 
-        return response()->json('The text has been imported successfully.', 200);
+        return response()->json([
+            'message' => '导入成功。',
+            'processing_mode' => $processingMode ?? 'tokenizer',
+        ], 200);
     }
 
     public function getYoutubeSubtitles(GetYoutubeSubtitlesRequest $request) {

@@ -1,0 +1,10 @@
+bottle
+spacy
+lxml
+lxml_html_clean
+youtube_transcript_api
+ebooklib
+pykakasi
+pinyin
+pysub-parser
+newspaper3k
