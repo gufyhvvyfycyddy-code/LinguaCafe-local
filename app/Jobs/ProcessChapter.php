@@ -130,11 +130,20 @@ class ProcessChapter implements ShouldQueue
             $chapter->wordCount = $chapter->getWordCounts($words);
         }
         
-        event(new \App\Events\ChapterStateUpdatedEvent($this->userUuid, [
-            $chapter->id => [
-                'processing_status' => $chapter->processing_status,
-                'wordCount' => $chapter->wordCount ?? null,
-            ]
-        ]));
+        try {
+            event(new \App\Events\ChapterStateUpdatedEvent($this->userUuid, [
+                $chapter->id => [
+                    'processing_status' => $chapter->processing_status,
+                    'wordCount' => $chapter->wordCount ?? null,
+                ]
+            ]));
+        } catch (\Throwable $e) {
+            Log::warning('Chapter status broadcast failed.', [
+                'user_id' => $this->userId,
+                'chapter_id' => $chapter->id,
+                'language' => $this->language,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 }

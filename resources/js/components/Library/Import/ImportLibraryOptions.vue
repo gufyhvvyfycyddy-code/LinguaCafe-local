@@ -91,6 +91,7 @@
                     placeholder="书名"
                     maxlength="128"
                     :rules="[rules.bookName]"
+                    @input="formChanged"
                     @keyup="formChanged"
                 ></v-text-field>
             </template>
@@ -106,6 +107,7 @@
                     placeholder="章节名"
                     maxlength="120"
                     :rules="[rules.chapterName]"
+                    @input="formChanged"
                     @keyup="formChanged"
                 ></v-text-field>
             </template>
