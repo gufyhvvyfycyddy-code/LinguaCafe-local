@@ -990,6 +990,72 @@ class WordSenseTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_gpt_workflow_doctor_runs_with_actionable_status(): void
+    {
+        $this->resetWorkflowDirectory();
+
+        $this->artisan("senses:gpt-workflow doctor --user_id={$this->user->id} --language=english")
+            ->expectsOutputToContain('LinguaCafe FSRS GPT workflow doctor')
+            ->expectsOutputToContain('PHP version')
+            ->assertSuccessful();
+    }
+
+    public function test_demo_gpt_workflow_runs_end_to_end(): void
+    {
+        $this->resetWorkflowDirectory();
+        $sense = $this->createSense([
+            'sense_key' => 'charge-money',
+            'sense_zh' => '收费；要价',
+            'sense_en' => 'to ask for money as a price',
+        ]);
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/input'));
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/downloads'));
+        File::put(base_path('storage/app/gpt-workflow/input/demo-material.txt'), implode("\n", [
+            'The museum charges a small fee for late-night entry.',
+            'Please charge the battery before tomorrow\'s trip.',
+            'The committee tabled the proposal after a tense debate.',
+            'She kicked the bucket list idea into next year.',
+            'I usually drink water with dinner.',
+        ]));
+
+        $this->artisan("senses:gpt-workflow prepare --user_id={$this->user->id} --language=english --input=storage/app/gpt-workflow/input/demo-material.txt")
+            ->assertSuccessful();
+        $this->assertFileExists(base_path('storage/app/gpt-workflow/package/gpt-sense-package.md'));
+        $this->assertFileExists(base_path('storage/app/gpt-workflow/package/prompt.txt'));
+
+        File::put(
+            base_path('storage/app/gpt-workflow/downloads/demo-sense-mapping.json'),
+            json_encode($this->demoMappingPayload($sense->id), JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE)
+        );
+
+        $this->artisan("senses:gpt-workflow validate-latest --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+        $this->assertCount(1, File::files(base_path('storage/app/gpt-workflow/validated')));
+
+        $this->artisan("senses:gpt-workflow import-latest --user_id={$this->user->id} --language=english --dry-run")
+            ->assertSuccessful();
+        $this->assertSame(0, WordSenseOccurrence::count());
+        $this->assertSame(0, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count());
+
+        $this->artisan("senses:gpt-workflow import-latest --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $this->assertSame(5, WordSenseOccurrence::count());
+        $this->assertSame(1, WordSenseOccurrence::where('status', WordSenseOccurrence::STATUS_BOUND)->count());
+        $this->assertSame(3, WordSenseOccurrence::where('status', WordSenseOccurrence::STATUS_PENDING)->count());
+        $this->assertSame(1, WordSenseOccurrence::where('status', WordSenseOccurrence::STATUS_IGNORED)->count());
+        $this->assertTrue(WordSenseOccurrence::where('type', WordSenseOccurrence::TYPE_PHRASE)->where('status', WordSenseOccurrence::STATUS_PENDING)->exists());
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+
+        $pendingResponse = $this->actingAs($this->user)->getJson('/senses/occurrences?status=pending');
+        $pendingResponse->assertOk();
+        $this->assertSame(3, $pendingResponse->json('summary.pending'));
+
+        $senseReviewResponse = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $senseReviewResponse->assertOk();
+        $this->assertSame(1, $senseReviewResponse->json('summary.due_count'));
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -1128,6 +1194,104 @@ class WordSenseTest extends TestCase
                     'pos' => 'verb',
                 ], $match), $matches),
             ]],
+        ];
+    }
+
+    private function demoMappingPayload(int $matchedSenseId): array
+    {
+        return [
+            'schema_version' => 1,
+            'document_id' => 'demo-material',
+            'language' => 'english',
+            'sentences' => [
+                [
+                    'sentence_id' => 'demo-s001',
+                    'en' => 'The museum charges a small fee for late-night entry.',
+                    'zh' => '博物馆对夜间入场收取少量费用。',
+                    'matches' => [[
+                        'type' => 'word',
+                        'surface' => 'charges',
+                        'lemma' => 'charge',
+                        'pos' => 'verb',
+                        'decision' => 'match_existing_sense',
+                        'matched_sense_id' => $matchedSenseId,
+                        'sense_key' => 'charge-money',
+                        'sense_zh' => '收费；要价',
+                        'sense_en' => 'to ask for money as a price',
+                        'confidence' => 0.96,
+                        'evidence' => 'The sentence uses charge with fee, matching the money sense.',
+                        'auto_fsrs_allowed' => true,
+                    ]],
+                ],
+                [
+                    'sentence_id' => 'demo-s002',
+                    'en' => 'Please charge the battery before tomorrow\'s trip.',
+                    'zh' => '请在明天出行前给电池充电。',
+                    'matches' => [[
+                        'type' => 'word',
+                        'surface' => 'charge',
+                        'lemma' => 'charge',
+                        'pos' => 'verb',
+                        'decision' => 'new_sense',
+                        'sense_zh' => '充电',
+                        'sense_en' => 'to put electrical energy into a battery',
+                        'confidence' => 0.94,
+                        'evidence' => 'The object is battery, which is a different sense from charging money.',
+                        'auto_fsrs_allowed' => false,
+                    ]],
+                ],
+                [
+                    'sentence_id' => 'demo-s003',
+                    'en' => 'The committee tabled the proposal after a tense debate.',
+                    'zh' => '委员会在激烈辩论后搁置了这项提案。',
+                    'matches' => [[
+                        'type' => 'word',
+                        'surface' => 'tabled',
+                        'lemma' => 'table',
+                        'pos' => 'verb',
+                        'decision' => 'uncertain',
+                        'sense_zh' => '搁置；提交讨论',
+                        'sense_en' => 'context-dependent use of table as a verb',
+                        'confidence' => 0.62,
+                        'evidence' => 'The verb table can mean different actions by dialect and context.',
+                        'auto_fsrs_allowed' => false,
+                    ]],
+                ],
+                [
+                    'sentence_id' => 'demo-s004',
+                    'en' => 'I usually drink water with dinner.',
+                    'zh' => '我晚餐通常喝水。',
+                    'matches' => [[
+                        'type' => 'word',
+                        'surface' => 'water',
+                        'lemma' => 'water',
+                        'pos' => 'noun',
+                        'decision' => 'ignore',
+                        'sense_zh' => '水',
+                        'sense_en' => 'water',
+                        'confidence' => 1.0,
+                        'evidence' => 'Common word that does not need a new learning item in this demo.',
+                        'auto_fsrs_allowed' => false,
+                    ]],
+                ],
+                [
+                    'sentence_id' => 'demo-s005',
+                    'en' => 'She kicked the bucket list idea into next year.',
+                    'zh' => '她把那个遗愿清单的想法推迟到了明年。',
+                    'matches' => [[
+                        'type' => 'phrase',
+                        'surface' => 'bucket list',
+                        'lemma' => 'bucket list',
+                        'pos' => 'noun',
+                        'decision' => 'phrase_match',
+                        'sense_zh' => '遗愿清单',
+                        'sense_en' => 'a list of things someone wants to do during their life',
+                        'confidence' => 0.93,
+                        'evidence' => 'This is a phrase-level meaning and phrase FSRS is deferred.',
+                        'auto_fsrs_allowed' => false,
+                    ]],
+                ],
+            ],
         ];
     }
 }

@@ -1,0 +1,281 @@
+# LinguaCafe FSRS 用户手册
+
+## 1. 现在能做什么
+
+当前版本已经支持两套复习流程：
+
+- 单词复习：原 Review 页面继续复习 word card。
+- 词义复习：Sense Review 页面单独复习 sense card。
+
+系统也支持把新英文材料打包给 GPT 网页端，让 GPT 输出 `sense-mapping.json`，再由 LinguaCafe 校验、导入、人工确认，最后进入词义复习。
+
+## 2. Word-only Review 怎么用
+
+打开原来的 Review 页面即可。这个页面只显示 `target_type=word` 的到期卡片。
+
+评分按钮：
+
+- Again
+- Hard
+- Good
+- Easy
+
+点击后由后端 FSRS 服务更新 `review_cards`，并写入 `review_logs`。
+
+## 3. Sense Mapping Review 怎么用
+
+入口：
+
+```text
+/senses/review
+```
+
+这个页面用于处理导入后的 `word_sense_occurrences`。
+
+常见状态：
+
+- `pending`：需要人工确认。
+- `bound`：已经绑定到一个词义。
+- `ignored`：已忽略，不进入 FSRS。
+- `rejected`：已拒绝，不进入 FSRS。
+
+可执行操作：
+
+- 确认当前绑定。
+- 改绑到已有词义。
+- 从 occurrence 新建词义。
+- 忽略。
+- 拒绝。
+- 批量确认、批量忽略、批量拒绝。
+- 批量确认高置信度匹配。
+
+## 4. Sense FSRS Review 怎么用
+
+入口：
+
+```text
+/reviews/senses
+```
+
+这个页面只复习 `target_type=sense` 的到期卡片，不会混入 word card。
+
+进入队列的条件：
+
+- 当前用户。
+- 当前语言。
+- `target_type=sense`。
+- `fsrs_enabled=true`。
+- `fsrs_due_at <= now()`。
+- 对应 `word_sense.status=confirmed`。
+
+不会进入队列的内容：
+
+- `ai_suggested` sense。
+- `rejected` sense。
+- phrase card。
+- word card。
+
+## 5. 如何准备新英文材料
+
+把新材料保存为纯文本文件，例如：
+
+```text
+storage/app/gpt-workflow/input/new-material.txt
+```
+
+每句英文建议单独一行。材料越清晰，GPT 返回的 `sentence_id` 和匹配结果越容易校验。
+
+## 6. 如何生成 GPT package
+
+运行：
+
+```bash
+php artisan senses:gpt-workflow prepare --user_id=1 --language=english --input=storage/app/gpt-workflow/input/new-material.txt
+```
+
+生成文件：
+
+- `storage/app/gpt-workflow/package/gpt-sense-package.md`
+- `storage/app/gpt-workflow/package/prompt.txt`
+
+也可以直接生成 package：
+
+```bash
+php artisan senses:make-gpt-package --user_id=1 --language=english --input=storage/app/gpt-workflow/input/new-material.txt --output=storage/app/gpt-sense-package.md
+```
+
+## 7. 如何把 package 发给 GPT
+
+打开 ChatGPT 网页端，把 `prompt.txt` 和 `gpt-sense-package.md` 的内容发给 GPT。
+
+要求 GPT：
+
+- 只输出严格 JSON。
+- 不输出解释。
+- 不输出 Markdown。
+- 不省略 `schema_version`。
+
+## 8. GPT 返回 JSON 后放在哪里
+
+把 GPT 输出保存为 `.json` 文件，放到：
+
+```text
+storage/app/gpt-workflow/downloads/
+```
+
+推荐文件名：
+
+```text
+sense-mapping.json
+```
+
+## 9. 如何 validate
+
+运行：
+
+```bash
+php artisan senses:gpt-workflow validate-latest --user_id=1 --language=english
+```
+
+校验成功后，文件会复制到：
+
+```text
+storage/app/gpt-workflow/validated/
+```
+
+校验失败后，文件会复制到：
+
+```text
+storage/app/gpt-workflow/failed/
+```
+
+同时生成 `.errors.json` 错误报告。
+
+## 10. 如何 dry-run
+
+正式导入前先运行：
+
+```bash
+php artisan senses:gpt-workflow import-latest --user_id=1 --language=english --dry-run
+```
+
+dry-run 只显示将要导入的 summary，不写数据库。
+
+## 11. 如何 import
+
+确认 dry-run 结果后运行：
+
+```bash
+php artisan senses:gpt-workflow import-latest --user_id=1 --language=english
+```
+
+导入成功后，文件会复制到：
+
+```text
+storage/app/gpt-workflow/imported/
+```
+
+## 12. 如何进入人工确认
+
+导入后打开：
+
+```text
+/senses/review
+```
+
+在这里处理 pending occurrences。
+
+## 13. 如何进入词义复习
+
+确认词义并启用 FSRS 后打开：
+
+```text
+/reviews/senses
+```
+
+这里会显示到期的 sense card。
+
+## 14. Quicker 如何串联 bat 脚本
+
+Windows 脚本在：
+
+```text
+scripts/windows/
+```
+
+推荐 Quicker 动作：
+
+- 准备 GPT 包：`gpt-workflow-prepare.bat`
+- 打开 ChatGPT：`open-chatgpt.bat`
+- 校验下载结果：`gpt-workflow-validate-latest.bat`
+- 导入 dry-run：`gpt-workflow-import-latest-dry-run.bat`
+- 正式导入：`gpt-workflow-import-latest.bat`
+- 打开确认页面：`open-sense-review.bat`
+- 检查环境：`gpt-workflow-doctor.bat`
+
+默认配置在：
+
+```text
+scripts/windows/gpt-workflow-config.bat
+```
+
+## 15. 哪些地方不能全自动
+
+当前不会做这些事：
+
+- 不自动控制 ChatGPT 网页端。
+- 不自动上传文件。
+- 不自动下载文件。
+- 不保存账号、cookie 或浏览器会话。
+- 不自动合并疑似重复 sense。
+- phrase 只做 occurrence 标记，不进入 FSRS。
+
+建议流程仍然是：先 validate，再 dry-run，再 import，最后人工确认。
+
+## 16. 常见错误和处理
+
+### JSON 格式错误
+
+现象：`validate-latest` 失败。
+
+处理：查看 `storage/app/gpt-workflow/failed/*.errors.json`，让 GPT 重新输出严格 JSON。
+
+### matched_sense_id 不存在
+
+现象：校验报 `matched_sense_id` 无效。
+
+处理：重新生成 package，确保 GPT 使用 package 中存在的 `sense_id`。
+
+### confidence 太低
+
+现象：`confidence < 0.90` 且 `auto_fsrs_allowed=true` 会失败。
+
+处理：低置信度项目必须设置 `auto_fsrs_allowed=false`，导入后在确认页面人工处理。
+
+### auto_fsrs_allowed 不合法
+
+现象：校验要求它是 boolean。
+
+处理：只能使用 `true` 或 `false`，不能用字符串 `"true"`。
+
+### PHP 不在 PATH
+
+现象：bat 脚本提示找不到 `php`。
+
+处理：把 PHP 加到系统 PATH，或修改 `scripts/windows/gpt-workflow-config.bat` 中的 `PHP_BIN`。
+
+### fsrs-rs-php 未加载
+
+现象：doctor 输出 `WARN fsrs-rs-php native extension loaded`。
+
+处理：编译并加载 `fsrs-rs-php` 原生扩展。本地测试可以临时 fallback，但生产验证不能把 fallback 当正式方案。
+
+### PowerShell 中文显示乱码
+
+现象：终端中文看起来异常，但文件本身可能是 UTF-8。
+
+处理：使用支持 UTF-8 的终端，或先运行：
+
+```powershell
+chcp 65001
+```
