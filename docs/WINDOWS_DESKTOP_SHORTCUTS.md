@@ -18,6 +18,14 @@ scripts\windows\linguacafe-doctor.bat
 
 如果 doctor 出现 `FAIL`，先按提示修复。
 
+如果打开登录页后无法登录，且当前数据库还没有用户，请在项目根目录运行：
+
+```bat
+php artisan user:create --email=test@example.com --password=12345678
+```
+
+当前项目没有网页注册入口。第一个用户会自动成为 admin，密码会用 Laravel Hash 加密。之后在登录页使用 `test@example.com` 和 `12345678` 登录。换数据库或清空数据库后，需要重新创建用户。
+
 ## 修改配置
 
 统一配置文件：

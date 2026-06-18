@@ -9,6 +9,30 @@
 
 系统也支持把新英文材料打包给 GPT 网页端，让 GPT 输出 `sense-mapping.json`，再由 LinguaCafe 校验、导入、人工确认，最后进入词义复习。
 
+## 首次登录 / 创建本地用户
+
+当前项目没有网页注册入口。登录页只显示 email 和 password。
+
+第一次使用本地数据库时，先在项目根目录运行：
+
+```bash
+php artisan user:create --email=test@example.com --password=12345678
+```
+
+说明：
+
+- 第一个用户会自动成为 admin。
+- 密码会用 Laravel Hash 加密保存。
+- 登录页使用这个 email 和 password 登录。
+- 换数据库或清空数据库后，需要重新创建用户。
+
+创建后可以用：
+
+```text
+邮箱：test@example.com
+密码：12345678
+```
+
 ## 2. Word-only Review 怎么用
 
 打开原来的 Review 页面即可。这个页面只显示 `target_type=word` 的到期卡片。
