@@ -12,6 +12,7 @@ use App\Services\ReviewCardService;
 use App\Services\ReviewService;
 use App\Services\WordSenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -906,6 +907,89 @@ class WordSenseTest extends TestCase
         $this->assertSame(1, WordSense::where('status', WordSense::STATUS_AI_SUGGESTED)->count());
     }
 
+    public function test_gpt_workflow_prepare_generates_package_and_prompt(): void
+    {
+        $this->resetWorkflowDirectory();
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/input'));
+        File::put(base_path('storage/app/gpt-workflow/input/new-material.txt'), 'They charge a fee.');
+        $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_zh' => 'charge money']);
+        $this->wordSenseService->createReviewCardForSense($sense);
+
+        $this->artisan("senses:gpt-workflow prepare --user_id={$this->user->id} --language=english --input=storage/app/gpt-workflow/input/new-material.txt")
+            ->assertSuccessful();
+
+        $this->assertFileExists(base_path('storage/app/gpt-workflow/package/gpt-sense-package.md'));
+        $this->assertFileExists(base_path('storage/app/gpt-workflow/package/prompt.txt'));
+        $this->assertStringContainsString('sense-mapping.json', File::get(base_path('storage/app/gpt-workflow/package/prompt.txt')));
+    }
+
+    public function test_gpt_workflow_validate_latest_copies_success_to_validated(): void
+    {
+        $this->resetWorkflowDirectory();
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/downloads'));
+        File::put(base_path('storage/app/gpt-workflow/downloads/sense-mapping.json'), json_encode($this->mappingPayload([[
+            'decision' => 'new_sense',
+            'sense_en' => 'to ask for money',
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => false,
+        ]]), JSON_PRETTY_PRINT));
+
+        $this->artisan("senses:gpt-workflow validate-latest --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $this->assertCount(1, File::files(base_path('storage/app/gpt-workflow/validated')));
+    }
+
+    public function test_gpt_workflow_validate_latest_copies_failure_to_failed_with_report(): void
+    {
+        $this->resetWorkflowDirectory();
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/downloads'));
+        File::put(base_path('storage/app/gpt-workflow/downloads/bad.json'), '{"schema_version":1,"sentences":[');
+
+        $this->artisan("senses:gpt-workflow validate-latest --user_id={$this->user->id} --language=english")
+            ->assertFailed();
+
+        $failedFiles = File::files(base_path('storage/app/gpt-workflow/failed'));
+        $this->assertGreaterThanOrEqual(2, count($failedFiles));
+        $this->assertStringContainsString('errors', collect($failedFiles)->first(fn ($file) => str_ends_with($file->getFilename(), '.errors.json'))->getFilename());
+    }
+
+    public function test_gpt_workflow_import_latest_dry_run_does_not_write_database(): void
+    {
+        $this->resetWorkflowDirectory();
+        $this->writeValidatedWorkflowMapping();
+
+        $this->artisan("senses:gpt-workflow import-latest --user_id={$this->user->id} --language=english --dry-run")
+            ->assertSuccessful();
+
+        $this->assertSame(0, WordSenseOccurrence::count());
+    }
+
+    public function test_gpt_workflow_import_latest_imports_and_copies_to_imported(): void
+    {
+        $this->resetWorkflowDirectory();
+        $this->writeValidatedWorkflowMapping();
+
+        $this->artisan("senses:gpt-workflow import-latest --user_id={$this->user->id} --language=english")
+            ->assertSuccessful();
+
+        $this->assertSame(1, WordSenseOccurrence::count());
+        $this->assertCount(1, File::files(base_path('storage/app/gpt-workflow/imported')));
+    }
+
+    public function test_gpt_workflow_without_downloads_gives_clear_error(): void
+    {
+        $this->resetWorkflowDirectory();
+
+        $this->artisan("senses:gpt-workflow validate-latest --user_id={$this->user->id} --language=english")
+            ->expectsOutputToContain('No JSON files found')
+            ->assertFailed();
+
+        $this->artisan("senses:gpt-workflow import-latest --user_id={$this->user->id} --language=english")
+            ->expectsOutputToContain('No validated JSON files found')
+            ->assertFailed();
+    }
+
     private function createUser(string $email, string $language): User
     {
         return User::forceCreate([
@@ -1012,6 +1096,22 @@ class WordSenseTest extends TestCase
         file_put_contents(base_path($relativePath), $content);
 
         return $relativePath;
+    }
+
+    private function resetWorkflowDirectory(): void
+    {
+        File::deleteDirectory(base_path('storage/app/gpt-workflow'));
+    }
+
+    private function writeValidatedWorkflowMapping(): void
+    {
+        File::ensureDirectoryExists(base_path('storage/app/gpt-workflow/validated'));
+        File::put(base_path('storage/app/gpt-workflow/validated/sense-mapping.json'), json_encode($this->mappingPayload([[
+            'decision' => 'new_sense',
+            'sense_en' => 'to ask for money',
+            'confidence' => 0.95,
+            'auto_fsrs_allowed' => false,
+        ]]), JSON_PRETTY_PRINT));
     }
 
     private function mappingPayload(array $matches): array
