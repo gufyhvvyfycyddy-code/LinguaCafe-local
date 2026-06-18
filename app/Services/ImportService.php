@@ -26,17 +26,13 @@ class ImportService {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
-        // tokenize book
-        $text = Http::post($this->pythonService . ':8678/tokenizer/import-book', [
+        $chunks = $this->postTokenizer('/tokenizer/import-book', [
             'language' => $selectedLanguage,
             'chapterSortMethod' => $eBookChapterSortMethod,
             'importFile' => $file,
             'chunkSize' => $chunkSize
         ]);
-        
-        
-        // import chunks
-        $chunks = json_decode($text);
+
         $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName);        
         
         return 'success';
@@ -46,15 +42,12 @@ class ImportService {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
-        // tokenize book
-        $chunks = Http::post($this->pythonService . ':8678/tokenizer/import-text', [
+        $chunks = $this->postTokenizer('/tokenizer/import-text', [
             'language' => $selectedLanguage,
             'importText' => $importText,
             'chunkSize' => $chunkSize
         ]);
-        
-        // import chunks
-        $chunks = json_decode($chunks);
+
         $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName);        
 
         return 'success';
@@ -64,16 +57,13 @@ class ImportService {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
-        // import subtitles
-        $subtitles = Http::post($this->pythonService . ':8678/tokenizer/import-subtitles', [
+        $subtitles = $this->postTokenizer('/tokenizer/import-subtitles', [
             'language' => $selectedLanguage,
             'subtitles' => $importSubtitles,
             'chunkSize' => $chunkSize
         ]);
-        
-        // import chunks
-        $chunks = json_decode($subtitles);
-        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, true);
+
+        $this->importChunks($subtitles, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, true);
     }
 
     /*
@@ -82,6 +72,10 @@ class ImportService {
         is used by other import functions to avoid code dupication.
     */
     private function importChunks($chunks, $userId, $userUuid, $language, $bookName, $bookId, $chapterName, $isSubtitle = false) {
+        if (!is_array($chunks) || count($chunks) === 0) {
+            throw new \Exception('文本处理服务没有返回可导入的章节内容。');
+        }
+
         // retrieve or create book
         if ($bookId == -1) {
             $book = new Book();
@@ -97,7 +91,7 @@ class ImportService {
                 ->first();
             
             if (!$book) {
-                return 'error';
+                throw new \Exception('阅读材料不存在，或不属于当前用户。');
             }
         }
 
@@ -126,26 +120,49 @@ class ImportService {
     }
 
     public function getYoutubeSubtitles($url) {
-        $subtitleList = Http::post($this->pythonService . ':8678/tokenizer/get-youtube-subtitle-list', [
+        return $this->postTokenizer('/tokenizer/get-youtube-subtitle-list', [
             'url' => $url,
         ]);
-        
-        return json_decode($subtitleList);
     }
 
     public function getSubtitleFileContent($fileName) {
-        $subtitleContent = Http::post($this->pythonService . ':8678/tokenizer/get-subtitle-file-content', [
+        return $this->postTokenizer('/tokenizer/get-subtitle-file-content', [
             'fileName' => $fileName,
         ]);
-        
-        return json_decode($subtitleContent);
     }
 
     public function getWebsiteText($url) {
-        $websiteText = Http::post($this->pythonService . ':8678/tokenizer/get-website-text', [
+        return $this->postTokenizer('/tokenizer/get-website-text', [
             'url' => $url,
         ]);
+    }
 
-        return json_decode($websiteText);
+    private function postTokenizer(string $path, array $payload)
+    {
+        try {
+            $response = Http::timeout(30)->post($this->pythonServiceUrl() . $path, $payload);
+        } catch (\Throwable $exception) {
+            throw new \Exception('文本处理服务不可用，请确认 Python tokenizer 服务已经启动。');
+        }
+
+        if (!$response->successful()) {
+            throw new \Exception('文本处理服务返回错误：' . $response->status());
+        }
+
+        $decoded = json_decode($response->body());
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('文本处理服务返回了无效 JSON。');
+        }
+
+        return $decoded;
+    }
+
+    private function pythonServiceUrl(): string
+    {
+        if (str_starts_with($this->pythonService, 'http://') || str_starts_with($this->pythonService, 'https://')) {
+            return rtrim($this->pythonService, '/');
+        }
+
+        return 'http://' . rtrim($this->pythonService, '/') . ':8678';
     }
 }

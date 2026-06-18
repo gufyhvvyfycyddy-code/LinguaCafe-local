@@ -68,3 +68,15 @@ Phase 8：新增本地半自动 GPT workflow 命令、Windows 脚本和 Quicker 
 - phrase review 的独立数据层和独立页面。
 - 更细的 GPT package 分片和按 lemma 过滤导出。
 - 真实用户数据上的长周期 FSRS 参数观察和报表。
+## 中文界面与稳定性收口
+
+当前界面已切换为中文优先：登录页、首页、导航、学习语言选择、阅读材料导入、书库、阅读页、词汇页、Word Review、Sense Mapping Review、Sense Review 以及常用弹窗都已覆盖主要中文文案。
+
+本次收口明确区分：
+
+- `uiLanguage=zh-CN`：界面语言。
+- `selected_language=english/japanese/...`：学习语言，用于阅读材料、词汇、Review、Sense Review 和 GPT workflow。
+
+阅读导入和语言选择已加入失败兜底。Python tokenizer 或接口不可用时，前端会退出 loading 并显示中文错误，不再无限转圈。旧用户缺少 UI language 时，首页会补 `zh-CN`；新用户通过 `user:create` 创建时会初始化 `selected_language=english` 和 `uiLanguage=zh-CN`。
+
+仍需注意：当前环境若 PHP 不在 PATH，则 Laravel 测试、doctor、migration 和浏览器真实后端流程无法执行。前端构建可以单独通过，但真实导入和 Review 接口仍需 PHP/Laravel 环境可用。

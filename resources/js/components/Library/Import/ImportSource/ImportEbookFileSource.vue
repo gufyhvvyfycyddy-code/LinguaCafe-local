@@ -2,20 +2,19 @@
     <div>
         <v-form ref="importFileForm" v-model="isFormValid">
             <v-alert dark border="left" type="info" color="primary" class="mb-8">
-                Please make sure that your .epub file contains no DRM (digital rights management) protection. 
-                Unfortunately we have no means to read DRM protected files.
+                请确认 .epub 文件没有 DRM 保护。LinguaCafe 无法读取受 DRM 保护的文件。
             </v-alert>
-            <label class="font-weight-bold">E-book file</label>
+            <label class="font-weight-bold">电子书文件</label>
             <v-file-input
                 v-model="ebookFile"
                 filled
                 dense
                 rounded
                 persistent-hint
-                hint="Accepted format: .epub"
+                hint="支持格式：.epub"
                 ref="ebookFile"
                 accept=".epub"
-                placeholder="E-book file"
+                placeholder="电子书文件"
                 prepend-icon="mdi-book"
                 :rules="[rules.ebookFileRule]"
                 @change="selectImportFile"
@@ -33,13 +32,13 @@
                 rules: {
                     ebookFileRule: (value) => {
                         if (value === null || value === undefined) {
-                            return 'You must select a file.';
+                            return '请选择文件。';
                         }
                         
                         let extension = value.name.split('.');
                         extension = extension[extension.length - 1];
                         if (extension !== 'epub') {
-                            return 'The selected file must a .epub file.';
+                            return '请选择 .epub 文件。';
                         }
 
                         return true;

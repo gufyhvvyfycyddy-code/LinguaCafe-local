@@ -26,15 +26,15 @@
             value : Boolean,
             title: {
                 type: String,
-                default: 'Error'
+                default: '错误'
             },
             content: {
                 type: String,
-                default: 'Error'
+                default: '发生错误，请稍后重试。'
             },
             buttonText: {
                 type: String,
-                default: 'Close'
+                default: '关闭'
             },
         },
         emits: ['input'],

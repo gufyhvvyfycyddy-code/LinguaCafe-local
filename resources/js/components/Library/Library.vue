@@ -4,7 +4,7 @@
         <error-dialog
             v-if="errorDialog.active"
             v-model="errorDialog.active"
-            content="An error has occurred while deleting the book."
+            :content="errorDialog.content"
         ></error-dialog>
 
         <!-- Review dialog -->
@@ -46,7 +46,7 @@
               <v-menu offset-y class="rounded-lg">
                     <template v-slot:activator="{ on, attrs }">
                         <v-btn color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                            Layout
+                            布局
                             <v-icon v-if="attrs['aria-expanded'] === 'true'">mdi-chevron-up</v-icon>
                             <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                         </v-btn>
@@ -58,7 +58,7 @@
                         @click="setLayout('table')"
                     >
                         <v-icon class="mr-1">mdi-view-list</v-icon>
-                        List
+                        列表
                     </v-btn>
                     <v-btn
                         class="menu-button justify-start"
@@ -67,7 +67,7 @@
                         @click="setLayout('cover-only')"
                     >
                         <v-icon class="mr-1">mdi-view-module</v-icon>
-                        Cover only
+                        仅封面
                     </v-btn>
                     <v-btn
                         class="menu-button justify-start"
@@ -76,7 +76,7 @@
                         @click="setLayout('detailed')"
                     >
                         <v-icon class="mr-1">mdi-view-agenda</v-icon>
-                        Detailed
+                        详细
                     </v-btn>
                 </v-menu>
 
@@ -84,7 +84,7 @@
                 <v-menu offset-y class="rounded-lg">
                     <template v-slot:activator="{ on, attrs }">
                         <v-btn class="library-small-screen" :color="theme == 'eink' ? 'white' : ''" rounded depressed v-bind="attrs" v-on="on">
-                            Library
+                            阅读材料
                             <v-icon v-if="attrs['aria-expanded'] === 'true'">mdi-chevron-up</v-icon>
                             <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                         </v-btn>
@@ -96,7 +96,7 @@
                         @click="showEditBookDialog(null)"
                     >
                         <v-icon class="mr-1">mdi-book-plus</v-icon>
-                        Create book
+                        创建书籍
                     </v-btn>
                     <v-btn
                         class="menu-button justify-start"
@@ -105,7 +105,7 @@
                         @click="importDialog.active = true;"
                     >
                         <v-icon class="mr-1">mdi-import</v-icon>
-                        Import
+                        导入
                     </v-btn>
                 </v-menu>
 
@@ -115,7 +115,7 @@
                     color="primary"
                     @click="showEditBookDialog(null)"
                 >
-                    <v-icon class="mr-1">mdi-book-plus</v-icon>Create book
+                    <v-icon class="mr-1">mdi-book-plus</v-icon>创建书籍
                 </v-btn>
                 <v-btn
                     rounded
@@ -123,7 +123,7 @@
                     color="primary"
                     @click="importDialog.active = true;"
                 >
-                    <v-icon class="mr-1">mdi-import</v-icon>Import
+                    <v-icon class="mr-1">mdi-import</v-icon>导入
                 </v-btn>
         </div>
 
@@ -168,6 +168,7 @@
 <script>
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
+    import { requestErrorMessage } from './../../services/UiTextService';
     export default {
         data: function() {
             return {
@@ -177,6 +178,7 @@
                 openedBook: -1,
                 errorDialog: {
                     active: false,
+                    content: '',
                 },
                 importDialog: {
                     active: false,
@@ -210,9 +212,13 @@
 
                 axios.get('/books/get-word-counts/' + this.books[index].id).then((response) => {
                     if (response.data !== 'error') {
-                        this.books[index].wordCountLoading = false;
                         this.books[index].wordCount = response.data;
                     }
+                }).catch((error) => {
+                    this.errorDialog.content = requestErrorMessage(error, '词数加载失败。');
+                    this.errorDialog.active = true;
+                }).finally(() => {
+                    this.books[index].wordCountLoading = false;
                 });
             },
             showEditBookDialog(book = null) {
@@ -235,14 +241,16 @@
             deleteBook() {
                 axios.post('/books/delete', {
                     'bookId': this.deleteBookDialog.bookId,
-                }).catch((e) => {
-                    this.errorDialog.active = true;
                 }).then((response) => {
                     if (response.status === 200) {
                         this.loadBooks();
                     } else {
+                        this.errorDialog.content = '删除书籍失败。';
                         this.errorDialog.active = true;
                     }
+                }).catch((e) => {
+                    this.errorDialog.content = requestErrorMessage(e, '删除书籍失败。');
+                    this.errorDialog.active = true;
                 });
             },
             openBook(bookId) {
@@ -293,6 +301,10 @@
                             this.openBook(parseInt(this.$route.params.bookId));
                         });
                     }
+                }).catch((error) => {
+                    this.books = [];
+                    this.errorDialog.content = requestErrorMessage(error, '阅读材料加载失败。');
+                    this.errorDialog.active = true;
                 });
             },
             setLayout(newLayout) {

@@ -1,5 +1,16 @@
 <template>
     <div id="fullscreen-box" :class="{'fullscreen-mode': fullscreenMode}" :style="{'background-color': $vuetify.theme.currentTheme.background}">
+        <v-container v-if="readerLoading || readerError" class="py-8">
+            <v-card outlined class="rounded-lg pa-6 mx-auto" max-width="680">
+                <v-progress-linear v-if="readerLoading" indeterminate color="primary" class="mb-4"></v-progress-linear>
+                <div v-if="readerLoading">正在加载阅读内容...</div>
+                <v-alert v-if="readerError" type="error" outlined class="mb-4">{{ readerError }}</v-alert>
+                <v-btn v-if="readerError" rounded depressed color="primary" to="/books">
+                    返回阅读材料
+                </v-btn>
+            </v-card>
+        </v-container>
+
         <!-- Hotkey information dialog -->
         <text-reader-hotkey-information-dialog
             v-model="hotkeyDialog"
@@ -9,15 +20,15 @@
         <div id="reader-box" :style="{'max-width': maximumTextWidthData[settings.maximumTextWidth]}" v-if="chapterId !== null">
             <div id="toolbar-box">
                 <div v-if="!finished && !saving" id="toolbar" :class="{'d-flex': true}" :style="{'top': toolbarTop + 'px'}">
-                    <v-btn title="Fullscreen" icon @click="fullscreen" v-if="!fullscreenMode"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
-                    <v-btn title="Exit fullscreen" icon @click="exitFullscreen" v-if="fullscreenMode"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
-                    <v-btn title="Text reader settings" icon @click="openDialog('settings')"><v-icon>mdi-cog</v-icon></v-btn>
-                    <v-btn title="Chapters" icon @click="openDialog('chapters')"><v-icon>mdi-book-alphabet</v-icon></v-btn>
-                    <v-btn title="Glossary" icon @click="openDialog('glossary')"><v-icon>mdi-translate</v-icon></v-btn>
-                    <v-btn title="Increase font size" icon @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
-                    <v-btn title="Decrease font size" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-                    <v-btn title="Toggle plain text mode" icon @click="settings.plainTextMode = !settings.plainTextMode; toolbarSettingChanged();"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-marker</v-icon></v-btn>
-                    <v-btn title="Show hotkey information" icon @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
+                    <v-btn title="全屏" icon @click="fullscreen" v-if="!fullscreenMode"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
+                    <v-btn title="退出全屏" icon @click="exitFullscreen" v-if="fullscreenMode"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
+                    <v-btn title="阅读设置" icon @click="openDialog('settings')"><v-icon>mdi-cog</v-icon></v-btn>
+                    <v-btn title="章节" icon @click="openDialog('chapters')"><v-icon>mdi-book-alphabet</v-icon></v-btn>
+                    <v-btn title="词汇表" icon @click="openDialog('glossary')"><v-icon>mdi-translate</v-icon></v-btn>
+                    <v-btn title="增大字号" icon @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
+                    <v-btn title="减小字号" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
+                    <v-btn title="切换纯文本模式" icon @click="settings.plainTextMode = !settings.plainTextMode; toolbarSettingChanged();"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-marker</v-icon></v-btn>
+                    <v-btn title="查看快捷键" icon @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
                 </div>
             </div>
 
@@ -109,7 +120,7 @@
                         'mb-3': $vuetify.breakpoint.xsOnly,
                     }">
                         <v-spacer></v-spacer>
-                        <v-btn rounded color="primary" @click="finish()"><v-icon>mdi-text-box-check</v-icon> Finish reading</v-btn>
+                        <v-btn rounded color="primary" @click="finish()"><v-icon>mdi-text-box-check</v-icon> 完成阅读</v-btn>
                     </div>
                 </v-card-text>
             </v-card>&nbsp;
@@ -124,8 +135,8 @@
                 background="foreground"
             >
                 <!-- Title -->
-                <v-card-title v-if="!saving && !finishError"><v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>Congratulations!</v-card-title>
-                <v-card-title v-if="saving">Updating data...</v-card-title>
+                <v-card-title v-if="!saving && !finishError"><v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>阅读完成</v-card-title>
+                <v-card-title v-if="saving">正在更新数据...</v-card-title>
                 <v-card-text v-if="saving" height="200px"></v-card-text>
                 <v-card-text v-if="!saving && finishError" height="300px">
                     <v-alert
@@ -134,7 +145,7 @@
                         type="error"
                         v-if="finishError"
                     >
-                        An error has occurred while updating your data.
+                        更新阅读数据时发生错误。
                     </v-alert>
                 </v-card-text>
 
@@ -142,22 +153,21 @@
                 <div style="max-height: calc(100vh - 220px); overflow-y: auto;"  v-if="!saving && !finishError">
                     <v-card-text>
                         <!-- Text -->
-                        You have finished reading this chapter: <b>{{ chapterName }}</b>, and you have read <b>{{ formatNumber(wordCount) }}</b> words. Keep up the good work, and your
-                        <span class="text-capitalize">{{ language }}</span> skills will improve steadily. Consistency is key!
+                        你已完成章节：<b>{{ chapterName }}</b>，本章共阅读 <b>{{ formatNumber(wordCount) }}</b> 个词。保持节奏，学习会稳步推进。
 
                         <template v-if="nextChapter === -1">
                             <br><br>
-                            This was the last chapter in this book.
+                            这是本书的最后一章。
                         </template>
 
                         <!-- Leveled up words -->
                         <template v-if="settings.autoLevelUpWords && leveledUpWordsAndPhrases.wordsAndPhrases.length">
-                            <div class="subheader mt-8">Leveled up words</div>
+                            <div class="subheader mt-8">升级的词汇</div>
                             <v-data-table
                                 class="no-hover"
                                 :headers="[
-                                    { text: 'Word', value: 'word' },
-                                    { text: 'Level', value: 'stage', align: 'center', width: '180px'},
+                                    { text: '词项', value: 'word' },
+                                    { text: '等级', value: 'stage', align: 'center', width: '180px'},
                                 ]"
                                 :items="leveledUpWordsAndPhrases.wordsAndPhrases"
                                 :items-per-page="-1"
@@ -176,7 +186,7 @@
                                 <!-- Stage -->
                                 <template v-slot:item.stage="{ item }">
                                     <template v-if="item.stage === -1">
-                                        <v-icon color="success" class="mr-1">mdi-check</v-icon>known
+                                        <v-icon color="success" class="mr-1">mdi-check</v-icon>已掌握
                                     </template>
                                     <template v-else>
                                         <span class="finished-stage-level rounded-pill">{{ item.stage * -1 }}</span>
@@ -200,7 +210,7 @@
                         @click="$router.push('/books/' + bookId)"
                     >
                         <v-icon class="mr-1">mdi-book-open-variant</v-icon>
-                        Library
+                        阅读材料
                     </v-btn>
                     <v-btn
                         v-if="nextChapter !== -1"
@@ -211,7 +221,7 @@
                         :to="'/chapters/read/' + nextChapter"
                     >
                         <v-icon class="mr-1">mdi-page-next-outline</v-icon>
-                        Next chapter
+                        下一章
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -222,11 +232,14 @@
 <script>
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager, defaultSettings } from './../../services/LocalStorageManagerService';
+    import { requestErrorMessage } from './../../services/UiTextService';
 
     export default {
         data: function() {
             return {
                 hotkeyDialog: false,
+                readerLoading: true,
+                readerError: '',
                 text: null,
                 dialogs: {
                     settings: false,
@@ -356,6 +369,10 @@
                 this.updateToolbarPosition();
                 this.vocabularySidebarTest();
                 this.$forceUpdate();
+            }).catch((error) => {
+                this.readerError = requestErrorMessage(error, '阅读内容加载失败。章节可能仍在处理中，请稍后重试。');
+            }).finally(() => {
+                this.readerLoading = false;
             });
         },
         beforeDestroy() {

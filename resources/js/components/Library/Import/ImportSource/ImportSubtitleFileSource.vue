@@ -1,17 +1,17 @@
 <template>
     <div class="d-flex flex-column align-stretch">
         <!-- Subtitle file -->
-        <label class="font-weight-bold">Subtitle file</label>
+        <label class="font-weight-bold">字幕文件</label>
         <v-file-input
             v-model="subtitleFile"
             filled
             dense
             rounded
             persistent-hint
-            hint="Accepted formats: .srt .ass"
+            hint="支持格式：.srt .ass"
             ref="subtitleFile"
             accept=".srt,.ass"
-            placeholder="Subtitle file"
+            placeholder="字幕文件"
             prepend-icon="mdi-book"
             class="mb-4"
             :rules="[rules.subtitleFileRule]"
@@ -33,14 +33,14 @@
             border="left"
             type="error"
         >
-            An error has occurred while retrieving the contents of the subtitle file. Please try again, and if the error does not get resolved, 
-            create a GitHub issue.
+            {{ errorMessage || '读取字幕文件失败，请重试。' }}
         </v-alert>
     </div>
 </template>
 
 <script>
 import axios from 'axios';
+import { requestErrorMessage } from './../../../../services/UiTextService';
 
     export default {
         data: function() {
@@ -50,16 +50,17 @@ import axios from 'axios';
                 isFormValid: false,
                 loading: false,
                 error: false,
+                errorMessage: '',
                 rules: {
                     subtitleFileRule: (value) => {
                         if (value === null || value === undefined) {
-                            return 'You must select a file.';
+                            return '请选择文件。';
                         }
                         
                         let extension = value.name.split('.');
                         extension = extension[extension.length - 1];
                         if (extension !== 'srt' && extension !== 'ass') {
-                            return 'The selected file must a .srt or .ass file.';
+                            return '请选择 .srt 或 .ass 文件。';
                         }
 
                         return true;
@@ -77,6 +78,7 @@ import axios from 'axios';
                 // validate
                 this.subtitles = null;
                 this.error = false;
+                this.errorMessage = '';
                 
                 if (!this.$refs.subtitleFile.validate()) {
                     // disable continue button in import dialog
@@ -103,6 +105,7 @@ import axios from 'axios';
                 }).catch((error) => {
                     this.subtitles = null;
                     this.error = true;
+                    this.errorMessage = requestErrorMessage(error, '读取字幕文件失败，请重试。');
                     this.loading = false;
 
                     this.$emit('subtitle-selected', {

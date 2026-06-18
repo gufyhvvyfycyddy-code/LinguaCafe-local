@@ -30,15 +30,16 @@
         <!-- Search header -->
         <v-card outlined class="rounded-lg px-4 pb-4 my-4" :loading="loading">
             <div class="subheader my-4 d-flex">
-                Vocabulary
+                词汇
                 <v-spacer></v-spacer>
-                <v-chip id="search-result-info" color="foreground" class="pl-1"><v-icon class="mr-1" right>mdi-text-box-check</v-icon>{{ wordCount }} results</v-chip>
+                <v-chip id="search-result-info" color="foreground" class="pl-1"><v-icon class="mr-1" right>mdi-text-box-check</v-icon>{{ wordCount }} 条结果</v-chip>
             </div>
+            <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
 
             <!-- search filter -->
             <div id="vocabulary-search-field" class="mb-6">
-                <v-btn rounded depressed color="primary" @click="applyFilter('text')"><v-icon>mdi-magnify</v-icon> Search</v-btn>
-                <v-text-field class="pt-0" rounded filled dense hide-details placeholder="Search term" v-model="filters.text" @keyup.enter="applyFilter('text')"></v-text-field>
+                <v-btn rounded depressed color="primary" @click="applyFilter('text')"><v-icon>mdi-magnify</v-icon> 搜索</v-btn>
+                <v-text-field class="pt-0" rounded filled dense hide-details placeholder="搜索词" v-model="filters.text" @keyup.enter="applyFilter('text')"></v-text-field>
             </div>
 
             <!-- filters -->
@@ -48,17 +49,17 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Level
+                                等级
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.stage == -999}" @click="applyFilter('stage', -999)">Any</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.stage == 2}" @click="applyFilter('stage', 2)">New</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.stage == 1}" @click="applyFilter('stage', 1)">Ignored</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.stage == 0}" @click="applyFilter('stage', 0)">Learned</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.stage == -999}" @click="applyFilter('stage', -999)">全部</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.stage == 2}" @click="applyFilter('stage', 2)">新词</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.stage == 1}" @click="applyFilter('stage', 1)">已忽略</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.stage == 0}" @click="applyFilter('stage', 0)">已掌握</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == -1}" @click="applyFilter('stage', -1)">1</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == -2}" @click="applyFilter('stage', -2)">2</v-list-item>
                                 <v-list-item :class="{'v-list-item--active': filters.stage == -3}" @click="applyFilter('stage', -3)">3</v-list-item>
@@ -74,14 +75,14 @@
                     <v-menu right offset-y v-if="books.length">
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Book
+                                书籍
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.book == -1}" @click="applyFilter('book', -1, -1)">Any</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.book == -1}" @click="applyFilter('book', -1, -1)">全部</v-list-item>
                                 <v-list-item 
                                     v-for="(book, index) in books" :key="index"
                                     :class="{'default-font': true, 'v-list-item--active': filters.book == book.id}"
@@ -95,14 +96,14 @@
                     <v-menu offset-y v-if="filters.bookIndex !== -1 && books.length">
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Chapter
+                                章节
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.chapter == -1}" @click="applyFilter('chapter', -1)">Any</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.chapter == -1}" @click="applyFilter('chapter', -1)">全部</v-list-item>
                                 <v-list-item 
                                     v-for="(chapter, index) in books[filters.bookIndex].chapters" :key="index"
                                     :class="{'default-font': true, 'v-list-item--active': filters.chapter == chapter.id}"
@@ -116,7 +117,7 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Translation
+                                释义
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
@@ -125,11 +126,11 @@
                             <v-list-item-group color="primary">
                                 <v-list-item 
                                     :class="{'v-list-item--active': filters.translation == 'any'}"
-                                    @click="applyFilter('translation', 'any')">Any
+                                    @click="applyFilter('translation', 'any')">全部
                                 </v-list-item>
                                 <v-list-item 
                                     :class="{'v-list-item--active': filters.translation == 'not empty'}" 
-                                    @click="applyFilter('translation', 'not empty')">Not empty
+                                    @click="applyFilter('translation', 'not empty')">非空
                                 </v-list-item>
                             </v-list-item-group>
                         </v-list>
@@ -139,7 +140,7 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Phrases
+                                短语
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
@@ -148,15 +149,15 @@
                             <v-list-item-group color="primary">
                                 <v-list-item 
                                     :class="{'v-list-item--active': filters.phrases == 'both'}"
-                                    @click="applyFilter('phrases', 'both')">Both
+                                    @click="applyFilter('phrases', 'both')">全部
                                 </v-list-item>
                                 <v-list-item 
                                     :class="{'v-list-item--active': filters.phrases == 'only words'}" 
-                                    @click="applyFilter('phrases', 'only words')">Only words
+                                    @click="applyFilter('phrases', 'only words')">仅单词
                                 </v-list-item>
                                 <v-list-item 
                                     :class="{'v-list-item--active': filters.phrases == 'only phrases'}" 
-                                    @click="applyFilter('phrases', 'only phrases')">Only phrases
+                                    @click="applyFilter('phrases', 'only phrases')">仅短语
                                 </v-list-item>
                             </v-list-item-group>
                         </v-list>
@@ -166,25 +167,25 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu pl-3 pr-2 mx-1" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                Order by
+                                排序
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item-group color="primary">
-                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'words'}" @click="applyFilter('orderBy', 'words')"><v-icon class="mr-1">mdi-sort-alphabetical-ascending</v-icon>Word</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'words desc'}" @click="applyFilter('orderBy', 'words desc')"><v-icon class="mr-1">mdi-sort-alphabetical-descending</v-icon>Word</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'stage'}" @click="applyFilter('orderBy', 'stage')"><v-icon class="mr-1">mdi-sort-numeric-ascending</v-icon>Level</v-list-item>
-                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'stage desc'}" @click="applyFilter('orderBy', 'stage desc')"><v-icon class="mr-1">mdi-sort-numeric-descending</v-icon>Level</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'words'}" @click="applyFilter('orderBy', 'words')"><v-icon class="mr-1">mdi-sort-alphabetical-ascending</v-icon>词项</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'words desc'}" @click="applyFilter('orderBy', 'words desc')"><v-icon class="mr-1">mdi-sort-alphabetical-descending</v-icon>词项</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'stage'}" @click="applyFilter('orderBy', 'stage')"><v-icon class="mr-1">mdi-sort-numeric-ascending</v-icon>等级</v-list-item>
+                                <v-list-item :class="{'v-list-item--active': filters.orderBy == 'stage desc'}" @click="applyFilter('orderBy', 'stage desc')"><v-icon class="mr-1">mdi-sort-numeric-descending</v-icon>等级</v-list-item>
                             </v-list-item-group>
                         </v-list>
                     </v-menu>
 
                     <!-- Show filters -->
                     <v-btn class="filter-menu show-filters px-3" rounded depressed @click="filtersHidden = !filtersHidden">
-                        <template v-if="filtersHidden"><v-icon small class="mr-1">mdi-eye</v-icon>Show filters</template>
-                        <template v-else><v-icon small class="mr-1">mdi-eye-off</v-icon>Hide filters</template>
+                        <template v-if="filtersHidden"><v-icon small class="mr-1">mdi-eye</v-icon>显示筛选</template>
+                        <template v-else><v-icon small class="mr-1">mdi-eye-off</v-icon>隐藏筛选</template>
                     </v-btn>
                     
                     <!-- search result info -->
@@ -194,17 +195,17 @@
                     <v-menu offset-y>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn class="filter-menu export pl-3 pr-2" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                                <v-icon small class="mr-1">mdi-file-download</v-icon>Data
+                                <v-icon small class="mr-1">mdi-file-download</v-icon>数据
                                 <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                                 <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                             </v-btn>
                         </template>
                         <v-list class="filter-popup pa-0" dense>
                             <v-list-item @click="openExportDialog" :disabled="loading">
-                                <v-icon class="mr-1">mdi-file-delimited</v-icon>Export
+                                <v-icon class="mr-1">mdi-file-delimited</v-icon>导出
                             </v-list-item>
                             <v-list-item @click="openImportDialog" :disabled="loading">
-                                <v-icon class="mr-1">mdi-file-delimited</v-icon>Import
+                                <v-icon class="mr-1">mdi-file-delimited</v-icon>导入
                             </v-list-item>
                         </v-list>
                     </v-menu>
@@ -216,12 +217,12 @@
         <v-simple-table id="vocabulary-list" class="py-0 no-hover border rounded-lg" dense>
             <thead>
                 <tr>
-                    <th class="word">Word</th>
-                    <th class="reading" v-if="($props.language == 'japanese' || $props.language == 'chinese')">Reading</th>
-                    <th class="word-with-reading">Word</th>
-                    <th class="stage px-1">Level</th>
-                    <th class="translation">Definitions</th>
-                    <th class="actions">Options</th>
+                    <th class="word">词项</th>
+                    <th class="reading" v-if="($props.language == 'japanese' || $props.language == 'chinese')">读音</th>
+                    <th class="word-with-reading">词项</th>
+                    <th class="stage px-1">等级</th>
+                    <th class="translation">释义</th>
+                    <th class="actions">操作</th>
                 </tr>
             </thead>
             <tbody>
@@ -257,7 +258,7 @@
                         <div>X</div>
                     </td>
                     <td class="stage px-1" :stage="word.stage" v-if="word.stage == 2">
-                        <div class="new-word">New</div>
+                        <div class="new-word">新词</div>
                     </td>
                     
                     <td class="translation">{{ word.translation }}</td>
@@ -265,7 +266,7 @@
                         <v-btn 
                             v-if="word.type == 'word'"
                             icon 
-                            title="Edit"
+                            title="编辑"
                             @click="editItem(word.id, 'Word')"
                         >
                             <v-icon>mdi-pencil</v-icon>
@@ -273,7 +274,7 @@
                         <v-btn 
                             v-else
                             icon 
-                            title="Edit"
+                            title="编辑"
                             @click="editItem(word.id, 'Phrase')"
                         >
                             <v-icon>mdi-pencil</v-icon>
@@ -302,6 +303,7 @@
         data: function() {
             return {
                 loading: false,
+                error: '',
                 filtersHidden: true,
                 visiblePopup: '',
                 paginationLimitBefore: 3,
@@ -358,6 +360,8 @@
         },
         methods: {
             loadVocabularySearchPage() {
+                this.loading = true;
+                this.error = '';
                 axios.post('/vocabulary/search', {
                     text: (this.filters.text == '') ? 'anytext' : this.filters.text,
                     book: parseInt(this.filters.book),
@@ -368,7 +372,6 @@
                     orderBy: this.filters.orderBy,
                     page: this.currentPage,
                 }).then((response) => {
-                    this.loading = false;
                     var data = response.data;
                     this.filters.bookIndex = data.bookIndex;
                     this.words = data.words;
@@ -389,6 +392,14 @@
                     if (this.filters.text == 'anytext') {
                         this.filters.text = '';
                     }
+                }).catch((error) => {
+                    this.words = [];
+                    this.books = [];
+                    this.wordCount = 0;
+                    this.pageCount = 1;
+                    this.error = error?.response?.data?.message || error?.response?.data || '词汇加载失败。';
+                }).finally(() => {
+                    this.loading = false;
                 });
             },
             openExportDialog() {
@@ -419,6 +430,8 @@
                     link.setAttribute('download', 'vocabulary.csv');
                     document.body.appendChild(link);
                     link.click();
+                }).catch((error) => {
+                    this.error = error?.response?.data?.message || error?.response?.data || '导出 CSV 失败。';
                 });
             },
             editItem(itemId, itemType) {

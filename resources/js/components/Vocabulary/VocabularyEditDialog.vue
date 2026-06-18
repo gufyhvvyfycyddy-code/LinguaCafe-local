@@ -10,15 +10,24 @@
         >
             <!-- Title bar -->
             <v-card-title>
-                <span class="text-h5">{{ $props.itemType }} edit</span>
+                <span class="text-h5">{{ itemTypeLabel }}编辑</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
 
+            <v-card-text v-if="!loading && !item">
+                <v-alert type="error" dense outlined>
+                    {{ error || '暂无可编辑内容。' }}
+                </v-alert>
+            </v-card-text>
+
             <!-- Edit -->
             <v-card-text class="d-flex flex-wrap" v-if="item">
+                <v-alert v-if="error" type="error" dense outlined class="mb-4" width="100%">
+                    {{ error }}
+                </v-alert>
 
                 <!-- Chip informations -->
                 <div id="vocabulary-edit-chips" class="pb-4">
@@ -28,9 +37,9 @@
                         :small="$vuetify.breakpoint.smAndDown"
                         class="ma-1 pr-4" 
                         color="primary"
-                        title="First time added to srs."
+                        title="首次加入复习的时间。"
                     > 
-                        Added on {{ item.added_to_srs }}<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-cards</v-icon>
+                        加入于 {{ item.added_to_srs }}<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-cards</v-icon>
                     </v-chip>
 
                     <v-chip 
@@ -39,9 +48,9 @@
                         :small="$vuetify.breakpoint.smAndDown"
                         class="ma-1" 
                         color="primary" 
-                        title="This word or phrase was in review and has been learned."
+                        title="这个单词或短语已经完成复习。"
                     >
-                        Finished review
+                        已完成复习
                         <v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-timer-off-outline</v-icon>
                     </v-chip>
 
@@ -51,9 +60,9 @@
                         :small="$vuetify.breakpoint.smAndDown"
                         class="ma-1 pr-3" 
                         color="primary" 
-                        title="Next review."
+                        title="下次复习时间。"
                     >
-                        Due on {{ item.next_review }}<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-timer-outline</v-icon>
+                        到期于 {{ item.next_review }}<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-timer-outline</v-icon>
                     </v-chip>
                     
                     <v-chip 
@@ -61,9 +70,9 @@
                         :small="$vuetify.breakpoint.smAndDown"
                         class="ma-1 pr-3" 
                         color="primary"
-                        title="Number of lookups for this word or phrase."
+                        title="这个单词或短语的查询次数。"
                     >
-                        {{ item.lookup_count }} lookups<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-magnify</v-icon>
+                        查询 {{ item.lookup_count }} 次<v-icon :small="$vuetify.breakpoint.smAndDown" right class="ml-1">mdi-magnify</v-icon>
                     </v-chip>
                     
                     <!-- <v-chip 
@@ -87,7 +96,7 @@
                         filled
                         dense
                         rounded
-                        label="Lemma"
+                        label="词元"
                         @keyup="changed"
                     ></v-text-field>
 
@@ -98,7 +107,7 @@
                         filled
                         dense
                         rounded
-                        label="Lemma reading"
+                        label="词元读音"
                         @keyup="changed"
                     ></v-text-field>
                 </div>
@@ -119,7 +128,7 @@
                         dense
                         rounded
                         disabled
-                        label="Word"
+                        label="单词"
                         @keyup="changed"
                     ></v-text-field>
                     <v-text-field 
@@ -130,7 +139,7 @@
                         dense
                         rounded
                         disabled
-                        label="Phrase"
+                        label="短语"
                         @keyup="changed"
                     ></v-text-field>
 
@@ -141,7 +150,7 @@
                         filled
                         dense
                         rounded
-                        label="Reading"
+                        label="读音"
                         @keyup="changed"
                     ></v-text-field>
                 </div>
@@ -154,7 +163,7 @@
                     dense
                     rounded
                     no-resize
-                    label="Translation"
+                    label="释义"
                     @keyup="changed"
                 ></v-textarea>
 
@@ -188,14 +197,14 @@
             <!-- Action bar -->
             <v-card-actions v-if="!loading">
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
                 <v-btn 
                     rounded 
                     depressed
                     color="primary" 
                     :disabled="saved || saving" 
                     @click="save"
-                >Save</v-btn>
+                >保存</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -223,11 +232,11 @@
                 saving: false,
                 loading: true,
                 item: null,
+                error: '',
             };
         },
         mounted: function() {
             axios.get('/vocabulary/' + this.$props.itemType.toLowerCase() + 's/get/' + this.$props.itemId).then((response) => {
-                this.loading = false;
                 this.item = response.data;
                 
                 if (this.$props.itemType == 'Phrase') {
@@ -237,7 +246,16 @@
                         this.item.words = JSON.parse(this.item.words).join('');
                     }
                 }
+            }).catch(() => {
+                this.error = '词汇加载失败，请稍后重试。';
+            }).finally(() => {
+                this.loading = false;
             });
+        },
+        computed: {
+            itemTypeLabel: function() {
+                return this.$props.itemType === 'Phrase' ? '短语' : '单词';
+            }
         },
         methods: {
             setStage: function(newStage) {
@@ -268,8 +286,11 @@
 
                 axios.post('/vocabulary/word/update', saveData).then(() => {
                     this.saved = true;
-                    this.saving = false;
                     this.updateVocabularySearch();
+                }).catch(() => {
+                    this.error = '保存失败，请稍后重试。';
+                }).finally(() => {
+                    this.saving = false;
                 });
             },
             savePhrase: function(withStage = false, exampleSentenceChanged = false) {                
@@ -282,8 +303,11 @@
 
                 axios.post('/vocabulary/phrases/update', saveData).then(() => {
                     this.saved = true;
-                    this.saving = false;
                     this.updateVocabularySearch();
+                }).catch(() => {
+                    this.error = '保存失败，请稍后重试。';
+                }).finally(() => {
+                    this.saving = false;
                 });
             },
             changed: function() {

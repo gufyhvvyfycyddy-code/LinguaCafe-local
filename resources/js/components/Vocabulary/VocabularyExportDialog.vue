@@ -6,7 +6,7 @@
         >
             <!-- Title bar -->
             <v-card-title>
-                <span class="text-h5">Vocabulary export</span>
+                <span class="text-h5">词汇导出</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -15,7 +15,7 @@
 
             <v-card-text>
                 <!-- Field selection switches -->
-                <label class="font-weight-bold mt-2">Select fields to export</label>
+                <label class="font-weight-bold mt-2">选择要导出的字段</label>
                 <div class="d-flex flex-wrap">
                     <!-- Lemma switch -->
                     <v-checkbox
@@ -23,7 +23,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Lemma"
+                        label="词元"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -33,7 +33,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Word"
+                        label="单词"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -43,7 +43,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Lemma reading"
+                        label="词元读音"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -53,7 +53,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Reading"
+                        label="读音"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -63,7 +63,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Translation"
+                        label="释义"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -73,7 +73,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Level"
+                        label="等级"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -83,7 +83,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Added to srs date"
+                        label="加入复习日期"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -93,7 +93,7 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Read count"
+                        label="阅读次数"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
 
@@ -103,25 +103,25 @@
                         hide-details
                         class="vocabulary-export-switch my-1"
                         color="primary"
-                        label="Lookup count"
+                        label="查询次数"
                         @change="fieldSwitchChange"
                     ></v-checkbox>
                 </div>
 
                 <!-- Sample -->
-                <label class="font-weight-bold mt-6">Sample preview</label>
+                <label class="font-weight-bold mt-6">预览</label>
                 <v-simple-table fixed-header id="vocabulary-export-sample-table" class="border rounded-lg" height="260px">
                     <thead>
                         <tr>
-                            <th v-if="fields.lemma">Lemma</th>
-                            <th v-if="fields.word">Word</th>
-                            <th v-if="fields.lemmaReading">Lemma reading</th>
-                            <th v-if="fields.reading">Reading</th>
-                            <th v-if="fields.translation">Translation</th>
-                            <th v-if="fields.stage">Level</th>
-                            <th v-if="fields.addedToSrs">Added to srs</th>
-                            <th v-if="fields.readCount">Read count</th>
-                            <th v-if="fields.lookupCount">Lookup count</th>
+                            <th v-if="fields.lemma">词元</th>
+                            <th v-if="fields.word">单词</th>
+                            <th v-if="fields.lemmaReading">词元读音</th>
+                            <th v-if="fields.reading">读音</th>
+                            <th v-if="fields.translation">释义</th>
+                            <th v-if="fields.stage">等级</th>
+                            <th v-if="fields.addedToSrs">加入复习</th>
+                            <th v-if="fields.readCount">阅读次数</th>
+                            <th v-if="fields.lookupCount">查询次数</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -163,7 +163,7 @@
                     hide-details
                     class="select-all-switch vocabulary-export-switch my-1"
                     color="primary"
-                    label="Select all"
+                    label="全选"
                     @change="selectAll"
                 ></v-checkbox>
                 <v-checkbox
@@ -171,19 +171,19 @@
                     hide-details
                     class="select-all-switch-small vocabulary-export-switch my-1"
                     color="primary"
-                    label="All"
+                    label="全部"
                     @change="selectAll"
                 ></v-checkbox>
 
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
                 <v-btn
                     rounded
                     depressed
                     color="primary"
                     :disabled="!fields.any"
                     @click="exportToCsv"
-                >Export</v-btn>
+                >导出</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -216,7 +216,6 @@
             };
         },
         mounted: function() {
-            console.log(this.$props.sampleWords);
         },
         methods: {
             selectAll() {

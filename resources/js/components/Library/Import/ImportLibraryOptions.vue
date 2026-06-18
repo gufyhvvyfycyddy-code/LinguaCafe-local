@@ -2,17 +2,18 @@
     <div>
         <v-form ref="libraryLocationForm" v-model="isFormValid">
             <v-alert dark border="left" type="info" color="primary" class="mt-4">
-                Your selected chapter name will be suffixed with indexes of the imported chapters.
-                For example if you choose the chapter name "Narnia chapter", then your chapter names will be:<br><br>
+                如果导入内容会拆成多个章节，章节名会自动加上序号。
+                例如章节名为“英语短文”，导入后会变成：<br><br>
                 <ul class="mb-0">
-                    <li>Narnia chapter 1</li>
-                    <li>Narnia chapter 2</li>
+                    <li>英语短文 1</li>
+                    <li>英语短文 2</li>
                     <li>...</li>
                 </ul>
             </v-alert>
+            <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
 
             <!-- Book selector and chapter name -->
-            <label class="font-weight-bold">Library location</label>
+            <label class="font-weight-bold">阅读材料位置</label>
             
             <!-- Skeleton loaders for radio buttons -->
             <div class="library-location-skeleton-loader mb-2" v-if="loading">
@@ -45,24 +46,24 @@
                 @change="formChanged"
             >
                 <v-radio
-                    label="Create new book"
+                    label="创建新书"
                     value="new"
                     :disabled="loading"
                 ></v-radio>
                 <v-radio
                     v-if="books.length > 0"
-                    label="Use existing book"
+                    label="使用已有书籍"
                     value="existing"
                 ></v-radio>
             </v-radio-group>
             
             <!-- Book selector for existing book -->
             <template v-if="newOrExistingBook == 'existing'">
-                <label class="font-weight-bold">Book</label>
+                <label class="font-weight-bold">书籍</label>
                 <v-select
                     v-model="bookId"
                     :items="books"
-                    placeholder="Select a book"
+                    placeholder="选择书籍"
                     item-value="id"
                     dense
                     filled
@@ -81,13 +82,13 @@
 
             <!-- Book name text field for new book -->
             <template v-if="newOrExistingBook == 'new'">
-                <label class="font-weight-bold">Book name</label>
+                <label class="font-weight-bold">书名</label>
                 <v-text-field 
                     v-model="bookName"
                     filled
                     dense
                     rounded
-                    placeholder="Book name"
+                    placeholder="书名"
                     maxlength="128"
                     :rules="[rules.bookName]"
                     @keyup="formChanged"
@@ -96,13 +97,13 @@
             
             <!-- Chapter name -->
             <template v-if="newOrExistingBook !== ''">
-                <label class="font-weight-bold">Chapter name</label>
+                <label class="font-weight-bold">章节名</label>
                 <v-text-field 
                     v-model="chapterName"
                     filled
                     dense
                     rounded
-                    placeholder="Chapter name"
+                    placeholder="章节名"
                     maxlength="120"
                     :rules="[rules.chapterName]"
                     @keyup="formChanged"
@@ -113,11 +114,14 @@
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../../services/UiTextService';
+
     export default {
         data: function() {
             return {
                 loading: true,
-                books: [{id: -1, name: 'loading'}],
+                error: '',
+                books: [{id: -1, name: '加载中'}],
                 bookId: -1,
                 isFormValid: false,
                 newOrExistingBook: '',
@@ -126,7 +130,7 @@
                 rules: {
                     newOrExistingBook: (value) => {
                         if (value === '') {
-                            return 'You must select an option.';
+                            return '请选择一个选项。';
                         }
 
                         return true;
@@ -136,22 +140,22 @@
                     },
                     bookName: (value) => {
                         if (!value.length) {
-                            return 'You must type in a book name.';
+                            return '请输入书名。';
                         }
 
                         if (value.length > 128) {
-                            return 'The book name must be below 128 characters.';
+                            return '书名不能超过 128 个字符。';
                         }
 
                         return true;
                     },
                     chapterName: (value) => {
                         if (!value.length) {
-                            return 'You must type in a chapter name.';
+                            return '请输入章节名。';
                         }
 
                         if (value.length > 120) {
-                            return 'The chapter name must be below 120 characters.';
+                            return '章节名不能超过 120 个字符。';
                         }
 
                         return true;
@@ -162,13 +166,19 @@
         props: {
         },
         mounted() {
+            this.loading = true;
+            this.error = '';
             axios.post('/books').then((response) => {
-                this.loading = false;
                 this.books = response.data;
                 
                 if (this.books.length) {
                     this.bookId = this.books[0].id;
                 }
+            }).catch((error) => {
+                this.books = [];
+                this.error = requestErrorMessage(error, '书籍列表加载失败，请稍后重试。');
+            }).finally(() => {
+                this.loading = false;
             });
         },
         methods: {

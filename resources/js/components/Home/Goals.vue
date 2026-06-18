@@ -10,7 +10,7 @@
             @save="loadGoals"
         />
 
-        <div class="subheader subheader-margin-top">Daily goals</div>
+        <div class="subheader subheader-margin-top">每日目标</div>
         <div id="goals">
             <goal 
                 v-for="(goal, index) in goals" :key="index"
@@ -51,6 +51,8 @@
                 axios.post('/goals/get').then((response) => {
                     this.goals = response.data;
                     this.$emit('goal-quantity-change');
+                }).catch(() => {
+                    this.goals = [];
                 });
             },
             editGoal(goal) {

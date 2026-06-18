@@ -1,17 +1,17 @@
 <template>
     <div class="d-flex flex-column align-stretch">
         <!-- Text file -->
-        <label class="font-weight-bold">Text file</label>
+        <label class="font-weight-bold">文本文件</label>
         <v-file-input
             v-model="textFile"
             filled
             dense
             rounded
             persistent-hint
-            hint="Accepted format: .txt"
+            hint="支持格式：.txt"
             ref="textFile"
             accept=".txt"
-            placeholder="Text file"
+            placeholder="文本文件"
             prepend-icon="mdi-book"
             :rules="[rules.textFileRule]"
             @change="textFileSelected"
@@ -30,13 +30,13 @@
                 rules: {
                     textFileRule: (value) => {
                         if (value === null || value === undefined) {
-                            return 'You must select a file.';
+                            return '请选择文件。';
                         }
                         
                         let extension = value.name.split('.');
                         extension = extension[extension.length - 1];
                         if (extension !== 'txt') {
-                            return 'The selected file must a .txt file.';
+                            return '请选择 .txt 文件。';
                         }
 
                         return true;
@@ -72,6 +72,13 @@
                     this.$emit('text-selected', {
                         text: this.text,
                         isImportSourceValid: true
+                    });
+                };
+                reader.onerror = () => {
+                    this.text = '';
+                    this.$emit('text-selected', {
+                        text: '',
+                        isImportSourceValid: false
                     });
                 };
             }

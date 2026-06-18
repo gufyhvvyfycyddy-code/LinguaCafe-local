@@ -4,7 +4,7 @@
         <error-dialog
             v-if="errorDialog.active"
             v-model="errorDialog.active" 
-            content="An error has occurred while deleting the chapter."
+            :content="errorDialog.content"
         ></error-dialog>
 
         <!-- Edit book chapter dialog -->
@@ -41,13 +41,13 @@
         <v-data-table
             class="my-4 mb-0 no-hover"
             :headers="[
-                { text: 'Chapter', value: 'name'},
-                { text: 'Total', value: 'wordCount.total', align: 'center' },
-                { text: 'Unique', value: 'wordCount.unique', align: 'center' },
-                { text: 'Known', value: 'wordCount.known', align: 'center' },
-                { text: 'Highlighted', value: 'wordCount.highlighted', align: 'center' },
-                { text: 'New', value: 'wordCount.new', align: 'center' },
-                { text: 'Actions', value: 'actions', sortable: false },
+                { text: '章节', value: 'name'},
+                { text: '总词数', value: 'wordCount.total', align: 'center' },
+                { text: '唯一词', value: 'wordCount.unique', align: 'center' },
+                { text: '已知词', value: 'wordCount.known', align: 'center' },
+                { text: '高亮词', value: 'wordCount.highlighted', align: 'center' },
+                { text: '新词', value: 'wordCount.new', align: 'center' },
+                { text: '操作', value: 'actions', sortable: false },
             ]"
             :items="chapters"
             :loading="chaptersLoading"
@@ -164,7 +164,7 @@
                 <div class="d-flex justify-center">
                     <!-- Action buttons -->
                     <template v-if="item.processing_status == 'processed'">
-                        <v-btn icon :to="'/chapters/read/' + item.id" title="Read"><v-icon>mdi-book-open-variant</v-icon></v-btn>
+                        <v-btn icon :to="'/chapters/read/' + item.id" title="阅读"><v-icon>mdi-book-open-variant</v-icon></v-btn>
                         <v-menu rounded offset-y bottom left nudge-top="-5">
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn icon v-bind="attrs" v-on="on"><v-icon>mdi-dots-horizontal</v-icon></v-btn>
@@ -176,7 +176,7 @@
                                 color="white"
                                 @click="showEditChapterDialog(item.id)"
                             >
-                                Edit
+                                编辑
                             </v-btn>
                             <v-btn
                                 width="100"
@@ -185,7 +185,7 @@
                                 color="white"
                                 @click="showStartReviewDialog(book.id, book.name, item.id, item.name)"
                             >
-                                Review
+                                复习
                             </v-btn>
                             <v-btn
                                 width="100"
@@ -194,19 +194,19 @@
                                 color="white"
                                 @click="showDeleteChapterDialog(item)"
                             >
-                                Delete
+                                删除
                             </v-btn>
                         </v-menu>
                     </template>
 
                     <!-- Chapter importing loader -->
                     <template v-else-if="item.processing_status === 'unprocessed'">
-                        <v-chip small color="warning">importing</v-chip>
+                        <v-chip small color="warning">处理中</v-chip>
                     </template>
 
                     <!-- Chapter importing failed -->
                     <template v-else-if="item.processing_status === 'failed'">
-                        <v-chip small color="error">failed</v-chip>
+                        <v-chip small color="error">处理失败</v-chip>
                     </template>
                 </div>
             </template>
@@ -216,6 +216,7 @@
 
 <script>
     import {formatNumber} from './../../helper.js';
+    import { requestErrorMessage } from './../../services/UiTextService';
     export default {
         data: function() {
             return {
@@ -226,6 +227,7 @@
                 randomChapter: 0,
                 errorDialog: {
                     active: false,
+                    content: '',
                 },
                 editBookChapterDialog: {
                     active: false,
@@ -291,14 +293,16 @@
             deleteChapter() {
                 axios.post('/chapters/delete', {
                     'chapterId': this.deleteBookChapterDialog.chapterId,
-                }).catch(() => {
-                    this.errorDialog.active = true;
                 }).then((response) => {
                     if (response.status === 200) {
                         this.$emit('word-count-changed');
                     } else {
+                        this.errorDialog.content = '删除章节失败。';
                         this.errorDialog.active = true;
                     }
+                }).catch((error) => {
+                    this.errorDialog.content = requestErrorMessage(error, '删除章节失败。');
+                    this.errorDialog.active = true;
                 });
             },
             loadChapters() {
@@ -323,8 +327,16 @@
 
                     this.chaptersLoading = false;
                     this.$nextTick(() => {
-                        axios.get('/chapters/word-counts/' + this.$props.bookId);
+                        axios.get('/chapters/word-counts/' + this.$props.bookId).catch((error) => {
+                            this.errorDialog.content = requestErrorMessage(error, '章节词数加载失败。');
+                            this.errorDialog.active = true;
+                        });
                     }) 
+                }).catch((error) => {
+                    this.chapters = [];
+                    this.errorDialog.content = requestErrorMessage(error, '章节列表加载失败。');
+                    this.errorDialog.active = true;
+                    this.chaptersLoading = false;
                 });
             },
             showStartReviewDialog(bookId, bookName, chapterId, chapterName) {

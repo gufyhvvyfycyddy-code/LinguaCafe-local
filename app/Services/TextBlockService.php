@@ -112,21 +112,17 @@ class TextBlockService
         $text = $this->rawText;
         $text = preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $text));
 
-        $this->tokenizedWords = Http::post($this->pythonService . ':8678/tokenizer', [
+        $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
             'raw_text' => $text,
             'language' => $this->language,
         ]);
-
-        $this->tokenizedWords = json_decode($this->tokenizedWords);
     }
 
     public function tokenizeRawSubtitles() {
-        $tokenizerResponse = Http::post($this->pythonService . ':8678/tokenizer/subtitle', [
+        $tokenizerResponse = $this->postTokenizer('/tokenizer/subtitle', [
             'subtitles' => $this->rawText,
             'language' => $this->language,
         ]);
-        
-        $tokenizerResponse = json_decode($tokenizerResponse);
 
         $this->tokenizedWords = $tokenizerResponse->tokenizedText;
         return $tokenizerResponse->timeStamps;
@@ -562,6 +558,35 @@ class TextBlockService
         foreach ($this->uniqueWords as $uniqueWord) {
             $uniqueWord->definitions_checked = false;
         }
+    }
+
+    private function postTokenizer(string $path, array $payload)
+    {
+        try {
+            $response = Http::timeout(30)->post($this->pythonServiceUrl() . $path, $payload);
+        } catch (\Throwable $exception) {
+            throw new \Exception('文本处理服务不可用，请确认 Python tokenizer 服务已经启动。');
+        }
+
+        if (!$response->successful()) {
+            throw new \Exception('文本处理服务返回错误：' . $response->status());
+        }
+
+        $decoded = json_decode($response->body());
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \Exception('文本处理服务返回了无效 JSON。');
+        }
+
+        return $decoded;
+    }
+
+    private function pythonServiceUrl(): string
+    {
+        if (str_starts_with($this->pythonService, 'http://') || str_starts_with($this->pythonService, 'https://')) {
+            return rtrim($this->pythonService, '/');
+        }
+
+        return 'http://' . rtrim($this->pythonService, '/') . ':8678';
     }
 
     /*

@@ -9,8 +9,8 @@
 
             <!-- Title bar -->
             <v-card-title>
-                <span class="text-h5" v-if="importResult === null">Vocabulary import</span>
-                <span class="text-h5" v-if="importResult !== null">Import results</span>
+                <span class="text-h5" v-if="importResult === null">词汇导入</span>
+                <span class="text-h5" v-if="importResult !== null">导入结果</span>
                 
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
@@ -23,21 +23,21 @@
                 <template v-if="importResult === null || importResult.error">
                     <!-- Import information -->
                     <v-alert dark border="left" type="info" color="primary" v-if="!loading">
-                        Please read the <a href="/user-manual/vocabulary-import"><v-icon small class="mr-0.5">mdi-file</v-icon>user manual</a> before importing.
+                        导入前请先阅读 <a href="/user-manual/vocabulary-import"><v-icon small class="mr-0.5">mdi-file</v-icon>用户手册</a>。
                     </v-alert>
 
                     <!-- Csv file -->
-                    <label class="font-weight-bold">Subtitle file</label>
+                    <label class="font-weight-bold">CSV 文件</label>
                     <v-file-input
                         v-model="importFile"
                         filled
                         dense
                         rounded
                         persistent-hint
-                        hint="Accepted format: .csv"
+                        hint="支持格式：.csv"
                         ref="importFile"
                         accept=".csv"
-                        placeholder="Import file"
+                        placeholder="选择导入文件"
                         prepend-icon="mdi-file-delimited"
                         class="mb-4"
                         :disabled="loading"
@@ -45,7 +45,7 @@
                     ></v-file-input>
 
                     <!-- Delimiter -->
-                    <label class="font-weight-bold">Delimiter</label>
+                    <label class="font-weight-bold">分隔符</label>
                     <v-text-field 
                         v-model="delimiter"
                         filled
@@ -61,7 +61,7 @@
                         hide-details
                         class="my-1 mt-6"
                         color="primary"
-                        label="Skip first row"
+                        label="跳过第一行"
                         :disabled="loading"
                     ></v-switch>
 
@@ -71,19 +71,19 @@
                         hide-details
                         class="my-2"
                         color="primary"
-                        label="Only update"
+                        label="只更新已有词汇"
                         :disabled="loading"
                     ></v-switch>
 
                     <!-- Import information -->
                     <v-alert dark class="mt-4" border="left" type="error" color="error" v-if="!loading && importResult !== null && importResult.error">
-                        An error has occured while importing. Please make sure that your file is in the correct format.
+                        导入失败，请确认文件格式正确。
                     </v-alert>
                 </template>
 
                 <!-- Importing message -->
                 <v-alert class="mt-4" dark border="left" type="info" color="primary" v-if="loading">
-                    Importing your selected file. This might take take a while...
+                    正在导入所选文件，可能需要一点时间...
                 </v-alert>
 
                 <!-- Import success -->
@@ -91,15 +91,15 @@
                     <v-simple-table class="no-hover border rounded-lg mt-4">
                         <tbody>
                             <tr v-if="importResult.createdWords">
-                                <th>Created words:</th>
+                                <th>新增词汇：</th>
                                 <th>{{ importResult.createdWords }}</th>
                             </tr>
                             <tr v-if="importResult.updatedWords">
-                                <th>Updated words:</th>
+                                <th>更新词汇：</th>
                                 <th>{{ importResult.updatedWords }}</th>
                             </tr>
                             <tr v-if="importResult.rejectedWords">
-                                <th>Rejected words:</th>
+                                <th>跳过词汇：</th>
                                 <th>{{ importResult.rejectedWords }}</th>
                             </tr>
                         </tbody>
@@ -113,19 +113,19 @@
 
                 <!-- Import and cancel buttons -->
                 <template v-if="importResult === null || importResult.error">
-                    <v-btn rounded text :disabled="loading" @click="close">Cancel</v-btn>
+                    <v-btn rounded text :disabled="loading" @click="close">取消</v-btn>
                     <v-btn 
                         rounded 
                         depressed
                         color="primary"
                         :disabled="!importFileValid || loading"
                         @click="importFromCsv"
-                    >Import</v-btn>
+                    >导入</v-btn>
                 </template>
 
                 <!-- Close button -->
                 <template v-if="importResult !== null && !importResult.error">
-                    <v-btn rounded text @click="close">Close</v-btn>
+                    <v-btn rounded text @click="close">关闭</v-btn>
                 </template>
             </v-card-actions>
         </v-card>
@@ -151,7 +151,7 @@
                     importFileRule: (value) => {
                         if (value === null || value === undefined) {
                             this.importFileValid = false;
-                            return 'You must select a file.';
+                            return '请选择文件。';
                         }
                         
                         let extension = value.name.split('.');
@@ -159,7 +159,7 @@
                         
                         if (extension !== 'csv') {
                             this.importFileValid = false;
-                            return 'The selected file must a .csv file.';
+                            return '请选择 .csv 文件。';
                         }
 
                         this.importFileValid = true;

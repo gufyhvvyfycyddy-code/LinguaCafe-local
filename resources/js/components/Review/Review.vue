@@ -33,12 +33,12 @@
             <template v-if="totalReviews === 0">
                 <!-- Card title -->
                 <v-card-title>
-                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>当前没有到期卡片
+                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>{{ reviewError || '当前没有到期卡片' }}
                 </v-card-title>
 
                 <!-- Card content -->
                 <v-card-text>
-                    当前没有需要复习的单词或短语。
+                    {{ reviewError ? '请稍后重试，或检查后端服务是否正在运行。' : '当前没有需要复习的单词或短语。' }}
                 </v-card-text>
             </template>
 
@@ -51,7 +51,7 @@
 
                 <!-- Card content -->
                 <v-card-text>
-                    你已经完成 {{ formatNumber(totalReviews) }} 张卡片。保持节奏，{{ language }} 学习会稳步进步。
+                    你已经完成 {{ formatNumber(totalReviews) }} 张卡片。保持节奏，学习会稳步推进。
                 </v-card-text>
             </template>
 
@@ -105,13 +105,13 @@
 
             <!-- Toolbar -->
             <div id="toolbar">
-                <v-btn title="Fullscreen" icon class="my-2" @click="openFullscreen" v-if="!fullscreen"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
-                <v-btn title="Exit fullscreen" icon class="my-2" @click="exitFullscreen" v-if="fullscreen"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
-                <v-btn title="Review settings" icon @click="settingsDialog = true;"><v-icon>mdi-cog</v-icon></v-btn>
+                <v-btn title="全屏" icon class="my-2" @click="openFullscreen" v-if="!fullscreen"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
+                <v-btn title="退出全屏" icon class="my-2" @click="exitFullscreen" v-if="fullscreen"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
+                <v-btn title="复习设置" icon @click="settingsDialog = true;"><v-icon>mdi-cog</v-icon></v-btn>
                 <v-btn
                     class="my-2"
                     icon
-                    title="Text to speech"
+                    title="朗读"
                     :disabled="!textToSpeechAvailable"
                     @click="textToSpeech"
                 >
@@ -122,7 +122,7 @@
                     <template v-slot:activator="{ on, attrs }">
                         <v-btn
                             icon
-                            title="Example sentence mode"
+                            title="例句模式"
                             class="my-2"
                             v-bind="attrs"
                             v-on="on"
@@ -137,7 +137,7 @@
                         @click="settings.reviewSentenceMode = 'disabled'; saveSettings();"
                     >
                         <v-icon class="mr-1">mdi-close</v-icon>
-                        Disabled
+                        关闭
 
                     </v-btn>
                     <v-btn
@@ -147,7 +147,7 @@
                         @click="settings.reviewSentenceMode = 'plain-text'; saveSettings();"
                     >
                         <v-icon class="mr-1">mdi-text-long</v-icon>
-                        Plain text
+                        纯文本
                     </v-btn>
                     <v-btn
                         class="menu-button justify-start"
@@ -156,13 +156,13 @@
                         @click="settings.reviewSentenceMode = 'interactive-text'; saveSettings();"
                     >
                         <v-icon class="mr-1">mdi-comment-text-outline</v-icon>
-                        Interactive text
+                        交互文本
                     </v-btn>
                 </v-menu>
 
-                <v-btn title="Increase font size" icon class="my-2" @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
-                <v-btn title="Decrease font size" icon class="my-2" @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-                <v-btn title="Show hotkey information" icon class="my-2" @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
+                <v-btn title="增大字号" icon class="my-2" @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
+                <v-btn title="减小字号" icon class="my-2" @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
+                <v-btn title="查看快捷键" icon class="my-2" @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
             </div>
 
             <!-- Card -->
@@ -358,6 +358,7 @@
     import TextToSpeechService from './../../services/TextToSpeechService';
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
+    import { requestErrorMessage } from './../../services/UiTextService';
 
     export default {
         data: function() {
@@ -401,6 +402,7 @@
                 languageSpaces: false,
                 readWords: 0,
                 finishedReviews: -1,
+                reviewError: '',
                 finished: false,
                 today: new moment().format('YYYY-MM-DD'), // CHANGE TO SERVER SIDE
             }
@@ -448,6 +450,10 @@
 
                 this.textToSpeechService = new TextToSpeechService(this.language, this.updateTextToSpeechState);
                 window.addEventListener('keyup', this.hotkey);
+            }).catch((error) => {
+                this.reviewError = requestErrorMessage(error, '复习队列加载失败。');
+                this.totalReviews = 0;
+                this.finished = true;
             });
         },
         beforeDestroy: function () {
@@ -586,7 +592,7 @@
                         reviewCardId: this.reviews[this.currentReviewIndex].review_card_id,
                         rating: rating,
                     }).then(() => {
-                        axios.post('/goals/achievement/review/update');
+                        axios.post('/goals/achievement/review/update').catch(() => {});
 
                         if (this.reviews.length == 1) {
                             this.finish();
@@ -594,6 +600,9 @@
                             this.reviews.splice(this.currentReviewIndex, 1)[0];
                             setTimeout(this.next, this.transitionDuration);
                         }
+                    }).catch((error) => {
+                        this.reviewError = requestErrorMessage(error, '评分提交失败。');
+                        this.finished = true;
                     });
                 } else {
                     if (this.reviews.length == 1) {
@@ -639,14 +648,14 @@
                     }
 
                     this.textBlockKey++;
-                });
+                }).catch(() => {});
 
                 // update reviewed and read words data
                 axios.post('/reviews/update', {
                     readWords: this.readWords,
                 }).then(() => {
                     this.readWords = 0;
-                });
+                }).catch(() => {});
             },
             finish() {
                 this.finished = true;

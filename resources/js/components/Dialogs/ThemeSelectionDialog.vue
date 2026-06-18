@@ -2,7 +2,7 @@
     <v-dialog v-model="value" persistent max-width="300px">
         <v-card class="rounded-lg">
             <v-card-title>
-                <span class="text-h5">Theme</span>
+                <span class="text-h5">界面主题</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
@@ -22,7 +22,7 @@
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -42,26 +42,25 @@
                 selectedTheme: ThemeService.getCurrentTheme(),
                 displayNames: {
                     auto: {
-                        name: 'Auto',
+                        name: '跟随系统',
                         icon: 'mdi-theme-light-dark'
                     },
                     light: {
-                        name: 'Light theme',
+                        name: '浅色主题',
                         icon: 'mdi-weather-sunny'
                     },
                     dark: {
-                        name: 'Dark theme',
+                        name: '深色主题',
                         icon: 'mdi-weather-night'
                     },
                     eink: {
-                        name: 'Eink theme',
+                        name: '墨水屏主题',
                         icon: 'mdi-tablet'
                     }
                 },
             };
         },
         mounted: function() {
-            console.log(this.$vuetify.theme.themes);
         },
         methods: {
             selectTheme: function(newTheme) {

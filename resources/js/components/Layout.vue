@@ -107,6 +107,7 @@
     import TextStylingService from './../services/TextStylingService';
     import FontTypeService from './../services/FontTypeService';
     import { DefaultLocalStorageManager } from './../services/LocalStorageManagerService';
+    import { languageName } from './../services/UiTextService';
     
     export default {
         data: function() {
@@ -185,20 +186,7 @@
                 return settingsCssObject[this.theme]
             },
             selectedLanguageName: function() {
-                const names = {
-                    english: '英语',
-                    japanese: '日语',
-                    chinese: '中文',
-                    spanish: '西班牙语',
-                    french: '法语',
-                    german: '德语',
-                    korean: '韩语',
-                    italian: '意大利语',
-                    russian: '俄语',
-                    portuguese: '葡萄牙语',
-                };
-
-                return names[String(this.selectedLanguage || '').toLowerCase()] || this.selectedLanguage;
+                return languageName(this.selectedLanguage);
             }
         },
         props: {

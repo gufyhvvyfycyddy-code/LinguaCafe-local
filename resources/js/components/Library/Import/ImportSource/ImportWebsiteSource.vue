@@ -1,7 +1,7 @@
 <template>
     <div class="d-flex flex-column align-stretch">
         <!-- Website url input -->
-        <label class="font-weight-bold">Website url</label>
+        <label class="font-weight-bold">网页地址</label>
         <div class="d-flex flex-wrap flex-md-nowrap">
             <v-text-field
                 class="website-url-input"
@@ -9,7 +9,7 @@
                 filled
                 dense
                 rounded
-                placeholder="Website url"
+                placeholder="网页地址"
                 prepend-icon="mdi-web"
                 ref="url"
                 :rules="[rules.url]"
@@ -22,7 +22,7 @@
                 color="primary"
                 @click="retrieveWebsiteTExt"
             >
-                Retrieve
+                获取
             </v-btn>
         </div>
 
@@ -35,7 +35,7 @@
             dense
             rounded
             persistent-hint
-            placeholder="Website text"
+            placeholder="网页文本"
             maxlength="250000"
             counter="250000"
             no-resize
@@ -57,24 +57,27 @@
             border="left"
             type="error"
         >
-            An error has occurred while requesting the website content.
+            {{ errorMessage || '获取网页内容失败。' }}
         </v-alert>
     </div>
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../../../services/UiTextService';
+
     export default {
         data: function() {
             return {
                 loading: false,
                 websiteRequestStatus: '',
+                errorMessage: '',
                 text: '',
                 url: '',
                 rules: {
                     url: (value) => {
                         let pattern = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/;
                         if (!value.match(pattern)) {
-                            return 'Invalid url.';
+                            return '请输入有效的网址。';
                         }
 
                         return true;
@@ -93,6 +96,7 @@
                 if (this.$refs.url.validate()) {
                     this.loading = true;
                     this.text = '';
+                    this.errorMessage = '';
                     this.websiteRequestStatus = '';
 
                     axios.post('/website/get-text', {
@@ -103,6 +107,7 @@
                         this.loading = false;
                         this.websiteRequestStatus = 'success';
                     }).catch((error) => {
+                        this.errorMessage = requestErrorMessage(error, '获取网页内容失败。');
                         this.loading = false;
                         this.websiteRequestStatus = 'error';
                     });;

@@ -112,11 +112,11 @@ class LanguageService {
 
     public function deleteInstalledLanguages($user, $installableLanguages) {
         /*
-            Reset selected language to the default spanish, 
+            Reset selected language to the default english,
             so the user won't have a language selected that has been uninstalled.
         */
         if (in_array(ucfirst($user->selected_language), $installableLanguages)) {
-            $user->selected_language = 'spanish';
+            $user->selected_language = 'english';
             $user->save();
         }
 

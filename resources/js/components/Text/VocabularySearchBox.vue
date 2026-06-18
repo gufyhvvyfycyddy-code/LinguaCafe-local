@@ -7,10 +7,10 @@
                     <v-icon small>mdi-translate</v-icon>
                 </div>
                 {{ $props.searchTerm }}
-                <div class="search-result-word default-font" :title="$props.searchTerm">API search</div>
+                <div class="search-result-word default-font" :title="$props.searchTerm">API 查询</div>
             </div>
             <div class="search-result-definition rounded pr-2">
-                loading <v-progress-circular indeterminate class="ml-1" size="20" width="3" color="primary"></v-progress-circular>
+                正在查询 <v-progress-circular indeterminate class="ml-1" size="20" width="3" color="primary"></v-progress-circular>
             </div>
         </div>
 
@@ -45,11 +45,11 @@
                 <div class="dictionary-title-icon mr-1" style="background-color: var(--v-primary-base);">
                     <v-icon small>mdi-list-box</v-icon>
                 </div>
-                <span class="default-font" :title="$props.searchTerm">{{ $props.searchTerm }}</span> <div class="search-result-word">Dictionary search</div>
+                <span class="default-font" :title="$props.searchTerm">{{ $props.searchTerm }}</span> <div class="search-result-word">词典查询</div>
             </div>
 
             <div class="search-result-definition rounded pr-2">
-                loading <v-progress-circular indeterminate class="ml-1" size="20" width="3" color="primary"></v-progress-circular>
+                正在查询 <v-progress-circular indeterminate class="ml-1" size="20" width="3" color="primary"></v-progress-circular>
             </div>
         </div> 
 
@@ -63,7 +63,7 @@
             </div>
 
             <div class="search-result-definition rounded pr-2">
-                No dictionary results
+                暂无词典结果
             </div>
         </div> 
         
@@ -105,7 +105,7 @@
                     </div>
                 
                     <template v-if="record.otherForms.length">
-                        <div class="vocab-box-subheader">Other forms:</div>
+                        <div class="vocab-box-subheader">其他形式：</div>
                         <div class="d-flex flex-wrap default-font">
                             <div v-for="(form, formIndex) in record.otherForms" :key="formIndex">
                                 {{ form }}<span class="mr-2" v-if="formIndex < record.otherForms.length - 1">, </span>
@@ -160,6 +160,10 @@
                     term: this.$props.searchTerm
                 }).then((response) => {
                     this.processVocabularySearchResults(response.data);
+                }).catch(() => {
+                    this.searchResults = [];
+                    this.dictionarySearchResultsFound = false;
+                }).finally(() => {
                     this.dictionarySearchLoading = false;
                 });
 
@@ -212,7 +216,6 @@
                             records: []
                         };
 
-                        console.log('wtf', data[dictionaryIndex])
                         for (var recordIndex = 0; recordIndex < data[dictionaryIndex].records.length; recordIndex++) {
                             searchResult.records.push({
                                 word: data[dictionaryIndex].records[recordIndex].word,

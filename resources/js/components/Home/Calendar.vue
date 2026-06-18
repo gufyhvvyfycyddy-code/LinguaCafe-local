@@ -1,23 +1,23 @@
 <template>
     <div>
         <div class="subheader subheader-margin-top d-flex">
-            Calendar
+            日历
             <v-spacer></v-spacer>
 
             <!-- Displayed goal select -->
             <v-menu offset-y class="rounded-lg">
                 <template v-slot:activator="{ on, attrs }">
                     <v-btn class="calendar-button" color="foreground" rounded depressed v-bind="attrs" v-on="on">
-                        <span id="goal-selection-text-small">Goal</span>
-                        <span id="goal-selection-text">Displayed goal</span>
+                        <span id="goal-selection-text-small">目标</span>
+                        <span id="goal-selection-text">显示目标</span>
                         <v-icon v-if="attrs['aria-expanded'] === 'true' ">mdi-chevron-up</v-icon>
                         <v-icon v-if="attrs['aria-expanded'] !== 'true'">mdi-chevron-down</v-icon>
                     </v-btn>
                 </template>
-                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'reviews_due'; updateCalendar();">Reviews due</v-btn>
-                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'read_words'; updateCalendar();">Reading</v-btn>
-                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'review'; updateCalendar();">Review</v-btn>
-                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'learn_words'; updateCalendar();">New words</v-btn>
+                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'reviews_due'; updateCalendar();">到期复习</v-btn>
+                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'read_words'; updateCalendar();">阅读</v-btn>
+                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'review'; updateCalendar();">复习</v-btn>
+                <v-btn  class="menu-button justife-start" tile color="white" @click="selectedGoal = 'learn_words'; updateCalendar();">新词</v-btn>
             </v-menu>
 
             <!-- Date picker -->
@@ -50,7 +50,7 @@
                     @change="datePickerChanged"
                 >
                     <v-spacer></v-spacer>
-                    <v-btn text rounded @click="showDatePicker = false">Close</v-btn>
+                    <v-btn text rounded @click="showDatePicker = false">关闭</v-btn>
                 </v-date-picker>
             </v-menu>
         </div>
@@ -93,13 +93,13 @@
                             <v-simple-table dense class="no-row-border no-hover">
                                 <tbody>
                                     <tr>
-                                        <td>Reviews due:</td>
+                                        <td>到期复习：</td>
                                         <td>{{ popupMenu.day.reviewsDue }}</td>
                                     </tr>
                                     <tr v-for="(achievement, index) in popupMenu.achievements" :key="index">
                                         <td>{{ goalTexts[achievement.type] }}:</td>
                                         <td v-if="achievement.goalQuantity">{{ achievement.achievedQuantity }}/{{ achievement.goalQuantity }}</td>
-                                        <td v-if="!achievement.goalQuantity"> none </td>
+                                        <td v-if="!achievement.goalQuantity"> 无 </td>
                                     </tr>
                                 </tbody>
                             </v-simple-table>
@@ -170,6 +170,7 @@
     import {formatNumber} from './../../helper.js';
     const moment = require('moment');
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
+    import { formatChineseMonth } from './../../services/UiTextService';
     export default {
         data: function() {
             return {
@@ -177,9 +178,9 @@
                 calendarData: [],
                 reviewsDue: [],
                 goalTexts: {
-                    'review': 'reviews',
-                    'read_words': 'words',
-                    'learn_words': 'new words',
+                    'review': '复习',
+                    'read_words': '阅读词数',
+                    'learn_words': '新词',
                 },
                 pickerDate: new moment().format('YYYY-MM'),
                 pickerDateFormated: '',
@@ -286,7 +287,7 @@
                 this.popupMenu.active = false;
             },
             datePickerChanged() {
-                this.pickerDateFormated = new moment(this.pickerDate).format('YYYY, MMMM');
+                this.pickerDateFormated = formatChineseMonth(new moment(this.pickerDate));
                 this.currentMonth = moment(this.pickerDate).startOf('month');
                 this.updateCalendar();
                 this.showDatePicker = false;
@@ -294,18 +295,21 @@
             nextMonth() {
                 this.currentMonth.add(1, 'month').startOf('month');
                 this.pickerDate = new moment(this.currentMonth).format('YYYY-MM');
-                this.pickerDateFormated = moment(this.pickerDate).format('YYYY, MMMM');
+                this.pickerDateFormated = formatChineseMonth(moment(this.pickerDate));
                 this.updateCalendar();
             },
             previousMonth() {
                 this.currentMonth.subtract(1, 'month').startOf('month');
                 this.pickerDate = new moment(this.currentMonth).format('YYYY-MM');
-                this.pickerDateFormated = moment(this.pickerDate).format('YYYY, MMMM');
+                this.pickerDateFormated = formatChineseMonth(moment(this.pickerDate));
                 this.updateCalendar();
             },
             loadCalendarData() {
                 axios.post('/goals/get-calendar-data').then((response) => {
                     this.calendarData = response.data;
+                    this.updateCalendar();
+                }).catch(() => {
+                    this.calendarData = [];
                     this.updateCalendar();
                 });
             },
@@ -317,9 +321,9 @@
                 var currentDate = new moment(this.currentMonth.format('YYYY-MM-DD')).startOf('month').subtract(4, 'months');
                 var lastDay = new moment(this.currentMonth.format('YYYY-MM-DD')).endOf('month');
                 while (currentDate.isBefore(lastDay)) {
-                    if (!this.selectedMonths.length || this.selectedMonths[this.selectedMonths.length - 1].formattedString !== currentDate.format('YYYY, MMMM')) {
+                    if (!this.selectedMonths.length || this.selectedMonths[this.selectedMonths.length - 1].formattedString !== formatChineseMonth(currentDate)) {
                         this.selectedMonths.push({
-                            formattedString: currentDate.format('YYYY, MMMM'),
+                            formattedString: formatChineseMonth(currentDate),
                             days: [],
                         });
                     }

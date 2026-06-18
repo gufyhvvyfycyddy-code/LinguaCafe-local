@@ -8,7 +8,7 @@
 
             <template v-if="!passwordChanged">
                 <div class="subheader subheader-margin-top d-flex">
-                    <v-icon large color="error" class="mr-2">mdi-alert</v-icon>Password change
+                    <v-icon large color="error" class="mr-2">mdi-alert</v-icon>修改密码
                 </div>
 
                 <v-alert
@@ -17,7 +17,7 @@
                     color="foreground"
                     border="left"
                 >
-                    Your account and password was created by an admin. Please change your password before continuing your language learning journey.
+                    你的账号由管理员创建。继续使用前，请先修改密码。
 
                     <div class="d-flex mt-4">
                         <v-spacer />
@@ -28,7 +28,7 @@
                             @click="passwordChangeDialog = true;"
                         >
                             <v-icon class="mr-2">mdi-lock-reset</v-icon>
-                            Change password
+                            修改密码
                         </v-btn>
                     </div>
                 </v-alert>
@@ -47,27 +47,27 @@
             ></statistics>
 
             <div class="subheader subheader-margin-top d-flex">
-                About
+                关于
             </div>
 
             <div id="about" class="d-flex flex-wrap">
                 <v-card outlined class="rounded-lg pt-0 mr-4 mb-4" width="290px">
                     <v-card-title>LinguaCafe</v-card-title>
                     <v-card-text>
-                        You can find more information about LinguaCafe on these links.
+                        可以通过这些链接了解 LinguaCafe。
                         <div class="footer-link-box mb-1 mt-4">
-                            <router-link to="/attributions"><v-icon class="mr-2">mdi-copyright</v-icon>Attributions</router-link>
+                            <router-link to="/attributions"><v-icon class="mr-2">mdi-copyright</v-icon>版权与致谢</router-link>
                         </div>
                         <div class="footer-link-box mb-1">
-                            <a href="https://simjanos-dev.github.io/LinguaCafeHome/"><v-icon class="mr-2">mdi-file-document</v-icon>Overview</a>
+                            <a href="https://simjanos-dev.github.io/LinguaCafeHome/"><v-icon class="mr-2">mdi-file-document</v-icon>项目介绍</a>
                         </div>
                     </v-card-text>
                 </v-card>
 
                 <v-card outlined class="rounded-lg pt-0 mr-4 mb-4" width="290px">
-                    <v-card-title>Contact</v-card-title>
+                    <v-card-title>联系</v-card-title>
                     <v-card-text>
-                        You can contact the developer of LinguaCafe on these platforms.
+                        可以通过这些平台联系 LinguaCafe 开发者。
                         <div class="footer-link-box mb-1 mt-4">
                             <a href="https://discord.gg/wZYZYrdaeP"><v-icon class="mr-2">mdi-message-text</v-icon>Discord chat</a>
                         </div>
@@ -81,11 +81,11 @@
                 </v-card>
 
                 <v-card outlined class="rounded-lg pt-0 mr-4 mb-4" width="290px">
-                    <v-card-title>Version</v-card-title>
+                    <v-card-title>版本</v-card-title>
                     <v-card-text>
-                        The current LinguaCafe version is v0.14.1.
+                        当前 LinguaCafe 版本是 v0.14.1。
                         <div class="footer-link-box mb-1 mt-4">
-                            <router-link to="/patch-notes"><v-icon class="mr-2">mdi-update</v-icon>Update notes</router-link>
+                            <router-link to="/patch-notes"><v-icon class="mr-2">mdi-update</v-icon>更新说明</router-link>
                         </div>
                     </v-card-text>
                 </v-card>
@@ -112,7 +112,7 @@
         mounted() {
             axios.get('/users/is-password-changed').then((response) => {
                 this.passwordChanged = Boolean(response.data);
-            });
+            }).catch(() => {});
         },
         methods: {
             updateCalendar() {

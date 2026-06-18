@@ -162,3 +162,19 @@ php artisan user:create --email=test@example.com --password=12345678
 - 是否已经创建本地用户。
 - Laravel 后端服务是否正在运行。
 - 当前用户是否有学习语言，默认应为 `english`。
+## 中文界面与首次登录
+
+桌面快捷方式打开的 LinguaCafe 默认显示中文界面。左下角“学习语言”用于选择学习材料语言，不是界面语言；默认学习语言是 `english`。
+
+如果第一次打开登录页无法登录，请在项目根目录运行：
+
+```bat
+php artisan user:create --email=test@example.com --password=12345678
+```
+
+该命令会创建本地用户，把第一个用户设为 admin，用 Laravel Hash 加密密码，并初始化：
+
+- 界面语言：`zh-CN`
+- 学习语言：`english`
+
+如果左下角“学习语言”一直转圈，请检查 Laravel 是否启动、是否已登录、数据库是否有用户，以及后端是否能访问语言接口。导入阅读材料一直加载时，请检查 Python tokenizer 服务是否可用。

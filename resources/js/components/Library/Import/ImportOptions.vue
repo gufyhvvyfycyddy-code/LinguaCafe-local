@@ -3,14 +3,13 @@
         <v-form ref="importOptionsForm" v-model="isFormValid">
             <!-- E-book chapter order -->
             <label class="font-weight-bold mt-2" v-if="$props.type === 'e-book'">
-                E-book chapter order
+                电子书章节顺序
                 <v-menu offset-y nudge-top="-12px">
                     <template v-slot:activator="{ on, attrs }">
                         <v-icon class="ml-1" v-bind="attrs" v-on="on">mdi-help-circle-outline</v-icon>
                     </template>
                     <v-card outlined class="rounded-lg pa-4" width="320px">
-                        For some rare cases the chapter order can be incorrect after importing an e-book. If it 
-                        happened to you, please delete the imported book, and import it again with the Spine option.
+                        少数电子书导入后章节顺序可能不正确。如果遇到这种情况，请删除导入的书籍，并用 Spine 选项重新导入。
                     </v-card>
                 </v-menu>
             </label>
@@ -25,20 +24,20 @@
                     value="default"
                 >
                     <template v-slot:label>
-                        <div>Default</div>
+                        <div>默认</div>
                     </template>
                 </v-radio>
                 <v-radio
                     value="spine"
                 >
                     <template v-slot:label>
-                        <div>Spine</div>
+                        <div>Spine 顺序</div>
                     </template>
                 </v-radio>
             </v-radio-group>
 
             <!-- Text processing method label -->
-            <label class="font-weight-bold mt-2">Maximum characters per chapter</label>
+            <label class="font-weight-bold mt-2">每章最大字符数</label>
             <v-text-field 
                 v-model="maximumCharactersPerChapter"
                 ref="maximumCharactersPerChapterInput"
@@ -54,7 +53,7 @@
             ></v-text-field>
 
             <v-alert dark border="left" color="warning" type="error" v-if="maximumCharactersPerChapter > defaultMaximumCharactersPerChapter">
-                Using larger chapter sizes can lead to performance issues. The default settings are highly recommended!
+                章节过大可能导致页面性能问题，建议使用默认值。
             </v-alert>
         </v-form>
     </div>
@@ -72,11 +71,11 @@
                 rules: {
                     maximumCharactersPerChapter: value => {
                         if (value < 300) {
-                            return 'It has to be at least 300 characters.';
+                            return '至少需要 300 个字符。';
                         }
 
                         if (value > 15000) {
-                            return 'It cannot be more than 15000 characters.';
+                            return '不能超过 15000 个字符。';
                         }
 
                         return true;

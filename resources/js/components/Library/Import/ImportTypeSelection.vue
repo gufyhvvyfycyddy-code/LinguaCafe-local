@@ -1,13 +1,14 @@
 <template>
     <div v-if="!loading">
-        <label class="font-weight-bold">Select an import option</label>
+        <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
+        <label class="font-weight-bold">选择导入方式</label>
         <div class="import-type-group flex-wrap">
             <!--Plain text -->
             <div class="import-type-button rounded-lg mx-2 mb-4" @click="selectImportType('plain-text')">
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-text-box</v-icon>
                 </div>
-                <span>Plain text</span>
+                <span>粘贴文本</span>
             </div>
             
             <!-- Text file -->
@@ -15,7 +16,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-file-document</v-icon>
                 </div>
-                <span>Text file</span>
+                <span>文本文件</span>
             </div>
 
             <!-- E-book -->
@@ -23,7 +24,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-book</v-icon>
                 </div>
-                <span>E-book</span>
+                <span>电子书</span>
             </div>
         
             <!-- Youtube -->
@@ -31,7 +32,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-youtube</v-icon>
                 </div>
-                <span>Youtube</span>
+                <span>YouTube 字幕</span>
             </div>
 
             <!-- Jellyfin subtitle -->
@@ -39,7 +40,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-movie</v-icon>
                 </div>
-                <span>Jellyfin subtitle</span>
+                <span>Jellyfin 字幕</span>
             </div>
 
             <!-- Subtitle file -->
@@ -47,7 +48,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-subtitles</v-icon>
                 </div>
-                <span>Subtitle file</span>
+                <span>字幕文件</span>
             </div>
 
             <!-- Website -->
@@ -55,7 +56,7 @@
                 <div class="import-type-button-icon-box">
                     <v-icon large>mdi-web</v-icon>
                 </div>
-                <span>Website</span>
+                <span>网页</span>
             </div>
 
             <!--
@@ -100,10 +101,13 @@
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../../services/UiTextService';
+
     export default {
         data: function() {
             return {
                 loading: true,
+                error: '',
                 websiteImportSupported: false,
                 jellyfinEnabled: false,
             }
@@ -112,14 +116,21 @@
             language: String
         },
         mounted() {
+            this.loading = true;
+            this.error = '';
             axios.all([
                 axios.get('/config/get/linguacafe.languages.website_import_supported_languages'),
                 axios.get('/settings/is-jellyfin-enabled'),
             ]).then(axios.spread((response1, response2) => {
                 this.websiteImportSupported = response1.data.includes(this.$props.language);
                 this.jellyfinEnabled = response2.data;
+            })).catch((error) => {
+                this.error = requestErrorMessage(error, '导入方式加载失败。已隐藏需要额外服务的导入方式。');
+                this.websiteImportSupported = false;
+                this.jellyfinEnabled = false;
+            }).finally(() => {
                 this.loading = false;
-            }));
+            });
         },
         methods: {
             selectImportType(type) {

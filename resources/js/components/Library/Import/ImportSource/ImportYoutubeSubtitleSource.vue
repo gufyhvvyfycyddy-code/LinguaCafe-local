@@ -1,7 +1,7 @@
 <template>
     <div>
         <!-- Youtube url input -->
-        <label class="font-weight-bold">Youtube video url</label>
+        <label class="font-weight-bold">YouTube 视频地址</label>
         <div class="d-flex flex-wrap flex-md-nowrap">
             <v-text-field
                 class="youtube-url-input"
@@ -10,8 +10,8 @@
                 dense
                 rounded
                 persistent-hint
-                hint="Example: https://www.youtube.com/watch?v=aaaAaa1_A1A"
-                placeholder="Youtube url"
+                hint="示例：https://www.youtube.com/watch?v=aaaAaa1_A1A"
+                placeholder="YouTube 地址"
                 prepend-icon="mdi-youtube"
                 @keyup.enter="retrieveSubtitles"
             ></v-text-field>
@@ -22,14 +22,14 @@
                 color="primary"
                 @click="retrieveSubtitles"
             >
-                Retrieve
+                获取
             </v-btn>
         </div>
 
         <!-- Subtitle list-->
         <div id="youtube-subtitles" class="mt-2" v-if="selectedSubtitle === -1 && (subtitlesLoaded || loading)">
             <!-- Subtitle list label -->
-            <label class="font-weight-bold mt-2">Retrieved subtitles</label>
+            <label class="font-weight-bold mt-2">已获取的字幕</label>
 
             <!-- Subtitles loading -->
             <div class="d-flex justify-center">
@@ -46,7 +46,7 @@
                 border="left"
                 type="error"
             >
-                Could not retreive a list of subtitles. Please make sure that the url provided is correct, and your internet connection is stable.
+                无法获取字幕列表。请确认地址正确，并且网络连接正常。
             </v-alert>
 
             <!-- Subtitle list -->
@@ -64,7 +64,7 @@
                     v-if="!subtitles.length && !error"
                     class="d-flex youtube-subtitle regular-list-height rounded-pill my-2 pl-10"
                 >
-                    No subtitles found
+                    没有找到字幕
                 </div>
             </div>
         </div>
@@ -76,7 +76,7 @@
             border="left"
             type="error"
         >
-            An error has occurred while retrieving youtube subtitles.
+            {{ errorMessage || '获取 YouTube 字幕失败。' }}
         </v-alert>
         
         <!-- Selected subtitle text -->
@@ -86,7 +86,7 @@
                 class="font-weight-bold" 
                 v-if="selectedSubtitle !== -1"
             >
-                Selected subtitle
+                已选择字幕
             </label>
         </div>
         <div 
@@ -102,11 +102,13 @@
             color="primary"
             class="mt-2"
             @click="unselectSubtitle"
-        >Select another subtitle</v-btn>
+        >重新选择字幕</v-btn>
     </div>
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../../../services/UiTextService';
+
     export default {
         data: function() {
             return {
@@ -114,6 +116,7 @@
                 subtitles: null,
                 subtitlesLoaded: false,
                 error: false,
+                errorMessage: '',
                 selectedSubtitle: -1,
                 url: ''
             }
@@ -144,6 +147,7 @@
                 this.selectedSubtitle = -1;
                 this.loading = true;
                 this.error = false;
+                this.errorMessage = '';
 
                 axios.post('/youtube/get-subtitle-list', {url: this.url}).then((response) => {
                     this.subtitles = response.data;
@@ -155,9 +159,10 @@
                     }
                     
                     this.subtitlesLoaded = true;
-                    this.loading = false;
                 }).catch((error) => {
                     this.error = true;
+                    this.errorMessage = requestErrorMessage(error, '获取 YouTube 字幕失败。');
+                }).finally(() => {
                     this.loading = false;
                 });
             }

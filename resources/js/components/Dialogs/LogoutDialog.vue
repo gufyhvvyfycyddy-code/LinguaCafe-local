@@ -3,19 +3,19 @@
         <v-card class="rounded-lg">
             <v-card-title>
                 <v-icon class="mr-2">mdi-logout</v-icon>
-                <span class="text-h5">Logout</span>
+                <span class="text-h5">退出登录</span>
                 <v-spacer></v-spacer>
                 <v-btn icon @click="close">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
             <v-card-text class="pt-4 pb-6">
-                Do you want to logout?
+                确定要退出当前账号吗？
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">Cancel</v-btn>
-                <v-btn rounded text @click="logout"><v-icon class="mr-1">mdi-logout</v-icon>Logout</v-btn>
+                <v-btn rounded text @click="close">取消</v-btn>
+                <v-btn rounded text @click="logout"><v-icon class="mr-1">mdi-logout</v-icon>退出</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -39,7 +39,9 @@
                 this.loading = true;
                 axios.post('/logout').then((response) => {
                     window.location.href = "/";
-                })
+                }).catch(() => {
+                    this.loading = false;
+                });
             },
             close() {
                 this.$emit('input', false);

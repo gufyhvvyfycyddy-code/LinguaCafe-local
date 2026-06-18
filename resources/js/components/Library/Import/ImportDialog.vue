@@ -3,7 +3,7 @@
         <v-card id="import-dialog" class="rounded-lg" :loading="importLoading">
             <!-- Card title -->
             <v-card-title>
-                <v-icon class="mr-2">mdi-file-import</v-icon>Import content
+                <v-icon class="mr-2">mdi-file-import</v-icon>导入阅读材料
 
                 <v-spacer />
                 <v-btn icon @click="close">
@@ -16,26 +16,26 @@
                 <v-stepper id="import-stepper" v-model="stepperPage" elevation="0" class="pb-0" min-height="70vh">
                     <v-stepper-header>
                         <v-stepper-step :complete="stepperPage > 1" step="1" :color="stepperPage > 1 ? 'success' : 'primary'">
-                            Type
-                            <small>Import type</small>
+                            类型
+                            <small>导入类型</small>
                         </v-stepper-step>
                         <v-divider/>
 
                         <v-stepper-step :complete="stepperPage > 2" step="2" :color="stepperPage > 2 ? 'success' : 'primary'">
-                            Source
-                            <small>Import source</small>
+                            来源
+                            <small>导入来源</small>
                         </v-stepper-step>
                         <v-divider/>
 
                         <v-stepper-step :complete="stepperPage > 3" step="3" :color="stepperPage > 3 ? 'success' : 'primary'">
-                            Book
-                            <small>Library location</small>
+                            位置
+                            <small>阅读材料位置</small>
                         </v-stepper-step>
                         <v-divider/>
                         
                         <v-stepper-step :complete="stepperPage > 4" step="4" :color="stepperPage > 4 ? 'success' : 'primary'">
-                            Method
-                            <small>Text processing method</small>
+                            设置
+                            <small>文本处理设置</small>
                         </v-stepper-step>
                         <v-divider/>
 
@@ -44,8 +44,8 @@
                             step="5" 
                             :color="stepperPage > 4 && importResult !== '' ? importResult : 'primary'"
                         >
-                            Finish
-                            <small>Complete import</small>
+                            完成
+                            <small>导入结果</small>
                         </v-stepper-step>
 
                     </v-stepper-header>
@@ -132,23 +132,23 @@
                         <v-stepper-content step="5">
                             <!-- Importing info -->
                             <v-alert dark border="left" type="info" color="primary" v-if="importResult === ''">
-                                Importing your selected text. Please be patient, it can take several minutes based on:
+                                正在导入你选择的文本，请稍等。耗时取决于：
                                 <ul>
-                                    <li>How long is the text you are importing.</li>
-                                    <li>How many new words it contains.</li>
-                                    <li>How many phrases you have saved that have to be indexed in the text.</li>
-                                    <li>How fast is your computer.</li>
+                                    <li>文本长度。</li>
+                                    <li>新词数量。</li>
+                                    <li>需要索引的已保存短语数量。</li>
+                                    <li>本机文本处理服务速度。</li>
                                 </ul>
                             </v-alert>
 
                             <!-- Error message -->
                             <v-alert dark border="left" type="error" color="error" v-if="importResult === 'error'">
-                                An error has occurred while importing your text.
+                                {{ importError || '导入文本时发生错误。' }}
                             </v-alert>
 
                             <!-- Success message -->
                             <v-alert dark border="left" type="success" color="success" v-if="importResult === 'success'">
-                                Your book and chapters have been created successfully. The chapters will be processed in the background and become available for reading as soon as it's finished.
+                                阅读材料和章节已创建成功。章节处理完成后即可阅读。
                             </v-alert>
                         </v-stepper-content>
 
@@ -166,14 +166,14 @@
                     rounded 
                     text 
                     @click="close"
-                >Close</v-btn>
+                >关闭</v-btn>
 
                 <v-btn 
                     rounded 
                     text 
                     @click="close" 
                     v-if="stepperPage == 1"
-                >Cancel</v-btn>
+                >取消</v-btn>
 
                 <v-btn 
                     v-if="stepperPage > 1 && importResult !== 'success'"
@@ -181,7 +181,7 @@
                     text 
                     :disabled="stepperPage == 5 && importResult === ''"
                     @click="stepBack"
-                >Back</v-btn>
+                >上一步</v-btn>
 
                 <v-btn 
                     v-if="stepperPage < 4"
@@ -202,7 +202,7 @@
                     "
                     @click="stepForward"
                 >
-                    Continue
+                    继续
                 </v-btn>
                 <v-btn 
                     v-if="stepperPage > 3 && importResult !== 'success'"
@@ -214,7 +214,7 @@
                     :disabled="stepperPage == 5 && importResult === '' || !isImportOptionsValid"
                     @click="finishImport"
                 >
-                    Import
+                    导入
                 </v-btn>
             </v-card-actions>
         </v-card>
@@ -222,11 +222,14 @@
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../../services/UiTextService';
+
     export default {
         data: function() {
             return {
                 importLoading: false,
                 importResult: '',
+                importError: '',
                 stepperPage: 1  ,
                 isImportSourceValid: false,
                 isImportOptionsValid: false,
@@ -350,18 +353,20 @@
                 this.importLoading = true;
                 this.stepperPage = 5;
                 this.importResult = '';
+                this.importError = '';
 
-                axios.post('/import', data).catch(() => {
-                    this.importResult = 'error';
-                    this.importLoading = false;
-                }).then((response) => {
+                axios.post('/import', data).then((response) => {
                     if (response.status == 200) {
                         this.importResult = 'success';
-                        this.importLoading = false;
                         this.$emit('import-finished', false);
+                    } else {
+                        this.importResult = 'error';
+                        this.importError = '导入请求没有成功完成。';
                     }
                 }).catch((error) => {
                     this.importResult = 'error';
+                    this.importError = requestErrorMessage(error, '文本处理服务不可用，请确认后端和 Python tokenizer 服务已经启动。');
+                }).finally(() => {
                     this.importLoading = false;
                 });
             },

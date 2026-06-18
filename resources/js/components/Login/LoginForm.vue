@@ -2,8 +2,7 @@
     <v-container class="d-flex justify-center">
         <theme-selection-dialog v-model="themeSelectionDialog" @input="updateTheme"></theme-selection-dialog>
 
-        <!-- Create user dialog -->
-        <admin-edit-user-dialog 
+        <admin-edit-user-dialog
             v-if="addUserDialog"
             v-model="addUserDialog"
             :_user-id="-1"
@@ -14,9 +13,7 @@
             @user-saved="addUserDialogSaved"
         ></admin-edit-user-dialog>
 
-        <!-- Login and create first user form -->
         <v-card outlined class="rounded-lg mt-16" width="600px">
-            <!-- Form title -->
             <v-card-title>
                 <v-icon class="mr-2">mdi-account</v-icon>登录
                 <v-spacer />
@@ -27,27 +24,25 @@
 
             <v-card-text class="pt-4 pb-6">
                 <v-form v-model="isFormValid" ref="loginForm">
-                    <!-- First user information alerts -->
                     <v-alert
                         v-if="$props.userCount == 0 && !firstUserAdded"
                         class="rounded-lg mb-8"
                         color="primary"
-                        type="info" 
+                        type="info"
                         border="left"
                         dark
                     >
                         看起来这是安装后第一次使用 LinguaCafe。请先创建第一个本地用户，
                         该用户会自动成为管理员。
-
                         <div class="d-flex mt-4">
                             <v-spacer />
-                            <v-btn 
-                                rounded 
-                                depressed 
+                            <v-btn
+                                rounded
+                                depressed
                                 color="gray"
                                 class="text--text"
                                 @click="addUserDialog = true;"
-                            >   
+                            >
                                 <v-icon color="text" class="mr-2">mdi-account-plus</v-icon>
                                 创建第一个用户
                             </v-btn>
@@ -63,9 +58,8 @@
                         dark
                     >
                         用户账号创建成功。
-                    </v-alert>                
+                    </v-alert>
 
-                    <!-- Forms -->
                     <label class="font-weight-bold">邮箱</label>
                     <v-text-field
                         v-model="email"
@@ -91,7 +85,6 @@
                         @keyup.enter="login"
                     />
 
-                    <!-- Error alert -->
                     <v-alert
                         v-if="error !== ''"
                         class="rounded-lg mt-4 mb-0"
@@ -105,13 +98,12 @@
                 </v-form>
             </v-card-text>
 
-            <!-- Action buttons -->
             <v-card-actions>
                 <v-spacer></v-spacer>
                 <v-btn
-                    color="primary" 
-                    rounded 
-                    :disabled="loading || !isFormValid" 
+                    color="primary"
+                    rounded
+                    :disabled="loading || !isFormValid"
                     :loading="loading"
                     @click="login"
                 >
@@ -137,14 +129,12 @@
                 password: '',
                 error: '',
                 loading: false,
-                
-
                 rules: {
                     password: value => {
                         if (value.length < 1) {
                             return '请输入密码。';
                         }
-                        
+
                         return true;
                     },
                     email: value => {
@@ -153,8 +143,6 @@
                     }
                 }
             };
-        },
-        mounted: function() {
         },
         methods: {
             addUserDialogSaved() {
@@ -167,6 +155,7 @@
                 }
 
                 this.loading = true;
+                this.error = '';
                 axios.post('/login', {
                     email: this.email,
                     password: this.password,
@@ -175,11 +164,11 @@
                     if(response.status === 200) {
                         window.location.href = "/";
                     } else {
-                        this.error = '邮箱或密码不正确';
-                        this.loading = false;
+                        this.error = '邮箱或密码不正确。';
                     }
-                }).catch((error) => {
-                    this.error = '邮箱或密码不正确';
+                }).catch(() => {
+                    this.error = '邮箱或密码不正确。';
+                }).finally(() => {
                     this.loading = false;
                 });
             },

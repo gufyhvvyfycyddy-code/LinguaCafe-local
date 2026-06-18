@@ -1,7 +1,7 @@
 <template>
     <div>
         <div class="subheader subheader-margin-top d-flex">
-            Statistics
+            统计
         </div>
         <div id="statistics">
             <v-card 
@@ -45,6 +45,8 @@
             loadStatistics() {
                 axios.post('/statistics/get').then((response) => {
                     this.statistics = response.data;
+                }).catch(() => {
+                    this.statistics = [];
                 });
             },
             formatNumber: formatNumber

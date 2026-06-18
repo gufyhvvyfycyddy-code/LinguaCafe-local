@@ -29,6 +29,13 @@ class HomeController extends Controller {
             $user->save();
         }
 
+        $uiLanguage = $this->settingsService->getUserSettingsByName($user->id, ['uiLanguage']);
+        if (!$uiLanguage || !$uiLanguage->has('uiLanguage')) {
+            $this->settingsService->updateUserSettings($user->id, [
+                'uiLanguage' => 'zh-CN',
+            ]);
+        }
+
         $selectedLanguage = $user->selected_language;
         $userCount = User::count();
         $userName = $user->name;

@@ -1,7 +1,7 @@
 <template>
     <div class="d-flex flex-column align-stretch">
         <!-- Text input -->
-        <label class="font-weight-bold">Text</label>
+        <label class="font-weight-bold">文本</label>
         <v-textarea
             id="plain-text-import-input"
             v-model="text"
@@ -9,8 +9,8 @@
             dense
             rounded
             persistent-hint
-            hint="You can copy or type in any text here"
-            placeholder="Text"
+            hint="可以在这里粘贴或输入任意文本"
+            placeholder="文本"
             maxlength="250000"
             counter="250000"
             no-resize

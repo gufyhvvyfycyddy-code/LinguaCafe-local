@@ -80,6 +80,8 @@
 </template>
 
 <script>
+    import { languageName, requestErrorMessage } from './../../services/UiTextService';
+
     export default {
         props: {
             value : Boolean,
@@ -120,7 +122,7 @@
                     this.supportedLanguages = response.data.languages;
                     this.notInstalledLanguages = response.data.notInstalledLanguages;
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || '学习语言加载失败，请确认已登录且后端服务正在运行。';
+                    this.error = requestErrorMessage(error, '学习语言加载失败，请确认已登录且后端服务正在运行。');
                     this.supportedLanguages = ['English'];
                     this.notInstalledLanguages = 0;
                 }).finally(() => {
@@ -128,29 +130,18 @@
                 });
             },
             selectLanguage(newLanguage) {
+                this.loading = true;
+                this.error = '';
                 var language = newLanguage.toLowerCase();
                 axios.get('/languages/select/' + language).then(function (response) {
                     document.location.href = '/';
                 }.bind(this)).catch((error) => {
-                    this.error = error.response?.data?.message || '学习语言切换失败。';
+                    this.error = requestErrorMessage(error, '学习语言切换失败。');
+                }).finally(() => {
+                    this.loading = false;
                 });
             },
-            languageName(language) {
-                const names = {
-                    english: '英语',
-                    japanese: '日语',
-                    chinese: '中文',
-                    spanish: '西班牙语',
-                    french: '法语',
-                    german: '德语',
-                    korean: '韩语',
-                    italian: '意大利语',
-                    russian: '俄语',
-                    portuguese: '葡萄牙语',
-                };
-
-                return names[String(language).toLowerCase()] || language;
-            },
+            languageName,
             close() {
                 this.$emit('input', false);
             }

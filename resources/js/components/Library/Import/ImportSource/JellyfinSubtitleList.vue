@@ -9,8 +9,7 @@
             border="left"
             dark
         >
-            Choose a subtitle from the media currently being played on your Jellyfin server. 
-            You can import them seamlessly into LinguaCafe for later reading.
+            从 Jellyfin 当前正在播放的媒体中选择字幕，导入后可在 LinguaCafe 中阅读。
         </v-alert>
 
         <!-- Subtitle list -->
@@ -22,7 +21,7 @@
         >
             <!-- Subtitle list title-->
             <div id="subtitles-card-title" class="mt-4" v-if="!$props.subtitleLoading">
-                Subtitles
+                字幕
                 <v-btn 
                     id="refresh-button" 
                     rounded
@@ -31,17 +30,17 @@
                     :disabled="subtitleListLoading" 
                     v-if="!$props.subtitleLoading"
                 >
-                    <v-icon class="mr-1">mdi-refresh</v-icon> Refresh
+                    <v-icon class="mr-1">mdi-refresh</v-icon> 刷新
                 </v-btn>
             </div>
 
             
             <!-- Subtitle list header -->
             <div class="regular-list-height subtitle header rounded-pill my-2" v-if="!$props.subtitleLoading">
-                <div class="subtitle-language">Language</div>
-                <div class="subtitle-user">User</div>
-                <div class="subtitle-client">Client</div>
-                <div class="subtitle-media">Media</div>
+                <div class="subtitle-language">语言</div>
+                <div class="subtitle-user">用户</div>
+                <div class="subtitle-client">客户端</div>
+                <div class="subtitle-media">媒体</div>
             </div>
             
             <!-- Subtitle list skeleton loader -->
@@ -62,12 +61,12 @@
                     border="left"
                     dark
                 >
-                    Cannot connect to Jellyfin.
+                    无法连接 Jellyfin。
                 </v-alert>
             </template>
 
             <div class="regular-list-height subtitle rounded-pill my-2" v-if="!subtitleListLoading && !$props.subtitleLoading && !sessions.length && !subtitleListError">
-                <div id="no-subtitle-found-label">No subtitles found</div>
+                <div id="no-subtitle-found-label">没有找到字幕</div>
             </div>
 
             <!-- Subtitle list body -->
@@ -99,7 +98,7 @@
 
             <!-- Subtitle processing title -->
             <div id="subtitles-card-title" class="mt-4 processing" v-if="$props.subtitleLoading">
-                Subtitle processing
+                正在处理字幕
             </div>
 
             <!-- Subtitle processing info -->
@@ -111,8 +110,7 @@
                     dark
                     icon="mdi-progress-clock"
                 >
-                    Your selected subtitle is being processed. This can take 10 to 30 seconds. 
-                    Once processed, it will be cached for quicker loading in the future.
+                    正在处理你选择的字幕，通常需要 10 到 30 秒。处理完成后会缓存，之后加载更快。
                 </v-alert>
             </div>
         </v-card>
@@ -161,10 +159,10 @@ export default {
                 }
 
                 this.sessions = sessions;
-                this.subtitleListLoading = false;
             }).catch((error) => {
-                this.subtitleListLoading = false;
                 this.subtitleListError = true;
+            }).finally(() => {
+                this.subtitleListLoading = false;
             });
         },
         selectSubtitle: function(selectedSession, selectedSubtitle) {
