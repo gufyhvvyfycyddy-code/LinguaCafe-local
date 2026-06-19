@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Carbon\Carbon;
 use App\Models\Phrase;
+use App\Services\VocabularyTokenFilter;
 
 /*
     This class contains functions to transfrom plain text
@@ -97,7 +98,7 @@ class TextBlockService
         $wordsToSkip = config('linguacafe.words_to_skip');      
         $wordCount = 0;
         foreach ($this->processedWords as $word) {
-            if (!in_array($word->word, $wordsToSkip, true)) {
+            if (!in_array($word->word, $wordsToSkip, true) && !VocabularyTokenFilter::shouldSkip($word->word, $this->language)) {
                 $wordCount ++;
             }
         }
@@ -313,7 +314,7 @@ class TextBlockService
             for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
                 if (
                     in_array(mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8'), $encounteredWords, true) ||
-                    $this->processedWords[$wordIndex]->word === 'NEWLINE'
+                    VocabularyTokenFilter::shouldSkip($this->processedWords[$wordIndex]->word, $this->language)
                 ){
                     continue;
                 }
@@ -340,7 +341,7 @@ class TextBlockService
                 $encounteredWord['updated_at'] = Carbon::now();
 
                 
-                if (in_array($this->processedWords[$wordIndex]->word, $wordsToSkip, true) || is_numeric($this->processedWords[$wordIndex]->word)) {
+                if (in_array($this->processedWords[$wordIndex]->word, $wordsToSkip, true) || VocabularyTokenFilter::shouldSkip($this->processedWords[$wordIndex]->word, $this->language)) {
                     $encounteredWord['stage'] = 1;
                     $encounteredWord['base_word'] = '';
                     $encounteredWord['lemma'] = '';
@@ -356,15 +357,22 @@ class TextBlockService
 
                 $encounteredWordsToInsert[] = $encounteredWord;
             }
-            DB::table('encountered_words')->insert($encounteredWordsToInsert);
+            if (count($encounteredWordsToInsert)) {
+                DB::table('encountered_words')->insert($encounteredWordsToInsert);
+            }
         });
     }
 
     public function collectUniqueWords() {
         $this->uniqueWords = [];
         for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
-            if (!in_array(mb_strtolower($this->processedWords[$wordIndex]->word), $this->uniqueWords, true)) {
-                $this->uniqueWords[] = mb_strtolower($this->processedWords[$wordIndex]->word);
+            $word = $this->processedWords[$wordIndex]->word;
+            if (VocabularyTokenFilter::shouldSkip($word, $this->language)) {
+                continue;
+            }
+
+            if (!in_array(mb_strtolower($word, 'UTF-8'), $this->uniqueWords, true)) {
+                $this->uniqueWords[] = mb_strtolower($word, 'UTF-8');
             }
         }
     }
@@ -558,9 +566,17 @@ class TextBlockService
                 return $item->word == mb_strtolower($word->word);
             });
 
-            $word->stage = $encounteredWords[$wordId]->stage;
-            $word->lookup_count = $encounteredWords[$wordId]->lookup_count;
-            $word->furigana = $encounteredWords[$wordId]->reading;
+            if ($wordId === false) {
+                $word->id = null;
+                $word->stage = 1;
+                $word->lookup_count = 0;
+                $word->furigana = '';
+            } else {
+                $word->id = $encounteredWords[$wordId]->id;
+                $word->stage = $encounteredWords[$wordId]->stage;
+                $word->lookup_count = $encounteredWords[$wordId]->lookup_count;
+                $word->furigana = $encounteredWords[$wordId]->reading;
+            }
 
             $this->words[] = $word;
         }

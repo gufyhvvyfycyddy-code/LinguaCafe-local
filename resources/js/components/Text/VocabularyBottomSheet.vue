@@ -196,6 +196,11 @@
                         <v-icon>mdi-close</v-icon>
                     </v-btn>
                 </div>
+                <div v-if="type == 'word'" class="w-100 d-flex justify-space-around mb-2">
+                    <v-btn small rounded depressed color="warning" @click="setStage(1)">忽略</v-btn>
+                    <v-btn small rounded depressed color="success" @click="setStage(0)">标为已知</v-btn>
+                    <v-btn small rounded depressed color="error" @click="deleteWord">删除词条</v-btn>
+                </div>
             </template>
             
             <div class="w-100 d-flex justify-space-around mb-2">
@@ -344,6 +349,9 @@ export default {
             },
             deletePhrase() {
                 this.$emit('showDeletePhraseDialog');
+            },
+            deleteWord() {
+                this.$emit('deleteWord');
             },
             updateVocabBoxTranslationList() {
                 this.translationList = this._translationText.split(';');

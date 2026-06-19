@@ -129,6 +129,7 @@
             @updateVocabBoxData="updateVocabBoxData"
             @addNewPhrase="addNewPhrase"
             @showDeletePhraseDialog="showDeletePhraseDialog"
+            @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
         ></vocabulary-box>
 
@@ -155,6 +156,7 @@
                 @updateVocabBoxData="updateVocabBoxData"
                 @addNewPhrase="addNewPhrase"
                 @deletePhrase="deletePhrase"
+                @deleteWord="deleteWord"
                 @addSelectedWordToAnki="addSelectedWordToAnki"
             ></vocabulary-bottom-sheet>
         </v-bottom-sheet>
@@ -172,6 +174,7 @@
             @updateVocabBoxData="updateVocabBoxData"
             @addNewPhrase="addNewPhrase"
             @deletePhrase="deletePhrase"
+            @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
         ></vocabulary-side-box>
     </div>
@@ -1607,6 +1610,41 @@
                 this.removePhraseHover();
                 this.unselectAllWords();
                 this.updatePhraseBorders();
+            },
+            deleteWord() {
+                if (this.selectedPhrase !== -1 || this.selection.length !== 1) {
+                    return;
+                }
+
+                var selectedWord = this.uniqueWords[this.selection[0].uniqueWordIndex];
+                if (!selectedWord || !selectedWord.id) {
+                    return;
+                }
+
+                if (!window.confirm(`确定要删除词条“${selectedWord.word}”吗？这会将它标为已忽略并停用复习卡。`)) {
+                    return;
+                }
+
+                axios.post('/vocabulary/word/delete', {
+                    id: selectedWord.id
+                }).then(() => {
+                    for (var i = 0; i < this.uniqueWords.length; i++) {
+                        if (this.uniqueWords[i].word.toLowerCase() == selectedWord.word.toLowerCase()) {
+                            this.uniqueWords[i].stage = 1;
+                        }
+                    }
+
+                    for (var w = 0; w < this.words.length; w++) {
+                        if (this.words[w].word.toLowerCase() == selectedWord.word.toLowerCase()) {
+                            this.words[w].stage = 1;
+                        }
+                    }
+
+                    this.$store.commit('vocabularyBox/setStage', 1);
+                    this.unselectAllWords();
+                }).catch(() => {
+                    alert('词条删除失败，请稍后重试。');
+                });
             },
             savePhrase(withStage = false, exampleSentenceChanged = false) {
                 if (this.phraseCurrentlySaving) {

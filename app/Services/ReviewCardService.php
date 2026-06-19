@@ -59,6 +59,15 @@ class ReviewCardService
         );
     }
 
+    public function disableWordCard(EncounteredWord $word): void
+    {
+        ReviewCard::where('user_id', $word->user_id)
+            ->where('language_id', $word->language)
+            ->where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)
+            ->update(['fsrs_enabled' => false]);
+    }
+
     public function initializeExistingWords(?int $userId = null, ?string $language = null): int
     {
         $created = 0;

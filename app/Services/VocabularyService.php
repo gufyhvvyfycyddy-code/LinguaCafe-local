@@ -18,6 +18,7 @@ use App\Enums\ChapterProcessingStatusEnum;
 // services
 use App\Services\TextBlockService;
 use Illuminate\Support\Facades\DB;;
+use App\Services\VocabularyTokenFilter;
 
 class VocabularyService {
     private $itemsPerPage;
@@ -56,9 +57,71 @@ class VocabularyService {
         $word->update($wordData);
         $word->save();
 
-        $this->reviewCardService->ensureWordCard($word);
+        if ($word->stage < 0) {
+            $this->reviewCardService->ensureWordCard($word);
+        } else {
+            $this->reviewCardService->disableWordCard($word);
+        }
 
         return true;
+    }
+
+    public function ignoreWord($userId, $wordId): bool
+    {
+        return $this->setWordIgnored($userId, $wordId);
+    }
+
+    public function softDeleteWord($userId, $wordId): bool
+    {
+        return $this->setWordIgnored($userId, $wordId);
+    }
+
+    public function cleanupInvalidTokens(int $userId, string $language, bool $dryRun = false): array
+    {
+        $words = EncounteredWord::where('user_id', $userId)
+            ->where('language', $language)
+            ->get()
+            ->filter(fn ($word) => VocabularyTokenFilter::shouldSkip($word->word, $language));
+
+        $examples = $words->pluck('word')->unique()->take(20)->values()->all();
+
+        if (!$dryRun) {
+            foreach ($words as $word) {
+                $this->markWordIgnored($word);
+                $word->save();
+                $this->reviewCardService->disableWordCard($word);
+            }
+        }
+
+        return [
+            'matched_count' => $words->count(),
+            'examples' => $examples,
+            'dry_run' => $dryRun,
+        ];
+    }
+
+    private function setWordIgnored($userId, $wordId): bool
+    {
+        $word = EncounteredWord::where('user_id', $userId)
+            ->where('id', $wordId)
+            ->first();
+
+        if (!$word) {
+            throw new \Exception('Word does not exist, or it belongs to a different user.');
+        }
+
+        $this->markWordIgnored($word);
+        $word->save();
+        $this->reviewCardService->disableWordCard($word);
+
+        return true;
+    }
+
+    private function markWordIgnored(EncounteredWord $word): void
+    {
+        $word->stage = 1;
+        $word->relearning = false;
+        $word->next_review = null;
     }
 
     public function createPhrase($userId, $language, $words, $stage, $reading, $translation, $languagesWithoutSpaces) {

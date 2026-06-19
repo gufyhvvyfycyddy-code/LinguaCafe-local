@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 
 // services
 use App\Services\VocabularyService;
@@ -90,6 +91,22 @@ class VocabularyController extends Controller {
         }
 
         return response()->json('Word has been successfully updated.', 200);
+    }
+
+    public function deleteWord(Request $request) {
+        $request->validate([
+            'id' => ['required', 'integer'],
+        ]);
+
+        $userId = Auth::user()->id;
+
+        try {
+            $this->vocabularyService->softDeleteWord($userId, (int) $request->post('id'));
+        } catch (\Exception $e) {
+            abort(500, $e->getMessage());
+        }
+
+        return response()->json('词条已删除。', 200);
     }
 
     public function getPhrase($phraseId, GetPhraseRequest $request) {
