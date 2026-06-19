@@ -13,6 +13,7 @@ use App\Models\EncounteredWord;
 use App\Enums\ChapterProcessingStatusEnum;
 use App\Services\TextBlockService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 
 class ChapterService {
@@ -86,6 +87,7 @@ class ChapterService {
             ->toArray();
 
         $chaptersWithWordCounts = [];
+        $allChapterWordCounts = [];
         for ($i = 0; $i < count($chapters); $i++) {
             if ($chapters[$i]->processing_status !== ChapterProcessingStatusEnum::PROCESSED->value) {
                 continue;
@@ -93,17 +95,27 @@ class ChapterService {
 
             $currentChapterWordCounts = new \stdClass();
             $currentChapterWordCounts->wordCount = $chapters[$i]->getWordCounts($words);
+            $currentChapterWordCounts->processing_status = $chapters[$i]->processing_status;
 
             $chaptersWithWordCounts[$chapters[$i]->id] = $currentChapterWordCounts;
+            $allChapterWordCounts[$chapters[$i]->id] = $currentChapterWordCounts;
 
             // push data on websockets in 5 item chunks
             if ($i % 5 === 0 || $i === count($chapters) - 1) {
-                event(new \App\Events\ChapterStateUpdatedEvent($userUuid, $chaptersWithWordCounts));
+                try {
+                    event(new \App\Events\ChapterStateUpdatedEvent($userUuid, $chaptersWithWordCounts));
+                } catch (\Throwable $e) {
+                    Log::warning('Chapter word count broadcast failed.', [
+                        'user_id' => $userId,
+                        'book_id' => $bookId,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
                 $chaptersWithWordCounts = [];
             }
         }
         
-        return true;
+        return $allChapterWordCounts;
     }
     
     public function getChapterForEditor($userId, $chapterId) {

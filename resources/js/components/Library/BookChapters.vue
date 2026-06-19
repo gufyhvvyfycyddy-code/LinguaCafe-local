@@ -1,43 +1,35 @@
 <template>
     <v-container class="book-chapters py-0">
-        <!-- Error dialog -->
         <error-dialog
             v-if="errorDialog.active"
-            v-model="errorDialog.active" 
+            v-model="errorDialog.active"
             :content="errorDialog.content"
         ></error-dialog>
 
-        <!-- Edit book chapter dialog -->
         <edit-book-chapter-dialog
             v-if="editBookChapterDialog.active"
-            v-model="editBookChapterDialog.active" 
+            v-model="editBookChapterDialog.active"
             :book-id="$props.bookId"
             :chapter-id="editBookChapterDialog.chapterId"
             @chapter-saved="chapterSaved"
-        >
-        </edit-book-chapter-dialog>
+        ></edit-book-chapter-dialog>
 
-        <!-- Delete book chapter dialog -->
         <delete-book-chapter-dialog
             v-if="deleteBookChapterDialog.active"
-            v-model="deleteBookChapterDialog.active" 
+            v-model="deleteBookChapterDialog.active"
             :chapter-id="deleteBookChapterDialog.chapterId"
             :chapter-name="deleteBookChapterDialog.chapterName"
             @confirm="deleteChapter"
-        >
-        </delete-book-chapter-dialog>
-        
-        <!-- Review dialog -->
-        <start-review-dialog 
-            v-model="startReviewDialog.active" 
-            :book-id="startReviewDialog.bookId" 
-            :book-name="startReviewDialog.bookName"
-            :chapter-id="startReviewDialog.chapterId" 
-            :chapter-name="startReviewDialog.chapterName">
-        </start-review-dialog>
-        
+        ></delete-book-chapter-dialog>
 
-        <!-- Chapter list -->
+        <start-review-dialog
+            v-model="startReviewDialog.active"
+            :book-id="startReviewDialog.bookId"
+            :book-name="startReviewDialog.bookName"
+            :chapter-id="startReviewDialog.chapterId"
+            :chapter-name="startReviewDialog.chapterName"
+        ></start-review-dialog>
+
         <v-data-table
             class="my-4 mb-0 no-hover"
             :headers="[
@@ -54,64 +46,50 @@
             :items-per-page="-1"
             hide-default-footer
         >
-
-            <!-- Total words -->
             <template v-slot:item.wordCount.total="{ item }">
-                <!-- Count -->
-                <template v-if="item.processing_status === 'processed' && item.wordCountsLoaded">
+                <template v-if="isWordCountReady(item)">
                     {{ formatNumber(item.wordCount.total) }}
                 </template>
-
-                <!-- Skeleton -->
+                <template v-else-if="shouldShowWordCountPlaceholder(item)">-</template>
                 <v-skeleton-loader
-                        v-else
-                        class="chapter-word-count-skeleton rounded-pill"
-                        type="image"
+                    v-else
+                    class="chapter-word-count-skeleton rounded-pill"
+                    type="image"
                 ></v-skeleton-loader>
             </template>
 
-            <!-- Unique words -->
             <template v-slot:item.wordCount.unique="{ item }">
-                <!-- Count -->
-                <template v-if="item.processing_status === 'processed' && item.wordCountsLoaded">
+                <template v-if="isWordCountReady(item)">
                     {{ formatNumber(item.wordCount.unique) }}
                 </template>
-
-                <!-- Skeleton -->
+                <template v-else-if="shouldShowWordCountPlaceholder(item)">-</template>
                 <v-skeleton-loader
-                        v-else
-                        class="chapter-word-count-skeleton rounded-pill"
-                        type="image"
+                    v-else
+                    class="chapter-word-count-skeleton rounded-pill"
+                    type="image"
                 ></v-skeleton-loader>
             </template>
 
-            <!-- Known words -->
             <template v-slot:item.wordCount.known="{ item }">
-                <!-- Count -->
-                <template v-if="item.processing_status === 'processed' && item.wordCountsLoaded">
+                <template v-if="isWordCountReady(item)">
                     <template v-if="$props.wordCountDisplayType == 0">
                         {{ formatNumber(item.wordCount.known) }}
                     </template>
                     <template v-else-if="item.wordCount.unique">
                         {{ (item.wordCount.known / item.wordCount.unique * 100).toFixed(1) }}%
                     </template>
-                    <template v-else>
-                        0%
-                    </template>
+                    <template v-else>0%</template>
                 </template>
-
-                <!-- Skeleton -->
+                <template v-else-if="shouldShowWordCountPlaceholder(item)">-</template>
                 <v-skeleton-loader
-                        v-else
-                        class="chapter-word-count-skeleton rounded-pill"
-                        type="image"
+                    v-else
+                    class="chapter-word-count-skeleton rounded-pill"
+                    type="image"
                 ></v-skeleton-loader>
             </template>
 
-            <!-- Highlighted words -->
             <template v-slot:item.wordCount.highlighted="{ item }">
-                <!-- Count -->
-                <template v-if="item.processing_status === 'processed' && item.wordCountsLoaded">
+                <template v-if="isWordCountReady(item)">
                     <div class="highlighted-words px-2 rounded-xl mx-auto">
                         <template v-if="$props.wordCountDisplayType < 2">
                             {{ formatNumber(item.wordCount.highlighted) }}
@@ -119,25 +97,19 @@
                         <template v-else-if="item.wordCount.unique">
                             {{ (item.wordCount.highlighted / item.wordCount.unique * 100).toFixed(1) }}%
                         </template>
-                        <template v-else>
-                            0%
-                        </template>
+                        <template v-else>0%</template>
                     </div>
                 </template>
-
-                <!-- Skeleton -->
+                <template v-else-if="shouldShowWordCountPlaceholder(item)">-</template>
                 <v-skeleton-loader
-                        v-else
-                        class="chapter-word-count-skeleton rounded-pill"
-                        type="image"
+                    v-else
+                    class="chapter-word-count-skeleton rounded-pill"
+                    type="image"
                 ></v-skeleton-loader>
             </template>
 
-
-            <!-- New words -->
             <template v-slot:item.wordCount.new="{ item }">
-                <!-- Count -->
-                <template v-if="item.processing_status === 'processed' && item.wordCountsLoaded">
+                <template v-if="isWordCountReady(item)">
                     <div class="new-words px-2 rounded-xl mx-auto">
                         <template v-if="$props.wordCountDisplayType < 2">
                             {{ formatNumber(item.wordCount.new) }}
@@ -145,66 +117,43 @@
                         <template v-else-if="item.wordCount.unique">
                             {{ (item.wordCount.new / item.wordCount.unique * 100).toFixed(1) }}%
                         </template>
-                        <template v-else>
-                            0%
-                        </template>
+                        <template v-else>0%</template>
                     </div>
                 </template>
-
-                <!-- Skeleton -->
+                <template v-else-if="shouldShowWordCountPlaceholder(item)">-</template>
                 <v-skeleton-loader
-                        v-else
-                        class="chapter-word-count-skeleton rounded-pill"
-                        type="image"
+                    v-else
+                    class="chapter-word-count-skeleton rounded-pill"
+                    type="image"
                 ></v-skeleton-loader>
             </template>
 
-            <!-- Actions -->
             <template v-slot:item.actions="{ item }">
                 <div class="d-flex justify-center">
-                    <!-- Action buttons -->
                     <template v-if="item.processing_status == 'processed'">
-                        <v-btn icon :to="'/chapters/read/' + item.id" title="阅读"><v-icon>mdi-book-open-variant</v-icon></v-btn>
+                        <v-btn icon :to="'/chapters/read/' + item.id" title="阅读">
+                            <v-icon>mdi-book-open-variant</v-icon>
+                        </v-btn>
                         <v-menu rounded offset-y bottom left nudge-top="-5">
                             <template v-slot:activator="{ on, attrs }">
                                 <v-btn icon v-bind="attrs" v-on="on"><v-icon>mdi-dots-horizontal</v-icon></v-btn>
                             </template>
-                            <v-btn
-                                width="100"
-                                class="menu-button"
-                                tile
-                                color="white"
-                                @click="showEditChapterDialog(item.id)"
-                            >
+                            <v-btn width="100" class="menu-button" tile color="white" @click="showEditChapterDialog(item.id)">
                                 编辑
                             </v-btn>
-                            <v-btn
-                                width="100"
-                                class="menu-button"
-                                tile
-                                color="white"
-                                @click="showStartReviewDialog(book.id, book.name, item.id, item.name)"
-                            >
+                            <v-btn width="100" class="menu-button" tile color="white" @click="showStartReviewDialog(book.id, book.name, item.id, item.name)">
                                 复习
                             </v-btn>
-                            <v-btn
-                                width="100"
-                                class="menu-button"
-                                tile
-                                color="white"
-                                @click="showDeleteChapterDialog(item)"
-                            >
+                            <v-btn width="100" class="menu-button" tile color="white" @click="showDeleteChapterDialog(item)">
                                 删除
                             </v-btn>
                         </v-menu>
                     </template>
 
-                    <!-- Chapter importing loader -->
                     <template v-else-if="item.processing_status === 'unprocessed'">
                         <v-chip small color="warning">处理中</v-chip>
                     </template>
 
-                    <!-- Chapter importing failed -->
                     <template v-else-if="item.processing_status === 'failed'">
                         <v-chip small color="error">处理失败</v-chip>
                     </template>
@@ -217,6 +166,7 @@
 <script>
     import {formatNumber} from './../../helper.js';
     import { requestErrorMessage } from './../../services/UiTextService';
+
     export default {
         data: function() {
             return {
@@ -253,13 +203,16 @@
         mounted() {
             this.loadChapters();
 
-            // retrieve word counts
-            this.$store.getters['shared/echo'].private('chapter-status-update.' + this.$store.getters['shared/userUuid']).listen('ChapterStateUpdatedEvent', (message) => {
-                this.chapterStatusUpdate(JSON.parse(message.chapters));
-            });
+            this.$store.getters['shared/echo']
+                .private('chapter-status-update.' + this.$store.getters['shared/userUuid'])
+                .listen('ChapterStateUpdatedEvent', (message) => {
+                    this.chapterStatusUpdate(JSON.parse(message.chapters));
+                });
         },
         beforeDestroy() {
-            this.$store.getters['shared/echo'].private('chapter-status-update.' + this.$store.getters['shared/userUuid']).stopListening('ChapterStateUpdatedEvent');
+            this.$store.getters['shared/echo']
+                .private('chapter-status-update.' + this.$store.getters['shared/userUuid'])
+                .stopListening('ChapterStateUpdatedEvent');
         },
         methods: {
             chapterStatusUpdate(chapters) {
@@ -269,8 +222,9 @@
                     }
 
                     if ('wordCount' in chapters[currentChapter.id] && chapters[currentChapter.id].wordCount !== null) {
-                        currentChapter.wordCount = chapters[currentChapter.id].wordCount
+                        currentChapter.wordCount = chapters[currentChapter.id].wordCount;
                         currentChapter.wordCountsLoaded = true;
+                        currentChapter.wordCountLoadFailed = false;
                     }
 
                     if ('processing_status' in chapters[currentChapter.id]) {
@@ -314,8 +268,9 @@
                 }).then((response) => {
                     for (let chapterIndex = 0; chapterIndex < response.data.chapters.length; chapterIndex++) {
                         response.data.chapters[chapterIndex].wordCountsLoaded = false;
+                        response.data.chapters[chapterIndex].wordCountLoadFailed = false;
                     }
-                    
+
                     this.book = response.data.book;
                     this.chapters = response.data.chapters;
 
@@ -327,11 +282,16 @@
 
                     this.chaptersLoading = false;
                     this.$nextTick(() => {
-                        axios.get('/chapters/word-counts/' + this.$props.bookId).catch((error) => {
-                            this.errorDialog.content = requestErrorMessage(error, '章节词数加载失败。');
+                        axios.get('/chapters/word-counts/' + this.$props.bookId).then((response) => {
+                            this.chapterStatusUpdate(response.data);
+                        }).catch((error) => {
+                            this.chapters.forEach((chapter) => {
+                                chapter.wordCountLoadFailed = true;
+                            });
+                            this.errorDialog.content = requestErrorMessage(error, '章节词数加载失败。实时状态服务未启动时，请手动刷新页面。');
                             this.errorDialog.active = true;
                         });
-                    }) 
+                    });
                 }).catch((error) => {
                     this.chapters = [];
                     this.errorDialog.content = requestErrorMessage(error, '章节列表加载失败。');
@@ -345,6 +305,12 @@
                 this.startReviewDialog.chapterName = chapterName;
                 this.startReviewDialog.chapterId = chapterId;
                 this.startReviewDialog.active = true;
+            },
+            isWordCountReady(chapter) {
+                return chapter.processing_status === 'processed' && chapter.wordCountsLoaded && chapter.wordCount;
+            },
+            shouldShowWordCountPlaceholder(chapter) {
+                return chapter.wordCountLoadFailed || chapter.processing_status !== 'processed';
             },
             formatNumber: formatNumber
         }

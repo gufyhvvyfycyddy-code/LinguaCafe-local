@@ -56,7 +56,16 @@ class UserController extends Controller {
         return $this->showPublicUserPage(true);
     }
 
-    private function showPublicUserPage(bool $setupMode)
+    public function showRegisterForm()
+    {
+        if (Auth::check()) {
+            return redirect()->intended('/');
+        }
+
+        return $this->showPublicUserPage(false, true);
+    }
+
+    private function showPublicUserPage(bool $setupMode, bool $registerMode = false)
     {
         $userCount = User::count();
         $theme = $_COOKIE['theme'] ?? 'light';
@@ -66,6 +75,8 @@ class UserController extends Controller {
             'userUuid' => '',
             'theme' => $theme,
             'setupMode' => $setupMode,
+            'registerMode' => $registerMode,
+            'allowWebRegister' => config('linguacafe.allow_web_register'),
         ]);
     }
     
@@ -107,12 +118,19 @@ class UserController extends Controller {
         $name = $request->post('name');
         $email = $request->post('email');
         $password = $request->post('password');
+        $allowPublicRegistration = (bool) config('linguacafe.allow_web_register');
+        $isPublicRegistration = !Auth::check() && $userCount !== 0 && $allowPublicRegistration;
         $isAdmin = $userCount === 0 ? true : $request->post('isAdmin');
         $passwordChanged = $userCount === 0;
 
         // If this is the first user, it can be created without any authorization.
-        if (!Auth::check() && $userCount !== 0) {
+        if (!Auth::check() && $userCount !== 0 && !$allowPublicRegistration) {
             abort(401, 'Not authorized to create a user.');
+        }
+
+        if ($isPublicRegistration) {
+            $isAdmin = false;
+            $passwordChanged = true;
         }
 
         try {

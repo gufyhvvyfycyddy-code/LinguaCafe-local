@@ -242,6 +242,7 @@ const router = new VueRouter({
         { path: '/attributions', component: Attributions },
         { path: '/login', component: LoginForm },
         { path: '/setup', component: LoginForm },
+        { path: '/register', component: LoginForm },
         { path: '/books/:bookId?', component: Library },
         { path: '/chapters/read/:chapterId', component: TextReader },
         { path: '/review/:practiceMode?/:bookId?/:chapterId?', component: Review },

@@ -1,6 +1,7 @@
 <?php
 
 return [
+    'allow_web_register' => env('ALLOW_WEB_REGISTER', env('APP_ENV') === 'local'),
     'my_memory_url' => 'https://api.mymemory.translated.net/',
     'languages' => [
         // A list of the supported languages that can be read with linguacafe. 

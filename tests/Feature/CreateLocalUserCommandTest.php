@@ -78,6 +78,8 @@ class CreateLocalUserCommandTest extends TestCase
 
     public function test_public_user_create_is_closed_after_system_is_initialized(): void
     {
+        config(['linguacafe.allow_web_register' => false]);
+
         $this->artisan('user:create --email=admin@example.com --password=12345678')
             ->assertSuccessful();
 
@@ -94,5 +96,38 @@ class CreateLocalUserCommandTest extends TestCase
         ])->assertStatus(401);
 
         $this->assertSame(0, User::where('email', 'second@example.com')->count());
+    }
+
+    public function test_web_registration_can_create_regular_local_user_when_enabled(): void
+    {
+        config(['linguacafe.allow_web_register' => true]);
+
+        $this->artisan('user:create --email=admin@example.com --password=12345678')
+            ->assertSuccessful();
+
+        $this->get('/register')
+            ->assertOk()
+            ->assertSee(':_register-mode="true"', false)
+            ->assertSee(':_allow-web-register="true"', false);
+
+        $this->post('/users/create', [
+            'name' => 'local@example.com',
+            'email' => 'local@example.com',
+            'password' => '12345678',
+            'password_confirmation' => '12345678',
+            'isAdmin' => true,
+        ])->assertOk();
+
+        $user = User::where('email', 'local@example.com')->first();
+
+        $this->assertNotNull($user);
+        $this->assertFalse((bool) $user->is_admin);
+        $this->assertTrue((bool) $user->password_changed);
+        $this->assertSame('english', $user->selected_language);
+        $this->assertSame('zh-CN', json_decode(Setting::where('user_id', $user->id)->where('name', 'uiLanguage')->value('value')));
+        $this->assertTrue(Auth::validate([
+            'email' => 'local@example.com',
+            'password' => '12345678',
+        ]));
     }
 }

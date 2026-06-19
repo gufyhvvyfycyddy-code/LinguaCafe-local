@@ -5,7 +5,7 @@
         <start-review-dialog v-model="startReviewDialog" />
         <logout-dialog v-model="logoutDialog"/>
 
-        <template v-if="!['/login', '/setup'].includes($router.currentRoute.path)">
+        <template v-if="!['/login', '/setup', '/register'].includes($router.currentRoute.path)">
             <theme-selection-dialog v-model="themeSelectionDialog" @input="updateTheme"></theme-selection-dialog>
             <language-selection-dialog v-model="languageSelectionDialog"></language-selection-dialog>
             <v-navigation-drawer
@@ -97,7 +97,7 @@
             </v-bottom-navigation>
         </template>
         <v-main :style="{background: $vuetify.theme.currentTheme.background, ...textStyling}" :class="{ eink: theme == 'eink'}">
-            <router-view :user-count="$props._userCount" :setup-mode="$props._setupMode" :language="selectedLanguage" :key="$route.fullPath"></router-view>
+            <router-view :user-count="$props._userCount" :setup-mode="$props._setupMode" :register-mode="$props._registerMode" :allow-web-register="$props._allowWebRegister" :language="selectedLanguage" :key="$route.fullPath"></router-view>
         </v-main>
     </v-app>
 </template>
@@ -205,6 +205,8 @@
             },
             _userCount: Number,
             _setupMode: Boolean,
+            _registerMode: Boolean,
+            _allowWebRegister: Boolean,
             _isAdmin: Boolean,
             themeSettings: {
                 type: Object,

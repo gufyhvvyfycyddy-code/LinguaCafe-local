@@ -43,12 +43,12 @@ class ChapterController extends Controller {
         $bookId = intval($request->bookId);
         
         try {
-            $this->chapterService->getChaptersBookCount($userId, $userUuid, $bookId);
+            $chapterWordCounts = $this->chapterService->getChaptersBookCount($userId, $userUuid, $bookId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
 
-        return response()->json('Chapters have been successfully requested.', 200);
+        return response()->json($chapterWordCounts, 200);
     }
 
     public function getChapterForEditor(GetChapterForEditorRequest $request) {

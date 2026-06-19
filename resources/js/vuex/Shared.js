@@ -3,6 +3,22 @@ import Pusher from 'pusher-js';
 
 Pusher.logToConsole = false;
 
+function emptyEcho() {
+    return {
+        private() {
+            return {
+                listen() {
+                    return this;
+                },
+                stopListening() {
+                    return this;
+                },
+            };
+        },
+        leave() {},
+    };
+}
+
 function createEcho() {
     try {
         const echo = new Echo({
@@ -16,25 +32,13 @@ function createEcho() {
         });
 
         echo.connector.pusher.connection.bind('error', (error) => {
-            console.warn('实时状态服务未启动，导入状态可能需要手动刷新。', error);
+            console.warn('实时状态服务未启动，章节状态可能需要手动刷新。', error);
         });
 
         return echo;
     } catch (error) {
-        console.warn('实时状态服务初始化失败，导入状态可能需要手动刷新。', error);
-        return {
-            private() {
-                return {
-                    listen() {
-                        return this;
-                    },
-                    stopListening() {
-                        return this;
-                    },
-                };
-            },
-            leave() {},
-        };
+        console.warn('实时状态服务初始化失败，章节状态可能需要手动刷新。', error);
+        return emptyEcho();
     }
 }
 

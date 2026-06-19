@@ -4,8 +4,8 @@
 
         <v-card outlined class="rounded-lg mt-16" width="600px">
             <v-card-title>
-                <v-icon class="mr-2">{{ setupMode ? 'mdi-account-plus' : 'mdi-account' }}</v-icon>
-                {{ setupMode ? '创建第一个管理员账号' : '登录' }}
+                <v-icon class="mr-2">{{ titleIcon }}</v-icon>
+                {{ pageTitle }}
                 <v-spacer />
                 <v-btn rounded depressed @click="themeSelectionDialog = true;">
                     <v-icon class="mr-2">mdi-weather-sunny</v-icon> / <v-icon class="ml-2">mdi-weather-night</v-icon>
@@ -27,23 +27,42 @@
                         当前还没有任何用户。请创建第一个管理员账号，创建后再返回登录页登录。
                     </v-alert>
 
-                    <v-form v-model="isSetupFormValid" ref="setupForm">
-                        <label class="font-weight-bold">邮箱</label>
-                        <v-text-field v-model="setup.email" rounded filled dense placeholder="邮箱" :rules="[rules.email]" :disabled="loading" />
+                    <account-form
+                        ref="setupForm"
+                        v-model="isSetupFormValid"
+                        :email.sync="setup.email"
+                        :password.sync="setup.password"
+                        :password-confirmation.sync="setup.passwordConfirmation"
+                        :rules="rules"
+                        :disabled="loading"
+                        @submit="createFirstUser"
+                    />
+                </template>
 
-                        <label class="font-weight-bold">密码</label>
-                        <v-text-field v-model="setup.password" rounded filled dense type="password" placeholder="密码" :rules="[rules.password]" :disabled="loading" />
-
-                        <label class="font-weight-bold">确认密码</label>
-                        <v-text-field v-model="setup.passwordConfirmation" rounded filled dense type="password" placeholder="确认密码" :rules="[rules.passwordMatch]" :disabled="loading" @keyup.enter="createFirstUser" />
-
-                        <v-alert v-if="error !== ''" class="rounded-lg mt-4 mb-0" color="error" type="error" border="left" dark>
-                            {{ error }}
+                <template v-else-if="registerMode">
+                    <template v-if="!allowWebRegister">
+                        <v-alert class="rounded-lg mb-6" color="warning" type="warning" border="left" dark>
+                            当前环境未开放网页注册，请使用已有账号登录，或在本地配置中开启 ALLOW_WEB_REGISTER。
                         </v-alert>
-                        <v-alert v-if="success !== ''" class="rounded-lg mt-4 mb-0" color="success" type="success" border="left" dark>
-                            {{ success }}
+                        <v-btn rounded depressed color="primary" href="/login">
+                            返回登录
+                        </v-btn>
+                    </template>
+                    <template v-else>
+                        <v-alert class="rounded-lg mb-6" color="primary" type="info" border="left" dark>
+                            本地网页注册已开启。创建的普通账号会默认使用中文界面和英语学习语言。
                         </v-alert>
-                    </v-form>
+                        <account-form
+                            ref="registerForm"
+                            v-model="isRegisterFormValid"
+                            :email.sync="register.email"
+                            :password.sync="register.password"
+                            :password-confirmation.sync="register.passwordConfirmation"
+                            :rules="rules"
+                            :disabled="loading"
+                            @submit="registerUser"
+                        />
+                    </template>
                 </template>
 
                 <template v-else>
@@ -64,12 +83,15 @@
 
                         <label class="font-weight-bold">密码</label>
                         <v-text-field v-model="password" rounded filled dense type="password" name="linguacafe-password" placeholder="密码" :rules="[rules.requiredPassword]" @keyup.enter="login" />
-
-                        <v-alert v-if="error !== ''" class="rounded-lg mt-4 mb-0" color="error" type="error" border="left" dark>
-                            {{ error }}
-                        </v-alert>
                     </v-form>
                 </template>
+
+                <v-alert v-if="error !== ''" class="rounded-lg mt-4 mb-0" color="error" type="error" border="left" dark>
+                    {{ error }}
+                </v-alert>
+                <v-alert v-if="success !== ''" class="rounded-lg mt-4 mb-0" color="success" type="success" border="left" dark>
+                    {{ success }}
+                </v-alert>
             </v-card-text>
 
             <v-card-actions v-if="setupMode && userCount == 0">
@@ -80,7 +102,18 @@
                 </v-btn>
             </v-card-actions>
 
-            <v-card-actions v-if="!setupMode">
+            <v-card-actions v-else-if="registerMode && allowWebRegister">
+                <v-btn rounded text href="/login" :disabled="loading">返回登录</v-btn>
+                <v-spacer />
+                <v-btn color="primary" rounded :disabled="loading || !isRegisterFormValid" :loading="loading" @click="registerUser">
+                    创建账号
+                </v-btn>
+            </v-card-actions>
+
+            <v-card-actions v-else-if="!setupMode && !registerMode">
+                <v-btn v-if="allowWebRegister" rounded text href="/register" :disabled="loading">
+                    注册 / 创建账号
+                </v-btn>
                 <v-spacer />
                 <v-btn color="primary" rounded :disabled="loading || !isLoginFormValid" :loading="loading" @click="login">
                     登录
@@ -91,19 +124,58 @@
 </template>
 
 <script>
+const AccountForm = {
+    props: {
+        value: Boolean,
+        email: String,
+        password: String,
+        passwordConfirmation: String,
+        rules: Object,
+        disabled: Boolean,
+    },
+    template: `
+        <v-form :value="value" @input="$emit('input', $event)">
+            <label class="font-weight-bold">邮箱</label>
+            <v-text-field :value="email" @input="$emit('update:email', $event)" rounded filled dense placeholder="邮箱" :rules="[rules.email]" :disabled="disabled" />
+
+            <label class="font-weight-bold">密码</label>
+            <v-text-field :value="password" @input="$emit('update:password', $event)" rounded filled dense type="password" placeholder="密码" :rules="[rules.password]" :disabled="disabled" />
+
+            <label class="font-weight-bold">确认密码</label>
+            <v-text-field :value="passwordConfirmation" @input="$emit('update:passwordConfirmation', $event)" rounded filled dense type="password" placeholder="确认密码" :rules="[rules.passwordMatch(password)]" :disabled="disabled" @keyup.enter="$emit('submit')" />
+        </v-form>
+    `,
+    methods: {
+        validate() {
+            return this.$children[0].validate();
+        },
+    },
+};
+
 export default {
+    components: {
+        AccountForm,
+    },
     props: {
         userCount: Number,
         setupMode: Boolean,
+        registerMode: Boolean,
+        allowWebRegister: Boolean,
     },
     data() {
         return {
             themeSelectionDialog: false,
             isLoginFormValid: false,
             isSetupFormValid: false,
+            isRegisterFormValid: false,
             email: '',
             password: '',
             setup: {
+                email: '',
+                password: '',
+                passwordConfirmation: '',
+            },
+            register: {
                 email: '',
                 password: '',
                 passwordConfirmation: '',
@@ -114,13 +186,29 @@ export default {
             rules: {
                 requiredPassword: value => value.length > 0 || '请输入密码。',
                 password: value => (value.length >= 8 && value.length <= 32) || '密码长度必须在 8 到 32 个字符之间。',
-                passwordMatch: value => value == this.setup.password || '两次输入的密码不一致。',
+                passwordMatch: password => value => value == password || '两次输入的密码不一致。',
                 email: value => {
-                    const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+                    const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
                     return pattern.test(value) || '请输入有效邮箱。';
                 }
             }
         };
+    },
+    computed: {
+        pageTitle() {
+            if (this.setupMode) {
+                return '创建第一个管理员账号';
+            }
+
+            if (this.registerMode) {
+                return '注册 / 创建账号';
+            }
+
+            return '登录';
+        },
+        titleIcon() {
+            return this.setupMode || this.registerMode ? 'mdi-account-plus' : 'mdi-account';
+        },
     },
     methods: {
         createFirstUser() {
@@ -128,18 +216,28 @@ export default {
                 return;
             }
 
+            this.createUser(this.setup, true, '账号创建成功，请使用该邮箱和密码登录。');
+        },
+        registerUser() {
+            if (!this.$refs.registerForm.validate()) {
+                return;
+            }
+
+            this.createUser(this.register, false, '账号创建成功，请登录。');
+        },
+        createUser(form, isAdmin, successMessage) {
             this.loading = true;
             this.error = '';
             this.success = '';
 
             axios.post('/users/create', {
-                name: this.setup.email,
-                email: this.setup.email,
-                password: this.setup.password,
-                password_confirmation: this.setup.passwordConfirmation,
-                isAdmin: true,
+                name: form.email,
+                email: form.email,
+                password: form.password,
+                password_confirmation: form.passwordConfirmation,
+                isAdmin: isAdmin,
             }).then(() => {
-                this.success = '账号创建成功，请使用该邮箱和密码登录。';
+                this.success = successMessage;
                 window.location.href = '/login';
             }).catch((error) => {
                 this.error = this.formatError(error) || '账号创建失败。';
