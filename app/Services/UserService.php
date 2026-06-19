@@ -40,7 +40,7 @@ class UserService {
         $user->save();
     }
 
-    public function createUser($name, $email, $password, $isAdmin, $passwordChanged) {
+    public function createUser($name, $email, $password, $isAdmin, $passwordChanged, string $studyLanguage = 'english') {
         // check for duplicated e-email address
         $user = User
             ::where('email', $email)
@@ -56,11 +56,15 @@ class UserService {
         $user->email = $email;
         $user->is_admin = $isAdmin;
         $user->password_changed = $passwordChanged;
+        $user->selected_language = $studyLanguage;
         $user->uuid = Str::uuid()->toString();
         $user->password = Hash::make($password);
         $user->save();
 
-        (new GoalService())->createGoalsForLanguage($user->id, 'english');
+        (new GoalService())->createGoalsForLanguage($user->id, $studyLanguage);
+        (new SettingsService())->updateUserSettings($user->id, [
+            'uiLanguage' => 'zh-CN',
+        ]);
 
         return true;
     }

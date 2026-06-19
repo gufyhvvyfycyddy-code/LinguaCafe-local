@@ -4,8 +4,6 @@ namespace App\Console\Commands;
 
 use App\Models\User;
 use App\Services\UserService;
-use App\Services\GoalService;
-use App\Services\SettingsService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -21,7 +19,7 @@ class CreateLocalUser extends Command
 
     protected $description = 'Create a local LinguaCafe user for development.';
 
-    public function handle(UserService $userService, GoalService $goalService, SettingsService $settingsService): int
+    public function handle(UserService $userService): int
     {
         $email = trim((string) $this->option('email'));
         $password = (string) $this->option('password');
@@ -48,14 +46,8 @@ class CreateLocalUser extends Command
         }
 
         try {
-            $userService->createUser($name, $email, $password, $isAdmin, true);
+            $userService->createUser($name, $email, $password, $isAdmin, true, $studyLanguage);
             $user = User::where('email', $email)->firstOrFail();
-            $user->selected_language = $studyLanguage;
-            $user->save();
-            $goalService->createGoalsForLanguage($user->id, $studyLanguage);
-            $settingsService->updateUserSettings($user->id, [
-                'uiLanguage' => 'zh-CN',
-            ]);
         } catch (\Throwable $exception) {
             $this->error($exception->getMessage());
 

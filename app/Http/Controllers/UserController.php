@@ -44,17 +44,28 @@ class UserController extends Controller {
 
     public function showLoginForm() 
     {
-        $userCount = User::count();
-        $theme = $_COOKIE['theme'] ?? 'light';
-
         if (Auth::check()) {
             return redirect()->intended('/');
         }
+
+        return $this->showPublicUserPage(false);
+    }
+
+    public function showSetupForm()
+    {
+        return $this->showPublicUserPage(true);
+    }
+
+    private function showPublicUserPage(bool $setupMode)
+    {
+        $userCount = User::count();
+        $theme = $_COOKIE['theme'] ?? 'light';
 
         return view('auth.login', [
             'userCount' => $userCount,
             'userUuid' => '',
             'theme' => $theme,
+            'setupMode' => $setupMode,
         ]);
     }
     
@@ -96,7 +107,7 @@ class UserController extends Controller {
         $name = $request->post('name');
         $email = $request->post('email');
         $password = $request->post('password');
-        $isAdmin = $request->post('isAdmin');
+        $isAdmin = $userCount === 0 ? true : $request->post('isAdmin');
         $passwordChanged = $userCount === 0;
 
         // If this is the first user, it can be created without any authorization.
