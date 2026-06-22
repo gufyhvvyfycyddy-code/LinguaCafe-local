@@ -680,15 +680,27 @@
                 }
 
                 // set words to selected, and collect their information
+                var validSelection = [];
                 for (let i = 0; i < this.ongoingSelection.length; i++) {
                     this.words[this.ongoingSelection[i].wordIndex].selected = true;
-                    var uniqueWordIndex = this.uniqueWordMap.get(this.ongoingSelection[i].word.toLowerCase());
+                    const key = this.normalizeWordKey(this.ongoingSelection[i].word);
+                    const uniqueWordIndex = this.uniqueWordMap.get(key);
+                    if (uniqueWordIndex === undefined || !this.uniqueWords[uniqueWordIndex]) {
+                        continue;
+                    }
                     this.ongoingSelection[i].uniqueWordIndex = uniqueWordIndex;
                     this.ongoingSelection[i].reading = this.uniqueWords[uniqueWordIndex].reading;
                     this.ongoingSelection[i].kanji = this.uniqueWords[uniqueWordIndex].kanji;
+                    validSelection.push(this.ongoingSelection[i]);
                 }
 
-                this.selection = this.ongoingSelection;
+                // If all items were skipped, clean up and abort without opening the panel
+                if (validSelection.length === 0) {
+                    this.ongoingSelection = [];
+                    return;
+                }
+
+                this.selection = validSelection;
                 this.ongoingSelection = [];
 
                 if (this.selection.length) {
@@ -696,7 +708,8 @@
 
                     // update lookup counts
                     if (this.selection.length == 1) {
-                        var inflectionSearchTerm = this.uniqueWords[uniqueWordIndex].base_word.length ? this.uniqueWords[uniqueWordIndex].base_word : this.uniqueWords[uniqueWordIndex].word;
+                        var singleUniqueWordIndex = this.selection[0].uniqueWordIndex;
+                        var inflectionSearchTerm = this.uniqueWords[singleUniqueWordIndex].base_word.length ? this.uniqueWords[singleUniqueWordIndex].base_word : this.uniqueWords[singleUniqueWordIndex].word;
                         this.requestInflections(inflectionSearchTerm);
                         this.updateWordLookupCount(this.selection[0].word);
                     } else if (this.selectedPhrase !== -1) {
@@ -768,7 +781,12 @@
                 // select the phrasew
                 do {
                     if (this.words[currentWordIndex].word !== 'NEWLINE') {
-                        var uniqueWordIndex = this.uniqueWordMap.get(this.words[currentWordIndex].word.toLowerCase());
+                        const key = this.normalizeWordKey(this.words[currentWordIndex].word);
+                        const uniqueWordIndex = this.uniqueWordMap.get(key);
+                        if (uniqueWordIndex === undefined || !this.uniqueWords[uniqueWordIndex]) {
+                            currentWordIndex++;
+                            continue;
+                        }
                         var uniqueWord = this.uniqueWords[uniqueWordIndex];
                         newSelection.push({
                             word: this.words[currentWordIndex].word,
@@ -837,7 +855,11 @@
                 };
 
                 if (hoveredWords !== null && hoveredWords.length === 1) {
-                    var uniqueWordIndex = this.uniqueWordMap.get(hoveredWords[0].word.toLowerCase());
+                    const key = this.normalizeWordKey(hoveredWords[0].word);
+                    const uniqueWordIndex = this.uniqueWordMap.get(key);
+                    if (uniqueWordIndex === undefined || !this.uniqueWords[uniqueWordIndex]) {
+                        return;
+                    }
                     var uniqueWord = this.uniqueWords[uniqueWordIndex];
 
                     data.translation = uniqueWord.translation;
@@ -1014,9 +1036,15 @@
                 this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'stage', value: -1 });
                 this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
             },
+            normalizeWordKey(word) {
+                return (word || '').toString().trim().toLowerCase();
+            },
             preProcessWords() {
                 for (let i = 0; i < this.uniqueWords.length; i++) {
-                    this.uniqueWordMap.set(this.uniqueWords[i].word, i);
+                    const key = this.normalizeWordKey(this.uniqueWords[i].word);
+                    if (key && !this.uniqueWordMap.has(key)) {
+                        this.uniqueWordMap.set(key, i);
+                    }
                 }
 
                 for (let i = 0; i < this.$props._text.words.length; i++) {
@@ -1457,6 +1485,7 @@
 
                 this.selectedPhrase = -1;
                 this.selection = [];
+                this.ongoingSelection = [];
                 this.$store.commit('vocabularyBox/setActive', false);
 
                 this.unselectAllWordsProcess();
@@ -1473,7 +1502,11 @@
                 }
             },
             updateWordLookupCount(word) {
-                let uniqueWordIndex = this.uniqueWordMap.get(word.toLowerCase());
+                const key = this.normalizeWordKey(word);
+                const uniqueWordIndex = this.uniqueWordMap.get(key);
+                if (uniqueWordIndex === undefined || !this.uniqueWords[uniqueWordIndex]) {
+                    return;
+                }
 
                 this.uniqueWords[uniqueWordIndex].lookup_count ++;
                 this.uniqueWords[uniqueWordIndex].definitions_checked  = true;
