@@ -1,12 +1,15 @@
 # LinguaCafe Codex 交接报告
 
-> 最后更新：2026-06-22
+> 最后更新：2026-06-23
 
 ## 当前最新 commit
 
 ```
+aa149d8 feat: repair known bad lemma data in study-base:doctor
+65fecff feat: add tokenizer:doctor command
+387cca4 feat: add LemmInflect to Python tokenizer for English lemmatization
+ad73e89 fix: prevent unsafe PHP fallback lemmas
 0e2cb93 feat: add study_base concept with corrected de-doubling rules and user override
-75b2b82 fix English lemma detection and add lemma doctor
 ```
 
 （注：如果此后有新提交，以 `git log --oneline -1` 为准。）
@@ -15,8 +18,17 @@
 
 ### 基础环境
 - [x] Windows 本地运行（PHP 8.2, MariaDB 12.3, `linguacafe_fsrs` 库）
-- [x] Python tokenizer + 英文 fallback
+- [x] Python tokenizer（spaCy + LemmInflect）+ 极保守 PHP fallback
 - [x] `.env.testing` 隔离测试数据库（`linguacafe_fsrs_test`）
+
+### 英文词元识别根治（2026-06-23 新增）
+- [x] **三层防线**：spaCy(en_core_web_sm) 主路径 → LemmInflect 补充 → PHP 极保守兜底
+- [x] PHP fallback 不再生成 opene/cal/walke 等脏数据：只查不规则表，默认保留 surface
+- [x] applyEnglishLemma() 重命名为 suggestEnglishLemmaForDoctorOnly()，禁止导入路径调用
+- [x] Python tokenizer 不可用时 Log::critical（非 Log::warning），不允许静默 fallback
+- [x] `--fix-bad-lemmas` doctor 模式：Tier 1 硬编码自动修，Tier 2 可疑模式只报告
+- [x] `php artisan tokenizer:doctor` 一键检查：spaCy 模型、LemmInflect、测试用例、坏词元扫描
+- [x] ECDICT 不再用于词元候选验证，仅保留词典查询功能
 
 ### 阅读 & 词汇
 - [x] 英文纯文本导入（保留段落、`[A]-[Z]` 段落标记）

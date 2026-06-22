@@ -394,25 +394,39 @@
                 this.textToSpeechAvailable = this.textToSpeechService.getLanguageVoices().length > 0;
             },
             startSelectionTouchEvent: function(event) {
-                var element = event.target
-                if (event.target.localName === 'ruby') {
-                    element = event.target.parentElement;
-                }
-
-                if (event.target.localName === 'rt') {
-                    element = event.target.parentElement.parentElement;
-                }
-
-                if (!element.classList.contains('word')) {
+                // Normalize event.target to an Element (may be a text node)
+                var element = event.target instanceof Element ? event.target : event.target?.parentElement;
+                if (!element) {
                     this.unselectAllWords();
                     return;
+                }
+
+                // Handle ruby and rt child elements
+                if (element.localName === 'ruby') {
+                    element = element.parentElement;
+                } else if (element.localName === 'rt') {
+                    element = element.parentElement.parentElement;
+                }
+
+                // Fallback: walk up to find the nearest .word ancestor
+                if (!element || !element.classList || !element.classList.contains('word')) {
+                    element = element?.closest ? element.closest('.word') : null;
+                    if (!element) {
+                        this.unselectAllWords();
+                        return;
+                    }
                 }
 
                 if (this.$props.plainTextMode) {
                     return;
                 }
 
-                var wordIndex = parseInt(element.attributes['wordindex'].nodeValue);
+                var wordIndex = parseInt(element.getAttribute('wordindex'));
+                if (isNaN(wordIndex)) {
+                    this.unselectAllWords();
+                    return;
+                }
+
                 this.touchStartWordIndex = wordIndex;
                 this.touchTimer = setTimeout(() => {
                     this.startSelection(wordIndex);
@@ -424,23 +438,37 @@
                 }
 
                 this.startTime = performance.now();
-                var element = event.target
-                if (event.target.localName === 'ruby') {
-                    element = event.target.parentElement;
-                }
 
-                if (event.target.localName === 'rt') {
-                    element = event.target.parentElement.parentElement;
-                }
-
-                if (!element.classList.contains('word')) {
+                // Normalize event.target to an Element (may be a text node)
+                var element = event.target instanceof Element ? event.target : event.target?.parentElement;
+                if (!element) {
                     this.unselectAllWords();
                     return;
                 }
 
-                this.startSelection(parseInt(element.attributes['wordindex'].nodeValue));
+                // Handle ruby and rt child elements
+                if (element.localName === 'ruby') {
+                    element = element.parentElement;
+                } else if (element.localName === 'rt') {
+                    element = element.parentElement.parentElement;
+                }
 
+                // Fallback: walk up to find the nearest .word ancestor
+                if (!element || !element.classList || !element.classList.contains('word')) {
+                    element = element?.closest ? element.closest('.word') : null;
+                    if (!element) {
+                        this.unselectAllWords();
+                        return;
+                    }
+                }
 
+                var wordIndex = parseInt(element.getAttribute('wordindex'));
+                if (isNaN(wordIndex)) {
+                    this.unselectAllWords();
+                    return;
+                }
+
+                this.startSelection(wordIndex);
             },
             updateSelectionTouchEvent: function(event) {
                 if (!event.cancelable) {
@@ -1005,21 +1033,38 @@
                     return;
                 }
 
-                switch(event.which) {
-                    // set level to new
-                    case 86:
-                        if (!event.ctrlKey) {
-                            this.textToSpeech();
-                        }
+                // Never intercept browser/system shortcuts (Ctrl+F, Ctrl+C, Ctrl+V, Ctrl+A, etc.)
+                if (event.ctrlKey || event.metaKey || event.altKey) {
+                    return;
+                }
 
+                // Do not intercept hotkeys when the user is typing in an input field,
+                // textarea, select, or contentEditable element
+                const target = event.target;
+                if (target instanceof Element) {
+                    const tag = target.tagName;
+                    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
+                        return;
+                    }
+                }
+
+                // Do not intercept when a Vuetify dialog, menu, or select is active
+                if (document.querySelector('.v-dialog--active') ||
+                    document.querySelector('.v-menu__content--active') ||
+                    document.querySelector('.v-overlay--active') ||
+                    document.querySelector('.menuable__content__active')) {
+                    return;
+                }
+
+                switch(event.which) {
+                    // text to speech
+                    case 86:
+                        this.textToSpeech();
                         break;
 
                     // set level to new
                     case 67:
-                        if (!event.ctrlKey) {
-                            this.setStage(2);
-                        }
-
+                        this.setStage(2);
                         break;
 
                     // set level 0-7
@@ -1056,8 +1101,8 @@
 
                         // decrease font size
                     case 73:
-                        // do not do anything if ctrl+shift+i is pressed for dev tools
-                        if (event.ctrlKey || event.shiftKey) {
+                        // do not do anything if shift+i is pressed
+                        if (event.shiftKey) {
                             return;
                         }
 
@@ -1074,14 +1119,14 @@
                     case 38:
                     case 87:
                         event.preventDefault();
-                        this.scrollText('up', event.ctrlKey || event.shiftKey);
+                        this.scrollText('up', event.shiftKey);
                         break;
 
                     // scroll down
                     case 40:
                     case 83:
                         event.preventDefault();
-                        this.scrollText('down', event.ctrlKey || event.shiftKey);
+                        this.scrollText('down', event.shiftKey);
                         break;
 
                     // add selected word to anki
@@ -1100,14 +1145,14 @@
                     case 37:
                     case 65:
                         event.preventDefault();
-                        this.selectPreviousWord(event.ctrlKey, event.shiftKey);
+                        this.selectPreviousWord(false, event.shiftKey);
                         break;
 
                     // next
                     case 39:
                     case 68:
                         event.preventDefault();
-                        this.selectNextWord(event.ctrlKey, event.shiftKey);
+                        this.selectNextWord(false, event.shiftKey);
                         break;
 
                     // plain text mode
@@ -1375,9 +1420,14 @@
                 }
             },
             unselectAllWordsOnEmptyClick(event) {
+                // Normalize event.target to an Element (may be a text node)
+                const el = event.target instanceof Element ? event.target : event.target?.parentElement;
+                if (!el || !el.classList) {
+                    return;
+                }
+
                 // Ignore clicks inside Vuetify overlays, menus, selects, and dialogs
                 // (v-select/v-menu dropdowns are teleported to body, outside the side panel DOM)
-                const el = event.target;
                 if (el.classList.contains('v-overlay__scrim') || el.classList.contains('v-overlay')) {
                     return;
                 }
@@ -1385,6 +1435,14 @@
                     || el.closest('.v-list-item') || el.closest('.v-dialog')
                     || el.closest('.v-overlay') || el.closest('.menuable__content__active')
                     || el.closest('#vocab-side-box') || el.closest('#vocab-box')) {
+                    return;
+                }
+
+                // Do not unselect when clicking on words or the text block.
+                // Under normal circumstances these clicks are stopped by @mouseup.stop
+                // on .text-block, but if propagation is disrupted (e.g. by browser find
+                // highlights), this guard prevents word clicks from being misclassified.
+                if (el.closest('.word') || el.closest('.text-block') || el.closest('[wordindex]')) {
                     return;
                 }
 

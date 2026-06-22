@@ -350,7 +350,6 @@
                 this.languageSpaces = data.languageSpaces;
                 this.chapters = data.chapters;
 
-                document.getElementById('app').addEventListener('mouseup', this.finishSelection);
                 window.addEventListener('resize', this.updateToolbarPosition);
                 window.addEventListener('resize', this.vocabularySidebarTest);
                 window.addEventListener('scroll', this.updateToolbarPosition);
