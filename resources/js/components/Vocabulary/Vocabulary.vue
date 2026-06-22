@@ -203,9 +203,9 @@
                     </td>
                     <td class="stage px-1" :stage="word.stage">
                         <div v-if="word.stage < 0" class="highlighted-word">{{ word.stage * -1 }}</div>
-                        <div v-else-if="word.stage == 0">0</div>
-                        <div v-else-if="word.stage == 1">X</div>
-                        <div v-else class="new-word">新词</div>
+                        <div v-if="word.stage === 0">0</div>
+                        <div v-if="word.stage === 1">X</div>
+                        <div v-if="word.stage === 2" class="new-word">新词</div>
                     </td>
                     <td class="translation">{{ word.translation }}</td>
                     <td class="actions">
