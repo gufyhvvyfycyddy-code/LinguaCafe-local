@@ -7,12 +7,13 @@ import pykakasi
 import spacy
 import time
 import re
-import ebooklib 
+import ebooklib
 import html
 import pinyin
 from ebooklib import epub
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled
+import lemminflect
 from urllib import parse
 from pysubparser import parser
 from pysubparser.cleaners import formatting
@@ -299,6 +300,30 @@ def tokenizeText(text, language, sentenceIndexStart = 0):
             
             # get lemma
             lemma = token.lemma_
+
+            # English supplement: if spaCy could not lemmatize (lemma == surface),
+            # try LemmInflect for content words. LemmInflect has ~96% accuracy on
+            # verbs/nouns vs spaCy's ~80-85%, making it a valuable safety net for
+            # words spaCy's lookup table misses.
+            # Safety rules:
+            #   - Only for English (other languages have their own lemmatizers)
+            #   - Only when spaCy returned lemma == surface (couldn't lemmatize)
+            #   - Only for VERB, NOUN, ADJ, ADV (content words)
+            #   - Only when LemmInflect returns a DIFFERENT, reasonable result
+            #   - Preserves correct spaCy output: code→code, recently→recently
+            if language == 'english' and lemma == token.text.lower():
+                if token.pos_ in ('VERB', 'NOUN', 'ADJ', 'ADV'):
+                    try:
+                        lemmas = lemminflect.getLemma(token.text, upos=token.pos_)
+                        if lemmas and len(lemmas) > 0:
+                            candidate = lemmas[0]
+                            # Only accept if different from surface and looks reasonable
+                            if (candidate != token.text.lower()
+                                and len(candidate) >= 2
+                                and abs(len(candidate) - len(token.text)) <= 4):
+                                lemma = candidate
+                    except Exception:
+                        pass  # LemmInflect is best-effort; spaCy lemma stays
             
             # get hiragana reading
             reading = list()
@@ -595,6 +620,40 @@ model_name: dict[str, str] = {
     "tr-core-news-md": "Turkish",
     "spacy-thai": "Thai",
 }
+
+@route('/tokenizer/health', method = 'GET')
+def health_check():
+    """Health check endpoint for tokenizer:doctor.
+    Reports spaCy model availability, LemmInflect presence, and test cases."""
+    result = {
+        'spacy_available': True,
+        'en_core_web_sm_loaded': False,
+        'lemminflect_available': False,
+        'tests': {}
+    }
+    # Check spaCy English model
+    try:
+        nlp = spacy.load('en_core_web_sm')
+        result['en_core_web_sm_loaded'] = True
+        # Test cases: verify spaCy lemmatization for known problematic words
+        test_words = ['opened', 'called', 'stopped', 'running', 'walking']
+        doc = nlp(' '.join(test_words))
+        for token in doc:
+            result['tests'][token.text] = token.lemma_
+    except Exception as e:
+        result['spacy_available'] = False
+        result['spacy_error'] = str(e)
+    # Check LemmInflect
+    try:
+        import lemminflect
+        result['lemminflect_available'] = True
+        # Verify LemmInflect on common cases
+        for word, pos in [('opened', 'VERB'), ('called', 'VERB'), ('children', 'NOUN')]:
+            lemmas = lemminflect.getLemma(word, upos=pos)
+            result['tests'][f'lemminflect_{word}'] = lemmas[0] if lemmas else None
+    except ImportError:
+        result['lemminflect_available'] = False
+    return json.dumps(result)
 
 @route('/models/install', method = 'POST')
 def model_install():

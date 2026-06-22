@@ -27,6 +27,8 @@ set "TOKENIZER_PYTHON=%TOKENIZER_VENV%\Scripts\python.exe"
 "%TOKENIZER_PYTHON%" -m pip install --upgrade pip setuptools wheel
 "%TOKENIZER_PYTHON%" -m pip install -r "%~dp0tokenizer-requirements.txt"
 "%TOKENIZER_PYTHON%" -m spacy download en_core_web_sm
+echo [LinguaCafe] Installing LemmInflect for English lemmatization enhancement...
+"%TOKENIZER_PYTHON%" -m pip install lemminflect
 
 if errorlevel 1 (
     echo [LinguaCafe] Dependency installation failed. Check the error above.

@@ -8,3 +8,4 @@ pykakasi
 pinyin
 pysub-parser
 newspaper3k
+lemminflect
