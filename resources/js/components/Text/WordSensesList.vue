@@ -20,8 +20,8 @@
                 <span class="text--secondary mr-1">词元：</span>
                 <strong class="default-font">{{ effectiveLemma || '未识别' }}</strong>
             </div>
-            <div v-if="legacyTranslation" class="legacy-translation mt-2">
-                <span class="text--secondary">旧词条释义：</span>{{ legacyTranslation }}
+            <div v-if="legacyTranslation" class="legacy-translation mt-2 text-caption text--secondary">
+                旧词条释义：{{ legacyTranslation }}
             </div>
         </div>
 
@@ -48,13 +48,6 @@
                     </div>
                 </v-expansion-panel-header>
                 <v-expansion-panel-content>
-                    <div v-if="!group.senses.length" class="empty-pos rounded pa-3 mb-2">
-                        当前还没有{{ group.shortLabel }}释义。
-                        <v-btn x-small text color="primary" class="ml-1" @click="openAddForm(group.pos)">
-                            + 在{{ group.shortLabel }}下添加释义
-                        </v-btn>
-                    </div>
-
                     <div
                         v-for="sense in group.senses"
                         :key="sense.sense_id"
@@ -67,6 +60,9 @@
                             <v-spacer />
                             <v-btn v-if="editingSenseId !== sense.sense_id" x-small outlined color="primary" @click="startEdit(sense)">
                                 编辑该释义
+                            </v-btn>
+                            <v-btn v-if="editingSenseId !== sense.sense_id" x-small text color="error" class="ml-1" @click="deleteSense(sense)">
+                                删除释义
                             </v-btn>
                         </div>
 
@@ -140,11 +136,26 @@
                             </div>
 
                             <div class="d-flex mt-2">
-                                <v-btn x-small text disabled>查看例句</v-btn>
+                                <v-btn x-small text :loading="loadingExamples[sense.sense_id]" @click="toggleExamples(sense)">
+                                    {{ examplesExpanded[sense.sense_id] ? '收起例句' : '查看例句' }}
+                                </v-btn>
                                 <v-spacer />
                                 <span class="text-caption text--secondary" v-if="sense.fsrs_reps !== null && sense.fsrs_reps !== undefined">
                                     已复习 {{ sense.fsrs_reps }} 次
                                 </span>
+                            </div>
+
+                            <div v-if="examplesExpanded[sense.sense_id]" class="examples-area rounded pa-2 mt-2" :class="{ 'text--secondary': !examplesData[sense.sense_id] || !examplesData[sense.sense_id].length }">
+                                <div v-if="loadingExamples[sense.sense_id]" class="text-caption">
+                                    正在查询例句...
+                                </div>
+                                <div v-else-if="!examplesData[sense.sense_id] || !examplesData[sense.sense_id].length" class="text-caption">
+                                    暂无例句
+                                </div>
+                                <div v-else v-for="(example, i) in examplesData[sense.sense_id]" :key="i" class="example-item mb-1">
+                                    <div class="text-body-2">{{ example.sentence_en }}</div>
+                                    <div v-if="example.sentence_zh" class="text-caption text--secondary">{{ example.sentence_zh }}</div>
+                                </div>
                             </div>
                         </template>
                     </div>
@@ -254,15 +265,17 @@ export default {
             return (this.surface || this.lemma || '').trim();
         },
         senseGroups() {
-            return POS_OPTIONS.map(option => {
-                const senses = this.senses.filter(sense => (sense.pos || 'other') === option.value);
-                return {
-                    pos: option.value,
-                    label: option.label,
-                    shortLabel: option.shortLabel,
-                    senses: senses,
-                };
-            });
+            return POS_OPTIONS
+                .map(option => {
+                    const senses = this.senses.filter(sense => (sense.pos || 'other') === option.value);
+                    return {
+                        pos: option.value,
+                        label: option.label,
+                        shortLabel: option.shortLabel,
+                        senses: senses,
+                    };
+                })
+                .filter(group => group.senses.length > 0);
         },
     },
     watch: {
@@ -291,6 +304,16 @@ export default {
             posOptions: POS_OPTIONS,
             newForm: this.emptyForm(),
             editForm: this.emptyForm(),
+            // Snapshot of selected word context, captured when form opens
+            // Prevents data loss if the store is accidentally reset (e.g. v-select click-outside)
+            snapshot: {
+                chapterId: null,
+                sentenceIndex: null,
+                sentenceText: '',
+            },
+            examplesExpanded: {},
+            examplesData: {},
+            loadingExamples: {},
         };
     },
     methods: {
@@ -362,6 +385,13 @@ export default {
             this.newForm = this.emptyForm();
             this.newForm.pos = pos || 'verb';
 
+            // Snapshot current Vuex state in case store is reset (e.g. v-select click-outside)
+            this.snapshot = {
+                chapterId: this.chapterId,
+                sentenceIndex: this.sentenceIndex,
+                sentenceText: this.sentenceText,
+            };
+
             if (prefill) {
                 this.prefillSource = prefill.dictionary || '词典';
                 this.newForm.pos = prefill.pos || this.newForm.pos;
@@ -383,6 +413,12 @@ export default {
             this.newForm = this.emptyForm();
         },
         createPayload(form) {
+            // Use snapshot as fallback in case Vuex state was reset (e.g. v-select click-outside)
+            const chapterId = this.chapterId !== null ? this.chapterId : this.snapshot.chapterId;
+            const sentenceIndex = this.sentenceIndex !== null && this.sentenceIndex !== undefined
+                ? this.sentenceIndex : this.snapshot.sentenceIndex;
+            const sentenceText = this.sentenceText || this.snapshot.sentenceText;
+
             return {
                 lemma: this.effectiveLemma,
                 surface_form: this.surfaceWord,
@@ -391,9 +427,9 @@ export default {
                 sense_en: form.sense_en,
                 aliases_zh: this.splitList(form.aliases_zh),
                 collocations: this.splitList(form.collocations),
-                chapter_id: this.chapterId,
-                sentence_id: this.sentenceIndex !== null && this.sentenceIndex !== undefined ? String(this.sentenceIndex) : null,
-                sentence_en: form.example_sentence_en || this.sentenceText,
+                chapter_id: chapterId,
+                sentence_id: sentenceIndex !== null && sentenceIndex !== undefined ? String(sentenceIndex) : null,
+                sentence_en: form.example_sentence_en || sentenceText,
             };
         },
         createSense() {
@@ -412,7 +448,7 @@ export default {
                     const pos = this.newForm.pos;
                     this.closeAddForm();
                     this.fetchSenses();
-                    const index = POS_OPTIONS.findIndex(option => option.value === pos);
+                    const index = this.senseGroups.findIndex(group => group.pos === pos);
                     if (index >= 0 && this.openPanels.indexOf(index) === -1) {
                         this.openPanels.push(index);
                     }
@@ -465,6 +501,54 @@ export default {
                 })
                 .catch(() => {
                     this.saveError = '更新词义失败，请稍后重试。';
+                })
+                .finally(() => {
+                    this.saving = false;
+                });
+        },
+        toggleExamples(sense) {
+            const senseId = sense.sense_id;
+            const currently = this.examplesExpanded[senseId];
+
+            if (currently) {
+                this.$set(this.examplesExpanded, senseId, false);
+                return;
+            }
+
+            // First time — fetch examples
+            this.$set(this.examplesExpanded, senseId, true);
+            if (this.examplesData[senseId]) {
+                return; // Already cached
+            }
+
+            this.$set(this.loadingExamples, senseId, true);
+            axios.get(`/senses/${senseId}/examples`)
+                .then((response) => {
+                    this.$set(this.examplesData, senseId, response.data.occurrences || []);
+                })
+                .catch(() => {
+                    this.$set(this.examplesData, senseId, []);
+                })
+                .finally(() => {
+                    this.$set(this.loadingExamples, senseId, false);
+                });
+        },
+        deleteSense(sense) {
+            if (!confirm(`确认要删除释义「${sense.sense_zh || sense.sense_en || '（无释义文本）'}」吗？该释义将从列表中移除，相关 Sense Review 卡将被禁用。`)) {
+                return;
+            }
+
+            this.saving = true;
+            this.saveError = '';
+            this.message = '';
+
+            axios.put(`/senses/${sense.sense_id}/archive`)
+                .then(() => {
+                    this.message = '已删除该释义。';
+                    this.fetchSenses();
+                })
+                .catch(() => {
+                    this.saveError = '删除释义失败，请稍后重试。';
                 })
                 .finally(() => {
                     this.saving = false;
@@ -540,5 +624,20 @@ export default {
 
 .sense-fsrs-row strong {
     color: var(--v-success-base);
+}
+
+.examples-area {
+    background: rgba(127, 127, 127, 0.06);
+    border: 1px solid var(--v-gray2-base);
+}
+
+.example-item {
+    border-bottom: 1px solid rgba(127, 127, 127, 0.1);
+    padding-bottom: 4px;
+}
+
+.example-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
 }
 </style>

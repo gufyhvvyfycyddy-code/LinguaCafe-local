@@ -81,6 +81,22 @@ class WordSenseService
         return $sense;
     }
 
+    public function archiveSense(WordSense $sense): WordSense
+    {
+        return DB::transaction(function () use ($sense) {
+            $sense->status = WordSense::STATUS_REJECTED;
+            $sense->save();
+
+            // Disable FSRS review card without deleting history
+            if ($card = $sense->reviewCard) {
+                $card->fsrs_enabled = false;
+                $card->save();
+            }
+
+            return $sense->fresh('reviewCard');
+        });
+    }
+
     public function confirmSense(WordSense $sense): WordSense
     {
         $sense->status = WordSense::STATUS_CONFIRMED;

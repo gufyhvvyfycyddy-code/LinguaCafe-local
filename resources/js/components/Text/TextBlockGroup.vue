@@ -1372,7 +1372,16 @@
                 }
             },
             unselectAllWordsOnEmptyClick(event) {
-                if (event.target.classList.contains('v-overlay__scrim')) {
+                // Ignore clicks inside Vuetify overlays, menus, selects, and dialogs
+                // (v-select/v-menu dropdowns are teleported to body, outside the side panel DOM)
+                const el = event.target;
+                if (el.classList.contains('v-overlay__scrim') || el.classList.contains('v-overlay')) {
+                    return;
+                }
+                if (el.closest('.v-menu__content') || el.closest('.v-select-list')
+                    || el.closest('.v-list-item') || el.closest('.v-dialog')
+                    || el.closest('.v-overlay') || el.closest('.menuable__content__active')
+                    || el.closest('#vocab-side-box') || el.closest('#vocab-box')) {
                     return;
                 }
 

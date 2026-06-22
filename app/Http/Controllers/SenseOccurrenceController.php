@@ -258,6 +258,52 @@ class SenseOccurrenceController extends Controller
         return response()->json($this->serializeOccurrence($occurrence->load('wordSense.reviewCard')));
     }
 
+    public function examples(int $id)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $sense = WordSense::where('id', $id)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->firstOrFail();
+
+        $occurrences = WordSenseOccurrence::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('word_sense_id', $sense->id)
+            ->whereNotNull('sentence_en')
+            ->where('sentence_en', '<>', '')
+            ->orderBy('created_at', 'desc')
+            ->limit(20)
+            ->get();
+
+        return response()->json([
+            'sense_id' => $sense->id,
+            'lemma' => $sense->lemma,
+            'occurrences' => $occurrences->map(fn (WordSenseOccurrence $o) => [
+                'occurrence_id' => $o->id,
+                'sentence_en' => $o->sentence_en,
+                'sentence_zh' => $o->sentence_zh,
+                'surface' => $o->surface,
+                'chapter_id' => $o->chapter_id,
+                'status' => $o->status,
+                'created_at' => $o->created_at?->toISOString(),
+            ])->values(),
+        ]);
+    }
+
+    public function archiveSense(int $id)
+    {
+        $sense = WordSense::where('id', $id)
+            ->where('user_id', Auth::user()->id)
+            ->where('language_id', Auth::user()->selected_language)
+            ->firstOrFail();
+
+        $sense = $this->wordSenseService->archiveSense($sense);
+
+        return response()->json($this->serializeSense($sense->load('reviewCard')));
+    }
+
     public function ignore(int $id)
     {
         $occurrence = $this->occurrenceService->ignoreOccurrence($this->findOccurrence($id));

@@ -77,8 +77,12 @@
                     </div>
                 </template>
 
-                <div class="vocab-box-subheader d-flex">释义</div>
-                <v-textarea class="mb-2 mt-1" placeholder="释义" title="释义" filled dense no-resize rounded hide-details height="100" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
+                <div class="vocab-box-subheader d-flex align-center" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
+                    <span>旧词条释义（兼容）</span>
+                    <v-spacer />
+                    <v-icon small :color="showLegacyTranslation ? 'primary' : ''">{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                </div>
+                <v-textarea v-if="showLegacyTranslation" class="mb-2 mt-1" placeholder="旧词条释义（兼容，不推荐使用此编辑入口）" title="旧词条释义" filled dense no-resize rounded hide-details height="80" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
                 <v-text-field placeholder="词典搜索" class="dictionary-search-field default-font mt-2 mb-3" width="100%" prepend-inner-icon="mdi-magnify" filled dense rounded hide-details :value="searchField" @change="searchFieldChanged" @keydown.stop=";" />
 
                 <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
@@ -146,6 +150,7 @@ export default {
     data() {
         return {
             tab: 0,
+            showLegacyTranslation: false,
             phraseText: '',
             reading: '',
             baseWord: '',

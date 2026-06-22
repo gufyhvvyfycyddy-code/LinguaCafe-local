@@ -5,7 +5,7 @@
 ## 当前最新 commit
 
 ```
-9cd786c add manual lemma-based multi-sense management
+a25bc0d improve reader word sense panel usability
 ```
 
 （注：如果此后有新提交，以 `git log --oneline -1` 为准。）
@@ -38,14 +38,17 @@
 - [x] `setStage()` 缺失 `reviewIntervals` 时自动运行 `SettingsSeeder`
 - [x] `GoalService` 缺失 goals 时自动创建
 
-### 多释义管理 UI（本次修改，commit 9cd786c + 未提交改动）
-- [x] 右侧点词面板分为 5 个区域：单词基础信息、普通词汇状态、释义(旧)、词典结果、词元释义
-- [x] 词元释义按词性分组显示（v-expansion-panels，每组可展开/收起）
+### 多释义管理 UI（commit a25bc0d + 本次改动）
+- [x] 右侧点词面板分为 5 个区域：单词基础信息、普通词汇状态、旧词条释义(兼容)、词典结果、词元释义
+- [x] 旧释义（EncounteredWord.translation）改为默认折叠，标题「旧词条释义（兼容）」，不作为主要编辑入口
+- [x] 词元释义按词性分组显示（v-expansion-panels，每组可展开/收起），空词性分组默认隐藏
 - [x] 已保存释义显示 FSRS 下次复习时间和学习状态
 - [x] "添加新释义"表单：词性下拉、中文释义、英文解释、例句、近义译法、搭配
+- [x] 词性下拉框不再导致选中单词丢失（修复 click-outside 误触 reset + 快照保护）
 - [x] 词典结果每条旁 "+ 添加为新释义"按钮，可预填释义内容
 - [x] "编辑该释义"按钮可编辑已有释义的 pos/中文/英文/近义译法/搭配
-- [x] 旧词条释义（EncounteredWord.translation）在词元释义卡片中显示
+- [x] "删除释义"按钮，二次确认后软删除（设为 rejected，禁用 FSRS review card）
+- [x] "查看例句"按钮，点击展开该 sense 关联的 WordSenseOccurrence 例句，无例句显示"暂无例句"
 - [x] 面板内容超出时可滚动（overflow-y: auto）
 - [x] 英文 fallback tokenizer 词性推断（n./v./adj./adv. 等前缀匹配）
 
@@ -53,12 +56,16 @@
 
 | 文件 | 改动类型 |
 |------|----------|
-| `resources/js/components/Text/WordSensesList.vue` | 重写（v-expansion-panels 分组、编辑/新增表单、FSRS 状态显示） |
-| `resources/js/components/Text/VocabularySideBox.vue` | 中改（重构单词基础信息卡片、添加区域标题、修复事件传递和滚动） |
+| `resources/js/components/Text/WordSensesList.vue` | 重写（v-expansion-panels 分组、空组默认隐藏、编辑/新增/删除/例句表单、FSRS 状态显示、快照保护） |
+| `resources/js/components/Text/VocabularySideBox.vue` | 中改（重构单词基础信息卡片、旧释义折叠为「旧词条释义（兼容）」、修复事件传递和滚动） |
 | `resources/js/components/Text/VocabularySearchBox.vue` | 中改（"+ 添加为新释义"按钮、词性推断、行布局） |
-| `resources/js/components/Text/VocabularyBox.vue` | 小改（passthrough 事件） |
+| `resources/js/components/Text/VocabularyBox.vue` | 中改（旧释义折叠、事件透传） |
+| `resources/js/components/Text/TextBlockGroup.vue` | 小改（click-outside 检测排除 v-menu/v-select 下拉框） |
 | `resources/sass/Text/VocabularySideBox.scss` | 小改（overflow-y: auto） |
-| `app/Http/Controllers/SenseOccurrenceController.php` | 小改（FSRS 详细字段） |
+| `app/Http/Controllers/SenseOccurrenceController.php` | 中改（FSRS 详细字段、archiveSense、examples 接口） |
+| `app/Services/WordSenseService.php` | 小改（archiveSense 软删除） |
+| `app/Services/WordSenseOccurrenceService.php` | 小改（candidates 排除 rejected senses） |
+| `routes/web.php` | 小改（新增 /senses/{id}/archive、/senses/{id}/examples） |
 
 ## 右侧面板区域
 
@@ -87,16 +94,13 @@
 
 ## 仍未完成
 
-- [ ] 手动多释义管理（一个词多个 sense 的 UI 管理界面）—— 基本完成，需浏览器验收
 - [ ] 点正在学习的词时先复习其所有到期 sense card，依次弹出复习卡，全部答完后再进入查词/释义管理界面
-- [ ] 添加新释义时即时生成新 sense card（当前通过 `/senses/review` 确认后才生成）—— 已通过 `/senses/manual` 直接创建
 - [ ] 阅读页内嵌 GPT 词义包导出按钮
 - [ ] 网页端 sense-mapping.json 上传→校验→预览→导入完整流程
 - [ ] 颜色逻辑（新词蓝、学习中黄、已知无高亮、忽略无高亮，LingQ 风格）
 - [ ] Phrase FSRS
 - [ ] 非英文材料完整支持
-- [ ] 浏览器 smoke test 全自动化
-- [ ] "查看例句"功能（当前按钮为 disabled 占位）
+- [ ] 浏览器 smoke test 全自动化（Playwright）
 
 ## 导入格式问题：真实根因和最终修法
 

@@ -189,6 +189,7 @@ class WordSenseOccurrenceService
             ->where('user_id', $userId)
             ->where('language_id', $language)
             ->where('lemma', mb_strtolower(trim($lemma)))
+            ->where('status', '<>', WordSense::STATUS_REJECTED)
             ->when($pos !== null && $pos !== '', fn ($query) => $query->where('pos', $pos))
             ->orderByRaw("case when status = ? then 0 else 1 end", [WordSense::STATUS_CONFIRMED])
             ->orderBy('id')

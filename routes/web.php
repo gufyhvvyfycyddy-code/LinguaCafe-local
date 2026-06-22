@@ -186,6 +186,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/senses/possible-duplicates', [App\Http\Controllers\SenseOccurrenceController::class, 'possibleDuplicates']);
     Route::post('/senses/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'storeManualSense']);
     Route::put('/senses/{id}/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'updateManualSense']);
+    Route::put('/senses/{id}/archive', [App\Http\Controllers\SenseOccurrenceController::class, 'archiveSense']);
+    Route::get('/senses/{id}/examples', [App\Http\Controllers\SenseOccurrenceController::class, 'examples']);
     Route::post('/senses/occurrences/bulk-confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirm']);
     Route::post('/senses/occurrences/bulk-ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkIgnore']);
     Route::post('/senses/occurrences/bulk-reject', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkReject']);
