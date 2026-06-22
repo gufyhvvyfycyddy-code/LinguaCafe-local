@@ -11,6 +11,7 @@ use League\Csv\Reader;
 use League\Csv\Writer;
 use App\Models\Chapter;
 use App\Models\Radical;
+use App\Models\ReviewCard;
 use App\Models\EncounteredWord;
 use App\Models\ExampleSentence;
 use App\Enums\ChapterProcessingStatusEnum;
@@ -227,6 +228,69 @@ class VocabularyService {
     public function softDeleteWord($userId, $wordId): bool
     {
         return $this->setWordIgnored($userId, $wordId);
+    }
+
+    public function hardDeleteWord(int $userId, string $language, int $wordId): bool
+    {
+        $deleted = $this->hardDeleteWordsByIds($userId, $language, [$wordId]);
+
+        if ($deleted === 0) {
+            throw new \Exception('Word does not exist, or it belongs to a different user.');
+        }
+
+        return true;
+    }
+
+    public function hardDeleteWordsByIds(int $userId, string $language, array $wordIds): int
+    {
+        $wordIds = collect($wordIds)
+            ->map(fn ($wordId) => (int) $wordId)
+            ->filter(fn ($wordId) => $wordId > 0)
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($wordIds)) {
+            return 0;
+        }
+
+        return DB::transaction(function () use ($userId, $language, $wordIds) {
+            $ids = EncounteredWord::where('user_id', $userId)
+                ->where('language', $language)
+                ->whereIn('id', $wordIds)
+                ->lockForUpdate()
+                ->pluck('id')
+                ->all();
+
+            if (empty($ids)) {
+                return 0;
+            }
+
+            ReviewCard::where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('target_type', ReviewCard::TARGET_WORD)
+                ->whereIn('target_id', $ids)
+                ->update(['fsrs_enabled' => false]);
+
+            return EncounteredWord::where('user_id', $userId)
+                ->where('language', $language)
+                ->whereIn('id', $ids)
+                ->delete();
+        });
+    }
+
+    public function countHardDeletableWordsByFilters(int $userId, string $language, array $filters): int
+    {
+        return $this->buildHardDeleteWordQuery($userId, $language, $filters)->count();
+    }
+
+    public function hardDeleteWordsByFilters(int $userId, string $language, array $filters): int
+    {
+        $ids = $this->buildHardDeleteWordQuery($userId, $language, $filters)
+            ->pluck('id')
+            ->all();
+
+        return $this->hardDeleteWordsByIds($userId, $language, $ids);
     }
 
     public function cleanupInvalidTokens(int $userId, string $language, bool $dryRun = false): array
@@ -777,6 +841,71 @@ class VocabularyService {
         $responseData->rejectedWords = $rejectedWords;
         
         return $responseData;
+    }
+
+    private function buildHardDeleteWordQuery(int $userId, string $language, array $filters)
+    {
+        $phrases = $filters['phrases'] ?? 'both';
+        if ($phrases === 'only phrases') {
+            return EncounteredWord::whereRaw('1 = 0');
+        }
+
+        $text = $filters['text'] ?? 'anytext';
+        $bookId = (int) ($filters['book'] ?? -1);
+        $chapterId = (int) ($filters['chapter'] ?? -1);
+        $stage = (int) ($filters['stage'] ?? -999);
+        $translation = $filters['translation'] ?? 'any';
+        $wordsToSkip = config('linguacafe.words_to_skip');
+
+        $query = EncounteredWord::select('id')
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->whereNotIn('word', $wordsToSkip);
+
+        if ($text !== 'anytext') {
+            $query->where(function ($query) use ($text) {
+                $query->orWhere('word', 'like', '%' . $text . '%')
+                    ->orWhere('reading', 'like', '%' . $text . '%');
+            });
+        }
+
+        if ($bookId !== -1) {
+            $filteredWords = $this->filteredVocabularyWords($userId, $language, $bookId, $chapterId);
+            $query->whereIn('word', $filteredWords);
+        }
+
+        if ($stage !== -999) {
+            $query->where('stage', $stage);
+        }
+
+        if ($translation === 'not empty') {
+            $query->where('translation', '<>', '');
+        }
+
+        return $query;
+    }
+
+    private function filteredVocabularyWords(int $userId, string $language, int $bookId, int $chapterId): array
+    {
+        $filteredChapters = Chapter::where('user_id', $userId)
+            ->where('language', $language)
+            ->where('book_id', $bookId);
+
+        if ($chapterId !== -1) {
+            $filteredChapters->where('id', $chapterId);
+        }
+
+        $filteredWords = [];
+        foreach ($filteredChapters->get() as $filteredChapter) {
+            $chapterWords = json_decode($filteredChapter->unique_words) ?: [];
+            foreach ($chapterWords as $chapterWord) {
+                if (!in_array($chapterWord, $filteredWords, true)) {
+                    $filteredWords[] = $chapterWord;
+                }
+            }
+        }
+
+        return $filteredWords;
     }
 
     /*

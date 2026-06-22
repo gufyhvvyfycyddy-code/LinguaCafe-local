@@ -159,6 +159,9 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/vocabulary/word/delete', [App\Http\Controllers\VocabularyController::class, 'deleteWord']);
     Route::post('/vocabulary/words/batch-ignore', [App\Http\Controllers\VocabularyController::class, 'batchIgnoreWords']);
     Route::post('/vocabulary/words/batch-delete', [App\Http\Controllers\VocabularyController::class, 'batchDeleteWords']);
+    Route::post('/vocabulary/words/batch-hard-delete', [App\Http\Controllers\VocabularyController::class, 'batchHardDeleteWords']);
+    Route::post('/vocabulary/words/bulk-hard-delete-count', [App\Http\Controllers\VocabularyController::class, 'bulkHardDeleteWordsCount']);
+    Route::post('/vocabulary/words/bulk-hard-delete', [App\Http\Controllers\VocabularyController::class, 'bulkHardDeleteWords']);
     Route::get ('/vocabulary/phrases/get/{phraseId}', [App\Http\Controllers\VocabularyController::class, 'getPhrase']);
     Route::post('/vocabulary/phrases/create', [App\Http\Controllers\VocabularyController::class, 'createPhrase']);
     Route::post('/vocabulary/phrases/update', [App\Http\Controllers\VocabularyController::class, 'updatePhrase']);

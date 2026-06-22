@@ -113,14 +113,15 @@ class VocabularyController extends Controller {
         ]);
 
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $this->vocabularyService->softDeleteWord($userId, (int) $request->post('id'));
+            $this->vocabularyService->hardDeleteWord($userId, $language, (int) $request->post('id'));
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
 
-        return response()->json('词条已删除。', 200);
+        return response()->json('词条已彻底删除。', 200);
     }
 
     public function batchIgnoreWords(Request $request) {
@@ -165,6 +166,68 @@ class VocabularyController extends Controller {
         }
 
         return response()->json(['deleted' => $deleted, 'total' => count($request->post('ids'))], 200);
+    }
+
+    public function batchHardDeleteWords(Request $request) {
+        $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        try {
+            $deleted = $this->vocabularyService->hardDeleteWordsByIds($userId, $language, $request->post('ids'));
+        } catch (\Exception $e) {
+            abort(500, $e->getMessage());
+        }
+
+        return response()->json(['deleted' => $deleted, 'total' => count($request->post('ids'))], 200);
+    }
+
+    public function bulkHardDeleteWordsCount(Request $request) {
+        $filters = $this->validatedBulkDeleteFilters($request);
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        try {
+            $count = $this->vocabularyService->countHardDeletableWordsByFilters($userId, $language, $filters);
+        } catch (\Exception $e) {
+            abort(500, $e->getMessage());
+        }
+
+        return response()->json(['count' => $count], 200);
+    }
+
+    public function bulkHardDeleteWords(Request $request) {
+        $filters = $this->validatedBulkDeleteFilters($request);
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        try {
+            $deleted = $this->vocabularyService->hardDeleteWordsByFilters($userId, $language, $filters);
+        } catch (\Exception $e) {
+            abort(500, $e->getMessage());
+        }
+
+        return response()->json(['deleted' => $deleted], 200);
+    }
+
+    private function validatedBulkDeleteFilters(Request $request): array
+    {
+        $validated = $request->validate([
+            'filters' => ['required', 'array'],
+            'filters.text' => ['required', 'string'],
+            'filters.book' => ['required', 'numeric'],
+            'filters.chapter' => ['required', 'numeric'],
+            'filters.stage' => ['required', 'numeric'],
+            'filters.phrases' => ['required', 'string'],
+            'filters.orderBy' => ['required', 'string'],
+            'filters.translation' => ['required', 'string'],
+        ]);
+
+        return $validated['filters'];
     }
 
     public function getPhrase($phraseId, GetPhraseRequest $request) {

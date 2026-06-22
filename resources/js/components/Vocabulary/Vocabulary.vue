@@ -190,6 +190,7 @@
                     <td class="select" v-if="batchSelectEnabled">
                         <v-checkbox
                             :value="selectedIds.has(word.id)"
+                            :disabled="word.type !== 'word'"
                             @change="toggleWord(word)"
                             hide-details
                             dense
@@ -229,13 +230,25 @@
         </v-simple-table>
 
         <!-- Batch actions -->
-        <div v-if="batchSelectEnabled && selectedIds.size > 0" class="d-flex align-center mt-3 px-2">
-            <span class="mr-3">已选 {{ selectedIds.size }} 个词条</span>
+        <div v-if="batchSelectEnabled && (selectedIds.size > 0 || selectedAllMatching)" class="d-flex align-center flex-wrap mt-3 px-2">
+            <span class="mr-3" v-if="!selectedAllMatching">已选择本页 {{ selectedIds.size }} 个词。</span>
+            <span class="mr-3" v-if="selectedAllMatching">已选择全部 {{ allMatchingCount }} 个匹配词。</span>
+            <v-btn
+                v-if="selectedIds.size > 0 && !selectedAllMatching && wordCount > selectedIds.size"
+                small
+                rounded
+                text
+                color="primary"
+                :loading="countingAllMatches"
+                @click="selectAllMatching"
+            >
+                选择全部 {{ wordCount }} 个匹配结果
+            </v-btn>
             <v-btn small rounded color="warning" class="mr-2" @click="batchIgnore" :loading="batchProcessing">
                 <v-icon small class="mr-1">mdi-eye-off</v-icon>批量忽略
             </v-btn>
             <v-btn small rounded color="error" class="mr-2" @click="batchDelete" :loading="batchProcessing">
-                <v-icon small class="mr-1">mdi-delete</v-icon>批量删除
+                <v-icon small class="mr-1">mdi-delete</v-icon>批量彻底删除
             </v-btn>
             <v-btn small rounded text @click="clearSelection">取消选择</v-btn>
         </div>
@@ -275,6 +288,9 @@ export default {
             languageSpaces: true,
             // batch selection
             selectedIds: new Set(),
+            selectedAllMatching: false,
+            allMatchingCount: 0,
+            countingAllMatches: false,
             batchProcessing: false,
         };
     },
@@ -295,10 +311,11 @@ export default {
         },
         allSelected() {
             if (!this.words.length) return false;
-            return this.words.every(w => this.selectedIds.has(w.id));
+            const selectableWords = this.words.filter(w => w.type === 'word');
+            return selectableWords.length > 0 && selectableWords.every(w => this.selectedIds.has(w.id));
         },
         someSelected() {
-            return this.words.some(w => this.selectedIds.has(w.id));
+            return this.words.some(w => w.type === 'word' && this.selectedIds.has(w.id));
         },
     },
     mounted() {
@@ -396,7 +413,7 @@ export default {
                 });
         },
         deleteWord(word) {
-            if (!window.confirm(`确定要删除词条“${word.word}”吗？这会将它标为已忽略并停用复习卡。`)) {
+            if (!window.confirm(`确定要彻底删除词条“${word.word}”吗？删除后它会从词汇页消失，但不会删除历史复习日志。`)) {
                 return;
             }
 
@@ -407,6 +424,8 @@ export default {
                 });
         },
         applyFilter(filter, newValue = -1, newBookIndex = -1) {
+            this.clearSelection();
+
             if (filter !== 'text') {
                 this.filters[filter] = newValue;
             }
@@ -432,6 +451,8 @@ export default {
             }
         },
         moveToPage(page) {
+            this.clearSelection();
+
             const text = this.filters.text !== '' ? encodeURI(this.filters.text) : 'anytext';
             this.$router.push('/vocabulary/search'
                 + '/' + text
@@ -453,6 +474,13 @@ export default {
         },
         // --- batch selection ---
         toggleWord(word) {
+            if (word.type !== 'word') {
+                return;
+            }
+
+            this.selectedAllMatching = false;
+            this.allMatchingCount = 0;
+
             if (this.selectedIds.has(word.id)) {
                 this.selectedIds.delete(word.id);
             } else {
@@ -462,17 +490,58 @@ export default {
             this.selectedIds = new Set(this.selectedIds);
         },
         toggleSelectAll() {
+            this.selectedAllMatching = false;
+            this.allMatchingCount = 0;
+
             if (this.allSelected) {
                 this.clearSelection();
             } else {
-                this.words.forEach(w => this.selectedIds.add(w.id));
+                this.words.filter(w => w.type === 'word').forEach(w => this.selectedIds.add(w.id));
                 this.selectedIds = new Set(this.selectedIds);
             }
         },
         clearSelection() {
             this.selectedIds = new Set();
+            this.selectedAllMatching = false;
+            this.allMatchingCount = 0;
+        },
+        currentFilterPayload() {
+            return {
+                text: (this.filters.text == '') ? 'anytext' : this.filters.text,
+                book: parseInt(this.filters.book),
+                chapter: parseInt(this.filters.chapter),
+                stage: parseInt(this.filters.stage),
+                translation: this.filters.translation,
+                phrases: this.filters.phrases,
+                orderBy: this.filters.orderBy,
+            };
+        },
+        selectAllMatching() {
+            this.countingAllMatches = true;
+            axios.post('/vocabulary/words/bulk-hard-delete-count', {
+                filters: this.currentFilterPayload(),
+            }).then((response) => {
+                this.allMatchingCount = response.data.count || 0;
+                if (this.allMatchingCount === 0) {
+                    this.error = '当前筛选条件下没有可彻底删除的单词。';
+                    this.clearSelection();
+                    return;
+                }
+
+                this.selectedAllMatching = true;
+                this.error = '';
+            }).catch((error) => {
+                this.error = error?.response?.data?.message || error?.response?.data || '统计匹配词条失败。';
+            }).finally(() => {
+                this.countingAllMatches = false;
+            });
         },
         batchIgnore() {
+            if (this.selectedAllMatching) {
+                this.error = '批量忽略只支持当前页已选词；如需跨页操作，请使用批量彻底删除。';
+                return;
+            }
+
             const ids = Array.from(this.selectedIds);
             if (!ids.length) return;
             if (!window.confirm(`确定要忽略已选的 ${ids.length} 个词条吗？这会将它们标为已忽略并停用复习卡。`)) {
@@ -496,13 +565,23 @@ export default {
         },
         batchDelete() {
             const ids = Array.from(this.selectedIds);
-            if (!ids.length) return;
-            if (!window.confirm(`确定要删除已选的 ${ids.length} 个词条吗？这会将它们标为已忽略并停用复习卡。此操作不会删除历史复习数据。`)) {
+            const deleteCount = this.selectedAllMatching ? this.allMatchingCount : ids.length;
+            if (!deleteCount) return;
+
+            const confirmMessage = this.selectedAllMatching
+                ? `确定要彻底删除当前筛选条件下的全部 ${deleteCount} 个匹配词吗？此操作会跨页生效，词条会从词汇页消失，但不会删除历史复习日志。`
+                : `确定要彻底删除已选的 ${deleteCount} 个词条吗？词条会从词汇页消失，但不会删除历史复习日志。`;
+
+            if (!window.confirm(confirmMessage)) {
                 return;
             }
 
             this.batchProcessing = true;
-            axios.post('/vocabulary/words/batch-delete', { ids: ids })
+            const request = this.selectedAllMatching
+                ? axios.post('/vocabulary/words/bulk-hard-delete', { filters: this.currentFilterPayload() })
+                : axios.post('/vocabulary/words/batch-hard-delete', { ids: ids });
+
+            request
                 .then((response) => {
                     const deleted = response.data.deleted || 0;
                     this.error = '';
@@ -510,7 +589,7 @@ export default {
                     this.loadVocabularySearchPage();
                 })
                 .catch((error) => {
-                    this.error = error?.response?.data?.message || error?.response?.data || '批量删除失败。';
+                    this.error = error?.response?.data?.message || error?.response?.data || '批量彻底删除失败。';
                 })
                 .finally(() => {
                     this.batchProcessing = false;
