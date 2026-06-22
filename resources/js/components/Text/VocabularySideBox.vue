@@ -103,7 +103,7 @@
                 <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
                 <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
 
-                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" />
+                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" @word-learning-updated="$emit('word-learning-updated', $event)" />
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />

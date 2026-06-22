@@ -96,18 +96,22 @@ class SenseOccurrenceController extends Controller
             'sentence_id' => ['nullable'],
             'sentence_en' => ['nullable', 'string'],
             'sentence_zh' => ['nullable', 'string'],
+            'encountered_word_id' => ['nullable', 'integer'],
         ]);
 
         $data['aliases_zh'] = $this->normalizeList($request->post('aliases_zh'));
         $data['collocations'] = $this->normalizeList($request->post('collocations'));
 
-        $sense = $this->wordSenseService->createManualSense(
+        $result = $this->wordSenseService->createManualSense(
             Auth::user()->id,
             Auth::user()->selected_language,
             $data,
         );
 
-        return response()->json($this->serializeSense($sense));
+        $response = $this->serializeSense($result['sense']);
+        $response['updated_word'] = $result['updated_word'];
+
+        return response()->json($response);
     }
 
     public function updateManualSense(int $id, Request $request)

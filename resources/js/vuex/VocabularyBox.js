@@ -19,6 +19,7 @@ export default {
         studyBase: '',
         baseWordReading: '',
         stage: 0,
+        encounteredWordId: null,
 
         // data for phrase
         phrase: [],
@@ -62,6 +63,7 @@ export default {
             state.studyBase = '';
             state.baseWordReading = '';
             state.stage = 2;
+            state.encounteredWordId = null;
             state.type = 'empty';
         },
         setActive (state, value) {
@@ -117,6 +119,9 @@ export default {
         },
         setStage (state, value) {
             state.stage = value;
+        },
+        setEncounteredWordId(state, value) {
+            state.encounteredWordId = value;
         },
         setSearchField (state, value) {
             state.searchField = value;

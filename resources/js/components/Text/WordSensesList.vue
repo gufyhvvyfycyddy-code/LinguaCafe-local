@@ -269,6 +269,7 @@ export default {
             chapterId: state => state.vocabularyBox.chapterId,
             sentenceIndex: state => state.vocabularyBox.sentenceIndex,
             sentenceText: state => state.vocabularyBox.sentenceText,
+            encounteredWordId: state => state.vocabularyBox.encounteredWordId,
         }),
         effectiveLemma() {
             // Full fallback chain: studyBase → baseWord → lemma → surface → word
@@ -323,6 +324,7 @@ export default {
                 chapterId: null,
                 sentenceIndex: null,
                 sentenceText: '',
+                encounteredWordId: null,
             },
             examplesExpanded: {},
             examplesData: {},
@@ -409,6 +411,7 @@ export default {
                 chapterId: this.chapterId,
                 sentenceIndex: this.sentenceIndex,
                 sentenceText: this.sentenceText,
+                encounteredWordId: this.encounteredWordId,
             };
 
             if (prefill) {
@@ -449,6 +452,7 @@ export default {
                 chapter_id: chapterId,
                 sentence_id: sentenceIndex !== null && sentenceIndex !== undefined ? String(sentenceIndex) : null,
                 sentence_en: form.example_sentence_en || sentenceText,
+                encountered_word_id: this.snapshot?.encounteredWordId ?? this.encounteredWordId ?? null,
             };
         },
         createSense() {
@@ -462,8 +466,21 @@ export default {
             this.message = '';
 
             axios.post('/senses/manual', this.createPayload(this.newForm))
-                .then(() => {
+                .then((response) => {
                     this.message = '已保存新词义，并已创建词义复习卡。';
+
+                    // Handle auto-mark Learning 7 result from backend
+                    const updatedWord = response.data.updated_word;
+                    if (updatedWord && updatedWord.id && updatedWord.stage !== null) {
+                        // Sync Vuex store for sidebar panel display
+                        this.$store.commit('vocabularyBox/setStage', updatedWord.stage);
+                        // Emit to TextBlockGroup to update text token colors
+                        this.$emit('word-learning-updated', {
+                            encounteredWordId: updatedWord.id,
+                            stage: updatedWord.stage,
+                        });
+                    }
+
                     const pos = this.newForm.pos;
                     this.closeAddForm();
                     this.fetchSenses();

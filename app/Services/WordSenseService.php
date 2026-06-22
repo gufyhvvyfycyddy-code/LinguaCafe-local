@@ -105,9 +105,20 @@ class WordSenseService
         return $sense;
     }
 
-    public function createManualSense(int $userId, string $language, array $data): WordSense
+    public function createManualSense(int $userId, string $language, array $data): array
     {
         return DB::transaction(function () use ($userId, $language, $data) {
+            // 0. Validate encountered_word_id ownership BEFORE any writes
+            $encounteredWordId = Arr::get($data, 'encountered_word_id');
+            $encounteredWord = null;
+            if ($encounteredWordId) {
+                $encounteredWord = \App\Models\EncounteredWord::where('id', (int) $encounteredWordId)
+                    ->where('user_id', $userId)
+                    ->where('language', $language)
+                    ->first();
+            }
+
+            // 1. Create the confirmed WordSense
             $sense = $this->createSense([
                 'user_id' => $userId,
                 'language' => $language,
@@ -124,12 +135,51 @@ class WordSenseService
                 'source_chapter_id' => Arr::get($data, 'chapter_id'),
                 'sentence_id' => Arr::get($data, 'sentence_id'),
                 'status' => WordSense::STATUS_CONFIRMED,
+                // Only backfill encountered_word_id after ownership is verified
+                'encountered_word_id' => $encounteredWord ? $encounteredWord->id : null,
             ]);
 
             $card = $this->createReviewCardForSense($sense);
             $this->createManualOccurrence($sense, $card, $data);
 
-            return $sense->fresh('reviewCard');
+            // 2. Auto-mark as Learning 7 + ensure word review card
+            $updatedWord = null;
+            if ($encounteredWord) {
+                if ($encounteredWord->stage === 2) {
+                    // New (stage=2) → Learning 7
+                    $encounteredWord->setStage(-7);
+                    $encounteredWord->save();
+                    $this->reviewCardService->ensureWordCard($encounteredWord);
+
+                    $updatedWord = [
+                        'id' => $encounteredWord->id,
+                        'stage' => $encounteredWord->stage,
+                        'word' => $encounteredWord->word,
+                        'base_word' => $encounteredWord->base_word,
+                        'study_base' => $encounteredWord->study_base,
+                        'stage_changed' => true,
+                    ];
+                } elseif ($encounteredWord->stage < 0) {
+                    // Already in Learning: don't change stage,
+                    // but use ensureWordCard idempotency to fill missing historical cards
+                    $this->reviewCardService->ensureWordCard($encounteredWord);
+
+                    $updatedWord = [
+                        'id' => $encounteredWord->id,
+                        'stage' => $encounteredWord->stage,
+                        'word' => $encounteredWord->word,
+                        'base_word' => $encounteredWord->base_word,
+                        'study_base' => $encounteredWord->study_base,
+                        'stage_changed' => false,
+                    ];
+                }
+                // stage 0 (Known) / stage 1 (Ignored): skip stage update and word card
+            }
+
+            return [
+                'sense' => $sense->fresh('reviewCard'),
+                'updated_word' => $updatedWord,
+            ];
         });
     }
 

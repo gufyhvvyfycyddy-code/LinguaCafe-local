@@ -140,6 +140,7 @@
             @showDeletePhraseDialog="showDeletePhraseDialog"
             @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
+            @word-learning-updated="onWordLearningUpdated"
         ></vocabulary-box>
 
         <!-- Vocabulary bottom sheet -->
@@ -187,6 +188,7 @@
             @deletePhrase="deletePhrase"
             @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
+            @word-learning-updated="onWordLearningUpdated"
         ></vocabulary-side-box>
     </div>
 </template>
@@ -1039,6 +1041,39 @@
             normalizeWordKey(word) {
                 return (word || '').toString().trim().toLowerCase();
             },
+            // Receive notification from WordSensesList that a manual sense was added
+            // and the backend auto-marked the word as Learning 7 (or confirmed existing stage).
+            onWordLearningUpdated(payload) {
+                const { encounteredWordId, stage } = payload;
+                if (!encounteredWordId || stage === null || stage === undefined) {
+                    return;
+                }
+
+                const targetWord = this.uniqueWords.find(w => w.id === encounteredWordId);
+                if (!targetWord) {
+                    return;
+                }
+
+                // Use normalizeWordKey for consistent case-insensitive matching (b20f668)
+                const targetKey = this.normalizeWordKey(targetWord.word);
+
+                // Update uniqueWords[] — all same-name words share the stage
+                for (let i = 0; i < this.uniqueWords.length; i++) {
+                    if (this.normalizeWordKey(this.uniqueWords[i].word) === targetKey) {
+                        this.uniqueWords[i].stage = stage;
+                    }
+                }
+
+                // Update words[] — visible text tokens refresh their color immediately
+                for (let i = 0; i < this.words.length; i++) {
+                    if (this.normalizeWordKey(this.words[i].word) === targetKey) {
+                        this.words[i].stage = stage;
+                    }
+                }
+
+                // Sync Vuex store so the sidebar panel shows the updated stage
+                this.$store.commit('vocabularyBox/setStage', stage);
+            },
             preProcessWords() {
                 for (let i = 0; i < this.uniqueWords.length; i++) {
                     const key = this.normalizeWordKey(this.uniqueWords[i].word);
@@ -1321,6 +1356,7 @@
                     this.$store.commit('vocabularyBox/setBaseWordReading', uniqueWord.base_word_reading);
                     this.$store.commit('vocabularyBox/setTranslationText', uniqueWord.translation);
                     this.$store.commit('vocabularyBox/setStage', uniqueWord.stage);
+                    this.$store.commit('vocabularyBox/setEncounteredWordId', uniqueWord.id || null);
                     this.$store.commit('vocabularyBox/setChapterId', this.$props._text && this.$props._text.chapterId ? this.$props._text.chapterId : null);
                     this.$store.commit('vocabularyBox/setSentenceIndex', this.selection[0].sentence_index);
                     this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceText());

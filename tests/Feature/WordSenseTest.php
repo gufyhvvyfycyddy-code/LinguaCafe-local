@@ -2597,4 +2597,278 @@ class WordSenseTest extends TestCase
         $this->assertEquals(2, $word->stage, 'Stage should be preserved');
         $this->assertEquals('open', $word->lemma, 'Lemma should be corrected');
     }
+
+    // ===================================================================
+    // Auto-mark Learning 7 when adding manual sense
+    // ===================================================================
+
+    public function test_manual_sense_auto_sets_new_word_to_learning_7(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 2]); // New
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surge',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+        $word->refresh();
+
+        // Stage should change from 2 (New) to -7 (Learning 7)
+        $this->assertSame(-7, $word->stage);
+
+        // Word review card should exist
+        $this->assertDatabaseHas('review_cards', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+        ]);
+
+        // WordSense.encountered_word_id should be correctly filled
+        $sense = WordSense::where('lemma', 'surge')->first();
+        $this->assertNotNull($sense);
+        $this->assertSame($word->id, $sense->encountered_word_id);
+
+        // Response should include updated_word with stage=-7 and stage_changed=true
+        $response->assertJsonPath('updated_word.id', $word->id);
+        $response->assertJsonPath('updated_word.stage', -7);
+        $response->assertJsonPath('updated_word.stage_changed', true);
+
+        // The manual sense occurrence should NOT be pending in /senses/review
+        $pending = $this->actingAs($this->user)->getJson('/senses/occurrences?status=pending&lemma=surge');
+        $pending->assertOk();
+        $this->assertSame(0, $pending->json('pagination.total'));
+    }
+
+    public function test_manual_sense_does_not_overwrite_known_word(): void
+    {
+        $word = $this->createWord('known');
+        $word->update(['stage' => 0]); // Known
+
+        $beforeCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'known',
+            'surface_form' => 'known',
+            'pos' => 'verb',
+            'sense_zh' => '已知',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+        $word->refresh();
+
+        // Stage should remain 0 (Known)
+        $this->assertSame(0, $word->stage);
+
+        // No word card should be created
+        $this->assertSame($beforeCardCount, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count());
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
+
+    public function test_manual_sense_does_not_overwrite_ignored_word(): void
+    {
+        $word = $this->createWord('ignored');
+        $word->update(['stage' => 1]); // Ignored
+
+        $beforeCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'ignored',
+            'surface_form' => 'ignored',
+            'pos' => 'verb',
+            'sense_zh' => '已忽略',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+        $word->refresh();
+
+        // Stage should remain 1 (Ignored)
+        $this->assertSame(1, $word->stage);
+
+        // No word card should be created
+        $this->assertSame($beforeCardCount, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count());
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
+
+    public function test_manual_sense_does_not_duplicate_card_for_learning_word(): void
+    {
+        $word = $this->createWord('learning');
+        $word->update(['stage' => -7]); // Learning 7
+        app(ReviewCardService::class)->ensureWordCard($word);
+
+        $beforeCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->count();
+        $this->assertSame(1, $beforeCardCount);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'learning',
+            'surface_form' => 'learning',
+            'pos' => 'verb',
+            'sense_zh' => '学习中',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+        $word->refresh();
+
+        // Stage should remain -7
+        $this->assertSame(-7, $word->stage);
+
+        // Word card count should still be 1 (ensureWordCard idempotent)
+        $this->assertSame(1, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->count());
+
+        // Response should have updated_word with stage=-7 and stage_changed=false
+        $response->assertJsonPath('updated_word.id', $word->id);
+        $response->assertJsonPath('updated_word.stage', -7);
+        $response->assertJsonPath('updated_word.stage_changed', false);
+    }
+
+    public function test_manual_sense_ensures_word_card_for_learning_word_without_card(): void
+    {
+        $word = $this->createWord('nocards');
+        $word->update(['stage' => -5]); // Learning 5, no word card
+        ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->delete();
+
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->exists());
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'nocards',
+            'surface_form' => 'nocards',
+            'pos' => 'verb',
+            'sense_zh' => '补卡',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+        $word->refresh();
+
+        // Stage should remain -5
+        $this->assertSame(-5, $word->stage);
+
+        // Word card should now exist (historical gap filled)
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->exists());
+
+        // Response should have updated_word with stage=-5 and stage_changed=false
+        $response->assertJsonPath('updated_word.id', $word->id);
+        $response->assertJsonPath('updated_word.stage', -5);
+        $response->assertJsonPath('updated_word.stage_changed', false);
+    }
+
+    public function test_manual_sense_without_encountered_word_id_does_not_error(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'standalone',
+            'surface_form' => 'standalone',
+            'pos' => 'verb',
+            'sense_zh' => '独立',
+        ]);
+
+        $response->assertOk();
+
+        // Sense should be created normally (backward compat)
+        $sense = WordSense::where('lemma', 'standalone')->first();
+        $this->assertNotNull($sense);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
+
+    public function test_manual_sense_with_other_user_encountered_word_id_graceful(): void
+    {
+        $otherWord = EncounteredWord::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'language' => 'english',
+            'stage' => 2,
+            'word' => 'otherword',
+            'kanji' => '',
+            'reading' => '',
+            'translation' => '',
+            'base_word' => '',
+            'base_word_reading' => '',
+            'lookup_count' => 0,
+            'read_count' => 0,
+            'lemma' => '',
+            'added_to_srs' => now()->toDateString(),
+            'next_review' => now()->toDateString(),
+            'relearning' => false,
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'otherword',
+            'surface_form' => 'otherword',
+            'pos' => 'verb',
+            'sense_zh' => '别人',
+            'encountered_word_id' => $otherWord->id,
+        ]);
+
+        $response->assertOk();
+
+        // Sense should still be created
+        $sense = WordSense::where('lemma', 'otherword')->first();
+        $this->assertNotNull($sense);
+
+        // Other user's word stage should NOT change
+        $otherWord->refresh();
+        $this->assertSame(2, $otherWord->stage);
+
+        // WordSense.encountered_word_id should NOT point to other user's word
+        $this->assertNull($sense->encountered_word_id);
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
+
+    public function test_manual_sense_with_nonexistent_encountered_word_id_graceful(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'nonexistent',
+            'surface_form' => 'nonexistent',
+            'pos' => 'verb',
+            'sense_zh' => '不存在',
+            'encountered_word_id' => 999999,
+        ]);
+
+        $response->assertOk();
+
+        // Sense should be created normally
+        $sense = WordSense::where('lemma', 'nonexistent')->first();
+        $this->assertNotNull($sense);
+
+        // WordSense.encountered_word_id should be null
+        $this->assertNull($sense->encountered_word_id);
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
+
+    public function test_manual_sense_null_encountered_word_id_graceful(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'nullword',
+            'surface_form' => 'nullword',
+            'pos' => 'verb',
+            'sense_zh' => '空值',
+            'encountered_word_id' => null,
+        ]);
+
+        $response->assertOk();
+
+        // Sense should be created normally
+        $sense = WordSense::where('lemma', 'nullword')->first();
+        $this->assertNotNull($sense);
+
+        // Response should have updated_word null
+        $response->assertJsonPath('updated_word', null);
+    }
 }
