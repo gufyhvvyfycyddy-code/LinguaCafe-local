@@ -307,6 +307,11 @@ class SenseOccurrenceController extends Controller
             'fsrs_state' => $sense->reviewCard?->fsrs_state,
             'review_card_id' => $sense->reviewCard?->id,
             'fsrs_enabled' => $sense->reviewCard?->fsrs_enabled,
+            'fsrs_due_at' => $sense->reviewCard?->fsrs_due_at,
+            'fsrs_stability' => $sense->reviewCard?->fsrs_stability,
+            'fsrs_difficulty' => $sense->reviewCard?->fsrs_difficulty,
+            'fsrs_reps' => $sense->reviewCard?->fsrs_reps,
+            'fsrs_lapses' => $sense->reviewCard?->fsrs_lapses,
         ];
     }
 

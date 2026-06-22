@@ -153,16 +153,18 @@
                             @keydown.stop=";"
                         ></v-text-field>
 
+                        <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
                         <!-- Search box -->
                         <vocabulary-search-box
                             :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled"
                             :language="$props.language"
                             :searchTerm="searchField"
                             @addDefinitionToInput="addDefinitionToInput"
+                            @addDefinitionAsSense="addDefinitionAsSense"
                         ></vocabulary-search-box>
 
                         <!-- Saved word senses -->
-                        <word-senses-list v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" />
+                        <word-senses-list ref="wordSensesList" v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" :legacy-translation="translationText" />
                     </v-card-text>
 
                     <v-card-actions v-if="type !== 'word'" class="mt-2 pl-0">
@@ -392,6 +394,11 @@
 
                 this.translationText += definition;
                 this.inputChanged('translation');
+            },
+            addDefinitionAsSense(payload) {
+                if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromDictionary) {
+                    this.$refs.wordSensesList.openAddFormFromDictionary(payload);
+                }
             },
             inputChanged(inputName = '') {
                 this.updateVocabBoxTranslationList();

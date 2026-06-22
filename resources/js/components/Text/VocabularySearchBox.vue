@@ -24,10 +24,14 @@
             <div
                 v-for="(definition, definitionIndex) in searchResult.definitions"
                 :key="`api-search-result-${searchResultIndex}-${definitionIndex}`"
-                class="search-result-definition rounded"
-                @click="addDefinitionToInput(definition)"
+                class="search-result-definition rounded dictionary-definition-row"
             >
-                {{ definition }} <v-icon small>mdi-plus</v-icon>
+                <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                    {{ definition }} <v-icon small>mdi-plus</v-icon>
+                </div>
+                <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, $props.searchTerm, searchResult.dictionary)">
+                    + 添加为新释义
+                </v-btn>
             </div>
         </div>
 
@@ -68,10 +72,14 @@
                     <div
                         v-for="(definition, definitionIndex) in record.definitions"
                         :key="definitionIndex"
-                        class="search-result-definition rounded"
-                        @click="addDefinitionToInput(definition)"
+                        class="search-result-definition rounded dictionary-definition-row"
                     >
-                        {{ definition }} <v-icon small>mdi-plus</v-icon>
+                        <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                            {{ definition }} <v-icon small>mdi-plus</v-icon>
+                        </div>
+                        <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)">
+                            + 添加为新释义
+                        </v-btn>
                     </div>
                 </div>
             </template>
@@ -84,8 +92,13 @@
                         </div>
                         {{ searchResult.dictionary }}<div class="search-result-word default-font" :title="record.word"> {{ record.word }} </div>
                     </div>
-                    <div class="search-result-definition rounded" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex" @click="addDefinitionToInput(definition)">
-                        {{ definition }} <v-icon small>mdi-plus</v-icon>
+                    <div class="search-result-definition rounded dictionary-definition-row" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex">
+                        <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                            {{ definition }} <v-icon small>mdi-plus</v-icon>
+                        </div>
+                        <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)">
+                            + 添加为新释义
+                        </v-btn>
                     </div>
 
                     <template v-if="record.otherForms.length">
@@ -130,6 +143,28 @@ export default {
     methods: {
         addDefinitionToInput(definition) {
             this.$emit('addDefinitionToInput', definition);
+        },
+        addDefinitionAsSense(definition, word, dictionary) {
+            this.$emit('addDefinitionAsSense', {
+                definition: definition,
+                word: word,
+                dictionary: dictionary,
+                pos: this.inferPartOfSpeech(definition),
+            });
+        },
+        inferPartOfSpeech(definition) {
+            const value = (definition || '').trim().toLowerCase();
+            const rules = [
+                { match: /^(v\.|vi\.|vt\.|verb\b)/, pos: 'verb' },
+                { match: /^(n\.|noun\b)/, pos: 'noun' },
+                { match: /^(adj\.|a\.|adjective\b)/, pos: 'adjective' },
+                { match: /^(adv\.|adverb\b)/, pos: 'adverb' },
+                { match: /^(prep\.|preposition\b)/, pos: 'preposition' },
+                { match: /^(conj\.|conjunction\b)/, pos: 'conjunction' },
+            ];
+
+            const rule = rules.find(item => item.match.test(value));
+            return rule ? rule.pos : 'other';
         },
         makeSearchRequest() {
             this.searchResults = [];
@@ -221,3 +256,17 @@ export default {
     }
 }
 </script>
+
+<style scoped>
+.dictionary-definition-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dictionary-definition-text {
+    flex: 1;
+    min-width: 0;
+}
+</style>

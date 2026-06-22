@@ -39,10 +39,19 @@
 
         <v-tabs-items v-model="tab" v-if="type !== 'empty'">
             <v-tab-item :value="0" class="sidebar-tab">
-                <div class="d-flex" v-if="type == 'word'">
-                    <v-text-field :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}" hide-details placeholder="词元" title="词元" filled dense rounded v-model="baseWord" @keyup="inputChanged" @keydown.stop=";" />
-                    <v-icon class="mt-1 mx-1">mdi-arrow-right</v-icon>
-                    <v-text-field :class="{'default-font': true, 'mt-2': true, 'mb-2': ($props.language !== 'japanese' && $props.language !== 'chinese')}" hide-details placeholder="单词" title="单词" disabled filled dense rounded :value="word" @keyup="inputChanged" @keydown.stop=";" />
+                <div class="word-basic-info rounded pa-3 mb-3" v-if="type == 'word'">
+                    <div class="text-caption font-weight-bold mb-1">单词基础信息</div>
+                    <div class="d-flex align-center">
+                        <div>
+                            <div class="text-h6 default-font mb-1">{{ word }}</div>
+                            <div class="text-caption text--secondary">
+                                当前词形：<strong class="default-font">{{ word }}</strong>
+                                <span class="mx-2">词元：<strong class="default-font">{{ baseWord || word }}</strong></span>
+                            </div>
+                        </div>
+                        <v-spacer />
+                        <v-btn v-if="$props.textToSpeechAvailable" icon title="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+                    </div>
                 </div>
 
                 <div class="d-flex" v-if="type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
@@ -55,6 +64,7 @@
                 <v-textarea v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')" class="default-font my-2" label="读音" filled dense no-resize rounded hide-details height="80" v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
 
                 <template v-if="type !== 'new-phrase'">
+                    <div class="vocab-box-subheader d-flex mb-2">普通词汇状态</div>
                     <div id="vocab-box-stage-buttons" class="mb-2">
                         <v-btn v-for="stageNumber in [-7,-6,-5,-4,-3,-2,-1]" :key="stageNumber" :class="{'v-btn--active': stage == stageNumber}" @click="setStage(stageNumber)">{{ stageNumber * -1 }}</v-btn>
                         <v-btn :class="{'v-btn--active': stage == 0}" @click="setStage(0)"><v-icon small>mdi-check</v-icon></v-btn>
@@ -71,9 +81,10 @@
                 <v-textarea class="mb-2 mt-1" placeholder="释义" title="释义" filled dense no-resize rounded hide-details height="100" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
                 <v-text-field placeholder="词典搜索" class="dictionary-search-field default-font mt-2 mb-3" width="100%" prepend-inner-icon="mdi-magnify" filled dense rounded hide-details :value="searchField" @change="searchFieldChanged" @keydown.stop=";" />
 
-                <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" />
+                <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
+                <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
 
-                <word-senses-list v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" />
+                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" :legacy-translation="translationText" />
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />
@@ -181,6 +192,11 @@ export default {
             }
             this.translationText += definition;
             this.inputChanged('translation');
+        },
+        addDefinitionAsSense(payload) {
+            if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromDictionary) {
+                this.$refs.wordSensesList.openAddFormFromDictionary(payload);
+            }
         },
         inputChanged(inputName = '') {
             this.$emit('updateVocabBoxData', {
