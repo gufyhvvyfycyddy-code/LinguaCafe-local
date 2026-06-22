@@ -18,6 +18,7 @@ class WordSenseOccurrence extends Model
     public const STATUS_IGNORED = 'ignored';
 
     public const SOURCE_SENSE_MAPPING_IMPORT = 'sense_mapping_import';
+    public const SOURCE_MANUAL_VOCAB_BRIDGE = 'manual_vocab_bridge';
 
     protected $fillable = [
         'user_id',

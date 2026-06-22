@@ -2,9 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Models\Chapter;
 use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
@@ -28,6 +30,22 @@ class WordSenseTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+
+        // Ensure reviewIntervals setting exists for setStage() calls
+        if (!\App\Models\Setting::where('name', 'reviewIntervals')->exists()) {
+            \App\Models\Setting::forceCreate([
+                'name' => 'reviewIntervals',
+                'value' => json_encode([
+                    '-7' => [0],
+                    '-6' => [1],
+                    '-5' => [2],
+                    '-4' => [3],
+                    '-3' => [7],
+                    '-2' => [15],
+                    '-1' => [30],
+                ]),
+            ]);
+        }
 
         $this->user = $this->createUser('sense@example.com', 'english');
         $this->otherUser = $this->createUser('other-sense@example.com', 'english');
@@ -1054,6 +1072,289 @@ class WordSenseTest extends TestCase
         $senseReviewResponse = $this->actingAs($this->user)->getJson('/reviews/senses');
         $senseReviewResponse->assertOk();
         $this->assertSame(1, $senseReviewResponse->json('summary.due_count'));
+    }
+
+    // ─── Vocabulary bridge → WordSense → WordSenseOccurrence ───
+
+    public function test_bridge_creates_word_sense_and_occurrence_when_saving_learning_word(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Brick', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '-', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => 'and', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'mortar', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'still', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        // WordSense created
+        $sense = WordSense::where('encountered_word_id', $word->id)->first();
+        $this->assertNotNull($sense);
+        $this->assertSame(WordSense::STATUS_AI_SUGGESTED, $sense->status);
+        $this->assertSame('商店', $sense->sense_zh);
+
+        // WordSenseOccurrence created
+        $occurrence = WordSenseOccurrence::where('word_sense_id', $sense->id)->first();
+        $this->assertNotNull($occurrence);
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertSame('manual_vocab_bridge', $occurrence->source);
+        $this->assertSame('manual_vocab_bridge', $occurrence->decision);
+        $this->assertSame(1.0, $occurrence->confidence);
+        $this->assertTrue($occurrence->auto_fsrs_allowed);
+        $this->assertSame('stores', $occurrence->surface);
+        $this->assertSame('stores', $occurrence->lemma);
+        $this->assertSame('0', $occurrence->sentence_id);
+        $this->assertNotEmpty($occurrence->sentence_en);
+        $this->assertStringContainsString('stores', $occurrence->sentence_en);
+    }
+
+    public function test_bridge_does_not_create_duplicate_occurrence(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $postData = [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ];
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', $postData)->assertOk();
+        $this->actingAs($this->user)->post('/vocabulary/word/update', $postData)->assertOk();
+
+        $this->assertSame(1, WordSense::where('encountered_word_id', $word->id)->count());
+        $this->assertSame(1, WordSenseOccurrence::where('source', 'manual_vocab_bridge')
+            ->where('chapter_id', $chapter->id)
+            ->where('sentence_id', '0')
+            ->where('surface', 'stores')
+            ->count());
+    }
+
+    public function test_bridge_updates_pending_occurrence_on_repeat_save(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        $occurrence = WordSenseOccurrence::first();
+        $this->assertSame('商店', $occurrence->raw_payload['sense_zh']);
+
+        // re-save with different translation
+        $word->update(['translation' => '店铺；门店']);
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '店铺；门店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        $this->assertSame(1, WordSenseOccurrence::count());
+        $occurrence->refresh();
+        $this->assertSame(WordSenseOccurrence::STATUS_PENDING, $occurrence->status);
+        $this->assertSame('店铺；门店', $occurrence->raw_payload['sense_zh']);
+    }
+
+    public function test_bridge_does_not_overwrite_confirmed_occurrence(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        // simulate user confirming the occurrence in /senses/review
+        $occurrence = WordSenseOccurrence::first();
+        $sense = WordSense::first();
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+        $occurrence->update([
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'raw_payload' => ['sense_zh' => '商店', 'source' => 'manual_vocab_bridge'],
+        ]);
+
+        // re-save with different translation — should not overwrite
+        $word->update(['translation' => '改掉的译法']);
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '改掉的译法',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        $occurrence->refresh();
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $occurrence->status);
+        $this->assertSame('商店', $occurrence->raw_payload['sense_zh']);
+    }
+
+    public function test_bridge_skips_occurrence_without_chapter_context(): void
+    {
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+        ])->assertOk();
+
+        // WordSense should still be created
+        $this->assertSame(1, WordSense::where('encountered_word_id', $word->id)->count());
+        // WordSenseOccurrence should NOT be created (no chapter context)
+        $this->assertSame(0, WordSenseOccurrence::count());
+    }
+
+    public function test_bridge_occurrence_appears_in_senses_occurrences_api(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        $response = $this->actingAs($this->user)->getJson('/senses/occurrences?status=pending');
+        $response->assertOk();
+        $this->assertCount(1, $response->json('data'));
+        $this->assertSame('stores', $response->json('data.0.surface'));
+        $this->assertSame('pending', $response->json('data.0.status'));
+        $this->assertSame('manual_vocab_bridge', $response->json('data.0.decision'));
+        $this->assertNotEmpty($response->json('data.0.sentence_en'));
+        $this->assertSame(1, $response->json('summary.pending'));
+    }
+
+    public function test_confirming_bridge_occurrence_creates_sense_review_card(): void
+    {
+        $chapter = $this->createTestChapter([
+            (object) ['word' => 'Stores', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'are', 'sentence_index' => 0, 'spaceAfter' => true],
+            (object) ['word' => 'important', 'sentence_index' => 0, 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => 0, 'spaceAfter' => false],
+        ]);
+
+        $word = $this->createWord('stores');
+        $word->update(['stage' => -7, 'translation' => '商店']);
+
+        $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'translation' => '商店',
+            'stage' => -7,
+            'word' => 'stores',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 0,
+        ])->assertOk();
+
+        $occurrence = WordSenseOccurrence::first();
+        $sense = WordSense::first();
+
+        // confirm via /senses/occurrences/{id}/confirm
+        $this->actingAs($this->user)->post("/senses/occurrences/{$occurrence->id}/confirm")
+            ->assertOk();
+
+        $occurrence->refresh();
+        $sense->refresh();
+
+        $this->assertSame(WordSenseOccurrence::STATUS_BOUND, $occurrence->status);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+
+        // sense review card should be created (auto_fsrs_allowed=true)
+        $senseCard = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)
+            ->where('target_id', $sense->id)
+            ->first();
+        $this->assertNotNull($senseCard);
+        $this->assertTrue($senseCard->fsrs_enabled);
+
+        // word card should still exist and be enabled
+        $wordCard = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->first();
+        $this->assertNotNull($wordCard);
+        $this->assertTrue($wordCard->fsrs_enabled);
+    }
+
+    private function createTestChapter(array $processedWords): Chapter
+    {
+        return Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 1,
+            'name' => 'Test Chapter',
+            'read_count' => 0,
+            'word_count' => count($processedWords),
+            'language' => 'english',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'raw_text' => '',
+            'type' => 'text',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode($processedWords), 1),
+        ]);
     }
 
     private function createUser(string $email, string $language): User

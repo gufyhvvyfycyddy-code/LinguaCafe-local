@@ -94,6 +94,9 @@ class VocabularyController extends Controller {
         if ($request->has('word')) {
             $bridgeContext['word'] = (string) $request->post('word');
         }
+        if ($request->has('translation')) {
+            $bridgeContext['translation'] = (string) $request->post('translation');
+        }
 
         try {
             $this->vocabularyService->updateWord($userId, $wordId, $wordData, $wordStage, $bridgeContext);

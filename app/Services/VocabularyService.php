@@ -73,39 +73,150 @@ class VocabularyService {
 
     private function bridgeWordToSense(EncounteredWord $word, array $context): void
     {
-        // 已有关联 sense 则不重复创建
-        $existing = \App\Models\WordSense::where('encountered_word_id', $word->id)
-            ->where('user_id', $word->user_id)
-            ->exists();
+        $lemma = $word->base_word ?: mb_strtolower($word->word, 'UTF-8');
+        $surface = $context['word'] ?? $word->word;
 
-        if ($existing) {
+        // 已有关联 sense 则复用，否则创建
+        $existingSense = \App\Models\WordSense::where('encountered_word_id', $word->id)
+            ->where('user_id', $word->user_id)
+            ->first();
+
+        if ($existingSense) {
+            $sense = $existingSense;
+        } else {
+            $senseData = [
+                'user_id' => $word->user_id,
+                'language' => $word->language,
+                'language_id' => $word->language,
+                'encountered_word_id' => $word->id,
+                'lemma' => $lemma,
+                'surface_form' => $surface,
+                'sense_zh' => $word->translation,
+                'sense_en' => '',
+                'status' => \App\Models\WordSense::STATUS_AI_SUGGESTED,
+            ];
+
+            if (!empty($context['chapter_id'])) {
+                $senseData['source_chapter_id'] = (int) $context['chapter_id'];
+            }
+
+            if (isset($context['sentence_index'])) {
+                $senseData['sentence_id'] = (string) $context['sentence_index'];
+            }
+
+            // 生成 sense_key
+            $senseData['sense_key'] = $lemma . '|' . md5($senseData['sense_zh']);
+
+            $sense = \App\Models\WordSense::create($senseData);
+        }
+
+        // 创建 WordSenseOccurrence（仅当有章节上下文时）
+        if (empty($context['chapter_id']) || !isset($context['sentence_index'])) {
             return;
         }
 
-        $senseData = [
+        $chapterId = (int) $context['chapter_id'];
+        $sentenceId = (string) $context['sentence_index'];
+
+        // 提取句子文本
+        $sentenceEn = $this->extractSentenceText($chapterId, (int) $context['sentence_index']);
+        if ($sentenceEn === '') {
+            // fallback: 至少用 surface 或 lemma，避免 /senses/review 显示空句子
+            $sentenceEn = $surface ?: $lemma;
+            \Log::warning('bridgeWordToSense: could not extract sentence text, using fallback', [
+                'chapter_id' => $chapterId,
+                'sentence_index' => $context['sentence_index'],
+                'surface' => $surface,
+            ]);
+        }
+
+        // 去重：检查是否已有 manual_vocab_bridge 来源的 occurrence
+        $existingOccurrence = \App\Models\WordSenseOccurrence::where('user_id', $word->user_id)
+            ->where('language_id', $word->language)
+            ->where('chapter_id', $chapterId)
+            ->where('sentence_id', $sentenceId)
+            ->where('surface', $surface)
+            ->where('source', \App\Models\WordSenseOccurrence::SOURCE_MANUAL_VOCAB_BRIDGE)
+            ->first();
+
+        if ($existingOccurrence) {
+            // pending → 更新建议词义
+            if ($existingOccurrence->status === \App\Models\WordSenseOccurrence::STATUS_PENDING) {
+                $existingOccurrence->update([
+                    'word_sense_id' => $sense->id,
+                    'raw_payload' => ['sense_zh' => $word->translation, 'source' => 'manual_vocab_bridge'],
+                ]);
+            }
+            // confirmed / bound / rejected / ignored → 不覆盖已有确认结果
+            return;
+        }
+
+        // 创建新 occurrence，状态 pending，等待用户在 /senses/review 确认
+        \App\Models\WordSenseOccurrence::create([
             'user_id' => $word->user_id,
             'language' => $word->language,
             'language_id' => $word->language,
-            'encountered_word_id' => $word->id,
-            'lemma' => $word->base_word ?: mb_strtolower($word->word, 'UTF-8'),
-            'surface_form' => $context['word'] ?? $word->word,
-            'sense_zh' => $word->translation,
-            'sense_en' => '',
-            'status' => \App\Models\WordSense::STATUS_AI_SUGGESTED,
-        ];
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapterId,
+            'sentence_id' => $sentenceId,
+            'sentence_en' => $sentenceEn,
+            'surface' => $surface,
+            'lemma' => $lemma,
+            'type' => \App\Models\WordSenseOccurrence::TYPE_WORD,
+            'decision' => 'manual_vocab_bridge',
+            'confidence' => 1.0,
+            'auto_fsrs_allowed' => true,
+            'status' => \App\Models\WordSenseOccurrence::STATUS_PENDING,
+            'source' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_VOCAB_BRIDGE,
+            'raw_payload' => ['sense_zh' => $word->translation, 'source' => 'manual_vocab_bridge'],
+        ]);
+    }
 
-        if (!empty($context['chapter_id'])) {
-            $senseData['source_chapter_id'] = (int) $context['chapter_id'];
+    private function extractSentenceText(int $chapterId, int $sentenceIndex): string
+    {
+        $chapter = Chapter::find($chapterId);
+        if (!$chapter) {
+            return '';
         }
 
-        if (isset($context['sentence_index'])) {
-            $senseData['sentence_id'] = (string) $context['sentence_index'];
+        try {
+            $words = $chapter->getProcessedText();
+        } catch (\Throwable $e) {
+            \Log::warning('extractSentenceText: failed to decode processed_text', [
+                'chapter_id' => $chapterId,
+                'error' => $e->getMessage(),
+            ]);
+            return '';
         }
 
-        // 生成 sense_key
-        $senseData['sense_key'] = $senseData['lemma'] . '|' . md5($senseData['sense_zh']);
+        if (!is_array($words)) {
+            return '';
+        }
 
-        \App\Models\WordSense::create($senseData);
+        $sentenceWords = [];
+        foreach ($words as $w) {
+            if (!is_object($w)) {
+                continue;
+            }
+            $si = $w->sentence_index ?? -1;
+            if ((int) $si === $sentenceIndex) {
+                $sentenceWords[] = $w;
+            }
+        }
+
+        if (empty($sentenceWords)) {
+            return '';
+        }
+
+        $text = '';
+        foreach ($sentenceWords as $w) {
+            $text .= $w->word ?? '';
+            if (!empty($w->spaceAfter)) {
+                $text .= ' ';
+            }
+        }
+
+        return trim($text);
     }
 
     public function ignoreWord($userId, $wordId): bool
