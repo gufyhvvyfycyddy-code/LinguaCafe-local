@@ -230,9 +230,12 @@
 
         <!-- Batch actions -->
         <div v-if="batchSelectEnabled && selectedIds.size > 0" class="d-flex align-center mt-3 px-2">
-            <span class="mr-3">已选 {{ selectedIds.size }} 个新词</span>
+            <span class="mr-3">已选 {{ selectedIds.size }} 个词条</span>
             <v-btn small rounded color="warning" class="mr-2" @click="batchIgnore" :loading="batchProcessing">
                 <v-icon small class="mr-1">mdi-eye-off</v-icon>批量忽略
+            </v-btn>
+            <v-btn small rounded color="error" class="mr-2" @click="batchDelete" :loading="batchProcessing">
+                <v-icon small class="mr-1">mdi-delete</v-icon>批量删除
             </v-btn>
             <v-btn small rounded text @click="clearSelection">取消选择</v-btn>
         </div>
@@ -283,8 +286,7 @@ export default {
             return this.$props.language == 'japanese' || this.$props.language == 'chinese';
         },
         batchSelectEnabled() {
-            // only show batch selection when filtered to new words (stage == 2)
-            return this.filters.stage == 2 && !this.loading;
+            return !this.loading;
         },
         colspan() {
             let count = this.isCjkLanguage ? 6 : 5;
@@ -473,7 +475,7 @@ export default {
         batchIgnore() {
             const ids = Array.from(this.selectedIds);
             if (!ids.length) return;
-            if (!window.confirm(`确定要忽略已选的 ${ids.length} 个新词吗？这会将它们标为已忽略并停用复习卡。`)) {
+            if (!window.confirm(`确定要忽略已选的 ${ids.length} 个词条吗？这会将它们标为已忽略并停用复习卡。`)) {
                 return;
             }
 
@@ -487,6 +489,28 @@ export default {
                 })
                 .catch((error) => {
                     this.error = error?.response?.data?.message || error?.response?.data || '批量忽略失败。';
+                })
+                .finally(() => {
+                    this.batchProcessing = false;
+                });
+        },
+        batchDelete() {
+            const ids = Array.from(this.selectedIds);
+            if (!ids.length) return;
+            if (!window.confirm(`确定要删除已选的 ${ids.length} 个词条吗？这会将它们标为已忽略并停用复习卡。此操作不会删除历史复习数据。`)) {
+                return;
+            }
+
+            this.batchProcessing = true;
+            axios.post('/vocabulary/words/batch-delete', { ids: ids })
+                .then((response) => {
+                    const deleted = response.data.deleted || 0;
+                    this.error = '';
+                    this.clearSelection();
+                    this.loadVocabularySearchPage();
+                })
+                .catch((error) => {
+                    this.error = error?.response?.data?.message || error?.response?.data || '批量删除失败。';
                 })
                 .finally(() => {
                     this.batchProcessing = false;

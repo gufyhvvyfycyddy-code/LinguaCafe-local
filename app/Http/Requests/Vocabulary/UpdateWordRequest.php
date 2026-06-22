@@ -33,6 +33,9 @@ class UpdateWordRequest extends FormRequest
             'lookup_count' => 'nullable|numeric|gte:0',
             'read_count' => 'nullable|numeric|gte:0',
             'relearning' => 'nullable|boolean',
+            'chapter_id' => 'nullable|integer|gte:0',
+            'sentence_index' => 'nullable|integer|gte:0',
+            'word' => 'nullable|string',
         ];
     }
 }

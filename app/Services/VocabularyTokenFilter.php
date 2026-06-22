@@ -13,7 +13,7 @@ class VocabularyTokenFilter
     {
         $token = trim((string) $token);
 
-        if ($token === '' || $token === 'NEWLINE') {
+        if ($token === '' || $token === 'NEWLINE' || $token === 'PARAGRAPH_BREAK') {
             return true;
         }
 
@@ -24,6 +24,12 @@ class VocabularyTokenFilter
         }
 
         if (in_array($token, config('linguacafe.words_to_skip', []), true)) {
+            return true;
+        }
+
+        // 非 CJK 学习语言中跳过含中文字符的 token（不影响日语/中文学习场景）
+        $languagesWithoutSpaces = config('linguacafe.languages.languages_without_spaces', []);
+        if (!in_array($language, $languagesWithoutSpaces, true) && preg_match('/\p{Han}/u', $token)) {
             return true;
         }
 

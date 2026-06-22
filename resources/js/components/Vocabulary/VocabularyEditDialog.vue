@@ -300,6 +300,11 @@
                     lookup_count: this.item.lookup_count,
                 };
 
+                // 当词条进入 Learning 状态时，传递上下文以创建 word_sense 桥接
+                if (saveData.stage < 0 && saveData.translation) {
+                    saveData.word = this.item.word;
+                }
+
                 axios.post('/vocabulary/word/update', saveData).then(() => {
                     this.saved = true;
                     this.updateVocabularySearch();

@@ -40,16 +40,16 @@ class VocabularyService {
         return $word;
     }
 
-    public function updateWord($userId, $wordId, $wordData, $wordStage = null) {
+    public function updateWord($userId, $wordId, $wordData, $wordStage = null, array $bridgeContext = []) {
         $word = EncounteredWord
             ::where('user_id', $userId)
             ->where('id', $wordId)
             ->first();
-        
+
         if (!$word) {
             throw new \Exception('Word does not exist, or it belongs to a different user.');
         }
-        
+
         if ($wordStage !== null) {
             $word->setStage($wordStage);
         }
@@ -63,7 +63,49 @@ class VocabularyService {
             $this->reviewCardService->disableWordCard($word);
         }
 
+        // 桥接：Learning 词自动创建 word_sense 草稿
+        if ($word->stage < 0 && !empty($word->translation)) {
+            $this->bridgeWordToSense($word, $bridgeContext);
+        }
+
         return true;
+    }
+
+    private function bridgeWordToSense(EncounteredWord $word, array $context): void
+    {
+        // 已有关联 sense 则不重复创建
+        $existing = \App\Models\WordSense::where('encountered_word_id', $word->id)
+            ->where('user_id', $word->user_id)
+            ->exists();
+
+        if ($existing) {
+            return;
+        }
+
+        $senseData = [
+            'user_id' => $word->user_id,
+            'language' => $word->language,
+            'language_id' => $word->language,
+            'encountered_word_id' => $word->id,
+            'lemma' => $word->base_word ?: mb_strtolower($word->word, 'UTF-8'),
+            'surface_form' => $context['word'] ?? $word->word,
+            'sense_zh' => $word->translation,
+            'sense_en' => '',
+            'status' => \App\Models\WordSense::STATUS_AI_SUGGESTED,
+        ];
+
+        if (!empty($context['chapter_id'])) {
+            $senseData['source_chapter_id'] = (int) $context['chapter_id'];
+        }
+
+        if (isset($context['sentence_index'])) {
+            $senseData['sentence_id'] = (string) $context['sentence_index'];
+        }
+
+        // 生成 sense_key
+        $senseData['sense_key'] = $senseData['lemma'] . '|' . md5($senseData['sense_zh']);
+
+        \App\Models\WordSense::create($senseData);
     }
 
     public function ignoreWord($userId, $wordId): bool

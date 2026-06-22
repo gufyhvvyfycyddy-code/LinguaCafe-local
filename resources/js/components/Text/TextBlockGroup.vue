@@ -70,6 +70,7 @@
                     -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
                 --></div><!--
                 --><br v-if="word.word === 'NEWLINE'" /><!--
+                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" style="height: 0.8em;"></div><!--
                 --><span
                     v-else
                     :wordindex="wordIndex"
@@ -1761,6 +1762,17 @@
 
                 if (withStage) {
                     saveData.stage = selectedWord.stage;
+                }
+
+                // 当词条进入 Learning 状态时，传递上下文以创建 word_sense 桥接
+                if (saveData.stage < 0 && saveData.translation) {
+                    if (this.$props._text && this.$props._text.chapterId) {
+                        saveData.chapter_id = this.$props._text.chapterId;
+                    }
+                    if (this.selection && this.selection[0] && this.selection[0].sentence_index !== undefined) {
+                        saveData.sentence_index = this.selection[0].sentence_index;
+                    }
+                    saveData.word = selectedWord.word;
                 }
 
                 axios.post('/vocabulary/word/update', saveData).catch(function (error) {

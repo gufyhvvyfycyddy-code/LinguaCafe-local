@@ -57,7 +57,7 @@ slovenian_nlp = None
 
 @Language.component("custom_sentence_splitter")
 def custom_sentence_splitter(doc):    
-    punctuations = ['NEWLINE', '？', '！', '。', '?', '!', '.', '»', '«']
+    punctuations = ['NEWLINE', 'PARAGRAPH_BREAK', '？', '！', '。', '?', '!', '.', '»', '«']
     for token in doc[:-1]:
         if token.text in punctuations:
             doc[token.i+1].is_sent_start = True

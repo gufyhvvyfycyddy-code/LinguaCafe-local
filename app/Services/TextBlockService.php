@@ -111,7 +111,10 @@ class TextBlockService
     */
     public function tokenizeRawText() {
         $text = $this->rawText;
-        $text = preg_replace("/ {2,}/", " ", str_replace(["\r\n", "\r", "\n"], " NEWLINE ", $text));
+        // 区分段落分隔（双换行）和软换行（单换行）
+        $text = str_replace(["\r\n\r\n", "\n\n", "\r\n", "\r", "\n"],
+            [" PARAGRAPH_BREAK ", " PARAGRAPH_BREAK ", " NEWLINE ", " NEWLINE ", " NEWLINE "], $text);
+        $text = preg_replace("/ {2,}/", " ", $text);
 
         try {
             $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
@@ -619,6 +622,9 @@ class TextBlockService
 
     private function fallbackEnglishTokenize(string $text): array
     {
+        // fallback 中 PARAGRAPH_BREAK 降级为 NEWLINE
+        $text = str_replace('PARAGRAPH_BREAK', 'NEWLINE', $text);
+
         $tokens = [];
         $sentenceIndex = 0;
         $sentences = preg_split('/(?<=[.!?])\s+|(?:\s+NEWLINE\s+)/u', trim($text), -1, PREG_SPLIT_NO_EMPTY);
