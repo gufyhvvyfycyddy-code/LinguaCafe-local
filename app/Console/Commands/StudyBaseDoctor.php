@@ -15,7 +15,8 @@ class StudyBaseDoctor extends Command
                             {--user_id= : Filter by user ID (default: all)}
                             {--fix : Apply study_base corrections (dry-run only without this flag)}
                             {--limit= : Limit suggestions to N entries}
-                            {--include-derivational : Also suggest derivational simplifications (-ly, -ness, etc.)}';
+                            {--include-derivational : Also suggest derivational simplifications (-ly, -ness, etc.)}
+                            {--fix-bad-lemmas : Scan and fix known bad lemmas (opene→open, cal→call, etc.)}';
 
     protected $description = 'Diagnose and optionally fix study_base (learning base) in encountered_words.
 Scans for words where study_base is missing or could be improved,
@@ -44,6 +45,47 @@ suggests corrections, and applies them with --fix.';
         'news', 'series', 'species', 'means', 'lens', 'lens',
     ];
 
+    /**
+     * Tier 1: Known bad lemmas produced by the old PHP fallback (pre-Commit-1 fix).
+     * These are hardcoded stem+'e' errors on regular -ed/-ing verbs, and
+     * double-consonant errors (called→cal instead of call).
+     *
+     * --fix WILL repair these automatically.
+     */
+    private const KNOWN_BAD_LEMMAS = [
+        'opene'   => 'open',
+        'reporte' => 'report',
+        'walke'   => 'walk',
+        'looke'   => 'look',
+        'worke'   => 'work',
+        'talke'   => 'talk',
+        'likee'   => 'like',
+        'makee'   => 'make',
+        'takee'   => 'take',
+        'givee'   => 'give',
+        'havee'   => 'have',
+        'livee'   => 'live',
+        'lovee'   => 'love',
+        'comee'   => 'come',
+        'caree'   => 'care',
+        'sharee'  => 'share',
+        'placee'  => 'place',
+        'usee'    => 'use',
+        'movee'   => 'move',
+        'reade'   => 'read',
+        'deale'   => 'deal',
+        'feele'   => 'feel',
+        'nee'     => 'need',
+        'cal'     => 'call',
+        'calle'   => 'call',
+        'fel'     => 'fell',
+        'fal'     => 'fall',
+        'sel'     => 'sell',
+    ];
+
+    // Track suspicious (Tier 2) lemmas for reporting
+    private array $suspiciousLemmas = [];
+
     public function handle(): int
     {
         $language = $this->option('language') ?: 'english';
@@ -51,6 +93,7 @@ suggests corrections, and applies them with --fix.';
         $fix = (bool) $this->option('fix');
         $limit = $this->option('limit') ? (int) $this->option('limit') : null;
         $includeDerivational = (bool) $this->option('include-derivational');
+        $fixBadLemmas = (bool) $this->option('fix-bad-lemmas');
 
         $this->info('=== Study Base Doctor ===');
         $this->info("Language: {$language}");
@@ -63,6 +106,9 @@ suggests corrections, and applies them with --fix.';
         }
         if ($includeDerivational) {
             $this->info("Including derivational suggestions (-ly, -ness, etc.)");
+        }
+        if ($fixBadLemmas) {
+            $this->info("Scanning for known bad lemmas (opene→open, cal→call, etc.)");
         }
         $this->newLine();
 
@@ -77,9 +123,16 @@ suggests corrections, and applies them with --fix.';
         $this->newLine();
 
         if ($fix && !$ecdictAvailable) {
-            $this->error('ECDICT is not available. --fix is blocked to prevent incorrect batch modifications.');
-            $this->info('Run `php artisan dictionary:import-ecdict` first, or use dry-run mode.');
-            return 2;
+            // --fix-bad-lemmas with Tier 1 (hardcoded) can run without ECDICT.
+            // Phases 1-3 and Tier 2 suspicious detection still need ECDICT.
+            if ($fixBadLemmas) {
+                $this->warn('ECDICT is not available. Only Tier 1 (hardcoded known bad lemmas) will be fixed.');
+                $this->warn('Tier 2 (suspicious pattern detection) will be skipped.');
+            } else {
+                $this->error('ECDICT is not available. --fix is blocked to prevent incorrect batch modifications.');
+                $this->info('Run `php artisan dictionary:import-ecdict` first, or use dry-run mode.');
+                return 2;
+            }
         }
 
         // Phase 1: High-confidence fixes (missing study_base, study_base == word)
@@ -91,6 +144,11 @@ suggests corrections, and applies them with --fix.';
         // Phase 3: Derivational suggestions (low confidence, only with --include-derivational)
         if ($includeDerivational) {
             $this->scanDerivational($language, $userId, $fix, $limit);
+        }
+
+        // Phase 4: Known bad lemma repair (Tier 1 auto-fix, Tier 2 report only)
+        if ($fixBadLemmas) {
+            $this->scanBadLemmas($language, $userId, $fix, $limit);
         }
 
         // Summary
@@ -372,8 +430,10 @@ suggests corrections, and applies them with --fix.';
                 if (in_array($lastChar, ['l', 's', 'z'], true)) return $stem;
                 return $deDouble;
             }
-            if ($this->ecdictExists($stem . 'e')) return $stem . 'e';
+            // No double consonant: try bare stem FIRST, then +e
+            // (bare stem prevents reading→reade when "reade" exists in ECDICT)
             if ($this->ecdictExists($stem)) return $stem;
+            if ($this->ecdictExists($stem . 'e')) return $stem . 'e';
         }
 
         // -ed (with ll/ss/zz → bare stem, others → de-double)
@@ -387,11 +447,13 @@ suggests corrections, and applies them with --fix.';
                 if (in_array($lastChar, ['l', 's', 'z'], true)) return $stem;
                 return $deDouble;
             }
-            if ($this->ecdictExists($stem . 'e')) return $stem . 'e';
+            // No double consonant: try bare stem FIRST, then -ied→-y, then +e
+            // (bare stem prevents opened→opene when "opene" exists in ECDICT)
+            if ($this->ecdictExists($stem)) return $stem;
             if (preg_match('/^(.+)i$/u', $stem, $m2)) {
                 if ($this->ecdictExists($m2[1] . 'y')) return $m2[1] . 'y';
             }
-            if ($this->ecdictExists($stem)) return $stem;
+            if ($this->ecdictExists($stem . 'e')) return $stem . 'e';
         }
 
         return $lower;
@@ -580,5 +642,184 @@ suggests corrections, and applies them with --fix.';
             ->where('language', $language)
             ->where('surface', $surface)
             ->exists();
+    }
+
+    /**
+     * Phase 4: Known bad lemma repair.
+     *
+     * Tier 1 (KNOWN_BAD_LEMMAS): hardcoded stem+'e' errors, double-consonant errors.
+     *   --fix WILL repair these automatically.
+     *
+     * Tier 2 (suspicious patterns): lemma matches stem+'e' pattern where surface ends
+     *   in -ed or -ing. These are REPORTED ONLY, never auto-fixed.
+     *
+     * Constraints:
+     *   - Skips words with existing user_study_base_rules.
+     *   - Only updates base_word, lemma, study_base (not word, stage, review data).
+     *   - Does not delete or merge WordSenses.
+     */
+    private function scanBadLemmas(string $language, ?int $userId, bool $fix, ?int $limit): void
+    {
+        $this->info('--- Phase 4: Known bad lemma repair ---');
+
+        $badLemmaKeys = array_keys(self::KNOWN_BAD_LEMMAS);
+
+        $query = EncounteredWord::where('language', $language)
+            ->where('stage', '<>', 1)
+            ->orderBy('id');
+
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+        if ($limit !== null) {
+            $query->limit($limit);
+        }
+
+        $words = $query->get();
+
+        $tier1Fixed = 0;
+        $tier1Skipped = 0;
+        $tier2Found = 0;
+
+        foreach ($words as $word) {
+            $surface = mb_strtolower(trim($word->word), 'UTF-8');
+            $currentLemma = mb_strtolower(trim($word->lemma ?? ''), 'UTF-8');
+            $currentStudyBase = $word->study_base
+                ? mb_strtolower(trim($word->study_base), 'UTF-8')
+                : '';
+
+            // Skip if user has a custom rule — they already handled this
+            if ($this->hasUserRule($word->user_id, $language, $surface)) {
+                continue;
+            }
+
+            // Skip if study_base was manually set to something different from both
+            // surface and base_word (user intentionally customized it)
+            if ($currentStudyBase !== ''
+                && $currentStudyBase !== $currentLemma
+                && $currentStudyBase !== $surface) {
+                continue;
+            }
+
+            $needsFix = null;
+            $isTier1 = false;
+
+            // Tier 1: Check against hardcoded known bad lemmas
+            if (array_key_exists($currentLemma, self::KNOWN_BAD_LEMMAS)) {
+                $needsFix = self::KNOWN_BAD_LEMMAS[$currentLemma];
+                $isTier1 = true;
+            }
+            // Also check base_word
+            $currentBaseWord = mb_strtolower(trim($word->base_word ?? ''), 'UTF-8');
+            if ($needsFix === null && $currentBaseWord !== $currentLemma
+                && array_key_exists($currentBaseWord, self::KNOWN_BAD_LEMMAS)) {
+                $needsFix = self::KNOWN_BAD_LEMMAS[$currentBaseWord];
+                $isTier1 = true;
+            }
+
+            // Tier 2: Suspicious pattern detection (stem+'e' on -ed/-ing surface)
+            if ($needsFix === null) {
+                $suspicion = $this->detectSuspiciousLemma($surface, $currentLemma);
+                if ($suspicion !== null) {
+                    $this->suspiciousLemmas[] = [
+                        'id' => $word->id,
+                        'word' => $surface,
+                        'current_lemma' => $currentLemma,
+                        'suggested' => $suspicion,
+                        'pattern' => 'stem+e',
+                    ];
+                    $tier2Found++;
+                }
+            }
+
+            // Apply Tier 1 fix
+            if ($isTier1 && $needsFix !== null) {
+                if ($fix) {
+                    $word->lemma = $needsFix;
+                    $word->base_word = $needsFix;
+                    // Only update study_base if it matches the old bad lemma
+                    if ($currentStudyBase === $currentLemma
+                        || $currentStudyBase === '' || $currentStudyBase === null) {
+                        $word->study_base = $needsFix;
+                    }
+                    $word->save();
+                    $tier1Fixed++;
+                    $this->info("  FIXED: #{$word->id} {$surface} {$currentLemma}→{$needsFix}");
+                } else {
+                    $tier1Fixed++;
+                    $this->line("  [dry-run] #{$word->id} {$surface} {$currentLemma}→{$needsFix}");
+                }
+            } elseif ($isTier1) {
+                $tier1Skipped++;
+            }
+        }
+
+        // Report
+        $this->newLine();
+        if ($tier1Fixed > 0) {
+            $this->info("Tier 1 (known bad lemmas): {$tier1Fixed} " . ($fix ? 'fixed.' : 'would fix (dry-run).'));
+            if (!$fix) {
+                $this->info('  Run with --fix to apply these corrections.');
+            }
+        } else {
+            $this->info('Tier 1 (known bad lemmas): none found.');
+        }
+
+        if ($tier2Found > 0) {
+            $this->warn("Tier 2 (suspicious patterns): {$tier2Found} found — REPORT ONLY, not auto-fixed.");
+            $this->newLine();
+            $this->line('  These words match a stem+e pattern that MAY be wrong.');
+            $this->line('  Review them manually before applying any fixes.');
+            $this->line('');
+            foreach (array_slice($this->suspiciousLemmas, 0, 20) as $s) {
+                $this->line("    #{$s['id']} {$s['word']} → current={$s['current_lemma']}, suggested={$s['suggested']}");
+            }
+            if (count($this->suspiciousLemmas) > 20) {
+                $this->line('    ... and ' . (count($this->suspiciousLemmas) - 20) . ' more.');
+            }
+            $this->newLine();
+            $this->info('  To manually fix a suspicious lemma, edit the word in the reading page UI,');
+            $this->info('  or update the DB directly with a verified correct lemma.');
+        }
+    }
+
+    /**
+     * Tier 2 detection: check if a lemma looks like a stem+'e' error.
+     * Returns the suggested correction (bare stem) or null.
+     */
+    private function detectSuspiciousLemma(string $surface, string $lemma): ?string
+    {
+        $surfaceLen = mb_strlen($surface);
+        $lemmaLen = mb_strlen($lemma);
+
+        // Pattern: surface ends in -ed, lemma = surface[:-2] + 'e'
+        // e.g., "reported" → stem="report" + "e" = "reporte"
+        if (preg_match('/^(.+)(ed|ED)$/u', $surface, $m) && mb_strlen($m[1]) >= 2) {
+            $stem = $m[1];
+            // Check if lemma is stem + 'e' AND stem itself is a known ECDICT word
+            if ($lemma === $stem . 'e' && $lemmaLen === $surfaceLen - 1) {
+                if ($this->ecdictExists($stem)) {
+                    return $stem;  // bare stem is in ECDICT → likely correct
+                }
+            }
+            // Check if lemma is shorter than expected: e.g., "called" → "cal"
+            if ($lemmaLen < mb_strlen($stem) && !$this->ecdictExists($lemma)) {
+                if ($this->ecdictExists($stem)) {
+                    return $stem;
+                }
+            }
+        }
+
+        // Pattern: surface ends in -ing, lemma = surface[:-3] + 'e'
+        if (preg_match('/^(.+)(ing|ING)$/u', $surface, $m) && mb_strlen($m[1]) >= 2) {
+            $stem = $m[1];
+            if ($lemma === $stem . 'e' && $lemmaLen === $surfaceLen - 2) {
+                if ($this->ecdictExists($stem)) {
+                    return $stem;
+                }
+            }
+        }
+
+        return null;
     }
 }

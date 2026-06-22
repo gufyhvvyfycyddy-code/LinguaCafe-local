@@ -8,6 +8,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\ReviewCardService;
@@ -2457,5 +2458,143 @@ class WordSenseTest extends TestCase
                 ],
             ],
         ];
+    }
+
+    // ===================================================================
+    // Commit 4: Bad lemma doctor tests
+    // ===================================================================
+
+    public function test_bad_lemma_dry_run_does_not_write(): void
+    {
+        // Ensure we have a known bad lemma to test with
+        DB::table('encountered_words')->insert([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'testopened',
+            'lemma' => 'opene',
+            'base_word' => 'opene',
+            'study_base' => null,
+            'kanji' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'translation' => '',
+            'stage' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Dry-run should NOT change the lemma
+        $this->artisan('study-base:doctor', [
+            '--language' => 'english',
+            '--fix-bad-lemmas' => true,
+        ])->assertSuccessful();
+
+        $word = DB::table('encountered_words')->where('word', 'testopened')->first();
+        $this->assertEquals('opene', $word->lemma, 'Dry-run should not modify lemma');
+        $this->assertNull($word->study_base, 'Dry-run should not modify study_base');
+    }
+
+    public function test_bad_lemma_fix_updates_all_fields(): void
+    {
+        DB::table('encountered_words')->insert([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'testopened2',
+            'lemma' => 'opene',
+            'base_word' => 'opene',
+            'study_base' => null,
+            'kanji' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'translation' => '',
+            'stage' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('study-base:doctor', [
+            '--language' => 'english',
+            '--fix-bad-lemmas' => true,
+            '--fix' => true,
+        ])->assertSuccessful();
+
+        $word = DB::table('encountered_words')->where('word', 'testopened2')->first();
+        $this->assertEquals('open', $word->lemma, '--fix should correct opene→open');
+        $this->assertEquals('open', $word->base_word, '--fix should correct base_word');
+        $this->assertEquals('open', $word->study_base, '--fix should fill study_base');
+    }
+
+    public function test_bad_lemma_skips_user_rule(): void
+    {
+        // Insert a word with a bad lemma
+        DB::table('encountered_words')->insert([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'testcalled',
+            'lemma' => 'cal',
+            'base_word' => 'cal',
+            'study_base' => null,
+            'kanji' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'translation' => '',
+            'stage' => 2,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        // Create a user rule — user manually set study_base for this surface
+        DB::table('user_study_base_rules')->insert([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'surface' => 'testcalled',
+            'study_base' => 'customvalue',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->artisan('study-base:doctor', [
+            '--language' => 'english',
+            '--fix-bad-lemmas' => true,
+            '--fix' => true,
+        ])->assertSuccessful();
+
+        $word = DB::table('encountered_words')->where('word', 'testcalled')->first();
+        // Should NOT be modified because user has a custom rule
+        $this->assertEquals('cal', $word->lemma, 'Should skip words with user rules');
+    }
+
+    public function test_bad_lemma_preserves_review_data(): void
+    {
+        // Verify that fixing lemmas doesn't delete word data
+        DB::table('encountered_words')->insert([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'testopened3',
+            'lemma' => 'opene',
+            'base_word' => 'opene',
+            'study_base' => null,
+            'kanji' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'stage' => 2,
+            'translation' => '打开',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $beforeId = DB::getPdo()->lastInsertId();
+
+        $this->artisan('study-base:doctor', [
+            '--language' => 'english',
+            '--fix-bad-lemmas' => true,
+            '--fix' => true,
+        ])->assertSuccessful();
+
+        $word = DB::table('encountered_words')->find($beforeId);
+        $this->assertNotNull($word, 'Word should not be deleted');
+        $this->assertEquals('打开', $word->translation, 'Translation should be preserved');
+        $this->assertEquals(2, $word->stage, 'Stage should be preserved');
+        $this->assertEquals('open', $word->lemma, 'Lemma should be corrected');
     }
 }
