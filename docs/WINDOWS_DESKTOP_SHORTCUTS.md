@@ -206,3 +206,41 @@ scripts\windows\tokenizer-install-deps.bat
 ```
 
 如果只导入英文文本，即使 tokenizer 没启动，也可以使用基础英文 fallback 完成导入；但日语、中文等其他学习语言仍需要 tokenizer 才能获得正确分词。
+# MariaDB / MySQL 启动检查
+
+当前 Windows 本地版会在启动 LinguaCafe 前先检查 `.env` 中的数据库连接。当前推荐配置：
+
+```env
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=linguacafe_fsrs
+DB_USERNAME=root
+DB_PASSWORD=
+```
+
+本机 MariaDB 安装在：
+
+```text
+C:\Program Files\MariaDB 12.3
+```
+
+该安装没有注册 Windows 服务，因此启动脚本会在数据库端口不可连接时尝试运行：
+
+```text
+C:\Program Files\MariaDB 12.3\bin\mysqld.exe --defaults-file="C:\Program Files\MariaDB 12.3\data\my.ini"
+```
+
+如果启动失败，请先运行：
+
+```bat
+scripts\windows\database-doctor.bat
+```
+
+常见原因：
+
+- `.env` 仍然写着 `DB_PORT=3309`，但 MariaDB 实际监听 `3306`。
+- `.env` 写了 `DB_PASSWORD=root`，但本机 root 账号实际为空密码。
+- 3306 端口被其他 MySQL/MariaDB 占用。
+- `C:\Program Files\MariaDB 12.3\data\my.ini` 不存在或端口配置被改动。
+
+启动脚本现在会先确认数据库可连接，再执行 migration；如果数据库不可连接，会停止启动并提示运行 `database-doctor.bat`，不会继续盲目迁移。

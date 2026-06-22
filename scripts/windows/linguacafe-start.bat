@@ -46,6 +46,12 @@ if not exist "vendor\autoload.php" (
     exit /b 1
 )
 
+call "%~dp0database-start.bat" --no-pause
+if errorlevel 1 (
+    pause
+    exit /b 1
+)
+
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -Uri '%APP_URL%' -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
 if not errorlevel 1 (
     echo [LinguaCafe] Server already appears to be running.
