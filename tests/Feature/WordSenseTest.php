@@ -590,6 +590,113 @@ class WordSenseTest extends TestCase
         $response->assertJsonPath('0.sense_id', $sense->id);
     }
 
+    public function test_manual_sense_add_uses_lemma_creates_confirmed_card_and_bound_occurrence(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'sense_en' => 'to increase suddenly',
+            'aliases_zh' => ['猛增'],
+            'collocations' => ['prices surged'],
+            'chapter_id' => 123,
+            'sentence_id' => '7',
+            'sentence_en' => 'Prices surged overnight.',
+        ]);
+
+        $response->assertOk();
+
+        $sense = WordSense::where('lemma', 'surge')->where('surface_form', 'surged')->first();
+        $this->assertNotNull($sense);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+        $this->assertSame('verb', $sense->pos);
+        $this->assertSame('激增', $sense->sense_zh);
+
+        $this->assertDatabaseHas('review_cards', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_enabled' => true,
+        ]);
+
+        $this->assertDatabaseHas('word_sense_occurrences', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'sentence_id' => '7',
+            'surface' => 'surged',
+            'lemma' => 'surge',
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $pending = $this->actingAs($this->user)->getJson('/senses/occurrences?status=pending&lemma=surge');
+        $pending->assertOk();
+        $this->assertSame(0, $pending->json('pagination.total'));
+    }
+
+    public function test_manual_sense_add_allows_multiple_senses_for_same_lemma_grouped_by_pos_data(): void
+    {
+        $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+        ])->assertOk();
+
+        $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'noun',
+            'sense_zh' => '浪涌',
+        ])->assertOk();
+
+        $response = $this->actingAs($this->user)->getJson('/senses/candidates?lemma=surge');
+
+        $response->assertOk();
+        $this->assertCount(2, $response->json());
+        $this->assertEqualsCanonicalizing(['noun', 'verb'], collect($response->json())->pluck('pos')->all());
+        $this->assertSame(2, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count());
+    }
+
+    public function test_manual_sense_edit_is_limited_to_current_user_language_and_keeps_card(): void
+    {
+        $sense = $this->createSense([
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+        ]);
+        $card = $this->wordSenseService->createReviewCardForSense($sense);
+
+        $this->actingAs($this->user)->putJson("/senses/{$sense->id}/manual", [
+            'pos' => 'noun',
+            'sense_zh' => '浪涌',
+            'sense_en' => 'a sudden increase',
+            'aliases_zh' => ['涌动'],
+            'collocations' => ['a surge of energy'],
+        ])->assertOk();
+
+        $sense->refresh();
+        $this->assertSame('noun', $sense->pos);
+        $this->assertSame('浪涌', $sense->sense_zh);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+        $this->assertSame($card->id, $sense->reviewCard->id);
+
+        $otherSense = $this->createSense([
+            'user_id' => $this->otherUser->id,
+            'sense_key' => 'other-surge',
+        ]);
+
+        $this->actingAs($this->user)->putJson("/senses/{$otherSense->id}/manual", [
+            'pos' => 'verb',
+            'sense_zh' => '不能修改',
+        ])->assertNotFound();
+    }
+
     public function test_sense_review_page_route_opens_for_authenticated_user(): void
     {
         $this->actingAs($this->user)->get('/reviews/senses')->assertOk();

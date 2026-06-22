@@ -5,12 +5,19 @@ namespace App\Http\Controllers;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\WordSenseOccurrenceService;
+use App\Services\WordSenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class SenseOccurrenceController extends Controller
 {
-    public function __construct(private WordSenseOccurrenceService $occurrenceService)
+    private const POS_OPTIONS = ['noun', 'verb', 'adjective', 'adverb', 'preposition', 'conjunction', 'phrase', 'other'];
+
+    public function __construct(
+        private WordSenseOccurrenceService $occurrenceService,
+        private WordSenseService $wordSenseService,
+    )
     {
     }
 
@@ -73,6 +80,57 @@ class SenseOccurrenceController extends Controller
         }
 
         return response()->json($this->occurrenceService->possibleDuplicates($userId, $language, $request->query('lemma')));
+    }
+
+    public function storeManualSense(Request $request)
+    {
+        $data = $request->validate([
+            'lemma' => ['required', 'string'],
+            'surface_form' => ['nullable', 'string'],
+            'pos' => ['required', Rule::in(self::POS_OPTIONS)],
+            'sense_zh' => ['required', 'string'],
+            'sense_en' => ['nullable', 'string'],
+            'aliases_zh' => ['nullable'],
+            'collocations' => ['nullable'],
+            'chapter_id' => ['nullable', 'integer'],
+            'sentence_id' => ['nullable'],
+            'sentence_en' => ['nullable', 'string'],
+            'sentence_zh' => ['nullable', 'string'],
+        ]);
+
+        $data['aliases_zh'] = $this->normalizeList($request->post('aliases_zh'));
+        $data['collocations'] = $this->normalizeList($request->post('collocations'));
+
+        $sense = $this->wordSenseService->createManualSense(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $data,
+        );
+
+        return response()->json($this->serializeSense($sense));
+    }
+
+    public function updateManualSense(int $id, Request $request)
+    {
+        $data = $request->validate([
+            'pos' => ['required', Rule::in(self::POS_OPTIONS)],
+            'sense_zh' => ['required', 'string'],
+            'sense_en' => ['nullable', 'string'],
+            'aliases_zh' => ['nullable'],
+            'collocations' => ['nullable'],
+        ]);
+
+        $data['aliases_zh'] = $this->normalizeList($request->post('aliases_zh'));
+        $data['collocations'] = $this->normalizeList($request->post('collocations'));
+
+        $sense = $this->wordSenseService->updateManualSense(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $id,
+            $data,
+        );
+
+        return response()->json($this->serializeSense($sense));
     }
 
     public function bulkConfirm(Request $request)
@@ -247,6 +305,8 @@ class SenseOccurrenceController extends Controller
             'collocations' => $sense->collocations ?: [],
             'status' => $sense->status,
             'fsrs_state' => $sense->reviewCard?->fsrs_state,
+            'review_card_id' => $sense->reviewCard?->id,
+            'fsrs_enabled' => $sense->reviewCard?->fsrs_enabled,
         ];
     }
 

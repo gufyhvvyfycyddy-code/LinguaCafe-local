@@ -28,6 +28,9 @@ export default {
         inflections: [],
         kanjiList: [],
         translationText: '',
+        chapterId: null,
+        sentenceIndex: null,
+        sentenceText: '',
 
         // ui data
         tab: 0,
@@ -47,6 +50,9 @@ export default {
             state.tab = 0;
             state.searchField = '';
             state.translationText = '';
+            state.chapterId = null;
+            state.sentenceIndex = null;
+            state.sentenceText = '';
             state.word = '';
             state.phrase = [];
             state.reading = '';
@@ -94,6 +100,15 @@ export default {
         },
         setTranslationText (state, value) {
             state.translationText = value;
+        },
+        setChapterId (state, value) {
+            state.chapterId = value;
+        },
+        setSentenceIndex (state, value) {
+            state.sentenceIndex = value;
+        },
+        setSentenceText (state, value) {
+            state.sentenceText = value;
         },
         setStage (state, value) {
             state.stage = value;

@@ -4,7 +4,9 @@ namespace App\Services;
 
 use App\Models\ReviewCard;
 use App\Models\WordSense;
+use App\Models\WordSenseOccurrence;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class WordSenseService
@@ -87,6 +89,100 @@ class WordSenseService
         return $sense;
     }
 
+    public function createManualSense(int $userId, string $language, array $data): WordSense
+    {
+        return DB::transaction(function () use ($userId, $language, $data) {
+            $sense = $this->createSense([
+                'user_id' => $userId,
+                'language' => $language,
+                'language_id' => $language,
+                'lemma' => Arr::get($data, 'lemma'),
+                'surface_form' => Arr::get($data, 'surface_form', Arr::get($data, 'lemma')),
+                'pos' => Arr::get($data, 'pos'),
+                'sense_zh' => Arr::get($data, 'sense_zh'),
+                'sense_en' => Arr::get($data, 'sense_en'),
+                'aliases_zh' => Arr::get($data, 'aliases_zh', []),
+                'collocations' => Arr::get($data, 'collocations', []),
+                'example_sentence_en' => Arr::get($data, 'sentence_en'),
+                'example_sentence_zh' => Arr::get($data, 'sentence_zh'),
+                'source_chapter_id' => Arr::get($data, 'chapter_id'),
+                'sentence_id' => Arr::get($data, 'sentence_id'),
+                'status' => WordSense::STATUS_CONFIRMED,
+            ]);
+
+            $card = $this->createReviewCardForSense($sense);
+            $this->createManualOccurrence($sense, $card, $data);
+
+            return $sense->fresh('reviewCard');
+        });
+    }
+
+    public function updateManualSense(int $userId, string $language, int $senseId, array $data): WordSense
+    {
+        return DB::transaction(function () use ($userId, $language, $senseId, $data) {
+            $sense = WordSense::where('id', $senseId)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->firstOrFail();
+
+            $sense->fill([
+                'pos' => Arr::get($data, 'pos', $sense->pos),
+                'sense_zh' => Arr::get($data, 'sense_zh', $sense->sense_zh),
+                'sense_en' => Arr::get($data, 'sense_en', $sense->sense_en),
+                'aliases_zh' => $this->normalizeArray(Arr::get($data, 'aliases_zh', $sense->aliases_zh ?: [])),
+                'collocations' => $this->normalizeArray(Arr::get($data, 'collocations', $sense->collocations ?: [])),
+                'status' => WordSense::STATUS_CONFIRMED,
+            ]);
+            $sense->save();
+
+            $this->createReviewCardForSense($sense);
+
+            return $sense->fresh('reviewCard');
+        });
+    }
+
+    private function createManualOccurrence(WordSense $sense, ?ReviewCard $card, array $data): void
+    {
+        $sentenceId = Arr::get($data, 'sentence_id');
+        $sentenceEn = trim((string) Arr::get($data, 'sentence_en', ''));
+
+        if ($sentenceId === null || $sentenceEn === '') {
+            return;
+        }
+
+        WordSenseOccurrence::updateOrCreate(
+            [
+                'user_id' => $sense->user_id,
+                'language_id' => $sense->language_id,
+                'word_sense_id' => $sense->id,
+                'chapter_id' => Arr::get($data, 'chapter_id'),
+                'sentence_id' => (string) $sentenceId,
+                'surface' => Arr::get($data, 'surface_form', $sense->surface_form ?: $sense->lemma),
+                'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            ],
+            [
+                'language' => $sense->language,
+                'review_card_id' => $card?->id,
+                'sentence_en' => $sentenceEn,
+                'sentence_zh' => Arr::get($data, 'sentence_zh'),
+                'type' => WordSenseOccurrence::TYPE_WORD,
+                'lemma' => $sense->lemma,
+                'pos' => $sense->pos,
+                'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+                'confidence' => 1.0,
+                'evidence' => ['source' => 'manual reading page add'],
+                'auto_fsrs_allowed' => true,
+                'status' => WordSenseOccurrence::STATUS_BOUND,
+                'raw_payload' => [
+                    'sense_zh' => $sense->sense_zh,
+                    'sense_en' => $sense->sense_en,
+                    'aliases_zh' => $sense->aliases_zh ?: [],
+                    'collocations' => $sense->collocations ?: [],
+                ],
+            ]
+        );
+    }
+
     private function normalizeSenseData(array $data): array
     {
         $language = Arr::get($data, 'language_id', Arr::get($data, 'language'));
@@ -117,8 +213,12 @@ class WordSenseService
         return hash('sha256', Str::lower(implode('|', array_map([$this, 'normalizeText'], $parts))));
     }
 
-    private function normalizeArray(array $values): array
+    private function normalizeArray(mixed $values): array
     {
+        if (!is_array($values)) {
+            $values = explode(',', (string) $values);
+        }
+
         return array_values(array_filter(array_map([$this, 'normalizeText'], $values), fn ($value) => $value !== ''));
     }
 

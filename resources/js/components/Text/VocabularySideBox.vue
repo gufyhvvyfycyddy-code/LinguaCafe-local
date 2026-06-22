@@ -73,7 +73,7 @@
 
                 <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" />
 
-                <word-senses-list v-if="type === 'word'" :lemma="baseWord" :language="$props.language" />
+                <word-senses-list v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" />
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />

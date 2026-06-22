@@ -1245,6 +1245,9 @@
                     this.$store.commit('vocabularyBox/setBaseWordReading', uniqueWord.base_word_reading);
                     this.$store.commit('vocabularyBox/setTranslationText', uniqueWord.translation);
                     this.$store.commit('vocabularyBox/setStage', uniqueWord.stage);
+                    this.$store.commit('vocabularyBox/setChapterId', this.$props._text && this.$props._text.chapterId ? this.$props._text.chapterId : null);
+                    this.$store.commit('vocabularyBox/setSentenceIndex', this.selection[0].sentence_index);
+                    this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceText());
                     if (uniqueWord.base_word !== '') {
                         this.$store.commit('vocabularyBox/setSearchField', this.trimSearchTerm(uniqueWord.base_word));
                     } else {
@@ -1926,6 +1929,27 @@
                 }
 
                 return exampleSentence;
+            },
+            buildSelectedSentenceText() {
+                if (!this.selection.length) {
+                    return '';
+                }
+
+                var sentenceIndex = this.selection[0].sentence_index;
+                var sentenceText = '';
+
+                for (var i = 0; i < this.words.length; i++) {
+                    if (this.words[i].word == 'NEWLINE' || this.words[i].sentence_index !== sentenceIndex) {
+                        continue;
+                    }
+
+                    sentenceText += this.words[i].word;
+                    if (this.words[i].spaceAfter) {
+                        sentenceText += ' ';
+                    }
+                }
+
+                return sentenceText.trim();
             },
             updateExampleSentence() {
                 var exampleSentence = this.getExampleSentence();
