@@ -5,7 +5,8 @@
 ## 当前最新 commit
 
 ```
-待提交 — fix English lemma detection and add lemma doctor
+0e2cb93 feat: add study_base concept with corrected de-doubling rules and user override
+75b2b82 fix English lemma detection and add lemma doctor
 ```
 
 （注：如果此后有新提交，以 `git log --oneline -1` 为准。）
@@ -55,6 +56,12 @@
 - [x] 修复 `createNewEncounteredWords()` 中 base_word==word 时错误清空的问题（仅对英文/欧洲语言保留）
 - [x] `php artisan lemma:doctor` 诊断命令：检查缺失/可疑 base_word，--fix 修复
 - [x] 右侧面板增加"修改词元"入口：手动编辑 base_word 后立即刷新 WordSense 查询
+- [x] `php artisan study-base:doctor` 诊断命令：检查 study_base，--fix 修复，--include-derivational 派生建议
+- [x] 新增 `study_base` 列（encountered_words）："学习词根"与"语法词元"分离
+- [x] 右侧面板显示"学习词根"（studyBase → baseWord → word 回退链）
+- [x] 用户手动修改学习词根后保存规则（user_study_base_rules 表），再次导入同 surface 自动应用
+- [x] study_base 恢复默认值时自动删除用户规则
+- [x] -ed/-ing 双写辅音修正：ll/ss/zz 保留 bare stem（called→call, passed→pass），其他去双写（stopped→stop, dropped→drop）
 
 ## 英文词元修复详情
 

@@ -154,10 +154,11 @@ class TextBlockService
                 throw $exception;
             }
 
-            Log::warning('Python tokenizer failed; using basic English fallback tokenization.', [
+            Log::critical('Python tokenizer unavailable; English import proceeding WITHOUT lemmatization. Start the Python tokenizer service to restore normal lemmatization.', [
                 'user_id' => $this->userId,
                 'error' => $exception->getMessage(),
             ]);
+            $this->tokenizerDegraded = true;
             $tokens = $this->fallbackEnglishTokenize($text);
         }
 
@@ -744,9 +745,14 @@ class TextBlockService
         $token->w = $surface;
         $token->r = '';
 
-        // English alphabetic words: attempt lemmatization
+        // English alphabetic words: ultra-conservative lemmatization.
+        // The Python tokenizer (spaCy) is the authoritative source for lemmas.
+        // This fallback only runs when Python is completely unavailable,
+        // and it must NEVER generate wrong lemmas (opene, cal, walke, etc.).
+        // It only applies the high-confidence irregular table; everything else
+        // keeps its surface form as the lemma.
         if (preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)) {
-            $token->l = $this->applyEnglishLemma($surface);
+            $token->l = $this->conservativeFallbackLemma($surface);
             $token->pos = 'X';
         } else {
             $token->l = $surface;
@@ -760,24 +766,67 @@ class TextBlockService
     }
 
     /**
-     * Conservative English lemmatization for fallback tokenizer.
+     * Ultra-conservative English lemmatization for Python-down fallback ONLY.
+     *
+     * This method is intentionally minimal. It must NEVER produce wrong lemmas
+     * like "opene", "cal", or "walke". When in doubt, it keeps the surface form.
      *
      * Rules (order matters):
-     *  1. Irregular verb/noun table (was → be, has → have, mice → mouse, etc.)
-     *  2. -ies → -y  (stories → story) — only when word length > 3
-     *  3. -ves → -f   (wives → wife)
-     *  4. -ses/-xes/-zes/-ches/-shes → remove -es (boxes → box, watches → watch)
-     *  5. -es → remove -s  (stores → store, makes → make)
-     *  6. -s → remove -s   (facts → fact)
-     *  7. -(n)ing → remove -ing, optional restore double consonant (dropping → drop)
-     *  8. -ed → remove -ed, optional restore double consonant (stopped → stop)
+     *   1. Very short words (< 3 chars) — preserve as-is (is→is, am→am)
+     *   2. Irregular verb/noun table (was → be, children → child) — high confidence
+     *   3. Everything else — return lowercase surface (NO morphological guessing)
      *
-     * Conservative guard: if the candidate lemma is found in ECDICT, use it.
-     * If not found in ECDICT, fall back to lowercase surface.
-     * Words shorter than 3 chars are never lemmatized.
-     * Structural markers (ZZPARAZZ etc.) are never lemmatized.
+     * For full lemmatization, the Python tokenizer (spaCy + LemmInflect) must be running.
      */
-    private function applyEnglishLemma(string $surface): string
+    private function conservativeFallbackLemma(string $surface): string
+    {
+        $lower = mb_strtolower($surface, 'UTF-8');
+
+        // Don't touch structural markers
+        if (preg_match('/^zz(para|newl|sect)/i', $lower)) {
+            return $lower;
+        }
+
+        // 1. Very short words (length < 3): keep as-is.
+        //    This catches "is", "am", "he", "be", "go", "do" etc.
+        //    These are so short that lemmatization is unnecessary and any
+        //    wrong mapping would be confusing (e.g., is→be loses tense info).
+        if (mb_strlen($lower) < 3) {
+            return $lower;
+        }
+
+        // 2. Irregular lookups only (was→be, children→child, etc.)
+        //    No ECDICT verification needed — the irregular table is hand-curated.
+        $irregular = $this->englishIrregularLemma($lower);
+        if ($irregular !== null) {
+            return $irregular;
+        }
+
+        // 3. Everything else: return lowercase surface.
+        //    NO -ed/-ing/-s/-es/-ies/-ves morphological rules.
+        //    NO ECDICT lookups for candidate validation.
+        //    opened→opened, called→called, facts→facts, walking→walking.
+        //    This is safe: the surface form is always recognizable to the user.
+        return $lower;
+    }
+
+    /**
+     * English lemma suggestion for DOCTOR / OFFLINE USE ONLY.
+     *
+     * NOT used during import. The import path uses:
+     *   - spaCy (primary, via Python tokenizer)
+     *   - conservativeFallbackLemma() (Python-down fallback)
+     *
+     * This method uses ECDICT-gated morphological heuristics (-ed, -ing, -s, -es,
+     * -ies, -ves) and an irregular lookup table. These heuristics can produce
+     * wrong lemmas for obscure ECDICT entries (e.g., opened→opene, called→cal).
+     * They are suitable for doctor commands where results are reviewed by a human,
+     * but NOT for unsupervised import.
+     *
+     * Do NOT call this from tokenizeRawText(), fallbackEnglishTokenize(),
+     * or makeFallbackToken().
+     */
+    private function suggestEnglishLemmaForDoctorOnly(string $surface): string
     {
         $lower = mb_strtolower($surface, 'UTF-8');
 
@@ -883,14 +932,15 @@ class TextBlockService
             }
             // No double consonant
             if ($this->ecdictAvailable()) {
-                // Try +e (making → make, taking → take)
+                // Try bare stem FIRST (opening→open), then +e (making→make)
+                // Bare stem is safer: +e can produce false matches for obscure
+                // ECDICT entries (e.g., reading→reade if "reade" exists in ECDICT).
+                if ($this->lemmaInEcdict($stem)) {
+                    return $stem;
+                }
                 $candidate = $stem . 'e';
                 if ($this->lemmaInEcdict($candidate)) {
                     return $candidate;
-                }
-                // Try bare stem
-                if ($this->lemmaInEcdict($stem)) {
-                    return $stem;
                 }
             } else {
                 // No ECDICT: try +e then stem (same as old behavior).
@@ -931,10 +981,11 @@ class TextBlockService
             }
             // No double consonant
             if ($this->ecdictAvailable()) {
-                // Try +e (surged → surge, liked → like)
-                $candidate = $stem . 'e';
-                if ($this->lemmaInEcdict($candidate)) {
-                    return $candidate;
+                // Try bare stem FIRST (opened→open, walked→walk), then +e (liked→like)
+                // Bare stem is safer: +e can produce false matches for obscure
+                // ECDICT entries (e.g., opened→opene if "opene" exists in ECDICT).
+                if ($this->lemmaInEcdict($stem)) {
+                    return $stem;
                 }
                 // -ied → -y (tried → try)
                 if (preg_match('/^(.+)i$/u', $stem, $m2)) {
@@ -943,9 +994,10 @@ class TextBlockService
                         return $candidate2;
                     }
                 }
-                // bare stem
-                if ($this->lemmaInEcdict($stem)) {
-                    return $stem;
+                // Try +e (liked → like, surged → surge)
+                $candidate = $stem . 'e';
+                if ($this->lemmaInEcdict($candidate)) {
+                    return $candidate;
                 }
             } else {
                 // No ECDICT: conservative — no blind +e

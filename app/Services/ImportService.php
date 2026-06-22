@@ -56,7 +56,7 @@ class ImportService {
                 throw $exception;
             }
 
-            Log::warning('Python tokenizer import-text failed; using English fallback chunking.', [
+            Log::critical('Python tokenizer import-text failed; using English fallback chunking. Start the Python tokenizer service to restore normal chunking.', [
                 'error' => $exception->getMessage(),
             ]);
             $chunks = $this->fallbackEnglishChunks($importText, $chunkSize);
