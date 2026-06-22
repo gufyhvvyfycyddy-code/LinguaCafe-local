@@ -164,6 +164,16 @@
         <v-simple-table id="vocabulary-list" class="py-0 no-hover border rounded-lg" dense>
             <thead>
                 <tr>
+                    <th class="select" v-if="batchSelectEnabled">
+                        <v-checkbox
+                            :value="allSelected"
+                            :indeterminate="someSelected && !allSelected"
+                            @change="toggleSelectAll"
+                            hide-details
+                            dense
+                            class="ma-0 pa-0"
+                        />
+                    </th>
                     <th class="word">词条</th>
                     <th class="reading" v-if="isCjkLanguage">读音</th>
                     <th class="word-with-reading">词条</th>
@@ -174,9 +184,18 @@
             </thead>
             <tbody>
                 <tr v-if="!loading && words.length === 0">
-                    <td :colspan="isCjkLanguage ? 6 : 5" class="text-center py-6">暂无词汇</td>
+                    <td :colspan="colspan" class="text-center py-6">暂无词汇</td>
                 </tr>
                 <tr v-for="(word, index) in words" :key="index">
+                    <td class="select" v-if="batchSelectEnabled">
+                        <v-checkbox
+                            :value="selectedIds.has(word.id)"
+                            @change="toggleWord(word)"
+                            hide-details
+                            dense
+                            class="ma-0 pa-0"
+                        />
+                    </td>
                     <td class="word default-font">{{ displayWord(word) }}</td>
                     <td class="reading default-font" v-if="isCjkLanguage">{{ word.reading }}</td>
                     <td class="word-with-reading default-font">
@@ -208,6 +227,15 @@
                 </tr>
             </tbody>
         </v-simple-table>
+
+        <!-- Batch actions -->
+        <div v-if="batchSelectEnabled && selectedIds.size > 0" class="d-flex align-center mt-3 px-2">
+            <span class="mr-3">已选 {{ selectedIds.size }} 个新词</span>
+            <v-btn small rounded color="warning" class="mr-2" @click="batchIgnore" :loading="batchProcessing">
+                <v-icon small class="mr-1">mdi-eye-off</v-icon>批量忽略
+            </v-btn>
+            <v-btn small rounded text @click="clearSelection">取消选择</v-btn>
+        </div>
 
         <div class="px-2">
             <v-pagination class="my-6" v-model="currentPage" :length="pageCount" :total-visible="10" prev-icon="mdi-menu-left" next-icon="mdi-menu-right" @input="moveToPage(currentPage)" />
@@ -242,6 +270,9 @@ export default {
                 text: ''
             },
             languageSpaces: true,
+            // batch selection
+            selectedIds: new Set(),
+            batchProcessing: false,
         };
     },
     props: {
@@ -250,7 +281,23 @@ export default {
     computed: {
         isCjkLanguage() {
             return this.$props.language == 'japanese' || this.$props.language == 'chinese';
-        }
+        },
+        batchSelectEnabled() {
+            // only show batch selection when filtered to new words (stage == 2)
+            return this.filters.stage == 2 && !this.loading;
+        },
+        colspan() {
+            let count = this.isCjkLanguage ? 6 : 5;
+            if (this.batchSelectEnabled) count++;
+            return count;
+        },
+        allSelected() {
+            if (!this.words.length) return false;
+            return this.words.every(w => this.selectedIds.has(w.id));
+        },
+        someSelected() {
+            return this.words.some(w => this.selectedIds.has(w.id));
+        },
     },
     mounted() {
         this.loading = true;
@@ -401,6 +448,49 @@ export default {
 
             const words = JSON.parse(word.word);
             return this.languageSpaces ? words.join(' ') : words.join('');
+        },
+        // --- batch selection ---
+        toggleWord(word) {
+            if (this.selectedIds.has(word.id)) {
+                this.selectedIds.delete(word.id);
+            } else {
+                this.selectedIds.add(word.id);
+            }
+            // force reactivity
+            this.selectedIds = new Set(this.selectedIds);
+        },
+        toggleSelectAll() {
+            if (this.allSelected) {
+                this.clearSelection();
+            } else {
+                this.words.forEach(w => this.selectedIds.add(w.id));
+                this.selectedIds = new Set(this.selectedIds);
+            }
+        },
+        clearSelection() {
+            this.selectedIds = new Set();
+        },
+        batchIgnore() {
+            const ids = Array.from(this.selectedIds);
+            if (!ids.length) return;
+            if (!window.confirm(`确定要忽略已选的 ${ids.length} 个新词吗？这会将它们标为已忽略并停用复习卡。`)) {
+                return;
+            }
+
+            this.batchProcessing = true;
+            axios.post('/vocabulary/words/batch-ignore', { ids: ids })
+                .then((response) => {
+                    const ignored = response.data.ignored || 0;
+                    this.error = '';
+                    this.clearSelection();
+                    this.loadVocabularySearchPage();
+                })
+                .catch((error) => {
+                    this.error = error?.response?.data?.message || error?.response?.data || '批量忽略失败。';
+                })
+                .finally(() => {
+                    this.batchProcessing = false;
+                });
         },
     }
 }

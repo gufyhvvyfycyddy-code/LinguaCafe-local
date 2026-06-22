@@ -109,6 +109,28 @@ class VocabularyController extends Controller {
         return response()->json('词条已删除。', 200);
     }
 
+    public function batchIgnoreWords(Request $request) {
+        $request->validate([
+            'ids' => ['required', 'array'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $userId = Auth::user()->id;
+        $ignored = 0;
+
+        foreach ($request->post('ids') as $wordId) {
+            try {
+                if ($this->vocabularyService->ignoreWord($userId, (int) $wordId)) {
+                    $ignored++;
+                }
+            } catch (\Exception $e) {
+                // skip individual failures, continue with remaining
+            }
+        }
+
+        return response()->json(['ignored' => $ignored, 'total' => count($request->post('ids'))], 200);
+    }
+
     public function getPhrase($phraseId, GetPhraseRequest $request) {
         $userId = Auth::user()->id;
 

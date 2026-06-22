@@ -157,7 +157,7 @@
 
                 <!-- Translation -->
                 <v-textarea
-                    v-if="item" 
+                    v-if="item"
                     v-model="item.translation"
                     filled
                     dense
@@ -166,6 +166,21 @@
                     label="释义"
                     @keyup="changed"
                 ></v-textarea>
+
+                <!-- Lookup count -->
+                <v-text-field
+                    v-if="item"
+                    v-model.number="item.lookup_count"
+                    type="number"
+                    min="0"
+                    step="1"
+                    filled
+                    dense
+                    rounded
+                    label="查询次数"
+                    @keyup="changed"
+                    style="max-width: 180px;"
+                ></v-text-field>
 
                 <!-- Stage -->
                 <div id="vocabulary-edit-stage-buttons">
@@ -282,6 +297,7 @@
                     base_word: this.item.base_word,
                     base_word_reading: this.item.base_word_reading,
                     stage: this.item.stage,
+                    lookup_count: this.item.lookup_count,
                 };
 
                 axios.post('/vocabulary/word/update', saveData).then(() => {
