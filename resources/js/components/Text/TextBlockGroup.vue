@@ -196,7 +196,29 @@
 <script>
     import TextToSpeechService from './../../services/TextToSpeechService';
     import { mapState } from 'vuex';
-    
+
+    const ENGLISH_ABBREVIATIONS = new Set([
+        // person
+        'mr', 'mrs', 'ms', 'dr', 'prof', 'sr', 'jr',
+        // address / company
+        'st', 'ave', 'blvd', 'rd', 'inc', 'ltd', 'co', 'corp',
+        // latin abbreviations
+        'etc', 'vs', 'viz',
+        // time
+        'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+        // military / titles
+        'gen', 'col', 'capt', 'lt', 'maj', 'sgt', 'cpl', 'pvt',
+        'rev', 'hon', 'gov', 'sen', 'rep',
+        // other
+        'no', 'vol', 'pp', 'ch', 'sec', 'fig', 'eq', 'al',
+        'dept', 'univ', 'assn', 'bros',
+    ]);
+
+    const COMPOUND_ABBREVIATIONS = new Set([
+        'e.g', 'i.e', 'u.s', 'u.k', 'u.n', 'a.m', 'p.m',
+        'e.g.', 'i.e.', 'u.s.', 'u.k.', 'u.n.', 'a.m.', 'p.m.',
+    ]);
+
     export default {
         data: function() {
             return {
@@ -1359,7 +1381,7 @@
                     this.$store.commit('vocabularyBox/setEncounteredWordId', uniqueWord.id || null);
                     this.$store.commit('vocabularyBox/setChapterId', this.$props._text && this.$props._text.chapterId ? this.$props._text.chapterId : null);
                     this.$store.commit('vocabularyBox/setSentenceIndex', this.selection[0].sentence_index);
-                    this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceText());
+                    this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceTextFromTokenWindow());
                     if (uniqueWord.base_word !== '') {
                         this.$store.commit('vocabularyBox/setSearchField', this.trimSearchTerm(uniqueWord.base_word));
                     } else {
@@ -2084,6 +2106,212 @@
 
                 return exampleSentence;
             },
+            // === Token-window sentence extraction (Task B) ===
+
+            // Find the array index of the selected word in this.words.
+            // Uses object reference first, then falls back to wordIndex (template index).
+            resolveSelectedWordArrayIndex() {
+                if (!this.selection.length) return -1;
+
+                const selected = this.selection[0];
+
+                // Primary: object reference match
+                for (let i = 0; i < this.words.length; i++) {
+                    if (this.words[i] === selected) return i;
+                }
+
+                // Fallback: use selected.wordIndex (template index = array index)
+                const idx = selected.wordIndex;
+                if (idx !== undefined && Number.isInteger(idx) && idx >= 0 && idx < this.words.length) {
+                    if (this.words[idx].word === selected.word) return idx;
+                }
+
+                return -1;
+            },
+
+            // Hard boundaries: never cross these
+            isHardBoundary(word) {
+                if (!word) return true;
+                if (word.word === 'NEWLINE' || word.word === 'PARAGRAPH_BREAK') return true;
+                if (word.is_structure) return true;
+                if (this.isSectionMarker(word.word)) return true;
+                return false;
+            },
+
+            // Check if a token ending in "." is a known compound abbreviation.
+            // Examples: Mr. Dr. e.g. i.e. U.S. a.m. p.m.
+            isKnownAbbreviationToken(word) {
+                if (!word) return false;
+                const cleaned = word.replace(/\.+$/, '').toLowerCase();
+                return ENGLISH_ABBREVIATIONS.has(cleaned)
+                    || COMPOUND_ABBREVIATIONS.has(cleaned + '.')
+                    || COMPOUND_ABBREVIATIONS.has(cleaned);
+            },
+
+            // Check if a token is a decimal number like 15.2, 3.14, 1,234.56
+            isDecimalToken(word) {
+                if (!word) return false;
+                return /^\d[\d,]*\.\d+$/.test(word);
+            },
+
+            // Check if a token is an initialism chain like U.S. U.K. U.N.
+            isInitialismToken(word) {
+                if (!word) return false;
+                return /^([A-Z]\.){2,}$/.test(word);
+            },
+
+            // Check if the token before a standalone "." is in the abbreviation whitelist.
+            // Example: "Mr . Smith" — prev = "Mr" → true
+            isAbbreviationPrecursor(prev) {
+                if (!prev) return false;
+                const cleaned = prev.word.replace(/\.+$/, '').toLowerCase();
+                return ENGLISH_ABBREVIATIONS.has(cleaned);
+            },
+
+            // Check if a standalone "." is part of a dotted abbreviation chain
+            // like U . S .  or e . g .  (needs at least 2 letters + 2 dots).
+            isDottedAbbreviationPeriod(index) {
+                const current = this.words[index];
+                if (!current || current.word !== '.') return false;
+
+                const prev = this.words[index - 1];
+                const next = this.words[index + 1];
+
+                // Precondition: the token before "." must be a single letter
+                if (!prev || !/^[A-Za-z]$/.test(prev.word)) return false;
+
+                // Case 1: middle dot — U . S  or e . g (next is a single letter, chain continues)
+                if (next && /^[A-Za-z]$/.test(next.word)) {
+                    return true;
+                }
+
+                // Case 2: terminal dot — U . S . retail  or e . g . tools
+                // Need: single-letter + . + single-letter + current .
+                // i.e. words[index-3] is a single letter, words[index-2] is "."
+                const beforePrev = this.words[index - 2];
+                const beforeBeforePrev = this.words[index - 3];
+
+                if (
+                    beforeBeforePrev &&
+                    beforePrev &&
+                    /^[A-Za-z]$/.test(beforeBeforePrev.word) &&
+                    beforePrev.word === '.'
+                ) {
+                    return true;
+                }
+
+                return false;
+            },
+
+            // Check if a standalone "." is a decimal point: 15 . 2
+            isDecimalSplit(prev, next) {
+                if (!prev || !next) return false;
+                return /\d$/.test(prev.word) && /^\d/.test(next.word);
+            },
+
+            // Determine if a word/token is a sentence boundary.
+            // Handles ? ! . with three-way classification for ".".
+            isSentenceBoundary(word, index) {
+                if (!word) return false;
+                const w = word.word;
+
+                // ? and ! are always boundaries
+                if (w === '?' || w === '!') return true;
+                if (w.endsWith('?') || w.endsWith('!')) return true;
+
+                // Standalone "." token
+                if (w === '.') {
+                    const prev = index > 0 ? this.words[index - 1] : null;
+                    if (!prev) return true;
+
+                    // Previous token already ends with "." (e.g. "Mr.") → this "." is standalone punctuation
+                    if (prev.word.endsWith('.')) return true;
+
+                    // Abbreviation whitelist (Mr .  Dr .  etc.)
+                    if (this.isAbbreviationPrecursor(prev)) return false;
+
+                    // Dotted abbreviation chain (U . S .  e . g .  i . e .  a . m .  p . m .)
+                    if (this.isDottedAbbreviationPeriod(index)) return false;
+
+                    // Decimal point
+                    const next = index < this.words.length - 1 ? this.words[index + 1] : null;
+                    if (this.isDecimalSplit(prev, next)) return false;
+
+                    // Normal sentence-ending period
+                    return true;
+                }
+
+                // Non-standalone token ending with "." — three-way classification
+                if (w.endsWith('.') && w !== '.') {
+                    if (this.isKnownAbbreviationToken(w)) return false;   // Mr. Dr. e.g. i.e.
+                    if (this.isDecimalToken(w)) return false;              // 15.2 3.14
+                    if (this.isInitialismToken(w)) return false;           // U.S. U.K.
+                    return true;  // left. stayed. happened. → sentence boundary
+                }
+
+                return false;
+            },
+
+            // Token-window based sentence extraction.
+            // Scans left and right from the selected word until a hard or sentence boundary.
+            // Non-English languages fall back to the original sentence_index-based method.
+            buildSelectedSentenceTextFromTokenWindow() {
+                if (!this.selection.length) return '';
+
+                // Non-English: use original sentence_index-based logic
+                if (this.$props.language !== 'english') {
+                    return this.buildSelectedSentenceText();
+                }
+
+                const startIndex = this.resolveSelectedWordArrayIndex();
+                if (startIndex < 0) {
+                    return this.buildSelectedSentenceText();  // fallback
+                }
+
+                const MAX_TOKENS = 120;
+
+                // Scan left
+                let left = startIndex;
+                let tokenCount = startIndex - left;
+                while (left > 0 && tokenCount < MAX_TOKENS) {
+                    const candidate = this.words[left - 1];
+                    if (this.isHardBoundary(candidate)) break;
+                    if (this.isSentenceBoundary(candidate, left - 1)) break;
+                    left--;
+                    tokenCount++;
+                }
+
+                // Scan right
+                let right = startIndex;
+                tokenCount = right - startIndex;
+                while (right < this.words.length - 1 && tokenCount < MAX_TOKENS) {
+                    const candidate = this.words[right + 1];
+                    if (this.isHardBoundary(candidate)) break;
+                    if (this.isSentenceBoundary(this.words[right], right)) break;
+                    right++;
+                    tokenCount++;
+                }
+
+                // Join tokens [left, right]
+                let text = '';
+                for (let i = left; i <= right; i++) {
+                    text += this.words[i].word;
+                    if (this.words[i].spaceAfter && i < right) {
+                        text += ' ';
+                    }
+                }
+                text = text.trim();
+
+                // Fallback if result is too long
+                if (text.length > 600) {
+                    return this.buildSelectedSentenceText();
+                }
+
+                return text;
+            },
+
+            // Original sentence_index-based extraction.  Kept for non-English languages
+            // and as a fallback for the token-window method.
             buildSelectedSentenceText() {
                 if (!this.selection.length) {
                     return '';
