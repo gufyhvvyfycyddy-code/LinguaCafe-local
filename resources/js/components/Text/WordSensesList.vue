@@ -239,7 +239,19 @@ export default {
             type: String,
             required: true,
         },
+        studyBase: {
+            type: String,
+            default: '',
+        },
+        baseWord: {
+            type: String,
+            default: '',
+        },
         surface: {
+            type: String,
+            default: '',
+        },
+        word: {
             type: String,
             default: '',
         },
@@ -259,7 +271,8 @@ export default {
             sentenceText: state => state.vocabularyBox.sentenceText,
         }),
         effectiveLemma() {
-            return (this.lemma || this.surface || '').trim().toLowerCase();
+            // Full fallback chain: studyBase → baseWord → lemma → surface → word
+            return (this.studyBase || this.baseWord || this.lemma || this.surface || this.word || '').trim().toLowerCase();
         },
         surfaceWord() {
             return (this.surface || this.lemma || '').trim();

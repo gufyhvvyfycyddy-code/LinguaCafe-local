@@ -16,6 +16,7 @@ export default {
         word: '',
         reading: '',
         baseWord: '',
+        studyBase: '',
         baseWordReading: '',
         stage: 0,
 
@@ -58,6 +59,7 @@ export default {
             state.reading = '';
             state.kanjiList = [];
             state.baseWord = '';
+            state.studyBase = '';
             state.baseWordReading = '';
             state.stage = 2;
             state.type = 'empty';
@@ -94,6 +96,9 @@ export default {
         },
         setBaseWord (state, value) {
             state.baseWord = value;
+        },
+        setStudyBase (state, value) {
+            state.studyBase = value;
         },
         setBaseWordReading (state, value) {
             state.baseWordReading = value;

@@ -22,6 +22,7 @@ class EncounteredWord extends Model
         'stage',
         'word',
         'lemma',
+        'study_base',
         'kanji',
         'reading',
         'base_word',

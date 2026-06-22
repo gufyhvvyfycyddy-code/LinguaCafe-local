@@ -46,8 +46,8 @@
                             <div class="text-h6 default-font mb-1">{{ word }}</div>
                             <div class="text-caption text--secondary">
                                 当前词形：<strong class="default-font">{{ word }}</strong>
-                                <span class="mx-2">词元：
-                                    <strong v-if="!editingLemma" class="default-font">{{ baseWord || word }}</strong>
+                                <span class="mx-2">学习词根：
+                                    <strong v-if="!editingLemma" class="default-font">{{ studyBase || baseWord || word }}</strong>
                                     <span v-if="!editingLemma" class="lemma-edit-link ml-1" @click="startEditLemma">[修改]</span>
                                     <span v-if="editingLemma" class="lemma-edit-inline">
                                         <input
@@ -103,7 +103,7 @@
                 <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
                 <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
 
-                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" :legacy-translation="translationText" />
+                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" />
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />
@@ -150,6 +150,7 @@ export default {
         inflections: state => state.vocabularyBox.inflections,
         _reading: state => state.vocabularyBox.reading,
         _baseWord: state => state.vocabularyBox.baseWord,
+        _studyBase: state => state.vocabularyBox.studyBase,
         _baseWordReading: state => state.vocabularyBox.baseWordReading,
         _phraseReading: state => state.vocabularyBox.phraseReading,
         _translationText: state => state.vocabularyBox.translationText,
@@ -171,6 +172,7 @@ export default {
             phraseText: '',
             reading: '',
             baseWord: '',
+            studyBase: '',
             baseWordReading: '',
             phraseReading: '',
             translationText: '',
@@ -183,6 +185,7 @@ export default {
             this.translationText = this._translationText;
             this.reading = this._reading;
             this.baseWord = this._baseWord;
+            this.studyBase = this._studyBase;
             this.baseWordReading = this._baseWordReading;
             this.phraseReading = this._phraseReading;
             this.searchField = this._searchField;
@@ -209,7 +212,7 @@ export default {
         deletePhrase() { this.$emit('deletePhrase'); },
         deleteWord() { this.$emit('deleteWord'); },
         startEditLemma() {
-            this.editLemmaValue = this.baseWord || this.word;
+            this.editLemmaValue = this.studyBase || this.baseWord || this.word;
             this.editingLemma = true;
             this.$nextTick(() => {
                 if (this.$refs.lemmaInput) {
@@ -220,15 +223,16 @@ export default {
         },
         saveLemma() {
             if (!this.editingLemma) return;
-            const newLemma = (this.editLemmaValue || '').trim();
-            if (newLemma && newLemma !== this.baseWord) {
-                this.baseWord = newLemma;
-                // Update Vuex store so saveWord picks up the new base_word
-                this.$store.commit('vocabularyBox/setBaseWord', newLemma);
-                // Emit to parent so it persists to encountered_word.base_word
+            const newValue = (this.editLemmaValue || '').trim().toLowerCase();
+            if (newValue && newValue !== this.studyBase) {
+                this.studyBase = newValue;
+                // Update Vuex store so saveWord picks up the new study_base
+                this.$store.commit('vocabularyBox/setStudyBase', newValue);
+                // Emit to parent so it persists to encountered_word.study_base
                 this.$emit('updateVocabBoxData', {
                     reading: this.reading,
-                    baseWord: newLemma,
+                    baseWord: this.baseWord,
+                    studyBase: newValue,
                     baseWordReading: this.baseWordReading,
                     phraseReading: this.phraseReading,
                     translationText: this.translationText

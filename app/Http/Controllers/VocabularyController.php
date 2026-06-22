@@ -64,6 +64,10 @@ class VocabularyController extends Controller {
             $wordData['base_word'] = $request->base_word === NULL ? '' : $request->base_word;
         }
 
+        if ($request->has('study_base')) {
+            $wordData['study_base'] = $request->study_base === NULL ? '' : $request->study_base;
+        }
+
         if ($request->has('base_word_reading')) {
             $wordData['base_word_reading'] = $request->base_word_reading === NULL ? '' : $request->base_word_reading;
         }
@@ -102,6 +106,43 @@ class VocabularyController extends Controller {
             $this->vocabularyService->updateWord($userId, $wordId, $wordData, $wordStage, $bridgeContext);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
+        }
+
+        // Save or delete user study_base rule
+        if ($request->has('study_base')) {
+            $word = \App\Models\EncounteredWord::where('id', $wordId)
+                ->where('user_id', $userId)
+                ->first();
+            if ($word) {
+                $surface = mb_strtolower(trim($word->word), 'UTF-8');
+                $studyBase = $request->study_base === NULL || $request->study_base === ''
+                    ? '' : mb_strtolower(trim($request->study_base), 'UTF-8');
+                $baseWord = $word->base_word
+                    ? mb_strtolower(trim($word->base_word), 'UTF-8')
+                    : '';
+
+                $language = $word->language;
+
+                if ($surface !== '' && $studyBase !== '' && $language !== '') {
+                    if ($studyBase !== $baseWord) {
+                        // User set a custom study_base → save rule
+                        \App\Models\UserStudyBaseRule::updateOrCreate(
+                            [
+                                'user_id' => $userId,
+                                'language' => $language,
+                                'surface' => $surface,
+                            ],
+                            ['study_base' => $studyBase]
+                        );
+                    } else {
+                        // User reset study_base to match base_word → delete rule
+                        \App\Models\UserStudyBaseRule::where('user_id', $userId)
+                            ->where('language', $language)
+                            ->where('surface', $surface)
+                            ->delete();
+                    }
+                }
+            }
         }
 
         return response()->json('Word has been successfully updated.', 200);

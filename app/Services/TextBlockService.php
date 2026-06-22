@@ -401,7 +401,18 @@ class TextBlockService
                 $encounteredWord['language'] = $this->language;
                 $encounteredWord['word'] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
                 $encounteredWord['lemma'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-                $encounteredWord['base_word'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
+                $grammaticalLemma = mb_strtolower($this->processedWords[$wordIndex]->lemma);
+                $encounteredWord['base_word'] = $grammaticalLemma;
+
+                // study_base: use user rule if exists, otherwise default to grammatical lemma
+                $surfaceLower = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
+                $userRule = \App\Models\UserStudyBaseRule::where('user_id', $this->userId)
+                    ->where('language', $this->language)
+                    ->where('surface', $surfaceLower)
+                    ->first();
+                $encounteredWord['study_base'] = $userRule
+                    ? $userRule->study_base
+                    : $grammaticalLemma;
                 $encounteredWord['reading'] = $this->processedWords[$wordIndex]->reading;
                 $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
                 $encounteredWord['base_word_reading'] = $this->processedWords[$wordIndex]->lemma_reading;
@@ -415,6 +426,7 @@ class TextBlockService
                     $encounteredWord['stage'] = 1;
                     $encounteredWord['base_word'] = '';
                     $encounteredWord['lemma'] = '';
+                    $encounteredWord['study_base'] = '';
                     $encounteredWord['reading'] = '';
                     $encounteredWord['base_word_reading'] = '';
                 }
@@ -426,6 +438,7 @@ class TextBlockService
                 if ($isCJK && $encounteredWord['base_word'] == $encounteredWord['word']) {
                     $encounteredWord['base_word'] = '';
                     $encounteredWord['lemma'] = '';
+                    $encounteredWord['study_base'] = '';
                     $encounteredWord['base_word_reading'] = '';
                 }
 
@@ -846,19 +859,46 @@ class TextBlockService
             $stem = $m[1];
             // Double consonant removal: dropping→drop, running→run
             if (mb_strlen($stem) >= 3 && mb_substr($stem, -1) === mb_substr($stem, -2, 1)) {
-                $deDouble = mb_substr($stem, 0, -1);
-                if ($this->lemmaInEcdict($deDouble) || !$this->ecdictAvailable()) {
-                    return $deDouble;
+                $lastChar = mb_substr($stem, -1);
+                if ($this->ecdictAvailable()) {
+                    // ECDICT available: try bare stem first (falling→fall), then de-double (running→run), then +e
+                    if ($this->lemmaInEcdict($stem)) {
+                        return $stem;
+                    }
+                    $deDouble = mb_substr($stem, 0, -1);
+                    if ($this->lemmaInEcdict($deDouble)) {
+                        return $deDouble;
+                    }
+                    $candidate = $stem . 'e';
+                    if ($this->lemmaInEcdict($candidate)) {
+                        return $candidate;
+                    }
+                } else {
+                    // ECDICT unavailable: ll/ss/zz keep bare stem, other doubles de-double
+                    if (in_array($lastChar, ['l', 's', 'z'], true)) {
+                        return $stem;
+                    }
+                    return mb_substr($stem, 0, -1);
                 }
             }
-            // Try adding 'e' (making → make, taking → take, coming → come)
-            $candidate = $stem . 'e';
-            if ($this->lemmaInEcdict($candidate) || !$this->ecdictAvailable()) {
+            // No double consonant
+            if ($this->ecdictAvailable()) {
+                // Try +e (making → make, taking → take)
+                $candidate = $stem . 'e';
+                if ($this->lemmaInEcdict($candidate)) {
+                    return $candidate;
+                }
+                // Try bare stem
+                if ($this->lemmaInEcdict($stem)) {
+                    return $stem;
+                }
+            } else {
+                // No ECDICT: try +e then stem (same as old behavior).
+                // +e is correct for most common -ing forms (coming→come, making→make, taking→take)
+                // and when wrong (walking→walke), the form is still recognizable.
+                // The alternative (bare stem) would break common verbs (com, mak, tak are unrecognizable).
+                $candidate = $stem . 'e';
                 return $candidate;
-            }
-            // Try bare stem (beating → beat)
-            if ($this->lemmaInEcdict($stem)) {
-                return $stem;
             }
         }
 
@@ -867,25 +907,53 @@ class TextBlockService
             $stem = $m[1];
             // Double consonant removal: stopped→stop, dropped→drop
             if (mb_strlen($stem) >= 3 && mb_substr($stem, -1) === mb_substr($stem, -2, 1)) {
-                $deDouble = mb_substr($stem, 0, -1);
-                if ($this->lemmaInEcdict($deDouble) || !$this->ecdictAvailable()) {
-                    return $deDouble;
+                $lastChar = mb_substr($stem, -1);
+                if ($this->ecdictAvailable()) {
+                    // ECDICT available: try bare stem first (called→call), then de-double (stopped→stop), then +e
+                    if ($this->lemmaInEcdict($stem)) {
+                        return $stem;
+                    }
+                    $deDouble = mb_substr($stem, 0, -1);
+                    if ($this->lemmaInEcdict($deDouble)) {
+                        return $deDouble;
+                    }
+                    $candidate = $stem . 'e';
+                    if ($this->lemmaInEcdict($candidate)) {
+                        return $candidate;
+                    }
+                } else {
+                    // ECDICT unavailable: ll/ss/zz keep bare stem, other doubles de-double
+                    if (in_array($lastChar, ['l', 's', 'z'], true)) {
+                        return $stem;
+                    }
+                    return mb_substr($stem, 0, -1);
                 }
             }
-            // Try adding 'e' (surged → surge, liked → like)
-            $candidate = $stem . 'e';
-            if ($this->lemmaInEcdict($candidate) || !$this->ecdictAvailable()) {
-                return $candidate;
-            }
-            // -ied → -y (tried → try)
-            if (preg_match('/^(.+)i$/u', $stem, $m2)) {
-                $candidate2 = $m2[1] . 'y';
-                if ($this->lemmaInEcdict($candidate2) || !$this->ecdictAvailable()) {
-                    return $candidate2;
+            // No double consonant
+            if ($this->ecdictAvailable()) {
+                // Try +e (surged → surge, liked → like)
+                $candidate = $stem . 'e';
+                if ($this->lemmaInEcdict($candidate)) {
+                    return $candidate;
                 }
-            }
-            // bare stem
-            if ($this->lemmaInEcdict($stem)) {
+                // -ied → -y (tried → try)
+                if (preg_match('/^(.+)i$/u', $stem, $m2)) {
+                    $candidate2 = $m2[1] . 'y';
+                    if ($this->lemmaInEcdict($candidate2)) {
+                        return $candidate2;
+                    }
+                }
+                // bare stem
+                if ($this->lemmaInEcdict($stem)) {
+                    return $stem;
+                }
+            } else {
+                // No ECDICT: conservative — no blind +e
+                // -ied → -y is a high-confidence rule (tried → try, studied → study)
+                if (preg_match('/^(.+)i$/u', $stem, $m2)) {
+                    return $m2[1] . 'y';
+                }
+                // Return bare stem (walked→walk, looked→look)
                 return $stem;
             }
         }

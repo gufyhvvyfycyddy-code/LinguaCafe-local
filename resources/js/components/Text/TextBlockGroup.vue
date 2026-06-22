@@ -1244,6 +1244,7 @@
                     this.$store.commit('vocabularyBox/setWord', uniqueWord.word);
                     this.$store.commit('vocabularyBox/setReading', uniqueWord.reading);
                     this.$store.commit('vocabularyBox/setBaseWord', uniqueWord.base_word);
+                    this.$store.commit('vocabularyBox/setStudyBase', uniqueWord.study_base || uniqueWord.base_word);
                     this.$store.commit('vocabularyBox/setBaseWordReading', uniqueWord.base_word_reading);
                     this.$store.commit('vocabularyBox/setTranslationText', uniqueWord.translation);
                     this.$store.commit('vocabularyBox/setStage', uniqueWord.stage);
@@ -1754,6 +1755,9 @@
             updateVocabBoxData(newVocabBoxData) {
                 this.$store.commit('vocabularyBox/setReading', newVocabBoxData.reading);
                 this.$store.commit('vocabularyBox/setBaseWord', newVocabBoxData.baseWord);
+                if (newVocabBoxData.studyBase !== undefined) {
+                    this.$store.commit('vocabularyBox/setStudyBase', newVocabBoxData.studyBase);
+                }
                 this.$store.commit('vocabularyBox/setBaseWordReading', newVocabBoxData.baseWordReading);
                 this.$store.commit('vocabularyBox/setPhraseReading', newVocabBoxData.phraseReading);
                 this.$store.commit('vocabularyBox/setTranslationText', newVocabBoxData.translationText);
@@ -1797,6 +1801,7 @@
                     translation: this.$store.state.vocabularyBox.translationText,
                     reading: this.$store.state.vocabularyBox.reading,
                     base_word: this.$store.state.vocabularyBox.baseWord,
+                    study_base: this.$store.state.vocabularyBox.studyBase,
                     base_word_reading: this.$store.state.vocabularyBox.baseWordReading,
                     lookup_count: selectedWord.lookup_count,
                 };

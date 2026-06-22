@@ -170,7 +170,7 @@
                         ></vocabulary-search-box>
 
                         <!-- Saved word senses -->
-                        <word-senses-list ref="wordSensesList" v-if="type === 'word'" :lemma="baseWord || word" :surface="word" :language="$props.language" :legacy-translation="translationText" />
+                        <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" />
                     </v-card-text>
 
                     <v-card-actions v-if="type !== 'word'" class="mt-2 pl-0">
@@ -326,6 +326,7 @@
             inflections: state => state.vocabularyBox.inflections,
             _reading: state => state.vocabularyBox.reading,
             _baseWord: state => state.vocabularyBox.baseWord,
+            _studyBase: state => state.vocabularyBox.studyBase,
             _baseWordReading: state => state.vocabularyBox.baseWordReading,
             _phraseReading: state => state.vocabularyBox.phraseReading,
             _translationText: state => state.vocabularyBox.translationText,
@@ -340,6 +341,7 @@
                 // data for word
                 reading: '',
                 baseWord: '',
+                studyBase: '',
                 baseWordReading: '',
                 phraseReading: '',
 
@@ -362,6 +364,7 @@
                 this.translationText = this._translationText;
                 this.reading = this._reading;
                 this.baseWord = this._baseWord;
+                this.studyBase = this._studyBase;
                 this.baseWordReading = this._baseWordReading;
                 this.phraseReading = this._phraseReading;
                 this.searchField = this._searchField;
