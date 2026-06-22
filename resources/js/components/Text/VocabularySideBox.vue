@@ -73,6 +73,8 @@
 
                 <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" />
 
+                <word-senses-list v-if="type === 'word'" :lemma="baseWord" :language="$props.language" />
+
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />
                     <v-btn small rounded color="success" @click="addNewPhrase" v-if="type == 'new-phrase'">保存短语</v-btn>
@@ -98,8 +100,12 @@
 
 <script>
 import { mapState } from 'vuex';
+import WordSensesList from './WordSensesList.vue';
 
 export default {
+    components: {
+        WordSensesList,
+    },
     props: {
         language: String,
         autoHighlightWords: Boolean,

@@ -160,6 +160,9 @@
                             :searchTerm="searchField"
                             @addDefinitionToInput="addDefinitionToInput"
                         ></vocabulary-search-box>
+
+                        <!-- Saved word senses -->
+                        <word-senses-list v-if="type === 'word'" :lemma="baseWord" :language="$props.language" />
                     </v-card-text>
 
                     <v-card-actions v-if="type !== 'word'" class="mt-2 pl-0">
@@ -294,8 +297,12 @@
 
 <script>
     import { mapState } from 'vuex';
+    import WordSensesList from './WordSensesList.vue';
 
     export default {
+        components: {
+            WordSensesList,
+        },
         props: {
             autoHighlightWords: Boolean,
             language: String,
