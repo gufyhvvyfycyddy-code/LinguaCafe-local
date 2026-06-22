@@ -1431,33 +1431,64 @@ class WordSenseTest extends TestCase
 
     // ─── Fallback tokenizer preserves PARAGRAPH_BREAK ───
 
-    public function test_fallback_tokenizer_preserves_paragraph_break_and_newline(): void
+    public function test_safe_markers_survive_fallback_tokenizer_as_single_tokens(): void
     {
         $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
         $reflector = new \ReflectionClass($textBlock);
         $method = $reflector->getMethod('fallbackEnglishTokenize');
         $method->setAccessible(true);
 
-        $tokens = $method->invoke($textBlock, "Hello NEWLINE world PARAGRAPH_BREAK testing _SECT_A_ Retail");
+        // Use the real safe markers (ZZPARAZZ, ZZSECTxZ) — all uppercase letters
+        $tokens = $method->invoke($textBlock, "Hello ZZPARAZZ world ZZSECTAZ Retail");
 
         $words = array_map(fn ($t) => $t->w, $tokens);
 
-        $this->assertContains('NEWLINE', $words);
-        $this->assertContains('PARAGRAPH_BREAK', $words);
-        $this->assertContains('_SECT_A_', $words);
+        $this->assertContains('ZZPARAZZ', $words);
+        $this->assertContains('ZZSECTAZ', $words);
         $this->assertContains('Hello', $words);
         $this->assertContains('world', $words);
-        $this->assertContains('testing', $words);
         $this->assertContains('Retail', $words);
+    }
+
+    public function test_map_structural_tokens_converts_markers_correctly(): void
+    {
+        $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
+        $reflector = new \ReflectionClass($textBlock);
+        $method = $reflector->getMethod('mapStructuralTokens');
+        $method->setAccessible(true);
+
+        $input = [
+            (object) ['w' => 'Hello', 'l' => 'hello', 'si' => 0, 'pos' => 'X'],
+            (object) ['w' => 'ZZPARAZZ', 'l' => 'ZZPARAZZ', 'si' => 1, 'pos' => 'X'],
+            (object) ['w' => 'ZZSECTAZ', 'l' => 'ZZSECTAZ', 'si' => 2, 'pos' => 'X'],
+            (object) ['w' => 'World', 'l' => 'world', 'si' => 3, 'pos' => 'X'],
+        ];
+
+        $result = $method->invoke($textBlock, $input);
+
+        $outWords = [];
+        $outPoses = [];
+        foreach ($result as $t) {
+            $outWords[] = $t->w;
+            $outPoses[] = $t->pos;
+        }
+
+        $this->assertSame(['Hello', 'PARAGRAPH_BREAK', '[A]', 'World'], $outWords);
+        $this->assertSame(['X', 'STRUCT', 'STRUCT', 'X'], $outPoses);
     }
 
     public function test_vocabulary_token_filter_skips_structural_tokens(): void
     {
         $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('PARAGRAPH_BREAK', 'english'));
         $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('NEWLINE', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('[A]', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('[B]', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('[Z]', 'english'));
+        // Backward compat
         $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_A_', 'english'));
-        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_B_', 'english'));
-        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_Z_', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('ZZPARAZZ', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('ZZSECTAZ', 'english'));
+        // Real words pass through
         $this->assertFalse(\App\Services\VocabularyTokenFilter::shouldSkip('brick', 'english'));
         $this->assertFalse(\App\Services\VocabularyTokenFilter::shouldSkip('stores', 'english'));
     }

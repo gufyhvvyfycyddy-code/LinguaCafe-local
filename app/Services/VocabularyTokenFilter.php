@@ -17,8 +17,18 @@ class VocabularyTokenFilter
             return true;
         }
 
-        // 跳过 [A] [B] [C] ... [Z] 段落标记（已转化为 _SECT_X_）
+        // 跳过 [A] [B] [C] ... [Z] 段落标记（新格式）
+        if (preg_match('/^\[[A-Z]\]$/u', $token)) {
+            return true;
+        }
+
+        // 兼容旧格式 _SECT_X_（旧导入可能残留）
         if (preg_match('/^_SECT_[A-Z]_$/u', $token)) {
+            return true;
+        }
+
+        // 跳过 tokenizer 安全标记（不应出现在 processed_text，兜底）
+        if (preg_match('/^ZZPARAZZ$|^ZZNEWLZZ$|^ZZSECT[A-Z]Z$/u', $token)) {
             return true;
         }
 

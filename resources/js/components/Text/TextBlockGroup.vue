@@ -69,16 +69,16 @@
                     ><!--
                     -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
                 --></div><!--
-                --><br v-if="word.word === 'NEWLINE'" /><!--
-                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" style="display:block;height:1.2em;clear:both;"></div><!--
+                --><br v-if="word.is_structure && word.word === 'NEWLINE'" /><!--
+                --><div v-else-if="word.is_structure && word.word === 'PARAGRAPH_BREAK'" style="display:block;height:1.2em;clear:both;"></div><!--
                 --><span
-                    v-else-if="isSectionMarker(word.word)"
+                    v-else-if="word.is_structure && isSectionMarker(word.word)"
                     class="word selected-font"
                     :style="{'margin-bottom': (lineSpacing * 4) + 'px', 'font-weight': 'bold'}"
                     :wordindex="wordIndex"
                     :stage="word.stage"
                     :key="wordIndex"
-                >[{{ word.word.slice(-1) }}]</span><!--
+                >{{ word.word }}</span><!--
                 --><span
                     v-else
                     :wordindex="wordIndex"
@@ -358,7 +358,12 @@
         },
         methods: {
             isSectionMarker(word) {
-                return typeof word === 'string' && word.startsWith('_SECT_') && word.length === 7;
+                if (typeof word !== 'string') return false;
+                // 新格式: [A] [B] [C] ... [Z]
+                if (word.length === 3 && word[0] === '[' && word[2] === ']' && word[1] >= 'A' && word[1] <= 'Z') return true;
+                // 兼容旧格式: _SECT_X_
+                if (word.startsWith('_SECT_') && word.length === 8) return true;
+                return false;
             },
             textToSpeech() {
                 if (!this.selection.length) {

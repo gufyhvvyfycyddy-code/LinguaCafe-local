@@ -109,23 +109,43 @@ class TextBlockService
     /* 
         Sends the raw text to python tokenizer service, and stores the result.
     */
+    /*
+     * 使用不会被任何 tokenizer 拆散的标记代替段落/换行结构，
+     * tokenize 之后再统一替换为结构 token（type=STRUCT）。
+     * 标记全大写字母，不含下划线或标点，spaCy/fallback 都视为单个 token。
+     */
+    private const MARKER_PARA = 'ZZPARAZZ';
+    private const MARKER_NEWL = 'ZZNEWLZZ';
+    private const MARKER_SECT_PREFIX = 'ZZSECT';
+
     public function tokenizeRawText() {
         $text = $this->rawText;
-        // 区分段落分隔（双换行）和软换行（单换行）
+
+        // 1. 换行 → tokenizer 安全标记
         $text = str_replace(["\r\n\r\n", "\n\n", "\r\n", "\r", "\n"],
-            [" PARAGRAPH_BREAK ", " PARAGRAPH_BREAK ", " NEWLINE ", " NEWLINE ", " NEWLINE "], $text);
-        $text = preg_replace("/ {2,}/", " ", $text);
+            [' ' . self::MARKER_PARA . ' ', ' ' . self::MARKER_PARA . ' ',
+             ' ' . self::MARKER_NEWL . ' ', ' ' . self::MARKER_NEWL . ' ', ' ' . self::MARKER_NEWL . ' '],
+            $text);
+        $text = preg_replace('/ {2,}/', ' ', $text);
 
-        // 保护 [A] [B] [C] ... [Z] 段落标记不被 tokenizer 拆散
-        // 将标记转化为单个 token，并确保前方有段落间隔
-        $text = preg_replace('/\s*\[([A-Z])\]\s*/u', ' _SECT_$1_ ', $text);
-        // 当 _SECT_ 紧跟在普通词后面（非 PARAGRAPH_BREAK）时，插入段落间隔
-        $text = preg_replace('/(\S)\s+_SECT_([A-Z])_/u', '$1 PARAGRAPH_BREAK _SECT_$2_', $text);
-        // 合并连续的 PARAGRAPH_BREAK
-        $text = preg_replace('/(PARAGRAPH_BREAK\s+)+/', 'PARAGRAPH_BREAK ', $text);
+        // 2. [A]-[Z] 段落标记 → 安全标记，并确保前方有段落分隔
+        $text = preg_replace_callback(
+            '/\s*\[([A-Z])\]\s*/u',
+            fn ($m) => ' ' . self::MARKER_SECT_PREFIX . $m[1] . 'Z ',
+            $text
+        );
+        // 紧跟在普通词后方的 section marker 前插入段落分隔
+        $text = preg_replace(
+            '/(\S)\s+(' . self::MARKER_SECT_PREFIX . '[A-Z]Z)/u',
+            '$1 ' . self::MARKER_PARA . ' $2',
+            $text
+        );
+        // 合并连续段落标记
+        $text = preg_replace('/(' . self::MARKER_PARA . '\s+)+/', self::MARKER_PARA . ' ', $text);
 
+        // 3. Tokenize
         try {
-            $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
+            $tokens = $this->postTokenizer('/tokenizer', [
                 'raw_text' => $text,
                 'language' => $this->language,
             ]);
@@ -138,8 +158,46 @@ class TextBlockService
                 'user_id' => $this->userId,
                 'error' => $exception->getMessage(),
             ]);
-            $this->tokenizedWords = $this->fallbackEnglishTokenize($text);
+            $tokens = $this->fallbackEnglishTokenize($text);
         }
+
+        // 4. 后处理：将安全标记替换为结构 token（不再依赖前端字符串匹配）
+        $this->tokenizedWords = $this->mapStructuralTokens($tokens);
+    }
+
+    /**
+     * 将 tokenizer 返回的安全标记 ZZPARAZZ / ZZNEWLZZ / ZZSECTxZ
+     * 替换为显式结构 token（pos = 'STRUCT'），前端/过滤层据此识别。
+     */
+    private function mapStructuralTokens(array $tokens): array
+    {
+        $result = [];
+        foreach ($tokens as $token) {
+            $w = $token->w ?? '';
+
+            if ($w === self::MARKER_PARA) {
+                $st = clone $token;
+                $st->w = 'PARAGRAPH_BREAK';
+                $st->l = 'PARAGRAPH_BREAK';
+                $st->pos = 'STRUCT';
+                $result[] = $st;
+            } elseif ($w === self::MARKER_NEWL) {
+                $st = clone $token;
+                $st->w = 'NEWLINE';
+                $st->l = 'NEWLINE';
+                $st->pos = 'STRUCT';
+                $result[] = $st;
+            } elseif (preg_match('/^' . self::MARKER_SECT_PREFIX . '([A-Z])Z$/', $w, $m)) {
+                $st = clone $token;
+                $st->w = '[' . $m[1] . ']';
+                $st->l = '[' . $m[1] . ']';
+                $st->pos = 'STRUCT';
+                $result[] = $st;
+            } else {
+                $result[] = $token;
+            }
+        }
+        return $result;
     }
 
     public function tokenizeRawSubtitles() {
@@ -181,6 +239,7 @@ class TextBlockService
             }
             
             $word->pos = $this->tokenizedWords[$wordIndex]->pos;
+            $word->is_structure = ($this->tokenizedWords[$wordIndex]->pos === 'STRUCT');
             $word->phrase_ids = [];
 
             // japanese post processing
@@ -630,63 +689,20 @@ class TextBlockService
 
     private function fallbackEnglishTokenize(string $text): array
     {
+        // 安全标记（ZZPARAZZ, ZZNEWLZZ, ZZSECTxZ）都是纯大写字母，
+        // 会被下游 [A-Za-z]+ 作为单个 token 提取，不需要特殊处理。
+        // mapStructuralTokens() 会在 tokenize 之后统一转换为 STRUCT token。
         $tokens = [];
         $sentenceIndex = 0;
 
-        // Split on sentence endings, NEWLINE, and PARAGRAPH_BREAK — capture delimiters
-        $parts = preg_split(
-            '/((?<=[.!?])\s+|(?:\s+NEWLINE\s+)|(?:\s+PARAGRAPH_BREAK\s+))/u',
+        $sentences = preg_split(
+            '/((?<=[.!?])\s+)/u',
             trim($text), -1,
             PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
         );
 
-        foreach ($parts as $part) {
-            $trimmed = trim($part);
-
-            if ($trimmed === 'NEWLINE' || $trimmed === 'PARAGRAPH_BREAK') {
-                $token = new \stdClass();
-                $token->w = $trimmed;
-                $token->r = '';
-                $token->l = $trimmed;
-                $token->lr = '';
-                $token->pos = 'PUNCT';
-                $token->si = $sentenceIndex;
-                $token->g = '';
-                $tokens[] = $token;
-                $sentenceIndex++;
-                continue;
-            }
-
-            // Extract _SECT_X_ section markers first, then tokenize the rest
-            $remainder = $trimmed;
-            while (preg_match('/_SECT_[A-Z]_/u', $remainder, $m, PREG_OFFSET_CAPTURE)) {
-                $pos = $m[0][1];
-                $marker = $m[0][0];
-                // Tokenize text before the marker
-                $before = substr($remainder, 0, $pos);
-                if (trim($before) !== '') {
-                    preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', trim($before), $bm);
-                    foreach ($bm[0] ?? [] as $surface) {
-                        if ($surface === '') continue;
-                        $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
-                    }
-                }
-                // Add the marker itself
-                $tokens[] = $this->makeFallbackTokenWithPos($marker, 'X', $sentenceIndex);
-                // Advance past the marker
-                $remainder = substr($remainder, $pos + strlen($marker));
-            }
-            // Tokenize remaining text
-            $remainder = trim($remainder);
-            if ($remainder !== '') {
-                preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $remainder, $rm);
-                foreach ($rm[0] ?? [] as $surface) {
-                    if ($surface === '') continue;
-                    $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
-                }
-            }
-            $sentenceIndex++;
-            continue;
+        foreach ($sentences as $sentence) {
+            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $sentence, $matches);
 
             foreach ($matches[0] ?? [] as $surface) {
                 if ($surface === '') {
