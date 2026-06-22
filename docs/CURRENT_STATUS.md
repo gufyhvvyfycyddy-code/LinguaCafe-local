@@ -127,6 +127,21 @@ php artisan dictionary:import-ecdict --force
 5. `matched_sense_id` 在 GPT workflow 中依赖 package 里导出的 `sense_id`；如果用户用 demo JSON 可能指向不存在的 ID。
 6. 词典数据不在 git 版本控制内；测试后可能需重新导入 `php artisan dictionary:import-ecdict`。
 
+## 数据库自愈
+
+以下组件若缺失，系统会自动修复：
+
+| 组件 | 缺失症状 | 自愈方式 |
+|------|----------|----------|
+| `reviewIntervals` setting | 保存词汇等级失败 | `EncounteredWord::setStage()` 自动运行 `SettingsSeeder` |
+| Goals（review/read_words/learn_words） | 保存词汇等级失败 | `GoalService::updateGoalAchievement()` 自动调用 `createGoalsForLanguage()` |
+
+手动检查：
+```bash
+php artisan db:doctor           # 检查 settings / goals / ECDICT / 测试隔离
+php artisan db:doctor --fix     # 检查并自动修复
+```
+
 ## 保护清单（不可破坏）
 
 - 英文导入、tokenizer English fallback。
@@ -135,4 +150,6 @@ php artisan dictionary:import-ecdict --force
 - GPT sense-mapping workflow（prepare → validate → dry-run → import）。
 - 注册、登录、用户创建。
 - Pusher 本地降级（`BROADCAST_DRIVER=log`）。
-- 现有 58 个 FSRS/Sense 测试必须全绿。
+- 现有 FSRS/Sense 测试必须全绿。
+- `php artisan test` 必须使用独立测试数据库，不得清空开发数据库。
+- 保存 Learning 词不得因 settings/goals 缺失而崩溃。

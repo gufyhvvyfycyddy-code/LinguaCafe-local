@@ -155,15 +155,30 @@ php artisan dictionary:import-ecdict
 php artisan dictionary:import-ecdict --force
 ```
 
-健康输出示例：
-```
-Table exists:    YES
-Row count:       768,739
-Expected min:    700,000
-Overall health:  HEALTHY
+> **注意**：`.env.testing` 已使用独立数据库 `linguacafe_fsrs_test`，测试不会再清除主库词典。
+
+### 保存 Learning 词失败 / 等级保存报错
+
+现象：词汇页或阅读页设置单词等级后，提示"保存失败，请稍后重试"。
+
+原因：`settings.reviewIntervals` 或用户 goals 被数据库重建清空。
+
+检查：
+```bash
+php artisan db:doctor
 ```
 
-> **注意**：`.env.testing` 已使用独立数据库 `linguacafe_fsrs_test`，测试不会再清除主库词典。但首次使用前需确保测试库已创建（`CREATE DATABASE IF NOT EXISTS linguacafe_fsrs_test`）。
+恢复：
+```bash
+# 检查并自动修复 settings 和 goals
+php artisan db:doctor --fix
+
+# 或手动分别修复
+php artisan db:seed --class=SettingsSeeder
+php artisan tinker --execute="(new App\Services\GoalService())->createGoalsForLanguage(1, 'english');"
+```
+
+> 系统已内置自愈：保存 Learning 词时如果 settings 或 goals 缺失，会自动补齐而不崩溃。但如果手动修复更可控，建议运行 `db:doctor --fix`。
 
 ### 中文显示乱码
 

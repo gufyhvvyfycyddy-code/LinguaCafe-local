@@ -59,9 +59,24 @@ class GoalService {
             ->where('language', $language)
             ->where('type', $type)
             ->first();
-        
+
         if (!$goal) {
-            throw new \Exception('There was no goal found in the database with the given type, user id and language. This error should never occur.');
+            // Auto-recover: create missing goals for this user/language, then retry
+            \Log::warning('GoalService: goals missing, auto-creating', [
+                'user_id' => $userId,
+                'language' => $language,
+                'type' => $type,
+            ]);
+            $this->createGoalsForLanguage($userId, $language);
+            $goal = Goal::where('user_id', $userId)
+                ->where('language', $language)
+                ->where('type', $type)
+                ->first();
+            if (!$goal) {
+                // Still missing after creation — skip gracefully instead of crashing vocabulary save
+                \Log::error("GoalService: unable to create goal type={$type} for user={$userId} language={$language}");
+                return false;
+            }
         }
 
         $achievement = GoalAchievement
