@@ -1338,6 +1338,127 @@ class WordSenseTest extends TestCase
         $this->assertTrue($wordCard->fsrs_enabled);
     }
 
+    // ─── FSRS Doctor ───
+
+    public function test_fsrs_doctor_detects_missing_word_card(): void
+    {
+        // Create a learning word without a review card
+        $word = $this->createWord('doctor-test');
+        $word->update(['stage' => -7]);
+        // ensure no card exists
+        ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->delete();
+
+        $this->artisan('fsrs:doctor', ['--user_id' => $this->user->id, '--language' => 'english'])
+            ->assertExitCode(1); // missing cards → non-zero
+    }
+
+    public function test_fsrs_doctor_fix_creates_missing_word_card(): void
+    {
+        $word = $this->createWord('doctor-fix');
+        $word->update(['stage' => -7]);
+        ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->delete();
+
+        $this->artisan('fsrs:doctor', [
+            '--fix' => true,
+            '--user_id' => $this->user->id,
+            '--language' => 'english',
+        ])->assertSuccessful();
+
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)->exists());
+    }
+
+    public function test_fsrs_doctor_does_not_duplicate_existing_word_card(): void
+    {
+        $word = $this->createWord('doctor-existing');
+        $word->update(['stage' => -7]);
+        // explicitly create the card first
+        $card = app(ReviewCardService::class)->ensureWordCard($word);
+        $cardId = $card->id;
+
+        $this->artisan('fsrs:doctor', [
+            '--fix' => true,
+            '--user_id' => $this->user->id,
+            '--language' => 'english',
+        ])->assertSuccessful();
+
+        $this->assertSame(1, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)->count());
+        $this->assertSame($cardId, $card->fresh()->id);
+    }
+
+    public function test_fsrs_doctor_detects_missing_sense_card(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'doctor-sense', 'sense_zh' => '医生']);
+        ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->delete();
+
+        $this->artisan('fsrs:doctor', ['--user_id' => $this->user->id, '--language' => 'english'])
+            ->assertExitCode(1);
+    }
+
+    public function test_fsrs_doctor_fix_creates_missing_sense_card(): void
+    {
+        $sense = $this->createSense(['sense_key' => 'doctor-fix-sense', 'sense_zh' => '医生']);
+        ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->delete();
+
+        // should not exist yet
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)
+            ->where('target_id', $sense->id)->exists());
+
+        $this->artisan('fsrs:doctor', [
+            '--fix' => true,
+            '--user_id' => $this->user->id,
+            '--language' => 'english',
+        ])->assertSuccessful();
+
+        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)
+            ->where('target_id', $sense->id)->exists());
+    }
+
+    public function test_fsrs_doctor_all_healthy_when_cards_present(): void
+    {
+        $word = $this->createWord('doctor-healthy');
+        $word->update(['stage' => -7]);
+        app(ReviewCardService::class)->ensureWordCard($word);
+
+        $sense = $this->createSense(['sense_key' => 'doctor-healthy-sense', 'sense_zh' => '医生']);
+        app(ReviewCardService::class)->ensureSenseCard($sense);
+
+        $this->artisan('fsrs:doctor', ['--user_id' => $this->user->id, '--language' => 'english'])
+            ->assertSuccessful()
+            ->assertExitCode(0);
+    }
+
+    // ─── Fallback tokenizer preserves PARAGRAPH_BREAK ───
+
+    public function test_fallback_tokenizer_preserves_paragraph_break_and_newline(): void
+    {
+        $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
+        $reflector = new \ReflectionClass($textBlock);
+        $method = $reflector->getMethod('fallbackEnglishTokenize');
+        $method->setAccessible(true);
+
+        $tokens = $method->invoke($textBlock, "Hello NEWLINE world PARAGRAPH_BREAK testing");
+
+        $words = array_map(fn ($t) => $t->w, $tokens);
+
+        $this->assertContains('NEWLINE', $words);
+        $this->assertContains('PARAGRAPH_BREAK', $words);
+        $this->assertContains('Hello', $words);
+        $this->assertContains('world', $words);
+        $this->assertContains('testing', $words);
+    }
+
+    public function test_vocabulary_token_filter_skips_paragraph_break_and_newline(): void
+    {
+        $filter = new \App\Services\VocabularyTokenFilter();
+
+        $this->assertTrue($filter::shouldSkip('PARAGRAPH_BREAK', 'english'));
+        $this->assertTrue($filter::shouldSkip('NEWLINE', 'english'));
+        $this->assertFalse($filter::shouldSkip('brick', 'english'));
+        $this->assertFalse($filter::shouldSkip('stores', 'english'));
+    }
+
     private function createTestChapter(array $processedWords): Chapter
     {
         return Chapter::forceCreate([

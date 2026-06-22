@@ -70,7 +70,7 @@
                     -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
                 --></div><!--
                 --><br v-if="word.word === 'NEWLINE'" /><!--
-                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" style="height: 0.8em;"></div><!--
+                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" class="paragraph-break" style="display:block;height:0;margin-top:1.2em;"></div><!--
                 --><span
                     v-else
                     :wordindex="wordIndex"

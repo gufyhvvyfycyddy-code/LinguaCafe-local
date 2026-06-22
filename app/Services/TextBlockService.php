@@ -622,15 +622,34 @@ class TextBlockService
 
     private function fallbackEnglishTokenize(string $text): array
     {
-        // fallback 中 PARAGRAPH_BREAK 降级为 NEWLINE
-        $text = str_replace('PARAGRAPH_BREAK', 'NEWLINE', $text);
-
         $tokens = [];
         $sentenceIndex = 0;
-        $sentences = preg_split('/(?<=[.!?])\s+|(?:\s+NEWLINE\s+)/u', trim($text), -1, PREG_SPLIT_NO_EMPTY);
 
-        foreach ($sentences as $sentence) {
-            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $sentence, $matches);
+        // Split on sentence endings, NEWLINE, and PARAGRAPH_BREAK — capture delimiters
+        $parts = preg_split(
+            '/((?<=[.!?])\s+|(?:\s+NEWLINE\s+)|(?:\s+PARAGRAPH_BREAK\s+))/u',
+            trim($text), -1,
+            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+        );
+
+        foreach ($parts as $part) {
+            $trimmed = trim($part);
+
+            if ($trimmed === 'NEWLINE' || $trimmed === 'PARAGRAPH_BREAK') {
+                $token = new \stdClass();
+                $token->w = $trimmed;
+                $token->r = '';
+                $token->l = $trimmed;
+                $token->lr = '';
+                $token->pos = 'PUNCT';
+                $token->si = $sentenceIndex;
+                $token->g = '';
+                $tokens[] = $token;
+                $sentenceIndex++;
+                continue;
+            }
+
+            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $trimmed, $matches);
 
             foreach ($matches[0] ?? [] as $surface) {
                 if ($surface === '') {
