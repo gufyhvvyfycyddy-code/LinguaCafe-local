@@ -132,6 +132,39 @@ storage/app/gpt-workflow/downloads/
 
 处理：打开同目录的 `.errors.json`，根据错误让 GPT 修正输出。
 
+### ECDICT 词典消失
+
+现象：阅读页点词查不到中文释义，或词典列表里没有 `ECDICT EN-ZH`。
+
+原因：
+- 运行 `php artisan test` 时 `RefreshDatabase` 会执行 `migrate:fresh` 清除非 migration 表。
+- 手动执行 `php artisan migrate:fresh`。
+- 切换或重建数据库。
+
+检查：
+```bash
+php artisan dictionary:import-ecdict --status
+```
+
+恢复：
+```bash
+# 如果表不存在，直接导入
+php artisan dictionary:import-ecdict
+
+# 如果表存在但条数异常（< 700,000），强制重建
+php artisan dictionary:import-ecdict --force
+```
+
+健康输出示例：
+```
+Table exists:    YES
+Row count:       768,739
+Expected min:    700,000
+Overall health:  HEALTHY
+```
+
+> **注意**：`.env.testing` 已使用独立数据库 `linguacafe_fsrs_test`，测试不会再清除主库词典。但首次使用前需确保测试库已创建（`CREATE DATABASE IF NOT EXISTS linguacafe_fsrs_test`）。
+
 ### 中文显示乱码
 
 现象：命令行中文显示异常。

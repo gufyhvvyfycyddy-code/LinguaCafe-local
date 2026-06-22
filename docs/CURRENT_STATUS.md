@@ -85,6 +85,39 @@ b13193e fix global loading states and complete Chinese UI
 - [ ] phrase FSRS 未启用。
 - [ ] ChatGPT 网页端自动控制（明确不做）。
 
+## ECDICT 完整词典
+
+| 项目 | 状态 |
+|------|------|
+| 词典名 | `ECDICT EN-ZH` |
+| 表名 | `dict_en_ecdict_full` |
+| 预期条数 | ~768,739 |
+| 词典类型 | 本地 `custom_csv`，english→chinese |
+| 导入命令 | `php artisan dictionary:import-ecdict` |
+| 检查命令 | `php artisan dictionary:import-ecdict --status` |
+| 强制重建 | `php artisan dictionary:import-ecdict --force` |
+| CSV 路径 | `C:\Users\Administrator\Desktop\linguacafe\linguacafe_ecdict_en_zh_pipe.csv` |
+
+> **重要**：词典是数据库运行时数据，不会被 git 保存。以下操作会导致词典消失：
+> - 运行 `php artisan test`（`RefreshDatabase` 的 `migrate:fresh` 会删除非 migration 表）
+> - 执行 `php artisan migrate:fresh` 或 `migrate:refresh`
+> - 手动删除 `dict_en_ecdict_full` 表
+> - 切换或重建数据库
+
+**恢复方法**：
+```bash
+# 先检查状态
+php artisan dictionary:import-ecdict --status
+
+# 如果缺失，重新导入（默认跳过已健康存在的词典）
+php artisan dictionary:import-ecdict
+
+# 如果表存在但条数异常，强制重建
+php artisan dictionary:import-ecdict --force
+```
+
+**测试隔离**：已创建 `.env.testing` 使用独立数据库 `linguacafe_fsrs_test`，防止测试清除主库词典。
+
 ## 已知风险
 
 1. `fsrs-rs-php` 原生扩展在当前 Windows 环境未编译加载（使用 PHP fallback，功能正常但非原生性能）。
@@ -92,6 +125,7 @@ b13193e fix global loading states and complete Chinese UI
 3. `scripts/windows/linguacafe-start.bat` 有未提交修改（移除了 tokenizer 自动检查启动逻辑，简化了端口检测 PowerShell 命令）。
 4. 全量 Laravel 旧测试（非 FSRS/Sense 相关）可能仍有 Auth/首页相关失败，未逐一排查。
 5. `matched_sense_id` 在 GPT workflow 中依赖 package 里导出的 `sense_id`；如果用户用 demo JSON 可能指向不存在的 ID。
+6. 词典数据不在 git 版本控制内；测试后可能需重新导入 `php artisan dictionary:import-ecdict`。
 
 ## 保护清单（不可破坏）
 
