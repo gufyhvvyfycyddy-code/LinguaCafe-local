@@ -17,6 +17,11 @@ class VocabularyTokenFilter
             return true;
         }
 
+        // 跳过 [A] [B] [C] ... [Z] 段落标记（已转化为 _SECT_X_）
+        if (preg_match('/^_SECT_[A-Z]_$/u', $token)) {
+            return true;
+        }
+
         $lowerToken = mb_strtolower($token, 'UTF-8');
 
         if (in_array($lowerToken, self::CONTRACTION_FRAGMENTS, true)) {

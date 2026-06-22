@@ -116,6 +116,14 @@ class TextBlockService
             [" PARAGRAPH_BREAK ", " PARAGRAPH_BREAK ", " NEWLINE ", " NEWLINE ", " NEWLINE "], $text);
         $text = preg_replace("/ {2,}/", " ", $text);
 
+        // 保护 [A] [B] [C] ... [Z] 段落标记不被 tokenizer 拆散
+        // 将标记转化为单个 token，并确保前方有段落间隔
+        $text = preg_replace('/\s*\[([A-Z])\]\s*/u', ' _SECT_$1_ ', $text);
+        // 当 _SECT_ 紧跟在普通词后面（非 PARAGRAPH_BREAK）时，插入段落间隔
+        $text = preg_replace('/(\S)\s+_SECT_([A-Z])_/u', '$1 PARAGRAPH_BREAK _SECT_$2_', $text);
+        // 合并连续的 PARAGRAPH_BREAK
+        $text = preg_replace('/(PARAGRAPH_BREAK\s+)+/', 'PARAGRAPH_BREAK ', $text);
+
         try {
             $this->tokenizedWords = $this->postTokenizer('/tokenizer', [
                 'raw_text' => $text,
@@ -649,24 +657,42 @@ class TextBlockService
                 continue;
             }
 
-            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $trimmed, $matches);
+            // Extract _SECT_X_ section markers first, then tokenize the rest
+            $remainder = $trimmed;
+            while (preg_match('/_SECT_[A-Z]_/u', $remainder, $m, PREG_OFFSET_CAPTURE)) {
+                $pos = $m[0][1];
+                $marker = $m[0][0];
+                // Tokenize text before the marker
+                $before = substr($remainder, 0, $pos);
+                if (trim($before) !== '') {
+                    preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', trim($before), $bm);
+                    foreach ($bm[0] ?? [] as $surface) {
+                        if ($surface === '') continue;
+                        $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
+                    }
+                }
+                // Add the marker itself
+                $tokens[] = $this->makeFallbackTokenWithPos($marker, 'X', $sentenceIndex);
+                // Advance past the marker
+                $remainder = substr($remainder, $pos + strlen($marker));
+            }
+            // Tokenize remaining text
+            $remainder = trim($remainder);
+            if ($remainder !== '') {
+                preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $remainder, $rm);
+                foreach ($rm[0] ?? [] as $surface) {
+                    if ($surface === '') continue;
+                    $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
+                }
+            }
+            $sentenceIndex++;
+            continue;
 
             foreach ($matches[0] ?? [] as $surface) {
                 if ($surface === '') {
                     continue;
                 }
-
-                $token = new \stdClass();
-                $token->w = $surface;
-                $token->r = '';
-                $token->l = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)
-                    ? mb_strtolower($surface, 'UTF-8')
-                    : $surface;
-                $token->lr = '';
-                $token->pos = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface) ? 'X' : 'PUNCT';
-                $token->si = $sentenceIndex;
-                $token->g = '';
-                $tokens[] = $token;
+                $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
             }
 
             $sentenceIndex++;
@@ -677,6 +703,34 @@ class TextBlockService
         }
 
         return $tokens;
+    }
+
+    private function makeFallbackToken(string $surface, int $sentenceIndex): \stdClass
+    {
+        $token = new \stdClass();
+        $token->w = $surface;
+        $token->r = '';
+        $token->l = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)
+            ? mb_strtolower($surface, 'UTF-8')
+            : $surface;
+        $token->lr = '';
+        $token->pos = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface) ? 'X' : 'PUNCT';
+        $token->si = $sentenceIndex;
+        $token->g = '';
+        return $token;
+    }
+
+    private function makeFallbackTokenWithPos(string $surface, string $pos, int $sentenceIndex): \stdClass
+    {
+        $token = new \stdClass();
+        $token->w = $surface;
+        $token->r = '';
+        $token->l = $surface;
+        $token->lr = '';
+        $token->pos = $pos;
+        $token->si = $sentenceIndex;
+        $token->g = '';
+        return $token;
     }
 
     /*

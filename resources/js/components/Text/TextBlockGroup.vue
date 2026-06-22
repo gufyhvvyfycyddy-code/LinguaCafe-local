@@ -70,7 +70,15 @@
                     -->{{ subtitleTimestamps[word.subtitleIndex].start }}<!--
                 --></div><!--
                 --><br v-if="word.word === 'NEWLINE'" /><!--
-                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" class="paragraph-break" style="display:block;height:0;margin-top:1.2em;"></div><!--
+                --><div v-else-if="word.word === 'PARAGRAPH_BREAK'" style="display:block;height:1.2em;clear:both;"></div><!--
+                --><span
+                    v-else-if="isSectionMarker(word.word)"
+                    class="word selected-font"
+                    :style="{'margin-bottom': (lineSpacing * 4) + 'px', 'font-weight': 'bold'}"
+                    :wordindex="wordIndex"
+                    :stage="word.stage"
+                    :key="wordIndex"
+                >[{{ word.word.slice(-1) }}]</span><!--
                 --><span
                     v-else
                     :wordindex="wordIndex"
@@ -349,6 +357,9 @@
             window.removeEventListener('mousemove', this.closeHoverBox);
         },
         methods: {
+            isSectionMarker(word) {
+                return typeof word === 'string' && word.startsWith('_SECT_') && word.length === 7;
+            },
             textToSpeech() {
                 if (!this.selection.length) {
                     return;

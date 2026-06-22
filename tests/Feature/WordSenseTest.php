@@ -1438,25 +1438,28 @@ class WordSenseTest extends TestCase
         $method = $reflector->getMethod('fallbackEnglishTokenize');
         $method->setAccessible(true);
 
-        $tokens = $method->invoke($textBlock, "Hello NEWLINE world PARAGRAPH_BREAK testing");
+        $tokens = $method->invoke($textBlock, "Hello NEWLINE world PARAGRAPH_BREAK testing _SECT_A_ Retail");
 
         $words = array_map(fn ($t) => $t->w, $tokens);
 
         $this->assertContains('NEWLINE', $words);
         $this->assertContains('PARAGRAPH_BREAK', $words);
+        $this->assertContains('_SECT_A_', $words);
         $this->assertContains('Hello', $words);
         $this->assertContains('world', $words);
         $this->assertContains('testing', $words);
+        $this->assertContains('Retail', $words);
     }
 
-    public function test_vocabulary_token_filter_skips_paragraph_break_and_newline(): void
+    public function test_vocabulary_token_filter_skips_structural_tokens(): void
     {
-        $filter = new \App\Services\VocabularyTokenFilter();
-
-        $this->assertTrue($filter::shouldSkip('PARAGRAPH_BREAK', 'english'));
-        $this->assertTrue($filter::shouldSkip('NEWLINE', 'english'));
-        $this->assertFalse($filter::shouldSkip('brick', 'english'));
-        $this->assertFalse($filter::shouldSkip('stores', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('PARAGRAPH_BREAK', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('NEWLINE', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_A_', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_B_', 'english'));
+        $this->assertTrue(\App\Services\VocabularyTokenFilter::shouldSkip('_SECT_Z_', 'english'));
+        $this->assertFalse(\App\Services\VocabularyTokenFilter::shouldSkip('brick', 'english'));
+        $this->assertFalse(\App\Services\VocabularyTokenFilter::shouldSkip('stores', 'english'));
     }
 
     private function createTestChapter(array $processedWords): Chapter
