@@ -419,7 +419,11 @@ class TextBlockService
                     $encounteredWord['base_word_reading'] = '';
                 }
 
-                if ($encounteredWord['base_word'] == $encounteredWord['word']) {
+                // Only clear lemma/base_word for CJK languages where lemma==word is the default.
+                // English and other European languages: keep base_word even if it matches the surface
+                // (e.g., "series" → lemma "series" is correct; clearing it breaks WordSense lookups).
+                $isCJK = in_array($this->language, ['japanese', 'chinese', 'korean', 'thai'], true);
+                if ($isCJK && $encounteredWord['base_word'] == $encounteredWord['word']) {
                     $encounteredWord['base_word'] = '';
                     $encounteredWord['lemma'] = '';
                     $encounteredWord['base_word_reading'] = '';
@@ -726,14 +730,415 @@ class TextBlockService
         $token = new \stdClass();
         $token->w = $surface;
         $token->r = '';
-        $token->l = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)
-            ? mb_strtolower($surface, 'UTF-8')
-            : $surface;
+
+        // English alphabetic words: attempt lemmatization
+        if (preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)) {
+            $token->l = $this->applyEnglishLemma($surface);
+            $token->pos = 'X';
+        } else {
+            $token->l = $surface;
+            $token->pos = 'PUNCT';
+        }
+
         $token->lr = '';
-        $token->pos = preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface) ? 'X' : 'PUNCT';
         $token->si = $sentenceIndex;
         $token->g = '';
         return $token;
+    }
+
+    /**
+     * Conservative English lemmatization for fallback tokenizer.
+     *
+     * Rules (order matters):
+     *  1. Irregular verb/noun table (was → be, has → have, mice → mouse, etc.)
+     *  2. -ies → -y  (stories → story) — only when word length > 3
+     *  3. -ves → -f   (wives → wife)
+     *  4. -ses/-xes/-zes/-ches/-shes → remove -es (boxes → box, watches → watch)
+     *  5. -es → remove -s  (stores → store, makes → make)
+     *  6. -s → remove -s   (facts → fact)
+     *  7. -(n)ing → remove -ing, optional restore double consonant (dropping → drop)
+     *  8. -ed → remove -ed, optional restore double consonant (stopped → stop)
+     *
+     * Conservative guard: if the candidate lemma is found in ECDICT, use it.
+     * If not found in ECDICT, fall back to lowercase surface.
+     * Words shorter than 3 chars are never lemmatized.
+     * Structural markers (ZZPARAZZ etc.) are never lemmatized.
+     */
+    private function applyEnglishLemma(string $surface): string
+    {
+        $lower = mb_strtolower($surface, 'UTF-8');
+
+        // Don't lemmatize structural markers
+        if (preg_match('/^zz(para|newl|sect)/i', $lower)) {
+            return $lower;
+        }
+
+        // 1. Irregular lookups (verb conjugations, noun plurals) — check first,
+        //    even for short words (e.g., "is" → "be", "am" → "be")
+        $irregular = $this->englishIrregularLemma($lower);
+        if ($irregular !== null) {
+            return $this->ecdictSafeLemma($irregular, $lower);
+        }
+
+        // Very short words (length < 3) that aren't irregular: keep as-is
+        if (mb_strlen($lower) < 3) {
+            return $lower;
+        }
+
+        // 2. -ies → -y (stories → story, but not "ties" → "ty" universally)
+        if (preg_match('/^(.+)ies$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
+            $candidate = $m[1] . 'y';
+            return $this->ecdictSafeLemma($candidate, $lower);
+        }
+
+        // 3. -ves → -f (wives → wife, knives → knife)
+        if (preg_match('/^(.+)ves$/u', $lower, $m) && mb_strlen($m[1]) >= 1) {
+            $candidate = $m[1] . 'f';
+            if ($this->lemmaInEcdict($candidate)) {
+                return $candidate;
+            }
+            $candidate2 = $m[1] . 'fe';
+            if ($this->lemmaInEcdict($candidate2)) {
+                return $candidate2;
+            }
+        }
+
+        // 4. -ses, -xes, -zes, -ches, -shes → remove -es (boxes, watches)
+        if (preg_match('/^(.+)([sxz]|[cs]h)es$/u', $lower, $m) && mb_strlen($m[1]) >= 1) {
+            $candidate = $m[1] . $m[2];
+            return $this->ecdictSafeLemma($candidate, $lower);
+        }
+
+        // 5. -es → remove -s (stores → store, makes → make)
+        if (preg_match('/^(.+)es$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
+            // Try adding 'e' back (stores → store, makes → make)
+            $candidate = $m[1] . 'e';
+            if ($this->lemmaInEcdict($candidate)) {
+                return $candidate;
+            }
+            // Try removing just -s
+            $candidate2 = $m[1];
+            if ($this->lemmaInEcdict($candidate2)) {
+                return $candidate2;
+            }
+            // When ECDICT unavailable: word+"e" is the more likely correct form
+            if (!$this->ecdictAvailable()) {
+                return $candidate;
+            }
+        }
+
+        // 6. -s → remove -s (facts → fact, retailers → retailer)
+        // Conservative: only if removing 's' gives a known dictionary word
+        if (preg_match('/^(.+)s$/u', $lower, $m) && mb_strlen($m[1]) >= 3) {
+            $candidate = $m[1];
+            if ($this->lemmaInEcdict($candidate)) {
+                return $candidate;
+            }
+            // When ECDICT unavailable: tentatively return the candidate
+            // (this makes fallback tokenizer useful before ECDICT import)
+            if (!$this->ecdictAvailable()) {
+                return $candidate;
+            }
+        }
+
+        // 7. -(n)ing → base (dropping → drop, running → run, making → make)
+        if (preg_match('/^(.+)(ing|ING)$/u', $lower, $m)) {
+            $stem = $m[1];
+            // Double consonant removal: dropping→drop, running→run
+            if (mb_strlen($stem) >= 3 && mb_substr($stem, -1) === mb_substr($stem, -2, 1)) {
+                $deDouble = mb_substr($stem, 0, -1);
+                if ($this->lemmaInEcdict($deDouble) || !$this->ecdictAvailable()) {
+                    return $deDouble;
+                }
+            }
+            // Try adding 'e' (making → make, taking → take, coming → come)
+            $candidate = $stem . 'e';
+            if ($this->lemmaInEcdict($candidate) || !$this->ecdictAvailable()) {
+                return $candidate;
+            }
+            // Try bare stem (beating → beat)
+            if ($this->lemmaInEcdict($stem)) {
+                return $stem;
+            }
+        }
+
+        // 8. -ed → base (surged → surge, stopped → stop)
+        if (preg_match('/^(.+)(ed|ED)$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
+            $stem = $m[1];
+            // Double consonant removal: stopped→stop, dropped→drop
+            if (mb_strlen($stem) >= 3 && mb_substr($stem, -1) === mb_substr($stem, -2, 1)) {
+                $deDouble = mb_substr($stem, 0, -1);
+                if ($this->lemmaInEcdict($deDouble) || !$this->ecdictAvailable()) {
+                    return $deDouble;
+                }
+            }
+            // Try adding 'e' (surged → surge, liked → like)
+            $candidate = $stem . 'e';
+            if ($this->lemmaInEcdict($candidate) || !$this->ecdictAvailable()) {
+                return $candidate;
+            }
+            // -ied → -y (tried → try)
+            if (preg_match('/^(.+)i$/u', $stem, $m2)) {
+                $candidate2 = $m2[1] . 'y';
+                if ($this->lemmaInEcdict($candidate2) || !$this->ecdictAvailable()) {
+                    return $candidate2;
+                }
+            }
+            // bare stem
+            if ($this->lemmaInEcdict($stem)) {
+                return $stem;
+            }
+        }
+
+        // Default: lowercase surface (conservative — no wild guesses)
+        return $lower;
+    }
+
+    /**
+     * Irregular English verb/noun mapping.
+     * Returns the lemma or null if the word is not in the irregular table.
+     */
+    private function englishIrregularLemma(string $word): ?string
+    {
+        $map = [
+            // be
+            'am' => 'be', 'is' => 'be', 'are' => 'be', 'was' => 'be', 'were' => 'be',
+            'been' => 'be', 'being' => 'be',
+            // have
+            'has' => 'have', 'had' => 'have', 'having' => 'have',
+            // do
+            'does' => 'do', 'did' => 'do', 'done' => 'do', 'doing' => 'do',
+            // go
+            'goes' => 'go', 'went' => 'go', 'gone' => 'go', 'going' => 'go',
+            // say
+            'says' => 'say', 'said' => 'say',
+            // get
+            'got' => 'get', 'gotten' => 'get',
+            // make
+            'made' => 'make', 'makes' => 'make',
+            // know
+            'knew' => 'know', 'known' => 'know',
+            // think
+            'thought' => 'think',
+            // take
+            'took' => 'take', 'taken' => 'take',
+            // see
+            'saw' => 'see', 'seen' => 'see',
+            // come
+            'came' => 'come',
+            // give
+            'gave' => 'give', 'given' => 'give',
+            // find
+            'found' => 'find',
+            // tell
+            'told' => 'tell',
+            // become
+            'became' => 'become',
+            // leave
+            'left' => 'leave',
+            // feel
+            'felt' => 'feel',
+            // put
+            'put' => 'put',
+            // bring
+            'brought' => 'bring',
+            // begin
+            'began' => 'begin', 'begun' => 'begin',
+            // keep
+            'kept' => 'keep',
+            // hold
+            'held' => 'hold',
+            // write
+            'wrote' => 'write', 'written' => 'write',
+            // stand
+            'stood' => 'stand',
+            // hear
+            'heard' => 'hear',
+            // let
+            'let' => 'let',
+            // mean
+            'meant' => 'mean',
+            // set
+            'set' => 'set',
+            // meet
+            'met' => 'meet',
+            // run
+            'ran' => 'run',
+            // pay
+            'paid' => 'pay',
+            // sit
+            'sat' => 'sit',
+            // speak
+            'spoke' => 'speak', 'spoken' => 'speak',
+            // lie
+            'lay' => 'lie', 'lain' => 'lie',
+            // lead
+            'led' => 'lead',
+            // read (past)
+            'read' => 'read',
+            // grow
+            'grew' => 'grow', 'grown' => 'grow',
+            // lose
+            'lost' => 'lose',
+            // fall
+            'fell' => 'fall', 'fallen' => 'fall',
+            // send
+            'sent' => 'send',
+            // build
+            'built' => 'build',
+            // understand
+            'understood' => 'understand',
+            // draw
+            'drew' => 'draw', 'drawn' => 'draw',
+            // break
+            'broke' => 'break', 'broken' => 'break',
+            // spend
+            'spent' => 'spend',
+            // cut
+            'cut' => 'cut',
+            // rise
+            'rose' => 'rise', 'risen' => 'rise',
+            // drive
+            'drove' => 'drive', 'driven' => 'drive',
+            // buy
+            'bought' => 'buy',
+            // wear
+            'wore' => 'wear', 'worn' => 'wear',
+            // choose
+            'chose' => 'choose', 'chosen' => 'choose',
+            // eat
+            'ate' => 'eat', 'eaten' => 'eat',
+            // drink
+            'drank' => 'drink', 'drunk' => 'drink',
+            // sleep
+            'slept' => 'sleep',
+            // sing
+            'sang' => 'sing', 'sung' => 'sing',
+            // teach
+            'taught' => 'teach',
+            // sell
+            'sold' => 'sell',
+            // catch
+            'caught' => 'catch',
+            // fight
+            'fought' => 'fight',
+            // swim
+            'swam' => 'swim', 'swum' => 'swim',
+            // fly
+            'flew' => 'fly', 'flown' => 'fly',
+            // throw
+            'threw' => 'throw', 'thrown' => 'throw',
+            // ride
+            'rode' => 'ride', 'ridden' => 'ride',
+            // shut
+            'shut' => 'shut',
+            // win
+            'won' => 'win',
+            // forget
+            'forgot' => 'forget', 'forgotten' => 'forget',
+            // hang
+            'hung' => 'hang',
+            // cost
+            'cost' => 'cost',
+            // spread
+            'spread' => 'spread',
+            // hit
+            'hit' => 'hit',
+            // hurt
+            'hurt' => 'hurt',
+
+            // Irregular nouns
+            'children' => 'child',
+            'men' => 'man',
+            'women' => 'woman',
+            'people' => 'person',
+            'teeth' => 'tooth',
+            'feet' => 'foot',
+            'mice' => 'mouse',
+            'geese' => 'goose',
+            'oxen' => 'ox',
+            'lives' => 'life',
+            'wives' => 'wife',
+            'knives' => 'knife',
+            'leaves' => 'leaf',
+            'shelves' => 'shelf',
+            'thieves' => 'thief',
+            'wolves' => 'wolf',
+            'halves' => 'half',
+            'selves' => 'self',
+            'elves' => 'elf',
+            'calves' => 'calf',
+            'loaves' => 'loaf',
+            'scarves' => 'scarf',
+            'hooves' => 'hoof',
+        ];
+
+        return $map[$word] ?? null;
+    }
+
+    /**
+     * Check if a word exists in ECDICT.
+     * When ECDICT is not available, returns false — downstream rules
+     * should handle the unavailable case gracefully with heuristics.
+     */
+    private function lemmaInEcdict(string $word): bool
+    {
+        static $cache = [];
+        static $available = null;
+        $key = mb_strtolower($word, 'UTF-8');
+        if (array_key_exists($key, $cache)) {
+            return $cache[$key];
+        }
+        if ($available === null) {
+            try {
+                $available = \Illuminate\Support\Facades\DB::table('dict_en_ecdict_full')->exists();
+            } catch (\Throwable $e) {
+                $available = false;
+            }
+        }
+        if (!$available) {
+            $cache[$key] = false;
+            return false;
+        }
+        try {
+            $exists = \Illuminate\Support\Facades\DB::table('dict_en_ecdict_full')
+                ->where('word', $key)
+                ->exists();
+            $cache[$key] = $exists;
+            return $exists;
+        } catch (\Throwable $e) {
+            $cache[$key] = false;
+            return false;
+        }
+    }
+
+    /**
+     * Returns the candidate lemma if it exists in ECDICT, otherwise returns the fallback.
+     * When ECDICT is not available, trusts the candidate (morphological rules are more
+     * likely correct than the surface form, even without dictionary verification).
+     */
+    private function ecdictSafeLemma(string $candidate, string $fallback): string
+    {
+        if (!$this->ecdictAvailable()) {
+            return $candidate;
+        }
+        return $this->lemmaInEcdict($candidate) ? $candidate : $fallback;
+    }
+
+    /**
+     * Check if ECDICT is available (table exists and has data).
+     */
+    private function ecdictAvailable(): bool
+    {
+        static $available = null;
+        if ($available === null) {
+            try {
+                $available = \Illuminate\Support\Facades\DB::table('dict_en_ecdict_full')->exists();
+            } catch (\Throwable $e) {
+                $available = false;
+            }
+        }
+        return $available;
     }
 
     private function makeFallbackTokenWithPos(string $surface, string $pos, int $sentenceIndex): \stdClass

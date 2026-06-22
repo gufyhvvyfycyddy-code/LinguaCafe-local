@@ -105,5 +105,30 @@
         #vocab-box-edit-page .v-input__slot {
             font-size: 18px;
         }
+
+        .lemma-edit-link {
+            cursor: pointer;
+            color: var(--v-primary-base);
+            font-size: 12px;
+            user-select: none;
+            &:hover {
+                text-decoration: underline;
+            }
+        }
+
+        .lemma-edit-inline {
+            display: inline-flex;
+            align-items: center;
+
+            .lemma-edit-input {
+                width: 120px;
+                padding: 2px 6px;
+                border: 1px solid var(--v-primary-base);
+                border-radius: 4px;
+                font-size: 14px;
+                background: var(--v-foreground-base);
+                color: var(--v-text-base);
+            }
+        }
     }
 }

@@ -46,7 +46,22 @@
                             <div class="text-h6 default-font mb-1">{{ word }}</div>
                             <div class="text-caption text--secondary">
                                 当前词形：<strong class="default-font">{{ word }}</strong>
-                                <span class="mx-2">词元：<strong class="default-font">{{ baseWord || word }}</strong></span>
+                                <span class="mx-2">词元：
+                                    <strong v-if="!editingLemma" class="default-font">{{ baseWord || word }}</strong>
+                                    <span v-if="!editingLemma" class="lemma-edit-link ml-1" @click="startEditLemma">[修改]</span>
+                                    <span v-if="editingLemma" class="lemma-edit-inline">
+                                        <input
+                                            ref="lemmaInput"
+                                            v-model="editLemmaValue"
+                                            class="lemma-edit-input"
+                                            @keyup.enter="saveLemma"
+                                            @keyup.escape="cancelEditLemma"
+                                            @blur="saveLemma"
+                                        />
+                                        <v-icon x-small class="ml-1" @click="saveLemma">mdi-check</v-icon>
+                                        <v-icon x-small @click="cancelEditLemma">mdi-close</v-icon>
+                                    </span>
+                                </span>
                             </div>
                         </div>
                         <v-spacer />
@@ -151,6 +166,8 @@ export default {
         return {
             tab: 0,
             showLegacyTranslation: false,
+            editingLemma: false,
+            editLemmaValue: '',
             phraseText: '',
             reading: '',
             baseWord: '',
@@ -191,6 +208,40 @@ export default {
         addNewPhrase() { this.$emit('addNewPhrase'); },
         deletePhrase() { this.$emit('deletePhrase'); },
         deleteWord() { this.$emit('deleteWord'); },
+        startEditLemma() {
+            this.editLemmaValue = this.baseWord || this.word;
+            this.editingLemma = true;
+            this.$nextTick(() => {
+                if (this.$refs.lemmaInput) {
+                    this.$refs.lemmaInput.focus();
+                    this.$refs.lemmaInput.select();
+                }
+            });
+        },
+        saveLemma() {
+            if (!this.editingLemma) return;
+            const newLemma = (this.editLemmaValue || '').trim();
+            if (newLemma && newLemma !== this.baseWord) {
+                this.baseWord = newLemma;
+                // Update Vuex store so saveWord picks up the new base_word
+                this.$store.commit('vocabularyBox/setBaseWord', newLemma);
+                // Emit to parent so it persists to encountered_word.base_word
+                this.$emit('updateVocabBoxData', {
+                    reading: this.reading,
+                    baseWord: newLemma,
+                    baseWordReading: this.baseWordReading,
+                    phraseReading: this.phraseReading,
+                    translationText: this.translationText
+                });
+                // Trigger save to persist immediately
+                this.$emit('saveWord', true);
+            }
+            this.editingLemma = false;
+        },
+        cancelEditLemma() {
+            this.editingLemma = false;
+            this.editLemmaValue = '';
+        },
         addDefinitionToInput(definition) {
             if (this.translationText.length && this.translationText[this.translationText.length - 1] !== ';') {
                 this.translationText += ';';

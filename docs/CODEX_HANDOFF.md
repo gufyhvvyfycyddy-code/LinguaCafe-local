@@ -5,7 +5,7 @@
 ## 当前最新 commit
 
 ```
-a25bc0d improve reader word sense panel usability
+待提交 — fix English lemma detection and add lemma doctor
 ```
 
 （注：如果此后有新提交，以 `git log --oneline -1` 为准。）
@@ -51,6 +51,30 @@ a25bc0d improve reader word sense panel usability
 - [x] "查看例句"按钮，点击展开该 sense 关联的 WordSenseOccurrence 例句，无例句显示"暂无例句"
 - [x] 面板内容超出时可滚动（overflow-y: auto）
 - [x] 英文 fallback tokenizer 词性推断（n./v./adj./adv. 等前缀匹配）
+- [x] 英文词元（lemma）识别修复：fallback tokenizer 增加保守的形态学还原规则
+- [x] 修复 `createNewEncounteredWords()` 中 base_word==word 时错误清空的问题（仅对英文/欧洲语言保留）
+- [x] `php artisan lemma:doctor` 诊断命令：检查缺失/可疑 base_word，--fix 修复
+- [x] 右侧面板增加"修改词元"入口：手动编辑 base_word 后立即刷新 WordSense 查询
+
+## 英文词元修复详情
+
+### 根因
+1. `fallbackEnglishTokenize()` 中的 `makeFallbackToken()` 未做词形还原，lemma = 小写词形
+2. `createNewEncounteredWords()` 中 `base_word == word` 时对全语言清空，影响英文 fallback 路径
+3. fallback tokenizer 在 Python tokenizer 不可用时静默接管（英文例外处理）
+
+### 修复方案
+- `applyEnglishLemma()`: 不规则表 + -ies→-y + -ves→-f + -es/-s 复数 + -ing/-ed + ECDICT 校验
+- CJK 语言才执行 base_word==word 清空逻辑；英文/欧洲语言保留
+- 新增 `lemma:doctor` artisan 命令：扫描 missing/suspicious base_word，支持 --fix
+- VocabularySideBox.vue: 词元行增加 [修改] 按钮，inline 编辑后立即保存
+
+### lemma:doctor 用法
+```bash
+php artisan lemma:doctor --language=english           # dry-run, 仅检查
+php artisan lemma:doctor --language=english --fix     # 修复 base_word
+php artisan lemma:doctor --user_id=1 --language=english --limit=20
+```
 
 ## 本次 UI 改动的组件
 

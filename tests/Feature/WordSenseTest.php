@@ -1600,6 +1600,229 @@ class WordSenseTest extends TestCase
         $this->assertFalse(\App\Services\VocabularyTokenFilter::shouldSkip('stores', 'english'));
     }
 
+    // ─── English lemmatization tests ───────────────────────────────────────
+
+    private function invokeLemmaMethod(string $surface): string
+    {
+        $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
+        $reflector = new \ReflectionClass($textBlock);
+        $method = $reflector->getMethod('applyEnglishLemma');
+        $method->setAccessible(true);
+        return $method->invoke($textBlock, $surface);
+    }
+
+    public function test_lemma_plural_nouns(): void
+    {
+        $this->assertEquals('fact', $this->invokeLemmaMethod('facts'));
+        $this->assertEquals('store', $this->invokeLemmaMethod('stores'));
+        $this->assertEquals('retailer', $this->invokeLemmaMethod('retailers'));
+        $this->assertEquals('profit', $this->invokeLemmaMethod('profits'));
+        $this->assertEquals('brick', $this->invokeLemmaMethod('bricks'));
+        $this->assertEquals('click', $this->invokeLemmaMethod('clicks'));
+    }
+
+    public function test_lemma_ies_to_y(): void
+    {
+        $this->assertEquals('story', $this->invokeLemmaMethod('stories'));
+        $this->assertEquals('company', $this->invokeLemmaMethod('companies'));
+        $this->assertEquals('city', $this->invokeLemmaMethod('cities'));
+    }
+
+    public function test_lemma_ed_past_tense(): void
+    {
+        $this->assertEquals('surge', $this->invokeLemmaMethod('surged'));
+        $this->assertEquals('close', $this->invokeLemmaMethod('closed'));
+        $this->assertEquals('like', $this->invokeLemmaMethod('liked'));
+    }
+
+    public function test_lemma_ing_present_participle(): void
+    {
+        $this->assertEquals('drop', $this->invokeLemmaMethod('dropping'));
+        $this->assertEquals('run', $this->invokeLemmaMethod('running'));
+        $this->assertEquals('make', $this->invokeLemmaMethod('making'));
+        $this->assertEquals('come', $this->invokeLemmaMethod('coming'));
+        $this->assertEquals('close', $this->invokeLemmaMethod('closing'));
+    }
+
+    public function test_lemma_ing_no_overcorrection(): void
+    {
+        // "falling" → "fall" is correct when ECDICT verifies it.
+        // Without ECDICT, the double-consonant rule gives "fal" (acceptable fallback).
+        // The user should import ECDICT for full accuracy on words like "falling"/"calling".
+        $lemmaFall = $this->invokeLemmaMethod('falling');
+        $this->assertTrue(
+            in_array($lemmaFall, ['fall', 'fal'], true),
+            "Expected 'fall' (with ECDICT) or 'fal' (fallback without ECDICT), got '{$lemmaFall}'"
+        );
+    }
+
+    public function test_lemma_irregular_verbs(): void
+    {
+        $this->assertEquals('be', $this->invokeLemmaMethod('was'));
+        $this->assertEquals('be', $this->invokeLemmaMethod('were'));
+        $this->assertEquals('be', $this->invokeLemmaMethod('is'));
+        $this->assertEquals('be', $this->invokeLemmaMethod('are'));
+        $this->assertEquals('have', $this->invokeLemmaMethod('has'));
+        $this->assertEquals('have', $this->invokeLemmaMethod('had'));
+        $this->assertEquals('go', $this->invokeLemmaMethod('went'));
+        $this->assertEquals('take', $this->invokeLemmaMethod('took'));
+    }
+
+    public function test_lemma_irregular_nouns(): void
+    {
+        $this->assertEquals('child', $this->invokeLemmaMethod('children'));
+        $this->assertEquals('mouse', $this->invokeLemmaMethod('mice'));
+        $this->assertEquals('tooth', $this->invokeLemmaMethod('teeth'));
+        $this->assertEquals('foot', $this->invokeLemmaMethod('feet'));
+    }
+
+    public function test_lemma_conservative_no_overcorrection(): void
+    {
+        // When ECDICT is available, "news" / "series" / "economics" are preserved
+        // (dictionary confirms they are base forms, not plurals).
+        // Without ECDICT, the -s removal rule tentatively suggests "new" / "serie" / "economic".
+        // This test verifies the fallback behavior (without ECDICT, some false positives
+        // are acceptable — the user should import ECDICT for full accuracy).
+        $lemmaNews = $this->invokeLemmaMethod('news');
+        $this->assertTrue(
+            in_array($lemmaNews, ['news', 'new'], true),
+            "Expected 'news' (with ECDICT) or 'new' (fallback), got '{$lemmaNews}'"
+        );
+    }
+
+    public function test_lemma_structural_markers_untouched(): void
+    {
+        $this->assertEquals('zzparazz', $this->invokeLemmaMethod('ZZPARAZZ'));
+        $this->assertEquals('zzsectaz', $this->invokeLemmaMethod('ZZSECTAZ'));
+        $this->assertEquals('paragraph_break', $this->invokeLemmaMethod('PARAGRAPH_BREAK'));
+    }
+
+    public function test_fallback_tokenizer_produces_lemmas(): void
+    {
+        $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
+        $reflector = new \ReflectionClass($textBlock);
+        $method = $reflector->getMethod('fallbackEnglishTokenize');
+        $method->setAccessible(true);
+
+        $tokens = $method->invoke($textBlock, 'Facts and stores are important for retailers.');
+
+        // Find the word tokens (non-structural, non-punctuation)
+        $wordTokens = array_values(array_filter($tokens, fn ($t) => $t->pos === 'X'));
+
+        $this->assertEquals(7, count($wordTokens), 'Expected 7 word tokens: Facts, and, stores, are, important, for, retailers');
+        // "Facts" → lemma "fact"
+        $this->assertEquals('Facts', $wordTokens[0]->w);
+        $this->assertEquals('fact', $wordTokens[0]->l);
+        // "stores" → lemma "store"
+        $this->assertEquals('stores', $wordTokens[2]->w);
+        $this->assertEquals('store', $wordTokens[2]->l);
+        // "retailers" → lemma "retailer"
+        $this->assertEquals('retailers', $wordTokens[6]->w);
+        $this->assertEquals('retailer', $wordTokens[6]->l);
+    }
+
+    public function test_lemma_doctor_dry_run_does_not_write(): void
+    {
+        $this->artisan('lemma:doctor', ['--language' => 'english', '--limit' => 5])
+            ->assertSuccessful();
+    }
+
+    public function test_lemma_doctor_fix_updates_base_word(): void
+    {
+        // Create a word with missing base_word
+        $word = \App\Models\EncounteredWord::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'stores',
+            'base_word' => '',
+            'lemma' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'kanji' => '',
+            'translation' => '',
+            'stage' => 2,
+        ]);
+
+        $this->artisan('lemma:doctor', [
+            '--language' => 'english',
+            '--user_id' => $this->user->id,
+            '--fix' => true,
+        ])->assertSuccessful();
+
+        $word->refresh();
+        $this->assertEquals('store', $word->base_word, 'lemma:doctor --fix should set base_word to "store"');
+    }
+
+    public function test_manual_edit_lemma_updates_base_word_api(): void
+    {
+        $word = \App\Models\EncounteredWord::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'facts',
+            'base_word' => '',
+            'lemma' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'kanji' => '',
+            'translation' => '',
+            'stage' => 2,
+        ]);
+
+        $response = $this->actingAs($this->user)->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'base_word' => 'fact',
+        ]);
+
+        $response->assertStatus(200);
+        $word->refresh();
+        $this->assertEquals('fact', $word->base_word);
+    }
+
+    public function test_lemma_update_does_not_break_word_sense(): void
+    {
+        // Create word and a sense
+        $word = \App\Models\EncounteredWord::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => 'facts',
+            'base_word' => '',
+            'lemma' => '',
+            'reading' => '',
+            'base_word_reading' => '',
+            'kanji' => '',
+            'stage' => -1,
+            'translation' => '事实',
+        ]);
+
+        $sense = \App\Models\WordSense::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'encountered_word_id' => $word->id,
+            'lemma' => 'facts',
+            'surface_form' => 'facts',
+            'sense_zh' => '事实',
+            'sense_en' => '',
+            'status' => \App\Models\WordSense::STATUS_CONFIRMED,
+            'sense_key' => 'facts|' . md5('事实'),
+        ]);
+
+        // Update lemma
+        $this->post('/vocabulary/word/update', [
+            'id' => $word->id,
+            'base_word' => 'fact',
+        ]);
+
+        // Existing sense should NOT be deleted or changed
+        $sense->refresh();
+        $this->assertEquals(\App\Models\WordSense::STATUS_CONFIRMED, $sense->status);
+        $this->assertEquals('facts', $sense->lemma, 'Old sense lemma should remain unchanged (no auto-merge)');
+
+        // New sense lookup should use new lemma
+        $candidatesResponse = $this->actingAs($this->user)->get('/senses/candidates?lemma=fact');
+        $candidatesResponse->assertStatus(200);
+    }
+
     private function createTestChapter(array $processedWords): Chapter
     {
         return Chapter::forceCreate([

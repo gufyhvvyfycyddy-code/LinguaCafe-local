@@ -317,6 +317,12 @@ export default {
         };
     },
     methods: {
+        refreshLemma() {
+            // Force re-fetch senses when the lemma has been manually edited.
+            // The effectiveLemma watcher normally handles this, but this provides
+            // a direct reset point for external callers.
+            this.fetchSenses();
+        },
         emptyForm() {
             return {
                 pos: 'verb',

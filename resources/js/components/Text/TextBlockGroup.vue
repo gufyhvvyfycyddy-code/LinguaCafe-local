@@ -172,6 +172,7 @@
 
         <!--Vocabulary sidebar-->
         <vocabulary-side-box
+            ref="vocabularySideBox"
             v-if="$props.vocabularySidebar && !$store.state.vocabularyBox.sidebarHidden"
             :language="$props.language"
             :auto-highlight-words="$props.autoHighlightWords"
@@ -181,6 +182,7 @@
             @setStage="setStage"
             @unselectAllWords="unselectAllWords"
             @updateVocabBoxData="updateVocabBoxData"
+            @saveWord="onSaveWordFromSideBox"
             @addNewPhrase="addNewPhrase"
             @deletePhrase="deletePhrase"
             @deleteWord="deleteWord"
@@ -1755,6 +1757,17 @@
                 this.$store.commit('vocabularyBox/setBaseWordReading', newVocabBoxData.baseWordReading);
                 this.$store.commit('vocabularyBox/setPhraseReading', newVocabBoxData.phraseReading);
                 this.$store.commit('vocabularyBox/setTranslationText', newVocabBoxData.translationText);
+            },
+            // Called when user edits the lemma from the side box
+            onSaveWordFromSideBox(withStage = false) {
+                if (this.selection.length !== 1) return;
+                this.saveWord(withStage, false);
+                // Notify WordSensesList to refresh with new lemma
+                this.$nextTick(() => {
+                    if (this.$refs.vocabularySideBox && this.$refs.vocabularySideBox.$refs.wordSensesList) {
+                        this.$refs.vocabularySideBox.$refs.wordSensesList.refreshLemma();
+                    }
+                });
             },
             saveWord(withStage = false, exampleSentenceChanged = false) {
                 var selectedWord = this.uniqueWords[this.selection[0].uniqueWordIndex];
