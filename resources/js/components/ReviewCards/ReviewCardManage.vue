@@ -124,7 +124,7 @@
                                 <v-btn x-small text @click="startEdit(item)">编辑</v-btn>
                                 <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
                                 <v-btn v-else x-small text color="success" @click="toggleEnabled(item)">恢复</v-btn>
-                                <v-btn x-small text @click="setDueNow(item)">立即到期</v-btn>
+                                <v-btn v-if="item.fsrs_enabled" x-small text @click="setDueNow(item)">立即到期</v-btn>
                                 <v-btn x-small text color="info" @click="viewSource(item)">查看原文</v-btn>
                             </template>
                         </td>
@@ -302,12 +302,9 @@ export default {
             axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
                 enabled: newEnabled,
             })
-            .then((response) => {
-                const idx = this.items.findIndex(i => i.review_card_id === item.review_card_id);
-                if (idx >= 0) {
-                    this.$set(this.items, idx, response.data);
-                }
+            .then(() => {
                 this.showSnackbar('已恢复。该卡会重新进入日常复习。', 'success');
+                this.loadData();
             })
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
@@ -328,12 +325,9 @@ export default {
             axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
                 enabled: false,
             })
-            .then((response) => {
-                const idx = this.items.findIndex(i => i.review_card_id === item.review_card_id);
-                if (idx >= 0) {
-                    this.$set(this.items, idx, response.data);
-                }
+            .then(() => {
                 this.showSnackbar('已归档。该卡不会进入日常复习。', 'warning');
+                this.loadData();
             })
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
