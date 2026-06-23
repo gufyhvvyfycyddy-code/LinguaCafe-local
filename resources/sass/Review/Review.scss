@@ -515,3 +515,26 @@
         color: var(--v-text-base);
     }
 }
+
+// Sense source dialog styles (purple target tokens, scoped to dialog only)
+.sense-source-dialog {
+    .source-context {
+        line-height: 1.8;
+        text-align: left;
+        user-select: text;
+    }
+
+    .source-context .word {
+        user-select: text;
+    }
+
+    .source-context .source-target-token {
+        background-color: #9c27b0 !important;
+        color: white !important;
+        border-radius: 4px;
+        padding-left: 4px;
+        padding-right: 4px;
+        font-weight: 700;
+    }
+}
+

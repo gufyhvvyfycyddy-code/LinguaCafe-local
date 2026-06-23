@@ -21,6 +21,14 @@
             @changed="updateSettings"
         ></review-settings>
 
+        <sense-source-dialog
+            v-if="currentReviewIndex !== -1 && reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'"
+            v-model="senseSourceDialog"
+            :sense-id="reviews[currentReviewIndex].word_sense_id"
+            :language="language"
+            :font-size="settings.fontSize"
+        />
+
         <!-- Review finished box -->
         <v-card
             v-if="finished"
@@ -285,6 +293,15 @@
                                             fallback-text="（回忆这个词义）"
                                         />
                                     </v-sheet>
+                                    <v-btn
+                                        small
+                                        outlined
+                                        class="mt-2"
+                                        @click.stop="senseSourceDialog = true"
+                                    >
+                                        查看原文
+                                    </v-btn>
+
                                     <div class="text-caption text--secondary mt-2">
                                         这里的 {{ reviews[currentReviewIndex].lemma }} 是什么意思？
                                     </div>
@@ -427,10 +444,12 @@
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
     import SenseSentencePreview from './SenseSentencePreview.vue';
+    import SenseSourceDialog from './SenseSourceDialog.vue';
 
     export default {
         components: {
             SenseSentencePreview,
+            SenseSourceDialog,
         },
         data: function() {
             return {
@@ -468,6 +487,7 @@
                 currentReviewIndex: -1,
                 reviews: [],
                 totalReviews: 0,
+                senseSourceDialog: false,
                 correctReviews: 0,
                 language: '',
                 languageSpaces: false,
@@ -715,6 +735,7 @@
                 this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
 
                 this.exampleSentence = null;
+                this.senseSourceDialog = false;
 
                 // sense 卡片已在 payload 中自带例句，无需 API 加载
                 if (this.reviews[this.currentReviewIndex].type !== 'sense') {

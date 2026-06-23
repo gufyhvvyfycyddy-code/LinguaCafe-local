@@ -73,6 +73,239 @@ class SenseReviewService
         ];
     }
 
+    // ==================== Source context (查看原文 dialog) ====================
+
+    public function sourceContext(int $userId, string $language, int $senseId): array
+    {
+        $sense = WordSense::where('id', $senseId)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('status', WordSense::STATUS_CONFIRMED)
+            ->firstOrFail();
+
+        $occurrence = WordSenseOccurrence::query()
+            ->where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('word_sense_id', $sense->id)
+            ->where('status', WordSenseOccurrence::STATUS_BOUND)
+            ->whereNotNull('chapter_id')
+            ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
+            ->orderByDesc('id')
+            ->first();
+
+        $chapterId = $occurrence?->chapter_id ?? $sense->source_chapter_id;
+        $sentenceId = $occurrence?->sentence_id ?? $sense->sentence_id;
+        $sentenceHash = $occurrence?->sentence_hash ?? $sense->sentence_hash;
+        $exampleSentence = $occurrence?->sentence_en ?? $sense->example_sentence_en;
+
+        if (!$chapterId) {
+            return $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        }
+
+        $chapter = Chapter::query()
+            ->where('id', $chapterId)
+            ->where('user_id', $sense->user_id)
+            ->where('language', $sense->language_id)
+            ->first();
+
+        if (!$chapter) {
+            return $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        }
+
+        $context = $this->sourceContextFromChapter(
+            $chapter,
+            $sense,
+            $occurrence,
+            $sentenceId,
+            $sentenceHash,
+            $exampleSentence
+        );
+
+        if (!$context) {
+            return $this->emptySourceContext($sense->id, '找到了材料，但没有定位到原句');
+        }
+
+        return [
+            'sense_id' => $sense->id,
+            'source_available' => true,
+            'chapter_id' => $chapter->id,
+            'chapter_title' => $chapter->name,
+            'sentence_id' => $sentenceId,
+            'sentence_hash' => $sentenceHash,
+            'context_tokens' => $context['tokens'],
+            'target_indexes' => $context['target_indexes'],
+            'fallback_message' => null,
+        ];
+    }
+
+    private function emptySourceContext(int $senseId, string $message): array
+    {
+        return [
+            'sense_id' => $senseId,
+            'source_available' => false,
+            'chapter_id' => null,
+            'chapter_title' => null,
+            'sentence_id' => null,
+            'sentence_hash' => null,
+            'context_tokens' => [],
+            'target_indexes' => [],
+            'fallback_message' => $message,
+        ];
+    }
+
+    private function sourceContextFromChapter(
+        Chapter $chapter,
+        WordSense $sense,
+        ?WordSenseOccurrence $occurrence,
+        $sentenceId,
+        $sentenceHash,
+        ?string $exampleSentence
+    ): ?array {
+        $words = $this->flattenProcessedWords($chapter->getProcessedText());
+
+        if (empty($words)) {
+            return null;
+        }
+
+        $groups = $this->groupTokensBySentenceWithIndexes($words);
+        $targetKey = $this->findSourceSentenceKey($groups, $sentenceId, $sentenceHash, $exampleSentence);
+
+        if ($targetKey === null) {
+            return null;
+        }
+
+        $entries = $this->contextEntriesAroundGroup($groups, $targetKey);
+
+        $contextTokens = [];
+        $targetIndexes = [];
+
+        foreach ($entries as $localIndex => $entry) {
+            $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence);
+            if ($token['is_target']) {
+                $targetIndexes[] = $localIndex;
+            }
+            $contextTokens[] = $token;
+        }
+
+        if (empty($contextTokens)) {
+            return null;
+        }
+
+        return [
+            'tokens' => $contextTokens,
+            'target_indexes' => $targetIndexes,
+        ];
+    }
+
+    private function groupTokensBySentenceWithIndexes(array $words): array
+    {
+        $groups = [];
+
+        foreach ($words as $index => $word) {
+            $wordObj = is_array($word) ? (object) $word : $word;
+
+            $tokenWord = $wordObj->word ?? '';
+            if ($tokenWord === 'NEWLINE' || $tokenWord === 'PARAGRAPH_BREAK') {
+                continue;
+            }
+
+            $key = $wordObj->sentence_index ?? $wordObj->si ?? $wordObj->sentence_id ?? '__no_sentence__';
+
+            $groups[(string) $key][] = [
+                'word' => $wordObj,
+                'global_index' => $index,
+            ];
+        }
+
+        return $groups;
+    }
+
+    private function findSourceSentenceKey(array $groups, $sentenceId, $sentenceHash, ?string $exampleSentence): ?string
+    {
+        // First: match by sentence_id
+        if ($sentenceId !== null) {
+            foreach ($groups as $key => $entries) {
+                foreach ($entries as $entry) {
+                    $word = is_array($entry['word']) ? (object) $entry['word'] : $entry['word'];
+
+                    if (
+                        (isset($word->sentence_id) && (string) $word->sentence_id === (string) $sentenceId) ||
+                        (isset($word->sentence_index) && (string) $word->sentence_index === (string) $sentenceId) ||
+                        (isset($word->si) && (string) $word->si === (string) $sentenceId)
+                    ) {
+                        return (string) $key;
+                    }
+                }
+            }
+        }
+
+        // Second: match by sentence_hash
+        if ($sentenceHash !== null) {
+            foreach ($groups as $key => $entries) {
+                foreach ($entries as $entry) {
+                    $word = is_array($entry['word']) ? (object) $entry['word'] : $entry['word'];
+
+                    if (isset($word->sentence_hash) && (string) $word->sentence_hash === (string) $sentenceHash) {
+                        return (string) $key;
+                    }
+                }
+            }
+        }
+
+        // Third: match by exampleSentence text
+        if ($exampleSentence) {
+            $targetNormalized = $this->normalizeSentenceText($exampleSentence);
+
+            foreach ($groups as $key => $entries) {
+                $rawWords = array_map(fn ($entry) => $entry['word'], $entries);
+                $groupText = $this->tokensToSentenceText($rawWords);
+                $groupNormalized = $this->normalizeSentenceText($groupText);
+
+                if ($groupNormalized === $targetNormalized) {
+                    return (string) $key;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function contextEntriesAroundGroup(array $groups, string $targetKey): array
+    {
+        $keys = array_keys($groups);
+        // PHP auto-converts numeric string keys (e.g. '0', '1') to integers
+        // in array keys, so use loose comparison to handle '1' matching 1.
+        $pos = array_search($targetKey, $keys);
+
+        if ($pos === false) {
+            return [];
+        }
+
+        $start = max(0, $pos - 1);
+        $end = min(count($keys) - 1, $pos + 1);
+
+        $result = [];
+
+        for ($i = $start; $i <= $end; $i++) {
+            foreach ($groups[$keys[$i]] as $entry) {
+                $result[] = $entry;
+            }
+        }
+
+        return $result;
+    }
+
+    private function simplifyContextToken($word, int $localIndex, WordSense $sense, ?WordSenseOccurrence $occurrence): array
+    {
+        $token = $this->simplifyToken($word, $localIndex);
+
+        if ($this->tokenMatchesSenseTarget($token['word'], $sense, $occurrence)) {
+            $token['is_target'] = true;
+        }
+
+        return $token;
+    }
+
     // ==================== Token payload: three-layer strategy ====================
 
     /**
