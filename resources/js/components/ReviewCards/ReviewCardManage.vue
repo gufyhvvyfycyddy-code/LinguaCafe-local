@@ -7,7 +7,7 @@
                 <p class="text--secondary mb-0">管理词义复习卡，可批量归档、恢复或彻底删除。</p>
             </div>
             <v-spacer />
-            <div class="d-flex flex-wrap ga-3">
+            <div class="d-flex flex-wrap" style="gap: 12px;">
                 <div class="stat-chip text-center px-4 py-2 rounded-lg">
                     <div class="text-caption text--secondary">总计</div>
                     <div class="text-h6 font-weight-bold">{{ pagination.total }}</div>
