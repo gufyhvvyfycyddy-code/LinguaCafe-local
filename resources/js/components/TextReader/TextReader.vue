@@ -300,6 +300,9 @@
                 finishError: false,
                 leveledUpWordsAndPhrases: null,
                 saving: false,
+
+                // source highlight
+                sourceHighlightTimer: null,
             }
         },
         props: {
@@ -364,6 +367,7 @@
                 this.$forceUpdate();
                 this.$nextTick(() => {
                     this.updateGlossary();
+                    this.applySourceHighlightFromQuery();
                 });
                 this.updateToolbarPosition();
                 this.vocabularySidebarTest();
@@ -375,6 +379,9 @@
             });
         },
         beforeDestroy() {
+            if (this.sourceHighlightTimer) {
+                clearTimeout(this.sourceHighlightTimer);
+            }
             window.removeEventListener('resize', this.updateToolbarPosition);
             window.removeEventListener('resize', this.vocabularySidebarTest);
             window.removeEventListener('scroll', this.updateToolbarPosition);
@@ -510,7 +517,83 @@
                     this.finishError = true;
                 });
             },
-            formatNumber: formatNumber
+            formatNumber: formatNumber,
+            applySourceHighlightFromQuery() {
+                const sourceWord = this.$route.query.source_word;
+                const sourceLemma = this.$route.query.source_lemma;
+                const sourceSentenceId = this.$route.query.source_sentence_id;
+
+                if (!sourceWord && !sourceLemma) {
+                    return;
+                }
+
+                this.$nextTick(() => {
+                    const targetIndex = this.findSourceWordIndex(sourceWord, sourceLemma, sourceSentenceId);
+
+                    if (targetIndex === -1) {
+                        return;
+                    }
+
+                    this.markSourceWord(targetIndex);
+                    this.scrollSourceWordIntoView(targetIndex);
+                });
+            },
+            findSourceWordIndex(sourceWord, sourceLemma, sourceSentenceId) {
+                if (!this.text || !Array.isArray(this.text.words)) {
+                    return -1;
+                }
+
+                const normalize = (value) => (value || '').toString().trim().toLowerCase();
+
+                const word = normalize(sourceWord);
+                const lemma = normalize(sourceLemma);
+                const sentenceId = sourceSentenceId !== undefined && sourceSentenceId !== null
+                    ? String(sourceSentenceId)
+                    : null;
+
+                for (let i = 0; i < this.text.words.length; i++) {
+                    const token = this.text.words[i];
+                    const tokenWord = normalize(token.word);
+                    const tokenBase = normalize(token.base_word || token.lemma || token.study_base);
+                    const tokenSentence = token.sentence_index !== undefined && token.sentence_index !== null
+                        ? String(token.sentence_index)
+                        : (token.sentence_id !== undefined && token.sentence_id !== null ? String(token.sentence_id) : null);
+
+                    const sentenceMatches = sentenceId === null || tokenSentence === sentenceId;
+                    const wordMatches = tokenWord === word || tokenWord === lemma || tokenBase === word || tokenBase === lemma;
+
+                    if (sentenceMatches && wordMatches) {
+                        return i;
+                    }
+                }
+
+                return -1;
+            },
+            markSourceWord(index) {
+                if (!this.text || !Array.isArray(this.text.words) || !this.text.words[index]) {
+                    return;
+                }
+
+                this.$set(this.text.words[index], 'sourceHighlight', true);
+
+                if (this.sourceHighlightTimer) {
+                    clearTimeout(this.sourceHighlightTimer);
+                }
+
+                this.sourceHighlightTimer = setTimeout(() => {
+                    if (this.text && this.text.words[index]) {
+                        this.$set(this.text.words[index], 'sourceHighlight', false);
+                    }
+                }, 8000);
+            },
+            scrollSourceWordIntoView(index) {
+                this.$nextTick(() => {
+                    const element = document.querySelector('#reader-content [wordindex="' + index + '"]');
+                    if (element && element.scrollIntoView) {
+                        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                });
+            },
         }
     }
 </script>

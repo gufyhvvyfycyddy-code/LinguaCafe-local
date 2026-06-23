@@ -150,6 +150,15 @@
         }
     }
 
+    .word.source-highlight {
+        background-color: #9c27b0 !important;
+        color: white !important;
+        border-radius: 4px !important;
+        font-weight: 700 !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
 }
 
 // padding for spaceless languages (Chinese, Japanese, Thai...)

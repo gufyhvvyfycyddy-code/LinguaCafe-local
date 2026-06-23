@@ -724,6 +724,54 @@ class SenseSourceContextTest extends TestCase
         $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
     }
 
+    public function test_source_context_recovered_chapter_payload_contains_sentence_id_for_reader_query(): void
+    {
+        // Chapter with multiple sentences - recovery should return sentence_id for frontend router query
+        $processedWords = [
+            (object) ['word' => 'First', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'sentence', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => 'The', 'sentence_index' => '1', 'spaceAfter' => true],
+            (object) ['word' => 'target', 'sentence_index' => '1', 'spaceAfter' => true],
+            (object) ['word' => 'word', 'sentence_index' => '1', 'spaceAfter' => true],
+            (object) ['word' => 'is', 'sentence_index' => '1', 'spaceAfter' => true],
+            (object) ['word' => 'here', 'sentence_index' => '1', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '1', 'spaceAfter' => false],
+            (object) ['word' => 'Last', 'sentence_index' => '2', 'spaceAfter' => true],
+            (object) ['word' => 'line', 'sentence_index' => '2', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '2', 'spaceAfter' => false],
+        ];
+
+        $chapter = $this->createTestChapter($processedWords, ['name' => 'Reader Query Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'target',
+            'surface_form' => 'target',
+            'pos' => 'noun',
+            'sense_zh' => '目标',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'The target word is here .',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertContains($json['source_kind'], ['chapter_recovered', 'chapter_title'], 'source_kind should be chapter_recovered or chapter_title');
+        $this->assertNotEmpty($json['chapter_id'], 'chapter_id should not be empty for reader query');
+        $this->assertSame($chapter->id, $json['chapter_id']);
+        $this->assertNotNull($json['sentence_id'], 'sentence_id should be available for frontend query parameter');
+    }
+
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter
     {
         return Chapter::forceCreate(array_merge([

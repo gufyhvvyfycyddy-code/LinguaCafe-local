@@ -21,10 +21,9 @@
             @changed="updateSettings"
         ></review-settings>
 
-        <sense-source-dialog
-            v-if="currentReviewIndex !== -1 && reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'"
-            v-model="senseSourceDialog"
-            :sense-id="reviews[currentReviewIndex].word_sense_id"
+        <sense-example-dialog
+            v-model="sourceFallbackDialog"
+            :payload="sourceFallbackContext"
             :language="language"
             :font-size="settings.fontSize"
         />
@@ -297,7 +296,8 @@
                                         small
                                         outlined
                                         class="mt-2"
-                                        @click.stop="senseSourceDialog = true"
+                                        :loading="sourceLoading"
+                                        @click.stop="openSenseSource"
                                     >
                                         查看原文
                                     </v-btn>
@@ -444,12 +444,12 @@
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
     import SenseSentencePreview from './SenseSentencePreview.vue';
-    import SenseSourceDialog from './SenseSourceDialog.vue';
+    import SenseExampleDialog from './SenseExampleDialog.vue';
 
     export default {
         components: {
             SenseSentencePreview,
-            SenseSourceDialog,
+            SenseExampleDialog,
         },
         data: function() {
             return {
@@ -487,7 +487,10 @@
                 currentReviewIndex: -1,
                 reviews: [],
                 totalReviews: 0,
-                senseSourceDialog: false,
+                sourceLoading: false,
+                sourceFallbackDialog: false,
+                sourceFallbackContext: null,
+                sourceError: '',
                 correctReviews: 0,
                 language: '',
                 languageSpaces: false,
@@ -735,7 +738,9 @@
                 this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
 
                 this.exampleSentence = null;
-                this.senseSourceDialog = false;
+                this.sourceFallbackDialog = false;
+                this.sourceFallbackContext = null;
+                this.sourceError = '';
 
                 // sense 卡片已在 payload 中自带例句，无需 API 加载
                 if (this.reviews[this.currentReviewIndex].type !== 'sense') {
@@ -762,6 +767,56 @@
             },
             finish() {
                 this.finished = true;
+            },
+            openSenseSource() {
+                const card = this.reviews[this.currentReviewIndex];
+
+                if (!card || card.type !== 'sense' || !card.word_sense_id) {
+                    return;
+                }
+
+                this.sourceLoading = true;
+                this.sourceError = '';
+
+                axios.get('/senses/' + card.word_sense_id + '/source-context')
+                    .then((response) => {
+                        const context = response.data;
+
+                        const canOpenChapter = context
+                            && context.source_available
+                            && context.chapter_id
+                            && ['chapter', 'chapter_recovered', 'chapter_title'].includes(context.source_kind);
+
+                        if (canOpenChapter) {
+                            this.$router.push({
+                                path: '/chapters/read/' + context.chapter_id,
+                                query: {
+                                    source_sense_id: card.word_sense_id,
+                                    source_sentence_id: context.sentence_id,
+                                    source_word: card.surface_form || card.lemma,
+                                    source_lemma: card.lemma,
+                                },
+                            });
+                            return;
+                        }
+
+                        this.sourceFallbackContext = {
+                            card: card,
+                            context: context,
+                        };
+                        this.sourceFallbackDialog = true;
+                    })
+                    .catch(() => {
+                        this.sourceError = '原文位置加载失败。';
+                        this.sourceFallbackContext = {
+                            card: card,
+                            context: null,
+                        };
+                        this.sourceFallbackDialog = true;
+                    })
+                    .finally(() => {
+                        this.sourceLoading = false;
+                    });
             },
             formatNumber: formatNumber
         },

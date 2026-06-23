@@ -538,3 +538,28 @@
     }
 }
 
+// Sense example dialog styles
+.sense-example-dialog {
+    .source-context {
+        line-height: 1.8;
+        text-align: left;
+        user-select: text;
+    }
+
+    .source-context .word {
+        user-select: text;
+    }
+
+    .source-context .source-target-token {
+        background-color: #9c27b0 !important;
+        color: white !important;
+        border-radius: 4px;
+        padding-left: 4px;
+        padding-right: 4px;
+        font-weight: 700;
+    }
+
+    .example-translation {
+        background: var(--v-background-base);
+    }
+}

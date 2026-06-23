@@ -89,6 +89,7 @@
                         'word': true,
                         'selected-font': true,
                         'highlighted': word.selected || word.hover,
+                        'source-highlight': word.sourceHighlight,
                         'phrase': word.phraseIndexes.length,
                         'space-after': word.spaceAfter,
                         'phrase-start': word.phraseStart,
