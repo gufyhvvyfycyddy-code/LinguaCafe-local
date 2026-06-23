@@ -219,7 +219,7 @@ export default {
         this.loadData();
     },
     methods: {
-        loadData() {
+        loadData(allowPageFallback = true) {
             this.loading = true;
             this.error = '';
 
@@ -235,6 +235,13 @@ export default {
                 this.items = response.data.items;
                 this.pagination = response.data.pagination;
                 this.currentPage = response.data.pagination.current_page;
+
+                // Fallback: if current page is empty but total data exists, go back one page
+                if (allowPageFallback && this.items.length === 0 && this.currentPage > 1 && this.pagination.total > 0) {
+                    this.currentPage--;
+                    this.loadData(false);
+                    return;
+                }
             })
             .catch((err) => {
                 this.error = '加载数据失败：' + (err.response?.data?.message || err.message);
