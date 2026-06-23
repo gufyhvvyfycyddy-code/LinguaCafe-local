@@ -21,6 +21,12 @@
                         <v-alert v-if="context.source_kind === 'card_example'" type="info" dense text class="mb-3">
                             {{ context.fallback_message }}
                         </v-alert>
+                        <v-alert v-if="context.source_kind === 'chapter_recovered'" type="info" dense text class="mb-3">
+                            {{ context.fallback_message }}
+                        </v-alert>
+                        <v-alert v-if="context.source_kind === 'chapter_title'" type="info" dense text class="mb-3">
+                            {{ context.fallback_message }}
+                        </v-alert>
 
                         <div class="text-subtitle-2 mb-3">
                             {{ context.source_kind === 'card_example' ? '复习卡例句' : (context.chapter_title || '未命名章节') }}
@@ -51,7 +57,7 @@
                 <v-btn
                     color="primary"
                     depressed
-                    :disabled="!context || context.source_kind !== 'chapter' || !context.chapter_id"
+                    :disabled="!canOpenChapter()"
                     @click="openChapter"
                 >
                     打开原章节
@@ -84,6 +90,12 @@
                 set(value) {
                     this.$emit('input', value);
                 },
+            },
+            canOpenChapter() {
+                return this.context
+                    && this.context.source_available
+                    && this.context.chapter_id
+                    && ['chapter', 'chapter_recovered', 'chapter_title'].includes(this.context.source_kind);
             },
         },
         watch: {

@@ -133,6 +133,12 @@ class SenseReviewService
             }
         }
 
+        // Recovery: search all user chapters for the example sentence
+        $recovered = $this->recoverSourceContextFromExampleSentence($sense, $occurrence, $exampleSentence);
+        if ($recovered) {
+            return $recovered;
+        }
+
         // Fallback: card example sentence
         $fallback = $this->fallbackCardExampleSourceContext($sense, $occurrence);
         if ($fallback) {
@@ -191,6 +197,139 @@ class SenseReviewService
             'target_indexes' => $targetIndexes,
             'fallback_message' => '未找到原章节位置，以下为复习卡保存的例句。',
         ];
+    }
+
+    private function recoverSourceContextFromExampleSentence(
+        WordSense $sense,
+        ?WordSenseOccurrence $occurrence,
+        ?string $exampleSentence
+    ): ?array {
+        if (!$exampleSentence) {
+            return null;
+        }
+
+        $chapters = Chapter::query()
+            ->where('user_id', $sense->user_id)
+            ->where('language', $sense->language_id)
+            ->orderByDesc('id')
+            ->get();
+
+        $targetNormalized = $this->normalizeSentenceText($exampleSentence);
+
+        foreach ($chapters as $chapter) {
+            // 1. Check chapter title match
+            $titleNormalized = $this->normalizeSentenceText($chapter->name);
+            if ($titleNormalized === $targetNormalized) {
+                $tokens = $this->syntheticSentenceTokens($exampleSentence, $sense, $occurrence);
+                $targetIndexes = [];
+                foreach ($tokens as $index => $token) {
+                    if (!empty($token['is_target'])) {
+                        $targetIndexes[] = $index;
+                    }
+                }
+
+                // Write back to DB
+                $this->writeBackRecoveredSource($sense, $occurrence, $chapter->id, null);
+
+                return [
+                    'sense_id' => $sense->id,
+                    'source_available' => true,
+                    'source_kind' => 'chapter_title',
+                    'chapter_id' => $chapter->id,
+                    'chapter_title' => $chapter->name,
+                    'sentence_id' => null,
+                    'sentence_hash' => null,
+                    'context_tokens' => $tokens,
+                    'target_indexes' => $targetIndexes,
+                    'fallback_message' => '该例句来自章节标题。',
+                ];
+            }
+
+            // 2. Search processed_text for the example sentence
+            $words = $this->flattenProcessedWords($chapter->getProcessedText());
+            if (empty($words)) {
+                continue;
+            }
+
+            $groups = $this->groupTokensBySentenceWithIndexes($words);
+            $targetKey = null;
+
+            foreach ($groups as $key => $entries) {
+                $rawWords = array_map(fn ($entry) => $entry['word'], $entries);
+                $groupText = $this->tokensToSentenceText($rawWords);
+                $groupNormalized = $this->normalizeSentenceText($groupText);
+
+                if ($groupNormalized === $targetNormalized) {
+                    $targetKey = (string) $key;
+                    break;
+                }
+            }
+
+            if ($targetKey === null) {
+                continue;
+            }
+
+            // Found the sentence in this chapter — build context
+            $entries = $this->contextEntriesAroundGroup($groups, $targetKey);
+
+            $contextTokens = [];
+            $targetIndexes = [];
+
+            foreach ($entries as $localIndex => $entry) {
+                $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence);
+                if ($token['is_target']) {
+                    $targetIndexes[] = $localIndex;
+                }
+                $contextTokens[] = $token;
+            }
+
+            if (empty($contextTokens)) {
+                continue;
+            }
+
+            // Write back to DB
+            $this->writeBackRecoveredSource($sense, $occurrence, $chapter->id, $targetKey);
+
+            return [
+                'sense_id' => $sense->id,
+                'source_available' => true,
+                'source_kind' => 'chapter_recovered',
+                'chapter_id' => $chapter->id,
+                'chapter_title' => $chapter->name,
+                'sentence_id' => $targetKey,
+                'sentence_hash' => null,
+                'context_tokens' => $contextTokens,
+                'target_indexes' => $targetIndexes,
+                'fallback_message' => '已根据复习卡例句定位到原章节。',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Write back recovered chapter_id / sentence_id to the database
+     * so the next lookup can skip the full-text search.
+     */
+    private function writeBackRecoveredSource(
+        WordSense $sense,
+        ?WordSenseOccurrence $occurrence,
+        int $chapterId,
+        ?string $sentenceId
+    ): void {
+        try {
+            $sense->source_chapter_id = $chapterId;
+            $sense->sentence_id = $sentenceId;
+            $sense->save();
+
+            if ($occurrence) {
+                $occurrence->chapter_id = $chapterId;
+                $occurrence->sentence_id = $sentenceId;
+                $occurrence->save();
+            }
+        } catch (\Throwable $e) {
+            // Non-critical: don't break the response if write-back fails
+        }
     }
 
     private function sourceContextFromChapter(
