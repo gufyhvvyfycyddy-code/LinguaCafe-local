@@ -18,8 +18,12 @@
                     </v-alert>
 
                     <template v-else>
+                        <v-alert v-if="context.source_kind === 'card_example'" type="info" dense text class="mb-3">
+                            {{ context.fallback_message }}
+                        </v-alert>
+
                         <div class="text-subtitle-2 mb-3">
-                            {{ context.chapter_title || '未命名章节' }}
+                            {{ context.source_kind === 'card_example' ? '复习卡例句' : (context.chapter_title || '未命名章节') }}
                         </div>
 
                         <div class="text-block-group source-context" :style="{ 'font-size': fontSize + 'px' }">
@@ -47,7 +51,7 @@
                 <v-btn
                     color="primary"
                     depressed
-                    :disabled="!context || !context.source_available || !context.chapter_id"
+                    :disabled="!context || context.source_kind !== 'chapter' || !context.chapter_id"
                     @click="openChapter"
                 >
                     打开原章节

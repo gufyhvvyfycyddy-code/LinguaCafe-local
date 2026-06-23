@@ -98,44 +98,48 @@ class SenseReviewService
         $sentenceHash = $occurrence?->sentence_hash ?? $sense->sentence_hash;
         $exampleSentence = $occurrence?->sentence_en ?? $sense->example_sentence_en;
 
-        if (!$chapterId) {
-            return $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        // Try chapter source first
+        if ($chapterId) {
+            $chapter = Chapter::query()
+                ->where('id', $chapterId)
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->first();
+
+            if ($chapter) {
+                $context = $this->sourceContextFromChapter(
+                    $chapter,
+                    $sense,
+                    $occurrence,
+                    $sentenceId,
+                    $sentenceHash,
+                    $exampleSentence
+                );
+
+                if ($context) {
+                    return [
+                        'sense_id' => $sense->id,
+                        'source_available' => true,
+                        'source_kind' => 'chapter',
+                        'chapter_id' => $chapter->id,
+                        'chapter_title' => $chapter->name,
+                        'sentence_id' => $sentenceId,
+                        'sentence_hash' => $sentenceHash,
+                        'context_tokens' => $context['tokens'],
+                        'target_indexes' => $context['target_indexes'],
+                        'fallback_message' => null,
+                    ];
+                }
+            }
         }
 
-        $chapter = Chapter::query()
-            ->where('id', $chapterId)
-            ->where('user_id', $sense->user_id)
-            ->where('language', $sense->language_id)
-            ->first();
-
-        if (!$chapter) {
-            return $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        // Fallback: card example sentence
+        $fallback = $this->fallbackCardExampleSourceContext($sense, $occurrence);
+        if ($fallback) {
+            return $fallback;
         }
 
-        $context = $this->sourceContextFromChapter(
-            $chapter,
-            $sense,
-            $occurrence,
-            $sentenceId,
-            $sentenceHash,
-            $exampleSentence
-        );
-
-        if (!$context) {
-            return $this->emptySourceContext($sense->id, '找到了材料，但没有定位到原句');
-        }
-
-        return [
-            'sense_id' => $sense->id,
-            'source_available' => true,
-            'chapter_id' => $chapter->id,
-            'chapter_title' => $chapter->name,
-            'sentence_id' => $sentenceId,
-            'sentence_hash' => $sentenceHash,
-            'context_tokens' => $context['tokens'],
-            'target_indexes' => $context['target_indexes'],
-            'fallback_message' => null,
-        ];
+        return $this->emptySourceContext($sense->id, '暂无可用原文位置');
     }
 
     private function emptySourceContext(int $senseId, string $message): array
@@ -143,6 +147,7 @@ class SenseReviewService
         return [
             'sense_id' => $senseId,
             'source_available' => false,
+            'source_kind' => null,
             'chapter_id' => null,
             'chapter_title' => null,
             'sentence_id' => null,
@@ -150,6 +155,41 @@ class SenseReviewService
             'context_tokens' => [],
             'target_indexes' => [],
             'fallback_message' => $message,
+        ];
+    }
+
+    private function fallbackCardExampleSourceContext(WordSense $sense, ?WordSenseOccurrence $occurrence = null): ?array
+    {
+        if (!$sense->example_sentence_en && (!$occurrence || !$occurrence->sentence_en)) {
+            return null;
+        }
+
+        $sentence = $occurrence?->sentence_en ?: $sense->example_sentence_en;
+
+        $tokens = $this->syntheticSentenceTokens($sentence, $sense, $occurrence);
+
+        if (empty($tokens)) {
+            return null;
+        }
+
+        $targetIndexes = [];
+        foreach ($tokens as $index => $token) {
+            if (!empty($token['is_target'])) {
+                $targetIndexes[] = $index;
+            }
+        }
+
+        return [
+            'sense_id' => $sense->id,
+            'source_available' => true,
+            'source_kind' => 'card_example',
+            'chapter_id' => null,
+            'chapter_title' => null,
+            'sentence_id' => $occurrence?->sentence_id ?? $sense->sentence_id,
+            'sentence_hash' => $occurrence?->sentence_hash ?? $sense->sentence_hash,
+            'context_tokens' => $tokens,
+            'target_indexes' => $targetIndexes,
+            'fallback_message' => '未找到原章节位置，以下为复习卡保存的例句。',
         ];
     }
 

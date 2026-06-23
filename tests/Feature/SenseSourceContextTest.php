@@ -114,6 +114,7 @@ class SenseSourceContextTest extends TestCase
         $json = $response->json();
 
         $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('chapter', $json['source_kind']);
         $this->assertSame($chapter->id, $json['chapter_id']);
         $this->assertNotEmpty($json['context_tokens'], 'context_tokens should not be empty');
         $this->assertNotEmpty($json['target_indexes'], 'target_indexes should not be empty');
@@ -192,6 +193,7 @@ class SenseSourceContextTest extends TestCase
         $json = $response->json();
 
         $this->assertTrue($json['source_available'], 'source_available should be true for sentence_id="0"');
+        $this->assertSame('chapter', $json['source_kind']);
         $this->assertSame('0', $json['sentence_id']);
     }
 
@@ -259,6 +261,7 @@ class SenseSourceContextTest extends TestCase
         $json = $response->json();
 
         $this->assertTrue($json['source_available'], 'source_available should be true (matched by text)');
+        $this->assertSame('chapter', $json['source_kind']);
         $this->assertNotEmpty($json['context_tokens']);
 
         // Find a target token
@@ -274,6 +277,7 @@ class SenseSourceContextTest extends TestCase
 
     public function test_source_context_returns_unavailable_without_source(): void
     {
+        // Truly empty: no chapter, no occurrence, no example_sentence_en
         $sense = $this->wordSenseService->createSense([
             'user_id' => $this->user->id,
             'language' => 'english',
@@ -295,7 +299,8 @@ class SenseSourceContextTest extends TestCase
         $response->assertOk();
         $json = $response->json();
 
-        $this->assertFalse($json['source_available'], 'source_available should be false without chapter');
+        $this->assertFalse($json['source_available'], 'source_available should be false without any source');
+        $this->assertNull($json['source_kind']);
         $this->assertNull($json['chapter_id']);
         $this->assertNotEmpty($json['fallback_message']);
     }
@@ -377,8 +382,11 @@ class SenseSourceContextTest extends TestCase
         $json = $response->json();
 
         // Chapter lookup filters by sense->user_id and sense->language_id,
-        // so the other user's chapter should be rejected -> unavailable
-        $this->assertFalse($json['source_available'], 'source_available should be false when chapter belongs to other user');
+        // so the other user's chapter should be rejected.
+        // But the occurrence has sentence_en, so fallback to card_example should work.
+        $this->assertTrue($json['source_available'], 'source_available should be true via card_example fallback');
+        $this->assertSame('card_example', $json['source_kind']);
+        $this->assertNull($json['chapter_id'], 'chapter_id should be null (other user chapter rejected)');
     }
 
     public function test_source_context_cannot_read_other_language_chapter(): void
@@ -433,8 +441,105 @@ class SenseSourceContextTest extends TestCase
         $response->assertOk();
         $json = $response->json();
 
-        // Chapter language=spanish, sense language=english → mismatch → unavailable
-        $this->assertFalse($json['source_available'], 'source_available should be false when chapter language differs');
+        // Chapter language=spanish, sense language=english → mismatch.
+        // But the occurrence has sentence_en, so fallback to card_example should work.
+        $this->assertTrue($json['source_available'], 'source_available should be true via card_example fallback');
+        $this->assertSame('card_example', $json['source_kind']);
+        $this->assertNull($json['chapter_id'], 'chapter_id should be null (language mismatch)');
+    }
+
+    public function test_source_context_falls_back_to_card_example_without_chapter(): void
+    {
+        // Sense with example_sentence_en but NO source_chapter_id, NO occurrence
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'bureau',
+            'surface_form' => 'Bureau',
+            'pos' => 'noun',
+            'sense_zh' => '局；统计局',
+            'sense_en' => 'an office or department for transacting particular business',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'Sure enough, the Census Bureau released data.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('card_example', $json['source_kind']);
+        $this->assertNull($json['chapter_id']);
+        $this->assertNotEmpty($json['context_tokens'], 'context_tokens should not be empty');
+        $this->assertNotEmpty($json['target_indexes'], 'target_indexes should not be empty');
+        $this->assertSame('未找到原章节位置，以下为复习卡保存的例句。', $json['fallback_message']);
+
+        // Bureau token should be marked as target
+        $hasTarget = false;
+        foreach ($json['context_tokens'] as $token) {
+            if ($token['word'] === 'Bureau' && $token['is_target']) {
+                $hasTarget = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
+    }
+
+    public function test_source_context_falls_back_to_card_example_when_chapter_missing(): void
+    {
+        // Sense has example_sentence_en, occurrence points to non-existent chapter (id=99999)
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'example',
+            'surface_form' => 'example',
+            'pos' => 'noun',
+            'sense_zh' => '例子',
+            'sense_en' => 'a thing serving as a model',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'This is an example sentence.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        // Create occurrence pointing to non-existent chapter
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => 99999,  // Non-existent chapter
+            'sentence_id' => '0',
+            'sentence_en' => 'This is an example sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => 'example',
+            'lemma' => 'example',
+            'pos' => 'noun',
+            'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'auto_fsrs_allowed' => false,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true via fallback');
+        $this->assertSame('card_example', $json['source_kind']);
+        $this->assertNull($json['chapter_id'], 'chapter_id should be null when chapter is missing');
+        $this->assertNotEmpty($json['context_tokens']);
     }
 
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter

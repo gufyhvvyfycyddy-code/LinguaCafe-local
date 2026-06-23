@@ -1379,7 +1379,10 @@
                     this.$store.commit('vocabularyBox/setTranslationText', uniqueWord.translation);
                     this.$store.commit('vocabularyBox/setStage', uniqueWord.stage);
                     this.$store.commit('vocabularyBox/setEncounteredWordId', uniqueWord.id || null);
-                    this.$store.commit('vocabularyBox/setChapterId', this.$props._text && this.$props._text.chapterId ? this.$props._text.chapterId : null);
+                    const chapterId = this.$props._text && this.$props._text.chapterId !== undefined && this.$props._text.chapterId !== null
+                        ? this.$props._text.chapterId
+                        : null;
+                    this.$store.commit('vocabularyBox/setChapterId', chapterId);
                     this.$store.commit('vocabularyBox/setSentenceIndex', this.selection[0].sentence_index);
                     this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceTextFromTokenWindow());
                     if (uniqueWord.base_word !== '') {
