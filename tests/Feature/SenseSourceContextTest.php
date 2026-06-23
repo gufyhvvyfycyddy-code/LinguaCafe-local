@@ -133,6 +133,19 @@ class SenseSourceContextTest extends TestCase
             }
         }
         $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
+
+        // Verify is_source_sentence is set on tokens
+        $hasSourceSentenceTokens = false;
+        $hasNonSourceSentenceTokens = false;
+        foreach ($json['context_tokens'] as $token) {
+            if (!empty($token['is_source_sentence'])) {
+                $hasSourceSentenceTokens = true;
+            } else {
+                $hasNonSourceSentenceTokens = true;
+            }
+        }
+        $this->assertTrue($hasSourceSentenceTokens, 'Some tokens should have is_source_sentence=true');
+        $this->assertTrue($hasNonSourceSentenceTokens, 'Some tokens should have is_source_sentence=false');
     }
 
     public function test_source_context_keeps_sentence_id_zero_valid(): void
@@ -770,6 +783,199 @@ class SenseSourceContextTest extends TestCase
         $this->assertNotEmpty($json['chapter_id'], 'chapter_id should not be empty for reader query');
         $this->assertSame($chapter->id, $json['chapter_id']);
         $this->assertNotNull($json['sentence_id'], 'sentence_id should be available for frontend query parameter');
+    }
+
+    public function test_source_context_marks_source_sentence_tokens(): void
+    {
+        // Create a chapter with 5 sentences, target at sentence_index=2
+        $processedWords = [];
+        $sentenceWords = [
+            ['First', 'sentence', 'here'],
+            ['Another', 'intro', 'line'],
+            ['The', 'target', 'word', 'Census', 'Bureau', 'appears', 'here'],
+            ['After', 'sentence', 'goes', 'on'],
+            ['Final', 'closing', 'words'],
+        ];
+        $sentencePunctuation = ['.', '.', '.', '.', '.'];
+
+        foreach ($sentenceWords as $si => $words) {
+            foreach ($words as $wi => $w) {
+                $spaceAfter = ($wi < count($words) - 1);
+                $processedWords[] = (object) [
+                    'word' => $w,
+                    'sentence_index' => (string) $si,
+                    'spaceAfter' => $spaceAfter,
+                ];
+            }
+            $processedWords[] = (object) [
+                'word' => $sentencePunctuation[$si],
+                'sentence_index' => (string) $si,
+                'spaceAfter' => false,
+            ];
+        }
+
+        $chapter = $this->createTestChapter($processedWords, ['name' => 'Source Sentence Marking Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'bureau',
+            'surface_form' => 'Bureau',
+            'pos' => 'noun',
+            'sense_zh' => '局',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'The target word Census Bureau appears here .',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '2',
+            'sentence_en' => 'The target word Census Bureau appears here .',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => 'Bureau',
+            'lemma' => 'bureau',
+            'pos' => 'noun',
+            'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'auto_fsrs_allowed' => false,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('chapter', $json['source_kind']);
+
+        // Verify: target sentence tokens have is_source_sentence=true
+        $sourceSentenceWords = [];
+        $nonSourceSentenceWords = [];
+        foreach ($json['context_tokens'] as $token) {
+            if (!empty($token['is_source_sentence'])) {
+                $sourceSentenceWords[] = $token['word'];
+            } else {
+                $nonSourceSentenceWords[] = $token['word'];
+            }
+        }
+
+        $this->assertNotEmpty($sourceSentenceWords, 'Should have tokens with is_source_sentence=true');
+        $this->assertContains('Census', $sourceSentenceWords, 'Target sentence word should have is_source_sentence=true');
+        $this->assertContains('Bureau', $sourceSentenceWords, 'Target sentence word should have is_source_sentence=true');
+
+        $this->assertNotEmpty($nonSourceSentenceWords, 'Should have tokens with is_source_sentence=false');
+        $this->assertContains('First', $nonSourceSentenceWords, 'Non-target sentence word should have is_source_sentence=false');
+        $this->assertContains('Final', $nonSourceSentenceWords, 'Non-target sentence word should have is_source_sentence=false');
+    }
+
+    public function test_source_context_expands_to_surrounding_sentences(): void
+    {
+        // Create 15 sentences, target at sentence_index=7
+        // With radius=5, context should include sentences 2-12 (11 sentences),
+        // and exclude sentences 0, 1, 13, 14
+        $processedWords = [];
+        for ($i = 0; $i < 15; $i++) {
+            $wordA = 'S' . $i . 'a';
+            $wordB = 'S' . $i . 'b';
+            $processedWords[] = (object) [
+                'word' => $wordA,
+                'sentence_index' => (string) $i,
+                'spaceAfter' => true,
+            ];
+            $processedWords[] = (object) [
+                'word' => $wordB,
+                'sentence_index' => (string) $i,
+                'spaceAfter' => false,
+            ];
+            $processedWords[] = (object) [
+                'word' => '.',
+                'sentence_index' => (string) $i,
+                'spaceAfter' => false,
+            ];
+        }
+
+        $chapter = $this->createTestChapter($processedWords, ['name' => 'Expanded Context Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 's7b',
+            'surface_form' => 'S7b',
+            'pos' => 'noun',
+            'sense_zh' => '目标词',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'S7a S7b .',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '7',
+            'sentence_en' => 'S7a S7b .',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => 'S7b',
+            'lemma' => 's7b',
+            'pos' => 'noun',
+            'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'auto_fsrs_allowed' => false,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('chapter', $json['source_kind']);
+
+        $words = array_column($json['context_tokens'], 'word');
+
+        // Should include sentences 2-12 (radius 5)
+        $this->assertContains('S2a', $words, 'Should include sentence 2 (start of radius)');
+        $this->assertContains('S12a', $words, 'Should include sentence 12 (end of radius)');
+
+        // Should NOT include sentences 0, 1, 13, 14
+        $this->assertNotContains('S0a', $words, 'Should NOT include sentence 0 (outside radius)');
+        $this->assertNotContains('S0b', $words, 'Should NOT include sentence 0');
+        $this->assertNotContains('S1a', $words, 'Should NOT include sentence 1 (outside radius)');
+        $this->assertNotContains('S1b', $words, 'Should NOT include sentence 1');
+        $this->assertNotContains('S13a', $words, 'Should NOT include sentence 13 (outside radius)');
+        $this->assertNotContains('S13b', $words, 'Should NOT include sentence 13');
+        $this->assertNotContains('S14a', $words, 'Should NOT include sentence 14 (outside radius)');
+        $this->assertNotContains('S14b', $words, 'Should NOT include sentence 14');
+
+        // Should include the target sentence
+        $this->assertContains('S7a', $words, 'Should include target sentence');
+        $this->assertContains('S7b', $words, 'Should include target sentence');
+
+        // Verify context has more tokens than just 3 sentences
+        $this->assertGreaterThan(3 * 3, count($json['context_tokens']), 'Context should have more tokens than 3 sentences');
     }
 
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter

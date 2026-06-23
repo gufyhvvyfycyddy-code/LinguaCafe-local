@@ -1,41 +1,45 @@
 <template>
-    <v-dialog v-model="dialogValue" max-width="800">
+    <v-dialog v-model="dialogValue" max-width="1100" scrollable>
         <v-card class="sense-example-dialog">
             <v-card-title>
-                复习卡例句
+                原文与译文
                 <v-spacer />
                 <v-btn icon @click="close"><v-icon>mdi-close</v-icon></v-btn>
             </v-card-title>
 
-            <v-card-text>
+            <v-card-text class="source-dialog-body">
                 <v-alert v-if="message" type="info" dense text class="mb-3">
                     {{ message }}
                 </v-alert>
 
-                <div class="text-block-group source-context" :style="{ 'font-size': fontSize + 'px' }">
-                    <span
-                        v-for="(token, index) in tokens"
-                        :key="index"
-                        :class="[
-                            'word',
-                            'selected-font',
-                            {
-                                'space-after': token.spaceAfter,
-                                'source-target-token': token.is_target
-                            }
-                        ]"
-                        :stage="token.stage === undefined || token.stage === null ? 2 : token.stage"
-                    >{{ token.word }}</span>
+                <div v-if="tokens.length" ref="scrollBox" class="source-scroll-box">
+                    <div class="text-block-group source-context" :style="{ 'font-size': fontSize + 'px' }">
+                        <span
+                            v-for="(token, index) in tokens"
+                            :key="index"
+                            :ref="token.is_target ? 'targetToken' : null"
+                            :class="[
+                                'word',
+                                'selected-font',
+                                {
+                                    'space-after': token.spaceAfter,
+                                    'source-target-token': token.is_target,
+                                    'source-sentence-token': token.is_source_sentence
+                                }
+                            ]"
+                            :stage="token.stage === undefined || token.stage === null ? 2 : token.stage"
+                        >{{ token.word }}</span>
+                    </div>
                 </div>
+
+                <v-alert v-else type="info" dense text class="mt-3">
+                    暂无可显示的原文或例句。
+                </v-alert>
 
                 <div v-if="translation" class="mt-4 pa-3 rounded example-translation">
-                    <div class="text-caption text--secondary mb-1">译文</div>
+                    <div class="text-caption text--secondary mb-1">译文 / 释义</div>
                     <div>{{ translation }}</div>
                 </div>
-
-                <v-alert v-if="!tokens.length" type="info" dense text class="mt-3">
-                    暂无可显示的例句。
-                </v-alert>
             </v-card-text>
 
             <v-card-actions>
@@ -53,6 +57,11 @@
             payload: Object,
             fontSize: Number,
             language: String,
+        },
+        data() {
+            return {
+                autoScrolled: false,
+            };
         },
         computed: {
             dialogValue: {
@@ -96,16 +105,64 @@
                 return '';
             },
             message() {
-                if (this.context && this.context.fallback_message) {
-                    return this.context.fallback_message;
+                if (this.payload && this.payload.error) {
+                    return this.payload.error;
                 }
 
-                return '未定位到原章节，以下为复习卡保存的例句。';
+                if (!this.context) {
+                    return '未定位到原章节，以下为复习卡保存的例句。';
+                }
+
+                if (!this.context.source_available) {
+                    return this.context.fallback_message || '暂无可用原文位置。';
+                }
+
+                if (this.context.source_kind === 'chapter') {
+                    return '已定位到原文位置。';
+                }
+
+                if (this.context.source_kind === 'chapter_recovered') {
+                    return '已根据复习卡例句定位到原章节。';
+                }
+
+                if (this.context.source_kind === 'chapter_title') {
+                    return '该例句来自章节标题。';
+                }
+
+                if (this.context.source_kind === 'card_example') {
+                    return this.context.fallback_message || '未找到原章节位置，以下为复习卡保存的例句。';
+                }
+
+                return '';
+            },
+        },
+        watch: {
+            value(newValue) {
+                if (newValue) {
+                    this.autoScrolled = false;
+                    this.$nextTick(() => {
+                        this.scrollTargetIntoView();
+                    });
+                }
             },
         },
         methods: {
             close() {
                 this.$emit('input', false);
+            },
+            scrollTargetIntoView() {
+                this.$nextTick(() => {
+                    const refs = this.$refs.targetToken;
+                    const target = Array.isArray(refs) ? refs[0] : refs;
+
+                    if (target && target.scrollIntoView) {
+                        target.scrollIntoView({
+                            behavior: 'smooth',
+                            block: 'center',
+                            inline: 'center',
+                        });
+                    }
+                });
             },
         },
     };

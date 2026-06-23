@@ -299,7 +299,7 @@
                                         :loading="sourceLoading"
                                         @click.stop="openSenseSource"
                                     >
-                                        查看原文
+                                        查看原文/译文
                                     </v-btn>
 
                                     <div class="text-caption text--secondary mt-2">
@@ -780,37 +780,17 @@
 
                 axios.get('/senses/' + card.word_sense_id + '/source-context')
                     .then((response) => {
-                        const context = response.data;
-
-                        const canOpenChapter = context
-                            && context.source_available
-                            && context.chapter_id
-                            && ['chapter', 'chapter_recovered', 'chapter_title'].includes(context.source_kind);
-
-                        if (canOpenChapter) {
-                            this.$router.push({
-                                path: '/chapters/read/' + context.chapter_id,
-                                query: {
-                                    source_sense_id: card.word_sense_id,
-                                    source_sentence_id: context.sentence_id,
-                                    source_word: card.surface_form || card.lemma,
-                                    source_lemma: card.lemma,
-                                },
-                            });
-                            return;
-                        }
-
                         this.sourceFallbackContext = {
                             card: card,
-                            context: context,
+                            context: response.data,
                         };
                         this.sourceFallbackDialog = true;
                     })
                     .catch(() => {
-                        this.sourceError = '原文位置加载失败。';
                         this.sourceFallbackContext = {
                             card: card,
                             context: null,
+                            error: '原文位置加载失败。',
                         };
                         this.sourceFallbackDialog = true;
                     })

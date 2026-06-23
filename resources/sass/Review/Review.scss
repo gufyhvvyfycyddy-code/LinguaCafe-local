@@ -540,14 +540,33 @@
 
 // Sense example dialog styles
 .sense-example-dialog {
+    .source-dialog-body {
+        max-height: 75vh;
+        overflow: hidden;
+    }
+
+    .source-scroll-box {
+        max-height: 52vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 16px;
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        border-radius: 8px;
+        background: var(--v-foreground-base);
+    }
+
     .source-context {
-        line-height: 1.8;
+        line-height: 1.9;
         text-align: left;
         user-select: text;
     }
 
     .source-context .word {
         user-select: text;
+    }
+
+    .source-context .source-sentence-token {
+        box-shadow: inset 0 -0.35em rgba(156, 39, 176, 0.12);
     }
 
     .source-context .source-target-token {

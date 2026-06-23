@@ -359,7 +359,7 @@ class SenseReviewService
         $targetIndexes = [];
 
         foreach ($entries as $localIndex => $entry) {
-            $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence);
+            $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence, $entry['is_source_sentence'] ?? false);
             if ($token['is_target']) {
                 $targetIndexes[] = $localIndex;
             }
@@ -460,23 +460,31 @@ class SenseReviewService
             return [];
         }
 
-        $start = max(0, $pos - 1);
-        $end = min(count($keys) - 1, $pos + 1);
+        $radius = 5;
+        $start = max(0, $pos - $radius);
+        $end = min(count($keys) - 1, $pos + $radius);
 
         $result = [];
 
         for ($i = $start; $i <= $end; $i++) {
             foreach ($groups[$keys[$i]] as $entry) {
-                $result[] = $entry;
+                $result[] = [
+                    'word' => $entry['word'],
+                    'global_index' => $entry['global_index'],
+                    'group_key' => $keys[$i],
+                    'is_source_sentence' => $keys[$i] == $targetKey,
+                ];
             }
         }
 
         return $result;
     }
 
-    private function simplifyContextToken($word, int $localIndex, WordSense $sense, ?WordSenseOccurrence $occurrence): array
+    private function simplifyContextToken($word, int $localIndex, WordSense $sense, ?WordSenseOccurrence $occurrence, bool $isSourceSentence = false): array
     {
         $token = $this->simplifyToken($word, $localIndex);
+
+        $token['is_source_sentence'] = $isSourceSentence;
 
         if ($this->tokenMatchesSenseTarget($token['word'], $sense, $occurrence)) {
             $token['is_target'] = true;
