@@ -320,7 +320,7 @@ class SenseReviewService
             $targetIndexes = [];
 
             foreach ($entries as $localIndex => $entry) {
-                $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence);
+                $token = $this->simplifyContextToken($entry['word'], $localIndex, $sense, $occurrence, $entry['is_source_sentence'] ?? false);
                 if ($token['is_target']) {
                     $targetIndexes[] = $localIndex;
                 }
