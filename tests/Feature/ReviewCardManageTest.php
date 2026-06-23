@@ -1379,7 +1379,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertNull(ReviewCard::find($cardId));
     }
 
-    public function test_destroy_preserves_word_sense(): void
+    public function test_destroy_rejects_word_sense(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
         $senseId = $sense->id;
@@ -1390,16 +1390,16 @@ class ReviewCardManageTest extends TestCase
         $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}");
         $response->assertOk();
 
-        // WordSense must still exist with all fields intact
+        // WordSense must still exist but be set to rejected
         $freshSense = WordSense::find($senseId);
         $this->assertNotNull($freshSense);
         $this->assertSame($oldLemma, $freshSense->lemma);
         $this->assertSame($oldSenseZh, $freshSense->sense_zh);
         $this->assertSame($oldSenseEn, $freshSense->sense_en);
-        $this->assertSame(WordSense::STATUS_CONFIRMED, $freshSense->status);
+        $this->assertSame(WordSense::STATUS_REJECTED, $freshSense->status);
     }
 
-    public function test_destroy_preserves_word_sense_occurrences(): void
+    public function test_destroy_preserves_occurrences_but_clears_review_card_link(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
 
@@ -1429,8 +1429,12 @@ class ReviewCardManageTest extends TestCase
         $response->assertOk();
 
         // Occurrence must still exist
-        $this->assertNotNull(WordSenseOccurrence::find($occId));
-        $this->assertSame('test sentence', WordSenseOccurrence::find($occId)->sentence_en);
+        $freshOcc = WordSenseOccurrence::find($occId);
+        $this->assertNotNull($freshOcc);
+        $this->assertSame('test sentence', $freshOcc->sentence_en);
+        // Occurrence review_card_id cleared and auto_fsrs_allowed set to false
+        $this->assertNull($freshOcc->review_card_id);
+        $this->assertFalse($freshOcc->auto_fsrs_allowed);
     }
 
     public function test_destroy_preserves_review_logs(): void
@@ -1683,7 +1687,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertNull(ReviewCard::find($card2Id));
     }
 
-    public function test_bulk_destroy_preserves_word_senses(): void
+    public function test_bulk_destroy_rejects_word_senses(): void
     {
         [$card1, $sense1] = $this->createTestSenseCard();
         [$card2, $sense2] = $this->createTestSenseCard();
@@ -1696,11 +1700,11 @@ class ReviewCardManageTest extends TestCase
             'ids' => [$card1->id, $card2->id],
         ])->assertOk();
 
-        // WordSenses preserved
+        // WordSenses still exist but are rejected
         $this->assertNotNull(WordSense::find($sense1Id));
         $this->assertNotNull(WordSense::find($sense2Id));
-        $this->assertSame(WordSense::STATUS_CONFIRMED, WordSense::find($sense1Id)->status);
-        $this->assertSame(WordSense::STATUS_CONFIRMED, WordSense::find($sense2Id)->status);
+        $this->assertSame(WordSense::STATUS_REJECTED, WordSense::find($sense1Id)->status);
+        $this->assertSame(WordSense::STATUS_REJECTED, WordSense::find($sense2Id)->status);
     }
 
     public function test_bulk_destroy_preserves_review_logs(): void
@@ -1855,6 +1859,74 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame($oldSenseCount, WordSense::count());
         $this->assertSame($oldLogCount, ReviewLog::count());
         $this->assertNotNull(ReviewCard::find($cardId));
+    }
+
+    // ==================== Sense Rejection After Delete ====================
+
+    public function test_destroy_rejected_sense_excluded_from_candidates(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $lemma = $sense->lemma;
+
+        // Before delete: sense appears in candidates
+        $candidatesBefore = $this->actingAs($this->user)
+            ->get("/senses/candidates?lemma={$lemma}")
+            ->json();
+        $idsBefore = array_column($candidatesBefore, 'sense_id');
+        $this->assertContains($sense->id, $idsBefore);
+
+        // Delete
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}")->assertOk();
+
+        // After delete: sense excluded from candidates (status=rejected filtered out)
+        $candidatesAfter = $this->actingAs($this->user)
+            ->get("/senses/candidates?lemma={$lemma}")
+            ->json();
+        $idsAfter = array_column($candidatesAfter, 'sense_id');
+        $this->assertNotContains($sense->id, $idsAfter);
+    }
+
+    public function test_archive_does_not_reject_word_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_enabled' => true]);
+        $senseId = $sense->id;
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card->id],
+            'enabled' => false,
+        ])->assertOk();
+
+        // Archive: WordSense status should remain CONFIRMED (only fsrs_enabled changed)
+        $freshSense = WordSense::find($senseId);
+        $this->assertNotNull($freshSense);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $freshSense->status);
+    }
+
+    public function test_destroy_does_not_affect_other_same_lemma_senses(): void
+    {
+        // Create two senses with the same lemma but different IDs
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'shared']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'shared',
+            'surface_form' => 'shared2',
+            'sense_key' => hash('sha256', 'english|shared|noun|测试2|test2'),
+            'sense_zh' => '测试2',
+            'sense_en' => 'test2',
+        ]);
+        $card2 = $this->createSenseCard($sense2);
+
+        // Delete only card1
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card1->id}")->assertOk();
+
+        // Sense1 rejected
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense1->fresh()->status);
+        $this->assertNull(ReviewCard::find($card1->id));
+
+        // Sense2 untouched
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense2->fresh()->status);
+        $this->assertNotNull(ReviewCard::find($card2->id));
     }
 
     // ==================== Helper ====================

@@ -6,6 +6,7 @@ use App\Models\Chapter;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\WordSenseService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,6 +15,11 @@ use Illuminate\Support\Facades\DB;
 
 class ReviewCardManageController extends Controller
 {
+    public function __construct(
+        private WordSenseService $wordSenseService,
+    )
+    {
+    }
     /**
      * Whitelist of fields allowed for normal edit.
      */
@@ -268,20 +274,22 @@ class ReviewCardManageController extends Controller
 
     /**
      * DELETE /review-cards/manage/{reviewCard}
-     * Permanently delete a sense review card. Only the review_cards row is removed.
-     * WordSense, WordSenseOccurrence, review_logs, and all other data are preserved.
+     * Permanently delete a sense review card and reject the linked WordSense.
+     * WordSense is set to rejected so it no longer appears in reading page candidates.
+     * WordSenseOccurrence and review_logs are preserved.
+     * Reading materials, chapters, and EncounteredWord are never deleted.
      */
     public function destroy(int $reviewCard): JsonResponse
     {
         [$card, $sense] = $this->findManageableSenseCard($reviewCard);
 
-        $card->delete();
+        $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
 
         return response()->json([
             'deleted' => true,
             'review_card_id' => $reviewCard,
             'word_sense_id' => $sense->id,
-            'message' => '已彻底删除复习卡。词义和阅读记录已保留。',
+            'message' => '已彻底删除词义复习卡。该释义不会再出现在阅读页，阅读记录和复习历史已保留。',
         ]);
     }
 
@@ -341,9 +349,10 @@ class ReviewCardManageController extends Controller
 
     /**
      * POST /review-cards/manage/bulk-delete
-     * Bulk permanently delete sense review cards.
+     * Bulk permanently delete sense review cards and reject the linked WordSenses.
+     * WordSense is set to rejected so it no longer appears in reading page candidates.
+     * WordSenseOccurrence and review_logs are preserved.
      * Body: { ids: int[] }
-     * Only review_cards rows are removed. WordSense, occurrences, and review_logs are preserved.
      */
     public function bulkDestroy(Request $request): JsonResponse
     {
@@ -376,14 +385,20 @@ class ReviewCardManageController extends Controller
                 continue;
             }
 
-            $card->delete();
+            $sense = WordSense::find($card->target_id);
+            if (!$sense) {
+                $skipped++;
+                continue;
+            }
+
+            $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
             $deleted++;
         }
 
         return response()->json([
             'deleted' => $deleted,
             'skipped' => $skipped,
-            'message' => "已彻底删除 {$deleted} 张复习卡。词义和阅读记录已保留。",
+            'message' => "已彻底删除 {$deleted} 张词义复习卡。对应释义不会再出现在阅读页，阅读记录和复习历史已保留。",
         ]);
     }
 

@@ -24,7 +24,10 @@ use App\Services\VocabularyTokenFilter;
 class VocabularyService {
     private $itemsPerPage;
 
-    public function __construct(private ReviewCardService $reviewCardService) {
+    public function __construct(
+        private ReviewCardService $reviewCardService,
+        private WordSenseService $wordSenseService,
+    ) {
         $this->itemsPerPage = 30;
     }
 
@@ -266,6 +269,20 @@ class VocabularyService {
                 return 0;
             }
 
+            // Reject WordSenses linked via encountered_word_id before deleting words.
+            // Only senses with status != rejected are processed to avoid redundant work.
+            // Other senses with the same lemma but different encountered_word_id are NOT affected.
+            $linkedSenses = \App\Models\WordSense::where('user_id', $userId)
+                ->where('language_id', $language)
+                ->whereIn('encountered_word_id', $ids)
+                ->where('status', '<>', \App\Models\WordSense::STATUS_REJECTED)
+                ->get();
+
+            foreach ($linkedSenses as $sense) {
+                $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
+            }
+
+            // Disable legacy word-type review cards
             ReviewCard::where('user_id', $userId)
                 ->where('language_id', $language)
                 ->where('target_type', ReviewCard::TARGET_WORD)

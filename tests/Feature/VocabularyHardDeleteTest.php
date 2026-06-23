@@ -100,7 +100,7 @@ class VocabularyHardDeleteTest extends TestCase
         ]);
     }
 
-    public function test_hard_delete_disables_word_review_queue_without_deleting_sense_data(): void
+    public function test_hard_delete_rejects_linked_sense_and_disables_review(): void
     {
         $user = $this->createUser('review-delete@example.com');
         $word = $this->createWord($user->id, 'reviewable', -1);
@@ -116,6 +116,16 @@ class VocabularyHardDeleteTest extends TestCase
             'sense_zh' => '可复习的',
             'sense_en' => 'available for review',
             'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        $senseCard = ReviewCard::forceCreate([
+            'user_id' => $user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
         ]);
         $occurrence = WordSenseOccurrence::forceCreate([
             'user_id' => $user->id,
@@ -138,9 +148,21 @@ class VocabularyHardDeleteTest extends TestCase
             'id' => $word->id,
         ])->assertOk();
 
+        // Word is deleted
+        $this->assertDatabaseMissing('encountered_words', ['id' => $word->id]);
+
+        // WordSense preserved but rejected
         $this->assertDatabaseHas('word_senses', ['id' => $sense->id]);
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense->fresh()->status);
+
+        // Occurrence preserved
         $this->assertDatabaseHas('word_sense_occurrences', ['id' => $occurrence->id]);
+
+        // Word-type review card disabled (legacy behavior)
         $this->assertFalse((bool) $card->fresh()->fsrs_enabled);
+
+        // Sense-type review card deleted
+        $this->assertNull(ReviewCard::find($senseCard->id));
 
         $response = $this->actingAs($user)->post('/reviews', [
             'bookId' => -1,
@@ -150,6 +172,96 @@ class VocabularyHardDeleteTest extends TestCase
 
         $response->assertOk();
         $this->assertCount(0, $response->json('reviews'));
+    }
+
+    public function test_hard_delete_does_not_reject_same_lemma_different_encountered_word_sense(): void
+    {
+        $user = $this->createUser('cross-sense@example.com');
+        $word1 = $this->createWord($user->id, 'cross-sense', -1);
+        $word2 = $this->createWord($user->id, 'cross-sense-2', -1);
+        $word2->update(['word' => 'cross-sense-2']);
+
+        $sense1 = WordSense::forceCreate([
+            'user_id' => $user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'encountered_word_id' => $word1->id,
+            'lemma' => 'shared-lemma',
+            'surface_form' => 'shared-lemma',
+            'sense_key' => 'shared-lemma|test1',
+            'sense_zh' => '测试1',
+            'sense_en' => 'test1',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        $sense2 = WordSense::forceCreate([
+            'user_id' => $user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'encountered_word_id' => $word2->id,
+            'lemma' => 'shared-lemma',
+            'surface_form' => 'shared-lemma',
+            'sense_key' => 'shared-lemma|test2',
+            'sense_zh' => '测试2',
+            'sense_en' => 'test2',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        $card2 = ReviewCard::forceCreate([
+            'user_id' => $user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense2->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+        ]);
+
+        // Delete only word1
+        $this->actingAs($user)->post('/vocabulary/word/delete', [
+            'id' => $word1->id,
+        ])->assertOk();
+
+        // Sense1 (linked to word1) is rejected
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense1->fresh()->status);
+
+        // Sense2 (linked to word2, different encountered_word_id) is untouched
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense2->fresh()->status);
+        $this->assertNotNull(ReviewCard::find($card2->id));
+    }
+
+    public function test_hard_delete_sense_excluded_from_candidates(): void
+    {
+        $user = $this->createUser('candidate-delete@example.com');
+        $word = $this->createWord($user->id, 'candidate-word', -1);
+        $sense = WordSense::forceCreate([
+            'user_id' => $user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'encountered_word_id' => $word->id,
+            'lemma' => 'candidate-lemma',
+            'surface_form' => 'candidate-lemma',
+            'sense_key' => 'candidate-lemma|test',
+            'sense_zh' => '候选词',
+            'sense_en' => 'candidate word',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+
+        // Before delete: sense in candidates
+        $cBefore = $this->actingAs($user)
+            ->get('/senses/candidates?lemma=candidate-lemma')
+            ->json();
+        $this->assertContains($sense->id, array_column($cBefore, 'sense_id'));
+
+        // Delete word
+        $this->actingAs($user)->post('/vocabulary/word/delete', [
+            'id' => $word->id,
+        ])->assertOk();
+
+        // After delete: sense not in candidates (rejected)
+        $cAfter = $this->actingAs($user)
+            ->get('/senses/candidates?lemma=candidate-lemma')
+            ->json();
+        $this->assertNotContains($sense->id, array_column($cAfter, 'sense_id'));
     }
 
     public function test_deleted_word_can_be_created_again_later(): void

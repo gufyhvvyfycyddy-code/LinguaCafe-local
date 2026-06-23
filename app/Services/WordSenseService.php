@@ -97,6 +97,44 @@ class WordSenseService
         });
     }
 
+    /**
+     * Remove a WordSense from the review system.
+     *
+     * - Sets WordSense status to rejected (it will no longer appear in reading page candidates).
+     * - Optionally deletes the associated ReviewCard (true for permanent delete, false for archive).
+     * - Clears occurrence review_card_id references and disables auto_fsrs_allowed.
+     * - Does NOT delete WordSenseOccurrence rows.
+     * - Does NOT delete review_logs.
+     * - Does NOT delete reading materials, chapters, or EncounteredWord.
+     */
+    public function removeSenseFromReviewSystem(WordSense $sense, bool $deleteReviewCard = true): WordSense
+    {
+        return DB::transaction(function () use ($sense, $deleteReviewCard) {
+            $sense->status = WordSense::STATUS_REJECTED;
+            $sense->save();
+
+            if ($card = $sense->reviewCard) {
+                if ($deleteReviewCard) {
+                    $card->delete();
+                } else {
+                    $card->fsrs_enabled = false;
+                    $card->save();
+                }
+            }
+
+            // Clear occurrence links to the now-deleted/disabled review card
+            WordSenseOccurrence::where('word_sense_id', $sense->id)
+                ->where('user_id', $sense->user_id)
+                ->where('language_id', $sense->language_id)
+                ->update([
+                    'auto_fsrs_allowed' => false,
+                    'review_card_id' => null,
+                ]);
+
+            return $sense->fresh();
+        });
+    }
+
     public function confirmSense(WordSense $sense): WordSense
     {
         $sense->status = WordSense::STATUS_CONFIRMED;

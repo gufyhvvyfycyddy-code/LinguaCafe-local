@@ -230,10 +230,10 @@
         <!-- Delete confirmation dialog -->
         <v-dialog v-model="deleteDialog" max-width="500">
             <v-card>
-                <v-card-title class="error--text">彻底删除复习卡</v-card-title>
+                <v-card-title class="error--text">彻底删除词义复习卡</v-card-title>
                 <v-card-text>
-                    <p>这会永久删除这张复习卡，使它不再进入复习系统。</p>
-                    <p class="font-weight-bold">词义、例句、原文位置和阅读记录会保留。</p>
+                    <p>这会删除这张词义复习卡，并让该释义不再出现在阅读页点词结果中。</p>
+                    <p class="font-weight-bold">阅读材料、原文位置和复习历史会保留。</p>
                     <p class="error--text">此操作不可恢复。确定删除吗？</p>
                 </v-card-text>
                 <v-card-actions>
@@ -247,10 +247,10 @@
         <!-- Bulk delete confirmation dialog -->
         <v-dialog v-model="bulkDeleteDialog" max-width="520">
             <v-card>
-                <v-card-title class="error--text">批量彻底删除复习卡</v-card-title>
+                <v-card-title class="error--text">批量彻底删除词义复习卡</v-card-title>
                 <v-card-text>
-                    <p>将永久删除已选的 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
-                    <p class="font-weight-bold">词义、例句、原文位置和阅读记录会保留。</p>
+                    <p>将删除已选的 <strong>{{ selectedIds.length }}</strong> 张词义复习卡，并让对应释义不再出现在阅读页点词结果中。</p>
+                    <p class="font-weight-bold">阅读材料、原文位置和复习历史会保留。</p>
                     <p class="error--text">此操作不可恢复。确定删除吗？</p>
                 </v-card-text>
                 <v-card-actions>
@@ -507,7 +507,7 @@ export default {
 
             axios.delete('/review-cards/manage/' + item.review_card_id)
                 .then((response) => {
-                    this.showSnackbar(response.data.message || '已彻底删除复习卡。词义和阅读记录已保留。', 'success');
+                    this.showSnackbar(response.data.message || '已彻底删除词义复习卡。该释义不会再出现在阅读页。', 'success');
                     this.selectedIds = this.selectedIds.filter(id => id !== item.review_card_id);
                     this.loadData();
                 })
@@ -528,7 +528,7 @@ export default {
             axios.post('/review-cards/manage/bulk-delete', { ids })
                 .then((response) => {
                     this.clearSelection();
-                    this.showSnackbar(response.data.message || '已彻底删除复习卡。', 'success');
+                    this.showSnackbar(response.data.message || '已彻底删除词义复习卡。', 'success');
                     this.loadData();
                 })
                 .catch((err) => {
