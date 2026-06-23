@@ -73,9 +73,18 @@ class SenseReviewService
         ];
     }
 
+    // ==================== Token payload: three-layer strategy ====================
+
+    /**
+     * Layer 1: Real source tokens from chapter processed_text via occurrence or sense.
+     * Layer 2: Text match — find the sentence in processed_text by comparing example_sentence_en.
+     * Layer 3: Synthetic tokens generated from example_sentence_en string.
+     *
+     * Only returns null tokens when there is NO example_sentence_en at all.
+     */
     private function exampleSentenceTokenPayload(WordSense $sense): array
     {
-        // 1. 优先查 WordSenseOccurrence
+        // 1. Look up WordSenseOccurrence (prefer manual_sense_add source)
         $occurrence = WordSenseOccurrence::query()
             ->where('user_id', $sense->user_id)
             ->where('language_id', $sense->language_id)
@@ -86,57 +95,81 @@ class SenseReviewService
             ->orderByDesc('id')
             ->first();
 
-        // 2. 取定位信息（用 ?? 而非 ?:，因为 sentence_id 可能是 "0" 这类 falsy 值）
+        // 2. Determine positioning info (use ?? not ?: because "0" is falsy in PHP)
         $chapterId = $occurrence?->chapter_id ?? $sense->source_chapter_id;
         $sentenceId = $occurrence?->sentence_id ?? $sense->sentence_id;
         $sentenceHash = $occurrence?->sentence_hash ?? $sense->sentence_hash;
 
-        // 3. 如果没有 chapterId，或 sentenceId / sentenceHash 都没有
-        if ($chapterId === null || ($sentenceId === null && $sentenceHash === null)) {
-            return ['tokens' => null, 'source' => null];
+        // === Layer 1: Real source tokens ===
+        if ($chapterId !== null && ($sentenceId !== null || $sentenceHash !== null)) {
+            $chapter = Chapter::query()
+                ->where('id', $chapterId)
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->first();
+
+            if ($chapter) {
+                $tokens = $this->extractSentenceTokensFromChapter($chapter, $sentenceId, $sentenceHash);
+                if ($tokens !== null) {
+                    return [
+                        'tokens' => $tokens,
+                        'source' => $occurrence ? 'occurrence' : 'word_sense',
+                    ];
+                }
+            }
         }
 
-        // 4. 查 Chapter
-        $chapter = Chapter::query()
-            ->where('id', $chapterId)
-            ->where('user_id', $sense->user_id)
-            ->where('language', $sense->language_id)
-            ->first();
+        // === Layer 2: Text match — reverse-lookup sentence in processed_text by example_sentence_en ===
+        if ($sense->example_sentence_en && $chapterId !== null) {
+            $chapter = $chapter ?? Chapter::query()
+                ->where('id', $chapterId)
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->first();
 
-        if (!$chapter) {
-            return ['tokens' => null, 'source' => null];
+            if ($chapter) {
+                $tokens = $this->matchSentenceTokensByText($chapter, $sense->example_sentence_en);
+                if ($tokens !== null) {
+                    return [
+                        'tokens' => $tokens,
+                        'source' => 'sentence_text_match',
+                    ];
+                }
+            }
         }
 
-        // 5. 提取句子 tokens
-        $tokens = $this->extractSentenceTokensFromChapter($chapter, $sentenceId, $sentenceHash);
+        // === Layer 3: Synthetic tokens ===
+        if ($sense->example_sentence_en) {
+            $tokens = $this->syntheticSentenceTokens($sense->example_sentence_en, $sense, $occurrence);
+            return [
+                'tokens' => $tokens,
+                'source' => 'synthetic',
+            ];
+        }
 
-        return [
-            'tokens' => $tokens,
-            'source' => $occurrence ? 'occurrence' : 'word_sense',
-        ];
+        // No example_sentence_en — truly no tokens
+        return ['tokens' => null, 'source' => null];
     }
 
+    // ==================== Layer 1 helpers ====================
+
+    /**
+     * Extract tokens for a specific sentence from chapter processed_text.
+     */
     private function extractSentenceTokensFromChapter(Chapter $chapter, $sentenceId, $sentenceHash): ?array
     {
         $processedText = $chapter->getProcessedText();
-
-        // 兼容 processed_text 是对象且有 words 字段，或 processed_text 本身是数组
-        $words = [];
-        if (is_object($processedText) && isset($processedText->words)) {
-            $words = $processedText->words;
-        } elseif (is_array($processedText)) {
-            $words = $processedText;
-        }
+        $words = $this->flattenProcessedWords($processedText);
 
         if (empty($words)) {
             return null;
         }
 
         $tokens = [];
-        foreach ($words as $word) {
+        foreach ($words as $index => $word) {
             $wordObj = is_array($word) ? (object) $word : $word;
 
-            // 匹配 sentence_id / sentence_index / si / sentence_hash
+            // Match by sentence_id / sentence_index / si / sentence_hash
             $matches = false;
             if ($sentenceId !== null) {
                 if (
@@ -155,22 +188,230 @@ class SenseReviewService
                 continue;
             }
 
-            // 跳过 NEWLINE / PARAGRAPH_BREAK
+            // Skip structural tokens
             $tokenWord = $wordObj->word ?? '';
             if ($tokenWord === 'NEWLINE' || $tokenWord === 'PARAGRAPH_BREAK') {
                 continue;
             }
 
-            $tokens[] = [
-                'word' => $tokenWord,
-                'stage' => $wordObj->stage ?? 2,
-                'spaceAfter' => $wordObj->spaceAfter ?? false,
-                'is_structure' => $wordObj->is_structure ?? false,
-                'sentence_index' => $wordObj->sentence_index ?? $wordObj->si ?? 0,
-                'wordIndex' => $wordObj->wordIndex ?? 0,
-            ];
+            $tokens[] = $this->simplifyToken($wordObj, $index);
         }
 
         return !empty($tokens) ? $tokens : null;
+    }
+
+    // ==================== Layer 2 helpers ====================
+
+    /**
+     * Match example_sentence_en against processed_text sentences by normalized text comparison.
+     */
+    private function matchSentenceTokensByText(Chapter $chapter, string $exampleSentenceEn): ?array
+    {
+        $processedText = $chapter->getProcessedText();
+        $words = $this->flattenProcessedWords($processedText);
+
+        if (empty($words)) {
+            return null;
+        }
+
+        // Group tokens by sentence key
+        $groups = $this->groupTokensBySentence($words);
+        $targetNormalized = $this->normalizeSentenceText($exampleSentenceEn);
+
+        foreach ($groups as $groupTokens) {
+            $groupText = $this->tokensToSentenceText($groupTokens);
+            $groupNormalized = $this->normalizeSentenceText($groupText);
+
+            if ($groupNormalized === $targetNormalized) {
+                $result = [];
+                foreach ($groupTokens as $index => $word) {
+                    $wordObj = is_array($word) ? (object) $word : $word;
+                    $result[] = $this->simplifyToken($wordObj, $index);
+                }
+                return $result;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Group raw word objects by sentence_index / si / sentence_id.
+     */
+    private function groupTokensBySentence(array $words): array
+    {
+        $groups = [];
+        foreach ($words as $word) {
+            $wordObj = is_array($word) ? (object) $word : $word;
+            $key = $wordObj->sentence_index ?? $wordObj->si ?? $wordObj->sentence_id ?? '__no_sentence__';
+            $groups[(string) $key][] = $wordObj;
+        }
+        return $groups;
+    }
+
+    /**
+     * Join tokens into a sentence text string.
+     */
+    private function tokensToSentenceText(array $tokens): string
+    {
+        $parts = [];
+        foreach ($tokens as $token) {
+            $tokenObj = is_array($token) ? (object) $token : $token;
+            $word = $tokenObj->word ?? '';
+            if ($word === 'NEWLINE' || $word === 'PARAGRAPH_BREAK') {
+                continue;
+            }
+            $spaceAfter = $tokenObj->spaceAfter ?? false;
+            $parts[] = $word . ($spaceAfter ? ' ' : '');
+        }
+        return trim(implode('', $parts));
+    }
+
+    /**
+     * Normalize sentence text for comparison: lowercase, collapse whitespace, trim.
+     */
+    private function normalizeSentenceText(string $text): string
+    {
+        $text = mb_strtolower($text);
+        $text = preg_replace('/\s+/u', ' ', $text);
+        $text = trim($text);
+        // Normalize common punctuation spacing
+        $text = preg_replace('/\s*([.,!?;:])\s*/u', '$1 ', $text);
+        $text = trim($text);
+        return $text;
+    }
+
+    // ==================== Layer 3 helpers ====================
+
+    /**
+     * Generate synthetic tokens from a plain example_sentence_en string.
+     */
+    private function syntheticSentenceTokens(string $sentenceText, WordSense $sense, ?WordSenseOccurrence $occurrence = null): array
+    {
+        // Tokenize: match words (including contractions/hyphenated) and non-alphanumeric tokens
+        preg_match_all(
+            '/[A-Za-z0-9]+(?:[.\\-\\\'\\\x{2019}][A-Za-z0-9]+)*|[^\\sA-Za-z0-9]/u',
+            $sentenceText,
+            $matches,
+            PREG_OFFSET_CAPTURE
+        );
+
+        $rawTokens = $matches[0];
+        $count = count($rawTokens);
+        $tokens = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $word = $rawTokens[$i][0];
+            $startPos = $rawTokens[$i][1];
+            $endPos = $startPos + strlen($word);
+
+            // Determine spaceAfter: check if there's whitespace before next token
+            $spaceAfter = true;
+            if ($i + 1 < $count) {
+                $nextStart = $rawTokens[$i + 1][1];
+                $gap = substr($sentenceText, $endPos, $nextStart - $endPos);
+                $spaceAfter = (trim($gap) === '');
+            }
+
+            $token = [
+                'word' => $word,
+                'stage' => 2,
+                'spaceAfter' => $spaceAfter,
+                'is_structure' => false,
+                'sentence_index' => null,
+                'wordIndex' => $i,
+                'is_target' => false,
+            ];
+
+            // Check if this token is the target word
+            if ($this->tokenMatchesSenseTarget($word, $sense, $occurrence)) {
+                $token['stage'] = -7;
+                $token['is_target'] = true;
+            }
+
+            $tokens[] = $token;
+        }
+
+        return $tokens;
+    }
+
+    /**
+     * Check if a token word matches the sense's target word.
+     */
+    private function tokenMatchesSenseTarget(string $token, WordSense $sense, ?WordSenseOccurrence $occurrence = null): bool
+    {
+        // Strip leading/trailing punctuation from token
+        $cleanToken = mb_strtolower(trim($token, ".,!?;:'\"()[]{}\u{2018}\u{2019}\u{201C}\u{201D}"));
+        if ($cleanToken === '') {
+            return false;
+        }
+
+        $surface = mb_strtolower((string) ($sense->surface_form ?? $sense->lemma ?? ''));
+        $lemma = mb_strtolower((string) ($sense->lemma ?? ''));
+
+        if ($cleanToken === $surface || $cleanToken === $lemma) {
+            return true;
+        }
+
+        if ($occurrence && $occurrence->surface) {
+            $occSurface = mb_strtolower((string) $occurrence->surface);
+            if ($cleanToken === $occSurface) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // ==================== Shared helpers ====================
+
+    /**
+     * Recursively flatten processed_text into an array of word objects.
+     * Handles nested objects/arrays — real processed_text may not be a simple $processed->words.
+     */
+    private function flattenProcessedWords($node): array
+    {
+        $result = [];
+
+        if (is_array($node)) {
+            foreach ($node as $child) {
+                $result = array_merge($result, $this->flattenProcessedWords($child));
+            }
+            return $result;
+        }
+
+        if (is_object($node)) {
+            // Leaf node: has a 'word' property
+            if (isset($node->word)) {
+                return [$node];
+            }
+
+            // Traverse properties
+            foreach (get_object_vars($node) as $child) {
+                $result = array_merge($result, $this->flattenProcessedWords($child));
+            }
+
+            return $result;
+        }
+
+        return [];
+    }
+
+    /**
+     * Convert a raw processed word object into a simplified token array.
+     */
+    private function simplifyToken($word, int $index): array
+    {
+        $wordObj = is_array($word) ? (object) $word : $word;
+
+        return [
+            'word' => $wordObj->word ?? '',
+            'stage' => $wordObj->stage ?? 2,
+            'spaceAfter' => $wordObj->spaceAfter ?? false,
+            'is_structure' => $wordObj->is_structure ?? false,
+            'sentence_index' => $wordObj->sentence_index ?? ($wordObj->si ?? ($wordObj->sentence_id ?? null)),
+            'wordIndex' => $index,
+            'is_target' => $wordObj->is_target ?? false,
+        ];
     }
 }

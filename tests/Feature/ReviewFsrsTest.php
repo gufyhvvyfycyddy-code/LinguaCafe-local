@@ -556,11 +556,11 @@ class ReviewFsrsTest extends TestCase
         $this->assertSame('occurrence', $reviews[0]['example_sentence_token_source']);
     }
 
-    public function test_sense_review_payload_has_null_sentence_tokens_without_source(): void
+    public function test_sense_review_payload_builds_synthetic_tokens_without_source(): void
     {
-        // Create sense without occurrence / source_chapter_id
-        $sense = $this->createSense($this->user->id, 'english', 'sourceless', 'noun', '无源测试', 'source less');
-        $sense->example_sentence_en = 'No source sentence.';
+        // Create sense without occurrence / source_chapter_id, but with example_sentence_en
+        $sense = $this->createSense($this->user->id, 'english', 'retail', 'noun', '零售', 'retail');
+        $sense->example_sentence_en = 'U.S. retail sales increased.';
         $sense->save();
 
         app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
@@ -575,15 +575,33 @@ class ReviewFsrsTest extends TestCase
         $reviews = $response->json('reviews');
         $this->assertCount(1, $reviews);
 
-        // example_sentence_tokens should be null
-        $this->assertNull($reviews[0]['example_sentence_tokens']);
+        // Tokens should exist (synthetic fallback)
+        $this->assertNotNull($reviews[0]['example_sentence_tokens'], 'Tokens should not be null with example_sentence_en');
+        $this->assertNotEmpty($reviews[0]['example_sentence_tokens'], 'Tokens should not be empty');
+        $this->assertSame('synthetic', $reviews[0]['example_sentence_token_source']);
+
+        $tokens = $reviews[0]['example_sentence_tokens'];
+
+        // Check token words include original sentence words
+        $tokenWords = array_column($tokens, 'word');
+        $this->assertContains('U.S', $tokenWords);
+        $this->assertContains('retail', $tokenWords);
+        $this->assertContains('sales', $tokenWords);
+
+        // Target word 'retail' should be marked as target with stage=-7
+        $targetTokens = array_filter($tokens, fn ($t) => ($t['word'] ?? '') === 'retail');
+        $this->assertNotEmpty($targetTokens, 'retail token should exist');
+        $targetToken = array_values($targetTokens)[0];
+        $this->assertTrue($targetToken['is_target'], 'retail should be marked is_target=true');
+        $this->assertSame(-7, $targetToken['stage'], 'target word should have stage=-7');
+
         // example_sentence_en should still be returned
-        $this->assertSame('No source sentence.', $reviews[0]['example_sentence_en']);
+        $this->assertSame('U.S. retail sales increased.', $reviews[0]['example_sentence_en']);
     }
 
     public function test_sense_review_sentence_tokens_do_not_cross_user_scope(): void
     {
-        // Create otherUser's chapter
+        // Create otherUser's chapter with a sentence
         $otherChapter = \App\Models\Chapter::forceCreate([
             'user_id' => $this->otherUser->id,
             'book_id' => 1,
@@ -601,7 +619,7 @@ class ReviewFsrsTest extends TestCase
                 'words' => [
                     (object) ['word' => 'Other', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
                     (object) ['word' => 'user', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
-                    (object) ['word' => 'secret', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'secret', 'stage' => -7, 'spaceAfter' => true, 'sentence_index' => 0],
                     (object) ['word' => 'text', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 0],
                 ],
                 'phrases' => [],
@@ -647,10 +665,193 @@ class ReviewFsrsTest extends TestCase
         $reviews = $response->json('reviews');
         $this->assertCount(1, $reviews);
 
-        // Chapter lookup filters by user_id, so tokens should be null
-        // (the chapter belongs to otherUser, so find will fail)
-        $this->assertNull($reviews[0]['example_sentence_tokens'], 'Tokens should be null when chapter belongs to other user');
+        // Chapter lookup filters by user_id — real tokens must NOT leak
+        // But synthetic fallback still generates tokens from example_sentence_en
+        $this->assertNotNull($reviews[0]['example_sentence_tokens'], 'Synthetic tokens should still exist');
+        // Source must NOT be 'occurrence' (real tokens from other user's chapter did not leak)
+        $this->assertNotSame('occurrence', $reviews[0]['example_sentence_token_source'],
+            'Real occurrence tokens must not leak from other user chapter');
+        // Source should be synthetic since real chapter lookup failed
+        $this->assertSame('synthetic', $reviews[0]['example_sentence_token_source']);
         $this->assertSame('This should not leak.', $reviews[0]['example_sentence_en']);
+    }
+
+    public function test_sense_review_payload_extracts_tokens_from_nested_processed_text(): void
+    {
+        // Create chapter with nested processed_text (not simple words at top level)
+        $chapter = \App\Models\Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 1,
+            'name' => 'Nested Chapter',
+            'read_count' => 0,
+            'word_count' => 50,
+            'language' => 'english',
+            'raw_text' => 'Sure enough the Census Bureau released.',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'subtitle_timestamps' => '[]',
+            'type' => 'text',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode((object) [
+                'blocks' => [
+                    (object) [
+                        'words' => [
+                            (object) ['word' => 'Sure', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                            (object) ['word' => 'enough', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 0],
+                            (object) ['word' => ',', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                            (object) ['word' => 'the', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                            (object) ['word' => 'Census', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                            (object) ['word' => 'Bureau', 'stage' => -7, 'spaceAfter' => true, 'sentence_index' => 0],
+                            (object) ['word' => 'released', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 0],
+                            (object) ['word' => '.', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                        ],
+                    ],
+                ],
+            ]), 1),
+        ]);
+
+        // Create confirmed WordSense
+        $sense = $this->createSense($this->user->id, 'english', 'Bureau', 'noun', '局', 'Bureau');
+        $sense->example_sentence_en = 'Sure enough, the Census Bureau released.';
+        $sense->source_chapter_id = $chapter->id;
+        $sense->sentence_id = '0';
+        $sense->save();
+
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+
+        // Tokens should be extracted despite nested structure
+        $this->assertNotNull($reviews[0]['example_sentence_tokens'], 'Tokens should be extracted from nested processed_text');
+        $this->assertNotEmpty($reviews[0]['example_sentence_tokens']);
+
+        $tokens = $reviews[0]['example_sentence_tokens'];
+        $tokenWords = array_column($tokens, 'word');
+        $this->assertContains('Bureau', $tokenWords, 'Bureau token must be found');
+
+        // Find Bureau token and verify stage=-7
+        foreach ($tokens as $token) {
+            if ($token['word'] === 'Bureau') {
+                $this->assertSame(-7, $token['stage'], 'Bureau should have stage=-7');
+                break;
+            }
+        }
+    }
+
+    public function test_sense_review_payload_can_match_sentence_by_example_text(): void
+    {
+        // Create chapter with processed_text
+        $chapter = \App\Models\Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 1,
+            'name' => 'Match Chapter',
+            'read_count' => 0,
+            'word_count' => 30,
+            'language' => 'english',
+            'raw_text' => 'Hello world. Another sentence here.',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'subtitle_timestamps' => '[]',
+            'type' => 'text',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode((object) [
+                'words' => [
+                    (object) ['word' => 'Hello', 'stage' => -7, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'world', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 0],
+                    (object) ['word' => '.', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'Another', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 1],
+                    (object) ['word' => 'sentence', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 1],
+                    (object) ['word' => 'here', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 1],
+                    (object) ['word' => '.', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 1],
+                ],
+                'phrases' => [],
+                'uniqueWords' => [],
+            ]), 1),
+        ]);
+
+        // Create sense — occurrence has chapter_id but sentence_id='99' which won't match any token
+        $sense = $this->createSense($this->user->id, 'english', 'world', 'noun', '世界', 'world');
+        $sense->example_sentence_en = 'Hello world.';
+        $sense->save();
+
+        // Occurrence has a non-matching sentence_id
+        \App\Models\WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '99', // won't match any token
+            'sentence_en' => 'Hello world.',
+            'surface' => 'world',
+            'lemma' => 'world',
+            'type' => \App\Models\WordSenseOccurrence::TYPE_WORD,
+            'pos' => 'noun',
+            'decision' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'evidence' => ['source' => 'test'],
+            'auto_fsrs_allowed' => true,
+            'status' => \App\Models\WordSenseOccurrence::STATUS_BOUND,
+            'source' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+
+        // Layer 1 should fail (sentence_id=99 matches nothing)
+        // Layer 2 should succeed via text match
+        $this->assertSame('sentence_text_match', $reviews[0]['example_sentence_token_source']);
+        $this->assertNotNull($reviews[0]['example_sentence_tokens']);
+        $this->assertNotEmpty($reviews[0]['example_sentence_tokens']);
+
+        $tokens = $reviews[0]['example_sentence_tokens'];
+        $tokenWords = array_column($tokens, 'word');
+        $this->assertContains('Hello', $tokenWords);
+        $this->assertContains('world', $tokenWords);
+        $this->assertNotContains('Another', $tokenWords, 'Tokens from other sentences should not appear');
+    }
+
+    // ==================== No-example-sentence edge case ====================
+
+    public function test_sense_review_payload_returns_null_tokens_only_when_no_example_sentence(): void
+    {
+        // Sense with no example_sentence_en at all
+        $sense = $this->createSense($this->user->id, 'english', 'noexample', 'noun', '无例句', 'no example');
+        // example_sentence_en is null (default from createSense)
+
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+
+        // Only truly null when there is NO example_sentence_en
+        $this->assertNull($reviews[0]['example_sentence_tokens']);
+        $this->assertNull($reviews[0]['example_sentence_token_source']);
     }
 
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense
