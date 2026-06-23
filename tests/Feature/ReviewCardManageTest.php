@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Chapter;
+use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
@@ -1929,7 +1930,177 @@ class ReviewCardManageTest extends TestCase
         $this->assertNotNull(ReviewCard::find($card2->id));
     }
 
+    // ==================== EncounteredWord restoration ====================
+
+    public function test_deleting_last_linked_sense_restores_word_to_new(): void
+    {
+        $word = $this->createEncounteredWord('restorable', -7);
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'restorable',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|restorable|noun|可恢复|restorable'),
+            'sense_zh' => '可恢复',
+            'sense_en' => 'restorable',
+        ]);
+        $card = $this->createSenseCard($sense);
+
+        // Before: word in Learning
+        $this->assertSame(-7, $word->fresh()->stage);
+
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}")->assertOk();
+
+        // After: word restored to New
+        $word->refresh();
+        $this->assertSame(2, $word->stage, 'Word should be restored to New (stage=2)');
+        $this->assertSame(0, (int) $word->relearning, 'relearning should be 0');
+        $this->assertNull($word->next_review, 'next_review should be null');
+
+        // Sense rejected
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense->fresh()->status);
+
+        // ReviewCard deleted
+        $this->assertNull(ReviewCard::find($card->id));
+    }
+
+    public function test_deleting_one_sense_when_another_confirmed_sense_exists_does_not_restore_word(): void
+    {
+        $word = $this->createEncounteredWord('multi-sense', -7);
+
+        // First sense (will be deleted)
+        $sense1 = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'multi-sense',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|multi-sense|noun|释义1|sense1'),
+            'sense_zh' => '释义1',
+            'sense_en' => 'sense1',
+        ]);
+        $card1 = $this->createSenseCard($sense1);
+
+        // Second sense (stays confirmed)
+        $sense2 = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'multi-sense',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|multi-sense|noun|释义2|sense2'),
+            'sense_zh' => '释义2',
+            'sense_en' => 'sense2',
+        ]);
+        $card2 = $this->createSenseCard($sense2);
+
+        // Before: word in Learning
+        $this->assertSame(-7, $word->fresh()->stage);
+
+        // Delete only the first card
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card1->id}")->assertOk();
+
+        // After: word should still be in Learning (another confirmed sense remains)
+        $word->refresh();
+        $this->assertLessThan(0, $word->stage, 'Word should still be in Learning');
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense1->fresh()->status);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense2->fresh()->status);
+        $this->assertNotNull(ReviewCard::find($card2->id));
+    }
+
+    public function test_known_word_not_restored_when_last_sense_deleted(): void
+    {
+        $word = $this->createEncounteredWord('known-word', 0);
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'known-word',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|known-word|noun|已知|known'),
+            'sense_zh' => '已知',
+            'sense_en' => 'known',
+        ]);
+        $card = $this->createSenseCard($sense);
+
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}")->assertOk();
+
+        // Known word (stage=0) should NOT be changed
+        $this->assertSame(0, $word->fresh()->stage, 'Known word stage should remain 0');
+    }
+
+    public function test_ignored_word_not_restored_when_last_sense_deleted(): void
+    {
+        $word = $this->createEncounteredWord('ignored-word', 1);
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'ignored-word',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|ignored-word|noun|忽略|ignored'),
+            'sense_zh' => '忽略',
+            'sense_en' => 'ignored',
+        ]);
+        $card = $this->createSenseCard($sense);
+
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}")->assertOk();
+
+        // Ignored word (stage=1) should NOT be changed
+        $this->assertSame(1, $word->fresh()->stage, 'Ignored word stage should remain 1');
+    }
+
+    public function test_sense_without_encountered_word_id_does_not_affect_any_word(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'standalone',
+            'encountered_word_id' => null,
+            'sense_key' => hash('sha256', 'english|standalone|noun|独立|standalone'),
+            'sense_zh' => '独立',
+            'sense_en' => 'standalone',
+        ]);
+        $card = $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}");
+        $response->assertOk();
+
+        // Should complete without error — no EncounteredWord was touched
+        $this->assertSame(0, EncounteredWord::count());
+    }
+
+    public function test_archive_does_not_restore_word_to_new(): void
+    {
+        $word = $this->createEncounteredWord('archive-word', -7);
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'archive-word',
+            'encountered_word_id' => $word->id,
+            'sense_key' => hash('sha256', 'english|archive-word|noun|归档|archive'),
+            'sense_zh' => '归档',
+            'sense_en' => 'archive',
+        ]);
+        $card = $this->createSenseCard($sense);
+
+        // Archive (not delete)
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card->id],
+            'enabled' => false,
+        ])->assertOk();
+
+        // Word should remain in Learning (archive is not deletion)
+        $word->refresh();
+        $this->assertSame(-7, $word->stage, 'Word should stay at Learning after archive');
+        // Sense remains confirmed (archive, not rejection)
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->fresh()->status);
+    }
+
     // ==================== Helper ====================
+
+    private function createEncounteredWord(string $word, int $stage): EncounteredWord
+    {
+        return EncounteredWord::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'stage' => $stage,
+            'word' => $word,
+            'kanji' => '',
+            'reading' => '',
+            'translation' => '',
+            'base_word' => '',
+            'base_word_reading' => '',
+            'lookup_count' => 0,
+            'read_count' => 0,
+            'lemma' => '',
+            'added_to_srs' => $stage < 0 ? now()->toDateString() : null,
+            'next_review' => $stage < 0 ? now()->toDateString() : null,
+            'relearning' => $stage < 0,
+        ]);
+    }
 
     private function createTestSenseCard(): array
     {

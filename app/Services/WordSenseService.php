@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
@@ -131,8 +132,66 @@ class WordSenseService
                     'review_card_id' => null,
                 ]);
 
+            // Restore the linked EncounteredWord to New if this was its last active sense.
+            // Only when permanently deleting (not archiving): archive pauses review without
+            // removing the word from Learning, per task spec C.8-fix-2 rule 7.
+            if ($deleteReviewCard) {
+                $this->restoreEncounteredWordIfNoActiveSenses($sense);
+            }
+
             return $sense->fresh();
         });
+    }
+
+    /**
+     * Restore a linked EncounteredWord back to New (stage=2) when the last
+     * confirmed WordSense for that word is removed from the review system.
+     *
+     * Guards:
+     * - Only acts when the sense has an encountered_word_id.
+     * - Only acts when the EncounteredWord exists for the same user/language.
+     * - Only acts when the EncounteredWord is in Learning (stage < 0).
+     * - Does NOT touch Known (stage=0), Ignored (stage=1), or already-New (stage=2).
+     * - Only restores if no OTHER confirmed WordSense remains linked to the same word.
+     * - Uses encountered_word_id binding, NOT lemma-based matching, to avoid
+     *   accidentally restoring an unrelated word that shares the same lemma.
+     */
+    private function restoreEncounteredWordIfNoActiveSenses(WordSense $sense): void
+    {
+        if (!$sense->encountered_word_id) {
+            return;
+        }
+
+        $word = EncounteredWord::where('id', $sense->encountered_word_id)
+            ->where('user_id', $sense->user_id)
+            ->where('language', $sense->language_id)
+            ->first();
+
+        if (!$word) {
+            return;
+        }
+
+        // Only restore words that are currently in Learning state
+        if ($word->stage >= 0) {
+            return;
+        }
+
+        // Check if any other confirmed WordSense still exists for this word
+        $otherActiveSense = WordSense::where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('encountered_word_id', $word->id)
+            ->where('id', '!=', $sense->id)
+            ->where('status', WordSense::STATUS_CONFIRMED)
+            ->exists();
+
+        if ($otherActiveSense) {
+            return;
+        }
+
+        // Restore to New (stage=2) — setStage(2, true) also sets
+        // relearning=false and next_review=null
+        $word->setStage(2, true);
+        $word->save();
     }
 
     public function confirmSense(WordSense $sense): WordSense
