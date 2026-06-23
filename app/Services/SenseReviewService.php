@@ -7,6 +7,7 @@ use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class SenseReviewService
 {
@@ -83,7 +84,9 @@ class SenseReviewService
             ->where('status', WordSense::STATUS_CONFIRMED)
             ->firstOrFail();
 
-        $occurrence = WordSenseOccurrence::query()
+        // Split occurrence queries: one for chapter source (requires chapter_id),
+        // one for sentence text (requires sentence_en, no chapter_id requirement).
+        $sourceOccurrence = WordSenseOccurrence::query()
             ->where('user_id', $sense->user_id)
             ->where('language_id', $sense->language_id)
             ->where('word_sense_id', $sense->id)
@@ -93,10 +96,23 @@ class SenseReviewService
             ->orderByDesc('id')
             ->first();
 
-        $chapterId = $occurrence?->chapter_id ?? $sense->source_chapter_id;
-        $sentenceId = $occurrence?->sentence_id ?? $sense->sentence_id;
-        $sentenceHash = $occurrence?->sentence_hash ?? $sense->sentence_hash;
-        $exampleSentence = $occurrence?->sentence_en ?? $sense->example_sentence_en;
+        $exampleOccurrence = WordSenseOccurrence::query()
+            ->where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('word_sense_id', $sense->id)
+            ->where('status', WordSenseOccurrence::STATUS_BOUND)
+            ->whereNotNull('sentence_en')
+            ->where('sentence_en', '<>', '')
+            ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
+            ->orderByDesc('id')
+            ->first();
+
+        $occurrence = $sourceOccurrence ?: $exampleOccurrence;
+        $chapterId = $sourceOccurrence?->chapter_id ?? $sense->source_chapter_id;
+        $sentenceId = $sourceOccurrence?->sentence_id ?? $sense->sentence_id;
+        $sentenceHash = $sourceOccurrence?->sentence_hash ?? $sense->sentence_hash;
+        $exampleSentence = $exampleOccurrence?->sentence_en ?? $sense->example_sentence_en;
+        $targetOccurrence = $exampleOccurrence ?: $sourceOccurrence;
 
         // Try chapter source first
         if ($chapterId) {
@@ -110,14 +126,14 @@ class SenseReviewService
                 $context = $this->sourceContextFromChapter(
                     $chapter,
                     $sense,
-                    $occurrence,
+                    $targetOccurrence,
                     $sentenceId,
                     $sentenceHash,
                     $exampleSentence
                 );
 
                 if ($context) {
-                    return [
+                    $result = [
                         'sense_id' => $sense->id,
                         'source_available' => true,
                         'source_kind' => 'chapter',
@@ -129,23 +145,51 @@ class SenseReviewService
                         'target_indexes' => $context['target_indexes'],
                         'fallback_message' => null,
                     ];
+                    $this->logSourceContextResult($sense, $result, [
+                        'has_example' => (bool) $exampleSentence,
+                        'chapter_id_candidate' => $chapterId,
+                    ]);
+                    return $result;
                 }
             }
         }
 
-        // Recovery: search all user chapters for the example sentence
-        $recovered = $this->recoverSourceContextFromExampleSentence($sense, $occurrence, $exampleSentence);
+        // Recovery: search all user chapters for the example sentence (exact match first)
+        $recovered = $this->recoverSourceContextFromExampleSentence($sense, $targetOccurrence, $exampleSentence);
         if ($recovered) {
+            $this->logSourceContextResult($sense, $recovered, [
+                'has_example' => (bool) $exampleSentence,
+                'chapter_id_candidate' => $chapterId,
+            ]);
             return $recovered;
         }
 
+        // Fuzzy recovery: approximate match across all user chapters
+        $fuzzy = $this->recoverSourceContextByFuzzyMatch($sense, $targetOccurrence, $exampleSentence);
+        if ($fuzzy) {
+            $this->logSourceContextResult($sense, $fuzzy, [
+                'has_example' => (bool) $exampleSentence,
+                'chapter_id_candidate' => $chapterId,
+            ]);
+            return $fuzzy;
+        }
+
         // Fallback: card example sentence
-        $fallback = $this->fallbackCardExampleSourceContext($sense, $occurrence);
+        $fallback = $this->fallbackCardExampleSourceContext($sense, $targetOccurrence);
         if ($fallback) {
+            $this->logSourceContextResult($sense, $fallback, [
+                'has_example' => (bool) $exampleSentence,
+                'chapter_id_candidate' => $chapterId,
+            ]);
             return $fallback;
         }
 
-        return $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        $empty = $this->emptySourceContext($sense->id, '暂无可用原文位置');
+        $this->logSourceContextResult($sense, $empty, [
+            'has_example' => (bool) $exampleSentence,
+            'chapter_id_candidate' => $chapterId,
+        ]);
+        return $empty;
     }
 
     private function emptySourceContext(int $senseId, string $message): array
@@ -833,5 +877,331 @@ class SenseReviewService
             'wordIndex' => $index,
             'is_target' => $wordObj->is_target ?? false,
         ];
+    }
+
+    // ==================== Fuzzy source recovery ====================
+
+    /**
+     * Fuzzy-match the example sentence against all user chapters to recover source context.
+     * Scores each candidate by word overlap and target-term presence.
+     */
+    private function recoverSourceContextByFuzzyMatch(
+        WordSense $sense,
+        ?WordSenseOccurrence $occurrence,
+        ?string $exampleSentence
+    ): ?array {
+        if (!$exampleSentence) {
+            return null;
+        }
+
+        $chapters = Chapter::query()
+            ->where('user_id', $sense->user_id)
+            ->where('language', $sense->language_id)
+            ->orderByDesc('id')
+            ->get();
+
+        if ($chapters->isEmpty()) {
+            return null;
+        }
+
+        $queryTokens = $this->meaningfulTextTokens($exampleSentence);
+        $targetTerms = $this->targetTerms($sense, $occurrence);
+        $queryTokensCount = count($queryTokens);
+
+        $best = null; // ['chapter', 'target_key', 'entries', 'kind', 'score', 'contains_target', 'text_preview']
+
+        foreach ($chapters as $chapter) {
+            // Score chapter name as title candidate
+            $titleScore = $this->fuzzySourceScore($exampleSentence, $chapter->name, $targetTerms);
+            if ($titleScore['score'] > ($best['score'] ?? 0)) {
+                $best = [
+                    'chapter' => $chapter,
+                    'target_key' => null,
+                    'entries' => null,
+                    'kind' => 'chapter_title',
+                    'score' => $titleScore['score'],
+                    'contains_target' => $titleScore['contains_target'],
+                    'text_preview' => mb_substr($chapter->name, 0, 120),
+                ];
+            }
+
+            // Score each sentence group in processed_text
+            $words = $this->flattenProcessedWords($chapter->getProcessedText());
+            if (empty($words)) {
+                continue;
+            }
+
+            $groups = $this->groupTokensBySentenceWithIndexes($words);
+            foreach ($groups as $key => $entries) {
+                $rawWords = array_map(fn ($entry) => $entry['word'], $entries);
+                $groupText = $this->tokensToSentenceText($rawWords);
+
+                $candidateScore = $this->fuzzySourceScore($exampleSentence, $groupText, $targetTerms);
+                if ($candidateScore['score'] > ($best['score'] ?? 0)) {
+                    $best = [
+                        'chapter' => $chapter,
+                        'target_key' => $key,
+                        'entries' => $entries,
+                        'kind' => 'chapter_fuzzy',
+                        'score' => $candidateScore['score'],
+                        'contains_target' => $candidateScore['contains_target'],
+                        'text_preview' => mb_substr($groupText, 0, 120),
+                    ];
+                }
+            }
+        }
+
+        if ($best === null || $best['score'] <= 0) {
+            return null;
+        }
+
+        // Apply thresholds
+        $meetsThreshold = false;
+        if ($best['contains_target']) {
+            if ($best['score'] >= 0.55) {
+                $meetsThreshold = true;
+            }
+        } else {
+            if ($best['score'] >= 0.82) {
+                $meetsThreshold = true;
+            }
+        }
+
+        // If query has very few tokens, require target match + higher score
+        if ($queryTokensCount < 5 && (!$best['contains_target'] || $best['score'] < 0.75)) {
+            $meetsThreshold = false;
+        }
+
+        if (!$meetsThreshold) {
+            return null;
+        }
+
+        // Build result based on kind
+        if ($best['kind'] === 'chapter_title') {
+            $tokens = $this->syntheticSentenceTokens($exampleSentence, $sense, $occurrence);
+            $targetIndexes = $this->collectTargetIndexes($tokens);
+
+            // Write back to DB
+            $this->writeBackRecoveredSource($sense, $occurrence, $best['chapter']->id, null);
+
+            $result = [
+                'sense_id' => $sense->id,
+                'source_available' => true,
+                'source_kind' => 'chapter_fuzzy_title',
+                'chapter_id' => $best['chapter']->id,
+                'chapter_title' => $best['chapter']->name,
+                'sentence_id' => null,
+                'sentence_hash' => null,
+                'context_tokens' => $tokens,
+                'target_indexes' => $targetIndexes,
+                'fallback_message' => '已根据复习卡例句模糊定位到章节标题。',
+            ];
+
+            if (config('app.debug')) {
+                $result['debug'] = [
+                    'match_score' => $best['score'],
+                    'match_kind' => $best['kind'],
+                    'contains_target' => $best['contains_target'],
+                    'text_preview' => $best['text_preview'],
+                ];
+            }
+
+            return $result;
+        }
+
+        // chapter_fuzzy: build context from processed_text
+        $groups = $this->groupTokensBySentenceWithIndexes(
+            $this->flattenProcessedWords($best['chapter']->getProcessedText())
+        );
+
+        $entries = $this->contextEntriesAroundGroup($groups, $best['target_key']);
+
+        $contextTokens = [];
+        $targetIndexes = [];
+
+        foreach ($entries as $localIndex => $entry) {
+            $token = $this->simplifyContextToken(
+                $entry['word'],
+                $localIndex,
+                $sense,
+                $occurrence,
+                $entry['is_source_sentence'] ?? false
+            );
+            if ($token['is_target']) {
+                $targetIndexes[] = $localIndex;
+            }
+            $contextTokens[] = $token;
+        }
+
+        if (empty($contextTokens)) {
+            return null;
+        }
+
+        // Write back to DB
+        $this->writeBackRecoveredSource($sense, $occurrence, $best['chapter']->id, $best['target_key']);
+
+        $result = [
+            'sense_id' => $sense->id,
+            'source_available' => true,
+            'source_kind' => 'chapter_fuzzy',
+            'chapter_id' => $best['chapter']->id,
+            'chapter_title' => $best['chapter']->name,
+            'sentence_id' => $best['target_key'],
+            'sentence_hash' => null,
+            'context_tokens' => $contextTokens,
+            'target_indexes' => $targetIndexes,
+            'fallback_message' => '已根据复习卡例句模糊定位到原文位置。',
+        ];
+
+        if (config('app.debug')) {
+            $result['debug'] = [
+                'match_score' => $best['score'],
+                'match_kind' => $best['kind'],
+                'contains_target' => $best['contains_target'],
+                'text_preview' => $best['text_preview'],
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Tokenize text into meaningful lowercase word tokens, stripping stopwords and punctuation.
+     */
+    private function meaningfulTextTokens(string $text): array
+    {
+        $text = mb_strtolower($text);
+        $text = str_replace(
+            ["\u{2018}", "\u{2019}", "\u{201C}", "\u{201D}", "\u{2013}", "\u{2014}"],
+            ["'", "'", '"', '"', '-', '-'],
+            $text
+        );
+
+        preg_match_all('/[a-z0-9]+/u', $text, $matches);
+        $tokens = $matches[0] ?? [];
+
+        $stopwords = [
+            'the', 'a', 'an', 'of', 'to', 'in', 'on', 'at', 'for',
+            'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be',
+            'been', 'being', 'that', 'this', 'these', 'those', 'with',
+            'as', 'by', 'from', 'it', 'its', 'into',
+        ];
+
+        $tokens = array_values(array_filter($tokens, fn ($t) => !in_array($t, $stopwords, true)));
+
+        return $tokens;
+    }
+
+    /**
+     * Collect target-matching terms from sense and occurrence surface/lemma forms.
+     */
+    private function targetTerms(WordSense $sense, ?WordSenseOccurrence $occurrence): array
+    {
+        $terms = [];
+
+        if ($sense->surface_form) {
+            $terms[] = $sense->surface_form;
+        }
+        if ($sense->lemma) {
+            $terms[] = $sense->lemma;
+        }
+        if ($occurrence?->surface) {
+            $terms[] = $occurrence->surface;
+        }
+        if ($occurrence?->lemma) {
+            $terms[] = $occurrence->lemma;
+        }
+
+        // Tokenize each term and collect unique tokens
+        $allTokens = [];
+        foreach ($terms as $term) {
+            $tokens = $this->meaningfulTextTokens($term);
+            foreach ($tokens as $t) {
+                $allTokens[$t] = true;
+            }
+        }
+
+        return array_keys($allTokens);
+    }
+
+    /**
+     * Score how well a candidate text matches the query text.
+     * Returns score, coverage, and whether the candidate contains any target term.
+     */
+    private function fuzzySourceScore(string $query, string $candidate, array $targetTerms): array
+    {
+        $queryTokens = $this->meaningfulTextTokens($query);
+        $candidateTokens = $this->meaningfulTextTokens($candidate);
+
+        if (empty($queryTokens) || empty($candidateTokens)) {
+            return ['score' => 0.0, 'coverage' => 0.0, 'contains_target' => false];
+        }
+
+        $uniqueQuery = array_unique($queryTokens);
+        $uniqueCandidate = array_unique($candidateTokens);
+
+        $common = array_intersect($uniqueQuery, $uniqueCandidate);
+        $coverage = count($common) / max(1, count($uniqueQuery));
+
+        $containsTarget = false;
+        foreach ($targetTerms as $term) {
+            if (in_array($term, $candidateTokens, true)) {
+                $containsTarget = true;
+                break;
+            }
+        }
+
+        $score = $coverage;
+        if ($containsTarget) {
+            $score += 0.25;
+        }
+
+        // Exact match bonus (after normalization)
+        if ($this->normalizeSentenceText($query) === $this->normalizeSentenceText($candidate)) {
+            $score = 2.0;
+        }
+
+        return [
+            'score' => round($score, 4),
+            'coverage' => round($coverage, 4),
+            'contains_target' => $containsTarget,
+        ];
+    }
+
+    /**
+     * Collect indexes of tokens where is_target is true.
+     */
+    private function collectTargetIndexes(array $tokens): array
+    {
+        $indexes = [];
+        foreach ($tokens as $index => $token) {
+            if (!empty($token['is_target'])) {
+                $indexes[] = $index;
+            }
+        }
+        return $indexes;
+    }
+
+    /**
+     * Log source context result for debugging. Never logs full tokens, keys, or secrets.
+     */
+    private function logSourceContextResult(WordSense $sense, array $result, array $extra = []): void
+    {
+        try {
+            Log::info('sense_source_context', [
+                'sense_id' => $sense->id,
+                'user_id' => $sense->user_id,
+                'language_id' => $sense->language_id,
+                'lemma' => $sense->lemma,
+                'surface_form' => $sense->surface_form,
+                'source_available' => $result['source_available'] ?? null,
+                'source_kind' => $result['source_kind'] ?? null,
+                'chapter_id' => $result['chapter_id'] ?? null,
+                'sentence_id' => $result['sentence_id'] ?? null,
+                'target_count' => count($result['target_indexes'] ?? []),
+            ] + $extra);
+        } catch (\Throwable $e) {
+            // Never let logging break the response
+        }
     }
 }

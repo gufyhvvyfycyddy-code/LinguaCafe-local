@@ -978,6 +978,232 @@ class SenseSourceContextTest extends TestCase
         $this->assertGreaterThan(3 * 3, count($json['context_tokens']), 'Context should have more tokens than 3 sentences');
     }
 
+    public function test_source_context_fuzzy_recovers_sentence_with_punctuation_differences(): void
+    {
+        // Example sentence with commas and hyphens
+        $exampleSentence = 'It is certain that the Census procedures, which lump the online sales of major traditional retailers like Walmart in with "non - store retailers" like food trucks, can mask major changes in individual retail categories.';
+
+        // Processed text version with slightly different punctuation/spacing
+        $targetSentenceText = 'It is certain that the Census procedures which lump the online sales of major traditional retailers like Walmart in with non-store retailers like food trucks can mask major changes in individual retail categories.';
+
+        $processedWords = [];
+        // S0: preceding sentence
+        $processedWords[] = (object) ['word' => 'Preceding', 'sentence_index' => '0', 'spaceAfter' => true];
+        $processedWords[] = (object) ['word' => 'context', 'sentence_index' => '0', 'spaceAfter' => true];
+        $processedWords[] = (object) ['word' => 'here', 'sentence_index' => '0', 'spaceAfter' => false];
+        $processedWords[] = (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false];
+
+        // S1: target sentence (different punctuation from example)
+        $targetWords = explode(' ', $targetSentenceText);
+        foreach ($targetWords as $wi => $w) {
+            $processedWords[] = (object) [
+                'word' => $w,
+                'sentence_index' => '1',
+                'spaceAfter' => ($wi < count($targetWords) - 1),
+            ];
+        }
+        $processedWords[] = (object) ['word' => '.', 'sentence_index' => '1', 'spaceAfter' => false];
+
+        // S2: following sentence
+        $processedWords[] = (object) ['word' => 'Following', 'sentence_index' => '2', 'spaceAfter' => true];
+        $processedWords[] = (object) ['word' => 'context', 'sentence_index' => '2', 'spaceAfter' => false];
+        $processedWords[] = (object) ['word' => '.', 'sentence_index' => '2', 'spaceAfter' => false];
+
+        $chapter = $this->createTestChapter($processedWords, ['name' => 'Fuzzy Punctuation Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'walmart',
+            'surface_form' => 'Walmart',
+            'pos' => 'noun',
+            'sense_zh' => '沃尔玛',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => $exampleSentence,
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('chapter_fuzzy', $json['source_kind']);
+        $this->assertSame($chapter->id, $json['chapter_id'], 'chapter_id should be correct');
+        $this->assertNotEmpty($json['target_indexes'], 'target_indexes should not be empty');
+
+        // Walmart should be marked as target
+        $hasTarget = false;
+        foreach ($json['context_tokens'] as $token) {
+            if ($token['word'] === 'Walmart' && $token['is_target']) {
+                $hasTarget = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasTarget, 'Walmart token should be marked as target');
+    }
+
+    public function test_source_context_fuzzy_recovers_title_when_chapter_name_not_exact(): void
+    {
+        // Chapter name has slightly different text than example sentence
+        $chapterTitle = 'Retailers Bricks and Clicks';
+        $exampleSentence = 'The Best Retailers Combine Bricks and Clicks';
+
+        $processedWords = [
+            (object) ['word' => 'Unrelated', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'chapter', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'text', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+
+        $chapter = $this->createTestChapter($processedWords, ['name' => $chapterTitle]);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'brick',
+            'surface_form' => 'Bricks',
+            'pos' => 'noun',
+            'sense_zh' => '砖',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => $exampleSentence,
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('chapter_fuzzy_title', $json['source_kind']);
+        $this->assertSame($chapter->id, $json['chapter_id'], 'chapter_id should be set');
+
+        // Bricks should be marked as target
+        $hasTarget = false;
+        foreach ($json['context_tokens'] as $token) {
+            if ($token['word'] === 'Bricks' && $token['is_target']) {
+                $hasTarget = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasTarget, 'Bricks token should be marked as target');
+    }
+
+    public function test_source_context_fuzzy_does_not_cross_user_or_language(): void
+    {
+        // Create a chapter for another user with matching text
+        $otherChapterWords = [
+            (object) ['word' => 'Sure', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'enough', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => ',', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'the', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'Census', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'released', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'data', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+
+        // Other user's chapter — should NOT be searched
+        $this->createTestChapter($otherChapterWords, ['user_id' => $this->otherUser->id, 'name' => 'Other User Chapter']);
+
+        // Create a chapter for this user but with completely unrelated text
+        $unrelatedWords = [
+            (object) ['word' => 'Completely', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'unrelated', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'text', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $this->createTestChapter($unrelatedWords, ['name' => 'Unrelated Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'bureau',
+            'surface_form' => 'Bureau',
+            'pos' => 'noun',
+            'sense_zh' => '局；统计局',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'Sure enough, the Census Bureau released data.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        // Should fall back to card_example since the only matching chapter belongs to another user
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('card_example', $json['source_kind'], 'should fall back to card_example (other user chapter not searched)');
+        $this->assertNull($json['chapter_id'], 'chapter_id should be null');
+    }
+
+    public function test_source_context_fuzzy_falls_back_to_card_example_when_score_low(): void
+    {
+        // Create a chapter with completely unrelated text
+        $processedWords = [
+            (object) ['word' => 'The', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'weather', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'is', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'nice', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'today', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+
+        $this->createTestChapter($processedWords, ['name' => 'Weather Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'bureau',
+            'surface_form' => 'Bureau',
+            'pos' => 'noun',
+            'sense_zh' => '局；统计局',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'Sure enough, the Census Bureau released data.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        // Score too low — should fall back to card_example
+        $this->assertTrue($json['source_available'], 'source_available should be true');
+        $this->assertSame('card_example', $json['source_kind'], 'should fall back to card_example when fuzzy score is too low');
+        $this->assertNull($json['chapter_id'], 'chapter_id should be null');
+
+        // Bureau should still be marked as target in synthetic fallback
+        $hasTarget = false;
+        foreach ($json['context_tokens'] as $token) {
+            if ($token['word'] === 'Bureau' && $token['is_target']) {
+                $hasTarget = true;
+                break;
+            }
+        }
+        $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
+    }
+
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter
     {
         return Chapter::forceCreate(array_merge([

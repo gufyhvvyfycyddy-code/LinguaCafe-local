@@ -40,6 +40,10 @@
                     <div class="text-caption text--secondary mb-1">译文 / 释义</div>
                     <div>{{ translation }}</div>
                 </div>
+
+                <div v-if="context && context.debug" class="mt-2 text-caption text--secondary">
+                    匹配方式：{{ context.source_kind }}，得分：{{ context.debug.match_score }}
+                </div>
             </v-card-text>
 
             <v-card-actions>
@@ -123,6 +127,14 @@
 
                 if (this.context.source_kind === 'chapter_recovered') {
                     return '已根据复习卡例句定位到原章节。';
+                }
+
+                if (this.context.source_kind === 'chapter_fuzzy') {
+                    return '已根据复习卡例句模糊定位到原文位置。';
+                }
+
+                if (this.context.source_kind === 'chapter_fuzzy_title') {
+                    return '已根据复习卡例句模糊定位到章节标题。';
                 }
 
                 if (this.context.source_kind === 'chapter_title') {
