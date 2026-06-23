@@ -115,9 +115,8 @@ class ReviewFsrsTest extends TestCase
 
         $response->assertOk();
         $reviews = $response->json('reviews');
-        $this->assertCount(1, $reviews);
-        $this->assertSame($dueWord->id, $reviews[0]['id']);
-        $this->assertSame($dueCard->id, $reviews[0]['review_card_id']);
+        // 日常复习只保留 sense card，孤立 word card 不再进入复习
+        $this->assertCount(0, $reviews, 'Word cards should no longer appear in review queue');
     }
 
     public function test_each_rating_updates_card_and_writes_log(): void
@@ -246,11 +245,13 @@ class ReviewFsrsTest extends TestCase
 
         $response->assertOk();
         $reviews = $response->json('reviews');
-        $this->assertCount(2, $reviews);
+        // 日常复习只保留 sense card：word card 不再进入队列
+        $this->assertCount(1, $reviews);
 
         $types = array_column($reviews, 'type');
-        $this->assertContains('word', $types);
         $this->assertContains('sense', $types);
+        $this->assertNotContains('word', $types, 'Word cards should not appear in review queue');
+        $this->assertSame($sense->id, $reviews[0]['word_sense_id']);
     }
 
     public function test_review_queue_does_not_return_sense_in_chapter_mode(): void
@@ -269,22 +270,14 @@ class ReviewFsrsTest extends TestCase
         $globalTypes = array_column($globalReviews, 'type');
         $this->assertContains('sense', $globalTypes);
 
-        // Verify service-level guard: when bookId !== -1, sense cards are excluded.
-        // We check this by inspecting the service directly — the sense-mixing block
-        // is guarded by $bookId === -1 && $chapterId === -1.
-        // With bookId=1 (non-existent), the service throws — confirming the chapter-mode
-        // code path is taken BEFORE sense mixing.
-        $threw = false;
-        try {
-            app(\App\Services\ReviewService::class)->getReviewItems(
-                $this->user->id, 'english', 1, -1, false,
-                config('linguacafe.languages.languages_without_spaces')
-            );
-        } catch (\Exception $e) {
-            $threw = true;
-            $this->assertStringContainsString('Book does not exist', $e->getMessage());
-        }
-        $this->assertTrue($threw, 'Chapter-mode path should validate book existence before sense mixing');
+        // bookId/chapterId 限定模式第一版不支持 sense 过滤，返回空队列
+        $chapterResponse = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => 1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+        $chapterResponse->assertOk();
+        $this->assertEmpty($chapterResponse->json('reviews'), 'Chapter mode should return empty queue');
     }
 
     public function test_review_queue_filters_out_archived_sense(): void
@@ -421,6 +414,49 @@ class ReviewFsrsTest extends TestCase
         $this->assertSame($serialized['example_sentence_en'], $apiCard['example_sentence_en']);
         $this->assertSame($serialized['example_sentence_zh'], $apiCard['example_sentence_zh']);
         $this->assertSame('sense', $apiCard['type']);
+    }
+
+    public function test_word_card_not_in_queue_even_when_due(): void
+    {
+        $dueWord = $this->createWord($this->user->id, 'english', -1, 'apple');
+        $wordCard = app(ReviewCardService::class)->ensureWordCard($dueWord);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        // word card must not appear — sense-only queue
+        $this->assertCount(0, $reviews, 'Due word card should not enter sense-only review queue');
+        $this->assertNotNull($wordCard->fresh(), 'Word card should still exist in database');
+    }
+
+    public function test_old_word_card_not_deleted_after_sense_only_switch(): void
+    {
+        $dueWord = $this->createWord($this->user->id, 'english', -1, 'oldword');
+        $wordCard = app(ReviewCardService::class)->ensureWordCard($dueWord);
+
+        // Trigger review queue (sense-only)
+        $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ])->assertOk();
+
+        // Word card must still exist — not deleted
+        $this->assertDatabaseHas('review_cards', [
+            'id' => $wordCard->id,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $dueWord->id,
+        ]);
+    }
+
+    public function test_reviews_senses_endpoint_still_accessible(): void
+    {
+        $this->actingAs($this->user)->get('/reviews/senses')->assertOk();
     }
 
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense

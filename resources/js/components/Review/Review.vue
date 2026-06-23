@@ -33,12 +33,12 @@
             <template v-if="totalReviews === 0">
                 <!-- Card title -->
                 <v-card-title>
-                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>{{ reviewError || '当前没有到期卡片' }}
+                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>{{ reviewError || '当前没有到期的词义卡。' }}
                 </v-card-title>
 
                 <!-- Card content -->
                 <v-card-text>
-                    {{ reviewError ? '请稍后重试，或检查后端服务是否正在运行。' : '当前没有需要复习的单词或短语。' }}
+                    {{ reviewError ? '请稍后重试，或检查后端服务是否正在运行。' : '当前没有到期的词义卡。阅读中添加词义后，会在这里复习。' }}
                 </v-card-text>
             </template>
 

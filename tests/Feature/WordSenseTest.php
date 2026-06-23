@@ -448,30 +448,15 @@ class WordSenseTest extends TestCase
 
         $reviews = app(ReviewService::class)->getReviewItems($this->user->id, 'english', -1, -1, false, []);
 
-        // 全局模式混入 sense cards：两者均应出现
-        $this->assertCount(2, $reviews);
+        // 日常复习只保留 sense card：word card 不再进入队列
+        $this->assertCount(1, $reviews);
 
         $types = array_column($reviews, 'type');
-        $this->assertContains('word', $types);
         $this->assertContains('sense', $types);
+        $this->assertNotContains('word', $types, 'Word cards should not appear in review queue');
 
-        // 验证 word card 仍然存在且正确
-        $wordReview = null;
-        $senseReview = null;
-        foreach ($reviews as $review) {
-            $type = is_array($review) ? ($review['type'] ?? null) : ($review->type ?? null);
-            if ($type === 'word') {
-                $wordReview = $review;
-            }
-            if ($type === 'sense') {
-                $senseReview = $review;
-            }
-        }
-        $this->assertNotNull($wordReview);
-        $this->assertNotNull($senseReview);
-        $this->assertSame($word->id, $wordReview['id']);
-        $this->assertSame($wordCard->id, $wordReview['review_card_id']);
-        $this->assertSame($senseCard->id, $senseReview->review_card_id);
+        $this->assertSame($senseCard->id, $reviews[0]->review_card_id);
+        $this->assertSame($sense->id, $reviews[0]->word_sense_id);
     }
 
     public function test_occurrence_list_returns_only_current_user_language(): void
@@ -657,6 +642,68 @@ class WordSenseTest extends TestCase
         $pending = $this->actingAs($this->user)->getJson('/senses/occurrences?status=pending&lemma=surge');
         $pending->assertOk();
         $this->assertSame(0, $pending->json('pagination.total'));
+
+        // 不应创建 word review_card
+        $this->assertSame(0, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count(),
+            'Manual sense add should NOT create word review_card');
+    }
+
+    public function test_manual_sense_add_does_not_create_word_review_card_for_new_word(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 2]); // New word
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'sense_en' => 'to increase suddenly',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+
+        // stage 从 2 变 -7
+        $word->refresh();
+        $this->assertSame(-7, $word->stage, 'Stage should change from 2 to -7');
+
+        // 创建了 sense review_card
+        $senseCard = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->first();
+        $this->assertNotNull($senseCard, 'Sense review card should be created');
+
+        // 没有创建 word review_card
+        $wordCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+        $this->assertSame(0, $wordCardCount, 'Word review card should NOT be created');
+    }
+
+    public function test_manual_sense_add_does_not_create_word_review_card_for_learning_word(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => -7]); // Already Learning
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'sense_en' => 'to increase suddenly',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+
+        // stage 不变（已是 Learning）
+        $word->refresh();
+        $this->assertSame(-7, $word->stage, 'Stage should remain -7');
+
+        // 创建了 sense card
+        $senseCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count();
+        $this->assertSame(1, $senseCardCount, 'Sense review card should be created');
+
+        // 没有创建 word card（即使之前没有 word card）
+        $wordCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+        $this->assertSame(0, $wordCardCount, 'Word review card should NOT be created for already-learning word');
     }
 
     public function test_manual_sense_add_allows_multiple_senses_for_same_lemma_grouped_by_pos_data(): void
@@ -2641,8 +2688,8 @@ class WordSenseTest extends TestCase
         // Stage should change from 2 (New) to -7 (Learning 7)
         $this->assertSame(-7, $word->stage);
 
-        // Word review card should exist
-        $this->assertDatabaseHas('review_cards', [
+        // Word review card should NOT be created (sense-only policy)
+        $this->assertDatabaseMissing('review_cards', [
             'user_id' => $this->user->id,
             'language_id' => 'english',
             'target_type' => ReviewCard::TARGET_WORD,
@@ -2775,8 +2822,9 @@ class WordSenseTest extends TestCase
         // Stage should remain -5
         $this->assertSame(-5, $word->stage);
 
-        // Word card should now exist (historical gap filled)
-        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->exists());
+        // Word card should NOT be created (sense-only policy: no new word cards)
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->exists(),
+            'Word review card should NOT be created for already-learning word');
 
         // Response should have updated_word with stage=-5 and stage_changed=false
         $response->assertJsonPath('updated_word.id', $word->id);

@@ -142,14 +142,14 @@ class WordSenseService
             $card = $this->createReviewCardForSense($sense);
             $this->createManualOccurrence($sense, $card, $data);
 
-            // 2. Auto-mark as Learning 7 + ensure word review card
+            // 2. Auto-mark as Learning 7 (word card no longer created)
             $updatedWord = null;
             if ($encounteredWord) {
                 if ($encounteredWord->stage === 2) {
                     // New (stage=2) → Learning 7
+                    // 只改 stage，不创建 word review_card
                     $encounteredWord->setStage(-7);
                     $encounteredWord->save();
-                    $this->reviewCardService->ensureWordCard($encounteredWord);
 
                     $updatedWord = [
                         'id' => $encounteredWord->id,
@@ -160,10 +160,7 @@ class WordSenseService
                         'stage_changed' => true,
                     ];
                 } elseif ($encounteredWord->stage < 0) {
-                    // Already in Learning: don't change stage,
-                    // but use ensureWordCard idempotency to fill missing historical cards
-                    $this->reviewCardService->ensureWordCard($encounteredWord);
-
+                    // Already in Learning: don't change stage, don't create word card
                     $updatedWord = [
                         'id' => $encounteredWord->id,
                         'stage' => $encounteredWord->stage,
