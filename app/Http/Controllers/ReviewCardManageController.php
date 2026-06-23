@@ -35,7 +35,7 @@ class ReviewCardManageController extends Controller
         $language = Auth::user()->selected_language;
 
         $perPage = min((int) $request->input('per_page', 20), 100);
-        $filter = $request->input('filter', 'all');
+        $filter = $request->input('filter', 'enabled');
         $q = trim($request->input('q', ''));
 
         // Base query — all security constraints baked in via whereHas

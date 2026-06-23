@@ -187,7 +187,7 @@ class ReviewCardManageTest extends TestCase
         $card = $this->createSenseCard($sense);
         $card->update(['fsrs_enabled' => false]);
 
-        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=disabled');
         $response->assertOk();
         $items = $response->json('items');
         $this->assertCount(1, $items);
@@ -199,7 +199,7 @@ class ReviewCardManageTest extends TestCase
         $sense = $this->createSense($this->user->id, 'english');
         $this->createSenseCard($sense);
 
-        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=enabled');
         $response->assertOk();
         $items = $response->json('items');
         $this->assertCount(1, $items);
@@ -1215,6 +1215,152 @@ class ReviewCardManageTest extends TestCase
         $this->assertArrayHasKey('review_card_id', $data);
         $this->assertArrayHasKey('fsrs_due_at', $data);
         $this->assertArrayHasKey('fsrs_enabled', $data);
+    }
+
+    // ==================== Archive/Restore + Review Queue tests ====================
+
+    public function test_archive_preserves_word_sense_status(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $oldStatus = $sense->status;
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false]);
+        $response->assertOk();
+        $this->assertFalse($response->json('fsrs_enabled'));
+        $this->assertSame($oldStatus, $sense->fresh()->status);
+    }
+
+    public function test_archive_preserves_word_sense_text_fields(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $sense->update([
+            'sense_zh' => '保留的释义',
+            'sense_en' => 'preserved definition',
+            'lemma' => 'preserved_lemma',
+        ]);
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false]);
+
+        $fresh = $sense->fresh();
+        $this->assertSame('保留的释义', $fresh->sense_zh);
+        $this->assertSame('preserved definition', $fresh->sense_en);
+        $this->assertSame('preserved_lemma', $fresh->lemma);
+    }
+
+    public function test_archive_does_not_delete_review_card(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false]);
+        $response->assertOk();
+
+        $this->assertNotNull(ReviewCard::find($card->id));
+        $this->assertFalse(ReviewCard::find($card->id)->fsrs_enabled);
+    }
+
+    public function test_archive_does_not_delete_word_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false]);
+
+        $this->assertNotNull(WordSense::find($sense->id));
+        $this->assertSame(WordSense::STATUS_CONFIRMED, WordSense::find($sense->id)->status);
+    }
+
+    public function test_archived_card_excluded_from_daily_review_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->subHour()]);
+
+        $dueCards = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+
+        $this->assertNotContains($card->id, $dueCards);
+    }
+
+    public function test_restored_due_card_re_enters_review_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->subHour()]);
+
+        // Verify excluded before restore
+        $dueBefore = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertNotContains($card->id, $dueBefore);
+
+        // Restore
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => true])
+            ->assertOk();
+        $this->assertTrue($card->fresh()->fsrs_enabled);
+
+        // Verify included after restore (due_at <= now)
+        $dueAfter = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertContains($card->id, $dueAfter);
+    }
+
+    public function test_restore_does_not_change_fsrs_due_at(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDay()]);
+        $oldDue = $card->fresh()->fsrs_due_at;
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => true]);
+
+        $this->assertSame($oldDue->timestamp, $card->fresh()->fsrs_due_at->timestamp);
+    }
+
+    public function test_archived_future_card_not_in_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        // Card is archived and due in the future
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDays(7)]);
+
+        $dueCards = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+
+        $this->assertNotContains($card->id, $dueCards);
+    }
+
+    public function test_enabled_but_future_card_not_in_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        // Card is enabled but due in the future
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->addDays(7)]);
+
+        $dueCards = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+
+        $this->assertNotContains($card->id, $dueCards);
+    }
+
+    public function test_default_data_filter_is_enabled(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'enabled_one']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_enabled' => true]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabled_one']);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_enabled' => false]);
+
+        // Default request without filter parameter
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('enabled_one', $items[0]['lemma']);
+        $this->assertTrue($items[0]['fsrs_enabled']);
     }
 
     // ==================== Helper ====================
