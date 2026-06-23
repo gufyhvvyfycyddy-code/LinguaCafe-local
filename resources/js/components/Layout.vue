@@ -161,6 +161,12 @@
                     //     bottomNav: false,
                     // },
                     {
+                        name: '复习卡管理',
+                        url: '/review-cards/manage',
+                        icon: 'mdi-card-account-details',
+                        bottomNav: false,
+                    },
+                    {
                         name: '设置',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',

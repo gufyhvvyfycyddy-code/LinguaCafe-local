@@ -116,6 +116,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/kanji/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/kanji/{character}', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/review-cards/manage', [App\Http\Controllers\HomeController::class, 'index']);
 
     // home
     Route::post('/statistics/get', [App\Http\Controllers\HomeController::class, 'getStatistics']);
@@ -198,6 +199,12 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceController::class, 'createSense']);
     Route::post('/senses/occurrences/{id}/reject', [App\Http\Controllers\SenseOccurrenceController::class, 'reject']);
     Route::post('/senses/occurrences/{id}/ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'ignore']);
+
+    // review card management
+    Route::get('/review-cards/manage/data', [App\Http\Controllers\ReviewCardManageController::class, 'data']);
+    Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
+    Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
+    Route::post('/review-cards/manage/{reviewCard}/due-now', [App\Http\Controllers\ReviewCardManageController::class, 'dueNow']);
 
     // anki
     Route::post('/anki/add-card', [App\Http\Controllers\AnkiController::class, 'addCardToAnki']);

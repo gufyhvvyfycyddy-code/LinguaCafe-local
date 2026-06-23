@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Chapter;
+use App\Models\ReviewCard;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
@@ -1202,6 +1203,105 @@ class SenseSourceContextTest extends TestCase
             }
         }
         $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
+    }
+
+    // ==================== Management page integration ====================
+
+    public function test_source_context_api_still_works(): void
+    {
+        $sense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'manage',
+            'surface_form' => 'manage',
+            'pos' => 'verb',
+            'sense_zh' => '管理',
+            'sense_en' => 'to administer',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'We need to manage resources.',
+            'example_sentence_zh' => '我们需要管理资源。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', 'english|manage|verb|管理|to administer'),
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+        $response->assertOk();
+
+        $data = $response->json();
+        $this->assertArrayHasKey('sense_id', $data);
+        $this->assertArrayHasKey('source_available', $data);
+        $this->assertArrayHasKey('source_kind', $data);
+    }
+
+    public function test_source_context_response_contains_required_keys(): void
+    {
+        $sense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'required',
+            'surface_form' => 'required',
+            'pos' => 'adjective',
+            'sense_zh' => '必须的',
+            'sense_en' => 'necessary',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'This is required.',
+            'example_sentence_zh' => '这是必须的。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', 'english|required|adjective|必须的|necessary'),
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+        $response->assertOk();
+
+        $data = $response->json();
+        $this->assertArrayHasKey('source_kind', $data);
+        $this->assertArrayHasKey('chapter_id', $data);
+        $this->assertArrayHasKey('sentence_id', $data);
+        $this->assertArrayHasKey('target_indexes', $data);
+        $this->assertArrayHasKey('fallback_message', $data);
+    }
+
+    public function test_management_page_data_route_does_not_trigger_source_context_log(): void
+    {
+        $sense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'nolog',
+            'surface_form' => 'nolog',
+            'pos' => 'noun',
+            'sense_zh' => '无日志',
+            'sense_en' => 'no log',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'No log test.',
+            'example_sentence_zh' => '无日志测试。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', 'english|nolog|noun|无日志|no log'),
+        ]);
+
+        ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+        ]);
+
+        // Verify data route doesn't log source_context entries
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $this->assertNotEmpty($response->json('items'));
     }
 
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter

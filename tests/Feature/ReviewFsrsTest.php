@@ -854,6 +854,177 @@ class ReviewFsrsTest extends TestCase
         $this->assertNull($reviews[0]['example_sentence_token_source']);
     }
 
+    // ==================== Review card management integration ====================
+
+    public function test_review_queue_returns_only_target_type_sense(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'reviewlemma', 'noun', '复习', 'review');
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $types = array_column($reviews, 'type');
+        $this->assertContains('sense', $types);
+    }
+
+    public function test_review_queue_excludes_target_type_word(): void
+    {
+        $word = $this->createWord($this->user->id, 'english', -1, 'wordcard');
+        $sense = $this->createSense($this->user->id, 'english', 'sensecard', 'noun', '义卡', 'sense');
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $types = array_column($reviews, 'type');
+        $this->assertNotContains('word', $types);
+    }
+
+    public function test_disabled_sense_card_does_not_appear_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'disabledsense', 'noun', '禁用', 'disabled');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->subHour()]);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(0, $reviews);
+    }
+
+    public function test_enabled_and_due_sense_card_appears_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'duesense', 'noun', '到期', 'due');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+        $this->assertSame('sense', $reviews[0]['type']);
+    }
+
+    public function test_normal_edit_sense_zh_reflected_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'editsense', 'noun', '原释义', 'old def');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        // Edit sense_zh via manage controller
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", ['sense_zh' => '新释义123']);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertSame('新释义123', $reviews[0]['sense_zh']);
+    }
+
+    public function test_normal_edit_sense_en_reflected_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'editen', 'noun', '释义', 'old english');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", ['sense_en' => 'new english def']);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $reviews = $response->json('reviews');
+        $this->assertSame('new english def', $reviews[0]['sense_en']);
+    }
+
+    public function test_normal_edit_example_sentence_en_reflected_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'editex', 'noun', '例句', 'example');
+        $sense->update(['example_sentence_en' => 'Old sentence.']);
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", ['example_sentence_en' => 'New review sentence.']);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $reviews = $response->json('reviews');
+        $this->assertSame('New review sentence.', $reviews[0]['example_sentence_en']);
+    }
+
+    public function test_normal_edit_does_not_rebuild_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'norebuild', 'noun', '无重建', 'no rebuild');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $oldCardCount = ReviewCard::count();
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", ['sense_zh' => '不重建']);
+
+        $this->assertSame($oldCardCount, ReviewCard::count());
+    }
+
+    public function test_normal_edit_does_not_add_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'nologs', 'noun', '无日志', 'no logs');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", ['sense_zh' => '无日志修改']);
+
+        $this->assertSame($oldLogCount, ReviewLog::count());
+    }
+
+    public function test_due_now_enabled_card_appears_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'duenowenabled', 'noun', '立即到期启用', 'due now');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        // Card is enabled by default, but due in future
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->addDays(7)]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/due-now");
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+        $this->assertSame('sense', $reviews[0]['type']);
+    }
+
+    public function test_due_now_disabled_card_still_not_in_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'duenowdisabled', 'noun', '到期禁用', 'due now dis');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDays(7)]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/due-now");
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $reviews = $response->json('reviews');
+        $this->assertCount(0, $reviews);
+    }
+
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense
     {
         return WordSense::forceCreate([
