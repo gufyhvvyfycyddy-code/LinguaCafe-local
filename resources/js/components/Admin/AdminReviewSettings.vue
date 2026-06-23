@@ -17,8 +17,26 @@
                 <v-simple-table dense class="no-hover">
                     <tbody>
                         <tr>
-                            <td class="font-weight-bold pr-4 py-2">Desired Retention</td>
-                            <td class="py-2">90%</td>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">Desired Retention</td>
+                            <td class="py-2" style="min-width: 200px;">
+                                <v-select
+                                    v-model="fsrsDesiredRetention"
+                                    :items="fsrsRetentionOptions"
+                                    item-text="text"
+                                    item-value="value"
+                                    outlined
+                                    dense
+                                    hide-details
+                                    style="max-width: 160px;"
+                                />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2">目标记忆保持率说明</td>
+                            <td class="py-2 grey--text text--darken-1">
+                                Desired retention 越高，复习负担越重。
+                                本设置只影响之后评分产生的新到期时间，本轮不自动重排已有卡片。
+                            </td>
                         </tr>
                         <tr>
                             <td class="font-weight-bold pr-4 py-2">参数来源</td>
@@ -39,7 +57,25 @@
                     </tbody>
                 </v-simple-table>
 
-                <div class="mt-4 grey--text caption">
+                <v-card-actions class="px-0">
+                    <v-spacer />
+                    <v-btn
+                        rounded
+                        depressed
+                        color="primary"
+                        :disabled="fsrsSaving"
+                        :loading="fsrsSaving"
+                        @click="saveFsrsSettings"
+                    >
+                        保存 FSRS 设置
+                    </v-btn>
+                </v-card-actions>
+
+                <div v-if="fsrsSaveStatus" class="mt-2 green--text text--darken-1 body-2">
+                    {{ fsrsSaveStatus }}
+                </div>
+
+                <div class="mt-2 grey--text caption">
                     FSRS 参数优化和卡片重置功能会在后续版本加入。
                 </div>
             </v-card-text>
@@ -109,6 +145,19 @@
                 saving: false,
                 saveStatus: '',
                 reviewIntervals: [],
+                fsrsDesiredRetention: 0.90,
+                fsrsSaving: false,
+                fsrsSaveStatus: '',
+                fsrsRetentionOptions: [
+                    { text: '70%', value: 0.70 },
+                    { text: '75%', value: 0.75 },
+                    { text: '80%', value: 0.80 },
+                    { text: '85%', value: 0.85 },
+                    { text: '90%', value: 0.90 },
+                    { text: '92%', value: 0.92 },
+                    { text: '95%', value: 0.95 },
+                    { text: '97%', value: 0.97 },
+                ],
             }
         },
         props: {
@@ -149,7 +198,6 @@
             saveSettings() {
                 this.saving = true;
 
-
                 let reviewIntervalsArray = {};
                 for (let intervalIndex = 0; intervalIndex < this.reviewIntervals.length; intervalIndex++) {
                     let key = (parseInt(this.reviewIntervals[intervalIndex].name) * -1);
@@ -166,9 +214,25 @@
                     this.loadSettings();
                 });
             },
+            saveFsrsSettings() {
+                this.fsrsSaving = true;
+
+                axios.post('/settings/global/update', {
+                    'settings': {
+                        'fsrsDesiredRetention': this.fsrsDesiredRetention,
+                    }
+                }).then(() => {
+                    this.fsrsSaving = false;
+                    this.fsrsSaveStatus = 'FSRS 设置已保存。新的复习评分会使用该目标保持率；已排程卡片不会自动重排。';
+                    setTimeout(() => { this.fsrsSaveStatus = ''; }, 5000);
+                }).catch(() => {
+                    this.fsrsSaving = false;
+                    this.fsrsSaveStatus = '保存失败，请重试。';
+                });
+            },
             loadSettings() {
                 axios.post('/settings/global/get', {
-                    'settingNames': ['reviewIntervals']
+                    'settingNames': ['reviewIntervals', 'fsrsDesiredRetention']
                 }).then((result) => {
                     Object.keys(result.data.reviewIntervals).forEach((key, index) => {
                         this.reviewIntervals.push({
@@ -176,6 +240,10 @@
                             values: result.data.reviewIntervals[key].join(',')
                         });
                     });
+
+                    if (result.data.fsrsDesiredRetention !== undefined && result.data.fsrsDesiredRetention !== null) {
+                        this.fsrsDesiredRetention = result.data.fsrsDesiredRetention;
+                    }
 
                     this.saving = false;
                     this.$forceUpdate();

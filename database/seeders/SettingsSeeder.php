@@ -101,6 +101,15 @@ class SettingsSeeder extends Seeder
             ]);
         }
 
+        // fsrs settings
+        $setting = Setting::where('name', 'fsrsDesiredRetention')->first();
+        if (!$setting) {
+            DB::table('settings')->insert([
+                'name' => 'fsrsDesiredRetention',
+                'value' => json_encode(0.90)
+            ]);
+        }
+
         // review srs settings
         $setting = Setting::where('name', 'reviewIntervals')->first();
         if (!$setting) {

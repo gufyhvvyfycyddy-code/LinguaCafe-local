@@ -5,8 +5,10 @@ namespace Tests\Feature;
 use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\WordSense;
+use App\Services\FsrsSchedulingService;
 use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -1023,6 +1025,68 @@ class ReviewFsrsTest extends TestCase
 
         $reviews = $response->json('reviews');
         $this->assertCount(0, $reviews);
+    }
+
+    // ==================== FSRS desired retention configuration ====================
+
+    public function test_desired_retention_defaults_to_0_90_when_setting_missing(): void
+    {
+        $service = app(FsrsSchedulingService::class);
+
+        // No fsrsDesiredRetention setting exists; should default to 0.90
+        $this->assertSame(0.90, $service->desiredRetention());
+    }
+
+    public function test_desired_retention_reads_from_settings_table(): void
+    {
+        Setting::forceCreate([
+            'user_id' => -1,
+            'name' => 'fsrsDesiredRetention',
+            'value' => json_encode(0.95),
+        ]);
+
+        $service = app(FsrsSchedulingService::class);
+
+        $this->assertSame(0.95, $service->desiredRetention());
+    }
+
+    public function test_desired_retention_clamps_low_value_to_0_70(): void
+    {
+        Setting::forceCreate([
+            'user_id' => -1,
+            'name' => 'fsrsDesiredRetention',
+            'value' => json_encode(0.50),
+        ]);
+
+        $service = app(FsrsSchedulingService::class);
+
+        $this->assertSame(0.70, $service->desiredRetention());
+    }
+
+    public function test_desired_retention_clamps_high_value_to_0_97(): void
+    {
+        Setting::forceCreate([
+            'user_id' => -1,
+            'name' => 'fsrsDesiredRetention',
+            'value' => json_encode(0.99),
+        ]);
+
+        $service = app(FsrsSchedulingService::class);
+
+        $this->assertSame(0.97, $service->desiredRetention());
+    }
+
+    public function test_desired_retention_defaults_to_0_90_for_non_numeric(): void
+    {
+        Setting::forceCreate([
+            'user_id' => -1,
+            'name' => 'fsrsDesiredRetention',
+            'value' => json_encode('not-a-number'),
+        ]);
+
+        $service = app(FsrsSchedulingService::class);
+
+        $this->assertSame(0.90, $service->desiredRetention());
     }
 
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense

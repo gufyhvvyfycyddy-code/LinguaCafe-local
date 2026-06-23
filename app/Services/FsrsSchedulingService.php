@@ -12,7 +12,34 @@ class FsrsSchedulingService
     public const RATING_GOOD = 'good';
     public const RATING_EASY = 'easy';
 
-    private const DESIRED_RETENTION = 0.9;
+    /**
+     * Read the user-configured FSRS desired retention from the global settings table.
+     *
+     * Defaults to 0.90 when the setting is missing or invalid.
+     * Clamped to [0.70, 0.97] regardless of stored value.
+     *
+     * @return float
+     */
+    public function desiredRetention(): float
+    {
+        $setting = \App\Models\Setting::where('name', 'fsrsDesiredRetention')
+            ->where('user_id', -1)
+            ->first();
+
+        if (!$setting) {
+            return 0.90;
+        }
+
+        $value = json_decode($setting->value, true);
+
+        if (!is_numeric($value)) {
+            return 0.90;
+        }
+
+        $value = (float) $value;
+
+        return max(0.70, min(0.97, $value));
+    }
 
     public function schedule(ReviewCard $card, string $rating, ?Carbon $reviewedAt = null): array
     {
@@ -71,7 +98,7 @@ class FsrsSchedulingService
         }
 
         $fsrs = new \fsrs\FSRS(get_default_parameters());
-        $states = $fsrs->next_states($memory, self::DESIRED_RETENTION, $elapsedDays);
+        $states = $fsrs->next_states($memory, $this->desiredRetention(), $elapsedDays);
 
         $state = match ($rating) {
             self::RATING_AGAIN => $states->get_again(),
