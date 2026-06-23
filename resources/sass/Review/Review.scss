@@ -488,8 +488,30 @@
         &.into-the-correct-deck-animation #review-card-content,
         &.draw-new-card-animation #review-card-content,
         &.back-to-deck-animation #review-card-content,
-        &.revealed #review-card-content {        
+        &.revealed #review-card-content {
             animation-duration: 0s;
         }
+    }
+}
+
+// Sense sentence preview styles
+#review-box .sense-sentence-preview {
+    display: block;
+    line-height: 1.6;
+    text-align: center;
+
+    .word {
+        user-select: none;
+    }
+
+    .sense-target-token {
+        font-weight: 700;
+        text-decoration: underline;
+        text-decoration-thickness: 2px;
+        text-underline-offset: 3px;
+    }
+
+    .sense-sentence-fallback {
+        color: var(--v-text-base);
     }
 }

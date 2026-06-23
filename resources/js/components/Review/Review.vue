@@ -275,9 +275,15 @@
                                         <span v-if="reviews[currentReviewIndex].pos"> / {{ reviews[currentReviewIndex].pos }}</span>
                                     </div>
                                     <v-sheet outlined rounded class="pa-3 mt-2">
-                                        <div class="default-font">
-                                            {{ reviews[currentReviewIndex].example_sentence_en || '（回忆这个词义）' }}
-                                        </div>
+                                        <sense-sentence-preview
+                                            :tokens="reviews[currentReviewIndex].example_sentence_tokens"
+                                            :sentence-text="reviews[currentReviewIndex].example_sentence_en"
+                                            :target-surface="reviews[currentReviewIndex].surface_form"
+                                            :target-lemma="reviews[currentReviewIndex].lemma"
+                                            :language="language"
+                                            :font-size="settings.fontSize"
+                                            fallback-text="（回忆这个词义）"
+                                        />
                                     </v-sheet>
                                     <div class="text-caption text--secondary mt-2">
                                         这里的 {{ reviews[currentReviewIndex].lemma }} 是什么意思？
@@ -383,9 +389,15 @@
                                         {{ reviews[currentReviewIndex].sense_en }}
                                     </div>
                                     <v-sheet outlined rounded class="pa-3 mb-3">
-                                        <div class="default-font">
-                                            {{ reviews[currentReviewIndex].example_sentence_en || '（无例句）' }}
-                                        </div>
+                                        <sense-sentence-preview
+                                            :tokens="reviews[currentReviewIndex].example_sentence_tokens"
+                                            :sentence-text="reviews[currentReviewIndex].example_sentence_en"
+                                            :target-surface="reviews[currentReviewIndex].surface_form"
+                                            :target-lemma="reviews[currentReviewIndex].lemma"
+                                            :language="language"
+                                            :font-size="settings.fontSize"
+                                            fallback-text="（无例句）"
+                                        />
                                         <div v-if="reviews[currentReviewIndex].example_sentence_zh" class="text--secondary mt-1">
                                             {{ reviews[currentReviewIndex].example_sentence_zh }}
                                         </div>
@@ -414,8 +426,12 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
+    import SenseSentencePreview from './SenseSentencePreview.vue';
 
     export default {
+        components: {
+            SenseSentencePreview,
+        },
         data: function() {
             return {
                 textToSpeechService: null,
