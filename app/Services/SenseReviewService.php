@@ -725,7 +725,7 @@ class SenseReviewService
             if ($word === 'NEWLINE' || $word === 'PARAGRAPH_BREAK') {
                 continue;
             }
-            $spaceAfter = $tokenObj->spaceAfter ?? false;
+            $spaceAfter = $tokenObj->spaceAfter ?? true;
             $parts[] = $word . ($spaceAfter ? ' ' : '');
         }
         return trim(implode('', $parts));
@@ -871,7 +871,7 @@ class SenseReviewService
         return [
             'word' => $wordObj->word ?? '',
             'stage' => $wordObj->stage ?? 2,
-            'spaceAfter' => $wordObj->spaceAfter ?? false,
+            'spaceAfter' => $wordObj->spaceAfter ?? true,
             'is_structure' => $wordObj->is_structure ?? false,
             'sentence_index' => $wordObj->sentence_index ?? ($wordObj->si ?? ($wordObj->sentence_id ?? null)),
             'wordIndex' => $index,
