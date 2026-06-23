@@ -14,6 +14,10 @@ class ReviewService {
     }
 
     public function getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces) {
+        // 前端可能传字符串 "-1"，统一转为 int
+        $bookId = (int) $bookId;
+        $chapterId = (int) $chapterId;
+
         // check if book exists
         if ($bookId !== -1) {
             $book = Book
@@ -102,6 +106,22 @@ class ReviewService {
         foreach ($reviewWords as $word) {
             $word->type = 'word';
             $reviews[] = $word; 
+        }
+
+        // 仅在全局普通到期复习模式混入 sense cards
+        // 约束：!practiceMode、bookId=-1、chapterId=-1 严格判断（已转 int）
+        if (!$practiceMode && $bookId === -1 && $chapterId === -1) {
+            $senseReviewService = app(\App\Services\SenseReviewService::class);
+            $senseCards = $senseReviewService->dueCards($userId, $language);
+
+            foreach ($senseCards as $card) {
+                $serialized = $senseReviewService->serializeCard($card);
+                $serialized['type'] = 'sense';
+                $reviews[] = (object) $serialized;
+            }
+
+            // 统一随机
+            shuffle($reviews);
         }
 
         return $reviews;

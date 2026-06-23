@@ -444,14 +444,34 @@ class WordSenseTest extends TestCase
         $word = $this->createWord('charge');
         $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
         $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
-        $this->wordSenseService->createReviewCardForSense($sense);
+        $senseCard = $this->wordSenseService->createReviewCardForSense($sense);
 
         $reviews = app(ReviewService::class)->getReviewItems($this->user->id, 'english', -1, -1, false, []);
 
-        $this->assertCount(1, $reviews);
-        $this->assertSame($word->id, $reviews[0]['id']);
-        $this->assertSame($wordCard->id, $reviews[0]['review_card_id']);
-        $this->assertSame('word', $reviews[0]['type']);
+        // 全局模式混入 sense cards：两者均应出现
+        $this->assertCount(2, $reviews);
+
+        $types = array_column($reviews, 'type');
+        $this->assertContains('word', $types);
+        $this->assertContains('sense', $types);
+
+        // 验证 word card 仍然存在且正确
+        $wordReview = null;
+        $senseReview = null;
+        foreach ($reviews as $review) {
+            $type = is_array($review) ? ($review['type'] ?? null) : ($review->type ?? null);
+            if ($type === 'word') {
+                $wordReview = $review;
+            }
+            if ($type === 'sense') {
+                $senseReview = $review;
+            }
+        }
+        $this->assertNotNull($wordReview);
+        $this->assertNotNull($senseReview);
+        $this->assertSame($word->id, $wordReview['id']);
+        $this->assertSame($wordCard->id, $wordReview['review_card_id']);
+        $this->assertSame($senseCard->id, $senseReview->review_card_id);
     }
 
     public function test_occurrence_list_returns_only_current_user_language(): void

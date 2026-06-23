@@ -266,6 +266,25 @@
                                 </div>
                             </template>
 
+                            <!-- Sense review -->
+                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'">
+                                <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                    <div class="text-h6 mb-2">{{ reviews[currentReviewIndex].lemma }}</div>
+                                    <div class="text--secondary mb-3">
+                                        {{ reviews[currentReviewIndex].surface_form || reviews[currentReviewIndex].lemma }}
+                                        <span v-if="reviews[currentReviewIndex].pos"> / {{ reviews[currentReviewIndex].pos }}</span>
+                                    </div>
+                                    <v-sheet outlined rounded class="pa-3 mt-2">
+                                        <div class="default-font">
+                                            {{ reviews[currentReviewIndex].example_sentence_en || '（回忆这个词义）' }}
+                                        </div>
+                                    </v-sheet>
+                                    <div class="text-caption text--secondary mt-2">
+                                        这里的 {{ reviews[currentReviewIndex].lemma }} 是什么意思？
+                                    </div>
+                                </div>
+                            </template>
+
                             <!-- Reveal button -->
                             <div class="review-button-box">
                                 <v-btn rounded id="review-reveal-button" color="success" @click="reveal" v-if="!revealed && !newCardAnimation && !backToDeckAnimation && !intoTheCorrectDeckAnimation"><v-icon>mdi-rotate-3d-variant</v-icon> 显示答案</v-btn>
@@ -274,69 +293,105 @@
 
                         <!-- Review card back -->
                         <div id="review-card-back" class="rounded-lg border" :style="{'background-color': backgroundColor}">
-                            <!-- Word review -->
-                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'word'">
-                                <!-- Single word  mode -->
-                                <div class="word selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                    {{ reviews[currentReviewIndex].word }}
-                                </div>
-                            </template>
+                            <!-- Word / Phrase review back (non-sense) -->
+                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type != 'sense'">
+                                <!-- Word review -->
+                                <template v-if="reviews[currentReviewIndex].type == 'word'">
+                                    <!-- Single word  mode -->
+                                    <div class="word selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                        <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
+                                        {{ reviews[currentReviewIndex].word }}
+                                    </div>
+                                </template>
 
-                            <!-- Phrase review -->
-                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'phrase'">
-                                <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <template v-if="languageSpaces">
-                                        {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
-                                    </template>
-                                    <template v-else>
-                                        {{ JSON.parse(reviews[currentReviewIndex].words).join('') }}
-                                    </template>
-                                </div>
-                            </template>
+                                <!-- Phrase review -->
+                                <template v-if="reviews[currentReviewIndex].type == 'phrase'">
+                                    <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                        <template v-if="languageSpaces">
+                                            {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
+                                        </template>
+                                        <template v-else>
+                                            {{ JSON.parse(reviews[currentReviewIndex].words).join('') }}
+                                        </template>
+                                    </div>
+                                </template>
 
-                            <!-- Reading -->
-                            <div class="reading selected-font" v-if="reviews[currentReviewIndex] !== undefined && (language == 'japanese' || language == 'chinese')" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                <!-- Reading -->
+                                <div class="reading selected-font" v-if="(language == 'japanese' || language == 'chinese')" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                    <hr>
+                                    <template v-if="reviews[currentReviewIndex].type == 'word' && reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word_reading }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
+                                    {{ reviews[currentReviewIndex].reading }}
+                                </div>
+
+                                <!-- Example sentence interactive text mode -->
+                                <hr v-if="settings.reviewSentenceMode !== 'disabled'">
+                                <text-block-group
+                                    v-if="revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
+                                    ref="textBlock"
+                                    :key="'text-block-3' + textBlockKey"
+                                    :theme="theme"
+                                    :fullscreen="fullscreen"
+                                    :_text="exampleSentence"
+                                    :language="language"
+                                    :highlight-words="true"
+                                    :plain-text-mode="false"
+                                    :line-spacing="0"
+                                    :font-size="settings.fontSize"
+                                    :vocabulary-hover-box="settings.vocabularyHoverBox"
+                                    :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
+                                    :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
+                                    :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
+                                />
+
+                                <!-- Example sentence plain text mode -->
+                                <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text'">
+                                    <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                        <span
+                                            v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
+                                            :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
+                                        >{{ word.word }}</span>
+                                    </div>
+                                </template>
+
+                                <!-- Translation -->
                                 <hr>
-                                <template v-if="reviews[currentReviewIndex].type == 'word' && reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word_reading }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                {{ reviews[currentReviewIndex].reading }}
-                            </div>
-
-                            <!-- Example sentence interactive text mode -->
-                            <hr v-if="settings.reviewSentenceMode !== 'disabled'">
-                            <text-block-group
-                                v-if="revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
-                                ref="textBlock"
-                                :key="'text-block-3' + textBlockKey"
-                                :theme="theme"
-                                :fullscreen="fullscreen"
-                                :_text="exampleSentence"
-                                :language="language"
-                                :highlight-words="true"
-                                :plain-text-mode="false"
-                                :line-spacing="0"
-                                :font-size="settings.fontSize"
-                                :vocabulary-hover-box="settings.vocabularyHoverBox"
-                                :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
-                                :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
-                                :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
-                            />
-
-                            <!-- Example sentence plain text mode -->
-                            <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
-                                <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <span
-                                        v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                        :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
-                                    >{{ word.word }}</span>
+                                <div id="translation" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                    {{ reviews[currentReviewIndex].translation }}
                                 </div>
                             </template>
 
-                            <!-- Translation -->
-                            <hr>
-                            <div id="translation" v-if="reviews[currentReviewIndex] !== undefined" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                {{ reviews[currentReviewIndex].translation }}
-                            </div>
+                            <!-- Sense review back -->
+                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'">
+                                <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
+                                    <div class="text-h6">{{ reviews[currentReviewIndex].lemma }}</div>
+                                    <div class="text--secondary mb-2">
+                                        <span v-if="reviews[currentReviewIndex].pos">{{ reviews[currentReviewIndex].pos }}</span>
+                                    </div>
+                                    <hr>
+                                    <!-- 中文释义优先，降级到英文释义，再降级到"暂无释义" -->
+                                    <div v-if="reviews[currentReviewIndex].sense_zh" class="mb-3" style="font-size: 24px; font-weight: 600;">
+                                        {{ reviews[currentReviewIndex].sense_zh }}
+                                    </div>
+                                    <div v-else-if="reviews[currentReviewIndex].sense_en" class="mb-3" style="font-size: 24px; font-weight: 600;">
+                                        {{ reviews[currentReviewIndex].sense_en }}
+                                    </div>
+                                    <div v-else class="mb-3" style="font-size: 20px; color: #999;">
+                                        暂无释义
+                                    </div>
+                                    <!-- 英文释义：中文释义存在时作为补充 -->
+                                    <div v-if="reviews[currentReviewIndex].sense_zh && reviews[currentReviewIndex].sense_en" class="mb-2">
+                                        {{ reviews[currentReviewIndex].sense_en }}
+                                    </div>
+                                    <v-sheet outlined rounded class="pa-3 mb-3">
+                                        <div class="default-font">
+                                            {{ reviews[currentReviewIndex].example_sentence_en || '（无例句）' }}
+                                        </div>
+                                        <div v-if="reviews[currentReviewIndex].example_sentence_zh" class="text--secondary mt-1">
+                                            {{ reviews[currentReviewIndex].example_sentence_zh }}
+                                        </div>
+                                    </v-sheet>
+                                </div>
+                            </template>
 
                             <!-- Answer buttons -->
                             <div class="review-button-box">
@@ -464,7 +519,9 @@
                 var text = '';
                 var joinSeparator = this.languageSpaces ? ' ' : '';
 
-                if (this.reviews[this.currentReviewIndex].type == 'phrase') {
+                if (this.reviews[this.currentReviewIndex].type == 'sense') {
+                    text = this.reviews[this.currentReviewIndex].lemma || '';
+                } else if (this.reviews[this.currentReviewIndex].type == 'phrase') {
                     if (this.reviews[this.currentReviewIndex].reading.length) {
                         text = this.reviews[this.currentReviewIndex].reading;
                     } else {
@@ -551,6 +608,11 @@
                 this.newCardAnimation = false;
             },
             countReadWords() {
+                // sense 卡片无单词统计，跳过
+                if (this.reviews[this.currentReviewIndex].type == 'sense') {
+                    return;
+                }
+
                 var wordsToSkip = ['。', '、', ':', '？', '！', '＜', '＞', '：', ' ', '「', '」', '（', '）', '｛', '｝', '≪', '≫', '〈', '〉',
                         '《', '》','【', '】', '『', '』', '〔', '〕', '［', '］', '・', '?', '(', ')', ' ', ' NEWLINE ', '.', '%', '-',
                         '«', '»', "'", '’', '–', 'NEWLINE'];
@@ -637,18 +699,22 @@
                 this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
 
                 this.exampleSentence = null;
-                axios.get('/vocabulary/example-sentence/' + this.reviews[this.currentReviewIndex].type + '/' + this.reviews[this.currentReviewIndex].id).then((response) => {
-                    if (response.data.words !== undefined) {
-                        this.exampleSentence = {
-                            id: 0,
-                            words: response.data.words,
-                            phrases: response.data.phrases,
-                            uniqueWords: response.data.uniqueWords,
-                        };
-                    }
 
-                    this.textBlockKey++;
-                }).catch(() => {});
+                // sense 卡片已在 payload 中自带例句，无需 API 加载
+                if (this.reviews[this.currentReviewIndex].type !== 'sense') {
+                    axios.get('/vocabulary/example-sentence/' + this.reviews[this.currentReviewIndex].type + '/' + this.reviews[this.currentReviewIndex].id).then((response) => {
+                        if (response.data.words !== undefined) {
+                            this.exampleSentence = {
+                                id: 0,
+                                words: response.data.words,
+                                phrases: response.data.phrases,
+                                uniqueWords: response.data.uniqueWords,
+                            };
+                        }
+
+                        this.textBlockKey++;
+                    }).catch(() => {});
+                }
 
                 // update reviewed and read words data
                 axios.post('/reviews/update', {

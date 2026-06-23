@@ -153,12 +153,13 @@
                         icon: 'mdi-check-decagram',
                         bottomNav: false,
                     },
-                    {
-                        name: '词义复习',
-                        url: '/reviews/senses',
-                        icon: 'mdi-brain',
-                        bottomNav: false,
-                    },
+                    // 词义复习入口已合并到单词复习，保留注释供日后恢复
+                    // {
+                    //     name: '词义复习',
+                    //     url: '/reviews/senses',
+                    //     icon: 'mdi-brain',
+                    //     bottomNav: false,
+                    // },
                     {
                         name: '设置',
                         url: '/user-settings',
