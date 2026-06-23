@@ -25,3 +25,6 @@ yarn-error.log
 /public/mix-manifest.json
 /public/fonts/vendor/@mdi/*
 /cache/*tokenizer.log
+
+# Local Claude Code / agent configuration
+.claude/
