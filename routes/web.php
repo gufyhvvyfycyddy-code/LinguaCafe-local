@@ -205,6 +205,9 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
     Route::post('/review-cards/manage/{reviewCard}/due-now', [App\Http\Controllers\ReviewCardManageController::class, 'dueNow']);
+    Route::delete('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'destroy']);
+    Route::post('/review-cards/manage/bulk-enabled', [App\Http\Controllers\ReviewCardManageController::class, 'bulkEnabled']);
+    Route::post('/review-cards/manage/bulk-delete', [App\Http\Controllers\ReviewCardManageController::class, 'bulkDestroy']);
 
     // anki
     Route::post('/anki/add-card', [App\Http\Controllers\AnkiController::class, 'addCardToAnki']);

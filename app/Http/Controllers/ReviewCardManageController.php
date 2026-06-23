@@ -266,6 +266,127 @@ class ReviewCardManageController extends Controller
         return response()->json($this->serializeCard($card->fresh(), $sense));
     }
 
+    /**
+     * DELETE /review-cards/manage/{reviewCard}
+     * Permanently delete a sense review card. Only the review_cards row is removed.
+     * WordSense, WordSenseOccurrence, review_logs, and all other data are preserved.
+     */
+    public function destroy(int $reviewCard): JsonResponse
+    {
+        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+
+        $card->delete();
+
+        return response()->json([
+            'deleted' => true,
+            'review_card_id' => $reviewCard,
+            'word_sense_id' => $sense->id,
+            'message' => '已彻底删除复习卡。词义和阅读记录已保留。',
+        ]);
+    }
+
+    /**
+     * POST /review-cards/manage/bulk-enabled
+     * Bulk archive or restore sense review cards.
+     * Body: { ids: int[], enabled: bool }
+     */
+    public function bulkEnabled(Request $request): JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return response()->json(['message' => '请选择至少一张复习卡。'], 422);
+        }
+
+        $enabled = $request->boolean('enabled');
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $affected = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $card = ReviewCard::query()
+                ->where('id', $id)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('target_type', ReviewCard::TARGET_SENSE)
+                ->whereHas('sense', function ($q) use ($userId, $language) {
+                    $q->where('user_id', $userId)
+                        ->where('language_id', $language)
+                        ->where('status', WordSense::STATUS_CONFIRMED);
+                })
+                ->first();
+
+            if (!$card) {
+                $skipped++;
+                continue;
+            }
+
+            $card->fsrs_enabled = $enabled;
+            $card->save();
+            $affected++;
+        }
+
+        $actionLabel = $enabled ? '恢复' : '归档';
+
+        return response()->json([
+            'affected' => $affected,
+            'skipped' => $skipped,
+            'enabled' => $enabled,
+            'message' => $enabled
+                ? "已恢复 {$affected} 张复习卡。它们会重新进入日常复习。"
+                : "已归档 {$affected} 张复习卡。它们不会进入日常复习。",
+        ]);
+    }
+
+    /**
+     * POST /review-cards/manage/bulk-delete
+     * Bulk permanently delete sense review cards.
+     * Body: { ids: int[] }
+     * Only review_cards rows are removed. WordSense, occurrences, and review_logs are preserved.
+     */
+    public function bulkDestroy(Request $request): JsonResponse
+    {
+        $ids = $request->input('ids', []);
+        if (!is_array($ids) || empty($ids)) {
+            return response()->json(['message' => '请选择至少一张复习卡。'], 422);
+        }
+
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $deleted = 0;
+        $skipped = 0;
+
+        foreach ($ids as $id) {
+            $card = ReviewCard::query()
+                ->where('id', $id)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('target_type', ReviewCard::TARGET_SENSE)
+                ->whereHas('sense', function ($q) use ($userId, $language) {
+                    $q->where('user_id', $userId)
+                        ->where('language_id', $language)
+                        ->where('status', WordSense::STATUS_CONFIRMED);
+                })
+                ->first();
+
+            if (!$card) {
+                $skipped++;
+                continue;
+            }
+
+            $card->delete();
+            $deleted++;
+        }
+
+        return response()->json([
+            'deleted' => $deleted,
+            'skipped' => $skipped,
+            'message' => "已彻底删除 {$deleted} 张复习卡。词义和阅读记录已保留。",
+        ]);
+    }
+
     // ==================== Private helpers ====================
 
     /**

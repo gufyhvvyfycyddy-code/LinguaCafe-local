@@ -1363,6 +1363,500 @@ class ReviewCardManageTest extends TestCase
         $this->assertTrue($items[0]['fsrs_enabled']);
     }
 
+    // ==================== Single Delete Tests ====================
+
+    public function test_destroy_deletes_own_sense_review_card(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $cardId = $card->id;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$cardId}");
+        $response->assertOk();
+        $this->assertTrue($response->json('deleted'));
+        $this->assertSame($cardId, $response->json('review_card_id'));
+
+        // Review card should no longer exist
+        $this->assertNull(ReviewCard::find($cardId));
+    }
+
+    public function test_destroy_preserves_word_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $senseId = $sense->id;
+        $oldLemma = $sense->lemma;
+        $oldSenseZh = $sense->sense_zh;
+        $oldSenseEn = $sense->sense_en;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}");
+        $response->assertOk();
+
+        // WordSense must still exist with all fields intact
+        $freshSense = WordSense::find($senseId);
+        $this->assertNotNull($freshSense);
+        $this->assertSame($oldLemma, $freshSense->lemma);
+        $this->assertSame($oldSenseZh, $freshSense->sense_zh);
+        $this->assertSame($oldSenseEn, $freshSense->sense_en);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $freshSense->status);
+    }
+
+    public function test_destroy_preserves_word_sense_occurrences(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $occ = WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => 1,
+            'sentence_id' => 's1',
+            'sentence_en' => 'test sentence',
+            'sentence_zh' => '测试句子',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => 'test',
+            'lemma' => 'test',
+            'pos' => 'noun',
+            'decision' => 'confirmed',
+            'confidence' => 0.8,
+            'auto_fsrs_allowed' => false,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_SENSE_MAPPING_IMPORT,
+            'raw_payload' => ['decision' => 'confirmed'],
+        ]);
+        $occId = $occ->id;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}");
+        $response->assertOk();
+
+        // Occurrence must still exist
+        $this->assertNotNull(WordSenseOccurrence::find($occId));
+        $this->assertSame('test sentence', WordSenseOccurrence::find($occId)->sentence_en);
+    }
+
+    public function test_destroy_preserves_review_logs(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $log = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => now(),
+            'new_state' => 'review',
+            'source' => 'review',
+        ]);
+        $logId = $log->id;
+        $oldLogCount = ReviewLog::count();
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}");
+        $response->assertOk();
+
+        // ReviewLog is preserved (no FK cascade)
+        $this->assertSame($oldLogCount, ReviewLog::count());
+        $this->assertNotNull(ReviewLog::find($logId));
+    }
+
+    public function test_destroy_cannot_delete_other_user_card(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'other']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $cardId = $otherCard->id;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$cardId}");
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+
+        // Card must still exist
+        $this->assertNotNull(ReviewCard::find($cardId));
+    }
+
+    public function test_destroy_cannot_delete_other_language_card(): void
+    {
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'espanol']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardId = $cardEs->id;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$cardId}");
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+
+        // Card must still exist
+        $this->assertNotNull(ReviewCard::find($cardId));
+    }
+
+    public function test_destroy_cannot_delete_legacy_word_card(): void
+    {
+        $wordCard = $this->createWordCard($this->user->id, 'english', 42);
+        $cardId = $wordCard->id;
+
+        $response = $this->actingAs($this->user)->delete("/review-cards/manage/{$cardId}");
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+
+        // Card must still exist
+        $this->assertNotNull(ReviewCard::find($cardId));
+    }
+
+    public function test_deleted_card_excluded_from_due_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        // Verify in queue before delete
+        $dueBefore = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertContains($card->id, $dueBefore);
+
+        // Delete
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$card->id}")->assertOk();
+
+        // Verify NOT in queue after delete
+        $dueAfter = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertNotContains($card->id, $dueAfter);
+    }
+
+    // ==================== Bulk Enabled (Archive/Restore) Tests ====================
+
+    public function test_bulk_enabled_archives_multiple_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => true]);
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $card2->update(['fsrs_enabled' => true, 'lemma' => 'test2']);
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => false,
+        ]);
+        $response->assertOk();
+        $this->assertSame(2, $response->json('affected'));
+        $this->assertSame(0, $response->json('skipped'));
+        $this->assertFalse($response->json('enabled'));
+
+        $this->assertFalse($card1->fresh()->fsrs_enabled);
+        $this->assertFalse($card2->fresh()->fsrs_enabled);
+    }
+
+    public function test_bulk_enabled_restores_multiple_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => false]);
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $card2->update(['fsrs_enabled' => false, 'lemma' => 'test2']);
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => true,
+        ]);
+        $response->assertOk();
+        $this->assertSame(2, $response->json('affected'));
+        $this->assertSame(0, $response->json('skipped'));
+        $this->assertTrue($response->json('enabled'));
+
+        $this->assertTrue($card1->fresh()->fsrs_enabled);
+        $this->assertTrue($card2->fresh()->fsrs_enabled);
+    }
+
+    public function test_bulk_enabled_skips_other_user_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => true]);
+
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'other']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCard->update(['fsrs_enabled' => true]);
+        $otherCardId = $otherCard->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $otherCardId],
+            'enabled' => false,
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('affected'));
+        $this->assertSame(1, $response->json('skipped'));
+
+        // Own card archived
+        $this->assertFalse($card1->fresh()->fsrs_enabled);
+        // Other user card untouched
+        $this->assertTrue($otherCard->fresh()->fsrs_enabled);
+    }
+
+    public function test_bulk_enabled_skips_other_language_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => true]);
+
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'espanol']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardEs->update(['fsrs_enabled' => true]);
+        $cardEsId = $cardEs->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $cardEsId],
+            'enabled' => false,
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('affected'));
+        $this->assertSame(1, $response->json('skipped'));
+    }
+
+    public function test_bulk_enabled_skips_legacy_word_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => true]);
+
+        $wordCard = $this->createWordCard($this->user->id, 'english', 99);
+        $wordCard->update(['fsrs_enabled' => true]);
+        $wordCardId = $wordCard->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $wordCardId],
+            'enabled' => false,
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('affected'));
+        $this->assertSame(1, $response->json('skipped'));
+
+        // Word card untouched
+        $this->assertTrue($wordCard->fresh()->fsrs_enabled);
+    }
+
+    public function test_bulk_enabled_rejects_empty_ids(): void
+    {
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [],
+            'enabled' => false,
+        ]);
+        $this->assertSame(422, $response->status());
+    }
+
+    public function test_bulk_enabled_preserves_word_senses(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $oldSense1Data = $sense1->fresh()->toArray();
+        $oldSense2Data = $sense2->fresh()->toArray();
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => false,
+        ])->assertOk();
+
+        // WordSenses unchanged
+        $fresh1 = $sense1->fresh();
+        $fresh2 = $sense2->fresh();
+        $this->assertSame($oldSense1Data['sense_zh'], $fresh1->sense_zh);
+        $this->assertSame($oldSense1Data['sense_en'], $fresh1->sense_en);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $fresh1->status);
+        $this->assertSame($oldSense2Data['sense_zh'], $fresh2->sense_zh);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $fresh2->status);
+    }
+
+    // ==================== Bulk Delete Tests ====================
+
+    public function test_bulk_destroy_deletes_multiple_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $card1Id = $card1->id;
+        $card2Id = $card2->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1Id, $card2Id],
+        ]);
+        $response->assertOk();
+        $this->assertSame(2, $response->json('deleted'));
+        $this->assertSame(0, $response->json('skipped'));
+
+        // Cards deleted
+        $this->assertNull(ReviewCard::find($card1Id));
+        $this->assertNull(ReviewCard::find($card2Id));
+    }
+
+    public function test_bulk_destroy_preserves_word_senses(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $sense1Id = $sense1->id;
+        $sense2Id = $sense2->id;
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $card2->id],
+        ])->assertOk();
+
+        // WordSenses preserved
+        $this->assertNotNull(WordSense::find($sense1Id));
+        $this->assertNotNull(WordSense::find($sense2Id));
+        $this->assertSame(WordSense::STATUS_CONFIRMED, WordSense::find($sense1Id)->status);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, WordSense::find($sense2Id)->status);
+    }
+
+    public function test_bulk_destroy_preserves_review_logs(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $log1 = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $card1->id,
+            'rating' => 'good',
+            'reviewed_at' => now(),
+            'new_state' => 'review',
+            'source' => 'review',
+        ]);
+        $log2 = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $card2->id,
+            'rating' => 'again',
+            'reviewed_at' => now(),
+            'new_state' => 'relearning',
+            'source' => 'review',
+        ]);
+
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $card2->id],
+        ])->assertOk();
+
+        // Review logs preserved (no FK cascade)
+        $this->assertSame($oldLogCount, ReviewLog::count());
+        $this->assertNotNull(ReviewLog::find($log1->id));
+        $this->assertNotNull(ReviewLog::find($log2->id));
+    }
+
+    public function test_bulk_destroy_skips_other_user_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'other']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCardId = $otherCard->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $otherCardId],
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('deleted'));
+        $this->assertSame(1, $response->json('skipped'));
+
+        // Own card deleted
+        $this->assertNull(ReviewCard::find($card1->id));
+        // Other user card preserved
+        $this->assertNotNull(ReviewCard::find($otherCardId));
+    }
+
+    public function test_bulk_destroy_skips_other_language_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'espanol']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardEsId = $cardEs->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $cardEsId],
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('deleted'));
+        $this->assertSame(1, $response->json('skipped'));
+
+        $this->assertNotNull(ReviewCard::find($cardEsId));
+    }
+
+    public function test_bulk_destroy_skips_legacy_word_cards(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+
+        $wordCard = $this->createWordCard($this->user->id, 'english', 99);
+        $wordCardId = $wordCard->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $wordCardId],
+        ]);
+        $response->assertOk();
+        $this->assertSame(1, $response->json('deleted'));
+        $this->assertSame(1, $response->json('skipped'));
+
+        // Word card preserved
+        $this->assertNotNull(ReviewCard::find($wordCardId));
+    }
+
+    public function test_bulk_destroy_rejects_empty_ids(): void
+    {
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [],
+        ]);
+        $this->assertSame(422, $response->status());
+    }
+
+    public function test_bulk_destroy_deleted_cards_excluded_from_due_queue(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $card1->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+        $card2->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        // Both in queue before delete
+        $dueBefore = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertContains($card1->id, $dueBefore);
+        $this->assertContains($card2->id, $dueBefore);
+
+        // Bulk delete
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $card2->id],
+        ])->assertOk();
+
+        // Neither in queue after delete
+        $dueAfter = app(\App\Services\SenseReviewService::class)
+            ->dueCards($this->user->id, 'english')
+            ->pluck('id')
+            ->toArray();
+        $this->assertNotContains($card1->id, $dueAfter);
+        $this->assertNotContains($card2->id, $dueAfter);
+    }
+
+    // ==================== Full immutability after failed delete ====================
+
+    public function test_failed_delete_leaves_all_models_unchanged(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'immutableDelete']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $cardId = $otherCard->id;
+
+        $oldCardCount = ReviewCard::count();
+        $oldSenseCount = WordSense::count();
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)->delete("/review-cards/manage/{$cardId}");
+
+        $this->assertSame($oldCardCount, ReviewCard::count());
+        $this->assertSame($oldSenseCount, WordSense::count());
+        $this->assertSame($oldLogCount, ReviewLog::count());
+        $this->assertNotNull(ReviewCard::find($cardId));
+    }
+
     // ==================== Helper ====================
 
     private function createTestSenseCard(): array
