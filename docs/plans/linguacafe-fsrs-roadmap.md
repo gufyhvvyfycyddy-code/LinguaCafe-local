@@ -60,7 +60,7 @@
 | C.13-scout | 新词选项侦察，推荐方案 A（keep_new 参数） |
 | C.13-a | 添加释义时支持"保持新词"选项，payload 加 keep_new boolean，stage===2 且 keep_new=true 时跳过 setStage(-7) |
 | C.14-scout | 复习日志删除语义侦察，确认无外键、JOIN 自动排除孤立日志、UI 文案准确，推荐不做删除功能 |
-| C.18-scout | 阅读页"保持新词"浏览器回归验收，通过 HTTP 层集成测试 + 数据库核验确认闭环 |
+| C.18-a | "保持新词"HTTP/DB 回归验证，确认后端行为、payload、数据库闭环正确；真实浏览器视觉验收待完成 |
 
 ---
 
@@ -175,12 +175,13 @@
 
 **实现文件**：WordSensesList.vue、SenseOccurrenceController.php、WordSenseService.php、WordSenseTest.php。
 
-**C.18-scout 浏览器回归验收**（2026-06-24）：
+**C.18-a HTTP/DB 回归验证**（2026-06-24）：
 - 基础检查：134 个 WordSense 测试全部通过，60 个 ReviewFsrsTest 全部通过，npm run development 编译成功。
 - 验收 A（默认行为 keep_new=false）：通过 HTTP 层集成测试 — payload `keep_new` 不传或 false，response `updated_word.stage=-7`，`stage_changed=true`。DB 确认 stage 从 2 变为 -7。
 - 验收 B（保持新词 keep_new=true）：通过 HTTP 层集成测试 — payload `keep_new=true`，response `updated_word.stage=2`，`stage_changed=false`。DB 确认 stage 保持 2。后续手动 setStage(-7) 成功将词从 New 升级为 Learning 7。
 - 数据库核验：WordSense 创建正确（status=confirmed, encountered_word_id 正确），ReviewCard 创建正确（target_type=sense, fsrs_state=new, fsrs_enabled=1）。
 - 结论：C.13-a 的保持新词功能在后端行为上完全正确，默认行为未退化。
+- ⚠️ **未完成真实浏览器视觉验收**：未验证 checkbox 真实默认状态截图、阅读页 token 颜色变化、/vocabulary/search 视觉显示。这些需要真实浏览器（C.18-b）补充。
 
 ---
 
@@ -211,11 +212,11 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18-scout 已完成。
+以下任务为候选，均未冻结实现。C.18-a HTTP/DB 验证已完成，C.18-b 真实浏览器视觉验收待完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ✅ | C.18-scout | 阅读页"保持新词"浏览器回归验收 | 验收侦察 | 已完成（2026-06-24），HTTP 层集成测试 + 数据库核验均通过 |
+| ★★★★ | C.18-b | 阅读页"保持新词"真实浏览器视觉验收 | 验收 | C.18-a 已通过 HTTP/DB 验证，但仍缺真实浏览器截图、Network DevTools 证据、token 颜色和 /vocabulary/search 视觉确认 |
 | ★★★ | C.15-scout | 复习卡管理页详情抽屉侦察 | 功能侦察 | 管理页已有大量列、编辑、筛选、隐藏、紧凑模式；下一步增强管理页时，详情抽屉比继续塞列更合理 |
 | ★★☆ | C.16-scout | 当前筛选结果导出侦察 | 功能侦察 | 用户可能希望把管理页筛选后的复习卡导出给 GPT/Anki/备份；当前延后中，需重新侦察范围 |
 | ★★☆ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
@@ -223,7 +224,7 @@
 | ★☆☆ | — | 导出当前筛选结果实现 | 功能实现 | 延后，等待 C.16-scout 侦察结果 |
 | ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
 
-**建议下一步**：先做 **C.15-scout** — 复习卡管理页详情抽屉侦察。理由：管理页能力已很丰富，详情抽屉是增强管理页的自然下一步。
+**建议下一步**：先做 **C.18-b** — 阅读页"保持新词"真实浏览器视觉验收。理由：C.13-a 的后端和数据库闭环已通过（C.18-a），但仍缺真实页面颜色、DevTools Network 和词汇页显示证据，不能跳到新功能。
 
 ---
 
@@ -272,6 +273,15 @@
 - 当前 UI 文案准确："复习历史会保留"。
 - 因此不在删除卡片流程中加入 `delete_review_logs`，不加 checkbox，不加 API 参数。
 - 如未来需要清理历史孤立日志，应做独立 `review-logs:prune` artisan 命令，默认 dry-run，远离核心删除流程。
+
+### Decision 5 — 验收证据分级
+
+**日期**：2026-06-24
+
+- **后端/数据闭环证据**：GitHub 代码侦查、自动化测试（php artisan test）、HTTP 层集成测试（Auth::login + Controller 调用）、数据库核验（SQL 查询验证）可以证明后端行为和数据闭环正确。
+- **这些不能替代真实浏览器验收**：自动化测试和 HTTP 层测试无法验证 UI 颜色、checkbox 默认状态、Network DevTools payload、页面跳转行为、词汇页视觉显示。
+- **涉及 UI 的任务必须提供真实浏览器证据**：包括但不限于 checkbox 视觉状态截图、token 颜色变化截图、DevTools Network 面板截图、/vocabulary/search 页面截图。
+- **没有真实浏览器证据时的 roadmap 记录规则**：只能写"HTTP/DB 验证通过，浏览器视觉验收待完成"，不得写"浏览器回归验收完成"或"浏览器验收通过"。
 
 ---
 
