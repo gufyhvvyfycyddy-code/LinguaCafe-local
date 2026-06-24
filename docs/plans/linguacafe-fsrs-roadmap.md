@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`a6f8be0 docs: correct keep-new visual validation status`
+> **当前 latest commit**：`5efe312 feat: show review log history in card details`
 
 ---
 
@@ -66,12 +66,13 @@
 | C.15-a | 管理页详情抽屉第一版，前端-only 展示当前行已有字段，不新增 API |
 | C.16-a | 管理页当前筛选结果 JSON 导出，复用筛选/排序条件，不分页导出，5000 条上限 |
 | C.17-a | 管理页详情抽屉显示最近 20 条 ReviewLog，只读展示 rating/source/FSRS 前后状态 |
+| C.15-b | 详情抽屉显示 aliases_zh / collocations，data/export item 字段同步补齐，只读展示 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`83e0a14 docs: add scout for review log deletion semantics`
+**Latest commit**：`5efe312 feat: show review log history in card details`
 
 ### `/review-cards/manage` 当前能力
 
@@ -241,7 +242,7 @@
 
 ### C.15 — 复习卡管理页详情抽屉
 
-**状态**：C.15-scout 侦察完成（C.12 阶段已间接侦察）；**C.15-a 第一版已完成**。
+**状态**：C.15-scout 侦察完成（C.12 阶段已间接侦察）；**C.15-a 第一版已完成**；**C.15-b 已完成**。
 
 **已完成**：
 - C.15-a：管理页详情抽屉第一版，前端-only。
@@ -254,13 +255,19 @@
   - 抽屉内不提供编辑、归档、恢复、立即到期、重置、删除操作。
   - 不影响表格筛选、排序、分页、列显示设置、紧凑模式。
   - 不影响现有编辑状态和 source dialog。
+- C.15-b：详情抽屉显示 aliases_zh / collocations。
+  - `buildItems()` 返回的 item 新增 `aliases_zh` 和 `collocations` 字段，与 `serializeCard()` 格式一致。
+  - 详情抽屉"释义信息"分区新增"近义译法"和"搭配"两行，使用 v-chip 展示数组内容。
+  - 空数组显示 `—`，前端容错 `null` 值。
+  - `export()` 因复用 `buildItems()`，JSON 导出自然包含这两个字段。
+  - 不新增 API。
+  - 不改 routes。
+  - 不做编辑功能。
+  - 不新增 Route。
+  - 不新增接口。
+  - 不查 ReviewLog。
 
-**未做事项**：
-- 不展示 `aliases_zh` / `collocations`（`/manage/data` 当前未返回这些字段）。
-- 不展示 ReviewLog 历史。
-- 不新增后端接口（纯前端展示）。
-
-**实现文件**：`ReviewCardManage.vue`。
+**实现文件**：`ReviewCardManageController.php`、`ReviewCardManage.vue`、`ReviewCardManageTest.php`。
 
 ---
 
@@ -284,7 +291,6 @@
 - Legacy word card (`target_type=word`)。
 - Rejected WordSense。
 - Source full context（仅在导出中包含 source_chapter_title 和 source_kind）。
-- aliases_zh / collocations（字段未返回给前端，不在导出范围）。
 
 **第一版限制**：
 - 只做 JSON，不做 CSV。
@@ -326,14 +332,13 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.16-a 已完成，C.17-a 已完成。
+以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.15-b 已完成，C.16-a 已完成，C.17-a 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★☆ | C.15-b | 详情抽屉增强（aliases/collocations） | 功能增强 | 第一版详情抽屉和 ReviewLog 展示已完成，后续可新增 aliases/collocations |
 | ★★☆ | C.16-b | 导出增强（CSV / Anki / 字段扩展） | 功能增强 | 第一版 JSON 已完成，后续可根据需要添加 CSV/Anki 格式和更多字段 |
 
-**建议下一步**：**C.15-b** — 详情抽屉增强（aliases/collocations），或 **C.16-b** — 导出增强侦察（CSV/Anki）。C.17-a 已完成，ReviewLog 只读展示已上线。
+**建议下一步**：**C.16-b** — 导出增强侦察（CSV/Anki），或 **roadmap sync**。
 
 ---
 

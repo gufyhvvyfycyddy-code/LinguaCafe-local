@@ -495,6 +495,7 @@ class ReviewCardManageTest extends TestCase
         $requiredFields = [
             'review_card_id', 'word_sense_id', 'lemma', 'surface_form', 'pos',
             'sense_zh', 'sense_en', 'example_sentence_en', 'example_sentence_zh',
+            'aliases_zh', 'collocations',
             'source_chapter_id', 'source_chapter_title', 'source_kind',
             'fsrs_state', 'fsrs_due_at', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled',
             'missing_definition', 'missing_example', 'missing_source',
@@ -503,6 +504,55 @@ class ReviewCardManageTest extends TestCase
         foreach ($requiredFields as $field) {
             $this->assertArrayHasKey($field, $item, "Missing field: {$field}");
         }
+    }
+
+    public function test_manage_data_includes_aliases_and_collocations(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', [
+            'aliases_zh' => ['别名1', '别名2'],
+            'collocations' => ['搭配1', '搭配2'],
+        ]);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+
+        $this->assertArrayHasKey('aliases_zh', $item);
+        $this->assertArrayHasKey('collocations', $item);
+        $this->assertEquals(['别名1', '别名2'], $item['aliases_zh']);
+        $this->assertEquals(['搭配1', '搭配2'], $item['collocations']);
+    }
+
+    public function test_manage_data_returns_empty_arrays_for_missing_aliases_and_collocations(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english');
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+
+        $this->assertEquals([], $item['aliases_zh']);
+        $this->assertEquals([], $item['collocations']);
+    }
+
+    public function test_export_includes_aliases_and_collocations(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', [
+            'aliases_zh' => ['导出别名'],
+            'collocations' => ['导出搭配'],
+        ]);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertArrayHasKey('aliases_zh', $items[0]);
+        $this->assertArrayHasKey('collocations', $items[0]);
+        $this->assertEquals(['导出别名'], $items[0]['aliases_zh']);
+        $this->assertEquals(['导出搭配'], $items[0]['collocations']);
     }
 
     // ==================== PATCH Update Tests ====================

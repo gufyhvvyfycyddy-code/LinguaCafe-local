@@ -440,6 +440,24 @@
                                 <span class="detail-label">中文例句</span>
                                 <span class="detail-value">{{ displayValue(detailTarget.example_sentence_zh) }}</span>
                             </div>
+                            <div class="detail-row">
+                                <span class="detail-label">近义译法</span>
+                                <span class="detail-value">
+                                    <template v-if="Array.isArray(detailTarget.aliases_zh) && detailTarget.aliases_zh.length > 0">
+                                        <v-chip v-for="(alias, i) in detailTarget.aliases_zh" :key="i" x-small class="mr-1">{{ alias }}</v-chip>
+                                    </template>
+                                    <template v-else>—</template>
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">搭配</span>
+                                <span class="detail-value">
+                                    <template v-if="Array.isArray(detailTarget.collocations) && detailTarget.collocations.length > 0">
+                                        <v-chip v-for="(coll, i) in detailTarget.collocations" :key="i" x-small class="mr-1">{{ coll }}</v-chip>
+                                    </template>
+                                    <template v-else>—</template>
+                                </span>
+                            </div>
                         </div>
 
                         <v-divider class="my-3" />

@@ -674,6 +674,8 @@ class ReviewCardManageController extends Controller
                 'fsrs_reps' => $card->fsrs_reps,
                 'fsrs_lapses' => $card->fsrs_lapses,
                 'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
+                'aliases_zh' => $sense->aliases_zh ?: [],
+                'collocations' => $sense->collocations ?: [],
                 'fsrs_enabled' => $card->fsrs_enabled,
                 'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
                 'missing_example' => empty($sense->example_sentence_en),
