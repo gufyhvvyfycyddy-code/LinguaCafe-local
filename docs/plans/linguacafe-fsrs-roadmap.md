@@ -57,6 +57,8 @@
 | C.12-e-a | 管理页列显示/隐藏自定义，localStorage 持久化，默认隐藏 释义(英)、例句(英)、例句(中) |
 | C.12-e-c | 管理页操作列"更多"菜单，低频操作（查看原文/重置/彻底删除）收入菜单 |
 | C.12-e-d | 管理页紧凑模式开关，CSS class 缩小 padding/字体/窄列宽度，standard 1640/compact 1480 |
+| C.13-scout | 新词选项侦察，推荐方案 A（keep_new 参数） |
+| C.13-a | 添加释义时支持"保持新词"选项，payload 加 keep_new boolean，stage===2 且 keep_new=true 时跳过 setStage(-7) |
 
 ---
 
@@ -142,29 +144,21 @@
 
 ---
 
-### C.13-scout — 添加释义时支持"新词"等级选项
+### C.13 — 手动释义"保持新词"选项
 
-**状态**：侦察完成，待冻结实现方案。推荐方案 A：新增 `keep_new=true` 请求参数，阻止 EncounteredWord 从 New 自动升到 Learning 7，仍创建 WordSense 和 sense ReviewCard。
+**状态**：C.13-scout 已完成；C.13-a 已完成。
 
-**侦察结论摘要**：
-- 当前 `WordSensesList.vue` 添加释义表单**无**等级选择器，stage 由后端 `createManualSense()` 自动决定（New→Learning 7）。
-- "新词"选项应只影响 EncounteredWord.stage，不影响 ReviewCard FSRS 初始状态。
-- 实现边界：前端加 checkbox/switch，后端加 `keep_new` 参数，不改 DB，新增 6 个测试。
-- 词汇页中 stage=2 已显示"新词"（Vocabulary.vue:209），无需额外改动。
-- 允许修改：WordSensesList.vue、SenseOccurrenceController.php、WordSenseService.php、WordSenseTest.php。
-- 禁止修改：routes、migration、model fillable、ReviewCardService、TextBlockGroup.vue。
+**已完成**：
+- C.13-scout：字段语义、前后端调用链、stage 状态机分析。
+- C.13-a："保持新词" checkbox。
+  - 前端：`WordSensesList.vue` 添加 "保持新词" v-checkbox，默认不勾选。
+  - payload：新增 `keep_new` boolean 字段。
+  - Controller：验证 `keep_new` 参数（'nullable'/'boolean'）。
+  - Service：`createManualSense()` 在 `stage===2` 且 `keep_new=true` 时跳过 `setStage(-7)`。
+  - 不改 DB，不改 routes，不改 ReviewCardService，不改 EncounteredWord model。
+  - 6 个测试覆盖：keep_new 阻止升级、仍创建 sense & card、默认行为不变、不降级 Learning/Known/Ignored 词。
 
-**已解决的产品语义**：
-1. 只影响 EncounteredWord.stage，不影响 ReviewCard FSRS 初始状态。
-2. 仍创建 confirmed WordSense。
-3. 仍创建 sense review_card。
-4. 该 sense card 仍进入 /senses/review。
-5. 阅读页 token 保持 New 颜色（stage=2，无高亮/蓝灰色）。
-6. 词汇页等级显示"新词"（已有实现）。
-7. 以后可通过阅读页等级按钮改为任意等级（包括 Learning 7）。
-8. 已在 Learning 的词再添加释义时不降级（keep_new 只在 stage===2 时生效）。
-9. "新词"仅影响本次新建释义时的行为，不影响其他已存在的 sense。
-10. 推荐命名为 **"保持新词"**，防止用户误解为"创建新词性"。
+**实现文件**：WordSensesList.vue、SenseOccurrenceController.php、WordSenseService.php、WordSenseTest.php。
 
 ---
 

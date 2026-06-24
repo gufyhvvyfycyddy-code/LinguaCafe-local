@@ -706,6 +706,170 @@ class WordSenseTest extends TestCase
         $this->assertSame(0, $wordCardCount, 'Word review card should NOT be created for already-learning word');
     }
 
+    // ─── Keep new tests ───
+    public function test_keep_new_prevents_stage_change_when_adding_manual_sense(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 2]); // New word
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+            'keep_new' => true,
+        ]);
+
+        $response->assertOk();
+
+        // stage 应保持 2
+        $word->refresh();
+        $this->assertSame(2, $word->stage, 'Stage should remain 2 when keep_new=true');
+        $this->assertSame(2, $response->json('updated_word.stage'));
+        $this->assertFalse($response->json('updated_word.stage_changed'));
+    }
+
+    public function test_keep_new_still_creates_confirmed_word_sense_and_sense_card(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 2]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+            'keep_new' => true,
+        ]);
+
+        $response->assertOk();
+
+        // WordSense 正常创建
+        $sense = WordSense::where('lemma', 'surge')->where('surface_form', 'surged')->first();
+        $this->assertNotNull($sense, 'WordSense should be created even with keep_new=true');
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+
+        // sense ReviewCard 正常创建
+        $this->assertDatabaseHas('review_cards', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'new',
+            'fsrs_enabled' => true,
+        ]);
+
+        // stage 保持 2
+        $word->refresh();
+        $this->assertSame(2, $word->stage);
+    }
+
+    public function test_keep_new_defaults_to_false_changes_stage_to_learning_7(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 2]);
+
+        // 不传 keep_new
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+        ]);
+
+        $response->assertOk();
+
+        $word->refresh();
+        $this->assertSame(-7, $word->stage, 'Stage should change to -7 when keep_new is not provided');
+        $this->assertSame(-7, $response->json('updated_word.stage'));
+        $this->assertTrue($response->json('updated_word.stage_changed'));
+
+        // 传 keep_new=false 应与不传行为一致
+        $word2 = $this->createWord('drop');
+        $word2->update(['stage' => 2]);
+
+        $response2 = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'drop',
+            'surface_form' => 'dropped',
+            'pos' => 'verb',
+            'sense_zh' => '落下',
+            'encountered_word_id' => $word2->id,
+            'keep_new' => false,
+        ]);
+
+        $response2->assertOk();
+        $word2->refresh();
+        $this->assertSame(-7, $word2->stage, 'Stage should change to -7 when keep_new=false');
+    }
+
+    public function test_keep_new_does_not_downgrade_learning_word(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => -5]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+            'keep_new' => true,
+        ]);
+
+        $response->assertOk();
+
+        $word->refresh();
+        $this->assertSame(-5, $word->stage, 'Stage should remain -5 for already-learning word');
+        $this->assertFalse($response->json('updated_word.stage_changed'));
+    }
+
+    public function test_keep_new_does_not_change_known_word_stage(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 0]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+            'keep_new' => true,
+        ]);
+
+        $response->assertOk();
+
+        $word->refresh();
+        $this->assertSame(0, $word->stage, 'Stage should remain 0 for known word');
+        $this->assertNull($response->json('updated_word'),
+            'updated_word should be null for known words');
+    }
+
+    public function test_keep_new_does_not_change_ignored_word_stage(): void
+    {
+        $word = $this->createWord('surge');
+        $word->update(['stage' => 1]);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'surge',
+            'surface_form' => 'surged',
+            'pos' => 'verb',
+            'sense_zh' => '激增',
+            'encountered_word_id' => $word->id,
+            'keep_new' => true,
+        ]);
+
+        $response->assertOk();
+
+        $word->refresh();
+        $this->assertSame(1, $word->stage, 'Stage should remain 1 for ignored word');
+        $this->assertNull($response->json('updated_word'),
+            'updated_word should be null for ignored words');
+    }
+
     public function test_manual_sense_add_allows_multiple_senses_for_same_lemma_grouped_by_pos_data(): void
     {
         $this->actingAs($this->user)->postJson('/senses/manual', [

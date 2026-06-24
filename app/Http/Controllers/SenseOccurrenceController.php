@@ -99,6 +99,7 @@ class SenseOccurrenceController extends Controller
             'sentence_en' => ['nullable', 'string'],
             'sentence_zh' => ['nullable', 'string'],
             'encountered_word_id' => ['nullable', 'integer'],
+            'keep_new' => ['nullable', 'boolean'],
         ]);
 
         $data['aliases_zh'] = $this->normalizeList($request->post('aliases_zh'));

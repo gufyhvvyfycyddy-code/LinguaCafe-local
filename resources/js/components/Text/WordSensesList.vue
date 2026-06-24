@@ -210,6 +210,14 @@
             <v-text-field dense filled rounded hide-details class="mb-2" label="例句（可选）" v-model="newForm.example_sentence_en" />
             <v-text-field dense filled rounded hide-details class="mb-2" label="近义译法，用逗号分隔" v-model="newForm.aliases_zh" />
             <v-text-field dense filled rounded hide-details class="mb-2" label="搭配，用逗号分隔" v-model="newForm.collocations" />
+            <v-checkbox
+                v-model="newForm.keep_new"
+                label="保持新词"
+                dense
+                hide-details
+                class="mb-2"
+            />
+            <div class="text-caption text--secondary mb-2 ml-1">勾选后保存释义和复习卡，但不把该词标记为已学习。</div>
             <div class="d-flex">
                 <v-spacer />
                 <v-btn small text class="mr-2" @click="closeAddForm">取消</v-btn>
@@ -346,6 +354,7 @@ export default {
                 aliases_zh: '',
                 collocations: '',
                 example_sentence_en: '',
+                keep_new: false,
             };
         },
         fetchSenses() {
@@ -453,6 +462,7 @@ export default {
                 sentence_id: sentenceIndex !== null && sentenceIndex !== undefined ? String(sentenceIndex) : null,
                 sentence_en: form.example_sentence_en || sentenceText,
                 encountered_word_id: this.snapshot?.encounteredWordId ?? this.encounteredWordId ?? null,
+                keep_new: form.keep_new === true,
             };
         },
         createSense() {

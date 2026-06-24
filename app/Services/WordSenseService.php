@@ -240,22 +240,35 @@ class WordSenseService
             $this->createManualOccurrence($sense, $card, $data);
 
             // 2. Auto-mark as Learning 7 (word card no longer created)
+            $keepNew = (bool) Arr::get($data, 'keep_new', false);
             $updatedWord = null;
             if ($encounteredWord) {
                 if ($encounteredWord->stage === 2) {
-                    // New (stage=2) → Learning 7
-                    // 只改 stage，不创建 word review_card
-                    $encounteredWord->setStage(-7);
-                    $encounteredWord->save();
+                    if ($keepNew) {
+                        // Keep as New — don't upgrade to Learning 7
+                        $updatedWord = [
+                            'id' => $encounteredWord->id,
+                            'stage' => $encounteredWord->stage,
+                            'word' => $encounteredWord->word,
+                            'base_word' => $encounteredWord->base_word,
+                            'study_base' => $encounteredWord->study_base,
+                            'stage_changed' => false,
+                        ];
+                    } else {
+                        // New (stage=2) → Learning 7
+                        // 只改 stage，不创建 word review_card
+                        $encounteredWord->setStage(-7);
+                        $encounteredWord->save();
 
-                    $updatedWord = [
-                        'id' => $encounteredWord->id,
-                        'stage' => $encounteredWord->stage,
-                        'word' => $encounteredWord->word,
-                        'base_word' => $encounteredWord->base_word,
-                        'study_base' => $encounteredWord->study_base,
-                        'stage_changed' => true,
-                    ];
+                        $updatedWord = [
+                            'id' => $encounteredWord->id,
+                            'stage' => $encounteredWord->stage,
+                            'word' => $encounteredWord->word,
+                            'base_word' => $encounteredWord->base_word,
+                            'study_base' => $encounteredWord->study_base,
+                            'stage_changed' => true,
+                        ];
+                    }
                 } elseif ($encounteredWord->stage < 0) {
                     // Already in Learning: don't change stage, don't create word card
                     $updatedWord = [
