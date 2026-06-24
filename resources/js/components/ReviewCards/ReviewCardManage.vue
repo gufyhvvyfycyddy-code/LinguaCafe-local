@@ -307,6 +307,7 @@
                                 </template>
                                 <template v-else>
                                     <v-btn x-small text @click="startEdit(item)">编辑</v-btn>
+                                    <v-btn x-small text @click="openDetail(item)">详情</v-btn>
                                     <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
                                     <v-btn v-else x-small text color="success" @click="toggleEnabled(item)">恢复</v-btn>
                                     <v-btn v-if="item.fsrs_enabled" x-small text @click="setDueNow(item)">立即到期</v-btn>
@@ -355,6 +356,172 @@
             :language="language"
             :font-size="16"
         />
+
+        <!-- Detail drawer -->
+        <v-navigation-drawer
+            v-model="detailDrawer"
+            right
+            temporary
+            fixed
+            width="420"
+            class="detail-drawer"
+        >
+            <template v-if="detailTarget">
+                <v-card flat>
+                    <v-card-title class="d-flex align-center">
+                        <span>复习卡详情</span>
+                        <v-spacer />
+                        <v-btn icon small @click="closeDetail">
+                            <v-icon>mdi-close</v-icon>
+                        </v-btn>
+                    </v-card-title>
+                    <v-card-subtitle class="pb-0">
+                        {{ detailTarget.lemma }} / {{ detailTarget.surface_form }} / {{ detailTarget.pos }}
+                    </v-card-subtitle>
+                    <v-card-text class="detail-content">
+                        <!-- 基本信息 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">基本信息</div>
+                            <div class="detail-row">
+                                <span class="detail-label">ReviewCard ID</span>
+                                <span class="detail-value">{{ detailTarget.review_card_id }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">WordSense ID</span>
+                                <span class="detail-value">{{ detailTarget.word_sense_id }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Lemma</span>
+                                <span class="detail-value">{{ detailTarget.lemma }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Surface</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.surface_form) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">POS</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.pos) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">状态</span>
+                                <span class="detail-value">
+                                    <v-chip x-small :color="detailTarget.fsrs_enabled ? 'success' : 'grey'">
+                                        {{ detailTarget.fsrs_enabled ? '未归档' : '已归档' }}
+                                    </v-chip>
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">FSRS State</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.fsrs_state) }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- 释义信息 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">释义信息</div>
+                            <div class="detail-row">
+                                <span class="detail-label">中文释义</span>
+                                <span class="detail-value" :class="{ 'text--secondary': detailTarget.missing_definition }">{{ displayValue(detailTarget.sense_zh) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">英文释义</span>
+                                <span class="detail-value" :class="{ 'text--secondary': detailTarget.missing_definition }">{{ displayValue(detailTarget.sense_en) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">英文例句</span>
+                                <span class="detail-value" :class="{ 'text--secondary': detailTarget.missing_example }">{{ displayValue(detailTarget.example_sentence_en) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">中文例句</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.example_sentence_zh) }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- 溯源信息 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">溯源信息</div>
+                            <div class="detail-row">
+                                <span class="detail-label">来源</span>
+                                <span class="detail-value" :class="{ 'text--secondary': detailTarget.missing_source }">
+                                    {{ detailTarget.source_chapter_title || sourceKindLabel(detailTarget.source_kind) }}
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">来源类型</span>
+                                <span class="detail-value">{{ sourceKindLabel(detailTarget.source_kind) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">来源章节 ID</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.source_chapter_id) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">缺溯源</span>
+                                <span class="detail-value">{{ detailTarget.missing_source ? '是' : '否' }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- FSRS 信息 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">FSRS 信息</div>
+                            <div class="detail-row">
+                                <span class="detail-label">到期时间</span>
+                                <span class="detail-value">{{ formatDueAt(detailTarget.fsrs_due_at) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">最近复习</span>
+                                <span class="detail-value">{{ formatLastReviewed(detailTarget.fsrs_last_reviewed_at) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">稳定度</span>
+                                <span class="detail-value">{{ formatFsrsNumber(detailTarget.fsrs_stability) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">难度</span>
+                                <span class="detail-value">{{ formatFsrsNumber(detailTarget.fsrs_difficulty) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">复习次数</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.fsrs_reps, 0) }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">遗忘次数</span>
+                                <span class="detail-value">{{ displayValue(detailTarget.fsrs_lapses, 0) }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- 缺失状态 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">缺失状态</div>
+                            <div class="detail-row">
+                                <span class="detail-label">缺释义</span>
+                                <span class="detail-value">{{ detailTarget.missing_definition ? '是' : '否' }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">缺例句</span>
+                                <span class="detail-value">{{ detailTarget.missing_example ? '是' : '否' }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">缺溯源</span>
+                                <span class="detail-value">{{ detailTarget.missing_source ? '是' : '否' }}</span>
+                            </div>
+                        </div>
+                    </v-card-text>
+                    <v-card-actions>
+                        <v-btn text @click="closeDetail">关闭</v-btn>
+                        <v-spacer />
+                        <v-btn text color="primary" @click="viewSource(detailTarget); closeDetail()">查看原文</v-btn>
+                    </v-card-actions>
+                </v-card>
+            </template>
+        </v-navigation-drawer>
 
         <!-- Archive confirmation dialog -->
         <v-dialog v-model="archiveDialog" max-width="480">
@@ -466,6 +633,8 @@ export default {
             editForm: {},
             sourceDialog: false,
             sourcePayload: {},
+            detailDrawer: false,
+            detailTarget: null,
             archiveDialog: false,
             archiveTarget: null,
             resetDialog: false,
@@ -963,6 +1132,21 @@ export default {
                 });
         },
 
+        openDetail(item) {
+            this.detailTarget = item;
+            this.detailDrawer = true;
+        },
+
+        closeDetail() {
+            this.detailDrawer = false;
+            this.detailTarget = null;
+        },
+
+        displayValue(value, fallback = '—') {
+            if (value === null || value === undefined || value === '') return fallback;
+            return value;
+        },
+
         sourceKindLabel(kind) {
             const labels = {
                 chapter: '章节原文',
@@ -1291,5 +1475,44 @@ export default {
 .manage-table.table--compact .col-last-review { width: 78px; }
 .manage-table.table--compact .col-actions {
     min-width: 145px;
+}
+
+/* Detail drawer */
+.detail-drawer .detail-content {
+    padding-top: 4px;
+}
+
+.detail-section {
+    margin-bottom: 4px;
+}
+
+.detail-section-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: rgba(0, 0, 0, 0.54);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+}
+
+.detail-row {
+    display: flex;
+    align-items: baseline;
+    padding: 4px 0;
+    border-bottom: 1px solid #f5f5f5;
+}
+
+.detail-label {
+    flex: 0 0 100px;
+    font-size: 0.8rem;
+    color: rgba(0, 0, 0, 0.54);
+    white-space: nowrap;
+}
+
+.detail-value {
+    flex: 1;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.87);
+    word-break: break-word;
 }
 </style>
