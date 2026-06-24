@@ -29,6 +29,8 @@ class ReviewCardManageController extends Controller
         'sense_en',
         'example_sentence_en',
         'example_sentence_zh',
+        'aliases_zh',
+        'collocations',
     ];
 
     /**
@@ -235,13 +237,36 @@ class ReviewCardManageController extends Controller
         // Whitelist-only update — set each field individually
         foreach (self::EDITABLE_FIELDS as $field) {
             if ($request->has($field)) {
-                $sense->{$field} = $request->input($field);
+                $value = $request->input($field);
+
+                // Normalize array fields: accept comma-separated strings or arrays
+                if (in_array($field, ['aliases_zh', 'collocations'], true)) {
+                    $value = $this->normalizeArray($value);
+                }
+
+                $sense->{$field} = $value;
             }
         }
 
         $sense->save();
 
         return response()->json($this->serializeCard($card->fresh(), $sense->fresh()));
+    }
+
+    /**
+     * Normalize a value to an array of trimmed, non-empty strings.
+     * Accepts arrays or comma-separated strings.
+     */
+    private function normalizeArray(mixed $values): array
+    {
+        if (!is_array($values)) {
+            $values = explode(',', (string) $values);
+        }
+
+        return array_values(array_filter(
+            array_map(fn ($value) => trim((string) $value), $values),
+            fn ($value) => $value !== ''
+        ));
     }
 
     /**
@@ -485,6 +510,8 @@ class ReviewCardManageController extends Controller
             'sense_en' => $sense->sense_en,
             'example_sentence_en' => $sense->example_sentence_en,
             'example_sentence_zh' => $sense->example_sentence_zh,
+            'aliases_zh' => $sense->aliases_zh ?: [],
+            'collocations' => $sense->collocations ?: [],
             'source_chapter_id' => $sourceChapterId,
             'source_chapter_title' => $sourceChapterTitle,
             'source_kind' => $sourceKind,

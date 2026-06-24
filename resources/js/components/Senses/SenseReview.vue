@@ -26,6 +26,16 @@
                 <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
             </div>
 
+            <!-- Action buttons -->
+            <div class="d-flex justify-end mb-3" style="gap: 8px;">
+                <v-btn small text @click="startEdit">
+                    <v-icon small left>mdi-pencil</v-icon>编辑
+                </v-btn>
+                <v-btn small text color="info" @click="viewSource">
+                    <v-icon small left>mdi-book-open-page-variant</v-icon>查看原文
+                </v-btn>
+            </div>
+
             <v-row dense>
                 <v-col cols="12" md="6">
                     <div class="caption text--secondary">中文释义</div>
@@ -76,11 +86,113 @@
         <v-alert v-else-if="!loading" type="info" dense outlined>
             当前没有到期词义卡。
         </v-alert>
+
+        <!-- Edit dialog -->
+        <v-dialog v-model="editDialog" max-width="600">
+            <v-card>
+                <v-card-title>编辑词义卡片</v-card-title>
+                <v-card-text>
+                    <v-row dense>
+                        <v-col cols="6">
+                            <v-text-field
+                                v-model="editForm.pos"
+                                label="词性"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="6">
+                            <v-text-field
+                                v-model="editForm.sense_zh"
+                                label="中文释义"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="12">
+                            <v-text-field
+                                v-model="editForm.sense_en"
+                                label="英文释义"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="12">
+                            <v-textarea
+                                v-model="editForm.example_sentence_en"
+                                label="英文例句"
+                                dense
+                                hide-details="auto"
+                                rows="2"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="12">
+                            <v-text-field
+                                v-model="editForm.example_sentence_zh"
+                                label="中文例句"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="12">
+                            <v-text-field
+                                v-model="editForm.aliases_zh_text"
+                                label="近义译法（逗号分隔）"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                        <v-col cols="12">
+                            <v-text-field
+                                v-model="editForm.collocations_text"
+                                label="搭配（逗号分隔）"
+                                dense
+                                hide-details="auto"
+                                class="mb-3"
+                            />
+                        </v-col>
+                    </v-row>
+                    <v-alert v-if="editError" type="error" dense outlined class="mt-2">{{ editError }}</v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="cancelEdit">取消</v-btn>
+                    <v-btn color="primary" :loading="editing" @click="saveEdit">保存</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Source context dialog -->
+        <sense-example-dialog
+            v-model="sourceDialog"
+            :payload="sourcePayload"
+            language="english"
+            :font-size="16"
+        />
+
+        <!-- Snackbar -->
+        <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" top>
+            {{ snackbar.text }}
+            <template #action="{ attrs }">
+                <v-btn text v-bind="attrs" @click="snackbar.show = false">关闭</v-btn>
+            </template>
+        </v-snackbar>
     </v-container>
 </template>
 
 <script>
+    import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
+
     export default {
+        components: {
+            SenseExampleDialog,
+        },
         data: function() {
             return {
                 loading: false,
@@ -89,6 +201,28 @@
                 cards: [],
                 summary: {},
                 reviewedCount: 0,
+                // Edit dialog
+                editDialog: false,
+                editing: false,
+                editError: '',
+                editForm: {
+                    pos: '',
+                    sense_zh: '',
+                    sense_en: '',
+                    example_sentence_en: '',
+                    example_sentence_zh: '',
+                    aliases_zh_text: '',
+                    collocations_text: '',
+                },
+                // Source context dialog
+                sourceDialog: false,
+                sourcePayload: {},
+                // Snackbar
+                snackbar: {
+                    show: false,
+                    text: '',
+                    color: 'success',
+                },
             }
         },
         computed: {
@@ -133,6 +267,109 @@
                 }).finally(() => {
                     this.rating = false;
                 });
+            },
+            // ==================== Edit dialog ====================
+            startEdit() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                this.editError = '';
+                this.editForm = {
+                    pos: this.currentCard.pos || '',
+                    sense_zh: this.currentCard.sense_zh || '',
+                    sense_en: this.currentCard.sense_en || '',
+                    example_sentence_en: this.currentCard.example_sentence_en || '',
+                    example_sentence_zh: this.currentCard.example_sentence_zh || '',
+                    aliases_zh_text: Array.isArray(this.currentCard.aliases_zh)
+                        ? this.currentCard.aliases_zh.join(', ')
+                        : '',
+                    collocations_text: Array.isArray(this.currentCard.collocations)
+                        ? this.currentCard.collocations.join(', ')
+                        : '',
+                };
+                this.editDialog = true;
+            },
+            saveEdit() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                this.editing = true;
+                this.editError = '';
+
+                // Build payload: normalize comma-separated text fields to arrays
+                const payload = {
+                    pos: this.editForm.pos,
+                    sense_zh: this.editForm.sense_zh,
+                    sense_en: this.editForm.sense_en,
+                    example_sentence_en: this.editForm.example_sentence_en,
+                    example_sentence_zh: this.editForm.example_sentence_zh,
+                    aliases_zh: this.editForm.aliases_zh_text
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(s => s !== ''),
+                    collocations: this.editForm.collocations_text
+                        .split(',')
+                        .map(s => s.trim())
+                        .filter(s => s !== ''),
+                };
+
+                axios.patch(`/review-cards/manage/${this.currentCard.review_card_id}`, payload)
+                    .then((response) => {
+                        // Update current card with saved data
+                        const saved = response.data;
+                        this.cards[0].pos = saved.pos;
+                        this.cards[0].sense_zh = saved.sense_zh;
+                        this.cards[0].sense_en = saved.sense_en;
+                        this.cards[0].example_sentence_en = saved.example_sentence_en;
+                        this.cards[0].example_sentence_zh = saved.example_sentence_zh;
+                        this.cards[0].aliases_zh = saved.aliases_zh || [];
+                        this.cards[0].collocations = saved.collocations || [];
+                        // Force reactivity
+                        this.cards = [...this.cards];
+                        this.editDialog = false;
+                        this.showSnackbar('已保存词义卡片。', 'success');
+                    })
+                    .catch((err) => {
+                        this.editError = err.response?.data?.message || '词义卡片保存失败。';
+                    })
+                    .finally(() => {
+                        this.editing = false;
+                    });
+            },
+            cancelEdit() {
+                this.editDialog = false;
+                this.editError = '';
+            },
+            // ==================== Source context dialog ====================
+            viewSource() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                const card = {
+                    lemma: this.currentCard.lemma,
+                    surface_form: this.currentCard.surface_form,
+                    sense_zh: this.currentCard.sense_zh,
+                    sense_en: this.currentCard.sense_en,
+                    example_sentence_en: this.currentCard.example_sentence_en,
+                    example_sentence_zh: this.currentCard.example_sentence_zh,
+                };
+
+                axios.get(`/senses/${this.currentCard.word_sense_id}/source-context`)
+                    .then((response) => {
+                        this.sourcePayload = { card: card, context: response.data };
+                        this.sourceDialog = true;
+                    })
+                    .catch(() => {
+                        this.sourcePayload = { card: card, context: null, error: '获取原文失败。' };
+                        this.sourceDialog = true;
+                    });
+            },
+            // ==================== Snackbar ====================
+            showSnackbar(text, color) {
+                this.snackbar = { show: true, text, color };
             },
         }
     }

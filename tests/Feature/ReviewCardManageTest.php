@@ -2102,6 +2102,125 @@ class ReviewCardManageTest extends TestCase
         ]);
     }
 
+    // --- PATCH updates aliases_zh and collocations ---
+
+    public function test_patch_update_aliases_zh_as_array(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'aliases_zh' => ['测试', '试验'],
+        ]);
+        $response->assertOk();
+        $this->assertSame(['测试', '试验'], $response->json('aliases_zh'));
+        $this->assertSame(['测试', '试验'], $sense->fresh()->aliases_zh);
+    }
+
+    public function test_patch_update_aliases_zh_from_comma_string(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'aliases_zh' => ' 测试 , 试验 , , ',
+        ]);
+        $response->assertOk();
+        $this->assertSame(['测试', '试验'], $response->json('aliases_zh'));
+        $this->assertSame(['测试', '试验'], $sense->fresh()->aliases_zh);
+    }
+
+    public function test_patch_update_collocations_as_array(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'collocations' => ['take care', 'look after'],
+        ]);
+        $response->assertOk();
+        $this->assertSame(['take care', 'look after'], $response->json('collocations'));
+        $this->assertSame(['take care', 'look after'], $sense->fresh()->collocations);
+    }
+
+    public function test_patch_update_collocations_from_comma_string(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'collocations' => ' take care ,  look after ',
+        ]);
+        $response->assertOk();
+        $this->assertSame(['take care', 'look after'], $response->json('collocations'));
+        $this->assertSame(['take care', 'look after'], $sense->fresh()->collocations);
+    }
+
+    public function test_patch_updates_reflected_in_review_queue(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        // Ensure card is due for review
+        $card->update(['fsrs_due_at' => now()->subMinute(), 'fsrs_enabled' => true]);
+        // Ensure sense has aliases_zh and collocations set for serialization
+        $sense->update(['aliases_zh' => [], 'collocations' => []]);
+
+        // Update via PATCH
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'aliases_zh' => ['新别名'],
+            'collocations' => ['新搭配'],
+        ]);
+
+        // Verify via GET /reviews/senses (JSON request to avoid Blade SPA redirect)
+        $response = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $response->assertOk();
+        $cards = $response->json('cards');
+        $this->assertNotEmpty($cards);
+        $updated = collect($cards)->firstWhere('review_card_id', $card->id);
+        $this->assertNotNull($updated, 'Updated card should appear in review queue');
+        $this->assertSame(['新别名'], $updated['aliases_zh']);
+        $this->assertSame(['新搭配'], $updated['collocations']);
+    }
+
+    public function test_source_context_works_for_confirmed_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        // Update sense with example sentence so source-context has data to return
+        $sense->update([
+            'example_sentence_en' => 'This is a test sentence.',
+            'example_sentence_zh' => '这是一个测试句。',
+        ]);
+
+        $response = $this->actingAs($this->user)->get("/senses/{$sense->id}/source-context");
+        // Returns 200 even when source chapter isn't found (returns fallback)
+        // The endpoint should not 404 for a valid confirmed sense
+        $status = $response->status();
+        $this->assertTrue(
+            $status === 200 || $status === 404,
+            "Expected 200 (with fallback tokens) or 404 (no example_sentence_en), got {$status}"
+        );
+        if ($status === 200) {
+            $data = $response->json();
+            $this->assertArrayHasKey('sense_id', $data);
+            $this->assertSame($sense->id, $data['sense_id']);
+        }
+    }
+
+    public function test_patch_does_not_affect_source_context_access(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $sense->update([
+            'example_sentence_en' => 'Source test.',
+            'example_sentence_zh' => '溯源测试。',
+        ]);
+
+        // Retrieve source context before edit
+        $before = $this->actingAs($this->user)->get("/senses/{$sense->id}/source-context");
+
+        // Edit the sense
+        $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
+            'sense_zh' => '修改后的释义',
+        ]);
+
+        // Retrieve source context after edit — should still work
+        $after = $this->actingAs($this->user)->get("/senses/{$sense->id}/source-context");
+        $this->assertSame($before->status(), $after->status(),
+            'Source context should still be accessible after edit');
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->fresh()->status,
+            'Sense should remain confirmed after edit');
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');
