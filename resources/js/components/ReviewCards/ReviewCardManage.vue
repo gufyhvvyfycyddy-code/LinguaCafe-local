@@ -64,6 +64,36 @@
                     @change="changePerPage"
                 />
             </v-col>
+            <v-col cols="6" sm="3" md="1" class="d-flex align-center justify-end">
+                <v-menu offset-y :close-on-content-click="false">
+                    <template #activator="{ on, attrs }">
+                        <v-btn small text v-bind="attrs" v-on="on">
+                            <v-icon small left>mdi-cog</v-icon>列设置
+                            <v-chip v-if="hasHiddenColumns" x-small color="primary" class="ml-1" label>已隐藏</v-chip>
+                        </v-btn>
+                    </template>
+                    <v-card min-width="220">
+                        <v-card-text class="pa-2">
+                            <div class="text-caption text--secondary mb-2">选择要显示的列：</div>
+                            <v-checkbox
+                                v-for="col in configurableColumns"
+                                :key="col.key"
+                                v-model="col.visible"
+                                :label="col.label"
+                                dense
+                                hide-details
+                                class="ma-0 py-1"
+                                @change="toggleColumnVisibility(col.key)"
+                            />
+                            <v-divider class="my-2" />
+                            <div class="d-flex" style="gap: 4px;">
+                                <v-btn x-small text @click="resetColumnDefaults">恢复默认</v-btn>
+                                <v-btn x-small text @click="showAllColumns">全部显示</v-btn>
+                            </div>
+                        </v-card-text>
+                    </v-card>
+                </v-menu>
+            </v-col>
         </v-row>
 
         <!-- Advanced Filter Panel -->
@@ -165,7 +195,7 @@
         <!-- Cards table -->
         <v-card class="manage-table-card">
             <div class="table-wrapper">
-                <table class="manage-table">
+                <table class="manage-table" :style="{ minWidth: tableMinWidth }">
                     <thead>
                         <tr>
                             <th class="col-check">
@@ -178,22 +208,22 @@
                                     @change="toggleSelectAll"
                                 />
                             </th>
-                            <th class="col-id sortable" @click="toggleSort('id')">ID <span class="sort-icon">{{ sortIcon('id') }}</span></th>
+                            <th class="col-id sortable" @click="toggleSort('id')" v-if="isColumnVisible('id')">ID <span class="sort-icon">{{ sortIcon('id') }}</span></th>
                             <th class="col-lemma">Lemma</th>
-                            <th class="col-surface">Surface</th>
-                            <th class="col-pos">POS</th>
+                            <th class="col-surface" v-if="isColumnVisible('surface_form')">Surface</th>
+                            <th class="col-pos" v-if="isColumnVisible('pos')">POS</th>
                             <th class="col-def">释义(中)</th>
-                            <th class="col-def">释义(英)</th>
-                            <th class="col-example">例句(英)</th>
-                            <th class="col-example">例句(中)</th>
-                            <th class="col-source">溯源</th>
+                            <th class="col-def" v-if="isColumnVisible('sense_en')">释义(英)</th>
+                            <th class="col-example" v-if="isColumnVisible('example_sentence_en')">例句(英)</th>
+                            <th class="col-example" v-if="isColumnVisible('example_sentence_zh')">例句(中)</th>
+                            <th class="col-source" v-if="isColumnVisible('source')">溯源</th>
                             <th class="col-status sortable" @click="toggleSort('fsrs_state')">状态 <span class="sort-icon">{{ sortIcon('fsrs_state') }}</span></th>
-                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
-                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
-                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_reps')">复习 <span class="sort-icon">{{ sortIcon('fsrs_reps') }}</span></th>
-                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_lapses')">遗忘 <span class="sort-icon">{{ sortIcon('fsrs_lapses') }}</span></th>
-                            <th class="col-last-review sortable" @click="toggleSort('fsrs_last_reviewed_at')">最近复习 <span class="sort-icon">{{ sortIcon('fsrs_last_reviewed_at') }}</span></th>
-                            <th class="col-due sortable" @click="toggleSort('fsrs_due_at')">到期 <span class="sort-icon">{{ sortIcon('fsrs_due_at') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_stability')" v-if="isColumnVisible('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')" v-if="isColumnVisible('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_reps')" v-if="isColumnVisible('fsrs_reps')">复习 <span class="sort-icon">{{ sortIcon('fsrs_reps') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_lapses')" v-if="isColumnVisible('fsrs_lapses')">遗忘 <span class="sort-icon">{{ sortIcon('fsrs_lapses') }}</span></th>
+                            <th class="col-last-review sortable" @click="toggleSort('fsrs_last_reviewed_at')" v-if="isColumnVisible('fsrs_last_reviewed_at')">最近复习 <span class="sort-icon">{{ sortIcon('fsrs_last_reviewed_at') }}</span></th>
+                            <th class="col-due sortable" @click="toggleSort('fsrs_due_at')" v-if="isColumnVisible('fsrs_due_at')">到期 <span class="sort-icon">{{ sortIcon('fsrs_due_at') }}</span></th>
                             <th class="col-actions">操作</th>
                         </tr>
                     </thead>
@@ -209,10 +239,10 @@
                                     @change="toggleItem(item.review_card_id)"
                                 />
                             </td>
-                            <td class="col-id">{{ item.review_card_id }}</td>
+                            <td class="col-id" v-if="isColumnVisible('id')">{{ item.review_card_id }}</td>
                             <td class="col-lemma">{{ item.lemma }}</td>
-                            <td class="col-surface">{{ item.surface_form }}</td>
-                            <td class="col-pos">
+                            <td class="col-surface" v-if="isColumnVisible('surface_form')">{{ item.surface_form }}</td>
+                            <td class="col-pos" v-if="isColumnVisible('pos')">
                                 <template v-if="editingId === item.review_card_id">
                                     <v-text-field v-model="editForm.pos" dense hide-details class="edit-field" />
                                 </template>
@@ -224,25 +254,25 @@
                                 </template>
                                 <template v-else>{{ item.sense_zh || '—' }}</template>
                             </td>
-                            <td class="col-def" :class="{ 'text--secondary': item.missing_definition }">
+                            <td class="col-def" :class="{ 'text--secondary': item.missing_definition }" v-if="isColumnVisible('sense_en')">
                                 <template v-if="editingId === item.review_card_id">
                                     <v-text-field v-model="editForm.sense_en" dense hide-details class="edit-field" />
                                 </template>
                                 <template v-else>{{ item.sense_en || '—' }}</template>
                             </td>
-                            <td class="col-example" :class="{ 'text--secondary': item.missing_example }">
+                            <td class="col-example" :class="{ 'text--secondary': item.missing_example }" v-if="isColumnVisible('example_sentence_en')">
                                 <template v-if="editingId === item.review_card_id">
                                     <v-textarea v-model="editForm.example_sentence_en" dense hide-details rows="2" class="edit-field" />
                                 </template>
                                 <template v-else>{{ item.example_sentence_en || '—' }}</template>
                             </td>
-                            <td class="col-example">
+                            <td class="col-example" v-if="isColumnVisible('example_sentence_zh')">
                                 <template v-if="editingId === item.review_card_id">
                                     <v-text-field v-model="editForm.example_sentence_zh" dense hide-details class="edit-field" />
                                 </template>
                                 <template v-else>{{ item.example_sentence_zh || '—' }}</template>
                             </td>
-                            <td class="col-source" :class="{ 'text--secondary': item.missing_source }">
+                            <td class="col-source" :class="{ 'text--secondary': item.missing_source }" v-if="isColumnVisible('source')">
                                 {{ item.source_chapter_title || sourceKindLabel(item.source_kind) }}
                             </td>
                             <td class="col-status">
@@ -251,12 +281,12 @@
                                 </v-chip>
                                 <span class="text-caption d-block">{{ item.fsrs_state }}</span>
                             </td>
-                            <td class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_stability) }}</td>
-                            <td class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_difficulty) }}</td>
-                            <td class="col-fsrs text-center">{{ item.fsrs_reps || 0 }}</td>
-                            <td class="col-fsrs text-center">{{ item.fsrs_lapses || 0 }}</td>
-                            <td class="col-last-review text-center">{{ formatLastReviewed(item.fsrs_last_reviewed_at) }}</td>
-                            <td class="col-due">
+                            <td class="col-fsrs text-center" v-if="isColumnVisible('fsrs_stability')">{{ formatFsrsNumber(item.fsrs_stability) }}</td>
+                            <td class="col-fsrs text-center" v-if="isColumnVisible('fsrs_difficulty')">{{ formatFsrsNumber(item.fsrs_difficulty) }}</td>
+                            <td class="col-fsrs text-center" v-if="isColumnVisible('fsrs_reps')">{{ item.fsrs_reps || 0 }}</td>
+                            <td class="col-fsrs text-center" v-if="isColumnVisible('fsrs_lapses')">{{ item.fsrs_lapses || 0 }}</td>
+                            <td class="col-last-review text-center" v-if="isColumnVisible('fsrs_last_reviewed_at')">{{ formatLastReviewed(item.fsrs_last_reviewed_at) }}</td>
+                            <td class="col-due" v-if="isColumnVisible('fsrs_due_at')">
                                 <span class="text-caption">{{ formatDueAt(item.fsrs_due_at) }}</span>
                             </td>
                             <td class="col-actions">
@@ -278,7 +308,7 @@
                             </td>
                         </tr>
                         <tr v-if="!loading && items.length === 0">
-                            <td colspan="18" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
+                            <td :colspan="visibleColumnCount" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
                         </tr>
                     </tbody>
                 </table>
@@ -384,6 +414,7 @@
 <script>
 import axios from 'axios';
 import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
+import { DefaultLocalStorageManager } from '../../services/LocalStorageManagerService.js';
 
 export default {
     components: {
@@ -461,6 +492,46 @@ export default {
                 reviewed_today: 0,
                 reset_count: 0,
             },
+            // Column visibility settings
+            columnSettings: {},
+            columnSettingsLoaded: false,
+            columnDefaults: {
+                id: true,
+                surface_form: true,
+                pos: true,
+                sense_en: false,
+                example_sentence_en: false,
+                example_sentence_zh: false,
+                source: true,
+                fsrs_stability: true,
+                fsrs_difficulty: true,
+                fsrs_reps: true,
+                fsrs_lapses: true,
+                fsrs_last_reviewed_at: true,
+                fsrs_due_at: true,
+            },
+            pinnedColumnKeys: [
+                'checkbox',
+                'lemma',
+                'sense_zh',
+                'fsrs_state',
+                'actions',
+            ],
+            configurableColumnDefs: [
+                { key: 'id', label: 'ID' },
+                { key: 'surface_form', label: 'Surface' },
+                { key: 'pos', label: 'POS' },
+                { key: 'sense_en', label: '释义(英)' },
+                { key: 'example_sentence_en', label: '例句(英)' },
+                { key: 'example_sentence_zh', label: '例句(中)' },
+                { key: 'source', label: '溯源' },
+                { key: 'fsrs_stability', label: '稳定度' },
+                { key: 'fsrs_difficulty', label: '难度' },
+                { key: 'fsrs_reps', label: '复习' },
+                { key: 'fsrs_lapses', label: '遗忘' },
+                { key: 'fsrs_last_reviewed_at', label: '最近复习' },
+                { key: 'fsrs_due_at', label: '到期' },
+            ],
         };
     },
     computed: {
@@ -504,8 +575,30 @@ export default {
                 || this.advancedFilters.repsMin !== null
                 || this.advancedFilters.lapsesMin !== null;
         },
+        configurableColumns() {
+            return this.configurableColumnDefs.map(def => ({
+                ...def,
+                visible: this.isColumnVisible(def.key),
+            }));
+        },
+        hasHiddenColumns() {
+            return this.configurableColumns.some(col => !col.visible);
+        },
+        visibleColumnCount() {
+            const pinnedVisible = this.pinnedColumnKeys.length;
+            const configVisible = Object.values(this.columnSettings).filter(Boolean).length;
+            return pinnedVisible + configVisible;
+        },
+        tableMinWidth() {
+            let width = 1700;
+            if (!this.isColumnVisible('sense_en')) width -= 100;
+            if (!this.isColumnVisible('example_sentence_en')) width -= 140;
+            if (!this.isColumnVisible('example_sentence_zh')) width -= 140;
+            return width + 'px';
+        },
     },
     mounted() {
+        this.loadColumnSettings();
         this.loadData();
         this.loadFsrsStats();
     },
@@ -933,6 +1026,70 @@ export default {
             this.clearSelection();
             this.loadData();
         },
+
+        // Column visibility methods
+        isColumnVisible(key) {
+            // Pinned columns are always visible
+            if (this.pinnedColumnKeys.includes(key)) return true;
+            // Configurable columns: check settings, default to visible if not yet loaded
+            if (this.columnSettings.hasOwnProperty(key)) {
+                return this.columnSettings[key];
+            }
+            // Fallback: use default
+            return this.columnDefaults.hasOwnProperty(key) ? this.columnDefaults[key] : true;
+        },
+
+        loadColumnSettings() {
+            try {
+                const saved = DefaultLocalStorageManager.loadSetting('reviewCardManageColumnSettings');
+                if (saved && typeof saved === 'object') {
+                    // Merge with defaults — any missing key gets the default value
+                    this.columnSettings = { ...this.columnDefaults, ...saved };
+                } else {
+                    this.columnSettings = { ...this.columnDefaults };
+                }
+            } catch (e) {
+                // Corrupted localStorage — fall back to defaults
+                this.columnSettings = { ...this.columnDefaults };
+            }
+            this.columnSettingsLoaded = true;
+            this.ensureVisibleSortColumn();
+        },
+
+        saveColumnSettings() {
+            try {
+                DefaultLocalStorageManager.saveSetting('reviewCardManageColumnSettings', this.columnSettings);
+            } catch (e) {
+                // localStorage full or unavailable — silently ignore
+            }
+        },
+
+        toggleColumnVisibility(key) {
+            if (this.pinnedColumnKeys.includes(key)) return;
+            this.$set(this.columnSettings, key, !this.isColumnVisible(key));
+            this.saveColumnSettings();
+            this.ensureVisibleSortColumn();
+        },
+
+        resetColumnDefaults() {
+            this.columnSettings = { ...this.columnDefaults };
+            this.saveColumnSettings();
+            this.ensureVisibleSortColumn();
+        },
+
+        showAllColumns() {
+            for (const key of Object.keys(this.columnSettings)) {
+                this.$set(this.columnSettings, key, true);
+            }
+            this.saveColumnSettings();
+        },
+
+        ensureVisibleSortColumn() {
+            if (!this.isColumnVisible(this.sortBy)) {
+                this.sortBy = 'id';
+                this.sortDir = 'desc';
+            }
+        },
     },
 };
 </script>
@@ -966,7 +1123,6 @@ export default {
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    min-width: 1700px;
 }
 
 .manage-table thead {
