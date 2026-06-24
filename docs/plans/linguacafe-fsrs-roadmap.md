@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`5efe312 feat: show review log history in card details`
+> **当前 latest commit**：`9d931de feat: show aliases and collocations in card details`
 
 ---
 
@@ -72,7 +72,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`5efe312 feat: show review log history in card details`
+**Latest commit**：`9d931de feat: show aliases and collocations in card details`
 
 ### `/review-cards/manage` 当前能力
 
@@ -332,13 +332,17 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.15-b 已完成，C.16-a 已完成，C.17-a 已完成。
+以下任务为候选，均未冻结实现。C.15 系列已完成，C.16-a 已完成，C.17-a 已完成，C.18 系列已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★☆ | C.16-b | 导出增强（CSV / Anki / 字段扩展） | 功能增强 | 第一版 JSON 已完成，后续可根据需要添加 CSV/Anki 格式和更多字段 |
+| ★★★ | C.20-a | 管理页 JSON 导出字段选择 | 小功能 | JSON 导出已完成，下一步只允许用户选择导出字段，不做 CSV/Anki |
+| ★★☆ | C.21-scout | Anki 导出格式侦察 | 功能侦察 | Anki 涉及模板、字段、卡型，不应直接实现 |
+| ★★☆ | C.22-scout | CSV 导出侦察 | 功能侦察 | CSV 涉及换行、逗号、Excel 编码、字段选择，需要独立侦察 |
+| ★★ | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 | UI/体验侦察 | 当前只读列表可用，但 rating/state/source 可中文化 |
+| ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
 
-**建议下一步**：**C.16-b** — 导出增强侦察（CSV/Anki），或 **roadmap sync**。
+**建议下一步**：**C.20-a** — 管理页 JSON 导出字段选择。理由：C.16-a 已完成 JSON 全量筛选导出，C.15-b 已补齐 aliases/collocations 字段；字段选择是最小增量，不进入 CSV/Anki 大任务。
 
 ---
 
