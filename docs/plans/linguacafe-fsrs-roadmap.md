@@ -62,7 +62,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`da9cc75 feat: move review card actions into more menu`
+**Latest commit**：`f10bd75 feat: add compact mode to review card manager`
 
 ### `/review-cards/manage` 当前能力
 
@@ -144,25 +144,27 @@
 
 ### C.13-scout — 添加释义时支持"新词"等级选项
 
-**状态**：侦察阶段，待冻结
+**状态**：侦察完成，待冻结实现方案。推荐方案 A：新增 `keep_new=true` 请求参数，阻止 EncounteredWord 从 New 自动升到 Learning 7，仍创建 WordSense 和 sense ReviewCard。
 
-**来源**：用户希望在选中单词添加释义时，在目前"几级"的基础上，增加一个"新词"选项。
+**侦察结论摘要**：
+- 当前 `WordSensesList.vue` 添加释义表单**无**等级选择器，stage 由后端 `createManualSense()` 自动决定（New→Learning 7）。
+- "新词"选项应只影响 EncounteredWord.stage，不影响 ReviewCard FSRS 初始状态。
+- 实现边界：前端加 checkbox/switch，后端加 `keep_new` 参数，不改 DB，新增 6 个测试。
+- 词汇页中 stage=2 已显示"新词"（Vocabulary.vue:209），无需额外改动。
+- 允许修改：WordSensesList.vue、SenseOccurrenceController.php、WordSenseService.php、WordSenseTest.php。
+- 禁止修改：routes、migration、model fillable、ReviewCardService、TextBlockGroup.vue。
 
-**已知代码事实**：
-- 当前 `WordSenseService::createManualSense()` 创建手动释义后，会把 New 的 EncounteredWord 自动标记为 Learning 7，即 `stage=-7`。
-- "新词"选项可能意味着：仍创建 confirmed WordSense 和 sense review_card，但 EncounteredWord 保持 New，或恢复为 New。
-- 该需求会影响阅读页点词弹窗、手动释义请求 payload、`WordSenseService::createManualSense()`、EncounteredWord stage 语义和阅读页颜色刷新。
-- 需要先 scout，不直接开发。
-
-**待侦察问题**：
-1. 现有"几级"选择 UI 在哪个 Vue 组件。
-2. 现有请求 payload 是否传 level/stage。
-3. "新词"是否只影响 EncounteredWord.stage，还是也影响 sense review_card 的 FSRS 初始状态。
-4. 选择"新词"后，是否仍要创建 sense review_card。
-5. 选择"新词"后，`/senses/review` 是否应该出现该 sense card。
-6. 选择"新词"后，阅读页 token 是否保持 New 颜色。
-7. 选择"新词"后，词汇页等级是否显示 New。
-8. 与 C.8-fix-2（删除最后一个词义后恢复 New）是否一致。
+**已解决的产品语义**：
+1. 只影响 EncounteredWord.stage，不影响 ReviewCard FSRS 初始状态。
+2. 仍创建 confirmed WordSense。
+3. 仍创建 sense review_card。
+4. 该 sense card 仍进入 /senses/review。
+5. 阅读页 token 保持 New 颜色（stage=2，无高亮/蓝灰色）。
+6. 词汇页等级显示"新词"（已有实现）。
+7. 以后可通过阅读页等级按钮改为任意等级（包括 Learning 7）。
+8. 已在 Learning 的词再添加释义时不降级（keep_new 只在 stage===2 时生效）。
+9. "新词"仅影响本次新建释义时的行为，不影响其他已存在的 sense。
+10. 推荐命名为 **"保持新词"**，防止用户误解为"创建新词性"。
 
 ---
 
