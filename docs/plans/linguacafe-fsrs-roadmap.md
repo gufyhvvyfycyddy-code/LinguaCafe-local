@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-24
-> **当前 latest commit**：`b716712 feat: show last reviewed in review card manager`
+> **当前 latest commit**：`da9cc75 feat: move review card actions into more menu`
 
 ---
 
@@ -61,7 +61,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`c29530a feat: filter review card manager by fsrs fields`
+**Latest commit**：`da9cc75 feat: move review card actions into more menu`
 
 ### `/review-cards/manage` 当前能力
 
