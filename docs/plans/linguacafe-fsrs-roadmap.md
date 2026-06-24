@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-24
-> **当前 latest commit**：待 C.12-d-a 完成后更新
+> **当前 latest commit**：`b716712 feat: show last reviewed in review card manager`
 
 ---
 
