@@ -162,30 +162,28 @@
 
 ---
 
-### C.14-scout — 删除复习记录语义侦察
+### C.14 — 删除复习记录语义
 
-**状态**：侦察阶段，待冻结
+**状态**：C.14-scout 侦察完成，推荐 A — 不做删除 ReviewLog 功能。
 
-**来源**：用户希望在删除复习卡时，增加可以删除复习记录的功能。但如果删除释义卡片后，该单词记录已永久删除，则不需要。
+**侦察关键事实**：
+1. `review_logs.review_card_id` **无外键约束**（migration 仅建 index，无 `->constrained()` 或 `->onDelete()`）。删除 ReviewCard 时 ReviewLog **不会被 cascade 删除**，日志作为孤立记录保留在 DB。
+2. `ReviewStatsService::baseLogQuery()` 通过 `join('review_cards')` 过滤 ReviewLog → **已删除 ReviewCard 的日志自动被统计排除**（JOIN 无匹配行）。
+3. `WordSenseService::removeSenseFromReviewSystem()` 注释明确 "Does NOT delete review_logs"，控制器 `destroy()` 返回消息 "复习历史已保留"。
+4. 测试 `test_destroy_preserves_review_logs()` 和 `test_bulk_destroy_preserves_review_logs()` 断言删除后 ReviewLog 数量不变。
+5. **当前 UI 文案准确**："阅读材料、原文位置和复习历史会保留" — 与代码行为一致。
+6. **当前系统已正确且安全**：孤立日志不污染统计、不造成数据异常、不引入额外风险。
 
-**已知代码事实**：
-- 当前 `WordSenseService::removeSenseFromReviewSystem()` 明确不删除 review_logs。
-- 当前硬删除释义卡时，会 reject WordSense，并删除 ReviewCard，但不删除 ReviewLog。
-- 当前不删除 EncounteredWord，只在删除最后一个 active sense 后把 EncounteredWord 恢复为 New。
-- ReviewLog 有 review_card_id，但 ReviewLog 没有 target_type 字段。
-- 如果 ReviewCard 被删除，ReviewLog 可能保留为历史记录或形成不可直接关联的记录。
+**推荐方案 A — 不做删除 ReviewLog 功能**。
 
-**待侦察问题**：
-1. 删除 ReviewCard 后 review_logs 是否仍保留。
-2. `review_logs.review_card_id` 是否有外键约束，是否 cascade。
-3. 当前统计接口是否还会统计已删除卡的 review_logs。
-4. 管理页删除提示"复习记录不会被删除"是否准确。
-5. 是否要增加"同时删除复习记录" checkbox。
-6. 是否要新增接口参数 `delete_review_logs=true`。
-7. 是否只允许单卡删除时删除日志，还是批量删除也支持。
-8. 删除 review_logs 是否影响 C.11 stats、reviewed_today、reset_count。
-9. 删除日志后是否需要审计提示。
-10. 是否需要二次确认文案。
+理由：
+- 数据安全：当前设计天然防止 stats 污染，加入删除日志功能会引入误删风险。
+- 统计正确性：`baseLogQuery()` 的 JOIN 保证只有活跃 ReviewCard 的日志被统计，是最优雅的设计。
+- 不可恢复性：ReviewLog 记录了 FSRS 状态快照（previous_*/new_* 字段），是不可替代的历史数据，硬删除后无法重建。
+- 最低风险：不新增 API 参数、不新增 checkbox、不需要 migration、不修改测试。
+- 文案已准确：无需修正。
+
+**如果未来确实需要删除日志**（例如清理 3 年以上的孤立日志），建议作为独立的 `review-logs:prune` artisan 命令开发，而非嵌入删除卡片流程。
 
 ---
 
