@@ -37,6 +37,9 @@
                 <v-btn small text color="warning" :loading="archiveLoading" @click="openArchiveDialog">
                     <v-icon small left>mdi-archive</v-icon>归档
                 </v-btn>
+                <v-btn small text color="primary" :loading="resetLoading" @click="openResetDialog">
+                    <v-icon small left>mdi-restore</v-icon>重置
+                </v-btn>
                 <v-btn small text color="error" :loading="deleteLoading" @click="openDeleteDialog">
                     <v-icon small left>mdi-delete</v-icon>彻底删除
                 </v-btn>
@@ -82,10 +85,10 @@
             </v-row>
 
             <div class="d-flex justify-center flex-wrap mt-6">
-                <v-btn depressed rounded color="error" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('again')">忘了</v-btn>
-                <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('hard')">勉强记得</v-btn>
-                <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('good')">记得</v-btn>
-                <v-btn depressed rounded color="success" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('easy')">很熟</v-btn>
+                <v-btn depressed rounded color="error" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('again')">忘了</v-btn>
+                <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('hard')">勉强记得</v-btn>
+                <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('good')">记得</v-btn>
+                <v-btn depressed rounded color="success" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('easy')">很熟</v-btn>
             </div>
         </v-card>
 
@@ -189,6 +192,24 @@
             </v-card>
         </v-dialog>
 
+        <!-- Reset confirmation dialog -->
+        <v-dialog v-model="resetDialog" max-width="500">
+            <v-card>
+                <v-card-title>重置为新学卡</v-card-title>
+                <v-card-text>
+                    <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
+                    <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
+                    <p>重置后，这张卡会立即重新进入复习队列。</p>
+                    <p class="font-weight-bold">确定重置吗？</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
+                    <v-btn color="primary" :loading="resetLoading" @click="resetCard">确认重置</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Delete confirmation dialog -->
         <v-dialog v-model="deleteDialog" max-width="480">
             <v-card>
@@ -253,6 +274,9 @@
                 // Archive dialog
                 archiveDialog: false,
                 archiveLoading: false,
+                // Reset dialog
+                resetDialog: false,
+                resetLoading: false,
                 // Delete dialog
                 deleteDialog: false,
                 deleteLoading: false,
@@ -433,6 +457,32 @@
                 }).finally(() => {
                     this.archiveLoading = false;
                 });
+            },
+            // ==================== Reset ====================
+            openResetDialog() {
+                if (!this.currentCard) {
+                    return;
+                }
+                this.resetDialog = true;
+            },
+            resetCard() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                this.resetLoading = true;
+                axios.post(`/review-cards/manage/${this.currentCard.review_card_id}/reset`)
+                    .then((response) => {
+                        this.resetDialog = false;
+                        this.showSnackbar(response.data?.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
+                        this.loadCards();
+                    })
+                    .catch((err) => {
+                        this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
+                    })
+                    .finally(() => {
+                        this.resetLoading = false;
+                    });
             },
             // ==================== Delete ====================
             openDeleteDialog() {
