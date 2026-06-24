@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-24
-> **当前 latest commit**：`da9cc75 feat: move review card actions into more menu`
+> **当前 latest commit**：`83e0a14 docs: add scout for review log deletion semantics`
 
 ---
 
@@ -59,12 +59,13 @@
 | C.12-e-d | 管理页紧凑模式开关，CSS class 缩小 padding/字体/窄列宽度，standard 1640/compact 1480 |
 | C.13-scout | 新词选项侦察，推荐方案 A（keep_new 参数） |
 | C.13-a | 添加释义时支持"保持新词"选项，payload 加 keep_new boolean，stage===2 且 keep_new=true 时跳过 setStage(-7) |
+| C.14-scout | 复习日志删除语义侦察，确认无外键、JOIN 自动排除孤立日志、UI 文案准确，推荐不做删除功能 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`f10bd75 feat: add compact mode to review card manager`
+**Latest commit**：`83e0a14 docs: add scout for review log deletion semantics`
 
 ### `/review-cards/manage` 当前能力
 
@@ -75,8 +76,21 @@
 - **分页**：`page` + `per_page`（默认 20，最大 100）。
 - **FSRS stats chips**：总词义卡、启用中、已归档、当前到期、新卡、学习中、复习中、重新学习、今日已复习、今日重置。
 - **表格列**：checkbox、ID、Lemma、Surface、POS、中文释义、英文释义、英文例句、中文例句、溯源、状态（fsrs_state + 归档 chip）、稳定度、难度、复习（reps）、遗忘（lapses）、最近复习、到期（due_at）、操作。
-- **操作**：行内编辑（POS/释义/例句白名单）、查看原文、归档/恢复、立即到期、重置为新学卡、彻底删除、批量归档/恢复/删除。
+- **操作**：行内编辑（POS/释义/例句白名单）、归档/恢复、立即到期，以及"更多"菜单（查看原文、重置为新学卡、彻底删除），批量归档/恢复/删除。
 - **列显示自定义**：列设置按钮，可隐藏/显示列，localStorage 持久化。常驻列（checkbox、Lemma、释义(中)、状态、操作）不可隐藏。默认隐藏 释义(英)、例句(英)、例句(中)。支持恢复默认和全部显示。
+- **紧凑模式**：列设置菜单中的 v-switch，localStorage 持久化。通过 CSS class `table--compact` 缩小 padding/字体/窄列宽度。标准 tableMinWidth 1640，紧凑 1480。"恢复默认"同时关闭紧凑模式。
+
+### 手动添加释义（阅读页）
+
+- **保持新词**：手动添加释义表单中的 "保持新词" v-checkbox。勾选后保存释义和复习卡，但不把该词的 EncounteredWord 从 New (stage=2) 升级为 Learning 7 (stage=-7)。
+- **实现**：前端 `WordSensesList.vue` → `keep_new` boolean payload → Controller 验证 `'keep_new' => ['nullable', 'boolean']` → `WordSenseService::createManualSense()` 在 `stage===2` 且 `keep_new=true` 时跳过 `setStage(-7)`。
+- **安全边界**：keep_new 仅对 stage===2 (New) 生效；已进入 Learning (stage<0)、Known (stage=0)、Ignored (stage=1) 的词不受影响。
+
+### 复习日志删除语义（C.14）
+
+- **结论**：不做 ReviewLog 删除功能。当前设计已正确且安全。
+- **关键事实**：`review_logs.review_card_id` 无外键约束（删除 ReviewCard 不 cascade 删除日志）。`ReviewStatsService::baseLogQuery()` 通过 JOIN review_cards 自动排除孤立日志。`WordSenseService::removeSenseFromReviewSystem()` 明确保留 ReviewLog。
+- **UI 准确性**：删除弹窗文案 "复习历史会保留" 与代码行为完全一致，无需修正。
 
 ### 安全边界（强制）
 
@@ -187,6 +201,24 @@
 
 ---
 
+### 下一阶段候选任务
+
+以下任务为候选，均未冻结实现。推荐下一步先做 C.18-scout，因为这是对刚完成的 C.13-a 的真实页面验证，风险最低。
+
+| 优先级 | 编号 | 内容 | 类型 | 理由 |
+|--------|------|------|------|------|
+| ★★★★ | C.18-scout | 阅读页"保持新词"浏览器回归验收 | 验收侦察 | C.13-a 刚完成，须用真实页面颜色、Network payload 和词汇页等级确认闭环，不立刻开新功能 |
+| ★★★ | C.15-scout | 复习卡管理页详情抽屉侦察 | 功能侦察 | 管理页已有大量列、编辑、筛选、隐藏、紧凑模式；下一步增强管理页时，详情抽屉比继续塞列更合理 |
+| ★★☆ | C.16-scout | 当前筛选结果导出侦察 | 功能侦察 | 用户可能希望把管理页筛选后的复习卡导出给 GPT/Anki/备份；当前延后中，需重新侦察范围 |
+| ★★☆ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
+| ★☆☆ | — | 卡片详情抽屉实现 | 功能实现 | 延后，等待 C.15-scout 侦察结果 |
+| ★☆☆ | — | 导出当前筛选结果实现 | 功能实现 | 延后，等待 C.16-scout 侦察结果 |
+| ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
+
+**建议下一步**：先做 **C.18-scout** — 阅读页"保持新词"浏览器回归验收。理由：C.13-a 刚完成，必须在真实阅读页中验证颜色变化、词汇页等级显示和 Network payload 闭环，而不是立刻开新功能。
+
+---
+
 ## 六、延后项目
 
 以下项目暂不做：
@@ -221,6 +253,17 @@
 **日期**：2026-06-24
 
 **原因**：C.12-d-a 后管理页列数达到 18 列，用户浏览器验收时确认关键列需要横向滚动才能看到。用户明确提出 `释义(英)`、`例句(英)`、`例句(中)` 可以不显示，并要求后续支持自定义列显示/隐藏和表头宽度调整。因此加入 C.12-e-scout，不立即开发，先进入大计划。
+
+### Decision 4 — C.14 不做 ReviewLog 删除功能
+
+**日期**：2026-06-24
+
+- C.14-scout 确认 `review_logs.review_card_id` 无外键约束，删除 ReviewCard 后日志保留为孤立记录。
+- `ReviewStatsService::baseLogQuery()` 通过 JOIN review_cards 自动排除孤立日志，统计不受影响。
+- `WordSenseService::removeSenseFromReviewSystem()` 明确保留 ReviewLog，控制器消息 "复习历史已保留" 与代码行为一致。
+- 当前 UI 文案准确："复习历史会保留"。
+- 因此不在删除卡片流程中加入 `delete_review_logs`，不加 checkbox，不加 API 参数。
+- 如未来需要清理历史孤立日志，应做独立 `review-logs:prune` artisan 命令，默认 dry-run，远离核心删除流程。
 
 ---
 
