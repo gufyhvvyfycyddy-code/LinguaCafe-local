@@ -58,6 +58,37 @@ class ReviewCardManageController extends Controller
     private const EXPORT_LIMIT = 5000;
 
     /**
+     * Whitelist of allowed export field keys.
+     */
+    private const EXPORT_FIELDS = [
+        'review_card_id',
+        'word_sense_id',
+        'lemma',
+        'surface_form',
+        'pos',
+        'sense_zh',
+        'sense_en',
+        'example_sentence_en',
+        'example_sentence_zh',
+        'aliases_zh',
+        'collocations',
+        'source_chapter_id',
+        'source_chapter_title',
+        'source_kind',
+        'fsrs_state',
+        'fsrs_due_at',
+        'fsrs_stability',
+        'fsrs_difficulty',
+        'fsrs_reps',
+        'fsrs_lapses',
+        'fsrs_last_reviewed_at',
+        'fsrs_enabled',
+        'missing_definition',
+        'missing_example',
+        'missing_source',
+    ];
+
+    /**
      * GET /review-cards/manage/data
      * Read-only paginated list of sense review cards for current user/language.
      */
@@ -111,6 +142,31 @@ class ReviewCardManageController extends Controller
         $cards = $query->get();
         $items = $this->buildItems($cards, $userId, $language);
 
+        // Field selection
+        $requestedFields = $request->input('fields', []);
+        if (!is_array($requestedFields)) {
+            $requestedFields = [];
+        }
+
+        $selectedFields = [];
+        if (!empty($requestedFields)) {
+            $validFields = array_intersect($requestedFields, self::EXPORT_FIELDS);
+            if (empty($validFields)) {
+                return response()->json([
+                    'message' => '请选择至少一个有效导出字段。',
+                    'allowed_fields' => self::EXPORT_FIELDS,
+                ], 422);
+            }
+            $selectedFields = array_values($validFields);
+
+            $items = $items->map(fn ($item) => array_intersect_key(
+                $item,
+                array_flip($selectedFields)
+            ));
+        } else {
+            $selectedFields = self::EXPORT_FIELDS;
+        }
+
         $filters = [
             'q' => trim($request->input('q', '')),
             'filter' => $request->input('filter', 'enabled'),
@@ -126,6 +182,7 @@ class ReviewCardManageController extends Controller
             'exported_at' => now()->toISOString(),
             'language' => $language,
             'filters' => $filters,
+            'fields' => $selectedFields,
             'count' => $items->count(),
             'items' => $items,
         ];

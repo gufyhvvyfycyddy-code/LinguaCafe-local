@@ -67,6 +67,7 @@
 | C.16-a | 管理页当前筛选结果 JSON 导出，复用筛选/排序条件，不分页导出，5000 条上限 |
 | C.17-a | 管理页详情抽屉显示最近 20 条 ReviewLog，只读展示 rating/source/FSRS 前后状态 |
 | C.15-b | 详情抽屉显示 aliases_zh / collocations，data/export item 字段同步补齐，只读展示 |
+| C.20-a | 管理页 JSON 导出字段选择，fields[] 白名单导出，不改变筛选/排序/分页逻辑 |
 
 ---
 
@@ -327,6 +328,32 @@
 - 最多 20 条。
 
 **实现文件**：`routes/web.php`, `ReviewCardManageController.php`, `ReviewCardManage.vue`, `ReviewCardManageTest.php`。
+
+---
+
+### C.20 — 管理页 JSON 导出字段选择
+
+**状态**：C.20-a 已完成。
+
+**已完成**：
+- C.20-a：管理页 JSON 导出字段选择。
+  - 后端 `EXPORT_FIELDS` 白名单常量，`export()` 支持 `fields[]` 参数。
+  - 不传 `fields` 时导出默认全部字段。
+  - 传入 `fields[]` 时只保留白名单字段。
+  - 全部无效字段返回 422（含 `allowed_fields`）。
+  - 顶层 metadata 新增 `fields` 数组。
+  - 前端导出按钮改为 v-menu，标题"选择导出字段"。
+  - 菜单内 24 个字段 checkbox，中文 label。
+  - 全选 / 恢复默认 / 导出 JSON 三个按钮。
+  - 未选字段时前端阻止导出并 snackbar 提示。
+  - 不影响表格列设置、详情抽屉、筛选、分页。
+  - 不做 CSV。
+  - 不做 Anki。
+  - 不做 ReviewLog 导出。
+  - 不新增数据库结构。
+  - 5 个测试覆盖：默认全部字段、选定字段过滤、过滤无效字段、全无效返回 422、metadata 记录字段。
+
+**实现文件**：`ReviewCardManageController.php`、`ReviewCardManage.vue`、`ReviewCardManageTest.php`。
 
 ---
 

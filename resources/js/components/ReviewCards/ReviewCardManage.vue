@@ -65,9 +65,35 @@
                 />
             </v-col>
             <v-col cols="6" sm="3" md="1" class="d-flex align-center justify-end">
-                <v-btn small text :loading="exportLoading" @click="exportCurrentFilter" class="mr-1">
-                    <v-icon small left>mdi-download</v-icon>导出
-                </v-btn>
+                <v-menu offset-y :close-on-content-click="false" max-height="500">
+                    <template #activator="{ on, attrs }">
+                        <v-btn small text :loading="exportLoading" v-bind="attrs" v-on="on" class="mr-1">
+                            <v-icon small left>mdi-download</v-icon>导出
+                        </v-btn>
+                    </template>
+                    <v-card min-width="240">
+                        <v-card-title class="text-subtitle-2 pa-3 pb-0">选择导出字段</v-card-title>
+                        <v-card-text class="pa-2" style="max-height: 360px; overflow-y: auto;">
+                            <v-checkbox
+                                v-for="opt in exportFieldOptions"
+                                :key="opt.key"
+                                v-model="exportFields"
+                                :value="opt.key"
+                                :label="opt.label"
+                                dense
+                                hide-details
+                                class="ma-0 py-1"
+                            />
+                        </v-card-text>
+                        <v-divider />
+                        <v-card-actions class="pa-2">
+                            <v-btn x-small text @click="selectAllExportFields">全选</v-btn>
+                            <v-btn x-small text @click="resetExportFields">恢复默认</v-btn>
+                            <v-spacer />
+                            <v-btn x-small color="primary" @click="exportCurrentFilter">导出 JSON</v-btn>
+                        </v-card-actions>
+                    </v-card>
+                </v-menu>
                 <v-menu offset-y :close-on-content-click="false">
                     <template #activator="{ on, attrs }">
                         <v-btn small text v-bind="attrs" v-on="on">
@@ -788,6 +814,33 @@ export default {
             compactMode: false,
             // Export
             exportLoading: false,
+            exportFieldOptions: [
+                { key: 'review_card_id', label: 'ReviewCard ID' },
+                { key: 'word_sense_id', label: 'WordSense ID' },
+                { key: 'lemma', label: 'Lemma' },
+                { key: 'surface_form', label: 'Surface' },
+                { key: 'pos', label: 'POS' },
+                { key: 'sense_zh', label: '中文释义' },
+                { key: 'sense_en', label: '英文释义' },
+                { key: 'example_sentence_en', label: '英文例句' },
+                { key: 'example_sentence_zh', label: '中文例句' },
+                { key: 'aliases_zh', label: '近义译法' },
+                { key: 'collocations', label: '搭配' },
+                { key: 'source_chapter_title', label: '来源章节' },
+                { key: 'source_kind', label: '来源类型' },
+                { key: 'fsrs_state', label: 'FSRS 状态' },
+                { key: 'fsrs_due_at', label: '到期时间' },
+                { key: 'fsrs_stability', label: '稳定度' },
+                { key: 'fsrs_difficulty', label: '难度' },
+                { key: 'fsrs_reps', label: '复习次数' },
+                { key: 'fsrs_lapses', label: '遗忘次数' },
+                { key: 'fsrs_last_reviewed_at', label: '最近复习' },
+                { key: 'fsrs_enabled', label: '是否启用' },
+                { key: 'missing_definition', label: '缺释义' },
+                { key: 'missing_example', label: '缺例句' },
+                { key: 'missing_source', label: '缺溯源' },
+            ],
+            exportFields: [],
         };
     },
     computed: {
@@ -858,6 +911,7 @@ export default {
         this.loadCompactMode();
         this.loadData();
         this.loadFsrsStats();
+        this.initExportFields();
     },
     methods: {
         loadFsrsStats() {
@@ -1227,7 +1281,23 @@ export default {
                 });
         },
 
+        initExportFields() {
+            this.exportFields = this.exportFieldOptions.map(o => o.key);
+        },
+
+        selectAllExportFields() {
+            this.exportFields = this.exportFieldOptions.map(o => o.key);
+        },
+
+        resetExportFields() {
+            this.initExportFields();
+        },
+
         exportCurrentFilter() {
+            if (!this.exportFields || this.exportFields.length === 0) {
+                this.snackbar = { show: true, text: '请至少选择一个导出字段。', color: 'error' };
+                return;
+            }
             this.exportLoading = true;
             axios.get('/review-cards/manage/export', {
                 params: {
@@ -1239,6 +1309,7 @@ export default {
                     due_range: this.advancedFilters.dueRange,
                     reps_min: this.advancedFilters.repsMin,
                     lapses_min: this.advancedFilters.lapsesMin,
+                    fields: this.exportFields,
                 },
                 responseType: 'blob',
             })

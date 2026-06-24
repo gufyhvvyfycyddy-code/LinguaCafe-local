@@ -3525,6 +3525,100 @@ class ReviewCardManageTest extends TestCase
         $this->assertEmpty($items);
     }
 
+    public function test_export_defaults_to_all_fields_when_fields_omitted(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'allFields',
+            'aliases_zh' => ['别名'],
+            'collocations' => ['搭配'],
+        ]);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $item = $response->json('items.0');
+
+        $this->assertArrayHasKey('lemma', $item);
+        $this->assertArrayHasKey('sense_zh', $item);
+        $this->assertArrayHasKey('aliases_zh', $item);
+        $this->assertArrayHasKey('collocations', $item);
+        $this->assertArrayHasKey('fsrs_state', $item);
+        $this->assertArrayHasKey('fsrs_stability', $item);
+        $this->assertEquals('allFields', $item['lemma']);
+        $this->assertEquals(['别名'], $item['aliases_zh']);
+        $this->assertEquals(['搭配'], $item['collocations']);
+    }
+
+    public function test_export_respects_selected_fields(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'selectedFields']);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?fields[]=lemma&fields[]=sense_zh');
+        $response->assertOk();
+        $item = $response->json('items.0');
+
+        // Only selected fields present
+        $this->assertArrayHasKey('lemma', $item);
+        $this->assertArrayHasKey('sense_zh', $item);
+        // Unselected fields absent
+        $this->assertArrayNotHasKey('example_sentence_en', $item);
+        $this->assertArrayNotHasKey('fsrs_state', $item);
+        $this->assertArrayNotHasKey('review_card_id', $item);
+        $this->assertArrayNotHasKey('aliases_zh', $item);
+        $this->assertCount(2, $item);
+    }
+
+    public function test_export_ignores_invalid_fields(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'ignoreInvalid']);
+        $this->createSenseCard($sense);
+
+        // fields[]=lemma (valid) + fields[]=hack (invalid) → only lemma returned
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?fields[]=lemma&fields[]=hack');
+        $response->assertOk();
+        $item = $response->json('items.0');
+        $this->assertArrayHasKey('lemma', $item);
+        $this->assertArrayNotHasKey('hack', $item);
+        $this->assertCount(1, $item);
+    }
+
+    public function test_export_rejects_when_all_fields_invalid(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'allInvalid']);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?fields[]=hack');
+        $response->assertStatus(422);
+
+        $data = $response->json();
+        $this->assertArrayHasKey('message', $data);
+        $this->assertArrayHasKey('allowed_fields', $data);
+        $this->assertSame('请选择至少一个有效导出字段。', $data['message']);
+        $this->assertContains('lemma', $data['allowed_fields']);
+        $this->assertContains('sense_zh', $data['allowed_fields']);
+    }
+
+    public function test_export_metadata_contains_selected_fields(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'metaFields']);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?fields[]=lemma&fields[]=sense_zh&fields[]=aliases_zh');
+        $response->assertOk();
+
+        $fields = $response->json('fields');
+        $this->assertIsArray($fields);
+        $this->assertCount(3, $fields);
+        $this->assertContains('lemma', $fields);
+        $this->assertContains('sense_zh', $fields);
+        $this->assertContains('aliases_zh', $fields);
+
+        // Only selected fields in items
+        $item = $response->json('items.0');
+        $this->assertCount(3, $item);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');
