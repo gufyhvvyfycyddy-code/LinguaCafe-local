@@ -3034,6 +3034,229 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame('mine', $items[0]['lemma']);
     }
 
+    // ==================== Export Tests ====================
+
+    public function test_export_returns_json_with_metadata_and_items(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'exportTest']);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+
+        $data = $response->json();
+        $this->assertArrayHasKey('exported_at', $data);
+        $this->assertArrayHasKey('language', $data);
+        $this->assertArrayHasKey('filters', $data);
+        $this->assertArrayHasKey('count', $data);
+        $this->assertArrayHasKey('items', $data);
+        $this->assertSame('english', $data['language']);
+        $this->assertSame(1, $data['count']);
+        $this->assertCount(1, $data['items']);
+    }
+
+    public function test_export_excludes_legacy_word_cards(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'senseCard']);
+        $this->createSenseCard($sense);
+        $this->createWordCard($this->user->id, 'english', 999);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('senseCard', $items[0]['lemma']);
+    }
+
+    public function test_export_excludes_other_user_cards(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'myCard']);
+        $this->createSenseCard($sense);
+
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'otherCard']);
+        $this->createSenseCard($otherSense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('myCard', $items[0]['lemma']);
+    }
+
+    public function test_export_excludes_other_language_cards(): void
+    {
+        $senseEn = $this->createSense($this->user->id, 'english', ['lemma' => 'englishCard']);
+        $this->createSenseCard($senseEn);
+
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'spanishCard']);
+        $this->createSenseCard($senseEs);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('englishCard', $items[0]['lemma']);
+    }
+
+    public function test_export_excludes_rejected_word_senses(): void
+    {
+        $confirmed = $this->createSense($this->user->id, 'english', ['lemma' => 'confirmed', 'status' => WordSense::STATUS_CONFIRMED]);
+        $this->createSenseCard($confirmed);
+
+        $rejected = $this->createSense($this->user->id, 'english', ['lemma' => 'rejected', 'status' => WordSense::STATUS_REJECTED]);
+        $this->createSenseCard($rejected);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('confirmed', $items[0]['lemma']);
+    }
+
+    public function test_export_respects_filter_enabled(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'enabledExport']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_enabled' => true]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabledExport', 'sense_key' => hash('sha256', 'english|disabledExport|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_enabled' => false]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=enabled');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('enabledExport', $items[0]['lemma']);
+        $this->assertTrue($items[0]['fsrs_enabled']);
+    }
+
+    public function test_export_respects_filter_disabled(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'enExp']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_enabled' => true]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disExp', 'sense_key' => hash('sha256', 'english|disExp|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_enabled' => false]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=disabled');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('disExp', $items[0]['lemma']);
+        $this->assertFalse($items[0]['fsrs_enabled']);
+    }
+
+    public function test_export_respects_search_query(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'searchableExport']);
+        $this->createSenseCard($sense1);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'other', 'sense_key' => hash('sha256', 'english|other|noun|测试|test')]);
+        $this->createSenseCard($sense2);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?q=searchableExport');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('searchableExport', $items[0]['lemma']);
+        $this->assertSame('searchableExport', $response->json('filters.q'));
+    }
+
+    public function test_export_respects_advanced_filters_fsrs_states(): void
+    {
+        $senseNew = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
+        $cardNew = $this->createSenseCard($senseNew);
+        $cardNew->update(['fsrs_state' => 'new']);
+
+        $senseReview = $this->createSense($this->user->id, 'english', ['lemma' => 'reviewCard', 'sense_key' => hash('sha256', 'english|reviewCard|noun|测试|test')]);
+        $cardReview = $this->createSenseCard($senseReview);
+        $cardReview->update(['fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('newCard', $items[0]['lemma']);
+        $this->assertSame('new', $items[0]['fsrs_state']);
+    }
+
+    public function test_export_respects_advanced_filters_reps_min(): void
+    {
+        $senseLow = $this->createSense($this->user->id, 'english', ['lemma' => 'lowReps']);
+        $cardLow = $this->createSenseCard($senseLow);
+        $cardLow->update(['fsrs_reps' => 2, 'fsrs_state' => 'review']);
+
+        $senseHigh = $this->createSense($this->user->id, 'english', ['lemma' => 'highReps', 'sense_key' => hash('sha256', 'english|highReps|noun|测试|test')]);
+        $cardHigh = $this->createSenseCard($senseHigh);
+        $cardHigh->update(['fsrs_reps' => 10, 'fsrs_state' => 'review']);
+
+        // reps_min=5 should only return the card with 10 reps
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=all&reps_min=5');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('highReps', $items[0]['lemma']);
+    }
+
+    public function test_export_respects_sorting(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'aaa']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_state' => 'review', 'fsrs_reps' => 1]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'zzz', 'sense_key' => hash('sha256', 'english|zzz|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_state' => 'review', 'fsrs_reps' => 3]);
+
+        // Sort by fsrs_reps desc: zzz (3) should come before aaa (1)
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=all&sort_by=fsrs_reps&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        $this->assertSame('zzz', $items[0]['lemma']);
+        $this->assertSame('aaa', $items[1]['lemma']);
+    }
+
+    public function test_export_filters_array_in_response(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'filterTest']);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?q=filterTest&filter=enabled&sort_by=id&sort_dir=desc');
+        $response->assertOk();
+        $filters = $response->json('filters');
+        $this->assertSame('filterTest', $filters['q']);
+        $this->assertSame('enabled', $filters['filter']);
+        $this->assertSame('id', $filters['sort_by']);
+        $this->assertSame('desc', $filters['sort_dir']);
+    }
+
+    public function test_export_does_not_paginate(): void
+    {
+        // Create 25 cards — should all appear in export (no pagination)
+        for ($i = 0; $i < 25; $i++) {
+            $sense = $this->createSense($this->user->id, 'english', [
+                'lemma' => "card{$i}",
+                'sense_key' => hash('sha256', "english|card{$i}|noun|测试|test"),
+            ]);
+            $this->createSenseCard($sense);
+        }
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=all');
+        $response->assertOk();
+        $this->assertSame(25, $response->json('count'));
+        $this->assertCount(25, $response->json('items'));
+    }
+
+    public function test_export_requires_auth(): void
+    {
+        $response = $this->get('/review-cards/manage/export');
+        $this->assertTrue($response->status() === 302 || $response->status() === 401);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

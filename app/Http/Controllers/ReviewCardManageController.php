@@ -52,6 +52,11 @@ class ReviewCardManageController extends Controller
     ];
 
     /**
+     * Maximum number of cards that can be exported in a single request.
+     */
+    private const EXPORT_LIMIT = 5000;
+
+    /**
      * GET /review-cards/manage/data
      * Read-only paginated list of sense review cards for current user/language.
      */
@@ -59,203 +64,15 @@ class ReviewCardManageController extends Controller
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
-
         $perPage = min((int) $request->input('per_page', 20), 100);
-        $filter = $request->input('filter', 'enabled');
-        $q = trim($request->input('q', ''));
 
-        // Base query — all security constraints baked in via whereHas
-        $query = ReviewCard::query()
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
-            ->where('review_cards.target_type', ReviewCard::TARGET_SENSE)
-            ->whereHas('sense', function ($subQuery) use ($userId, $language) {
-                $subQuery->where('user_id', $userId)
-                    ->where('language_id', $language)
-                    ->where('status', WordSense::STATUS_CONFIRMED);
-            })
-            ->with('sense');
-
-        // Search — scoped inside whereHas to prevent escaping security constraints
-        if (!empty($q)) {
-            $query->whereHas('sense', function ($subQuery) use ($q) {
-                $subQuery->where(function ($inner) use ($q) {
-                    $inner->where('lemma', 'like', "%{$q}%")
-                        ->orWhere('surface_form', 'like', "%{$q}%")
-                        ->orWhere('sense_zh', 'like', "%{$q}%")
-                        ->orWhere('sense_en', 'like', "%{$q}%")
-                        ->orWhere('example_sentence_en', 'like', "%{$q}%");
-                });
-            });
-        }
-
-        // Apply filters
-        $now = Carbon::now();
-        switch ($filter) {
-            case 'due':
-                $query->where('review_cards.fsrs_due_at', '<=', $now);
-                break;
-            case 'future':
-                $query->where('review_cards.fsrs_due_at', '>', $now);
-                break;
-            case 'enabled':
-                $query->where('review_cards.fsrs_enabled', true);
-                break;
-            case 'disabled':
-                $query->where('review_cards.fsrs_enabled', false);
-                break;
-            case 'missing_definition':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->where(function ($q) {
-                        $q->whereNull('sense_zh')->orWhere('sense_zh', '');
-                    })->where(function ($q) {
-                        $q->whereNull('sense_en')->orWhere('sense_en', '');
-                    });
-                });
-                break;
-            case 'missing_example':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->where(function ($q) {
-                        $q->whereNull('example_sentence_en')->orWhere('example_sentence_en', '');
-                    });
-                });
-                break;
-            case 'missing_source':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->whereNull('source_chapter_id');
-                })->whereNotExists(function ($subQuery) use ($userId, $language) {
-                    $subQuery->select(DB::raw(1))
-                        ->from('word_sense_occurrences')
-                        ->whereColumn('word_sense_occurrences.word_sense_id', 'review_cards.target_id')
-                        ->where('word_sense_occurrences.user_id', $userId)
-                        ->where('word_sense_occurrences.language_id', $language)
-                        ->where('word_sense_occurrences.status', WordSenseOccurrence::STATUS_BOUND)
-                        ->whereNotNull('word_sense_occurrences.chapter_id');
-                });
-                break;
-        }
-
-        // Advanced filters — all within security scope (user_id/language_id/sense confirmed)
-        $this->applyAdvancedFilters($query, $request);
-
-        // Sort — whitelist only, no raw user input in orderBy
-        $sortBy = $request->input('sort_by', 'id');
-        $sortDir = strtolower($request->input('sort_dir', 'desc'));
-
-        if (!array_key_exists($sortBy, self::SORTABLE_COLUMNS)) {
-            $sortBy = 'id';
-        }
-
-        if (!in_array($sortDir, ['asc', 'desc'], true)) {
-            $sortDir = 'desc';
-        }
-
-        $sortColumn = self::SORTABLE_COLUMNS[$sortBy];
-        $query->orderBy($sortColumn, $sortDir);
-
-        // Tie-breaker for stable pagination
-        if ($sortBy !== 'id') {
-            $query->orderBy('review_cards.id', 'desc');
-        }
+        $query = $this->buildManageQuery($request, $userId, $language);
 
         // Paginate
         $paginator = $query->paginate($perPage);
         $cards = $paginator->getCollection();
 
-        // Collect all sense IDs
-        $senseIds = $cards->pluck('target_id')->filter()->unique()->values()->toArray();
-
-        // Batch-fetch occurrence chapters for all senses at once
-        $occurrenceChapters = [];
-        if (!empty($senseIds)) {
-            $occurrenceChapters = WordSenseOccurrence::query()
-                ->select('word_sense_id', 'chapter_id')
-                ->whereIn('word_sense_id', $senseIds)
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->where('status', WordSenseOccurrence::STATUS_BOUND)
-                ->whereNotNull('chapter_id')
-                ->get()
-                ->groupBy('word_sense_id')
-                ->map(fn($group) => $group->first()->chapter_id)
-                ->toArray();
-        }
-
-        // Collect all relevant chapter IDs and fetch chapters in one query
-        $chapterIds = collect();
-        foreach ($cards as $card) {
-            $sense = $card->sense;
-            if ($sense) {
-                if ($sense->source_chapter_id) {
-                    $chapterIds->push($sense->source_chapter_id);
-                }
-            }
-            $sid = $card->target_id;
-            if (isset($occurrenceChapters[$sid])) {
-                $chapterIds->push($occurrenceChapters[$sid]);
-            }
-        }
-        $chapterIds = $chapterIds->filter()->unique()->values()->toArray();
-
-        $chapters = [];
-        if (!empty($chapterIds)) {
-            $chapters = Chapter::query()
-                ->whereIn('id', $chapterIds)
-                ->where('user_id', $userId)
-                ->where('language', $language)
-                ->pluck('name', 'id')
-                ->toArray();
-        }
-
-        // Map items
-        $items = $cards->map(function (ReviewCard $card) use ($chapters, $occurrenceChapters) {
-            $sense = $card->sense;
-            $senseId = $card->target_id;
-
-            if (!$sense) {
-                return null;
-            }
-
-            $occChapterId = $occurrenceChapters[$senseId] ?? null;
-            $sourceChapterId = $sense->source_chapter_id ?? $occChapterId;
-
-            $sourceKind = $this->inferSourceKind(
-                $sense->source_chapter_id,
-                $occChapterId,
-                $sense->example_sentence_en
-            );
-
-            $sourceChapterTitle = null;
-            if ($sourceChapterId && isset($chapters[$sourceChapterId])) {
-                $sourceChapterTitle = $chapters[$sourceChapterId];
-            }
-
-            return [
-                'review_card_id' => $card->id,
-                'word_sense_id' => $senseId,
-                'lemma' => $sense->lemma,
-                'surface_form' => $sense->surface_form,
-                'pos' => $sense->pos,
-                'sense_zh' => $sense->sense_zh,
-                'sense_en' => $sense->sense_en,
-                'example_sentence_en' => $sense->example_sentence_en,
-                'example_sentence_zh' => $sense->example_sentence_zh,
-                'source_chapter_id' => $sourceChapterId,
-                'source_chapter_title' => $sourceChapterTitle,
-                'source_kind' => $sourceKind,
-                'fsrs_state' => $card->fsrs_state,
-                'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
-                'fsrs_stability' => $card->fsrs_stability,
-                'fsrs_difficulty' => $card->fsrs_difficulty,
-                'fsrs_reps' => $card->fsrs_reps,
-                'fsrs_lapses' => $card->fsrs_lapses,
-                'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
-                'fsrs_enabled' => $card->fsrs_enabled,
-                'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
-                'missing_example' => empty($sense->example_sentence_en),
-                'missing_source' => empty($sense->source_chapter_id) && empty($occChapterId),
-            ];
-        })->filter()->values();
+        $items = $this->buildItems($cards, $userId, $language);
 
         return response()->json([
             'items' => $items,
@@ -265,6 +82,57 @@ class ReviewCardManageController extends Controller
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+        ]);
+    }
+
+    /**
+     * GET /review-cards/manage/export
+     * Export current filtered/sorted results as JSON download.
+     * Reuses the same security constraints and filtering logic as data().
+     * Does NOT paginate — exports all matching cards up to EXPORT_LIMIT.
+     */
+    public function export(Request $request): JsonResponse
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $query = $this->buildManageQuery($request, $userId, $language);
+        $total = $query->count();
+
+        if ($total > self::EXPORT_LIMIT) {
+            return response()->json([
+                'message' => '当前筛选结果超过 ' . self::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
+                'total' => $total,
+                'limit' => self::EXPORT_LIMIT,
+            ], 422);
+        }
+
+        $cards = $query->get();
+        $items = $this->buildItems($cards, $userId, $language);
+
+        $filters = [
+            'q' => trim($request->input('q', '')),
+            'filter' => $request->input('filter', 'enabled'),
+            'fsrs_states' => $request->input('fsrs_states', []),
+            'due_range' => $request->input('due_range', 'all'),
+            'reps_min' => $request->input('reps_min'),
+            'lapses_min' => $request->input('lapses_min'),
+            'sort_by' => $request->input('sort_by', 'id'),
+            'sort_dir' => $request->input('sort_dir', 'desc'),
+        ];
+
+        $data = [
+            'exported_at' => now()->toISOString(),
+            'language' => $language,
+            'filters' => $filters,
+            'count' => $items->count(),
+            'items' => $items,
+        ];
+
+        $filename = 'review-cards-export-' . now()->format('Ymd-His') . '.json';
+
+        return response()->json($data, 200, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
 
@@ -548,6 +416,230 @@ class ReviewCardManageController extends Controller
             $lapsesMin = (int) $lapsesMin;
             $query->where('review_cards.fsrs_lapses', '>=', $lapsesMin);
         }
+    }
+
+    /**
+     * Build the shared base query with all security constraints, search, filters,
+     * advanced filters, and sort applied. Used by both data() and export().
+     */
+    private function buildManageQuery(Request $request, int $userId, string $language)
+    {
+        $filter = $request->input('filter', 'enabled');
+        $q = trim($request->input('q', ''));
+
+        // Base query — all security constraints baked in via whereHas
+        $query = ReviewCard::query()
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('review_cards.target_type', ReviewCard::TARGET_SENSE)
+            ->whereHas('sense', function ($subQuery) use ($userId, $language) {
+                $subQuery->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('status', WordSense::STATUS_CONFIRMED);
+            })
+            ->with('sense');
+
+        // Search — scoped inside whereHas to prevent escaping security constraints
+        if (!empty($q)) {
+            $query->whereHas('sense', function ($subQuery) use ($q) {
+                $subQuery->where(function ($inner) use ($q) {
+                    $inner->where('lemma', 'like', "%{$q}%")
+                        ->orWhere('surface_form', 'like', "%{$q}%")
+                        ->orWhere('sense_zh', 'like', "%{$q}%")
+                        ->orWhere('sense_en', 'like', "%{$q}%")
+                        ->orWhere('example_sentence_en', 'like', "%{$q}%");
+                });
+            });
+        }
+
+        // Apply standard filters
+        $this->applyFilters($query, $filter, $userId, $language);
+
+        // Advanced filters — all within security scope (user_id/language_id/sense confirmed)
+        $this->applyAdvancedFilters($query, $request);
+
+        // Sort — whitelist only, no raw user input in orderBy
+        $this->applySort($query, $request);
+
+        return $query;
+    }
+
+    /**
+     * Apply standard filter to a query already scoped to current user/language/sense.
+     */
+    private function applyFilters($query, string $filter, int $userId, string $language): void
+    {
+        $now = Carbon::now();
+        switch ($filter) {
+            case 'due':
+                $query->where('review_cards.fsrs_due_at', '<=', $now);
+                break;
+            case 'future':
+                $query->where('review_cards.fsrs_due_at', '>', $now);
+                break;
+            case 'enabled':
+                $query->where('review_cards.fsrs_enabled', true);
+                break;
+            case 'disabled':
+                $query->where('review_cards.fsrs_enabled', false);
+                break;
+            case 'missing_definition':
+                $query->whereHas('sense', function ($subQuery) {
+                    $subQuery->where(function ($q) {
+                        $q->whereNull('sense_zh')->orWhere('sense_zh', '');
+                    })->where(function ($q) {
+                        $q->whereNull('sense_en')->orWhere('sense_en', '');
+                    });
+                });
+                break;
+            case 'missing_example':
+                $query->whereHas('sense', function ($subQuery) {
+                    $subQuery->where(function ($q) {
+                        $q->whereNull('example_sentence_en')->orWhere('example_sentence_en', '');
+                    });
+                });
+                break;
+            case 'missing_source':
+                $query->whereHas('sense', function ($subQuery) {
+                    $subQuery->whereNull('source_chapter_id');
+                })->whereNotExists(function ($subQuery) use ($userId, $language) {
+                    $subQuery->select(DB::raw(1))
+                        ->from('word_sense_occurrences')
+                        ->whereColumn('word_sense_occurrences.word_sense_id', 'review_cards.target_id')
+                        ->where('word_sense_occurrences.user_id', $userId)
+                        ->where('word_sense_occurrences.language_id', $language)
+                        ->where('word_sense_occurrences.status', WordSenseOccurrence::STATUS_BOUND)
+                        ->whereNotNull('word_sense_occurrences.chapter_id');
+                });
+                break;
+        }
+    }
+
+    /**
+     * Apply sort to a query — whitelist only, no raw user input in orderBy.
+     */
+    private function applySort($query, Request $request): void
+    {
+        $sortBy = $request->input('sort_by', 'id');
+        $sortDir = strtolower($request->input('sort_dir', 'desc'));
+
+        if (!array_key_exists($sortBy, self::SORTABLE_COLUMNS)) {
+            $sortBy = 'id';
+        }
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
+        $sortColumn = self::SORTABLE_COLUMNS[$sortBy];
+        $query->orderBy($sortColumn, $sortDir);
+
+        // Tie-breaker for stable pagination
+        if ($sortBy !== 'id') {
+            $query->orderBy('review_cards.id', 'desc');
+        }
+    }
+
+    /**
+     * Map a collection of ReviewCards to the unified item array format.
+     * Batch-fetches occurrence chapters and chapter names for performance.
+     */
+    private function buildItems($cards, int $userId, string $language)
+    {
+        // Collect all sense IDs
+        $senseIds = $cards->pluck('target_id')->filter()->unique()->values()->toArray();
+
+        // Batch-fetch occurrence chapters for all senses at once
+        $occurrenceChapters = [];
+        if (!empty($senseIds)) {
+            $occurrenceChapters = WordSenseOccurrence::query()
+                ->select('word_sense_id', 'chapter_id')
+                ->whereIn('word_sense_id', $senseIds)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('status', WordSenseOccurrence::STATUS_BOUND)
+                ->whereNotNull('chapter_id')
+                ->get()
+                ->groupBy('word_sense_id')
+                ->map(fn($group) => $group->first()->chapter_id)
+                ->toArray();
+        }
+
+        // Collect all relevant chapter IDs and fetch chapters in one query
+        $chapterIds = collect();
+        foreach ($cards as $card) {
+            $sense = $card->sense;
+            if ($sense) {
+                if ($sense->source_chapter_id) {
+                    $chapterIds->push($sense->source_chapter_id);
+                }
+            }
+            $sid = $card->target_id;
+            if (isset($occurrenceChapters[$sid])) {
+                $chapterIds->push($occurrenceChapters[$sid]);
+            }
+        }
+        $chapterIds = $chapterIds->filter()->unique()->values()->toArray();
+
+        $chapters = [];
+        if (!empty($chapterIds)) {
+            $chapters = Chapter::query()
+                ->whereIn('id', $chapterIds)
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->pluck('name', 'id')
+                ->toArray();
+        }
+
+        // Map items
+        return $cards->map(function (ReviewCard $card) use ($chapters, $occurrenceChapters) {
+            $sense = $card->sense;
+            $senseId = $card->target_id;
+
+            if (!$sense) {
+                return null;
+            }
+
+            $occChapterId = $occurrenceChapters[$senseId] ?? null;
+            $sourceChapterId = $sense->source_chapter_id ?? $occChapterId;
+
+            $sourceKind = $this->inferSourceKind(
+                $sense->source_chapter_id,
+                $occChapterId,
+                $sense->example_sentence_en
+            );
+
+            $sourceChapterTitle = null;
+            if ($sourceChapterId && isset($chapters[$sourceChapterId])) {
+                $sourceChapterTitle = $chapters[$sourceChapterId];
+            }
+
+            return [
+                'review_card_id' => $card->id,
+                'word_sense_id' => $senseId,
+                'lemma' => $sense->lemma,
+                'surface_form' => $sense->surface_form,
+                'pos' => $sense->pos,
+                'sense_zh' => $sense->sense_zh,
+                'sense_en' => $sense->sense_en,
+                'example_sentence_en' => $sense->example_sentence_en,
+                'example_sentence_zh' => $sense->example_sentence_zh,
+                'source_chapter_id' => $sourceChapterId,
+                'source_chapter_title' => $sourceChapterTitle,
+                'source_kind' => $sourceKind,
+                'fsrs_state' => $card->fsrs_state,
+                'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
+                'fsrs_stability' => $card->fsrs_stability,
+                'fsrs_difficulty' => $card->fsrs_difficulty,
+                'fsrs_reps' => $card->fsrs_reps,
+                'fsrs_lapses' => $card->fsrs_lapses,
+                'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
+                'fsrs_enabled' => $card->fsrs_enabled,
+                'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
+                'missing_example' => empty($sense->example_sentence_en),
+                'missing_source' => empty($sense->source_chapter_id) && empty($occChapterId),
+            ];
+        })->filter()->values();
     }
 
     /**

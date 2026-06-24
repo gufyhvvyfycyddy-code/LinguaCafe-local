@@ -65,6 +65,9 @@
                 />
             </v-col>
             <v-col cols="6" sm="3" md="1" class="d-flex align-center justify-end">
+                <v-btn small text :loading="exportLoading" @click="exportCurrentFilter" class="mr-1">
+                    <v-icon small left>mdi-download</v-icon>导出
+                </v-btn>
                 <v-menu offset-y :close-on-content-click="false">
                     <template #activator="{ on, attrs }">
                         <v-btn small text v-bind="attrs" v-on="on">
@@ -725,6 +728,8 @@ export default {
             ],
             // Compact mode
             compactMode: false,
+            // Export
+            exportLoading: false,
         };
     },
     computed: {
@@ -1140,6 +1145,54 @@ export default {
         closeDetail() {
             this.detailDrawer = false;
             this.detailTarget = null;
+        },
+
+        exportCurrentFilter() {
+            this.exportLoading = true;
+            axios.get('/review-cards/manage/export', {
+                params: {
+                    q: this.searchQuery,
+                    filter: this.currentFilter,
+                    sort_by: this.sortBy,
+                    sort_dir: this.sortDir,
+                    fsrs_states: this.advancedFilters.fsrsStates,
+                    due_range: this.advancedFilters.dueRange,
+                    reps_min: this.advancedFilters.repsMin,
+                    lapses_min: this.advancedFilters.lapsesMin,
+                },
+                responseType: 'blob',
+            })
+            .then((response) => {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                const disposition = response.headers['content-disposition'] || '';
+                const match = disposition.match(/filename="?(.+?)"?$/);
+                link.setAttribute('download', match ? match[1] : 'review-cards-export.json');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                this.snackbar = { show: true, text: '已导出当前筛选结果。', color: 'success' };
+            })
+            .catch((err) => {
+                if (err.response && err.response.status === 422) {
+                    // Parse the JSON error from blob
+                    err.response.data.text().then((text) => {
+                        try {
+                            const parsed = JSON.parse(text);
+                            this.snackbar = { show: true, text: parsed.message || '导出失败。', color: 'error' };
+                        } catch (e) {
+                            this.snackbar = { show: true, text: '导出失败：结果超过上限。', color: 'error' };
+                        }
+                    });
+                } else {
+                    this.snackbar = { show: true, text: '导出失败：' + (err.response?.data?.message || err.message), color: 'error' };
+                }
+            })
+            .finally(() => {
+                this.exportLoading = false;
+            });
         },
 
         displayValue(value, fallback = '—') {

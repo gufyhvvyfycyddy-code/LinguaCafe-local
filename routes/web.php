@@ -203,6 +203,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // review card management
     Route::get('/review-cards/stats', [App\Http\Controllers\ReviewStatsController::class, 'index']);
     Route::get('/review-cards/manage/data', [App\Http\Controllers\ReviewCardManageController::class, 'data']);
+    Route::get('/review-cards/manage/export', [App\Http\Controllers\ReviewCardManageController::class, 'export']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
     Route::post('/review-cards/manage/{reviewCard}/due-now', [App\Http\Controllers\ReviewCardManageController::class, 'dueNow']);

@@ -64,6 +64,7 @@
 | C.18-b-partial | "保持新词"Playwright/Network/DB 验证，checkbox 与 payload 通过；token 颜色截图、词 A 词汇页显示、等级按钮 7 浏览器动作待补 |
 | C.18-c | 补齐"保持新词"视觉验收与测试账户隔离，确认 token 颜色、词汇页显示、等级按钮 7 浏览器动作 |
 | C.15-a | 管理页详情抽屉第一版，前端-only 展示当前行已有字段，不新增 API |
+| C.16-a | 管理页当前筛选结果 JSON 导出，复用筛选/排序条件，不分页导出，5000 条上限 |
 
 ---
 
@@ -262,19 +263,49 @@
 
 ---
 
+### C.16 — 当前筛选结果导出
+
+**状态**：C.16-scout 侦察完成（C.16-a 已实现第一版）；**C.16-a 已完成**。
+
+**已完成**：
+- C.16-a：当前筛选结果 JSON 导出。
+  - 新增路由 `GET /review-cards/manage/export` → `ReviewCardManageController::export()`。
+  - 复用 `buildManageQuery()` 安全约束（user/language/target_type=sense/confirmed sense）。
+  - 复用 `applyFilters()` / `applyAdvancedFilters()` / `applySort()` 筛选排序逻辑。
+  - 不分页 — 导出全部匹配结果（上限 5000 条，超限返回 422）。
+  - JSON 结构：`exported_at` / `language` / `filters` / `count` / `items`。
+  - 前端"导出"按钮（toolbar 列设置旁），`responseType: 'blob'` 下载 JSON 文件。
+  - 文件名：`review-cards-export-YYYYMMDD-HHMMSS.json`。
+  - 17 个测试覆盖：元数据、安全隔离、筛选复用、搜索、高级筛选、排序、不分页、auth 检查。
+
+**不导出**：
+- ReviewLog 历史。
+- Legacy word card (`target_type=word`)。
+- Rejected WordSense。
+- Source full context（仅在导出中包含 source_chapter_title 和 source_kind）。
+- aliases_zh / collocations（字段未返回给前端，不在导出范围）。
+
+**第一版限制**：
+- 只做 JSON，不做 CSV。
+- 不做 Anki 包。
+- 不分页 — 上限 5000。
+
+**实现文件**：`routes/web.php`, `ReviewCardManageController.php`, `ReviewCardManage.vue`, `ReviewCardManageTest.php`。
+
+---
+
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成。
+以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.16-a 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★★ | C.16-scout | 当前筛选结果导出侦察 | 功能侦察 | 用户可能希望把管理页筛选后的复习卡导出给 GPT/Anki/备份；当前延后中，需重新侦察范围 |
-| ★★☆ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
+| ★★★ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
 | ★★☆ | C.15-b | 详情抽屉增强（aliases/collocations/ReviewLog 历史） | 功能增强 | 第一版完成，后续可根据需要新增后端字段和 ReviewLog 历史展示 |
-| ★☆☆ | — | 导出当前筛选结果实现 | 功能实现 | 延后，等待 C.16-scout 侦察结果 |
+| ★★☆ | C.16-b | 导出增强（CSV / Anki / 字段扩展） | 功能增强 | 第一版 JSON 已完成，后续可根据需要添加 CSV/Anki 格式和更多字段 |
 | ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
 
-**建议下一步**：先做 **C.16-scout** — 当前筛选结果导出侦察。理由：C.15-a 详情抽屉已完成，C.18-c 视觉验收已完成，C.13 保持新词功能全链路验证通过。
+**建议下一步**：先做 **C.17-scout** — ReviewLog 历史展示侦察。理由：C.15-a 详情抽屉已完成，C.16-a JSON 导出已完成，C.13 保持新词功能全链路验证通过。下一步应侦察 ReviewLog 只读展示方案。
 
 ---
 
@@ -285,7 +316,6 @@
 | 项目 | 原因 |
 |------|------|
 | 批量重置 | 非当前优先级 |
-| 导出当前筛选结果 | 非当前优先级 |
 | 卡片详情抽屉 | 非当前优先级 |
 | retrievability 展示 | 非当前优先级 |
 | FSRS optimizer/simulator | 非当前优先级 |
