@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Chapter;
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\ReviewCardService;
@@ -133,6 +134,45 @@ class ReviewCardManageController extends Controller
 
         return response()->json($data, 200, [
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
+    }
+
+    /**
+     * GET /review-cards/manage/{reviewCard}/logs
+     * Return the most recent 20 ReviewLog entries for a manageable sense card.
+     * Read-only — no delete, no export, no pagination, no charts.
+     */
+    public function logs(int $reviewCard): JsonResponse
+    {
+        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $logs = ReviewLog::query()
+            ->where('review_card_id', $card->id)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->orderBy('reviewed_at', 'desc')
+            ->limit(20)
+            ->get()
+            ->map(fn (ReviewLog $log) => [
+                'id' => $log->id,
+                'rating' => $log->rating,
+                'source' => $log->source,
+                'reviewed_at' => optional($log->reviewed_at)->toISOString(),
+                'previous_state' => $log->previous_state,
+                'new_state' => $log->new_state,
+                'previous_due_at' => optional($log->previous_due_at)->toISOString(),
+                'new_due_at' => optional($log->new_due_at)->toISOString(),
+                'previous_stability' => $log->previous_stability,
+                'new_stability' => $log->new_stability,
+                'previous_difficulty' => $log->previous_difficulty,
+                'new_difficulty' => $log->new_difficulty,
+            ]);
+
+        return response()->json([
+            'items' => $logs,
         ]);
     }
 

@@ -3257,6 +3257,224 @@ class ReviewCardManageTest extends TestCase
         $this->assertTrue($response->status() === 302 || $response->status() === 401);
     }
 
+    // ==================== Logs Tests ====================
+
+    public function test_logs_returns_recent_logs_for_manageable_sense_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'logTest']);
+        $card = $this->createSenseCard($sense);
+
+        // Create 3 review logs with different reviewed_at
+        $log1 = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'source' => 'review',
+            'reviewed_at' => now()->subDays(3),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 1.23,
+            'previous_difficulty' => null,
+            'new_difficulty' => 5.67,
+        ]);
+
+        $log2 = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'again',
+            'source' => 'review',
+            'reviewed_at' => now()->subDay(),
+            'previous_state' => 'learning',
+            'new_state' => 'relearning',
+            'previous_stability' => 1.23,
+            'new_stability' => 0.5,
+            'previous_difficulty' => 5.67,
+            'new_difficulty' => 7.0,
+        ]);
+
+        $log3 = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'hard',
+            'source' => 'review',
+            'reviewed_at' => now(),
+            'previous_state' => 'relearning',
+            'new_state' => 'review',
+            'previous_stability' => 0.5,
+            'new_stability' => 2.0,
+            'previous_difficulty' => 7.0,
+            'new_difficulty' => 6.5,
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $card->id . '/logs');
+        $response->assertOk();
+
+        $items = $response->json('items');
+        $this->assertCount(3, $items);
+
+        // Most recent first (desc by reviewed_at)
+        $this->assertSame($log3->id, $items[0]['id']);
+        $this->assertSame('hard', $items[0]['rating']);
+        $this->assertSame($log2->id, $items[1]['id']);
+        $this->assertSame('again', $items[1]['rating']);
+        $this->assertSame($log1->id, $items[2]['id']);
+        $this->assertSame('good', $items[2]['rating']);
+
+        // Verify field structure
+        foreach ($items as $item) {
+            $this->assertArrayHasKey('id', $item);
+            $this->assertArrayHasKey('rating', $item);
+            $this->assertArrayHasKey('source', $item);
+            $this->assertArrayHasKey('reviewed_at', $item);
+            $this->assertArrayHasKey('previous_state', $item);
+            $this->assertArrayHasKey('new_state', $item);
+            $this->assertArrayHasKey('previous_stability', $item);
+            $this->assertArrayHasKey('new_stability', $item);
+            $this->assertArrayHasKey('previous_difficulty', $item);
+            $this->assertArrayHasKey('new_difficulty', $item);
+            $this->assertArrayHasKey('previous_due_at', $item);
+            $this->assertArrayHasKey('new_due_at', $item);
+        }
+    }
+
+    public function test_logs_limits_to_20(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'limitTest']);
+        $card = $this->createSenseCard($sense);
+
+        // Create 25 review logs
+        for ($i = 0; $i < 25; $i++) {
+            ReviewLog::forceCreate([
+                'user_id' => $this->user->id,
+                'language_id' => 'english',
+                'review_card_id' => $card->id,
+                'rating' => 'good',
+                'source' => 'review',
+                'reviewed_at' => now()->subMinutes($i),
+                'previous_state' => 'new',
+                'new_state' => 'learning',
+                'previous_stability' => null,
+                'new_stability' => 1.0,
+                'previous_difficulty' => null,
+                'new_difficulty' => 5.0,
+            ]);
+        }
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $card->id . '/logs');
+        $response->assertOk();
+
+        $items = $response->json('items');
+        $this->assertCount(20, $items);
+    }
+
+    public function test_logs_rejects_other_user_card(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'otherUserCard']);
+        $otherCard = $this->createSenseCard($otherSense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $otherCard->id . '/logs');
+        $response->assertStatus(404);
+    }
+
+    public function test_logs_rejects_other_language_card(): void
+    {
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'spanishCard']);
+        $cardEs = $this->createSenseCard($senseEs);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $cardEs->id . '/logs');
+        $response->assertStatus(404);
+    }
+
+    public function test_logs_rejects_legacy_word_card(): void
+    {
+        $wordCard = $this->createWordCard($this->user->id, 'english', 999);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $wordCard->id . '/logs');
+        $response->assertStatus(404);
+    }
+
+    public function test_logs_rejects_rejected_sense_card(): void
+    {
+        $rejectedSense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'rejectedSense',
+            'status' => WordSense::STATUS_REJECTED,
+            'sense_key' => hash('sha256', 'english|rejectedSense|noun|测试|test'),
+        ]);
+        $rejectedCard = $this->createSenseCard($rejectedSense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $rejectedCard->id . '/logs');
+        $response->assertStatus(404);
+    }
+
+    public function test_logs_does_not_return_other_card_logs(): void
+    {
+        // Card A — has logs
+        $senseA = $this->createSense($this->user->id, 'english', ['lemma' => 'cardA']);
+        $cardA = $this->createSenseCard($senseA);
+        ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $cardA->id,
+            'rating' => 'good',
+            'source' => 'review',
+            'reviewed_at' => now(),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 1.0,
+            'previous_difficulty' => null,
+            'new_difficulty' => 5.0,
+        ]);
+
+        // Card B — has different logs
+        $senseB = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'cardB',
+            'sense_key' => hash('sha256', 'english|cardB|noun|测试|test'),
+        ]);
+        $cardB = $this->createSenseCard($senseB);
+        ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $cardB->id,
+            'rating' => 'easy',
+            'source' => 'review',
+            'reviewed_at' => now(),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 2.0,
+            'previous_difficulty' => null,
+            'new_difficulty' => 4.0,
+        ]);
+
+        // Request logs for card A — should NOT include card B's log
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $cardA->id . '/logs');
+        $response->assertOk();
+
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('good', $items[0]['rating']);
+        // JSON may represent whole floats as int — use float-safe comparison
+        $this->assertEqualsWithDelta(1.0, $items[0]['new_stability'], 0.001);
+    }
+
+    public function test_logs_empty_when_no_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'noLogs']);
+        $card = $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $card->id . '/logs');
+        $response->assertOk();
+
+        $items = $response->json('items');
+        $this->assertIsArray($items);
+        $this->assertEmpty($items);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

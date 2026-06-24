@@ -500,6 +500,43 @@
 
                         <v-divider class="my-3" />
 
+                        <!-- 最近复习记录 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">最近复习记录</div>
+                            <div v-if="detailLogsLoading" class="text-caption text--secondary py-2">加载复习记录中...</div>
+                            <div v-else-if="detailLogsError" class="text-caption error--text py-2">{{ detailLogsError }}</div>
+                            <div v-else-if="detailLogs.length === 0" class="text-caption text--secondary py-2">暂无复习记录。</div>
+                            <div v-else>
+                                <div
+                                    v-for="log in detailLogs"
+                                    :key="log.id"
+                                    class="log-entry mb-2 pa-2"
+                                >
+                                    <div class="d-flex align-center" style="gap: 6px;">
+                                        <v-chip x-small :color="logRatingColor(log.rating)">{{ log.rating }}</v-chip>
+                                        <span class="text-caption">| {{ log.source }}</span>
+                                        <v-spacer />
+                                        <span class="text-caption text--secondary">{{ formatDateTime(log.reviewed_at) }}</span>
+                                    </div>
+                                    <div class="text-caption mt-1">
+                                        <span :class="log.previous_state ? '' : 'text--secondary'">{{ log.previous_state || '—' }}</span>
+                                        <span class="mx-1">→</span>
+                                        <span :class="log.new_state ? '' : 'text--secondary'">{{ log.new_state || '—' }}</span>
+                                    </div>
+                                    <div class="text-caption text--secondary mt-1">
+                                        S: {{ formatFsrsNumber(log.previous_stability) }} → {{ formatFsrsNumber(log.new_stability) }}
+                                        &nbsp;|&nbsp;
+                                        D: {{ formatFsrsNumber(log.previous_difficulty) }} → {{ formatFsrsNumber(log.new_difficulty) }}
+                                    </div>
+                                    <div class="text-caption text--secondary">
+                                        到期: {{ formatDueAt(log.previous_due_at) }} → {{ formatDueAt(log.new_due_at) }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
                         <!-- 缺失状态 -->
                         <div class="detail-section">
                             <div class="detail-section-title">缺失状态</div>
@@ -638,6 +675,9 @@ export default {
             sourcePayload: {},
             detailDrawer: false,
             detailTarget: null,
+            detailLogs: [],
+            detailLogsLoading: false,
+            detailLogsError: '',
             archiveDialog: false,
             archiveTarget: null,
             resetDialog: false,
@@ -1139,12 +1179,34 @@ export default {
 
         openDetail(item) {
             this.detailTarget = item;
+            this.detailLogs = [];
+            this.detailLogsLoading = false;
+            this.detailLogsError = '';
             this.detailDrawer = true;
+            this.loadDetailLogs(item);
         },
 
         closeDetail() {
             this.detailDrawer = false;
             this.detailTarget = null;
+            this.detailLogs = [];
+            this.detailLogsLoading = false;
+            this.detailLogsError = '';
+        },
+
+        loadDetailLogs(item) {
+            this.detailLogsLoading = true;
+            this.detailLogsError = '';
+            axios.get('/review-cards/manage/' + item.review_card_id + '/logs')
+                .then((response) => {
+                    this.detailLogs = response.data.items || [];
+                })
+                .catch((err) => {
+                    this.detailLogsError = '加载复习记录失败：' + (err.response?.data?.message || err.message);
+                })
+                .finally(() => {
+                    this.detailLogsLoading = false;
+                });
         },
 
         exportCurrentFilter() {
@@ -1231,6 +1293,23 @@ export default {
                 return '—';
             }
             return number.toFixed(2);
+        },
+
+        formatDateTime(isoString) {
+            if (!isoString) return '—';
+            const d = new Date(isoString);
+            return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        },
+
+        logRatingColor(rating) {
+            const colors = {
+                again: 'red',
+                hard: 'orange',
+                good: 'green',
+                easy: 'blue',
+                reset: 'grey',
+            };
+            return colors[rating] || '';
         },
 
         isSortedBy(column) {
@@ -1567,5 +1646,11 @@ export default {
     font-size: 0.85rem;
     color: rgba(0, 0, 0, 0.87);
     word-break: break-word;
+}
+
+.log-entry {
+    background: #fafafa;
+    border-radius: 4px;
+    border: 1px solid #f0f0f0;
 }
 </style>

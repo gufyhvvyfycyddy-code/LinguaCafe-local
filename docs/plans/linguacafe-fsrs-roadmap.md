@@ -65,6 +65,7 @@
 | C.18-c | 补齐"保持新词"视觉验收与测试账户隔离，确认 token 颜色、词汇页显示、等级按钮 7 浏览器动作 |
 | C.15-a | 管理页详情抽屉第一版，前端-only 展示当前行已有字段，不新增 API |
 | C.16-a | 管理页当前筛选结果 JSON 导出，复用筛选/排序条件，不分页导出，5000 条上限 |
+| C.17-a | 管理页详情抽屉显示最近 20 条 ReviewLog，只读展示 rating/source/FSRS 前后状态 |
 
 ---
 
@@ -294,18 +295,45 @@
 
 ---
 
+### C.17 — 管理页详情抽屉显示最近复习记录
+
+**状态**：C.17-scout 已完成（C.14 / C.15-a 已铺垫侦察）；**C.17-a 第一版已完成**。
+
+**已完成**：
+- C.17-a：管理页详情抽屉显示最近 20 条 ReviewLog。
+  - 新增路由 `GET /review-cards/manage/{reviewCard}/logs` → `ReviewCardManageController::logs()`。
+  - 安全策略：先调用 `findManageableSenseCard()` 确保卡片属于当前用户/语言/target_type=sense/sense=confirmed，再按 `user_id` + `language_id` + `review_card_id` 查询 ReviewLog。
+  - `orderBy reviewed_at desc`，`limit 20`。
+  - 返回字段：`id` / `rating` / `source` / `reviewed_at` / `previous_state` / `new_state` / `previous_due_at` / `new_due_at` / `previous_stability` / `new_stability` / `previous_difficulty` / `new_difficulty`。
+  - 前端在详情抽屉中新增"最近复习记录"分区（位于 FSRS 信息之后、缺失状态之前）。
+  - 展示 rating 彩色 chip（again=red, hard=orange, good=green, easy=blue, reset=grey）、source、reviewed_at、状态变化（previous_state→new_state）、stability/difficulty 变化、due_at 变化。
+  - Loading/error/empty 三态处理。
+  - 8 个测试覆盖：正常返回、限 20 条、拒绝其他用户/语言/legacy word/rejected sense、不混入其他卡片日志、空日志。
+
+**第一版限制**：
+- 只读展示，不提供编辑/删除/重置操作。
+- 只显示当前 live/manageable sense card 的日志。
+- 不展示 orphan logs（已删除 ReviewCard 的孤立日志）。
+- 不做图表。
+- 不做分页。
+- 不导出 ReviewLog。
+- 不删除 ReviewLog。
+- 最多 20 条。
+
+**实现文件**：`routes/web.php`, `ReviewCardManageController.php`, `ReviewCardManage.vue`, `ReviewCardManageTest.php`。
+
+---
+
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.16-a 已完成。
+以下任务为候选，均未冻结实现。C.18 系列已完成，C.15-a 已完成，C.16-a 已完成，C.17-a 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★★ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
-| ★★☆ | C.15-b | 详情抽屉增强（aliases/collocations/ReviewLog 历史） | 功能增强 | 第一版完成，后续可根据需要新增后端字段和 ReviewLog 历史展示 |
+| ★★☆ | C.15-b | 详情抽屉增强（aliases/collocations） | 功能增强 | 第一版详情抽屉和 ReviewLog 展示已完成，后续可新增 aliases/collocations |
 | ★★☆ | C.16-b | 导出增强（CSV / Anki / 字段扩展） | 功能增强 | 第一版 JSON 已完成，后续可根据需要添加 CSV/Anki 格式和更多字段 |
-| ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
 
-**建议下一步**：先做 **C.17-scout** — ReviewLog 历史展示侦察。理由：C.15-a 详情抽屉已完成，C.16-a JSON 导出已完成，C.13 保持新词功能全链路验证通过。下一步应侦察 ReviewLog 只读展示方案。
+**建议下一步**：**C.15-b** — 详情抽屉增强（aliases/collocations），或 **C.16-b** — 导出增强侦察（CSV/Anki）。C.17-a 已完成，ReviewLog 只读展示已上线。
 
 ---
 
