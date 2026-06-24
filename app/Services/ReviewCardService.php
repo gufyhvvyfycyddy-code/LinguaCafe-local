@@ -88,6 +88,76 @@ class ReviewCardService
         return $this->initializableWordsQuery($userId, $language)->count();
     }
 
+    /**
+     * Reset a sense review card to new-card state, erasing all FSRS memory.
+     *
+     * Only sense cards (target_type=sense) with a confirmed WordSense are eligible.
+     * Archived cards are force-enabled. Existing review_logs are preserved.
+     * A new ReviewLog with rating='reset' and source='reset' is created.
+     */
+    public function resetCard(int $userId, string $language, int $reviewCardId): ReviewCard
+    {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId) {
+            $card = ReviewCard::lockForUpdate()
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('id', $reviewCardId)
+                ->where('target_type', ReviewCard::TARGET_SENSE)
+                ->first();
+
+            if (!$card) {
+                throw new \Exception('Review card does not exist, is not a sense card, or belongs to another user.');
+            }
+
+            $sense = WordSense::where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('id', $card->target_id)
+                ->where('status', WordSense::STATUS_CONFIRMED)
+                ->first();
+
+            if (!$sense) {
+                throw new \Exception('Review card target sense is not confirmed or does not exist.');
+            }
+
+            $previous = [
+                'state' => $card->fsrs_state,
+                'due_at' => $card->fsrs_due_at,
+                'stability' => $card->fsrs_stability,
+                'difficulty' => $card->fsrs_difficulty,
+            ];
+
+            $card->fsrs_state = 'new';
+            $card->fsrs_due_at = Carbon::now();
+            $card->fsrs_stability = null;
+            $card->fsrs_difficulty = null;
+            $card->fsrs_reps = 0;
+            $card->fsrs_lapses = 0;
+            $card->fsrs_last_reviewed_at = null;
+            $card->fsrs_enabled = true;
+            $card->save();
+
+            ReviewLog::create([
+                'user_id' => $userId,
+                'language_id' => $language,
+                'language' => $language,
+                'review_card_id' => $card->id,
+                'rating' => 'reset',
+                'reviewed_at' => Carbon::now(),
+                'previous_state' => $previous['state'],
+                'new_state' => $card->fsrs_state,
+                'previous_due_at' => $previous['due_at'],
+                'new_due_at' => $card->fsrs_due_at,
+                'previous_stability' => $previous['stability'],
+                'new_stability' => $card->fsrs_stability,
+                'previous_difficulty' => $previous['difficulty'],
+                'new_difficulty' => $card->fsrs_difficulty,
+                'source' => 'reset',
+            ]);
+
+            return $card;
+        });
+    }
+
     public function recordReview(int $userId, string $language, int $reviewCardId, string $rating, string $source = 'review'): ReviewCard
     {
         return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source) {

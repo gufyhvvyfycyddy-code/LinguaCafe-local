@@ -6,6 +6,7 @@ use App\Models\Chapter;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\ReviewCardService;
 use App\Services\WordSenseService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -17,6 +18,7 @@ class ReviewCardManageController extends Controller
 {
     public function __construct(
         private WordSenseService $wordSenseService,
+        private ReviewCardService $reviewCardService,
     )
     {
     }
@@ -295,6 +297,27 @@ class ReviewCardManageController extends Controller
         $card->save();
 
         return response()->json($this->serializeCard($card->fresh(), $sense));
+    }
+
+    /**
+     * POST /review-cards/manage/{reviewCard}/reset
+     * Reset a sense review card to new-card state, erasing all FSRS memory.
+     * Archived cards are force-enabled. Existing review_logs are preserved.
+     */
+    public function reset(int $reviewCard): JsonResponse
+    {
+        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+
+        $card = $this->reviewCardService->resetCard(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $reviewCard
+        );
+
+        return response()->json(array_merge(
+            ['message' => '已重置为新学卡。该卡会重新进入复习队列。'],
+            $this->serializeCard($card->fresh(), $sense->fresh())
+        ));
     }
 
     /**

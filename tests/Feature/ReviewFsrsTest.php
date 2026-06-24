@@ -1269,6 +1269,330 @@ class ReviewFsrsTest extends TestCase
         $this->assertSame(0.90, $service->desiredRetention());
     }
 
+    // ==================== Reset card ====================
+
+    public function test_reset_card_resets_all_fsrs_fields_to_defaults(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'resetall', 'noun', '全部重置', 'reset all');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        // Give the card some review history
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDays(30),
+            'fsrs_stability' => 12.5,
+            'fsrs_difficulty' => 3.2,
+            'fsrs_reps' => 15,
+            'fsrs_lapses' => 2,
+            'fsrs_last_reviewed_at' => now()->subDays(5),
+            'fsrs_enabled' => true,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset");
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertSame('new', $data['fsrs_state']);
+        $this->assertNotNull($data['fsrs_due_at']);
+        $this->assertNull($data['fsrs_stability']);
+        $this->assertNull($data['fsrs_difficulty']);
+        $this->assertSame(0, $data['fsrs_reps']);
+        $this->assertSame(0, $data['fsrs_lapses']);
+        $this->assertTrue($data['fsrs_enabled']);
+
+        // Verify database
+        $card->refresh();
+        $this->assertSame('new', $card->fsrs_state);
+        $this->assertNotNull($card->fsrs_due_at);
+        $this->assertNull($card->fsrs_stability);
+        $this->assertNull($card->fsrs_difficulty);
+        $this->assertSame(0, $card->fsrs_reps);
+        $this->assertSame(0, $card->fsrs_lapses);
+        $this->assertNull($card->fsrs_last_reviewed_at);
+        $this->assertTrue($card->fsrs_enabled);
+    }
+
+    public function test_reset_card_creates_review_log_with_source_reset(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'resetlog', 'noun', '重置日志', 'reset log');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 8.0,
+            'fsrs_difficulty' => 4.5,
+            'fsrs_due_at' => now()->addDays(10),
+            'fsrs_last_reviewed_at' => now()->subDays(3),
+        ]);
+
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        $this->assertSame($oldLogCount + 1, ReviewLog::count());
+
+        $log = ReviewLog::latest()->first();
+        $this->assertSame('reset', $log->rating);
+        $this->assertSame('reset', $log->source);
+        $this->assertSame('review', $log->previous_state);
+        $this->assertSame('new', $log->new_state);
+        $this->assertSame($card->id, $log->review_card_id);
+        $this->assertSame($this->user->id, $log->user_id);
+        $this->assertSame('english', $log->language_id);
+    }
+
+    public function test_reset_card_preserves_old_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'preservelog', 'noun', '保留日志', 'preserve log');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_due_at' => now()->subHour()]);
+
+        // Rate the card to create a review log
+        $this->actingAs($this->user)
+            ->postJson("/reviews/senses/{$card->id}/rate", ['rating' => 'good'])
+            ->assertOk();
+
+        $oldLogs = ReviewLog::where('review_card_id', $card->id)->get();
+        $oldLogCount = $oldLogs->count();
+        $this->assertGreaterThan(0, $oldLogCount, 'Should have at least one rating log before reset');
+
+        // Reset the card
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        // Old logs should still exist
+        $allLogs = ReviewLog::where('review_card_id', $card->id)->get();
+        $this->assertSame($oldLogCount + 1, $allLogs->count(), 'Should have old logs plus one reset log');
+
+        foreach ($oldLogs as $oldLog) {
+            $this->assertNotNull(ReviewLog::find($oldLog->id), 'Old review log should not be deleted');
+        }
+    }
+
+    public function test_reset_card_does_not_affect_word_sense(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'keepsense', 'noun', '保留释义', 'keep sense');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 3.0,
+            'fsrs_due_at' => now()->addDays(5),
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        $sense->refresh();
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status, 'Sense status should remain confirmed');
+        $this->assertSame('保留释义', $sense->sense_zh);
+        $this->assertSame('keep sense', $sense->sense_en);
+        $this->assertSame('keepsense', $sense->lemma);
+        $this->assertSame('noun', $sense->pos);
+    }
+
+    public function test_reset_card_does_not_affect_encountered_word(): void
+    {
+        $word = EncounteredWord::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'stage' => -7,
+            'word' => 'resetword',
+            'kanji' => '',
+            'reading' => '',
+            'translation' => 'reset word translation',
+            'base_word' => '',
+            'base_word_reading' => '',
+            'lookup_count' => 0,
+            'read_count' => 0,
+            'lemma' => '',
+            'added_to_srs' => now()->toDateString(),
+            'next_review' => now()->toDateString(),
+            'relearning' => true,
+        ]);
+
+        $sense = $this->createSense($this->user->id, 'english', 'resetword', 'noun', '重置词', 'reset word');
+        $sense->update(['encountered_word_id' => $word->id]);
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 6.0,
+            'fsrs_difficulty' => 3.5,
+            'fsrs_due_at' => now()->addDays(3),
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        $word->refresh();
+        $this->assertSame(-7, $word->stage, 'EncounteredWord stage should not change');
+        $this->assertSame(1, (int) $word->relearning, 'EncounteredWord relearning should not change');
+    }
+
+    public function test_reset_card_appears_in_senses_review_queue(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'resetqueue', 'noun', '进队测试', 'queue test');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        // Card is due far in the future
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 2.0,
+            'fsrs_due_at' => now()->addDays(60),
+            'fsrs_enabled' => true,
+        ]);
+
+        // Before reset: card should NOT be in review queue
+        $before = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $before->assertOk();
+        $beforeIds = array_column($before->json('cards'), 'review_card_id');
+        $this->assertNotContains($card->id, $beforeIds, 'Card should not be in queue before reset');
+
+        // Reset the card
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        // After reset: card should be in review queue
+        $after = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $after->assertOk();
+        $afterIds = array_column($after->json('cards'), 'review_card_id');
+        $this->assertContains($card->id, $afterIds, 'Card should appear in queue after reset');
+    }
+
+    public function test_reset_archived_card_auto_enables(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'archivedreset', 'noun', '归档重置', 'archived reset');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 7.0,
+            'fsrs_difficulty' => 4.0,
+            'fsrs_due_at' => now()->addDays(14),
+            'fsrs_enabled' => false, // archived
+        ]);
+
+        $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset")
+            ->assertOk();
+
+        $card->refresh();
+        $this->assertTrue($card->fsrs_enabled, 'Archived card should be re-enabled after reset');
+        $this->assertSame('new', $card->fsrs_state);
+    }
+
+    public function test_reset_already_new_card_is_idempotent(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'newreset', 'noun', '新卡重置', 'new reset');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        // Card already has default new-card state
+        $this->assertSame('new', $card->fsrs_state);
+
+        $oldLogCount = ReviewLog::count();
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset");
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertSame('new', $data['fsrs_state']);
+        $this->assertSame(0, $data['fsrs_reps']);
+        $this->assertSame(0, $data['fsrs_lapses']);
+        $this->assertTrue($data['fsrs_enabled']);
+
+        // A reset log should still be created
+        $this->assertSame($oldLogCount + 1, ReviewLog::count());
+        $log = ReviewLog::latest()->first();
+        $this->assertSame('reset', $log->rating);
+        $this->assertSame('new', $log->previous_state);
+        $this->assertSame('new', $log->new_state);
+    }
+
+    public function test_reset_card_cannot_cross_user(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', 'otherreset', 'noun', '他人重置', 'other reset');
+        $otherCard = app(ReviewCardService::class)->ensureSenseCard($otherSense);
+        $otherCard->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 3.0,
+            'fsrs_due_at' => now()->addDays(7),
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$otherCard->id}/reset");
+
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+        // Other user's card must remain unchanged
+        $otherCard->refresh();
+        $this->assertSame('review', $otherCard->fsrs_state, 'Other user card state should not change');
+        $this->assertSame(5.0, $otherCard->fsrs_stability, 'Other user card stability should not change');
+    }
+
+    public function test_reset_card_cannot_cross_language(): void
+    {
+        $sense = $this->createSense($this->user->id, 'spanish', 'idioma', 'noun', '语言', 'language');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 3.0,
+            'fsrs_due_at' => now()->addDays(7),
+        ]);
+
+        // User's selected_language is 'english', but card is 'spanish'
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset");
+
+        $this->assertSame(404, $response->status());
+        // Card must remain unchanged
+        $card->refresh();
+        $this->assertSame('review', $card->fsrs_state, 'Cross-language card state should not change');
+    }
+
+    public function test_reset_card_not_applicable_to_word_card(): void
+    {
+        $word = $this->createWord($this->user->id, 'english', -1, 'wordcard');
+        $card = app(ReviewCardService::class)->ensureWordCard($word);
+        $this->assertNotNull($card);
+        $this->assertSame(ReviewCard::TARGET_WORD, $card->target_type);
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset");
+
+        $this->assertSame(404, $response->status());
+        // Word card must remain unchanged
+        $card->refresh();
+        $this->assertSame('new', $card->fsrs_state);
+    }
+
+    public function test_reset_card_rejected_sense_returns_404(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'rejected', 'noun', '已拒绝', 'rejected');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 2.5,
+            'fsrs_due_at' => now()->addDays(3),
+        ]);
+
+        // Reject the sense
+        $sense->update(['status' => WordSense::STATUS_REJECTED]);
+
+        $response = $this->actingAs($this->user)
+            ->postJson("/review-cards/manage/{$card->id}/reset");
+
+        $this->assertSame(404, $response->status());
+        // Card must remain unchanged
+        $card->refresh();
+        $this->assertSame('review', $card->fsrs_state, 'Card for rejected sense should not be reset');
+    }
+
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense
     {
         return WordSense::forceCreate([
