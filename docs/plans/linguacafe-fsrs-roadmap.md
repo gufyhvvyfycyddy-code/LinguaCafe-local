@@ -61,7 +61,7 @@
 | C.13-a | 添加释义时支持"保持新词"选项，payload 加 keep_new boolean，stage===2 且 keep_new=true 时跳过 setStage(-7) |
 | C.14-scout | 复习日志删除语义侦察，确认无外键、JOIN 自动排除孤立日志、UI 文案准确，推荐不做删除功能 |
 | C.18-a | "保持新词"HTTP/DB 回归验证，确认后端行为、payload、数据库闭环正确；真实浏览器视觉验收待完成 |
-| C.18-b | 阅读页"保持新词"真实浏览器视觉验收，通过 Playwright + Chrome headless 完成 checkbox/Network/DB 闭环 |
+| C.18-b-partial | "保持新词"Playwright/Network/DB 验证，checkbox 与 payload 通过；token 颜色截图、词 A 词汇页显示、等级按钮 7 浏览器动作待补 |
 
 ---
 
@@ -184,12 +184,16 @@
 - 结论：C.13-a 的保持新词功能在后端行为上完全正确，默认行为未退化。
 - ⚠️ **未完成真实浏览器视觉验收**：未验证 checkbox 真实默认状态截图、阅读页 token 颜色变化、/vocabulary/search 视觉显示。这些需要真实浏览器（C.18-b）补充。
 
-**C.18-b 真实浏览器视觉验收**（2026-06-25）：
-- 使用 Playwright + Chrome headless 完成真实浏览器交互验证。
+**C.18-b-partial Playwright/Network/DB 验证**（2026-06-25）：
+- 使用 Playwright + Chrome headless 进行浏览器交互验证。
 - 验收 A（默认行为，词 sharply）：checkbox 默认 UNCHECKED ✅ → payload `keep_new: false` ✅ → response `stage: -7, stage_changed: true` ✅ → DB 确认 sharply stage=-7 ✅。
 - 验收 B（保持新词，词 stores）：checkbox 默认 UNCHECKED ✅ → 勾选后 CHECKED ✅ → payload `keep_new: true` ✅ → response `stage: 2, stage_changed: false` ✅ → DB 确认 stores stage=2 ✅ → /vocabulary/search 显示"新词" ✅。
 - 数据库核验：WordSense 创建正确、sense ReviewCard 创建正确（fsrs_state=new, fsrs_enabled=1）。
-- 结论：C.13-a 保持新词功能在真实浏览器中完全正确，payload 闭合、checkbox 默认/勾选行为正确、DB 闭环正确。
+- ❌ **未完成项**：
+  - 未提供 token 颜色变化截图（词 A 从 New→Learning 7 绿色，词 B 保持 New 颜色）。
+  - 未提供词 A 在 /vocabulary/search 的浏览器显示证据。
+  - 未在浏览器中执行词 B 的等级按钮 7 点击动作。
+  - ⚠️ 修改了真实用户 5（1816529781@qq.com）的密码为临时密码 `test123456`，原 bcrypt hash 未完整保存，需用户手动恢复或重置密码。
 
 ---
 
@@ -220,11 +224,11 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.18-a/C.18-b 均已完成。
+以下任务为候选，均未冻结实现。C.18-a 已完成，C.18-b-partial 部分完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ✅ | C.18-b | 阅读页"保持新词"真实浏览器视觉验收 | 验收 | 已完成（2026-06-25），Playwright + Chrome headless，checkbox/Network/DB 闭环通过 |
+| ★★★★ | C.18-c | 补齐"保持新词"视觉验收与测试账户隔离 | 验收/修复流程 | 需要补 token 颜色截图、词汇页显示、等级按钮 7 浏览器动作，并停止使用真实用户账号做自动化 |
 | ★★★ | C.15-scout | 复习卡管理页详情抽屉侦察 | 功能侦察 | 管理页已有大量列、编辑、筛选、隐藏、紧凑模式；下一步增强管理页时，详情抽屉比继续塞列更合理 |
 | ★★☆ | C.16-scout | 当前筛选结果导出侦察 | 功能侦察 | 用户可能希望把管理页筛选后的复习卡导出给 GPT/Anki/备份；当前延后中，需重新侦察范围 |
 | ★★☆ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
@@ -232,7 +236,7 @@
 | ★☆☆ | — | 导出当前筛选结果实现 | 功能实现 | 延后，等待 C.16-scout 侦察结果 |
 | ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
 
-**建议下一步**：先做 **C.15-scout** — 复习卡管理页详情抽屉侦察。理由：C.18-b 已补齐真实浏览器证据，C.13-a 功能闭环完整验收通过；管理页详情抽屉是增强管理页的自然下一步。
+**建议下一步**：先做 **C.18-c** — 补齐"保持新词"视觉验收与测试账户隔离。理由：C.18-b 仍缺关键视觉证据，并且自动化验收修改了真实用户密码，必须先修复流程恢复用户认证，不能进入新功能。
 
 ---
 
@@ -290,6 +294,16 @@
 - **这些不能替代真实浏览器验收**：自动化测试和 HTTP 层测试无法验证 UI 颜色、checkbox 默认状态、Network DevTools payload、页面跳转行为、词汇页视觉显示。
 - **涉及 UI 的任务必须提供真实浏览器证据**：包括但不限于 checkbox 视觉状态截图、token 颜色变化截图、DevTools Network 面板截图、/vocabulary/search 页面截图。
 - **没有真实浏览器证据时的 roadmap 记录规则**：只能写"HTTP/DB 验证通过，浏览器视觉验收待完成"，不得写"浏览器回归验收完成"或"浏览器验收通过"。
+
+### Decision 6 — 浏览器验收不得修改真实用户认证数据
+
+**日期**：2026-06-25
+
+- 自动化浏览器验收不得修改真实用户密码。
+- 如需登录，应使用既有测试账号，或让用户手动登录后复用 session（如 Playwright 的 `storageState`）。
+- 如果必须创建测试账号，必须先征得用户确认，并明确账号、密码、清理方式。
+- 不得把真实用户密码改成公开临时密码（如 `test123456`）。
+- 验收报告必须区分视觉证据、Network 证据、DB 证据，不能用 DB 推断代替视觉截图。
 
 ---
 
