@@ -180,6 +180,7 @@
                                     <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
                                     <v-btn v-else x-small text color="success" @click="toggleEnabled(item)">恢复</v-btn>
                                     <v-btn v-if="item.fsrs_enabled" x-small text @click="setDueNow(item)">立即到期</v-btn>
+                                    <v-btn x-small text color="primary" @click="confirmReset(item)">重置</v-btn>
                                     <v-btn x-small text color="info" @click="viewSource(item)">查看原文</v-btn>
                                     <v-btn x-small text color="error" @click="confirmDelete(item)">彻底删除</v-btn>
                                 </template>
@@ -223,6 +224,24 @@
                     <v-spacer />
                     <v-btn text @click="archiveDialog = false">取消</v-btn>
                     <v-btn color="warning" @click="doArchive">归档</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Reset confirmation dialog -->
+        <v-dialog v-model="resetDialog" max-width="500">
+            <v-card>
+                <v-card-title>重置为新学卡</v-card-title>
+                <v-card-text>
+                    <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
+                    <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
+                    <p>如果这张卡已归档，重置后会重新启用并进入复习队列。</p>
+                    <p class="font-weight-bold">确定重置吗？</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
+                    <v-btn color="primary" :loading="resetLoading" @click="doReset">确认重置</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -303,6 +322,9 @@ export default {
             sourcePayload: {},
             archiveDialog: false,
             archiveTarget: null,
+            resetDialog: false,
+            resetTarget: null,
+            resetLoading: false,
             deleteDialog: false,
             deleteTarget: null,
             bulkDeleteDialog: false,
@@ -492,6 +514,31 @@ export default {
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
             });
+        },
+
+        confirmReset(item) {
+            this.resetTarget = item;
+            this.resetDialog = true;
+        },
+
+        doReset() {
+            if (!this.resetTarget) return;
+            const item = this.resetTarget;
+            this.resetLoading = true;
+
+            axios.post('/review-cards/manage/' + item.review_card_id + '/reset')
+                .then((response) => {
+                    this.resetDialog = false;
+                    this.resetTarget = null;
+                    this.showSnackbar(response.data.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
+                    this.loadData();
+                })
+                .catch((err) => {
+                    this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
+                })
+                .finally(() => {
+                    this.resetLoading = false;
+                });
         },
 
         confirmDelete(item) {
