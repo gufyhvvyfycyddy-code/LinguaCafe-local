@@ -34,6 +34,12 @@
                 <v-btn small text color="info" @click="viewSource">
                     <v-icon small left>mdi-book-open-page-variant</v-icon>查看原文
                 </v-btn>
+                <v-btn small text color="warning" :loading="archiveLoading" @click="openArchiveDialog">
+                    <v-icon small left>mdi-archive</v-icon>归档
+                </v-btn>
+                <v-btn small text color="error" :loading="deleteLoading" @click="openDeleteDialog">
+                    <v-icon small left>mdi-delete</v-icon>彻底删除
+                </v-btn>
             </div>
 
             <v-row dense>
@@ -76,10 +82,10 @@
             </v-row>
 
             <div class="d-flex justify-center flex-wrap mt-6">
-                <v-btn depressed rounded color="error" class="ma-2" :disabled="rating" @click="rate('again')">忘了</v-btn>
-                <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating" @click="rate('hard')">勉强记得</v-btn>
-                <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating" @click="rate('good')">记得</v-btn>
-                <v-btn depressed rounded color="success" class="ma-2" :disabled="rating" @click="rate('easy')">很熟</v-btn>
+                <v-btn depressed rounded color="error" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('again')">忘了</v-btn>
+                <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('hard')">勉强记得</v-btn>
+                <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('good')">记得</v-btn>
+                <v-btn depressed rounded color="success" class="ma-2" :disabled="rating || archiveLoading || deleteLoading" @click="rate('easy')">很熟</v-btn>
             </div>
         </v-card>
 
@@ -168,6 +174,36 @@
             </v-card>
         </v-dialog>
 
+        <!-- Archive confirmation dialog -->
+        <v-dialog v-model="archiveDialog" max-width="480">
+            <v-card>
+                <v-card-title>确认归档</v-card-title>
+                <v-card-text>
+                    归档后，这张词义卡不会进入日常复习，但释义、例句、复习历史都会保留。确定归档吗？
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="archiveDialog = false" :disabled="archiveLoading">取消</v-btn>
+                    <v-btn color="warning" :loading="archiveLoading" @click="archiveCard">确认归档</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Delete confirmation dialog -->
+        <v-dialog v-model="deleteDialog" max-width="480">
+            <v-card>
+                <v-card-title>确认删除</v-card-title>
+                <v-card-text>
+                    这会删除这张词义复习卡，并让该释义不再出现在阅读页点词结果中。阅读材料、原文位置和复习历史会保留。此操作不可恢复。确定删除吗？
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="deleteDialog = false" :disabled="deleteLoading">取消</v-btn>
+                    <v-btn color="error" :loading="deleteLoading" @click="deleteCard">确认删除</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Source context dialog -->
         <sense-example-dialog
             v-model="sourceDialog"
@@ -214,6 +250,12 @@
                     aliases_zh_text: '',
                     collocations_text: '',
                 },
+                // Archive dialog
+                archiveDialog: false,
+                archiveLoading: false,
+                // Delete dialog
+                deleteDialog: false,
+                deleteLoading: false,
                 // Source context dialog
                 sourceDialog: false,
                 sourcePayload: {},
@@ -365,6 +407,58 @@
                     .catch(() => {
                         this.sourcePayload = { card: card, context: null, error: '获取原文失败。' };
                         this.sourceDialog = true;
+                    });
+            },
+            // ==================== Archive ====================
+            openArchiveDialog() {
+                if (!this.currentCard) {
+                    return;
+                }
+                this.archiveDialog = true;
+            },
+            archiveCard() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                this.archiveLoading = true;
+                axios.patch(`/review-cards/manage/${this.currentCard.review_card_id}/enabled`, {
+                    enabled: false,
+                }).then(() => {
+                    this.archiveDialog = false;
+                    this.showSnackbar('已归档。该卡不会进入日常复习。', 'success');
+                    this.loadCards();
+                }).catch((err) => {
+                    this.showSnackbar(err.response?.data?.message || '归档失败。', 'error');
+                }).finally(() => {
+                    this.archiveLoading = false;
+                });
+            },
+            // ==================== Delete ====================
+            openDeleteDialog() {
+                if (!this.currentCard) {
+                    return;
+                }
+                this.deleteDialog = true;
+            },
+            deleteCard() {
+                if (!this.currentCard) {
+                    return;
+                }
+
+                this.deleteLoading = true;
+                axios.delete(`/review-cards/manage/${this.currentCard.review_card_id}`)
+                    .then((response) => {
+                        this.deleteDialog = false;
+                        const message = response.data?.message || '已彻底删除词义复习卡。';
+                        this.showSnackbar(message, 'success');
+                        this.loadCards();
+                    })
+                    .catch((err) => {
+                        this.showSnackbar(err.response?.data?.message || '删除失败。', 'error');
+                    })
+                    .finally(() => {
+                        this.deleteLoading = false;
                     });
             },
             // ==================== Snackbar ====================

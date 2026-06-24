@@ -1027,6 +1027,186 @@ class ReviewFsrsTest extends TestCase
         $this->assertCount(0, $reviews);
     }
 
+    // ==================== Review-page archive & delete integration ====================
+
+    public function test_archive_card_via_manage_api_excludes_from_senses_review_queue(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'tobearchived', 'noun', '待归档', 'to be archived');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        // Verify card is in review queue before archive
+        $before = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $before->assertOk();
+        $beforeCards = $before->json('cards');
+        $this->assertNotEmpty($beforeCards);
+        $beforeIds = array_column($beforeCards, 'review_card_id');
+        $this->assertContains($card->id, $beforeIds);
+
+        // Archive via manage endpoint (same as what review page does)
+        $this->actingAs($this->user)
+            ->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false])
+            ->assertOk();
+
+        // Verify card is excluded from review queue after archive
+        $after = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $after->assertOk();
+        $afterCards = $after->json('cards');
+        $afterIds = array_column($afterCards, 'review_card_id');
+        $this->assertNotContains($card->id, $afterIds);
+    }
+
+    public function test_archive_via_manage_api_does_not_reject_word_sense(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'archivesense', 'noun', '归档释义', 'archive sense');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $this->actingAs($this->user)
+            ->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false])
+            ->assertOk();
+
+        // WordSense must remain confirmed
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->fresh()->status);
+        // ReviewCard must still exist
+        $this->assertNotNull(ReviewCard::find($card->id));
+        $this->assertFalse(ReviewCard::find($card->id)->fsrs_enabled);
+    }
+
+    public function test_archive_via_manage_api_does_not_create_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'archivenolog', 'noun', '归档无日志', 'archive no log');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)
+            ->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => false])
+            ->assertOk();
+
+        $this->assertSame($oldLogCount, ReviewLog::count());
+    }
+
+    public function test_delete_card_via_manage_api_excludes_from_senses_review_queue(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'tobedeleted', 'noun', '待删除', 'to be deleted');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        // Verify card is in review queue before delete
+        $before = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $before->assertOk();
+        $beforeCards = $before->json('cards');
+        $beforeIds = array_column($beforeCards, 'review_card_id');
+        $this->assertContains($card->id, $beforeIds);
+
+        // Delete via manage endpoint (same as what review page does)
+        $this->actingAs($this->user)
+            ->delete("/review-cards/manage/{$card->id}")
+            ->assertOk();
+
+        // Verify card is excluded from review queue after delete
+        $after = $this->actingAs($this->user)->getJson('/reviews/senses');
+        $after->assertOk();
+        $afterCards = $after->json('cards');
+        $afterIds = array_column($afterCards, 'review_card_id');
+        $this->assertNotContains($card->id, $afterIds);
+    }
+
+    public function test_delete_via_manage_api_rejects_word_sense(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'deletesense', 'noun', '删除释义', 'delete sense');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $this->actingAs($this->user)
+            ->delete("/review-cards/manage/{$card->id}")
+            ->assertOk();
+
+        // WordSense must be rejected
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense->fresh()->status);
+        // ReviewCard must be deleted
+        $this->assertNull(ReviewCard::find($card->id));
+    }
+
+    public function test_delete_via_manage_api_does_not_create_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'deletenolog', 'noun', '删除无日志', 'delete no log');
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $oldLogCount = ReviewLog::count();
+
+        $this->actingAs($this->user)
+            ->delete("/review-cards/manage/{$card->id}")
+            ->assertOk();
+
+        $this->assertSame($oldLogCount, ReviewLog::count());
+    }
+
+    public function test_delete_last_linked_sense_via_manage_api_restores_encountered_word(): void
+    {
+        $word = \App\Models\EncounteredWord::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'stage' => -7,
+            'word' => 'restoreword',
+            'kanji' => '',
+            'reading' => '',
+            'translation' => 'restore translation',
+            'base_word' => '',
+            'base_word_reading' => '',
+            'lookup_count' => 0,
+            'read_count' => 0,
+            'lemma' => '',
+            'added_to_srs' => now()->toDateString(),
+            'next_review' => now()->toDateString(),
+            'relearning' => true,
+        ]);
+
+        $sense = $this->createSense($this->user->id, 'english', 'restoreword', 'noun', '恢复测试', 'restore test');
+        $sense->update(['encountered_word_id' => $word->id]);
+        $card = app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+        $card->update(['fsrs_enabled' => true, 'fsrs_due_at' => now()->subHour()]);
+
+        $this->actingAs($this->user)
+            ->delete("/review-cards/manage/{$card->id}")
+            ->assertOk();
+
+        // EncounteredWord should be restored to New (stage=2)
+        $word->refresh();
+        $this->assertSame(2, $word->stage, 'Word should be restored to New (stage=2)');
+        $this->assertSame(0, (int) $word->relearning);
+        $this->assertNull($word->next_review);
+    }
+
+    public function test_archive_via_manage_api_cannot_cross_user(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', 'otherarchive', 'noun', '他人归档', 'other archive');
+        $otherCard = app(\App\Services\ReviewCardService::class)->ensureSenseCard($otherSense);
+        $otherCard->update(['fsrs_enabled' => true]);
+
+        $response = $this->actingAs($this->user)
+            ->patch("/review-cards/manage/{$otherCard->id}/enabled", ['enabled' => false]);
+
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+        $this->assertTrue($otherCard->fresh()->fsrs_enabled, 'Other user card should remain enabled');
+    }
+
+    public function test_delete_via_manage_api_cannot_cross_user(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', 'otherdelete', 'noun', '他人删除', 'other delete');
+        $otherCard = app(\App\Services\ReviewCardService::class)->ensureSenseCard($otherSense);
+        $otherCard->update(['fsrs_enabled' => true]);
+
+        $response = $this->actingAs($this->user)
+            ->delete("/review-cards/manage/{$otherCard->id}");
+
+        $this->assertTrue(in_array($response->status(), [404, 403]));
+        $this->assertNotNull(ReviewCard::find($otherCard->id), 'Other user card should still exist');
+    }
+
     // ==================== FSRS desired retention configuration ====================
 
     public function test_desired_retention_defaults_to_0_90_when_setting_missing(): void
