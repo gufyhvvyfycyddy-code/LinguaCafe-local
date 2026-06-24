@@ -106,7 +106,7 @@
                                     @change="toggleSelectAll"
                                 />
                             </th>
-                            <th class="col-id">ID</th>
+                            <th class="col-id sortable" @click="toggleSort('id')">ID <span class="sort-icon">{{ sortIcon('id') }}</span></th>
                             <th class="col-lemma">Lemma</th>
                             <th class="col-surface">Surface</th>
                             <th class="col-pos">POS</th>
@@ -115,12 +115,12 @@
                             <th class="col-example">例句(英)</th>
                             <th class="col-example">例句(中)</th>
                             <th class="col-source">溯源</th>
-                            <th class="col-status">状态</th>
-                            <th class="col-fsrs">稳定度</th>
-                            <th class="col-fsrs">难度</th>
-                            <th class="col-fsrs">复习</th>
-                            <th class="col-fsrs">遗忘</th>
-                            <th class="col-due">到期</th>
+                            <th class="col-status sortable" @click="toggleSort('fsrs_state')">状态 <span class="sort-icon">{{ sortIcon('fsrs_state') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_reps')">复习 <span class="sort-icon">{{ sortIcon('fsrs_reps') }}</span></th>
+                            <th class="col-fsrs sortable" @click="toggleSort('fsrs_lapses')">遗忘 <span class="sort-icon">{{ sortIcon('fsrs_lapses') }}</span></th>
+                            <th class="col-due sortable" @click="toggleSort('fsrs_due_at')">到期 <span class="sort-icon">{{ sortIcon('fsrs_due_at') }}</span></th>
                             <th class="col-actions">操作</th>
                         </tr>
                     </thead>
@@ -332,6 +332,8 @@ export default {
             currentFilter: 'enabled',
             perPage: 20,
             currentPage: 1,
+            sortBy: 'id',
+            sortDir: 'desc',
             editingId: null,
             savingId: null,
             editForm: {},
@@ -385,6 +387,20 @@ export default {
                 { label: '今日重置', value: this.fsrsStats.reset_count },
             ];
         },
+        sortableColumns() {
+            return ['id', 'fsrs_state', 'fsrs_stability', 'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses', 'fsrs_due_at'];
+        },
+        columnDefaultDir() {
+            return {
+                id: 'desc',
+                fsrs_state: 'asc',
+                fsrs_stability: 'asc',
+                fsrs_difficulty: 'desc',
+                fsrs_reps: 'desc',
+                fsrs_lapses: 'desc',
+                fsrs_due_at: 'asc',
+            };
+        },
     },
     mounted() {
         this.loadData();
@@ -415,6 +431,8 @@ export default {
                     filter: this.currentFilter,
                     page: this.currentPage,
                     per_page: this.perPage,
+                    sort_by: this.sortBy,
+                    sort_dir: this.sortDir,
                 },
             })
             .then((response) => {
@@ -746,6 +764,34 @@ export default {
             }
             return number.toFixed(2);
         },
+
+        isSortedBy(column) {
+            return this.sortBy === column;
+        },
+
+        sortIcon(column) {
+            if (this.sortBy !== column) {
+                return '↕';
+            }
+            return this.sortDir === 'asc' ? '↑' : '↓';
+        },
+
+        toggleSort(column) {
+            if (!this.sortableColumns.includes(column)) {
+                return;
+            }
+            if (this.sortBy === column) {
+                // Toggle direction
+                this.sortDir = this.sortDir === 'asc' ? 'desc' : 'asc';
+            } else {
+                // New column — use its default direction
+                this.sortBy = column;
+                this.sortDir = (this.columnDefaultDir[column] || 'asc');
+            }
+            this.currentPage = 1;
+            this.clearSelection();
+            this.loadData();
+        },
     },
 };
 </script>
@@ -843,6 +889,28 @@ export default {
 
 .manage-table thead .col-actions {
     z-index: 2;
+}
+
+.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sortable:hover {
+    background: #e0e0e0;
+}
+
+.sort-icon {
+    display: inline-block;
+    width: 14px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #999;
+    margin-left: 2px;
+}
+
+.sortable .sort-icon {
+    color: #1976d2;
 }
 
 .edit-field {

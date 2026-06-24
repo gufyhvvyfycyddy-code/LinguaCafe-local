@@ -2221,6 +2221,322 @@ class ReviewCardManageTest extends TestCase
             'Sense should remain confirmed after edit');
     }
 
+    // ==================== Sorting Tests ====================
+
+    public function test_sort_default_is_id_desc(): void
+    {
+        // Create cards with non-sequential IDs
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'beta', 'sense_key' => hash('sha256', 'english|beta|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $items = $response->json('items');
+
+        // Default sort is id desc — highest id first
+        $this->assertGreaterThanOrEqual(2, count($items));
+        $ids = array_column($items, 'review_card_id');
+        $sorted = $ids;
+        rsort($sorted); // descending
+        $this->assertSame($sorted, $ids, 'Default sort should be id desc');
+    }
+
+    public function test_sort_by_fsrs_due_at_asc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'early']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->subDays(5)]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'late', 'sense_key' => hash('sha256', 'english|late|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDays(5)]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_due_at&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Earlier due_at should come first
+        $this->assertSame($card1->id, $items[0]['review_card_id']);
+        $this->assertSame($card2->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_fsrs_due_at_desc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'early']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->subDays(5)]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'late', 'sense_key' => hash('sha256', 'english|late|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDays(5)]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_due_at&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Later due_at should come first
+        $this->assertSame($card2->id, $items[0]['review_card_id']);
+        $this->assertSame($card1->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_fsrs_stability_asc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'low']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_stability' => 0.5, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'high', 'sense_key' => hash('sha256', 'english|high|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_stability' => 3.0, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_stability&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Lower stability first
+        $this->assertSame($card1->id, $items[0]['review_card_id']);
+        $this->assertSame($card2->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_fsrs_difficulty_desc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'easy']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_difficulty' => 0.3, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'hard', 'sense_key' => hash('sha256', 'english|hard|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_difficulty' => 0.9, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_difficulty&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Higher difficulty first
+        $this->assertSame($card2->id, $items[0]['review_card_id']);
+        $this->assertSame($card1->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_fsrs_reps_desc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'few']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_reps' => 1, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'many', 'sense_key' => hash('sha256', 'english|many|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_reps' => 10, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_reps&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Higher reps first
+        $this->assertSame($card2->id, $items[0]['review_card_id']);
+        $this->assertSame($card1->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_fsrs_lapses_desc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'few_lapses']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_lapses' => 0, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'many_lapses', 'sense_key' => hash('sha256', 'english|many_lapses|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_lapses' => 5, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_lapses&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Higher lapses first
+        $this->assertSame($card2->id, $items[0]['review_card_id']);
+        $this->assertSame($card1->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_invalid_sort_by_falls_back_to_default_column(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'beta', 'sense_key' => hash('sha256', 'english|beta|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+
+        // Invalid sort_by with invalid sort_dir — both fall back to defaults (id desc)
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=malicious;DROP TABLE users;&sort_dir=hacked');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertGreaterThanOrEqual(2, count($items));
+        // Should be sorted by id desc (default), not by malicious injection
+        $ids = array_column($items, 'review_card_id');
+        $sorted = $ids;
+        rsort($sorted);
+        $this->assertSame($sorted, $ids, 'Invalid sort_by with invalid sort_dir should fall back to default id desc');
+    }
+
+    public function test_sort_invalid_sort_dir_falls_back_to_default(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'beta', 'sense_key' => hash('sha256', 'english|beta|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+
+        // Invalid sort_dir should fall back to desc
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=invalid');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertGreaterThanOrEqual(2, count($items));
+        // Should be sorted by id desc (default dir)
+        $ids = array_column($items, 'review_card_id');
+        $sorted = $ids;
+        rsort($sorted);
+        $this->assertSame($sorted, $ids);
+    }
+
+    public function test_sort_does_not_leak_other_user_data(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'mine']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_stability' => 100.0, 'fsrs_state' => 'review']);
+
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'theirs']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCard->update(['fsrs_stability' => 0.1, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_stability&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        // Should only see own card, not other user's
+        $this->assertCount(1, $items);
+        $this->assertSame($card->id, $items[0]['review_card_id']);
+    }
+
+    public function test_sort_does_not_leak_other_language_data(): void
+    {
+        $senseEn = $this->createSense($this->user->id, 'english', ['lemma' => 'english']);
+        $cardEn = $this->createSenseCard($senseEn);
+        $cardEn->update(['fsrs_stability' => 100.0, 'fsrs_state' => 'review']);
+
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'spanish']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardEs->update(['fsrs_stability' => 0.1, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_stability&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        // Should only see english card
+        $this->assertCount(1, $items);
+        $this->assertSame($cardEn->id, $items[0]['review_card_id']);
+    }
+
+    public function test_sort_excludes_rejected_sense(): void
+    {
+        $senseOk = $this->createSense($this->user->id, 'english', ['lemma' => 'confirmed']);
+        $cardOk = $this->createSenseCard($senseOk);
+
+        $senseRejected = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'rejected',
+            'status' => WordSense::STATUS_REJECTED,
+            'sense_key' => hash('sha256', 'english|rejected|noun|测试|test'),
+        ]);
+        $this->createSenseCard($senseRejected);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        // Should only include confirmed sense
+        $this->assertCount(1, $items);
+        $this->assertSame($cardOk->id, $items[0]['review_card_id']);
+    }
+
+    public function test_sort_excludes_legacy_word_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'sense']);
+        $card = $this->createSenseCard($sense);
+
+        $this->createWordCard($this->user->id, 'english', 999);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame($card->id, $items[0]['review_card_id']);
+    }
+
+    public function test_sort_tie_breaker_stability_with_same_fsrs_stability(): void
+    {
+        // Two cards with identical fsrs_stability — tie-breaker (id desc) ensures consistent order
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_stability' => 1.0, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'beta', 'sense_key' => hash('sha256', 'english|beta|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_stability' => 1.0, 'fsrs_state' => 'review']);
+
+        $response1 = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_stability&sort_dir=asc');
+        $response1->assertOk();
+        $items1 = $response1->json('items');
+
+        $response2 = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=fsrs_stability&sort_dir=asc');
+        $items2 = $response2->json('items');
+
+        // Same query should return same order (stable via id tie-breaker)
+        $this->assertSame(
+            array_column($items1, 'review_card_id'),
+            array_column($items2, 'review_card_id'),
+            'Tie-breaker should produce stable ordering'
+        );
+        // Both cards present
+        $ids = array_column($items1, 'review_card_id');
+        $this->assertContains($card1->id, $ids);
+        $this->assertContains($card2->id, $ids);
+    }
+
+    public function test_sort_by_id_asc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'first']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'second', 'sense_key' => hash('sha256', 'english|second|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Ascending: lower id first
+        $this->assertSame($card1->id, $items[0]['review_card_id']);
+        $this->assertSame($card2->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_preserves_pagination(): void
+    {
+        // Create 3 cards, request 2 per page sorted by id asc
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'a']);
+        $card1 = $this->createSenseCard($sense1);
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'b', 'sense_key' => hash('sha256', 'english|b|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $sense3 = $this->createSense($this->user->id, 'english', ['lemma' => 'c', 'sense_key' => hash('sha256', 'english|c|noun|测试|test')]);
+        $card3 = $this->createSenseCard($sense3);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=asc&per_page=2&page=1');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        $this->assertSame($card1->id, $items[0]['review_card_id']);
+        $this->assertSame($card2->id, $items[1]['review_card_id']);
+        $this->assertSame(2, $response->json('pagination.last_page'));
+
+        // Page 2
+        $response2 = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=asc&per_page=2&page=2');
+        $response2->assertOk();
+        $items2 = $response2->json('items');
+        $this->assertCount(1, $items2);
+        $this->assertSame($card3->id, $items2[0]['review_card_id']);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

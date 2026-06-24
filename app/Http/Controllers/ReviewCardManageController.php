@@ -36,6 +36,22 @@ class ReviewCardManageController extends Controller
     ];
 
     /**
+     * Whitelist of sortable columns.
+     * Maps query-param keys to fully-qualified column expressions.
+     * Only review_cards direct fields are supported — no word_senses join.
+     */
+    private const SORTABLE_COLUMNS = [
+        'id'                    => 'review_cards.id',
+        'fsrs_state'            => 'review_cards.fsrs_state',
+        'fsrs_due_at'           => 'review_cards.fsrs_due_at',
+        'fsrs_stability'        => 'review_cards.fsrs_stability',
+        'fsrs_difficulty'       => 'review_cards.fsrs_difficulty',
+        'fsrs_reps'             => 'review_cards.fsrs_reps',
+        'fsrs_lapses'           => 'review_cards.fsrs_lapses',
+        'fsrs_last_reviewed_at' => 'review_cards.fsrs_last_reviewed_at',
+    ];
+
+    /**
      * GET /review-cards/manage/data
      * Read-only paginated list of sense review cards for current user/language.
      */
@@ -119,8 +135,28 @@ class ReviewCardManageController extends Controller
                 break;
         }
 
+        // Sort — whitelist only, no raw user input in orderBy
+        $sortBy = $request->input('sort_by', 'id');
+        $sortDir = strtolower($request->input('sort_dir', 'desc'));
+
+        if (!array_key_exists($sortBy, self::SORTABLE_COLUMNS)) {
+            $sortBy = 'id';
+        }
+
+        if (!in_array($sortDir, ['asc', 'desc'], true)) {
+            $sortDir = 'desc';
+        }
+
+        $sortColumn = self::SORTABLE_COLUMNS[$sortBy];
+        $query->orderBy($sortColumn, $sortDir);
+
+        // Tie-breaker for stable pagination
+        if ($sortBy !== 'id') {
+            $query->orderBy('review_cards.id', 'desc');
+        }
+
         // Paginate
-        $paginator = $query->orderBy('review_cards.id')->paginate($perPage);
+        $paginator = $query->paginate($perPage);
         $cards = $paginator->getCollection();
 
         // Collect all sense IDs
