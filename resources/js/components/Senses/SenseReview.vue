@@ -7,7 +7,16 @@
                 <v-chip class="mx-1" color="foreground">到期数量 {{ summary.due_count || 0 }}</v-chip>
                 <v-chip class="mx-1" color="foreground">已复习 {{ reviewedCount }}</v-chip>
                 <v-chip class="mx-1" color="foreground">剩余 {{ remainingCount }}</v-chip>
+                <!-- FSRS stats: second row -->
+                <v-spacer></v-spacer>
+                <v-chip class="mx-1 my-1" small outlined>今日已复习 {{ fsrsStats.reviewed_today }}</v-chip>
+                <v-chip class="mx-1 my-1" small outlined>今日重置 {{ fsrsStats.reset_count }}</v-chip>
+                <v-chip class="mx-1 my-1" small outlined>总词义卡 {{ fsrsStats.total }}</v-chip>
+                <v-chip class="mx-1 my-1" small outlined>启用中 {{ fsrsStats.enabled }}</v-chip>
+                <v-chip class="mx-1 my-1" small outlined>已归档 {{ fsrsStats.archived }}</v-chip>
+                <v-chip class="mx-1 my-1" small outlined>当前到期 {{ fsrsStats.due }}</v-chip>
             </div>
+            <v-alert v-if="statsError" type="warning" dense text class="mt-2 mb-0">{{ statsError }}</v-alert>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -289,6 +298,26 @@
                     text: '',
                     color: 'success',
                 },
+                // FSRS stats
+                statsLoading: false,
+                statsError: '',
+                fsrsStats: {
+                    total: 0,
+                    enabled: 0,
+                    archived: 0,
+                    due: 0,
+                    by_state: {
+                        new: 0,
+                        learning: 0,
+                        review: 0,
+                        relearning: 0,
+                    },
+                    average_stability: null,
+                    average_difficulty: null,
+                    lapses_total: 0,
+                    reviewed_today: 0,
+                    reset_count: 0,
+                },
             }
         },
         computed: {
@@ -301,8 +330,23 @@
         },
         mounted() {
             this.loadCards();
+            this.loadFsrsStats();
         },
         methods: {
+            loadFsrsStats() {
+                this.statsLoading = true;
+                this.statsError = '';
+                axios.get('/review-cards/stats')
+                    .then((response) => {
+                        this.fsrsStats = response.data;
+                    })
+                    .catch(() => {
+                        this.statsError = 'FSRS 统计加载失败。';
+                    })
+                    .finally(() => {
+                        this.statsLoading = false;
+                    });
+            },
             loadCards() {
                 this.loading = true;
                 this.error = '';
@@ -328,6 +372,7 @@
                     this.reviewedCount++;
                     this.summary = response.data.summary;
                     this.loadCards();
+                    this.loadFsrsStats();
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义卡评分失败。';
                 }).finally(() => {
@@ -452,6 +497,7 @@
                     this.archiveDialog = false;
                     this.showSnackbar('已归档。该卡不会进入日常复习。', 'success');
                     this.loadCards();
+                    this.loadFsrsStats();
                 }).catch((err) => {
                     this.showSnackbar(err.response?.data?.message || '归档失败。', 'error');
                 }).finally(() => {
@@ -476,6 +522,7 @@
                         this.resetDialog = false;
                         this.showSnackbar(response.data?.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
                         this.loadCards();
+                        this.loadFsrsStats();
                     })
                     .catch((err) => {
                         this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
@@ -503,6 +550,7 @@
                         const message = response.data?.message || '已彻底删除词义复习卡。';
                         this.showSnackbar(message, 'success');
                         this.loadCards();
+                        this.loadFsrsStats();
                     })
                     .catch((err) => {
                         this.showSnackbar(err.response?.data?.message || '删除失败。', 'error');
