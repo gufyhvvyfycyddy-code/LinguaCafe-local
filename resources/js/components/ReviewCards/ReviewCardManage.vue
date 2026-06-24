@@ -19,6 +19,15 @@
             </div>
         </div>
 
+        <!-- FSRS Stats Chips -->
+        <v-alert v-if="statsError" type="warning" dense text class="mb-2">{{ statsError }}</v-alert>
+        <div class="d-flex flex-wrap align-center mb-2" style="gap: 4px;">
+            <span class="text-caption text--secondary mr-2">FSRS 总览：</span>
+            <v-chip v-for="chip in statsChips" :key="chip.label" x-small outlined class="mr-1 mb-1">
+                {{ chip.label }} {{ chip.value }}
+            </v-chip>
+        </div>
+
         <!-- Toolbar -->
         <v-row class="mb-3" dense align="center">
             <v-col cols="12" sm="5" md="4">
@@ -331,6 +340,21 @@ export default {
             selectedIds: [],
             selectAll: false,
             snackbar: { show: false, text: '', color: 'success' },
+            // FSRS stats
+            statsLoading: false,
+            statsError: '',
+            fsrsStats: {
+                total: 0,
+                enabled: 0,
+                archived: 0,
+                due: 0,
+                by_state: { new: 0, learning: 0, review: 0, relearning: 0 },
+                average_stability: null,
+                average_difficulty: null,
+                lapses_total: 0,
+                reviewed_today: 0,
+                reset_count: 0,
+            },
         };
     },
     computed: {
@@ -339,11 +363,40 @@ export default {
             if (this.items.length === 0) return false;
             return this.selectedIds.length < this.items.length;
         },
+        statsChips() {
+            return [
+                { label: '总词义卡', value: this.fsrsStats.total },
+                { label: '启用中', value: this.fsrsStats.enabled },
+                { label: '已归档', value: this.fsrsStats.archived },
+                { label: '当前到期', value: this.fsrsStats.due },
+                { label: '新卡', value: this.fsrsStats.by_state.new },
+                { label: '学习中', value: this.fsrsStats.by_state.learning },
+                { label: '复习中', value: this.fsrsStats.by_state.review },
+                { label: '重新学习', value: this.fsrsStats.by_state.relearning },
+                { label: '今日已复习', value: this.fsrsStats.reviewed_today },
+                { label: '今日重置', value: this.fsrsStats.reset_count },
+            ];
+        },
     },
     mounted() {
         this.loadData();
+        this.loadFsrsStats();
     },
     methods: {
+        loadFsrsStats() {
+            this.statsLoading = true;
+            this.statsError = '';
+            axios.get('/review-cards/stats')
+                .then((response) => {
+                    this.fsrsStats = response.data;
+                })
+                .catch(() => {
+                    this.statsError = 'FSRS 统计加载失败。';
+                })
+                .finally(() => {
+                    this.statsLoading = false;
+                });
+        },
         loadData(allowPageFallback = true) {
             this.loading = true;
             this.error = '';
@@ -487,6 +540,7 @@ export default {
             .then(() => {
                 this.showSnackbar('已恢复。该卡会重新进入日常复习。', 'success');
                 this.loadData();
+                this.loadFsrsStats();
             })
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
@@ -510,6 +564,7 @@ export default {
             .then(() => {
                 this.showSnackbar('已归档。该卡不会进入日常复习。', 'warning');
                 this.loadData();
+                this.loadFsrsStats();
             })
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
@@ -532,6 +587,7 @@ export default {
                     this.resetTarget = null;
                     this.showSnackbar(response.data.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
                     this.loadData();
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
@@ -557,6 +613,7 @@ export default {
                     this.showSnackbar(response.data.message || '已彻底删除词义复习卡。该释义不会再出现在阅读页。', 'success');
                     this.selectedIds = this.selectedIds.filter(id => id !== item.review_card_id);
                     this.loadData();
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.error = '删除失败：' + (err.response?.data?.message || err.message);
@@ -577,6 +634,7 @@ export default {
                     this.clearSelection();
                     this.showSnackbar(response.data.message || '已彻底删除词义复习卡。', 'success');
                     this.loadData();
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.error = '批量删除失败：' + (err.response?.data?.message || err.message);
@@ -592,6 +650,7 @@ export default {
                     this.clearSelection();
                     this.showSnackbar(response.data.message || '已批量归档。', 'warning');
                     this.loadData();
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.error = '批量归档失败：' + (err.response?.data?.message || err.message);
@@ -607,6 +666,7 @@ export default {
                     this.clearSelection();
                     this.showSnackbar(response.data.message || '已批量恢复。', 'success');
                     this.loadData();
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.error = '批量恢复失败：' + (err.response?.data?.message || err.message);
@@ -624,6 +684,7 @@ export default {
                     if (idx >= 0) {
                         this.$set(this.items, idx, response.data);
                     }
+                    this.loadFsrsStats();
                 })
                 .catch((err) => {
                     this.error = '操作失败：' + (err.response?.data?.message || err.message);
