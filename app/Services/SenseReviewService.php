@@ -39,10 +39,33 @@ class SenseReviewService
         return $card ? $this->serializeCard($card) : null;
     }
 
+    /**
+     * SQL-level COUNT of due sense review cards.
+     *
+     * Uses the same filter conditions as dueCards() but runs a single
+     * SQL COUNT query instead of hydrating the full card collection.
+     */
+    public function dueCount(int $userId, string $language): int
+    {
+        return ReviewCard::query()
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('review_cards.fsrs_enabled', true)
+            ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->count();
+    }
+
     public function summary(int $userId, string $language): array
     {
         return [
-            'due_count' => $this->dueCards($userId, $language)->count(),
+            'due_count' => $this->dueCount($userId, $language),
         ];
     }
 

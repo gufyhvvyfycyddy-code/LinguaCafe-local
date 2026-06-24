@@ -201,6 +201,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/senses/occurrences/{id}/ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'ignore']);
 
     // review card management
+    Route::get('/review-cards/stats', [App\Http\Controllers\ReviewStatsController::class, 'index']);
     Route::get('/review-cards/manage/data', [App\Http\Controllers\ReviewCardManageController::class, 'data']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
