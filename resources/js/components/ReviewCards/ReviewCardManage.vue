@@ -116,6 +116,10 @@
                             <th class="col-example">例句(中)</th>
                             <th class="col-source">溯源</th>
                             <th class="col-status">状态</th>
+                            <th class="col-fsrs">稳定度</th>
+                            <th class="col-fsrs">难度</th>
+                            <th class="col-fsrs">复习</th>
+                            <th class="col-fsrs">遗忘</th>
                             <th class="col-due">到期</th>
                             <th class="col-actions">操作</th>
                         </tr>
@@ -174,6 +178,10 @@
                                 </v-chip>
                                 <span class="text-caption d-block">{{ item.fsrs_state }}</span>
                             </td>
+                            <td class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_stability) }}</td>
+                            <td class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_difficulty) }}</td>
+                            <td class="col-fsrs text-center">{{ item.fsrs_reps || 0 }}</td>
+                            <td class="col-fsrs text-center">{{ item.fsrs_lapses || 0 }}</td>
                             <td class="col-due">
                                 <span class="text-caption">{{ formatDueAt(item.fsrs_due_at) }}</span>
                             </td>
@@ -196,7 +204,7 @@
                             </td>
                         </tr>
                         <tr v-if="!loading && items.length === 0">
-                            <td colspan="13" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
+                            <td colspan="17" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
                         </tr>
                     </tbody>
                 </table>
@@ -727,6 +735,17 @@ export default {
             const d = new Date(isoString);
             return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         },
+
+        formatFsrsNumber(value) {
+            if (value === null || value === undefined || value === '') {
+                return '—';
+            }
+            const number = Number(value);
+            if (Number.isNaN(number)) {
+                return '—';
+            }
+            return number.toFixed(2);
+        },
     },
 };
 </script>
@@ -760,7 +779,7 @@ export default {
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    min-width: 1200px;
+    min-width: 1600px;
 }
 
 .manage-table thead {
@@ -805,6 +824,7 @@ export default {
 .col-source { min-width: 90px; }
 .col-status { width: 80px; }
 .col-due { width: 90px; }
+.col-fsrs { width: 70px; text-align: center; }
 
 /* Sticky operations column */
 .col-actions {
