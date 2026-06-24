@@ -86,6 +86,15 @@
                                 @change="toggleColumnVisibility(col.key)"
                             />
                             <v-divider class="my-2" />
+                            <v-switch
+                                v-model="compactMode"
+                                label="紧凑模式"
+                                dense
+                                hide-details
+                                class="ma-0 pa-0"
+                                @change="saveCompactMode"
+                            />
+                            <v-divider class="my-2" />
                             <div class="d-flex" style="gap: 4px;">
                                 <v-btn x-small text @click="resetColumnDefaults">恢复默认</v-btn>
                                 <v-btn x-small text @click="showAllColumns">全部显示</v-btn>
@@ -195,7 +204,7 @@
         <!-- Cards table -->
         <v-card class="manage-table-card">
             <div class="table-wrapper">
-                <table class="manage-table" :style="{ minWidth: tableMinWidth }">
+                <table class="manage-table" :class="{ 'table--compact': compactMode }" :style="{ minWidth: tableMinWidth }">
                     <thead>
                         <tr>
                             <th class="col-check">
@@ -545,6 +554,8 @@ export default {
                 { key: 'fsrs_last_reviewed_at', label: '最近复习' },
                 { key: 'fsrs_due_at', label: '到期' },
             ],
+            // Compact mode
+            compactMode: false,
         };
     },
     computed: {
@@ -603,7 +614,7 @@ export default {
             return pinnedVisible + configVisible;
         },
         tableMinWidth() {
-            let width = 1640;
+            let width = this.compactMode ? 1480 : 1640;
             if (!this.isColumnVisible('sense_en')) width -= 100;
             if (!this.isColumnVisible('example_sentence_en')) width -= 140;
             if (!this.isColumnVisible('example_sentence_zh')) width -= 140;
@@ -612,6 +623,7 @@ export default {
     },
     mounted() {
         this.loadColumnSettings();
+        this.loadCompactMode();
         this.loadData();
         this.loadFsrsStats();
     },
@@ -1088,6 +1100,9 @@ export default {
             this.columnSettings = { ...this.columnDefaults };
             this.saveColumnSettings();
             this.ensureVisibleSortColumn();
+            // Also disable compact mode
+            this.compactMode = false;
+            this.saveCompactMode();
         },
 
         showAllColumns() {
@@ -1101,6 +1116,24 @@ export default {
             if (!this.isColumnVisible(this.sortBy)) {
                 this.sortBy = 'id';
                 this.sortDir = 'desc';
+            }
+        },
+
+        // Compact mode methods
+        loadCompactMode() {
+            try {
+                const saved = DefaultLocalStorageManager.loadSetting('reviewCardManageCompactMode');
+                this.compactMode = saved === true;
+            } catch (e) {
+                this.compactMode = false;
+            }
+        },
+
+        saveCompactMode() {
+            try {
+                DefaultLocalStorageManager.saveSetting('reviewCardManageCompactMode', this.compactMode);
+            } catch (e) {
+                // localStorage full or unavailable — silently ignore
             }
         },
     },
@@ -1231,5 +1264,32 @@ export default {
 
 .v-btn-toggle.flex-wrap {
     flex-wrap: wrap;
+}
+
+/* Compact mode */
+.manage-table.table--compact th {
+    padding: 6px 4px;
+    font-size: 0.72rem;
+}
+
+.manage-table.table--compact td {
+    padding: 4px;
+    font-size: 0.75rem;
+}
+
+.manage-table.table--compact .col-check { width: 34px; }
+.manage-table.table--compact .col-id { width: 44px; }
+.manage-table.table--compact .col-lemma { min-width: 80px; }
+.manage-table.table--compact .col-surface { min-width: 70px; }
+.manage-table.table--compact .col-pos { width: 60px; }
+.manage-table.table--compact .col-def { min-width: 90px; }
+.manage-table.table--compact .col-example { min-width: 120px; }
+.manage-table.table--compact .col-source { min-width: 78px; }
+.manage-table.table--compact .col-status { width: 70px; }
+.manage-table.table--compact .col-due { width: 78px; }
+.manage-table.table--compact .col-fsrs { width: 58px; }
+.manage-table.table--compact .col-last-review { width: 78px; }
+.manage-table.table--compact .col-actions {
+    min-width: 145px;
 }
 </style>
