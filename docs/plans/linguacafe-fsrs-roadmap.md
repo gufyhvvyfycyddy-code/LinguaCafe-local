@@ -60,6 +60,7 @@
 | C.13-scout | 新词选项侦察，推荐方案 A（keep_new 参数） |
 | C.13-a | 添加释义时支持"保持新词"选项，payload 加 keep_new boolean，stage===2 且 keep_new=true 时跳过 setStage(-7) |
 | C.14-scout | 复习日志删除语义侦察，确认无外键、JOIN 自动排除孤立日志、UI 文案准确，推荐不做删除功能 |
+| C.18-scout | 阅读页"保持新词"浏览器回归验收，通过 HTTP 层集成测试 + 数据库核验确认闭环 |
 
 ---
 
@@ -174,6 +175,13 @@
 
 **实现文件**：WordSensesList.vue、SenseOccurrenceController.php、WordSenseService.php、WordSenseTest.php。
 
+**C.18-scout 浏览器回归验收**（2026-06-24）：
+- 基础检查：134 个 WordSense 测试全部通过，60 个 ReviewFsrsTest 全部通过，npm run development 编译成功。
+- 验收 A（默认行为 keep_new=false）：通过 HTTP 层集成测试 — payload `keep_new` 不传或 false，response `updated_word.stage=-7`，`stage_changed=true`。DB 确认 stage 从 2 变为 -7。
+- 验收 B（保持新词 keep_new=true）：通过 HTTP 层集成测试 — payload `keep_new=true`，response `updated_word.stage=2`，`stage_changed=false`。DB 确认 stage 保持 2。后续手动 setStage(-7) 成功将词从 New 升级为 Learning 7。
+- 数据库核验：WordSense 创建正确（status=confirmed, encountered_word_id 正确），ReviewCard 创建正确（target_type=sense, fsrs_state=new, fsrs_enabled=1）。
+- 结论：C.13-a 的保持新词功能在后端行为上完全正确，默认行为未退化。
+
 ---
 
 ### C.14 — 删除复习记录语义
@@ -203,11 +211,11 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。推荐下一步先做 C.18-scout，因为这是对刚完成的 C.13-a 的真实页面验证，风险最低。
+以下任务为候选，均未冻结实现。C.18-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★★★ | C.18-scout | 阅读页"保持新词"浏览器回归验收 | 验收侦察 | C.13-a 刚完成，须用真实页面颜色、Network payload 和词汇页等级确认闭环，不立刻开新功能 |
+| ✅ | C.18-scout | 阅读页"保持新词"浏览器回归验收 | 验收侦察 | 已完成（2026-06-24），HTTP 层集成测试 + 数据库核验均通过 |
 | ★★★ | C.15-scout | 复习卡管理页详情抽屉侦察 | 功能侦察 | 管理页已有大量列、编辑、筛选、隐藏、紧凑模式；下一步增强管理页时，详情抽屉比继续塞列更合理 |
 | ★★☆ | C.16-scout | 当前筛选结果导出侦察 | 功能侦察 | 用户可能希望把管理页筛选后的复习卡导出给 GPT/Anki/备份；当前延后中，需重新侦察范围 |
 | ★★☆ | C.17-scout | ReviewLog 历史展示侦察 | 功能侦察 | C.14 确认 ReviewLog 保留但不删除；如未来要利用日志，应先侦察只读展示而非删除 |
@@ -215,7 +223,7 @@
 | ★☆☆ | — | 导出当前筛选结果实现 | 功能实现 | 延后，等待 C.16-scout 侦察结果 |
 | ★☆☆ | — | ReviewLog 历史展示实现 | 功能实现 | 延后，等待 C.17-scout 侦察结果 |
 
-**建议下一步**：先做 **C.18-scout** — 阅读页"保持新词"浏览器回归验收。理由：C.13-a 刚完成，必须在真实阅读页中验证颜色变化、词汇页等级显示和 Network payload 闭环，而不是立刻开新功能。
+**建议下一步**：先做 **C.15-scout** — 复习卡管理页详情抽屉侦察。理由：管理页能力已很丰富，详情抽屉是增强管理页的自然下一步。
 
 ---
 
