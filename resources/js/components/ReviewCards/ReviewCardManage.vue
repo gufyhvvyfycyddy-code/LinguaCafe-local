@@ -301,9 +301,22 @@
                                     <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
                                     <v-btn v-else x-small text color="success" @click="toggleEnabled(item)">恢复</v-btn>
                                     <v-btn v-if="item.fsrs_enabled" x-small text @click="setDueNow(item)">立即到期</v-btn>
-                                    <v-btn x-small text color="primary" @click="confirmReset(item)">重置</v-btn>
-                                    <v-btn x-small text color="info" @click="viewSource(item)">查看原文</v-btn>
-                                    <v-btn x-small text color="error" @click="confirmDelete(item)">彻底删除</v-btn>
+                                    <v-menu offset-y>
+                                        <template #activator="{ on, attrs }">
+                                            <v-btn x-small text v-bind="attrs" v-on="on">更多</v-btn>
+                                        </template>
+                                        <v-list dense>
+                                            <v-list-item @click="viewSource(item)">
+                                                <v-list-item-title>查看原文</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="confirmReset(item)">
+                                                <v-list-item-title>重置</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="confirmDelete(item)">
+                                                <v-list-item-title class="error--text">彻底删除</v-list-item-title>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-menu>
                                 </template>
                             </td>
                         </tr>
@@ -590,7 +603,7 @@ export default {
             return pinnedVisible + configVisible;
         },
         tableMinWidth() {
-            let width = 1700;
+            let width = 1640;
             if (!this.isColumnVisible('sense_en')) width -= 100;
             if (!this.isColumnVisible('example_sentence_en')) width -= 140;
             if (!this.isColumnVisible('example_sentence_zh')) width -= 140;
@@ -1172,7 +1185,7 @@ export default {
 
 /* Sticky operations column */
 .col-actions {
-    min-width: 220px;
+    min-width: 160px;
     white-space: nowrap;
     position: sticky;
     right: 0;
