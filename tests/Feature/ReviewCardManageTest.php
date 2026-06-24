@@ -2537,6 +2537,364 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame($card3->id, $items2[0]['review_card_id']);
     }
 
+    // ==================== Advanced Filter Tests ====================
+
+    public function test_advanced_filter_fsrs_states_single_new(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_state' => 'new']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'reviewCard', 'sense_key' => hash('sha256', 'english|reviewCard|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_state' => 'review']);
+
+        // Default filter=enabled, so request with explicit filter=all to see both
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('newCard', $items[0]['lemma']);
+        $this->assertSame('new', $items[0]['fsrs_state']);
+    }
+
+    public function test_advanced_filter_fsrs_states_multi_new_and_review(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_state' => 'new']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'reviewCard', 'sense_key' => hash('sha256', 'english|reviewCard|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_state' => 'review']);
+
+        $sense3 = $this->createSense($this->user->id, 'english', ['lemma' => 'learningCard', 'sense_key' => hash('sha256', 'english|learningCard|noun|测试|test')]);
+        $card3 = $this->createSenseCard($sense3);
+        $card3->update(['fsrs_state' => 'learning']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new&fsrs_states[]=review');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        $states = array_column($items, 'fsrs_state');
+        $this->assertContains('new', $states);
+        $this->assertContains('review', $states);
+        $this->assertNotContains('learning', $states);
+    }
+
+    public function test_advanced_filter_fsrs_states_invalid_ignored(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_state' => 'new']);
+
+        // Invalid fsrs_states value should be ignored, so no filter applied
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=invalid_state');
+        $response->assertOk();
+        $items = $response->json('items');
+        // Invalid value ignored → no state filter → sees all cards
+        $this->assertCount(1, $items);
+        $this->assertSame('newCard', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_fsrs_states_empty_no_filter(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_state' => 'new']);
+
+        // Empty array should not filter — all cards visible
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+    }
+
+    public function test_advanced_filter_due_range_overdue(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'overdue']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->subDay()]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'future', 'sense_key' => hash('sha256', 'english|future|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDay()]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=overdue');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('overdue', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_due_range_today(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'today']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->addHours(2)]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'future', 'sense_key' => hash('sha256', 'english|future|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDays(10)]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=today');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('today', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_due_range_next7(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'next7']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->addDays(3)]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'farFuture', 'sense_key' => hash('sha256', 'english|farFuture|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDays(30)]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=next7');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('next7', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_due_range_future(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'past']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => now()->subDay()]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'future', 'sense_key' => hash('sha256', 'english|future|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()->addDay()]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=future');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('future', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_due_range_none(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'noDue']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_due_at' => null]);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'hasDue', 'sense_key' => hash('sha256', 'english|hasDue|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_due_at' => now()]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=none');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('noDue', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_due_range_invalid_treats_as_all(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_due_at' => now()]);
+
+        // Invalid due_range should fall back to 'all' → no filter
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=invalid_range');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+    }
+
+    public function test_advanced_filter_reps_min(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'fewReps']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_reps' => 1, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'manyReps', 'sense_key' => hash('sha256', 'english|manyReps|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_reps' => 10, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&reps_min=5');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('manyReps', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_lapses_min(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'noLapses']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_lapses' => 0, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'hasLapses', 'sense_key' => hash('sha256', 'english|hasLapses|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_lapses' => 3, 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&lapses_min=1');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('hasLapses', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_reps_min_invalid_ignored(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_reps' => 5, 'fsrs_state' => 'review']);
+
+        // Invalid reps_min — non-numeric, should be ignored
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&reps_min=hello');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+    }
+
+    public function test_advanced_filter_lapses_min_invalid_ignored(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_lapses' => 2, 'fsrs_state' => 'review']);
+
+        // Invalid lapses_min — non-numeric, should be ignored
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&lapses_min=abc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+    }
+
+    public function test_advanced_filter_combined_with_search(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'apple']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_state' => 'new']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'banana', 'sense_key' => hash('sha256', 'english|banana|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_state' => 'new']);
+
+        // Search for 'apple' + filter new → only 'apple' card
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&q=apple&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('apple', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_combined_with_preset_filter(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'enabledNew']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_enabled' => true, 'fsrs_state' => 'new']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabledNew', 'sense_key' => hash('sha256', 'english|disabledNew|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_enabled' => false, 'fsrs_state' => 'new']);
+
+        // filter=enabled + fsrs_states=new → only enabled new card
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=enabled&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('enabledNew', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_combined_with_sort(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'lowReps']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_reps' => 1, 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'highReps', 'sense_key' => hash('sha256', 'english|highReps|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_reps' => 10, 'fsrs_state' => 'review']);
+
+        // filter all + sort by fsrs_reps desc
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&sort_by=fsrs_reps&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        $this->assertSame('highReps', $items[0]['lemma']);
+        $this->assertSame('lowReps', $items[1]['lemma']);
+    }
+
+    public function test_advanced_filter_does_not_leak_other_user_data(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'mine']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_state' => 'new']);
+
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'theirs']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCard->update(['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('mine', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_does_not_leak_other_language_data(): void
+    {
+        $senseEn = $this->createSense($this->user->id, 'english', ['lemma' => 'english']);
+        $cardEn = $this->createSenseCard($senseEn);
+        $cardEn->update(['fsrs_state' => 'new']);
+
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'spanish']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardEs->update(['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('english', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_excludes_rejected_sense(): void
+    {
+        $senseOk = $this->createSense($this->user->id, 'english', ['lemma' => 'ok']);
+        $cardOk = $this->createSenseCard($senseOk);
+        $cardOk->update(['fsrs_state' => 'new']);
+
+        $senseRejected = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'rejected',
+            'status' => WordSense::STATUS_REJECTED,
+            'sense_key' => hash('sha256', 'english|rejected|noun|测试|test'),
+        ]);
+        $cardRejected = $this->createSenseCard($senseRejected);
+        $cardRejected->update(['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('ok', $items[0]['lemma']);
+    }
+
+    public function test_advanced_filter_excludes_legacy_word_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'sense']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_state' => 'new']);
+
+        // Create a legacy word card (target_type=word) — it has no 'sense' relation
+        // so it would fail the whereHas('sense') constraint already
+        $this->createWordCard($this->user->id, 'english', 999);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=new');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame('sense', $items[0]['lemma']);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

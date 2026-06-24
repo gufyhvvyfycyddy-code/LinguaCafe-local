@@ -66,6 +66,78 @@
             </v-col>
         </v-row>
 
+        <!-- Advanced Filter Panel -->
+        <v-expansion-panels v-model="advancedPanelOpen" flat class="mb-3">
+            <v-expansion-panel>
+                <v-expansion-panel-header class="font-weight-medium">
+                    高级筛选
+                    <v-chip v-if="hasAdvancedFilter" x-small color="primary" class="ml-2" label>已启用</v-chip>
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                    <v-row dense>
+                        <!-- FSRS States multi-select -->
+                        <v-col cols="12" sm="6" md="3">
+                            <div class="text-caption text--secondary mb-1">FSRS 状态</div>
+                            <div class="d-flex flex-wrap" style="gap: 4px;">
+                                <v-chip
+                                    v-for="state in fsrsStateOptions"
+                                    :key="state.value"
+                                    small
+                                    :color="advancedFilters.fsrsStates.includes(state.value) ? 'primary' : ''"
+                                    :outlined="!advancedFilters.fsrsStates.includes(state.value)"
+                                    @click="toggleFsrsState(state.value)"
+                                    style="cursor: pointer;"
+                                >
+                                    {{ state.label }}
+                                </v-chip>
+                            </div>
+                        </v-col>
+
+                        <!-- Due Range -->
+                        <v-col cols="12" sm="6" md="3">
+                            <v-select
+                                v-model="advancedFilters.dueRange"
+                                :items="dueRangeOptions"
+                                label="到期范围"
+                                dense
+                                hide-details
+                            />
+                        </v-col>
+
+                        <!-- Reps Min -->
+                        <v-col cols="6" sm="3" md="2">
+                            <v-text-field
+                                v-model="advancedFilters.repsMin"
+                                label="最少复习次数"
+                                type="number"
+                                min="0"
+                                dense
+                                hide-details
+                            />
+                        </v-col>
+
+                        <!-- Lapses Min -->
+                        <v-col cols="6" sm="3" md="2">
+                            <v-text-field
+                                v-model="advancedFilters.lapsesMin"
+                                label="最少遗忘次数"
+                                type="number"
+                                min="0"
+                                dense
+                                hide-details
+                            />
+                        </v-col>
+
+                        <!-- Actions -->
+                        <v-col cols="12" sm="6" md="2" class="d-flex align-end" style="gap: 8px;">
+                            <v-btn small color="primary" @click="applyAdvancedFilter">应用筛选</v-btn>
+                            <v-btn small text @click="clearAdvancedFilter">清空高级筛选</v-btn>
+                        </v-col>
+                    </v-row>
+                </v-expansion-panel-content>
+            </v-expansion-panel>
+        </v-expansion-panels>
+
         <!-- Bulk action bar -->
         <div v-if="selectedIds.length > 0" class="bulk-action-bar d-flex flex-wrap align-center pa-3 mb-3 rounded-lg">
             <v-checkbox
@@ -350,6 +422,28 @@ export default {
             selectedIds: [],
             selectAll: false,
             snackbar: { show: false, text: '', color: 'success' },
+            // Advanced filters
+            advancedPanelOpen: undefined,
+            advancedFilters: {
+                fsrsStates: [],
+                dueRange: 'all',
+                repsMin: null,
+                lapsesMin: null,
+            },
+            fsrsStateOptions: [
+                { label: '新卡', value: 'new' },
+                { label: '学习中', value: 'learning' },
+                { label: '复习中', value: 'review' },
+                { label: '重新学习', value: 'relearning' },
+            ],
+            dueRangeOptions: [
+                { text: '全部', value: 'all' },
+                { text: '已逾期', value: 'overdue' },
+                { text: '今天', value: 'today' },
+                { text: '未来 7 天', value: 'next7' },
+                { text: '未来', value: 'future' },
+                { text: '无到期', value: 'none' },
+            ],
             // FSRS stats
             statsLoading: false,
             statsError: '',
@@ -401,6 +495,12 @@ export default {
                 fsrs_due_at: 'asc',
             };
         },
+        hasAdvancedFilter() {
+            return this.advancedFilters.fsrsStates.length > 0
+                || this.advancedFilters.dueRange !== 'all'
+                || this.advancedFilters.repsMin !== null
+                || this.advancedFilters.lapsesMin !== null;
+        },
     },
     mounted() {
         this.loadData();
@@ -433,6 +533,10 @@ export default {
                     per_page: this.perPage,
                     sort_by: this.sortBy,
                     sort_dir: this.sortDir,
+                    fsrs_states: this.advancedFilters.fsrsStates,
+                    due_range: this.advancedFilters.dueRange,
+                    reps_min: this.advancedFilters.repsMin,
+                    lapses_min: this.advancedFilters.lapsesMin,
                 },
             })
             .then((response) => {
@@ -788,6 +892,34 @@ export default {
                 this.sortBy = column;
                 this.sortDir = (this.columnDefaultDir[column] || 'asc');
             }
+            this.currentPage = 1;
+            this.clearSelection();
+            this.loadData();
+        },
+
+        // Advanced filter methods
+        toggleFsrsState(value) {
+            const index = this.advancedFilters.fsrsStates.indexOf(value);
+            if (index >= 0) {
+                this.advancedFilters.fsrsStates.splice(index, 1);
+            } else {
+                this.advancedFilters.fsrsStates.push(value);
+            }
+        },
+
+        applyAdvancedFilter() {
+            this.currentPage = 1;
+            this.clearSelection();
+            this.loadData();
+        },
+
+        clearAdvancedFilter() {
+            this.advancedFilters = {
+                fsrsStates: [],
+                dueRange: 'all',
+                repsMin: null,
+                lapsesMin: null,
+            };
             this.currentPage = 1;
             this.clearSelection();
             this.loadData();

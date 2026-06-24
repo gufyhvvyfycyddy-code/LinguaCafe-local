@@ -135,6 +135,9 @@ class ReviewCardManageController extends Controller
                 break;
         }
 
+        // Advanced filters — all within security scope (user_id/language_id/sense confirmed)
+        $this->applyAdvancedFilters($query, $request);
+
         // Sort — whitelist only, no raw user input in orderBy
         $sortBy = $request->input('sort_by', 'id');
         $sortDir = strtolower($request->input('sort_dir', 'desc'));
@@ -487,6 +490,64 @@ class ReviewCardManageController extends Controller
     }
 
     // ==================== Private helpers ====================
+
+    /**
+     * Apply advanced filter query parameters within the already-scoped query.
+     * All filters use whitelist/enum/int-safe parsing — no raw user input in SQL.
+     */
+    private function applyAdvancedFilters($query, Request $request): void
+    {
+        // fsrs_states[] — whitelist each value
+        $allowedStates = ['new', 'learning', 'review', 'relearning'];
+        $fsrsStates = $request->input('fsrs_states', []);
+        if (is_array($fsrsStates) && !empty($fsrsStates)) {
+            $validStates = array_values(array_intersect($fsrsStates, $allowedStates));
+            if (!empty($validStates)) {
+                $query->whereIn('review_cards.fsrs_state', $validStates);
+            }
+        }
+
+        // due_range — whitelist via switch
+        $dueRange = $request->input('due_range', 'all');
+        $allowedRanges = ['all', 'overdue', 'today', 'next7', 'future', 'none'];
+        if (!in_array($dueRange, $allowedRanges, true)) {
+            $dueRange = 'all';
+        }
+        switch ($dueRange) {
+            case 'overdue':
+                $query->where('review_cards.fsrs_due_at', '<', Carbon::today());
+                break;
+            case 'today':
+                $query->whereBetween('review_cards.fsrs_due_at', [Carbon::today(), Carbon::tomorrow()]);
+                break;
+            case 'next7':
+                $query->whereBetween('review_cards.fsrs_due_at', [Carbon::now(), Carbon::now()->addDays(7)]);
+                break;
+            case 'future':
+                $query->where('review_cards.fsrs_due_at', '>', Carbon::now());
+                break;
+            case 'none':
+                $query->whereNull('review_cards.fsrs_due_at');
+                break;
+            case 'all':
+            default:
+                break; // no filter
+        }
+
+        // reps_min — non-negative int, ctype_digit guard
+        $repsMin = $request->input('reps_min');
+        if ($repsMin !== null && $repsMin !== '' && ctype_digit((string) $repsMin)) {
+            $repsMin = (int) $repsMin;
+            $query->where('review_cards.fsrs_reps', '>=', $repsMin);
+        }
+
+        // lapses_min — non-negative int, ctype_digit guard
+        $lapsesMin = $request->input('lapses_min');
+        if ($lapsesMin !== null && $lapsesMin !== '' && ctype_digit((string) $lapsesMin)) {
+            $lapsesMin = (int) $lapsesMin;
+            $query->where('review_cards.fsrs_lapses', '>=', $lapsesMin);
+        }
+    }
 
     /**
      * Security query: find a manageable sense card scoped to current user/language.
