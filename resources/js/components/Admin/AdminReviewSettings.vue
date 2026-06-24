@@ -81,6 +81,118 @@
             </v-card-text>
         </v-card>
 
+        <!-- FSRS Stats Overview Card -->
+        <v-card outlined class="rounded-lg mt-4" :loading="statsLoading">
+            <v-card-title>FSRS 统计总览</v-card-title>
+            <v-card-subtitle>仅统计当前语言下的词义复习卡，不包含旧单词卡。</v-card-subtitle>
+            <v-card-text>
+                <v-alert v-if="statsError" type="error" dense outlined class="mb-4">{{ statsError }}</v-alert>
+
+                <div v-if="!statsError && fsrsStats.total === 0 && !statsLoading" class="text--secondary py-4 text-center">
+                    当前没有词义复习卡。
+                </div>
+
+                <div v-if="!statsError && fsrsStats.total > 0">
+                    <!-- Row 1: Summary -->
+                    <div class="text-caption text--secondary mb-2">概况</div>
+                    <v-row dense class="mb-4">
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.total }}</div>
+                                <div class="text-caption text--secondary">总词义卡</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.enabled }}</div>
+                                <div class="text-caption text--secondary">启用中</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.archived }}</div>
+                                <div class="text-caption text--secondary">已归档</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.due }}</div>
+                                <div class="text-caption text--secondary">当前到期</div>
+                            </v-sheet>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Row 2: State Distribution -->
+                    <div class="text-caption text--secondary mb-2">状态分布</div>
+                    <v-row dense class="mb-4">
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.by_state.new }}</div>
+                                <div class="text-caption text--secondary">新卡</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.by_state.learning }}</div>
+                                <div class="text-caption text--secondary">学习中</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.by_state.review }}</div>
+                                <div class="text-caption text--secondary">复习中</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.by_state.relearning }}</div>
+                                <div class="text-caption text--secondary">重新学习</div>
+                            </v-sheet>
+                        </v-col>
+                    </v-row>
+
+                    <!-- Row 3: FSRS Proficiency -->
+                    <div class="text-caption text--secondary mb-2">FSRS 熟练度</div>
+                    <v-row dense class="mb-2">
+                        <v-col cols="2">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ formatFloat(fsrsStats.average_stability) }}</div>
+                                <div class="text-caption text--secondary">平均稳定度</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="2">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ formatFloat(fsrsStats.average_difficulty) }}</div>
+                                <div class="text-caption text--secondary">平均难度</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="2">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.lapses_total }}</div>
+                                <div class="text-caption text--secondary">总遗忘次数</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.reviewed_today }}</div>
+                                <div class="text-caption text--secondary">今日已复习</div>
+                            </v-sheet>
+                        </v-col>
+                        <v-col cols="3">
+                            <v-sheet outlined rounded class="pa-3 text-center">
+                                <div class="text-h6 font-weight-bold">{{ fsrsStats.reset_count }}</div>
+                                <div class="text-caption text--secondary">今日重置</div>
+                            </v-sheet>
+                        </v-col>
+                    </v-row>
+
+                    <div class="mt-2 grey--text caption">
+                        稳定度越高，表示记忆越稳定；难度越高，表示这张卡越难。
+                    </div>
+                </div>
+            </v-card-text>
+        </v-card>
+
         <!-- Legacy SRS Settings (collapsed by default) -->
         <v-expansion-panels flat class="mt-4">
             <v-expansion-panel>
@@ -158,6 +270,26 @@
                     { text: '95%', value: 0.95 },
                     { text: '97%', value: 0.97 },
                 ],
+                // FSRS stats
+                statsLoading: false,
+                statsError: '',
+                fsrsStats: {
+                    total: 0,
+                    enabled: 0,
+                    archived: 0,
+                    due: 0,
+                    by_state: {
+                        new: 0,
+                        learning: 0,
+                        review: 0,
+                        relearning: 0,
+                    },
+                    average_stability: null,
+                    average_difficulty: null,
+                    lapses_total: 0,
+                    reviewed_today: 0,
+                    reset_count: 0,
+                },
             }
         },
         props: {
@@ -165,8 +297,29 @@
         },
         mounted() {
             this.loadSettings();
+            this.loadFsrsStats();
         },
         methods: {
+            formatFloat(value) {
+                if (value === null || value === undefined) {
+                    return '—';
+                }
+                return Number(value).toFixed(2);
+            },
+            loadFsrsStats() {
+                this.statsLoading = true;
+                this.statsError = '';
+                axios.get('/review-cards/stats')
+                    .then((response) => {
+                        this.fsrsStats = response.data;
+                    })
+                    .catch(() => {
+                        this.statsError = 'FSRS 统计加载失败。';
+                    })
+                    .finally(() => {
+                        this.statsLoading = false;
+                    });
+            },
             reviewIntervalChanged(value, index) {
                 // split value
                 let intervals = [1];
