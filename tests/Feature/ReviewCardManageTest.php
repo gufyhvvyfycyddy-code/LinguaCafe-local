@@ -2895,6 +2895,145 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame('sense', $items[0]['lemma']);
     }
 
+    // ==================== Last Reviewed Tests ====================
+
+    public function test_last_reviewed_at_in_data_response(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'test']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_last_reviewed_at' => now()->subDay()]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+
+        $this->assertArrayHasKey('fsrs_last_reviewed_at', $item);
+        $this->assertNotNull($item['fsrs_last_reviewed_at']);
+    }
+
+    public function test_last_reviewed_at_null_for_new_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'new']);
+        $card = $this->createSenseCard($sense);
+        // New card has null fsrs_last_reviewed_at by default
+        $this->assertNull($card->fsrs_last_reviewed_at);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+        $this->assertNull($item['fsrs_last_reviewed_at']);
+    }
+
+    public function test_last_reviewed_at_has_value_after_review(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'reviewed']);
+        $card = $this->createSenseCard($sense);
+        $card->update([
+            'fsrs_due_at' => now()->subMinute(),
+            'fsrs_state' => 'new',
+            'fsrs_enabled' => true,
+        ]);
+
+        // Record a review via the service
+        $card = app(\App\Services\ReviewCardService::class)->recordReview(
+            $this->user->id,
+            'english',
+            $card->id,
+            'good',
+            'sense_review'
+        );
+
+        $this->assertNotNull($card->fsrs_last_reviewed_at);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+        $this->assertNotNull($item['fsrs_last_reviewed_at']);
+    }
+
+    public function test_last_reviewed_at_null_after_reset(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'reset']);
+        $card = $this->createSenseCard($sense);
+        $card->update([
+            'fsrs_last_reviewed_at' => now()->subDay(),
+            'fsrs_state' => 'review',
+            'fsrs_enabled' => true,
+        ]);
+
+        // Reset the card
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $item = $response->json('items.0');
+        $this->assertNull($item['fsrs_last_reviewed_at']);
+    }
+
+    public function test_sort_by_last_reviewed_at_desc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'older']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_last_reviewed_at' => now()->subDays(5), 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'newer', 'sense_key' => hash('sha256', 'english|newer|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_last_reviewed_at' => now(), 'fsrs_state' => 'review']);
+
+        // Default sort=all to see both
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&sort_by=fsrs_last_reviewed_at&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Most recent first (desc)
+        $this->assertSame($card2->id, $items[0]['review_card_id']);
+        $this->assertSame($card1->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_by_last_reviewed_at_asc(): void
+    {
+        $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'older']);
+        $card1 = $this->createSenseCard($sense1);
+        $card1->update(['fsrs_last_reviewed_at' => now()->subDays(5), 'fsrs_state' => 'review']);
+
+        $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'newer', 'sense_key' => hash('sha256', 'english|newer|noun|测试|test')]);
+        $card2 = $this->createSenseCard($sense2);
+        $card2->update(['fsrs_last_reviewed_at' => now(), 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&sort_by=fsrs_last_reviewed_at&sort_dir=asc');
+        $response->assertOk();
+        $items = $response->json('items');
+        $this->assertCount(2, $items);
+        // Oldest first (asc)
+        $this->assertSame($card1->id, $items[0]['review_card_id']);
+        $this->assertSame($card2->id, $items[1]['review_card_id']);
+    }
+
+    public function test_sort_last_reviewed_at_does_not_leak(): void
+    {
+        // Own card
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'mine']);
+        $card = $this->createSenseCard($sense);
+        $card->update(['fsrs_last_reviewed_at' => now(), 'fsrs_state' => 'review']);
+
+        // Other user card
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'theirs']);
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCard->update(['fsrs_last_reviewed_at' => now(), 'fsrs_state' => 'review']);
+
+        // Other language card
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'spanish']);
+        $cardEs = $this->createSenseCard($senseEs);
+        $cardEs->update(['fsrs_last_reviewed_at' => now(), 'fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&sort_by=fsrs_last_reviewed_at&sort_dir=desc');
+        $response->assertOk();
+        $items = $response->json('items');
+        // Only own card in current language
+        $this->assertCount(1, $items);
+        $this->assertSame('mine', $items[0]['lemma']);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

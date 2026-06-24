@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-24
-> **当前 latest commit**：`c29530a feat: filter review card manager by fsrs fields`
+> **当前 latest commit**：待 C.12-d-a 完成后更新
 
 ---
 
@@ -52,6 +52,8 @@
 | C.12-a | 管理页展示 FSRS 列（稳定度、难度、复习、遗忘） |
 | C.12-b | 管理页服务器端排序（白名单 + tie-breaker） |
 | C.12-c | 管理页高级筛选面板（fsrs_states、due_range、reps_min、lapses_min） |
+| C.12-d-scout | ReviewLog 简略信息侦察（结论：只用 fsrs_last_reviewed_at，不 join ReviewLog） |
+| C.12-d-a | 管理页展示最近复习列（fsrs_last_reviewed_at），开放排序，不 join ReviewLog |
 
 ---
 
@@ -87,13 +89,20 @@
 
 ### C.12-d — ReviewLog 简略信息 / 最近复习信息
 
-**状态**：scout → 计划中
+**状态**：C.12-d-a 已完成，后续扩展延后
 
-**目标**：
-- 先侦察是否应在管理页显示 `fsrs_last_reviewed_at`（ReviewCard 现有字段）。
-- 优先使用 `ReviewCard.fsrs_last_reviewed_at`，不要贸然 join ReviewLog。
-- 如需 ReviewLog，只能通过 review_cards 过滤 `target_type=sense`，避免 legacy word card 混入。
-- **禁止**：详情抽屉、导出、批量重置。
+**已完成**：
+- C.12-d-a：管理页展示"最近复习"列，使用 `ReviewCard.fsrs_last_reviewed_at`。
+- 后端 `data()` 和 `serializeCard()` 均返回 `fsrs_last_reviewed_at`（ISO 8601 string，null 时为 null）。
+- 前端新增"最近复习"列（位于"遗忘"与"到期"之间），支持排序（默认 desc）。
+- null 值显示为 `—`，reset 后变为 `—`。
+- 后端 SORTABLE_COLUMNS 已有 `fsrs_last_reviewed_at`（C.12-b 已加入），前端 sortableColumns 同步开放。
+
+**决策记录**：
+1. 第一版只展示 `ReviewCard.fsrs_last_reviewed_at`，不 join ReviewLog。
+2. ReviewLog 聚合（review_log_count、reset_count、last_rating 等）延后到后续阶段。
+3. ReviewLog 删除语义留给 C.14-scout。
+4. 不新增最近复习高级筛选。
 
 ---
 

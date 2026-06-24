@@ -192,6 +192,7 @@
                             <th class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
                             <th class="col-fsrs sortable" @click="toggleSort('fsrs_reps')">复习 <span class="sort-icon">{{ sortIcon('fsrs_reps') }}</span></th>
                             <th class="col-fsrs sortable" @click="toggleSort('fsrs_lapses')">遗忘 <span class="sort-icon">{{ sortIcon('fsrs_lapses') }}</span></th>
+                            <th class="col-last-review sortable" @click="toggleSort('fsrs_last_reviewed_at')">最近复习 <span class="sort-icon">{{ sortIcon('fsrs_last_reviewed_at') }}</span></th>
                             <th class="col-due sortable" @click="toggleSort('fsrs_due_at')">到期 <span class="sort-icon">{{ sortIcon('fsrs_due_at') }}</span></th>
                             <th class="col-actions">操作</th>
                         </tr>
@@ -254,6 +255,7 @@
                             <td class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_difficulty) }}</td>
                             <td class="col-fsrs text-center">{{ item.fsrs_reps || 0 }}</td>
                             <td class="col-fsrs text-center">{{ item.fsrs_lapses || 0 }}</td>
+                            <td class="col-last-review text-center">{{ formatLastReviewed(item.fsrs_last_reviewed_at) }}</td>
                             <td class="col-due">
                                 <span class="text-caption">{{ formatDueAt(item.fsrs_due_at) }}</span>
                             </td>
@@ -276,7 +278,7 @@
                             </td>
                         </tr>
                         <tr v-if="!loading && items.length === 0">
-                            <td colspan="17" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
+                            <td colspan="18" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
                         </tr>
                     </tbody>
                 </table>
@@ -482,7 +484,7 @@ export default {
             ];
         },
         sortableColumns() {
-            return ['id', 'fsrs_state', 'fsrs_stability', 'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses', 'fsrs_due_at'];
+            return ['id', 'fsrs_state', 'fsrs_stability', 'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses', 'fsrs_last_reviewed_at', 'fsrs_due_at'];
         },
         columnDefaultDir() {
             return {
@@ -492,6 +494,7 @@ export default {
                 fsrs_difficulty: 'desc',
                 fsrs_reps: 'desc',
                 fsrs_lapses: 'desc',
+                fsrs_last_reviewed_at: 'desc',
                 fsrs_due_at: 'asc',
             };
         },
@@ -858,6 +861,12 @@ export default {
             return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
         },
 
+        formatLastReviewed(isoString) {
+            if (!isoString) return '—';
+            const d = new Date(isoString);
+            return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        },
+
         formatFsrsNumber(value) {
             if (value === null || value === undefined || value === '') {
                 return '—';
@@ -957,7 +966,7 @@ export default {
     width: 100%;
     border-collapse: collapse;
     table-layout: auto;
-    min-width: 1600px;
+    min-width: 1700px;
 }
 
 .manage-table thead {
@@ -1003,6 +1012,7 @@ export default {
 .col-status { width: 80px; }
 .col-due { width: 90px; }
 .col-fsrs { width: 70px; text-align: center; }
+.col-last-review { width: 90px; text-align: center; }
 
 /* Sticky operations column */
 .col-actions {
