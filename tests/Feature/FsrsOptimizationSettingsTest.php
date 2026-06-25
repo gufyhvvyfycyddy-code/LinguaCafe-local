@@ -617,19 +617,19 @@ class FsrsOptimizationSettingsTest extends TestCase
         Setting::forceCreate([
             'name' => 'fsrs_parameters_source',
             'user_id' => -1,
-            'value' => 'optimized',
+            'value' => json_encode('optimized'),
         ]);
         Setting::forceCreate([
             'name' => 'fsrs_parameters_optimized_at',
             'user_id' => -1,
-            'value' => '2026-06-26T10:30:00+00:00',
+            'value' => json_encode('2026-06-26T10:30:00+00:00'),
         ]);
 
         $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
 
         $response->assertOk();
         $response->assertJsonPath('parameters_source', 'optimized');
-        $response->assertJsonPath('parameters_source_label', '当前使用已优化参数');
+        $response->assertJsonPath('parameters_source_label', '正在优化参数');
         $response->assertJsonPath('has_optimized_parameters', true);
         $response->assertJsonPath('last_optimized_at', '2026-06-26T10:30:00+00:00');
         $response->assertJsonPath('parameters_count', 21);
@@ -663,7 +663,7 @@ class FsrsOptimizationSettingsTest extends TestCase
         Setting::forceCreate([
             'name' => 'fsrs_parameters_source',
             'user_id' => -1,
-            'value' => 'custom_source_value',
+            'value' => json_encode('custom_source_value'),
         ]);
 
         $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
@@ -673,5 +673,31 @@ class FsrsOptimizationSettingsTest extends TestCase
         $response->assertJsonPath('parameters_source_label', '当前使用自定义参数');
         $response->assertJsonPath('has_optimized_parameters', false);
         $response->assertJsonPath('parameters_count', 19);
+    }
+
+    public function test_confirm_followed_by_status_returns_optimized(): void
+    {
+        // Create enough review logs for a real optimization
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        // Run confirm=true optimization (this saves with json_encode via upsertGlobalSetting)
+        $confirmResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+        $confirmResponse->assertOk();
+        $confirmResponse->assertJsonPath('applied', true);
+
+        // Now fetch optimization-status — must decode the JSON-encoded values correctly
+        $statusResponse = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $statusResponse->assertOk();
+        $statusResponse->assertJsonPath('parameters_source', 'optimized');
+        $statusResponse->assertJsonPath('parameters_source_label', '正在优化参数');
+        $statusResponse->assertJsonPath('has_optimized_parameters', true);
+        $statusResponse->assertJsonPath('parameters_count', 21);
+        $statusResponse->assertJsonPath('last_optimized_at', function ($value) {
+            return !empty($value);
+        });
     }
 }

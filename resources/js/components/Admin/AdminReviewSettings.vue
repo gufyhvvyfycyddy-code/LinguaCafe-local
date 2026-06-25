@@ -373,15 +373,17 @@
 
                                     <!-- Optimized parameters -->
                                     <div v-else-if="fsrsParameterSource === 'optimized'">
-                                        <div>当前使用已优化参数。</div>
+                                        <v-chip color="success" small label class="mb-2">
+                                            正在优化参数
+                                        </v-chip>
                                         <div class="grey--text text--darken-1 caption">
                                             最近优化时间：{{ formatDate(fsrsParameterLastOptimizedAt) }}
                                         </div>
                                         <div class="grey--text text--darken-1 caption mt-1">
                                             参数数量：{{ fsrsParameterCount }} 个
                                         </div>
-                                        <div class="grey--text text--darken-1 caption">
-                                            只影响之后新的复习评分；已有卡片不会自动重排。
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            已保存优化参数；之后新的复习评分将使用这组参数。已有卡片不会自动重排。
                                         </div>
                                     </div>
 

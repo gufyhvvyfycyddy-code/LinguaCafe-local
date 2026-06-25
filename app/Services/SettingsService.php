@@ -164,16 +164,13 @@ class SettingsService {
             ];
         }
 
-        $sourceSetting = Setting::where('name', 'fsrs_parameters_source')->where('user_id', -1)->first();
-        $source = $sourceSetting ? $sourceSetting->value : 'default';
-
-        $optimizedAtSetting = Setting::where('name', 'fsrs_parameters_optimized_at')->where('user_id', -1)->first();
-        $lastOptimizedAt = $optimizedAtSetting ? $optimizedAtSetting->value : null;
+        $source = $this->decodeSettingValue('fsrs_parameters_source', 'default');
+        $lastOptimizedAt = $this->decodeSettingValue('fsrs_parameters_optimized_at');
 
         if ($source === 'optimized') {
             return [
                 'parameters_source' => 'optimized',
-                'parameters_source_label' => '当前使用已优化参数',
+                'parameters_source_label' => '正在优化参数',
                 'last_optimized_at' => $lastOptimizedAt,
                 'parameters_count' => count($params),
                 'has_optimized_parameters' => true,
@@ -198,6 +195,28 @@ class SettingsService {
             'parameters_count' => count($params),
             'has_optimized_parameters' => false,
         ];
+    }
+
+    private function decodeSettingValue(string $name, mixed $fallback = null): mixed {
+        $setting = Setting::where('name', $name)->where('user_id', -1)->first();
+        if (!$setting) {
+            return $fallback;
+        }
+
+        $value = $setting->value;
+        if ($value === null) {
+            return $fallback;
+        }
+
+        // Attempt json_decode: handles both JSON-encoded strings (e.g. '"optimized"')
+        // and bare strings (e.g. 'optimized') from older writes.
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            return $decoded;
+        }
+
+        // Not valid JSON — return the raw string value as-is
+        return $value;
     }
 
     public function preflightFsrsOptimization(int $userId, string $language): array {
