@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`4f1ca81`
+> **当前 latest commit**：`38d32bc`
 
 ---
 
@@ -76,7 +76,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`4f1ca81`
+**Latest commit**：`38d32bc`
 
 ### `/review-cards/manage` 当前能力
 
