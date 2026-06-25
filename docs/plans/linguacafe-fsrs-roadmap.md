@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`3c4e159 feat: add export field selection UI and backend filtering`
+> **当前 latest commit**：`4f1ca81`
 
 ---
 
@@ -69,12 +69,13 @@
 | C.15-b | 详情抽屉显示 aliases_zh / collocations，data/export item 字段同步补齐，只读展示 |
 | C.20-a | 管理页 JSON 导出字段选择，fields[] 白名单导出，不改变筛选/排序/分页逻辑 |
 | C.21-scout | Anki 导出格式侦察 — 旧 AnkiConnect 接口为 legacy word-card 模式，不适合 sense-only；推荐 C.21-a 做 Anki TSV 文件导出 |
+| C.22-scout | CSV 导出侦察 — 复用 JSON/TSV 导出基础，确认 CSV 有价值但不紧急，推荐 C.22-a 冻结实现 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`3c4e159 feat: add export field selection UI and backend filtering`
+**Latest commit**：`4f1ca81`
 
 ### `/review-cards/manage` 当前能力
 
@@ -385,18 +386,101 @@
 
 ---
 
+### C.22-scout：CSV 导出侦察
+
+#### 当前已有导出能力
+
+| 能力 | 路由 | Controller 方法 | 行号 |
+|------|------|----------------|------|
+| JSON 导出 | `GET /review-cards/manage/export` | `ReviewCardManageController::export()` | routes L206, controller L126 |
+| Anki TSV 导出 | `GET /review-cards/manage/export-anki-tsv` | `ReviewCardManageController::exportAnkiTsv()` | routes L207, controller L203 |
+
+**共享基础**：
+- `buildManageQuery()` (controller L636)：强制 user_id + language_id + TARGET_SENSE + confirmed WordSense；支持 q 搜索、8 种标准 filter、4 种 advanced filter、白名单排序
+- `buildItems()` (controller L758)：批量预取 occurrence chapter + chapter name，映射 25 个字段
+- `EXPORT_LIMIT = 5000` (controller L58)
+- `EXPORT_FIELDS`：25 个白名单字段（review_card_id, word_sense_id, lemma, surface_form, pos, sense_zh, sense_en, example_sentence_en, example_sentence_zh, aliases_zh, collocations, source_chapter_id, source_chapter_title, source_kind, fsrs_state, fsrs_due_at, fsrs_stability, fsrs_difficulty, fsrs_reps, fsrs_lapses, fsrs_last_reviewed_at, fsrs_enabled, missing_definition, missing_example, missing_source）
+
+**差异**：
+- JSON 导出：支持 `fields[]` 参数字段选择、返回 JSON（含 metadata）、无 HTML 转义、Content-Type: application/json
+- Anki TSV 导出：固定 13 列（Front/Back/Aux）、Front/Back 含 HTML（`htmlEscape` + `tsvEscape`）、Content-Type: text/tab-separated-values
+
+**前端**：
+- Vue 组件 `ReviewCardManage.vue`：导出菜单含 24 字段复选框 + "导出 JSON" + "导出 Anki TSV" 按钮
+- `exportCurrentFilter()`：构造 params（q, filter, sort_by, sort_dir, fsrs_states, due_range, reps_min, lapses_min, fields）
+- `exportAnkiTsv()`：同上但不含 fields
+
+**测试**：
+- JSON 导出测试：20 个（隔离 4 个、过滤/搜索/排序 5 个、字段选择 4 个、超限 1 个、认证 1 个、其他 5 个）
+- Anki TSV 导出测试：6 个（固定字段、隔离、过滤、超限 skipped、tab/newline 转义、HTML 转义）
+- 无 CSV 导出测试
+
+#### CSV 导出必要性分析
+
+| 对比维度 | CSV | JSON | Anki TSV |
+|----------|-----|------|----------|
+| 用途 | 表格分析 / Excel / WPS / Google Sheets / Numbers | 程序化处理 / API | Anki 导入复习 |
+| 用户价值 | ✅ 高：用户可用 Excel/WPS 打开、筛选、排序、做数据分析 | 中等：需编程解析 | 特定：仅 Anki 用户 |
+| 格式复杂度 | 中等：RFC 4180 引号转义 | 简单 | 简单：TSV 只需 tab/newline 转义 |
+| 字段灵活性 | 可支持 fields[] 选择 | ✅ 已支持 | 13 列固定 |
+| 中文兼容 | 需 UTF-8 BOM（Excel 要求） | 天然兼容 | 无要求 |
+
+**建议**：CSV 有价值，但不紧急。优先级在 C.22-a（如果冻结）中可排为中等。
+
+#### CSV 导出风险清单
+
+1. **安全隔离**（低风险）：完全复用 `buildManageQuery()` 的 user_id + language_id + TARGET_SENSE + confirmed 限定，禁止绕过或使用 card_ids
+2. **Excel formula injection**（高风险）：字段以 `=` `+` `-` `@` 开头时 Excel 会当作公式执行，必须对所有以这些字符开头的单元格加单引号前缀转义
+3. **RFC 4180 转义**（中风险）：含逗号、双引号、换行符的字段需双引号包裹 + 内部双引号加倍转义
+4. **UTF-8 BOM**（低风险）：Excel 打开 UTF-8 CSV 中文乱码，需加 BOM（`\xEF\xBB\xBF`），但现有 JSON/TSV 均无 BOM
+5. **多行字段**（中风险）：example_sentence_en/zh 可能含换行，CSV 换行是记录分隔符，需转义
+6. **数据量**（低风险）：沿用 EXPORT_LIMIT=5000，突破即 422
+7. **禁忌范围**：禁止导出 legacy word card、ReviewLog、非 confirmed sense、other user/language
+
+#### C.22-a 推荐冻结方向
+
+1. **路由**：`GET /review-cards/manage/export-csv` → `ReviewCardManageController::exportCsv()`
+2. **复用**：完全复用 `buildManageQuery()` + `buildItems()` + `EXPORT_FIELDS` + `EXPORT_LIMIT`
+3. **范围**：仅当前筛选/排序结果（与 JSON 导出行为一致）
+4. **字段选择**：支持 `fields[]` 参数，沿用 JSON 导出的白名单校验逻辑
+5. **CSV header**：英文字段名（与 EXPORT_FIELDS 一致），不输出中文 header
+6. **Formula injection 防护**：对所有以 `=` `+` `-` `@` `\t` 开头的单元格加单引号前缀 `'`
+7. **RFC 4180 转义**：用 `fputcsv()` 或 league/csv 处理逗号/引号/换行转义
+8. **BOM**：加 UTF-8 BOM（仅 CSV 导出，JSON/TSV 保持无 BOM），确保 Excel 中文兼容
+9. **Content-Type**：`text/csv; charset=UTF-8`
+10. **不导出**：ReviewLog、legacy word card、非 confirmed sense
+
+#### C.22-a 禁止范围
+
+- 不做 all/selected/card_ids 模式参数
+- 不做 all/selected 模式
+- 不做 card_ids 参数
+- 不做导入
+- 不做编辑
+- 不改 Anki TSV 导出
+- 不改 JSON 导出
+- 不改 `buildManageQuery()` / `buildItems()` 签名
+- 不做数据库 migration
+- 不做 ReviewLog 导出
+- 不做 legacy word card 导出
+- 不新增 Service 层
+- 不调用 AnkiConnect
+- 不做 Excel 公式执行回测（只做 escape，不做验证是否被 Excel 执行）
+- CSV header 不用中文
+
+---
+
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★★ | C.20-a | 管理页 JSON 导出字段选择 | 小功能 | JSON 导出已完成，下一步只允许用户选择导出字段，不做 CSV/Anki |
-| ★★☆ | C.22-scout | CSV 导出侦察 | 功能侦察 | CSV 涉及换行、逗号、Excel 编码、字段选择，需要独立侦察 |
+| ★★☆ | C.22-a | CSV 导出实现（待冻结） | 功能 | C.22-scout 已完成，如需 CSV 导出则冻结 C.22-a |
 | ★★ | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 | UI/体验侦察 | 当前只读列表可用，但 rating/state/source 可中文化 |
 | ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
 
-**建议下一步**：**C.22-scout** — CSV 导出侦察。理由：C.20-a 字段选择已上线，C.21-scout 确认旧 AnkiConnect 不适合 sense-only；CSV 导出涉及编码/换行/字段选择，需求更独立，应先侦察再实现。
+**建议下一步**：**C.22-a（待冻结）** — CSV 导出实现。理由：C.22-scout 侦察已完成，确认 CSV 有价值但非紧急；如需实现则冻结 C.22-a，否则继续延后。
 
 ---
 
