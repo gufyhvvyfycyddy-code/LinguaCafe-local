@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`38d32bc`
+> **当前 latest commit**：`9d47047`
 
 ---
 
@@ -72,12 +72,13 @@
 | C.22-scout | CSV 导出侦察 — 复用 JSON/TSV 导出基础，确认 CSV 有价值但不紧急，推荐 C.22-a 冻结实现 |
 | C.22-a-lite | CSV 导出实现 — 新增 `/review-cards/manage/export-csv`，复用 buildManageQuery/buildItems/EXPORT_FIELDS/EXPORT_LIMIT，fputcsv + BOM + formula injection 防护 |
 | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 — 确认 rating/state/source 可中文化，FSRS 数值可本地化，建议 C.23-a 冻结实现 |
+| C.24-scout | 管理页真实用户批量操作风险复查 — 识别 4 类 Medium 风险（bulk 无确认弹窗/无事务/无上限），推荐 C.24-a 安全加固 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`549da5a`
+**Latest commit**：`9d47047`
 
 ### `/review-cards/manage` 当前能力
 
@@ -506,13 +507,13 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout、C.24-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
+| ★★ | C.24-a | 管理页批量操作安全加固 | 安全加固 | 在 C.24-scout 侦察基础上实施：bulk transaction、确认弹窗补充 |
 
-**建议下一步**：**C.24-scout** — 管理页真实用户批量操作风险复查。理由：C.23-scout 侦察已完成，ReviewLog 可读性有了方向。C.24-scout 可以复查管理页批量操作的误操作防护。
+**建议下一步**：**C.24-a** — 管理页批量操作安全加固。理由：C.24-scout 侦察完成，识别出 3 类 Medium 风险，推荐在最小改动范围内实现。
 
 ---
 
@@ -574,6 +575,99 @@
 - 不改测试覆盖结构
 - 不改 CSS 布局（只改文案/chip label）
 - 不改 API 响应格式
+
+---
+
+### C.24-scout：管理页真实用户批量操作风险复查
+
+**侦察日期**：2026-06-25
+
+#### 当前批量操作安全现状
+
+管理页现有 4 类高危操作：
+
+| 操作 | 路由 | 确认弹窗 | 用户隔离 | 事务性 |
+|------|------|----------|----------|--------|
+| 单卡重置 | POST /review-cards/manage/{id}/reset | ✅ resetDialog（含 FSRS 清空说明） | ✅ findManageableSenseCard(user_id+language_id+sense confirmed) | ✅ 单卡操作 |
+| 单卡删除 | DELETE /review-cards/manage/{id} | ✅ deleteDialog（标注"不可恢复"） | ✅ findManageableSenseCard | ✅ DB::transaction |
+| 批量归档/恢复 | POST /review-cards/manage/bulk-enabled | ❌ 无确认弹窗，直接执行 | ✅ 逐卡 whereHas user_id+language_id+confirmed | ❌ foreach 无事务包裹 |
+| 批量删除 | POST /review-cards/manage/bulk-delete | ✅ bulkDeleteDialog（标注"不可恢复"） | ✅ 逐卡 whereHas user_id+language_id+confirmed | ⚠️ 逐卡独立事务，无外层回滚 |
+
+#### 并行侦察结果
+
+**杨戬（代码侦察）**：
+- 所有单卡操作（reset/destroy/enabled/due-now/logs）均经 `findManageableSenseCard()` 检查 `user_id + language_id + target_type=sense + status=confirmed`，不匹配则 abort(404)。
+- 批量操作（bulk-enabled/bulk-delete）对每个 ID 独立查询检查 `user_id + language_id + target_type + whereHas sense confirmed`，不匹配则 skip。
+- **确认弹窗缺口**：批量归档/恢复无确认弹窗，单卡恢复（toggleEnabled）和单卡归档（archive）也无确认弹窗。
+- **输入上限缺口**：bulk-enabled 和 bulk-delete 均未限制 ids[] 数组大小（前端受分页 100 条限制，但 API 层无上限）。
+- **事务缺口**：bulk-enabled 无 DB::transaction 包裹，bulk-delete 逐卡独立事务（Service 内部有事务）但外层循环无整体回滚。
+
+**黄飞虎（测试结构侦察）**：
+- Bulk enabled: 7 个测试（归档/恢复/skip 其他用户/skip 其他语言/skip legacy word card/空数组拒绝/保留 WordSense）
+- Bulk delete: 8 个测试（多卡删除/sense reject/保留日志/skip 其他用户/skip 其他语言/skip legacy word card/空数组拒绝/排除复习队列）
+- Single delete: 16 个测试（覆盖面最全，含隔离/WordSense reject/保留 Occurrence/保留日志/不影响同 lemma 其他 sense/恢复 word stage）
+- Single reset: 仅 1 个测试（仅检查 fsrs_last_reviewed_at 变 null，无隔离性测试）
+- **测试缺口**：不存在 ID 处理、ids[] 超上限行为、reset 用户/语言隔离均无测试覆盖
+
+**姜子牙（风险审计）**：
+- ### 风险分级
+- **Medium（4 项）**：批量归档/恢复无确认弹窗；ids[] 无上限列表；bulk 操作无事务；高风险操作缺少二次确认（如输入 DELETE 确认）
+- **Low（4 项）**：用户隔离已到位；撤销沟通基本到位（删除标注"不可恢复"，重置只说"清空 FSRS"未明确标注不可恢复）；UI 选择受分页限制（max 100）；错误反馈返回 affected/skipped 数量但未指明具体失败 ID
+
+**申公豹（历史偏离复盘）**：
+- C.21-a 的 all/selected/card_ids 偏离模式在批量操作中已不存在（当前所有操作仅接受 ids[] 逐卡处理）
+- 安全隔离（user_id + language_id + sense confirmed）在 4 个操作中均已到位
+- **禁止 C.24-a 引入**：all/selected/card_ids 模式、改变 API 响应格式、新增路由/Service/migration
+- **推荐 C.24-a 包含**：bulk archive 增加确认弹窗（纯前端 wrap 色 dialog）、bulk-enabled 外层加 DB::transaction
+- **不推荐**：type-to-confirm、后端 max_selection 上限、X-Operation-Count header
+
+#### C.24-a 推荐方向
+
+1. **后端**：
+   - bulkEnabled() 外层包裹 `DB::transaction()` 确保批量归档/恢复的原子性
+   - bulkDestroy() 外层包裹 `DB::transaction()` 确保批量删除的原子性
+   - 保持现有 `ids[]` 逐卡校验模式，不改所有单卡操作逻辑
+
+2. **前端**：
+   - 为 bulkArchive 和 bulkRestore 增加 warning 色确认弹窗（参考 bulkDeleteDialog 样式）
+   - 重置弹窗增加"此操作不可恢复"标注（当前只说"清空 FSRS 记忆状态"）
+
+3. **测试**：
+   - 补充 bulk-enabled 和 bulk-delete 在 `DB::transaction` 包裹后的回归测试
+   - 补充 reset 的用户/语言隔离测试（模拟其他用户/其他语言返回 404）
+   - 补充 bulk 操作传入不存在 ID 的 skipped 行为测试
+
+4. **禁用范围**：
+   - 不做 all/selected/card_ids 模式
+   - 不新增路由
+   - 不新增 migration/model/Service
+   - 不改变 API 响应格式
+   - 不改 export（JSON/TSV/CSV）
+   - 不改 FSRS 算法/ReviewLog
+   - 不改认证/授权模型
+
+#### 测试建议
+
+1. 现有 7 个 bulk enabled 测试 + 8 个 bulk delete 测试在包裹事务后应保持通过。
+2. 补充 3 个新测试：reset 用户隔离、reset 语言隔离、bulk 操作传入不存在 ID。
+3. 浏览器验收只需确认新增的确认弹窗正确显示文案和颜色。
+
+#### C.24-a 禁止范围
+
+- 不新增 route
+- 不新增 Controller 方法
+- 不新增 migration
+- 不新增 model
+- 不新增 Service
+- 不新增 composer/npm 依赖
+- 不改变 API 返回字段名
+- 不改变路由 URL/HTTP method
+- 不做 all/card_ids/selected 模式
+- 不做 type-to-confirm
+- 不改 export（JSON/TSV/CSV/Anki）
+- 不改 FSRS
+- 不改 ReviewLog
+- 不改 auth/authz
 
 ---
 
