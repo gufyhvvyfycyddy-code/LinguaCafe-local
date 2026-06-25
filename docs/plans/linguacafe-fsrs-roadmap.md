@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`9d931de feat: show aliases and collocations in card details`
+> **当前 latest commit**：`3c4e159 feat: add export field selection UI and backend filtering`
 
 ---
 
@@ -68,12 +68,13 @@
 | C.17-a | 管理页详情抽屉显示最近 20 条 ReviewLog，只读展示 rating/source/FSRS 前后状态 |
 | C.15-b | 详情抽屉显示 aliases_zh / collocations，data/export item 字段同步补齐，只读展示 |
 | C.20-a | 管理页 JSON 导出字段选择，fields[] 白名单导出，不改变筛选/排序/分页逻辑 |
+| C.21-scout | Anki 导出格式侦察 — 旧 AnkiConnect 接口为 legacy word-card 模式，不适合 sense-only；推荐 C.21-a 做 Anki TSV 文件导出 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`9d931de feat: show aliases and collocations in card details`
+**Latest commit**：`3c4e159 feat: add export field selection UI and backend filtering`
 
 ### `/review-cards/manage` 当前能力
 
@@ -357,19 +358,37 @@
 
 ---
 
+### C.21 — Anki 导出格式侦察
+
+**状态**：C.21-scout 已完成。
+
+**侦察结论**：
+1. 当前项目中旧 AnkiConnect 接口（`app/Services/Anki/`）为 legacy word-card 模式设计，依赖 EncounteredWord id 和 word-level 数据结构，不兼容 sense-only 主线。
+2. 旧接口包含 `AnkiConnectService.php`、`MediaService.php`、`AnkiNoteRepository.php` 等文件，调用 AnkiConnect HTTP API（需要 Anki 桌面客户端运行），不适合无 GUI 环境批量导出。
+3. 旧接口无 tests，无 WordSense 支持，无 ReviewCard 关联，直接复用风险高。
+4. 推荐不改造旧 AnkiConnect，而是新建 **Anki TSV 文件导出**（C.21-a）：
+   - 生成标准 Anki TSV/CSV 格式文件（字段分列，可导入 Anki Desktop/AnkiDroid）。
+   - 复用 C.20-a 的字段选择逻辑（EXPORT_FIELDS 白名单）。
+   - 不依赖 AnkiConnect HTTP API。
+   - 不做 apkg/anki 包（不出现在本地 Anki 中）。
+   - 输出文件可用户手动导入 Anki。
+
+**决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。下一步 C.21-a 做 Anki TSV 文件导出第一版。
+
+---
+
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15 系列已完成，C.16-a 已完成，C.17-a 已完成，C.18 系列已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.21-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
 | ★★★ | C.20-a | 管理页 JSON 导出字段选择 | 小功能 | JSON 导出已完成，下一步只允许用户选择导出字段，不做 CSV/Anki |
-| ★★☆ | C.21-scout | Anki 导出格式侦察 | 功能侦察 | Anki 涉及模板、字段、卡型，不应直接实现 |
 | ★★☆ | C.22-scout | CSV 导出侦察 | 功能侦察 | CSV 涉及换行、逗号、Excel 编码、字段选择，需要独立侦察 |
 | ★★ | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 | UI/体验侦察 | 当前只读列表可用，但 rating/state/source 可中文化 |
 | ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
 
-**建议下一步**：**C.20-a** — 管理页 JSON 导出字段选择。理由：C.16-a 已完成 JSON 全量筛选导出，C.15-b 已补齐 aliases/collocations 字段；字段选择是最小增量，不进入 CSV/Anki 大任务。
+**建议下一步**：**C.22-scout** — CSV 导出侦察。理由：C.20-a 字段选择已上线，C.21-scout 确认旧 AnkiConnect 不适合 sense-only；CSV 导出涉及编码/换行/字段选择，需求更独立，应先侦察再实现。
 
 ---
 
