@@ -167,61 +167,71 @@
             </v-card-text>
         </v-card>
 
-        <!-- Zone 3: 高级工具 -->
-        <v-card outlined class="rounded-lg mt-4">
-            <v-card-title>高级工具</v-card-title>
-            <v-card-subtitle>参数查看、卡片管理与功能预览。高级功能（参数优化、重排）将在后续版本加入。</v-card-subtitle>
-            <v-card-text>
-                <v-simple-table dense class="no-hover">
-                    <tbody>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
-                            <td class="py-2">
-                                <div>当前使用 fsrs-rs-php 默认参数。</div>
-                                <div class="grey--text text--darken-1 caption">
-                                    后续会显示是否使用过个性化优化参数。
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数编辑</td>
-                            <td class="py-2">
-                                <div>不开放手动编辑。</div>
-                                <div class="grey--text text--darken-1 caption">
-                                    稳定度、难度等熟练度参数由 FSRS 自动维护，不建议手动修改。
-                                </div>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">卡片重置</td>
-                            <td class="py-2">
-                                <div>已在复习卡管理页开放。</div>
-                                <div class="grey--text text--darken-1 caption mb-2">
-                                    如果想让某张卡重新开始学习，请在管理页使用"重置"。
-                                </div>
-                                <v-btn
-                                    x-small
-                                    outlined
-                                    color="primary"
-                                    @click="goToManagePage"
-                                >
-                                    前往复习卡管理页
-                                </v-btn>
-                            </td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数优化</td>
-                            <td class="py-2">
-                                <div>暂未开放。</div>
-                                <div class="grey--text text--darken-1 caption">
-                                    后续会在复习历史足够时，支持根据你的真实复习记录优化参数。
-                                </div>
-                            </td>
-                        </tr>
-                    </tbody>
-                </v-simple-table>
-            </v-card-text>
-        </v-card>
+        <!-- Zone 3: 高级工具 (collapsed by default) -->
+        <v-expansion-panels flat class="mt-4">
+            <v-expansion-panel>
+                <v-expansion-panel-header>
+                    高级工具
+                </v-expansion-panel-header>
+                <v-expansion-panel-content>
+                    <div class="text-caption grey--text text--darken-1 mb-3">
+                        参数优化、手动参数、卡片重置等低频操作，需要时再打开。
+                    </div>
+
+                    <v-simple-table dense class="no-hover">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">自动优化参数</td>
+                                <td class="py-2">
+                                    <div>暂未开放。</div>
+                                    <div class="grey--text text--darken-1 caption">
+                                        后续会根据你的真实复习记录，自动优化 FSRS 参数，让之后的复习安排更适合你的记忆情况。
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
+                                <td class="py-2">
+                                    <div>当前使用 fsrs-rs-php 默认参数。</div>
+                                    <div class="grey--text text--darken-1 caption">
+                                        后续会显示是否使用过个性化优化参数，以及最近一次优化时间。
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">手动编辑参数</td>
+                                <td class="py-2">
+                                    <div>暂未开放。</div>
+                                    <div class="grey--text text--darken-1 caption">
+                                        后续可以作为高级功能单独评估。手动编辑会影响复习安排，需要强提醒和单独确认。
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">卡片重置</td>
+                                <td class="py-2">
+                                    <div>已在复习卡管理页开放。</div>
+                                    <div class="grey--text text--darken-1 caption">
+                                        如果想让某张卡重新开始学习，请在管理页使用"重置"。
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </v-simple-table>
+
+                    <v-card-actions class="px-0">
+                        <v-btn
+                            small
+                            outlined
+                            color="primary"
+                            @click="goToManagePage"
+                        >
+                            前往复习卡管理页
+                        </v-btn>
+                    </v-card-actions>
+                </v-expansion-panel-content>
+            </v-expansion-panel>
+        </v-expansion-panels>
 
         <!-- Legacy SRS Settings (collapsed by default) -->
         <v-expansion-panels flat class="mt-4">
