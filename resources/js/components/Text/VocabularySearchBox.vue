@@ -13,28 +13,6 @@
             </div>
         </div>
 
-        <div v-else class="search-result" v-for="(searchResult, searchResultIndex) in apiSearchResults" :key="`api-${searchResultIndex}`">
-            <div class="search-result-title">
-                <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.dictionaryColor}">
-                    <v-icon small>mdi-translate</v-icon>
-                </div>
-                {{ searchResult.dictionary }}
-                <div class="search-result-word default-font" :title="$props.searchTerm">{{ $props.searchTerm }}</div>
-            </div>
-            <div
-                v-for="(definition, definitionIndex) in searchResult.definitions"
-                :key="`api-search-result-${searchResultIndex}-${definitionIndex}`"
-                class="search-result-definition rounded dictionary-definition-row"
-            >
-                <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
-                    {{ definition }} <v-icon small>mdi-plus</v-icon>
-                </div>
-                <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, $props.searchTerm, searchResult.dictionary)">
-                    + 添加为新释义
-                </v-btn>
-            </div>
-        </div>
-
         <div class="search-result disabled" v-if="dictionarySearchLoading">
             <div class="search-result-title">
                 <div class="dictionary-title-icon mr-1" style="background-color: var(--v-primary-base);">
@@ -60,57 +38,82 @@
             </div>
         </div>
 
-        <div class="search-result jmdict" v-for="(searchResult, searchresultIndex) in searchResults" :key="searchresultIndex">
-            <template v-if="searchResult.dictionary !== 'JMDict'">
-                <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                    <div class="search-result-title" :title="record.word">
-                        <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.color}">
-                            <v-icon small>mdi-list-box</v-icon>
-                        </div>
-                        {{ searchResult.dictionary }}<div class="search-result-word" :title="record.word"> {{ record.word }} </div>
+        <!-- Scrollable dictionary results -->
+        <div class="dictionary-results-scroll">
+            <div v-if="!dictionaryApiSearchLoading" class="search-result" v-for="(searchResult, searchResultIndex) in apiSearchResults" :key="`api-${searchResultIndex}`">
+                <div class="search-result-title">
+                    <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.dictionaryColor}">
+                        <v-icon small>mdi-translate</v-icon>
                     </div>
-                    <div
-                        v-for="(definition, definitionIndex) in record.definitions"
-                        :key="definitionIndex"
-                        class="search-result-definition rounded dictionary-definition-row"
-                    >
-                        <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
-                            {{ definition }} <v-icon small>mdi-plus</v-icon>
-                        </div>
-                        <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)">
-                            + 添加为新释义
-                        </v-btn>
-                    </div>
+                    {{ searchResult.dictionary }}
+                    <div class="search-result-word default-font" :title="$props.searchTerm">{{ $props.searchTerm }}</div>
                 </div>
-            </template>
-
-            <template v-if="searchResult.dictionary == 'JMDict'">
-                <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                    <div class="search-result-title" :title="record.word">
-                        <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.color}">
-                            <v-icon small>mdi-list-box</v-icon>
-                        </div>
-                        {{ searchResult.dictionary }}<div class="search-result-word default-font" :title="record.word"> {{ record.word }} </div>
+                <div
+                    v-for="(definition, definitionIndex) in searchResult.definitions"
+                    :key="`api-search-result-${searchResultIndex}-${definitionIndex}`"
+                    class="search-result-definition rounded dictionary-definition-row"
+                >
+                    <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                        {{ definition }} <v-icon small>mdi-plus</v-icon>
                     </div>
-                    <div class="search-result-definition rounded dictionary-definition-row" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex">
-                        <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
-                            {{ definition }} <v-icon small>mdi-plus</v-icon>
-                        </div>
-                        <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)">
-                            + 添加为新释义
-                        </v-btn>
-                    </div>
+                    <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, $props.searchTerm, searchResult.dictionary)" title="保存后会加入词义复习">
+                        + 添加为新释义
+                    </v-btn>
+                </div>
+            </div>
 
-                    <template v-if="record.otherForms.length">
-                        <div class="vocab-box-subheader">其他形式：</div>
-                        <div class="d-flex flex-wrap default-font">
-                            <div v-for="(form, formIndex) in record.otherForms" :key="formIndex">
-                                {{ form }}<span class="mr-2" v-if="formIndex < record.otherForms.length - 1">, </span>
+            <div class="search-result jmdict" v-for="(searchResult, searchresultIndex) in searchResults" :key="searchresultIndex">
+                <template v-if="searchResult.dictionary !== 'JMDict'">
+                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
+                        <div class="search-result-title" :title="record.word">
+                            <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.color}">
+                                <v-icon small>mdi-list-box</v-icon>
                             </div>
+                            {{ searchResult.dictionary }}<div class="search-result-word" :title="record.word"> {{ record.word }} </div>
                         </div>
-                    </template>
-                </div>
-            </template>
+                        <div
+                            v-for="(definition, definitionIndex) in record.definitions"
+                            :key="definitionIndex"
+                            class="search-result-definition rounded dictionary-definition-row"
+                        >
+                            <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                                {{ definition }} <v-icon small>mdi-plus</v-icon>
+                            </div>
+                            <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)" title="保存后会加入词义复习">
+                                + 添加为新释义
+                            </v-btn>
+                        </div>
+                    </div>
+                </template>
+
+                <template v-if="searchResult.dictionary == 'JMDict'">
+                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
+                        <div class="search-result-title" :title="record.word">
+                            <div class="dictionary-title-icon mr-1" :style="{'background-color': searchResult.color}">
+                                <v-icon small>mdi-list-box</v-icon>
+                            </div>
+                            {{ searchResult.dictionary }}<div class="search-result-word default-font" :title="record.word"> {{ record.word }} </div>
+                        </div>
+                        <div class="search-result-definition rounded dictionary-definition-row" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex">
+                            <div class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                                {{ definition }} <v-icon small>mdi-plus</v-icon>
+                            </div>
+                            <v-btn x-small outlined color="primary" class="ml-2" @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)" title="保存后会加入词义复习">
+                                + 添加为新释义
+                            </v-btn>
+                        </div>
+
+                        <template v-if="record.otherForms.length">
+                            <div class="vocab-box-subheader">其他形式：</div>
+                            <div class="d-flex flex-wrap default-font">
+                                <div v-for="(form, formIndex) in record.otherForms" :key="formIndex">
+                                    {{ form }}<span class="mr-2" v-if="formIndex < record.otherForms.length - 1">, </span>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
         </div>
     </div>
 </template>
@@ -258,6 +261,11 @@ export default {
 </script>
 
 <style scoped>
+.dictionary-results-scroll {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
 .dictionary-definition-row {
     display: flex;
     align-items: center;

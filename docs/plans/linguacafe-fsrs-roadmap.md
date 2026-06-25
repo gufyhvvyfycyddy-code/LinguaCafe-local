@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`28e62e4`
+> **当前 latest commit**：`deb788c`
 
 ---
 
@@ -80,13 +80,14 @@
 | D.2-c | 复习负担预估第一版 — 在复习目标区增加小估算框，使用当前 stats 数据做粗略每日复习量预估，提示负担变化 |
 | CODEX-FSRS-1 | FSRS 设置页 Anki-like 增强 — 修正 latest commit hash，落地简单模式/高级工具雏形，新增自动优化参数按钮、optimization-status 与 optimize preflight 接口；第一版只检查资格，不真实计算或保存参数 |
 | RightClickPanel-2-scout | 自动创建复习卡 + 最相关词义默认展开可行性侦察 — 结论：`+ 添加为新释义` 已自动创建 sense review card（无需额外开发）；最相关词义默认展开尚未实现，推荐方案见 right-click-panel-word-sense-plan.md；词典结果无高度限制需加 scroll |
+| RightClickPanel-3-a | 最相关词义默认展开 + 词典结果高度限制 — WordSensesList 默认只展开第一个含 confirmed sense 的词性组；VocabularySearchBox 词典结果加 max-height scroll；按钮增加 title 提示保存后会加入词义复习；纯前端，不改后端 |
 | RightClickPanel-1 | 右侧点词面板 WordSense UI 功能改造 — 右侧点词面板完成分区整理；词典结果新增“添加为新释义”入口；WordSense 区域改为更清晰的展开/折叠管理卡片与空分组添加入口；不改 FSRS 调度，不改 sense-only 语义 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`28e62e4`
+**Latest commit**：`deb788c`
 
 ### `/review-cards/manage` 当前能力
 

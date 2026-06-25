@@ -384,9 +384,16 @@ export default {
             })
                 .then((response) => {
                     this.senses = response.data || [];
-                    this.openPanels = this.senseGroups
-                        .map((group, index) => group.senses.length ? index : null)
-                        .filter(index => index !== null);
+                    // Default: expand only the most relevant sense group
+                    const firstConfirmedIdx = this.senseGroups.findIndex(
+                        group => group.senses.some(s => s.status === 'confirmed')
+                    );
+                    if (firstConfirmedIdx >= 0) {
+                        this.openPanels = [firstConfirmedIdx];
+                    } else {
+                        const firstNonEmptyIdx = this.senseGroups.findIndex(group => group.senses.length > 0);
+                        this.openPanels = firstNonEmptyIdx >= 0 ? [firstNonEmptyIdx] : [];
+                    }
                 })
                 .catch(() => {
                     this.error = true;
