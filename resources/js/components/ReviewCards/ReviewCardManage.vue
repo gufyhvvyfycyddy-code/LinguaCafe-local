@@ -96,6 +96,10 @@
                         <v-card-actions class="pa-2">
                             <v-btn x-small color="primary" :loading="ankiExportLoading" @click="exportAnkiTsv">导出 Anki TSV</v-btn>
                         </v-card-actions>
+                        <v-divider />
+                        <v-card-actions class="pa-2">
+                            <v-btn x-small color="primary" :loading="csvExportLoading" @click="exportCsv">导出 CSV</v-btn>
+                        </v-card-actions>
                     </v-card>
                 </v-menu>
                 <v-menu offset-y :close-on-content-click="false">
@@ -819,6 +823,7 @@ export default {
             // Export
             exportLoading: false,
             ankiExportLoading: false,
+            csvExportLoading: false,
             exportFieldOptions: [
                 { key: 'review_card_id', label: 'ReviewCard ID' },
                 { key: 'word_sense_id', label: 'WordSense ID' },
@@ -1395,6 +1400,54 @@ export default {
             })
             .finally(() => {
                 this.ankiExportLoading = false;
+            });
+        },
+
+        exportCsv() {
+            this.csvExportLoading = true;
+            axios.get('/review-cards/manage/export-csv', {
+                params: {
+                    q: this.searchQuery,
+                    filter: this.currentFilter,
+                    sort_by: this.sortBy,
+                    sort_dir: this.sortDir,
+                    fsrs_states: this.advancedFilters.fsrsStates,
+                    due_range: this.advancedFilters.dueRange,
+                    reps_min: this.advancedFilters.repsMin,
+                    lapses_min: this.advancedFilters.lapsesMin,
+                    fields: this.exportFields,
+                },
+                responseType: 'blob',
+            })
+            .then((response) => {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                const disposition = response.headers['content-disposition'] || '';
+                const match = disposition.match(/filename="?(.+?)"?$/);
+                link.setAttribute('download', match ? match[1] : 'review-cards.csv');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                this.snackbar = { show: true, text: '已导出 CSV。', color: 'success' };
+            })
+            .catch((err) => {
+                if (err.response && err.response.status === 422) {
+                    err.response.data.text().then((text) => {
+                        try {
+                            const parsed = JSON.parse(text);
+                            this.snackbar = { show: true, text: parsed.message || '导出失败。', color: 'error' };
+                        } catch (e) {
+                            this.snackbar = { show: true, text: '导出失败：结果超过上限。', color: 'error' };
+                        }
+                    });
+                } else {
+                    this.snackbar = { show: true, text: '导出失败：' + (err.message || '未知错误'), color: 'error' };
+                }
+            })
+            .finally(() => {
+                this.csvExportLoading = false;
             });
         },
 

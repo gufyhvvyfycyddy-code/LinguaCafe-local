@@ -205,6 +205,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/review-cards/manage/data', [App\Http\Controllers\ReviewCardManageController::class, 'data']);
     Route::get('/review-cards/manage/export', [App\Http\Controllers\ReviewCardManageController::class, 'export']);
     Route::get('/review-cards/manage/export-anki-tsv', [App\Http\Controllers\ReviewCardManageController::class, 'exportAnkiTsv']);
+    Route::get('/review-cards/manage/export-csv', [App\Http\Controllers\ReviewCardManageController::class, 'exportCsv']);
     Route::get('/review-cards/manage/{reviewCard}/logs', [App\Http\Controllers\ReviewCardManageController::class, 'logs']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);

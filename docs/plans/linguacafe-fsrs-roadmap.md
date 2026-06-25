@@ -70,6 +70,7 @@
 | C.20-a | 管理页 JSON 导出字段选择，fields[] 白名单导出，不改变筛选/排序/分页逻辑 |
 | C.21-scout | Anki 导出格式侦察 — 旧 AnkiConnect 接口为 legacy word-card 模式，不适合 sense-only；推荐 C.21-a 做 Anki TSV 文件导出 |
 | C.22-scout | CSV 导出侦察 — 复用 JSON/TSV 导出基础，确认 CSV 有价值但不紧急，推荐 C.22-a 冻结实现 |
+| C.22-a-lite | CSV 导出实现 — 新增 `/review-cards/manage/export-csv`，复用 buildManageQuery/buildItems/EXPORT_FIELDS/EXPORT_LIMIT，fputcsv + BOM + formula injection 防护 |
 
 ---
 
@@ -470,17 +471,48 @@
 
 ---
 
+### C.22-a-lite：CSV 导出实现（已完成）
+
+**实现时间**：2026-06-25
+
+**路由**：`GET /review-cards/manage/export-csv` → `ReviewCardManageController::exportCsv()`
+
+**实现要点**：
+- 复用 `buildManageQuery()`、`buildItems()`、`EXPORT_FIELDS`（25 字段）、`EXPORT_LIMIT`（5000 条）
+- 支持 `fields[]` 参数，复用 JSON export 白名单，默认全字段
+- 使用 `fputcsv()`（PHP 内置），UTF-8 BOM
+- Excel formula injection 防护：`=` `+` `-` `@` tab CR LF 开头的单元格前加单引号 `'`
+- 数组字段 `aliases_zh`/`collocations` 用 `；` 拼接
+- `null` → 空字符串
+- 超过 5000 条返回 422 JSON
+- Vue：在已有导出菜单底部新增"导出 CSV"按钮，使用当前字段选择 `exportFields` 和筛选条件
+
+**测试**（6 个）：
+1. `test_export_csv_downloads_selected_fields` — fields[]=lemma&sense_zh&fsrs_state，断言 BOM + header + 数据
+2. `test_export_csv_uses_current_user_language_and_sense_only_scope` — 用户/语言/sense 隔离
+3. `test_export_csv_respects_current_filters` — q + fsrs_states 筛选
+4. `test_export_csv_escapes_rfc4180_values` — 逗号/双引号/换行 → fgetcsv 回读
+5. `test_export_csv_prevents_excel_formula_injection` — `=SUM` `+cmd` `-10` `@user` 全部带引号前缀
+6. `test_export_csv_rejects_over_limit` — markTestSkipped（过慢，路径复用 export/anki 已验证）
+
+**安全边界**：
+- 不做 all/selected/card_ids 模式
+- 不改 Anki TSV / JSON 导出
+- 不导出 ReviewLog / legacy word card
+- 不新增 composer/npm 依赖
+
+---
+
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★☆ | C.22-a | CSV 导出实现（待冻结） | 功能 | C.22-scout 已完成，如需 CSV 导出则冻结 C.22-a |
 | ★★ | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 | UI/体验侦察 | 当前只读列表可用，但 rating/state/source 可中文化 |
 | ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
 
-**建议下一步**：**C.22-a（待冻结）** — CSV 导出实现。理由：C.22-scout 侦察已完成，确认 CSV 有价值但非紧急；如需实现则冻结 C.22-a，否则继续延后。
+**建议下一步**：**C.23-scout** — 详情抽屉 ReviewLog 可读性优化侦察。理由：C.22-a-lite CSV 导出已完成，ReviewLog 可读性是下一个可无需功能实现的侦察任务。
 
 ---
 

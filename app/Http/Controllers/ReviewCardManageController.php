@@ -289,6 +289,107 @@ class ReviewCardManageController extends Controller
             ->header('X-Export-Count', count($items));
     }
 
+    /**
+     * GET /review-cards/manage/export-csv
+     * Export current filtered/sorted results as CSV download.
+     * Reuses buildManageQuery, buildItems, EXPORT_FIELDS, EXPORT_LIMIT.
+     * No mode, no card_ids, no all/selected. Uses fputcsv + BOM.
+     */
+    public function exportCsv(Request $request): \Illuminate\Http\Response
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $query = $this->buildManageQuery($request, $userId, $language);
+        $total = $query->count();
+
+        if ($total > self::EXPORT_LIMIT) {
+            return response()->json([
+                'message' => '当前筛选结果超过 ' . self::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
+                'total' => $total,
+                'limit' => self::EXPORT_LIMIT,
+            ], 422);
+        }
+
+        $cards = $query->get();
+        $items = $this->buildItems($cards, $userId, $language);
+
+        // Field selection — same as export()
+        $requestedFields = $request->input('fields', []);
+        if (!is_array($requestedFields)) {
+            $requestedFields = [];
+        }
+
+        $selectedFields = [];
+        if (!empty($requestedFields)) {
+            $validFields = array_intersect($requestedFields, self::EXPORT_FIELDS);
+            if (empty($validFields)) {
+                return response()->json([
+                    'message' => '请选择至少一个有效导出字段。',
+                    'allowed_fields' => self::EXPORT_FIELDS,
+                ], 422);
+            }
+            $selectedFields = array_values($validFields);
+        } else {
+            $selectedFields = self::EXPORT_FIELDS;
+        }
+
+        // Build CSV using fputcsv with in-memory stream
+        $stream = fopen('php://temp', 'r+');
+
+        // UTF-8 BOM
+        fwrite($stream, "\xEF\xBB\xBF");
+
+        // Header row
+        fputcsv($stream, $selectedFields);
+
+        foreach ($items as $item) {
+            $row = [];
+            foreach ($selectedFields as $field) {
+                $row[] = $this->csvCellValue($item[$field] ?? null);
+            }
+            fputcsv($stream, $row);
+        }
+
+        rewind($stream);
+        $csv = stream_get_contents($stream);
+        fclose($stream);
+
+        $filename = 'review-cards-' . now()->format('Ymd-His') . '.csv';
+
+        return response($csv, 200)
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('X-Export-Count', count($items));
+    }
+
+    /**
+     * Convert a buildItems value to a CSV-safe cell string.
+     * - null → ''
+     * - array → '；'-joined string
+     * - Applies Excel formula injection protection (prefixes with quote)
+     */
+    private function csvCellValue($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_array($value)) {
+            $value = $this->joinArray($value);
+        }
+
+        $value = (string) $value;
+
+        // Excel formula injection protection
+        $trimmed = ltrim($value);
+        if ($trimmed !== '' && in_array($trimmed[0], ['=', '+', '-', '@', "\t", "\r", "\n"], true)) {
+            $value = "'" . $value;
+        }
+
+        return $value;
+    }
+
     private function tsvEscape(?string $value): string
     {
         if ($value === null) return '';
