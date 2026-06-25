@@ -196,92 +196,97 @@ class ReviewCardManageController extends Controller
 
     /**
      * GET /review-cards/manage/export-anki-tsv
-     * Export current filtered cards as Anki-compatible TSV.
+     * Export current filtered/sorted results as Anki-compatible TSV.
+     * Reuses buildManageQuery — no mode, no card_ids, no all/selected.
+     * Fixed 13 columns, Front/Back are HTML-rendered question/answer faces.
      */
-    private const TSV_FIELDS = ['word', 'reading', 'translation', 'example_sentence'];
-
     public function exportAnkiTsv(Request $request): \Illuminate\Http\Response
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
-        $mode = $request->input('mode', 'current');
-        if (!in_array($mode, ['current', 'all', 'selected'], true)) {
-            return response("无效的导出模式。有效模式：current, all, selected。\n", 422, [
-                'Content-Type' => 'text/plain; charset=utf-8',
-            ]);
+        $query = $this->buildManageQuery($request, $userId, $language);
+
+        $total = $query->count();
+        if ($total > self::EXPORT_LIMIT) {
+            return response()->json([
+                'message' => '导出数量超过上限。',
+                'total' => $total,
+                'limit' => self::EXPORT_LIMIT,
+            ], 422);
         }
 
-        if ($mode === 'selected') {
-            $cardIds = $request->input('card_ids', []);
-            if (!is_array($cardIds) || count($cardIds) === 0) {
-                return response("请至少选择一个复习卡。\n", 422, [
-                    'Content-Type' => 'text/plain; charset=utf-8',
-                ]);
-            }
-            $cards = ReviewCard::whereIn('id', $cardIds)->get();
-        } else {
-            $query = $this->buildManageQuery($request, $userId, $language);
-            if ($mode === 'current') {
-                // Apply filters from request (current filter)
-                $query = $this->buildManageQuery($request, $userId, $language);
-            } else {
-                // 'all' mode — no filter, all language sense cards
-                $query = ReviewCard::query()
-                    ->where('user_id', $userId)
-                    ->where('language', $language)
-                    ->where('target_type', 'sense')
-                    ->orderBy('id', 'desc');
-            }
+        $cards = $query->get();
+        $items = $this->buildItems($cards, $userId, $language);
 
-            $cards = $query->get();
-        }
-
-        if ($cards->isEmpty()) {
-            return response("没有匹配的复习卡可以导出。\n", 200, [
-                'Content-Type' => 'text/plain; charset=utf-8',
-            ]);
-        }
-
-        // Build TSV
-        $senseIds = $cards->pluck('target_id')->unique()->values()->toArray();
-        $senses = WordSense::whereIn('id', $senseIds)->get()->keyBy('id');
+        $headers = ['Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Source', 'FsrsState'];
 
         $lines = [];
-        // Header
-        $lines[] = implode("\t", self::TSV_FIELDS);
+        $lines[] = implode("\t", $headers);
 
-        $exportedCount = 0;
-        foreach ($cards as $card) {
-            $sense = $senses->get($card->target_id);
-            if (!$sense) continue;
+        foreach ($items as $item) {
+            $lemma = $this->tsvEscape($item['lemma'] ?? '');
+            $surface = $this->tsvEscape($item['surface_form'] ?? '');
+            $pos = $this->tsvEscape($item['pos'] ?? '');
+            $senseZh = $this->tsvEscape($item['sense_zh'] ?? '');
+            $senseEn = $this->tsvEscape($item['sense_en'] ?? '');
+            $exampleEn = $this->tsvEscape($item['example_sentence_en'] ?? '');
+            $exampleZh = $this->tsvEscape($item['example_sentence_zh'] ?? '');
+            $aliasesZh = $this->tsvEscape($this->joinArray($item['aliases_zh'] ?? []));
+            $collocations = $this->tsvEscape($this->joinArray($item['collocations'] ?? []));
+            $source = $this->tsvEscape($item['source_chapter_title'] ?? '');
+            $fsrsState = $this->tsvEscape($item['fsrs_state'] ?? '');
 
-            $lemma = $sense->lemma ?? '';
-            $reading = $sense->reading ?? '';
-            $translation = $sense->sense_zh ?? '';
-            $exampleSentence = $sense->example_sentence_en ?? '';
+            $front = $this->tsvEscape(
+                $exampleEn . "<br><br> <strong>" . $lemma . "</strong> / " . $surface . " / " . $pos
+            );
+            $back = $this->tsvEscape(
+                "<strong>中文释义</strong><br>" . $senseZh . "<br><br> <strong>英文释义</strong><br>" . $senseEn
+                . "<br><br> <strong>例句翻译</strong><br>" . $exampleZh
+                . "<br><br> <strong>近义译法</strong><br>" . $aliasesZh
+                . "<br><br> <strong>搭配</strong><br>" . $collocations
+                . "<br><br> <strong>来源</strong><br>" . $source
+            );
 
-            // Escape special characters for TSV
-            $escape = fn($s) => str_replace(["\\", "\t", "\n", "\r"], ["\\\\", "\\t", "\\n", ""], $s ?? '');
+            $row = [
+                $front,
+                $back,
+                $lemma,
+                $surface,
+                $pos,
+                $senseZh,
+                $senseEn,
+                $exampleEn,
+                $exampleZh,
+                $aliasesZh,
+                $collocations,
+                $source,
+                $fsrsState,
+            ];
 
-            $lines[] = implode("\t", [
-                $escape($lemma),
-                $escape($reading),
-                $escape($translation),
-                $escape($exampleSentence),
-            ]);
-            $exportedCount++;
+            $lines[] = implode("\t", $row);
         }
 
-        $tsv = implode("\n", $lines) . "\n";
+        $tsv = implode("\n", $lines);
+        $filename = 'review-cards-anki-' . now()->format('Ymd-His') . '.tsv';
 
-        $filename = 'lingucafe-anki-import-' . now()->format('Ymd-His') . '.tsv';
+        return response($tsv, 200)
+            ->header('Content-Type', 'text/tab-separated-values; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="' . $filename . '"')
+            ->header('X-Export-Count', count($items));
+    }
 
-        return response($tsv, 200, [
-            'Content-Type' => 'text/tab-separated-values; charset=utf-8',
-            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
-            'X-Export-Count' => (string) $exportedCount,
-        ]);
+    private function tsvEscape(?string $value): string
+    {
+        if ($value === null) return '';
+        $value = str_replace(["\t", "\r", "\n"], [' ', ' ', ' '], $value);
+        return $value;
+    }
+
+    private function joinArray(?array $arr): string
+    {
+        if (empty($arr)) return '';
+        return implode('；', $arr);
     }
 
     /**

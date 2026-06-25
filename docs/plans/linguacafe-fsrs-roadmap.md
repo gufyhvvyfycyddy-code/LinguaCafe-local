@@ -368,17 +368,19 @@
 3. 旧接口无 tests，无 WordSense 支持，无 ReviewCard 关联，直接复用风险高。
 4. 推荐不改造旧 AnkiConnect，而是新建 **Anki TSV 文件导出**（C.21-a）：生成标准 Anki TSV 文件（字段分列，可导入 Anki Desktop/AnkiDroid），不依赖 AnkiConnect HTTP API，不做 apkg/anki 包，输出文件可用户手动导入 Anki。
 
-**C.21-a 实现**：
+**C.21-a 实现**（regression fix 后）：
 - 路由 `GET /review-cards/manage/export-anki-tsv` → `ReviewCardManageController::exportAnkiTsv()`
-- 三种模式：`current`（当前筛选）、`all`（全部语言卡）、`selected`（选定 ID）
-- TSV 字段：`word`、`reading`、`translation`、`example_sentence`（对应 Anki Note 模型字段）
-- 导出时对 `\`、`\t`、`\n` 做转义，`Content-Type: text/tab-separated-values`，`.tsv` 文件下载
-- 响应头 `X-Export-Count` 返回导出条数
-- Vue：在已有导出菜单底部新增 "Anki TSV: 当前/全部/已选" 按钮
-- 5 个测试覆盖：默认筛选、全部模式、选定 ID、空选择拒绝、无效模式拒绝
-- 未做：apkg 包、CSV/Excel 格式、自定义字段映射、AnkiConnect 集成
+- **只导出当前筛选/排序结果**：复用 `buildManageQuery()`，无 mode 参数，无 `all`/`selected` 模式，无 `card_ids`
+- **固定 13 列**：`Front`、`Back`、`Lemma`、`Surface`、`POS`、`SenseZh`、`SenseEn`、`ExampleEn`、`ExampleZh`、`AliasesZh`、`Collocations`、`Source`、`FsrsState`
+- `Front` / `Back` 为 HTML 拼接的问答面（含例句、lemma、释义、搭配、来源等），其余 11 列为原始字段
+- 导出时对 `\t`、`\r`、`\n` 替换为空格，不添加 UTF-8 BOM
+- `Content-Type: text/tab-separated-values; charset=UTF-8`，文件名 `review-cards-anki-YYYYMMDD-HHMMSS.tsv`
+- 响应头 `X-Export-Count` 返回导出条数；超限时返回 422 JSON（含 `message`/`total`/`limit`）
+- Vue：导出菜单底部只保留一个 "导出 Anki TSV" 按钮，不传 mode/card_ids
+- 5 个测试覆盖：固定 13 字段下载、用户/语言/sense-only 隔离、筛选复用、超限 422（skip）、tab/newline 消毒
+- 未做：apkg 包、CSV/Excel 格式、自定义字段映射、AnkiConnect 集成、`all`/`selected` 导出模式
 
-**决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。旧 AnkiConnect 接口保留不动，仅新增独立的 TSV 导出端点。
+**决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。旧 AnkiConnect 接口保留不动。TSV 导出端点独立、简单、只支持当前筛选结果。
 
 ---
 

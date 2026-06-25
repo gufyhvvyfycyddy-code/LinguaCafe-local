@@ -93,11 +93,8 @@
                             <v-btn x-small color="primary" @click="exportCurrentFilter">导出 JSON</v-btn>
                         </v-card-actions>
                         <v-divider />
-                        <v-card-actions class="pa-2" style="flex-wrap: wrap; gap: 4px;">
-                            <span class="text-caption text--secondary mr-1" style="line-height: 28px;">Anki TSV:</span>
-                            <v-btn x-small color="primary" :loading="ankiExportLoading" @click="exportAnkiTsv('current')">当前</v-btn>
-                            <v-btn x-small text @click="exportAnkiTsv('all')">全部</v-btn>
-                            <v-btn x-small text @click="exportAnkiTsv('selected')">已选</v-btn>
+                        <v-card-actions class="pa-2">
+                            <v-btn x-small color="primary" :loading="ankiExportLoading" @click="exportAnkiTsv">导出 Anki TSV</v-btn>
                         </v-card-actions>
                     </v-card>
                 </v-menu>
@@ -1354,53 +1351,51 @@ export default {
             });
         },
 
-        exportAnkiTsv(mode) {
-            if (mode === 'selected' && (!this.selectedIds || this.selectedIds.length === 0)) {
-                this.snackbar = { show: true, text: '请先选择要导出的复习卡。', color: 'error' };
-                return;
-            }
+        exportAnkiTsv() {
             this.ankiExportLoading = true;
-            const params = {
-                mode: mode,
-                q: this.searchQuery,
-                filter: this.currentFilter,
-                sort_by: this.sortBy,
-                sort_dir: this.sortDir,
-                fsrs_states: this.advancedFilters.fsrsStates,
-                due_range: this.advancedFilters.dueRange,
-                reps_min: this.advancedFilters.repsMin,
-                lapses_min: this.advancedFilters.lapsesMin,
-            };
-            if (mode === 'selected') {
-                params.card_ids = this.selectedIds;
-            }
-            axios.get('/review-cards/manage/export-anki-tsv', { params, responseType: 'blob' })
-                .then((response) => {
-                    const url = window.URL.createObjectURL(new Blob([response.data]));
-                    const link = document.createElement('a');
-                    link.href = url;
-                    const disposition = response.headers['content-disposition'] || '';
-                    const match = disposition.match(/filename="?(.+?)"?$/);
-                    link.setAttribute('download', match ? match[1] : 'lingucafe-anki-import.tsv');
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    window.URL.revokeObjectURL(url);
-                    const count = response.headers['x-export-count'] || '—';
-                    this.snackbar = { show: true, text: `已导出 ${count} 条到 Anki TSV。`, color: 'success' };
-                })
-                .catch((err) => {
-                    if (err.response && err.response.status === 422) {
-                        err.response.data.text().then((text) => {
-                            this.snackbar = { show: true, text: text || '导出失败。', color: 'error' };
-                        });
-                    } else {
-                        this.snackbar = { show: true, text: '导出失败：' + (err.message || '未知错误'), color: 'error' };
-                    }
-                })
-                .finally(() => {
-                    this.ankiExportLoading = false;
-                });
+            axios.get('/review-cards/manage/export-anki-tsv', {
+                params: {
+                    q: this.searchQuery,
+                    filter: this.currentFilter,
+                    sort_by: this.sortBy,
+                    sort_dir: this.sortDir,
+                    fsrs_states: this.advancedFilters.fsrsStates,
+                    due_range: this.advancedFilters.dueRange,
+                    reps_min: this.advancedFilters.repsMin,
+                    lapses_min: this.advancedFilters.lapsesMin,
+                },
+                responseType: 'blob',
+            })
+            .then((response) => {
+                const url = window.URL.createObjectURL(new Blob([response.data]));
+                const link = document.createElement('a');
+                link.href = url;
+                const disposition = response.headers['content-disposition'] || '';
+                const match = disposition.match(/filename="?(.+?)"?$/);
+                link.setAttribute('download', match ? match[1] : 'review-cards-anki.tsv');
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.URL.revokeObjectURL(url);
+                this.snackbar = { show: true, text: '已导出 Anki TSV。', color: 'success' };
+            })
+            .catch((err) => {
+                if (err.response && err.response.status === 422) {
+                    err.response.data.text().then((text) => {
+                        try {
+                            const parsed = JSON.parse(text);
+                            this.snackbar = { show: true, text: parsed.message || '导出失败。', color: 'error' };
+                        } catch (e) {
+                            this.snackbar = { show: true, text: '导出失败：结果超过上限。', color: 'error' };
+                        }
+                    });
+                } else {
+                    this.snackbar = { show: true, text: '导出失败：' + (err.message || '未知错误'), color: 'error' };
+                }
+            })
+            .finally(() => {
+                this.ankiExportLoading = false;
+            });
         },
 
         displayValue(value, fallback = '—') {
