@@ -79,6 +79,7 @@
 | D.2-b | Desired Retention 帮助说明增强 — 每个 retention 值增加一句话解释，90% 标注"推荐默认值"，低保持率保留可选 |
 | D.2-c | 复习负担预估第一版 — 在复习目标区增加小估算框，使用当前 stats 数据做粗略每日复习量预估，提示负担变化 |
 | CODEX-FSRS-1 | FSRS 设置页 Anki-like 增强 — 修正 latest commit hash，落地简单模式/高级工具雏形，新增自动优化参数按钮、optimization-status 与 optimize preflight 接口；第一版只检查资格，不真实计算或保存参数 |
+| RightClickPanel-2-scout | 自动创建复习卡 + 最相关词义默认展开可行性侦察 — 结论：`+ 添加为新释义` 已自动创建 sense review card（无需额外开发）；最相关词义默认展开尚未实现，推荐方案见 right-click-panel-word-sense-plan.md；词典结果无高度限制需加 scroll |
 | RightClickPanel-1 | 右侧点词面板 WordSense UI 功能改造 — 右侧点词面板完成分区整理；词典结果新增“添加为新释义”入口；WordSense 区域改为更清晰的展开/折叠管理卡片与空分组添加入口；不改 FSRS 调度，不改 sense-only 语义 |
 
 ---
