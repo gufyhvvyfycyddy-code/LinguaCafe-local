@@ -33,9 +33,13 @@ class FsrsReschedulePreviewService
      */
     public function preview(int $userId, string $language): array
     {
+        if ($language !== 'english') {
+            return $this->unsupportedLanguageResponse($language);
+        }
+
         // 1) Check fsrs-rs-php extension availability
         if (!$this->extensionAvailable()) {
-            return $this->unavailableResponse('FSRS 扩展未加载，无法预览。扩展要求：fsrs-rs-php。');
+            return $this->unavailableResponse($language, 'FSRS 扩展未加载，无法预览。扩展要求：fsrs-rs-php。');
         }
 
         $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters();
@@ -51,6 +55,7 @@ class FsrsReschedulePreviewService
         $now = Carbon::now();
 
         // 3) Compute preview for each card
+        $skippedCount = 0;
         $previewRows = [];
         $willMoveEarlier = 0;
         $willMoveLater = 0;
@@ -63,6 +68,7 @@ class FsrsReschedulePreviewService
         foreach ($cards as $card) {
             $row = $this->buildPreviewForCard($card, $activeParams, $desiredRetention, $now);
             if ($row === null) {
+                $skippedCount++;
                 continue;
             }
 
@@ -102,6 +108,7 @@ class FsrsReschedulePreviewService
             'target_type' => 'sense',
             'total_candidates' => $totalCandidates,
             'total_changed' => $totalChanged,
+            'skipped_count' => $skippedCount,
             'summary' => [
                 'will_move_earlier' => $willMoveEarlier,
                 'will_move_later' => $willMoveLater,
@@ -148,6 +155,7 @@ class FsrsReschedulePreviewService
             ->whereNotNull('review_cards.fsrs_stability')
             ->whereNotNull('review_cards.fsrs_difficulty')
             ->whereNotNull('review_cards.fsrs_last_reviewed_at')
+            ->whereNotNull('review_cards.fsrs_due_at')
             ->where('word_senses.user_id', $userId)
             ->where('word_senses.language_id', $language)
             ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
@@ -254,15 +262,16 @@ class FsrsReschedulePreviewService
             && function_exists('get_default_parameters');
     }
 
-    private function unavailableResponse(string $message): array
+    private function unavailableResponse(string $language, string $message): array
     {
         return [
             'success' => true,
             'preview_available' => false,
-            'language' => '',
+            'language' => $language,
             'target_type' => 'sense',
             'total_candidates' => 0,
             'total_changed' => 0,
+            'skipped_count' => 0,
             'summary' => [
                 'will_move_earlier' => 0,
                 'will_move_later' => 0,
@@ -289,6 +298,7 @@ class FsrsReschedulePreviewService
             'target_type' => 'sense',
             'total_candidates' => 0,
             'total_changed' => 0,
+            'skipped_count' => 0,
             'summary' => [
                 'will_move_earlier' => 0,
                 'will_move_later' => 0,
@@ -303,6 +313,33 @@ class FsrsReschedulePreviewService
             'warnings' => [
                 '这是预览，不会修改任何卡片。',
                 '当前没有符合条件的卡片。确认条件：sense card + review 状态 + 已 confirmed WordSense + 有 FSRS 记忆状态。',
+            ],
+        ];
+    }
+
+    private function unsupportedLanguageResponse(string $language): array
+    {
+        return [
+            'success' => true,
+            'preview_available' => false,
+            'language' => $language,
+            'target_type' => 'sense',
+            'total_candidates' => 0,
+            'total_changed' => 0,
+            'skipped_count' => 0,
+            'summary' => [
+                'will_move_earlier' => 0,
+                'will_move_later' => 0,
+                'unchanged' => 0,
+                'currently_due' => 0,
+                'newly_due_today' => 0,
+                'due_today_after_reschedule' => 0,
+                'max_earlier_days' => 0,
+                'max_later_days' => 0,
+            ],
+            'samples' => [],
+            'warnings' => [
+                '当前阶段只支持英语卡片重排预览。',
             ],
         ];
     }

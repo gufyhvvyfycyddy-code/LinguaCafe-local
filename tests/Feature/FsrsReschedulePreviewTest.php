@@ -74,6 +74,7 @@ class FsrsReschedulePreviewTest extends TestCase
         $response->assertJsonPath('target_type', 'sense');
         $response->assertJsonPath('total_candidates', 1);
         $response->assertJsonPath('total_changed', 1);
+        $response->assertJsonPath('skipped_count', 0);
         $response->assertJsonStructure([
             'success',
             'preview_available',
@@ -81,6 +82,7 @@ class FsrsReschedulePreviewTest extends TestCase
             'target_type',
             'total_candidates',
             'total_changed',
+            'skipped_count',
             'summary' => [
                 'will_move_earlier',
                 'will_move_later',
@@ -342,6 +344,66 @@ class FsrsReschedulePreviewTest extends TestCase
         $warnings = $response->json('warnings');
         $this->assertNotEmpty($warnings);
         $this->assertStringContainsString('预览', $warnings[0]);
+    }
+
+    public function test_preview_returns_unavailable_for_non_english_language(): void
+    {
+        $this->user->selected_language = 'japanese';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('preview_available', false);
+        $response->assertJsonPath('language', 'japanese');
+        $response->assertJsonPath('total_candidates', 0);
+        $response->assertJsonPath('skipped_count', 0);
+        $warnings = $response->json('warnings');
+        $this->assertNotEmpty($warnings);
+        $this->assertStringContainsString('只支持英语', $warnings[0]);
+    }
+
+    public function test_preview_excludes_cards_without_due_at(): void
+    {
+        $sense = $this->createSense('test_nodue', '无到期时间', 'no due at');
+        $this->createSenseCard($sense, [
+            'fsrs_due_at' => null,
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 4.0,
+            'fsrs_last_reviewed_at' => now()->subDays(3),
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $this->assertEquals(0, $response->json('total_candidates'));
+    }
+
+    public function test_preview_response_includes_skipped_count(): void
+    {
+        $this->createEligibleReviewCard();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $this->assertIsInt($response->json('skipped_count'));
+    }
+
+    public function test_preview_totals_balance(): void
+    {
+        $this->createEligibleReviewCard('card1');
+        $this->createEligibleReviewCard('card2');
+        $this->createEligibleReviewCard('card3');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertEquals(
+            $data['total_candidates'],
+            $data['total_changed'] + $data['summary']['unchanged'] + $data['skipped_count']
+        );
     }
 
     // ════════════════════════════════════════════════════════════════
