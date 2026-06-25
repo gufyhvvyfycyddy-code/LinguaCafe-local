@@ -79,10 +79,16 @@ class SettingsController extends Controller
     public function optimizeFsrsParameters() {
         $user = Auth::user();
 
-        return response()->json(
-            $this->settingsService->preflightFsrsOptimization($user->id, $user->selected_language),
-            200
-        );
+        try {
+            $result = $this->settingsService->computeFsrsOptimizationPreview($user->id, $user->selected_language);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => '参数优化计算失败：' . $e->getMessage(),
+            ], 200);
+        }
+
+        return response()->json($result, 200);
     }
 
     // returns an array of user settings

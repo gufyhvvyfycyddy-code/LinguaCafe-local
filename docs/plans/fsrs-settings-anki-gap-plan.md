@@ -215,19 +215,15 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 ---
 
-### D.3-a：参数优化第一版
+### D.3-a：参数优化第一版（✅ 已完成，2026-06-25）
 
-**前置条件**：D.2-d（参数来源字段）+ D.3-scout（可行性确认）。
+**前置条件**：D.2-d（参数来源字段）+ D.3-scout（可行性确认）— 均已完成。
 
-**目标**：让用户可以根据自己的复习历史生成个性化 FSRS 参数。
-
-**要做什么**：
-- 数据充分性检查：ReviewLog 数量 < 阈值（当前产品阈值 300，后续可由 D.3-scout 再校准）时，显示警告"复习记录还不够，先继续复习一段时间再来优化。"，不执行真实优化。
-- 优化触发：按钮"开始优化"，后端调用 fsrs-rs-php 的 optimize 方法。
-- 优化结果预览：显示新参数与旧参数的对比表（w0-w19 的值变化不大的一般不显示详细）。
-- 优化后保存：用户确认后保存到 Settings 表（建议存为 JSON，key 为 `fsrs_parameters`）。
-- 不自动重排已有卡片。
-- 不改变当前正在排队的卡片到期时间。
+**已完成**：
+- `SettingsService::computeFsrsOptimizationPreview()` — 构建 train set（FSRSItem[]），调用 `compute_parameters()`，返回 current vs optimized 参数对比 JSON。
+- `SettingsController::optimizeFsrsParameters()` — 返回优化预览（200），不保存参数。
+- 17 个测试：预飞流程、隔离过滤（word/reset/user/language/unconfirmed sense）、无副作用验证（不保存参数、不重排卡片）、rating 映射（again/hard/good/easy）。
+- 不保存参数，不重排卡片（留给 D.3-b / D.4）。
 
 ---
 
@@ -280,9 +276,10 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 **目标完成**：CODEX-FSRS-1 — 自动优化入口与资格检查（✅ 已在本轮完成）。
 
-**下一步推荐：D.3-a — 参数优化后端最小实现。**
+**下一步推荐：D.3-c — 前端优化预览展示。**
 
 **理由**：
-- 优化入口和 review_count preflight 已经可用。
-- FSRS-D3-scout 已确认：`compute_parameters()` API 可用，ReviewLog 数据完整，无需新增依赖。
+- D.3-a 后端优化预览已完成：computeFsrsOptimizationPreview() + 17 个测试全部通过。
+- 前端只需展示 API 返回的 current_parameters / optimized_parameters 对比。
+- D.3-c 纯前端只读，风险低，可独立完成。
 - 详见 `fsrs-parameter-optimization-plan.md`。

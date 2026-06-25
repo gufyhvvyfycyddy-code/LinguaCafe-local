@@ -157,6 +157,199 @@ class FsrsOptimizationSettingsTest extends TestCase
         );
     }
 
+    public function test_optimize_preview_returns_preview_available_false_when_insufficient(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, 50);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', false);
+        $response->assertJsonPath('applied', false);
+        $response->assertJsonPath('optimized', false);
+        $response->assertJsonPath('can_optimize', false);
+        $response->assertJsonPath('optimized_parameters', []);
+        $response->assertJsonPath('parameter_count', 0);
+    }
+
+    public function test_optimize_preview_returns_preview_available_true_when_sufficient(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $response->assertJsonPath('applied', false);
+        $response->assertJsonPath('optimized', false);
+        $response->assertJsonPath('can_optimize', true);
+        $paramCount = $response->json('parameter_count');
+        $this->assertTrue($paramCount >= 19 && $paramCount <= 21, "parameter_count $paramCount not in [19,21]");
+        $response->assertJsonPath('review_count', SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED);
+        $response->assertJsonPath('card_count', 1);
+
+        $optimizedParams = $response->json('optimized_parameters');
+        $this->assertIsArray($optimizedParams);
+        $this->assertCount($paramCount, $optimizedParams);
+        foreach ($optimizedParams as $p) {
+            $this->assertIsFloat($p);
+            $this->assertTrue(is_finite($p));
+        }
+
+        $currentParams = $response->json('current_parameters');
+        $this->assertIsArray($currentParams);
+        $this->assertCount(19, $currentParams);
+    }
+
+    public function test_optimize_preview_excludes_reset_logs(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, 300, [], 1);
+        // Add reset logs that should be excluded
+        $this->createReviewLogs($card, 2, [
+            'rating' => 'reset',
+            'source' => 'reset',
+            'previous_state' => 'review',
+            'new_state' => 'new',
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        // review_count should NOT include the 2 reset logs
+        $this->assertEquals(300, $response->json('review_count'));
+    }
+
+    public function test_optimize_preview_excludes_word_cards(): void
+    {
+        $senseCard = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $wordCard = $this->createWordCard($this->user->id, 'english');
+
+        $this->createReviewLogs($senseCard, 300, [], 1);
+        $this->createReviewLogs($wordCard, 50);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $this->assertEquals(300, $response->json('review_count'));
+    }
+
+    public function test_optimize_preview_excludes_other_users(): void
+    {
+        $userCard = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $otherCard = $this->createSenseCard($this->createSense($this->otherUser->id, 'english'));
+
+        $this->createReviewLogs($userCard, 300, [], 1);
+        $this->createReviewLogs($otherCard, 50);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $this->assertEquals(300, $response->json('review_count'));
+    }
+
+    public function test_optimize_preview_excludes_other_languages(): void
+    {
+        $englishCard = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $spanishCard = $this->createSenseCard($this->createSense($this->user->id, 'spanish'));
+
+        $this->createReviewLogs($englishCard, 300, [], 1);
+        $this->createReviewLogs($spanishCard, 50);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $this->assertEquals(300, $response->json('review_count'));
+    }
+
+    public function test_optimize_preview_excludes_unconfirmed_sense(): void
+    {
+        $confirmedSense = $this->createSense($this->user->id, 'english');
+        $confirmedCard = $this->createSenseCard($confirmedSense);
+        $this->createReviewLogs($confirmedCard, 300, [], 1);
+
+        $unconfirmedSense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'unconfirmed',
+            'status' => 'ai_suggested',
+        ]);
+        $unconfirmedCard = $this->createSenseCard($unconfirmedSense);
+        $this->createReviewLogs($unconfirmedCard, 50);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $this->assertEquals(300, $response->json('review_count'));
+    }
+
+    public function test_optimize_preview_does_not_save_parameters(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', false);
+
+        $this->assertDatabaseMissing('settings', [
+            'name' => 'fsrs_parameters',
+        ]);
+        $this->assertDatabaseMissing('settings', [
+            'name' => 'fsrs_parameters_source',
+        ]);
+        $this->assertDatabaseMissing('settings', [
+            'name' => 'fsrs_parameters_optimized_at',
+        ]);
+    }
+
+    public function test_optimize_preview_does_not_reschedule_cards(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'), [
+            'fsrs_due_at' => Carbon::now()->addDays(3),
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 4.0,
+        ]);
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+
+        $card->refresh();
+        $this->assertEquals(5.0, $card->fsrs_stability);
+        $this->assertEquals(4.0, $card->fsrs_difficulty);
+        // due_at should be approximately the same (within a second)
+        $this->assertTrue(Carbon::now()->addDays(3)->diffInSeconds($card->fsrs_due_at) < 5);
+    }
+
+    public function test_optimize_preview_rating_mapping_all_ratings_accepted(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, 1, ['rating' => 'again'], 1);
+        $this->createReviewLogs($card, 1, ['rating' => 'hard'], 1);
+        $this->createReviewLogs($card, 1, ['rating' => 'good'], 1);
+        $this->createReviewLogs($card, 1, ['rating' => 'easy'], 1);
+
+        // Need at least 300 total, so add more
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED - 4, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', true);
+        $response->assertJsonPath('optimized', false);
+        $optimizedParams = $response->json('optimized_parameters');
+        $this->assertCount($response->json('parameter_count'), $optimizedParams);
+    }
+
     private function createSense(int $userId, string $language, array $overrides = []): WordSense
     {
         $lemma = $overrides['lemma'] ?? 'test';
@@ -228,16 +421,20 @@ class FsrsOptimizationSettingsTest extends TestCase
         ]);
     }
 
-    private function createReviewLogs(ReviewCard $card, int $count, array $overrides = []): void
+    private function createReviewLogs(ReviewCard $card, int $count, array $overrides = [], int $daysSpacing = 0): void
     {
         for ($i = 0; $i < $count; $i++) {
+            $time = $daysSpacing > 0
+                ? Carbon::now()->subDays($i * $daysSpacing)
+                : Carbon::now()->subMinutes($i);
+
             ReviewLog::forceCreate(array_merge([
                 'user_id' => $card->user_id,
                 'language_id' => $card->language_id,
                 'language' => $card->language_id,
                 'review_card_id' => $card->id,
                 'rating' => 'good',
-                'reviewed_at' => Carbon::now()->subMinutes($i),
+                'reviewed_at' => $time,
                 'previous_state' => $card->fsrs_state,
                 'new_state' => 'review',
                 'previous_due_at' => $card->fsrs_due_at,

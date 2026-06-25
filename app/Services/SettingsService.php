@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\WordSense;
+use Illuminate\Support\Facades\DB;
 
 class SettingsService {
     public const FSRS_OPTIMIZATION_MIN_REQUIRED = 300;
@@ -159,5 +160,213 @@ class SettingsService {
             ->where('word_senses.language_id', $language)
             ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
             ->count('review_logs.id');
+    }
+
+    public function computeFsrsOptimizationPreview(int $userId, string $language): array {
+        $status = $this->getFsrsOptimizationStatus($userId, $language);
+
+        if (!$status['can_optimize']) {
+            return [
+                'optimized' => false,
+                'applied' => false,
+                'preview_available' => false,
+                'current_parameters' => [],
+                'optimized_parameters' => [],
+                'parameter_count' => 0,
+                'card_count' => 0,
+                'review_count' => $status['review_count'],
+                'min_required' => $status['min_required'],
+                'can_optimize' => $status['can_optimize'],
+                'message' => $status['message'],
+            ];
+        }
+
+        try {
+            if (!extension_loaded('fsrs-rs-php') || !class_exists('\fsrs\FSRS')) {
+                return [
+                    'optimized' => false,
+                    'applied' => false,
+                    'preview_available' => false,
+                    'current_parameters' => [],
+                    'optimized_parameters' => [],
+                    'parameter_count' => 0,
+                    'card_count' => 0,
+                    'review_count' => $status['review_count'],
+                    'min_required' => $status['min_required'],
+                    'can_optimize' => $status['can_optimize'],
+                    'message' => 'FSRS 扩展未加载，无法进行参数优化。',
+                    'error_code' => 'EXTENSION_NOT_LOADED',
+                ];
+            }
+
+            $trainSet = $this->buildFsrsOptimizationTrainSet($userId, $language);
+
+            if (empty($trainSet)) {
+                return [
+                    'optimized' => false,
+                    'applied' => false,
+                    'preview_available' => false,
+                    'current_parameters' => [],
+                    'optimized_parameters' => [],
+                    'parameter_count' => 0,
+                    'card_count' => 0,
+                    'review_count' => $status['review_count'],
+                    'min_required' => $status['min_required'],
+                    'can_optimize' => true,
+                    'message' => '记录足够但无法构造训练数据，请检查复习记录是否完整。',
+                    'error_code' => 'EMPTY_TRAINSET',
+                ];
+            }
+
+            $fsrs = new \fsrs\FSRS(get_default_parameters());
+            $optimized = $fsrs->compute_parameters($trainSet);
+
+            // compute_parameters returns an object; extract weights based on API
+            if (is_object($optimized)) {
+                if (method_exists($optimized, 'getWeights')) {
+                    $params = array_values((array) $optimized->getWeights());
+                } elseif (method_exists($optimized, 'toArray')) {
+                    $params = array_values($optimized->toArray());
+                } else {
+                    $params = array_values((array) $optimized);
+                }
+            } elseif (is_array($optimized)) {
+                $params = array_values($optimized);
+            } else {
+                throw new \Exception('compute_parameters 未返回有效结果。');
+            }
+
+            if (count($params) < 19 || count($params) > 21) {
+                throw new \Exception('优化返回 ' . count($params) . ' 个参数，预期 19-21 个。');
+            }
+
+            foreach ($params as $i => $p) {
+                if (!is_numeric($p) || !is_finite((float) $p)) {
+                    throw new \Exception("参数 #{$i} 无效: " . var_export($p, true));
+                }
+            }
+
+            $params = array_map('floatval', $params);
+
+            $defaultParams = get_default_parameters();
+            $currentParams = is_array($defaultParams) ? array_values($defaultParams) : [];
+            $cardCount = $this->countOptimizableCards($userId, $language);
+
+            return [
+                'optimized' => false,
+                'applied' => false,
+                'preview_available' => true,
+                'current_parameters' => $currentParams,
+                'optimized_parameters' => $params,
+                'parameter_count' => count($params),
+                'review_count' => $status['review_count'],
+                'card_count' => $cardCount,
+                'min_required' => $status['min_required'],
+                'can_optimize' => true,
+                'message' => '已根据你的复习记录计算出一组优化参数预览。此版本不会保存参数，也不会重排已有卡片。',
+            ];
+        } catch (\Exception $e) {
+            return [
+                'optimized' => false,
+                'applied' => false,
+                'preview_available' => false,
+                'current_parameters' => [],
+                'optimized_parameters' => [],
+                'parameter_count' => 0,
+                'card_count' => 0,
+                'review_count' => $status['review_count'],
+                'min_required' => $status['min_required'],
+                'can_optimize' => $status['can_optimize'],
+                'message' => '参数优化计算失败：' . $e->getMessage(),
+                'error_code' => 'COMPUTE_FAILED',
+            ];
+        }
+    }
+
+    private function buildFsrsOptimizationTrainSet(int $userId, string $language): array {
+        $ratingMap = [
+            'again' => 1,
+            'hard' => 2,
+            'good' => 3,
+            'easy' => 4,
+        ];
+
+        $logs = ReviewLog::query()
+            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_logs.user_id', $userId)
+            ->where('review_logs.language_id', $language)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_logs.rating', '!=', 'reset')
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->select([
+                'review_logs.review_card_id',
+                'review_logs.rating',
+                'review_logs.reviewed_at',
+            ])
+            ->orderBy('review_logs.review_card_id')
+            ->orderBy('review_logs.reviewed_at')
+            ->get();
+
+        $grouped = $logs->groupBy('review_card_id');
+        $trainSet = [];
+
+        foreach ($grouped as $cardId => $cardLogs) {
+            if ($cardLogs->isEmpty()) {
+                continue;
+            }
+
+            $reviews = [];
+            $previousAt = null;
+
+            foreach ($cardLogs as $log) {
+                $ratingInt = $ratingMap[$log->rating] ?? null;
+                if ($ratingInt === null) {
+                    continue;
+                }
+
+                $deltaT = 0;
+                if ($previousAt !== null) {
+                    $seconds = max(0, $previousAt->diffInSeconds($log->reviewed_at));
+                    $deltaT = (int) round($seconds / 86400.0);
+                }
+
+                $reviews[] = new \fsrs\FSRSReview($ratingInt, $deltaT);
+                $previousAt = $log->reviewed_at;
+            }
+
+            // FSRS requires at least 1 review with delta_t > 0 per item
+            if (count($reviews) >= 2) {
+                $trainSet[] = new \fsrs\FSRSItem($reviews);
+            }
+        }
+
+        return $trainSet;
+    }
+
+    private function countOptimizableCards(int $userId, string $language): int {
+        return DB::table('review_logs')
+            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_logs.user_id', $userId)
+            ->where('review_logs.language_id', $language)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->distinct()
+            ->count('review_logs.review_card_id');
     }
 }
