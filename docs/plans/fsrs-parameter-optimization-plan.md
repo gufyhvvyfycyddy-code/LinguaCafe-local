@@ -325,6 +325,7 @@ D.3-a / D.3-c / D.3-b / D.2-d 全部完成：
 - D.3-c：AdminReviewSettings.vue 预览 UI
 - D.3-b：applyFsrsOptimizedParameters() + 24 个测试 + 确认保存
 - D.2-d：resolveFsrsParameterSource() + 28 个测试 + 参数来源真实展示
+- D.2-d-fix：decodeSettingValue() 修复 json_encoded 来源/时间字段解析 + v-chip "正在优化参数"
 
 D.3-d 任务：
 1. 在 FSRS 调度流程（创建 card、评分、计算 due date）中读取 settings 里的 fsrs_parameters。

@@ -194,6 +194,7 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 - 前端根据状态展示对应文案：默认 → "当前使用默认参数 / 还没有保存过优化参数 / 参数数量：19"；已优化 → "当前使用已优化参数 / 最近优化时间 / 参数数量：21 / 只影响新评分，不重排"
 - 4 个新测试（28 total，162 assertions）：默认、已优化、JSON 异常、自定义来源
 - 不新增 migration，不保存参数，不重排卡片
+- **D.2-d-fix (2026-06-26)**：`resolveFsrsParameterSource()` 增加 `decodeSettingValue()` helper 解析 json_encoded 来源/时间字段；optimized 状态文案改为 v-chip "正在优化参数"；29 个测试全部通过（+1 confirm→status 检查）
 
 ---
 
