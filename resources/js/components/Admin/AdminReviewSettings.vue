@@ -40,6 +40,13 @@
                     </tbody>
                 </v-simple-table>
 
+                <!-- 复习负担预估 -->
+                <div class="mt-3 pa-3 rounded" style="background: #f5f7fa;">
+                    <div class="font-weight-medium body-2 mb-1">每天大概要复习多少</div>
+                    <div class="body-1 grey--text text--darken-1">{{ burdenEstimateMessage }}</div>
+                    <div class="caption grey--text mt-1">粗略预估，仅帮助你感受负担，不会重排已有卡片。</div>
+                </div>
+
                 <v-card-actions class="px-0">
                     <v-spacer />
                     <v-btn
@@ -364,6 +371,40 @@
             },
             isRecommended() {
                 return this.fsrsDesiredRetention === 0.90;
+            },
+            retentionBurdenEstimate() {
+                const multiplierMap = {
+                    0.70: 0.55,
+                    0.75: 0.65,
+                    0.80: 0.78,
+                    0.85: 0.90,
+                    0.90: 1.00,
+                    0.92: 1.15,
+                    0.95: 1.45,
+                    0.97: 1.90,
+                };
+                const multiplier = multiplierMap[this.fsrsDesiredRetention] || 1.00;
+                const enabled = Number(this.fsrsStats.enabled || 0);
+                const due = Number(this.fsrsStats.due || 0);
+                const reviewedToday = Number(this.fsrsStats.reviewed_today || 0);
+                const baseline = Math.max(due, reviewedToday, Math.ceil(enabled * 0.03));
+                const estimate = Math.ceil(baseline * multiplier);
+                const low = Math.max(0, Math.floor(estimate * 0.8));
+                const high = Math.max(low, Math.ceil(estimate * 1.25));
+                return { low, high };
+            },
+            burdenEstimateMessage() {
+                if (Number(this.fsrsStats.enabled || 0) === 0) {
+                    return '现在还没有启用中的词义卡，先不用担心复习负担。';
+                }
+                const est = this.retentionBurdenEstimate;
+                const range = `按当前数据粗略看，每天大约复习 ${est.low}-${est.high} 张。`;
+                if (this.fsrsDesiredRetention === 0.90) {
+                    return `${range}90% 是比较平衡的默认选择。`;
+                } else if (this.fsrsDesiredRetention < 0.90) {
+                    return `${range}会轻松一些，但也更容易忘。`;
+                }
+                return `${range}记得更稳，但复习会更密。`;
             },
         },
         methods: {
