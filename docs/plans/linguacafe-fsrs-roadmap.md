@@ -379,6 +379,7 @@
 - Vue：导出菜单底部只保留一个 "导出 Anki TSV" 按钮，不传 mode/card_ids
 - 5 个测试覆盖：固定 13 字段下载、用户/语言/sense-only 隔离、筛选复用、超限 422（skip）、tab/newline 消毒
 - 未做：apkg 包、CSV/Excel 格式、自定义字段映射、AnkiConnect 集成、`all`/`selected` 导出模式
+- **C.21-a-html-escape-fix**：Front / Back 中来自用户文本的内容已 HTML escape（`<` → `&lt;` 等），仅保留固定 `<strong>` / `<br>` 标签，避免 Anki HTML 面板渲染用户输入 HTML。
 
 **决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。旧 AnkiConnect 接口保留不动。TSV 导出端点独立、简单、只支持当前筛选结果。
 

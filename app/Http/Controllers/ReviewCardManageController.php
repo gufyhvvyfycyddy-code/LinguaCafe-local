@@ -237,15 +237,28 @@ class ReviewCardManageController extends Controller
             $source = $this->tsvEscape($item['source_chapter_title'] ?? '');
             $fsrsState = $this->tsvEscape($item['fsrs_state'] ?? '');
 
+            // HTML-escape user text embedded in Anki Front/Back HTML faces.
+            // Only fixed structural tags (<strong>, <br>) are kept raw.
+            $exampleEnHtml = $this->htmlEscape($exampleEn);
+            $lemmaHtml = $this->htmlEscape($lemma);
+            $surfaceHtml = $this->htmlEscape($surface);
+            $posHtml = $this->htmlEscape($pos);
+            $senseZhHtml = $this->htmlEscape($senseZh);
+            $senseEnHtml = $this->htmlEscape($senseEn);
+            $exampleZhHtml = $this->htmlEscape($exampleZh);
+            $aliasesZhHtml = $this->htmlEscape($aliasesZh);
+            $collocationsHtml = $this->htmlEscape($collocations);
+            $sourceHtml = $this->htmlEscape($source);
+
             $front = $this->tsvEscape(
-                $exampleEn . "<br><br> <strong>" . $lemma . "</strong> / " . $surface . " / " . $pos
+                $exampleEnHtml . "<br><br> <strong>" . $lemmaHtml . "</strong> / " . $surfaceHtml . " / " . $posHtml
             );
             $back = $this->tsvEscape(
-                "<strong>中文释义</strong><br>" . $senseZh . "<br><br> <strong>英文释义</strong><br>" . $senseEn
-                . "<br><br> <strong>例句翻译</strong><br>" . $exampleZh
-                . "<br><br> <strong>近义译法</strong><br>" . $aliasesZh
-                . "<br><br> <strong>搭配</strong><br>" . $collocations
-                . "<br><br> <strong>来源</strong><br>" . $source
+                "<strong>中文释义</strong><br>" . $senseZhHtml . "<br><br> <strong>英文释义</strong><br>" . $senseEnHtml
+                . "<br><br> <strong>例句翻译</strong><br>" . $exampleZhHtml
+                . "<br><br> <strong>近义译法</strong><br>" . $aliasesZhHtml
+                . "<br><br> <strong>搭配</strong><br>" . $collocationsHtml
+                . "<br><br> <strong>来源</strong><br>" . $sourceHtml
             );
 
             $row = [
@@ -281,6 +294,12 @@ class ReviewCardManageController extends Controller
         if ($value === null) return '';
         $value = str_replace(["\t", "\r", "\n"], [' ', ' ', ' '], $value);
         return $value;
+    }
+
+    private function htmlEscape(?string $value): string
+    {
+        if ($value === null) return '';
+        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
     private function joinArray(?array $arr): string

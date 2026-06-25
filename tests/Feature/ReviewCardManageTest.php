@@ -3750,6 +3750,52 @@ class ReviewCardManageTest extends TestCase
         $this->assertStringContainsString('tab char and newline char', $content);
     }
 
+    public function test_export_anki_tsv_escapes_html_in_front_and_back(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', [
+            'lemma' => '<script>alert(1)</script>',
+            'sense_zh' => '<img src=x onerror=alert(1)>',
+            'sense_en' => 'Tom & Jerry "quote"',
+            'example_sentence_en' => 'Use <b>bold</b> & symbols.',
+            'example_sentence_zh' => '中文 <script>坏</script>',
+        ]);
+        $this->createSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv');
+        $response->assertOk();
+        $content = $response->getContent();
+
+        $lines = explode("\n", $content);
+        $this->assertCount(2, $lines, 'Header + 1 data row');
+
+        foreach ($lines as $line) {
+            $cols = explode("\t", $line);
+            $this->assertCount(13, $cols, 'Each row must have exactly 13 columns');
+        }
+
+        $dataLine = $lines[1];
+        $cols = explode("\t", $dataLine);
+        $front = $cols[0];
+        $back = $cols[1];
+
+        // HTML-escaped user text must be present in Front/Back
+        $this->assertStringContainsString('&lt;script&gt;', $front . $back);
+        $this->assertStringContainsString('&lt;img', $back);
+        $this->assertStringContainsString('Tom &amp; Jerry', $back);
+        $this->assertStringContainsString('&lt;b&gt;bold&lt;/b&gt;', $front);
+
+        // Raw dangerous HTML must NOT appear in Front/Back
+        $this->assertStringNotContainsString('<script>', $front . $back);
+        $this->assertStringNotContainsString('<img src=x', $front . $back);
+        $this->assertStringNotContainsString('<b>bold</b>', $front . $back);
+
+        // Fixed structural tags must be preserved
+        $this->assertStringContainsString('<strong>', $front);
+        $this->assertStringContainsString('<strong>', $back);
+        $this->assertStringContainsString('<br>', $front);
+        $this->assertStringContainsString('<br>', $back);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');
