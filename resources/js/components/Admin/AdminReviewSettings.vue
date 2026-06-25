@@ -3,17 +3,11 @@
 
         <div class="subheader mt-4">间隔重复系统</div>
 
-        <!-- FSRS Status Card -->
+        <!-- Zone 1: 复习目标 -->
         <v-card outlined class="rounded-lg mt-4">
-            <v-card-title>FSRS 复习系统</v-card-title>
-            <v-card-subtitle>当前词义复习卡使用 FSRS（Free Spaced Repetition Scheduler）自动计算下次复习时间。</v-card-subtitle>
+            <v-card-title>复习目标</v-card-title>
+            <v-card-subtitle>设置目标记忆保持率，控制复习频率。</v-card-subtitle>
             <v-card-text>
-                <v-alert type="info" text class="mb-4">
-                    FSRS 会根据你的评分、稳定度、难度和复习历史自动计算下一次复习时间。
-                    这些熟练度参数由算法维护，不建议也不允许手动编辑。
-                    如需重新开始，应使用"重置卡片"为新学状态，而不是手动修改参数。
-                </v-alert>
-
                 <v-simple-table dense class="no-hover">
                     <tbody>
                         <tr>
@@ -32,27 +26,11 @@
                             </td>
                         </tr>
                         <tr>
-                            <td class="font-weight-bold pr-4 py-2">目标记忆保持率说明</td>
+                            <td class="font-weight-bold pr-4 py-2">说明</td>
                             <td class="py-2 grey--text text--darken-1">
                                 Desired retention 越高，复习负担越重。
-                                本设置只影响之后评分产生的新到期时间，本轮不自动重排已有卡片。
+                                本设置只影响之后评分产生的新到期时间，不会自动重排已有卡片。
                             </td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2">参数来源</td>
-                            <td class="py-2">fsrs-rs-php 默认参数</td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2">参数编辑</td>
-                            <td class="py-2">暂未开放</td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2">卡片重置</td>
-                            <td class="py-2">后续开放</td>
-                        </tr>
-                        <tr>
-                            <td class="font-weight-bold pr-4 py-2">参数优化</td>
-                            <td class="py-2">后续开放</td>
                         </tr>
                     </tbody>
                 </v-simple-table>
@@ -74,16 +52,12 @@
                 <div v-if="fsrsSaveStatus" class="mt-2 green--text text--darken-1 body-2">
                     {{ fsrsSaveStatus }}
                 </div>
-
-                <div class="mt-2 grey--text caption">
-                    FSRS 参数优化和卡片重置功能会在后续版本加入。
-                </div>
             </v-card-text>
         </v-card>
 
-        <!-- FSRS Stats Overview Card -->
+        <!-- Zone 2: 当前 FSRS 状态 -->
         <v-card outlined class="rounded-lg mt-4" :loading="statsLoading">
-            <v-card-title>FSRS 统计总览</v-card-title>
+            <v-card-title>当前 FSRS 状态</v-card-title>
             <v-card-subtitle>仅统计当前语言下的词义复习卡，不包含旧单词卡。</v-card-subtitle>
             <v-card-text>
                 <v-alert v-if="statsError" type="error" dense outlined class="mb-4">{{ statsError }}</v-alert>
@@ -190,6 +164,62 @@
                         稳定度越高，表示记忆越稳定；难度越高，表示这张卡越难。
                     </div>
                 </div>
+            </v-card-text>
+        </v-card>
+
+        <!-- Zone 3: 高级工具 -->
+        <v-card outlined class="rounded-lg mt-4">
+            <v-card-title>高级工具</v-card-title>
+            <v-card-subtitle>参数查看、卡片管理与功能预览。高级功能（参数优化、重排）将在后续版本加入。</v-card-subtitle>
+            <v-card-text>
+                <v-simple-table dense class="no-hover">
+                    <tbody>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
+                            <td class="py-2">
+                                <div>当前使用 fsrs-rs-php 默认参数。</div>
+                                <div class="grey--text text--darken-1 caption">
+                                    后续会显示是否使用过个性化优化参数。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数编辑</td>
+                            <td class="py-2">
+                                <div>不开放手动编辑。</div>
+                                <div class="grey--text text--darken-1 caption">
+                                    稳定度、难度等熟练度参数由 FSRS 自动维护，不建议手动修改。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">卡片重置</td>
+                            <td class="py-2">
+                                <div>已在复习卡管理页开放。</div>
+                                <div class="grey--text text--darken-1 caption mb-2">
+                                    如果想让某张卡重新开始学习，请在管理页使用"重置"。
+                                </div>
+                                <v-btn
+                                    x-small
+                                    outlined
+                                    color="primary"
+                                    @click="goToManagePage"
+                                >
+                                    前往复习卡管理页
+                                </v-btn>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数优化</td>
+                            <td class="py-2">
+                                <div>暂未开放。</div>
+                                <div class="grey--text text--darken-1 caption">
+                                    后续会在复习历史足够时，支持根据你的真实复习记录优化参数。
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </v-simple-table>
             </v-card-text>
         </v-card>
 
@@ -300,6 +330,9 @@
             this.loadFsrsStats();
         },
         methods: {
+            goToManagePage() {
+                window.location.href = '/review-cards/manage';
+            },
             formatFloat(value) {
                 if (value === null || value === undefined) {
                     return '—';
