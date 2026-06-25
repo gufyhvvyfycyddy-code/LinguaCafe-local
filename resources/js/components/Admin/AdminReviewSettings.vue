@@ -187,7 +187,7 @@
                 </v-expansion-panel-header>
                 <v-expansion-panel-content>
                     <div class="text-caption grey--text text--darken-1 mb-3">
-                        参数优化、手动参数、卡片重置等低频操作，需要时再打开。
+                        参数优化、卡片重排、手动参数、卡片重置等低频操作，需要时再打开。
                     </div>
 
                     <v-simple-table dense class="no-hover">
@@ -357,48 +357,6 @@
                                     </v-alert>
                                 </td>
                             </tr>
-                            <tr>
-                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
-                                <td class="py-2">
-                                    <!-- Default parameters -->
-                                    <div v-if="fsrsParameterSource === 'default'">
-                                        <div>当前使用默认参数。</div>
-                                        <div class="grey--text text--darken-1 caption">
-                                            还没有保存过优化参数。
-                                        </div>
-                                        <div class="grey--text text--darken-1 caption mt-1">
-                                            参数数量：{{ fsrsParameterCount }} 个
-                                        </div>
-                                    </div>
-
-                                    <!-- Optimized parameters -->
-                                    <div v-else-if="fsrsParameterSource === 'optimized'">
-                                        <v-chip color="success" small label class="mb-2">
-                                            正在优化参数
-                                        </v-chip>
-                                        <div class="grey--text text--darken-1 caption">
-                                            最近优化时间：{{ formatDate(fsrsParameterLastOptimizedAt) }}
-                                        </div>
-                                        <div class="grey--text text--darken-1 caption mt-1">
-                                            参数数量：{{ fsrsParameterCount }} 个
-                                        </div>
-                                        <div class="grey--text text--darken-1 caption mt-1">
-                                            已保存优化参数；之后新的复习评分将使用这组参数。已有卡片不会自动重排。
-                                        </div>
-                                    </div>
-
-                                    <!-- Unknown/custom parameters -->
-                                    <div v-else>
-                                        <div>{{ fsrsParameterSourceLabel }}</div>
-                                        <div v-if="fsrsParameterWarning" class="orange--text text--darken-2 caption mt-1">
-                                            {{ fsrsParameterWarning }}
-                                        </div>
-                                        <div class="grey--text text--darken-1 caption mt-1">
-                                            参数数量：{{ fsrsParameterCount }} 个
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
                             <!-- D.4-b: 重排已有卡片预览 -->
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">重排已有卡片</td>
@@ -416,7 +374,7 @@
                                         :disabled="fsrsReschedulePreviewLoading"
                                         @click="previewFsrsRescheduleImpact"
                                     >
-                                        预览重排影响
+                                        看看重排后卡片到期日会怎么变
                                     </v-btn>
 
                                     <!-- Error -->
@@ -481,6 +439,9 @@
                                                                 <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.skipped_count }}</div>
                                                                 <div class="text-caption text--secondary">跳过</div>
                                                             </v-sheet>
+                                                            <div v-if="fsrsReschedulePreview.skipped_count > 0" class="caption grey--text text--darken-1 mt-1">
+                                                                跳过通常表示卡片缺少完整 FSRS 到期信息或预览计算失败；本次不会修改这些卡片。
+                                                            </div>
                                                         </v-col>
                                                         <v-col cols="3">
                                                             <v-sheet outlined rounded class="pa-2 text-center">
@@ -581,6 +542,48 @@
                                                     </div>
                                                 </v-card-text>
                                             </v-card>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
+                                <td class="py-2">
+                                    <!-- Default parameters -->
+                                    <div v-if="fsrsParameterSource === 'default'">
+                                        <div>当前使用默认参数。</div>
+                                        <div class="grey--text text--darken-1 caption">
+                                            还没有保存过优化参数。
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
+                                        </div>
+                                    </div>
+
+                                    <!-- Optimized parameters -->
+                                    <div v-else-if="fsrsParameterSource === 'optimized'">
+                                        <v-chip color="success" small label class="mb-2">
+                                            正在优化参数
+                                        </v-chip>
+                                        <div class="grey--text text--darken-1 caption">
+                                            最近优化时间：{{ formatDate(fsrsParameterLastOptimizedAt) }}
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            已保存优化参数；之后新的复习评分将使用这组参数。已有卡片不会自动重排。
+                                        </div>
+                                    </div>
+
+                                    <!-- Unknown/custom parameters -->
+                                    <div v-else>
+                                        <div>{{ fsrsParameterSourceLabel }}</div>
+                                        <div v-if="fsrsParameterWarning" class="orange--text text--darken-2 caption mt-1">
+                                            {{ fsrsParameterWarning }}
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
                                         </div>
                                     </div>
                                 </td>
@@ -848,14 +851,6 @@
                 return this.fsrsReschedulePreview
                     && this.fsrsReschedulePreview.samples
                     && this.fsrsReschedulePreview.samples.length > 0;
-            },
-            reschedulePreviewWarnings() {
-                if (!this.fsrsReschedulePreview || !this.fsrsReschedulePreview.warnings) return [];
-                const warnings = [...this.fsrsReschedulePreview.warnings];
-                if (this.fsrsReschedulePreview.summary?.newly_due_today > 0) {
-                    warnings.push(`预览显示会新增 ${this.fsrsReschedulePreview.summary.newly_due_today} 张今天到期卡。正式重排前请确认你能接受复习量变化。`);
-                }
-                return warnings;
             },
         },
         methods: {
