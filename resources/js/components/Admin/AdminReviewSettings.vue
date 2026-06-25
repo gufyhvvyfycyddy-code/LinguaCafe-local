@@ -23,6 +23,11 @@
                                     hide-details
                                     style="max-width: 160px;"
                                 />
+                                <div class="mt-2 grey--text text--darken-1 caption">
+                                    <span class="font-weight-bold">{{ fsrsDesiredRetentionText }}</span>
+                                    <span v-if="retentionExplanation"> — {{ retentionExplanation }}</span>
+                                    <v-chip v-if="isRecommended" x-small color="success" outlined class="ml-1">推荐默认值</v-chip>
+                                </div>
                             </td>
                         </tr>
                         <tr>
@@ -338,6 +343,28 @@
         mounted() {
             this.loadSettings();
             this.loadFsrsStats();
+        },
+        computed: {
+            fsrsDesiredRetentionText() {
+                const option = this.fsrsRetentionOptions.find(o => o.value === this.fsrsDesiredRetention);
+                return option ? option.text : '';
+            },
+            retentionExplanation() {
+                const explanations = {
+                    0.70: '复习压力最低，但会更容易忘，适合临时减负。',
+                    0.75: '复习量较少，适合想保持轻量学习的人。',
+                    0.80: '偏轻松，能减少复习次数，但记忆保持会下降。',
+                    0.85: '负担适中偏轻，适合不想被复习压住的人。',
+                    0.90: '记忆效果和复习负担比较平衡。',
+                    0.92: '记得更稳一些，但每天复习会变多。',
+                    0.95: '追求更牢固记忆，复习负担会明显增加。',
+                    0.97: '非常高的保持率，复习压力可能很大，请谨慎选择。',
+                };
+                return explanations[this.fsrsDesiredRetention] || '';
+            },
+            isRecommended() {
+                return this.fsrsDesiredRetention === 0.90;
+            },
         },
         methods: {
             goToManagePage() {
