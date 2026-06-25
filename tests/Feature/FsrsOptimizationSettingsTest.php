@@ -591,4 +591,87 @@ class FsrsOptimizationSettingsTest extends TestCase
             ], $overrides));
         }
     }
+
+    // ── D.2-d: Parameter source tests ──
+
+    public function test_optimization_status_shows_default_when_no_saved_parameters(): void
+    {
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $response->assertJsonPath('parameters_source', 'default');
+        $response->assertJsonPath('parameters_source_label', '当前使用默认参数');
+        $response->assertJsonPath('has_optimized_parameters', false);
+        $response->assertJsonPath('last_optimized_at', null);
+        $response->assertJsonPath('parameters_count', 19);
+    }
+
+    public function test_optimization_status_shows_optimized_when_saved(): void
+    {
+        // Simulate saved optimized parameters
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters',
+            'user_id' => -1,
+            'value' => json_encode([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1]),
+        ]);
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters_source',
+            'user_id' => -1,
+            'value' => 'optimized',
+        ]);
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters_optimized_at',
+            'user_id' => -1,
+            'value' => '2026-06-26T10:30:00+00:00',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $response->assertJsonPath('parameters_source', 'optimized');
+        $response->assertJsonPath('parameters_source_label', '当前使用已优化参数');
+        $response->assertJsonPath('has_optimized_parameters', true);
+        $response->assertJsonPath('last_optimized_at', '2026-06-26T10:30:00+00:00');
+        $response->assertJsonPath('parameters_count', 21);
+    }
+
+    public function test_optimization_status_handles_malformed_parameters(): void
+    {
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters',
+            'user_id' => -1,
+            'value' => 'not-valid-json{{{',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $response->assertJsonPath('parameters_source', 'unknown');
+        $response->assertJsonPath('parameters_source_label', '参数来源异常，请重新优化或检查设置');
+        $response->assertJsonPath('has_optimized_parameters', false);
+        $response->assertJsonPath('parameters_count', 0);
+        $response->assertJsonPath('parameters_warning', '已保存的 fsrs_parameters 无法解析为有效参数数组。');
+    }
+
+    public function test_optimization_status_handles_custom_source(): void
+    {
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters',
+            'user_id' => -1,
+            'value' => json_encode([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9]),
+        ]);
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters_source',
+            'user_id' => -1,
+            'value' => 'custom_source_value',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $response->assertJsonPath('parameters_source', 'custom_source_value');
+        $response->assertJsonPath('parameters_source_label', '当前使用自定义参数');
+        $response->assertJsonPath('has_optimized_parameters', false);
+        $response->assertJsonPath('parameters_count', 19);
+    }
 }

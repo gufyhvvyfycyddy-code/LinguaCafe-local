@@ -125,16 +125,78 @@ class SettingsService {
         $reviewCount = $this->countOptimizableFsrsReviews($userId, $language);
         $canOptimize = $reviewCount >= self::FSRS_OPTIMIZATION_MIN_REQUIRED;
 
-        return [
+        $status = [
             'review_count' => $reviewCount,
             'min_required' => self::FSRS_OPTIMIZATION_MIN_REQUIRED,
             'can_optimize' => $canOptimize,
             'message' => $canOptimize
                 ? self::FSRS_OPTIMIZATION_PENDING_MESSAGE
                 : self::FSRS_OPTIMIZATION_INSUFFICIENT_MESSAGE,
-            'parameters_source' => 'default',
-            'parameters_source_label' => '当前使用默认参数',
-            'last_optimized_at' => null,
+        ];
+
+        return array_merge($status, $this->resolveFsrsParameterSource());
+    }
+
+    private function resolveFsrsParameterSource(): array {
+        $paramSetting = Setting::where('name', 'fsrs_parameters')->where('user_id', -1)->first();
+
+        // No saved parameters → system default
+        if (!$paramSetting) {
+            return [
+                'parameters_source' => 'default',
+                'parameters_source_label' => '当前使用默认参数',
+                'last_optimized_at' => null,
+                'parameters_count' => 19,
+                'has_optimized_parameters' => false,
+            ];
+        }
+
+        // Try to parse the saved parameters JSON
+        $params = json_decode($paramSetting->value, true);
+        if (!is_array($params) || empty($params)) {
+            return [
+                'parameters_source' => 'unknown',
+                'parameters_source_label' => '参数来源异常，请重新优化或检查设置',
+                'last_optimized_at' => null,
+                'parameters_count' => 0,
+                'has_optimized_parameters' => false,
+                'parameters_warning' => '已保存的 fsrs_parameters 无法解析为有效参数数组。',
+            ];
+        }
+
+        $sourceSetting = Setting::where('name', 'fsrs_parameters_source')->where('user_id', -1)->first();
+        $source = $sourceSetting ? $sourceSetting->value : 'default';
+
+        $optimizedAtSetting = Setting::where('name', 'fsrs_parameters_optimized_at')->where('user_id', -1)->first();
+        $lastOptimizedAt = $optimizedAtSetting ? $optimizedAtSetting->value : null;
+
+        if ($source === 'optimized') {
+            return [
+                'parameters_source' => 'optimized',
+                'parameters_source_label' => '当前使用已优化参数',
+                'last_optimized_at' => $lastOptimizedAt,
+                'parameters_count' => count($params),
+                'has_optimized_parameters' => true,
+            ];
+        }
+
+        if ($source === 'default') {
+            return [
+                'parameters_source' => 'default',
+                'parameters_source_label' => '当前使用默认参数',
+                'last_optimized_at' => null,
+                'parameters_count' => count($params),
+                'has_optimized_parameters' => false,
+            ];
+        }
+
+        // Unknown source value — display without crashing
+        return [
+            'parameters_source' => $source,
+            'parameters_source_label' => '当前使用自定义参数',
+            'last_optimized_at' => $lastOptimizedAt,
+            'parameters_count' => count($params),
+            'has_optimized_parameters' => false,
         ];
     }
 

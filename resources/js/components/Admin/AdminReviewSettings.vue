@@ -360,9 +360,40 @@
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
                                 <td class="py-2">
-                                    <div>当前使用默认参数。</div>
-                                    <div class="grey--text text--darken-1 caption">
-                                        还没有优化过。
+                                    <!-- Default parameters -->
+                                    <div v-if="fsrsParameterSource === 'default'">
+                                        <div>当前使用默认参数。</div>
+                                        <div class="grey--text text--darken-1 caption">
+                                            还没有保存过优化参数。
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
+                                        </div>
+                                    </div>
+
+                                    <!-- Optimized parameters -->
+                                    <div v-else-if="fsrsParameterSource === 'optimized'">
+                                        <div>当前使用已优化参数。</div>
+                                        <div class="grey--text text--darken-1 caption">
+                                            最近优化时间：{{ formatDate(fsrsParameterLastOptimizedAt) }}
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption">
+                                            只影响之后新的复习评分；已有卡片不会自动重排。
+                                        </div>
+                                    </div>
+
+                                    <!-- Unknown/custom parameters -->
+                                    <div v-else>
+                                        <div>{{ fsrsParameterSourceLabel }}</div>
+                                        <div v-if="fsrsParameterWarning" class="orange--text text--darken-2 caption mt-1">
+                                            {{ fsrsParameterWarning }}
+                                        </div>
+                                        <div class="grey--text text--darken-1 caption mt-1">
+                                            参数数量：{{ fsrsParameterCount }} 个
+                                        </div>
                                     </div>
                                 </td>
                             </tr>
@@ -474,6 +505,14 @@
                 fsrsOptimizationPreview: null,
                 fsrsOptimizationConfirmLoading: false,
                 fsrsOptimizationApplySuccess: false,
+
+                // Parameter source display
+                fsrsParameterSource: 'default',
+                fsrsParameterSourceLabel: '当前使用默认参数',
+                fsrsParameterLastOptimizedAt: null,
+                fsrsParameterCount: 19,
+                fsrsHasOptimizedParameters: false,
+                fsrsParameterWarning: '',
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -623,6 +662,21 @@
                 }
                 return Number(value).toFixed(2);
             },
+            formatDate(isoString) {
+                if (!isoString) {
+                    return '—';
+                }
+                try {
+                    const d = new Date(isoString);
+                    if (isNaN(d.getTime())) {
+                        return '—';
+                    }
+                    const pad = (n) => String(n).padStart(2, '0');
+                    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                } catch (e) {
+                    return '—';
+                }
+            },
             loadFsrsStats() {
                 this.statsLoading = true;
                 this.statsError = '';
@@ -642,6 +696,14 @@
                     .then((response) => {
                         this.fsrsOptimizationCanOptimize = response.data.can_optimize;
                         this.fsrsOptimizationMessage = response.data.message;
+
+                        // Parameter source
+                        this.fsrsParameterSource = response.data.parameters_source || 'default';
+                        this.fsrsParameterSourceLabel = response.data.parameters_source_label || '当前使用默认参数';
+                        this.fsrsParameterLastOptimizedAt = response.data.last_optimized_at || null;
+                        this.fsrsParameterCount = response.data.parameters_count ?? 19;
+                        this.fsrsHasOptimizedParameters = response.data.has_optimized_parameters || false;
+                        this.fsrsParameterWarning = response.data.parameters_warning || '';
                     })
                     .catch(() => {
                         this.fsrsOptimizationCanOptimize = false;
@@ -690,6 +752,8 @@
                         // Re-fetch preview to show updated current parameters
                         this.fsrsOptimizationPreview = null;
                         this.runFsrsOptimizationPreflight();
+                        // Refresh parameter source to show "optimized" status
+                        this.loadFsrsOptimizationStatus();
                     })
                     .catch((error) => {
                         const message = error.response?.data?.message

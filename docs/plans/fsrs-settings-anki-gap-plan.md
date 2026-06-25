@@ -187,17 +187,13 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 ---
 
-### D.2-d：参数来源与版本说明
+### D.2-d：参数来源与版本说明（✅ 已完成，2026-06-26）
 
-**目标**：把"fsrs-rs-php 默认参数"这个固定文案变成真实可读的信息。
-
-**要做什么**：
-- 后端：在 Settings 表增加可选字段 `fsrs_parameters_source`（值：`default` / `optimized`）和 `fsrs_parameters_optimized_at`（ISO 8601 string）。
-- 前端只读展示：
-  - 如果 source = default：显示"当前使用 fsrs-rs-php 默认参数，尚未个性化优化"
-  - 如果 source = optimized：显示"当前使用个性化参数（优化于 2026-06-XX）"
-- 第一版只需一个后端 endpoint 返回这两个字段。不涉及参数编辑或优化执行。
-- 不改参数结构、不改 FSRS 调度逻辑。
+**已完成**：
+- 后端 `resolveFsrsParameterSource()` 读取真实 settings（user_id=-1），返回 6 字段：parameters_source / source_label / last_optimized_at / parameters_count / has_optimized_parameters / warning
+- 前端根据状态展示对应文案：默认 → "当前使用默认参数 / 还没有保存过优化参数 / 参数数量：19"；已优化 → "当前使用已优化参数 / 最近优化时间 / 参数数量：21 / 只影响新评分，不重排"
+- 4 个新测试（28 total，162 assertions）：默认、已优化、JSON 异常、自定义来源
+- 不新增 migration，不保存参数，不重排卡片
 
 ---
 
@@ -300,9 +296,10 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 **目标完成**：CODEX-FSRS-1 — 自动优化入口与资格检查（✅ 已在本轮完成）。
 
-**下一步推荐：D.2-d — 参数来源与版本说明（升级占位文案，展示真实来源/时间）。**
+**下一步推荐：D.3-d — FSRS 调度集成（使用优化后的参数实际调度复习卡片）。**
 
 **理由**：
-- D.3-b 确认保存已完成：applyFsrsOptimizedParameters() + 24 个测试全部通过。
-- D.2-d 是 D.3 系列的自然延续：参数已可真实优化和保存，来源字段不再应该是固定文案。
+- D.2-d 参数来源已完成：`resolveFsrsParameterSource()` + 28 个测试全部通过。
+- D.3 系列（scout→a→c→b）全部完成：参数可计算、可预览、可确认保存、来源可真实展示。
+- 现在优化参数已保存在 settings 中，下一步是在实际的 FSRS 调度流程中读取并替代默认参数。
 - 详见 `fsrs-parameter-optimization-plan.md`。
