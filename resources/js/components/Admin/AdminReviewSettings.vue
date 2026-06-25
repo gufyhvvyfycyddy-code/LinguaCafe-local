@@ -399,6 +399,192 @@
                                     </div>
                                 </td>
                             </tr>
+                            <!-- D.4-b: 重排已有卡片预览 -->
+                            <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">重排已有卡片</td>
+                                <td class="py-2">
+                                    <div class="body-2">
+                                        保存优化参数后，新的复习评分已经会使用优化参数。这个预览可以告诉你：如果以后确认重排旧卡片，到期时间会怎么变化。
+                                    </div>
+
+                                    <v-btn
+                                        small
+                                        outlined
+                                        color="primary"
+                                        class="mt-2"
+                                        :loading="fsrsReschedulePreviewLoading"
+                                        :disabled="fsrsReschedulePreviewLoading"
+                                        @click="previewFsrsRescheduleImpact"
+                                    >
+                                        预览重排影响
+                                    </v-btn>
+
+                                    <!-- Error -->
+                                    <v-alert
+                                        v-if="fsrsReschedulePreviewError"
+                                        dense
+                                        outlined
+                                        type="error"
+                                        class="mt-3 mb-0"
+                                    >
+                                        {{ fsrsReschedulePreviewError }}
+                                    </v-alert>
+
+                                    <!-- Warning (preview_available=false) -->
+                                    <div v-if="fsrsReschedulePreview && !fsrsReschedulePreview.preview_available">
+                                        <v-alert
+                                            v-for="(w, wi) in fsrsReschedulePreview.warnings"
+                                            :key="'warn-' + wi"
+                                            dense
+                                            outlined
+                                            type="warning"
+                                            class="mt-3 mb-0"
+                                        >
+                                            {{ w }}
+                                        </v-alert>
+                                    </div>
+
+                                    <!-- Preview result (preview_available=true) -->
+                                    <div v-if="fsrsReschedulePreview && fsrsReschedulePreview.preview_available" class="mt-4">
+                                        <!-- Empty candidates -->
+                                        <div v-if="fsrsReschedulePreview.total_candidates === 0">
+                                            <v-alert dense outlined type="info" class="mb-0">
+                                                当前没有符合条件的旧卡片可预览。
+                                            </v-alert>
+                                            <div class="caption grey--text mt-2">
+                                                确认条件：sense card + review 状态 + 已 confirmed WordSense + 有 FSRS 记忆状态。
+                                            </div>
+                                        </div>
+
+                                        <!-- Results -->
+                                        <div v-if="fsrsReschedulePreview.total_candidates > 0">
+                                            <v-card outlined class="rounded-lg">
+                                                <v-card-text class="pa-4">
+                                                    <div class="font-weight-medium subtitle-2 mb-3">重排预览统计</div>
+
+                                                    <!-- Row 1: Core counts -->
+                                                    <v-row dense class="mb-2">
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.total_candidates }}</div>
+                                                                <div class="text-caption text--secondary">可预览旧卡片</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.total_changed }}</div>
+                                                                <div class="text-caption text--secondary">到期时间会变化</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.skipped_count }}</div>
+                                                                <div class="text-caption text--secondary">跳过</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.summary.unchanged }}</div>
+                                                                <div class="text-caption text--secondary">不变</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                    </v-row>
+
+                                                    <!-- Row 2: Movement and due -->
+                                                    <v-row dense class="mb-2">
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.summary.will_move_earlier }}</div>
+                                                                <div class="text-caption text--secondary">会提前到期</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.summary.will_move_later }}</div>
+                                                                <div class="text-caption text--secondary">会延后到期</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.summary.currently_due }}</div>
+                                                                <div class="text-caption text--secondary">当前已到期</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.summary.due_today_after_reschedule }}</div>
+                                                                <div class="text-caption text--secondary">重排后今天到期</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                    </v-row>
+
+                                                    <!-- Row 3: Max changes -->
+                                                    <v-row dense class="mb-3">
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ formatDaysChange(fsrsReschedulePreview.summary.max_earlier_days) }}</div>
+                                                                <div class="text-caption text--secondary">最大提前</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                        <v-col cols="3">
+                                                            <v-sheet outlined rounded class="pa-2 text-center">
+                                                                <div class="text-h6 font-weight-bold">{{ formatDaysChange(fsrsReschedulePreview.summary.max_later_days) }}</div>
+                                                                <div class="text-caption text--secondary">最大延后</div>
+                                                            </v-sheet>
+                                                        </v-col>
+                                                    </v-row>
+
+                                                    <!-- Newly due today risk -->
+                                                    <v-alert
+                                                        v-if="fsrsReschedulePreview.summary.newly_due_today > 0"
+                                                        dense
+                                                        outlined
+                                                        type="warning"
+                                                        class="mb-3"
+                                                    >
+                                                        预览显示会新增 {{ fsrsReschedulePreview.summary.newly_due_today }} 张今天到期卡。正式重排前请确认你能接受复习量变化。
+                                                    </v-alert>
+
+                                                    <!-- Preview disclaimer -->
+                                                    <v-alert dense outlined type="info" class="mb-2">
+                                                        这是预览，不会修改任何卡片。
+                                                    </v-alert>
+                                                    <v-alert dense outlined type="info" class="mb-0">
+                                                        正式重排会在后续步骤单独开放确认按钮。
+                                                    </v-alert>
+
+                                                    <!-- Samples table -->
+                                                    <div v-if="hasReschedulePreviewSamples" class="mt-4">
+                                                        <div class="font-weight-medium subtitle-2 mb-2">样例（最多 20 条）</div>
+                                                        <v-simple-table dense class="no-hover">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th class="text-left">词</th>
+                                                                    <th class="text-left">释义</th>
+                                                                    <th class="text-left">当前到期</th>
+                                                                    <th class="text-left">预览到期</th>
+                                                                    <th class="text-left">变化天数</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr v-for="(sample, si) in fsrsReschedulePreview.samples" :key="si">
+                                                                    <td>{{ sample.lemma }}</td>
+                                                                    <td>{{ sample.sense_zh || sample.sense_en || '—' }}</td>
+                                                                    <td>{{ formatDate(sample.current_due_at) }}</td>
+                                                                    <td>{{ formatDate(sample.preview_due_at) }}</td>
+                                                                    <td :class="sample.days_change < 0 ? 'green--text' : (sample.days_change > 0 ? 'orange--text' : '')">
+                                                                        {{ formatDaysChange(sample.days_change) }}
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </v-simple-table>
+                                                    </div>
+                                                </v-card-text>
+                                            </v-card>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">手动编辑参数</td>
                                 <td class="py-2">
@@ -545,6 +731,10 @@
                     reviewed_today: 0,
                     reset_count: 0,
                 },
+                // D.4-b: 重排预览
+                fsrsReschedulePreviewLoading: false,
+                fsrsReschedulePreview: null,
+                fsrsReschedulePreviewError: '',
             }
         },
         props: {
@@ -652,6 +842,20 @@
                     changedCount: changed.length,
                     maxDiffText: changed.length > 0 ? maxAbs.toFixed(4) : '—',
                 };
+            },
+            // D.4-b: 重排预览
+            hasReschedulePreviewSamples() {
+                return this.fsrsReschedulePreview
+                    && this.fsrsReschedulePreview.samples
+                    && this.fsrsReschedulePreview.samples.length > 0;
+            },
+            reschedulePreviewWarnings() {
+                if (!this.fsrsReschedulePreview || !this.fsrsReschedulePreview.warnings) return [];
+                const warnings = [...this.fsrsReschedulePreview.warnings];
+                if (this.fsrsReschedulePreview.summary?.newly_due_today > 0) {
+                    warnings.push(`预览显示会新增 ${this.fsrsReschedulePreview.summary.newly_due_today} 张今天到期卡。正式重排前请确认你能接受复习量变化。`);
+                }
+                return warnings;
             },
         },
         methods: {
@@ -829,6 +1033,29 @@
                     this.fsrsSaving = false;
                     this.fsrsSaveStatus = '保存失败，请重试。';
                 });
+            },
+            // D.4-b: 重排预览
+            formatDaysChange(days) {
+                if (!days && days !== 0) return '—';
+                if (days < 0) return `提前 ${Math.abs(days)} 天`;
+                if (days > 0) return `延后 ${days} 天`;
+                return '不变';
+            },
+            previewFsrsRescheduleImpact() {
+                this.fsrsReschedulePreviewLoading = true;
+                this.fsrsReschedulePreviewError = '';
+                this.fsrsReschedulePreview = null;
+
+                axios.post('/settings/fsrs/reschedule-preview')
+                    .then((response) => {
+                        this.fsrsReschedulePreview = response.data;
+                    })
+                    .catch(() => {
+                        this.fsrsReschedulePreviewError = '重排预览加载失败，请稍后再试。';
+                    })
+                    .finally(() => {
+                        this.fsrsReschedulePreviewLoading = false;
+                    });
             },
             loadSettings() {
                 axios.post('/settings/global/get', {
