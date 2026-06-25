@@ -117,6 +117,25 @@ class SettingsController extends Controller
         return response()->json($result, 200);
     }
 
+    public function rescheduleConfirm(Request $request)
+    {
+        $validated = $request->validate([
+            'preview_hash' => 'required|string',
+            'confirm' => 'required|boolean',
+        ]);
+        $user = Auth::user();
+        $service = app(FsrsReschedulePreviewService::class);
+        $result = $service->confirmPreflight(
+            $user->id, $user->selected_language,
+            $validated['preview_hash'], $validated['confirm']
+        );
+        $statusCode = 200;
+        if (!$result['success']) {
+            $statusCode = isset($result['preview_hash']) ? 409 : 422;
+        }
+        return response()->json($result, $statusCode);
+    }
+
     // returns an array of user settings
     public function getUserSettingsByName(GetUserSettingsByNameRequest $request) {
         $userId = Auth::user()->id;

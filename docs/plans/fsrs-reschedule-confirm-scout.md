@@ -407,3 +407,39 @@ if ($request->preview_hash !== $expectedHash) {
 2. **并行进入 D.4-c-d**：前端确认按钮 + v-dialog 弹窗
 3. D.4-c-b/c/e 依次串行
 4. 独立阶段 D.4-d 做撤销机制
+
+---
+
+## 15. D.4-c-a 执行勘误与边界说明
+
+### 15.1 preview_hash 设计勘误
+
+section 7 中的 preview_hash 示例代码包含 `'timestamp' => $now->timestamp`，**这是错误的**。
+
+**正确设计**：preview_hash **不得包含任何时间戳**（包括 `now()`、`timestamp`、`Carbon::now()`）。hash 必须是纯数据驱动的、稳定可复现的签名，以便 confirmPreflight() 重新计算时能够精确匹配。
+
+**实际实现**（D.4-c-a）：
+- payload 包含：`user_id`、`language`、`desired_retention`、`parameters_hash`（对排序后的 activeParams 做 sha256）、`cards` 数组（按 review_card_id 排序，每张卡包含 review_card_id / word_sense_id / fsrs_due_at / fsrs_stability / fsrs_difficulty / fsrs_last_reviewed_at / fsrs_state / fsrs_enabled）
+- 最终 hash = `sha256(json_encode(payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES))`
+- **不含 timestamp**
+
+### 15.2 D.4-c-a 执行边界
+
+D.4-c-a 的实现范围严格限定为 **confirm preflight 只读校验**，不涉及任何写入：
+
+| 行为 | 是否包含 | 说明 |
+|------|---------|------|
+| 路由 + Controller + Service 签名 | ✅ 是 | POST /settings/fsrs/reschedule-confirm |
+| preview_hash 校验 | ✅ 是 | 服务端重新计算并比对 |
+| 安全阈值检查 | ✅ 是 | MAX_NEWLY_DUE_TODAY=200, MAX_TOTAL_CHANGED=2000 |
+| ReviewCard 写入 | ❌ 否 | 留给 D.4-c-b |
+| ReviewLog 写入 | ❌ 否 | 留给 D.4-d 或更晚阶段 |
+| write_enabled | ❌ 否 | 硬编码为 `false`，不可切换 |
+
+### 15.3 write_enabled=false 硬编码
+
+confirmPreflight() 返回值中 `write_enabled` 字段永远为 `false`。D.4-c-a 只做“预览仍然有效”的校验，不做实际写入。前端在收到 `confirm_available=true` 且 `write_enabled=false` 时，应提示用户“正式写入将在后续阶段开放”。
+
+### 15.4 下一步
+
+**D.4-c-b**：正式 ReviewCard 写入逻辑（事务 + chunkById + lockForUpdate）。

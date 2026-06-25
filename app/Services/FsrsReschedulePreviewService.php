@@ -16,6 +16,9 @@ use Carbon\Carbon;
  */
 class FsrsReschedulePreviewService
 {
+    private const MAX_NEWLY_DUE_TODAY = 200;
+    private const MAX_TOTAL_CHANGED = 2000;
+
     private FsrsSchedulingService $fsrsSchedulingService;
 
     public function __construct(?FsrsSchedulingService $fsrsSchedulingService = null)
@@ -34,96 +37,94 @@ class FsrsReschedulePreviewService
     public function preview(int $userId, string $language): array
     {
         if ($language !== 'english') {
-            return $this->unsupportedLanguageResponse($language);
+            $response = $this->unsupportedLanguageResponse($language);
+            $response['preview_hash'] = null;
+            return $response;
         }
 
-        // 1) Check fsrs-rs-php extension availability
-        if (!$this->extensionAvailable()) {
-            return $this->unavailableResponse($language, 'FSRS 扩展未加载，无法预览。扩展要求：fsrs-rs-php。');
+        $data = $this->computePreviewData($userId, $language);
+        if ($data === null) {
+            $response = $this->unavailableResponse($language, 'FSRS 扩展未加载，无法预览。扩展要求：fsrs-rs-php。');
+            $response['preview_hash'] = null;
+            return $response;
         }
 
-        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters();
+        $previewHash = $this->buildPreviewHash($data['cards'], $language, $userId, $data['activeParams'], $data['desiredRetention']);
 
-        // 2) Build candidate query
-        $cards = $this->candidateCardsQuery($userId, $language)->get();
-
-        if ($cards->isEmpty()) {
-            return $this->emptyPreviewResponse($userId, $language);
+        if ($data['summary']['total_candidates'] === 0) {
+            $response = $this->emptyPreviewResponse($userId, $language);
+            $response['preview_hash'] = $previewHash;
+            return $response;
         }
 
-        $desiredRetention = $this->fsrsSchedulingService->desiredRetention();
-        $now = Carbon::now();
-
-        // 3) Compute preview for each card
-        $skippedCount = 0;
-        $previewRows = [];
-        $willMoveEarlier = 0;
-        $willMoveLater = 0;
-        $unchanged = 0;
-        $currentlyDue = 0;
-        $newlyDueToday = 0;
-        $maxEarlierDays = 0;
-        $maxLaterDays = 0;
-
-        foreach ($cards as $card) {
-            $row = $this->buildPreviewForCard($card, $activeParams, $desiredRetention, $now);
-            if ($row === null) {
-                $skippedCount++;
-                continue;
-            }
-
-            $previewRows[] = $row;
-
-            if ($row['days_change'] < 0) {
-                $willMoveEarlier++;
-                $maxEarlierDays = min($maxEarlierDays, $row['days_change']);
-            } elseif ($row['days_change'] > 0) {
-                $willMoveLater++;
-                $maxLaterDays = max($maxLaterDays, $row['days_change']);
-            } else {
-                $unchanged++;
-            }
-
-            if ($card->fsrs_due_at !== null && $card->fsrs_due_at->lte($now)) {
-                $currentlyDue++;
-            }
-
-            if ($row['is_newly_due_today']) {
-                $newlyDueToday++;
-            }
-        }
-
-        // 4) Sort samples by |days_change| descending, take top 20
-        usort($previewRows, fn ($a, $b) => abs($b['days_change']) <=> abs($a['days_change']));
-        $samples = array_slice($previewRows, 0, 20);
-
-        $totalCandidates = $cards->count();
-        $totalChanged = $willMoveEarlier + $willMoveLater;
-        $dueTodayAfter = $currentlyDue + $newlyDueToday;
+        $samples = array_slice($data['previewRows'], 0, 20);
 
         return [
             'success' => true,
             'preview_available' => true,
+            'preview_hash' => $previewHash,
             'language' => $language,
             'target_type' => 'sense',
-            'total_candidates' => $totalCandidates,
-            'total_changed' => $totalChanged,
-            'skipped_count' => $skippedCount,
+            'total_candidates' => $data['summary']['total_candidates'],
+            'total_changed' => $data['summary']['total_changed'],
+            'skipped_count' => $data['summary']['skipped_count'],
             'summary' => [
-                'will_move_earlier' => $willMoveEarlier,
-                'will_move_later' => $willMoveLater,
-                'unchanged' => $unchanged,
-                'currently_due' => $currentlyDue,
-                'newly_due_today' => $newlyDueToday,
-                'due_today_after_reschedule' => $dueTodayAfter,
-                'max_earlier_days' => $maxEarlierDays < 0 ? $maxEarlierDays : 0,
-                'max_later_days' => $maxLaterDays,
+                'will_move_earlier' => $data['summary']['will_move_earlier'],
+                'will_move_later' => $data['summary']['will_move_later'],
+                'unchanged' => $data['summary']['unchanged'],
+                'currently_due' => $data['summary']['currently_due'],
+                'newly_due_today' => $data['summary']['newly_due_today'],
+                'due_today_after_reschedule' => $data['summary']['due_today_after_reschedule'],
+                'max_earlier_days' => $data['summary']['max_earlier_days'],
+                'max_later_days' => $data['summary']['max_later_days'],
             ],
             'samples' => $samples,
             'warnings' => [
                 '这是预览，不会修改任何卡片。',
                 '正式重排可能让更多卡片今天到期。',
             ],
+        ];
+    }
+
+    public function confirmPreflight(int $userId, string $language, ?string $previewHash, bool $confirmed): array
+    {
+        if ($language !== 'english') {
+            return ['success' => true, 'confirm_available' => false, 'write_enabled' => false, 'message' => '当前阶段只支持英语卡片重排确认。'];
+        }
+        if (empty($previewHash)) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '缺少 preview_hash，无法确认预览。'];
+        }
+        if (!$confirmed) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '缺少确认标志（confirm=true 必填）。'];
+        }
+        $data = $this->computePreviewData($userId, $language);
+        if ($data === null) {
+            return ['success' => true, 'confirm_available' => false, 'write_enabled' => false, 'message' => 'FSRS 扩展未加载，无法确认。扩展要求：fsrs-rs-php。'];
+        }
+        $freshHash = $this->buildPreviewHash($data['cards'], $language, $userId, $data['activeParams'], $data['desiredRetention']);
+        if ($freshHash !== $previewHash) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '预览已过期，请重新获取预览后再确认。', 'preview_hash' => $freshHash];
+        }
+        $newlyDueToday = $data['summary']['newly_due_today'];
+        $totalChanged = $data['summary']['total_changed'];
+        if ($newlyDueToday > self::MAX_NEWLY_DUE_TODAY) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => "今日新增到期卡片数量（{$newlyDueToday}）超过安全上限（" . self::MAX_NEWLY_DUE_TODAY . "），已拒绝确认。"];
+        }
+        if ($totalChanged > self::MAX_TOTAL_CHANGED) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => "受影响卡片总数（{$totalChanged}）超过安全上限（" . self::MAX_TOTAL_CHANGED . "），已拒绝确认。"];
+        }
+        return [
+            'success' => true, 'confirm_available' => true, 'write_enabled' => false,
+            'message' => '预览仍然有效。正式写入将在后续阶段开放。',
+            'total_candidates' => $data['summary']['total_candidates'], 'total_changed' => $data['summary']['total_changed'],
+            'skipped_count' => $data['summary']['skipped_count'],
+            'summary' => [
+                'will_move_earlier' => $data['summary']['will_move_earlier'], 'will_move_later' => $data['summary']['will_move_later'],
+                'unchanged' => $data['summary']['unchanged'], 'currently_due' => $data['summary']['currently_due'],
+                'newly_due_today' => $data['summary']['newly_due_today'], 'due_today_after_reschedule' => $data['summary']['due_today_after_reschedule'],
+                'max_earlier_days' => $data['summary']['max_earlier_days'], 'max_later_days' => $data['summary']['max_later_days'],
+            ],
+            'preview_hash' => $freshHash,
         ];
     }
 
@@ -252,6 +253,116 @@ class FsrsReschedulePreviewService
             'fsrs_difficulty' => (float) $card->fsrs_difficulty,
             'fsrs_last_reviewed_at' => $lastReview->toIso8601String(),
             'is_newly_due_today' => $isNewlyDueToday,
+        ];
+    }
+
+    private function buildPreviewHash(\Illuminate\Support\Collection $cards, string $language, int $userId, array $activeParams, float $desiredRetention): string
+    {
+        $sortedCards = $cards->sortBy('review_card_id')->values();
+        $cardsArray = $sortedCards->map(function ($card) {
+            $dueAt = $card->fsrs_due_at instanceof Carbon
+                ? $card->fsrs_due_at->toIso8601String()
+                : ($card->fsrs_due_at !== null ? Carbon::parse($card->fsrs_due_at)->toIso8601String() : null);
+            $lastReviewedAt = $card->fsrs_last_reviewed_at instanceof Carbon
+                ? $card->fsrs_last_reviewed_at->toIso8601String()
+                : ($card->fsrs_last_reviewed_at !== null ? Carbon::parse($card->fsrs_last_reviewed_at)->toIso8601String() : null);
+            return [
+                'review_card_id' => (int) $card->review_card_id,
+                'word_sense_id' => (int) $card->word_sense_id,
+                'fsrs_due_at' => $dueAt,
+                'fsrs_stability' => (float) $card->fsrs_stability,
+                'fsrs_difficulty' => (float) $card->fsrs_difficulty,
+                'fsrs_last_reviewed_at' => $lastReviewedAt,
+                'fsrs_state' => $card->fsrs_state,
+                'fsrs_enabled' => (bool) $card->fsrs_enabled,
+            ];
+        })->toArray();
+        $paramsCopy = $activeParams;
+        sort($paramsCopy);
+        $parametersHash = hash('sha256', json_encode($paramsCopy, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $payload = [
+            'user_id' => $userId,
+            'language' => $language,
+            'desired_retention' => $desiredRetention,
+            'parameters_hash' => $parametersHash,
+            'cards' => $cardsArray,
+        ];
+        return hash('sha256', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+    }
+
+    private function computePreviewData(int $userId, string $language): ?array
+    {
+        if (!$this->extensionAvailable()) {
+            return null;
+        }
+
+        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters();
+        $cards = $this->candidateCardsQuery($userId, $language)->get();
+        $desiredRetention = $this->fsrsSchedulingService->desiredRetention();
+        $now = Carbon::now();
+
+        $skippedCount = 0;
+        $previewRows = [];
+        $willMoveEarlier = 0;
+        $willMoveLater = 0;
+        $unchanged = 0;
+        $currentlyDue = 0;
+        $newlyDueToday = 0;
+        $maxEarlierDays = 0;
+        $maxLaterDays = 0;
+
+        foreach ($cards as $card) {
+            $row = $this->buildPreviewForCard($card, $activeParams, $desiredRetention, $now);
+            if ($row === null) {
+                $skippedCount++;
+                continue;
+            }
+
+            $previewRows[] = $row;
+
+            if ($row['days_change'] < 0) {
+                $willMoveEarlier++;
+                $maxEarlierDays = min($maxEarlierDays, $row['days_change']);
+            } elseif ($row['days_change'] > 0) {
+                $willMoveLater++;
+                $maxLaterDays = max($maxLaterDays, $row['days_change']);
+            } else {
+                $unchanged++;
+            }
+
+            if ($card->fsrs_due_at !== null && $card->fsrs_due_at->lte($now)) {
+                $currentlyDue++;
+            }
+
+            if ($row['is_newly_due_today']) {
+                $newlyDueToday++;
+            }
+        }
+
+        usort($previewRows, fn ($a, $b) => abs($b['days_change']) <=> abs($a['days_change']));
+
+        $totalCandidates = $cards->count();
+        $totalChanged = $willMoveEarlier + $willMoveLater;
+        $dueTodayAfter = $currentlyDue + $newlyDueToday;
+
+        return [
+            'cards' => $cards,
+            'previewRows' => $previewRows,
+            'activeParams' => $activeParams,
+            'desiredRetention' => $desiredRetention,
+            'summary' => [
+                'will_move_earlier' => $willMoveEarlier,
+                'will_move_later' => $willMoveLater,
+                'unchanged' => $unchanged,
+                'currently_due' => $currentlyDue,
+                'newly_due_today' => $newlyDueToday,
+                'due_today_after_reschedule' => $dueTodayAfter,
+                'max_earlier_days' => $maxEarlierDays < 0 ? $maxEarlierDays : 0,
+                'max_later_days' => $maxLaterDays,
+                'skipped_count' => $skippedCount,
+                'total_candidates' => $totalCandidates,
+                'total_changed' => $totalChanged,
+            ],
         ];
     }
 

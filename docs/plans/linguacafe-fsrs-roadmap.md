@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-26
-> **当前 latest commit**：`85a8e7f`
+> **上一轮已验收基线 commit**：`83880cc`
 
 ---
 
@@ -89,6 +89,7 @@
 | RightClickPanel-2-scout | 自动创建复习卡 + 最相关词义默认展开可行性侦察 — 结论：`+ 添加为新释义` 已自动创建 sense review card（无需额外开发）；最相关词义默认展开尚未实现，推荐方案见 right-click-panel-word-sense-plan.md；词典结果无高度限制需加 scroll |
 | RightClickPanel-3-a | 最相关词义默认展开 + 词典结果高度限制 — WordSensesList 默认只展开第一个含 confirmed sense 的词性组；VocabularySearchBox 词典结果加 max-height scroll；按钮增加 title 提示保存后会加入词义复习；纯前端，不改后端 |
 | RightClickPanel-1 | 右侧点词面板 WordSense UI 功能改造 — 右侧点词面板完成分区整理；词典结果新增“添加为新释义”入口；WordSense 区域改为更清晰的展开/折叠管理卡片与空分组添加入口；不改 FSRS 调度，不改 sense-only 语义 |
+| D.4-c-a | 正式重排 confirm preflight API — 后端路由 + Controller + Service confirmPreflight() + preview_hash 校验 + computePreviewData() 复用 + 安全阈值（MAX_NEWLY_DUE_TODAY=200, MAX_TOTAL_CHANGED=2000）+ write_enabled=false 硬编码 |
 
 ---
 
@@ -533,7 +534,7 @@
 | 中 | D.4-b-fix | 收口重排预览 UI 文案、位置、文档状态与浏览器验收 | ✅ 已完成 | 位置调整、按钮文案优化、skipped_count 提示、浏览器 smoke |
 | 中 | D.4-c-scout | 正式重排确认机制侦察 | ✅ 已完成 | 推荐方案 A（不写 ReviewLog + preview_hash + 二次确认）|
 
-**建议下一步**：D.4-c-a — 正式重排 confirm API 后端（路由 + Controller + Service 签名 + preview_hash 校验）。
+**建议下一步**：D.4-c-b — 正式 ReviewCard 写入逻辑（事务 + chunk + lockForUpdate）。
 
 详细侦察报告见 [fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)。
 

@@ -67,6 +67,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
         Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
         Route::post('/settings/fsrs/reschedule-preview', [App\Http\Controllers\SettingsController::class, 'reschedulePreview']);
+        Route::post('/settings/fsrs/reschedule-confirm', [App\Http\Controllers\SettingsController::class, 'rescheduleConfirm'])->name('settings.fsrs.reschedule-confirm');
         Route::post('/settings/global/update', [App\Http\Controllers\SettingsController::class, 'updateGlobalSettings']);
         Route::post('/settings/global/get', [App\Http\Controllers\SettingsController::class, 'getGlobalSettingsByName']);
 

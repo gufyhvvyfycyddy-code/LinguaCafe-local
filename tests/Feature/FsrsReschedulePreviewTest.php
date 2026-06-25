@@ -407,6 +407,61 @@ class FsrsReschedulePreviewTest extends TestCase
     }
 
     // ════════════════════════════════════════════════════════════════
+    //  preview_hash
+    // ════════════════════════════════════════════════════════════════
+
+    public function test_preview_response_includes_preview_hash_for_english(): void
+    {
+        $this->createEligibleReviewCard();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $this->assertNotNull($response->json('preview_hash'));
+        $this->assertIsString($response->json('preview_hash'));
+    }
+
+    public function test_preview_hash_is_stable_for_unchanged_data(): void
+    {
+        $this->createEligibleReviewCard();
+
+        $response1 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $response2 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response1->assertOk();
+        $response2->assertOk();
+        $this->assertEquals($response1->json('preview_hash'), $response2->json('preview_hash'));
+    }
+
+    public function test_preview_hash_changes_when_candidate_due_at_changes(): void
+    {
+        $card = $this->createEligibleReviewCard();
+
+        $response1 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash1 = $response1->json('preview_hash');
+
+        $card->fsrs_due_at = $card->fsrs_due_at->copy()->addDay();
+        $card->save();
+
+        $response2 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash2 = $response2->json('preview_hash');
+
+        $this->assertNotEquals($hash1, $hash2);
+    }
+
+    public function test_preview_available_false_has_null_preview_hash(): void
+    {
+        $this->user->selected_language = 'japanese';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $response->assertJsonPath('preview_available', false);
+        $this->assertNull($response->json('preview_hash'));
+    }
+
+    // ════════════════════════════════════════════════════════════════
     //  Helpers
     // ════════════════════════════════════════════════════════════════
 
