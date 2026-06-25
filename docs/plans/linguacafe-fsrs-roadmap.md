@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`b82a7be`
+> **当前 latest commit**：`1376378`
 
 ---
 
@@ -81,6 +81,7 @@
 | CODEX-FSRS-1 | FSRS 设置页 Anki-like 增强 — 修正 latest commit hash，落地简单模式/高级工具雏形，新增自动优化参数按钮、optimization-status 与 optimize preflight 接口；第一版只检查资格，不真实计算或保存参数 |
 | FSRS-D3-scout | FSRS 参数优化可行性侦察 — 确认 fsrs-rs-php 已安装 `compute_parameters()` API；ReviewLog 数据完整可构造训练集；无需新增依赖或 migration；输出独立计划文档 fsrs-parameter-optimization-plan.md；未实现真实优化 |
 | FSRS-D3-a | FSRS 参数优化后端最小实现 — computeFsrsOptimizationPreview() 构建训练集调用 compute_parameters() 返回优化预览；SettingsController 接入；17 个新测试（含隔离/过滤/无副作用验证）；不保存参数，不重排卡片 |
+| FSRS-D3-c | FSRS 参数优化前端预览 — AdminReviewSettings.vue 增加预览卡片：展示 review_count/card_count/parameter_count、参数摘要（变化数量/最大幅度）、可展开参数明细表格、安全提示（不保存/不重排）；记录不足保持原有提示 |
 | RightClickPanel-2-scout | 自动创建复习卡 + 最相关词义默认展开可行性侦察 — 结论：`+ 添加为新释义` 已自动创建 sense review card（无需额外开发）；最相关词义默认展开尚未实现，推荐方案见 right-click-panel-word-sense-plan.md；词典结果无高度限制需加 scroll |
 | RightClickPanel-3-a | 最相关词义默认展开 + 词典结果高度限制 — WordSensesList 默认只展开第一个含 confirmed sense 的词性组；VocabularySearchBox 词典结果加 max-height scroll；按钮增加 title 提示保存后会加入词义复习；纯前端，不改后端 |
 | RightClickPanel-1 | 右侧点词面板 WordSense UI 功能改造 — 右侧点词面板完成分区整理；词典结果新增“添加为新释义”入口；WordSense 区域改为更清晰的展开/折叠管理卡片与空分组添加入口；不改 FSRS 调度，不改 sense-only 语义 |
@@ -89,7 +90,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`b82a7be`
+**Latest commit**：`963ee26`
 
 ### `/review-cards/manage` 当前能力
 
@@ -525,7 +526,7 @@
 | 中 | D.2-d | 参数来源与版本说明 | 后端+dashboard | 占位文案升级为真实来源/时间 |
 | 低 | D.4-scout | 重排已有卡片可行性侦察 | 侦察 | 评估风险和影响 |
 
-**建议下一步**：D.3-c — 前端优化预览展示（展示 current vs optimized 参数对比，详见 fsrs-parameter-optimization-plan.md）。
+**建议下一步**：D.3-b — 用户确认保存优化参数（详见 fsrs-parameter-optimization-plan.md）。
 
 ---
 
