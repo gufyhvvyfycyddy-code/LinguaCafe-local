@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 // services
+use App\Services\FsrsReschedulePreviewService;
 use App\Services\SettingsService;
 
 // request classes
@@ -94,6 +95,24 @@ class SettingsController extends Controller
                 'message' => '参数优化计算失败：' . $e->getMessage(),
             ], 200);
         }
+
+        return response()->json($result, 200);
+    }
+
+    /**
+     * D.4-a: Read-only preview of FSRS reschedule impact.
+     *
+     * Computes what would happen if eligible sense cards were rescheduled
+     * using the currently active FSRS parameters. Does NOT write to the
+     * database or create any ReviewLog entries.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function reschedulePreview() {
+        $user = Auth::user();
+
+        $service = app(FsrsReschedulePreviewService::class);
+        $result = $service->preview($user->id, $user->selected_language);
 
         return response()->json($result, 200);
     }

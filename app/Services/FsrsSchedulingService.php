@@ -52,9 +52,11 @@ class FsrsSchedulingService
      *
      * This method MUST NOT throw exceptions during review scheduling.
      *
+     * Made public for read-only use by FsrsReschedulePreviewService (D.4-a).
+     *
      * @return float[]
      */
-    private function getActiveFsrsParameters(): array
+    public function getActiveFsrsParameters(): array
     {
         try {
             $setting = Setting::where('name', 'fsrs_parameters')
