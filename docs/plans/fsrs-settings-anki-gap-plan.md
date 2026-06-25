@@ -201,16 +201,17 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 ---
 
-### D.3-scout：参数优化可行性侦察
+### D.3-scout：参数优化可行性侦察（✅ 已完成，2026-06-25）
 
 **目标**：研究 fsrs-rs-php 是否支持 optimize，需要多少 ReviewLog。
 
-**要做什么**：
-- 只读研究：`vendor/open-spaced-repetition/fsrs-rs-php` 源码中是否有 `computeParameters` 或 `optimize` 方法。
-- 评估需要的输入：多少条 ReviewLog、什么格式。
-- 评估优化性能：用户有几百到几千条日志时是否会超时。
-- 评估数据充分性：多少条日志以上才建议优化。
-- 不改代码，不实现功能。只出侦察报告。
+**侦察结论**：
+- `compute_parameters()` API **已确认可用** — 接收 FSRSItem 训练集，返回 19 个优化权重
+- ReviewLog 数据完全满足输入要求（rating→1-4 映射，delta_t 可计算）
+- 无需新增 Composer 依赖或 migration
+- 数据阈值维持 300
+- 输出独立计划文档 `fsrs-parameter-optimization-plan.md`
+- 未实现真实优化
 
 ---
 
@@ -279,9 +280,9 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 **目标完成**：CODEX-FSRS-1 — 自动优化入口与资格检查（✅ 已在本轮完成）。
 
-**下一步推荐：D.3-scout — 参数优化可行性侦察，然后再进入 D.3-a。**
+**下一步推荐：D.3-a — 参数优化后端最小实现。**
 
 **理由**：
 - 优化入口和 review_count preflight 已经可用。
-- 真实参数优化仍需要确认 fsrs-rs-php 的 optimize/computeParameters 能力、输入格式和性能边界。
-- 在没有可靠参数计算前，应继续保持 preflight，不伪装优化成功。
+- FSRS-D3-scout 已确认：`compute_parameters()` API 可用，ReviewLog 数据完整，无需新增依赖。
+- 详见 `fsrs-parameter-optimization-plan.md`。
