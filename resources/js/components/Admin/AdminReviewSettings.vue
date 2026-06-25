@@ -195,18 +195,37 @@
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">自动优化参数</td>
                                 <td class="py-2">
-                                    <div>暂未开放。</div>
-                                    <div class="grey--text text--darken-1 caption">
-                                        后续会根据你的真实复习记录，自动优化 FSRS 参数，让之后的复习安排更适合你的记忆情况。
+                                    <div>先检查复习记录是否足够，再决定能不能优化。</div>
+                                    <div class="grey--text text--darken-1 caption mb-2">
+                                        这一版只做安全检查，不会改参数，也不会重排已有卡片。
                                     </div>
+                                    <v-btn
+                                        small
+                                        outlined
+                                        color="primary"
+                                        :loading="fsrsOptimizationLoading"
+                                        :disabled="fsrsOptimizationLoading"
+                                        @click="runFsrsOptimizationPreflight"
+                                    >
+                                        根据我的复习记录优化
+                                    </v-btn>
+                                    <v-alert
+                                        v-if="fsrsOptimizationMessage"
+                                        dense
+                                        outlined
+                                        class="mt-3 mb-0"
+                                        :type="fsrsOptimizationCanOptimize ? 'info' : 'warning'"
+                                    >
+                                        {{ fsrsOptimizationMessage }}
+                                    </v-alert>
                                 </td>
                             </tr>
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数来源</td>
                                 <td class="py-2">
-                                    <div>当前使用 fsrs-rs-php 默认参数。</div>
+                                    <div>当前使用默认参数。</div>
                                     <div class="grey--text text--darken-1 caption">
-                                        后续会显示是否使用过个性化优化参数，以及最近一次优化时间。
+                                        还没有优化过。
                                     </div>
                                 </td>
                             </tr>
@@ -312,6 +331,9 @@
                 fsrsDesiredRetention: 0.90,
                 fsrsSaving: false,
                 fsrsSaveStatus: '',
+                fsrsOptimizationLoading: false,
+                fsrsOptimizationMessage: '',
+                fsrsOptimizationCanOptimize: false,
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -350,6 +372,7 @@
         mounted() {
             this.loadSettings();
             this.loadFsrsStats();
+            this.loadFsrsOptimizationStatus();
         },
         computed: {
             fsrsDesiredRetentionText() {
@@ -429,6 +452,34 @@
                     })
                     .finally(() => {
                         this.statsLoading = false;
+                    });
+            },
+            loadFsrsOptimizationStatus() {
+                axios.get('/settings/fsrs/optimization-status')
+                    .then((response) => {
+                        this.fsrsOptimizationCanOptimize = response.data.can_optimize;
+                        this.fsrsOptimizationMessage = response.data.message;
+                    })
+                    .catch(() => {
+                        this.fsrsOptimizationCanOptimize = false;
+                        this.fsrsOptimizationMessage = '自动优化状态加载失败，请稍后再试。';
+                    });
+            },
+            runFsrsOptimizationPreflight() {
+                this.fsrsOptimizationLoading = true;
+                this.fsrsOptimizationMessage = '';
+
+                axios.post('/settings/fsrs/optimize')
+                    .then((response) => {
+                        this.fsrsOptimizationCanOptimize = response.data.can_optimize;
+                        this.fsrsOptimizationMessage = response.data.message;
+                    })
+                    .catch(() => {
+                        this.fsrsOptimizationCanOptimize = false;
+                        this.fsrsOptimizationMessage = '检查失败了，请稍后再试。';
+                    })
+                    .finally(() => {
+                        this.fsrsOptimizationLoading = false;
                     });
             },
             reviewIntervalChanged(value, index) {

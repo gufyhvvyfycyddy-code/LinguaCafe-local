@@ -64,6 +64,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/fonts/delete', [App\Http\Controllers\FontTypeController::class, 'deleteFontType']);
 
         // settings
+        Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
+        Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
         Route::post('/settings/global/update', [App\Http\Controllers\SettingsController::class, 'updateGlobalSettings']);
         Route::post('/settings/global/get', [App\Http\Controllers\SettingsController::class, 'getGlobalSettingsByName']);
 

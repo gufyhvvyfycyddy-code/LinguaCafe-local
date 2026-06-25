@@ -67,6 +67,24 @@ class SettingsController extends Controller
         return response()->json('Settings have been updated successfully.', 200);
     }
 
+    public function getFsrsOptimizationStatus() {
+        $user = Auth::user();
+
+        return response()->json(
+            $this->settingsService->getFsrsOptimizationStatus($user->id, $user->selected_language),
+            200
+        );
+    }
+
+    public function optimizeFsrsParameters() {
+        $user = Auth::user();
+
+        return response()->json(
+            $this->settingsService->preflightFsrsOptimization($user->id, $user->selected_language),
+            200
+        );
+    }
+
     // returns an array of user settings
     public function getUserSettingsByName(GetUserSettingsByNameRequest $request) {
         $userId = Auth::user()->id;
