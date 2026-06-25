@@ -28,3 +28,6 @@ yarn-error.log
 
 # Local Claude Code / agent configuration
 .claude/
+
+# OpenCode runtime data (not tracked, per AGENTS.md)
+.omo/
