@@ -342,18 +342,19 @@
                                                     </v-btn>
                                                 </div>
 
-                                                <v-alert
-                                                    v-if="fsrsOptimizationApplySuccess"
-                                                    dense
-                                                    outlined
-                                                    type="success"
-                                                    class="mt-3 mb-0"
-                                                >
-                                                    {{ fsrsOptimizationApplySuccess }}
-                                                </v-alert>
                                             </v-card-text>
                                         </v-card>
                                     </div>
+
+                                    <v-alert
+                                        v-if="fsrsOptimizationApplySuccess"
+                                        dense
+                                        outlined
+                                        type="success"
+                                        class="mt-3 mb-0"
+                                    >
+                                        {{ fsrsOptimizationApplySuccess }}
+                                    </v-alert>
                                 </td>
                             </tr>
                             <tr>
@@ -651,6 +652,7 @@
                 this.fsrsOptimizationLoading = true;
                 this.fsrsOptimizationMessage = '';
                 this.fsrsOptimizationPreview = null;
+                this.fsrsOptimizationApplySuccess = false;
 
                 axios.post('/settings/fsrs/optimize')
                     .then((response) => {
@@ -673,6 +675,11 @@
                     });
             },
             confirmApplyFsrsParameters() {
+                const confirmed = window.confirm('确认应用这组优化参数吗？之后新的复习评分会使用它；已有卡片不会自动重排。');
+                if (!confirmed) {
+                    return;
+                }
+
                 this.fsrsOptimizationConfirmLoading = true;
                 this.fsrsOptimizationApplySuccess = false;
 
