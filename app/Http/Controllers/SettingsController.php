@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 
 // services
 use App\Services\SettingsService;
@@ -76,11 +77,17 @@ class SettingsController extends Controller
         );
     }
 
-    public function optimizeFsrsParameters() {
+    public function optimizeFsrsParameters(Request $request) {
         $user = Auth::user();
 
         try {
-            $result = $this->settingsService->computeFsrsOptimizationPreview($user->id, $user->selected_language);
+            if ($request->boolean('confirm')) {
+                $result = $this->settingsService->applyFsrsOptimizedParameters(
+                    $user->id, $user->selected_language
+                );
+            } else {
+                $result = $this->settingsService->computeFsrsOptimizationPreview($user->id, $user->selected_language);
+            }
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,

@@ -314,26 +314,43 @@
                                                 >
                                                     这次不会改变你的复习安排。
                                                 </v-alert>
-                                                <v-alert
-                                                    dense
-                                                    outlined
-                                                    type="info"
-                                                    class="mb-2"
-                                                >
-                                                    不会保存参数。
-                                                </v-alert>
+                                            <v-alert
+                                                dense
+                                                outlined
+                                                type="info"
+                                                class="mb-2"
+                                            >
+                                                参数保存后会替换当前 FSRS 参数，确认后不可撤销。
+                                            </v-alert>
                                                 <v-alert
                                                     dense
                                                     outlined
                                                     type="info"
                                                     class="mb-0"
                                                 >
-                                                    不会重排已有卡片。
+                                                    应用后，只会影响之后新的复习评分；不会重排已有卡片。
                                                 </v-alert>
 
-                                                <div class="mt-3 grey--text text--darken-1 body-2 text-center">
-                                                    暂不应用，等待下一步。
+                                                <div class="mt-4 text-center">
+                                                    <v-btn
+                                                        color="success"
+                                                        :loading="fsrsOptimizationConfirmLoading"
+                                                        :disabled="fsrsOptimizationConfirmLoading || fsrsOptimizationApplySuccess"
+                                                        @click="confirmApplyFsrsParameters"
+                                                    >
+                                                        确认应用优化参数
+                                                    </v-btn>
                                                 </div>
+
+                                                <v-alert
+                                                    v-if="fsrsOptimizationApplySuccess"
+                                                    dense
+                                                    outlined
+                                                    type="success"
+                                                    class="mt-3 mb-0"
+                                                >
+                                                    {{ fsrsOptimizationApplySuccess }}
+                                                </v-alert>
                                             </v-card-text>
                                         </v-card>
                                     </div>
@@ -454,6 +471,8 @@
                 fsrsOptimizationMessage: '',
                 fsrsOptimizationCanOptimize: false,
                 fsrsOptimizationPreview: null,
+                fsrsOptimizationConfirmLoading: false,
+                fsrsOptimizationApplySuccess: false,
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -651,6 +670,28 @@
                     })
                     .finally(() => {
                         this.fsrsOptimizationLoading = false;
+                    });
+            },
+            confirmApplyFsrsParameters() {
+                this.fsrsOptimizationConfirmLoading = true;
+                this.fsrsOptimizationApplySuccess = false;
+
+                axios.post('/settings/fsrs/optimize', { confirm: true })
+                    .then((response) => {
+                        this.fsrsOptimizationApplySuccess = response.data.message || '优化参数已保存。';
+                        this.fsrsOptimizationCanOptimize = response.data.can_optimize;
+                        // Re-fetch preview to show updated current parameters
+                        this.fsrsOptimizationPreview = null;
+                        this.runFsrsOptimizationPreflight();
+                    })
+                    .catch((error) => {
+                        const message = error.response?.data?.message
+                            || '参数保存失败，请稍后再试。';
+                        this.fsrsOptimizationApplySuccess = false;
+                        this.fsrsOptimizationMessage = message;
+                    })
+                    .finally(() => {
+                        this.fsrsOptimizationConfirmLoading = false;
                     });
             },
             reviewIntervalChanged(value, index) {

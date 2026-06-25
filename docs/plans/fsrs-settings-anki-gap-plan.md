@@ -227,6 +227,17 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 ---
 
+### D.3-b：参数确认保存（✅ 已完成，2026-06-25）
+
+**完成内容**：
+- `SettingsService::applyFsrsOptimizedParameters()` — 服务端重新计算预览，验证参数，DB::transaction 保存 4 个 settings（fsrs_parameters, fsrs_parameters_source, fsrs_parameters_optimized_at, fsrs_parameters_previous）。
+- `SettingsController::optimizeFsrsParameters()` 接受 `confirm=true`，调用 apply 方法。
+- Vue `confirmApplyFsrsParameters()` — 按钮 + loading + 成功提示，成功后重新运行 preflight。
+- 24 个测试（+7 新增）：不充分记录拒绝、4 settings 保存验证、metadata 正确、不重排、无需 preflight 重新计算、preflight 失败不保存、global user_id=-1 隔离。
+- 不重排卡片（留给 D.4）。
+
+---
+
 ### D.3-c：前端优化预览展示（✅ 已完成，2026-06-25；FSRS-D3-c-recovery 恢复提交 2026-06-25）
 
 **完成内容**：
@@ -289,10 +300,9 @@ FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。完成本文件。
 
 **目标完成**：CODEX-FSRS-1 — 自动优化入口与资格检查（✅ 已在本轮完成）。
 
-**下一步推荐：D.3-b — 用户确认保存优化参数。**
+**下一步推荐：D.2-d — 参数来源与版本说明（升级占位文案，展示真实来源/时间）。**
 
 **理由**：
-- D.3-c 前端预览已完成：参数对比 + 安全提示 UI。
-- 后端 API 已返回 optimized_parameters，直接保存即可。
-- D.3-b 是必要的最小保存步骤，风险可控。
+- D.3-b 确认保存已完成：applyFsrsOptimizedParameters() + 24 个测试全部通过。
+- D.2-d 是 D.3 系列的自然延续：参数已可真实优化和保存，来源字段不再应该是固定文案。
 - 详见 `fsrs-parameter-optimization-plan.md`。

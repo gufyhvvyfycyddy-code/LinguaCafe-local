@@ -350,6 +350,150 @@ class FsrsOptimizationSettingsTest extends TestCase
         $this->assertCount($response->json('parameter_count'), $optimizedParams);
     }
 
+    // ─── D.3-b: confirm=true tests ───────────────────────────────────────────
+
+    public function test_confirm_returns_400_when_insufficient(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', false);
+    }
+
+    public function test_confirm_saves_parameters_when_sufficient(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', true);
+
+        $this->assertDatabaseHas('settings', [
+            'user_id' => -1,
+            'name' => 'fsrs_parameters',
+        ]);
+        $this->assertDatabaseHas('settings', [
+            'user_id' => -1,
+            'name' => 'fsrs_parameters_source',
+        ]);
+        $this->assertDatabaseHas('settings', [
+            'user_id' => -1,
+            'name' => 'fsrs_parameters_optimized_at',
+        ]);
+        $this->assertDatabaseHas('settings', [
+            'user_id' => -1,
+            'name' => 'fsrs_parameters_previous',
+        ]);
+    }
+
+    public function test_confirm_persists_optimization_metadata(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+
+        // Verify source is set correctly
+        $sourceSetting = \DB::table('settings')
+            ->where('name', 'fsrs_parameters_source')
+            ->first();
+        $this->assertNotNull($sourceSetting);
+        $this->assertEquals('optimized', json_decode($sourceSetting->value));
+
+        // Verify optimized_at is a valid datetime (ISO 8601)
+        $optimizedAtSetting = \DB::table('settings')
+            ->where('name', 'fsrs_parameters_optimized_at')
+            ->first();
+        $this->assertNotNull($optimizedAtSetting);
+        $this->assertNotEmpty(json_decode($optimizedAtSetting->value));
+    }
+
+    public function test_confirm_does_not_reschedule_cards(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'), [
+            'fsrs_due_at' => Carbon::now()->addDays(3),
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 4.0,
+        ]);
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', true);
+
+        $card->refresh();
+        $this->assertEquals(5.0, $card->fsrs_stability);
+        $this->assertEquals(4.0, $card->fsrs_difficulty);
+        $this->assertTrue(Carbon::now()->addDays(3)->diffInSeconds($card->fsrs_due_at) < 5);
+    }
+
+    public function test_confirm_recomputes_preview_even_when_not_prefetched(): void
+    {
+        // confirm=true should work without a prior preflight call
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', true);
+    }
+
+    public function test_confirm_does_not_apply_when_preflight_fails(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('applied', false);
+
+        $this->assertDatabaseMissing('settings', [
+            'name' => 'fsrs_parameters',
+        ]);
+        $this->assertDatabaseMissing('settings', [
+            'name' => 'fsrs_parameters_source',
+        ]);
+    }
+
+    public function test_confirm_isolation_only_saves_global_settings(): void
+    {
+        // confirm=true saves to user_id=-1 (global), not to the acting user
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/optimize', [
+            'confirm' => true,
+        ]);
+
+        $response->assertOk();
+
+        // Verify saved as global (user_id=-1), not per-user
+        $this->assertDatabaseHas('settings', [
+            'user_id' => -1,
+            'name' => 'fsrs_parameters',
+        ]);
+        $this->assertDatabaseMissing('settings', [
+            'user_id' => $this->user->id,
+            'name' => 'fsrs_parameters',
+        ]);
+    }
+
     private function createSense(int $userId, string $language, array $overrides = []): WordSense
     {
         $lemma = $overrides['lemma'] ?? 'test';

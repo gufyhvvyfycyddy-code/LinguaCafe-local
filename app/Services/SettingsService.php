@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\WordSense;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class SettingsService {
@@ -349,6 +350,142 @@ class SettingsService {
         }
 
         return $trainSet;
+    }
+
+    public function applyFsrsOptimizedParameters(int $userId, string $language): array {
+        // Re-run the full optimization preview to compute fresh parameters internally.
+        // We never trust client-submitted parameters.
+        $preview = $this->computeFsrsOptimizationPreview($userId, $language);
+
+        if (!$preview['can_optimize'] || !$preview['preview_available']) {
+            return [
+                'optimized' => false,
+                'applied' => false,
+                'preview_available' => false,
+                'current_parameters' => [],
+                'optimized_parameters' => [],
+                'parameter_count' => 0,
+                'card_count' => $preview['card_count'] ?? 0,
+                'review_count' => $preview['review_count'] ?? 0,
+                'min_required' => $preview['min_required'] ?? 0,
+                'can_optimize' => false,
+                'message' => $preview['message'] ?? '优化条件不满足。',
+                'error_code' => 'INSUFFICIENT_REVIEWS',
+            ];
+        }
+
+        $optimizedParams = $preview['optimized_parameters'];
+
+        // Validate the computed parameters
+        try {
+            $params = $this->validateFsrsParameters($optimizedParams);
+        } catch (\InvalidArgumentException $e) {
+            return [
+                'optimized' => false,
+                'applied' => false,
+                'preview_available' => false,
+                'current_parameters' => [],
+                'optimized_parameters' => [],
+                'parameter_count' => count($optimizedParams),
+                'card_count' => $preview['card_count'],
+                'review_count' => $preview['review_count'],
+                'min_required' => $preview['min_required'],
+                'can_optimize' => $preview['can_optimize'],
+                'message' => '参数无效：' . $e->getMessage(),
+                'error_code' => 'INVALID_PARAMETERS',
+            ];
+        }
+
+        // Get current parameters (default or previously saved) as "previous"
+        $previousParams = get_default_parameters();
+        $existingSetting = Setting::where('name', 'fsrs_parameters')
+            ->where('user_id', -1)
+            ->first();
+        if ($existingSetting) {
+            $previousParams = json_decode($existingSetting->value, true);
+        }
+
+        // Save all four settings in a transaction
+        DB::transaction(function () use ($params, $previousParams) {
+            $now = Carbon::now()->toIso8601String();
+
+            $this->upsertGlobalSetting('fsrs_parameters', array_values($params));
+            $this->upsertGlobalSetting('fsrs_parameters_source', 'optimized');
+            $this->upsertGlobalSetting('fsrs_parameters_optimized_at', $now);
+            $this->upsertGlobalSetting('fsrs_parameters_previous', array_values($previousParams));
+        });
+
+        $defaultParams = get_default_parameters();
+
+        return [
+            'optimized' => true,
+            'applied' => true,
+            'preview_available' => false,
+            'current_parameters' => is_array($defaultParams) ? array_values($defaultParams) : [],
+            'optimized_parameters' => $params,
+            'parameter_count' => count($params),
+            'review_count' => $preview['review_count'],
+            'card_count' => $this->countOptimizableCards($userId, $language),
+            'min_required' => $preview['min_required'],
+            'can_optimize' => false,
+            'message' => '优化参数已保存。之后新的复习评分会使用这组参数；已有卡片不会自动重排。',
+            'saved_keys' => [
+                'fsrs_parameters',
+                'fsrs_parameters_source',
+                'fsrs_parameters_optimized_at',
+                'fsrs_parameters_previous',
+            ],
+        ];
+    }
+
+    private function validateFsrsParameters(array $parameters): array {
+        if (empty($parameters)) {
+            throw new \InvalidArgumentException('参数数组不能为空。');
+        }
+
+        $count = count($parameters);
+        if ($count < 19 || $count > 21) {
+            throw new \InvalidArgumentException("参数数量无效：{$count}，预期 19-21 个。");
+        }
+
+        $validated = [];
+        $i = 0;
+        foreach ($parameters as $val) {
+            if (!is_numeric($val)) {
+                throw new \InvalidArgumentException("参数 #{$i} 不是有效数字: " . var_export($val, true));
+            }
+
+            $float = (float) $val;
+            if (!is_finite($float)) {
+                throw new \InvalidArgumentException("参数 #{$i} 不是有限值: " . var_export($val, true));
+            }
+
+            if ($float < -1000 || $float > 1000) {
+                throw new \InvalidArgumentException("参数 #{$i} 超出合理范围 [-1000, 1000]: {$float}");
+            }
+
+            $validated[] = $float;
+            $i++;
+        }
+
+        return $validated;
+    }
+
+    private function upsertGlobalSetting(string $name, mixed $value): void {
+        $setting = Setting::where('name', $name)
+            ->where('user_id', -1)
+            ->first();
+
+        if ($setting) {
+            $setting->value = json_encode($value);
+            $setting->save();
+        } else {
+            Setting::forceCreate([
+                'user_id' => -1,
+                'name' => $name,
+                'value' => json_encode($value),
+            ]);
+        }
     }
 
     private function countOptimizableCards(int $userId, string $language): int {
