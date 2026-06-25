@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-26
-> **当前 latest commit**：`ccef6be`
+> **当前 latest commit**：`85a8e7f`
 
 ---
 
@@ -531,18 +531,11 @@
 | 中 | D.4-a | 预览已有卡片重排影响 | ✅ 已完成 | 后端只读 preview API |
 | 中 | D.4-b | 管理员 FSRS 设置页接入重排预览按钮与结果展示 | ✅ 已完成 | 前端 Vue 接入，已合并审查建议微调 |
 | 中 | D.4-b-fix | 收口重排预览 UI 文案、位置、文档状态与浏览器验收 | ✅ 已完成 | 位置调整、按钮文案优化、skipped_count 提示、浏览器 smoke |
-| 中 | D.4-c-scout | 正式重排确认机制侦察 | 🔄 待开发 | 侦察正式重排的数据写入、ReviewLog 记录、撤销策略和防误点策略 |
+| 中 | D.4-c-scout | 正式重排确认机制侦察 | ✅ 已完成 | 推荐方案 A（不写 ReviewLog + preview_hash + 二次确认）|
 
-**建议下一步**：D.4-c-scout — 正式重排确认机制侦察。
+**建议下一步**：D.4-c-a — 正式重排 confirm API 后端（路由 + Controller + Service 签名 + preview_hash 校验）。
 
-### D.4-c-scout 侦察范围
-
-1. **数据写入**：正式重排调用 fsrs-rs-php reschedule API 后是否需要写 ReviewLog？写入字段是什么（rating, source, previous_*, new_*）？
-2. **撤销策略**：是否支持撤销一整批 reschedule？是否需要 reschedule batch id？
-3. **二次确认**：是否需要两步确认（先预览再二次确认）？
-4. **风险防范**：如何避免大量卡片突然到期导致用户复习量暴增？是否要做 max_newly_due 上限？
-5. **ReviewCard 字段**：是否需要在 ReviewCard 上标记 rescheduled 来源以方便后续撤销？
-6. **并发风险**：如果在 reschedule 执行过程中用户进行了复习评分，如何处理冲突？
+详细侦察报告见 [fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)。
 
 ---
 
