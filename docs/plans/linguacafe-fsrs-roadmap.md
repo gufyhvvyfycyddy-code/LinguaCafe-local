@@ -358,28 +358,33 @@
 
 ---
 
-### C.21 — Anki 导出格式侦察
+### C.21 — Anki 导出格式侦察与实现
 
-**状态**：C.21-scout 已完成。
+**状态**：已完成（C.21-scout 侦察 + C.21-a 第一版实现）。
 
 **侦察结论**：
 1. 当前项目中旧 AnkiConnect 接口（路由 `POST /anki/add-card` → `AnkiController::addCardToAnki()`）为 legacy word-card 模式设计，依赖 word-level 字段（`word`, `reading`, `translation`, `exampleSentence`），不兼容 sense-only 主线。
 2. 接口实现文件：`app/Services/AnkiApiService.php`（类 `AnkiApiService`，方法 `addWord()`）→ 通过 AnkiConnect HTTP API 调用 Anki 桌面客户端，不适合无 GUI 环境批量导出。请求校验类：`app/Http/Requests/Anki/AddCardToAnkiRequest.php`（字段：`word` required, `reading`, `translation`, `exampleSentence` nullable string）。Anki Note 模型字段：`word`, `reading`, `translation`, `example_sentence`。
 3. 旧接口无 tests，无 WordSense 支持，无 ReviewCard 关联，直接复用风险高。
-4. 推荐不改造旧 AnkiConnect，而是新建 **Anki TSV 文件导出**（C.21-a）：
-   - 生成标准 Anki TSV/CSV 格式文件（字段分列，可导入 Anki Desktop/AnkiDroid）。
-   - 复用 C.20-a 的字段选择逻辑（EXPORT_FIELDS 白名单）。
-   - 不依赖 AnkiConnect HTTP API。
-   - 不做 apkg/anki 包（不出现在本地 Anki 中）。
-   - 输出文件可用户手动导入 Anki。
+4. 推荐不改造旧 AnkiConnect，而是新建 **Anki TSV 文件导出**（C.21-a）：生成标准 Anki TSV 文件（字段分列，可导入 Anki Desktop/AnkiDroid），不依赖 AnkiConnect HTTP API，不做 apkg/anki 包，输出文件可用户手动导入 Anki。
 
-**决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。下一步 C.21-a 做 Anki TSV 文件导出第一版。
+**C.21-a 实现**：
+- 路由 `GET /review-cards/manage/export-anki-tsv` → `ReviewCardManageController::exportAnkiTsv()`
+- 三种模式：`current`（当前筛选）、`all`（全部语言卡）、`selected`（选定 ID）
+- TSV 字段：`word`、`reading`、`translation`、`example_sentence`（对应 Anki Note 模型字段）
+- 导出时对 `\`、`\t`、`\n` 做转义，`Content-Type: text/tab-separated-values`，`.tsv` 文件下载
+- 响应头 `X-Export-Count` 返回导出条数
+- Vue：在已有导出菜单底部新增 "Anki TSV: 当前/全部/已选" 按钮
+- 5 个测试覆盖：默认筛选、全部模式、选定 ID、空选择拒绝、无效模式拒绝
+- 未做：apkg 包、CSV/Excel 格式、自定义字段映射、AnkiConnect 集成
+
+**决策**：不改造旧 AnkiConnect，不做 AnkiConnect 集成。旧 AnkiConnect 接口保留不动，仅新增独立的 TSV 导出端点。
 
 ---
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.21-scout 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|

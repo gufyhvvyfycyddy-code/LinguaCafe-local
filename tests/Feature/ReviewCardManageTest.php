@@ -3619,6 +3619,85 @@ class ReviewCardManageTest extends TestCase
         $this->assertCount(3, $item);
     }
 
+    // ==================== Anki TSV Export Tests ====================
+
+    public function test_export_anki_defaults_to_filtered_mode(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $sense->update(['lemma' => 'hello', 'sense_zh' => '你好', 'example_sentence_en' => 'Hello world.']);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv');
+        $response->assertOk();
+        $response->assertHeader('Content-Type', 'text/tab-separated-values; charset=utf-8');
+        $this->assertStringContainsString('attachment; filename="lingucafe-anki-import-', $response->headers->get('Content-Disposition'));
+
+        $content = $response->getContent();
+        $this->assertStringStartsWith("word\treading\ttranslation\texample_sentence\n", $content);
+        $this->assertStringContainsString('hello', $content);
+        $this->assertStringContainsString('你好', $content);
+        $this->assertStringContainsString('Hello world.', $content);
+
+        // Verify TSV has 4 columns (reading empty for sense-only, no reading field)
+        $lines = explode("\n", trim($content));
+        $this->assertCount(2, $lines, 'Header + 1 data row');
+        $cols = explode("\t", $lines[1]);
+        $this->assertCount(4, $cols, 'TSV data has 4 columns');
+        $this->assertSame('', $cols[1], 'Reading column is empty (WordSense has no reading field)');
+
+        $this->assertSame('1', $response->headers->get('X-Export-Count'));
+    }
+
+    public function test_export_anki_all_mode(): void
+    {
+        // Ensure only our test cards are counted: reset to only our language
+        // All-mode exports ALL sense cards for this user+language (no filter)
+        // Disable all existing cards first
+        ReviewCard::where('user_id', $this->user->id)->update(['fsrs_enabled' => false]);
+
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $sense1->update(['lemma' => 'alpha_all', 'sense_zh' => '阿尔法']);
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'beta_all', 'sense_zh' => '贝塔', 'sense_key' => hash('sha256', 'english|beta_all|noun|贝塔|beta')]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv?mode=all');
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertStringContainsString('alpha_all', $content);
+        $this->assertStringContainsString('beta_all', $content);
+        // Use greaterThan since other cards from previous tests may also be included
+        $count = (int) $response->headers->get('X-Export-Count');
+        $this->assertGreaterThanOrEqual(2, $count);
+    }
+
+    public function test_export_anki_with_selected_ids(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        $sense1->update(['lemma' => 'selectedA']);
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'selectedB', 'sense_key' => hash('sha256', 'english|selectedB|noun|测试|selectedB')]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv?mode=selected&card_ids[]=' . $card1->id);
+        $response->assertOk();
+        $content = $response->getContent();
+        $this->assertStringContainsString('selectedA', $content);
+        $this->assertStringNotContainsString('selectedB', $content);
+        $this->assertSame('1', $response->headers->get('X-Export-Count'));
+    }
+
+    public function test_export_anki_requires_non_empty_selection_when_mode_selected(): void
+    {
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv?mode=selected');
+        $response->assertStatus(422);
+        $this->assertStringContainsString('至少选择一个', $response->getContent());
+    }
+
+    public function test_export_anki_rejects_invalid_mode(): void
+    {
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/export-anki-tsv?mode=invalid');
+        $response->assertStatus(422);
+        $this->assertStringContainsString('无效的导出模式', $response->getContent());
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

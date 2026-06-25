@@ -195,6 +195,96 @@ class ReviewCardManageController extends Controller
     }
 
     /**
+     * GET /review-cards/manage/export-anki-tsv
+     * Export current filtered cards as Anki-compatible TSV.
+     */
+    private const TSV_FIELDS = ['word', 'reading', 'translation', 'example_sentence'];
+
+    public function exportAnkiTsv(Request $request): \Illuminate\Http\Response
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $mode = $request->input('mode', 'current');
+        if (!in_array($mode, ['current', 'all', 'selected'], true)) {
+            return response("无效的导出模式。有效模式：current, all, selected。\n", 422, [
+                'Content-Type' => 'text/plain; charset=utf-8',
+            ]);
+        }
+
+        if ($mode === 'selected') {
+            $cardIds = $request->input('card_ids', []);
+            if (!is_array($cardIds) || count($cardIds) === 0) {
+                return response("请至少选择一个复习卡。\n", 422, [
+                    'Content-Type' => 'text/plain; charset=utf-8',
+                ]);
+            }
+            $cards = ReviewCard::whereIn('id', $cardIds)->get();
+        } else {
+            $query = $this->buildManageQuery($request, $userId, $language);
+            if ($mode === 'current') {
+                // Apply filters from request (current filter)
+                $query = $this->buildManageQuery($request, $userId, $language);
+            } else {
+                // 'all' mode — no filter, all language sense cards
+                $query = ReviewCard::query()
+                    ->where('user_id', $userId)
+                    ->where('language', $language)
+                    ->where('target_type', 'sense')
+                    ->orderBy('id', 'desc');
+            }
+
+            $cards = $query->get();
+        }
+
+        if ($cards->isEmpty()) {
+            return response("没有匹配的复习卡可以导出。\n", 200, [
+                'Content-Type' => 'text/plain; charset=utf-8',
+            ]);
+        }
+
+        // Build TSV
+        $senseIds = $cards->pluck('target_id')->unique()->values()->toArray();
+        $senses = WordSense::whereIn('id', $senseIds)->get()->keyBy('id');
+
+        $lines = [];
+        // Header
+        $lines[] = implode("\t", self::TSV_FIELDS);
+
+        $exportedCount = 0;
+        foreach ($cards as $card) {
+            $sense = $senses->get($card->target_id);
+            if (!$sense) continue;
+
+            $lemma = $sense->lemma ?? '';
+            $reading = $sense->reading ?? '';
+            $translation = $sense->sense_zh ?? '';
+            $exampleSentence = $sense->example_sentence_en ?? '';
+
+            // Escape special characters for TSV
+            $escape = fn($s) => str_replace(["\\", "\t", "\n", "\r"], ["\\\\", "\\t", "\\n", ""], $s ?? '');
+
+            $lines[] = implode("\t", [
+                $escape($lemma),
+                $escape($reading),
+                $escape($translation),
+                $escape($exampleSentence),
+            ]);
+            $exportedCount++;
+        }
+
+        $tsv = implode("\n", $lines) . "\n";
+
+        $filename = 'lingucafe-anki-import-' . now()->format('Ymd-His') . '.tsv';
+
+        return response($tsv, 200, [
+            'Content-Type' => 'text/tab-separated-values; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'X-Export-Count' => (string) $exportedCount,
+        ]);
+    }
+
+    /**
      * GET /review-cards/manage/{reviewCard}/logs
      * Return the most recent 20 ReviewLog entries for a manageable sense card.
      * Read-only — no delete, no export, no pagination, no charts.
