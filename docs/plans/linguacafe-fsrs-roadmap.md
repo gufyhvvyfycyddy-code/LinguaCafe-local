@@ -77,7 +77,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`841b276`
+**Latest commit**：`549da5a`
 
 ### `/review-cards/manage` 当前能力
 
