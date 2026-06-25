@@ -48,15 +48,23 @@
                     </div>
                 </v-expansion-panel-header>
                 <v-expansion-panel-content>
+                    <div v-if="!group.senses.length" class="empty-pos rounded pa-3 mb-2">
+                        当前还没有{{ group.shortLabel }}释义。
+                        <v-btn x-small text color="primary" class="ml-1" @click="openAddForm(group.pos)">
+                            + 在{{ group.shortLabel }}下添加释义
+                        </v-btn>
+                    </div>
+
                     <div
                         v-for="sense in group.senses"
                         :key="sense.sense_id"
                         class="sense-item rounded mb-2 pa-2"
                     >
                         <div class="d-flex align-center mb-1">
-                            <v-chip x-small color="success" class="mr-1">已保存</v-chip>
+                            <v-chip x-small :color="statusColor(sense)" class="mr-1">{{ statusText(sense) }}</v-chip>
                             <v-chip x-small outlined class="mr-1">{{ group.label }}</v-chip>
                             <v-chip v-if="sense.review_card_id" x-small outlined color="primary">FSRS</v-chip>
+                            <v-chip v-else x-small outlined class="mr-1">暂无复习卡</v-chip>
                             <v-spacer />
                             <v-btn v-if="editingSenseId !== sense.sense_id" x-small outlined color="primary" @click="startEdit(sense)">
                                 编辑该释义
@@ -287,17 +295,15 @@ export default {
             return (this.surface || this.lemma || '').trim();
         },
         senseGroups() {
-            return POS_OPTIONS
-                .map(option => {
-                    const senses = this.senses.filter(sense => (sense.pos || 'other') === option.value);
-                    return {
-                        pos: option.value,
-                        label: option.label,
-                        shortLabel: option.shortLabel,
-                        senses: senses,
-                    };
-                })
-                .filter(group => group.senses.length > 0);
+            return POS_OPTIONS.map(option => {
+                const senses = this.senses.filter(sense => (sense.pos || 'other') === option.value);
+                return {
+                    pos: option.value,
+                    label: option.label,
+                    shortLabel: option.shortLabel,
+                    senses: senses,
+                };
+            });
         },
     },
     watch: {
@@ -406,6 +412,36 @@ export default {
             return (definition || '')
                 .replace(/^(vt\.|vi\.|v\.|n\.|adj\.|a\.|adv\.|prep\.|conj\.)\s*/i, '')
                 .trim();
+        },
+        statusText(sense) {
+            if (sense.status === 'confirmed') {
+                return '已保存';
+            }
+
+            if (sense.status === 'ai_suggested') {
+                return 'AI 建议';
+            }
+
+            if (sense.status === 'rejected') {
+                return '已拒绝';
+            }
+
+            return sense.status || '候选';
+        },
+        statusColor(sense) {
+            if (sense.status === 'confirmed') {
+                return 'success';
+            }
+
+            if (sense.status === 'ai_suggested') {
+                return 'warning';
+            }
+
+            if (sense.status === 'rejected') {
+                return 'error';
+            }
+
+            return 'info';
         },
         openAddForm(pos = 'verb', prefill = null) {
             this.showAddForm = true;

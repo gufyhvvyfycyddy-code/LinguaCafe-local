@@ -46,7 +46,7 @@
                             <div class="text-h6 default-font mb-1">{{ word }}</div>
                             <div class="text-caption text--secondary">
                                 当前词形：<strong class="default-font">{{ word }}</strong>
-                                <span class="mx-2">学习词根：
+                                <span class="mx-2">词元：
                                     <strong v-if="!editingLemma" class="default-font">{{ studyBase || baseWord || word }}</strong>
                                     <span v-if="!editingLemma" class="lemma-edit-link ml-1" @click="startEditLemma">[修改]</span>
                                     <span v-if="editingLemma" class="lemma-edit-inline">

@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`2ca6751`
+> **当前 latest commit**：`12bd67e`
 
 ---
 
@@ -79,12 +79,13 @@
 | D.2-b | Desired Retention 帮助说明增强 — 每个 retention 值增加一句话解释，90% 标注"推荐默认值"，低保持率保留可选 |
 | D.2-c | 复习负担预估第一版 — 在复习目标区增加小估算框，使用当前 stats 数据做粗略每日复习量预估，提示负担变化 |
 | CODEX-FSRS-1 | FSRS 设置页 Anki-like 增强 — 修正 latest commit hash，落地简单模式/高级工具雏形，新增自动优化参数按钮、optimization-status 与 optimize preflight 接口；第一版只检查资格，不真实计算或保存参数 |
+| RightClickPanel-1 | 右侧点词面板 WordSense UI 功能改造 — 右侧点词面板完成分区整理；词典结果新增“添加为新释义”入口；WordSense 区域改为更清晰的展开/折叠管理卡片与空分组添加入口；不改 FSRS 调度，不改 sense-only 语义 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`2ca6751`
+**Latest commit**：`12bd67e`
 
 ### `/review-cards/manage` 当前能力
 
