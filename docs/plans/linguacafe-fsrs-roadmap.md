@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`49609f8`
+> **当前 latest commit**：`6e95d2d`
 
 ---
 
@@ -74,12 +74,13 @@
 | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 — 确认 rating/state/source 可中文化，FSRS 数值可本地化，建议 C.23-a 冻结实现 |
 | C.24-scout | 管理页真实用户批量操作风险复查 — 识别 4 类 Medium 风险（bulk 无确认弹窗/无事务/无上限），推荐 C.24-a 安全加固 |
 | C.24-a-lite | 管理页批量操作安全加固 — bulkEnabled/bulkDestroy 使用 DB::transaction、bulkArchive/bulkRestore 增加确认弹窗、reset 弹窗增加不可恢复提示、新增 reset 隔离与 missing ID 测试 |
+| D.1-scout | FSRS 设置页 Anki 对标侦察 — 分析当前 FSRS 设置页已有/占位/缺失能力，对标 Anki FSRS 6 大功能，建立独立拆解文档 fsrs-settings-anki-gap-plan.md，在大计划纳入 D 系列 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`49609f8`
+**Latest commit**：`6e95d2d`
 
 ### `/review-cards/manage` 当前能力
 
@@ -508,13 +509,18 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout、C.24-scout、C.24-a-lite 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout、C.24-scout、C.24-a-lite、D.1-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| — | 暂无冻结候选 | — | — | 所有 C 系列核心加固任务已完成 |
+| 高 | D.2-a | FSRS 设置页信息架构重排 | 纯前端 | 最小改动，把状态页升级为控制面板，不碰算法 |
+| 中 | D.2-b | Desired Retention 帮助说明增强 | 纯前端 | 帮用户理解 retention 影响 |
+| 中 | D.2-c | 复习负担预估第一版 | 纯前端 | 用当前统计做粗略预估 |
+| 中 | D.2-d | 参数来源与版本说明 | 后端+dashboard | 占位文案升级为真实来源/时间 |
+| 低 | D.3-scout | 参数优化可行性侦察 | 侦察 | 研究 fsrs-rs-php 优化能力 |
+| 低 | D.4-scout | 重排已有卡片可行性侦察 | 侦察 | 评估风险和影响 |
 
-**建议下一步**：等待新指令。所有 C 系列功能/侦察/加固任务（C.15 至 C.24-a-lite）均已完成。
+**建议下一步**：D.2-a — FSRS 设置页信息架构重排（纯前端，最小改动，产品价值高）。
 
 ---
 
@@ -701,6 +707,89 @@
    - 未改 export（JSON/TSV/CSV/Anki）
    - 未改 FSRS / ReviewLog / auth
    - 未做 all/selected/card_ids 模式
+
+---
+
+### D 系列：FSRS 设置页完善 / Anki-like 配置体验
+
+**状态**：D.1-scout 已完成；D.2-a/D.2-b/D.2-c/D.2-d 均为未冻结候选。
+
+**方向说明**：
+
+D 系列的目标是把 LinguaCafe 的 FSRS 设置页从"状态说明页"升级为"决策辅助页"。这不是改 FSRS 算法，不是让用户手动编辑稳定度/难度，而是在已有的 FSRS 调度引擎之上，给用户一个能理解、能决策、能放心使用的设置界面。
+
+**对标基线**：Anki 的 FSRS 设置界面，包含 Desired Retention 滑块 + Help Me Decide 模拟器 + 参数优化入口 + 健康检查 + 重排控制 + 参数版本信息。
+
+**原则**：
+1. 第一阶段（D.2）先做产品信息架构和 UI，占位功能可以不接算法。
+2. 第二阶段（D.3）才考虑参数优化，必须先侦察 fsrs-rs-php 能力。
+3. 第三阶段（D.4）才考虑重排已有卡片，必须先侦察影响量级。
+4. 所有会大幅改变到期时间的操作必须强提醒。
+5. 第一目标是"让用户知道自己改 retention 会带来什么后果"。
+
+**当前能力概览**（详见 `fsrs-settings-anki-gap-plan.md`）：
+
+| 分类 | 能力 |
+|------|------|
+| A. 已有 | Desired Retention 下拉选择 + 保存、FSRS 说明、FSRS 统计总览（总词义卡/启用中/归档/到期/状态分布/熟练度）、旧 SRS 折叠设置 |
+| B. 占位 | 参数来源（固定文案）、参数编辑（暂未开放）、卡片重置（后续开放 — 实际管理页已有，文案过时）、参数优化（后续开放） |
+| C. 缺失 | Help Me Decide / retention 负担预估、参数优化入口+健康检查+预览、重排已有卡片+影响量提示、模拟未来复习负担、参数版本/来源/优化时间真实展示 |
+
+#### D.1-scout（✅ 已完成，2026-06-25）
+
+**内容**：FSRS 设置页 Anki 对标侦察 + 独立拆解文档建立。
+
+**产出**：
+- 完整分析了 `AdminReviewSettings.vue`（407 行）的当前能力（3 类：已有/占位/缺失）。
+- 对标 Anki FSRS 6 大功能，整理差异表。
+- 建立独立拆解文档 `docs/plans/fsrs-settings-anki-gap-plan.md`，包含 6 个章节和详细 D.2-D.4 小步骤拆解。
+- 在大计划中纳入 D 系列阶段。
+
+**实现文件**：`docs/plans/fsrs-settings-anki-gap-plan.md`（新增）、`docs/plans/linguacafe-fsrs-roadmap.md`（更新）。
+
+#### D.2-a：FSRS 设置页信息架构重排（待冻结）
+
+- 重排卡片布局：复习目标区 / 当前状态区 / 高级工具区
+- 更新过时文案（卡片重置不是"后续开放"，已有管理页入口）
+- 删除或修正页面底部版本计划说明
+- 不改算法、不新增后端、不新增路由
+
+#### D.2-b：Desired Retention 帮助说明增强（待冻结）
+
+- 每个 retention 值增加中文影响描述（纯前端动态说明）
+- 明确标注 90% 是推荐默认值
+
+#### D.2-c：复习负担预估第一版（待冻结）
+
+- 用当前统计总览数据做粗略预估
+- 只做文字提示，不画图表，不改排程
+
+#### D.2-d：参数来源与版本说明（待冻结）
+
+- 后端增加 `fsrs_parameters_source` 和 `fsrs_parameters_optimized_at` 设置字段
+- 前端展示真实来源和优化时间，替代"fsrs-rs-php 默认参数"固定文案
+
+#### D.3-scout：参数优化可行性侦察（待冻结）
+
+- 研究 fsrs-rs-php 的 optimize/computeParameters 方法
+- 确认需要的 ReviewLog 数量阈值
+
+#### D.4-scout：重排已有卡片可行性侦察（待冻结）
+
+- 研究 fsrs-rs-php 的 reschedule 方法
+- 评估重排对到期卡片数量的影响
+
+#### D 系列禁止范围
+
+- 不手动编辑单卡 stability/difficulty
+- 不删除 ReviewLog
+- 不绕过 sense-only
+- 不改 ReviewCard target_type 语义
+- 不改 CSV / Anki TSV / JSON 导出
+- 不改复习评分按钮语义
+- 不做 AnkiConnect 同步
+- 不做多 deck / preset 系统（除非后续单独侦察）
+- 不把 D 系列标记为已完成（除 D.1-scout 外）
 
 ---
 
