@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use App\Models\Setting;
 use Carbon\Carbon;
 
 class FsrsSchedulingService
@@ -39,6 +40,54 @@ class FsrsSchedulingService
         $value = (float) $value;
 
         return max(0.70, min(0.97, $value));
+    }
+
+    /**
+     * Returns the currently active FSRS parameters for scheduling.
+     *
+     * Reads the fsrs_parameters global setting (user_id=-1).
+     * If the setting is missing, empty, invalid JSON, wrong count,
+     * contains non-numeric or out-of-range values, or any error occurs,
+     * falls back to get_default_parameters().
+     *
+     * This method MUST NOT throw exceptions during review scheduling.
+     *
+     * @return float[]
+     */
+    private function getActiveFsrsParameters(): array
+    {
+        try {
+            $setting = Setting::where('name', 'fsrs_parameters')
+                ->where('user_id', -1)
+                ->first();
+
+            if (!$setting || empty($setting->value)) {
+                return get_default_parameters();
+            }
+
+            $params = json_decode($setting->value, true);
+
+            if (!is_array($params)) {
+                return get_default_parameters();
+            }
+
+            $params = array_values($params);
+            $count = count($params);
+
+            if ($count < 19 || $count > 21) {
+                return get_default_parameters();
+            }
+
+            foreach ($params as $v) {
+                if (!is_numeric($v) || !is_finite((float) $v) || abs((float) $v) > 1000) {
+                    return get_default_parameters();
+                }
+            }
+
+            return array_map('floatval', $params);
+        } catch (\Throwable $e) {
+            return get_default_parameters();
+        }
     }
 
     public function schedule(ReviewCard $card, string $rating, ?Carbon $reviewedAt = null): array
@@ -97,7 +146,7 @@ class FsrsSchedulingService
             $elapsedDays = (int) max(0, $card->fsrs_last_reviewed_at->diffInDays($reviewedAt));
         }
 
-        $fsrs = new \fsrs\FSRS(get_default_parameters());
+        $fsrs = new \fsrs\FSRS($this->getActiveFsrsParameters());
         $states = $fsrs->next_states($memory, $this->desiredRetention(), $elapsedDays);
 
         $state = match ($rating) {
