@@ -71,12 +71,13 @@
 | C.21-scout | Anki 导出格式侦察 — 旧 AnkiConnect 接口为 legacy word-card 模式，不适合 sense-only；推荐 C.21-a 做 Anki TSV 文件导出 |
 | C.22-scout | CSV 导出侦察 — 复用 JSON/TSV 导出基础，确认 CSV 有价值但不紧急，推荐 C.22-a 冻结实现 |
 | C.22-a-lite | CSV 导出实现 — 新增 `/review-cards/manage/export-csv`，复用 buildManageQuery/buildItems/EXPORT_FIELDS/EXPORT_LIMIT，fputcsv + BOM + formula injection 防护 |
+| C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 — 确认 rating/state/source 可中文化，FSRS 数值可本地化，建议 C.23-a 冻结实现 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`38d32bc`
+**Latest commit**：`a63f601`
 
 ### `/review-cards/manage` 当前能力
 
@@ -505,14 +506,74 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★ | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 | UI/体验侦察 | 当前只读列表可用，但 rating/state/source 可中文化 |
 | ★★ | C.24-scout | 管理页真实用户批量操作风险复查 | 风险侦察 | 管理页已有删除、批量删除、重置、归档，需要复查误操作防护 |
 
-**建议下一步**：**C.23-scout** — 详情抽屉 ReviewLog 可读性优化侦察。理由：C.22-a-lite CSV 导出已完成，ReviewLog 可读性是下一个可无需功能实现的侦察任务。
+**建议下一步**：**C.24-scout** — 管理页真实用户批量操作风险复查。理由：C.23-scout 侦察已完成，ReviewLog 可读性有了方向。C.24-scout 可以复查管理页批量操作的误操作防护。
+
+---
+
+### C.23-scout：详情抽屉 ReviewLog 可读性优化侦察
+
+**侦察日期**：2026-06-25
+
+#### 当前 ReviewLog 展示现状
+
+| 项目 | 详情 |
+|------|------|
+| **路由** | `GET /review-cards/manage/{reviewCard}/logs`（routes/web.php L209） |
+| **Controller 方法** | `ReviewCardManageController::logs()`（controller L417-448） |
+| **返回字段** | id, rating, source, reviewed_at, previous_state, new_state, previous_due_at, new_due_at, previous_stability, new_stability, previous_difficulty, new_difficulty |
+| **前端显示位置** | 详情抽屉底部"最近复习记录"区块（ReviewCardManage.vue L555-588） |
+| **加载/空/错误状态** | 加载中显示"加载复习记录中..."，失败显示错误文字，空列表显示"暂无复习记录。" |
+| **分页** | 后端 limit 20 条，无前端分页 |
+| **用户/语言/sense 隔离** | 先走 `findManageableSenseCard()` 校验 user_id + language_id + target_type=sense + confirmed |
+| **测试覆盖** | 9 个 HTTP 测试：基础数据返回、limit 20、其他 user 拒绝、其他 language 拒绝、legacy word card 拒绝、rejected sense 拒绝、跨 card 日志隔离、空数据 |
+
+#### 当前可读性问题
+
+1. **rating（评分）**：后端返回小写字符串 `again`/`hard`/`good`/`easy`/`reset`，前端用 `logRatingColor()` 映射为彩色 chip。chip 上直接显示 `again`/`hard`/`good`/`easy`/`reset` 英文原文，对中文用户不够直观。虽然有颜色区分（红/橙/绿/蓝/灰），但英文文案本身不够友好。
+2. **state（状态）**：`previous_state` 和 `new_state` 显示原始英文值如 `new`/`learning`/`review`/`relearning`/`manual`，无中文映射，不易读。
+3. **source（来源）**：显示原始英文值如 `review`/`reschedule`/`import`/`manage_reset`/`manage_archive`，无中文映射，不够直观。
+4. **FSRS 数值**：`S`（稳定度）和 `D`（难度）显示为浮点数（如 `1.23`/`5.67`），使用了 `formatFsrsNumber()` 保留 2 位小数，但标签和数值对非技术用户不够友好。
+5. **到期时间**：使用 `formatDueAt()` 本地化为 `MM/DD HH:mm` 格式，可读性中等。
+6. **复习时间**：使用 `formatDateTime()` 本地化为 `MM/DD HH:mm` 格式，可读性中等。
+7. **整体布局**：每条日志以卡片方式展示，视觉层级尚可，但"一行英文 chip → 一行 state 箭头 → 一行 S/D 数值 → 一行到期"的信息密度对新手用户偏高。
+8. **不可读的业务字段**：`reviewed_at` 没有相对时间（如"3 天前"），`S`/`D` 数值没有单位说明。
+
+#### C.23-a 推荐方向
+
+1. **只改前端展示层**：不修改 ReviewLog 数据模型、不修改后端 API 字段结构、不修改 FSRS 算法。
+2. **rating 中文化 chip**：`again` → `忘记`（红色）、`hard` → `困难`（橙色）、`good` → `良好`（绿色）、`easy` → `简单`（蓝色）、`reset` → `重置`（灰色）。
+3. **state 中文化映射**：`new` → `新词`、`learning` → `学习中`、`review` → `复习中`、`relearning` → `重学中`、`manual` → `手动`。
+4. **source 中文化映射**：`review` → `复习`、`reschedule` → `重排`、`import` → `导入`、`manage_reset` → `管理页重置`、`manage_archive` → `管理页归档`。
+5. **FSRS 数值加单位**：`S: 1.23 → 5.67` 改为 `稳定度: 1.23 → 5.67`，`D: 7.0 → 6.5` 改为 `难度: 7.0 → 6.5`。
+6. **相对时间可选**：`reviewed_at` 可增加"xx 分钟/小时/天前"的相对时间替代（可选，非必须）。
+7. **空状态和失败提示已存在**：当前已有加载/空/错误三种状态，无需新增。
+8. **保持纯前端改动**：不改 API 返回字段、不改测试、不改路由。
+
+#### C.23-a 测试建议
+
+1. **HTTP 测试现有**：9 个 logs 端点 HTTP 测试已覆盖隔离/权限/数据/空状态 → C.23-a 无需新增 HTTP 测试。
+2. **浏览器验收**：C.23-a 的改动为中文化映射和文案优化，主要依靠浏览器视觉验收确认文案显示正确。
+3. **Vue 单元测试**：如果抽取 `logRatingLabel`、`stateLabel`、`sourceLabel` 等映射函数到独立方法，可加简单的字符串映射单元测试。
+
+#### C.23-a 禁止范围
+
+- 不删除 ReviewLog
+- 不改 FSRS 算法/评分逻辑
+- 不做导出（CSV/JSON/TSV/Raw）
+- 不做批量操作
+- 不做数据库 migration
+- 不做 ReviewLog 编辑/删除
+- 不改 routes/web.php
+- 不改 controller 返回字段
+- 不改测试覆盖结构
+- 不改 CSS 布局（只改文案/chip label）
+- 不改 API 响应格式
 
 ---
 
