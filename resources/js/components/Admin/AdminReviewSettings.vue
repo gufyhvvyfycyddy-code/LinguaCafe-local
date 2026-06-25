@@ -195,9 +195,9 @@
                             <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">自动优化参数</td>
                                 <td class="py-2">
-                                    <div>先检查复习记录是否足够，再决定能不能优化。</div>
+                                    <div>根据你的复习记录，帮 FSRS 算出更适合你的参数。</div>
                                     <div class="grey--text text--darken-1 caption mb-2">
-                                        这一版只做安全检查，不会改参数，也不会重排已有卡片。
+                                        当前只是预览，不会修改 FSRS 调度。
                                     </div>
                                     <v-btn
                                         small
@@ -210,7 +210,7 @@
                                         根据我的复习记录优化
                                     </v-btn>
                                     <v-alert
-                                        v-if="fsrsOptimizationMessage"
+                                        v-if="fsrsOptimizationMessage && !fsrsOptimizationPreview"
                                         dense
                                         outlined
                                         class="mt-3 mb-0"
@@ -218,6 +218,125 @@
                                     >
                                         {{ fsrsOptimizationMessage }}
                                     </v-alert>
+
+                                    <!-- 优化预览卡片 -->
+                                    <div v-if="fsrsOptimizationPreview && fsrsOptimizationPreview.preview_available" class="mt-4">
+                                        <v-alert
+                                            dense
+                                            outlined
+                                            type="success"
+                                            class="mb-0"
+                                        >
+                                            {{ fsrsOptimizationPreview.message }}
+                                        </v-alert>
+
+                                        <v-card outlined class="rounded-lg mt-3">
+                                            <v-card-title class="subtitle-1">参数优化预览</v-card-title>
+                                            <v-card-text>
+
+                                                <div class="body-2 grey--text text--darken-1 mb-3">
+                                                    系统已经根据你的复习记录算出一组个性化参数，当前只是预览，不会保存，也不会重排已有卡片。
+                                                </div>
+
+                                                <v-simple-table dense class="no-hover mb-4">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">用于计算的复习记录</td>
+                                                            <td class="py-1">{{ fsrsOptimizationPreview.review_count }} 条</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">涉及词义卡</td>
+                                                            <td class="py-1">{{ fsrsOptimizationPreview.card_count }} 张</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">参数数量</td>
+                                                            <td class="py-1">{{ fsrsOptimizationPreview.parameter_count }} 个</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </v-simple-table>
+
+                                                <v-simple-table dense class="no-hover mb-4">
+                                                    <tbody>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">当前参数数量</td>
+                                                            <td class="py-1">{{ fsrsOptimizationPreview.current_parameters.length }} 个</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">优化后参数数量</td>
+                                                            <td class="py-1">{{ fsrsOptimizationPreview.optimized_parameters.length }} 个</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">发生变化的参数</td>
+                                                            <td class="py-1">{{ paramDiffSummary.changedCount }} 个</td>
+                                                        </tr>
+                                                        <tr>
+                                                            <td class="font-weight-medium pr-4 py-1">最大变化幅度</td>
+                                                            <td class="py-1">{{ paramDiffSummary.maxDiffText }}</td>
+                                                        </tr>
+                                                    </tbody>
+                                                </v-simple-table>
+
+                                                <v-expansion-panels flat>
+                                                    <v-expansion-panel>
+                                                        <v-expansion-panel-header class="body-2">
+                                                            查看参数明细
+                                                        </v-expansion-panel-header>
+                                                        <v-expansion-panel-content>
+                                                            <div class="pt-2" style="overflow-x: auto;">
+                                                                <table class="v-data-table v-data-table--dense theme--light" style="width: 100%;">
+                                                                    <thead>
+                                                                        <tr>
+                                                                            <th class="text-left px-2 py-1">参数</th>
+                                                                            <th class="text-right px-2 py-1">当前值</th>
+                                                                            <th class="text-right px-2 py-1">优化后</th>
+                                                                            <th class="text-right px-2 py-1">变化</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        <tr v-for="(row, idx) in paramComparisonRows" :key="idx">
+                                                                            <td class="text-left px-2 py-1">{{ row.label }}</td>
+                                                                            <td class="text-right px-2 py-1" style="font-family: monospace; font-size: 12px;">{{ row.currentText }}</td>
+                                                                            <td class="text-right px-2 py-1" style="font-family: monospace; font-size: 12px;">{{ row.optimizedText }}</td>
+                                                                            <td class="text-right px-2 py-1" :style="{ color: row.changed ? (row.diff > 0 ? '#2e7d32' : '#c62828') : '' }" style="font-family: monospace; font-size: 12px;">{{ row.diffText }}</td>
+                                                                        </tr>
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                        </v-expansion-panel-content>
+                                                    </v-expansion-panel>
+                                                </v-expansion-panels>
+
+                                                <v-alert
+                                                    dense
+                                                    outlined
+                                                    type="info"
+                                                    class="mt-4 mb-2"
+                                                >
+                                                    这次不会改变你的复习安排。
+                                                </v-alert>
+                                                <v-alert
+                                                    dense
+                                                    outlined
+                                                    type="info"
+                                                    class="mb-2"
+                                                >
+                                                    不会保存参数。
+                                                </v-alert>
+                                                <v-alert
+                                                    dense
+                                                    outlined
+                                                    type="info"
+                                                    class="mb-0"
+                                                >
+                                                    不会重排已有卡片。
+                                                </v-alert>
+
+                                                <div class="mt-3 grey--text text--darken-1 body-2 text-center">
+                                                    暂不应用，等待下一步。
+                                                </div>
+                                            </v-card-text>
+                                        </v-card>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
@@ -334,6 +453,7 @@
                 fsrsOptimizationLoading: false,
                 fsrsOptimizationMessage: '',
                 fsrsOptimizationCanOptimize: false,
+                fsrsOptimizationPreview: null,
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -429,6 +549,49 @@
                 }
                 return `${range}记得更稳，但复习会更密。`;
             },
+            paramComparisonRows() {
+                const preview = this.fsrsOptimizationPreview;
+                if (!preview || !preview.preview_available) return [];
+
+                const current = preview.current_parameters || [];
+                const optimized = preview.optimized_parameters || [];
+                const maxLen = Math.max(current.length, optimized.length);
+
+                const rows = [];
+                for (let i = 0; i < maxLen; i++) {
+                    const cur = i < current.length ? current[i] : null;
+                    const opt = i < optimized.length ? optimized[i] : null;
+                    const hasBoth = cur !== null && opt !== null;
+                    const diff = hasBoth ? opt - cur : null;
+                    const changed = hasBoth ? Math.abs(diff) > 0.0001 : false;
+                    rows.push({
+                        label: '参数 ' + (i + 1),
+                        current: cur,
+                        optimized: opt,
+                        diff: diff,
+                        changed: changed,
+                        currentText: cur !== null ? cur.toFixed(4) : '—',
+                        optimizedText: opt !== null ? opt.toFixed(4) : '—',
+                        diffText: diff !== null
+                            ? (changed ? (diff >= 0 ? '+' : '') + diff.toFixed(4) : '≈ 无变化')
+                            : '—',
+                    });
+                }
+                return rows;
+            },
+            paramDiffSummary() {
+                const rows = this.paramComparisonRows;
+                const changed = rows.filter(r => r.changed);
+                let maxAbs = 0;
+                changed.forEach(r => {
+                    const a = Math.abs(r.diff);
+                    if (a > maxAbs) maxAbs = a;
+                });
+                return {
+                    changedCount: changed.length,
+                    maxDiffText: changed.length > 0 ? maxAbs.toFixed(4) : '—',
+                };
+            },
         },
         methods: {
             goToManagePage() {
@@ -468,14 +631,22 @@
             runFsrsOptimizationPreflight() {
                 this.fsrsOptimizationLoading = true;
                 this.fsrsOptimizationMessage = '';
+                this.fsrsOptimizationPreview = null;
 
                 axios.post('/settings/fsrs/optimize')
                     .then((response) => {
-                        this.fsrsOptimizationCanOptimize = response.data.can_optimize;
-                        this.fsrsOptimizationMessage = response.data.message;
+                        const data = response.data;
+                        this.fsrsOptimizationCanOptimize = data.can_optimize;
+
+                        if (data.preview_available) {
+                            this.fsrsOptimizationPreview = data;
+                        } else {
+                            this.fsrsOptimizationMessage = data.message || '复习记录还不够，先继续复习一段时间再来优化。';
+                        }
                     })
                     .catch(() => {
                         this.fsrsOptimizationCanOptimize = false;
+                        this.fsrsOptimizationPreview = null;
                         this.fsrsOptimizationMessage = '检查失败了，请稍后再试。';
                     })
                     .finally(() => {
