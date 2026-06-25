@@ -1715,6 +1715,22 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame(WordSense::STATUS_CONFIRMED, $fresh2->status);
     }
 
+    public function test_bulk_enabled_skips_missing_ids(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $nonExistentId = 999999999;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card->id, $nonExistentId],
+            'enabled' => false,
+        ])->assertOk();
+
+        $response->assertJson([
+            'affected' => 1,
+            'skipped' => 1,
+        ]);
+    }
+
     // ==================== Bulk Delete Tests ====================
 
     public function test_bulk_destroy_deletes_multiple_cards(): void
@@ -1890,6 +1906,21 @@ class ReviewCardManageTest extends TestCase
             ->toArray();
         $this->assertNotContains($card1->id, $dueAfter);
         $this->assertNotContains($card2->id, $dueAfter);
+    }
+
+    public function test_bulk_destroy_skips_missing_ids(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $nonExistentId = 999999999;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id, $nonExistentId],
+        ])->assertOk();
+
+        $response->assertJson([
+            'deleted' => 1,
+            'skipped' => 1,
+        ]);
     }
 
     // ==================== Full immutability after failed delete ====================
@@ -3018,6 +3049,26 @@ class ReviewCardManageTest extends TestCase
         $response->assertOk();
         $item = $response->json('items.0');
         $this->assertNull($item['fsrs_last_reviewed_at']);
+    }
+
+    public function test_reset_rejects_other_user_card(): void
+    {
+        $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'otherReset']);
+        $otherCard = $this->createSenseCard($otherSense);
+
+        $this->actingAs($this->user)
+            ->post("/review-cards/manage/{$otherCard->id}/reset")
+            ->assertNotFound();
+    }
+
+    public function test_reset_rejects_other_language_card(): void
+    {
+        $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'espanolReset']);
+        $cardEs = $this->createSenseCard($senseEs);
+
+        $this->actingAs($this->user)
+            ->post("/review-cards/manage/{$cardEs->id}/reset")
+            ->assertNotFound();
     }
 
     public function test_sort_by_last_reviewed_at_desc(): void

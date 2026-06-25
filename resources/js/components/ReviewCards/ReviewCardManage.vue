@@ -638,6 +638,7 @@
                     <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
                     <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
                     <p>如果这张卡已归档，重置后会重新启用并进入复习队列。</p>
+                    <p class="error--text">此操作不可恢复。重置后 FSRS 记忆状态将被清除。</p>
                     <p class="font-weight-bold">确定重置吗？</p>
                 </v-card-text>
                 <v-card-actions>
@@ -678,6 +679,40 @@
                     <v-spacer />
                     <v-btn text @click="bulkDeleteDialog = false">取消</v-btn>
                     <v-btn color="error" @click="doBulkDelete">彻底删除 {{ selectedIds.length }} 张</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Bulk archive confirmation dialog -->
+        <v-dialog v-model="bulkArchiveDialog" max-width="500">
+            <v-card>
+                <v-card-title>批量归档</v-card-title>
+                <v-card-text>
+                    <p>即将批量归档 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
+                    <p>操作只影响当前选中的 sense review cards。</p>
+                    <p class="font-weight-bold">是否继续？</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="bulkArchiveDialog = false">取消</v-btn>
+                    <v-btn color="warning" @click="doBulkArchive">确认归档</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Bulk restore confirmation dialog -->
+        <v-dialog v-model="bulkRestoreDialog" max-width="500">
+            <v-card>
+                <v-card-title>批量恢复</v-card-title>
+                <v-card-text>
+                    <p>即将批量恢复 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
+                    <p>操作只影响当前选中的 sense review cards。</p>
+                    <p class="font-weight-bold">是否继续？</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="bulkRestoreDialog = false">取消</v-btn>
+                    <v-btn color="success" @click="doBulkRestore">确认恢复</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -737,6 +772,8 @@ export default {
             resetLoading: false,
             deleteDialog: false,
             deleteTarget: null,
+            bulkArchiveDialog: false,
+            bulkRestoreDialog: false,
             bulkDeleteDialog: false,
             selectedIds: [],
             selectAll: false,
@@ -1190,6 +1227,11 @@ export default {
 
         bulkArchive() {
             if (this.selectedIds.length === 0) return;
+            this.bulkArchiveDialog = true;
+        },
+
+        doBulkArchive() {
+            this.bulkArchiveDialog = false;
             const ids = [...this.selectedIds];
 
             axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: false })
@@ -1206,6 +1248,11 @@ export default {
 
         bulkRestore() {
             if (this.selectedIds.length === 0) return;
+            this.bulkRestoreDialog = true;
+        },
+
+        doBulkRestore() {
+            this.bulkRestoreDialog = false;
             const ids = [...this.selectedIds];
 
             axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: true })

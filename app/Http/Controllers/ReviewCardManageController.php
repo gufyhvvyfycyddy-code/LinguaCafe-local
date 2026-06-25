@@ -580,28 +580,30 @@ class ReviewCardManageController extends Controller
         $affected = 0;
         $skipped = 0;
 
-        foreach ($ids as $id) {
-            $card = ReviewCard::query()
-                ->where('id', $id)
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->where('target_type', ReviewCard::TARGET_SENSE)
-                ->whereHas('sense', function ($q) use ($userId, $language) {
-                    $q->where('user_id', $userId)
-                        ->where('language_id', $language)
-                        ->where('status', WordSense::STATUS_CONFIRMED);
-                })
-                ->first();
+        DB::transaction(function () use ($ids, $enabled, $userId, $language, &$affected, &$skipped) {
+            foreach ($ids as $id) {
+                $card = ReviewCard::query()
+                    ->where('id', $id)
+                    ->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('target_type', ReviewCard::TARGET_SENSE)
+                    ->whereHas('sense', function ($q) use ($userId, $language) {
+                        $q->where('user_id', $userId)
+                            ->where('language_id', $language)
+                            ->where('status', WordSense::STATUS_CONFIRMED);
+                    })
+                    ->first();
 
-            if (!$card) {
-                $skipped++;
-                continue;
+                if (!$card) {
+                    $skipped++;
+                    continue;
+                }
+
+                $card->fsrs_enabled = $enabled;
+                $card->save();
+                $affected++;
             }
-
-            $card->fsrs_enabled = $enabled;
-            $card->save();
-            $affected++;
-        }
+        });
 
         $actionLabel = $enabled ? '恢复' : '归档';
 
@@ -635,33 +637,35 @@ class ReviewCardManageController extends Controller
         $deleted = 0;
         $skipped = 0;
 
-        foreach ($ids as $id) {
-            $card = ReviewCard::query()
-                ->where('id', $id)
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->where('target_type', ReviewCard::TARGET_SENSE)
-                ->whereHas('sense', function ($q) use ($userId, $language) {
-                    $q->where('user_id', $userId)
-                        ->where('language_id', $language)
-                        ->where('status', WordSense::STATUS_CONFIRMED);
-                })
-                ->first();
+        DB::transaction(function () use ($ids, $userId, $language, &$deleted, &$skipped) {
+            foreach ($ids as $id) {
+                $card = ReviewCard::query()
+                    ->where('id', $id)
+                    ->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('target_type', ReviewCard::TARGET_SENSE)
+                    ->whereHas('sense', function ($q) use ($userId, $language) {
+                        $q->where('user_id', $userId)
+                            ->where('language_id', $language)
+                            ->where('status', WordSense::STATUS_CONFIRMED);
+                    })
+                    ->first();
 
-            if (!$card) {
-                $skipped++;
-                continue;
+                if (!$card) {
+                    $skipped++;
+                    continue;
+                }
+
+                $sense = WordSense::find($card->target_id);
+                if (!$sense) {
+                    $skipped++;
+                    continue;
+                }
+
+                $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
+                $deleted++;
             }
-
-            $sense = WordSense::find($card->target_id);
-            if (!$sense) {
-                $skipped++;
-                continue;
-            }
-
-            $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
-            $deleted++;
-        }
+        });
 
         return response()->json([
             'deleted' => $deleted,

@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-25
-> **当前 latest commit**：`9d47047`
+> **当前 latest commit**：`↺ C.24-a-lite 完成时更新`
 
 ---
 
@@ -73,6 +73,7 @@
 | C.22-a-lite | CSV 导出实现 — 新增 `/review-cards/manage/export-csv`，复用 buildManageQuery/buildItems/EXPORT_FIELDS/EXPORT_LIMIT，fputcsv + BOM + formula injection 防护 |
 | C.23-scout | 详情抽屉 ReviewLog 可读性优化侦察 — 确认 rating/state/source 可中文化，FSRS 数值可本地化，建议 C.23-a 冻结实现 |
 | C.24-scout | 管理页真实用户批量操作风险复查 — 识别 4 类 Medium 风险（bulk 无确认弹窗/无事务/无上限），推荐 C.24-a 安全加固 |
+| C.24-a-lite | 管理页批量操作安全加固 — bulkEnabled/bulkDestroy 使用 DB::transaction、bulkArchive/bulkRestore 增加确认弹窗、reset 弹窗增加不可恢复提示、新增 reset 隔离与 missing ID 测试 |
 
 ---
 
@@ -507,13 +508,13 @@
 
 ### 下一阶段候选任务
 
-以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout、C.24-scout 已完成。
+以下任务为候选，均未冻结实现。C.15、C.16、C.17、C.18、C.20、C.20-a、C.21-scout、C.21-a、C.22-scout、C.22-a-lite、C.23-scout、C.24-scout、C.24-a-lite 已完成。
 
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
-| ★★ | C.24-a | 管理页批量操作安全加固 | 安全加固 | 在 C.24-scout 侦察基础上实施：bulk transaction、确认弹窗补充 |
+| — | 暂无冻结候选 | — | — | 所有 C 系列核心加固任务已完成 |
 
-**建议下一步**：**C.24-a** — 管理页批量操作安全加固。理由：C.24-scout 侦察完成，识别出 3 类 Medium 风险，推荐在最小改动范围内实现。
+**建议下一步**：等待新指令。所有 C 系列功能/侦察/加固任务（C.15 至 C.24-a-lite）均已完成。
 
 ---
 
@@ -668,6 +669,38 @@
 - 不改 FSRS
 - 不改 ReviewLog
 - 不改 auth/authz
+
+---
+
+### C.24-a-lite：管理页批量操作安全加固（已完成）
+
+**完成日期**：2026-06-25
+
+**实现内容**：
+
+1. **后端事务包裹**：
+   - `bulkEnabled()` 外层包裹 `DB::transaction()`，确保批量归档/恢复的原子性
+   - `bulkDestroy()` 外层包裹 `DB::transaction()`，确保批量删除的原子性
+   - 保持逐卡 `user_id` + `language_id` + `target_type=sense` + `confirmed WordSense` 校验
+   - API 返回结构不变（`affected/skipped`，`deleted/skipped`）
+
+2. **前端确认弹窗**：
+   - `bulkArchive` 和 `bulkRestore` 触发前弹出 warning 色确认弹窗
+   - 弹窗文案明确：即将操作 N 张复习卡、只影响选中的 sense review cards、是否继续
+   - `reset` 弹窗增加 `"此操作不可恢复。重置后 FSRS 记忆状态将被清除。"` 标注
+
+3. **测试**（4 个新增）：
+   - `test_reset_rejects_other_user_card`：other user 的 sense card → reset → 404
+   - `test_reset_rejects_other_language_card`：other language 的 sense card → reset → 404
+   - `test_bulk_enabled_skips_missing_ids`：1 真实 card + 1 不存在 ID → affected=1, skipped=1
+   - `test_bulk_destroy_skips_missing_ids`：1 真实 card + 1 不存在 ID → deleted=1, skipped=1
+
+4. **未修改**：
+   - 未新增 route / Controller 方法 / migration / model / Service / 依赖
+   - 未改变 API 响应字段名
+   - 未改 export（JSON/TSV/CSV/Anki）
+   - 未改 FSRS / ReviewLog / auth
+   - 未做 all/selected/card_ids 模式
 
 ---
 
