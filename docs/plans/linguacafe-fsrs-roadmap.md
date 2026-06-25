@@ -363,8 +363,8 @@
 **状态**：C.21-scout 已完成。
 
 **侦察结论**：
-1. 当前项目中旧 AnkiConnect 接口（`app/Services/Anki/`）为 legacy word-card 模式设计，依赖 EncounteredWord id 和 word-level 数据结构，不兼容 sense-only 主线。
-2. 旧接口包含 `AnkiConnectService.php`、`MediaService.php`、`AnkiNoteRepository.php` 等文件，调用 AnkiConnect HTTP API（需要 Anki 桌面客户端运行），不适合无 GUI 环境批量导出。
+1. 当前项目中旧 AnkiConnect 接口（路由 `POST /anki/add-card` → `AnkiController::addCardToAnki()`）为 legacy word-card 模式设计，依赖 word-level 字段（`word`, `reading`, `translation`, `exampleSentence`），不兼容 sense-only 主线。
+2. 接口实现文件：`app/Services/AnkiApiService.php`（类 `AnkiApiService`，方法 `addWord()`）→ 通过 AnkiConnect HTTP API 调用 Anki 桌面客户端，不适合无 GUI 环境批量导出。请求校验类：`app/Http/Requests/Anki/AddCardToAnkiRequest.php`（字段：`word` required, `reading`, `translation`, `exampleSentence` nullable string）。Anki Note 模型字段：`word`, `reading`, `translation`, `example_sentence`。
 3. 旧接口无 tests，无 WordSense 支持，无 ReviewCard 关联，直接复用风险高。
 4. 推荐不改造旧 AnkiConnect，而是新建 **Anki TSV 文件导出**（C.21-a）：
    - 生成标准 Anki TSV/CSV 格式文件（字段分列，可导入 Anki Desktop/AnkiDroid）。
