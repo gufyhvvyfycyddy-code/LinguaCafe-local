@@ -3,7 +3,7 @@
 > **创建日期**：2026-06-25
 > **关联里程碑**：[linguacafe-fsrs-roadmap.md](./linguacafe-fsrs-roadmap.md) → D.3
 > **前置侦察**：FSRS-D3-scout（本文件即侦察输出）
-> **当前状态**：D.3-a/D.3-c/D.3-b/D.2-d/D.2-d-fix/D.3-d 全部完成，D.4-scout（重排已有卡片可行性侦察）✅ 已完成，D.4-a（预览后端只读）✅ 已完成，D.4-b（预览前端接入）✅ 已完成，D.4-b-fix（预览 UI 微调）✅ 已完成，D.4-c-scout（正式重排确认机制侦察）✅ 已完成，D.4-c-a（confirm preflight + preview_hash 校验）✅ 已完成
+> **当前状态**：D.3-a/D.3-c/D.3-b/D.2-d/D.2-d-fix/D.3-d 全部完成，D.4-scout（重排已有卡片可行性侦察）✅ 已完成，D.4-a（预览后端只读）✅ 已完成，D.4-b（预览前端接入）✅ 已完成，D.4-b-fix（预览 UI 微调）✅ 已完成，D.4-c-scout（正式重排确认机制侦察）✅ 已完成，D.4-c-a（confirm preflight + preview_hash 校验）✅ 已完成，D.4-c-b（正式重排 ReviewCard 写入 — 不写 ReviewLog，不影响 optimizer）✅ 已完成
 
 ---
 

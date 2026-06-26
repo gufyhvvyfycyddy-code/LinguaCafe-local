@@ -17,14 +17,14 @@
 | D.4-a | ✅ 已完成 | 后端只读 preview API（POST /settings/fsrs/reschedule-preview） |
 | D.4-b | ✅ 已完成 | 前端预览接入（高级工具面板 + 统计卡片 + samples 表格） |
 | D.4-b-fix | ✅ 已完成 | 位置调整、按钮文案优化、skipped_count 提示 |
+| D.4-c-a | ✅ 已完成 | 正式重排 confirm preflight API — preview_hash 校验 + 安全阈值 + write_enabled=false |
+| D.4-c-b | ✅ 已完成 | 正式重排 ReviewCard 写入 — confirmAndApply() + risk_confirm + preview_hash 参数顺序修复 |
 
 ### 还未做的事
 
-- ❌ 没有正式重排 confirm API
-- ❌ 没有写 ReviewCard（preview 只读）
-- ❌ 没有写 ReviewLog
-- ❌ 没有批量事务/撤销机制
-- ❌ 没有二次确认 UI（弹窗 / 复选框）
+- ❌ 没有写 ReviewLog（留到 D.4-d）
+- ❌ 没有撤销机制（D.4-d）
+- ❌ 没有二次确认 UI（弹窗 / 复选框 — D.4-c-d）
 
 ---
 
@@ -301,7 +301,7 @@ if ($request->preview_hash !== $expectedHash) {
 | 编号 | 内容 | 依赖 | 并行 |
 |------|------|------|------|
 | **D.4-c-a** | 后端 confirm API + preview_hash 校验 + 候选卡查询复用 | 无（可先做） | 与 UI 侦察并行 |
-| **D.4-c-b** | ReviewCard 写入逻辑（事务 + chunkById + lockForUpdate） | D.4-c-a | 串行 |
+| **D.4-c-b** | ReviewCard 写入逻辑（事务 + chunkById + lockForUpdate） | D.4-c-a | 串行 ✅ 已完成 |
 | **D.4-c-c** | 服务端阈值保护（newly_due_today 上限 + total_changed 上限） | D.4-c-a | 与 D.4-c-b 并行 |
 | **D.4-c-d** | 前端确认按钮 + v-dialog 二次确认弹窗 | 无（可先做 UI 框架） | 与后端并行 |
 | **D.4-c-e** | 前后端联调 + 测试 + 浏览器 smoke + 全量回归 | D.4-c-a/b/c/d | 串行最后 |
@@ -403,10 +403,11 @@ if ($request->preview_hash !== $expectedHash) {
 
 ## 14. 下一阶段建议
 
-1. **立即进入 D.4-c-a**：后端 confirm API 框架（路由 + Controller + Service 签名 + preview_hash）
-2. **并行进入 D.4-c-d**：前端确认按钮 + v-dialog 弹窗
-3. D.4-c-b/c/e 依次串行
-4. 独立阶段 D.4-d 做撤销机制
+1. **D.4-c-a**：后端 confirm API 框架（路由 + Controller + Service 签名 + preview_hash）✅ 已完成
+2. **D.4-c-b**：ReviewCard 写入逻辑 ✅ 已完成
+3. **D.4-c-d**：前端确认按钮 + v-dialog 二次确认弹窗（当前建议下一步）
+4. D.4-c-e 联调测试串行之后
+5. 独立阶段 D.4-d 做撤销机制
 
 ---
 
@@ -442,4 +443,15 @@ confirmPreflight() 返回值中 `write_enabled` 字段永远为 `false`。D.4-c-
 
 ### 15.4 下一步
 
-**D.4-c-b**：正式 ReviewCard 写入逻辑（事务 + chunkById + lockForUpdate）。
+**D.4-c-b**：正式 ReviewCard 写入逻辑（事务 + chunkById + lockForUpdate）。✅ 已完成
+
+### 15.5 D.4-c-b 产品决策记录
+
+D.4-c-b 实现过程中经用户确认的产品决策：
+
+| 决策项 | 决策内容 |
+|--------|---------|
+| newly_due_today > 200 | 允许通过二次确认后继续（原侦察方案为硬拒绝） |
+| total_changed > 2000 | 仍拒绝执行（稳定性优先） |
+| 成功消息文案 | "已重排 X 张卡片，其中 Y 张今天到期" |
+| 撤销机制 | 延后至 D.4-d，不在 D.4-c-b 实现 |

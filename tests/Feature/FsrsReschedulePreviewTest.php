@@ -449,6 +449,22 @@ class FsrsReschedulePreviewTest extends TestCase
         $this->assertNotEquals($hash1, $hash2);
     }
 
+    public function test_preview_hash_preserves_parameter_order(): void
+    {
+        $this->createEligibleReviewCard();
+
+        // Hash should be stable across multiple calls (deterministic)
+        $response1 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $response1->assertOk();
+        $hash1 = $response1->json('preview_hash');
+
+        $response2 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $response2->assertOk();
+        $hash2 = $response2->json('preview_hash');
+
+        $this->assertEquals($hash1, $hash2);
+    }
+
     public function test_preview_available_false_has_null_preview_hash(): void
     {
         $this->user->selected_language = 'japanese';

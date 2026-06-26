@@ -122,16 +122,34 @@ class SettingsController extends Controller
         $validated = $request->validate([
             'preview_hash' => 'required|string',
             'confirm' => 'required|boolean',
+            'risk_confirm' => 'sometimes|boolean',
+            'apply' => 'sometimes|boolean',
         ]);
         $user = Auth::user();
         $service = app(FsrsReschedulePreviewService::class);
-        $result = $service->confirmPreflight(
-            $user->id, $user->selected_language,
-            $validated['preview_hash'], $validated['confirm']
-        );
+
+        if ($request->boolean('apply')) {
+            $result = $service->confirmAndApply(
+                $user->id, $user->selected_language,
+                $validated['preview_hash'], $validated['confirm'],
+                $request->boolean('risk_confirm')
+            );
+        } else {
+            $result = $service->confirmPreflight(
+                $user->id, $user->selected_language,
+                $validated['preview_hash'], $validated['confirm']
+            );
+        }
+
         $statusCode = 200;
         if (!$result['success']) {
-            $statusCode = isset($result['preview_hash']) ? 409 : 422;
+            if (isset($result['preview_hash'])) {
+                $statusCode = 409;
+            } elseif (isset($result['risk_level'])) {
+                $statusCode = 422;
+            } else {
+                $statusCode = 422;
+            }
         }
         return response()->json($result, $statusCode);
     }

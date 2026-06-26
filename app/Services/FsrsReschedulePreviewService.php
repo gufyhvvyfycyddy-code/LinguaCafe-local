@@ -16,10 +16,10 @@ use Carbon\Carbon;
  */
 class FsrsReschedulePreviewService
 {
-    private const MAX_NEWLY_DUE_TODAY = 200;
-    private const MAX_TOTAL_CHANGED = 2000;
-
     private FsrsSchedulingService $fsrsSchedulingService;
+
+    protected function getMaxNewlyDueToday(): int { return 200; }
+    protected function getMaxTotalChanged(): int { return 2000; }
 
     public function __construct(?FsrsSchedulingService $fsrsSchedulingService = null)
     {
@@ -107,15 +107,22 @@ class FsrsReschedulePreviewService
         }
         $newlyDueToday = $data['summary']['newly_due_today'];
         $totalChanged = $data['summary']['total_changed'];
-        if ($newlyDueToday > self::MAX_NEWLY_DUE_TODAY) {
-            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => "今日新增到期卡片数量（{$newlyDueToday}）超过安全上限（" . self::MAX_NEWLY_DUE_TODAY . "），已拒绝确认。"];
+        if ($newlyDueToday > $this->getMaxNewlyDueToday()) {
+            return [
+                'success' => false,
+                'confirm_available' => false,
+                'write_enabled' => false,
+                'risk_level' => 'high',
+                'requires_risk_confirm' => true,
+                'message' => "本次重排会新增 {$newlyDueToday} 张今天到期卡。请二次确认后继续。",
+            ];
         }
-        if ($totalChanged > self::MAX_TOTAL_CHANGED) {
-            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => "受影响卡片总数（{$totalChanged}）超过安全上限（" . self::MAX_TOTAL_CHANGED . "），已拒绝确认。"];
+        if ($totalChanged > $this->getMaxTotalChanged()) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'risk_level' => 'blocked', 'requires_risk_confirm' => false, 'message' => "受影响卡片总数（{$totalChanged}）超过系统稳定性上限（" . $this->getMaxTotalChanged() . "），已拒绝执行。"];
         }
         return [
             'success' => true, 'confirm_available' => true, 'write_enabled' => false,
-            'message' => '预览仍然有效。正式写入将在后续阶段开放。',
+            'message' => '预览仍然有效。',
             'total_candidates' => $data['summary']['total_candidates'], 'total_changed' => $data['summary']['total_changed'],
             'skipped_count' => $data['summary']['skipped_count'],
             'summary' => [
@@ -125,6 +132,121 @@ class FsrsReschedulePreviewService
                 'max_earlier_days' => $data['summary']['max_earlier_days'], 'max_later_days' => $data['summary']['max_later_days'],
             ],
             'preview_hash' => $freshHash,
+        ];
+    }
+
+    public function confirmAndApply(int $userId, string $language, ?string $previewHash, bool $confirmed, bool $riskConfirmed = false): array
+    {
+        if ($language !== 'english') {
+            return ['success' => true, 'confirm_available' => false, 'write_enabled' => false, 'message' => '当前阶段只支持英语卡片重排确认。'];
+        }
+        if (empty($previewHash)) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '缺少 preview_hash，无法确认预览。'];
+        }
+        if (!$confirmed) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '缺少确认标志（confirm=true 必填）。'];
+        }
+        $data = $this->computePreviewData($userId, $language);
+        if ($data === null) {
+            return ['success' => true, 'confirm_available' => false, 'write_enabled' => false, 'message' => 'FSRS 扩展未加载，无法确认。扩展要求：fsrs-rs-php。'];
+        }
+        $freshHash = $this->buildPreviewHash($data['cards'], $language, $userId, $data['activeParams'], $data['desiredRetention']);
+        if ($freshHash !== $previewHash) {
+            return ['success' => false, 'confirm_available' => false, 'write_enabled' => false, 'message' => '预览已过期，请重新获取预览后再确认。', 'preview_hash' => $freshHash];
+        }
+        $newlyDueToday = $data['summary']['newly_due_today'];
+        $totalChanged = $data['summary']['total_changed'];
+        if ($newlyDueToday > $this->getMaxNewlyDueToday() && $riskConfirmed !== true) {
+            return [
+                'success' => false,
+                'confirm_available' => false,
+                'write_enabled' => false,
+                'risk_level' => 'high',
+                'requires_risk_confirm' => true,
+                'message' => "本次重排会新增 {$newlyDueToday} 张今天到期卡。请二次确认后继续。",
+            ];
+        }
+        if ($totalChanged > $this->getMaxTotalChanged()) {
+            return [
+                'success' => false,
+                'risk_level' => 'blocked',
+                'requires_risk_confirm' => false,
+                'message' => "受影响卡片总数（{$totalChanged}）超过系统稳定性上限（" . $this->getMaxTotalChanged() . "），已拒绝执行。",
+            ];
+        }
+
+        $candidateIds = $data['cards']->pluck('review_card_id')->toArray();
+        $appliedCount = 0;
+        $skippedCount = 0;
+        $newlyDueCount = 0;
+        $now = Carbon::now();
+
+        \DB::transaction(function () use ($userId, $language, $candidateIds, $data, $now, &$appliedCount, &$skippedCount, &$newlyDueCount) {
+            $lockedCards = ReviewCard::whereIn('id', $candidateIds)
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($candidateIds as $cardId) {
+                $card = $lockedCards->get($cardId);
+                if (!$card) {
+                    $skippedCount++;
+                    continue;
+                }
+                if (
+                    $card->user_id !== $userId
+                    || $card->language_id !== $language
+                    || $card->target_type !== ReviewCard::TARGET_SENSE
+                    || $card->fsrs_state !== 'review'
+                    || $card->fsrs_enabled !== true
+                    || $card->fsrs_stability === null
+                    || $card->fsrs_difficulty === null
+                    || $card->fsrs_last_reviewed_at === null
+                    || $card->fsrs_due_at === null
+                ) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $cardDto = new \stdClass();
+                $cardDto->review_card_id = (int) $card->id;
+                $cardDto->word_sense_id = (int) $card->target_id;
+                $cardDto->lemma = '';
+                $cardDto->sense_zh = '';
+                $cardDto->fsrs_stability = $card->fsrs_stability;
+                $cardDto->fsrs_difficulty = $card->fsrs_difficulty;
+                $cardDto->fsrs_last_reviewed_at = $card->fsrs_last_reviewed_at;
+                $cardDto->fsrs_due_at = $card->fsrs_due_at;
+                $cardDto->fsrs_state = $card->fsrs_state;
+                $cardDto->fsrs_enabled = $card->fsrs_enabled;
+
+                $preview = $this->buildPreviewForCard($cardDto, $data['activeParams'], $data['desiredRetention'], $now);
+                if ($preview === null) {
+                    $skippedCount++;
+                    continue;
+                }
+
+                $card->fsrs_due_at = $preview['preview_due_at'];
+                $card->fsrs_stability = $preview['new_fsrs_stability'];
+                $card->fsrs_difficulty = $preview['new_fsrs_difficulty'];
+                $card->save();
+
+                $appliedCount++;
+                if ($preview['is_newly_due_today']) {
+                    $newlyDueCount++;
+                }
+            }
+        });
+
+        return [
+            'success' => true,
+            'applied' => true,
+            'write_enabled' => true,
+            'message' => "已重排 {$appliedCount} 张卡片，其中 {$newlyDueCount} 张今天到期。",
+            'applied_count' => $appliedCount,
+            'newly_due_today' => $newlyDueCount,
+            'total_changed' => $totalChanged,
+            'skipped_count' => $skippedCount,
         ];
     }
 
@@ -212,6 +334,7 @@ class FsrsReschedulePreviewService
             $states = $fsrs->next_states($memory, $desiredRetention, $elapsedDays);
             $goodState = $states->get_good();
             $newInterval = max(1, (int) round($goodState->get_interval()));
+            $goodMemory = $goodState->get_memory();
         } catch (\Throwable $e) {
             return null;
         }
@@ -251,6 +374,8 @@ class FsrsReschedulePreviewService
             'days_change' => $daysChange,
             'fsrs_stability' => (float) $card->fsrs_stability,
             'fsrs_difficulty' => (float) $card->fsrs_difficulty,
+            'new_fsrs_stability' => (float) $goodMemory->get_stability(),
+            'new_fsrs_difficulty' => (float) $goodMemory->get_difficulty(),
             'fsrs_last_reviewed_at' => $lastReview->toIso8601String(),
             'is_newly_due_today' => $isNewlyDueToday,
         ];
@@ -277,9 +402,7 @@ class FsrsReschedulePreviewService
                 'fsrs_enabled' => (bool) $card->fsrs_enabled,
             ];
         })->toArray();
-        $paramsCopy = $activeParams;
-        sort($paramsCopy);
-        $parametersHash = hash('sha256', json_encode($paramsCopy, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $parametersHash = hash('sha256', json_encode(array_values($activeParams), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $payload = [
             'user_id' => $userId,
             'language' => $language,
