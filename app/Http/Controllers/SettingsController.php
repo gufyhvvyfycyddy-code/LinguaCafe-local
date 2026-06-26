@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 
 // services
 use App\Services\FsrsReschedulePreviewService;
+use App\Services\FsrsRescheduleSnapshotService;
 use App\Services\SettingsService;
 
 // request classes
@@ -152,6 +153,24 @@ class SettingsController extends Controller
             }
         }
         return response()->json($result, $statusCode);
+    }
+
+    public function rescheduleUndo(Request $request)
+    {
+        $validated = $request->validate([
+            'confirm' => 'required|boolean',
+        ]);
+        $user = Auth::user();
+        $service = app(FsrsRescheduleSnapshotService::class);
+        $result = $service->undoLatestForUserLanguage(
+            $user->id,
+            $user->selected_language,
+            $validated['confirm']
+        );
+        if (!$result['success'] && ($result['undo_available'] ?? true) === false) {
+            return response()->json($result, 422);
+        }
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
     // returns an array of user settings

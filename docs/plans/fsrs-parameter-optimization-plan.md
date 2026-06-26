@@ -8,6 +8,7 @@
 > D.4-c-e（真实数据联调与浏览器 smoke 总验收）✅ 已完成 — 7 测试 42 断言全部通过；仍不写 ReviewLog，不影响 optimizer；建议下一步 D.4-d-scout
 > D.4-d-scout（重排撤销机制侦察）✅ 已完成 — 推荐快照表方案 C，不写 ReviewLog，不影响 optimizer；撤销机制与 ReviewLog 完全解耦，零污染风险
 > D.4-d-a（快照表 schema + 创建快照记录）✅ 已完成 — 新增两张快照表（reschedule_snapshots + reschedule_snapshot_items），在 confirmAndApply 中写入快照；不写 ReviewLog，不影响 optimizer；快照表为独立表，与 optimizer 完全隔离
+> D.4-d-b（撤销后端 API）✅ 已完成 — POST /settings/fsrs/reschedule-undo + undoLatestForUserLanguage；不写 ReviewLog，不影响 optimizer；撤销数据仅存在于 snapshot 表中
 
 ---
 
