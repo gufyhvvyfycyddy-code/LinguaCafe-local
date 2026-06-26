@@ -43,8 +43,8 @@
 ### 2.2 事务与锁
 
 - `confirmAndApply` 使用 `DB::transaction()` + `lockForUpdate()`
-- 候选卡通过 chunkById 遍历，每批 100 张
-- 最大变更上限：`getMaxTotalChanged()` = 2000
+- 当前没有使用 chunkById。它先从 preview 数据中取得 `$candidateIds`，然后在事务中通过 `ReviewCard::whereIn('id', $candidateIds)->lockForUpdate()->get()->keyBy('id')` 锁定候选卡，再按 `candidateIds` 顺序逐张重算和写入
+- 最大变更上限：`getMaxTotalChanged()` = 2000（一次事务的最大写入规模受此控制）
 
 ### 2.3 ReviewLog 当前角色
 
@@ -117,7 +117,7 @@
 1. **零污染**：与 ReviewLog 完全隔离，不影响 stats、optimizer、学习历史
 2. **最小化**：只需保存 3 个字段（due_at, stability, difficulty），因为这就是 `confirmAndApply` 改的全部内容
 3. **batch 语义清晰**：一次重排 = 一个 batch，每张卡 = 一个 item
-4. **撤销原子性**：同一次 batch 的所有卡要么全部撤销，要么全部失败
+4. **撤销原子性**：同一次 undo 请求中，进入 restore set 的卡片要么全部恢复，要么全部回滚；已复习或不可恢复的卡片在事务前计入 skipped，不影响原子性
 5. **已复习卡可跳过**：检查 `fsrs_last_reviewed_at > batch.created_at` 即可
 6. **与现有架构一致**：不改变 ReviewLog 的设计契约（仅记录人工复习和 reset）
 7. **易于审计**：快照表本身就是完整的审计轨迹
@@ -176,7 +176,7 @@
 | **不污染 ReviewLog** | 撤销时也不写 ReviewLog |
 | **不影响 optimizer** | 不修改任何 ReviewLog/optimizer 相关表 |
 | **事务保护** | 使用 `DB::transaction` + `lockForUpdate` |
-| **原子性** | 同一 batch 中部分失败则全部回滚 |
+| **原子性** | restore set 内的卡片要么全部恢复，要么全部回滚；已复习卡在事务前判定为 skipped，不进入 restore set |
 
 ### 已复习卡跳过策略
 
@@ -346,4 +346,6 @@
 5. 测试：快照条目匹配变更卡、字段正确、不写 ReviewLog
 6. 仍不写 ReviewLog，不影响 optimizer
 7. DCP_ALLOWED=false
+
+**前置条件**：D.4-d-a 开始前，必须以当前 `whereIn + lockForUpdate + get + keyBy + foreach` 事务模型为基线，**不得假设已有 chunkById**。若要改为 chunkById 遍历，需要单独 scout 或单独任务评估，不应在 D.4-d-a 顺手改。快照 item 写入应发生在 ReviewCard 字段更新之前，同一事务内完成。
 ```
