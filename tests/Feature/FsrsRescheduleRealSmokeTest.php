@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\EncounteredWord;
+use App\Models\RescheduleSnapshot;
+use App\Models\RescheduleSnapshotItem;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
@@ -361,5 +363,31 @@ class FsrsRescheduleRealSmokeTest extends TestCase
         $preview2->assertOk();
         $data2 = $preview2->json();
         $this->assertNotNull($data2['preview_hash'], 'New preview should have a hash');
+    }
+
+    public function test_reschedule_creates_snapshot_with_items(): void
+    {
+        $preview = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash = $preview->json('preview_hash');
+
+        $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash, 'confirm' => true,
+        ])->assertOk();
+
+        $apply = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash, 'confirm' => true, 'apply' => true,
+        ]);
+        $apply->assertOk();
+        $applyData = $apply->json();
+
+        $this->assertEquals(1, RescheduleSnapshot::count(), 'One snapshot should exist');
+        $snapshot = RescheduleSnapshot::first();
+        $this->assertNotNull($snapshot);
+        $this->assertEquals($this->user->id, $snapshot->user_id);
+        $this->assertEquals('english', $snapshot->language_id);
+        $this->assertNotNull($snapshot->batch_id);
+        $this->assertEquals($applyData['applied_count'], $snapshot->applied_count);
+        $this->assertEquals($applyData['applied_count'], RescheduleSnapshotItem::count(), 'Item count should match applied count');
+        $this->assertEquals($snapshot->batch_id, $applyData['snapshot_batch_id'] ?? null);
     }
 }

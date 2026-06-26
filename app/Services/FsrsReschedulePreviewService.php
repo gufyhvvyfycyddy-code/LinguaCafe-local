@@ -17,13 +17,15 @@ use Carbon\Carbon;
 class FsrsReschedulePreviewService
 {
     private FsrsSchedulingService $fsrsSchedulingService;
+    private ?FsrsRescheduleSnapshotService $snapshotService = null;
 
     protected function getMaxNewlyDueToday(): int { return 200; }
     protected function getMaxTotalChanged(): int { return 2000; }
 
-    public function __construct(?FsrsSchedulingService $fsrsSchedulingService = null)
+    public function __construct(?FsrsSchedulingService $fsrsSchedulingService = null, ?FsrsRescheduleSnapshotService $snapshotService = null)
     {
         $this->fsrsSchedulingService = $fsrsSchedulingService ?? new FsrsSchedulingService();
+        $this->snapshotService = $snapshotService ?? new FsrsRescheduleSnapshotService();
     }
 
     /**
@@ -180,12 +182,15 @@ class FsrsReschedulePreviewService
         $skippedCount = 0;
         $newlyDueCount = 0;
         $now = Carbon::now();
+        $snapshotBatchId = null;
 
-        \DB::transaction(function () use ($userId, $language, $candidateIds, $data, $now, &$appliedCount, &$skippedCount, &$newlyDueCount) {
+        \DB::transaction(function () use ($userId, $language, $previewHash, $candidateIds, $data, $now, &$appliedCount, &$skippedCount, &$newlyDueCount, &$snapshotBatchId) {
             $lockedCards = ReviewCard::whereIn('id', $candidateIds)
                 ->lockForUpdate()
                 ->get()
                 ->keyBy('id');
+
+            $snapshotItems = [];
 
             foreach ($candidateIds as $cardId) {
                 $card = $lockedCards->get($cardId);
@@ -226,6 +231,16 @@ class FsrsReschedulePreviewService
                     continue;
                 }
 
+                $snapshotItems[] = [
+                    'review_card_id' => $card->id,
+                    'previous_due_at' => $card->getOriginal('fsrs_due_at'),
+                    'previous_stability' => $card->getOriginal('fsrs_stability'),
+                    'previous_difficulty' => $card->getOriginal('fsrs_difficulty'),
+                    'new_due_at' => $preview['preview_due_at'],
+                    'new_stability' => $preview['new_fsrs_stability'],
+                    'new_difficulty' => $preview['new_fsrs_difficulty'],
+                ];
+
                 $card->fsrs_due_at = $preview['preview_due_at'];
                 $card->fsrs_stability = $preview['new_fsrs_stability'];
                 $card->fsrs_difficulty = $preview['new_fsrs_difficulty'];
@@ -235,6 +250,22 @@ class FsrsReschedulePreviewService
                 if ($preview['is_newly_due_today']) {
                     $newlyDueCount++;
                 }
+            }
+
+            if ($appliedCount > 0) {
+                $snapshot = $this->snapshotService->createSnapshotForAppliedCards(
+                    $userId,
+                    $language,
+                    $previewHash,
+                    [
+                        'total_cards' => count($candidateIds),
+                        'applied_count' => $appliedCount,
+                        'skipped_count' => $skippedCount,
+                        'newly_due_today' => $newlyDueCount,
+                    ],
+                    $snapshotItems
+                );
+                $snapshotBatchId = $snapshot->batch_id;
             }
         });
 
@@ -247,6 +278,7 @@ class FsrsReschedulePreviewService
             'newly_due_today' => $newlyDueCount,
             'total_changed' => $totalChanged,
             'skipped_count' => $skippedCount,
+            'snapshot_batch_id' => $snapshotBatchId ?? null,
         ];
     }
 
