@@ -22,11 +22,12 @@
 | D.4-c-d | ✅ 已完成 | 前端确认按钮 + 二次确认弹窗 + 风险确认流程 |
 | D.4-c-d-fix | ✅ 已完成 | 成功提示保留 + 409 过期预览强制重新预览 |
 | D.4-c-e | ✅ 已完成 | 真实数据联调与浏览器 smoke 总验收 — 7 测试 42 断言通过 |
+| D.4-d-scout | ✅ 已完成 | 撤销机制侦察 — 推荐快照表方案 C，详见解锁文档 [fsrs-reschedule-undo-scout.md](./fsrs-reschedule-undo-scout.md) |
 
 ### 还未做的事
 
-- ❌ 没有写 ReviewLog（留到 D.4-d）
-- ❌ 没有撤销机制（D.4-d，建议先做 D.4-d-scout 侦察）
+- ❌ 没有写 ReviewLog（留到 D.4-d，但 D.4-d 方案 C 不写 ReviewLog）
+- ❌ 没有撤销机制（D.4-d-scout 已完成，推荐 D.4-d-a/b/c 三步开发）
 
 ---
 
