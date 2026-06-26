@@ -8,6 +8,7 @@
 > **D.4-d-c 实现**：✅ 已完成（`4cdf5e8` 后新增）— 前端撤销按钮 + 确认弹窗（AdminReviewSettings.vue +141 行）
 > **D.4-d-c-fix 实现**：✅ 已完成（`4f2d77e` 后新增）— 修复成功提示被 v-if 隐藏 + 修正"确认后不可撤销"旧文案 + 写入网状协作报告门禁规则
 > **D.4-d-e 验收**：✅ 已完成（`c9393e1` 后新增）— 真实浏览器 smoke + 全链路验收 + 最小文案收口（合并重复段落）；158 tests ✅
+> **D.4-final-review**：✅ 已完成（`517de2f` 后新增）— undo 阶段已通过最终 review，可收口。真实浏览器点击链路仍建议人工补验
 > **关联**：[fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)、[fsrs-reschedule-real-smoke-report.md](./fsrs-reschedule-real-smoke-report.md)
 
 ---
