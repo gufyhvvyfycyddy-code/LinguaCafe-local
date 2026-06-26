@@ -569,7 +569,7 @@
                                                     color="warning"
                                                     outlined
                                                     :loading="fsrsRescheduleConfirmLoading"
-                                                    :disabled="fsrsRescheduleConfirmLoading || !!fsrsRescheduleApplySuccess"
+                                                    :disabled="fsrsRescheduleConfirmLoading || !!fsrsRescheduleApplySuccess || !fsrsReschedulePreview"
                                                     @click="openRescheduleConfirmDialog"
                                                 >
                                                     确认重排这些卡片
@@ -1179,11 +1179,14 @@
                 if (days > 0) return `延后 ${days} 天`;
                 return '不变';
             },
-            previewFsrsRescheduleImpact() {
+            previewFsrsRescheduleImpact(options = {}) {
+                const preserveSuccess = options.preserveSuccess === true;
                 this.fsrsReschedulePreviewLoading = true;
                 this.fsrsReschedulePreviewError = '';
                 this.fsrsReschedulePreview = null;
-                this.fsrsRescheduleApplySuccess = false;
+                if (!preserveSuccess) {
+                    this.fsrsRescheduleApplySuccess = false;
+                }
                 this.fsrsRescheduleConfirmError = '';
 
                 axios.post('/settings/fsrs/reschedule-preview')
@@ -1235,11 +1238,7 @@
                     this.proceedWithApply();
                 }).catch((error) => {
                     if (error.response && error.response.status === 409) {
-                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
-                        this.fsrsRescheduleConfirmDialog = false;
-                        if (error.response.data && error.response.data.preview_hash) {
-                            this.fsrsReschedulePreview.preview_hash = error.response.data.preview_hash;
-                        }
+                        this.handleReschedulePreviewExpired();
                     } else if (error.response && error.response.status === 422) {
                         const data = error.response.data;
                         if (data && data.risk_level === 'high' && data.requires_risk_confirm) {
@@ -1273,12 +1272,7 @@
                     this.confirmRescheduleSuccess(response.data);
                 }).catch((error) => {
                     if (error.response && error.response.status === 409) {
-                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
-                        this.fsrsRescheduleConfirmDialog = false;
-                        this.fsrsRescheduleRiskDialog = false;
-                        if (error.response.data && error.response.data.preview_hash) {
-                            this.fsrsReschedulePreview.preview_hash = error.response.data.preview_hash;
-                        }
+                        this.handleReschedulePreviewExpired();
                     } else if (error.response && error.response.status === 422) {
                         const data = error.response.data;
                         if (data.risk_level === 'high') {
@@ -1324,7 +1318,16 @@
                 this.fsrsRescheduleConfirmLoading = false;
                 this.stopCountdown();
                 this.loadFsrsStats();
-                this.previewFsrsRescheduleImpact();
+                this.previewFsrsRescheduleImpact({ preserveSuccess: true });
+            },
+            handleReschedulePreviewExpired() {
+                this.stopCountdown();
+                this.fsrsRescheduleConfirmDialog = false;
+                this.fsrsRescheduleRiskDialog = false;
+                this.fsrsReschedulePreview = null;
+                this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"。';
+                this.fsrsRescheduleConfirmLoading = false;
+                this.fsrsRescheduleCountdown = 0;
             },
             confirmRescheduleError(error) {
                 this.stopCountdown();
@@ -1336,10 +1339,8 @@
                     const status = error.response.status;
                     const data = error.response.data;
                     if (status === 409) {
-                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
-                        if (data && data.preview_hash) {
-                            this.fsrsReschedulePreview.preview_hash = data.preview_hash;
-                        }
+                        this.handleReschedulePreviewExpired();
+                        return;
                     } else if (status === 422) {
                         this.fsrsRescheduleConfirmError = data && data.message ? data.message : '重排检查未通过。';
                     } else {

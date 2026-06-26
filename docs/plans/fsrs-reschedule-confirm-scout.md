@@ -19,7 +19,8 @@
 | D.4-b-fix | ✅ 已完成 | 位置调整、按钮文案优化、skipped_count 提示 |
 | D.4-c-a | ✅ 已完成 | 正式重排 confirm preflight API — preview_hash 校验 + 安全阈值 + write_enabled=false |
 | D.4-c-b | ✅ 已完成 | 正式重排 ReviewCard 写入 — confirmAndApply() + risk_confirm + preview_hash 参数顺序修复 |
-| D.4-c-d | 🔄 开发中 | 前端确认按钮 + 二次确认弹窗 + 风险确认流程 |
+| D.4-c-d | ✅ 已完成 | 前端确认按钮 + 二次确认弹窗 + 风险确认流程 |
+| D.4-c-d-fix | ✅ 已完成 | 成功提示保留 + 409 过期预览强制重新预览 |
 
 ### 还未做的事
 
