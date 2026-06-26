@@ -542,6 +542,44 @@
                                                     </div>
                                                 </v-card-text>
                                             </v-card>
+
+                                            <!-- D.4-c: Confirm reschedule button -->
+                                            <div class="mt-4">
+                                                <v-alert
+                                                    v-if="fsrsRescheduleApplySuccess"
+                                                    dense
+                                                    outlined
+                                                    type="success"
+                                                    class="mb-3"
+                                                >
+                                                    {{ fsrsRescheduleApplySuccess }}
+                                                </v-alert>
+
+                                                <v-alert
+                                                    v-if="fsrsRescheduleConfirmError"
+                                                    dense
+                                                    outlined
+                                                    type="error"
+                                                    class="mb-3"
+                                                >
+                                                    {{ fsrsRescheduleConfirmError }}
+                                                </v-alert>
+
+                                                <v-btn
+                                                    color="warning"
+                                                    outlined
+                                                    :loading="fsrsRescheduleConfirmLoading"
+                                                    :disabled="fsrsRescheduleConfirmLoading || !!fsrsRescheduleApplySuccess"
+                                                    @click="openRescheduleConfirmDialog"
+                                                >
+                                                    确认重排这些卡片
+                                                </v-btn>
+
+                                                <div class="caption grey--text mt-2">
+                                                    确认后系统将根据当前 FSRS 参数重新计算这些卡片的到期日。<br>
+                                                    这是一个一次性操作，确认后不可撤销。不会产生复习记录，不影响复习计数。
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -677,6 +715,101 @@
                 </v-expansion-panel-content>
             </v-expansion-panel>
         </v-expansion-panels>
+
+        <!-- D.4-c: First confirmation dialog -->
+        <v-dialog v-model="fsrsRescheduleConfirmDialog" max-width="480" persistent>
+            <v-card>
+                <v-card-title class="warning--text text--darken-1">
+                    <v-icon left color="warning">mdi-alert-circle-outline</v-icon>
+                    确认重排卡片
+                </v-card-title>
+                <v-card-text>
+                    <div class="body-2 mb-3 grey--text text--darken-1">
+                        请确认以下统计信息，确认后将不可撤销：
+                    </div>
+
+                    <v-simple-table dense class="no-hover mb-3">
+                        <tbody>
+                            <tr>
+                                <td class="font-weight-medium pr-4 py-1">可预览旧卡片</td>
+                                <td class="py-1">{{ fsrsReschedulePreview ? fsrsReschedulePreview.total_candidates : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-medium pr-4 py-1">到期时间会变化</td>
+                                <td class="py-1">{{ fsrsReschedulePreview ? fsrsReschedulePreview.total_changed : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-medium pr-4 py-1">重排后今天到期</td>
+                                <td class="py-1">{{ fsrsReschedulePreview && fsrsReschedulePreview.summary ? fsrsReschedulePreview.summary.due_today_after_reschedule : '—' }}</td>
+                            </tr>
+                            <tr>
+                                <td class="font-weight-medium pr-4 py-1">跳过</td>
+                                <td class="py-1">{{ fsrsReschedulePreview ? fsrsReschedulePreview.skipped_count : '—' }}</td>
+                            </tr>
+                        </tbody>
+                    </v-simple-table>
+
+                    <v-alert dense outlined type="warning" class="mb-3">
+                        此操作会修改卡片的到期日，不会创建复习记录，不影响复习计数。确认后不可撤销。
+                    </v-alert>
+
+                    <v-alert v-if="fsrsRescheduleCountdown > 0" dense outlined type="info" class="mb-0">
+                        请等待 {{ fsrsRescheduleCountdown }} 秒后确认
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="fsrsRescheduleConfirmDialog = false; stopCountdown();">
+                        取消
+                    </v-btn>
+                    <v-btn
+                        color="warning"
+                        :disabled="fsrsRescheduleCountdown > 0 || fsrsRescheduleConfirmLoading"
+                        :loading="fsrsRescheduleConfirmLoading"
+                        @click="confirmReschedule"
+                    >
+                        继续确认
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- D.4-c: High-risk confirmation dialog -->
+        <v-dialog v-model="fsrsRescheduleRiskDialog" max-width="480" persistent>
+            <v-card>
+                <v-card-title class="error--text">
+                    <v-icon left color="error">mdi-shield-alert</v-icon>
+                    高风险警告
+                </v-card-title>
+                <v-card-text>
+                    <v-alert dense outlined type="error" class="mb-3">
+                        {{ fsrsRescheduleRiskMessage }}
+                    </v-alert>
+
+                    <div class="body-2 grey--text text--darken-1 mb-3">
+                        继续操作将按上述风险执行重排，请确认你已了解复习量变化。
+                    </div>
+
+                    <v-alert v-if="fsrsRescheduleCountdown > 0" dense outlined type="info" class="mb-0">
+                        请等待 {{ fsrsRescheduleCountdown }} 秒后确认
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="fsrsRescheduleRiskDialog = false; stopCountdown();">
+                        取消
+                    </v-btn>
+                    <v-btn
+                        color="error"
+                        :disabled="fsrsRescheduleCountdown > 0 || fsrsRescheduleConfirmLoading"
+                        :loading="fsrsRescheduleConfirmLoading"
+                        @click="proceedWithHighRisk"
+                    >
+                        我知道复习量会变多，继续重排
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -738,6 +871,16 @@
                 fsrsReschedulePreviewLoading: false,
                 fsrsReschedulePreview: null,
                 fsrsReschedulePreviewError: '',
+                // D.4-c: 重排确认
+                fsrsRescheduleConfirmLoading: false,
+                fsrsRescheduleConfirmError: '',
+                fsrsRescheduleApplySuccess: false,
+                fsrsRescheduleConfirmDialog: false,
+                fsrsRescheduleRiskDialog: false,
+                fsrsRescheduleRiskMessage: '',
+                fsrsRescheduleRiskRequired: false,
+                fsrsRescheduleCountdown: 0,
+                fsrsRescheduleCountdownTimer: null,
             }
         },
         props: {
@@ -1040,6 +1183,8 @@
                 this.fsrsReschedulePreviewLoading = true;
                 this.fsrsReschedulePreviewError = '';
                 this.fsrsReschedulePreview = null;
+                this.fsrsRescheduleApplySuccess = false;
+                this.fsrsRescheduleConfirmError = '';
 
                 axios.post('/settings/fsrs/reschedule-preview')
                     .then((response) => {
@@ -1051,6 +1196,158 @@
                     .finally(() => {
                         this.fsrsReschedulePreviewLoading = false;
                     });
+            },
+            // D.4-c: 重排确认
+            openRescheduleConfirmDialog() {
+                if (!this.fsrsReschedulePreview || !this.fsrsReschedulePreview.preview_available) {
+                    return;
+                }
+                this.fsrsRescheduleConfirmError = '';
+                this.fsrsRescheduleConfirmDialog = true;
+                this.startCountdown(3);
+            },
+            startCountdown(seconds = 3) {
+                this.fsrsRescheduleCountdown = seconds;
+                this.fsrsRescheduleCountdownTimer = setInterval(() => {
+                    if (this.fsrsRescheduleCountdown > 0) {
+                        this.fsrsRescheduleCountdown--;
+                    } else {
+                        this.stopCountdown();
+                    }
+                }, 1000);
+            },
+            stopCountdown() {
+                if (this.fsrsRescheduleCountdownTimer) {
+                    clearInterval(this.fsrsRescheduleCountdownTimer);
+                    this.fsrsRescheduleCountdownTimer = null;
+                }
+            },
+            confirmReschedule() {
+                if (!this.fsrsReschedulePreview) return;
+                this.fsrsRescheduleConfirmLoading = true;
+                this.fsrsRescheduleConfirmError = '';
+
+                axios.post('/settings/fsrs/reschedule-confirm', {
+                    preview_hash: this.fsrsReschedulePreview.preview_hash,
+                    confirm: true,
+                }).then(() => {
+                    // Preflight passed (200), proceed with apply
+                    this.proceedWithApply();
+                }).catch((error) => {
+                    if (error.response && error.response.status === 409) {
+                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
+                        this.fsrsRescheduleConfirmDialog = false;
+                        if (error.response.data && error.response.data.preview_hash) {
+                            this.fsrsReschedulePreview.preview_hash = error.response.data.preview_hash;
+                        }
+                    } else if (error.response && error.response.status === 422) {
+                        const data = error.response.data;
+                        if (data && data.risk_level === 'high' && data.requires_risk_confirm) {
+                            // Risk detected in preflight, open risk dialog directly
+                            this.fsrsRescheduleConfirmDialog = false;
+                            this.fsrsRescheduleRiskMessage = data.message || '重排将导致复习量显著增加。';
+                            this.fsrsRescheduleRiskRequired = true;
+                            this.fsrsRescheduleRiskDialog = true;
+                            this.startCountdown(3);
+                        } else if (data && data.risk_level === 'blocked') {
+                            this.fsrsRescheduleConfirmError = data.message || '风险过高，无法重排。';
+                            this.fsrsRescheduleConfirmDialog = false;
+                        } else {
+                            this.fsrsRescheduleConfirmError = data && data.message ? data.message : '重排检查未通过。';
+                            this.fsrsRescheduleConfirmDialog = false;
+                        }
+                    } else {
+                        this.confirmRescheduleError(error);
+                    }
+                    this.fsrsRescheduleConfirmLoading = false;
+                });
+            },
+            proceedWithApply() {
+                this.fsrsRescheduleConfirmLoading = true;
+
+                axios.post('/settings/fsrs/reschedule-confirm', {
+                    preview_hash: this.fsrsReschedulePreview.preview_hash,
+                    confirm: true,
+                    apply: true,
+                }).then((response) => {
+                    this.confirmRescheduleSuccess(response.data);
+                }).catch((error) => {
+                    if (error.response && error.response.status === 409) {
+                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
+                        this.fsrsRescheduleConfirmDialog = false;
+                        this.fsrsRescheduleRiskDialog = false;
+                        if (error.response.data && error.response.data.preview_hash) {
+                            this.fsrsReschedulePreview.preview_hash = error.response.data.preview_hash;
+                        }
+                    } else if (error.response && error.response.status === 422) {
+                        const data = error.response.data;
+                        if (data.risk_level === 'high') {
+                            this.fsrsRescheduleConfirmDialog = false;
+                            this.fsrsRescheduleRiskMessage = data.message || '重排将导致复习量显著增加。';
+                            this.fsrsRescheduleRiskRequired = true;
+                            this.fsrsRescheduleRiskDialog = true;
+                            this.startCountdown(3);
+                        } else if (data.risk_level === 'blocked') {
+                            this.fsrsRescheduleConfirmError = data.message || '风险过高，无法重排。';
+                            this.fsrsRescheduleConfirmDialog = false;
+                        } else {
+                            this.fsrsRescheduleConfirmError = data.message || '重排失败。';
+                            this.fsrsRescheduleConfirmDialog = false;
+                        }
+                    } else {
+                        this.confirmRescheduleError(error);
+                    }
+                    this.fsrsRescheduleConfirmLoading = false;
+                });
+            },
+            proceedWithHighRisk() {
+                if (!this.fsrsReschedulePreview) return;
+                this.fsrsRescheduleConfirmLoading = true;
+
+                axios.post('/settings/fsrs/reschedule-confirm', {
+                    preview_hash: this.fsrsReschedulePreview.preview_hash,
+                    confirm: true,
+                    apply: true,
+                    risk_confirm: true,
+                }).then((response) => {
+                    this.confirmRescheduleSuccess(response.data);
+                }).catch((error) => {
+                    this.confirmRescheduleError(error);
+                    this.fsrsRescheduleConfirmLoading = false;
+                });
+            },
+            confirmRescheduleSuccess(data) {
+                this.fsrsRescheduleApplySuccess = data.message || '重排完成。';
+                this.fsrsRescheduleConfirmDialog = false;
+                this.fsrsRescheduleRiskDialog = false;
+                this.fsrsRescheduleConfirmError = '';
+                this.fsrsRescheduleConfirmLoading = false;
+                this.stopCountdown();
+                this.loadFsrsStats();
+                this.previewFsrsRescheduleImpact();
+            },
+            confirmRescheduleError(error) {
+                this.stopCountdown();
+                this.fsrsRescheduleConfirmDialog = false;
+                this.fsrsRescheduleRiskDialog = false;
+                this.fsrsRescheduleConfirmLoading = false;
+
+                if (error.response) {
+                    const status = error.response.status;
+                    const data = error.response.data;
+                    if (status === 409) {
+                        this.fsrsRescheduleConfirmError = '预览已过期，请重新点击"看看重排后卡片到期日会怎么变"';
+                        if (data && data.preview_hash) {
+                            this.fsrsReschedulePreview.preview_hash = data.preview_hash;
+                        }
+                    } else if (status === 422) {
+                        this.fsrsRescheduleConfirmError = data && data.message ? data.message : '重排检查未通过。';
+                    } else {
+                        this.fsrsRescheduleConfirmError = '重排失败，请不要重复点击。请重新预览后再试。';
+                    }
+                } else {
+                    this.fsrsRescheduleConfirmError = '网络错误，重排没有确认成功。请重新预览后再试。';
+                }
             },
             loadSettings() {
                 axios.post('/settings/global/get', {

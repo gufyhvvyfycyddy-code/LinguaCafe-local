@@ -19,6 +19,7 @@
 | D.4-b-fix | ✅ 已完成 | 位置调整、按钮文案优化、skipped_count 提示 |
 | D.4-c-a | ✅ 已完成 | 正式重排 confirm preflight API — preview_hash 校验 + 安全阈值 + write_enabled=false |
 | D.4-c-b | ✅ 已完成 | 正式重排 ReviewCard 写入 — confirmAndApply() + risk_confirm + preview_hash 参数顺序修复 |
+| D.4-c-d | 🔄 开发中 | 前端确认按钮 + 二次确认弹窗 + 风险确认流程 |
 
 ### 还未做的事
 
@@ -405,8 +406,8 @@ if ($request->preview_hash !== $expectedHash) {
 
 1. **D.4-c-a**：后端 confirm API 框架（路由 + Controller + Service 签名 + preview_hash）✅ 已完成
 2. **D.4-c-b**：ReviewCard 写入逻辑 ✅ 已完成
-3. **D.4-c-d**：前端确认按钮 + v-dialog 二次确认弹窗（当前建议下一步）
-4. D.4-c-e 联调测试串行之后
+3. **D.4-c-d**：前端确认按钮 + v-dialog 二次确认弹窗（🔄 开发中）
+4. **D.4-c-e**：前后端联调 + 测试 + 浏览器 smoke + 全量回归（建议下一步）
 5. 独立阶段 D.4-d 做撤销机制
 
 ---

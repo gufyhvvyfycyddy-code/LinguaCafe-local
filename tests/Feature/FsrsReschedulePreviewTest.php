@@ -449,7 +449,7 @@ class FsrsReschedulePreviewTest extends TestCase
         $this->assertNotEquals($hash1, $hash2);
     }
 
-    public function test_preview_hash_preserves_parameter_order(): void
+    public function test_preview_hash_is_stable_for_unchanged_data_again(): void
     {
         $this->createEligibleReviewCard();
 
@@ -463,6 +463,46 @@ class FsrsReschedulePreviewTest extends TestCase
         $hash2 = $response2->json('preview_hash');
 
         $this->assertEquals($hash1, $hash2);
+    }
+
+    public function test_preview_hash_changes_when_active_params_order_changes(): void
+    {
+        $service = new \App\Services\FsrsReschedulePreviewService();
+        $reflection = new \ReflectionMethod($service, 'buildPreviewHash');
+        $reflection->setAccessible(true);
+
+        $cards = collect();
+        $language = 'english';
+        $userId = 1;
+        $desiredRetention = 0.9;
+
+        // Use 19-element param arrays matching FSRS expected count
+        $paramsForward  = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0];
+        $paramsReverse  = [19.0, 18.0, 17.0, 16.0, 15.0, 14.0, 13.0, 12.0, 11.0, 10.0, 9.0, 8.0, 7.0, 6.0, 5.0, 4.0, 3.0, 2.0, 1.0];
+        $paramsSwapped  = [2.0, 1.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0];
+
+        $hashForward  = $reflection->invoke($service, $cards, $language, $userId, $paramsForward, $desiredRetention);
+        $hashReverse  = $reflection->invoke($service, $cards, $language, $userId, $paramsReverse, $desiredRetention);
+        $hashSwapped  = $reflection->invoke($service, $cards, $language, $userId, $paramsSwapped, $desiredRetention);
+        $hashForward2 = $reflection->invoke($service, $cards, $language, $userId, $paramsForward, $desiredRetention);
+
+        // 1. Prove different orders → different hashes (order sensitivity)
+        $this->assertNotEquals($hashForward, $hashReverse, 'Reverse-ordered params must produce a different hash');
+        $this->assertNotEquals($hashForward, $hashSwapped, 'Swapping the first two params must also change the hash');
+
+        // 2. Prove deterministic: same params always give same hash
+        $this->assertEquals($hashForward, $hashForward2, 'Same params in same order must produce identical hash');
+
+        // 3. Prove hashes are valid SHA-256 strings
+        $this->assertIsString($hashForward);
+        $this->assertIsString($hashReverse);
+        $this->assertSame(64, strlen($hashForward), 'SHA-256 hex digest must be 64 characters');
+        $this->assertSame(64, strlen($hashReverse), 'SHA-256 hex digest must be 64 characters');
+
+        // 4. Prove the underlying JSON serialization differs (root cause)
+        $jsonForward = json_encode(array_values($paramsForward), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $jsonReverse = json_encode(array_values($paramsReverse), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $this->assertNotEquals($jsonForward, $jsonReverse, 'JSON encoding of differently ordered params must differ');
     }
 
     public function test_preview_available_false_has_null_preview_hash(): void
