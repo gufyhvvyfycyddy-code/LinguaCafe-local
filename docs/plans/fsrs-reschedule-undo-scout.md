@@ -4,6 +4,7 @@
 > **起始 commit**：`b857c79`
 > **D.4-d-a 实现**：✅ 已完成（`1f29313` 后新增）— 快照表 schema + 创建快照记录
 > **D.4-d-b 实现**：✅ 已完成（`bfb06c3` 后新增）— 撤销后端 API（POST /settings/fsrs/reschedule-undo）
+> **D.4-d-b-fix 实现**：✅ 已完成（`8063bd1` 后新增）— 补全事务内二次校验（target_type/fsrs_enabled/undone/previous_*）+ 过期提示语义区分
 > **关联**：[fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)、[fsrs-reschedule-real-smoke-report.md](./fsrs-reschedule-real-smoke-report.md)
 
 ---

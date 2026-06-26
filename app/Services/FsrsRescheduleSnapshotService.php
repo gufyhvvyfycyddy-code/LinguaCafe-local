@@ -93,19 +93,21 @@ class FsrsRescheduleSnapshotService
             return ['success' => false, 'undo_available' => false, 'restored_count' => 0, 'skipped_count' => 0, 'message' => '缺少确认标志（confirm=true 必填）。'];
         }
 
-        // Find latest undoable snapshot
+        // Step 1: find the latest non-undone snapshot (without filtering by expires_at)
         $snapshot = RescheduleSnapshot::where('user_id', $userId)
             ->where('language_id', $language)
             ->whereNull('undone_at')
-            ->where(function ($q) {
-                $q->whereNull('expires_at')->orWhere('expires_at', '>=', now());
-            })
             ->orderBy('created_at', 'desc')
             ->orderBy('id', 'desc')
             ->first();
 
         if (!$snapshot) {
             return ['success' => false, 'undo_available' => false, 'restored_count' => 0, 'skipped_count' => 0, 'message' => '当前没有可撤销的重排操作。'];
+        }
+
+        // Step 2: check if snapshot has expired
+        if ($snapshot->expires_at !== null && $snapshot->expires_at->lt(now())) {
+            return ['success' => false, 'undo_available' => false, 'restored_count' => 0, 'skipped_count' => 0, 'message' => '重排操作已超过可撤销期限。'];
         }
 
         // Load all items with their review cards
@@ -157,10 +159,14 @@ class FsrsRescheduleSnapshotService
                 }
                 $card = $lockedCards->get($item->review_card_id);
                 if (!$card) { $skippedCount++; continue; }
-                // Re-check boundaries inside transaction
+                // Re-check all boundaries inside transaction (card may have changed since pre-check)
                 if ($card->user_id !== $userId) { $skippedCount++; continue; }
                 if ($card->language_id !== $language) { $skippedCount++; continue; }
+                if ($card->target_type !== ReviewCard::TARGET_SENSE) { $skippedCount++; continue; }
+                if ($card->fsrs_enabled !== true) { $skippedCount++; continue; }
                 if ($card->fsrs_last_reviewed_at && $card->fsrs_last_reviewed_at > $snapshot->created_at) { $skippedCount++; continue; }
+                if ($item->undone !== false) { $skippedCount++; continue; }
+                if ($item->previous_due_at === null && $item->previous_stability === null && $item->previous_difficulty === null) { $skippedCount++; continue; }
 
                 // Restore fields
                 if ($item->previous_due_at !== null) {

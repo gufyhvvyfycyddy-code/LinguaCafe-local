@@ -282,6 +282,98 @@ class FsrsRescheduleUndoTest extends TestCase
         $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
         $response->assertStatus(422);
         $response->assertJsonFragment(['undo_available' => false]);
+        $response->assertJsonFragment(['message' => '重排操作已超过可撤销期限。']);
+        // Snapshot should NOT be marked undone
+        $snapshot->refresh();
+        $this->assertNull($snapshot->undone_at);
+    }
+
+    public function test_expired_snapshot_returns_distinct_message(): void
+    {
+        // Verify no-snapshot case returns different message from expired case
+        $noSnapshotResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
+        $noSnapshotResponse->assertStatus(422);
+        $noSnapshotMsg = $noSnapshotResponse->json('message');
+        $this->assertStringNotContainsString('已超过可撤销期限', $noSnapshotMsg);
+        $this->assertStringContainsString('没有可撤销', $noSnapshotMsg);
+
+        // Create reschedule then expire it
+        $this->injectThresholdService(10, 10);
+        $this->createEligibleReviewCard();
+        $this->runReschedule();
+        $snapshot = RescheduleSnapshot::first();
+        $snapshot->expires_at = now()->subHour();
+        $snapshot->save();
+
+        $expiredResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
+        $expiredResponse->assertStatus(422);
+        $this->assertStringContainsString('已超过可撤销期限', $expiredResponse->json('message'));
+    }
+
+    public function test_undo_skips_when_target_type_changed(): void
+    {
+        $this->injectThresholdService(10, 10);
+        $card = $this->createEligibleReviewCard();
+        $this->runReschedule();
+
+        // Change target_type to word before undo
+        $card->refresh();
+        $card->target_type = ReviewCard::TARGET_WORD;
+        $card->save();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
+        $response->assertStatus(422);
+        $this->assertEquals(0, $response->json('restored_count'));
+        $this->assertEquals(1, $response->json('skipped_count'));
+
+        // Snapshot should NOT be marked undone
+        $snapshot = RescheduleSnapshot::first();
+        $this->assertNull($snapshot->undone_at);
+
+        // Card should NOT have been restored
+        $card->refresh();
+        $this->assertEquals(ReviewCard::TARGET_WORD, $card->target_type);
+    }
+
+    public function test_undo_skips_when_fsrs_enabled_false(): void
+    {
+        $this->injectThresholdService(10, 10);
+        $card = $this->createEligibleReviewCard();
+        $this->runReschedule();
+
+        // Disable the card before undo
+        $card->refresh();
+        $card->fsrs_enabled = false;
+        $card->save();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
+        $response->assertStatus(422);
+        $this->assertEquals(0, $response->json('restored_count'));
+        $this->assertEquals(1, $response->json('skipped_count'));
+
+        $snapshot = RescheduleSnapshot::first();
+        $this->assertNull($snapshot->undone_at);
+    }
+
+    public function test_undo_skips_when_item_already_undone(): void
+    {
+        $this->injectThresholdService(10, 10);
+        $this->createEligibleReviewCard();
+        $this->runReschedule();
+
+        // Manually mark item as undone
+        $item = RescheduleSnapshotItem::first();
+        $item->undone = true;
+        $item->save();
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
+        $response->assertStatus(422);
+        $this->assertEquals(0, $response->json('restored_count'));
+        $this->assertStringContainsString('均已被复习', $response->json('message'));
+
+        // Snapshot should NOT be marked undone
+        $snapshot = RescheduleSnapshot::first();
+        $this->assertNull($snapshot->undone_at);
     }
 
     public function test_undo_non_english_returns_message(): void
