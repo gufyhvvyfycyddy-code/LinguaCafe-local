@@ -580,6 +580,35 @@
                                                     这是一个一次性操作，确认后不可撤销。不会产生复习记录，不影响复习计数。
                                                 </div>
                                             </div>
+
+                                            <!-- D.4-d-c: Undo reschedule button -->
+                                            <div class="mt-4" v-if="!fsrsRescheduleUndoSuccess">
+                                                <v-alert
+                                                    v-if="fsrsRescheduleUndoError"
+                                                    dense outlined type="error"
+                                                    class="mb-3"
+                                                >{{ fsrsRescheduleUndoError }}</v-alert>
+
+                                                <v-alert
+                                                    v-if="fsrsRescheduleUndoSuccess"
+                                                    dense outlined type="success"
+                                                    class="mb-3"
+                                                >{{ fsrsRescheduleUndoSuccess }}</v-alert>
+
+                                                <v-btn
+                                                    color="secondary"
+                                                    outlined
+                                                    :loading="fsrsRescheduleUndoLoading"
+                                                    :disabled="fsrsRescheduleUndoLoading || fsrsRescheduleConfirmLoading"
+                                                    @click="openUndoDialog"
+                                                >
+                                                    撤销上次重排
+                                                </v-btn>
+
+                                                <div class="caption grey--text mt-2">
+                                                    7 天内可撤销，已复习的卡片不会恢复。
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </td>
@@ -810,6 +839,39 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <!-- D.4-d-c: Undo confirmation dialog -->
+        <v-dialog v-model="fsrsRescheduleUndoDialog" max-width="500" persistent>
+            <v-card>
+                <v-card-title class="headline">撤销上次重排？</v-card-title>
+                <v-card-text>
+                    <p class="body-1">
+                        这会把上次重排影响的卡片恢复到重排前的到期安排。
+                        已经在重排后复习过的卡片不会恢复。
+                    </p>
+                    <p class="body-1">
+                        此操作只影响上次重排，不会修改复习次数、复习历史或 FSRS 参数。
+                    </p>
+                    <div class="caption grey--text">仅 7 天内可撤销。</div>
+
+                    <v-alert v-if="fsrsRescheduleUndoCountdown > 0" dense outlined type="info" class="mb-0 mt-3">
+                        请等待 {{ fsrsRescheduleUndoCountdown }} 秒后确认
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer></v-spacer>
+                    <v-btn text @click="closeUndoDialog">取消</v-btn>
+                    <v-btn
+                        color="warning"
+                        :disabled="fsrsRescheduleUndoCountdown > 0 || fsrsRescheduleUndoLoading"
+                        :loading="fsrsRescheduleUndoLoading"
+                        @click="confirmUndo"
+                    >
+                        确认撤销{{ fsrsRescheduleUndoCountdown > 0 ? '（' + fsrsRescheduleUndoCountdown + '）' : '' }}
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -881,6 +943,13 @@
                 fsrsRescheduleRiskRequired: false,
                 fsrsRescheduleCountdown: 0,
                 fsrsRescheduleCountdownTimer: null,
+                // D.4-d-c: 撤销重排
+                fsrsRescheduleUndoLoading: false,
+                fsrsRescheduleUndoSuccess: false,
+                fsrsRescheduleUndoError: '',
+                fsrsRescheduleUndoDialog: false,
+                fsrsRescheduleUndoCountdown: 0,
+                fsrsRescheduleUndoCountdownTimer: null,
             }
         },
         props: {
@@ -1224,6 +1293,11 @@
                     clearInterval(this.fsrsRescheduleCountdownTimer);
                     this.fsrsRescheduleCountdownTimer = null;
                 }
+                // Also clean up undo timer
+                if (this.fsrsRescheduleUndoCountdownTimer) {
+                    clearInterval(this.fsrsRescheduleUndoCountdownTimer);
+                    this.fsrsRescheduleUndoCountdownTimer = null;
+                }
             },
             confirmReschedule() {
                 if (!this.fsrsReschedulePreview) return;
@@ -1348,6 +1422,73 @@
                     }
                 } else {
                     this.fsrsRescheduleConfirmError = '网络错误，重排没有确认成功。请重新预览后再试。';
+                }
+            },
+            // D.4-d-c: 撤销重排
+            openUndoDialog() {
+                this.fsrsRescheduleUndoError = '';
+                this.fsrsRescheduleUndoDialog = true;
+                this.startUndoCountdown(3);
+            },
+            startUndoCountdown(seconds = 3) {
+                this.fsrsRescheduleUndoCountdown = seconds;
+                this.fsrsRescheduleUndoCountdownTimer = setInterval(() => {
+                    if (this.fsrsRescheduleUndoCountdown > 0) {
+                        this.fsrsRescheduleUndoCountdown--;
+                    } else {
+                        this.stopUndoCountdown();
+                    }
+                }, 1000);
+            },
+            stopUndoCountdown() {
+                if (this.fsrsRescheduleUndoCountdownTimer) {
+                    clearInterval(this.fsrsRescheduleUndoCountdownTimer);
+                    this.fsrsRescheduleUndoCountdownTimer = null;
+                }
+            },
+            closeUndoDialog() {
+                this.stopUndoCountdown();
+                this.fsrsRescheduleUndoDialog = false;
+                this.fsrsRescheduleUndoError = '';
+                this.fsrsRescheduleUndoCountdown = 0;
+            },
+            confirmUndo() {
+                this.fsrsRescheduleUndoLoading = true;
+                this.fsrsRescheduleUndoError = '';
+
+                axios.post('/settings/fsrs/reschedule-undo', {
+                    confirm: true,
+                }).then((response) => {
+                    this.undoSuccess(response.data);
+                }).catch((error) => {
+                    this.undoError(error);
+                });
+            },
+            undoSuccess(data) {
+                this.fsrsRescheduleUndoSuccess = data.message || '撤销成功。';
+                this.fsrsRescheduleUndoDialog = false;
+                this.fsrsRescheduleUndoLoading = false;
+                this.fsrsRescheduleUndoError = '';
+                this.stopUndoCountdown();
+
+                // Refresh stats
+                this.loadFsrsStats();
+
+                // Clear preview so user must re-preview
+                this.fsrsReschedulePreview = null;
+                this.fsrsReschedulePreviewError = '';
+                this.fsrsRescheduleApplySuccess = false;
+                this.fsrsRescheduleConfirmError = '';
+            },
+            undoError(error) {
+                this.stopUndoCountdown();
+                this.fsrsRescheduleUndoLoading = false;
+
+                if (error.response) {
+                    const data = error.response.data;
+                    this.fsrsRescheduleUndoError = data && data.message ? data.message : '撤销请求失败，请稍后重试。';
+                } else {
+                    this.fsrsRescheduleUndoError = '撤销请求失败，请稍后重试。';
                 }
             },
             loadSettings() {

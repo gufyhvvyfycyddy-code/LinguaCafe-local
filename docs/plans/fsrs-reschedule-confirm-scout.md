@@ -25,6 +25,7 @@
 | D.4-d-scout | ✅ 已完成 | 撤销机制侦察 — 推荐快照表方案 C，详见解锁文档 [fsrs-reschedule-undo-scout.md](./fsrs-reschedule-undo-scout.md) |
 | D.4-d-a | ✅ 已完成 | 快照表 schema + 创建快照记录 — reschedule_snapshots + reschedule_snapshot_items + 写入集成 |
 | D.4-d-b | ✅ 已完成 | 撤销后端 API — POST /settings/fsrs/reschedule-undo + undo 逻辑 + 16 测试 |
+| D.4-d-c | ✅ 已完成 | 前端撤销按钮 + 确认弹窗 — AdminReviewSettings.vue 常驻按钮 + 3 秒倒计时弹窗 |
 
 ### 还未做的事
 
