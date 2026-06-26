@@ -577,24 +577,25 @@
 
                                                 <div class="caption grey--text mt-2">
                                                     确认后系统将根据当前 FSRS 参数重新计算这些卡片的到期日。<br>
-                                                    这是一个一次性操作，确认后不可撤销。不会产生复习记录，不影响复习计数。
+                                                    确认后系统会重新计算这些卡片的到期日。若发现不合适，可在 7 天内撤销上次重排；已复习的卡片不会恢复。不会产生复习记录，不影响复习计数。
                                                 </div>
                                             </div>
 
-                                            <!-- D.4-d-c: Undo reschedule button -->
+                                            <!-- D.4-d-c: Undo alerts (outside v-if so always visible) -->
+                                            <v-alert
+                                                v-if="fsrsRescheduleUndoError"
+                                                dense outlined type="error"
+                                                class="mb-3 mt-4"
+                                            >{{ fsrsRescheduleUndoError }}</v-alert>
+
+                                            <v-alert
+                                                v-if="fsrsRescheduleUndoSuccess"
+                                                dense outlined type="success"
+                                                class="mb-3 mt-4"
+                                            >{{ fsrsRescheduleUndoSuccess }}</v-alert>
+
+                                            <!-- D.4-d-c: Undo reschedule button (hidden after success) -->
                                             <div class="mt-4" v-if="!fsrsRescheduleUndoSuccess">
-                                                <v-alert
-                                                    v-if="fsrsRescheduleUndoError"
-                                                    dense outlined type="error"
-                                                    class="mb-3"
-                                                >{{ fsrsRescheduleUndoError }}</v-alert>
-
-                                                <v-alert
-                                                    v-if="fsrsRescheduleUndoSuccess"
-                                                    dense outlined type="success"
-                                                    class="mb-3"
-                                                >{{ fsrsRescheduleUndoSuccess }}</v-alert>
-
                                                 <v-btn
                                                     color="secondary"
                                                     outlined

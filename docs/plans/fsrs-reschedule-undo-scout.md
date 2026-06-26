@@ -6,6 +6,7 @@
 > **D.4-d-b 实现**：✅ 已完成（`bfb06c3` 后新增）— 撤销后端 API（POST /settings/fsrs/reschedule-undo）
 > **D.4-d-b-fix 实现**：✅ 已完成（`8063bd1` 后新增）— 补全事务内二次校验（target_type/fsrs_enabled/undone/previous_*）+ 过期提示语义区分
 > **D.4-d-c 实现**：✅ 已完成（`4cdf5e8` 后新增）— 前端撤销按钮 + 确认弹窗（AdminReviewSettings.vue +141 行）
+> **D.4-d-c-fix 实现**：✅ 已完成（`4f2d77e` 后新增）— 修复成功提示被 v-if 隐藏 + 修正"确认后不可撤销"旧文案 + 写入网状协作报告门禁规则
 > **关联**：[fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)、[fsrs-reschedule-real-smoke-report.md](./fsrs-reschedule-real-smoke-report.md)
 
 ---
@@ -352,4 +353,19 @@
 7. DCP_ALLOWED=false
 
 **前置条件**：D.4-d-a 开始前，必须以当前 `whereIn + lockForUpdate + get + keyBy + foreach` 事务模型为基线，**不得假设已有 chunkById**。若要改为 chunkById 遍历，需要单独 scout 或单独任务评估，不应在 D.4-d-a 顺手改。快照 item 写入应发生在 ReviewCard 字段更新之前，同一事务内完成。
+
+## 网状协作报告门禁规则（所有后续任务必须遵守）
+
+1. 如果任务使用多个辅助 Agent 或背景泳道，辅助报告必须在 commit 之前完成。
+2. 主执行 Agent 必须在最终 diff 和 commit 前整合辅助报告。
+3. 如果辅助 Agent 仍显示 running，主执行 Agent 不得 commit。
+4. 如果辅助报告无法及时完成，本轮必须明确写：
+   “某某辅助报告未纳入本轮实现依据。”
+   并停止等待人工判断，不能假装已经整合。
+5. 最终报告中禁止写“背景泳道运行中”同时又宣布任务完成。
+6. commit 前报告必须包含：
+   * 已收到哪些辅助报告
+   * 哪些建议被采纳
+   * 哪些建议未采纳及原因
+7. 这个规则以后适用于所有网状协作任务。
 ```
