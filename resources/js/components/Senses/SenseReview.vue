@@ -7,15 +7,20 @@
                 <v-chip class="mx-1" color="foreground">到期数量 {{ summary.due_count || 0 }}</v-chip>
                 <v-chip class="mx-1" color="foreground">已复习 {{ reviewedCount }}</v-chip>
                 <v-chip class="mx-1" color="foreground">剩余 {{ remainingCount }}</v-chip>
-                <!-- FSRS stats: second row -->
-                <v-spacer></v-spacer>
                 <v-chip class="mx-1 my-1" small outlined>今日已复习 {{ fsrsStats.reviewed_today }}</v-chip>
-                <v-chip class="mx-1 my-1" small outlined>今日重置 {{ fsrsStats.reset_count }}</v-chip>
-                <v-chip class="mx-1 my-1" small outlined>总词义卡 {{ fsrsStats.total }}</v-chip>
-                <v-chip class="mx-1 my-1" small outlined>启用中 {{ fsrsStats.enabled }}</v-chip>
-                <v-chip class="mx-1 my-1" small outlined>已归档 {{ fsrsStats.archived }}</v-chip>
-                <v-chip class="mx-1 my-1" small outlined>当前到期 {{ fsrsStats.due }}</v-chip>
+                <v-btn icon small @click="statsDetailOpen = !statsDetailOpen">
+                    <v-icon>{{ statsDetailOpen ? 'mdi-chevron-up' : 'mdi-chart-box-outline' }}</v-icon>
+                </v-btn>
             </div>
+            <v-expand-transition>
+                <div v-if="statsDetailOpen" class="d-flex flex-wrap align-center pb-2">
+                    <v-chip class="mx-1 my-1" small outlined>今日重置 {{ fsrsStats.reset_count }}</v-chip>
+                    <v-chip class="mx-1 my-1" small outlined>总词义卡 {{ fsrsStats.total }}</v-chip>
+                    <v-chip class="mx-1 my-1" small outlined>启用中 {{ fsrsStats.enabled }}</v-chip>
+                    <v-chip class="mx-1 my-1" small outlined>已归档 {{ fsrsStats.archived }}</v-chip>
+                    <v-chip class="mx-1 my-1" small outlined>当前到期 {{ fsrsStats.due }}</v-chip>
+                </div>
+            </v-expand-transition>
             <v-alert v-if="statsError" type="warning" dense text class="mt-2 mb-0">{{ statsError }}</v-alert>
         </v-card>
 
@@ -35,23 +40,37 @@
                 <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
             </div>
 
-            <!-- Action buttons -->
+            <!-- Action buttons in More menu -->
             <div class="d-flex justify-end mb-3" style="gap: 8px;">
-                <v-btn small text @click="startEdit">
-                    <v-icon small left>mdi-pencil</v-icon>编辑
-                </v-btn>
-                <v-btn small text color="info" @click="viewSource">
-                    <v-icon small left>mdi-book-open-page-variant</v-icon>查看原文
-                </v-btn>
-                <v-btn small text color="warning" :loading="archiveLoading" @click="openArchiveDialog">
-                    <v-icon small left>mdi-archive</v-icon>归档
-                </v-btn>
-                <v-btn small text color="primary" :loading="resetLoading" @click="openResetDialog">
-                    <v-icon small left>mdi-restore</v-icon>重置
-                </v-btn>
-                <v-btn small text color="error" :loading="deleteLoading" @click="openDeleteDialog">
-                    <v-icon small left>mdi-delete</v-icon>彻底删除
-                </v-btn>
+                <v-menu offset-y left>
+                    <template v-slot:activator="{ on, attrs }">
+                        <v-btn small text v-bind="attrs" v-on="on">
+                            <v-icon small left>mdi-dots-vertical</v-icon>更多
+                        </v-btn>
+                    </template>
+                    <v-list dense>
+                        <v-list-item @click="viewSource">
+                            <v-list-item-icon><v-icon small>mdi-book-open-page-variant</v-icon></v-list-item-icon>
+                            <v-list-item-title>查看原文</v-list-item-title>
+                        </v-list-item>
+                        <v-list-item @click="startEdit">
+                            <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
+                            <v-list-item-title>编辑</v-list-item-title>
+                        </v-list-item>
+                        <v-list-item @click="openArchiveDialog">
+                            <v-list-item-icon><v-icon small color="warning">mdi-archive</v-icon></v-list-item-icon>
+                            <v-list-item-title>归档</v-list-item-title>
+                        </v-list-item>
+                        <v-list-item @click="openResetDialog">
+                            <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
+                            <v-list-item-title>重置</v-list-item-title>
+                        </v-list-item>
+                        <v-list-item @click="openDeleteDialog">
+                            <v-list-item-icon><v-icon small color="error">mdi-delete</v-icon></v-list-item-icon>
+                            <v-list-item-title class="error--text">彻底删除</v-list-item-title>
+                        </v-list-item>
+                    </v-list>
+                </v-menu>
             </div>
 
             <v-row dense>
@@ -81,15 +100,21 @@
                         <div class="text--secondary mt-2">{{ currentCard.example_sentence_zh }}</div>
                     </v-sheet>
 
-                    <div class="caption text--secondary">FSRS</div>
-                    <v-simple-table dense class="no-hover border rounded-lg">
-                        <tbody>
-                            <tr><td>到期时间</td><td>{{ currentCard.fsrs_due_at }}</td></tr>
-                            <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
-                            <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
-                            <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
-                        </tbody>
-                    </v-simple-table>
+                    <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
+                        FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
+                        <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                    </div>
+                    <v-expand-transition>
+                        <div v-if="fsrsDetailOpen">
+                            <v-simple-table dense class="no-hover border rounded-lg mt-2">
+                                <tbody>
+                                    <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
+                                    <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
+                                    <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
+                                </tbody>
+                            </v-simple-table>
+                        </div>
+                    </v-expand-transition>
                 </v-col>
             </v-row>
 
@@ -318,6 +343,9 @@
                     reviewed_today: 0,
                     reset_count: 0,
                 },
+                // UI-Review-a
+                statsDetailOpen: false,
+                fsrsDetailOpen: false,
             }
         },
         computed: {
@@ -353,6 +381,7 @@
                 axios.get('/reviews/senses').then((response) => {
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
+                    this.fsrsDetailOpen = false;  // Reset FSRS collapse on card change
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
                 }).finally(() => {
