@@ -66,6 +66,10 @@
                 </v-btn>
             </div>
 
+            <div class="text-center caption grey--text mt-2" v-if="!showAnswer">
+                快捷键：Space 显示答案
+            </div>
+
             <!-- Answer side (visible when showAnswer=true) -->
             <template v-if="showAnswer">
                 <!-- Action buttons in More menu -->
@@ -145,6 +149,10 @@
                         </v-expand-transition>
                     </v-col>
                 </v-row>
+
+                <div class="text-center caption grey--text mb-2">
+                    快捷键：1 忘了 / 2 勉强 / 3 记得 / 4 很熟
+                </div>
 
                 <!-- Score buttons -->
                 <div class="d-flex justify-center flex-wrap mt-6">
@@ -387,9 +395,13 @@
                 return this.cards.length;
             },
         },
+        beforeDestroy() {
+            window.removeEventListener('keyup', this.handleHotkey);
+        },
         mounted() {
             this.loadCards();
             this.loadFsrsStats();
+            window.addEventListener('keyup', this.handleHotkey);
         },
         methods: {
             loadFsrsStats() {
@@ -439,6 +451,43 @@
                 }).finally(() => {
                     this.rating = false;
                 });
+            },
+            // UI-Review-c: keyboard shortcuts
+            handleHotkey(event) {
+                // Ignore when typing in input/textarea/select
+                const tag = event.target?.tagName?.toLowerCase();
+                if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
+                    return;
+                }
+                // Ignore when dialogs are open
+                if (this.editDialog || this.archiveDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                    return;
+                }
+                // Ignore when no card or loading
+                if (!this.currentCard || this.loading || this.rating || this.archiveLoading || this.resetLoading || this.deleteLoading) {
+                    return;
+                }
+                switch (event.key) {
+                    case ' ':
+                    case 'Spacebar':
+                        event.preventDefault();
+                        if (!this.showAnswer) {
+                            this.showAnswer = true;
+                        }
+                        break;
+                    case '1':
+                        if (this.showAnswer) { this.rate('again'); }
+                        break;
+                    case '2':
+                        if (this.showAnswer) { this.rate('hard'); }
+                        break;
+                    case '3':
+                        if (this.showAnswer) { this.rate('good'); }
+                        break;
+                    case '4':
+                        if (this.showAnswer) { this.rate('easy'); }
+                        break;
+                }
             },
             // ==================== Edit dialog ====================
             startEdit() {

@@ -4,6 +4,7 @@
 > **起始 commit**：`2fbea65`
 > **UI-Review-a 实现**：✅ 已完成 — SenseReview 信息层级整理（stats 精简、More 菜单、FSRS 折叠）
 > **UI-Review-b 实现**：✅ 已完成 — SenseReview 显示答案流程（问题面→显示答案→答案面+评分）
+> **UI-Review-c 实现**：✅ 已完成 — SenseReview 键盘快捷键（Space 显示答案，1/2/3/4 评分）
 > **关联**：[ui-anki-comparison-scout.md](./ui-anki-comparison-scout.md)、[linguacafe-fsrs-roadmap.md](./linguacafe-fsrs-roadmap.md)
 
 ---
