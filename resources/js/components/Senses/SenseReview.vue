@@ -27,6 +27,7 @@
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
 
         <v-card v-if="currentCard" outlined class="rounded-lg pa-5">
+            <!-- Lemma / surface form / pos — always visible -->
             <div class="d-flex align-center mb-3">
                 <div>
                     <div class="text-h5 default-font">{{ currentCard.lemma }}</div>
@@ -40,90 +41,119 @@
                 <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
             </div>
 
-            <!-- Action buttons in More menu -->
-            <div class="d-flex justify-end mb-3" style="gap: 8px;">
-                <v-menu offset-y left>
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn small text v-bind="attrs" v-on="on">
-                            <v-icon small left>mdi-dots-vertical</v-icon>更多
-                        </v-btn>
-                    </template>
-                    <v-list dense>
-                        <v-list-item @click="viewSource">
-                            <v-list-item-icon><v-icon small>mdi-book-open-page-variant</v-icon></v-list-item-icon>
-                            <v-list-item-title>查看原文</v-list-item-title>
-                        </v-list-item>
-                        <v-list-item @click="startEdit">
-                            <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
-                            <v-list-item-title>编辑</v-list-item-title>
-                        </v-list-item>
-                        <v-list-item @click="openArchiveDialog">
-                            <v-list-item-icon><v-icon small color="warning">mdi-archive</v-icon></v-list-item-icon>
-                            <v-list-item-title>归档</v-list-item-title>
-                        </v-list-item>
-                        <v-list-item @click="openResetDialog">
-                            <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
-                            <v-list-item-title>重置</v-list-item-title>
-                        </v-list-item>
-                        <v-list-item @click="openDeleteDialog">
-                            <v-list-item-icon><v-icon small color="error">mdi-delete</v-icon></v-list-item-icon>
-                            <v-list-item-title class="error--text">彻底删除</v-list-item-title>
-                        </v-list-item>
-                    </v-list>
-                </v-menu>
+            <!-- Question side (always visible, shows context) -->
+            <div class="mb-4">
+                <div class="caption text--secondary">例句</div>
+                <v-sheet outlined rounded class="pa-3 mb-3">
+                    <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
+                </v-sheet>
+                <div class="body-1 primary--text font-weight-medium">
+                    这个句子里的 “{{ currentCard.lemma }}” 是什么意思？
+                </div>
             </div>
 
-            <v-row dense>
-                <v-col cols="12" md="6">
-                    <div class="caption text--secondary">中文释义</div>
-                    <div class="sense-main mb-4">{{ currentCard.sense_zh }}</div>
+            <!-- Show answer button (visible when showAnswer=false) -->
+            <div v-if="!showAnswer" class="d-flex justify-center mb-4">
+                <v-btn
+                    depressed
+                    rounded
+                    color="primary"
+                    large
+                    :disabled="rating || archiveLoading || deleteLoading || resetLoading"
+                    @click="showAnswer = true"
+                >
+                    显示答案
+                </v-btn>
+            </div>
 
-                    <div class="caption text--secondary">英文释义</div>
-                    <div class="mb-4">{{ currentCard.sense_en || '暂无英文释义。' }}</div>
+            <!-- Answer side (visible when showAnswer=true) -->
+            <template v-if="showAnswer">
+                <!-- Action buttons in More menu -->
+                <div class="d-flex justify-end mb-3" style="gap: 8px;">
+                    <v-menu offset-y left>
+                        <template v-slot:activator="{ on, attrs }">
+                            <v-btn small text v-bind="attrs" v-on="on">
+                                <v-icon small left>mdi-dots-vertical</v-icon>更多
+                            </v-btn>
+                        </template>
+                        <v-list dense>
+                            <v-list-item @click="viewSource">
+                                <v-list-item-icon><v-icon small>mdi-book-open-page-variant</v-icon></v-list-item-icon>
+                                <v-list-item-title>查看原文</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="startEdit">
+                                <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
+                                <v-list-item-title>编辑</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="openArchiveDialog">
+                                <v-list-item-icon><v-icon small color="warning">mdi-archive</v-icon></v-list-item-icon>
+                                <v-list-item-title>归档</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="openResetDialog">
+                                <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
+                                <v-list-item-title>重置</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="openDeleteDialog">
+                                <v-list-item-icon><v-icon small color="error">mdi-delete</v-icon></v-list-item-icon>
+                                <v-list-item-title class="error--text">彻底删除</v-list-item-title>
+                            </v-list-item>
+                        </v-list>
+                    </v-menu>
+                </div>
 
-                    <div class="caption text--secondary">近义译法</div>
-                    <div class="mb-4">
-                        <v-chip small class="mr-1 mb-1" v-for="alias in currentCard.aliases_zh" :key="alias">{{ alias }}</v-chip>
-                        <span v-if="!currentCard.aliases_zh.length" class="text--secondary">无</span>
-                    </div>
+                <v-row dense>
+                    <v-col cols="12" md="6">
+                        <div class="caption text--secondary">中文释义</div>
+                        <div class="sense-main mb-4">{{ currentCard.sense_zh }}</div>
 
-                    <div class="caption text--secondary">搭配</div>
-                    <div>
-                        <v-chip small class="mr-1 mb-1" v-for="collocation in currentCard.collocations" :key="collocation">{{ collocation }}</v-chip>
-                        <span v-if="!currentCard.collocations.length" class="text--secondary">无</span>
-                    </div>
-                </v-col>
-                <v-col cols="12" md="6">
-                    <div class="caption text--secondary">例句</div>
-                    <v-sheet outlined rounded class="pa-3 mb-4">
-                        <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
-                        <div class="text--secondary mt-2">{{ currentCard.example_sentence_zh }}</div>
-                    </v-sheet>
+                        <div class="caption text--secondary">英文释义</div>
+                        <div class="mb-4">{{ currentCard.sense_en || '暂无英文释义。' }}</div>
 
-                    <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
-                        FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
-                        <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                    </div>
-                    <v-expand-transition>
-                        <div v-if="fsrsDetailOpen">
-                            <v-simple-table dense class="no-hover border rounded-lg mt-2">
-                                <tbody>
-                                    <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
-                                    <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
-                                    <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
-                                </tbody>
-                            </v-simple-table>
+                        <div class="caption text--secondary">近义译法</div>
+                        <div class="mb-4">
+                            <v-chip small class="mr-1 mb-1" v-for="alias in currentCard.aliases_zh" :key="alias">{{ alias }}</v-chip>
+                            <span v-if="!currentCard.aliases_zh.length" class="text--secondary">无</span>
                         </div>
-                    </v-expand-transition>
-                </v-col>
-            </v-row>
 
-            <div class="d-flex justify-center flex-wrap mt-6">
-                <v-btn depressed rounded color="error" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('again')">忘了</v-btn>
-                <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('hard')">勉强记得</v-btn>
-                <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('good')">记得</v-btn>
-                <v-btn depressed rounded color="success" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('easy')">很熟</v-btn>
-            </div>
+                        <div class="caption text--secondary">搭配</div>
+                        <div>
+                            <v-chip small class="mr-1 mb-1" v-for="collocation in currentCard.collocations" :key="collocation">{{ collocation }}</v-chip>
+                            <span v-if="!currentCard.collocations.length" class="text--secondary">无</span>
+                        </div>
+                    </v-col>
+                    <v-col cols="12" md="6">
+                        <div class="caption text--secondary">例句</div>
+                        <v-sheet outlined rounded class="pa-3 mb-4">
+                            <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
+                            <div class="text--secondary mt-2">{{ currentCard.example_sentence_zh }}</div>
+                        </v-sheet>
+
+                        <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
+                            FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
+                            <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                        </div>
+                        <v-expand-transition>
+                            <div v-if="fsrsDetailOpen">
+                                <v-simple-table dense class="no-hover border rounded-lg mt-2">
+                                    <tbody>
+                                        <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
+                                        <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
+                                        <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
+                                    </tbody>
+                                </v-simple-table>
+                            </div>
+                        </v-expand-transition>
+                    </v-col>
+                </v-row>
+
+                <!-- Score buttons -->
+                <div class="d-flex justify-center flex-wrap mt-6">
+                    <v-btn depressed rounded color="error" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('again')">忘了</v-btn>
+                    <v-btn depressed rounded color="warning" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('hard')">勉强记得</v-btn>
+                    <v-btn depressed rounded color="primary" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('good')">记得</v-btn>
+                    <v-btn depressed rounded color="success" class="ma-2" :disabled="rating || archiveLoading || deleteLoading || resetLoading" @click="rate('easy')">很熟</v-btn>
+                </div>
+            </template>
         </v-card>
 
         <v-alert v-else-if="!loading" type="info" dense outlined>
@@ -346,6 +376,7 @@
                 // UI-Review-a
                 statsDetailOpen: false,
                 fsrsDetailOpen: false,
+                showAnswer: false,
             }
         },
         computed: {
@@ -382,6 +413,7 @@
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;  // Reset FSRS collapse on card change
+                    this.showAnswer = false;
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
                 }).finally(() => {

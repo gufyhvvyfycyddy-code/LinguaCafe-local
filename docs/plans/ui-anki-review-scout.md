@@ -3,6 +3,7 @@
 > **创建日期**：2026-06-26
 > **起始 commit**：`2fbea65`
 > **UI-Review-a 实现**：✅ 已完成 — SenseReview 信息层级整理（stats 精简、More 菜单、FSRS 折叠）
+> **UI-Review-b 实现**：✅ 已完成 — SenseReview 显示答案流程（问题面→显示答案→答案面+评分）
 > **关联**：[ui-anki-comparison-scout.md](./ui-anki-comparison-scout.md)、[linguacafe-fsrs-roadmap.md](./linguacafe-fsrs-roadmap.md)
 
 ---
