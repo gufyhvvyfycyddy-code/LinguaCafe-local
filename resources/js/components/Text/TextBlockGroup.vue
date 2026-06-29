@@ -1815,7 +1815,7 @@
                     return;
                 }
 
-                if (!window.confirm(`确定要删除词条“${selectedWord.word}”吗？这会将它标为已忽略并停用复习卡。`)) {
+                if (!window.confirm(`确定要让词条“${selectedWord.word}”回归为新词吗？此操作会移除该词相关的学习记录，文章中它将重新显示为新词。`)) {
                     return;
                 }
 

@@ -46,6 +46,8 @@
 | Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览详情页紫色高亮 + 文档明确保留未完成计划 |
 | Plan-Integrity-1 | 总控大计划 + 未完成任务总表入库 | ✅ 已完成 | 新增 `linguacafe-master-plan.md`，汇总所有任务线 |
 | Reader-UI-1-a | 查词侧栏第一轮瘦身：隐藏旧 SRS 1-7 按钮 + "选择释义" + 词典默认收起 | ✅ 已完成 | 前端改动，不删 setStage 逻辑，不删数据 |
+| Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 + 确认弹窗如实告知行为 | ✅ 已完成 | 全前端改动，后端行为未改（当前 hardDeleteWord 物理删除数据） |
+| Reader-UI-6-b | 后端实现安全的"回归为新词" | 📋 后续任务 | 当前后端 hardDeleteWord 物理删除 EncounteredWord+WordSense+ReviewCard，后续需改为仅重置 stage |
 | Mgmt-7-c（待定） | 自动提升词汇等级改为 FSRS 复习记录 | 📋 审计完成 | 当前仍是旧 SRS `EncounteredWord.setStage()`，需要单独任务迁移 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |

@@ -119,7 +119,7 @@
                             <div v-if="type == 'word'" class="d-flex flex-wrap mb-3">
                                 <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
                                 <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
-                                <v-btn small rounded depressed color="error" class="mb-2" @click="deleteWord">删除词条</v-btn>
+                                <v-btn small rounded depressed color="error" class="mb-2" @click="deleteWord">回归为新词</v-btn>
                             </div>
                         </template>
                       
