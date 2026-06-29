@@ -87,7 +87,7 @@
                 }"
                 :style="{
                     'height': $vuetify.breakpoint.mdAndUp ? 'calc(100% - 24px - 24px)' : 'calc(100% - 24px - 24px - 64px)',
-                    'padding-right': settings.vocabularySidebar && vocabularySidebarFits ? (window.innerWidth >= 1280 ? '520px !important' : '400px !important') : '0px'
+                    'padding-right': settings.vocabularySidebar && vocabularySidebarFits ? (sidebarPaddingWidth) : '0px'
                 }"
             >
                 <v-card-text id="reader-content" :class="{
@@ -424,6 +424,13 @@
         },
         // this runs after the initial data
         // was downloaded with axios
+        computed: {
+            sidebarPaddingWidth() {
+                if (this.$vuetify.breakpoint.xlOnly) return '520px !important';
+                if (this.$vuetify.breakpoint.lgAndUp) return '480px !important';
+                return '400px !important';
+            },
+        },
         methods: {
             loadAiAssistCurrent() {
                 if (!this.chapterId) return;
@@ -441,7 +448,15 @@
                 });
             },
             vocabularySidebarTest() {
-                this.vocabularySidebarFits = window.innerWidth >= 960;
+                // Calculate if there's enough space for the reader text and the sidebar.
+                // Left navigation + margins take ~300px. The sidebar width varies by breakpoint:
+                // xl (≥1904): 520px, lg (1264-1903): 480px, md (960-1263): 400px
+                // Minimum reader text width ~400px.
+                // Total minimum = 400 (reader) + sidebarWidth + 300 (nav/margins) + 32 (gutters)
+                const sidebarEstimate = this.$vuetify.breakpoint.xlOnly ? 520
+                    : this.$vuetify.breakpoint.lgAndUp ? 480
+                    : 400;
+                this.vocabularySidebarFits = window.innerWidth >= 400 + sidebarEstimate + 300 + 32;
             },
             fullscreen() {
                 if (document.fullscreenEnabled) {

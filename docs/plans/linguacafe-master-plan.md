@@ -62,6 +62,7 @@
 | AI-Reading-Assist-5 | AI 生词/词组建议进入查词侧栏（lookup 接口 + AI 建议区域 + 预填表单） |
 | Reader-Lookup-UX-2 | 查词栏添加释义流程重构（统一"添加新释义"面板，隐藏空分组，紧凑显示） |
 | Reader-Layout-1 | 阅读页布局扩展（大屏查词栏 520px + 来源句默认收起） |
+| Reader-Layout-1-b | 修复全屏误弹窗 + 响应式 breakpoint + 动态宽度同步 |
 
 ### 3.4 右击面板 / Review UI
 

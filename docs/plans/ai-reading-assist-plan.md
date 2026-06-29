@@ -3,7 +3,7 @@
 > 本文档描述 LinguaCafe 的 AI 阅读辅助功能产品设计和分阶段开发计划。
 >
 > **性质**：功能规划 + 已有实现。
-> **状态**：AI-1 schema 实验完成；AI-2 已实现（方案 B 总览+详情页 + 紫色搜索命中）；AI-3 已实现（确认保存 AI 解析结果）；AI-4 已实现（AI 译文按句显示/隐藏开关）；AI-4-a 已实现（双字体区分）；AI-4-b 已实现（句子对齐修复+幼圆字体）；AI-5 已实现（AI 建议进入查词侧栏）；Reader-Lookup-UX-2 已实现（添加释义流程重构）；Reader-Layout-1 已实现（布局扩展 + 来源句收起）。
+> **状态**：AI-1 ~ AI-5 已完成；Reader-Lookup-UX-2 已完成；Reader-Layout-1 已完成；Reader-Layout-1-b 已完成（修复全屏误弹窗 + 响应式 breakpoint）。
 > **相关文档**：[schema 实验](./ai-reading-assist-schema-experiment.md) | [总控计划](./linguacafe-master-plan.md) | [AiReadingAssistService](../app/Services/AiReadingAssistService.php)
 
 ---

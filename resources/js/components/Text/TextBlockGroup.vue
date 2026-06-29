@@ -2401,7 +2401,11 @@
             },
             updateVocabBoxPosition() {
                 var margin = 8;
-                this.$store.commit('vocabularyBox/setWidth', 400);
+                // Dynamic sidebar width matching VocabularySideBox.vue computed sidebarWidth
+                const sidebarW = this.$props.vocabularySidebar && this.$props.vocabularySidebarFits
+                    ? (window.innerWidth >= 1904 ? 520 : window.innerWidth >= 1264 ? 480 : 400)
+                    : 400;
+                this.$store.commit('vocabularyBox/setWidth', sidebarW);
                 this.$store.commit('vocabularyBox/setVocabularyBottomSheetVisible', (window.innerWidth <= 768));
                 var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
                 var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();

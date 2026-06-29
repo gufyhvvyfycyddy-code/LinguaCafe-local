@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`45e9905`（Style: expand reader lookup workspace）
+**Latest commit**：`92cb030`（Docs: update roadmap Latest commit to 45e9905）
 
 ### `/review-cards/manage` 当前能力
 
@@ -598,6 +598,7 @@
 | 高 | AI-Reading-Assist-5 | AI 生词/词组建议进入查词侧栏 | ✅ 已完成 | lookup 接口 + 查词栏 AI 建议区域 + 点击预填释义表单，不自动创建学习数据 |
 | 中 | Reader-Lookup-UX-2 | 查词栏添加释义流程重构 | ✅ 已完成 | 统一"添加新释义"面板（AI 建议 + 词典 + 手动），隐藏空词性分组，紧凑显示 |
 | 低 | Reader-Layout-1 | 阅读页布局扩展 + 来源句默认收起 | ✅ 已完成 | 大屏查词栏 520px（原 400px），AI 来源句默认收起可展开，正文 padding 同步 |
+| 高 | Reader-Layout-1-b | 修复全屏查词栏误变弹窗 + 加载性能审计 | ✅ 已完成 | 修复 vocabularySidebarFits 改用响应式 breakpoint + 实际空间判断；updateVocabBoxPosition 同步动态宽度；padding-right 改用 Vuetify computed |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
