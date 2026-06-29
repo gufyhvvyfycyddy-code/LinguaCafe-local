@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`c7517ba`（Feat: save confirmed AI reading assist results）
+**Latest commit**：`fe45b5a`（Feat: show saved AI sentence translations）
 
 ### `/review-cards/manage` 当前能力
 
