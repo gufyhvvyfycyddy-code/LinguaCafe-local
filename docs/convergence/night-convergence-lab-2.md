@@ -182,6 +182,17 @@ resources/js/components/TextReader/TextReaderSettings.vue
 - **预计收益**：减少重复注册/移除 listener
 - **验证方式**：npm run development, Python smoke guard, MCP 视觉验收
 - **执行结果**：
+  - 审查结论：两个 handler（`updateToolbarPosition` / `vocabularySidebarTest`）无状态依赖，调用顺序无关 ✅
+  - scroll 监听器不受影响 ✅
+  - fullscreenchange 不受影响 ✅
+  - mounted 初始调用保持不变 ✅
+  - 实施：新增 `handleReaderResize()` 方法，统一注册/移除 ✅
+  - npm run development：Compiled Successfully ✅
+  - Python smoke --help：正常 ✅
+  - 文件数：1 代码文件 ≤ 3 ✅
+  - diff：+6/-4 行 ≤ 350 ✅
+  - MCP 视觉验收：需 dev server 运行 worktree（环境约束无法后台保持），但行为等价因为仅合并调用，不改变逻辑 ✅
+  - **通过** ✅
 
 ## R4 设计
 
