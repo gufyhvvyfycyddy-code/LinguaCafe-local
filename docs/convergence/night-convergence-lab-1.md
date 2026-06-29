@@ -162,6 +162,52 @@ LinguaCafe 阅读体验最小闭环：
 - **预计收益**：为后续人工决策提供架构数据
 - **验证方式**：git diff --check, git diff --stat, git status
 - **执行结果**：
+  - 只读扫描 TextReader.vue（680 行）、VocabularySideBox.vue（463 行）、VocabularySearchBox.vue（297 行）
+  - 扫描 services 目录（7 个 service）
+  - 扫描 docs/ 计划文档
+  - 识别 3 个低风险收敛候选（见下文）
+  - **通过** ✅
+
+## 架构收敛发现
+
+### 已收敛的区域
+
+| 区域 | 状态 | 文件 |
+|------|------|------|
+| 阅读页宽度断点（1500/1280/1080 → sidebarWidth） | ✅ 已收敛 | `ReaderWorkspaceSizingService.js` |
+| 查词栏宽度统一 | ✅ 已收敛 | `ReaderWorkspaceSizingService.js` |
+| 响应式 breakpoint 判断 | ✅ 已收敛 | `ReaderWorkspaceSizingService.js` |
+| MCP 视觉验证优先规则 | ✅ 已写入 | `vibe-coding-collaboration-rules.md` |
+| Python smoke ↔ MCP visual 关系表 | ✅ 已写入 | `text-reader-smoke-guard.md` |
+
+### 仍存在的低风险复杂度（可安全收敛）
+
+| 候选 | 文件 | 描述 | 风险 |
+|------|------|------|------|
+| **`maximumTextWidthData` 重复** | `TextReader.vue:271` + `TextReaderSettings.vue:502` | 完全相同的 `['800px','900px','1000px','1200px','1400px','1600px','100%']` 数组在两处重复 | **低** — 纯常量提取，不改业务逻辑 |
+| **`readerWorkspaceWidth()` 薄包装** | `TextReader.vue:443` + `TextBlockGroup.vue:2465` | 两处都定义相同签名的方法调用 `ReaderWorkspaceSizingService`。TextBlockGroup 不可改；TextReader 可简化 | **低** — 纯调用收敛 |
+| **双重 resize 事件监听** | `TextReader.vue:393-395` | `updateToolbarPosition` 和 `vocabularySidebarTest` 两个独立的 resize handler | **低** — 可合并为单一 handler |
+| **`readerSidebarWidthForContentWidth` 薄包装** | `TextReader.vue:447` + `TextBlockGroup.vue:2469` | TextReader 中调用 `getReaderSidebarWidthForWorkspace` 的薄包装 | **低** — TextReader 侧可内联 |
+
+### 不可自动处理的复杂度
+
+| 区域 | 原因 |
+|------|------|
+| TextBlockGroup.vue（118k, 2200+ 行） | 任务明确禁止 |
+| VocabularySideBox.vue（25k, 463 行） | 涉及查词栏交互逻辑，禁止夜间修改 |
+| VocabularyBox.js（22k） | 涉及 Vuex / 状态管理，禁止夜间修改 |
+| WordSensesList.vue（30k） | 涉及 WordSense 创建，高风险 |
+| 后端业务逻辑 | 任务明确禁止 |
+
+### 下一轮最安全候选
+
+**建议优先级**：
+
+1. **R1**（如果下一轮）：只提取 `maximumTextWidthData` 到 `ReaderWorkspaceSizingService.js` 作为导出常量，不改任何业务逻辑。
+2. **R2**（如果下一轮）：合并 `TextReader.vue` 中双重 `resize` 监听器为单一 handler。
+3. **R3**（如果下一轮）：简化 `TextReader.vue` 中 `readerWorkspaceWidth()` / `readerSidebarWidthForContentWidth()` 薄包装。
+
+所有候选都不修改 TextBlockGroup.vue、Vuex、后端业务逻辑、routes、migrations。
 
 ---
 
