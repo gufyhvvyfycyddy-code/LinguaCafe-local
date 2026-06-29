@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`f8a9876`（Feat: clarify reader lookup reset action）
+**Latest commit**：`0001a6d`（Fix: remove review history when returning word to new）
 
 ### `/review-cards/manage` 当前能力
 
