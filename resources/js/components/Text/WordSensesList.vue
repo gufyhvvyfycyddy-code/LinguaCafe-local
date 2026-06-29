@@ -1,19 +1,19 @@
 <template>
-    <div class="word-senses-section mt-4">
-        <div class="sense-section-header d-flex align-center mb-1">
-            <div>
-                <div class="vocab-box-subheader d-flex mb-0">词元释义</div>
-                <div class="text-caption text--secondary">
-                    以下释义都属于词元 <strong>{{ effectiveLemma || '未识别' }}</strong>，可按词性分组管理。
+        <div class="word-senses-section mt-3">
+            <div v-if="!compact" class="sense-section-header d-flex align-center mb-1">
+                <div>
+                    <div class="vocab-box-subheader d-flex mb-0">词元释义</div>
+                    <div class="text-caption text--secondary">
+                        以下释义都属于词元 <strong>{{ effectiveLemma || '未识别' }}</strong>，可按词性分组管理。
+                    </div>
                 </div>
+                <v-spacer />
+                <v-btn small rounded depressed color="primary" @click="openAddForm()" :disabled="!effectiveLemma">
+                    + 添加新释义
+                </v-btn>
             </div>
-            <v-spacer />
-            <v-btn small rounded depressed color="primary" @click="openAddForm()" :disabled="!effectiveLemma">
-                + 添加新释义
-            </v-btn>
-        </div>
 
-        <div class="lemma-surface-card rounded pa-2 mb-3">
+        <div v-if="!compact" class="lemma-surface-card rounded pa-2 mb-3">
             <div class="text-caption text--secondary">当前词形</div>
             <div class="d-flex align-center">
                 <strong class="default-font mr-2">{{ surfaceWord || '未选择' }}</strong>
@@ -38,8 +38,13 @@
         <v-alert v-if="message" dense text type="success" class="mt-2 mb-2">{{ message }}</v-alert>
         <v-alert v-if="saveError" dense text type="error" class="mt-2 mb-2">{{ saveError }}</v-alert>
 
+        <!-- Compact empty state -->
+        <div v-if="compact && !loading && !error && visibleSenseGroups.length === 0" class="text-caption text--secondary mb-2">
+            暂无已保存释义，可添加新释义。
+        </div>
+
         <v-expansion-panels v-if="!loading && !error" v-model="openPanels" multiple class="sense-groups">
-            <v-expansion-panel v-for="(group, groupIndex) in senseGroups" :key="group.pos" class="sense-group-panel">
+            <v-expansion-panel v-for="(group, groupIndex) in visibleSenseGroups" :key="group.pos" class="sense-group-panel">
                 <v-expansion-panel-header>
                     <div class="d-flex align-center w-full">
                         <strong>{{ group.label }}</strong>
@@ -279,6 +284,10 @@ export default {
             type: String,
             default: '',
         },
+        compact: {
+            type: Boolean,
+            default: false,
+        },
     },
     computed: {
         ...mapState({
@@ -304,6 +313,10 @@ export default {
                     senses: senses,
                 };
             });
+        },
+        visibleSenseGroups() {
+            if (!this.compact) return this.senseGroups;
+            return this.senseGroups.filter(g => g.senses.length > 0);
         },
     },
     watch: {

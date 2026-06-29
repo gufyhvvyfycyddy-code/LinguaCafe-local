@@ -100,73 +100,136 @@
                     </div>
                 </template>
 
-                <!-- AI Suggestions -->
-                <div v-if="type === 'word' && (aiVocabSuggestions.length || aiPhraseSuggestions.length)" class="ai-suggestions-section mb-3">
-                    <div class="vocab-box-subheader d-flex mb-1">AI 建议</div>
-                    <v-alert v-if="aiLookupError" dense text type="error" class="mb-2">
-                        AI 建议读取失败，不影响手动添加释义。
-                    </v-alert>
-                    <div v-if="aiLookupLoading" class="d-flex align-center mb-2">
-                        <v-progress-circular indeterminate size="16" width="2" color="primary" class="mr-2" />
-                        <span class="text-caption">加载 AI 建议中...</span>
+                <!-- Saved Senses (compact, no empty groups) -->
+                <word-senses-list
+                    ref="wordSensesList"
+                    v-if="type === 'word'"
+                    :study-base="studyBase"
+                    :base-word="baseWord"
+                    :lemma="baseWord || word"
+                    :surface="word"
+                    :word="word"
+                    :language="$props.language"
+                    :legacy-translation="translationText"
+                    compact
+                    @word-learning-updated="$emit('word-learning-updated', $event)"
+                />
+
+                <!-- Legacy translation (collapsible, minimal) -->
+                <div class="vocab-box-subheader d-flex align-center mt-2" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
+                    <v-icon x-small class="mr-1">mdi-pencil-outline</v-icon>
+                    <span class="text-caption text--secondary">旧版释义（兼容）</span>
+                    <v-spacer />
+                    <v-icon x-small>{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                </div>
+                <v-textarea v-if="showLegacyTranslation" class="mb-2 mt-1" placeholder="旧词条释义（兼容保留）" filled dense no-resize rounded hide-details height="60" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
+
+                <!-- Unified 添加新释义 panel -->
+                <div class="add-sense-panel mt-3" v-if="type === 'word'">
+                    <div class="vocab-box-subheader d-flex align-center pa-2 rounded" @click="showAddSensePanel = !showAddSensePanel" style="cursor:pointer; border: 1px solid var(--v-primary-base);">
+                        <v-icon small color="primary" class="mr-2">mdi-plus-circle-outline</v-icon>
+                        <span class="font-weight-medium primary--text">添加新释义</span>
+                        <v-chip
+                            v-if="!showAddSensePanel && (aiVocabSuggestions.length + aiPhraseSuggestions.length)"
+                            x-small
+                            color="primary"
+                            class="ml-2"
+                        >{{ aiVocabSuggestions.length + aiPhraseSuggestions.length }} 条建议</v-chip>
+                        <v-spacer />
+                        <v-icon x-small :color="showAddSensePanel ? 'primary' : ''">{{ showAddSensePanel ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                     </div>
-                    <template v-for="(vi, viIndex) in aiVocabSuggestions">
-                        <div :key="'ai-v-' + viIndex" class="ai-suggestion-card rounded pa-2 mb-2">
-                            <div class="d-flex align-center mb-1">
-                                <v-chip x-small outlined class="mr-1">{{ vi.pos || '未知' }}</v-chip>
-                                <v-chip x-small :color="vi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ vi.confidence }}</v-chip>
+
+                    <template v-if="showAddSensePanel">
+                        <!-- Section: AI Suggestions -->
+                        <div v-if="aiLookupLoading" class="d-flex align-center mt-2 mb-2">
+                            <v-progress-circular indeterminate size="14" width="2" color="primary" class="mr-2" />
+                            <span class="text-caption">加载 AI 建议中...</span>
+                        </div>
+                        <v-alert v-else-if="aiLookupError" dense text type="error" class="mt-2 mb-2" small>
+                            AI 建议读取失败，不影响手动添加释义。
+                        </v-alert>
+                        <div v-if="aiVocabSuggestions.length || aiPhraseSuggestions.length" class="mb-2">
+                            <div class="text-caption font-weight-medium mb-1 mt-2">AI 建议</div>
+                            <template v-for="(vi, viIndex) in aiVocabSuggestions">
+                                <div :key="'ai-v-' + viIndex" class="ai-suggestion-card rounded pa-2 mb-2">
+                                    <div class="d-flex align-center mb-1">
+                                        <v-chip x-small outlined class="mr-1">{{ vi.pos || '未知' }}</v-chip>
+                                        <v-chip x-small :color="vi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ vi.confidence }}</v-chip>
+                                        <v-spacer />
+                                        <v-btn x-small outlined color="primary" @click="useAiSuggestion(vi)">
+                                            使用此释义
+                                        </v-btn>
+                                    </div>
+                                    <div class="text-body-2 mb-1">{{ vi.meaning_zh }}</div>
+                                    <div v-if="vi.reason" class="text-caption text--secondary">{{ vi.reason }}</div>
+                                    <div v-if="vi.source_sentence" class="text-caption text--secondary mt-1">
+                                        <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                        {{ vi.source_sentence }}
+                                    </div>
+                                </div>
+                            </template>
+                            <template v-for="(pi, piIndex) in aiPhraseSuggestions">
+                                <div :key="'ai-p-' + piIndex" class="ai-suggestion-card rounded pa-2 mb-2">
+                                    <div class="d-flex align-center mb-1">
+                                        <v-chip x-small outlined color="purple" class="mr-1">词组</v-chip>
+                                        <v-chip x-small :color="pi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ pi.confidence }}</v-chip>
+                                        <v-spacer />
+                                        <v-btn x-small outlined color="primary" @click="useAiPhraseSuggestion(pi)">
+                                            用于当前单词
+                                        </v-btn>
+                                    </div>
+                                    <div class="text-body-2 mb-1">{{ pi.phrase }}</div>
+                                    <div class="text-caption mb-1">{{ pi.meaning_zh }}</div>
+                                    <div v-if="pi.trigger_words && pi.trigger_words.length" class="text-caption text--secondary">
+                                        触发词：{{ pi.trigger_words.join(', ') }}
+                                    </div>
+                                    <div v-if="pi.source_sentence" class="text-caption text--secondary mt-1">
+                                        <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                        {{ pi.source_sentence }}
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Section: Dictionary -->
+                        <div class="mt-2">
+                            <v-text-field
+                                placeholder="搜索词典..."
+                                class="dictionary-search-field default-font"
+                                dense
+                                filled
+                                rounded
+                                hide-details
+                                prepend-inner-icon="mdi-magnify"
+                                :value="searchField"
+                                @change="searchFieldChanged"
+                                @keydown.stop=";"
+                            />
+                            <div class="vocab-box-subheader d-flex align-center mt-1" @click="showDictionaryResults = !showDictionaryResults" style="cursor:pointer;">
+                                <v-icon x-small class="mr-1">mdi-book-open-variant</v-icon>
+                                <span class="text-caption">词典结果</span>
                                 <v-spacer />
-                                <v-btn x-small outlined color="primary" @click="useAiSuggestion(vi)">
-                                    使用此释义
-                                </v-btn>
+                                <v-icon x-small>{{ showDictionaryResults ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                             </div>
-                            <div class="text-body-2 mb-1">{{ vi.meaning_zh }}</div>
-                            <div v-if="vi.reason" class="text-caption text--secondary">{{ vi.reason }}</div>
-                            <div v-if="vi.source_sentence" class="text-caption text--secondary mt-1">
-                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                {{ vi.source_sentence }}
-                            </div>
+                            <vocabulary-search-box
+                                v-if="showDictionaryResults"
+                                :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled"
+                                :language="$props.language"
+                                :searchTerm="searchField"
+                                @addDefinitionToInput="addDefinitionToInput"
+                                @addDefinitionAsSense="addDefinitionAsSense"
+                            />
+                        </div>
+
+                        <!-- Section: Manual -->
+                        <div class="mt-2 mb-2">
+                            <v-btn small text color="primary" block @click="openManualAddForm">
+                                <v-icon x-small class="mr-1">mdi-pencil</v-icon>
+                                手动输入释义
+                            </v-btn>
                         </div>
                     </template>
-                    <template v-for="(pi, piIndex) in aiPhraseSuggestions">
-                        <div :key="'ai-p-' + piIndex" class="ai-suggestion-card rounded pa-2 mb-2">
-                            <div class="d-flex align-center mb-1">
-                                <v-chip x-small outlined color="purple" class="mr-1">词组</v-chip>
-                                <v-chip x-small :color="pi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ pi.confidence }}</v-chip>
-                                <v-spacer />
-                                <v-btn x-small outlined color="primary" @click="useAiPhraseSuggestion(pi)">
-                                    用于当前单词
-                                </v-btn>
-                            </div>
-                            <div class="text-body-2 mb-1">{{ pi.phrase }}</div>
-                            <div class="text-caption mb-1">{{ pi.meaning_zh }}</div>
-                            <div v-if="pi.trigger_words && pi.trigger_words.length" class="text-caption text--secondary">
-                                触发词：{{ pi.trigger_words.join(', ') }}
-                            </div>
-                            <div v-if="pi.source_sentence" class="text-caption text--secondary mt-1">
-                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                {{ pi.source_sentence }}
-                            </div>
-                        </div>
-                    </template>
                 </div>
-
-                <div class="vocab-box-subheader d-flex align-center" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
-                    <span>选择释义</span>
-                    <v-spacer />
-                    <v-icon small :color="showLegacyTranslation ? 'primary' : ''">{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                </div>
-                <v-textarea v-if="showLegacyTranslation" class="mb-2 mt-1" placeholder="旧词条释义（兼容，不推荐使用此编辑入口）" title="旧词条释义" filled dense no-resize rounded hide-details height="80" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
-                <v-text-field placeholder="词典搜索" class="dictionary-search-field default-font mt-2 mb-3" width="100%" prepend-inner-icon="mdi-magnify" filled dense rounded hide-details :value="searchField" @change="searchFieldChanged" @keydown.stop=";" />
-
-                <div class="vocab-box-subheader d-flex align-center mt-3" @click="showDictionaryResults = !showDictionaryResults" style="cursor:pointer;">
-                    <span>词典结果</span>
-                    <v-spacer />
-                    <v-icon small :color="showDictionaryResults ? 'primary' : ''">{{ showDictionaryResults ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                </div>
-                <vocabulary-search-box v-if="type !== 'empty' && showDictionaryResults" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
-
-                <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" @word-learning-updated="$emit('word-learning-updated', $event)" />
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />
@@ -246,6 +309,7 @@ export default {
             tab: 0,
             showLegacyTranslation: false,
             showDictionaryResults: false,
+            showAddSensePanel: false,
             editingLemma: false,
             editLemmaValue: '',
             phraseText: '',
@@ -333,6 +397,7 @@ export default {
             this.inputChanged('translation');
         },
         addDefinitionAsSense(payload) {
+            this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromDictionary) {
                 this.$refs.wordSensesList.openAddFormFromDictionary(payload);
             }
@@ -378,7 +443,18 @@ export default {
                 this.$store.commit('vocabularyBox/setAiLookupLoading', false);
             });
         },
+        openManualAddForm() {
+            this.showAddSensePanel = true;
+            if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddForm) {
+                this.$refs.wordSensesList.openAddForm();
+                this.$nextTick(() => {
+                    const el = this.$refs.wordSensesList.$el.querySelector('.sense-form');
+                    if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                });
+            }
+        },
         useAiSuggestion(vi) {
+            this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
                 this.$refs.wordSensesList.openAddFormFromAi({
                     pos: vi.pos || 'verb',
@@ -389,6 +465,7 @@ export default {
             }
         },
         useAiPhraseSuggestion(pi) {
+            this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
                 this.$refs.wordSensesList.openAddFormFromAi({
                     pos: 'other',
