@@ -102,6 +102,22 @@ python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 -
 
 阅读页相关改动优先执行 MCP / webapp-testing 视觉验收。Python smoke guard 仍保留，用于快速自动断言。
 
+### 实际验证经验（Lab-3）
+
+Lab-3 R0 使用真实 MCP / webapp-testing 验证了 `maximumTextWidthData` 收敛（R2）和 resize handler 合并（R3）：
+
+1. **编译 JS 验证**：`npm run development` 后确认 `public/js/app.js` 包含 `MAXIMUM_TEXT_WIDTH_OPTIONS` 和 `handleReaderResize`。
+2. **设置页 slider**：需要已登录且有章节数据的用户环境。Lab-3 中因测试用户无 chapter 5 数据，未完成视觉验证。
+3. **1920px 与 900px**：在已登录状态下侧边栏在 900px 正确隐藏，验证 resize handler 合并未破坏 fallback 行为。
+4. **Network 检查**：未检测到 `POST /senses/manual`。
+5. **截图保存路径**：`D:\Document\lingl\mcp-browser-smoke-screenshots\`
+6. **验证失败处理**：auth 状态过期或测试数据不足时，手动登录或补充测试数据后可重新运行。
+
+### 验证检查指南
+- 验证 Lab-2 R2（宽度选项收敛）：打开阅读设置，检查"最大文本宽度"slider 的 thumb label 仍显示 `800px` / `900px` / `1000px` / `1200px` / `1400px` / `1600px` / `100%`。
+- 验证 Lab-2 R3（resize handler 合并）：调整浏览器宽度至 1920px 和 900px，确认右侧栏正确显示/隐藏。
+- 验证 Lab-3 R3（toolbar actions 收敛）：点击工具栏各按钮，确认纯文本模式、快捷键 dialog、AI 阅读辅助、AI 译文按钮响应正常，页面不白屏。
+
 ### 验收步骤
 
 MCP 视觉验收步骤至少包括：

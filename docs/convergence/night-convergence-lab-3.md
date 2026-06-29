@@ -226,12 +226,28 @@ AGENTS.md
 - **目标**：根据 R4 结论执行或延期
 - **允许修改文件**：VocabularySearchBox.vue, VocabularySearchResultService.js（可新增）, lab-3.md
 - **验证方式**：npm build + smoke + MCP
+- **执行结果**：
+  - R4 不建议标准化 VocabularySearchBox 数据结构
+  - R5 延期不做实现
+  - 原因：收益中等、改动多、当前两套渲染清晰可维护
+  - **不改代码** ✅
+  - **通过** ✅
 
 ## R6 设计
 
 - **目标**：更新 smoke-guard.md 记录 Lab-3 验证经验
 - **允许修改文件**：text-reader-smoke-guard.md, lab-3.md
 - **验证方式**：git diff
+- **执行结果**：
+  - 更新 `docs/testing/text-reader-smoke-guard.md`：
+    - 新增「实际验证经验（Lab-3）」小节 ✅
+    - 新增「验证检查指南」小节 ✅
+    - 记录 Lab-3 实际 MCP 验证覆盖 ✅
+    - 记录 resize handler 改动后 1920px 和 900px 验证方法 ✅
+    - 记录 toolbar action 改动后验证方法 ✅
+  - 不写账号密码 ✅
+  - 不写 cookie/auth 内容 ✅
+  - **通过** ✅
 
 ## R7 设计
 
