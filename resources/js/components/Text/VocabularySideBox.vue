@@ -100,6 +100,57 @@
                     </div>
                 </template>
 
+                <!-- AI Suggestions -->
+                <div v-if="type === 'word' && (aiVocabSuggestions.length || aiPhraseSuggestions.length)" class="ai-suggestions-section mb-3">
+                    <div class="vocab-box-subheader d-flex mb-1">AI 建议</div>
+                    <v-alert v-if="aiLookupError" dense text type="error" class="mb-2">
+                        AI 建议读取失败，不影响手动添加释义。
+                    </v-alert>
+                    <div v-if="aiLookupLoading" class="d-flex align-center mb-2">
+                        <v-progress-circular indeterminate size="16" width="2" color="primary" class="mr-2" />
+                        <span class="text-caption">加载 AI 建议中...</span>
+                    </div>
+                    <template v-for="(vi, viIndex) in aiVocabSuggestions">
+                        <div :key="'ai-v-' + viIndex" class="ai-suggestion-card rounded pa-2 mb-2">
+                            <div class="d-flex align-center mb-1">
+                                <v-chip x-small outlined class="mr-1">{{ vi.pos || '未知' }}</v-chip>
+                                <v-chip x-small :color="vi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ vi.confidence }}</v-chip>
+                                <v-spacer />
+                                <v-btn x-small outlined color="primary" @click="useAiSuggestion(vi)">
+                                    使用此释义
+                                </v-btn>
+                            </div>
+                            <div class="text-body-2 mb-1">{{ vi.meaning_zh }}</div>
+                            <div v-if="vi.reason" class="text-caption text--secondary">{{ vi.reason }}</div>
+                            <div v-if="vi.source_sentence" class="text-caption text--secondary mt-1">
+                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                {{ vi.source_sentence }}
+                            </div>
+                        </div>
+                    </template>
+                    <template v-for="(pi, piIndex) in aiPhraseSuggestions">
+                        <div :key="'ai-p-' + piIndex" class="ai-suggestion-card rounded pa-2 mb-2">
+                            <div class="d-flex align-center mb-1">
+                                <v-chip x-small outlined color="purple" class="mr-1">词组</v-chip>
+                                <v-chip x-small :color="pi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ pi.confidence }}</v-chip>
+                                <v-spacer />
+                                <v-btn x-small outlined color="primary" @click="useAiPhraseSuggestion(pi)">
+                                    用于当前单词
+                                </v-btn>
+                            </div>
+                            <div class="text-body-2 mb-1">{{ pi.phrase }}</div>
+                            <div class="text-caption mb-1">{{ pi.meaning_zh }}</div>
+                            <div v-if="pi.trigger_words && pi.trigger_words.length" class="text-caption text--secondary">
+                                触发词：{{ pi.trigger_words.join(', ') }}
+                            </div>
+                            <div v-if="pi.source_sentence" class="text-caption text--secondary mt-1">
+                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                {{ pi.source_sentence }}
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
                 <div class="vocab-box-subheader d-flex align-center" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
                     <span>选择释义</span>
                     <v-spacer />
@@ -154,29 +205,40 @@ export default {
         anyApiDictionaryEnabled: Boolean,
         textToSpeechAvailable: Boolean,
     },
-    computed: mapState({
-        type: state => state.vocabularyBox.type,
-        word: state => state.vocabularyBox.word,
-        phrase: state => state.vocabularyBox.phrase,
-        stage: state => state.vocabularyBox.stage,
-        inflections: state => state.vocabularyBox.inflections,
-        _reading: state => state.vocabularyBox.reading,
-        _baseWord: state => state.vocabularyBox.baseWord,
-        _studyBase: state => state.vocabularyBox.studyBase,
-        _baseWordReading: state => state.vocabularyBox.baseWordReading,
-        _phraseReading: state => state.vocabularyBox.phraseReading,
-        _translationText: state => state.vocabularyBox.translationText,
-        _searchField: state => state.vocabularyBox.searchField,
-        positionLeft: state => state.vocabularyBox.positionLeft,
-        positionTop: state => state.vocabularyBox.positionTop,
-        height: state => state.vocabularyBox.height,
-        fsrsFamiliarityPercent: state => state.vocabularyBox.fsrsFamiliarityPercent,
-        fsrsFamiliarityLevel10: state => state.vocabularyBox.fsrsFamiliarityLevel10,
-        fsrsFamiliarityScore: state => state.vocabularyBox.fsrsFamiliarityScore,
-        fsrsFamiliarityHasData: state => state.vocabularyBox.fsrsFamiliarityHasData,
-    }),
+    computed: {
+        ...mapState({
+            type: state => state.vocabularyBox.type,
+            word: state => state.vocabularyBox.word,
+            phrase: state => state.vocabularyBox.phrase,
+            stage: state => state.vocabularyBox.stage,
+            inflections: state => state.vocabularyBox.inflections,
+            _reading: state => state.vocabularyBox.reading,
+            _baseWord: state => state.vocabularyBox.baseWord,
+            _studyBase: state => state.vocabularyBox.studyBase,
+            _baseWordReading: state => state.vocabularyBox.baseWordReading,
+            _phraseReading: state => state.vocabularyBox.phraseReading,
+            _translationText: state => state.vocabularyBox.translationText,
+            _searchField: state => state.vocabularyBox.searchField,
+            positionLeft: state => state.vocabularyBox.positionLeft,
+            positionTop: state => state.vocabularyBox.positionTop,
+            height: state => state.vocabularyBox.height,
+            fsrsFamiliarityPercent: state => state.vocabularyBox.fsrsFamiliarityPercent,
+            fsrsFamiliarityLevel10: state => state.vocabularyBox.fsrsFamiliarityLevel10,
+            fsrsFamiliarityScore: state => state.vocabularyBox.fsrsFamiliarityScore,
+            fsrsFamiliarityHasData: state => state.vocabularyBox.fsrsFamiliarityHasData,
+            _chapterId: state => state.vocabularyBox.chapterId,
+            _sentenceIndex: state => state.vocabularyBox.sentenceIndex,
+            aiVocabSuggestions: state => state.vocabularyBox.aiVocabSuggestions,
+            aiPhraseSuggestions: state => state.vocabularyBox.aiPhraseSuggestions,
+            aiLookupLoading: state => state.vocabularyBox.aiLookupLoading,
+            aiLookupError: state => state.vocabularyBox.aiLookupError,
+        }),
+    },
     watch: {
-        word() { this.updateDataFromStore(); },
+        word() {
+            this.updateDataFromStore();
+            this.loadAiSuggestions();
+        },
         phrase() { this.updateDataFromStore(); },
     },
     data() {
@@ -286,6 +348,54 @@ export default {
 
             if (inputName == 'translation' && this.$store.state.vocabularyBox.stage >= 0 && this.$props.autoHighlightWords && this.translationText !== '') {
                 this.setStage(-7);
+            }
+        },
+        loadAiSuggestions() {
+            const chapterId = this.$store.state.vocabularyBox.chapterId;
+            const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
+            const word = this.word;
+            const lemma = this.studyBase || this._studyBase || this._baseWord || word;
+            if (!chapterId || sentenceIndex === null || !word) {
+                this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
+                this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
+                return;
+            }
+            this.$store.commit('vocabularyBox/setAiLookupLoading', true);
+            this.$store.commit('vocabularyBox/setAiLookupError', '');
+            axios.get('/chapters/ai-assist/lookup/' + chapterId, {
+                params: { word, lemma, sentence_index: sentenceIndex }
+            }).then((response) => {
+                const data = response.data;
+                if (data.success) {
+                    this.$store.commit('vocabularyBox/setAiVocabSuggestions', data.vocabulary_suggestions || []);
+                    this.$store.commit('vocabularyBox/setAiPhraseSuggestions', data.phrase_suggestions || []);
+                }
+            }).catch(() => {
+                this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
+                this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
+                this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
+            }).finally(() => {
+                this.$store.commit('vocabularyBox/setAiLookupLoading', false);
+            });
+        },
+        useAiSuggestion(vi) {
+            if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
+                this.$refs.wordSensesList.openAddFormFromAi({
+                    pos: vi.pos || 'verb',
+                    sense_zh: vi.meaning_zh || '',
+                    source_sentence: vi.source_sentence || '',
+                    reason: vi.reason || '',
+                });
+            }
+        },
+        useAiPhraseSuggestion(pi) {
+            if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
+                this.$refs.wordSensesList.openAddFormFromAi({
+                    pos: 'other',
+                    sense_zh: pi.meaning_zh || '',
+                    source_sentence: pi.source_sentence || '',
+                    reason: '词组：' + (pi.phrase || ''),
+                });
             }
         },
         addSelectedWordToAnki() { this.$emit('addSelectedWordToAnki'); },

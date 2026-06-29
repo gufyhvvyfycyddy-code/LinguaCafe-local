@@ -83,6 +83,32 @@ class AiReadingAssistController extends Controller
      *
      * POST /chapters/ai-assist/confirm
      */
+    /**
+     * Look up AI vocabulary and phrase suggestions for a word in a sentence.
+     *
+     * GET /chapters/ai-assist/lookup/{chapterId}
+     */
+    public function lookup(int $chapterId, Request $request)
+    {
+        $request->validate([
+            'word' => ['required', 'string', 'min:1'],
+            'lemma' => ['required', 'string'],
+            'sentence_index' => ['required', 'integer', 'min:0'],
+        ]);
+
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+        $word = $request->query('word', '');
+        $lemma = $request->query('lemma', '');
+        $sentenceIndex = (int) $request->query('sentence_index', 0);
+
+        $result = $this->aiReadingAssistService->lookupSuggestions($userId, $language, $chapterId, $word, $lemma, $sentenceIndex);
+
+        $statusCode = $result['success'] ? 200 : 404;
+
+        return response()->json($result, $statusCode);
+    }
+
     public function confirm(Request $request)
     {
         $request->validate([

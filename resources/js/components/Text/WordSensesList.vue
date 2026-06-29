@@ -469,8 +469,30 @@ export default {
             if (prefill) {
                 this.prefillSource = prefill.dictionary || '词典';
                 this.newForm.pos = prefill.pos || this.newForm.pos;
-                this.newForm.sense_zh = this.cleanDictionaryDefinition(prefill.definition);
+                if (prefill.sense_zh) {
+                    this.newForm.sense_zh = prefill.sense_zh;
+                } else if (prefill.definition) {
+                    this.newForm.sense_zh = this.cleanDictionaryDefinition(prefill.definition);
+                }
+                if (prefill.source_sentence) {
+                    this.newForm.example_sentence_en = prefill.source_sentence;
+                }
             }
+        },
+        openAddFormFromAi(payload) {
+            const prefill = {
+                pos: payload?.pos || 'other',
+                sense_zh: payload?.sense_zh || '',
+                source_sentence: payload?.source_sentence || '',
+                ai_reason: payload?.reason || '',
+                dictionary: 'AI 建议',
+            };
+            this.openAddForm(prefill.pos, prefill);
+            this.$nextTick(() => {
+                if (payload?.source_sentence && this.$refs.sourceSentence) {
+                    this.$refs.sourceSentence.focus();
+                }
+            });
         },
         openAddFormFromDictionary(payload) {
             this.openAddForm(payload && payload.pos ? payload.pos : 'other', payload || {});

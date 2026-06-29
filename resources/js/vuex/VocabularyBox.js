@@ -40,6 +40,12 @@ export default {
         fsrsFamiliarityScore: null,
         fsrsFamiliarityHasData: false,
 
+        // AI reading assist suggestions
+        aiVocabSuggestions: [],
+        aiPhraseSuggestions: [],
+        aiLookupLoading: false,
+        aiLookupError: '',
+
         // ui data
         tab: 0,
         width: 400,
@@ -152,6 +158,18 @@ export default {
         },
         setSidebarHidden(state, value) {
             state.sidebarHidden = value;
+        },
+        setAiVocabSuggestions(state, value) {
+            state.aiVocabSuggestions = value;
+        },
+        setAiPhraseSuggestions(state, value) {
+            state.aiPhraseSuggestions = value;
+        },
+        setAiLookupLoading(state, value) {
+            state.aiLookupLoading = value;
+        },
+        setAiLookupError(state, value) {
+            state.aiLookupError = value;
         },
         pushWordToPhrase (state, value) {
             state.phrase.push(value);

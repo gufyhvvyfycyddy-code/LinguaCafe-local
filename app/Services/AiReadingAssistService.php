@@ -193,6 +193,97 @@ class AiReadingAssistService
      *
      * @return array
      */
+    /**
+     * Look up AI vocabulary and phrase suggestions for a specific word in a sentence.
+     *
+     * Matches by sentence_index + (surface OR lemma) for vocab items,
+     * and by sentence_index + (trigger_words OR phrase) for phrase items.
+     *
+     * @return array
+     */
+    public function lookupSuggestions(int $userId, string $language, int $chapterId, string $word, string $lemma, int $sentenceIndex): array
+    {
+        $chapter = Chapter::where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->first();
+
+        if (!$chapter) {
+            return ['success' => false, 'message' => '章节不存在或不属于当前用户。'];
+        }
+
+        $record = ChapterAiReadingAssist::where('user_id', $userId)
+            ->where('language', $language)
+            ->where('chapter_id', $chapterId)
+            ->first();
+
+        if (!$record) {
+            return [
+                'success' => true,
+                'vocabulary_suggestions' => [],
+                'phrase_suggestions' => [],
+            ];
+        }
+
+        $vocabItems = $record->vocabulary_items ?? [];
+        $phraseItems = $record->phrase_items ?? [];
+        $wordLower = mb_strtolower(trim($word));
+        $lemmaLower = mb_strtolower(trim($lemma));
+
+        // Match vocabulary_items
+        $vocabSuggestions = [];
+        foreach ($vocabItems as $vi) {
+            $viSi = $vi['sentence_index'] ?? null;
+            if ($viSi === null || (int) $viSi !== $sentenceIndex) {
+                continue;
+            }
+            $surface = mb_strtolower(trim($vi['surface'] ?? ''));
+            $suggestedLemma = mb_strtolower(trim($vi['suggested_lemma'] ?? ''));
+            $matched = ($surface === $wordLower) || ($surface === $lemmaLower)
+                || ($suggestedLemma === $wordLower) || ($suggestedLemma === $lemmaLower);
+            if ($matched) {
+                $vocabSuggestions[] = [
+                    'surface' => $vi['surface'] ?? '',
+                    'suggested_lemma' => $vi['suggested_lemma'] ?? '',
+                    'pos' => $vi['pos'] ?? '',
+                    'meaning_zh' => $vi['meaning_zh'] ?? '',
+                    'source_sentence' => $vi['source_sentence'] ?? '',
+                    'reason' => $vi['reason'] ?? '',
+                    'confidence' => $vi['confidence'] ?? 'medium',
+                ];
+            }
+        }
+
+        // Match phrase_items by trigger_words or phrase text
+        $phraseSuggestions = [];
+        foreach ($phraseItems as $pi) {
+            $piSi = $pi['sentence_index'] ?? null;
+            if ($piSi === null || (int) $piSi !== $sentenceIndex) {
+                continue;
+            }
+            $triggerWords = array_map('mb_strtolower', array_map('trim', $pi['trigger_words'] ?? []));
+            $phrase = mb_strtolower(trim($pi['phrase'] ?? ''));
+            $matched = in_array($wordLower, $triggerWords) || in_array($lemmaLower, $triggerWords)
+                || str_contains($phrase, $wordLower) || str_contains($phrase, $lemmaLower);
+            if ($matched) {
+                $phraseSuggestions[] = [
+                    'phrase' => $pi['phrase'] ?? '',
+                    'meaning_zh' => $pi['meaning_zh'] ?? '',
+                    'source_sentence' => $pi['source_sentence'] ?? '',
+                    'trigger_words' => $pi['trigger_words'] ?? [],
+                    'reason' => $pi['reason'] ?? '',
+                    'confidence' => $pi['confidence'] ?? 'medium',
+                ];
+            }
+        }
+
+        return [
+            'success' => true,
+            'vocabulary_suggestions' => $vocabSuggestions,
+            'phrase_suggestions' => $phraseSuggestions,
+        ];
+    }
+
     public function getCurrentAssist(int $userId, string $language, int $chapterId): array
     {
         $chapter = Chapter::where('id', $chapterId)
