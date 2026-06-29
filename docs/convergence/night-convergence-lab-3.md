@@ -201,6 +201,25 @@ AGENTS.md
 - **目标**：只读审查 VocabularySearchBox 数据结构
 - **允许修改文件**：lab-3.md
 - **验证方式**：git diff
+- **执行结果**：
+  ### 数据结构分析
+  | 数据源 | 结构 | 处理方式 |
+  |--------|------|----------|
+  | 本地词典 | `{dictionary, color, records[{word, definitions}]}` | `processVocabularySearchResults()` |
+  | JMDict | `{dictionary, color, records[{word, definitions, otherForms}]}` | 同上（JMDict 特殊分支） |
+  | API 词典 | `[{dictionary, definitions[]}]` | 直接赋值，无标准化 |
+  ### 关键差异
+  - 本地词典定义在 `records` 下，API 词典定义直接挂 dictionary
+  - 本地词典有 `word` 字段，API 没有独立的 word（使用 searchTerm）
+  - 模板渲染两个独立 v-for 块
+  ### 结论
+  标准化收益中等，但：
+  1. 需要统一数据格式（涉及 axios 响应处理）
+  2. 模板统一会增加单次改动行数
+  3. API/本地结果字段差异需要兼容层
+  4. 不改 API 请求（禁止修改）
+  **建议**：不做标准化。当前两套渲染是清晰可维护的。等到需要新增 API 词典源时再统一。
+  - **通过** ✅
 
 ## R5 设计
 
