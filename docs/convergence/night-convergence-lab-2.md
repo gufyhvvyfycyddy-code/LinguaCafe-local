@@ -232,6 +232,18 @@ resources/js/components/TextReader/TextReaderSettings.vue
 - **预计收益**：为下一轮提供决策依据
 - **验证方式**：git diff --check, git diff --stat
 - **执行结果**：
+  ### 扫描结果
+  TextReaderSettings.vue 中 data 部分的选项数组：
+  | 选项 | 定义位置 | 使用位置 | 是否重复 | 建议 |
+  |------|----------|----------|----------|------|
+  | `maximumTextWidthData` | TextReaderSettings.vue:503 | TextReaderSettings.vue:76 | ✅ R2 已提取 | 已完成 |
+  | `vocabBoxScrollIntoViewData` | TextReaderSettings.vue:489 | TextReaderSettings.vue:307 | ❌ 仅此一处 | 不提取，无重复 |
+  | `vocabularyHoverBoxPreferredPositionData` | TextReaderSettings.vue:479 | TextReaderSettings.vue:431 | ❌ 仅此一处 | 不提取，无重复 |
+  | 滑块 tick-labels（内联数组） | 模板内联 | 模板内联 | ❌ 仅此一处 | 不提取，无重复 |
+  ### 结论
+  ✅ 当前所有剩余选项数据均为单次定义/单次使用。R2 已覆盖全部重复常量。不需要进一步提取到 `TextReaderSettingsOptionsService.js`。
+  - **R5 不改业务代码** ✅
+  - **通过** ✅
 
 ## R6 设计
 
