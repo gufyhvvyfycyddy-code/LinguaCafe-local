@@ -218,6 +218,7 @@
 import { mapState } from 'vuex';
 import WordSensesList from './WordSensesList.vue';
 import AiSuggestionPanel from './AiSuggestionPanel.vue';
+import { getReaderSidebarCssWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
 
 export default {
     components: {
@@ -236,10 +237,7 @@ export default {
                 ? document.getElementById('fullscreen-box')
                 : null;
             const width = readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
-            if (width >= 1500) return '600px';
-            if (width >= 1280) return '560px';
-            if (width >= 1080) return '520px';
-            return '400px';
+            return getReaderSidebarCssWidthForWorkspace(width);
         },
         ...mapState({
             type: state => state.vocabularyBox.type,

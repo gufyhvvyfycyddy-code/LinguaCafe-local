@@ -253,6 +253,7 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager, defaultSettings } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
+    import { getReaderSidebarWidthForWorkspace, doesReaderSidebarFitWorkspace } from './../../services/ReaderWorkspaceSizingService';
 
     export default {
         data: function() {
@@ -444,10 +445,7 @@
                 return readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
             },
             readerSidebarWidthForContentWidth(width) {
-                if (width >= 1500) return 600;
-                if (width >= 1280) return 560;
-                if (width >= 1080) return 520;
-                return 400;
+                return getReaderSidebarWidthForWorkspace(width);
             },
             loadAiAssistCurrent() {
                 if (!this.chapterId) return;
@@ -465,12 +463,8 @@
                 });
             },
             vocabularySidebarTest() {
-                // Keep the sidebar only when the current reader workspace still leaves
-                // enough room for a stable text column.
                 const workspaceWidth = this.readerWorkspaceWidth();
-                const sidebarEstimate = this.readerSidebarWidthForContentWidth(workspaceWidth);
-                const minimumReaderWidth = workspaceWidth >= 1280 ? 720 : 560;
-                this.vocabularySidebarFits = workspaceWidth >= minimumReaderWidth + sidebarEstimate + 72;
+                this.vocabularySidebarFits = doesReaderSidebarFitWorkspace(workspaceWidth);
                 this.$forceUpdate();
 
                 this.$nextTick(() => {
