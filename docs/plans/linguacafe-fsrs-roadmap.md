@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`938b6e4`（开始 Reader-UI-6-a 前的最新 commit）
+**Latest commit**：`f8a9876`（Feat: clarify reader lookup reset action）
 
 ### `/review-cards/manage` 当前能力
 
