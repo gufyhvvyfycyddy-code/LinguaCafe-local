@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`a1c1bb3`（Fix: align AI sentence translations with reader sentences）
+**Latest commit**：`535d7b4`（Feat: show AI reading suggestions in lookup sidebar）
 
 ### `/review-cards/manage` 当前能力
 
@@ -595,6 +595,7 @@
 | 高 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏开关 | ✅ 已完成 | 新增 current 读取接口 + 阅读页工具栏开关 + TextBlockGroup 按句渲染，不创建学习数据 |
 | 低 | AI-Reading-Assist-4-a | AI 译文显示改为双字体区分 | ✅ 已完成 | 移除"AI 译文："前缀，改用 .lc-ai-sentence-translation class + 中文衬线字体，暗色模式支持 |
 | 高 | AI-Reading-Assist-4-b | AI 译文句子对齐修复 + 幼圆字体 | ✅ 已完成 | prompt 新增句子列表，preview/confirm 校验 sentence_index 对齐，拒绝不存在索引，字体改用幼圆 |
+| 高 | AI-Reading-Assist-5 | AI 生词/词组建议进入查词侧栏 | ✅ 已完成 | lookup 接口 + 查词栏 AI 建议区域 + 点击预填释义表单，不自动创建学习数据 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
