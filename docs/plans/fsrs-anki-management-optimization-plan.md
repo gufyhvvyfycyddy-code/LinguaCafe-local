@@ -36,8 +36,8 @@
 | 阶段 | 内容 | 状态 |
 |------|------|------|
 | FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 当前阶段 |
-| FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | ✅ 当前阶段 |
-| FSRS-Anki-Mgmt-3 | 重排风险面板优化 | 📋 计划中 |
+| FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | ✅ 已完成 |
+| FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 当前阶段 |
 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | 📋 计划中 |
 | FSRS-Anki-Mgmt-5 | Preset / 分组参数长期评估 | 📋 计划中 |
 
