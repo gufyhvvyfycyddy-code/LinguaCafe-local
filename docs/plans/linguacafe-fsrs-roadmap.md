@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-29
-> **上一轮已验收基线 commit**：`0213234`
+> **上一轮已验收基线 commit**：`981a4b5`
 
 ---
 
@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`71fadb2`（Feat: add AI reading assist preview search）
+**Latest commit**：`981a4b5`（Docs: update roadmap Latest commit to 71fadb2）
 
 ### `/review-cards/manage` 当前能力
 
@@ -583,6 +583,7 @@
 | 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 已完成 | `/reviews` + `/reviews/senses` 队列限制 + 超额复习入口 |
 | 中 | FSRS-Anki-Mgmt-7-follow-up | 修复 `/reviews/senses` 绕过每日上限问题 | ✅ 已完成 | SenseReviewController 改用 dueCardsWithLimits，SettingsService is_queue_enforced 改为 true |
 | 中 | FSRS-Anki-Mgmt-7-b | 每日新学累计计数精确化 | 📋 计划中 | 当前只限制队列显示数量，未严格统计今日已学新卡累计 |
+| 中 | Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动 | ✅ 已完成 | 后端 TextBlockService 根据 ReviewCard stability/due_at/state 计算熟悉度 level 1-7 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
@@ -595,6 +596,7 @@
 | 中 | AI-Reading-Assist-2-search | 详情页增加英文搜索框 | ✅ 已完成 | 大小写不敏感，覆盖 4 类详情字段 + trigger_words 数组 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
 | 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化 | 📋 计划中 | 见 ai-reading-assist-plan.md 第 7 节 |
+| 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | 📋 待审计 | 审计确认自动提升仍使用旧 SRS（EncounteredWord.setStage），建议后续单独任务 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
 

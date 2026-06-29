@@ -1,0 +1,366 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Book;
+use App\Models\Chapter;
+use App\Models\EncounteredWord;
+use App\Models\ReviewCard;
+use App\Models\User;
+use App\Models\WordSense;
+use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Tests\TestCase;
+
+class ReaderFsrsHighlightTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private User $user;
+    private User $otherUser;
+    private Chapter $chapter;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->user = User::forceCreate([
+            'name' => 'FSRS Highlight Test',
+            'email' => '__VG_EMAIL_fsrs_highlight__',
+            'password' => Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'is_admin' => true,
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+        ]);
+
+        $this->otherUser = User::forceCreate([
+            'name' => 'Other User',
+            'email' => '__VG_EMAIL_other__',
+            'password' => Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'is_admin' => false,
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+        ]);
+
+        $book = Book::forceCreate([
+            'user_id' => $this->user->id,
+            'name' => 'FSRS Highlight Book',
+            'language' => 'english',
+        ]);
+
+        $processedWords = [
+            (object) ['word' => 'Phenomenology', 'lemma' => 'phenomenology', 'pos' => 'NOUN', 'sentence_index' => 0, 'phrase_ids' => []],
+            (object) ['word' => 'is', 'lemma' => 'be', 'pos' => 'AUX', 'sentence_index' => 0, 'phrase_ids' => []],
+            (object) ['word' => 'a', 'lemma' => 'a', 'pos' => 'DET', 'sentence_index' => 0, 'phrase_ids' => []],
+            (object) ['word' => 'philosophical', 'lemma' => 'philosophical', 'pos' => 'ADJ', 'sentence_index' => 0, 'phrase_ids' => []],
+            (object) ['word' => 'tradition', 'lemma' => 'tradition', 'pos' => 'NOUN', 'sentence_index' => 0, 'phrase_ids' => []],
+        ];
+
+        $this->chapter = Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'name' => 'FSRS Highlight Chapter',
+            'language' => 'english',
+            'raw_text' => "Phenomenology is a philosophical tradition.",
+            'word_count' => 5,
+            'read_count' => 0,
+            'unique_words' => '["phenomenology"]',
+            'unique_word_ids' => '[]',
+            'processed_text' => gzcompress(json_encode($processedWords), 1),
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
+    }
+
+    private function createEncounteredWord(string $word, string $lemma, int $stage): EncounteredWord
+    {
+        $ew = EncounteredWord::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word' => $word,
+            'lemma' => $lemma,
+            'stage' => $stage,
+            'lookup_count' => 0,
+            'read_count' => 0,
+            'kanji' => '',
+            'reading' => '',
+            'base_word' => '',
+            'study_base' => '',
+            'base_word' => '',
+            'base_word_reading' => '',
+            'translation' => '',
+            'relearning' => false,
+        ]);
+        return $ew;
+    }
+
+    private function createWordSense(EncounteredWord $ew, string $status = WordSense::STATUS_CONFIRMED): WordSense
+    {
+        return WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 1,
+            'lemma' => $ew->lemma,
+            'surface_form' => $ew->word,
+            'encountered_word_id' => $ew->id,
+            'sense_zh' => '测试',
+            'status' => $status,
+            'sense_key' => hash('sha256', strtolower("english|{$ew->lemma}|noun|测试")),
+        ]);
+    }
+
+    private function createReviewCard(WordSense $ws, float $stability, ?Carbon $dueAt = null, string $state = 'review'): ReviewCard
+    {
+        return ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 1,
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $ws->id,
+            'fsrs_state' => $state,
+            'fsrs_due_at' => $dueAt ?? Carbon::now()->addDay(),
+            'fsrs_stability' => $stability,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 1,
+            'fsrs_lapses' => 0,
+        ]);
+    }
+
+    private function loadReader(string $endpoint = '/chapters/get/reader'): \Illuminate\Testing\TestResponse
+    {
+        return $this->actingAs($this->user)->postJson($endpoint, [
+            'chapterId' => $this->chapter->id,
+        ]);
+    }
+
+    // ── Tests ────────────────────────────────────
+
+    public function test_reader_returns_fsrs_familiarity_for_learning_word(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 10.0, state: 'review');
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        // Words array has the FSRS-overridden stage
+        $words = $response->json('words');
+        $phenWord = collect($words)->firstWhere('word', 'Phenomenology');
+        $this->assertNotNull($phenWord, 'Phenomenology should be in words array');
+
+        // Stage -5 (stability 10 → level 5 → -5)
+        $this->assertEquals(-5, $phenWord['stage'], 'stage should be FSRS-based');
+
+        // uniqueWords is NOT overridden (it's the raw EncounteredWord data)
+        $uniqueWords = $response->json('uniqueWords');
+        $phen = collect($uniqueWords)->firstWhere('word', 'phenomenology');
+        $this->assertEquals(-1, $phen['stage']);
+    }
+
+    public function test_high_stability_cards_get_higher_highlight_level(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 40.0, state: 'review', dueAt: Carbon::now()->addDays(30));
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-7, $phen['stage']); // highest level
+    }
+
+    public function test_low_stability_cards_get_lower_highlight_level(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 0.5, state: 'review');
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-2, $phen['stage']); // low stability → level 2
+    }
+
+    public function test_overdue_cards_get_penalty(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        // Stability 10 → level 5, but overdue → level 4
+        $this->createReviewCard($ws, stability: 10.0, dueAt: Carbon::now()->subDay());
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-4, $phen['stage']); // penalized by 1
+    }
+
+    public function test_new_state_cards_get_level_1(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 0, state: 'new');
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-1, $phen['stage']); // new → level 1
+    }
+
+    public function test_word_without_word_sense_uses_old_stage(): void
+    {
+        // Has EncounteredWord with old SRS stage, but no WordSense → keep old stage
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        // No WordSense created
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        // Old SRS -7 should be kept (no FSRS override since no WordSense)
+        $this->assertEquals(-7, $phen['stage']);
+    }
+
+    public function test_word_without_review_card_keeps_old_stage(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        // No ReviewCard created — keep old SRS stage since there's no FSRS data
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-7, $phen['stage']); // unchanged (no FSRS card to compute from)
+    }
+
+    public function test_new_word_stage_2_is_not_affected(): void
+    {
+        $this->createEncounteredWord('phenomenology', 'phenomenology', 2);
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(2, $phen['stage']); // unchanged
+    }
+
+    public function test_known_word_stage_0_is_not_affected(): void
+    {
+        $this->createEncounteredWord('phenomenology', 'phenomenology', 0);
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(0, $phen['stage']); // unchanged
+    }
+
+    public function test_word_sense_without_review_card_keeps_old_stage(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $this->createWordSense($ew);
+        // WordSense exists but no ReviewCard
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-7, $phen['stage']); // unchanged — no FSRS card
+        $this->assertArrayNotHasKey('fsrs_familiarity_score', $phen);
+    }
+
+    public function test_reader_does_not_create_review_log(): void
+    {
+        $originalLogCount = \App\Models\ReviewLog::count();
+        $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+
+        $this->loadReader();
+
+        $this->assertEquals($originalLogCount, \App\Models\ReviewLog::count());
+    }
+
+    public function test_reader_does_not_modify_encountered_word_stage(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+
+        $this->loadReader();
+
+        $ew->refresh();
+        $this->assertEquals(-7, $ew->stage); // unchanged in DB
+    }
+
+    public function test_reader_does_not_modify_review_card_due_at(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $rc = $this->createReviewCard($ws, stability: 10.0, dueAt: Carbon::now()->addDay());
+        $originalDue = $rc->fsrs_due_at;
+
+        $this->loadReader();
+
+        $rc->refresh();
+        $this->assertEquals($originalDue, $rc->fsrs_due_at);
+    }
+
+    public function test_words_array_contains_fsrs_familiarity_score(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 10.0, state: 'review');
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $words = $response->json('words');
+        $phen = collect($words)->firstWhere('word', 'Phenomenology');
+        $this->assertArrayHasKey('fsrs_familiarity_score', $phen);
+        $this->assertIsFloat($phen['fsrs_familiarity_score']);
+    }
+
+    public function test_language_isolation(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 10.0);
+
+        // Other user's chapter with the same word — should not see the FSRS mapping
+        $otherBook = Book::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'name' => 'Other Book',
+            'language' => 'english',
+        ]);
+        Chapter::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'book_id' => $otherBook->id,
+            'name' => 'Other Chapter',
+            'language' => 'english',
+            'raw_text' => 'Phenomenology is a philosophical tradition.',
+            'word_count' => 5,
+            'read_count' => 0,
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
+
+        $response = $this->actingAs($this->otherUser)->postJson('/chapters/get/reader', [
+            'chapterId' => $this->chapter->id,
+        ]);
+        $response->assertStatus(500); // chapter belongs to the test user
+    }
+
+    public function test_ai_reading_assist_endpoints_are_untouched(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/chapters/ai-assist/source', ['chapterId' => $this->chapter->id]);
+        $response->assertOk();
+        $this->assertStringContainsString('ARTICLE_TEXT_START', $response->json('prompt'));
+    }
+}

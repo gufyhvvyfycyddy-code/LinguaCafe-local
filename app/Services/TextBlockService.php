@@ -617,6 +617,9 @@ class TextBlockService
             ->whereIn('word', $this->uniqueWords)
             ->get();
 
+        // Build FSRS familiarity lookup for words with confirmed WordSenses + ReviewCards
+        $fwLookup = $this->loadFsrsFamiliarityLookup();
+
         $wordCount = count($this->processedWords);
         for ($wordIndex = 0; $wordIndex < $wordCount; $wordIndex ++) {
             // make the word into an object
@@ -666,6 +669,16 @@ class TextBlockService
                 $word->furigana = $encounteredWords[$wordId]->reading;
             }
 
+            // Override stage with FSRS familiarity for learning-system words
+            if ($word->stage < 0 && isset($encounteredWords[$wordId]->id) && array_key_exists($encounteredWords[$wordId]->id, $fwLookup)) {
+                $fw = $fwLookup[$encounteredWords[$wordId]->id];
+                // Keep stage < 0 so furigana and "highlighted" logic still works;
+                // only the numerical level (used for green depth) is adjusted
+                $word->stage = max(-7, min(-1, -$fw['level']));
+                $word->fsrs_familiarity_score = $fw['score'];
+            }
+            // If no FSRS data: keep old SRS stage unchanged
+
             $this->words[] = $word;
         }
 
@@ -674,6 +687,67 @@ class TextBlockService
         foreach ($this->uniqueWords as $uniqueWord) {
             $uniqueWord->definitions_checked = false;
         }
+    }
+
+    /**
+     * Load FSRS familiarity data for encountered words that have confirmed WordSenses.
+     *
+     * Returns array keyed by encountered_word_id:
+     *   ['level' => 1..7, 'score' => 0.0..1.0]
+     */
+    private function loadFsrsFamiliarityLookup(): array
+    {
+        $lookup = [];
+
+        // Direct join: confirmed WordSense + EncounteredWord (stage < 0) + ReviewCard (sense)
+        $rows = \Illuminate\Support\Facades\DB::table('word_senses')
+            ->join('encountered_words', 'word_senses.encountered_word_id', '=', 'encountered_words.id')
+            ->join('review_cards', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                     ->where('review_cards.target_type', '=', \App\Models\ReviewCard::TARGET_SENSE);
+            })
+            ->where('word_senses.user_id', $this->userId)
+            ->where('word_senses.language', $this->language)
+            ->where('word_senses.status', \App\Models\WordSense::STATUS_CONFIRMED)
+            ->where('encountered_words.stage', '<', 0)
+            ->select([
+                'word_senses.encountered_word_id',
+                'review_cards.fsrs_stability',
+                'review_cards.fsrs_due_at',
+                'review_cards.fsrs_state',
+            ])
+            ->get()
+            ->toArray();
+
+        foreach ($rows as $row) {
+            $stability = (float) ($row->fsrs_stability ?? 0);
+            $isOverdue = $row->fsrs_due_at && \Carbon\Carbon::parse($row->fsrs_due_at)->isPast();
+            $state = $row->fsrs_state ?? 'new';
+
+            // Map stability to level 1-7
+            if ($stability <= 0 || !$row->fsrs_stability) $level = 1;
+            elseif ($stability < 1)   $level = 2;
+            elseif ($stability < 3)   $level = 3;
+            elseif ($stability < 7)   $level = 4;
+            elseif ($stability < 14)  $level = 5;
+            elseif ($stability < 30)  $level = 6;
+            else                      $level = 7;
+
+            if ($state === 'new') $level = 1;
+            if ($isOverdue && $level > 1) $level--;
+
+            // Conservative: take lowest level for duplicate encountered_word_id
+            $existing = $lookup[$row->encountered_word_id] ?? null;
+            if (!$existing || $level < $existing['level']) {
+                $score = min(1.0, $stability / 30.0);
+                $lookup[$row->encountered_word_id] = [
+                    'level' => max(1, min(7, $level)),
+                    'score' => round($score, 2),
+                ];
+            }
+        }
+
+        return $lookup;
     }
 
     private function postTokenizer(string $path, array $payload)
