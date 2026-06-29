@@ -32,7 +32,9 @@ class AiReadingAssistService
         $cleaned = $this->cleanRawText($rawText);
         $wordCount = str_word_count($cleaned);
 
-        $prompt = $this->buildPromptText($cleaned);
+        // Build sentence list from processed_text for alignment
+        $sentenceList = $this->buildSentenceList($chapter);
+        $prompt = $this->buildPromptText($cleaned, $sentenceList);
 
         return [
             'success' => true,
@@ -40,7 +42,57 @@ class AiReadingAssistService
             'chapter_title' => $chapter->name,
             'prompt' => $prompt,
             'article_word_count' => $wordCount,
+            'sentence_count' => count($sentenceList),
         ];
+    }
+
+    /**
+     * Build a sentence list from the chapter's processed_text, using the same
+     * sentence_index values that the reader frontend uses for token rendering.
+     *
+     * Returns an array of ['sentence_index' => int, 'text' => string].
+     * Returns empty array if the chapter is not yet processed.
+     */
+    public function buildSentenceList(Chapter $chapter): array
+    {
+        try {
+            $words = $chapter->getProcessedText();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        if (!is_array($words) || empty($words)) {
+            return [];
+        }
+
+        $sentences = []; // sentence_index => word list
+        $indexesInOrder = [];
+
+        foreach ($words as $w) {
+            if (!is_object($w) || !empty($w->is_structure) || !isset($w->sentence_index)) {
+                continue;
+            }
+            $si = (int) $w->sentence_index;
+            if (!isset($sentences[$si])) {
+                $sentences[$si] = [];
+                $indexesInOrder[] = $si;
+            }
+            $text = $w->word ?? '';
+            $sentences[$si][] = $text;
+        }
+
+        $list = [];
+        foreach ($indexesInOrder as $si) {
+            $text = implode(' ', array_filter($sentences[$si], function ($t) { return $t !== ''; }));
+            // Collapse multiple spaces
+            $text = preg_replace('/\s+/', ' ', trim($text));
+            $list[] = [
+                'sentence_index' => $si,
+                'text' => $text,
+            ];
+        }
+
+        return $list;
     }
 
     /**
@@ -88,7 +140,19 @@ class AiReadingAssistService
             ];
         }
 
-        // 4. Build preview summary
+        // 4. Validate sentence alignment
+        $alignment = $this->validateSentenceAlignment($payload, $chapter);
+        if (!$alignment['success']) {
+            return [
+                'success' => false,
+                'parsed' => false,
+                'message' => $alignment['message'],
+                'errors' => $alignment['errors'] ?? [],
+                'warnings' => $alignment['warnings'] ?? [],
+            ];
+        }
+
+        // 5. Build preview summary
         $sentenceTranslations = $payload['sentence_translations'] ?? [];
         $vocabularyItems = $payload['vocabulary_items'] ?? [];
         $phraseItems = $payload['phrase_items'] ?? [];
@@ -214,7 +278,18 @@ class AiReadingAssistService
             ];
         }
 
-        // 4. Build summary
+        // 4. Validate sentence alignment (reject misaligned data)
+        $alignment = $this->validateSentenceAlignment($payload, $chapter);
+        if (!$alignment['success']) {
+            return [
+                'success' => false,
+                'message' => $alignment['message'],
+                'errors' => $alignment['errors'] ?? [],
+                'warnings' => $alignment['warnings'] ?? [],
+            ];
+        }
+
+        // 5. Build summary
         $sentenceTranslations = $payload['sentence_translations'] ?? [];
         $vocabularyItems = $payload['vocabulary_items'] ?? [];
         $phraseItems = $payload['phrase_items'] ?? [];
@@ -329,6 +404,91 @@ class AiReadingAssistService
     // ──────────────────────────────────────────────
 
     /**
+     * Validate sentence alignment between AI payload and the chapter's real sentence list.
+     *
+     * Checks:
+     * - Each sentence_translation sentence_index exists in the chapter's sentences.
+     * - No duplicate sentence_index.
+     * - Returns warnings for missing translations, errors for non-existent indexes.
+     *
+     * @return array{success: bool, message?: string, errors?: array, warnings?: array}
+     */
+    public function validateSentenceAlignment(array $payload, Chapter $chapter): array
+    {
+        $sentenceList = $this->buildSentenceList($chapter);
+        if (empty($sentenceList)) {
+            // Chapter not yet processed; cannot validate — allow through
+            return ['success' => true];
+        }
+
+        // Build lookup: sentence_index => text
+        $sentenceMap = [];
+        foreach ($sentenceList as $s) {
+            $sentenceMap[$s['sentence_index']] = $s['text'];
+        }
+
+        $translations = $payload['sentence_translations'] ?? [];
+        $errors = [];
+        $warnings = [];
+        $seenIndexes = [];
+
+        foreach ($translations as $st) {
+            $si = $st['sentence_index'] ?? null;
+
+            if ($si === null) {
+                $errors[] = ['field' => 'sentence_translations', 'message' => '某条译文缺少 sentence_index。'];
+                continue;
+            }
+
+            if (!isset($sentenceMap[$si])) {
+                $errors[] = ['field' => 'sentence_translations', 'message' => "sentence_index {$si} 不存在于本章句子列表中。"];
+                continue;
+            }
+
+            if (isset($seenIndexes[$si])) {
+                $warnings[] = ['field' => 'sentence_translations', 'message' => "sentence_index {$si} 出现多次，已跳过重复。"];
+                continue;
+            }
+            $seenIndexes[$si] = true;
+
+            // Optional: check source_text roughly matches
+            $sourceText = trim($st['source_text'] ?? '');
+            $expectedText = $sentenceMap[$si];
+            if ($sourceText !== '' && strcasecmp($sourceText, $expectedText) !== 0) {
+                // Source text mismatch — warn but allow (AI may normalize spacing)
+                $warnings[] = [
+                    'field' => 'sentence_translations',
+                    'message' => "sentence_index {$si} 的 source_text 与原文不一致。期望：「{$expectedText}」，收到：「{$sourceText}」",
+                ];
+            }
+        }
+
+        // Check for missing translations
+        $missingIndexes = array_diff(array_keys($sentenceMap), array_keys($seenIndexes));
+        if (!empty($missingIndexes)) {
+            $missingStr = implode(', ', array_slice($missingIndexes, 0, 10));
+            $warnings[] = [
+                'field' => 'sentence_translations',
+                'message' => '缺少以下 sentence_index 的译文：' . $missingStr . (count($missingIndexes) > 10 ? ' 等' : ''),
+            ];
+        }
+
+        if (!empty($errors)) {
+            return [
+                'success' => false,
+                'message' => 'AI 返回的句子编号与本章句子列表不匹配。',
+                'errors' => $errors,
+                'warnings' => $warnings,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'warnings' => $warnings,
+        ];
+    }
+
+    /**
      * Validate the parsed payload against expected schema.
      *
      * @return array{success: bool, message?: string, errors?: array}
@@ -369,9 +529,29 @@ class AiReadingAssistService
     //  Prompt Builder
     // ──────────────────────────────────────────────
 
-    private function buildPromptText(string $articleText): string
+    private function buildPromptText(string $articleText, array $sentenceList = []): string
     {
         $schemaVersion = 'linguacafe_ai_reading_assist_v1';
+
+        // Build the sentence list block
+        $sentenceListBlock = '';
+        if (!empty($sentenceList)) {
+            $listJson = json_encode($sentenceList, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+            // Indent each line for readability within the prompt
+            $indented = preg_replace('/^/m', '  ', $listJson);
+            $sentenceListBlock = <<<SENTENCES
+
+## LinguaCafe 句子列表
+
+你必须严格使用下面给出的 sentence_index。
+不要自己重新切句。不要自己重新编号。
+sentence_translations 中的 sentence_index 必须来自下面列表。
+vocabulary_items 和 phrase_items 中的 sentence_index 也必须来自下面列表。
+
+{$indented}
+
+SENTENCES;
+        }
 
         return <<<PROMPT
 你是一个英语阅读辅助分析器。你的任务是根据给定的英文文章，生成结构化的中文辅助阅读数据。
@@ -380,7 +560,7 @@ class AiReadingAssistService
 
 1. 只分析给定的英文文章。
 2. 不补充文章外内容。
-3. 不发表评论或解释。
+3. 不发表评论或解释。{$sentenceListBlock}
 
 ## 输出格式
 
@@ -445,6 +625,7 @@ class AiReadingAssistService
 1. 每个英文句子给一个中文译文。
 2. 译文与英文句子一一对应。
 3. 译文放在 sentence_translations 列表中。
+4. source_text 必须复制句子列表中的原文，不要修改，不要缩写。
 
 ## 生词要求
 
@@ -452,6 +633,7 @@ class AiReadingAssistService
 2. 每个词只给本语境中的一种中文释义。
 3. 生词放在 vocabulary_items 列表中。
 4. 不列出过于基础的词（如 "the", "a", "is", "are", "have" 等）。
+5. vocabulary_items 的 sentence_index 必须来自句子列表。
 
 ## 词组要求
 
@@ -459,6 +641,7 @@ class AiReadingAssistService
 2. 每个词组只给本语境中的一种中文释义。
 3. 词组放在 phrase_items 列表中。
 4. trigger_words 建议列出词组中用户点击后应该触发提示的关键词。
+5. phrase_items 的 sentence_index 必须来自句子列表。
 
 ## 输入文章
 
