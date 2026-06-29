@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`1646046`（开始 Reader-UI-1-a 前的最新 commit）
+**Latest commit**：`d23e24d`（Feat: simplify reader lookup sidebar）
 
 ### `/review-cards/manage` 当前能力
 
