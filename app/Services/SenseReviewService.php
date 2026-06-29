@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Chapter;
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\SettingsService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -66,6 +68,207 @@ class SenseReviewService
     {
         return [
             'due_count' => $this->dueCount($userId, $language),
+        ];
+    }
+
+    /**
+     * Count how many sense review cards the user has reviewed today.
+     */
+    public function reviewedTodayCount(int $userId, string $language): int
+    {
+        $today = Carbon::today();
+
+        return ReviewLog::query()
+            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_logs.user_id', $userId)
+            ->where('review_logs.language_id', $language)
+            ->where('review_logs.reviewed_at', '>=', $today)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_logs.rating', '!=', 'reset')
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->count('review_logs.id');
+    }
+
+    /**
+     * Get due sense review cards with daily limits applied.
+     *
+     * @return array{cards: \Illuminate\Support\Collection, summary: array}
+     */
+    public function dueCardsWithLimits(int $userId, string $language, bool $ignoreDailyLimits = false): array
+    {
+        $settingsService = app(SettingsService::class);
+        $limits = $settingsService->getFsrsDailyLimits();
+
+        $reviewLimitEnabled = $limits['daily_review_limit_enabled'] ?? true;
+        $reviewLimit = $limits['daily_review_limit'] ?? 200;
+        $newLimitEnabled = $limits['daily_new_limit_enabled'] ?? true;
+        $newLimit = $limits['daily_new_limit'] ?? 20;
+        $newIgnoreReviewLimit = $limits['new_cards_ignore_review_limit'] ?? false;
+
+        // Base due cards query
+        $allCards = $this->dueCards($userId, $language);
+
+        $totalDueCount = $allCards->count();
+
+        // Count today's reviewed sense cards
+        $reviewedTodayCount = $this->reviewedTodayCount($userId, $language);
+        $remainingReviewSlots = max(0, $reviewLimit - $reviewedTodayCount);
+        $limitReached = false;
+        $hiddenDueCount = 0;
+        $hiddenByReviewLimit = 0;
+        $hiddenByNewLimit = 0;
+
+        // If ignoreDailyLimits, return all cards
+        if ($ignoreDailyLimits) {
+            $visibleCards = $allCards;
+
+            return [
+                'cards' => $visibleCards,
+                'summary' => $this->buildLimitSummary(
+                    totalDueCount: $totalDueCount,
+                    visibleCount: $visibleCards->count(),
+                    reviewedTodayCount: $reviewedTodayCount,
+                    remainingReviewSlots: $remainingReviewSlots,
+                    reviewLimit: $reviewLimit,
+                    reviewLimitEnabled: $reviewLimitEnabled,
+                    newLimit: $newLimit,
+                    newLimitEnabled: $newLimitEnabled,
+                    newIgnoreReviewLimit: $newIgnoreReviewLimit,
+                    ignoreDailyLimits: $ignoreDailyLimits,
+                    limitReached: false,
+                    hiddenDueCount: 0,
+                    hiddenByReviewLimit: 0,
+                    hiddenByNewLimit: 0,
+                    isQueueEnforced: true,
+                ),
+            ];
+        }
+
+        // Split into new cards and known cards (review/learning/relearning)
+        $newCards = $allCards->filter(fn ($card) => $card->fsrs_state === 'new');
+        $knownCards = $allCards->filter(fn ($card) => $card->fsrs_state !== 'new');
+
+        $knownCount = $knownCards->count();
+        $newCount = $newCards->count();
+
+        // Apply review limit
+        $allowedReviewCards = $knownCards;
+        if ($reviewLimitEnabled && $remainingReviewSlots < $knownCount) {
+            $allowedReviewCards = $knownCards->slice(0, $remainingReviewSlots);
+            $hiddenByReviewLimit = $knownCount - $allowedReviewCards->count();
+        }
+
+        // Calculate how many review slots remain after filling known cards
+        $reviewSlotsUsed = $allowedReviewCards->count();
+        $remainingAfterKnown = max(0, $remainingReviewSlots - $reviewSlotsUsed);
+
+        // Apply new cards under the review limit
+        $allowedNewCards = collect();
+        if ($newLimitEnabled && $newCount > 0) {
+            if ($newIgnoreReviewLimit) {
+                // New cards ignore review limit — show up to newLimit
+                $allowedNewCards = $newCards->slice(0, $newLimit);
+                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
+            } elseif ($remainingAfterKnown > 0) {
+                // New cards compete for remaining review slots
+                $maxNew = min($newLimit, $remainingAfterKnown);
+                $allowedNewCards = $newCards->slice(0, $maxNew);
+                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
+            } else {
+                // No review slots remaining, hide all new cards
+                $hiddenByNewLimit = $newCount;
+            }
+        } elseif (!$newLimitEnabled) {
+            // No new card limit — show all new cards (subject to review limit)
+            $allowedNewCards = $newCards;
+        }
+
+        // Merge known + new, preserving order (known first, ordered by due_at)
+        $visibleCards = $allowedReviewCards->concat($allowedNewCards);
+        $visibleCount = $visibleCards->count();
+        $hiddenDueCount = $totalDueCount - $visibleCount;
+        $limitReached = $hiddenDueCount > 0;
+
+        $canContinueOverLimit = $totalDueCount > 0 && $reviewLimitEnabled && $limitReached;
+
+        return [
+            'cards' => $visibleCards,
+            'summary' => $this->buildLimitSummary(
+                totalDueCount: $totalDueCount,
+                visibleCount: $visibleCount,
+                reviewedTodayCount: $reviewedTodayCount,
+                remainingReviewSlots: $remainingReviewSlots,
+                reviewLimit: $reviewLimit,
+                reviewLimitEnabled: $reviewLimitEnabled,
+                newLimit: $newLimit,
+                newLimitEnabled: $newLimitEnabled,
+                newIgnoreReviewLimit: $newIgnoreReviewLimit,
+                ignoreDailyLimits: $ignoreDailyLimits,
+                limitReached: $limitReached,
+                hiddenDueCount: $hiddenDueCount,
+                hiddenByReviewLimit: $hiddenByReviewLimit,
+                hiddenByNewLimit: $hiddenByNewLimit,
+                isQueueEnforced: true,
+                canContinueOverLimit: $canContinueOverLimit,
+            ),
+        ];
+    }
+
+    /**
+     * Build a standardized daily limits summary array.
+     */
+    private function buildLimitSummary(
+        int $totalDueCount = 0,
+        int $visibleCount = 0,
+        int $reviewedTodayCount = 0,
+        int $remainingReviewSlots = 0,
+        int $reviewLimit = 200,
+        bool $reviewLimitEnabled = true,
+        int $newLimit = 20,
+        bool $newLimitEnabled = true,
+        bool $newIgnoreReviewLimit = false,
+        bool $ignoreDailyLimits = false,
+        bool $limitReached = false,
+        int $hiddenDueCount = 0,
+        int $hiddenByReviewLimit = 0,
+        int $hiddenByNewLimit = 0,
+        bool $isQueueEnforced = true,
+        bool $canContinueOverLimit = false
+    ): array {
+        $limitMessage = null;
+        if ($reviewLimitEnabled && $limitReached && !$ignoreDailyLimits) {
+            if ($hiddenDueCount > 0) {
+                $limitMessage = "今天已完成 {$reviewedTodayCount} 张复习，达到每日复习上限。还有 {$hiddenDueCount} 张到期卡暂时未显示。";
+            }
+        }
+
+        return [
+            'due_count' => $visibleCount,
+            'visible_count' => $visibleCount,
+            'total_due_count' => $totalDueCount,
+            'hidden_due_count' => $hiddenDueCount,
+            'hidden_by_review_limit' => $hiddenByReviewLimit,
+            'hidden_by_new_limit' => $hiddenByNewLimit,
+            'daily_review_limit_enabled' => $reviewLimitEnabled,
+            'daily_review_limit' => $reviewLimit,
+            'daily_new_limit_enabled' => $newLimitEnabled,
+            'daily_new_limit' => $newLimit,
+            'new_cards_ignore_review_limit' => $newIgnoreReviewLimit,
+            'reviewed_today_count' => $reviewedTodayCount,
+            'remaining_review_slots' => $remainingReviewSlots,
+            'is_queue_enforced' => $isQueueEnforced,
+            'ignore_daily_limits' => $ignoreDailyLimits,
+            'limit_reached' => $limitReached,
+            'can_continue_over_limit' => $canContinueOverLimit,
+            'limit_message' => $limitMessage,
         ];
     }
 

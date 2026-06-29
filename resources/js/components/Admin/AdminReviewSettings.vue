@@ -107,7 +107,7 @@
                                 <v-divider class="my-3"></v-divider>
                                 <div class="font-weight-medium body-2 mb-2">每日学习上限</div>
                                 <div class="caption grey--text mb-3">
-                                    用于控制每天引入新卡和显示复习卡的数量。当前版本只保存设置，不会限制实际复习队列；下一阶段接入复习页后才会生效。
+                                    用于控制每天引入新卡和显示复习卡的数量。复习页已按这些设置限制今日显示数量。
                                 </div>
 
                                 <v-row dense align="center" class="mb-2">
@@ -194,6 +194,9 @@
                                     class="mt-2 mb-0"
                                 >
                                     {{ dailyLimitsSaveStatus }}
+                                    <div v-if="dailyLimitsSaveStatus && dailyLimitsSaveStatus.includes('已保存')" class="mt-1 caption green--text text--darken-2 font-weight-medium">
+                                        ✅ 复习页已按这些设置限制今日显示数量。
+                                    </div>
                                 </v-alert>
                                 <v-alert
                                     v-if="dailyLimitsSaveError"

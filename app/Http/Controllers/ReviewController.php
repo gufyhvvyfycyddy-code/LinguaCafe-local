@@ -32,16 +32,18 @@ class ReviewController extends Controller {
         $practiceMode = $request->post('practiceMode');
         $chapterId = $request->post('chapterId');
         $bookId = $request->post('bookId');
+        $ignoreDailyLimits = $request->post('ignoreDailyLimits', false);
         $languagesWithoutSpaces = config('linguacafe.languages.languages_without_spaces');
         
         try {
-            $reviews = $this->reviewService->getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces);
+            $result = $this->reviewService->getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces, $ignoreDailyLimits);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
 
         $reviewData = new \stdClass();
-        $reviewData->reviews = $reviews;
+        $reviewData->reviews = $result['reviews'];
+        $reviewData->summary = $result['summary'];
         $reviewData->language = $language;
         $reviewData->languageSpaces = !in_array($language, $languagesWithoutSpaces, true);
 

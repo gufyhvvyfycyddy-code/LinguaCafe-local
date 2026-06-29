@@ -41,7 +41,7 @@
 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-5 | 每日学习上限 / 新卡与复习上限侦察 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（含 fix：默认复习上限开启 + 校验收口） | ✅ 已完成 |
-| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 |
+| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 当前阶段 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
 
@@ -51,7 +51,17 @@
 
 ## 5. 当前下一步
 
-进入 **FSRS-Anki-Mgmt-7：复习队列每日上限接入**（中高风险，需单独验收）
+进入 **FSRS-Anki-Mgmt-7：复习队列每日上限接入 + 超额复习入口**（中高风险，已接入 `/reviews` 队列）
+
+本阶段已完成：
+- 后端 `dueCardsWithLimits()` — 对 `/reviews` 队列应用每日复习上限 + 新学上限
+- `reviewedTodayCount()` — 基于 ReviewLog 统计今日已复习数
+- `ignore_daily_limits` — 允许今天超额复习
+- 前端超额复习入口 + localStorage 今日状态
+- 设置页文案更新
+- 编程协作规则文档新增
+- `Lemma-Origin-1` 仍为独立后续任务
+- Mgmt-8（今日临时上限）仍为后续
 
 本轮目标：只做侦察和计划，不实现功能。
 

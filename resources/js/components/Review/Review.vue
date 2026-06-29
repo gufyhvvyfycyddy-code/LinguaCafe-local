@@ -28,39 +28,92 @@
             :font-size="settings.fontSize"
         />
 
-        <!-- Review finished box -->
-        <v-card
-            v-if="finished"
-            outlined
-            id="finish-review-box"
-            class="mt-4 mx-auto rounded-lg"
-            width="500px"
-        >
-            <!-- There were no cards at all -->
-            <template v-if="totalReviews === 0">
-                <!-- Card title -->
-                <v-card-title>
-                    <v-icon large color="error" class="mr-1">mdi-cards</v-icon>{{ reviewError || '当前没有到期的词义卡。' }}
-                </v-card-title>
+            <!-- Review finished box -->
+            <v-card
+                v-if="finished"
+                outlined
+                id="finish-review-box"
+                class="mt-4 mx-auto rounded-lg"
+                width="500px"
+            >
+                <!-- There were no cards at all -->
+                <template v-if="totalReviews === 0">
+                    <!-- Card title -->
+                    <v-card-title>
+                        <v-icon large color="error" class="mr-1">mdi-cards</v-icon>{{ reviewError || '当前没有到期的词义卡。' }}
+                    </v-card-title>
 
-                <!-- Card content -->
-                <v-card-text>
-                    {{ reviewError ? '请稍后重试，或检查后端服务是否正在运行。' : '当前没有到期的词义卡。阅读中添加词义后，会在这里复习。' }}
-                </v-card-text>
-            </template>
+                    <!-- Card content -->
+                    <v-card-text>
+                        {{ reviewError ? '请稍后重试，或检查后端服务是否正在运行。' : '当前没有到期的词义卡。阅读中添加词义后，会在这里复习。' }}
+                    </v-card-text>
 
-            <!-- Review finished -->
-            <template v-if="totalReviews > 0">
-                <!-- Card title -->
-                <v-card-title>
-                    <v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>复习完成
-                </v-card-title>
+                    <!-- Daily limit reached but cards hidden -->
+                    <v-card-text v-if="dailyLimitSummary && dailyLimitSummary.limit_reached && !dailyLimitSummary.ignore_daily_limits">
+                        <v-alert dense outlined type="info" class="mb-0">
+                            今天已完成 {{ dailyLimitSummary.reviewed_today_count }} 张复习，达到每日复习上限。
+                            还有 {{ dailyLimitSummary.hidden_due_count }} 张到期卡暂时未显示。
+                            <template v-if="dailyLimitSummary.can_continue_over_limit">
+                                <v-btn
+                                    small
+                                    outlined
+                                    color="primary"
+                                    class="mt-2 d-block"
+                                    @click="enableIgnoreDailyLimits"
+                                >
+                                    今天继续超额复习
+                                </v-btn>
+                                <div class="caption grey--text mt-1">只影响今天，不会修改你的上限设置。</div>
+                            </template>
+                        </v-alert>
+                    </v-card-text>
 
-                <!-- Card content -->
-                <v-card-text>
-                    你已经完成 {{ formatNumber(totalReviews) }} 张卡片。保持节奏，学习会稳步推进。
-                </v-card-text>
-            </template>
+                    <!-- Over-limit mode message -->
+                    <v-card-text v-if="dailyLimitSummary && dailyLimitSummary.ignore_daily_limits">
+                        <v-alert dense outlined type="info" class="mb-0">
+                            🚀 今天已开启超额复习，本页会显示超过每日上限的到期卡。
+                        </v-alert>
+                    </v-card-text>
+                </template>
+
+                <!-- Review finished with cards -->
+                <template v-if="totalReviews > 0">
+                    <!-- Card title -->
+                    <v-card-title>
+                        <v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>复习完成
+                    </v-card-title>
+
+                    <!-- Card content -->
+                    <v-card-text>
+                        你已经完成 {{ formatNumber(totalReviews) }} 张卡片。保持节奏，学习会稳步推进。
+                    </v-card-text>
+
+                    <!-- Hidden cards notice -->
+                    <v-card-text v-if="dailyLimitSummary && dailyLimitSummary.hidden_due_count > 0 && !dailyLimitSummary.ignore_daily_limits">
+                        <v-alert dense outlined type="info" class="mb-0">
+                            今天的上限内复习已完成。还有 {{ dailyLimitSummary.hidden_due_count }} 张到期卡被每日上限暂时隐藏。
+                            <template v-if="dailyLimitSummary.can_continue_over_limit">
+                                <v-btn
+                                    small
+                                    outlined
+                                    color="primary"
+                                    class="mt-2 d-block"
+                                    @click="enableIgnoreDailyLimits"
+                                >
+                                    今天继续超额复习
+                                </v-btn>
+                                <div class="caption grey--text mt-1">只影响今天，不会修改你的上限设置。</div>
+                            </template>
+                        </v-alert>
+                    </v-card-text>
+
+                    <!-- Over-limit mode message (during review) -->
+                    <v-card-text v-if="dailyLimitSummary && dailyLimitSummary.ignore_daily_limits">
+                        <v-alert dense outlined type="info" class="mb-0">
+                            🚀 今天已开启超额复习，本页会显示超过每日上限的到期卡。
+                        </v-alert>
+                    </v-card-text>
+                </template>
 
             <!-- Card buttons -->
             <v-card-actions>
@@ -499,61 +552,92 @@
                 reviewError: '',
                 finished: false,
                 today: new moment().format('YYYY-MM-DD'), // CHANGE TO SERVER SIDE
+                ignoreDailyLimits: false,
+                dailyLimitSummary: null,
             }
         },
         props: {
         },
         mounted: function() {
-            var data = {
-                bookId: -1,
-                chapterId: -1,
-                practiceMode: this.practiceMode,
-            };
-
-            if (this.$route.params.bookId !== undefined) {
-                data.bookId = parseInt(this.$route.params.bookId);
+            // Check localStorage for today's ignore_daily_limits status
+            var lsKey = 'linguacafe_sense_review_ignore_daily_limits_' + this.today;
+            var stored = localStorage.getItem(lsKey);
+            if (stored === 'true') {
+                this.ignoreDailyLimits = true;
             }
 
-            if (this.$route.params.chapterId !== undefined) {
-                data.chapterId = parseInt(this.$route.params.chapterId);
-            }
-
-            if (this.$route.params.practiceMode !== undefined) {
-                data.practiceMode = this.$route.params.practiceMode === 'true';
-                this.practiceMode = this.$route.params.practiceMode === 'true';
-            }
-
-
-            axios.post('/reviews', data).then((response) => {
-                var data = response.data;
-                this.reviews = data.reviews;
-                this.totalReviews = data.reviews.length;
-                this.language = data.language;
-                this.languageSpaces = data.languageSpaces;
-
-                if (this.reviews.length) {
-                    this.$nextTick(() => {
-                        this.next();
-                        this.$nextTick(() => {
-                            document.getElementById('review-box').addEventListener('fullscreenchange', this.updateFullscreen);
-                        });
-                    });
-                } else {
-                    this.finish();
-                }
-
-                this.textToSpeechService = new TextToSpeechService(this.language, this.updateTextToSpeechState);
-                window.addEventListener('keyup', this.hotkey);
-            }).catch((error) => {
-                this.reviewError = requestErrorMessage(error, '复习队列加载失败。');
-                this.totalReviews = 0;
-                this.finished = true;
-            });
+            this.loadReviews();
         },
         beforeDestroy: function () {
             window.removeEventListener('keyup', this.hotkey);
         },
         methods: {
+            enableIgnoreDailyLimits() {
+                var lsKey = 'linguacafe_sense_review_ignore_daily_limits_' + this.today;
+                localStorage.setItem(lsKey, 'true');
+                this.ignoreDailyLimits = true;
+                this.finished = false;
+                this.reviews = [];
+                this.totalReviews = 0;
+                this.currentReviewIndex = -1;
+                this.correctReviews = 0;
+                this.reviewError = '';
+                this.dailyLimitSummary = null;
+                this.$nextTick(() => {
+                    this.loadReviews();
+                });
+            },
+            loadReviews() {
+                var data = {
+                    bookId: -1,
+                    chapterId: -1,
+                    practiceMode: this.practiceMode,
+                };
+
+                if (this.$route.params.bookId !== undefined) {
+                    data.bookId = parseInt(this.$route.params.bookId);
+                }
+
+                if (this.$route.params.chapterId !== undefined) {
+                    data.chapterId = parseInt(this.$route.params.chapterId);
+                }
+
+                if (this.$route.params.practiceMode !== undefined) {
+                    data.practiceMode = this.$route.params.practiceMode === 'true';
+                    this.practiceMode = this.$route.params.practiceMode === 'true';
+                }
+
+                if (this.ignoreDailyLimits) {
+                    data.ignoreDailyLimits = true;
+                }
+
+                axios.post('/reviews', data).then((response) => {
+                    var data = response.data;
+                    this.reviews = data.reviews;
+                    this.totalReviews = data.reviews.length;
+                    this.language = data.language;
+                    this.languageSpaces = data.languageSpaces;
+                    this.dailyLimitSummary = data.summary || null;
+
+                    if (this.reviews.length) {
+                        this.$nextTick(() => {
+                            this.next();
+                            this.$nextTick(() => {
+                                document.getElementById('review-box').addEventListener('fullscreenchange', this.updateFullscreen);
+                            });
+                        });
+                    } else {
+                        this.finish();
+                    }
+
+                    this.textToSpeechService = new TextToSpeechService(this.language, this.updateTextToSpeechState);
+                    window.addEventListener('keyup', this.hotkey);
+                }).catch((error) => {
+                    this.reviewError = requestErrorMessage(error, '复习队列加载失败。');
+                    this.totalReviews = 0;
+                    this.finished = true;
+                });
+            },
             textToSpeech() {
                 var text = '';
                 var joinSeparator = this.languageSpaces ? ' ' : '';

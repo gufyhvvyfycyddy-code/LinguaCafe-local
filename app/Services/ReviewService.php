@@ -13,7 +13,7 @@ class ReviewService {
     public function __construct() {
     }
 
-    public function getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces) {
+    public function getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces, $ignoreDailyLimits = false) {
         // 前端可能传字符串 "-1"，统一转为 int
         $bookId = (int) $bookId;
         $chapterId = (int) $chapterId;
@@ -25,7 +25,8 @@ class ReviewService {
 
         // 日常复习只保留 sense card，孤立 word card 不再进入复习
         $senseReviewService = app(\App\Services\SenseReviewService::class);
-        $senseCards = $senseReviewService->dueCards($userId, $language);
+        $result = $senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $senseCards = $result['cards'];
 
         $reviews = [];
         foreach ($senseCards as $card) {
@@ -37,6 +38,9 @@ class ReviewService {
         // 随机顺序
         shuffle($reviews);
 
-        return $reviews;
+        return [
+            'reviews' => $reviews,
+            'summary' => $result['summary'],
+        ];
     }
 }

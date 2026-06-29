@@ -115,6 +115,7 @@
 | FSRS-Anki-Mgmt-4 | ✅ 已完成 — Desired Retention 工作量模拟器（retentionWorkloadSimulationService + 85/90/93/95 四档模拟 + 前端模拟面板 + high 风险按钮文案更新） |
 | FSRS-Anki-Mgmt-5 | ✅ 已完成 — 每日学习上限 / 新卡与复习上限侦察（Anki 文档对标 + 代码侦察 + 产品方案 + 风险分析） |
 | FSRS-Anki-Mgmt-6 | ✅ 已完成 — 每日上限设置页第一版（settings 表保存/读取 + 前端设置区 + 5 项设置 + 测试覆盖；fix：默认复习上限开启 + 校验收口改为 422 拒绝） |
+| FSRS-Anki-Mgmt-7 | ✅ 已完成 — 复习队列每日上限接入 + 超额复习入口（dueCardsWithLimits 后端 + reviewedTodayCount + 前端超额复习 UI + localStorage 今日状态 + 编程协作规则） |
 
 ---
 
@@ -579,7 +580,7 @@
 | 中 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 已完成 | 后端 simulator + 前端模拟面板 + high 风险按钮文案已更新 |
 | 中 | FSRS-Anki-Mgmt-5 | 每日学习上限 / 新卡与复习上限侦察 | ✅ 已完成 | 只读侦察，Anki 对标 + 代码侦察 + 产品方案 |
 | 中 | FSRS-Anki-Mgmt-6 | 每日上限设置页第一版 | ✅ 已完成 | 全局复习上限 + 新学上限设置页，暂不接入队列；fix：默认复习上限改为开启 200 + 校验收口 |
-| 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 | 高风险，必须单独做 |
+| 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 当前阶段 | 高风险，已完成 `/reviews` 队列限制 + 超额复习入口 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
