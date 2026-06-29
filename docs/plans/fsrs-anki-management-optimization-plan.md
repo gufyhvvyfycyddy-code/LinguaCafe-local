@@ -43,6 +43,7 @@
 | FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（含 fix：默认复习上限开启 + 校验收口） | ✅ 已完成 |
 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 + 修复 `/reviews/senses` 绕过 | ✅ 已完成 |
 | Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动 | ✅ 已完成 | TextBlockService 根据 ReviewCard stability/due_at/state 计算 level 1-7 |
+| Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览详情页紫色高亮 + 文档明确保留未完成计划 |
 | Mgmt-7-c（待定） | 自动提升词汇等级改为 FSRS 复习记录 | 📋 审计完成 | 当前仍是旧 SRS `EncounteredWord.setStage()`，需要单独任务迁移 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |

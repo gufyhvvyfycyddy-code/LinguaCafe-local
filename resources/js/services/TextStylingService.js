@@ -23,6 +23,9 @@ class TextStylingService {
             'Level 5 word',
             'Level 6 word',
             'Level 7 word',
+            'Level 8 word',
+            'Level 9 word',
+            'Level 10 word',
             'Known phrase',
             'Level 1 phrase',
             'Level 2 phrase',
@@ -46,6 +49,16 @@ class TextStylingService {
 
     // returns an object with css styling for a single theme/word level combination
     getCssSettingObject(textStylingSettings, theme, level) {
+        // Resolve level settings; fall back to Level 7 for undefined higher levels (8-10)
+        let resolvedLevel = level;
+        if (textStylingSettings[theme] && textStylingSettings[theme][level] === undefined) {
+            const lvlMatch = level.match(/^Level (\d+) word$/);
+            if (lvlMatch && parseInt(lvlMatch[1], 10) >= 8) {
+                resolvedLevel = 'Level 7 word';
+            }
+        }
+        const settings = textStylingSettings[theme][resolvedLevel];
+
         const levelMapping = {
             'Level 1 word': 'wordLevel-1',
             'Level 2 word': 'wordLevel-2',
@@ -54,6 +67,9 @@ class TextStylingService {
             'Level 5 word': 'wordLevel-5',
             'Level 6 word': 'wordLevel-6',
             'Level 7 word': 'wordLevel-7',
+            'Level 8 word': 'wordLevel-8',
+            'Level 9 word': 'wordLevel-9',
+            'Level 10 word': 'wordLevel-10',
             'Known word': 'wordLevel0',
             'Ignored word': 'wordLevel1',
             'New word': 'wordLevel2',
@@ -69,89 +85,85 @@ class TextStylingService {
             'Selected pharse': 'phraseLevelSelected',
         }
 
+        const mappedKey = levelMapping[level];
         let cssVariables = {}
         
-        cssVariables[`--interactive-text-${levelMapping[level]}-color`] = textStylingSettings[theme][level].textColor;
-        cssVariables[`--interactive-text-${levelMapping[level]}-border-color`] = textStylingSettings[theme][level].borderColor;
-        cssVariables[`--interactive-text-${levelMapping[level]}-border-style`] = textStylingSettings[theme][level].borderStyle;
-        cssVariables[`--interactive-text-${levelMapping[level]}-border-radius`] = textStylingSettings[theme][level].borderRadius + 'px';
-        
+        cssVariables[`--interactive-text-${mappedKey}-color`] = settings.textColor;
+        cssVariables[`--interactive-text-${mappedKey}-border-color`] = settings.borderColor;
+        cssVariables[`--interactive-text-${mappedKey}-border-style`] = settings.borderStyle;
+        cssVariables[`--interactive-text-${mappedKey}-border-radius`] = settings.borderRadius + 'px';
         
         // padding
-        cssVariables[`--interactive-text-${levelMapping[level]}-padding-top`] = textStylingSettings[theme][level].paddingTop + 'px';
-        cssVariables[`--interactive-text-${levelMapping[level]}-padding-bottom`] = textStylingSettings[theme][level].paddingBottom + 'px';
+        cssVariables[`--interactive-text-${mappedKey}-padding-top`] = settings.paddingTop + 'px';
+        cssVariables[`--interactive-text-${mappedKey}-padding-bottom`] = settings.paddingBottom + 'px';
         
-        
-        
-
         // horizontal padding for spaceless languages only
-        if (textStylingSettings[theme][level].horizontalPaddingSpacelessLanguagesOnly) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-padding-left`] = '0px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-padding-right`] = '0px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-spaceless-language-padding-left`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-spaceless-language-padding-right`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
+        if (settings.horizontalPaddingSpacelessLanguagesOnly) {
+            cssVariables[`--interactive-text-${mappedKey}-padding-left`] = '0px';
+            cssVariables[`--interactive-text-${mappedKey}-padding-right`] = '0px';
+            cssVariables[`--interactive-text-${mappedKey}-spaceless-language-padding-left`] = settings.paddingHorizontal + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-spaceless-language-padding-right`] = settings.paddingHorizontal + 'px';
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-padding-left`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-padding-right`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-spaceless-language-padding-left`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-spaceless-language-padding-right`] = textStylingSettings[theme][level].paddingHorizontal + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-padding-left`] = settings.paddingHorizontal + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-padding-right`] = settings.paddingHorizontal + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-spaceless-language-padding-left`] = settings.paddingHorizontal + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-spaceless-language-padding-right`] = settings.paddingHorizontal + 'px';
         }
         
         // add colors 
-        cssVariables[`--interactive-text-${levelMapping[level]}-background-transparency`] = textStylingSettings[theme][level].backgroundTransparency + '%';
-        cssVariables[`--interactive-text-${levelMapping[level]}-border-color`] = textStylingSettings[theme][level].borderColor;
-        cssVariables[`--interactive-text-${levelMapping[level]}-background-color`] = textStylingSettings[theme][level].backgroundColor;
-        cssVariables[`--interactive-text-${levelMapping[level]}-color`] = textStylingSettings[theme][level].textColor;
+        cssVariables[`--interactive-text-${mappedKey}-background-transparency`] = settings.backgroundTransparency + '%';
+        cssVariables[`--interactive-text-${mappedKey}-border-color`] = settings.borderColor;
+        cssVariables[`--interactive-text-${mappedKey}-background-color`] = settings.backgroundColor;
+        cssVariables[`--interactive-text-${mappedKey}-color`] = settings.textColor;
 
         // set top border
-        if (!textStylingSettings[theme][level].borderTop || !textStylingSettings[theme][level].borderWidth) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-top-width`] = '0px'
+        if (!settings.borderTop || !settings.borderWidth) {
+            cssVariables[`--interactive-text-${mappedKey}-border-top-width`] = '0px'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-top-width`] = textStylingSettings[theme][level].borderWidth + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-border-top-width`] = settings.borderWidth + 'px';
         }
 
         // set bottom border
-        if (!textStylingSettings[theme][level].borderBottom || !textStylingSettings[theme][level].borderWidth) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-bottom-width`] = '0px'
+        if (!settings.borderBottom || !settings.borderWidth) {
+            cssVariables[`--interactive-text-${mappedKey}-border-bottom-width`] = '0px'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-bottom-width`] = textStylingSettings[theme][level].borderWidth + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-border-bottom-width`] = settings.borderWidth + 'px';
         }
 
         // set side borders
-        if (!textStylingSettings[theme][level].borderSides || !textStylingSettings[theme][level].borderWidth) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-left-width`] = '0px'
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-right-width`] = '0px'
+        if (!settings.borderSides || !settings.borderWidth) {
+            cssVariables[`--interactive-text-${mappedKey}-border-left-width`] = '0px'
+            cssVariables[`--interactive-text-${mappedKey}-border-right-width`] = '0px'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-left-width`] = textStylingSettings[theme][level].borderWidth + 'px';
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-right-width`] = textStylingSettings[theme][level].borderWidth + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-border-left-width`] = settings.borderWidth + 'px';
+            cssVariables[`--interactive-text-${mappedKey}-border-right-width`] = settings.borderWidth + 'px';
         }
 
         // add bold styling
-        if (textStylingSettings[theme][level].bold) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-weight`] = 'bold'
+        if (settings.bold) {
+            cssVariables[`--interactive-text-${mappedKey}-weight`] = 'bold'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-weight`] = 'normal'
+            cssVariables[`--interactive-text-${mappedKey}-weight`] = 'normal'
         }
 
         // add italic styling
-        if (textStylingSettings[theme][level].italic) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-style`] = 'italic'
+        if (settings.italic) {
+            cssVariables[`--interactive-text-${mappedKey}-style`] = 'italic'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-style`] = 'normal'
+            cssVariables[`--interactive-text-${mappedKey}-style`] = 'normal'
         }
 
         // add wavy underline
-        if (textStylingSettings[theme][level].wavyUnderline) {
-            cssVariables[`--interactive-text-${levelMapping[level]}-text-decoration`] = 'underline'
-            cssVariables[`--interactive-text-${levelMapping[level]}-wave-width`] = textStylingSettings[theme][level].borderWidth + 'px'
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-bottom-width`] = '0px'
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-top-width`] = '0px'
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-left-width`] = '0px'
-            cssVariables[`--interactive-text-${levelMapping[level]}-border-right-width`] = '0px'
+        if (settings.wavyUnderline) {
+            cssVariables[`--interactive-text-${mappedKey}-text-decoration`] = 'underline'
+            cssVariables[`--interactive-text-${mappedKey}-wave-width`] = settings.borderWidth + 'px'
+            cssVariables[`--interactive-text-${mappedKey}-border-bottom-width`] = '0px'
+            cssVariables[`--interactive-text-${mappedKey}-border-top-width`] = '0px'
+            cssVariables[`--interactive-text-${mappedKey}-border-left-width`] = '0px'
+            cssVariables[`--interactive-text-${mappedKey}-border-right-width`] = '0px'
         } else {
-            cssVariables[`--interactive-text-${levelMapping[level]}-text-decoration`] = 'none'
+            cssVariables[`--interactive-text-${mappedKey}-text-decoration`] = 'none'
         }
-        
 
         return cssVariables
     }

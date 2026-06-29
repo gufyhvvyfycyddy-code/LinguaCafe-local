@@ -674,8 +674,10 @@ class TextBlockService
                 $fw = $fwLookup[$encounteredWords[$wordId]->id];
                 // Keep stage < 0 so furigana and "highlighted" logic still works;
                 // only the numerical level (used for green depth) is adjusted
-                $word->stage = max(-7, min(-1, -$fw['level']));
+                $word->stage = max(-10, min(-1, -$fw['level_10']));
                 $word->fsrs_familiarity_score = $fw['score'];
+                $word->fsrs_familiarity_level_10 = $fw['level_10'];
+                $word->fsrs_familiarity_percent = $fw['level_10'] * 10;
             }
             // If no FSRS data: keep old SRS stage unchanged
 
@@ -724,24 +726,25 @@ class TextBlockService
             $isOverdue = $row->fsrs_due_at && \Carbon\Carbon::parse($row->fsrs_due_at)->isPast();
             $state = $row->fsrs_state ?? 'new';
 
-            // Map stability to level 1-7
-            if ($stability <= 0 || !$row->fsrs_stability) $level = 1;
-            elseif ($stability < 1)   $level = 2;
-            elseif ($stability < 3)   $level = 3;
-            elseif ($stability < 7)   $level = 4;
-            elseif ($stability < 14)  $level = 5;
-            elseif ($stability < 30)  $level = 6;
-            else                      $level = 7;
+            // Compute 10-tier familiarity level (1-10)
+            // Normalise stability to 0-1 range (30+ days → 1.0)
+            $score = $stability > 0 ? min(1.0, $stability / 30.0) : 0.0;
+            $level10 = (int) ceil(max(0.01, $score) * 10);
+            $level10 = max(1, min(10, $level10));
 
-            if ($state === 'new') $level = 1;
-            if ($isOverdue && $level > 1) $level--;
+            if ($state === 'new') $level10 = 1;
+            if ($isOverdue && $level10 > 1) $level10--;
+
+            // For backward compatibility with stage -1..-7 mapping:
+            // level_7 = ceil(level10 * 7 / 10)
+            $level7 = max(1, min(7, (int) ceil($level10 * 7 / 10)));
 
             // Conservative: take lowest level for duplicate encountered_word_id
             $existing = $lookup[$row->encountered_word_id] ?? null;
-            if (!$existing || $level < $existing['level']) {
-                $score = min(1.0, $stability / 30.0);
+            if (!$existing || $level10 < $existing['level_10']) {
                 $lookup[$row->encountered_word_id] = [
-                    'level' => max(1, min(7, $level)),
+                    'level_10' => $level10,
+                    'level' => $level7,
                     'score' => round($score, 2),
                 ];
             }

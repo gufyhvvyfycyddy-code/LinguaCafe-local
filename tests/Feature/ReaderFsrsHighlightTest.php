@@ -152,13 +152,31 @@ class ReaderFsrsHighlightTest extends TestCase
         $phenWord = collect($words)->firstWhere('word', 'Phenomenology');
         $this->assertNotNull($phenWord, 'Phenomenology should be in words array');
 
-        // Stage -5 (stability 10 → level 5 → -5)
-        $this->assertEquals(-5, $phenWord['stage'], 'stage should be FSRS-based');
+        // Stability 10 → score 0.33 → level_10 = ceil(0.33 * 10) = 4 → stage -4
+        $this->assertEquals(-4, $phenWord['stage'], 'stage should be FSRS-based (10-tier)');
+        $this->assertEquals(4, $phenWord['fsrs_familiarity_level_10'], 'level_10 should be 4');
+        $this->assertEquals(40, $phenWord['fsrs_familiarity_percent'], 'percent should be 40');
+        $this->assertNotNull($phenWord['fsrs_familiarity_score']);
 
         // uniqueWords is NOT overridden (it's the raw EncounteredWord data)
         $uniqueWords = $response->json('uniqueWords');
         $phen = collect($uniqueWords)->firstWhere('word', 'phenomenology');
         $this->assertEquals(-1, $phen['stage']);
+    }
+
+    public function test_fsrs_familiarity_level_10_range(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $ws = $this->createWordSense($ew);
+        $this->createReviewCard($ws, stability: 0.1, state: 'review');
+
+        $response = $this->loadReader();
+        $response->assertOk();
+        $word = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertGreaterThanOrEqual(1, $word['fsrs_familiarity_level_10']);
+        $this->assertLessThanOrEqual(10, $word['fsrs_familiarity_level_10']);
+        $this->assertGreaterThanOrEqual(10, $word['fsrs_familiarity_percent']);
+        $this->assertLessThanOrEqual(100, $word['fsrs_familiarity_percent']);
     }
 
     public function test_high_stability_cards_get_higher_highlight_level(): void
@@ -171,7 +189,8 @@ class ReaderFsrsHighlightTest extends TestCase
         $response->assertOk();
 
         $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
-        $this->assertEquals(-7, $phen['stage']); // highest level
+        $this->assertEquals(-10, $phen['stage']); // highest level (10)
+        $this->assertEquals(10, $phen['fsrs_familiarity_level_10']);
     }
 
     public function test_low_stability_cards_get_lower_highlight_level(): void
@@ -184,21 +203,24 @@ class ReaderFsrsHighlightTest extends TestCase
         $response->assertOk();
 
         $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
-        $this->assertEquals(-2, $phen['stage']); // low stability → level 2
+        // Stability 0.5 → score = 0.017 → level_10 = ceil(0.017 * 10) = 1 → stage -1
+        $this->assertEquals(-1, $phen['stage']);
+        $this->assertEquals(1, $phen['fsrs_familiarity_level_10']);
     }
 
     public function test_overdue_cards_get_penalty(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
         $ws = $this->createWordSense($ew);
-        // Stability 10 → level 5, but overdue → level 4
+        // Stability 10 → score 0.33 → level_10 4, but overdue → level_10 3
         $this->createReviewCard($ws, stability: 10.0, dueAt: Carbon::now()->subDay());
 
         $response = $this->loadReader();
         $response->assertOk();
 
         $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
-        $this->assertEquals(-4, $phen['stage']); // penalized by 1
+        $this->assertEquals(-3, $phen['stage']); // penalized by 1 → level_10 = 3
+        $this->assertEquals(3, $phen['fsrs_familiarity_level_10']);
     }
 
     public function test_new_state_cards_get_level_1(): void
@@ -310,7 +332,7 @@ class ReaderFsrsHighlightTest extends TestCase
         $this->assertEquals($originalDue, $rc->fsrs_due_at);
     }
 
-    public function test_words_array_contains_fsrs_familiarity_score(): void
+    public function test_words_array_contains_fsrs_familiarity_fields(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
         $ws = $this->createWordSense($ew);
@@ -322,7 +344,11 @@ class ReaderFsrsHighlightTest extends TestCase
         $words = $response->json('words');
         $phen = collect($words)->firstWhere('word', 'Phenomenology');
         $this->assertArrayHasKey('fsrs_familiarity_score', $phen);
+        $this->assertArrayHasKey('fsrs_familiarity_level_10', $phen);
+        $this->assertArrayHasKey('fsrs_familiarity_percent', $phen);
         $this->assertIsFloat($phen['fsrs_familiarity_score']);
+        $this->assertIsInt($phen['fsrs_familiarity_level_10']);
+        $this->assertEquals($phen['fsrs_familiarity_level_10'] * 10, $phen['fsrs_familiarity_percent']);
     }
 
     public function test_language_isolation(): void

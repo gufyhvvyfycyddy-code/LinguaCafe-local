@@ -209,8 +209,8 @@
                         >
                             <v-sheet outlined rounded class="pa-3">
                                 <div class="text-subtitle-2 font-weight-bold mb-1">{{ st.sentence_index }}</div>
-                                <div class="body-2 mb-1">{{ st.source_text }}</div>
-                                <div class="caption blue--text text--darken-1">{{ st.translation_zh }}</div>
+                                <div class="body-2 mb-1" v-html="hl(st.source_text, detailSearchQuery)"></div>
+                                <div class="caption blue--text text--darken-1" v-html="hl(st.translation_zh, detailSearchQuery)"></div>
                             </v-sheet>
                         </div>
                     </div>
@@ -232,7 +232,7 @@
                         >
                             <v-sheet outlined rounded class="pa-3">
                                 <div class="d-flex align-center mb-1">
-                                    <strong class="text-body-1">{{ vi.surface }}</strong>
+                                    <strong class="text-body-1" v-html="hl(vi.surface, detailSearchQuery)"></strong>
                                     <v-chip
                                         v-if="vi.confidence"
                                         small
@@ -243,22 +243,22 @@
                                     >{{ vi.confidence }}</v-chip>
                                 </div>
                                 <div v-if="vi.suggested_lemma" class="caption grey--text mb-1">
-                                    AI 建议原型：{{ vi.suggested_lemma }}
+                                    AI 建议原型：<span v-html="hl(vi.suggested_lemma, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.pos" class="caption grey--text mb-1">
-                                    词性：{{ vi.pos }}
+                                    词性：<span v-html="hl(vi.pos, detailSearchQuery)"></span>
                                 </div>
                                 <div class="body-2 mb-1">
-                                    中文释义：{{ vi.meaning_zh }}
+                                    中文释义：<span v-html="hl(vi.meaning_zh, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.sentence_index" class="caption grey--text mb-1">
                                     所在句：{{ vi.sentence_index }}
                                 </div>
                                 <div v-if="vi.source_sentence" class="caption grey--text mb-1">
-                                    原句：{{ vi.source_sentence }}
+                                    原句：<span v-html="hl(vi.source_sentence, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.reason" class="caption grey--text">
-                                    说明：{{ vi.reason }}
+                                    说明：<span v-html="hl(vi.reason, detailSearchQuery)"></span>
                                 </div>
                             </v-sheet>
                         </div>
@@ -281,7 +281,7 @@
                         >
                             <v-sheet outlined rounded class="pa-3">
                                 <div class="d-flex align-center mb-1">
-                                    <strong class="text-body-1">{{ pi.phrase }}</strong>
+                                    <strong class="text-body-1" v-html="hl(pi.phrase, detailSearchQuery)"></strong>
                                     <v-chip
                                         v-if="pi.confidence"
                                         small
@@ -292,19 +292,19 @@
                                     >{{ pi.confidence }}</v-chip>
                                 </div>
                                 <div class="body-2 mb-1">
-                                    中文释义：{{ pi.meaning_zh }}
+                                    中文释义：<span v-html="hl(pi.meaning_zh, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="pi.trigger_words && pi.trigger_words.length" class="caption grey--text mb-1">
-                                    触发词：{{ pi.trigger_words.join('、') }}
+                                    触发词：<span v-html="hl(pi.trigger_words.join('、'), detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="pi.sentence_index" class="caption grey--text mb-1">
                                     所在句：{{ pi.sentence_index }}
                                 </div>
                                 <div v-if="pi.source_sentence" class="caption grey--text mb-1">
-                                    原句：{{ pi.source_sentence }}
+                                    原句：<span v-html="hl(pi.source_sentence, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="pi.reason" class="caption grey--text">
-                                    说明：{{ pi.reason }}
+                                    说明：<span v-html="hl(pi.reason, detailSearchQuery)"></span>
                                 </div>
                             </v-sheet>
                         </div>
@@ -326,8 +326,8 @@
                             class="mb-2"
                         >
                             <v-sheet outlined rounded class="pa-3">
-                                <div class="caption font-weight-medium mb-1">{{ w.type }}</div>
-                                <div class="caption grey--text">{{ w.message }}</div>
+                                <div class="caption font-weight-medium mb-1" v-html="hl(w.type, detailSearchQuery)"></div>
+                                <div class="caption grey--text" v-html="hl(w.message, detailSearchQuery)"></div>
                             </v-sheet>
                         </div>
                     </div>
@@ -577,6 +577,33 @@
             close() {
                 this.visible = false;
             },
+
+            // ── Search highlight helpers ──
+
+            escapeHtml(str) {
+                const div = document.createElement('div');
+                div.appendChild(document.createTextNode(str));
+                return div.innerHTML;
+            },
+            hl(text, query) {
+                if (!query || !query.trim()) {
+                    return this.escapeHtml(text != null ? String(text) : '');
+                }
+                const escaped = this.escapeHtml(text != null ? String(text) : '');
+                if (!escaped) return escaped;
+                const q = query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const re = new RegExp(`(${q})`, 'gi');
+                return escaped.replace(re, '<span class="purple-highlight">$1</span>');
+            },
         },
     }
 </script>
+
+<style scoped>
+    .purple-highlight {
+        background-color: rgba(156, 39, 176, 0.16);
+        border-bottom: 1px solid rgba(156, 39, 176, 0.45);
+        padding: 0 1px;
+        border-radius: 2px;
+    }
+</style>

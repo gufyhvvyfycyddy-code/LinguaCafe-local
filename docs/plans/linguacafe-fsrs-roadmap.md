@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-29
-> **上一轮已验收基线 commit**：`981a4b5`
+> **上一轮已验收基线 commit**：`ad6237f`
 
 ---
 
@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`c34ceda`（Feat: drive reader highlights from FSRS familiarity）
+**Latest commit**：`ad6237f`（Docs: update roadmap Latest commit to c34ceda）
 
 ### `/review-cards/manage` 当前能力
 
@@ -584,6 +584,7 @@
 | 中 | FSRS-Anki-Mgmt-7-follow-up | 修复 `/reviews/senses` 绕过每日上限问题 | ✅ 已完成 | SenseReviewController 改用 dueCardsWithLimits，SettingsService is_queue_enforced 改为 true |
 | 中 | FSRS-Anki-Mgmt-7-b | 每日新学累计计数精确化 | 📋 计划中 | 当前只限制队列显示数量，未严格统计今日已学新卡累计 |
 | 中 | Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动 | ✅ 已完成 | 后端 TextBlockService 根据 ReviewCard stability/due_at/state 计算熟悉度 level 1-7 |
+| 中 | Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全规则 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览紫色高亮 + 文档明确保留所有未完成计划 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
