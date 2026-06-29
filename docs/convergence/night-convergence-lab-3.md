@@ -174,6 +174,13 @@ AGENTS.md
 - **目标**：审查/收敛 TextReaderSettings.vue 中剩余选项常量
 - **允许修改文件**：TextReaderSettingsOptionsService.js, TextReaderSettings.vue, lab-3.md
 - **验证方式**：npm build + MCP 设置页下拉选项
+- **执行结果**：
+  - 审查 `vocabBoxScrollIntoViewData`：3 项，仅在 TextReaderSettings.vue:307 使用 ✅ 无重复
+  - 审查 `vocabularyHoverBoxPreferredPositionData`：2 项，仅在 TextReaderSettings.vue:431 使用 ✅ 无重复
+  - 结论：❌ 不提取。这些选项是单点定义单点使用，提取到 Service 只是搬家，不减少重复。
+  - 之前 R2 Lab-2 已提取了唯一真正的重复常量 `maximumTextWidthData`。
+  - **不改代码** ✅
+  - **通过** ✅
 
 ## R3 设计
 
