@@ -83,7 +83,6 @@
                     'plain-text-mode': settings.plainTextMode,
                     'vertical-text': settings.verticalText,
                     'rounded-lg': true,
-                    'ml-2': true,
                 }"
                 :style="{
                     'height': $vuetify.breakpoint.mdAndUp ? 'calc(100% - 24px - 24px)' : 'calc(100% - 24px - 24px - 64px)',

@@ -328,6 +328,12 @@ export default {
             this.loadAiSuggestions();
         },
         phrase() { this.updateDataFromStore(); },
+        // Re-trigger AI lookup when sentence changes (new word in same sentence or different sentence)
+        '_sentenceIndex'() {
+            if (this.$store.state.vocabularyBox.active && this.word) {
+                this.loadAiSuggestions();
+            }
+        },
     },
     data() {
         return {

@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`6c46b0f`（Feat: simplify reader lookup definition UI）
+**Latest commit**：`ab5ff22`（Docs: update roadmap Latest commit to 6c46b0f）
 
 ### `/review-cards/manage` 当前能力
 
@@ -600,6 +600,7 @@
 | 低 | Reader-Layout-1 | 阅读页布局扩展 + 来源句默认收起 | ✅ 已完成 | 大屏查词栏 520px（原 400px），AI 来源句默认收起可展开，正文 padding 同步 |
 | 高 | Reader-Layout-1-b | 修复全屏查词栏误变弹窗 + 加载性能审计 | ✅ 已完成 | 修复 vocabularySidebarFits 改用响应式 breakpoint + 实际空间判断；updateVocabBoxPosition 同步动态宽度；padding-right 改用 Vuetify computed |
 | 中 | Reader-Toolbar-UI-1 | 恢复阅读工具栏 + 精简添加释义表单 + 压缩词典结果 | ✅ 已完成 | 工具栏 z-index+背景修复；添加释义高级选项默认折叠；词典结果紧凑化+加号按钮 |
+| 低 | Reader-Toolbar-UI-1-b | 工具栏避让查词栏 + AI 建议可见带 chip + 词典二次紧凑化（左词右义+行内加号） | ✅ 已完成 | 工具栏移至左侧 float:left，reader card ml-2 移除，vocab-side-box 可视区域扩大；_sentenceIndex watcher 补充 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 

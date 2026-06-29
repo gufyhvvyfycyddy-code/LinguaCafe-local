@@ -46,6 +46,7 @@
                     :key="`api-search-result-${searchResultIndex}-${definitionIndex}`"
                     class="search-result-definition rounded dictionary-definition-row compact"
                 >
+                    <span class="dict-word-label">{{ $props.searchTerm }}</span>
                     <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
                         {{ definition }}
                     </span>
@@ -62,53 +63,29 @@
                 </div>
             </div>
 
-            <div class="search-result jmdict" v-for="(searchResult, searchresultIndex) in searchResults" :key="searchresultIndex">
-                <template v-if="searchResult.dictionary !== 'JMDict'">
-                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                        <div
-                            v-for="(definition, definitionIndex) in record.definitions"
-                            :key="definitionIndex"
-                            class="search-result-definition rounded dictionary-definition-row compact"
+            <div class="search-result" v-for="(searchResult, searchresultIndex) in searchResults" :key="searchresultIndex">
+                <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
+                    <div v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex" class="search-result-definition rounded dictionary-definition-row compact">
+                        <span class="dict-word-label">{{ record.word }}</span>
+                        <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                            {{ definition }}
+                        </span>
+                        <v-btn
+                            icon
+                            x-small
+                            color="primary"
+                            class="ml-1 dictionary-add-btn"
+                            @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)"
+                            title="添加为新释义"
                         >
-                            <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
-                                {{ definition }}
-                            </span>
-                            <v-btn
-                                icon
-                                x-small
-                                color="primary"
-                                class="ml-1 dictionary-add-btn"
-                                @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)"
-                                title="添加为新释义"
-                            >
-                                <v-icon x-small>mdi-plus-circle-outline</v-icon>
-                            </v-btn>
-                        </div>
+                            <v-icon x-small>mdi-plus-circle-outline</v-icon>
+                        </v-btn>
                     </div>
-                </template>
-                <template v-if="searchResult.dictionary == 'JMDict'">
-                    <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
-                        <div class="search-result-definition rounded dictionary-definition-row compact" v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex">
-                            <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
-                                {{ definition }}
-                            </span>
-                            <v-btn
-                                icon
-                                x-small
-                                color="primary"
-                                class="ml-1 dictionary-add-btn"
-                                @click.stop="addDefinitionAsSense(definition, record.word, searchResult.dictionary)"
-                                title="添加为新释义"
-                            >
-                                <v-icon x-small>mdi-plus-circle-outline</v-icon>
-                            </v-btn>
-                        </div>
 
-                        <template v-if="record.otherForms.length">
-                            <div class="text-caption text--secondary mb-1">其他形式：{{ record.otherForms.join(', ') }}</div>
-                        </template>
-                    </div>
-                </template>
+                    <template v-if="record.otherForms && record.otherForms.length">
+                        <div class="text-caption text--secondary mb-1 ml-2">其他形式：{{ record.otherForms.join(', ') }}</div>
+                    </template>
+                </div>
             </div>
         </div>
     </div>
@@ -275,14 +252,31 @@ export default {
 }
 
 .dictionary-definition-row.compact {
-    padding-top: 2px;
-    padding-bottom: 2px;
-    margin-bottom: 2px;
+    padding: 2px 4px;
+    margin-bottom: 1px;
     font-size: 0.85em;
     line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.dict-word-label {
+    flex-shrink: 0;
+    min-width: 70px;
+    max-width: 100px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: 500;
+    color: var(--v-primary-base);
+    font-size: 0.9em;
+    text-align: right;
 }
 
 .dictionary-definition-row.compact .dictionary-definition-text {
+    flex: 1;
+    min-width: 0;
     cursor: pointer;
 }
 

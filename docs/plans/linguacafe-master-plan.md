@@ -64,6 +64,7 @@
 | Reader-Layout-1 | 阅读页布局扩展（大屏查词栏 520px + 来源句默认收起） |
 | Reader-Layout-1-b | 修复全屏误弹窗 + 响应式 breakpoint + 动态宽度同步 |
 | Reader-Toolbar-UI-1 | 恢复工具栏 + 添加释义高级选项折叠 + 词典结果紧凑化 |
+| Reader-Toolbar-UI-1-b | 工具栏左移避让查词栏 + AI 建议 chip 可见性 + 左词右义词典布局 |
 
 ### 3.4 右击面板 / Review UI
 
