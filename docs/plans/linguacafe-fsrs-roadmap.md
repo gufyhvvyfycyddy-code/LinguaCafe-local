@@ -122,7 +122,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`6a9c391`（Fix: prevent reader toolbar from covering lookup panel；本地 Codex-Reader-Workspace-UI-1 尚未提交）
+**Latest commit**：`dd7d337`（Style: optimize reader workspace layout；含 Codex-Reader-Workspace-UI-1 全量改动 + 小修 + Anti-Mud 规则）
 
 ### `/review-cards/manage` 当前能力
 
