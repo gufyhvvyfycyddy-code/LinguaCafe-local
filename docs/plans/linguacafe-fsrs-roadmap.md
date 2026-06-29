@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`5f02939`（Docs: mark AI-5 completed, update Latest commit）
+**Latest commit**：`09d6e21`（Feat: streamline lookup add-sense workflow）
 
 ### `/review-cards/manage` 当前能力
 
