@@ -38,30 +38,37 @@
 | FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 已完成 |
-| FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 当前阶段 |
-| FSRS-Anki-Mgmt-5 | Preset / 分组参数长期评估 | 📋 计划中 |
+| FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 已完成 |
+| FSRS-Anki-Mgmt-5 | 每日学习上限 / 新卡与复习上限侦察 | ✅ 当前阶段 |
+| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版 | 📋 计划中 |
+| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 |
+| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
+| FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
 
 ---
 
 ## 5. 当前下一步
 
-进入 **FSRS-Anki-Mgmt-4：Desired Retention 工作量模拟器**
+进入 **FSRS-Anki-Mgmt-5：每日学习上限 / 新卡与复习上限侦察**
 
-后端：
-- `FsrsRetentionWorkloadSimulationService` — 只读 simulate() 方法
-- `POST /settings/fsrs/retention-workload-simulation` — 路由
-- `SettingsController::retentionWorkloadSimulation()` — 控制器方法
-- 85%/90%/93%/95% 四档模拟，基于真实候选卡数据
+本轮目标：只做侦察和计划，不实现功能。
 
-前端：
-- `AdminReviewSettings.vue` — 复习目标区新增"查看不同保持率的复习量"按钮 + 模拟结果表格
-- high 风险确认按钮文案更新为"我知道风险，仍然重排"
-- 重排风险面板中"未来 7 天到期"突出显示 + 变化量 chip
+侦察结论：
+- Anki 支持 New Cards/Day + Maximum Reviews/Day + per-deck 三层限制。
+- LinguaCafe 当前没有每日上限设置，所有 due 卡全部进入复习队列。
+- LinguaCafe 的 sense review 基于 `fsrs_due_at <= now()` 取卡，无上限过滤。
+- 每日上限可通过已有 `settings` 表保存，无需新增 migration。
+- 第一版建议：全局每日复习上限（默认 200）+ 每日新学上限（默认 20），新卡受复习上限影响。
+- 风险：复习上限会隐藏部分 due 卡（必须 UI 提示），但不影响历史数据、ReviewLog、管理页导出。
+- 属于中高风险功能，必须分阶段实施。
 
-测试：
-- 空卡时返回清楚中文提示
-- 四档包含 today_due / next7_due / next7_delta_vs_current
-- 不写入 ReviewCard / ReviewLog
+后续阶段：
+| 阶段 | 内容 | 状态 | 风险 |
+|------|------|------|------|
+| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（全局上限） | 📋 计划中 | 低 |
+| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 | 高 |
+| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 中 |
+| FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 低 |
 
 后端：
 - `SettingsService::restoreFsrsDefaultParameters()` — 删除 4 个 global settings
