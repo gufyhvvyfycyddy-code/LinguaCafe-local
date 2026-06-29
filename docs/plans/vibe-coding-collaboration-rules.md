@@ -84,7 +84,84 @@
 11. 每次更新 roadmap（`linguacafe-fsrs-roadmap.md`）时，必须同步检查 master plan（`linguacafe-master-plan.md`）是否也需要更新。
 12. master plan 和 roadmap 的内容不能冲突。如有冲突，以 master plan 为准并修正 roadmap。
 
-## 8. 安全红线
+## 8. Anki 参考规则
+
+1. 涉及以下主题时，网页端 GPT 在提出产品问题或生成开发提示词前，必须先查看 Anki 相关信息：
+
+   - SRS / FSRS
+   - 复习卡
+   - 复习记录
+   - 删除 / 重置 / Forget / Reset
+   - Card Info
+   - Browser / Browse
+   - 统计图
+   - review history / revlog
+   - 学习队列
+   - answer buttons
+   - deck options / preset
+2. 信息来源优先级：
+
+   - Anki 官方手册
+   - Anki 官方代码仓库
+   - Anki 官方论坛 / 功能讨论
+   - 可靠社区经验
+3. **不盲目照搬 Anki**：
+
+   - Anki 是参考基准。
+   - LinguaCafe 是阅读学习工具，不是 Anki 克隆。
+   - 如果 Anki 做法与 LinguaCafe 已明确的 sense-only 规则或用户明确产品决定冲突，以 LinguaCafe 规则和用户决定为准。
+   - 偏离 Anki 时必须在报告中说明原因。
+4. 本地 Agent 如果被要求参考 Anki，必须在报告中说明：
+
+   - 查看了哪些 Anki 资料。
+   - 借鉴了什么。
+   - 哪些地方没有照搬。
+5. 不允许在没有查 Anki 的情况下，凭想象回答 "Anki 大概怎么做"。
+
+## 9. 最终报告格式规则
+
+自本轮起，OpenCode Agent 的最终报告必须采用以下结构：
+
+```markdown
+# <任务名> 完成报告
+
+## 1. Git 状态
+- 开始 commit：
+- 新 commit：
+- 是否 push：
+- git status：
+
+## 2. 实际修改文件
+| 文件 | 类型 | 修改内容 |
+|------|------|----------|
+| path/to/file | 代码/文档/测试 | 简要说明每个代码文件改了什么 |
+
+## 3. 代码改动核验点
+- 文件 A：
+  - 改了什么函数/组件/方法。
+  - 行为是否改变。
+  - 有无数据风险。
+- 文件 B：...
+
+## 4. 测试与构建
+- 测试命令及结果。
+- 构建命令及结果。
+- 浏览器 smoke（如有）。
+
+## 5. 文档更新
+- 修改了哪些计划文档。
+- 是否更新 master plan / roadmap / Latest commit。
+
+## 6. 简短合规确认
+- 代码边界：只修改允许的范围。
+- 数据边界：未清库、未误删、未跨用户/语言。
+- 安全边界：未改 .env、未用 --force、未执行 DCP、未修改 AGENTS.md、未处理 .omo/。
+- 计划边界：未删除既有计划、未自动进入下一任务。
+- 涉及数据删除的任务：说明删除范围和隔离条件。
+- 涉及 Anki 参考的任务：新增 Anki 参考资料、借鉴点、偏离点小节。
+```
+
+## 9. 安全红线
 
 - 不允许修改 `.env`。
 - 不允许清库、`migrate:fresh`、`db:wipe`、drop / truncate。

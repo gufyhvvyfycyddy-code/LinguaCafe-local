@@ -103,9 +103,9 @@ class WordSenseService
      *
      * - Sets WordSense status to rejected (it will no longer appear in reading page candidates).
      * - Optionally deletes the associated ReviewCard (true for permanent delete, false for archive).
+     * - Optionally deletes ReviewLog rows for that ReviewCard when $deleteReviewLogs=true.
      * - Clears occurrence review_card_id references and disables auto_fsrs_allowed.
      * - Does NOT delete WordSenseOccurrence rows.
-     * - Does NOT delete review_logs.
      * - Does NOT delete reading materials, chapters, or EncounteredWord.
      */
     public function removeSenseFromReviewSystem(

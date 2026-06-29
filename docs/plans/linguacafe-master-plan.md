@@ -192,9 +192,32 @@
 7. 本地 Agent 不得擅自改变产品优先级。
 8. 每次更新 roadmap 时检查是否误删旧计划。
 
+## 7. Anki 参考规则
+
+本文档适用于网页端 GPT 和本地 OpenCode Agent：
+
+1. **必须先查 Anki**：涉及以下主题时，在提出产品问题或生成开发提示词前，必须先查看 Anki 官方手册 / 代码仓库 / 功能讨论：
+
+   - SRS / FSRS
+   - 复习卡 / 复习记录 / review history / revlog
+   - 删除 / 重置 / Forget / Reset
+   - Card Info / Browser / Browse
+   - 统计图
+   - 学习队列 / answer buttons
+   - deck options / preset
+2. **Anki 是参考基准，不是圣经**：
+   - LinguaCafe 是阅读学习工具，不是 Anki 克隆。
+   - 如果 Anki 做法与 LinguaCafe 已明确的 sense-only 规则或用户明确产品决定冲突，以 LinguaCafe 总控计划和用户决定为准。
+   - 偏离 Anki 时必须在报告 / 提示词中说明原因。
+3. **本地 Agent 的 Anki 参考报告要求**：
+   - 查看了哪些 Anki 资料。
+   - 借鉴了什么。
+   - 哪些地方没有照搬。
+4. **禁止凭想象回答 "Anki 大概怎么做"**。
+
 ---
 
-## 7. 建议下一步顺序
+## 8. 建议下一步顺序
 
 以下为网页端 GPT 或项目负责人参考的建议顺序，不绑定开发节奏：
 
@@ -204,7 +227,7 @@
 | 2 | Reader-UI-1-a | 查词侧栏第一轮瘦身 | 隐藏旧 SRS 1-7 按钮，"旧词条释义"→"选择释义"，词典默认收起 |
 | 3 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 | 用户明确要求，改动小，价值高 |
 | 4 | AI-Reading-Assist-3 | 解析预览后用户确认内容 | AI-2 的后续，闭环 AI 导入流程 |
-| 4 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
+| 5 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
 | 5 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
 | 6 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
 | 7 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 清理旧 SRS 遗留逻辑 |
