@@ -134,7 +134,145 @@ class SettingsService {
                 : self::FSRS_OPTIMIZATION_INSUFFICIENT_MESSAGE,
         ];
 
-        return array_merge($status, $this->resolveFsrsParameterSource());
+        return array_merge($status, $this->resolveFsrsParameterSource(), [
+            'diagnostics' => $this->getFsrsOptimizationDiagnostics($userId, $language),
+        ]);
+    }
+
+    /**
+     * Compute FSRS optimization diagnostics for the diagnostic panel.
+     *
+     * Returns detailed breakdown of review logs, eligible records, excluded records,
+     * trainable cards, and a readable diagnosis level + message.
+     *
+     * @param int $userId
+     * @param string $language
+     * @return array<string, mixed>
+     */
+    private function getFsrsOptimizationDiagnostics(int $userId, string $language): array
+    {
+        $totalReviewLogs = ReviewLog::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->count('id');
+
+        // Reset logs: source='reset' OR rating='reset'
+        $resetReviewLogs = ReviewLog::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where(function ($q) {
+                $q->where('source', 'reset')
+                  ->orWhere('rating', 'reset');
+            })
+            ->count('id');
+
+        // Eligible logs: same filter as countOptimizableFsrsReviews()
+        $eligibleReviewLogs = $this->countOptimizableFsrsReviews($userId, $language);
+
+        // Eligible cards: distinct sense cards that have eligible logs
+        $eligibleCards = ReviewLog::query()
+            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_logs.user_id', $userId)
+            ->where('review_logs.language_id', $language)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->distinct()
+            ->count('review_logs.review_card_id');
+
+        // Trainable cards: eligible cards with ≥2 eligible reviews
+        $cardLogCounts = ReviewLog::query()
+            ->select('review_logs.review_card_id', DB::raw('COUNT(*) as cnt'))
+            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
+            ->join('word_senses', function ($join) {
+                $join->on('word_senses.id', '=', 'review_cards.target_id')
+                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
+            })
+            ->where('review_logs.user_id', $userId)
+            ->where('review_logs.language_id', $language)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('word_senses.user_id', $userId)
+            ->where('word_senses.language_id', $language)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->groupBy('review_logs.review_card_id')
+            ->having('cnt', '>=', 2)
+            ->get();
+
+        $trainableCards = $cardLogCounts->count();
+
+        // Excluded logs = total - eligible
+        $excludedReviewLogs = $totalReviewLogs - $eligibleReviewLogs;
+
+        // Inactive/deleted = excluded - reset (non-reset excluded)
+        $inactiveOrDeletedReviewLogs = $excludedReviewLogs - $resetReviewLogs;
+        if ($inactiveOrDeletedReviewLogs < 0) {
+            $inactiveOrDeletedReviewLogs = 0;
+        }
+
+        // Confirmed sense cards
+        $confirmedSenseCards = ReviewCard::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereHas('sense', function ($q) {
+                $q->where('status', WordSense::STATUS_CONFIRMED);
+            })
+            ->count('id');
+
+        // Rejected word senses
+        $rejectedWordSenses = WordSense::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('status', WordSense::STATUS_REJECTED)
+            ->count('id');
+
+        // Missing to threshold
+        $missingReviewLogs = max(0, self::FSRS_OPTIMIZATION_MIN_REQUIRED - $eligibleReviewLogs);
+
+        // Diagnosis level
+        $canOptimizeByCount = $eligibleReviewLogs >= self::FSRS_OPTIMIZATION_MIN_REQUIRED;
+        $canBuildTrainset = $trainableCards > 0;
+
+        $diagnosisLevel = 'empty';
+        $diagnosisMessage = '当前没有可用于参数优化的复习记录。先正常复习一段时间。';
+
+        if ($eligibleReviewLogs > 0 && !$canOptimizeByCount) {
+            $diagnosisLevel = 'insufficient';
+            $diagnosisMessage = '当前有效复习记录还不够，继续复习后再优化参数。';
+        }
+
+        if ($canOptimizeByCount && !$canBuildTrainset) {
+            $diagnosisLevel = 'needs_more_card_history';
+            $diagnosisMessage = '记录数量接近要求，但部分卡片复习次数太少，暂时无法形成可靠训练数据。';
+        }
+
+        if ($canOptimizeByCount && $canBuildTrainset) {
+            $diagnosisLevel = 'ready';
+            $diagnosisMessage = '已有足够有效复习记录，可以尝试计算优化参数。';
+        }
+
+        return [
+            'total_review_logs' => $totalReviewLogs,
+            'eligible_review_logs' => $eligibleReviewLogs,
+            'eligible_cards' => $eligibleCards,
+            'trainable_cards' => $trainableCards,
+            'excluded_review_logs' => $excludedReviewLogs,
+            'reset_review_logs' => $resetReviewLogs,
+            'inactive_or_deleted_review_logs' => $inactiveOrDeletedReviewLogs,
+            'confirmed_sense_cards' => $confirmedSenseCards,
+            'rejected_word_senses' => $rejectedWordSenses,
+            'min_required' => self::FSRS_OPTIMIZATION_MIN_REQUIRED,
+            'missing_review_logs' => $missingReviewLogs,
+            'can_optimize_by_count' => $canOptimizeByCount,
+            'can_build_trainset' => $canBuildTrainset,
+            'diagnosis_level' => $diagnosisLevel,
+            'diagnosis_message' => $diagnosisMessage,
+        ];
     }
 
     private function resolveFsrsParameterSource(): array {

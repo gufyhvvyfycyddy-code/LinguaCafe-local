@@ -678,6 +678,50 @@
                                 </td>
                             </tr>
                             <tr>
+                                <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">参数优化诊断</td>
+                                <td class="py-2">
+                                    <div v-if="!fsrsOptimizationDiagnostics" class="grey--text text--darken-1 caption">
+                                        {{ fsrsParameterSource === 'optimized' ? '诊断数据加载中...' : '暂无诊断数据。' }}
+                                    </div>
+                                    <div v-else>
+                                        <!-- Core status line -->
+                                        <div class="mb-2">
+                                            <span class="font-weight-medium">有效复习记录：</span>
+                                            <span>{{ fsrsOptimizationDiagnostics.eligible_review_logs }} / {{ fsrsOptimizationDiagnostics.min_required }}</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="font-weight-medium">可训练卡片：</span>
+                                            <span>{{ fsrsOptimizationDiagnostics.trainable_cards }} 张</span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="font-weight-medium">当前状态：</span>
+                                            <v-chip
+                                                x-small
+                                                :color="diagnosisChipColor"
+                                                outlined
+                                                label
+                                            >
+                                                {{ fsrsOptimizationDiagnostics.diagnosis_message }}
+                                            </v-chip>
+                                        </div>
+
+                                        <!-- Exclusion details -->
+                                        <div v-if="fsrsOptimizationDiagnostics.excluded_review_logs > 0" class="mt-2 caption grey--text text--darken-1">
+                                            <div>不会参与计算的旧记录：<strong>{{ fsrsOptimizationDiagnostics.excluded_review_logs }}</strong> 条</div>
+                                            <div v-if="fsrsOptimizationDiagnostics.reset_review_logs > 0">其中 reset 记录：<strong>{{ fsrsOptimizationDiagnostics.reset_review_logs }}</strong> 条</div>
+                                            <div v-if="fsrsOptimizationDiagnostics.inactive_or_deleted_review_logs > 0">已删除或已停用卡片相关记录：<strong>{{ fsrsOptimizationDiagnostics.inactive_or_deleted_review_logs }}</strong> 条</div>
+                                        </div>
+                                        <div v-else class="mt-2 caption grey--text text--darken-1">
+                                            没有发现会被排除的旧记录。
+                                        </div>
+
+                                        <div class="mt-2 caption grey--text text--darken-1">
+                                            删除或拒绝的词义卡不会参与参数优化。
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr>
                                 <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">手动编辑参数</td>
                                 <td class="py-2">
                                     <div>暂未开放。</div>
@@ -923,6 +967,7 @@
                 fsrsParameterWarning: '',
                 fsrsRestoreDefaultLoading: false,
                 fsrsRestoreDefaultSuccess: '',
+                fsrsOptimizationDiagnostics: null,
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -1004,6 +1049,13 @@
             },
             isRecommended() {
                 return this.fsrsDesiredRetention === 0.90;
+            },
+            diagnosisChipColor() {
+                if (!this.fsrsOptimizationDiagnostics) return 'grey';
+                const level = this.fsrsOptimizationDiagnostics.diagnosis_level;
+                if (level === 'ready') return 'success';
+                if (level === 'insufficient' || level === 'needs_more_card_history') return 'warning';
+                return 'grey';
             },
             retentionBurdenEstimate() {
                 const multiplierMap = {
@@ -1141,6 +1193,9 @@
                         this.fsrsParameterCount = response.data.parameters_count ?? 19;
                         this.fsrsHasOptimizedParameters = response.data.has_optimized_parameters || false;
                         this.fsrsParameterWarning = response.data.parameters_warning || '';
+
+                        // Diagnostics
+                        this.fsrsOptimizationDiagnostics = response.data.diagnostics || null;
                     })
                     .catch(() => {
                         this.fsrsOptimizationCanOptimize = false;

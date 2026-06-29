@@ -674,6 +674,109 @@ class FsrsOptimizationSettingsTest extends TestCase
         }
     }
 
+    // ─── FSRS-Anki-Mgmt-2: Diagnostics tests ──────────────────────────────
+
+    public function test_diagnostics_returns_empty_for_no_data(): void
+    {
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $diag = $response->json('diagnostics');
+        $this->assertNotNull($diag);
+        $this->assertEquals(0, $diag['total_review_logs']);
+        $this->assertEquals(0, $diag['eligible_review_logs']);
+        $this->assertEquals(0, $diag['eligible_cards']);
+        $this->assertEquals(0, $diag['trainable_cards']);
+        $this->assertEquals(0, $diag['excluded_review_logs']);
+        $this->assertEquals(0, $diag['confirmed_sense_cards']);
+        $this->assertEquals('empty', $diag['diagnosis_level']);
+    }
+
+    public function test_diagnostics_counts_eligible_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english');
+        $card = $this->createSenseCard($sense);
+        $this->createReviewLogs($card, 5);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $diag = $response->json('diagnostics');
+        $this->assertEquals(5, $diag['total_review_logs']);
+        $this->assertEquals(5, $diag['eligible_review_logs']);
+        $this->assertEquals(1, $diag['eligible_cards']);
+        $this->assertEquals(1, $diag['confirmed_sense_cards']);
+        $this->assertEquals('insufficient', $diag['diagnosis_level']);
+    }
+
+    public function test_diagnostics_excludes_reset_logs(): void
+    {
+        $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
+        $this->createReviewLogs($card, 3);
+        // Add a reset log
+        $this->createReviewLogs($card, 1, [
+            'rating' => 'reset',
+            'source' => 'reset',
+            'previous_state' => 'review',
+            'new_state' => 'new',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $diag = $response->json('diagnostics');
+        $this->assertEquals(4, $diag['total_review_logs']);
+        $this->assertEquals(3, $diag['eligible_review_logs']);
+        $this->assertEquals(1, $diag['reset_review_logs']);
+    }
+
+    public function test_diagnostics_excludes_rejected_sense_logs(): void
+    {
+        $confirmedSense = $this->createSense($this->user->id, 'english');
+        $confirmedCard = $this->createSenseCard($confirmedSense);
+        $this->createReviewLogs($confirmedCard, 3);
+
+        $rejectedSense = $this->createSense($this->user->id, 'english', [
+            'lemma' => 'rejected_word',
+            'status' => WordSense::STATUS_REJECTED,
+        ]);
+        $rejectedCard = $this->createSenseCard($rejectedSense);
+        $this->createReviewLogs($rejectedCard, 2);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $diag = $response->json('diagnostics');
+        $this->assertEquals(5, $diag['total_review_logs']);
+        $this->assertEquals(3, $diag['eligible_review_logs']);
+        $this->assertEquals(2, $diag['excluded_review_logs']);
+        $this->assertEquals(1, $diag['rejected_word_senses']);
+    }
+
+    public function test_diagnostics_trainable_cards_requires_two_or_more_reviews(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english');
+        $card = $this->createSenseCard($sense);
+
+        // Only 1 review → not trainable
+        $this->createReviewLogs($card, 1);
+
+        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+
+        $response->assertOk();
+        $diag = $response->json('diagnostics');
+        $this->assertEquals(1, $diag['eligible_review_logs']);
+        $this->assertEquals(1, $diag['eligible_cards']);
+        $this->assertEquals(0, $diag['trainable_cards']);
+
+        // Add second review → becomes trainable
+        $this->createReviewLogs($card, 1);
+        $response2 = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
+        $diag2 = $response2->json('diagnostics');
+        $this->assertEquals(2, $diag2['eligible_review_logs']);
+        $this->assertEquals(1, $diag2['trainable_cards']);
+    }
+
     // ── D.2-d: Parameter source tests ──
 
     public function test_optimization_status_shows_default_when_no_saved_parameters(): void
