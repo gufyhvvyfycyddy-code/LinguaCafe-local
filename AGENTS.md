@@ -66,3 +66,78 @@
 - 不做 force push。
 - 不改动 upstream 的 git 历史。
 - commit message 用英文描述做了什么（沿用 Codex 的 `fix:`, `feat:`, `docs:` 前缀风格）。
+
+## Architecture Gate: improve-codebase-architecture
+
+Before any cross-module change, large refactor, API/interface change, Vue component split, review-card logic change, WordSense logic change, FSRS logic change, import/export change, or reader-page state-flow change, run:
+
+- improve-codebase-architecture
+
+The architecture review must identify module responsibilities, boundaries, coupling, risks, allowed files, forbidden files, tests, and whether an ADR is required.
+
+## Architecture and Engineering Skills
+
+This project uses project-level OpenCode skills under `.opencode/skills/`.
+
+Installed skills:
+
+1. `improve-codebase-architecture`
+   - Use before cross-module changes, large refactors, component splits, architecture repair, and module-boundary reviews.
+
+2. `context-engineering`
+   - Use at the start of a session, when switching tasks, when the task has too much context, or when output quality drops.
+
+3. `api-and-interface-design`
+   - Use before changing APIs, module interfaces, Vue props/events, Vuex/store contracts, backend endpoints, request/response payloads, validation rules, or public module boundaries.
+
+4. `documentation-and-adrs`
+   - Use when making architectural decisions, changing APIs, changing data models, changing module boundaries, or shipping features whose rationale must be preserved.
+
+5. `doubt-driven-development`
+   - Use for high-risk decisions, confident but unverified plans, production-sensitive logic, unfamiliar code, irreversible changes, or changes involving core review-card / WordSense / FSRS / import-export logic.
+
+6. `code-review-and-quality`
+   - Use before considering any task complete, especially before commit or handoff.
+
+## Required Workflow for High-Risk Tasks
+
+For high-risk tasks, use skills in this order:
+
+1. `context-engineering`
+2. `improve-codebase-architecture`
+3. `api-and-interface-design` if any interface, API, store, component contract, or data contract is touched
+4. `documentation-and-adrs` if the decision affects architecture, data model, or long-term maintenance
+5. `doubt-driven-development` for adversarial review before implementation
+6. implementation only after user confirmation
+7. `code-review-and-quality` after implementation
+
+## High-Risk Areas
+
+The following areas require architecture review before coding:
+
+- `TextBlockGroup.vue`
+- `VocabularySideBox.vue`
+- `WordSensesList.vue`
+- reader-page state flow
+- Vuex/store logic
+- WordSense
+- ReviewCard
+- FSRS
+- AI lookup
+- sense-only review
+- import/export flow
+- backend endpoints
+- database migrations
+- review scheduling
+- source context / original chapter location logic
+
+## Stop Rules
+
+Stop and ask for confirmation before coding if:
+
+- The task touches more than one architectural boundary.
+- The task requires a new service, controller, store module, database table, or migration.
+- The task changes API semantics or payload shape.
+- The task changes review scheduling, FSRS behavior, WordSense binding, or AI lookup.
+- The architecture review says ADR is required.
+- The planned file list grows beyond the approved boundary.

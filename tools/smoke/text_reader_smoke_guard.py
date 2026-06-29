@@ -4,15 +4,17 @@ Text Reader Smoke Guard
 Zero-dependency browser smoke tests for reading page core behaviors.
 
 Usage:
-    python tools/smoke/text_reader_smoke_guard.py [--auth AUTH_FILE]
+    python tools/smoke/text_reader_smoke_guard.py [--auth AUTH_FILE] [--base-url URL]
 
     --auth AUTH_FILE  Optional: path to Playwright storage state JSON file
                       (pre-saved session cookie). Use this to skip manual login.
+    --base-url URL    Optional: base URL of the dev server.
+                      Default: http://localhost:8000
 
 Requirements:
     - Python 3.8+
     - pip install playwright && playwright install chromium
-    - Local dev server at http://127.0.0.1:8000
+    - Local dev server (default http://localhost:8000)
     - User already logged in browser session (or --auth file)
 
 Exit codes:
@@ -27,8 +29,7 @@ import json
 import argparse
 
 SCREENSHOT_DIR = r"D:\Document\lingl\text-reader-smoke-guard-screenshots"
-BASE_URL = "http://localhost:8000"
-CHAPTER_URL = f"{BASE_URL}/chapters/read/5"
+DEFAULT_BASE_URL = "http://localhost:8000"
 
 results = {"pass": [], "fail": [], "skip": []}
 
@@ -65,10 +66,16 @@ except ImportError:
 # ----------------------------------------------------------------
 ensure_dir()
 
-# Parse --auth argument
+# Parse arguments
 parser = argparse.ArgumentParser(description="Text Reader Smoke Guard")
 parser.add_argument("--auth", type=str, default=None, help="Path to Playwright storage state JSON file")
+parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL, help="Base URL of the dev server (default: http://localhost:8000)")
 args = parser.parse_args()
+
+base_url = args.base_url.rstrip("/")
+chapter_url = f"{base_url}/chapters/read/5"
+print(f"  Base URL: {base_url}")
+print(f"  Chapter URL: {chapter_url}")
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -94,11 +101,11 @@ with sync_playwright() as p:
     # ------------------------------------------------------------
     print("\n=== Step A: Navigate to reader ===")
     try:
-        page.goto(CHAPTER_URL, timeout=15000)
+        page.goto(chapter_url, timeout=15000)
         page.wait_for_load_state("networkidle")
         page.wait_for_timeout(4000)
     except Exception as e:
-        report("Server reachable", False, f"Cannot load {CHAPTER_URL}: {e}")
+        report("Server reachable", False, f"Cannot load {chapter_url}: {e}")
         browser.close()
         print("\nSmoke guard could not start — server or reader page unavailable.")
         sys.exit(2)

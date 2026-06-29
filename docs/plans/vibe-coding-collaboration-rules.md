@@ -211,7 +211,58 @@
 17. Vibe Coding 经验：AI 适合局部实现，但必须由人控制架构、边界、测试和验收。
 18. Anki 参考：稳定工作区和字段编辑区要有明确边界，不让工具栏、候选区、字段区互相覆盖。
 
-## 11. 安全红线
+## 11. Architecture Gate / 架构闸门规则
+
+### 11.1 任务分级
+
+| 等级 | 说明 | 闸门要求 |
+|------|------|----------|
+| **低风险** | 单文件小修、纯样式、文档更新、smoke 脚本更新 | 不必须启动完整架构闸门，但仍需限制文件范围 |
+| **中风险** | 涉及组件 props/events、Vuex 状态、前端 API 调用、工具函数 | 至少使用 `context-engineering` + 开发后 `code-review-and-quality`；涉及接口契约需加 `api-and-interface-design` |
+| **高风险** | 跨模块变更、大重构、组件拆分、WordSense/ReviewCard/FSRS/AI lookup/import-export 逻辑变化 | 必须完整启动架构闸门 |
+
+### 11.2 高风险任务标准流程
+
+按此顺序执行：
+
+1. `context-engineering` — 整理最小上下文包
+2. `improve-codebase-architecture` — 架构侦查 + 风险报告
+3. `api-and-interface-design` — 如果涉及接口契约、store、props/events、payload 变化
+4. `documentation-and-adrs` — 如果需要 ADR（架构决策改变时）
+5. `doubt-driven-development` — 实施前对抗性审查
+6. **网页端 GPT 判断是否进入实施** — OpenCode 不能默认继续开发，不能自 Accept
+7. 实施 — 用户确认后才能开始编码
+8. `code-review-and-quality` — 实施后质量门
+
+### 11.3 强制高风险区域
+
+以下任何改动前必须先过架构闸门：
+
+- `TextBlockGroup.vue`
+- `VocabularySideBox.vue`
+- `WordSensesList.vue`
+- reader 页面状态流
+- Vuex/store 逻辑
+- WordSense
+- ReviewCard
+- FSRS
+- AI lookup
+- sense-only review
+- import/export 流程
+- source context / 原章节定位
+- review scheduling
+
+### 11.4 关键约束
+
+- OpenCode 不能默认继续开发，不能自己 Accept
+- 网页端 GPT 是架构闸门的最终判断者
+- 用户是产品判断者
+- 架构闸门不替代 smoke guard、不替代 PHP 测试、不替代 GitHub 最新代码核验
+- 涉及阅读页的改动必须跑 text reader smoke guard
+- 最终报告必须直接输出到当前对话窗口
+- AGENTS.md 默认禁止修改。修改前必须由网页端 GPT 确认
+
+## 12. 安全红线
 
 - 不允许修改 `.env`。
 - 不允许清库、`migrate:fresh`、`db:wipe`、drop / truncate。

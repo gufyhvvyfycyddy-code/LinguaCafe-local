@@ -120,6 +120,8 @@
 | AddSenseForm-Extract-1 | ✅ 已完成 — 从 WordSensesList.vue 提取添加新释义表单为独立 AddSenseForm.vue 组件；Anti-Mud 小步重构，保存逻辑仍留在父组件，不改变 WordSense/ReviewCard/ReviewLog 创建行为 |
 | AiSuggestionPanel-Extract-1 | ✅ 已完成 — 从 VocabularySideBox.vue 提取 AI 建议显示面板为独立 AiSuggestionPanel.vue 组件；Anti-Mud 小步重构，lookup 逻辑仍留在父组件，不改变 AI lookup 规则和保存逻辑 |
 | TextBlockGroup-Smoke-Guard-1 | ✅ 已完成 — 建立阅读页核心行为零依赖浏览器 smoke guard（文档 + Python 脚本），保护 7 个 P0 + 3 个 P1 用例；不改 TextBlockGroup，不新增前端测试依赖 |
+| Architecture-Gate-Baseline-1A | ✅ 已完成 — 只读核验 6 个 skills 安装 + 安全扫描 + AGENTS.md 架构闸门规则 |
+| Architecture-Gate-Baseline-1B | ✅ 已完成 — 创建 ADR-0001、同步架构闸门到协作规则、修正 smoke guard 文档和 base-url 参数；提交 AGENTS.md 与 .opencode/skills/ 为一次性授权例外 |
 
 ---
 

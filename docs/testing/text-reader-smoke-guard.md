@@ -6,12 +6,12 @@
 
 ## 运行前提
 
-- 本地项目 `php artisan serve` 已在 `http://127.0.0.1:8000` 运行
+- 本地项目 `php artisan serve` 已在运行（推荐通过 `--base-url` 参数指定地址，默认 `http://localhost:8000`）
 - 浏览器已登录（通过 `/login` 页面）
-- 测试用户存在，邮箱：`1816529781@qq.com`（开发数据库已有）
+- 开发环境需要有一个可登录的本地测试用户（登录方式由用户在本地环境自行准备，不写入仓库）
 - 章节 `/chapters/read/5` 存在且为英文内容
 - 章节 5 已保存 AI 阅读辅助数据（含 `substantive` 在 sentence_index=0 的 AI 建议）
-- 设备上已安装 Python + Playwright（`pip install playwright` + `playwright install chromium`）
+- 本机已有 Python + Playwright（如果本机已有 Playwright，可运行自动脚本。如果没有，不要在本轮任务中安装依赖，改用手动 smoke）
 
 ## 不变量
 
@@ -49,22 +49,28 @@
 ### 自动 smoke（推荐）
 
 ```powershell
-python tools\smoke\text_reader_smoke_guard.py
+python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000
+```
+
+如果已有保存的 auth session，可附带 `--auth` 参数（auth 文件不应提交到仓库）：
+
+```powershell
+python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 --auth <path-to-auth.json>
 ```
 
 要求：
 - Python 3.8+
 - Playwright 已安装（`pip list | findstr playwright`）
 - `playwright install chromium` 已完成
-- 本地 dev server 已在 `http://127.0.0.1:8000` 运行
+- 本地 dev server 已在指定地址运行（默认 `http://localhost:8000`）
 - 用户已登录（脚本会检查登录状态，如未登录则提示手动操作）
 
 ### 手动 smoke（备选）
 
 如果 Python / Playwright 不可用，按以下步骤手动执行：
 
-1. 打开 `http://127.0.0.1:8000/login`，用测试邮箱登录
-2. 导航到 `http://127.0.0.1:8000/chapters/read/5`
+1. 打开登录页面，用本地测试用户登录
+2. 导航到 `/chapters/read/5`
 3. 点击 `substantive` 单词
 4. 确认右侧查词栏出现
 5. 确认 AI 建议区域显示 `AI 建议`、`adj`、`实质性的`、`使用此释义`
