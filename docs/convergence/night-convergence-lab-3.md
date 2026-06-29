@@ -139,6 +139,35 @@ AGENTS.md
 - **允许修改文件**：`docs/convergence/night-convergence-lab-3.md`
 - **禁止修改文件**：所有代码文件
 - **验证方式**：git diff --check, git diff --stat
+- **执行结果**：
+  ### 候选池（最大 15 个）
+  | # | 文件 | 重复类型 | 收益 | 风险 | 需 MCP | 允许本轮做 |
+  | - | ---- | -------- | ---- | ---- | ------ | --------- |
+  | 1 | TextReaderSettings.vue tick-labels（6 组内联数组） | 内联模板数据 | 低（内联不可复用） | 低 | 否 | 不 |
+  | 2 | TextReader.vue defaultSettings fontSize: 20 | 默认值常量 | 低（单点定义） | 低 | 否 | 已收敛 |
+  | 3 | TextReader.vue formatNumber import | 已有 helper | 无（已合理） | 无 | 否 | 已收敛 |
+  | 4 | TextReader.vue toolbar inline click handlers | 7 个内联箭头函数 | 中（可命名提升） | 低 | 是 | R3 候选 |
+  | 5 | TextReaderSettings.vue vocabBoxScrollIntoViewData | 单点定义使用 | 低（无重复） | 无 | 否 | 不 |
+  | 6 | TextReaderSettings.vue vocabularyHoverBoxPreferredPositionData | 单点定义使用 | 低（无重复） | 无 | 否 | 不 |
+  | 7 | VocabularySearchBox.vue 数据格式 | API vs 本地结构不一致 | 中（降低未来成本） | 中 | 是 | R4/R5 |
+  | 8 | TextReader.vue togglePlainTextMode / increaseFontSize / decreaseFontSize | 小方法散落 | 中（可提取） | 低 | 是 | R3 候选 |
+  | 9 | TextReaderSettings.vue saveSettings 多次调用 | 模式重复 | 低（Vue 模式） | 无 | 否 | 不|
+  | 10 | ReaderWorkspaceSizingService.js spacing=72 | magic number | 低（已注释) | 低 | 否 | 已充分 |
+  | 11 | TextReader.vue + TextReaderSettings.vue 共用 settings 选项 | 默认值两处定义 | 中 | 中 | 是 | 需审查 |
+  | 12 | TextReader.vue updateToolbarPosition + scroll | 已部分收敛 | 低 | 低 | 否 | 已完成 |
+  | 13 | TextReaderSettings.vue 内联 slider 配置 | Vuetify 模板特性 | 低 | 低 | 否 | 不|
+  | 14 | docs/testing/text-reader-smoke-guard.md 未记录 Lab-3 | 文档缺失 | 中 | 低 | 否 | R6 候选 |
+  | 15 | TextReader.vue 与 TextReaderSettings.vue settings 重复定义 | 两处独立定义 | 高 | 高 | 是 | 高风险 |
+  ### 本轮允许候选
+  - R2：TextReaderSettings.vue 剩余选项常量审查（#5, #6）— 低风险
+  - R3：TextReader.vue toolbar inline actions 收敛（#4, #8）— 中低风险
+  - R4/R5：VocabularySearchBox 数据结构审查（#7）— 只读或小实现
+  - R6：验证文档对齐（#14）— 低风险
+  ### 本轮禁止候选
+  - #11 共用 settings 定义：需深入审查 store/settings 交互
+  - #15 settings 对象重复：高风险（localStorage 一致性）
+  - #1, #9, #13：Vuetify/模板层特性，无收敛价值
+  - **通过** ✅
 
 ## R2 设计
 
