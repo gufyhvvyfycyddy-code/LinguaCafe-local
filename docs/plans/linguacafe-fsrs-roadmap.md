@@ -119,12 +119,13 @@
 | Codex-Reader-Workspace-UI-1 | ✅ 已完成 — 阅读页工作区全宽、查词栏宽度统一、词典结果三列布局、AI 建议命中自动展开；不实现 lemma/origin follow-up，不修改 FSRS/EncounteredWord 逻辑 |
 | AddSenseForm-Extract-1 | ✅ 已完成 — 从 WordSensesList.vue 提取添加新释义表单为独立 AddSenseForm.vue 组件；Anti-Mud 小步重构，保存逻辑仍留在父组件，不改变 WordSense/ReviewCard/ReviewLog 创建行为 |
 | AiSuggestionPanel-Extract-1 | ✅ 已完成 — 从 VocabularySideBox.vue 提取 AI 建议显示面板为独立 AiSuggestionPanel.vue 组件；Anti-Mud 小步重构，lookup 逻辑仍留在父组件，不改变 AI lookup 规则和保存逻辑 |
+| TextBlockGroup-Smoke-Guard-1 | ✅ 已完成 — 建立阅读页核心行为零依赖浏览器 smoke guard（文档 + Python 脚本），保护 7 个 P0 + 3 个 P1 用例；不改 TextBlockGroup，不新增前端测试依赖 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`56ed70a`（Refactor: extract AI suggestion panel）
+**Latest commit**：`fc22b15`（Docs: update plans for AiSuggestionPanel-Extract-1；本地 TextBlockGroup-Smoke-Guard-1 未提交，含 smoke 脚本 + 文档 + master plan 更新）
 
 ### `/review-cards/manage` 当前能力
 
