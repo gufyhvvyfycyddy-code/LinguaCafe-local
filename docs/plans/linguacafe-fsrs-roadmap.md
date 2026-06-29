@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`17693c0`（Feat: enforce FSRS daily limits in sense review queue）
+**Latest commit**：`5fb273a`（Fix: align sense review daily limits and document AI reading assist）
 
 ### `/review-cards/manage` 当前能力
 
