@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`fe45b5a`（Feat: show saved AI sentence translations）
+**Latest commit**：`b69308d`（Style: refine AI sentence translation typography）
 
 ### `/review-cards/manage` 当前能力
 
