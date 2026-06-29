@@ -589,7 +589,7 @@
 | 中 | Reader-UI-9 | 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | ✅ 已完成 | 文字 + v-progress-linear 绿色进度条，仅前端 + 小后端调整 |
 | 中 | Reader-UI-1-a | 查词侧栏第一轮瘦身：隐藏旧 SRS 1-7 按钮，释义标题改名，词典默认收起 | ✅ 已完成 | 前端仅改 VocabularySideBox.vue，不删 setStage 逻辑，不删数据 |
 | 中 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 + 确认弹窗如实告知行为 | ✅ 已完成 | 全前端改动（VocabularySideBox/VocabularyBox/VocabularyBottomSheet/TextBlockGroup），不改后端 |
-| 中 | Reader-UI-6-b | 后端实现安全的"回归为新词"（当前 hardDeleteWord 物理删除数据） | 📋 后续任务 | 当前后端硬删除 EncounteredWord+WordSense+ReviewCard，后续需改为仅重置 stage |
+| 中 | Reader-UI-6-b | 回归为新词时删除释义复习卡和复习记录 | ✅ 已完成 | 后端 delete ReviewLog + delete ReviewCard（sense+legacy），WordSense rejected，EncounteredWord 删除 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 

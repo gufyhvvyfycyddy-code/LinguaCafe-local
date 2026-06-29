@@ -108,13 +108,24 @@ class WordSenseService
      * - Does NOT delete review_logs.
      * - Does NOT delete reading materials, chapters, or EncounteredWord.
      */
-    public function removeSenseFromReviewSystem(WordSense $sense, bool $deleteReviewCard = true): WordSense
-    {
-        return DB::transaction(function () use ($sense, $deleteReviewCard) {
+    public function removeSenseFromReviewSystem(
+        WordSense $sense,
+        bool $deleteReviewCard = true,
+        bool $deleteReviewLogs = false
+    ): WordSense {
+        return DB::transaction(function () use ($sense, $deleteReviewCard, $deleteReviewLogs) {
             $sense->status = WordSense::STATUS_REJECTED;
             $sense->save();
 
             if ($card = $sense->reviewCard) {
+                // Delete ReviewLogs before deleting/disabling the card
+                if ($deleteReviewLogs) {
+                    \App\Models\ReviewLog::where('user_id', $sense->user_id)
+                        ->where('language_id', $sense->language_id)
+                        ->where('review_card_id', $card->id)
+                        ->delete();
+                }
+
                 if ($deleteReviewCard) {
                     $card->delete();
                 } else {

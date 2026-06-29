@@ -1815,7 +1815,7 @@
                     return;
                 }
 
-                if (!window.confirm(`确定要让词条“${selectedWord.word}”回归为新词吗？此操作会移除该词相关的学习记录，文章中它将重新显示为新词。`)) {
+                if (!window.confirm(`确定要让词条“${selectedWord.word}”回归为新词吗？此操作会删除它对应的释义复习卡和复习记录，文章中它将重新显示为新词。`)) {
                     return;
                 }
 

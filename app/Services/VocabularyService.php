@@ -279,15 +279,23 @@ class VocabularyService {
                 ->get();
 
             foreach ($linkedSenses as $sense) {
-                $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
+                $this->wordSenseService->removeSenseFromReviewSystem($sense, true, true);
             }
 
-            // Disable legacy word-type review cards
-            ReviewCard::where('user_id', $userId)
+            // Delete legacy word-type review cards and their review logs
+            $legacyCards = ReviewCard::where('user_id', $userId)
                 ->where('language_id', $language)
                 ->where('target_type', ReviewCard::TARGET_WORD)
                 ->whereIn('target_id', $ids)
-                ->update(['fsrs_enabled' => false]);
+                ->get();
+
+            foreach ($legacyCards as $legacyCard) {
+                \App\Models\ReviewLog::where('review_card_id', $legacyCard->id)
+                    ->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->delete();
+                $legacyCard->delete();
+            }
 
             return EncounteredWord::where('user_id', $userId)
                 ->where('language', $language)
