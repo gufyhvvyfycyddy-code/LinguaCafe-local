@@ -7,8 +7,9 @@
  * they always return the same output. They do NOT access DOM, Vue, Vuex, window,
  * or any external state.
  *
- * Breakpoint rules are defined once here and shared across TextReader.vue,
- * VocabularySideBox.vue, and TextBlockGroup.vue.
+ * Breakpoint rules are defined once here and shared across TextReader.vue
+ * and VocabularySideBox.vue. TextBlockGroup.vue is not yet converged — if
+ * it needs the same helper, that must go through a separate architecture gate.
  */
 
 /**

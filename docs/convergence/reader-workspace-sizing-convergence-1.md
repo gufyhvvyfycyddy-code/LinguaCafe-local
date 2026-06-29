@@ -6,7 +6,7 @@
 
 | 文件 | 方法/属性 | 行号 | 重复内容 |
 |------|-----------|:----:|---------|
-| `TextReader.vue` | `readerSidebarWidthForContentWidth(width)` | 446-451 | 7500/1280/1080 断点判断 |
+| `TextReader.vue` | `readerSidebarWidthForContentWidth(width)` | 446-451 | 1500/1280/1080 断点判断 |
 | `VocabularySideBox.vue` | `sidebarWidth()` computed | 234-242 | 同一套 1500/1280/1080 断点，返回带 'px' 字符串 |
 
 ### 重复规则是什么

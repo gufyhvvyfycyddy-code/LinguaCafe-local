@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-30
-> **上一轮已验收基线 commit**：`2c8898b`
+> **上一轮已验收基线 commit**：`44254a2`
 
 ---
 
@@ -122,12 +122,13 @@
 | TextBlockGroup-Smoke-Guard-1 | ✅ 已完成 — 建立阅读页核心行为零依赖浏览器 smoke guard（文档 + Python 脚本），保护 7 个 P0 + 3 个 P1 用例；不改 TextBlockGroup，不新增前端测试依赖 |
 | Architecture-Gate-Baseline-1A | ✅ 已完成 — 只读核验 6 个 skills 安装 + 安全扫描 + AGENTS.md 架构闸门规则 |
 | Architecture-Gate-Baseline-1B | ✅ 已完成 — 创建 ADR-0001、同步架构闸门到协作规则、修正 smoke guard 文档和 base-url 参数；提交 AGENTS.md 与 .opencode/skills/ 为一次性授权例外 |
+| ReaderWorkspaceSizing-Convergence-1 | ✅ 已完成 — 收敛阅读页宽度断点规则（TextReader.vue 和 VocabularySideBox.vue 中重复的 1500/1280/1080 断点判断）为纯函数 helper `ReaderWorkspaceSizingService.js`。低风险收敛，不改变 observable behavior，smoke guard 27/27 PASS。未进入 AI-6 / Lemma-Origin / TextBlockGroup 拆分 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`1116c7c`（Docs: add architecture gate workflow）
+**Latest commit**：`44254a2`（refactor: converge reader workspace sizing）
 
 ### `/review-cards/manage` 当前能力
 
