@@ -9,6 +9,7 @@
         border-right: none;
         box-shadow: 0px 0px 20px 5px rgba(0,0,0,0.38);
         user-select: text;
+        overflow-x: hidden;
 
         .v-window.v-item-group {
             height: calc(100% - 48px);

@@ -1,6 +1,6 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
-> **最后更新**：2026-06-29
+> **最后更新**：2026-06-30
 > **上一轮已验收基线 commit**：`2c8898b`
 
 ---
@@ -116,12 +116,13 @@
 | FSRS-Anki-Mgmt-5 | ✅ 已完成 — 每日学习上限 / 新卡与复习上限侦察（Anki 文档对标 + 代码侦察 + 产品方案 + 风险分析） |
 | FSRS-Anki-Mgmt-6 | ✅ 已完成 — 每日上限设置页第一版（settings 表保存/读取 + 前端设置区 + 5 项设置 + 测试覆盖；fix：默认复习上限开启 + 校验收口改为 422 拒绝） |
 | FSRS-Anki-Mgmt-7 | ✅ 已完成 — 复习队列每日上限接入 + 超额复习入口（dueCardsWithLimits 后端 + reviewedTodayCount + 前端超额复习 UI + localStorage 今日状态 + 编程协作规则） |
+| Codex-Reader-Workspace-UI-1 | ✅ 已完成 — 阅读页工作区全宽、查词栏宽度统一、词典结果三列布局、AI 建议命中自动展开；不实现 lemma/origin follow-up，不修改 FSRS/EncounteredWord 逻辑 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`6a9c391`（Fix: prevent reader toolbar from covering lookup panel）
+**Latest commit**：`6a9c391`（Fix: prevent reader toolbar from covering lookup panel；本地 Codex-Reader-Workspace-UI-1 尚未提交）
 
 ### `/review-cards/manage` 当前能力
 

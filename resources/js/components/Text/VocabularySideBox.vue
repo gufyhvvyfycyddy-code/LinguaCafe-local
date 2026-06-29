@@ -290,8 +290,13 @@ export default {
     },
     computed: {
         sidebarWidth() {
-            // Large viewports get a wider workspace sidebar
-            if (typeof window !== 'undefined' && window.innerWidth >= 1280) return '520px';
+            const readerWorkspace = typeof document !== 'undefined'
+                ? document.getElementById('fullscreen-box')
+                : null;
+            const width = readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
+            if (width >= 1500) return '600px';
+            if (width >= 1280) return '560px';
+            if (width >= 1080) return '520px';
             return '400px';
         },
         ...mapState({
@@ -469,6 +474,9 @@ export default {
                 if (data.success) {
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', data.vocabulary_suggestions || []);
                     this.$store.commit('vocabularyBox/setAiPhraseSuggestions', data.phrase_suggestions || []);
+                    if ((data.vocabulary_suggestions || []).length || (data.phrase_suggestions || []).length) {
+                        this.showAddSensePanel = true;
+                    }
                 }
             }).catch(() => {
                 this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');

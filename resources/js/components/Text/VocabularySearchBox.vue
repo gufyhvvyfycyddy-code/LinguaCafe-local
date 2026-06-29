@@ -47,7 +47,7 @@
                     class="search-result-definition rounded dictionary-definition-row compact"
                 >
                     <span class="dict-word-label">{{ $props.searchTerm }}</span>
-                    <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                    <span class="dictionary-definition-text" :title="definition" @click="addDefinitionToInput(definition)">
                         {{ definition }}
                     </span>
                     <v-btn
@@ -67,7 +67,7 @@
                 <div v-for="(record, recordIndex) in searchResult.records" :key="recordIndex">
                     <div v-for="(definition, definitionIndex) in record.definitions" :key="definitionIndex" class="search-result-definition rounded dictionary-definition-row compact">
                         <span class="dict-word-label">{{ record.word }}</span>
-                        <span class="dictionary-definition-text" @click="addDefinitionToInput(definition)">
+                        <span class="dictionary-definition-text" :title="definition" @click="addDefinitionToInput(definition)">
                             {{ definition }}
                         </span>
                         <v-btn
@@ -240,47 +240,58 @@ export default {
 }
 
 .dictionary-definition-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: grid !important;
+    grid-template-columns: minmax(82px, 116px) minmax(0, 1fr) 28px !important;
+    align-items: center !important;
     gap: 8px;
+    text-align: left !important;
+    padding-right: 4px !important;
 }
 
 .dictionary-definition-text {
-    flex: 1;
     min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .dictionary-definition-row.compact {
-    padding: 2px 4px;
+    padding: 2px 4px !important;
     margin-bottom: 1px;
     font-size: 0.85em;
-    line-height: 1.3;
-    display: flex;
-    align-items: center;
+    line-height: 1.3 !important;
+    min-height: 28px;
+    display: grid !important;
+    align-items: center !important;
     gap: 6px;
 }
 
 .dict-word-label {
-    flex-shrink: 0;
-    min-width: 70px;
-    max-width: 100px;
+    min-width: 0;
+    max-width: none;
+    padding-right: 8px;
+    border-right: 1px solid var(--v-gray2-base);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     font-weight: 500;
     color: var(--v-primary-base);
     font-size: 0.9em;
-    text-align: right;
+    text-align: left;
 }
 
 .dictionary-definition-row.compact .dictionary-definition-text {
-    flex: 1;
     min-width: 0;
     cursor: pointer;
 }
 
 .dictionary-add-btn {
-    flex-shrink: 0;
+    justify-self: end;
+    margin-left: 0 !important;
+    position: static !important;
+}
+
+.dictionary-add-btn .v-icon {
+    position: static !important;
 }
 </style>

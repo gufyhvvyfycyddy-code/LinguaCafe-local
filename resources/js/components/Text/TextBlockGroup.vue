@@ -180,7 +180,7 @@
         <!--Vocabulary sidebar-->
         <vocabulary-side-box
             ref="vocabularySideBox"
-            v-if="$props.vocabularySidebar && !$store.state.vocabularyBox.sidebarHidden"
+            v-if="$props.vocabularySidebar && $props.vocabularySidebarFits && !$store.state.vocabularyBox.sidebarHidden"
             :language="$props.language"
             :auto-highlight-words="$props.autoHighlightWords"
             :any-api-dictionary-enabled="anyApiDictionaryEnabled"
@@ -273,6 +273,10 @@
             theme: String,
             fullscreen: Boolean,
             _text: Object,
+            chapterId: {
+                type: [Number, String],
+                default: null,
+            },
             subtitleTimestamps: {
                 type: Array,
                 default: () => {
@@ -1418,9 +1422,11 @@
                     } else {
                         this.$store.commit('vocabularyBox/setFsrsFamiliarityHasData', false);
                     }
-                    const chapterId = this.$props._text && this.$props._text.chapterId !== undefined && this.$props._text.chapterId !== null
-                        ? this.$props._text.chapterId
-                        : null;
+                    const chapterId = this.$props.chapterId !== undefined && this.$props.chapterId !== null
+                        ? this.$props.chapterId
+                        : (this.$props._text && this.$props._text.chapterId !== undefined && this.$props._text.chapterId !== null
+                            ? this.$props._text.chapterId
+                            : null);
                     this.$store.commit('vocabularyBox/setChapterId', chapterId);
                     this.$store.commit('vocabularyBox/setSentenceIndex', this.selection[0].sentence_index);
                     this.$store.commit('vocabularyBox/setSentenceText', this.buildSelectedSentenceTextFromTokenWindow());
@@ -2401,13 +2407,16 @@
             },
             updateVocabBoxPosition() {
                 var margin = 8;
-                // Dynamic sidebar width matching VocabularySideBox.vue computed sidebarWidth
+                const workspaceWidth = this.readerWorkspaceWidth();
                 const sidebarW = this.$props.vocabularySidebar && this.$props.vocabularySidebarFits
-                    ? (window.innerWidth >= 1904 ? 520 : window.innerWidth >= 1264 ? 480 : 400)
+                    ? this.readerSidebarWidthForContentWidth(workspaceWidth)
                     : 400;
                 this.$store.commit('vocabularyBox/setWidth', sidebarW);
                 this.$store.commit('vocabularyBox/setVocabularyBottomSheetVisible', (window.innerWidth <= 768));
                 var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
+                if (!vocabBoxAreaElement) {
+                    return;
+                }
                 var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
 
 
@@ -2452,6 +2461,16 @@
                 );
 
                 this.scrollToVocabBox();
+            },
+            readerWorkspaceWidth() {
+                const readerWorkspace = document.getElementById('fullscreen-box');
+                return readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
+            },
+            readerSidebarWidthForContentWidth(width) {
+                if (width >= 1500) return 600;
+                if (width >= 1280) return 560;
+                if (width >= 1080) return 520;
+                return 400;
             },
             scrollToVocabBox() {
                 setTimeout(() => {

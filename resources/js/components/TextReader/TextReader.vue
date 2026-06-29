@@ -23,7 +23,7 @@
         ></text-reader-ai-assist>
 
         <!-- Toolbar -->
-        <div id="reader-box" :style="{'max-width': maximumTextWidthData[settings.maximumTextWidth]}" v-if="chapterId !== null">
+        <div id="reader-box" :style="readerBoxStyle" v-if="chapterId !== null">
             <div id="toolbar-box">
                 <div v-if="!finished && !saving" id="toolbar" :class="{'d-flex': true}" :style="{'top': toolbarTop + 'px'}">
                     <v-btn title="全屏" icon @click="fullscreen" v-if="!fullscreenMode"><v-icon>mdi-arrow-expand-all</v-icon></v-btn>
@@ -106,6 +106,7 @@
                         :theme="theme"
                         :fullscreen="fullscreenMode"
                         :_text="text"
+                        :chapter-id="chapterId"
                         :subtitle-timestamps="subtitleTimestamps"
                         :language="language"
                         :hide-all-highlights="settings.hideAllHighlights"
@@ -425,13 +426,29 @@
         // this runs after the initial data
         // was downloaded with axios
         computed: {
+            readerBoxStyle() {
+                return {
+                    '--reader-sidebar-width': this.sidebarWidthValue + 'px',
+                };
+            },
+            sidebarWidthValue() {
+                return this.readerSidebarWidthForContentWidth(this.readerWorkspaceWidth());
+            },
             sidebarPaddingWidth() {
-                if (this.$vuetify.breakpoint.xlOnly) return '520px !important';
-                if (this.$vuetify.breakpoint.lgAndUp) return '480px !important';
-                return '400px !important';
+                return this.sidebarWidthValue + 'px !important';
             },
         },
         methods: {
+            readerWorkspaceWidth() {
+                const readerWorkspace = document.getElementById('fullscreen-box');
+                return readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
+            },
+            readerSidebarWidthForContentWidth(width) {
+                if (width >= 1500) return 600;
+                if (width >= 1280) return 560;
+                if (width >= 1080) return 520;
+                return 400;
+            },
             loadAiAssistCurrent() {
                 if (!this.chapterId) return;
                 axios.get('/chapters/ai-assist/current/' + this.chapterId).then((response) => {
@@ -448,15 +465,19 @@
                 });
             },
             vocabularySidebarTest() {
-                // Calculate if there's enough space for the reader text and the sidebar.
-                // Left navigation + margins take ~300px. The sidebar width varies by breakpoint:
-                // xl (≥1904): 520px, lg (1264-1903): 480px, md (960-1263): 400px
-                // Minimum reader text width ~400px.
-                // Total minimum = 400 (reader) + sidebarWidth + 300 (nav/margins) + 32 (gutters)
-                const sidebarEstimate = this.$vuetify.breakpoint.xlOnly ? 520
-                    : this.$vuetify.breakpoint.lgAndUp ? 480
-                    : 400;
-                this.vocabularySidebarFits = window.innerWidth >= 400 + sidebarEstimate + 300 + 32;
+                // Keep the sidebar only when the current reader workspace still leaves
+                // enough room for a stable text column.
+                const workspaceWidth = this.readerWorkspaceWidth();
+                const sidebarEstimate = this.readerSidebarWidthForContentWidth(workspaceWidth);
+                const minimumReaderWidth = workspaceWidth >= 1280 ? 720 : 560;
+                this.vocabularySidebarFits = workspaceWidth >= minimumReaderWidth + sidebarEstimate + 72;
+                this.$forceUpdate();
+
+                this.$nextTick(() => {
+                    if (this.$refs.interactiveText) {
+                        this.$refs.interactiveText.updateVocabBoxPosition();
+                    }
+                });
             },
             fullscreen() {
                 if (document.fullscreenEnabled) {
