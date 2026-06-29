@@ -124,12 +124,13 @@
 | Architecture-Gate-Baseline-1B | ✅ 已完成 — 创建 ADR-0001、同步架构闸门到协作规则、修正 smoke guard 文档和 base-url 参数；提交 AGENTS.md 与 .opencode/skills/ 为一次性授权例外 |
 | ReaderWorkspaceSizing-Convergence-1 | ✅ 已完成 — 收敛阅读页宽度断点规则（TextReader.vue 和 VocabularySideBox.vue 中重复的 1500/1280/1080 断点判断）为纯函数 helper `ReaderWorkspaceSizingService.js`。低风险收敛，不改变 observable behavior，smoke guard 27/27 PASS。未进入 AI-6 / Lemma-Origin / TextBlockGroup 拆分 |
 | Validation-Rules-MCP-Visual-1 | ✅ 已完成 — 写入 MCP 视觉验证优先规则。不属于 FSRS 功能本体，属于项目协作和验收规则。不改业务代码 |
+| Night-Convergence-Lab-1 | ✅ 已完成 — 夜间安全分支架构收敛实验。docs-only 更新 roadmap commit 基线、验证层文档整理、只读架构扫描。不修改业务代码，不 push master，不合并 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`c468d6b`（docs: align convergence bookkeeping）
+**Latest commit**：`1f9700f`（docs: add MCP visual validation rules）
 
 ### `/review-cards/manage` 当前能力
 
