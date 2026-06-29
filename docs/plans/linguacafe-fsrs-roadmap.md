@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
-> **最后更新**：2026-06-26
-> **上一轮已验收基线 commit**：`83880cc`
+> **最后更新**：2026-06-29
+> **上一轮已验收基线 commit**：`17693c0`
 
 ---
 
@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`1f64e3a`（UI-Review-c 基线，UI-Review-e 验收记录新增 docs）
+**Latest commit**：`17693c0`（Feat: enforce FSRS daily limits in sense review queue）
 
 ### `/review-cards/manage` 当前能力
 
@@ -580,9 +580,20 @@
 | 中 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 已完成 | 后端 simulator + 前端模拟面板 + high 风险按钮文案已更新 |
 | 中 | FSRS-Anki-Mgmt-5 | 每日学习上限 / 新卡与复习上限侦察 | ✅ 已完成 | 只读侦察，Anki 对标 + 代码侦察 + 产品方案 |
 | 中 | FSRS-Anki-Mgmt-6 | 每日上限设置页第一版 | ✅ 已完成 | 全局复习上限 + 新学上限设置页，暂不接入队列；fix：默认复习上限改为开启 200 + 校验收口 |
-| 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 当前阶段 | 高风险，已完成 `/reviews` 队列限制 + 超额复习入口 |
+| 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 已完成 | `/reviews` + `/reviews/senses` 队列限制 + 超额复习入口 |
+| 中 | FSRS-Anki-Mgmt-7-follow-up | 修复 `/reviews/senses` 绕过每日上限问题 | ✅ 已完成 | SenseReviewController 改用 dueCardsWithLimits，SettingsService is_queue_enforced 改为 true |
+| 中 | FSRS-Anki-Mgmt-7-b | 每日新学累计计数精确化 | 📋 计划中 | 当前只限制队列显示数量，未严格统计今日已学新卡累计 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
+
+### 后续候选任务
+
+| 优先级 | 编号 | 内容 | 类型 | 理由 |
+|--------|------|------|------|------|
+| 中 | AI-Reading-Assist-1 | AI 阅读辅助方案侦察与 schema 实验 | 📋 计划中 | 见 ai-reading-assist-plan.md |
+| 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
+| 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化 | 📋 计划中 | 见 ai-reading-assist-plan.md 第 7 节 |
+
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
 
 详细侦察报告见 [fsrs-reschedule-confirm-scout.md](./fsrs-reschedule-confirm-scout.md)。

@@ -752,8 +752,8 @@ class SettingsService {
             $limits[$key] = $row ? json_decode($row->value) : $defaultValue;
         }
 
-        $limits['is_queue_enforced'] = false;
-        $limits['message'] = '每日上限设置已保存；当前版本暂不限制实际复习队列。';
+        $limits['is_queue_enforced'] = true;
+        $limits['message'] = '每日上限设置已保存；复习队列按以上限制显示卡。';
 
         return $limits;
     }

@@ -121,7 +121,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->createSenseCard($sense2);
 
         // Low review limit so all are visible (2 cards, limit 200)
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $response->assertOk();
         $this->assertCount(2, $response->json('reviews'));
@@ -142,7 +142,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->createSenseCard($sense2);
         $this->createSenseCard($sense3);
 
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $response->assertOk();
         $this->assertCount(2, $response->json('reviews'));
@@ -165,6 +165,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $response = $this->actingAs($this->user)->postJson('/reviews', [
             'bookId' => -1,
             'chapterId' => -1,
+            'practiceMode' => false,
             'ignoreDailyLimits' => true,
         ]);
 
@@ -182,6 +183,9 @@ class SenseReviewDailyLimitsTest extends TestCase
 
         $card = $this->createSenseCard($this->createSense(['lemma' => 'word_a']));
         $this->createTodayReviewLog($card);
+        // Set card A's due_at to future so it's not in the due list (simulating real rating behavior)
+        $card->fsrs_due_at = Carbon::now()->addDay();
+        $card->save();
 
         $sense2 = $this->createSense(['lemma' => 'word_b']);
         $sense3 = $this->createSense(['lemma' => 'word_c']);
@@ -191,7 +195,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->createSenseCard($sense4);
 
         // Reviewed 1 today, limit 3, remaining 2 slots
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $response->assertOk();
         $this->assertEquals(1, $response->json('summary.reviewed_today_count'));
@@ -208,7 +212,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $card = $this->createSenseCard($this->createSense(['lemma' => 'word_a']));
         $originalDueAt = $card->fsrs_due_at->toIso8601String();
 
-        $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $card->refresh();
         $this->assertEquals($originalDueAt, $card->fsrs_due_at->toIso8601String());
@@ -217,7 +221,7 @@ class SenseReviewDailyLimitsTest extends TestCase
     public function test_does_not_create_review_log_on_get(): void
     {
         $logCount = ReviewLog::count();
-        $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $this->assertEquals($logCount, ReviewLog::count());
     }
@@ -225,7 +229,7 @@ class SenseReviewDailyLimitsTest extends TestCase
     public function test_requires_auth(): void
     {
         $response = $this->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
-        $response->assertStatus(302);
+        $response->assertStatus(401);
     }
 
     public function test_summary_has_complete_structure(): void
@@ -233,7 +237,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $sense = $this->createSense();
         $this->createSenseCard($sense);
 
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
         $response->assertOk();
 
         $summary = $response->json('summary');
@@ -266,7 +270,7 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->createSenseCard($this->createSense(['lemma' => 'new_card_b']), ['fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null]);
         $this->createSenseCard($this->createSense(['lemma' => 'new_card_c']), ['fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null]);
 
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $response->assertOk();
         // Review limit 1, so only 1 review card. New cards compete for remaining slots (0 after 1 review)
@@ -287,10 +291,51 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->createSenseCard($this->createSense(['lemma' => 'new_card_a']), ['fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null]);
         $this->createSenseCard($this->createSense(['lemma' => 'new_card_b']), ['fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null]);
 
-        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1]);
+        $response = $this->actingAs($this->user)->postJson('/reviews', ['bookId' => -1, 'chapterId' => -1, 'practiceMode' => false]);
 
         $response->assertOk();
         // 1 review card + up to 3 new cards (new ignore review limit)
         $this->assertCount(3, $response->json('reviews'));
+    }
+
+    public function test_senses_endpoint_respects_daily_review_limits(): void
+    {
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(2)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+
+        $sense1 = $this->createSense(['lemma' => 'word_a']);
+        $sense2 = $this->createSense(['lemma' => 'word_b']);
+        $sense3 = $this->createSense(['lemma' => 'word_c']);
+        $this->createSenseCard($sense1);
+        $this->createSenseCard($sense2);
+        $this->createSenseCard($sense3);
+
+        // GET /reviews/senses must also respect daily limits
+        $response = $this->actingAs($this->user)->getJson('/reviews/senses');
+
+        $response->assertOk();
+        $this->assertCount(2, $response->json('cards'));
+        $this->assertEquals(1, $response->json('summary.hidden_due_count'));
+        $this->assertTrue($response->json('summary.limit_reached'));
+        $this->assertTrue($response->json('summary.is_queue_enforced'));
+    }
+
+    public function test_senses_endpoint_ignore_daily_limits(): void
+    {
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(1)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+
+        $sense1 = $this->createSense(['lemma' => 'word_a']);
+        $sense2 = $this->createSense(['lemma' => 'word_b']);
+        $this->createSenseCard($sense1);
+        $this->createSenseCard($sense2);
+
+        // GET /reviews/senses with ignore_daily_limits parameter
+        $response = $this->actingAs($this->user)->getJson('/reviews/senses?ignore_daily_limits=true');
+
+        $response->assertOk();
+        $this->assertCount(2, $response->json('cards'));
+        $this->assertEquals(0, $response->json('summary.hidden_due_count'));
+        $this->assertTrue($response->json('summary.ignore_daily_limits'));
     }
 }

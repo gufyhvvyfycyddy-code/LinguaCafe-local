@@ -25,13 +25,12 @@ class SenseReviewController extends Controller
 
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
-        $cards = $this->senseReviewService->dueCards($userId, $language);
+        $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
+        $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
 
         return response()->json([
-            'cards' => $cards->map(fn (ReviewCard $card) => $this->senseReviewService->serializeCard($card))->values(),
-            'summary' => [
-                'due_count' => $cards->count(),
-            ],
+            'cards' => $result['cards']->map(fn (ReviewCard $card) => $this->senseReviewService->serializeCard($card))->values(),
+            'summary' => $result['summary'],
         ]);
     }
 
@@ -43,6 +42,7 @@ class SenseReviewController extends Controller
 
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
+        $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
 
         $card = ReviewCard::where('id', $reviewCardId)
             ->where('user_id', $userId)
@@ -56,10 +56,14 @@ class SenseReviewController extends Controller
 
         $updatedCard = $this->reviewCardService->recordReview($userId, $language, $card->id, $request->post('rating'), 'sense_review');
 
+        // Use limit-aware next and summary
+        $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $nextCard = $result['cards']->first();
+
         return response()->json([
             'reviewed_card' => $this->senseReviewService->serializeCard($updatedCard->load('sense')),
-            'next_card' => $this->senseReviewService->nextDueCard($userId, $language),
-            'summary' => $this->senseReviewService->summary($userId, $language),
+            'next_card' => $nextCard ? $this->senseReviewService->serializeCard($nextCard) : null,
+            'summary' => $result['summary'],
         ]);
     }
 }

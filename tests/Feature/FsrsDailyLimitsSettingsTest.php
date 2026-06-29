@@ -39,7 +39,7 @@ class FsrsDailyLimitsSettingsTest extends TestCase
             'daily_review_limit_enabled' => true,
             'daily_review_limit' => 200,
             'new_cards_ignore_review_limit' => false,
-            'is_queue_enforced' => false,
+            'is_queue_enforced' => true,
         ]);
     }
 
@@ -60,7 +60,7 @@ class FsrsDailyLimitsSettingsTest extends TestCase
             'daily_review_limit_enabled' => true,
             'daily_review_limit' => 150,
             'new_cards_ignore_review_limit' => true,
-            'is_queue_enforced' => false,
+            'is_queue_enforced' => true,
         ]);
 
         $readResponse = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
@@ -202,12 +202,12 @@ class FsrsDailyLimitsSettingsTest extends TestCase
         ]);
     }
 
-    public function test_daily_limits_are_saved_but_not_enforced_yet(): void
+    public function test_daily_limits_are_enforced_in_queue(): void
     {
         $response = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
         $response->assertOk();
-        $response->assertJsonPath('is_queue_enforced', false);
-        $this->assertStringContainsString('暂不限制', $response->json('message'));
+        $response->assertJsonPath('is_queue_enforced', true);
+        $this->assertStringContainsString('按以上限制', $response->json('message'));
     }
 
     public function test_daily_limits_requires_auth(): void
