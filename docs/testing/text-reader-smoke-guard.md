@@ -96,6 +96,43 @@ python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 -
    - **contract-mismatch**：smoke 期望与当前产品契约不一致 → 记录为 contract-mismatch，不改业务代码
 4. 把所有信息贴回给网页端 GPT 做判断。
 
+## MCP / webapp-testing 视觉验收（优先）
+
+### 适用场景
+
+阅读页相关改动优先执行 MCP / webapp-testing 视觉验收。Python smoke guard 仍保留，用于快速自动断言。
+
+### 验收步骤
+
+MCP 视觉验收步骤至少包括：
+
+1. 打开 `/chapters/read/5`
+2. 点击 `substantive` 单词
+3. 截图阅读页打开状态（含页面整体布局）
+4. 截图右侧查词栏（确认宽度、位置、内容正常）
+5. 检查 AI 建议区域（确认 AI 建议、词性、释义文本、使用此释义按钮可见）
+6. 点击"使用此释义"
+7. 截图 AddSenseForm 预填状态（确认词性、中文释义已预填）
+8. 展开词典结果，点击词典加号
+9. 截图词典加号预填状态
+10. 设置 viewport 宽度 900px，截图窄屏 fallback 状态
+11. 在 Network 面板确认没有 `POST /senses/manual` 请求
+
+### 截图目录
+
+建议保存到以下目录（不提交到 git）：
+
+```
+D:\Document\lingl\mcp-browser-smoke-screenshots
+```
+
+### 安全说明
+
+- auth 文件只允许本地使用，不提交到 git
+- 不在报告中粘贴 auth 文件内容
+- 不写入账号密码
+- 截图只用于当前任务验证，不扩散
+
 ## 后续使用规则
 
 1. **每次修改以下文件前后，都必须先跑 smoke guard：**

@@ -137,6 +137,9 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 - 每轮任务必须报告文件变动、数据边界、安全边界
 - 架构闸门不替代 GitHub 最新代码核验
 - 闸门流程应定期回顾（至少每 10 轮任务一次）
+- 对用户可见 UI / reader / review / import-export 页面，Architecture Gate 实施后必须优先考虑 MCP 视觉验证
+- MCP 视觉验证不替代测试，而是补充 Python smoke 和 PHP tests
+- 验证失败必须归因，不能自动扩大实现范围
 
 ## Notes
 
