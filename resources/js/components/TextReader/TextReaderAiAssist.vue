@@ -12,7 +12,7 @@
             </v-card-title>
 
             <v-card-title v-if="previewStep === 'detail'" class="pb-0">
-                <v-btn icon class="mr-2" @click="previewStep = 'overview'" title="返回总览">
+                <v-btn icon class="mr-2" @click="goBackToOverview" title="返回总览">
                     <v-icon>mdi-arrow-left</v-icon>
                 </v-btn>
                 <v-icon left class="mr-2">mdi-format-list-bulleted</v-icon>
@@ -179,11 +179,31 @@
                     </v-row>
                 </template>
 
+                <!-- ─── DETAIL SEARCH BAR ──────────── -->
+                <div v-if="previewStep === 'detail'" class="mb-3">
+                    <v-text-field
+                        v-model="detailSearchQuery"
+                        label="搜索英文词、原型、词组或原句"
+                        placeholder="例如：their / investigate / draw on"
+                        outlined
+                        dense
+                        hide-details
+                        clearable
+                        prepend-inner-icon="mdi-magnify"
+                    >
+                        <template v-slot:append>
+                            <span v-if="detailSearchQuery && hasActiveDetailData" class="caption grey--text">
+                                已筛选出 {{ activeDetailFilteredCount }} / {{ activeDetailOriginalCount }} 条
+                            </span>
+                        </template>
+                    </v-text-field>
+                </div>
+
                 <!-- ─── TRANSLATIONS DETAIL ─────────── -->
                 <template v-if="previewStep === 'detail' && activeDetailType === 'translations'">
-                    <div v-if="items.sentence_translations.length">
+                    <div v-if="hasActiveDetailData && activeDetailItems.length">
                         <div
-                            v-for="(st, i) in items.sentence_translations"
+                            v-for="(st, i) in activeDetailItems"
                             :key="'st-d-' + i"
                             class="mb-3"
                         >
@@ -194,16 +214,19 @@
                             </v-sheet>
                         </div>
                     </div>
-                    <div v-else class="text-caption grey--text text-center py-4">
+                    <div v-else-if="!hasActiveDetailData" class="text-caption grey--text text-center py-4">
                         暂无句子译文。
+                    </div>
+                    <div v-else class="text-caption grey--text text-center py-4">
+                        没有找到匹配内容。
                     </div>
                 </template>
 
                 <!-- ─── VOCABULARY DETAIL ───────────── -->
                 <template v-if="previewStep === 'detail' && activeDetailType === 'vocabulary'">
-                    <div v-if="items.vocabulary_items.length">
+                    <div v-if="hasActiveDetailData && activeDetailItems.length">
                         <div
-                            v-for="(vi, i) in items.vocabulary_items"
+                            v-for="(vi, i) in activeDetailItems"
                             :key="'vi-d-' + i"
                             class="mb-3"
                         >
@@ -240,16 +263,19 @@
                             </v-sheet>
                         </div>
                     </div>
-                    <div v-else class="text-caption grey--text text-center py-4">
+                    <div v-else-if="!hasActiveDetailData" class="text-caption grey--text text-center py-4">
                         暂无生词释义。
+                    </div>
+                    <div v-else class="text-caption grey--text text-center py-4">
+                        没有找到匹配内容。
                     </div>
                 </template>
 
                 <!-- ─── PHRASES DETAIL ──────────────── -->
                 <template v-if="previewStep === 'detail' && activeDetailType === 'phrases'">
-                    <div v-if="items.phrase_items.length">
+                    <div v-if="hasActiveDetailData && activeDetailItems.length">
                         <div
-                            v-for="(pi, i) in items.phrase_items"
+                            v-for="(pi, i) in activeDetailItems"
                             :key="'pi-d-' + i"
                             class="mb-3"
                         >
@@ -283,16 +309,19 @@
                             </v-sheet>
                         </div>
                     </div>
-                    <div v-else class="text-caption grey--text text-center py-4">
+                    <div v-else-if="!hasActiveDetailData" class="text-caption grey--text text-center py-4">
                         暂无词组释义。
+                    </div>
+                    <div v-else class="text-caption grey--text text-center py-4">
+                        没有找到匹配内容。
                     </div>
                 </template>
 
                 <!-- ─── WARNINGS DETAIL ─────────────── -->
                 <template v-if="previewStep === 'detail' && activeDetailType === 'warnings'">
-                    <div v-if="items.warnings.length">
+                    <div v-if="hasActiveDetailData && activeDetailItems.length">
                         <div
-                            v-for="(w, i) in items.warnings"
+                            v-for="(w, i) in activeDetailItems"
                             :key="'w-d-' + i"
                             class="mb-2"
                         >
@@ -302,8 +331,11 @@
                             </v-sheet>
                         </div>
                     </div>
-                    <div v-else class="text-caption grey--text text-center py-4">
+                    <div v-else-if="!hasActiveDetailData" class="text-caption grey--text text-center py-4">
                         暂无警告。
+                    </div>
+                    <div v-else class="text-caption grey--text text-center py-4">
+                        没有找到匹配内容。
                     </div>
                 </template>
             </v-card-text>
@@ -335,6 +367,7 @@
                 previewError: '',
                 previewErrorList: [],
                 error: '',
+                detailSearchQuery: '',
             }
         },
         computed: {
@@ -368,6 +401,54 @@
                 };
                 return map[this.activeDetailType] || '详情';
             },
+
+            // ── Search filters ──
+
+            filteredSentenceTranslations() {
+                return this.filterList(this.items.sentence_translations, this.detailSearchQuery, ['source_text', 'translation_zh']);
+            },
+            filteredVocabularyItems() {
+                return this.filterList(this.items.vocabulary_items, this.detailSearchQuery, ['surface', 'suggested_lemma', 'pos', 'meaning_zh', 'source_sentence', 'reason', 'confidence']);
+            },
+            filteredPhraseItems() {
+                return this.filterList(this.items.phrase_items, this.detailSearchQuery, ['phrase', 'meaning_zh', 'trigger_words', 'source_sentence', 'reason', 'confidence']);
+            },
+            filteredWarnings() {
+                return this.filterList(this.items.warnings, this.detailSearchQuery, ['type', 'message']);
+            },
+            activeDetailOriginalCount() {
+                if (!this.activeDetailType) return 0;
+                const map = {
+                    translations: this.items.sentence_translations.length,
+                    vocabulary: this.items.vocabulary_items.length,
+                    phrases: this.items.phrase_items.length,
+                    warnings: this.items.warnings.length,
+                };
+                return map[this.activeDetailType] || 0;
+            },
+            activeDetailFilteredCount() {
+                if (!this.activeDetailType) return 0;
+                const map = {
+                    translations: this.filteredSentenceTranslations.length,
+                    vocabulary: this.filteredVocabularyItems.length,
+                    phrases: this.filteredPhraseItems.length,
+                    warnings: this.filteredWarnings.length,
+                };
+                return map[this.activeDetailType] || 0;
+            },
+            activeDetailItems() {
+                if (!this.activeDetailType) return [];
+                const map = {
+                    translations: this.filteredSentenceTranslations,
+                    vocabulary: this.filteredVocabularyItems,
+                    phrases: this.filteredPhraseItems,
+                    warnings: this.filteredWarnings,
+                };
+                return map[this.activeDetailType] || [];
+            },
+            hasActiveDetailData() {
+                return this.activeDetailOriginalCount > 0;
+            },
         },
         watch: {
             value(newVal) {
@@ -385,6 +466,19 @@
                 };
                 return map[level] || 'grey';
             },
+            filterList(list, query, fields) {
+                if (!query || !query.trim()) return list;
+                const q = query.trim().toLowerCase();
+                return list.filter(item => {
+                    return fields.some(field => {
+                        const val = item[field];
+                        if (Array.isArray(val)) {
+                            return val.some(v => String(v).toLowerCase().includes(q));
+                        }
+                        return val != null && String(val).toLowerCase().includes(q);
+                    });
+                });
+            },
             reset() {
                 this.sourceLoading = false;
                 this.sourceCopied = false;
@@ -395,6 +489,7 @@
                 this.previewError = '';
                 this.previewErrorList = [];
                 this.error = '';
+                this.detailSearchQuery = '';
             },
             loadSource() {
                 if (!this.chapterId) {
@@ -455,6 +550,7 @@
                     this.previewResult = response.data;
                     this.previewStep = 'overview';
                     this.activeDetailType = null;
+                    this.detailSearchQuery = '';
                 }).catch((error) => {
                     const data = error.response?.data;
                     if (data && data.parsed === false) {
@@ -468,9 +564,15 @@
                     this.previewLoading = false;
                 });
             },
+            goBackToOverview() {
+                this.previewStep = 'overview';
+                this.activeDetailType = null;
+                this.detailSearchQuery = '';
+            },
             openDetail(type) {
                 this.activeDetailType = type;
                 this.previewStep = 'detail';
+                this.detailSearchQuery = '';
             },
             close() {
                 this.visible = false;

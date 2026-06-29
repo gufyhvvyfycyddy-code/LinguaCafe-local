@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-29
-> **上一轮已验收基线 commit**：`bcb7cfa`
+> **上一轮已验收基线 commit**：`0213234`
 
 ---
 
@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`bcb7cfa`（Feat: improve AI reading assist preview navigation）
+**Latest commit**：`0213234`（Docs: update roadmap Latest commit to bcb7cfa）
 
 ### `/review-cards/manage` 当前能力
 
@@ -592,6 +592,7 @@
 |--------|------|------|------|------|
 | 中 | AI-Reading-Assist-1 | AI 阅读辅助方案侦察与 schema 实验 | ✅ 已完成 | 见 ai-reading-assist-schema-experiment.md |
 | 中 | AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览（方案 B 总览+详情页） | ✅ 已完成 | 用户选择方案 B（先总览→点击卡片进入详情）+ 25 测试 |
+| 中 | AI-Reading-Assist-2-search | 详情页增加英文搜索框 | ✅ 已完成 | 大小写不敏感，覆盖 4 类详情字段 + trigger_words 数组 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
 | 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化 | 📋 计划中 | 见 ai-reading-assist-plan.md 第 7 节 |
 
