@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`4b79193`（Docs: update roadmap Latest commit to 09d6e21）
+**Latest commit**：`45e9905`（Style: expand reader lookup workspace）
 
 ### `/review-cards/manage` 当前能力
 
