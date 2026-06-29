@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`09d6e21`（Feat: streamline lookup add-sense workflow）
+**Latest commit**：`4b79193`（Docs: update roadmap Latest commit to 09d6e21）
 
 ### `/review-cards/manage` 当前能力
 
@@ -597,6 +597,7 @@
 | 高 | AI-Reading-Assist-4-b | AI 译文句子对齐修复 + 幼圆字体 | ✅ 已完成 | prompt 新增句子列表，preview/confirm 校验 sentence_index 对齐，拒绝不存在索引，字体改用幼圆 |
 | 高 | AI-Reading-Assist-5 | AI 生词/词组建议进入查词侧栏 | ✅ 已完成 | lookup 接口 + 查词栏 AI 建议区域 + 点击预填释义表单，不自动创建学习数据 |
 | 中 | Reader-Lookup-UX-2 | 查词栏添加释义流程重构 | ✅ 已完成 | 统一"添加新释义"面板（AI 建议 + 词典 + 手动），隐藏空词性分组，紧凑显示 |
+| 低 | Reader-Layout-1 | 阅读页布局扩展 + 来源句默认收起 | ✅ 已完成 | 大屏查词栏 520px（原 400px），AI 来源句默认收起可展开，正文 padding 同步 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 

@@ -12,7 +12,7 @@
             'rounded-r-lg': true
         }"
         :style="{
-            'width': '400px',
+            'width': sidebarWidth,
             'border-left': '1px solid var(--v-gray2-base)',
             'left': positionLeft + 'px',
             'top': positionTop + 'px',
@@ -162,9 +162,19 @@
                                     </div>
                                     <div class="text-body-2 mb-1">{{ vi.meaning_zh }}</div>
                                     <div v-if="vi.reason" class="text-caption text--secondary">{{ vi.reason }}</div>
-                                    <div v-if="vi.source_sentence" class="text-caption text--secondary mt-1">
-                                        <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                        {{ vi.source_sentence }}
+                                    <div v-if="vi.source_sentence" class="mt-1">
+                                        <span v-if="!expandedAiSource['vocab-' + viIndex]" class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['vocab-' + viIndex] = true">
+                                            查看来源句
+                                        </span>
+                                        <template v-else>
+                                            <div class="text-caption text--secondary mt-1">
+                                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                                {{ vi.source_sentence }}
+                                            </div>
+                                            <span class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['vocab-' + viIndex] = false">
+                                                收起来源句
+                                            </span>
+                                        </template>
                                     </div>
                                 </div>
                             </template>
@@ -183,9 +193,19 @@
                                     <div v-if="pi.trigger_words && pi.trigger_words.length" class="text-caption text--secondary">
                                         触发词：{{ pi.trigger_words.join(', ') }}
                                     </div>
-                                    <div v-if="pi.source_sentence" class="text-caption text--secondary mt-1">
-                                        <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                        {{ pi.source_sentence }}
+                                    <div v-if="pi.source_sentence" class="mt-1">
+                                        <span v-if="!expandedAiSource['phrase-' + piIndex]" class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['phrase-' + piIndex] = true">
+                                            查看来源句
+                                        </span>
+                                        <template v-else>
+                                            <div class="text-caption text--secondary mt-1">
+                                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
+                                                {{ pi.source_sentence }}
+                                            </div>
+                                            <span class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['phrase-' + piIndex] = false">
+                                                收起来源句
+                                            </span>
+                                        </template>
                                     </div>
                                 </div>
                             </template>
@@ -269,6 +289,11 @@ export default {
         textToSpeechAvailable: Boolean,
     },
     computed: {
+        sidebarWidth() {
+            // Large viewports get a wider workspace sidebar
+            if (typeof window !== 'undefined' && window.innerWidth >= 1280) return '520px';
+            return '400px';
+        },
         ...mapState({
             type: state => state.vocabularyBox.type,
             word: state => state.vocabularyBox.word,
@@ -310,6 +335,7 @@ export default {
             showLegacyTranslation: false,
             showDictionaryResults: false,
             showAddSensePanel: false,
+            expandedAiSource: {}, // { 'vocab-0': true, 'phrase-1': false }
             editingLemma: false,
             editLemmaValue: '',
             phraseText: '',
@@ -416,6 +442,9 @@ export default {
             }
         },
         loadAiSuggestions() {
+            // Reset expanded state on word change
+            this.expandedAiSource = {};
+
             const chapterId = this.$store.state.vocabularyBox.chapterId;
             const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
             const word = this.word;

@@ -87,7 +87,7 @@
                 }"
                 :style="{
                     'height': $vuetify.breakpoint.mdAndUp ? 'calc(100% - 24px - 24px)' : 'calc(100% - 24px - 24px - 64px)',
-                    'padding-right': settings.vocabularySidebar && vocabularySidebarFits ? '400px !important' : '0px'
+                    'padding-right': settings.vocabularySidebar && vocabularySidebarFits ? (window.innerWidth >= 1280 ? '520px !important' : '400px !important') : '0px'
                 }"
             >
                 <v-card-text id="reader-content" :class="{
