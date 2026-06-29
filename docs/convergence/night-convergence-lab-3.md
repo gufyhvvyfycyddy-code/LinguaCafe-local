@@ -187,6 +187,14 @@ AGENTS.md
 - **目标**：审查/收敛 TextReader toolbar inline actions
 - **允许修改文件**：TextReader.vue, lab-3.md
 - **验证方式**：npm build + MCP 阅读页按钮响应
+- **执行结果**：
+  - 审查：4 个 toolbar 内联 handler 可以安全提取
+  - `togglePlainTextMode()` 已存在！toolbar 仍使用内联表达式 ✅ 改为使用方法
+  - 新增 `toggleHotkeyDialog()`、`openAiAssistDialog()`、`toggleAiTranslations()` ✅
+  - 删除内联箭头函数 4 处，改为命名方法引用
+  - npm run development：Compiled Successfully ✅
+  - diff：+13/-4，1 文件 ≤ 3 ✅
+  - **通过** ✅
 
 ## R4 设计
 
