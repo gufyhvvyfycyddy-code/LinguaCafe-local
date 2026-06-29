@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`ab5ff22`（Docs: update roadmap Latest commit to 6c46b0f）
+**Latest commit**：`6a9c391`（Fix: prevent reader toolbar from covering lookup panel）
 
 ### `/review-cards/manage` 当前能力
 
