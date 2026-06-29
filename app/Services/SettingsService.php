@@ -735,7 +735,7 @@ class SettingsService {
         $defaults = [
             'daily_new_limit_enabled' => true,
             'daily_new_limit' => 20,
-            'daily_review_limit_enabled' => false,
+            'daily_review_limit_enabled' => true,
             'daily_review_limit' => 200,
             'new_cards_ignore_review_limit' => false,
         ];
@@ -775,6 +775,8 @@ class SettingsService {
             'new_cards_ignore_review_limit',
         ];
 
+        $errors = [];
+
         foreach ($input as $key => $value) {
             if (!in_array($key, $allowed, true)) {
                 continue;
@@ -782,25 +784,47 @@ class SettingsService {
 
             // Validate boolean fields
             if (in_array($key, ['daily_new_limit_enabled', 'daily_review_limit_enabled', 'new_cards_ignore_review_limit'], true)) {
-                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-                if ($value === null) {
-                    continue;
+                $boolVal = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($boolVal === null) {
+                    $errors[$key] = '此设置必须是启用或关闭状态。';
                 }
             }
 
             // Validate numeric fields
             if ($key === 'daily_new_limit') {
-                $value = (int) $value;
-                if ($value < 0 || $value > 999) {
-                    continue;
+                $intVal = (int) $value;
+                if ($intVal < 0 || $intVal > 999) {
+                    $errors[$key] = '每日新学上限必须在 0 到 999 之间。';
                 }
             }
 
             if ($key === 'daily_review_limit') {
-                $value = (int) $value;
-                if ($value < 0 || $value > 9999) {
-                    continue;
+                $intVal = (int) $value;
+                if ($intVal < 0 || $intVal > 9999) {
+                    $errors[$key] = '每日复习上限必须在 0 到 9999 之间。';
                 }
+            }
+        }
+
+        // If any errors, reject entirely — do NOT partially save
+        if (!empty($errors)) {
+            throw new \App\Exceptions\DailyLimitsValidationException($errors);
+        }
+
+        // All validation passed — now save everything
+        foreach ($input as $key => $value) {
+            if (!in_array($key, $allowed, true)) {
+                continue;
+            }
+
+            if (in_array($key, ['daily_new_limit_enabled', 'daily_review_limit_enabled', 'new_cards_ignore_review_limit'], true)) {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            }
+            if ($key === 'daily_new_limit') {
+                $value = (int) $value;
+            }
+            if ($key === 'daily_review_limit') {
+                $value = (int) $value;
             }
 
             $setting = Setting::where('name', $key)

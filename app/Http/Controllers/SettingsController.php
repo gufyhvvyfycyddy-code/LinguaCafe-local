@@ -189,9 +189,17 @@ class SettingsController extends Controller
     public function updateFsrsDailyLimits(Request $request) {
         $input = $request->post();
 
-        $result = $this->settingsService->updateFsrsDailyLimits($input);
-
-        return response()->json($result, 200);
+        try {
+            $result = $this->settingsService->updateFsrsDailyLimits($input);
+            $result['success'] = true;
+            return response()->json($result, 200);
+        } catch (\App\Exceptions\DailyLimitsValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->getErrors(),
+            ], 422);
+        }
     }
 
     /**

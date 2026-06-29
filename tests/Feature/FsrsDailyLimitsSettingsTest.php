@@ -36,7 +36,7 @@ class FsrsDailyLimitsSettingsTest extends TestCase
         $response->assertJson([
             'daily_new_limit_enabled' => true,
             'daily_new_limit' => 20,
-            'daily_review_limit_enabled' => false,
+            'daily_review_limit_enabled' => true,
             'daily_review_limit' => 200,
             'new_cards_ignore_review_limit' => false,
             'is_queue_enforced' => false,
@@ -45,7 +45,6 @@ class FsrsDailyLimitsSettingsTest extends TestCase
 
     public function test_save_and_read_back_full_config(): void
     {
-        // Save
         $saveResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_new_limit_enabled' => false,
             'daily_new_limit' => 15,
@@ -64,9 +63,7 @@ class FsrsDailyLimitsSettingsTest extends TestCase
             'is_queue_enforced' => false,
         ]);
 
-        // Read back
         $readResponse = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-
         $readResponse->assertOk();
         $readResponse->assertJson([
             'daily_new_limit_enabled' => false,
@@ -79,7 +76,6 @@ class FsrsDailyLimitsSettingsTest extends TestCase
 
     public function test_boolean_fields_handle_true_false(): void
     {
-        // Save with true
         $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_new_limit_enabled' => true,
             'daily_review_limit_enabled' => true,
@@ -93,7 +89,6 @@ class FsrsDailyLimitsSettingsTest extends TestCase
             'new_cards_ignore_review_limit' => true,
         ]);
 
-        // Save with false
         $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_new_limit_enabled' => false,
             'daily_review_limit_enabled' => false,
@@ -108,52 +103,103 @@ class FsrsDailyLimitsSettingsTest extends TestCase
         ]);
     }
 
-    public function test_daily_new_limit_range_validation(): void
+    public function test_daily_new_limit_below_zero_rejected_with_422(): void
     {
-        // Below 0 should be rejected (stays at default)
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_new_limit' => -1,
         ]);
-        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(20, $response->json('daily_new_limit')); // unchanged
 
-        // Above 999 should be rejected
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
-            'daily_new_limit' => 1000,
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => '每日上限设置无效。',
         ]);
-        $response2 = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(20, $response2->json('daily_new_limit')); // unchanged
-
-        // Valid value should be saved
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
-            'daily_new_limit' => 50,
-        ]);
-        $response3 = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(50, $response3->json('daily_new_limit'));
+        $response->assertJsonStructure(['errors' => ['daily_new_limit']]);
     }
 
-    public function test_daily_review_limit_range_validation(): void
+    public function test_daily_new_limit_above_999_rejected_with_422(): void
     {
-        // Below 0 should be rejected
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+            'daily_new_limit' => 1000,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => '每日上限设置无效。',
+        ]);
+        $response->assertJsonStructure(['errors' => ['daily_new_limit']]);
+    }
+
+    public function test_daily_review_limit_below_zero_rejected_with_422(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_review_limit' => -1,
         ]);
-        $response = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(200, $response->json('daily_review_limit'));
 
-        // Above 9999 should be rejected
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => '每日上限设置无效。',
+        ]);
+        $response->assertJsonStructure(['errors' => ['daily_review_limit']]);
+    }
+
+    public function test_daily_review_limit_above_9999_rejected_with_422(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
             'daily_review_limit' => 10000,
         ]);
-        $response2 = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(200, $response2->json('daily_review_limit'));
 
-        // Valid value should be saved
-        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
-            'daily_review_limit' => 300,
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => '每日上限设置无效。',
         ]);
-        $response3 = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
-        $this->assertEquals(300, $response3->json('daily_review_limit'));
+        $response->assertJsonStructure(['errors' => ['daily_review_limit']]);
+    }
+
+    public function test_invalid_boolean_rejected_with_422(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+            'daily_review_limit_enabled' => 'not-a-bool',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJson([
+            'success' => false,
+            'message' => '每日上限设置无效。',
+        ]);
+        $response->assertJsonStructure(['errors' => ['daily_review_limit_enabled']]);
+    }
+
+    public function test_invalid_value_does_not_partially_save(): void
+    {
+        // Save a valid baseline first
+        $saveOk = $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+            'daily_new_limit_enabled' => false,
+            'daily_new_limit' => 15,
+            'daily_review_limit_enabled' => true,
+            'daily_review_limit' => 150,
+            'new_cards_ignore_review_limit' => true,
+        ]);
+        $saveOk->assertOk();
+
+        // Now send a mixed request with an invalid review limit
+        $this->actingAs($this->user)->postJson('/settings/fsrs/daily-limits', [
+            'daily_new_limit' => 99,
+            'daily_review_limit' => 10000,
+        ])->assertStatus(422);
+
+        // Read back — must be unchanged from the valid baseline
+        $final = $this->actingAs($this->user)->getJson('/settings/fsrs/daily-limits');
+        $final->assertJson([
+            'daily_new_limit_enabled' => false,
+            'daily_new_limit' => 15,
+            'daily_review_limit_enabled' => true,
+            'daily_review_limit' => 150,
+            'new_cards_ignore_review_limit' => true,
+        ]);
     }
 
     public function test_daily_limits_are_saved_but_not_enforced_yet(): void

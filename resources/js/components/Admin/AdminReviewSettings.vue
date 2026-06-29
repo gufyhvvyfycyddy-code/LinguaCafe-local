@@ -1203,7 +1203,7 @@
                 retentionSimData: null,
                 dailyNewLimitEnabled: true,
                 dailyNewLimit: 20,
-                dailyReviewLimitEnabled: false,
+                dailyReviewLimitEnabled: true,
                 dailyReviewLimit: 200,
                 newCardsIgnoreReviewLimit: false,
                 dailyLimitsSaving: false,
@@ -1519,6 +1519,11 @@
                     .catch((error) => {
                         const msg = error.response?.data?.message || '保存失败，请稍后再试。';
                         this.dailyLimitsSaveError = msg;
+                        const errors = error.response?.data?.errors;
+                        if (errors) {
+                            const detail = Object.values(errors).join(' ');
+                            this.dailyLimitsSaveError = msg + ' ' + detail;
+                        }
                     })
                     .finally(() => {
                         this.dailyLimitsSaving = false;

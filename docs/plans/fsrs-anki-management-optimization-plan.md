@@ -40,16 +40,18 @@
 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-5 | 每日学习上限 / 新卡与复习上限侦察 | ✅ 已完成 |
-| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版 | ✅ 当前阶段 |
+| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（含 fix：默认复习上限开启 + 校验收口） | ✅ 已完成 |
 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
+
+> **注意**：每日上限接入前，需注意阅读页新词创建与 lemma/study_base 归并质量；`Lemma-Origin-1` 将单独跟踪英文原型识别回归问题。
 
 ---
 
 ## 5. 当前下一步
 
-进入 **FSRS-Anki-Mgmt-5：每日学习上限 / 新卡与复习上限侦察**
+进入 **FSRS-Anki-Mgmt-7：复习队列每日上限接入**（中高风险，需单独验收）
 
 本轮目标：只做侦察和计划，不实现功能。
 
