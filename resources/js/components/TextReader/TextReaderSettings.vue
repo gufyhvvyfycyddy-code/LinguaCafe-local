@@ -456,6 +456,7 @@
     import TextToSpeechService from './../../services/TextToSpeechService';
     import FontTypeService from './../../services/FontTypeService';
     import {  defaultSettings, DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
+    import { MAXIMUM_TEXT_WIDTH_OPTIONS } from './../../services/TextReaderSettingsOptionsService';
 
     export default {
         emits: ['input'],
@@ -499,7 +500,7 @@
                     value: 'scroll-into-view-if-needed'
                 }
             ],
-            maximumTextWidthData: ['800px', '900px', '1000px', '1200px', '1400px', '1600px', '100%'],
+            maximumTextWidthData: MAXIMUM_TEXT_WIDTH_OPTIONS,
             }
         },
         props: {

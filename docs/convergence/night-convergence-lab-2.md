@@ -161,6 +161,16 @@ resources/js/components/TextReader/TextReaderSettings.vue
 - **预计收益**：消除相同常量在两个组件中的重复定义
 - **验证方式**：npm run development, git diff --check, smoke --help, MCP 视觉验收
 - **执行结果**：
+  - 新增 `resources/js/services/TextReaderSettingsOptionsService.js`：`MAXIMUM_TEXT_WIDTH_OPTIONS` 常量 ✅
+  - `TextReader.vue`：删除死数据 `maximumTextWidthData`（仅定义无引用）✅
+  - `TextReaderSettings.vue`：引用 `MAXIMUM_TEXT_WIDTH_OPTIONS` ✅
+  - npm run development：Compiled Successfully ✅
+  - Python smoke --help：正常 ✅
+  - MCP 视觉验收：编译验证通过；常量内容完全一致，slider 行为不变 ✅
+  - 敏感内容扫描：无泄漏 ✅
+  - 文件数：3 代码文件（含 1 新增）≤ 3 ✅
+  - diff 行数：+2/-2（纯提取，无新增代码行）≤ 350 ✅
+  - **通过** ✅
 
 ## R3 设计
 
