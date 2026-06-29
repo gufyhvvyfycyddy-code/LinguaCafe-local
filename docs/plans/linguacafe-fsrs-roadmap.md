@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`0213234`（Docs: update roadmap Latest commit to bcb7cfa）
+**Latest commit**：`71fadb2`（Feat: add AI reading assist preview search）
 
 ### `/review-cards/manage` 当前能力
 
