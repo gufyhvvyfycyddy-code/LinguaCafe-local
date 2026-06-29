@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`160ef2b`（Docs: update roadmap Latest commit to dcd3b05）
+**Latest commit**：`d758fc2`（Feat: show FSRS familiarity in reader lookup）
 
 ### `/review-cards/manage` 当前能力
 
