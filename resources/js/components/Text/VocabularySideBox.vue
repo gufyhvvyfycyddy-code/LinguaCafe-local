@@ -141,75 +141,15 @@
 
                     <template v-if="showAddSensePanel">
                         <!-- Section: AI Suggestions -->
-                        <div v-if="aiLookupLoading" class="d-flex align-center mt-2 mb-2">
-                            <v-progress-circular indeterminate size="14" width="2" color="primary" class="mr-2" />
-                            <span class="text-caption">加载 AI 建议中...</span>
-                        </div>
-                        <v-alert v-else-if="aiLookupError" dense text type="error" class="mt-2 mb-2" small>
-                            AI 建议读取失败，不影响手动添加释义。
-                        </v-alert>
-                        <div v-if="aiVocabSuggestions.length || aiPhraseSuggestions.length" class="mb-2">
-                            <div class="text-caption font-weight-medium mb-1 mt-2">AI 建议</div>
-                            <template v-for="(vi, viIndex) in aiVocabSuggestions">
-                                <div :key="'ai-v-' + viIndex" class="ai-suggestion-card rounded pa-2 mb-2">
-                                    <div class="d-flex align-center mb-1">
-                                        <v-chip x-small outlined class="mr-1">{{ vi.pos || '未知' }}</v-chip>
-                                        <v-chip x-small :color="vi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ vi.confidence }}</v-chip>
-                                        <v-spacer />
-                                        <v-btn x-small outlined color="primary" @click="useAiSuggestion(vi)">
-                                            使用此释义
-                                        </v-btn>
-                                    </div>
-                                    <div class="text-body-2 mb-1">{{ vi.meaning_zh }}</div>
-                                    <div v-if="vi.reason" class="text-caption text--secondary">{{ vi.reason }}</div>
-                                    <div v-if="vi.source_sentence" class="mt-1">
-                                        <span v-if="!expandedAiSource['vocab-' + viIndex]" class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['vocab-' + viIndex] = true">
-                                            查看来源句
-                                        </span>
-                                        <template v-else>
-                                            <div class="text-caption text--secondary mt-1">
-                                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                                {{ vi.source_sentence }}
-                                            </div>
-                                            <span class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['vocab-' + viIndex] = false">
-                                                收起来源句
-                                            </span>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                            <template v-for="(pi, piIndex) in aiPhraseSuggestions">
-                                <div :key="'ai-p-' + piIndex" class="ai-suggestion-card rounded pa-2 mb-2">
-                                    <div class="d-flex align-center mb-1">
-                                        <v-chip x-small outlined color="purple" class="mr-1">词组</v-chip>
-                                        <v-chip x-small :color="pi.confidence === 'high' ? 'green' : 'orange'" text-color="white">{{ pi.confidence }}</v-chip>
-                                        <v-spacer />
-                                        <v-btn x-small outlined color="primary" @click="useAiPhraseSuggestion(pi)">
-                                            用于当前单词
-                                        </v-btn>
-                                    </div>
-                                    <div class="text-body-2 mb-1">{{ pi.phrase }}</div>
-                                    <div class="text-caption mb-1">{{ pi.meaning_zh }}</div>
-                                    <div v-if="pi.trigger_words && pi.trigger_words.length" class="text-caption text--secondary">
-                                        触发词：{{ pi.trigger_words.join(', ') }}
-                                    </div>
-                                    <div v-if="pi.source_sentence" class="mt-1">
-                                        <span v-if="!expandedAiSource['phrase-' + piIndex]" class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['phrase-' + piIndex] = true">
-                                            查看来源句
-                                        </span>
-                                        <template v-else>
-                                            <div class="text-caption text--secondary mt-1">
-                                                <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>
-                                                {{ pi.source_sentence }}
-                                            </div>
-                                            <span class="text-caption primary--text" style="cursor:pointer;" @click="expandedAiSource['phrase-' + piIndex] = false">
-                                                收起来源句
-                                            </span>
-                                        </template>
-                                    </div>
-                                </div>
-                            </template>
-                        </div>
+                        <ai-suggestion-panel
+                            :key="word"
+                            :vocabulary-suggestions="aiVocabSuggestions"
+                            :phrase-suggestions="aiPhraseSuggestions"
+                            :loading="aiLookupLoading"
+                            :error="aiLookupError"
+                            @use-vocab-suggestion="useAiSuggestion"
+                            @use-phrase-suggestion="useAiPhraseSuggestion"
+                        />
 
                         <!-- Section: Dictionary -->
                         <div class="mt-2">
@@ -277,10 +217,12 @@
 <script>
 import { mapState } from 'vuex';
 import WordSensesList from './WordSensesList.vue';
+import AiSuggestionPanel from './AiSuggestionPanel.vue';
 
 export default {
     components: {
         WordSensesList,
+        AiSuggestionPanel,
     },
     props: {
         language: String,
@@ -346,7 +288,6 @@ export default {
             showLegacyTranslation: false,
             showDictionaryResults: false,
             showAddSensePanel: false,
-            expandedAiSource: {}, // { 'vocab-0': true, 'phrase-1': false }
             editingLemma: false,
             editLemmaValue: '',
             phraseText: '',
@@ -453,8 +394,7 @@ export default {
             }
         },
         loadAiSuggestions() {
-            // Reset expanded state on word change
-            this.expandedAiSource = {};
+            // AI suggestion panel manages its own expanded state via :key="word" reset
 
             const chapterId = this.$store.state.vocabularyBox.chapterId;
             const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
