@@ -146,6 +146,12 @@ LinguaCafe 阅读体验最小闭环：
 - **预计收益**：让后续开发者清晰知道何时跑什么验证
 - **验证方式**：git diff --check, git diff --stat, git status
 - **执行结果**：
+  - 新增验证层选择表（7 种修改类型 × 3 种验证方式） ✅
+  - 维护了 smoke-guard.md 结构完整性 ✅
+  - git diff --check：无实质错误 ✅
+  - git diff --stat：2 文件 ✅
+  - 敏感内容搜索：无泄漏 ✅
+  - **通过** ✅
 
 ## R3 设计
 

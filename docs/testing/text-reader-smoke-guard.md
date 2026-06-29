@@ -126,6 +126,23 @@ MCP 视觉验收步骤至少包括：
 D:\Document\lingl\mcp-browser-smoke-screenshots
 ```
 
+## 验证层选择表
+
+不同修改类型应使用不同验证层组合：
+
+| 修改类型 | Python smoke | MCP visual | PHP tests | 说明 |
+|----------|-------------|------------|-----------|------|
+| 纯文档 / smoke 脚本 | ✅ 推荐 | ❌ 不必须 | ❌ 不必须 | git diff + 人工审查足够 |
+| helper / service 纯逻辑 | ❌ 不必须 | ❌ 不必须 | ✅ 推荐 | PHPUnit / Jest 测试 |
+| reader 布局 / CSS | ✅ 必须 | ✅ 推荐 | ❌ 不必须 | Python smoke 保核心；MCP visual 保视觉 |
+| 查词栏 / AddSenseForm / AI 面板 | ✅ 必须 | ✅ 必须 | ❌ 不必须 | Python smoke 保数据流；MCP visual 保 UI 交互 |
+| 后端 API / 业务逻辑 | ❌ 不必须 | ❌ 不必须 | ✅ 必须 | PHPUnit 测试覆盖业务契约 |
+| 跨模块变更 | ✅ 推荐 | ✅ 推荐 | ✅ 必须 | 三层全跑 |
+| 高风险区域（Architecture Gate） | ✅ 必须 | ✅ 必须 | ✅ 必须 | 架构闸门要求全量验证 |
+
+**优先级**：Python smoke > MCP visual > PHP tests（执行顺序，不是重要性顺序）。
+**原则**：Python smoke 失败不进入 MCP visual；后端测试失败不进入前端验证。
+
 ### 安全说明
 
 - auth 文件只允许本地使用，不提交到 git
