@@ -495,24 +495,88 @@
                                                         </v-col>
                                                     </v-row>
 
-                                                    <!-- Newly due today risk -->
-                                                    <v-alert
-                                                        v-if="fsrsReschedulePreview.summary.newly_due_today > 0"
-                                                        dense
-                                                        outlined
-                                                        type="warning"
-                                                        class="mb-3"
-                                                    >
-                                                        预览显示会新增 {{ fsrsReschedulePreview.summary.newly_due_today }} 张今天到期卡。正式重排前请确认你能接受复习量变化。
-                                                    </v-alert>
+                                                    <!-- Risk assessment panel -->
+                                                    <div v-if="fsrsReschedulePreview.risk_assessment" class="mt-3 mb-3">
+                                                        <v-card outlined class="rounded-lg">
+                                                            <v-card-text class="pa-4">
+                                                                <div class="font-weight-medium subtitle-2 mb-3">重排风险评估</div>
 
-                                                    <!-- Preview disclaimer -->
-                                                    <v-alert dense outlined type="info" class="mb-2">
-                                                        这是预览，不会修改任何卡片。
-                                                    </v-alert>
-                                                    <v-alert dense outlined type="info" class="mb-0">
-                                                        正式重排会在后续步骤单独开放确认按钮。
-                                                    </v-alert>
+                                                                <!-- Risk level chip -->
+                                                                <div class="mb-3">
+                                                                    <v-chip
+                                                                        small
+                                                                        :color="riskAssessmentColor"
+                                                                        outlined
+                                                                        label
+                                                                    >
+                                                                        {{ fsrsReschedulePreview.risk_assessment.label }}
+                                                                    </v-chip>
+                                                                </div>
+
+                                                                <!-- Core workload impact -->
+                                                                <v-row dense class="mb-2">
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.workload_impact.changed_cards }}</div>
+                                                                            <div class="text-caption text--secondary">受影响卡片</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.workload_impact.newly_due_today }}</div>
+                                                                            <div class="text-caption text--secondary">今天新增到期</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.workload_impact.today_due_before }} → {{ fsrsReschedulePreview.workload_impact.today_due_after }}</div>
+                                                                            <div class="text-caption text--secondary">今天到期总数</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                </v-row>
+
+                                                                <!-- Next 7 days and movement -->
+                                                                <v-row dense class="mb-2">
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.workload_impact.next7_due_before }} → {{ fsrsReschedulePreview.workload_impact.next7_due_after }}</div>
+                                                                            <div class="text-caption text--secondary">未来 7 天到期</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ formatDaysChange(fsrsReschedulePreview.workload_impact.max_earlier_days) }}</div>
+                                                                            <div class="text-caption text--secondary">最大提前</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                    <v-col cols="4">
+                                                                        <v-sheet outlined rounded class="pa-2 text-center">
+                                                                            <div class="text-h6 font-weight-bold">{{ formatDaysChange(fsrsReschedulePreview.workload_impact.max_later_days) }}</div>
+                                                                            <div class="text-caption text--secondary">最大推迟</div>
+                                                                        </v-sheet>
+                                                                    </v-col>
+                                                                </v-row>
+
+                                                                <!-- Risk message -->
+                                                                <v-alert
+                                                                    dense
+                                                                    outlined
+                                                                    class="mb-0"
+                                                                    :type="riskAssessmentAlertType"
+                                                                >
+                                                                    {{ fsrsReschedulePreview.risk_assessment.message }}
+                                                                </v-alert>
+
+                                                                <div class="caption grey--text mt-2">
+                                                                    这是预览，不会修改卡片。只有点击确认重排后，已有卡片到期时间才会改变。
+                                                                </div>
+
+                                                                <div class="caption grey--text mt-1">
+                                                                    正式重排后会生成撤销记录，可在撤销入口恢复最近一次重排。
+                                                                </div>
+                                                            </v-card-text>
+                                                        </v-card>
+                                                    </div>
 
                                                     <!-- Samples table -->
                                                     <div v-if="hasReschedulePreviewSamples" class="mt-4">
@@ -1056,6 +1120,23 @@
                 if (level === 'ready') return 'success';
                 if (level === 'insufficient' || level === 'needs_more_card_history') return 'warning';
                 return 'grey';
+            },
+            riskAssessmentColor() {
+                if (!this.fsrsReschedulePreview || !this.fsrsReschedulePreview.risk_assessment) return 'grey';
+                const level = this.fsrsReschedulePreview.risk_assessment.level;
+                if (level === 'none') return 'success';
+                if (level === 'low') return 'info';
+                if (level === 'medium') return 'warning';
+                if (level === 'high' || level === 'blocked') return 'error';
+                return 'grey';
+            },
+            riskAssessmentAlertType() {
+                if (!this.fsrsReschedulePreview || !this.fsrsReschedulePreview.risk_assessment) return 'info';
+                const level = this.fsrsReschedulePreview.risk_assessment.level;
+                if (level === 'none' || level === 'low') return 'success';
+                if (level === 'medium') return 'warning';
+                if (level === 'high' || level === 'blocked') return 'error';
+                return 'info';
             },
             retentionBurdenEstimate() {
                 const multiplierMap = {

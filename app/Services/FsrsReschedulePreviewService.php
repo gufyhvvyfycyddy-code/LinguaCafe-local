@@ -21,6 +21,12 @@ class FsrsReschedulePreviewService
 
     protected function getMaxNewlyDueToday(): int { return 200; }
     protected function getMaxTotalChanged(): int { return 2000; }
+    protected function getHighNewlyDueTodayThreshold(): int { return 200; }
+    protected function getHighNext7DeltaThreshold(): int { return 300; }
+    protected function getMediumNewlyDueTodayThreshold(): int { return 50; }
+    protected function getMediumNext7DeltaThreshold(): int { return 100; }
+    protected function getMediumTotalChangedThreshold(): int { return 500; }
+    protected function getBlockedTotalChangedThreshold(): int { return 2000; }
 
     public function __construct(?FsrsSchedulingService $fsrsSchedulingService = null, ?FsrsRescheduleSnapshotService $snapshotService = null)
     {
@@ -80,6 +86,8 @@ class FsrsReschedulePreviewService
                 'max_earlier_days' => $data['summary']['max_earlier_days'],
                 'max_later_days' => $data['summary']['max_later_days'],
             ],
+            'workload_impact' => $data['workload_impact'],
+            'risk_assessment' => $data['risk_assessment'],
             'samples' => $samples,
             'warnings' => [
                 '这是预览，不会修改任何卡片。',
@@ -465,6 +473,9 @@ class FsrsReschedulePreviewService
         $newlyDueToday = 0;
         $maxEarlierDays = 0;
         $maxLaterDays = 0;
+        $next7DueBefore = 0;
+        $next7DueAfter = 0;
+        $sevenDaysFromNow = (new Carbon())->addDays(7);
 
         foreach ($cards as $card) {
             $row = $this->buildPreviewForCard($card, $activeParams, $desiredRetention, $now);
@@ -489,6 +500,19 @@ class FsrsReschedulePreviewService
                 $currentlyDue++;
             }
 
+            // Count current due within next 7 days
+            if ($card->fsrs_due_at !== null
+                && $card->fsrs_due_at->gt($now)
+                && $card->fsrs_due_at->lte($sevenDaysFromNow)) {
+                $next7DueBefore++;
+            }
+
+            // Count preview due within next 7 days
+            $previewDueAt = Carbon::parse($row['preview_due_at']);
+            if ($previewDueAt->gt($now) && $previewDueAt->lte($sevenDaysFromNow)) {
+                $next7DueAfter++;
+            }
+
             if ($row['is_newly_due_today']) {
                 $newlyDueToday++;
             }
@@ -499,6 +523,25 @@ class FsrsReschedulePreviewService
         $totalCandidates = $cards->count();
         $totalChanged = $willMoveEarlier + $willMoveLater;
         $dueTodayAfter = $currentlyDue + $newlyDueToday;
+
+        $next7Delta = $next7DueAfter - $next7DueBefore;
+
+        $workloadImpact = [
+            'changed_cards' => $totalChanged,
+            'today_due_before' => $currentlyDue,
+            'today_due_after' => $dueTodayAfter,
+            'newly_due_today' => $newlyDueToday,
+            'next7_due_before' => $next7DueBefore,
+            'next7_due_after' => $next7DueAfter,
+            'next7_delta' => $next7Delta,
+            'move_earlier' => $willMoveEarlier,
+            'move_later' => $willMoveLater,
+            'unchanged' => $unchanged,
+            'max_earlier_days' => $maxEarlierDays < 0 ? $maxEarlierDays : 0,
+            'max_later_days' => $maxLaterDays,
+        ];
+
+        $riskAssessment = $this->computeRiskAssessment($workloadImpact);
 
         return [
             'cards' => $cards,
@@ -518,6 +561,95 @@ class FsrsReschedulePreviewService
                 'total_candidates' => $totalCandidates,
                 'total_changed' => $totalChanged,
             ],
+            'workload_impact' => $workloadImpact,
+            'risk_assessment' => $riskAssessment,
+        ];
+    }
+
+    /**
+     * Compute risk assessment based on workload impact data.
+     *
+     * Thresholds are defined as protected methods so they can be overridden in tests.
+     */
+    private function computeRiskAssessment(array $wi): array
+    {
+        $totalChanged = $wi['changed_cards'];
+        $newlyDueToday = $wi['newly_due_today'];
+        $next7Delta = $wi['next7_delta'];
+
+        $blockedTotal = $this->getBlockedTotalChangedThreshold();
+
+        if ($totalChanged === 0) {
+            return [
+                'level' => 'none',
+                'label' => '无风险',
+                'message' => '本次预览几乎不会改变卡片到期安排。',
+                'reasons' => [],
+                'requires_extra_confirm' => false,
+                'can_apply' => true,
+            ];
+        }
+
+        if ($totalChanged > $blockedTotal) {
+            return [
+                'level' => 'blocked',
+                'label' => '已阻止',
+                'message' => "本次影响范围过大（{$totalChanged} 张），系统已阻止正式重排。",
+                'reasons' => ["受影响卡片总数（{$totalChanged}）超过系统稳定性上限（{$blockedTotal}）。"],
+                'requires_extra_confirm' => false,
+                'can_apply' => false,
+            ];
+        }
+
+        $reasons = [];
+
+        if ($newlyDueToday > $this->getHighNewlyDueTodayThreshold() || $next7Delta > $this->getHighNext7DeltaThreshold()) {
+            if ($newlyDueToday > $this->getHighNewlyDueTodayThreshold()) {
+                $reasons[] = "新增今天到期卡 {$newlyDueToday} 张";
+            }
+            if ($next7Delta > $this->getHighNext7DeltaThreshold()) {
+                $reasons[] = "未来 7 天到期增加 {$next7Delta} 张";
+            }
+            return [
+                'level' => 'high',
+                'label' => '高风险',
+                'message' => '本次重排可能让今天或未来 7 天复习量明显增加，请谨慎确认。',
+                'reasons' => $reasons,
+                'requires_extra_confirm' => true,
+                'can_apply' => true,
+            ];
+        }
+
+        if ($newlyDueToday > $this->getMediumNewlyDueTodayThreshold()
+            || $next7Delta > $this->getMediumNext7DeltaThreshold()
+            || $totalChanged > $this->getMediumTotalChangedThreshold()
+        ) {
+            if ($newlyDueToday > $this->getMediumNewlyDueTodayThreshold()) {
+                $reasons[] = "新增今天到期卡 {$newlyDueToday} 张";
+            }
+            if ($next7Delta > $this->getMediumNext7DeltaThreshold()) {
+                $reasons[] = "未来 7 天到期增加 {$next7Delta} 张";
+            }
+            if ($totalChanged > $this->getMediumTotalChangedThreshold()) {
+                $reasons[] = "受影响卡片 {$totalChanged} 张";
+            }
+            return [
+                'level' => 'medium',
+                'label' => '中风险',
+                'message' => '本次重排会改变一部分卡片到期时间，建议确认今天和未来 7 天负担。',
+                'reasons' => $reasons,
+                'requires_extra_confirm' => false,
+                'can_apply' => true,
+            ];
+        }
+
+        return [
+            'level' => 'low',
+            'label' => '低风险',
+            'message' => '本次重排影响较小，可以先预览再决定。',
+            'reasons' => ["受影响卡片 {$totalChanged} 张"],
+            'requires_extra_confirm' => false,
+            'can_apply' => true,
         ];
     }
 
@@ -548,6 +680,8 @@ class FsrsReschedulePreviewService
                 'max_earlier_days' => 0,
                 'max_later_days' => 0,
             ],
+            'workload_impact' => $this->emptyWorkloadImpact(),
+            'risk_assessment' => $this->noRiskAssessment(),
             'samples' => [],
             'warnings' => [
                 $message,
@@ -575,6 +709,8 @@ class FsrsReschedulePreviewService
                 'max_earlier_days' => 0,
                 'max_later_days' => 0,
             ],
+            'workload_impact' => $this->emptyWorkloadImpact(),
+            'risk_assessment' => $this->noRiskAssessment(),
             'samples' => [],
             'warnings' => [
                 '这是预览，不会修改任何卡片。',
@@ -603,10 +739,42 @@ class FsrsReschedulePreviewService
                 'max_earlier_days' => 0,
                 'max_later_days' => 0,
             ],
+            'workload_impact' => $this->emptyWorkloadImpact(),
+            'risk_assessment' => $this->noRiskAssessment(),
             'samples' => [],
             'warnings' => [
                 '当前阶段只支持英语卡片重排预览。',
             ],
+        ];
+    }
+
+    private function emptyWorkloadImpact(): array
+    {
+        return [
+            'changed_cards' => 0,
+            'today_due_before' => 0,
+            'today_due_after' => 0,
+            'newly_due_today' => 0,
+            'next7_due_before' => 0,
+            'next7_due_after' => 0,
+            'next7_delta' => 0,
+            'move_earlier' => 0,
+            'move_later' => 0,
+            'unchanged' => 0,
+            'max_earlier_days' => 0,
+            'max_later_days' => 0,
+        ];
+    }
+
+    private function noRiskAssessment(): array
+    {
+        return [
+            'level' => 'none',
+            'label' => '无风险',
+            'message' => '没有可评估的重排影响。',
+            'reasons' => [],
+            'requires_extra_confirm' => false,
+            'can_apply' => true,
         ];
     }
 }
