@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`ad6237f`（Docs: update roadmap Latest commit to c34ceda）
+**Latest commit**：`4c1f99f`（Feat: refine reader highlight color semantics）
 
 ### `/review-cards/manage` 当前能力
 
