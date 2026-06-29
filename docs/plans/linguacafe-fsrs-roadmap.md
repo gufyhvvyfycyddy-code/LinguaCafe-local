@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`d758fc2`（Feat: show FSRS familiarity in reader lookup）
+**Latest commit**：`1646046`（开始 Reader-UI-1-a 前的最新 commit）
 
 ### `/review-cards/manage` 当前能力
 
@@ -587,6 +587,7 @@
 | 中 | Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全规则 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览紫色高亮 + 文档明确保留所有未完成计划 |
 | 高 | Plan-Integrity-1 | 新增总控大计划 + 未完成任务总表入库 | ✅ 已完成 | 新增 `linguacafe-master-plan.md` 汇总所有任务线，详见总控计划 |
 | 中 | Reader-UI-9 | 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | ✅ 已完成 | 文字 + v-progress-linear 绿色进度条，仅前端 + 小后端调整 |
+| 中 | Reader-UI-1-a | 查词侧栏第一轮瘦身：隐藏旧 SRS 1-7 按钮，释义标题改名，词典默认收起 | ✅ 已完成 | 前端仅改 VocabularySideBox.vue，不删 setStage 逻辑，不删数据 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
@@ -598,7 +599,7 @@
 | 中 | AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览（方案 B 总览+详情页） | ✅ 已完成 | 用户选择方案 B（先总览→点击卡片进入详情）+ 25 测试 |
 | 中 | AI-Reading-Assist-2-search | 详情页增加英文搜索框 | ✅ 已完成 | 大小写不敏感，覆盖 4 类详情字段 + trigger_words 数组 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
-| 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化 | 📋 计划中 | 见 ai-reading-assist-plan.md 第 7 节 |
+| 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化（第一轮 Reader-UI-1-a 已完成） | 📋 暂缓，后续轮次 | 见 ai-reading-assist-plan.md 第 7 节 |
 | 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | 📋 待审计 | 审计确认自动提升仍使用旧 SRS（EncounteredWord.setStage），建议后续单独任务 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。

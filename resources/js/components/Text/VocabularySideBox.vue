@@ -93,12 +93,6 @@
                 <v-textarea v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')" class="default-font my-2" label="读音" filled dense no-resize rounded hide-details height="80" v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
 
                 <template v-if="type !== 'new-phrase'">
-                    <div class="vocab-box-subheader d-flex mb-2">普通词汇状态</div>
-                    <div id="vocab-box-stage-buttons" class="mb-2">
-                        <v-btn v-for="stageNumber in [-7,-6,-5,-4,-3,-2,-1]" :key="stageNumber" :class="{'v-btn--active': stage == stageNumber}" @click="setStage(stageNumber)">{{ stageNumber * -1 }}</v-btn>
-                        <v-btn :class="{'v-btn--active': stage == 0}" @click="setStage(0)"><v-icon small>mdi-check</v-icon></v-btn>
-                        <v-btn :class="{'v-btn--active': stage == 1}" @click="setStage(1)" v-if="type == 'word'"><v-icon small>mdi-close</v-icon></v-btn>
-                    </div>
                     <div v-if="type == 'word'" class="d-flex flex-wrap mb-3">
                         <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
                         <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
@@ -107,15 +101,19 @@
                 </template>
 
                 <div class="vocab-box-subheader d-flex align-center" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
-                    <span>旧词条释义（兼容）</span>
+                    <span>选择释义</span>
                     <v-spacer />
                     <v-icon small :color="showLegacyTranslation ? 'primary' : ''">{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                 </div>
                 <v-textarea v-if="showLegacyTranslation" class="mb-2 mt-1" placeholder="旧词条释义（兼容，不推荐使用此编辑入口）" title="旧词条释义" filled dense no-resize rounded hide-details height="80" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
                 <v-text-field placeholder="词典搜索" class="dictionary-search-field default-font mt-2 mb-3" width="100%" prepend-inner-icon="mdi-magnify" filled dense rounded hide-details :value="searchField" @change="searchFieldChanged" @keydown.stop=";" />
 
-                <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
-                <vocabulary-search-box v-if="type !== 'empty'" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
+                <div class="vocab-box-subheader d-flex align-center mt-3" @click="showDictionaryResults = !showDictionaryResults" style="cursor:pointer;">
+                    <span>词典结果</span>
+                    <v-spacer />
+                    <v-icon small :color="showDictionaryResults ? 'primary' : ''">{{ showDictionaryResults ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                </div>
+                <vocabulary-search-box v-if="type !== 'empty' && showDictionaryResults" :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled" :language="$props.language" :searchTerm="searchField" @addDefinitionToInput="addDefinitionToInput" @addDefinitionAsSense="addDefinitionAsSense" />
 
                 <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" @word-learning-updated="$emit('word-learning-updated', $event)" />
 
@@ -185,6 +183,7 @@ export default {
         return {
             tab: 0,
             showLegacyTranslation: false,
+            showDictionaryResults: false,
             editingLemma: false,
             editLemmaValue: '',
             phraseText: '',
