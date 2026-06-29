@@ -725,6 +725,101 @@ class SettingsService {
      *
      * @return array{success: bool, message: string, deleted_count: int, deleted_keys: string[], status: array}
      */
+    /**
+     * Get daily study limits configuration.
+     *
+     * Returns defaults when no settings are saved yet.
+     */
+    public function getFsrsDailyLimits(): array
+    {
+        $defaults = [
+            'daily_new_limit_enabled' => true,
+            'daily_new_limit' => 20,
+            'daily_review_limit_enabled' => false,
+            'daily_review_limit' => 200,
+            'new_cards_ignore_review_limit' => false,
+        ];
+
+        $keys = array_keys($defaults);
+        $rows = Setting::where('user_id', -1)
+            ->whereIn('name', $keys)
+            ->get()
+            ->keyBy('name');
+
+        $limits = [];
+        foreach ($defaults as $key => $defaultValue) {
+            $row = $rows->get($key);
+            $limits[$key] = $row ? json_decode($row->value) : $defaultValue;
+        }
+
+        $limits['is_queue_enforced'] = false;
+        $limits['message'] = '每日上限设置已保存；当前版本暂不限制实际复习队列。';
+
+        return $limits;
+    }
+
+    /**
+     * Save daily study limits configuration.
+     *
+     * @param array $input  associative array of key => value
+     * @return array  the full daily limits config after save
+     */
+    public function updateFsrsDailyLimits(array $input): array
+    {
+        // Allowed keys and their default values
+        $allowed = [
+            'daily_new_limit_enabled',
+            'daily_new_limit',
+            'daily_review_limit_enabled',
+            'daily_review_limit',
+            'new_cards_ignore_review_limit',
+        ];
+
+        foreach ($input as $key => $value) {
+            if (!in_array($key, $allowed, true)) {
+                continue;
+            }
+
+            // Validate boolean fields
+            if (in_array($key, ['daily_new_limit_enabled', 'daily_review_limit_enabled', 'new_cards_ignore_review_limit'], true)) {
+                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+                if ($value === null) {
+                    continue;
+                }
+            }
+
+            // Validate numeric fields
+            if ($key === 'daily_new_limit') {
+                $value = (int) $value;
+                if ($value < 0 || $value > 999) {
+                    continue;
+                }
+            }
+
+            if ($key === 'daily_review_limit') {
+                $value = (int) $value;
+                if ($value < 0 || $value > 9999) {
+                    continue;
+                }
+            }
+
+            $setting = Setting::where('name', $key)
+                ->where('user_id', -1)
+                ->first();
+
+            if (!$setting) {
+                $setting = new Setting();
+                $setting->name = $key;
+                $setting->user_id = -1;
+            }
+
+            $setting->value = json_encode($value);
+            $setting->save();
+        }
+
+        return $this->getFsrsDailyLimits();
+    }
+
     public function restoreFsrsDefaultParameters(): array
     {
         $keys = [

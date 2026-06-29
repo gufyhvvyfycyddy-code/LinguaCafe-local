@@ -70,6 +70,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/settings/fsrs/reschedule-confirm', [App\Http\Controllers\SettingsController::class, 'rescheduleConfirm'])->name('settings.fsrs.reschedule-confirm');
         Route::post('/settings/fsrs/reschedule-undo', [App\Http\Controllers\SettingsController::class, 'rescheduleUndo'])->name('settings.fsrs.reschedule-undo');
         Route::post('/settings/fsrs/restore-default', [App\Http\Controllers\SettingsController::class, 'restoreFsrsDefaultParameters']);
+        Route::get('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'getFsrsDailyLimits']);
+        Route::post('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'updateFsrsDailyLimits']);
         Route::post('/settings/fsrs/retention-workload-simulation', [App\Http\Controllers\SettingsController::class, 'retentionWorkloadSimulation']);
         Route::post('/settings/global/update', [App\Http\Controllers\SettingsController::class, 'updateGlobalSettings']);
         Route::post('/settings/global/get', [App\Http\Controllers\SettingsController::class, 'getGlobalSettingsByName']);

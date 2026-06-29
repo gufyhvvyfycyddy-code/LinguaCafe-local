@@ -103,19 +103,121 @@
                                     </div>
                                 </div>
 
+                                <!-- 每日学习上限 -->
+                                <v-divider class="my-3"></v-divider>
+                                <div class="font-weight-medium body-2 mb-2">每日学习上限</div>
+                                <div class="caption grey--text mb-3">
+                                    用于控制每天引入新卡和显示复习卡的数量。当前版本只保存设置，不会限制实际复习队列；下一阶段接入复习页后才会生效。
+                                </div>
+
+                                <v-row dense align="center" class="mb-2">
+                                    <v-col cols="6">
+                                        <v-switch
+                                            v-model="dailyNewLimitEnabled"
+                                            label="启用每日新学上限"
+                                            hide-details
+                                            dense
+                                            class="mt-0"
+                                        ></v-switch>
+                                    </v-col>
+                                    <v-col cols="6">
+                                        <v-text-field
+                                            v-model.number="dailyNewLimit"
+                                            :disabled="!dailyNewLimitEnabled"
+                                            type="number"
+                                            min="0"
+                                            max="999"
+                                            outlined
+                                            dense
+                                            hide-details
+                                            style="max-width: 100px;"
+                                        ></v-text-field>
+                                    </v-col>
+                                </v-row>
+                                <div class="caption grey--text ml-2 mt-n2 mb-2">控制每天最多引入多少新卡。新卡越多，未来复习量越大。</div>
+
+                                <v-row dense align="center" class="mb-2">
+                                    <v-col cols="6">
+                                        <v-switch
+                                            v-model="dailyReviewLimitEnabled"
+                                            label="启用每日复习上限"
+                                            hide-details
+                                            dense
+                                            class="mt-0"
+                                        ></v-switch>
+                                    </v-col>
+                                    <v-col cols="6">
+                                        <v-text-field
+                                            v-model.number="dailyReviewLimit"
+                                            :disabled="!dailyReviewLimitEnabled"
+                                            type="number"
+                                            min="0"
+                                            max="9999"
+                                            outlined
+                                            dense
+                                            hide-details
+                                            style="max-width: 100px;"
+                                        ></v-text-field>
+                                    </v-col>
+                                </v-row>
+                                <div class="caption grey--text ml-2 mt-n2 mb-2">开启后，超过上限的到期卡会暂时不显示，可能形成积压。</div>
+
+                                <v-row dense align="center" class="mb-2">
+                                    <v-col cols="12">
+                                        <v-switch
+                                            v-model="newCardsIgnoreReviewLimit"
+                                            label="新卡无视复习上限"
+                                            hide-details
+                                            dense
+                                            class="mt-0"
+                                        ></v-switch>
+                                    </v-col>
+                                </v-row>
+                                <div class="caption grey--text ml-2 mt-n2 mb-3">关闭时，如果复习积压较多，会优先复习旧卡，不继续增加新卡压力。</div>
+
+                                <v-btn
+                                    small
+                                    outlined
+                                    color="primary"
+                                    :loading="dailyLimitsSaving"
+                                    :disabled="dailyLimitsSaving"
+                                    @click="saveFsrsDailyLimits"
+                                >
+                                    保存每日上限设置
+                                </v-btn>
+
+                                <v-alert
+                                    v-if="dailyLimitsSaveStatus"
+                                    dense
+                                    outlined
+                                    type="success"
+                                    class="mt-2 mb-0"
+                                >
+                                    {{ dailyLimitsSaveStatus }}
+                                </v-alert>
+                                <v-alert
+                                    v-if="dailyLimitsSaveError"
+                                    dense
+                                    outlined
+                                    type="error"
+                                    class="mt-2 mb-0"
+                                >
+                                    {{ dailyLimitsSaveError }}
+                                </v-alert>
+
                                 <v-card-actions class="px-0">
-                    <v-spacer />
-                    <v-btn
-                        rounded
-                        depressed
-                        color="primary"
-                        :disabled="fsrsSaving"
-                        :loading="fsrsSaving"
-                        @click="saveFsrsSettings"
-                    >
-                        保存 FSRS 设置
-                    </v-btn>
-                </v-card-actions>
+                                    <v-spacer />
+                                    <v-btn
+                                        rounded
+                                        depressed
+                                        color="primary"
+                                        :disabled="fsrsSaving"
+                                        :loading="fsrsSaving"
+                                        @click="saveFsrsSettings"
+                                    >
+                                        保存 FSRS 设置
+                                    </v-btn>
+                                </v-card-actions>
 
                 <div v-if="fsrsSaveStatus" class="mt-2 green--text text--darken-1 body-2">
                     {{ fsrsSaveStatus }}
@@ -1099,6 +1201,14 @@
                 fsrsParameterWarning: '',
                 retentionSimLoading: false,
                 retentionSimData: null,
+                dailyNewLimitEnabled: true,
+                dailyNewLimit: 20,
+                dailyReviewLimitEnabled: false,
+                dailyReviewLimit: 200,
+                newCardsIgnoreReviewLimit: false,
+                dailyLimitsSaving: false,
+                dailyLimitsSaveStatus: '',
+                dailyLimitsSaveError: '',
                 fsrsRestoreDefaultLoading: false,
                 fsrsRestoreDefaultSuccess: '',
                 fsrsOptimizationDiagnostics: null,
@@ -1162,6 +1272,7 @@
             this.loadSettings();
             this.loadFsrsStats();
             this.loadFsrsOptimizationStatus();
+            this.loadFsrsDailyLimits();
         },
         computed: {
             fsrsDesiredRetentionText() {
@@ -1365,6 +1476,52 @@
                     })
                     .finally(() => {
                         this.retentionSimLoading = false;
+                    });
+            },
+            loadFsrsDailyLimits() {
+                axios.get('/settings/fsrs/daily-limits')
+                    .then((response) => {
+                        const data = response.data;
+                        this.dailyNewLimitEnabled = data.daily_new_limit_enabled;
+                        this.dailyNewLimit = data.daily_new_limit;
+                        this.dailyReviewLimitEnabled = data.daily_review_limit_enabled;
+                        this.dailyReviewLimit = data.daily_review_limit;
+                        this.newCardsIgnoreReviewLimit = data.new_cards_ignore_review_limit;
+                    })
+                    .catch(() => {
+                        // Silently fail — daily limits are optional
+                    });
+            },
+            saveFsrsDailyLimits() {
+                this.dailyLimitsSaving = true;
+                this.dailyLimitsSaveStatus = '';
+                this.dailyLimitsSaveError = '';
+
+                const payload = {
+                    daily_new_limit_enabled: this.dailyNewLimitEnabled,
+                    daily_new_limit: this.dailyNewLimit,
+                    daily_review_limit_enabled: this.dailyReviewLimitEnabled,
+                    daily_review_limit: this.dailyReviewLimit,
+                    new_cards_ignore_review_limit: this.newCardsIgnoreReviewLimit,
+                };
+
+                axios.post('/settings/fsrs/daily-limits', payload)
+                    .then((response) => {
+                        const data = response.data;
+                        this.dailyLimitsSaveStatus = data.message || '每日上限设置已保存。';
+                        // Refresh from server
+                        this.dailyNewLimitEnabled = data.daily_new_limit_enabled;
+                        this.dailyNewLimit = data.daily_new_limit;
+                        this.dailyReviewLimitEnabled = data.daily_review_limit_enabled;
+                        this.dailyReviewLimit = data.daily_review_limit;
+                        this.newCardsIgnoreReviewLimit = data.new_cards_ignore_review_limit;
+                    })
+                    .catch((error) => {
+                        const msg = error.response?.data?.message || '保存失败，请稍后再试。';
+                        this.dailyLimitsSaveError = msg;
+                    })
+                    .finally(() => {
+                        this.dailyLimitsSaving = false;
                     });
             },
             runFsrsOptimizationPreflight() {

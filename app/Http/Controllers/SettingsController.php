@@ -174,6 +174,27 @@ class SettingsController extends Controller
     }
 
     /**
+     * Get current daily study limits configuration.
+     */
+    public function getFsrsDailyLimits() {
+        return response()->json(
+            $this->settingsService->getFsrsDailyLimits(),
+            200
+        );
+    }
+
+    /**
+     * Update daily study limits configuration.
+     */
+    public function updateFsrsDailyLimits(Request $request) {
+        $input = $request->post();
+
+        $result = $this->settingsService->updateFsrsDailyLimits($input);
+
+        return response()->json($result, 200);
+    }
+
+    /**
      * Retention workload simulator.
      *
      * Simulates today and next-7-days due counts for 85%/90%/93%/95%
