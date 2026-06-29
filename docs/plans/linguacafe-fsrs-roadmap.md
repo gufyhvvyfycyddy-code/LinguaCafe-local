@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-29
-> **上一轮已验收基线 commit**：`d57331d`
+> **上一轮已验收基线 commit**：`bcb7cfa`
 
 ---
 
@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`bae1ee2`（Docs: update roadmap Latest commit to d57331d）
+**Latest commit**：`bcb7cfa`（Feat: improve AI reading assist preview navigation）
 
 ### `/review-cards/manage` 当前能力
 
