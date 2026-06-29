@@ -118,8 +118,8 @@
                 --><div
                     v-if="showAiTranslations && !word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
                     :key="'ai-t-' + wordIndex"
-                    style="font-size: 90%; color: #888; line-height: 1.3; padding: 2px 0 6px 0; border-bottom: 1px solid #eee; margin-bottom: 4px;"
-                ><span style="color: #aaa; margin-right: 4px;">AI 译文：</span><span>{{ getAiTranslation(word.sentence_index) }}</span></div><!--
+                    class="lc-ai-sentence-translation"
+                >{{ getAiTranslation(word.sentence_index) }}</div><!--
             --></template>
         </div>
 

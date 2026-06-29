@@ -593,6 +593,7 @@
 | 低 | Workflow-Rules-Anki-1 | 写入 Anki 参考规则 + 报告格式收口 + 注释修正 | ✅ 已完成 | 写入 vibe-coding-rules + master plan，WordSenseService 注释修正 |
 | 高 | AI-Reading-Assist-3 | 确认并保存 AI 解析结果 | ✅ 已完成 | 新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮，不创建 WordSense/ReviewCard/ReviewLog |
 | 高 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏开关 | ✅ 已完成 | 新增 current 读取接口 + 阅读页工具栏开关 + TextBlockGroup 按句渲染，不创建学习数据 |
+| 低 | AI-Reading-Assist-4-a | AI 译文显示改为双字体区分 | ✅ 已完成 | 移除"AI 译文："前缀，改用 .lc-ai-sentence-translation class + 中文衬线字体，暗色模式支持 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
