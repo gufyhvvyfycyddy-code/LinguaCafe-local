@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`2c8898b`（Docs: update roadmap Latest commit to 4c1f99f）
+**Latest commit**：`dcd3b05`（Docs: add LinguaCafe master plan）
 
 ### `/review-cards/manage` 当前能力
 
