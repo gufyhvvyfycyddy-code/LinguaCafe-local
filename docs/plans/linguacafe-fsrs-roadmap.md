@@ -125,7 +125,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`fc22b15`（Docs: update plans for AiSuggestionPanel-Extract-1；本地 TextBlockGroup-Smoke-Guard-1 未提交，含 smoke 脚本 + 文档 + master plan 更新）
+**Latest commit**：`6492ebf`（Test: add text reader smoke guard）
 
 ### `/review-cards/manage` 当前能力
 
