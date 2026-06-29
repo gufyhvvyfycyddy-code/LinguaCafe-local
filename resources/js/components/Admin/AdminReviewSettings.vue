@@ -641,18 +641,6 @@
                                         <div class="grey--text text--darken-1 caption mt-1">
                                             已保存优化参数；之后新的复习评分将使用这组参数。已有卡片不会自动重排。
                                         </div>
-                                        <v-btn
-                                            v-if="fsrsHasOptimizedParameters"
-                                            small
-                                            outlined
-                                            color="secondary"
-                                            class="mt-2"
-                                            :loading="fsrsRestoreDefaultLoading"
-                                            :disabled="fsrsRestoreDefaultLoading"
-                                            @click="restoreFsrsDefaultParameters"
-                                        >
-                                            恢复默认参数
-                                        </v-btn>
                                     </div>
 
                                     <!-- Unknown/custom parameters -->
@@ -665,6 +653,18 @@
                                             参数数量：{{ fsrsParameterCount }} 个
                                         </div>
                                     </div>
+
+                                    <v-btn
+                                        small
+                                        outlined
+                                        color="secondary"
+                                        class="mt-3"
+                                        :loading="fsrsRestoreDefaultLoading"
+                                        :disabled="fsrsRestoreDefaultLoading"
+                                        @click="restoreFsrsDefaultParameters"
+                                    >
+                                        恢复默认参数
+                                    </v-btn>
 
                                     <v-alert
                                         v-if="fsrsRestoreDefaultSuccess"
