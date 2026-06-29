@@ -202,6 +202,27 @@ resources/js/components/TextReader/TextReaderSettings.vue
 - **预计收益**：为下一轮提供决策依据
 - **验证方式**：git diff --check, git diff --stat
 - **执行结果**：
+  ### 扫描结果
+  - **组件行数**：297 行，template ~90 行，script ~145 行，style ~60 行
+  - **模板结构**：加载/空状态 + 两套数据渲染（API 词典结果 + 本地词典结果）
+  - **重复模式**：API 和本地结果的 `.dictionary-definition-row` 渲染结构高度相似（.dict-word-label + .definition-text + .add-btn）
+  - **差异点**：API 使用 `$props.searchTerm` 作为 label，本地使用 `record.word`；API 数据直接来自 `apiSearchResults`，本地经 `processVocabularySearchResults()` 处理
+  ### 提取可行性
+  | 维度 | 评估 |
+  |------|------|
+  | 提取`DictionarySuggestionTable.vue` | ⚠️ 可行但耦合高 |
+  | 需要传递 props | results 数组、searchTerm、loading 状态 |
+  | 需要 emit 事件 | `addDefinitionToInput`、`addDefinitionAsSense`（每个定义行） |
+  | 收益 | 减少 ~40 行模板重复 |
+  | 风险 | 新增 props/events 复杂度；两个结果源的 data 结构不一致 |
+  ### 结论
+  ❌ **不建议当前提取 `DictionarySuggestionTable.vue`**。理由：
+  1. 297 行组件整体可控
+  2. API/本地结果数据格式差异增加提取复杂度
+  3. 每行 3 个交互点（点击填词、点击加号、推断词性）需要 3 emit events
+  4. **更好的下一轮候选**：统一 `processVocabularySearchResults()` 的输出格式，使 API 和本地结果使用相同数据结构 → 此时提取 DictionarySuggestionTable 变为低风险纯展示组件
+  - **R4 不改业务代码** ✅
+  - **通过** ✅
 
 ## R5 设计
 
