@@ -688,6 +688,16 @@ class TextBlockService
 
         foreach ($this->uniqueWords as $uniqueWord) {
             $uniqueWord->definitions_checked = false;
+            // Add FSRS familiarity fields for the vocabulary sidebar
+            if (isset($fwLookup[$uniqueWord->id])) {
+                $fw = $fwLookup[$uniqueWord->id];
+                $uniqueWord->fsrs_familiarity_score = $fw['score'];
+                $uniqueWord->fsrs_familiarity_level_10 = $fw['level_10'];
+                $uniqueWord->fsrs_familiarity_percent = $fw['level_10'] * 10;
+                $uniqueWord->fsrs_familiarity_has_data = true;
+            } else {
+                $uniqueWord->fsrs_familiarity_has_data = false;
+            }
         }
     }
 

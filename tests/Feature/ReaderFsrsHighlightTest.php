@@ -158,10 +158,14 @@ class ReaderFsrsHighlightTest extends TestCase
         $this->assertEquals(40, $phenWord['fsrs_familiarity_percent'], 'percent should be 40');
         $this->assertNotNull($phenWord['fsrs_familiarity_score']);
 
-        // uniqueWords is NOT overridden (it's the raw EncounteredWord data)
+        // uniqueWords has the raw EncounteredWord stage + FSRS familiarity fields
         $uniqueWords = $response->json('uniqueWords');
         $phen = collect($uniqueWords)->firstWhere('word', 'phenomenology');
-        $this->assertEquals(-1, $phen['stage']);
+        $this->assertNotNull($phen, 'phenomenology should be in uniqueWords');
+        $this->assertEquals(-1, $phen['stage'], 'stage is raw EncounteredWord data');
+        $this->assertEquals(4, $phen['fsrs_familiarity_level_10'], 'uniqueWord should have FSRS level_10');
+        $this->assertEquals(40, $phen['fsrs_familiarity_percent'], 'uniqueWord should have FSRS percent');
+        $this->assertTrue($phen['fsrs_familiarity_has_data'], 'uniqueWord should mark has_data');
     }
 
     public function test_fsrs_familiarity_level_10_range(): void

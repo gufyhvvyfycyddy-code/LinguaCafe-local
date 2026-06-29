@@ -64,10 +64,24 @@
                                 </span>
                             </div>
                         </div>
-                        <v-spacer />
-                        <v-btn v-if="$props.textToSpeechAvailable" icon title="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
-                    </div>
-                </div>
+                                <v-spacer />
+                                <v-btn v-if="$props.textToSpeechAvailable" icon title="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+                            </div>
+                            <div v-if="fsrsFamiliarityHasData" class="d-flex align-center mt-1">
+                                <span class="text-caption grey--text mr-2" style="white-space: nowrap;">FSRS 熟悉度：{{ fsrsFamiliarityPercent }}%</span>
+                                <v-progress-linear
+                                    :value="fsrsFamiliarityPercent"
+                                    color="#4CAF50"
+                                    height="4"
+                                    rounded
+                                    class="flex-grow-1"
+                                    style="max-width: 140px;"
+                                ></v-progress-linear>
+                            </div>
+                            <div v-else-if="stage <= -1" class="text-caption grey--text mt-1">
+                                FSRS 熟悉度：尚未复习
+                            </div>
+                        </div>
 
                 <div class="d-flex" v-if="type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
                     <v-text-field class="default-font my-2" hide-details placeholder="词元读音" title="词元读音" filled dense rounded v-model="baseWordReading" @keyup="inputChanged" @keydown.stop=";" />
@@ -158,6 +172,10 @@ export default {
         positionLeft: state => state.vocabularyBox.positionLeft,
         positionTop: state => state.vocabularyBox.positionTop,
         height: state => state.vocabularyBox.height,
+        fsrsFamiliarityPercent: state => state.vocabularyBox.fsrsFamiliarityPercent,
+        fsrsFamiliarityLevel10: state => state.vocabularyBox.fsrsFamiliarityLevel10,
+        fsrsFamiliarityScore: state => state.vocabularyBox.fsrsFamiliarityScore,
+        fsrsFamiliarityHasData: state => state.vocabularyBox.fsrsFamiliarityHasData,
     }),
     watch: {
         word() { this.updateDataFromStore(); },

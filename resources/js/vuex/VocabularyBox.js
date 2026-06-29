@@ -34,6 +34,12 @@ export default {
         sentenceIndex: null,
         sentenceText: '',
 
+        // FSRS familiarity
+        fsrsFamiliarityPercent: null,
+        fsrsFamiliarityLevel10: null,
+        fsrsFamiliarityScore: null,
+        fsrsFamiliarityHasData: false,
+
         // ui data
         tab: 0,
         width: 400,
@@ -119,6 +125,18 @@ export default {
         },
         setStage (state, value) {
             state.stage = value;
+        },
+        setFsrsFamiliarityPercent(state, value) {
+            state.fsrsFamiliarityPercent = value;
+        },
+        setFsrsFamiliarityLevel10(state, value) {
+            state.fsrsFamiliarityLevel10 = value;
+        },
+        setFsrsFamiliarityScore(state, value) {
+            state.fsrsFamiliarityScore = value;
+        },
+        setFsrsFamiliarityHasData(state, value) {
+            state.fsrsFamiliarityHasData = value;
         },
         setEncounteredWordId(state, value) {
             state.encounteredWordId = value;

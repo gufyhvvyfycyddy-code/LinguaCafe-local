@@ -1380,6 +1380,15 @@
                     this.$store.commit('vocabularyBox/setTranslationText', uniqueWord.translation);
                     this.$store.commit('vocabularyBox/setStage', uniqueWord.stage);
                     this.$store.commit('vocabularyBox/setEncounteredWordId', uniqueWord.id || null);
+                    // FSRS familiarity
+                    if (uniqueWord.fsrs_familiarity_has_data) {
+                        this.$store.commit('vocabularyBox/setFsrsFamiliarityPercent', uniqueWord.fsrs_familiarity_percent);
+                        this.$store.commit('vocabularyBox/setFsrsFamiliarityLevel10', uniqueWord.fsrs_familiarity_level_10);
+                        this.$store.commit('vocabularyBox/setFsrsFamiliarityScore', uniqueWord.fsrs_familiarity_score);
+                        this.$store.commit('vocabularyBox/setFsrsFamiliarityHasData', true);
+                    } else {
+                        this.$store.commit('vocabularyBox/setFsrsFamiliarityHasData', false);
+                    }
                     const chapterId = this.$props._text && this.$props._text.chapterId !== undefined && this.$props._text.chapterId !== null
                         ? this.$props._text.chapterId
                         : null;

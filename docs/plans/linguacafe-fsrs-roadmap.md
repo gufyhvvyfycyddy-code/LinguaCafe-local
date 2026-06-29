@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`dcd3b05`（Docs: add LinguaCafe master plan）
+**Latest commit**：`160ef2b`（Docs: update roadmap Latest commit to dcd3b05）
 
 ### `/review-cards/manage` 当前能力
 
@@ -586,6 +586,7 @@
 | 中 | Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动 | ✅ 已完成 | 后端 TextBlockService 根据 ReviewCard stability/due_at/state 计算熟悉度 level 1-7 |
 | 中 | Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全规则 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览紫色高亮 + 文档明确保留所有未完成计划 |
 | 高 | Plan-Integrity-1 | 新增总控大计划 + 未完成任务总表入库 | ✅ 已完成 | 新增 `linguacafe-master-plan.md` 汇总所有任务线，详见总控计划 |
+| 中 | Reader-UI-9 | 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | ✅ 已完成 | 文字 + v-progress-linear 绿色进度条，仅前端 + 小后端调整 |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
