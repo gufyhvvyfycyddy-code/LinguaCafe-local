@@ -112,6 +112,12 @@ class AiReadingAssistService
             'parsed' => true,
             'schema_version' => $payload['schema_version'] ?? '',
             'summary' => $summary,
+            'items' => [
+                'sentence_translations' => $sentenceTranslations,
+                'vocabulary_items' => $vocabularyItems,
+                'phrase_items' => $phraseItems,
+                'warnings' => $warnings,
+            ],
             'samples' => $samples,
             'errors' => [],
         ];

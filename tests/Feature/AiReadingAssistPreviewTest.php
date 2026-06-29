@@ -209,6 +209,16 @@ class AiReadingAssistPreviewTest extends TestCase
         $this->assertStringNotContainsString('api_key', $prompt);
     }
 
+    public function test_prompt_does_not_recommend_model(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/chapters/ai-assist/source', ['chapterId' => $this->chapter->id]);
+
+        $prompt = $response->json('prompt');
+        $this->assertStringNotContainsString('推荐 Pro', $prompt);
+        $this->assertStringNotContainsString('推荐使用', $prompt);
+        $this->assertStringNotContainsString('建议首选', $prompt);
+    }
+
     // ── Preview: pure JSON ───────────────────────
 
     public function test_preview_parses_pure_json(): void
@@ -249,6 +259,26 @@ class AiReadingAssistPreviewTest extends TestCase
         $this->assertNotEmpty($response->json('samples.sentence_translations'));
         $this->assertNotEmpty($response->json('samples.vocabulary_items'));
         $this->assertNotEmpty($response->json('samples.phrase_items'));
+        // samples must be at most 3
+        $this->assertLessThanOrEqual(3, count($response->json('samples.sentence_translations')));
+        $this->assertLessThanOrEqual(3, count($response->json('samples.vocabulary_items')));
+        $this->assertLessThanOrEqual(3, count($response->json('samples.phrase_items')));
+    }
+
+    public function test_preview_returns_full_items(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/chapters/ai-assist/preview', [
+            'chapterId' => $this->chapter->id,
+            'aiText' => $this->validJsonPayload(),
+        ]);
+
+        $response->assertOk();
+        $this->assertArrayHasKey('items', $response->json());
+        $items = $response->json('items');
+        $this->assertCount(2, $items['sentence_translations']);
+        $this->assertCount(2, $items['vocabulary_items']);
+        $this->assertCount(1, $items['phrase_items']);
+        $this->assertCount(1, $items['warnings']);
     }
 
     public function test_preview_returns_schema_version(): void

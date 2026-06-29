@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`d57331d`（Feat: add AI reading assist prompt and preview）
+**Latest commit**：`bae1ee2`（Docs: update roadmap Latest commit to d57331d）
 
 ### `/review-cards/manage` 当前能力
 
@@ -591,7 +591,7 @@
 | 优先级 | 编号 | 内容 | 类型 | 理由 |
 |--------|------|------|------|------|
 | 中 | AI-Reading-Assist-1 | AI 阅读辅助方案侦察与 schema 实验 | ✅ 已完成 | 见 ai-reading-assist-schema-experiment.md |
-| 中 | AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览 | ✅ 当前阶段 | 已完成后端 Service/Controller/前端入口 + 23 测试 |
+| 中 | AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览（方案 B 总览+详情页） | ✅ 已完成 | 用户选择方案 B（先总览→点击卡片进入详情）+ 25 测试 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
 | 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化 | 📋 计划中 | 见 ai-reading-assist-plan.md 第 7 节 |
 
