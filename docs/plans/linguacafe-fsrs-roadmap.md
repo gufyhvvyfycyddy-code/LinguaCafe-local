@@ -127,7 +127,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`6492ebf`（Test: add text reader smoke guard）
+**Latest commit**：`1116c7c`（Docs: add architecture gate workflow）
 
 ### `/review-cards/manage` 当前能力
 
