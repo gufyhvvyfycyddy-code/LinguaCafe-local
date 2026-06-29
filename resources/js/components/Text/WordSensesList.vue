@@ -208,29 +208,43 @@
                 placeholder="例如：落下；掉下"
                 v-model="newForm.sense_zh"
             />
-            <v-textarea
-                dense
-                filled
-                rounded
-                hide-details
-                no-resize
-                class="mb-2"
-                height="70"
-                label="英文解释（可选）"
-                placeholder="例如：to fall"
-                v-model="newForm.sense_en"
-            />
-            <v-text-field dense filled rounded hide-details class="mb-2" label="例句（可选）" v-model="newForm.example_sentence_en" />
-            <v-text-field dense filled rounded hide-details class="mb-2" label="近义译法，用逗号分隔" v-model="newForm.aliases_zh" />
-            <v-text-field dense filled rounded hide-details class="mb-2" label="搭配，用逗号分隔" v-model="newForm.collocations" />
-            <v-checkbox
-                v-model="newForm.keep_new"
-                label="保持新词"
-                dense
-                hide-details
-                class="mb-2"
-            />
-            <div class="text-caption text--secondary mb-2 ml-1">勾选后保存释义和复习卡，但不把该词标记为已学习。</div>
+            <div class="d-flex align-center mb-2">
+                <v-btn
+                    x-small
+                    text
+                    color="primary"
+                    @click="showAdvanced = !showAdvanced"
+                >
+                    <v-icon x-small class="mr-1">{{ showAdvanced ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                    {{ showAdvanced ? '收起高级选项' : '高级选项' }}
+                </v-btn>
+                <v-spacer />
+            </div>
+            <template v-if="showAdvanced">
+                <v-textarea
+                    dense
+                    filled
+                    rounded
+                    hide-details
+                    no-resize
+                    class="mb-2"
+                    height="70"
+                    label="英文解释（可选）"
+                    placeholder="例如：to fall"
+                    v-model="newForm.sense_en"
+                />
+                <v-text-field dense filled rounded hide-details class="mb-2" label="例句（可选）" v-model="newForm.example_sentence_en" />
+                <v-text-field dense filled rounded hide-details class="mb-2" label="近义译法，用逗号分隔" v-model="newForm.aliases_zh" />
+                <v-text-field dense filled rounded hide-details class="mb-2" label="搭配，用逗号分隔" v-model="newForm.collocations" />
+                <v-checkbox
+                    v-model="newForm.keep_new"
+                    label="保持新词"
+                    dense
+                    hide-details
+                    class="mb-2"
+                />
+                <div class="text-caption text--secondary mb-2 ml-1">勾选后保存释义和复习卡，但不把该词标记为已学习。</div>
+            </template>
             <div class="d-flex">
                 <v-spacer />
                 <v-btn small text class="mr-2" @click="closeAddForm">取消</v-btn>
@@ -337,6 +351,7 @@ export default {
             error: false,
             saving: false,
             showAddForm: false,
+            showAdvanced: false,
             editingSenseId: null,
             message: '',
             saveError: '',
@@ -489,6 +504,10 @@ export default {
                 }
                 if (prefill.source_sentence) {
                     this.newForm.example_sentence_en = prefill.source_sentence;
+                }
+                // Auto-expand advanced section if prefill has advanced fields
+                if (prefill.source_sentence || prefill.sense_en || prefill.aliases_zh || prefill.collocations) {
+                    this.showAdvanced = true;
                 }
             }
         },

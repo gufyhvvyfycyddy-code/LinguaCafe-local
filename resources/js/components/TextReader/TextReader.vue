@@ -404,6 +404,7 @@
                 this.$nextTick(() => {
                     this.updateGlossary();
                     this.applySourceHighlightFromQuery();
+                    this.updateToolbarPosition();
                 });
                 this.loadAiAssistCurrent();
                 this.vocabularySidebarTest();
