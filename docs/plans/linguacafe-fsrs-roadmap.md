@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`981a4b5`（Docs: update roadmap Latest commit to 71fadb2）
+**Latest commit**：`c34ceda`（Feat: drive reader highlights from FSRS familiarity）
 
 ### `/review-cards/manage` 当前能力
 
