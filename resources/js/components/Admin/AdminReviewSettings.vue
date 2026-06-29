@@ -641,6 +641,18 @@
                                         <div class="grey--text text--darken-1 caption mt-1">
                                             已保存优化参数；之后新的复习评分将使用这组参数。已有卡片不会自动重排。
                                         </div>
+                                        <v-btn
+                                            v-if="fsrsHasOptimizedParameters"
+                                            small
+                                            outlined
+                                            color="secondary"
+                                            class="mt-2"
+                                            :loading="fsrsRestoreDefaultLoading"
+                                            :disabled="fsrsRestoreDefaultLoading"
+                                            @click="restoreFsrsDefaultParameters"
+                                        >
+                                            恢复默认参数
+                                        </v-btn>
                                     </div>
 
                                     <!-- Unknown/custom parameters -->
@@ -653,6 +665,16 @@
                                             参数数量：{{ fsrsParameterCount }} 个
                                         </div>
                                     </div>
+
+                                    <v-alert
+                                        v-if="fsrsRestoreDefaultSuccess"
+                                        dense
+                                        outlined
+                                        type="success"
+                                        class="mt-3 mb-0"
+                                    >
+                                        {{ fsrsRestoreDefaultSuccess }}
+                                    </v-alert>
                                 </td>
                             </tr>
                             <tr>
@@ -899,6 +921,8 @@
                 fsrsParameterCount: 19,
                 fsrsHasOptimizedParameters: false,
                 fsrsParameterWarning: '',
+                fsrsRestoreDefaultLoading: false,
+                fsrsRestoreDefaultSuccess: '',
                 fsrsRetentionOptions: [
                     { text: '70%', value: 0.70 },
                     { text: '75%', value: 0.75 },
@@ -1176,6 +1200,36 @@
                     })
                     .finally(() => {
                         this.fsrsOptimizationConfirmLoading = false;
+                    });
+            },
+            restoreFsrsDefaultParameters() {
+                const confirmed = window.confirm('这只会恢复 FSRS 默认参数，不会删除复习卡、词义、复习记录、词典或阅读材料。已有卡片不会自动重排。');
+                if (!confirmed) {
+                    return;
+                }
+
+                this.fsrsRestoreDefaultLoading = true;
+                this.fsrsRestoreDefaultSuccess = '';
+                this.fsrsOptimizationApplySuccess = false;
+
+                axios.post('/settings/fsrs/restore-default')
+                    .then((response) => {
+                        const data = response.data;
+                        this.fsrsRestoreDefaultSuccess = data.message || '已恢复 FSRS 默认参数。';
+
+                        // Refresh parameter source to show "default" status
+                        this.loadFsrsOptimizationStatus();
+
+                        // Clear any existing preview
+                        this.fsrsOptimizationPreview = null;
+                        this.fsrsOptimizationMessage = '';
+                    })
+                    .catch(() => {
+                        this.fsrsRestoreDefaultSuccess = '';
+                        alert('恢复默认参数失败，请稍后再试。');
+                    })
+                    .finally(() => {
+                        this.fsrsRestoreDefaultLoading = false;
                     });
             },
             reviewIntervalChanged(value, index) {

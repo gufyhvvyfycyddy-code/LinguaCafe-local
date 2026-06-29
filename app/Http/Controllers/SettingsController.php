@@ -173,6 +173,28 @@ class SettingsController extends Controller
         return response()->json($result, $result['success'] ? 200 : 422);
     }
 
+    /**
+     * Restore FSRS default parameters.
+     *
+     * Deletes fsrs_parameters, fsrs_parameters_source,
+     * fsrs_parameters_optimized_at, and fsrs_parameters_previous
+     * from global settings. Does NOT delete any review data.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function restoreFsrsDefaultParameters() {
+        $user = Auth::user();
+
+        $result = $this->settingsService->restoreFsrsDefaultParameters();
+
+        // Append refreshed optimization status
+        $result['status'] = $this->settingsService->getFsrsOptimizationStatus(
+            $user->id, $user->selected_language
+        );
+
+        return response()->json($result, 200);
+    }
+
     // returns an array of user settings
     public function getUserSettingsByName(GetUserSettingsByNameRequest $request) {
         $userId = Auth::user()->id;

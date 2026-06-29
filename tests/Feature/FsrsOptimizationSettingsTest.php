@@ -494,6 +494,88 @@ class FsrsOptimizationSettingsTest extends TestCase
         ]);
     }
 
+    // ─── FSRS-Anki-Mgmt-1: Restore default parameters tests ────────────────
+
+    public function test_restore_default_deletes_saved_parameters(): void
+    {
+        // Save 4 FSRS parameter settings
+        Setting::forceCreate(['name' => 'fsrs_parameters', 'user_id' => -1, 'value' => json_encode([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9])]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_source', 'user_id' => -1, 'value' => json_encode('optimized')]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1, 'value' => json_encode('2026-06-26T10:30:00+00:00')]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_previous', 'user_id' => -1, 'value' => json_encode([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3])]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('deleted_count', 4);
+
+        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters', 'user_id' => -1]);
+        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_source', 'user_id' => -1]);
+        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1]);
+        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_previous', 'user_id' => -1]);
+    }
+
+    public function test_restore_default_returns_default_optimization_status(): void
+    {
+        // Save optimized parameters first
+        Setting::forceCreate(['name' => 'fsrs_parameters', 'user_id' => -1, 'value' => json_encode([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9])]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_source', 'user_id' => -1, 'value' => json_encode('optimized')]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1, 'value' => json_encode('2026-06-26T10:30:00+00:00')]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+
+        // Verify status in response
+        $status = $response->json('status');
+        $this->assertEquals('default', $status['parameters_source']);
+        $this->assertFalse($status['has_optimized_parameters']);
+        $this->assertEquals(19, $status['parameters_count']);
+    }
+
+    public function test_restore_default_makes_scheduling_service_return_default_parameters(): void
+    {
+        // Save suboptimal parameters first
+        Setting::forceCreate(['name' => 'fsrs_parameters', 'user_id' => -1, 'value' => json_encode([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3])]);
+        Setting::forceCreate(['name' => 'fsrs_parameters_source', 'user_id' => -1, 'value' => json_encode('optimized')]);
+
+        $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
+
+        $schedulingService = app(\App\Services\FsrsSchedulingService::class);
+        $params = $schedulingService->getActiveFsrsParameters();
+        $this->assertIsArray($params);
+        $this->assertCount(19, $params);
+    }
+
+    public function test_restore_default_does_not_delete_other_settings(): void
+    {
+        // Save an unrelated setting
+        Setting::forceCreate(['name' => 'fsrsDesiredRetention', 'user_id' => -1, 'value' => json_encode(0.90)]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
+
+        $response->assertOk();
+
+        $this->assertDatabaseHas('settings', [
+            'name' => 'fsrsDesiredRetention',
+            'user_id' => -1,
+        ]);
+    }
+
+    public function test_restore_default_safe_when_no_parameters_saved(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('deleted_count', 0);
+        $response->assertJsonPath('status.parameters_source', 'default');
+        $response->assertJsonPath('status.has_optimized_parameters', false);
+        $response->assertJsonPath('status.parameters_count', 19);
+    }
+
     private function createSense(int $userId, string $language, array $overrides = []): WordSense
     {
         $lemma = $overrides['lemma'] ?? 'test';

@@ -108,6 +108,7 @@
 | UI-Review-b | ✅ 已完成 — SenseReview 显示答案流程（先问题 → 显示答案 → 再评分） |
 | UI-Review-c | ✅ 已完成 — SenseReview 键盘快捷键（Space 显示答案，1/2/3/4 评分） |
 | UI-Review-e | ✅ 已完成 — 真实浏览器 smoke 验收记录（代码审查通过，浏览器 Incomplete） |
+| FSRS-Param-Cleanup-Scout | ✅ 已完成 — 确认删除/rejected 词义卡旧 review_logs 不参与参数优化；当前无污染风险；不需要删除 review_logs |
 
 ---
 
@@ -564,6 +565,13 @@
 | 高 | D.4-d-c-fix | 修复撤销 UI 成功提示隐藏 + 旧文案冲突 + 报告门禁 | ✅ 已完成 | 成功提示脱离 v-if 控制 + 文案改为"7 天内可撤销" + 网状协作规则写入 |
 | 高 | D.4-d-e | 真实浏览器 smoke + 全链路验收 | ✅ 已完成 | 文案收口 + Feature tests 全覆盖（158 tests ✅） |
 | 高 | D.4-final-review | D.4 全阶段最终 Review | ✅ 已完成 | 20 目标全部完成，可阶段性收口，详见 [fsrs-d4-final-review.md](./fsrs-d4-final-review.md) |
+
+| 中 | FSRS-Param-Cleanup-Scout | 确认删除/rejected 词义卡旧 review_logs 不参与参数优化，无污染风险 | ✅ 已完成 | 代码 + 数据库侦察 |
+| 中 | FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 当前阶段 | 后端删除 4 settings + 前端按钮 |
+| 中 | FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | 📋 计划中 | 更接近 Anki 诊断面板 |
+| 中 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 | 📋 计划中 | 贴近 Anki 的风险展示 |
+| 中 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | 📋 计划中 | 接近 Anki Help Me Decide |
+| 中 | FSRS-Anki-Mgmt-5 | Preset / 分组参数长期评估 | 📋 计划中 | 需单独侦察 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
 

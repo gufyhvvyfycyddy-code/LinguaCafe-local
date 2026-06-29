@@ -569,6 +569,44 @@ class SettingsService {
         }
     }
 
+    /**
+     * Restore FSRS default parameters by deleting the 4 global settings.
+     *
+     * Deletes:
+     *   - fsrs_parameters
+     *   - fsrs_parameters_source
+     *   - fsrs_parameters_optimized_at
+     *   - fsrs_parameters_previous
+     *
+     * Does NOT delete any review data, cards, word senses, or dictionary data.
+     * Does NOT reschedule any cards.
+     * After deletion, getActiveFsrsParameters() will fall back to get_default_parameters().
+     *
+     * @return array{success: bool, message: string, deleted_count: int, deleted_keys: string[], status: array}
+     */
+    public function restoreFsrsDefaultParameters(): array
+    {
+        $keys = [
+            'fsrs_parameters',
+            'fsrs_parameters_source',
+            'fsrs_parameters_optimized_at',
+            'fsrs_parameters_previous',
+        ];
+
+        $deletedCount = Setting::where('user_id', -1)
+            ->whereIn('name', $keys)
+            ->delete();
+
+        return [
+            'success' => true,
+            'message' => $deletedCount > 0
+                ? '已恢复 FSRS 默认参数。之后新的复习评分将使用默认参数。'
+                : '当前已是默认参数，无需恢复。',
+            'deleted_count' => $deletedCount,
+            'deleted_keys' => $keys,
+        ];
+    }
+
     private function countOptimizableCards(int $userId, string $language): int {
         return DB::table('review_logs')
             ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
