@@ -123,7 +123,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`379936d`（Docs: update roadmap Latest commit to dd7d337；本地 AddSenseForm-Extract-1 未提交）
+**Latest commit**：`90e3c74`（Refactor: extract add sense form）
 
 ### `/review-cards/manage` 当前能力
 
