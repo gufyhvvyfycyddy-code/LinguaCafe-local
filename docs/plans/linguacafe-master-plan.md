@@ -56,6 +56,7 @@
 | AI-Reading-Assist-2-follow-up | 方案 B 详情页导航 |
 | AI-Reading-Assist-2-search | 详情页搜索框 + 紫色命中高亮 |
 | AI-Reading-Assist-3 | 确认并保存 AI 解析结果（不创建 WordSense/ReviewCard/ReviewLog） |
+| AI-Reading-Assist-4 | AI 译文按句显示/隐藏开关（从已保存数据读取，不创建学习数据） |
 
 ### 3.4 右击面板 / Review UI
 
@@ -90,7 +91,7 @@
 | 编号 | 内容 | 状态 |
 |------|------|------|
 | AI-Reading-Assist-3 | ✅ 已完成 — 确认保存 AI 解析结果（新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮，不创建 WordSense/ReviewCard/ReviewLog） | ✅ 已完成 |
-| AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 📋 计划中 |
+| AI-Reading-Assist-4 | ✅ 已完成 — AI 译文按句显示/隐藏开关（current 读取接口 + 阅读页工具栏开关 + TextBlockGroup 按句渲染） | ✅ 已完成 |
 | AI-Reading-Assist-5 | AI 释义与词组结果进入查词侧栏 | 📋 计划中 |
 | AI-Reading-Assist-6 | 词组识别后用户可添加整个词组或单个单词 | 📋 计划中 |
 | AI-Reading-Assist-7 | 释义卡多例句绑定浏览 | 📋 计划中 |

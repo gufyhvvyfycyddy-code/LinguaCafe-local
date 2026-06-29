@@ -36,6 +36,17 @@
                     <v-btn title="切换纯文本模式" icon @click="settings.plainTextMode = !settings.plainTextMode; toolbarSettingChanged();"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-marker</v-icon></v-btn>
                     <v-btn title="查看快捷键" icon @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
                     <v-btn title="AI 阅读辅助" icon @click="aiAssistDialog = true;"><v-icon>mdi-robot</v-icon></v-btn>
+                    <v-btn
+                        v-if="hasSavedAiAssist"
+                        :title="showAiTranslations ? '隐藏 AI 译文' : '显示 AI 译文'"
+                        icon
+                        @click="showAiTranslations = !showAiTranslations"
+                    >
+                        <v-icon :color="showAiTranslations ? 'primary' : ''">mdi-translate</v-icon>
+                    </v-btn>
+                    <v-btn v-else-if="chapterId !== null" icon disabled title="暂无已保存 AI 译文">
+                        <v-icon color="grey lighten-1">mdi-translate-off</v-icon>
+                    </v-btn>
                 </div>
             </div>
 
@@ -117,6 +128,8 @@
                         :space-between-subtitles="settings.spaceBetweenSubtitles"
                         :vocabulary-sidebar-fits="vocabularySidebarFits"
                         :hotkeys-enabled="true"
+                        :show-ai-translations="showAiTranslations"
+                        :ai-sentence-translations="aiSentenceTranslations"
                         @increase-font-size="increaseFontSize"
                         @decrease-font-size="decreaseFontSize"
                         @toggle-plain-text-mode="togglePlainTextMode"
@@ -309,9 +322,24 @@
                 leveledUpWordsAndPhrases: null,
                 saving: false,
 
+                // AI reading assist
+                showAiTranslations: false,
+                hasSavedAiAssist: false,
+                aiSentenceTranslations: [],
+
                 // source highlight
                 sourceHighlightTimer: null,
+                _aiDialogWasOpen: false,
             }
+        },
+        watch: {
+            aiAssistDialog(val) {
+                if (!val && this._aiDialogWasOpen) {
+                    // Dialog just closed — reload AI assist data
+                    this.loadAiAssistCurrent();
+                }
+                this._aiDialogWasOpen = val;
+            },
         },
         props: {
         },
@@ -377,7 +405,7 @@
                     this.updateGlossary();
                     this.applySourceHighlightFromQuery();
                 });
-                this.updateToolbarPosition();
+                this.loadAiAssistCurrent();
                 this.vocabularySidebarTest();
                 this.$forceUpdate();
             }).catch((error) => {
@@ -397,6 +425,21 @@
         // this runs after the initial data
         // was downloaded with axios
         methods: {
+            loadAiAssistCurrent() {
+                if (!this.chapterId) return;
+                axios.get('/chapters/ai-assist/current/' + this.chapterId).then((response) => {
+                    const data = response.data;
+                    if (data.success) {
+                        this.hasSavedAiAssist = data.has_saved_assist;
+                        this.aiSentenceTranslations = data.sentence_translations || [];
+                        if (!data.has_saved_assist) {
+                            this.showAiTranslations = false;
+                        }
+                    }
+                }).catch(() => {
+                    // Silently fail — AI assist is optional
+                });
+            },
             vocabularySidebarTest() {
                 this.vocabularySidebarFits = window.innerWidth >= 960;
             },

@@ -249,6 +249,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/ai-assist/source', [App\Http\Controllers\AiReadingAssistController::class, 'source']);
     Route::post('/chapters/ai-assist/preview', [App\Http\Controllers\AiReadingAssistController::class, 'preview']);
     Route::post('/chapters/ai-assist/confirm', [App\Http\Controllers\AiReadingAssistController::class, 'confirm']);
+    Route::get('/chapters/ai-assist/current/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'current']);
 
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);

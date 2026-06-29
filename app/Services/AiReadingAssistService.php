@@ -125,6 +125,50 @@ class AiReadingAssistService
     }
 
     /**
+     * Get the current saved AI reading assist data for a chapter.
+     *
+     * @return array
+     */
+    public function getCurrentAssist(int $userId, string $language, int $chapterId): array
+    {
+        $chapter = Chapter::where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->first();
+
+        if (!$chapter) {
+            return [
+                'success' => false,
+                'message' => '章节不存在或不属于当前用户。',
+            ];
+        }
+
+        $record = ChapterAiReadingAssist::where('user_id', $userId)
+            ->where('language', $language)
+            ->where('chapter_id', $chapterId)
+            ->first();
+
+        if (!$record) {
+            return [
+                'success' => true,
+                'chapter_id' => (int) $chapterId,
+                'has_saved_assist' => false,
+                'sentence_translations' => [],
+                'summary' => null,
+            ];
+        }
+
+        return [
+            'success' => true,
+            'chapter_id' => (int) $chapterId,
+            'has_saved_assist' => true,
+            'sentence_translations' => $record->sentence_translations ?? [],
+            'summary' => $record->summary,
+            'updated_at' => $record->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
      * Confirm and save the AI analysis result for a chapter.
      *
      * Re-validates the payload, then saves (or overwrites) the structured

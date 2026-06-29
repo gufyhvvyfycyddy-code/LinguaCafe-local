@@ -115,6 +115,11 @@
                     --><template v-else>{{ word.word }}</template><!--
                     --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
                 --></span><!--
+                --><div
+                    v-if="showAiTranslations && !word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
+                    :key="'ai-t-' + wordIndex"
+                    style="font-size: 90%; color: #888; line-height: 1.3; padding: 2px 0 6px 0; border-bottom: 1px solid #eee; margin-bottom: 4px;"
+                ><span style="color: #aaa; margin-right: 4px;">AI 译文：</span><span>{{ getAiTranslation(word.sentence_index) }}</span></div><!--
             --></template>
         </div>
 
@@ -351,7 +356,15 @@
             spaceBetweenSubtitles: {
                 type: Number,
                 default: 20
-            }
+            },
+            showAiTranslations: {
+                type: Boolean,
+                default: false,
+            },
+            aiSentenceTranslations: {
+                type: Array,
+                default: () => [],
+            },
         },
         computed: mapState({
             vocabularyBoxActive: state => state.vocabularyBox.active,
@@ -384,6 +397,22 @@
             window.removeEventListener('mousemove', this.closeHoverBox);
         },
         methods: {
+            isLastWordOfSentence(wordIndex) {
+                const word = this.words[wordIndex];
+                if (!word || word.is_structure) return false;
+                // Look ahead to find the next non-structure word
+                for (let j = wordIndex + 1; j < this.words.length; j++) {
+                    if (!this.words[j].is_structure) {
+                        return this.words[j].sentence_index !== word.sentence_index;
+                    }
+                }
+                return true; // no more non-structure words
+            },
+            getAiTranslation(sentenceIndex) {
+                if (!this.aiSentenceTranslations || !this.aiSentenceTranslations.length) return '';
+                const match = this.aiSentenceTranslations.find(st => st.sentence_index === sentenceIndex);
+                return match ? match.translation_zh : '';
+            },
             isSectionMarker(word) {
                 if (typeof word !== 'string') return false;
                 // 新格式: [A] [B] [C] ... [Z]

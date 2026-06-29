@@ -42,6 +42,23 @@ class AiReadingAssistController extends Controller
      *
      * POST /chapters/ai-assist/preview
      */
+    /**
+     * Get the current saved AI reading assist data for a chapter.
+     *
+     * GET /chapters/ai-assist/current/{chapterId}
+     */
+    public function current(int $chapterId)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $result = $this->aiReadingAssistService->getCurrentAssist($userId, $language, $chapterId);
+
+        $statusCode = $result['success'] ? 200 : 404;
+
+        return response()->json($result, $statusCode);
+    }
+
     public function preview(Request $request)
     {
         $request->validate([
