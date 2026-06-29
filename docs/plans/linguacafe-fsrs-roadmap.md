@@ -124,7 +124,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`90e3c74`（Refactor: extract add sense form；本地 AiSuggestionPanel-Extract-1 未提交）
+**Latest commit**：`56ed70a`（Refactor: extract AI suggestion panel）
 
 ### `/review-cards/manage` 当前能力
 
