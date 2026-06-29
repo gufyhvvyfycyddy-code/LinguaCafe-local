@@ -44,10 +44,66 @@
                 <div class="mt-3 pa-3 rounded" style="background: #f5f7fa;">
                     <div class="font-weight-medium body-2 mb-1">每天大概要复习多少</div>
                     <div class="body-1 grey--text text--darken-1">{{ burdenEstimateMessage }}</div>
-                    <div class="caption grey--text mt-1">粗略预估，仅帮助你感受负担，不会重排已有卡片。</div>
-                </div>
+                                <div class="caption grey--text mt-1">粗略预估，仅帮助你感受负担，不会重排已有卡片。</div>
+                                </div>
 
-                <v-card-actions class="px-0">
+                                <!-- 保持率工作量模拟 -->
+                                <div class="mt-3">
+                                    <v-btn
+                                        small
+                                        outlined
+                                        color="primary"
+                                        :loading="retentionSimLoading"
+                                        :disabled="retentionSimLoading"
+                                        @click="loadRetentionSimulation"
+                                    >
+                                        查看不同保持率的复习量
+                                    </v-btn>
+
+                                    <div v-if="retentionSimData" class="mt-3">
+                                        <v-alert v-if="!retentionSimData.simulation_available" dense outlined type="warning" class="mb-0">
+                                            {{ retentionSimData.warnings ? retentionSimData.warnings[0] : 'FSRS 扩展未加载，暂时无法生成工作量模拟。' }}
+                                        </v-alert>
+
+                                        <div v-if="retentionSimData.simulation_available">
+                                            <div class="font-weight-medium body-2 mb-2">保持率工作量模拟</div>
+                                            <div class="caption grey--text mb-2">基于 {{ retentionSimData.total_candidates }} 张复习中卡片估算，不会修改卡片。</div>
+                                            <v-simple-table dense class="no-hover">
+                                                <thead>
+                                                    <tr>
+                                                        <th class="text-left">保持率</th>
+                                                        <th class="text-right">今天到期</th>
+                                                        <th class="text-right">未来 7 天</th>
+                                                        <th class="text-right">变化</th>
+                                                        <th class="text-left">建议</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    <tr v-for="(opt, i) in retentionSimData.options" :key="i"
+                                                        :class="opt.is_current ? 'primary lighten-5' : ''">
+                                                        <td class="font-weight-medium">{{ opt.label }}</td>
+                                                        <td class="text-right">{{ opt.today_due }}</td>
+                                                        <td class="text-right">{{ opt.next7_due }}</td>
+                                                        <td class="text-right">
+                                                            <span v-if="opt.next7_delta_vs_current === 0">0</span>
+                                                            <span v-else-if="opt.next7_delta_vs_current > 0" class="orange--text">+{{ opt.next7_delta_vs_current }}</span>
+                                                            <span v-else class="green--text">{{ opt.next7_delta_vs_current }}</span>
+                                                        </td>
+                                                        <td>
+                                                            <v-chip x-small :color="opt.is_current ? 'success' : ''" outlined label>
+                                                                {{ opt.recommendation }}
+                                                            </v-chip>
+                                                            <div class="caption grey--text mt-1">{{ opt.message }}</div>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </v-simple-table>
+                                            <div class="caption grey--text mt-2">这是估算，不会修改卡片。保存复习目标后，之后的新复习才会按新目标调度。</div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <v-card-actions class="px-0">
                     <v-spacer />
                     <v-btn
                         rounded
@@ -538,9 +594,21 @@
                                                                 <!-- Next 7 days and movement -->
                                                                 <v-row dense class="mb-2">
                                                                     <v-col cols="4">
-                                                                        <v-sheet outlined rounded class="pa-2 text-center">
-                                                                            <div class="text-h6 font-weight-bold">{{ fsrsReschedulePreview.workload_impact.next7_due_before }} → {{ fsrsReschedulePreview.workload_impact.next7_due_after }}</div>
-                                                                            <div class="text-caption text--secondary">未来 7 天到期</div>
+                                                                        <v-sheet outlined rounded class="pa-2 text-center" style="background: #f5f7fa;">
+                                                                            <div class="text-h6 font-weight-bold">
+                                                                                {{ fsrsReschedulePreview.workload_impact.next7_due_before }} → {{ fsrsReschedulePreview.workload_impact.next7_due_after }}
+                                                                                <v-chip
+                                                                                    v-if="fsrsReschedulePreview.workload_impact.next7_delta !== 0"
+                                                                                    x-small
+                                                                                    :color="fsrsReschedulePreview.workload_impact.next7_delta > 0 ? 'warning' : 'success'"
+                                                                                    outlined
+                                                                                    label
+                                                                                    class="ml-1"
+                                                                                >
+                                                                                    {{ fsrsReschedulePreview.workload_impact.next7_delta > 0 ? '+' : '' }}{{ fsrsReschedulePreview.workload_impact.next7_delta }}
+                                                                                </v-chip>
+                                                                            </div>
+                                                                            <div class="text-caption text--secondary font-weight-medium">未来 7 天到期</div>
                                                                         </v-sheet>
                                                                     </v-col>
                                                                     <v-col cols="4">
@@ -964,7 +1032,7 @@
                         :loading="fsrsRescheduleConfirmLoading"
                         @click="proceedWithHighRisk"
                     >
-                        我知道复习量会变多，继续重排
+                        我知道风险，仍然重排
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -1029,6 +1097,8 @@
                 fsrsParameterCount: 19,
                 fsrsHasOptimizedParameters: false,
                 fsrsParameterWarning: '',
+                retentionSimLoading: false,
+                retentionSimData: null,
                 fsrsRestoreDefaultLoading: false,
                 fsrsRestoreDefaultSuccess: '',
                 fsrsOptimizationDiagnostics: null,
@@ -1281,6 +1351,20 @@
                     .catch(() => {
                         this.fsrsOptimizationCanOptimize = false;
                         this.fsrsOptimizationMessage = '自动优化状态加载失败，请稍后再试。';
+                    });
+            },
+            loadRetentionSimulation() {
+                this.retentionSimLoading = true;
+                this.retentionSimData = null;
+                axios.post('/settings/fsrs/retention-workload-simulation')
+                    .then((response) => {
+                        this.retentionSimData = response.data;
+                    })
+                    .catch(() => {
+                        this.retentionSimData = { simulation_available: false, warnings: ['加载失败，请稍后再试。'], options: [] };
+                    })
+                    .finally(() => {
+                        this.retentionSimLoading = false;
                     });
             },
             runFsrsOptimizationPreflight() {

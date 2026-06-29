@@ -174,6 +174,19 @@ class SettingsController extends Controller
     }
 
     /**
+     * Retention workload simulator.
+     *
+     * Simulates today and next-7-days due counts for 85%/90%/93%/95%
+     * desired retention rates. Read-only, does not modify any data.
+     */
+    public function retentionWorkloadSimulation() {
+        $user = Auth::user();
+        $service = new \App\Services\FsrsRetentionWorkloadSimulationService();
+        $result = $service->simulate($user->id, $user->selected_language);
+        return response()->json($result, 200);
+    }
+
+    /**
      * Restore FSRS default parameters.
      *
      * Deletes fsrs_parameters, fsrs_parameters_source,

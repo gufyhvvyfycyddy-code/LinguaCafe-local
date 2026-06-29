@@ -35,17 +35,33 @@
 
 | 阶段 | 内容 | 状态 |
 |------|------|------|
-| FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 当前阶段 |
+| FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 已完成 |
 | FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | ✅ 已完成 |
-| FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 当前阶段 |
-| FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | 📋 计划中 |
+| FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 已完成 |
+| FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 当前阶段 |
 | FSRS-Anki-Mgmt-5 | Preset / 分组参数长期评估 | 📋 计划中 |
 
 ---
 
 ## 5. 当前下一步
 
-进入 **FSRS-Anki-Mgmt-1：恢复默认参数按钮**
+进入 **FSRS-Anki-Mgmt-4：Desired Retention 工作量模拟器**
+
+后端：
+- `FsrsRetentionWorkloadSimulationService` — 只读 simulate() 方法
+- `POST /settings/fsrs/retention-workload-simulation` — 路由
+- `SettingsController::retentionWorkloadSimulation()` — 控制器方法
+- 85%/90%/93%/95% 四档模拟，基于真实候选卡数据
+
+前端：
+- `AdminReviewSettings.vue` — 复习目标区新增"查看不同保持率的复习量"按钮 + 模拟结果表格
+- high 风险确认按钮文案更新为"我知道风险，仍然重排"
+- 重排风险面板中"未来 7 天到期"突出显示 + 变化量 chip
+
+测试：
+- 空卡时返回清楚中文提示
+- 四档包含 today_due / next7_due / next7_delta_vs_current
+- 不写入 ReviewCard / ReviewLog
 
 后端：
 - `SettingsService::restoreFsrsDefaultParameters()` — 删除 4 个 global settings

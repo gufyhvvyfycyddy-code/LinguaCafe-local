@@ -112,6 +112,7 @@
 | FSRS-Anki-Mgmt-1 | ✅ 已完成 — 恢复默认参数按钮（后端 4 settings 删除 + 前端按钮始终显示） |
 | FSRS-Anki-Mgmt-2 | ✅ 已完成 — 参数优化诊断面板（后端 diagnostics 合并进 optimization-status + 前端诊断面板） |
 | FSRS-Anki-Mgmt-3 | ✅ 已完成 — 重排风险面板优化 + 诊断计数一致性修复（risk_assessment/workload_impact 增强 + 前端风险面板 + countOptimizableFsrsReviews 增加 rating!=reset 过滤） |
+| FSRS-Anki-Mgmt-4 | ✅ 已完成 — Desired Retention 工作量模拟器（retentionWorkloadSimulationService + 85/90/93/95 四档模拟 + 前端模拟面板 + high 风险按钮文案更新） |
 
 ---
 
@@ -572,9 +573,8 @@
 | 中 | FSRS-Param-Cleanup-Scout | 确认删除/rejected 词义卡旧 review_logs 不参与参数优化，无污染风险 | ✅ 已完成 | 代码 + 数据库侦察 |
 | 中 | FSRS-Anki-Mgmt-1 | 恢复默认参数按钮 | ✅ 已完成 | 后端删除 4 settings + 前端按钮 (fix: 始终显示) |
 | 中 | FSRS-Anki-Mgmt-2 | 参数优化诊断面板 | ✅ 已完成 | 后端 diagnostics + 前端诊断面板：有效记录/可训练卡/排除明细/状态提示 |
-| 中 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 当前阶段 | 后端 risk_assessment/workload_impact + 前端风险面板 + rating!=reset 口径对齐 |
-| 中 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 | 📋 计划中 | 贴近 Anki 的风险展示 |
-| 中 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | 📋 计划中 | 接近 Anki Help Me Decide |
+| 中 | FSRS-Anki-Mgmt-3 | 重排风险面板优化 + 诊断计数一致性修复 | ✅ 已完成 | 后端 risk_assessment/workload_impact + 前端风险面板 + rating!=reset 口径对齐 |
+| 中 | FSRS-Anki-Mgmt-4 | Desired Retention 工作量模拟器 | ✅ 当前阶段 | 后端 simulator + 前端模拟面板 + high 风险按钮文案已更新 |
 | 中 | FSRS-Anki-Mgmt-5 | Preset / 分组参数长期评估 | 📋 计划中 | 需单独侦察 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
