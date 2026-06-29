@@ -60,4 +60,28 @@ class AiReadingAssistController extends Controller
 
         return response()->json($result, $statusCode);
     }
+
+    /**
+     * Confirm and save the AI analysis result.
+     *
+     * POST /chapters/ai-assist/confirm
+     */
+    public function confirm(Request $request)
+    {
+        $request->validate([
+            'chapterId' => ['required', 'integer', 'min:1'],
+            'aiText' => ['required', 'string', 'min:1'],
+        ]);
+
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+        $chapterId = (int) $request->post('chapterId');
+        $aiText = $request->post('aiText');
+
+        $result = $this->aiReadingAssistService->confirmImport($userId, $language, $chapterId, $aiText);
+
+        $statusCode = $result['success'] ? 200 : 422;
+
+        return response()->json($result, $statusCode);
+    }
 }

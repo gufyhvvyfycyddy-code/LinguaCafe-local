@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`271d131`（Docs: update roadmap Latest commit to 0001a6d）
+**Latest commit**：`4647d95`（Docs: add Anki reference workflow rules）
 
 ### `/review-cards/manage` 当前能力
 
@@ -591,6 +591,7 @@
 | 中 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 + 确认弹窗如实告知行为 | ✅ 已完成 | 全前端改动（VocabularySideBox/VocabularyBox/VocabularyBottomSheet/TextBlockGroup），不改后端 |
 | 中 | Reader-UI-6-b | 回归为新词时删除释义复习卡和复习记录 | ✅ 已完成 | 后端 delete ReviewLog + delete ReviewCard（sense+legacy），WordSense rejected，EncounteredWord 删除 |
 | 低 | Workflow-Rules-Anki-1 | 写入 Anki 参考规则 + 报告格式收口 + 注释修正 | ✅ 已完成 | 写入 vibe-coding-rules + master plan，WordSenseService 注释修正 |
+| 高 | AI-Reading-Assist-3 | 确认并保存 AI 解析结果 | ✅ 已完成 | 新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮，不创建 WordSense/ReviewCard/ReviewLog |
 | 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 

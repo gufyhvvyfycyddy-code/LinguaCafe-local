@@ -98,6 +98,7 @@
                 <!-- ─── OVERVIEW STEP ────────────────── -->
                 <template v-if="previewStep === 'overview' && previewResult">
                     <v-alert
+                        v-if="!confirmSuccess"
                         dense
                         outlined
                         type="info"
@@ -105,7 +106,30 @@
                         class="mb-4"
                     >
                         <v-icon small left>mdi-information-outline</v-icon>
-                        当前只是预览，不会写入学习数据。
+                        当前只是预览，不会写入学习数据。保存后只作为本章阅读辅助数据，不会自动创建复习卡。
+                    </v-alert>
+
+                    <v-alert
+                        v-if="confirmSuccess"
+                        dense
+                        outlined
+                        type="success"
+                        text
+                        class="mb-3"
+                    >
+                        <v-icon small left>mdi-check-circle</v-icon>
+                        已保存本章 AI 辅助内容。
+                    </v-alert>
+                    <v-alert
+                        v-if="confirmError"
+                        dense
+                        outlined
+                        type="error"
+                        text
+                        class="mb-3"
+                    >
+                        <v-icon small left>mdi-alert-circle</v-icon>
+                        {{ confirmError }}
                     </v-alert>
 
                     <v-row>
@@ -342,6 +366,17 @@
 
             <v-card-actions>
                 <v-spacer />
+                <v-btn
+                    v-if="previewStep === 'overview' && previewResult && !confirmSuccess"
+                    depressed
+                    color="primary"
+                    :loading="confirmLoading"
+                    @click="confirmSave"
+                    class="mr-2"
+                >
+                    <v-icon left>mdi-content-save</v-icon>
+                    确认保存本章 AI 辅助内容
+                </v-btn>
                 <v-btn text @click="close">关闭</v-btn>
             </v-card-actions>
         </v-card>
@@ -360,6 +395,10 @@
                 sourceCopied: false,
                 previewLoading: false,
                 aiText: '',
+
+                confirmLoading: false,
+                confirmSuccess: false,
+                confirmError: '',
 
                 previewStep: 'input', // 'input' | 'overview' | 'detail'
                 activeDetailType: null, // 'translations' | 'vocabulary' | 'phrases' | 'warnings'
@@ -483,6 +522,9 @@
                 this.sourceLoading = false;
                 this.sourceCopied = false;
                 this.previewLoading = false;
+                this.confirmLoading = false;
+                this.confirmSuccess = false;
+                this.confirmError = '';
                 this.previewStep = 'input';
                 this.activeDetailType = null;
                 this.previewResult = null;
@@ -562,6 +604,30 @@
                     }
                 }).finally(() => {
                     this.previewLoading = false;
+                });
+            },
+            confirmSave() {
+                if (!this.aiText.trim() || !this.chapterId) {
+                    this.confirmError = '缺少 AI 内容或章节信息。';
+                    return;
+                }
+
+                this.confirmLoading = true;
+                this.confirmError = '';
+                this.confirmSuccess = false;
+
+                axios.post('/chapters/ai-assist/confirm', {
+                    chapterId: this.chapterId,
+                    aiText: this.aiText,
+                }).then((response) => {
+                    this.confirmSuccess = true;
+                    this.confirmError = '';
+                }).catch((error) => {
+                    const data = error.response?.data;
+                    this.confirmError = data?.message || '保存失败。';
+                    this.confirmSuccess = false;
+                }).finally(() => {
+                    this.confirmLoading = false;
                 });
             },
             goBackToOverview() {

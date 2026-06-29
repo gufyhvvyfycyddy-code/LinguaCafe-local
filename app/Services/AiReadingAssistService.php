@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Chapter;
+use App\Models\ChapterAiReadingAssist;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
@@ -120,6 +121,91 @@ class AiReadingAssistService
             ],
             'samples' => $samples,
             'errors' => [],
+        ];
+    }
+
+    /**
+     * Confirm and save the AI analysis result for a chapter.
+     *
+     * Re-validates the payload, then saves (or overwrites) the structured
+     * AI reading assist data. Does NOT create WordSense, ReviewCard, or
+     * ReviewLog.
+     *
+     * @return array
+     */
+    public function confirmImport(int $userId, string $language, int $chapterId, string $rawAiText): array
+    {
+        // 1. Verify chapter ownership
+        $chapter = Chapter::where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->first();
+
+        if (!$chapter) {
+            return [
+                'success' => false,
+                'message' => '章节不存在或不属于当前用户。',
+            ];
+        }
+
+        // 2. Extract JSON payload
+        $extracted = $this->extractJsonPayload($rawAiText);
+        if (!$extracted['success']) {
+            return [
+                'success' => false,
+                'message' => $extracted['message'],
+                'errors' => $extracted['errors'] ?? [],
+            ];
+        }
+
+        $payload = $extracted['payload'];
+
+        // 3. Re-validate payload (same validation as preview)
+        $validation = $this->validatePayload($payload);
+        if (!$validation['success']) {
+            return [
+                'success' => false,
+                'message' => $validation['message'],
+                'errors' => $validation['errors'] ?? [],
+            ];
+        }
+
+        // 4. Build summary
+        $sentenceTranslations = $payload['sentence_translations'] ?? [];
+        $vocabularyItems = $payload['vocabulary_items'] ?? [];
+        $phraseItems = $payload['phrase_items'] ?? [];
+        $warnings = $payload['warnings'] ?? [];
+        $schemaVersion = $payload['schema_version'] ?? '';
+
+        $summary = [
+            'sentence_translation_count' => count($sentenceTranslations),
+            'vocabulary_item_count' => count($vocabularyItems),
+            'phrase_item_count' => count($phraseItems),
+            'warning_count' => count($warnings),
+        ];
+
+        // 5. Save — overwrite if already exists for this user+language+chapter
+        ChapterAiReadingAssist::updateOrCreate(
+            [
+                'user_id' => $userId,
+                'language' => $language,
+                'chapter_id' => $chapterId,
+            ],
+            [
+                'schema_version' => $schemaVersion,
+                'sentence_translations' => $sentenceTranslations,
+                'vocabulary_items' => $vocabularyItems,
+                'phrase_items' => $phraseItems,
+                'warnings' => $warnings,
+                'summary' => $summary,
+            ]
+        );
+
+        return [
+            'success' => true,
+            'chapter_id' => (int) $chapterId,
+            'summary' => $summary,
+            'message' => '本章 AI 辅助内容已保存。',
         ];
     }
 

@@ -55,6 +55,7 @@
 | AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览（方案 B 总览+详情页） |
 | AI-Reading-Assist-2-follow-up | 方案 B 详情页导航 |
 | AI-Reading-Assist-2-search | 详情页搜索框 + 紫色命中高亮 |
+| AI-Reading-Assist-3 | 确认并保存 AI 解析结果（不创建 WordSense/ReviewCard/ReviewLog） |
 
 ### 3.4 右击面板 / Review UI
 
@@ -88,7 +89,7 @@
 
 | 编号 | 内容 | 状态 |
 |------|------|------|
-| AI-Reading-Assist-3 | 解析预览后用户确认内容（确认后才写入辅助数据） | 📋 计划中 |
+| AI-Reading-Assist-3 | ✅ 已完成 — 确认保存 AI 解析结果（新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮，不创建 WordSense/ReviewCard/ReviewLog） | ✅ 已完成 |
 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 📋 计划中 |
 | AI-Reading-Assist-5 | AI 释义与词组结果进入查词侧栏 | 📋 计划中 |
 | AI-Reading-Assist-6 | 词组识别后用户可添加整个词组或单个单词 | 📋 计划中 |
@@ -226,7 +227,7 @@
 | 1 | Reader-UI-9 | ✅ 已完成 — 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | 用户明确要求，改动小，价值高 |
 | 2 | Reader-UI-1-a | 查词侧栏第一轮瘦身 | 隐藏旧 SRS 1-7 按钮，"旧词条释义"→"选择释义"，词典默认收起 |
 | 3 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 | 用户明确要求，改动小，价值高 |
-| 4 | AI-Reading-Assist-3 | 解析预览后用户确认内容 | AI-2 的后续，闭环 AI 导入流程 |
+| 4 | AI-Reading-Assist-3 | ✅ 已完成 — 确认保存 AI 解析结果（不创建 WordSense/ReviewCard/ReviewLog） | 新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮 |
 | 5 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
 | 5 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
 | 6 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
