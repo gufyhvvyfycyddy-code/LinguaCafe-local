@@ -110,6 +110,9 @@ Vue.component('text-reader-settings', TextReaderSettings);
 Vue.component('text-reader-glossary', TextReaderGlossary);
 Vue.component('text-reader-chapter-list', TextReaderChapterList);
 
+import TextReaderAiAssist from './components/TextReader/TextReaderAiAssist.vue';
+Vue.component('text-reader-ai-assist', TextReaderAiAssist);
+
 // Jellyfin
 import JellyfinSubtitleList from './components/Library/Import/ImportSource/JellyfinSubtitleList';
 Vue.component('jellyfin-subtitle-list', JellyfinSubtitleList);

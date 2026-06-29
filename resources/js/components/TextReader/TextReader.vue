@@ -16,6 +16,12 @@
             v-model="hotkeyDialog"
         ></text-reader-hotkey-information-dialog>
 
+        <!-- AI Reading Assist Dialog -->
+        <text-reader-ai-assist
+            v-model="aiAssistDialog"
+            :chapter-id="chapterId"
+        ></text-reader-ai-assist>
+
         <!-- Toolbar -->
         <div id="reader-box" :style="{'max-width': maximumTextWidthData[settings.maximumTextWidth]}" v-if="chapterId !== null">
             <div id="toolbar-box">
@@ -29,6 +35,7 @@
                     <v-btn title="减小字号" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
                     <v-btn title="切换纯文本模式" icon @click="settings.plainTextMode = !settings.plainTextMode; toolbarSettingChanged();"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-marker</v-icon></v-btn>
                     <v-btn title="查看快捷键" icon @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
+                    <v-btn title="AI 阅读辅助" icon @click="aiAssistDialog = true;"><v-icon>mdi-robot</v-icon></v-btn>
                 </div>
             </div>
 
@@ -238,6 +245,7 @@
         data: function() {
             return {
                 hotkeyDialog: false,
+                aiAssistDialog: false,
                 readerLoading: true,
                 readerError: '',
                 text: null,

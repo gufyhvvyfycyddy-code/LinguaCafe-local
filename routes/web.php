@@ -245,6 +245,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/create', [App\Http\Controllers\ChapterController::class, 'createChapter']);
     Route::get('/chapters/retry-failed-chapters/{bookId}', [App\Http\Controllers\ChapterController::class, 'retryFailedChapters']);
 
+    // AI reading assist
+    Route::post('/chapters/ai-assist/source', [App\Http\Controllers\AiReadingAssistController::class, 'source']);
+    Route::post('/chapters/ai-assist/preview', [App\Http\Controllers\AiReadingAssistController::class, 'preview']);
+
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);
     Route::post('/youtube/get-subtitle-list', [App\Http\Controllers\ImportController::class, 'getYoutubeSubtitles']);
