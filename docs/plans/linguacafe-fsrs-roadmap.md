@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`4647d95`（Docs: add Anki reference workflow rules）
+**Latest commit**：`c7517ba`（Feat: save confirmed AI reading assist results）
 
 ### `/review-cards/manage` 当前能力
 
