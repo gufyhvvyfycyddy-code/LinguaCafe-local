@@ -121,7 +121,7 @@
 
 ## 四、当前最新状态
 
-**Latest commit**：`92cb030`（Docs: update roadmap Latest commit to 45e9905）
+**Latest commit**：`1915501`（Fix: restore reader lookup sidebar on wide screens）
 
 ### `/review-cards/manage` 当前能力
 
