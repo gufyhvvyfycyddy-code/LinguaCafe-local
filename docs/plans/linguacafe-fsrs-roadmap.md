@@ -117,12 +117,13 @@
 | FSRS-Anki-Mgmt-6 | ✅ 已完成 — 每日上限设置页第一版（settings 表保存/读取 + 前端设置区 + 5 项设置 + 测试覆盖；fix：默认复习上限开启 + 校验收口改为 422 拒绝） |
 | FSRS-Anki-Mgmt-7 | ✅ 已完成 — 复习队列每日上限接入 + 超额复习入口（dueCardsWithLimits 后端 + reviewedTodayCount + 前端超额复习 UI + localStorage 今日状态 + 编程协作规则） |
 | Codex-Reader-Workspace-UI-1 | ✅ 已完成 — 阅读页工作区全宽、查词栏宽度统一、词典结果三列布局、AI 建议命中自动展开；不实现 lemma/origin follow-up，不修改 FSRS/EncounteredWord 逻辑 |
+| AddSenseForm-Extract-1 | ✅ 已完成 — 从 WordSensesList.vue 提取添加新释义表单为独立 AddSenseForm.vue 组件；Anti-Mud 小步重构，保存逻辑仍留在父组件，不改变 WordSense/ReviewCard/ReviewLog 创建行为 |
 
 ---
 
 ## 四、当前最新状态
 
-**Latest commit**：`dd7d337`（Style: optimize reader workspace layout；含 Codex-Reader-Workspace-UI-1 全量改动 + 小修 + Anti-Mud 规则）
+**Latest commit**：`379936d`（Docs: update roadmap Latest commit to dd7d337；本地 AddSenseForm-Extract-1 未提交）
 
 ### `/review-cards/manage` 当前能力
 
