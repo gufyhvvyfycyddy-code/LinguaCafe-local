@@ -81,6 +81,8 @@
    * Reader-UI-1
    * Mgmt-7-c / Mgmt-8 / Mgmt-9
 10. 如果因为技术限制无法实现某功能，必须记录原因和替代方案，不能静默放弃。
+11. 每次更新 roadmap（`linguacafe-fsrs-roadmap.md`）时，必须同步检查 master plan（`linguacafe-master-plan.md`）是否也需要更新。
+12. master plan 和 roadmap 的内容不能冲突。如有冲突，以 master plan 为准并修正 roadmap。
 
 ## 8. 安全红线
 

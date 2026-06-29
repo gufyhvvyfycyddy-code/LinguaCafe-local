@@ -1,0 +1,199 @@
+# LinguaCafe 总控大计划
+
+> **最后更新**：2026-06-29
+> **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
+
+---
+
+## 1. 文档目的
+
+1. 本文档是 LinguaCafe 项目的**总控计划**，统一管理所有任务方向。
+2. `linguacafe-fsrs-roadmap.md` 是 FSRS / Sense Review 专项路线图。
+3. `ai-reading-assist-plan.md` 是 AI 阅读辅助专项计划。
+4. `ai-reading-assist-schema-experiment.md` 是 AI schema 设计与实验记录。
+5. `fsrs-anki-management-optimization-plan.md` 是 FSRS Anki 管理优化专项。
+6. 本文档用于防止旧计划被遗忘：插队任务**不等于**取消旧任务。
+7. 新增任务不自动删除旧任务，除非网页端 GPT 明确同意并更新相关文档。
+
+---
+
+## 2. 当前核心产品方向
+
+1. **sense-only 复习系统**：WordSense 是实际复习对象，ReviewCard `target_type = sense` 是主线，`target_type = word` 是 legacy。
+2. **EncounteredWord** 负责：阅读页颜色、熟悉度总览、词形出现记录。
+3. **阅读即学习**：但不能把"看过"简单等同于"复习过"。
+4. **FSRS 熟悉度**：阅读页绿色深浅由 `ReviewCard.stability + due_at + fsrs_state` 计算（10 档 10%-100%）。
+5. **AI 阅读辅助**：手动复制提示词 + 粘贴 AI 返回内容 → 解析预览（不做自动 API 调用）。
+6. **多例句绑定**：一张释义卡绑定多个来源句，复习时平均轮换展示。
+
+---
+
+## 3. 已完成主线
+
+### 3.1 FSRS / Anki 管理
+
+| 阶段 | 说明 |
+|------|------|
+| FSRS-D3-b 到 FSRS-D4-final-review | FSRS 参数优化全流程（优化保存、诊断面板、重排风险、撤销恢复、真实验收） |
+| FSRS-Anki-Mgmt-1 到 Mgmt-7 | 恢复默认参数、诊断面板、重排风险面板、Retention 模拟、每日上限侦察/设置/队列接入 |
+| Mgmt-7-follow-up | 修复 `/reviews/senses` 绕过每日上限 + SettingsService is_queue_enforced 修复 |
+| Mgmt-7-b | 每日新学累计计数精确化（计划中） |
+
+### 3.2 FSRS 阅读页颜色
+
+| 阶段 | 说明 |
+|------|------|
+| Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动（7 档） |
+| Reader-Visual-Semantics-1 | 扩展为 10 档（10%-100%）、AI 预览紫色搜索高亮、计划保全规则 |
+
+### 3.3 AI 阅读辅助
+
+| 阶段 | 说明 |
+|------|------|
+| AI-Reading-Assist-1 | Schema 设计 + 提示词模板 + DeepSeek Flash/Pro 对比实验材料 |
+| AI-Reading-Assist-2 | 复制整章英文 + AI 提示词 + 粘贴解析预览（方案 B 总览+详情页） |
+| AI-Reading-Assist-2-follow-up | 方案 B 详情页导航 |
+| AI-Reading-Assist-2-search | 详情页搜索框 + 紫色命中高亮 |
+
+### 3.4 右击面板 / Review UI
+
+| 阶段 | 说明 |
+|------|------|
+| RightClickPanel-1, -2-scout, -3-a | 右击点词面板 WordSense 功能改造 + 自动创建卡侦察 + 最相关词义展开 |
+| UI-Review-a 到 UI-Review-e | SenseReview 信息层级整理、显示答案流程、键盘快捷键、真实 smoke |
+| UI-Anki-Scout-1, UI-Anki-Review-Scout | 全界面 Anki 对标侦察、刷卡页学习节奏重构侦察 |
+
+---
+
+## 4. 未完成任务总表
+
+### 4.1 计划治理 / 仓库治理
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Repo-Governance-1 | 确认主开发仓库是 `LinguaCafe-local` 还是 `LinguaCafe-dev-main` | 📋 待确认 |
+| Repo-Governance-2 | 如需切换主仓库，制定同步计划 | 📋 待定 |
+| Plan-Integrity-1 | 总控计划持续维护 | ✅ 当前阶段 |
+
+### 4.2 AI 阅读辅助
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| AI-Reading-Assist-3 | 解析预览后用户确认内容（确认后才写入辅助数据） | 📋 计划中 |
+| AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 📋 计划中 |
+| AI-Reading-Assist-5 | AI 释义与词组结果进入查词侧栏 | 📋 计划中 |
+| AI-Reading-Assist-6 | 词组识别后用户可添加整个词组或单个单词 | 📋 计划中 |
+| AI-Reading-Assist-7 | 释义卡多例句绑定浏览 | 📋 计划中 |
+| AI-Reading-Assist-8 | 复习卡例句轮换 | 📋 计划中 |
+| AI-Reading-Assist-9 | AI API 配置页 | 📋 计划中 |
+| AI-Reading-Assist-10 | API 自动分析本章 | 📋 计划中 |
+| AI-Reading-Assist-11 | DeepSeek Flash / Pro 真实输出稳定性对比（需要人工在 chat.deepseek.com 测试） | 📋 待实验 |
+
+### 4.3 查词侧栏 / 阅读页 UI
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Reader-UI-1 | 查词侧栏瘦身 | 📋 计划中 |
+| Reader-UI-2 | "旧词条释义"改为"选择释义" | 📋 计划中 |
+| Reader-UI-3 | 词典结果默认收起，词典名称弱化 | 📋 计划中 |
+| Reader-UI-4 | 添加释义简化为"词性 + 中文释义"，高级字段默认隐藏 | 📋 计划中 |
+| Reader-UI-5 | 移除或隐藏旧 SRS 1-7 熟练度条 | 📋 计划中 |
+| Reader-UI-6 | 状态操作区重设计：标记已知、忽略、恢复新词、删除/归档 | 📋 计划中 |
+| Reader-UI-7 | hover 自动查词开关 | 📋 计划中 |
+| Reader-UI-8 | 隐藏右侧常驻"词汇表 / 阅读设置 / 关于本章 / 操作记录" | 📋 计划中 |
+| Reader-UI-9 | 查词栏显示 FSRS 熟悉度百分比，例如"FSRS 熟悉度：70%" | 📋 计划中 |
+
+### 4.4 FSRS / Anki 管理
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Mgmt-7-b | 每日新学累计计数精确化（当前只限制队列显示数量，未严格统计今日已学新卡累计） | 📋 计划中 |
+| Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录（审计确认当前仍使用旧 SRS EncounteredWord.setStage） | 📋 待开发 |
+| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
+| FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
+| FSRS-Param-Browser-Smoke | FSRS 参数优化真实浏览器验收 | 📋 待验收 |
+
+### 4.5 释义卡 / 多例句 / 复习体验
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Sense-Example-Link-1 | 一张释义卡绑定多个来源例句 | 📋 计划中 |
+| Sense-Example-Link-2 | 查词时先选定释义卡，再展示该卡其他例句 | 📋 计划中 |
+| Sense-Example-Link-3 | 复习卡例句轮换 | 📋 计划中 |
+| Sense-Example-Link-4 | 避免连续两天显示同一句 | 📋 计划中 |
+| Sense-Example-Link-5 | 尽量平均展示所有来源例句 | 📋 计划中 |
+
+### 4.6 Lemma / 原型识别
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 |
+| Lemma-Origin-2 | 添加释义时允许选择当前词形、系统原型、手动原型 | 📋 计划中 |
+| Lemma-Origin-3 | 手动原型只作用于本篇当前绑定，不全局改 lemma | 📋 计划中 |
+
+### 4.7 Source Context / 原文定位
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| Source-Context-Verify-1 | 复查"查看原文/译文"是否仍大量 fallback 到 card_example | 📋 待侦察 |
+| Source-Context-Fuzzy-1 | 如仍 fallback，恢复模糊定位原文任务 | 📋 待侦察 |
+| Source-Context-Diagnostics-1 | 原文定位失败诊断日志 | 📋 待侦察 |
+
+### 4.8 Sense Review 真实验收
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| SenseReview-Smoke-1 | 真实刷 5-10 张 sense cards | 📋 待验收 |
+| SenseReview-Smoke-2 | 测试 Space / 1 / 2 / 3 / 4 快捷键 | 📋 待验收 |
+| SenseReview-Smoke-3 | 查看答案面复杂度 | 📋 待验收 |
+| SenseReview-Smoke-4 | More 菜单体验 | 📋 待验收 |
+| SenseReview-Smoke-5 | 确认每日上限和超额复习入口真实可用 | 📋 待验收 |
+
+### 4.9 Dev / 运行环境
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| DevMain-Run-1 | 启动脚本验证 | 📋 待验证 |
+| DevMain-Run-2 | 旧电脑运行验证 | 📋 待验证 |
+| DevMain-Run-3 | 如切换到 dev-main，验证最新功能同步和运行 | 📋 待定 |
+
+---
+
+## 5. 颜色语义规则
+
+1. **黄色/橙色**：阅读正文中的新词 / 未处理词（stage = 2）。
+2. **绿色**：已进入学习系统 / 已有释义卡（stage < 0）。
+3. **绿色深浅**：FSRS 熟悉度，10% 到 100%（`fsrs_familiarity_percent`）。
+4. **紫色**：AI 预览搜索命中（仅在 TextReaderAiAssist 详情页生效）。
+5. 不允许把黄色、绿色、紫色混用。
+6. AI 搜索命中不能用黄/绿。
+7. **查词栏也要显示 FSRS 熟悉度百分比**（`Reader-UI-9`）。
+
+---
+
+## 6. 计划保全规则
+
+1. 已写入 roadmap / master plan 的任务不得静默删除。
+2. 临时插入任务不等于取消原计划。
+3. "本轮不做"不等于"以后不做"。
+4. 暂缓任务必须写为 planned / follow-up / postponed。
+5. 如果因为技术限制不能做，必须写明原因和替代方案。
+6. 网页端 GPT 负责产品优先级判断。
+7. 本地 Agent 不得擅自改变产品优先级。
+8. 每次更新 roadmap 时检查是否误删旧计划。
+
+---
+
+## 7. 建议下一步顺序
+
+以下为网页端 GPT 或项目负责人参考的建议顺序，不绑定开发节奏：
+
+| 建议顺序 | 编号 | 内容 | 理由 |
+|----------|------|------|------|
+| 1 | Reader-UI-9 | 查词栏显示 FSRS 熟悉度百分比 | 用户明确要求，改动小，价值高 |
+| 2 | Reader-UI-1 | 查词侧栏瘦身 | 已有完整产品设计，影响大 |
+| 3 | AI-Reading-Assist-3 | 解析预览后用户确认内容 | AI-2 的后续，闭环 AI 导入流程 |
+| 4 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
+| 5 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
+| 6 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
+| 7 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 清理旧 SRS 遗留逻辑 |
