@@ -75,6 +75,7 @@
 | ReaderWorkspaceSizing-Convergence-1 | 收敛阅读页宽度断点重复规则为纯函数 helper（`ReaderWorkspaceSizingService.js`）。低风险代码收敛，不改业务逻辑，smoke guard 27/27 PASS |
 | Validation-Rules-MCP-Visual-1 | 写入 MCP 视觉验证优先规则。协作规则更新，不改业务代码，用于约束后续阅读页 / UI 交互任务验收 |
 | Night-Convergence-Lab-1 | 夜间安全分支架构收敛实验。多轮自动迭代：更新 roadmap commit 基线、验证层文档整理、只读架构扫描。不修改业务代码，不 push，不合并 |
+| Night-Convergence-Lab-2 | 夜间中等强度架构收敛实验。重复常量提取、resize handler 收敛、只读扫描。不修改 master，不 merge |
 
 ### 3.4 右击面板 / Review UI
 

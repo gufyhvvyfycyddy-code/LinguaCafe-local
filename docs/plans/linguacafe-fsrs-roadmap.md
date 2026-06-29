@@ -1,7 +1,7 @@
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-30
-> **上一轮已验收基线 commit**：`c468d6b`
+> **上一轮已验收基线 commit**：`1f9700f`
 
 ---
 
@@ -125,6 +125,7 @@
 | ReaderWorkspaceSizing-Convergence-1 | ✅ 已完成 — 收敛阅读页宽度断点规则（TextReader.vue 和 VocabularySideBox.vue 中重复的 1500/1280/1080 断点判断）为纯函数 helper `ReaderWorkspaceSizingService.js`。低风险收敛，不改变 observable behavior，smoke guard 27/27 PASS。未进入 AI-6 / Lemma-Origin / TextBlockGroup 拆分 |
 | Validation-Rules-MCP-Visual-1 | ✅ 已完成 — 写入 MCP 视觉验证优先规则。不属于 FSRS 功能本体，属于项目协作和验收规则。不改业务代码 |
 | Night-Convergence-Lab-1 | ✅ 已完成 — 夜间安全分支架构收敛实验。docs-only 更新 roadmap commit 基线、验证层文档整理、只读架构扫描。不修改业务代码，不 push master，不合并 |
+| Night-Convergence-Lab-2 | ✅ 已完成 — 夜间中等强度架构收敛实验。重复常量提取、resize handler 收敛、只读扫描。不修改 master，不 merge |
 
 ---
 
