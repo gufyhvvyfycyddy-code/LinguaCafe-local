@@ -13,6 +13,10 @@ use Illuminate\Support\Facades\Log;
 
 class SenseReviewService
 {
+    public function __construct(
+        private SettingsService $settingsService,
+    ) {
+    }
     /**
      * Base query builder for due sense review cards.
      *
@@ -107,8 +111,7 @@ class SenseReviewService
      */
     public function dueCardsWithLimits(int $userId, string $language, bool $ignoreDailyLimits = false): array
     {
-        $settingsService = app(SettingsService::class);
-        $limits = $settingsService->getFsrsDailyLimits();
+        $limits = $this->settingsService->getFsrsDailyLimits();
 
         $reviewLimitEnabled = $limits['daily_review_limit_enabled'] ?? true;
         $reviewLimit = $limits['daily_review_limit'] ?? 200;
