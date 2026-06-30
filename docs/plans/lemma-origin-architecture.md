@@ -54,6 +54,8 @@ LemmInflect 专门为英语不规则形态设计，准确率 ~96%。当前 fallb
 
 **Lemma-Origin-HealthIrregular-1** 已把 10 个不规则或易错英语词形测试加入 `/tokenizer/health`，包括 `ran`/`running`/`mice`/`geese`/`better`/`best`/`went`/`children`/`studies`/`was`。每个 case 记录 surface、expected、actual、passed。**不改 tokenizeText 实际行为**，只增加健康检查可见性。
 
+**Lemma-Origin-DoctorIrregular-1** 让 `php artisan tokenizer:doctor` 读取 `/tokenizer/health` 的 `english_irregular`，在 human / JSON 输出中展示 expected/actual/passed。任一 case 失败时 doctor 返回失败 exit code。仍不改变 tokenizer 行为。
+
 ## 3. 当前导入链路事实
 
 ```

@@ -20,7 +20,8 @@ Checks:
   2. spaCy en_core_web_sm model loaded
   3. spaCy returns correct lemmas for opened→open, called→call
   4. LemmInflect importable and returns correct lemmas
-  5. (optional) Scan encountered_words for known bad lemmas';
+   5. English irregular lemma cases (ran→run, mice→mouse, better→good, etc.)
+   6. (optional) Scan encountered_words for known bad lemmas';
 
     /**
      * Known bad lemmas that the old PHP fallback could produce.
@@ -70,6 +71,8 @@ Checks:
             'lemminflect_available' => false,
             'lemminflect_lemmas_correct' => false,
             'test_cases' => [],
+            'english_irregular_cases' => [],
+            'english_irregular_correct' => false,
             'bad_lemmas' => [],
         ];
 
@@ -106,6 +109,12 @@ Checks:
                     }
                 }
                 $results['lemminflect_lemmas_correct'] = $liOk;
+
+                // English irregular lemma cases
+                $irregular = $health['english_irregular'] ?? [];
+                $results['english_irregular_cases'] = $irregular;
+                $results['english_irregular_correct'] = !empty($irregular)
+                    && collect($irregular)->every(fn ($c) => ($c['passed'] ?? false) === true);
             }
         }
 
@@ -123,7 +132,8 @@ Checks:
         // Determine exit code
         $allOk = $results['tokenizer_reachable']
             && $results['spacy_model_loaded']
-            && $results['spacy_lemmas_correct'];
+            && $results['spacy_lemmas_correct']
+            && $results['english_irregular_correct'];
 
         if (!$allOk) {
             return 1;
@@ -243,7 +253,32 @@ Checks:
             $liDetail
         );
 
-        // 5. Bad lemma scan
+        // 5. English irregular lemmas
+        $irregular = $results['english_irregular_cases'] ?? [];
+        if (!empty($irregular)) {
+            $passed = $results['english_irregular_correct'];
+            $parts = [];
+            foreach ($irregular as $c) {
+                $surface = $c['surface'] ?? '?';
+                $expected = $c['expected'] ?? '?';
+                $actual = $c['actual'] ?? '?';
+                $flag = ($c['passed'] ?? false) ? '' : ' ✗';
+                $parts[] = "{$surface}→{$actual}(expected:{$expected}){$flag}";
+            }
+            $this->renderCheck(
+                'English irregular lemma cases (ran→run, mice→mouse, etc.)',
+                $passed,
+                implode(', ', $parts)
+            );
+        } else {
+            $this->renderCheck(
+                'English irregular lemma cases',
+                false,
+                'Not available — tokenizer health endpoint may be outdated. Run: tokenizer-start.bat'
+            );
+        }
+
+        // 6. Bad lemma scan
         if ($scannedBadLemmas) {
             $this->newLine();
             $bad = $results['bad_lemmas'];
@@ -262,7 +297,8 @@ Checks:
         $this->newLine();
         $allOk = $results['tokenizer_reachable']
             && $results['spacy_model_loaded']
-            && $results['spacy_lemmas_correct'];
+            && $results['spacy_lemmas_correct']
+            && $results['english_irregular_correct'];
 
         if ($allOk) {
             $this->info('✓ Tokenizer is healthy.');
