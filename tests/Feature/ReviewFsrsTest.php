@@ -282,6 +282,50 @@ class ReviewFsrsTest extends TestCase
         $this->assertEmpty($chapterResponse->json('reviews'), 'Chapter mode should return empty queue');
     }
 
+    public function test_scoped_review_returns_empty_reviews_with_complete_summary(): void
+    {
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => 1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+
+        // reviews must be an empty array
+        $this->assertSame([], $response->json('reviews'));
+
+        // summary must exist and be an array
+        $summary = $response->json('summary');
+        $this->assertIsArray($summary);
+
+        // All fields matching emptyReviewSummary() must be present
+        $expectedKeys = [
+            'due_count', 'visible_count', 'total_due_count',
+            'hidden_due_count', 'hidden_by_review_limit', 'hidden_by_new_limit',
+            'daily_review_limit_enabled', 'daily_review_limit',
+            'daily_new_limit_enabled', 'daily_new_limit',
+            'new_cards_ignore_review_limit',
+            'reviewed_today_count', 'remaining_review_slots',
+            'is_queue_enforced', 'ignore_daily_limits',
+            'limit_reached', 'can_continue_over_limit', 'limit_message',
+        ];
+        foreach ($expectedKeys as $key) {
+            $this->assertArrayHasKey($key, $summary, "Summary missing key: {$key}");
+        }
+
+        // Key default values
+        $this->assertSame(0, $summary['due_count']);
+        $this->assertSame(0, $summary['visible_count']);
+        $this->assertSame(0, $summary['total_due_count']);
+        $this->assertSame(0, $summary['hidden_due_count']);
+        $this->assertSame(0, $summary['reviewed_today_count']);
+        $this->assertFalse($summary['limit_reached']);
+        $this->assertFalse($summary['can_continue_over_limit']);
+        $this->assertFalse($summary['ignore_daily_limits']);
+        $this->assertTrue($summary['is_queue_enforced']);
+    }
+
     public function test_review_queue_filters_out_archived_sense(): void
     {
         $sense = $this->createSense($this->user->id, 'english', 'archived', 'noun', '归档测试', 'archived test');
