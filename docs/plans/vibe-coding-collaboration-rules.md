@@ -507,6 +507,34 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
 最终报告：直接输出执行报告，不自动进入下一任务。
 ```
 
+### 14.4 OpenCode 与 CodeBuddy 并行工作流
+
+1. OpenCode 是执行端，负责修改代码、跑测试、commit、push、输出报告。
+2. CodeBuddy 是本地代码侦查 / 架构审查 / 风险扫描端，负责读取本地最新代码、使用 skills 做事实评估。
+3. 网页端 GPT 负责 GitHub 最新代码核验、合并 OpenCode 报告和 CodeBuddy 报告、做 Accept / Refuse / 下一轮提示词。
+4. CodeBuddy 的结论不能直接等于网页端 GPT 的结论；网页端 GPT 必须结合 GitHub 最新代码独立判断。
+5. 每轮原则上同时准备两条提示词：
+   - OpenCode 提示词。
+   - CodeBuddy 提示词。
+6. 两种使用方式：
+   - 如果 CodeBuddy 要审查 OpenCode 刚刚做的修改，那么提示词外部说明必须写："OpenCode 完成、push、报告贴回网页端后，再把下面的提示词发给 CodeBuddy。"
+   - 如果本次 CodeBuddy 要为下一步计划做代码侦查，而不是审查 OpenCode 本轮修改，那么提示词外部说明必须写："本轮先发给 CodeBuddy，CodeBuddy 只做事实侦查；网页端 GPT 根据报告再决定是否给 OpenCode 执行任务。"
+7. CodeBuddy 不替网页端 GPT 做最终 Accept / Refuse。
+8. CodeBuddy 不直接给 OpenCode 下执行命令。
+9. OpenCode 不能因为 CodeBuddy 提到风险就自行扩大任务。
+10. 每次 CodeBuddy 提示词必须指定使用一个 skill。
+
+### 14.5 CodeBuddy skills 使用规则
+
+CodeBuddy 每次必须从以下 skills 中选择一个或多个，但至少明确一个主 skill：
+
+1. **api-and-interface-design**：用于 API、Controller/Service 接口、payload、错误语义、模块边界、前后端契约。
+2. **code-review-and-quality**：用于 OpenCode 完成后复查 diff、测试、可维护性、越界改动。
+3. **context-engineering**：用于任务切换、长上下文漂移、需要决定本轮该读哪些文件/文档/报告。
+4. **documentation-and-adrs**：用于更新协作规则、架构原则、ADR、长期决策记录。
+5. **doubt-driven-development**：用于高风险、不可逆、权限、删除、数据迁移、批量操作、过度自信判断。
+6. **improve-codebase-architecture**：用于寻找浅模块、职责混乱、耦合、重复逻辑、边界泄漏、深模块候选点。
+
 ## 15. 服务边界 / 架构优化原则
 
 1. **Controller 只做编排。** Controller 可以负责读取 Request、调用 Service、组装 HTTP response，但不应长期持有复杂 query、导出格式、row payload、写操作事务等大块逻辑。
@@ -523,6 +551,37 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
    - 是否减少 Controller 职责。
    - 是否新增清晰 Service 边界。
    - 是否保留 observable behavior。
+
+9. **AI 架构原则 / 防屎山原则**
+
+   1. AI 可以加速实现，但不会自动保证架构正确。
+   2. AI 往往会延续既有架构；好架构会被放大，坏架构也会被放大。
+   3. 代码局部看起来合理，不代表整体可维护。
+   4. 不允许在边界不清楚时继续堆功能。
+   5. 架构优先目标是控制复杂度扩散。
+   6. 拆分可以降低大模块复杂度，但拆太碎会增加接口成本。
+   7. 每次拆分都要说明：
+      - 新模块职责是否一句话能说清。
+      - 接口是否比实现更小。
+      - 是否减少跨文件跳转。
+      - 是否减少状态分叉。
+      - 是否减少隐式行为。
+      - 是否减少重复逻辑。
+      - 是否让测试更容易。
+   8. 不把测试当成架构混乱的遮羞布。
+   9. 本地 Agent 最终报告必须说明：
+      - 本轮是否复用现有架构。
+      - 是否新增耦合。
+      - 是否造成分叉。
+      - 是否新增隐式行为。
+      - 是否扩大接口成本。
+   10. 对高风险删除、批量、权限、数据库、FSRS 逻辑，必须先侦查再实现。
+   11. **批量彻底删除的产品方向**：
+       - 删除前显示待删除 lemma / 卡片列表。
+       - 不需要输入"确认删除"。
+       - 必须弹窗询问是否确定删除。
+       - 操作按钮可以是"确定删除"。
+       - 具体实现必须另起独立 Phase，不在本 docs 任务中做。
 
 ## 16. 切换对话后的接续规则
 
