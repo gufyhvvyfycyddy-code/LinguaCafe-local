@@ -63,4 +63,18 @@ class SenseReviewQueryService
             ->where('word_senses.language_id', $language)
             ->where('word_senses.status', WordSense::STATUS_CONFIRMED);
     }
+
+    /**
+     * Sense review log query that excludes reset-type entries.
+     *
+     * Builds on confirmedSenseReviewLogQuery() and adds both
+     * source != reset and rating != reset so that daily review
+     * count and stats "reviewed today" use the same definition.
+     */
+    public function nonResetSenseReviewLogQuery(int $userId, string $language, Carbon $since): Builder
+    {
+        return $this->confirmedSenseReviewLogQuery($userId, $language, $since)
+            ->where('review_logs.source', '!=', 'reset')
+            ->where('review_logs.rating', '!=', 'reset');
+    }
 }

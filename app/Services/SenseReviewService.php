@@ -78,9 +78,7 @@ class SenseReviewService
         $today = Carbon::today();
 
         return $this->senseReviewQueryService
-            ->confirmedSenseReviewLogQuery($userId, $language, $today)
-            ->where('review_logs.source', '!=', 'reset')
-            ->where('review_logs.rating', '!=', 'reset')
+            ->nonResetSenseReviewLogQuery($userId, $language, $today)
             ->count('review_logs.id');
     }
 

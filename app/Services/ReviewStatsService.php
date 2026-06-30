@@ -100,8 +100,8 @@ class ReviewStatsService
     {
         $today = Carbon::today();
 
-        $reviewedToday = $this->baseLogQuery($userId, $language, $today)
-            ->where('review_logs.source', '!=', 'reset')
+        $reviewedToday = $this->senseReviewQueryService
+            ->nonResetSenseReviewLogQuery($userId, $language, $today)
             ->count();
 
         $resetCount = $this->baseLogQuery($userId, $language, $today)

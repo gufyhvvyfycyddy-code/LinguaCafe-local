@@ -506,4 +506,28 @@ class ReviewStatsTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('reviewed_today', 1);
     }
+
+    // ==================== Test 16: rating=reset excluded from reviewed_today ====================
+
+    public function test_reviewed_today_excludes_rating_reset_even_when_source_is_not_reset(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'reset_rating']);
+        $card = $this->createSenseCard($sense);
+
+        // Log with source=review (non-reset) but rating=reset
+        $this->createReviewLog($card, [
+            'rating' => 'reset',
+            'source' => 'review',
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/review-cards/stats');
+        $response->assertOk();
+
+        // rating=reset should NOT count toward reviewed_today
+        $this->assertEquals(0, $response->json('reviewed_today'));
+
+        // reset_count only counts source=reset, so this rating=reset + source=review
+        // should NOT appear in reset_count either
+        $this->assertEquals(0, $response->json('reset_count'));
+    }
 }
