@@ -312,6 +312,12 @@
 <script>
     import { mapState } from 'vuex';
     import WordSensesList from './WordSensesList.vue';
+    import {
+        buildAiSuggestionLookupContext,
+        fetchAiSuggestions,
+        buildAiVocabSensePayload,
+        buildAiPhraseSensePayload,
+    } from './../../services/VocabularyAiSuggestionService';
 
     export default {
         components: {
@@ -439,29 +445,28 @@
                 }
             },
             loadAiSuggestions() {
-                // Mirrors VocabularySideBox.loadAiSuggestions so the responsive
-                // (half-screen / narrow) vocab box shares the same AI candidate
-                // entry as the wide-screen side box. Reuses the same Vuex state
-                // and the same backend lookup endpoint.
-                const chapterId = this.$store.state.vocabularyBox.chapterId;
-                const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
-                const word = this.word;
-                const lemma = this.studyBase || this._studyBase || this._baseWord || word;
-                if (!chapterId || sentenceIndex === null || !word) {
+                // Uses VocabularyAiSuggestionService so the responsive
+                // (half-screen / narrow) vocab box and the wide-screen side box
+                // share the same AI candidate lookup rules. The service owns the
+                // request and response shaping; this component owns Vuex state.
+                const context = buildAiSuggestionLookupContext({
+                    chapterId: this.$store.state.vocabularyBox.chapterId,
+                    sentenceIndex: this.$store.state.vocabularyBox.sentenceIndex,
+                    word: this.word,
+                    studyBase: this.studyBase,
+                    storeStudyBase: this._studyBase,
+                    baseWord: this._baseWord,
+                });
+                if (!context) {
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
                     this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
                     return;
                 }
                 this.$store.commit('vocabularyBox/setAiLookupLoading', true);
                 this.$store.commit('vocabularyBox/setAiLookupError', '');
-                axios.get('/chapters/ai-assist/lookup/' + chapterId, {
-                    params: { word, lemma, sentence_index: sentenceIndex }
-                }).then((response) => {
-                    const data = response.data;
-                    if (data.success) {
-                        this.$store.commit('vocabularyBox/setAiVocabSuggestions', data.vocabulary_suggestions || []);
-                        this.$store.commit('vocabularyBox/setAiPhraseSuggestions', data.phrase_suggestions || []);
-                    }
+                fetchAiSuggestions(axios, context).then((result) => {
+                    this.$store.commit('vocabularyBox/setAiVocabSuggestions', result.vocabularySuggestions);
+                    this.$store.commit('vocabularyBox/setAiPhraseSuggestions', result.phraseSuggestions);
                 }).catch(() => {
                     this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
@@ -472,22 +477,12 @@
             },
             useAiSuggestion(vi) {
                 if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
-                    this.$refs.wordSensesList.openAddFormFromAi({
-                        pos: vi.pos || 'verb',
-                        sense_zh: vi.meaning_zh || '',
-                        source_sentence: vi.source_sentence || '',
-                        reason: vi.reason || '',
-                    });
+                    this.$refs.wordSensesList.openAddFormFromAi(buildAiVocabSensePayload(vi));
                 }
             },
             useAiPhraseSuggestion(pi) {
                 if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
-                    this.$refs.wordSensesList.openAddFormFromAi({
-                        pos: 'other',
-                        sense_zh: pi.meaning_zh || '',
-                        source_sentence: pi.source_sentence || '',
-                        reason: '词组：' + (pi.phrase || ''),
-                    });
+                    this.$refs.wordSensesList.openAddFormFromAi(buildAiPhraseSensePayload(pi));
                 }
             },
             inputChanged(inputName = '') {

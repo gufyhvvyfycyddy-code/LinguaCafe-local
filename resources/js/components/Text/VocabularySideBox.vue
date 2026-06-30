@@ -213,6 +213,13 @@
 import { mapState } from 'vuex';
 import WordSensesList from './WordSensesList.vue';
 import { getReaderSidebarCssWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
+import {
+    buildAiSuggestionLookupContext,
+    fetchAiSuggestions,
+    buildAiVocabSensePayload,
+    buildAiPhraseSensePayload,
+    hasAiSuggestions,
+} from './../../services/VocabularyAiSuggestionService';
 
 export default {
     components: {
@@ -394,27 +401,26 @@ export default {
         loadAiSuggestions() {
             // AI suggestion panel manages its own expanded state via :key="word" reset
 
-            const chapterId = this.$store.state.vocabularyBox.chapterId;
-            const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
-            const word = this.word;
-            const lemma = this.studyBase || this._studyBase || this._baseWord || word;
-            if (!chapterId || sentenceIndex === null || !word) {
+            const context = buildAiSuggestionLookupContext({
+                chapterId: this.$store.state.vocabularyBox.chapterId,
+                sentenceIndex: this.$store.state.vocabularyBox.sentenceIndex,
+                word: this.word,
+                studyBase: this.studyBase,
+                storeStudyBase: this._studyBase,
+                baseWord: this._baseWord,
+            });
+            if (!context) {
                 this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
                 this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
                 return;
             }
             this.$store.commit('vocabularyBox/setAiLookupLoading', true);
             this.$store.commit('vocabularyBox/setAiLookupError', '');
-            axios.get('/chapters/ai-assist/lookup/' + chapterId, {
-                params: { word, lemma, sentence_index: sentenceIndex }
-            }).then((response) => {
-                const data = response.data;
-                if (data.success) {
-                    this.$store.commit('vocabularyBox/setAiVocabSuggestions', data.vocabulary_suggestions || []);
-                    this.$store.commit('vocabularyBox/setAiPhraseSuggestions', data.phrase_suggestions || []);
-                    if ((data.vocabulary_suggestions || []).length || (data.phrase_suggestions || []).length) {
-                        this.showAddSensePanel = true;
-                    }
+            fetchAiSuggestions(axios, context).then((result) => {
+                this.$store.commit('vocabularyBox/setAiVocabSuggestions', result.vocabularySuggestions);
+                this.$store.commit('vocabularyBox/setAiPhraseSuggestions', result.phraseSuggestions);
+                if (hasAiSuggestions(result)) {
+                    this.showAddSensePanel = true;
                 }
             }).catch(() => {
                 this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
@@ -437,23 +443,13 @@ export default {
         useAiSuggestion(vi) {
             this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
-                this.$refs.wordSensesList.openAddFormFromAi({
-                    pos: vi.pos || 'verb',
-                    sense_zh: vi.meaning_zh || '',
-                    source_sentence: vi.source_sentence || '',
-                    reason: vi.reason || '',
-                });
+                this.$refs.wordSensesList.openAddFormFromAi(buildAiVocabSensePayload(vi));
             }
         },
         useAiPhraseSuggestion(pi) {
             this.showAddSensePanel = true;
             if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
-                this.$refs.wordSensesList.openAddFormFromAi({
-                    pos: 'other',
-                    sense_zh: pi.meaning_zh || '',
-                    source_sentence: pi.source_sentence || '',
-                    reason: '词组：' + (pi.phrase || ''),
-                });
+                this.$refs.wordSensesList.openAddFormFromAi(buildAiPhraseSensePayload(pi));
             }
         },
         addSelectedWordToAnki() { this.$emit('addSelectedWordToAnki'); },
