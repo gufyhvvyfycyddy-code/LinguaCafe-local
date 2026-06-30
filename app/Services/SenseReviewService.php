@@ -13,10 +13,19 @@ use Illuminate\Support\Facades\Log;
 
 class SenseReviewService
 {
-    public function dueCards(int $userId, string $language)
+    /**
+     * Base query builder for due sense review cards.
+     *
+     * Shared between dueCards() and dueCount() so that the filtering logic
+     * stays in one place and the two methods cannot drift apart.
+     *
+     * Callers must add their own terminal methods:
+     *   - dueCards(): select, with('sense'), orderBy, get()
+     *   - dueCount(): count()
+     */
+    private function dueSenseReviewCardQuery(int $userId, string $language): \Illuminate\Database\Eloquent\Builder
     {
         return ReviewCard::query()
-            ->select('review_cards.*')
             ->join('word_senses', function ($join) {
                 $join->on('word_senses.id', '=', 'review_cards.target_id')
                     ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
@@ -27,7 +36,13 @@ class SenseReviewService
             ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
             ->where('word_senses.user_id', $userId)
             ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
+            ->where('word_senses.status', WordSense::STATUS_CONFIRMED);
+    }
+
+    public function dueCards(int $userId, string $language)
+    {
+        return $this->dueSenseReviewCardQuery($userId, $language)
+            ->select('review_cards.*')
             ->with('sense')
             ->orderBy('review_cards.fsrs_due_at')
             ->orderBy('review_cards.id')
@@ -49,19 +64,7 @@ class SenseReviewService
      */
     public function dueCount(int $userId, string $language): int
     {
-        return ReviewCard::query()
-            ->join('word_senses', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
-            })
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
-            ->where('review_cards.fsrs_enabled', true)
-            ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
-            ->where('word_senses.user_id', $userId)
-            ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
-            ->count();
+        return $this->dueSenseReviewCardQuery($userId, $language)->count();
     }
 
     public function summary(int $userId, string $language): array
