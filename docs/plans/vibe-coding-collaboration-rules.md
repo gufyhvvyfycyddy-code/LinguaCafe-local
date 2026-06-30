@@ -328,3 +328,65 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
 - 不允许处理 `.omo/`。
 - 不允许 force push。
 - 不允许自动进入下一任务。
+
+## 14. 当前三员工工作流（2026-06-30）
+
+本项目后续默认采用"三员工 + 网页端 GPT"的工作流。四个角色的边界如下：
+
+| 角色 | 主要职责 | 不做什么 | 交付物 |
+|------|----------|----------|--------|
+| 网页端 GPT / 总流程设计师 | 产品判断、架构拆分、GitHub 最新代码核验、Accept / Refuse、下一轮提示词 | 不直接相信报告，不让用户承担代码判断 | 模型/档位建议、OpenCode 提示词、产品设计问题、验收结论 |
+| CodeBuddy | 架构侦察、风险审计、代码边界核查、指出哪些逻辑应抽 Service | 不改代码、不 commit、不 push、不做产品最终决定 | 架构/风险报告、允许/禁止边界、测试建议 |
+| WorkBuddy | 产品 QA、用户可见契约、页面/字段/交互验收、手动体验风险 | 不判断代码实现正确性、不执行危险写操作 | 产品验收报告、字段契约、用户影响分级 |
+| OpenCode | 按当前提示词执行最小任务、修改代码、跑测试、commit、push、输出报告 | 不擅自扩大范围、不跳阶段、不自 Accept、不自动进入下一任务 | 完成报告、测试结果、git 状态、合规确认 |
+
+执行顺序默认是：
+
+1. 网页端 GPT 冻结目标。
+2. CodeBuddy 做架构侦察。
+3. WorkBuddy 做产品 / QA 契约整理。
+4. 网页端 GPT 合并边界并给 OpenCode 提示词。
+5. OpenCode 执行。
+6. OpenCode 直接在当前对话窗口输出最终报告。
+7. 网页端 GPT 查 GitHub 最新 commit 后验收。
+8. 只有网页端 GPT 给出 Accept，才视为该 Phase 完成。
+
+## 15. 服务边界 / 架构优化原则
+
+1. **Controller 只做编排。** Controller 可以负责读取 Request、调用 Service、组装 HTTP response，但不应长期持有复杂 query、导出格式、row payload、写操作事务等大块逻辑。
+2. **按职责拆 Service，而不是按文件行数机械拆分。** 已形成的方向包括：
+   - `ReviewCardManageQueryService`：管理页查询、筛选、排序。
+   - `ReviewCardExportService`：JSON / Anki TSV / CSV 的导出字段、转义、格式化。
+   - `ReviewCardManageItemSerializerService`：管理页行数据 / 单卡响应 payload。
+3. **下一步服务边界重点是危险写操作。** 编辑、归档/恢复、立即到期、重置、彻底删除、批量归档/恢复/删除，都涉及 ReviewCard、WordSense、ReviewLog 或 EncounteredWord 语义，不能直接边写边抽。
+4. **危险写操作必须先 scout，后实施。** 先由 CodeBuddy 只读侦察现有写操作调用链、事务边界、权限隔离、日志保留规则，再由 WorkBuddy 判断产品风险和用户提示，最后才决定是否让 OpenCode 抽服务。
+5. **不要把删除类逻辑和普通重构混在一起。** 删除、reset、bulk 操作必须作为独立 Phase；每个 Phase 都要说明数据是否可恢复、是否保留 ReviewLog、是否影响 WordSense 状态。
+6. **row payload 字段契约必须稳定。** 管理页行数据字段被 data、export、edit、enabled、dueNow、reset 等多个流程共用；字段 key、日期 ISO 格式、`missing_*` 动态计算、`source_kind` 语义都不能随重构改变。
+7. **以"让 OpenCode 更安全接盘"为优先排序。** 架构优化优先处理最容易导致 Agent 误改、越界、重复实现、字段漂移、数据误删的部分，而不是追求形式上的"更优雅"。
+8. **每次架构优化都要报告三件事：**
+   - 是否减少 Controller 职责。
+   - 是否新增清晰 Service 边界。
+   - 是否保留 observable behavior。
+
+## 16. 切换对话后的接续规则
+
+1. 新对话开始时，先查 GitHub 最新 master，不能只用旧聊天压缩内容判断状态。
+2. 当前已知服务边界链路应作为背景：
+   - 查询逻辑已抽到 `ReviewCardManageQueryService`。
+   - 导出格式已抽到 `ReviewCardExportService`。
+   - 行序列化已抽到 `ReviewCardManageItemSerializerService`。
+3. 下一步不直接碰危险写操作实现，而是先做写操作边界侦察。
+4. 推荐下一轮任务名：`ReviewCardManage-MutationBoundary-Scout-1`。
+5. 该任务性质应为只读 scout，不改代码，不 commit，不 push。
+6. scout 需要覆盖：
+   - `update()`
+   - `enabled()`
+   - `dueNow()`
+   - `reset()`
+   - `destroy()`
+   - `bulkEnabled()`
+   - `bulkDestroy()`
+   - `findManageableSenseCard()`
+   - `WordSenseService::removeSenseFromReviewSystem()`
+   - `ReviewCardService::resetCardToNew()`
+7. 只有侦察报告明确说明安全拆分方案后，才允许进入真正的写操作 service extraction。

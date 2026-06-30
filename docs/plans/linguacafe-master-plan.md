@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-06-30 (TRAE-Smoke-Guard-ChapterId-1)
+> **最后更新**：2026-06-30 (Docs-ServiceBoundaryWorkflow-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -92,6 +92,12 @@
 | Reader-UI-6-a | "删除词条"语义收口 → "回归为新词" + 确认弹窗如实告知行为 |
 | Reader-UI-6-b | 后端实现：删除 sense ReviewLog + legacy word ReviewLog，删除（禁用→改为删除）legacy word ReviewCard |
 
+### 3.6 架构收敛 — ReviewCardManageController 职责分离
+
+| 阶段 | 说明 |
+|------|------|
+| ReviewCardManage-ServiceBoundary-1 | ✅ 已完成 — 管理页 Controller 已分离查询、导出、行序列化三类职责：`ReviewCardManageQueryService`、`ReviewCardExportService`、`ReviewCardManageItemSerializerService`。后续危险写操作必须先只读侦察，不直接抽离。 |
+
 ---
 
 ## 4. 未完成任务总表
@@ -179,7 +185,14 @@
 | SenseReview-Smoke-4 | More 菜单体验 | 📋 待验收 |
 | SenseReview-Smoke-5 | 确认每日上限和超额复习入口真实可用 | 📋 待验收 |
 
-### 4.9 Dev / 运行环境
+### 4.9 ReviewCardManage 安全服务边界
+
+| 编号 | 内容 | 状态 |
+|------|------|------|
+| ReviewCardManage-MutationBoundary-Scout-1 | 只读侦察管理页危险写操作边界：编辑、归档/恢复、立即到期、重置、彻底删除、批量操作、权限校验、ReviewLog 保留语义 | 📋 下一步建议 |
+| ReviewCardManage-MutationService-Extract-1 | 在 scout 通过后，再决定是否抽取安全写操作 Service；不得直接处理删除/reset/bulk | 📋 待侦察后决定 |
+
+### 4.10 Dev / 运行环境
 
 | 编号 | 内容 | 状态 |
 |------|------|------|
@@ -243,11 +256,12 @@
 
 | 建议顺序 | 编号 | 内容 | 理由 |
 |----------|------|------|------|
-| 1 | Reader-UI-9 | ✅ 已完成 — 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | 用户明确要求，改动小，价值高 |
-| 2 | Reader-UI-1-a | 查词侧栏第一轮瘦身 | 隐藏旧 SRS 1-7 按钮，"旧词条释义"→"选择释义"，词典默认收起 |
-| 3 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 | 用户明确要求，改动小，价值高 |
-| 4 | AI-Reading-Assist-3 | ✅ 已完成 — 确认保存 AI 解析结果（不创建 WordSense/ReviewCard/ReviewLog） | 新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮 |
-| 5 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
-| 5 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
-| 6 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
-| 7 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 清理旧 SRS 遗留逻辑 |
+| 1 | ReviewCardManage-MutationBoundary-Scout-1 | 只读侦察管理页危险写操作服务边界 | 用户明确希望把危险操作做成更安全的服务边界；先 scout，不直接改删除/reset/bulk |
+| 2 | Reader-UI-9 | ✅ 已完成 — 查词栏显示 FSRS 熟悉度百分比 + 小进度条 | 用户明确要求，改动小，价值高 |
+| 3 | Reader-UI-1-a | 查词侧栏第一轮瘦身 | 隐藏旧 SRS 1-7 按钮，"旧词条释义"→"选择释义"，词典默认收起 |
+| 4 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 | 用户明确要求，改动小，价值高 |
+| 5 | AI-Reading-Assist-3 | ✅ 已完成 — 确认保存 AI 解析结果（不创建 WordSense/ReviewCard/ReviewLog） | 新增 chapter_ai_reading_assists 表 + confirm 接口 + 前端按钮 |
+| 6 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | 核心 AI 辅助阅读功能 |
+| 6 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
+| 7 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
+| 8 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 清理旧 SRS 遗留逻辑 |
