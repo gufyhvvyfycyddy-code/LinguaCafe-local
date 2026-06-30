@@ -391,7 +391,10 @@
 
                 window.addEventListener('resize', this.handleReaderResize);
                 window.addEventListener('scroll', this.updateToolbarPosition);
-                document.getElementById('fullscreen-box').addEventListener('fullscreenchange', this.updateFullscreen);
+                const fullscreenBox = document.getElementById('fullscreen-box');
+                if (fullscreenBox) {
+                    fullscreenBox.addEventListener('fullscreenchange', this.updateFullscreen);
+                }
                 for (let i = 0; i < this.chapters.length; i++) {
                     if (this.chapters[i].id == this.chapterId && i < this.chapters.length - 1) {
                         this.nextChapter = this.chapters[i + 1].id;
@@ -420,6 +423,10 @@
             }
             window.removeEventListener('resize', this.handleReaderResize);
             window.removeEventListener('scroll', this.updateToolbarPosition);
+            const fullscreenBox = document.getElementById('fullscreen-box');
+            if (fullscreenBox) {
+                fullscreenBox.removeEventListener('fullscreenchange', this.updateFullscreen);
+            }
         },
         // this runs after the initial data
         // was downloaded with axios
@@ -471,13 +478,16 @@
                 });
             },
             fullscreen() {
-                if (document.fullscreenEnabled) {
-                    document.getElementById('fullscreen-box').requestFullscreen();
+                const fullscreenBox = document.getElementById('fullscreen-box');
+                if (document.fullscreenEnabled && fullscreenBox) {
+                    fullscreenBox.requestFullscreen();
                     this.fullscreenMode = true;
                 }
             },
             exitFullscreen() {
-                document.exitFullscreen();
+                if (document.fullscreenElement) {
+                    document.exitFullscreen();
+                }
                 this.fullscreenMode = false;
             },
             updateFullscreen: function() {
