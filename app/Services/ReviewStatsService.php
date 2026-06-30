@@ -2,9 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ReviewCard;
-use App\Models\ReviewLog;
-use App\Models\WordSense;
 use App\Services\SenseReviewQueryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;

@@ -4,7 +4,6 @@ namespace App\Services;
 
 use App\Models\Chapter;
 use App\Models\ReviewCard;
-use App\Models\ReviewLog;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\SettingsService;
