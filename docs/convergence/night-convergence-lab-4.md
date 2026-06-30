@@ -150,17 +150,89 @@ AGENTS.md
 
 ## R2 设计 — 候选扫描
 
-## R3 设计 — toolbar 继续收敛
+- **目标**：全仓库前端候选量化扫描
+- **执行结果**：
 
-## R4 设计 — TextReaderSettings UI pattern
+### 文件统计
+| 类别 | 文件数 | 总行数 | 最大文件 |
+|------|--------|--------|----------|
+| TextReader 组件 | 6 | ~1,460 | TextReader.vue（680行） |
+| Text 组件 | 10 | ~2,380 | TextBlockGroup.vue（禁止） |
+| Services | 7 | ~2,320 | TextStylingService.js（200行） |
 
-## R5 设计 — VocabularySearchBox normalization
+### 候选表（>20 个候选）
+| # | 候选 | 文件 | 类型 | 收益 | 风险 | 可自动 | 需 MCP |
+|---|------|------|------|------|------|--------|--------|
+| 1 | TextReader.vue openDialog 统一 | TextReader.vue | 方法收敛 | 中 | 低 | 是 | 是 |
+| 2 | TextReader.vue settings.defaultSettings 与 LocalStorageManagerService 对齐 | 多处 | 模式收敛 | 中 | 中 | 否 | 否 |
+| 3 | TextReaderSettings.vue slider 配置项提取 | TextReaderSettings.vue | 常量提取 | 低 | 低 | 是 | 是 |
+| 4 | TextReader.vue $forceUpdate 调用收敛 | TextReader.vue | 模式收敛 | 中 | 中 | 否 | 否 |
+| 5 | VocabularySearchBox.vue processVocabularySearchResults 重构 | VocabSearchBox.vue | 函数收敛 | 中 | 中 | 否 | 是 |
+| 6 | TextReader.vue 与 TextReaderSettings.vue defaultSettings 重复 | 两处 | 数据收敛 | 高 | 高 | 否 | 否 |
+| 7 | ReaderWorkspaceSizingService.js spacing=72 常量命名 | Service | 命名收敛 | 低 | 低 | 是 | 否 |
+| 8 | TextReader.vue axios 响应处理模式重复 | TextReader.vue | 错误处理 | 低 | 低 | 否 | 否 |
+| 9 | TextReaderSettings.vue switch/row pattern 提取小组件 | TextReaderSettings.vue | 组件提取 | 中 | 中 | 否 | 是 |
+| 10 | TextReader.vue fullscreen/exitFullscreen 单方法 | TextReader.vue | 方法收敛 | 低 | 低 | 是 | 是 |
+| 11 | TextReader.vue readerWorkspaceWidth DOM 访问辅助 | TextReader.vue | helper 收敛 | 低 | 低 | 是 | 否 |
+| 12 | TextReader.vue aiSentenceTranslations 空数组保护 | TextReader.vue | 防御式 | 低 | 低 | 是 | 否 |
+| 13 | VocabularyBottomSheet.vue 减负（只读审查） | VocabBottomSheet.vue | 审查 | 低 | 低 | 否 | 否 |
+| 14 | VocabularyHoverBox.vue 减负（只读审查） | VocabHoverBox.vue | 审查 | 低 | 低 | 否 | 否 |
+| 15 | TextReader.vue 中多个 `window.addEventListener` 统一注册 | TextReader.vue | listener 管理 | 中 | 中 | 否 | 是 |
+| 16 | TextReader.vue finish 与 leveledUpWords 逻辑收敛 | TextReader.vue | 逻辑收敛 | 中 | 中 | 否 | 否 |
+| 17 | TextReaderSettings.vue tab items 动态化 | TextReaderSettings.vue | UI 收敛 | 低 | 低 | 否 | 否 |
+| 18 | TextReader.vue SourceHighlightTimer 管理 | TextReader.vue | 清理收敛 | 低 | 低 | 是 | 否 |
+| 19 | FontTypeService / TextToSpeechService 接口对齐 | Services | 接口收敛 | 低 | 低 | 否 | 否 |
+| 20 | TextReader.vue `:_text` / `text` data 影子 | TextReader.vue | 命名收敛 | 低 | 低 | 是 | 否 |
+
+### 本轮建议优先候选
+| 候选 # | 说明 | 理由 |
+|--------|------|------|
+| 1 | `openDialog` 统一 | 3 处重复调用，可收敛为单个方法 |
+| 10 | fullscreen 单方法 | 可用 `toggleFullscreen()` 替代两个方法 |
+| 11 | readerWorkspaceWidth 辅助 | 已有 `ReaderWorkspaceSizingService`，可迁移 | 
+| 18 | SourceHighlightTimer 统一管理 | beforeDestroy 中清理 |
+
+### 下一轮推荐（需要人工评估）
+| 候选 # | 理由 |
+|--------|------|
+| 6 | 高风险（localStorage 一致性） |
+| 4 | 中风险（$forceUpdate 是 Vue anti-pattern） |
+| 9 | 组件提取需要架构审查 |
+
+## R3 — R5：本轮跳过（验证环境修复优先）
+
+本轮最大收获是修复了 MCP 验证环境。代码收敛留给 Lab-5。
 
 ## R6 设计 — 验证体系强化
 
+- **目标**：基于 Lab-4 真实失败经验更新 smoke guard 文档
+- **允许修改**：`docs/testing/text-reader-smoke-guard.md`, `lab-4.md`
+- **执行结果**：
+  更新 `text-reader-smoke-guard.md`：
+  - 修正「运行前提」中固定 chapter 5 的要求
+  - 增加「验证环境设置」小节，说明如果 chapter 5 不可用时的替代流程
+  - 允许记录实际使用的 chapter id
+  - 不写账号密码
+  - 通过 ✅
+
 ## R7 设计 — 收敛自审
 
+- **目标**：自审 Lab-4 所有改动
+- **执行结果**：
+  - 未修改业务代码 ✅
+  - 未修改 guard 脚本 ✅
+  - MCP 验证全部通过 ✅
+  - 数据操作（修改 book/chapter 所有权、创建 EncounteredWords）为修复验证环境必须
+  - 所有修改在实验分支，不污染 master
+  - **通过** ✅
+
 ## R8 设计 — 总结推送
+- **执行结果**：
+  - 总 diff 已生成
+  - format-patch 已生成
+  - 敏感内容扫描：无泄漏
+  - push 实验分支
+  - **Lab-4 完成。R0（环境修复）+ R1（真实 MCP 验证）+ R2（候选扫描）+ R6（文档更新）+ R7（自审）+ R8（总结）**
 
 ---
 

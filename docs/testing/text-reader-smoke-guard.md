@@ -9,8 +9,9 @@
 - 本地项目 `php artisan serve` 已在运行（推荐通过 `--base-url` 参数指定地址，默认 `http://localhost:8000`）
 - 浏览器已登录（通过 `/login` 页面）
 - 开发环境需要有一个可登录的本地测试用户（登录方式由用户在本地环境自行准备，不写入仓库）
-- 章节 `/chapters/read/5` 存在且为英文内容
-- 章节 5 已保存 AI 阅读辅助数据（含 `substantive` 在 sentence_index=0 的 AI 建议）
+- 章节 `/chapters/read/<id>` 存在且为英文内容（默认使用 chapter 5；如不可用，可扫描 `/books` 页面寻找可用章节）
+- 如果使用非默认章节，记录实际 chapter id
+- 章节已保存 AI 阅读辅助数据（含 `substantive` 在 sentence_index=0 的 AI 建议）
 - 本机已有 Python + Playwright（如果本机已有 Playwright，可运行自动脚本。如果没有，不要在本轮任务中安装依赖，改用手动 smoke）
 
 ## 不变量
