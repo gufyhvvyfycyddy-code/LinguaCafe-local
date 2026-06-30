@@ -38,8 +38,18 @@
             </div>
         </div>
 
-        <!-- Scrollable dictionary results -->
+        <!-- Scrollable unified candidate results (AI + dictionary) -->
         <div class="dictionary-results-scroll">
+            <!-- AI suggestions (vocab + phrase) — unified with dictionary rows -->
+            <ai-suggestion-panel
+                :vocabulary-suggestions="aiVocabSuggestions"
+                :phrase-suggestions="aiPhraseSuggestions"
+                :loading="aiLookupLoading"
+                :error="aiLookupError"
+                @use-vocab-suggestion="$emit('use-vocab-suggestion', $event)"
+                @use-phrase-suggestion="$emit('use-phrase-suggestion', $event)"
+            />
+
             <div v-if="!dictionaryApiSearchLoading" class="search-result" v-for="(searchResult, searchResultIndex) in apiSearchResults" :key="`api-${searchResultIndex}`">
                 <div
                     v-for="(definition, definitionIndex) in searchResult.definitions"
@@ -92,11 +102,32 @@
 </template>
 
 <script>
+import AiSuggestionPanel from './AiSuggestionPanel.vue';
+
 export default {
+    components: {
+        AiSuggestionPanel,
+    },
     props: {
         language: String,
         anyApiDictionaryEnabled: Boolean,
-        searchTerm: String
+        searchTerm: String,
+        aiVocabSuggestions: {
+            type: Array,
+            default: () => [],
+        },
+        aiPhraseSuggestions: {
+            type: Array,
+            default: () => [],
+        },
+        aiLookupLoading: {
+            type: Boolean,
+            default: false,
+        },
+        aiLookupError: {
+            type: String,
+            default: '',
+        },
     },
     watch: {
         searchTerm() {

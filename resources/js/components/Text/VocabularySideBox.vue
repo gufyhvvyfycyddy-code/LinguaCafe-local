@@ -140,18 +140,7 @@
                     </div>
 
                     <template v-if="showAddSensePanel">
-                        <!-- Section: AI Suggestions -->
-                        <ai-suggestion-panel
-                            :key="word"
-                            :vocabulary-suggestions="aiVocabSuggestions"
-                            :phrase-suggestions="aiPhraseSuggestions"
-                            :loading="aiLookupLoading"
-                            :error="aiLookupError"
-                            @use-vocab-suggestion="useAiSuggestion"
-                            @use-phrase-suggestion="useAiPhraseSuggestion"
-                        />
-
-                        <!-- Section: Dictionary -->
+                        <!-- Section: Unified candidate list (AI + dictionary) -->
                         <div class="mt-2">
                             <v-text-field
                                 placeholder="搜索词典..."
@@ -167,7 +156,7 @@
                             />
                             <div class="vocab-box-subheader d-flex align-center mt-1" @click="showDictionaryResults = !showDictionaryResults" style="cursor:pointer;">
                                 <v-icon x-small class="mr-1">mdi-book-open-variant</v-icon>
-                                <span class="text-caption">词典结果</span>
+                                <span class="text-caption">候选结果（AI + 词典）</span>
                                 <v-spacer />
                                 <v-icon x-small>{{ showDictionaryResults ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                             </div>
@@ -176,8 +165,14 @@
                                 :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled"
                                 :language="$props.language"
                                 :searchTerm="searchField"
+                                :ai-vocab-suggestions="aiVocabSuggestions"
+                                :ai-phrase-suggestions="aiPhraseSuggestions"
+                                :ai-lookup-loading="aiLookupLoading"
+                                :ai-lookup-error="aiLookupError"
                                 @addDefinitionToInput="addDefinitionToInput"
                                 @addDefinitionAsSense="addDefinitionAsSense"
+                                @use-vocab-suggestion="useAiSuggestion"
+                                @use-phrase-suggestion="useAiPhraseSuggestion"
                             />
                         </div>
 
@@ -217,13 +212,11 @@
 <script>
 import { mapState } from 'vuex';
 import WordSensesList from './WordSensesList.vue';
-import AiSuggestionPanel from './AiSuggestionPanel.vue';
 import { getReaderSidebarCssWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
 
 export default {
     components: {
         WordSensesList,
-        AiSuggestionPanel,
     },
     props: {
         language: String,
@@ -277,6 +270,13 @@ export default {
         '_sentenceIndex'() {
             if (this.$store.state.vocabularyBox.active && this.word) {
                 this.loadAiSuggestions();
+            }
+        },
+        // When the add-sense panel expands, auto-expand the unified candidate list
+        // so AI suggestions and dictionary rows are visible together.
+        showAddSensePanel(val) {
+            if (val) {
+                this.showDictionaryResults = true;
             }
         },
     },
