@@ -653,6 +653,48 @@ def health_check():
             result['tests'][f'lemminflect_{word}'] = lemmas[0] if lemmas else None
     except ImportError:
         result['lemminflect_available'] = False
+    # English irregular lemma check: replicate tokenizeText fallback logic
+    # so health reveals whether irregular forms are correctly lemmatized.
+    # This does NOT change tokenizeText behavior — it only adds observability.
+    result['english_irregular'] = []
+    irregular_cases = [
+        ('ran',    'VERB', 'run'),
+        ('running','VERB', 'run'),
+        ('mice',   'NOUN', 'mouse'),
+        ('geese',  'NOUN', 'goose'),
+        ('better', 'ADJ',  'good'),
+        ('best',   'ADJ',  'good'),
+        ('went',   'VERB', 'go'),
+        ('children','NOUN','child'),
+        ('studies','VERB', 'study'),
+        ('was',    'VERB', 'be'),
+    ]
+    if result['en_core_web_sm_loaded'] and result['lemminflect_available']:
+        nlp = spacy.load('en_core_web_sm')
+        import lemminflect
+        for surface, pos, expected in irregular_cases:
+            doc = nlp(surface)
+            token = doc[0]
+            lemma = token.lemma_
+            # Apply the same fallback logic as tokenizeText (lines 314-326)
+            if lemma == token.text.lower():
+                if token.pos_ in ('VERB', 'NOUN', 'ADJ', 'ADV'):
+                    try:
+                        lemmas = lemminflect.getLemma(token.text, upos=pos)
+                        if lemmas and len(lemmas) > 0:
+                            candidate = lemmas[0]
+                            if (candidate != token.text.lower()
+                                and len(candidate) >= 2
+                                and abs(len(candidate) - len(token.text)) <= 4):
+                                lemma = candidate
+                    except Exception:
+                        pass
+            result['english_irregular'].append({
+                'surface': surface,
+                'expected': expected,
+                'actual': lemma,
+                'passed': lemma == expected,
+            })
     return json.dumps(result)
 
 @route('/models/install', method = 'POST')

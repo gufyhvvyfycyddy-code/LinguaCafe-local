@@ -50,7 +50,9 @@ LemmInflect 专门为英语不规则形态设计，准确率 ~96%。当前 fallb
 
 ### 当前 health 端点测试用例
 
-`/tokenizer/health` 端点测试了：`opened`, `called`, `stopped`, `running`, `walking`——这些都是规则变化词。**当前没有测试不规则形态。** LemmInflect 测试也只包含 `opened`, `called`, `children`。
+`/tokenizer/health` 端点测试了：`opened`, `called`, `stopped`, `running`, `walking`——这些都是规则变化词。LemmInflect 测试也只包含 `opened`, `called`, `children`。
+
+**Lemma-Origin-HealthIrregular-1** 已把 10 个不规则或易错英语词形测试加入 `/tokenizer/health`，包括 `ran`/`running`/`mice`/`geese`/`better`/`best`/`went`/`children`/`studies`/`was`。每个 case 记录 surface、expected、actual、passed。**不改 tokenizeText 实际行为**，只增加健康检查可见性。
 
 ## 3. 当前导入链路事实
 
