@@ -25,16 +25,16 @@
                             <!-- With base word -->
                             <div class="expression mb-2 text-center default-font" v-if="baseWord !== ''">
                                 <ruby>
-                                    {{ baseWord }}
+                                    {{ word }}
                                     <rt v-if="($props.language == 'japanese' || $props.language == 'chinese')">
-                                        {{ baseWordReading }}
+                                        {{ reading }}
                                     </rt>
                                 </ruby>
                                 <v-icon color="text">mdi-arrow-right-thick</v-icon>
                                 <ruby>
-                                    {{ word }}
+                                    {{ baseWord }}
                                     <rt v-if="($props.language == 'japanese' || $props.language == 'chinese')">
-                                        {{ reading}}
+                                        {{ baseWordReading }}
                                     </rt>
                                 </ruby>
                             </div>

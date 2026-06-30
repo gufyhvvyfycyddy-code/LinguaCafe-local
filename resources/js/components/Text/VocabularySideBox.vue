@@ -43,13 +43,22 @@
                     <div class="text-caption font-weight-bold mb-1">单词基础信息</div>
                     <div class="d-flex align-center">
                         <div>
-                            <div class="text-h6 default-font mb-1">{{ word }}</div>
-                            <div class="text-caption text--secondary">
-                                当前词形：<strong class="default-font">{{ word }}</strong>
-                                <span class="mx-2">词元：
-                                    <strong v-if="!editingLemma" class="default-font">{{ studyBase || baseWord || word }}</strong>
-                                    <span v-if="!editingLemma" class="lemma-edit-link ml-1" @click="startEditLemma">[修改]</span>
-                                    <span v-if="editingLemma" class="lemma-edit-inline">
+                            <div class="text-h6 default-font mb-1">
+                                <template v-if="!editingLemma">
+                                    <span v-if="lemmaDisplay !== word" class="d-flex align-center flex-wrap">
+                                        <span class="default-font">{{ word }}</span>
+                                        <span class="mx-1 text--secondary">&rarr;</span>
+                                        <span class="default-font">{{ lemmaDisplay }}</span>
+                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[修改]</span>
+                                    </span>
+                                    <span v-else class="d-flex align-center flex-wrap">
+                                        <span class="default-font">{{ word }}</span>
+                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[修改]</span>
+                                    </span>
+                                </template>
+                                <template v-if="editingLemma">
+                                    <span class="default-font">{{ word }} &rarr; </span>
+                                    <span class="lemma-edit-inline">
                                         <input
                                             ref="lemmaInput"
                                             v-model="editLemmaValue"
@@ -61,7 +70,7 @@
                                         <v-icon x-small class="ml-1" @click="saveLemma">mdi-check</v-icon>
                                         <v-icon x-small @click="cancelEditLemma">mdi-close</v-icon>
                                     </span>
-                                </span>
+                                </template>
                             </div>
                         </div>
                                 <v-spacer />
@@ -239,6 +248,9 @@ export default {
                 : null;
             const width = readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
             return getReaderSidebarCssWidthForWorkspace(width);
+        },
+        lemmaDisplay() {
+            return this._studyBase || this._baseWord || this.word;
         },
         ...mapState({
             type: state => state.vocabularyBox.type,

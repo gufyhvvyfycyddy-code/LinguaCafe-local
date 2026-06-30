@@ -73,7 +73,8 @@ FSRS 熟悉度: XX%
 
 ### 第一轮只做：
 
-1. **只改 `VocabularySideBox.vue`**。
+1. **改 `VocabularySideBox.vue`**（查词侧栏信息面板）。
+2. **改 `VocabularyBox.vue`**（浮动查词弹窗）。原显示为 `lemma → surface`（错误顺序），已修正为 `surface → lemma`。
 2. 把"当前词形：X  词元：Y"标签格式改为箭头格式。
 3. 箭头格式位置：替换当前"当前词形：X  词元：Y"这一行。
 4. 具体位置：`VocabularySideBox.vue` 第 42-65 行的 word info 区域。
