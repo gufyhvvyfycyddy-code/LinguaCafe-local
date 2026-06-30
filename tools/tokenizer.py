@@ -262,6 +262,17 @@ def getTokenizerDoc(language, words):
         doc = multi_nlp(words)
     return doc
 
+# English irregular lemma override: correct known edge cases that
+# spaCy + LemmInflect fallback cannot handle together (e.g. PROPN-tagged
+# nouns, spaCy returning a different-but-incorrect lemma).
+# Keyed by lowercased surface. Only for English. Shared by tokenizeText
+# and /tokenizer/health so they stay in sync.
+ENGLISH_IRREGULAR_OVERRIDES = {
+    'geese': 'goose',
+    'better': 'good',
+    'best': 'good',
+}
+
 # used for splitting and parsing text
 sentenceEndings = ['NEWLINE', '？', '！', '。', '?', '!', '.', '»', '«']
 duplicateRemovalRegex = '(TMP_ST){2,}'
@@ -324,6 +335,14 @@ def tokenizeText(text, language, sentenceIndexStart = 0):
                                 lemma = candidate
                     except Exception:
                         pass  # LemmInflect is best-effort; spaCy lemma stays
+            
+            # English irregular override: correct edge cases that the
+            # spaCy + LemmInflect fallback pipeline cannot handle.
+            # Only for English; only for explicitly listed surfaces.
+            if language == 'english' and word.lower() in ENGLISH_IRREGULAR_OVERRIDES:
+                override = ENGLISH_IRREGULAR_OVERRIDES[word.lower()]
+                if override != lemma:
+                    lemma = override
             
             # get hiragana reading
             reading = list()
@@ -653,9 +672,9 @@ def health_check():
             result['tests'][f'lemminflect_{word}'] = lemmas[0] if lemmas else None
     except ImportError:
         result['lemminflect_available'] = False
-    # English irregular lemma check: replicate tokenizeText fallback logic
-    # so health reveals whether irregular forms are correctly lemmatized.
-    # This does NOT change tokenizeText behavior — it only adds observability.
+    # English irregular lemma check: replicate tokenizeText full pipeline
+    # (spaCy → LemmInflect fallback → ENGLISH_IRREGULAR_OVERRIDES)
+    # so health accurately reflects real lemmatization output.
     result['english_irregular'] = []
     irregular_cases = [
         ('ran',    'VERB', 'run'),
@@ -689,6 +708,11 @@ def health_check():
                                 lemma = candidate
                     except Exception:
                         pass
+            # Apply the same English irregular override as tokenizeText
+            if surface.lower() in ENGLISH_IRREGULAR_OVERRIDES:
+                override = ENGLISH_IRREGULAR_OVERRIDES[surface.lower()]
+                if override != lemma:
+                    lemma = override
             result['english_irregular'].append({
                 'surface': surface,
                 'expected': expected,
