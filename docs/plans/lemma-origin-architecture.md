@@ -56,6 +56,8 @@ LemmInflect 专门为英语不规则形态设计，准确率 ~96%。当前 fallb
 
 **Lemma-Origin-DoctorIrregular-1** 让 `php artisan tokenizer:doctor` 读取 `/tokenizer/health` 的 `english_irregular`，在 human / JSON 输出中展示 expected/actual/passed。任一 case 失败时 doctor 返回失败 exit code。仍不改变 tokenizer 行为。
 
+**Lemma-Origin-DisplayArchitecture-1** 开始原词 + 原形显示功能的架构核验。用户选择的文案格式为 "geese → goose"。不改 tokenizer / WordSense / ReviewCard / FSRS。详情见 `docs/plans/lemma-origin-display-architecture.md`。
+
 **Lemma-Origin-IrregularOverride-1** 通过最小 English irregular override table (`ENGLISH_IRREGULAR_OVERRIDES`) 修复了 `geese→goose`、`better→good`、`best→good`。不新增依赖，不改导入链路，不改 WordSense / ReviewCard / FSRS。health 和 doctor 共享同一 override 表，防止分叉。doctor 所有 10 个 irregular cases 全部通过，exit code 0。
 
 ## 3. 当前导入链路事实
