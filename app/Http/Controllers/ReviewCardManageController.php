@@ -40,13 +40,6 @@ class ReviewCardManageController extends Controller
         'collocations',
     ];
 
-    /**
-     * Whitelist of sortable columns.
-     * Maps query-param keys to fully-qualified column expressions.
-     * Only review_cards direct fields are supported — no word_senses join.
-     */    /**
-     * Maximum number of cards that can be exported in a single request.
-     */
     public function data(Request $request): JsonResponse
     {
         $userId = Auth::user()->id;
@@ -71,13 +64,6 @@ class ReviewCardManageController extends Controller
             ],
         ]);
     }
-
-    /**
-     * GET /review-cards/manage/export
-     * Export current filtered/sorted results as JSON download.
-     * Reuses the same security constraints and filtering logic as data().
-     * Does NOT paginate — exports all matching cards up to EXPORT_LIMIT.
-     */
     /**
      * GET /review-cards/manage/export
      * Export current filtered/sorted results as JSON download.
