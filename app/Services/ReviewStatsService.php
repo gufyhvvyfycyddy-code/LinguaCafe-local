@@ -5,11 +5,16 @@ namespace App\Services;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
+use App\Services\SenseReviewQueryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class ReviewStatsService
 {
+    public function __construct(
+        private SenseReviewQueryService $senseReviewQueryService,
+    ) {
+    }
     /**
      * All aggregate stats for the current user/language.
      * Merges cardStats and reviewActivity into a single response.
@@ -117,49 +122,26 @@ class ReviewStatsService
     /**
      * Base query for confirmed sense review cards scoped to user/language.
      *
-     * Joins word_senses to enforce:
-     *  - target_type = 'sense'
-     *  - word_senses.status = 'confirmed'
-     *  - user_id / language_id isolation on both tables
+     * Delegates common joins/filters to SenseReviewQueryService and adds
+     * select('review_cards.*') for card-level stats.
      */
     private function baseCardQuery(int $userId, string $language)
     {
-        return ReviewCard::query()
-            ->select('review_cards.*')
-            ->join('word_senses', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
-            })
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
-            ->where('word_senses.user_id', $userId)
-            ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED);
+        return $this->senseReviewQueryService
+            ->confirmedSenseCardQuery($userId, $language)
+            ->select('review_cards.*');
     }
 
     /**
-     * Base query for today's sense-only review logs.
+     * Base query for sense-only review logs.
      *
-     * Joins review_cards (for target_type filtering) and word_senses
-     * (for status/user/language isolation) since ReviewLog has no
-     * target_type or direct sense link.
+     * Delegates common joins/filters to SenseReviewQueryService and adds
+     * select('review_logs.*') for log-level aggregation.
      */
     private function baseLogQuery(int $userId, string $language, Carbon $since)
     {
-        return ReviewLog::query()
-            ->select('review_logs.*')
-            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
-            ->join('word_senses', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
-            })
-            ->where('review_logs.user_id', $userId)
-            ->where('review_logs.language_id', $language)
-            ->where('review_logs.reviewed_at', '>=', $since)
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
-            ->where('word_senses.user_id', $userId)
-            ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED);
+        return $this->senseReviewQueryService
+            ->confirmedSenseReviewLogQuery($userId, $language, $since)
+            ->select('review_logs.*');
     }
 }

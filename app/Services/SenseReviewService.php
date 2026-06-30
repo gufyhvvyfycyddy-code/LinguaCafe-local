@@ -15,6 +15,7 @@ class SenseReviewService
 {
     public function __construct(
         private SettingsService $settingsService,
+        private SenseReviewQueryService $senseReviewQueryService,
     ) {
     }
     /**
@@ -29,18 +30,10 @@ class SenseReviewService
      */
     private function dueSenseReviewCardQuery(int $userId, string $language): \Illuminate\Database\Eloquent\Builder
     {
-        return ReviewCard::query()
-            ->join('word_senses', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
-            })
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
+        return $this->senseReviewQueryService
+            ->confirmedSenseCardQuery($userId, $language)
             ->where('review_cards.fsrs_enabled', true)
-            ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
-            ->where('word_senses.user_id', $userId)
-            ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED);
+            ->where('review_cards.fsrs_due_at', '<=', Carbon::now());
     }
 
     public function dueCards(int $userId, string $language)
@@ -85,22 +78,10 @@ class SenseReviewService
     {
         $today = Carbon::today();
 
-        return ReviewLog::query()
-            ->join('review_cards', 'review_cards.id', '=', 'review_logs.review_card_id')
-            ->join('word_senses', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
-            })
-            ->where('review_logs.user_id', $userId)
-            ->where('review_logs.language_id', $language)
-            ->where('review_logs.reviewed_at', '>=', $today)
+        return $this->senseReviewQueryService
+            ->confirmedSenseReviewLogQuery($userId, $language, $today)
             ->where('review_logs.source', '!=', 'reset')
             ->where('review_logs.rating', '!=', 'reset')
-            ->where('review_cards.user_id', $userId)
-            ->where('review_cards.language_id', $language)
-            ->where('word_senses.user_id', $userId)
-            ->where('word_senses.language_id', $language)
-            ->where('word_senses.status', WordSense::STATUS_CONFIRMED)
             ->count('review_logs.id');
     }
 
