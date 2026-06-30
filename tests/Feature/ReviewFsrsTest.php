@@ -439,7 +439,7 @@ class ReviewFsrsTest extends TestCase
 
         $card = app(ReviewCardService::class)->ensureSenseCard($sense);
 
-        $serialized = app(\App\Services\SenseReviewService::class)->serializeCard($card);
+        $serialized = app(\App\Services\SenseReviewCardSerializerService::class)->serialize($card);
 
         // Verify key fields match between serializeCard and what the API returns
         $response = $this->actingAs($this->user)->post('/reviews', [

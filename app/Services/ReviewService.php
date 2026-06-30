@@ -14,6 +14,7 @@ class ReviewService {
     public function __construct(
         private SenseReviewService $senseReviewService,
         private ReviewLimitSummaryService $reviewLimitSummaryService,
+        private SenseReviewCardSerializerService $senseReviewCardSerializerService,
     ) {
     }
 
@@ -36,7 +37,7 @@ class ReviewService {
 
         $reviews = [];
         foreach ($senseCards as $card) {
-            $serialized = $this->senseReviewService->serializeCard($card);
+            $serialized = $this->senseReviewCardSerializerService->serialize($card);
             $serialized['type'] = 'sense';
             $reviews[] = (object) $serialized;
         }
