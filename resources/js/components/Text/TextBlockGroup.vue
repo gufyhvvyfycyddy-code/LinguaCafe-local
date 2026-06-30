@@ -201,6 +201,11 @@
 
 <script>
     import TextToSpeechService from './../../services/TextToSpeechService';
+    import {
+        resolveWordElementFromEventTarget,
+        resolveWordElementFromPoint,
+        readWordIndexFromElement,
+    } from './../../services/TextWordTargetService';
     import { mapState } from 'vuex';
 
     const ENGLISH_ABBREVIATIONS = new Set([
@@ -452,35 +457,18 @@
                 this.textToSpeechAvailable = this.textToSpeechService.getLanguageVoices().length > 0;
             },
             startSelectionTouchEvent: function(event) {
-                // Normalize event.target to an Element (may be a text node)
-                var element = event.target instanceof Element ? event.target : event.target?.parentElement;
+                var element = resolveWordElementFromEventTarget(event.target);
                 if (!element) {
                     this.unselectAllWords();
                     return;
-                }
-
-                // Handle ruby and rt child elements
-                if (element.localName === 'ruby') {
-                    element = element.parentElement;
-                } else if (element.localName === 'rt') {
-                    element = element.parentElement.parentElement;
-                }
-
-                // Fallback: walk up to find the nearest .word ancestor
-                if (!element || !element.classList || !element.classList.contains('word')) {
-                    element = element?.closest ? element.closest('.word') : null;
-                    if (!element) {
-                        this.unselectAllWords();
-                        return;
-                    }
                 }
 
                 if (this.$props.plainTextMode) {
                     return;
                 }
 
-                var wordIndex = parseInt(element.getAttribute('wordindex'));
-                if (isNaN(wordIndex)) {
+                var wordIndex = readWordIndexFromElement(element);
+                if (wordIndex === -1) {
                     this.unselectAllWords();
                     return;
                 }
@@ -497,31 +485,14 @@
 
                 this.startTime = performance.now();
 
-                // Normalize event.target to an Element (may be a text node)
-                var element = event.target instanceof Element ? event.target : event.target?.parentElement;
+                var element = resolveWordElementFromEventTarget(event.target);
                 if (!element) {
                     this.unselectAllWords();
                     return;
                 }
 
-                // Handle ruby and rt child elements
-                if (element.localName === 'ruby') {
-                    element = element.parentElement;
-                } else if (element.localName === 'rt') {
-                    element = element.parentElement.parentElement;
-                }
-
-                // Fallback: walk up to find the nearest .word ancestor
-                if (!element || !element.classList || !element.classList.contains('word')) {
-                    element = element?.closest ? element.closest('.word') : null;
-                    if (!element) {
-                        this.unselectAllWords();
-                        return;
-                    }
-                }
-
-                var wordIndex = parseInt(element.getAttribute('wordindex'));
-                if (isNaN(wordIndex)) {
+                var wordIndex = readWordIndexFromElement(element);
+                if (wordIndex === -1) {
                     this.unselectAllWords();
                     return;
                 }
@@ -543,10 +514,10 @@
                 }
 
                 var touch = event.changedTouches[0];
-                var element = document.elementFromPoint( touch.clientX, touch.clientY );
+                var element = resolveWordElementFromPoint(touch.clientX, touch.clientY);
 
                 var wordIndex = null;
-                if (element !== null && element.classList.contains('word') || element.classList.contains('rubyword')) {
+                if (element) {
                     wordIndex = element.getAttribute('wordindex');
                 }
 
@@ -564,15 +535,8 @@
                 }
             },
             updateSelectionMouseEvent(event) {
-                var element = event.target;
-                var wordIndex = -1;
-                if (event.target.localName === 'ruby') {
-                    element = event.target.parentElement;
-                }
-
-                if (element.classList.contains('word')) {
-                    wordIndex = parseInt(element.attributes['wordindex'].nodeValue);
-                }
+                var element = resolveWordElementFromEventTarget(event.target);
+                var wordIndex = readWordIndexFromElement(element);
 
                 if (wordIndex === -1) {
                     if (wordIndex !== this.$store.state.hoverVocabularyBox.lastHoveredWordIndex) {
