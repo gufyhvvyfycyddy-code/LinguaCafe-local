@@ -159,14 +159,20 @@
                             @keydown.stop=";"
                         ></v-text-field>
 
-                        <div class="vocab-box-subheader d-flex mt-3">词典结果</div>
+                        <div class="vocab-box-subheader d-flex mt-3">候选结果（AI + 词典）</div>
                         <!-- Search box -->
                         <vocabulary-search-box
                             :any-api-dictionary-enabled="$props.anyApiDictionaryEnabled"
                             :language="$props.language"
                             :searchTerm="searchField"
+                            :ai-vocab-suggestions="aiVocabSuggestions"
+                            :ai-phrase-suggestions="aiPhraseSuggestions"
+                            :ai-lookup-loading="aiLookupLoading"
+                            :ai-lookup-error="aiLookupError"
                             @addDefinitionToInput="addDefinitionToInput"
                             @addDefinitionAsSense="addDefinitionAsSense"
+                            @use-vocab-suggestion="useAiSuggestion"
+                            @use-phrase-suggestion="useAiPhraseSuggestion"
                         ></vocabulary-search-box>
 
                         <!-- Saved word senses -->
@@ -335,6 +341,12 @@
             positionTop: state => state.vocabularyBox.positionTop,
             width: state => state.vocabularyBox.width,
             height: state => state.vocabularyBox.height,
+            _chapterId: state => state.vocabularyBox.chapterId,
+            _sentenceIndex: state => state.vocabularyBox.sentenceIndex,
+            aiVocabSuggestions: state => state.vocabularyBox.aiVocabSuggestions,
+            aiPhraseSuggestions: state => state.vocabularyBox.aiPhraseSuggestions,
+            aiLookupLoading: state => state.vocabularyBox.aiLookupLoading,
+            aiLookupError: state => state.vocabularyBox.aiLookupError,
         }),
         data: function() {
             return {
@@ -356,8 +368,24 @@
                 searchResults: [],
             };
         },
+        watch: {
+            word() {
+                this.updateDataFromStore();
+                this.loadAiSuggestions();
+            },
+            phrase() {
+                this.updateDataFromStore();
+            },
+            // Re-trigger AI lookup when sentence changes (new word in same sentence or different sentence)
+            '_sentenceIndex'() {
+                if (this.$store.state.vocabularyBox.active && this.word) {
+                    this.loadAiSuggestions();
+                }
+            },
+        },
         mounted: function() {
             this.updateDataFromStore();
+            this.loadAiSuggestions();
         },
         methods: {
             updateDataFromStore() {
@@ -408,6 +436,58 @@
             addDefinitionAsSense(payload) {
                 if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromDictionary) {
                     this.$refs.wordSensesList.openAddFormFromDictionary(payload);
+                }
+            },
+            loadAiSuggestions() {
+                // Mirrors VocabularySideBox.loadAiSuggestions so the responsive
+                // (half-screen / narrow) vocab box shares the same AI candidate
+                // entry as the wide-screen side box. Reuses the same Vuex state
+                // and the same backend lookup endpoint.
+                const chapterId = this.$store.state.vocabularyBox.chapterId;
+                const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
+                const word = this.word;
+                const lemma = this.studyBase || this._studyBase || this._baseWord || word;
+                if (!chapterId || sentenceIndex === null || !word) {
+                    this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
+                    this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
+                    return;
+                }
+                this.$store.commit('vocabularyBox/setAiLookupLoading', true);
+                this.$store.commit('vocabularyBox/setAiLookupError', '');
+                axios.get('/chapters/ai-assist/lookup/' + chapterId, {
+                    params: { word, lemma, sentence_index: sentenceIndex }
+                }).then((response) => {
+                    const data = response.data;
+                    if (data.success) {
+                        this.$store.commit('vocabularyBox/setAiVocabSuggestions', data.vocabulary_suggestions || []);
+                        this.$store.commit('vocabularyBox/setAiPhraseSuggestions', data.phrase_suggestions || []);
+                    }
+                }).catch(() => {
+                    this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
+                    this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
+                    this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
+                }).finally(() => {
+                    this.$store.commit('vocabularyBox/setAiLookupLoading', false);
+                });
+            },
+            useAiSuggestion(vi) {
+                if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
+                    this.$refs.wordSensesList.openAddFormFromAi({
+                        pos: vi.pos || 'verb',
+                        sense_zh: vi.meaning_zh || '',
+                        source_sentence: vi.source_sentence || '',
+                        reason: vi.reason || '',
+                    });
+                }
+            },
+            useAiPhraseSuggestion(pi) {
+                if (this.$refs.wordSensesList && this.$refs.wordSensesList.openAddFormFromAi) {
+                    this.$refs.wordSensesList.openAddFormFromAi({
+                        pos: 'other',
+                        sense_zh: pi.meaning_zh || '',
+                        source_sentence: pi.source_sentence || '',
+                        reason: '词组：' + (pi.phrase || ''),
+                    });
                 }
             },
             inputChanged(inputName = '') {
