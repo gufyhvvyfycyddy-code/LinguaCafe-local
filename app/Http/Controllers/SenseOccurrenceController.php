@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
-use App\Services\SenseReviewService;
+use App\Services\SenseSourceContextService;
 use App\Services\WordSenseOccurrenceService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
@@ -18,7 +18,7 @@ class SenseOccurrenceController extends Controller
     public function __construct(
         private WordSenseOccurrenceService $occurrenceService,
         private WordSenseService $wordSenseService,
-        private SenseReviewService $senseReviewService,
+        private SenseSourceContextService $senseSourceContextService,
     )
     {
     }
@@ -301,7 +301,7 @@ class SenseOccurrenceController extends Controller
 
     public function sourceContext(int $id)
     {
-        return response()->json($this->senseReviewService->sourceContext(
+        return response()->json($this->senseSourceContextService->sourceContext(
             Auth::user()->id,
             Auth::user()->selected_language,
             $id,

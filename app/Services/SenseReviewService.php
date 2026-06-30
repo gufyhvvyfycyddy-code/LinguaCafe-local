@@ -3,7 +3,6 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
-use App\Models\WordSense;
 use App\Services\SettingsService;
 use Carbon\Carbon;
 
@@ -14,7 +13,6 @@ class SenseReviewService
         private SenseReviewQueryService $senseReviewQueryService,
         private ReviewLimitSummaryService $reviewLimitSummaryService,
         private SenseTokenPayloadService $senseTokenPayloadService,
-        private SenseSourceContextService $senseSourceContextService,
     ) {
     }
     /**
@@ -242,8 +240,4 @@ class SenseReviewService
         ];
     }
 
-    public function sourceContext(int $userId, string $language, int $senseId): array
-    {
-        return $this->senseSourceContextService->sourceContext($userId, $language, $senseId);
-    }
 }
