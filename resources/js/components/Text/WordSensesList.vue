@@ -191,6 +191,11 @@
 <script>
 import { mapState } from 'vuex';
 import AddSenseForm from './AddSenseForm.vue';
+import {
+    buildWordSenseCandidateLookupContext,
+    buildWordSenseCandidateLookupKey,
+    fetchWordSenseCandidates,
+} from '../../services/WordSenseCandidateService';
 
 const POS_OPTIONS = [
     { value: 'noun', label: '名词 noun', shortLabel: '名词' },
@@ -294,6 +299,7 @@ export default {
             saveError: '',
             prefillSource: '',
             openPanels: [],
+            latestSenseLookupKey: '',
             posOptions: POS_OPTIONS,
             newForm: this.emptyForm(),
             editForm: this.emptyForm(),
@@ -329,7 +335,13 @@ export default {
             };
         },
         fetchSenses() {
-            if (!this.effectiveLemma) {
+            const context = buildWordSenseCandidateLookupContext({
+                lemma: this.effectiveLemma,
+                language: this.language,
+            });
+
+            if (!context) {
+                this.latestSenseLookupKey = '';
                 this.senses = [];
                 this.loading = false;
                 this.error = false;
@@ -337,18 +349,16 @@ export default {
                 return;
             }
 
+            const lookupKey = buildWordSenseCandidateLookupKey(context);
+            this.latestSenseLookupKey = lookupKey;
             this.loading = true;
             this.error = false;
             this.senses = [];
 
-            axios.get('/senses/candidates', {
-                params: {
-                    lemma: this.effectiveLemma,
-                    language: this.language,
-                },
-            })
-                .then((response) => {
-                    this.senses = response.data || [];
+            fetchWordSenseCandidates(axios, context)
+                .then((senses) => {
+                    if (this.latestSenseLookupKey !== lookupKey) return;
+                    this.senses = senses;
                     // Default: expand only the most relevant sense group
                     const firstConfirmedIdx = this.senseGroups.findIndex(
                         group => group.senses.some(s => s.status === 'confirmed')
@@ -361,9 +371,11 @@ export default {
                     }
                 })
                 .catch(() => {
+                    if (this.latestSenseLookupKey !== lookupKey) return;
                     this.error = true;
                 })
                 .finally(() => {
+                    if (this.latestSenseLookupKey !== lookupKey) return;
                     this.loading = false;
                 });
         },
