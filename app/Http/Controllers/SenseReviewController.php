@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ReviewCard;
 use App\Services\ReviewCardService;
+use App\Services\SenseReviewCardSerializerService;
 use App\Services\SenseReviewService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +15,7 @@ class SenseReviewController extends Controller
         private SenseReviewService $senseReviewService,
         private ReviewCardService $reviewCardService,
         private HomeController $homeController,
+        private SenseReviewCardSerializerService $senseReviewCardSerializerService,
     ) {
     }
 
@@ -29,7 +31,7 @@ class SenseReviewController extends Controller
         $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
 
         return response()->json([
-            'cards' => $result['cards']->map(fn (ReviewCard $card) => $this->senseReviewService->serializeCard($card))->values(),
+            'cards' => $result['cards']->map(fn (ReviewCard $card) => $this->senseReviewCardSerializerService->serialize($card))->values(),
             'summary' => $result['summary'],
         ]);
     }
@@ -61,8 +63,8 @@ class SenseReviewController extends Controller
         $nextCard = $result['cards']->first();
 
         return response()->json([
-            'reviewed_card' => $this->senseReviewService->serializeCard($updatedCard->load('sense')),
-            'next_card' => $nextCard ? $this->senseReviewService->serializeCard($nextCard) : null,
+            'reviewed_card' => $this->senseReviewCardSerializerService->serialize($updatedCard->load('sense')),
+            'next_card' => $nextCard ? $this->senseReviewCardSerializerService->serialize($nextCard) : null,
             'summary' => $result['summary'],
         ]);
     }

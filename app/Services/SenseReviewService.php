@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ReviewCard;
 use App\Services\SettingsService;
 use Carbon\Carbon;
 
@@ -210,14 +209,6 @@ class SenseReviewService
                 canContinueOverLimit: $canContinueOverLimit,
             ),
         ];
-    }
-
-    /**
-     * Serialize a ReviewCard into the frontend review card payload.
-     */
-    public function serializeCard(ReviewCard $card): array
-    {
-        return $this->senseReviewCardSerializerService->serialize($card);
     }
 
 }
