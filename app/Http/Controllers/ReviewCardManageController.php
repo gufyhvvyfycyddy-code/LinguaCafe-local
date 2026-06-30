@@ -8,6 +8,7 @@ use App\Models\ReviewLog;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\ReviewCardService;
+use App\Services\ReviewCardExportService;
 use App\Services\WordSenseService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -20,6 +21,7 @@ class ReviewCardManageController extends Controller
     public function __construct(
         private WordSenseService $wordSenseService,
         private ReviewCardService $reviewCardService,
+        private ReviewCardExportService $exportService,
     )
     {
     }
@@ -54,44 +56,7 @@ class ReviewCardManageController extends Controller
 
     /**
      * Maximum number of cards that can be exported in a single request.
-     */
-    private const EXPORT_LIMIT = 5000;
-
-    /**
-     * Whitelist of allowed export field keys.
-     */
-    private const EXPORT_FIELDS = [
-        'review_card_id',
-        'word_sense_id',
-        'lemma',
-        'surface_form',
-        'pos',
-        'sense_zh',
-        'sense_en',
-        'example_sentence_en',
-        'example_sentence_zh',
-        'aliases_zh',
-        'collocations',
-        'source_chapter_id',
-        'source_chapter_title',
-        'source_kind',
-        'fsrs_state',
-        'fsrs_due_at',
-        'fsrs_stability',
-        'fsrs_difficulty',
-        'fsrs_reps',
-        'fsrs_lapses',
-        'fsrs_last_reviewed_at',
-        'fsrs_enabled',
-        'missing_definition',
-        'missing_example',
-        'missing_source',
-    ];
-
-    /**
-     * GET /review-cards/manage/data
-     * Read-only paginated list of sense review cards for current user/language.
-     */
+     */
     public function data(Request $request): JsonResponse
     {
         $userId = Auth::user()->id;
@@ -122,6 +87,12 @@ class ReviewCardManageController extends Controller
      * Export current filtered/sorted results as JSON download.
      * Reuses the same security constraints and filtering logic as data().
      * Does NOT paginate — exports all matching cards up to EXPORT_LIMIT.
+     */
+    /**
+     * GET /review-cards/manage/export
+     * Export current filtered/sorted results as JSON download.
+     * Reuses the same security constraints and filtering logic as data().
+     * Does NOT paginate — exports all matching cards up to EXPORT_LIMIT.
      */
     public function export(Request $request): JsonResponse
     {
@@ -131,41 +102,28 @@ class ReviewCardManageController extends Controller
         $query = $this->buildManageQuery($request, $userId, $language);
         $total = $query->count();
 
-        if ($total > self::EXPORT_LIMIT) {
+        if ($total > ReviewCardExportService::EXPORT_LIMIT) {
             return response()->json([
-                'message' => '当前筛选结果超过 ' . self::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
+                'message' => '当前筛选结果超过 ' . ReviewCardExportService::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
                 'total' => $total,
-                'limit' => self::EXPORT_LIMIT,
+                'limit' => ReviewCardExportService::EXPORT_LIMIT,
             ], 422);
         }
 
         $cards = $query->get();
         $items = $this->buildItems($cards, $userId, $language);
 
-        // Field selection
         $requestedFields = $request->input('fields', []);
         if (!is_array($requestedFields)) {
             $requestedFields = [];
         }
 
-        $selectedFields = [];
-        if (!empty($requestedFields)) {
-            $validFields = array_intersect($requestedFields, self::EXPORT_FIELDS);
-            if (empty($validFields)) {
-                return response()->json([
-                    'message' => '请选择至少一个有效导出字段。',
-                    'allowed_fields' => self::EXPORT_FIELDS,
-                ], 422);
-            }
-            $selectedFields = array_values($validFields);
-
-            $items = $items->map(fn ($item) => array_intersect_key(
-                $item,
-                array_flip($selectedFields)
-            ));
-        } else {
-            $selectedFields = self::EXPORT_FIELDS;
+        $fieldResult = $this->exportService->resolveFields($requestedFields);
+        if ($fieldResult['error'] !== null) {
+            return response()->json($fieldResult['error'], 422);
         }
+
+        $selectedFields = $fieldResult['selectedFields'];
 
         $filters = [
             'q' => trim($request->input('q', '')),
@@ -178,15 +136,7 @@ class ReviewCardManageController extends Controller
             'sort_dir' => $request->input('sort_dir', 'desc'),
         ];
 
-        $data = [
-            'exported_at' => now()->toISOString(),
-            'language' => $language,
-            'filters' => $filters,
-            'fields' => $selectedFields,
-            'count' => $items->count(),
-            'items' => $items,
-        ];
-
+        $data = $this->exportService->buildJsonExportData($items, $selectedFields, $filters, $language);
         $filename = 'review-cards-export-' . now()->format('Ymd-His') . '.json';
 
         return response()->json($data, 200, [
@@ -208,79 +158,18 @@ class ReviewCardManageController extends Controller
         $query = $this->buildManageQuery($request, $userId, $language);
 
         $total = $query->count();
-        if ($total > self::EXPORT_LIMIT) {
+        if ($total > ReviewCardExportService::EXPORT_LIMIT) {
             return response()->json([
                 'message' => '导出数量超过上限。',
                 'total' => $total,
-                'limit' => self::EXPORT_LIMIT,
+                'limit' => ReviewCardExportService::EXPORT_LIMIT,
             ], 422);
         }
 
         $cards = $query->get();
         $items = $this->buildItems($cards, $userId, $language);
 
-        $headers = ['Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Source', 'FsrsState'];
-
-        $lines = [];
-        $lines[] = implode("\t", $headers);
-
-        foreach ($items as $item) {
-            $lemma = $this->tsvEscape($item['lemma'] ?? '');
-            $surface = $this->tsvEscape($item['surface_form'] ?? '');
-            $pos = $this->tsvEscape($item['pos'] ?? '');
-            $senseZh = $this->tsvEscape($item['sense_zh'] ?? '');
-            $senseEn = $this->tsvEscape($item['sense_en'] ?? '');
-            $exampleEn = $this->tsvEscape($item['example_sentence_en'] ?? '');
-            $exampleZh = $this->tsvEscape($item['example_sentence_zh'] ?? '');
-            $aliasesZh = $this->tsvEscape($this->joinArray($item['aliases_zh'] ?? []));
-            $collocations = $this->tsvEscape($this->joinArray($item['collocations'] ?? []));
-            $source = $this->tsvEscape($item['source_chapter_title'] ?? '');
-            $fsrsState = $this->tsvEscape($item['fsrs_state'] ?? '');
-
-            // HTML-escape user text embedded in Anki Front/Back HTML faces.
-            // Only fixed structural tags (<strong>, <br>) are kept raw.
-            $exampleEnHtml = $this->htmlEscape($exampleEn);
-            $lemmaHtml = $this->htmlEscape($lemma);
-            $surfaceHtml = $this->htmlEscape($surface);
-            $posHtml = $this->htmlEscape($pos);
-            $senseZhHtml = $this->htmlEscape($senseZh);
-            $senseEnHtml = $this->htmlEscape($senseEn);
-            $exampleZhHtml = $this->htmlEscape($exampleZh);
-            $aliasesZhHtml = $this->htmlEscape($aliasesZh);
-            $collocationsHtml = $this->htmlEscape($collocations);
-            $sourceHtml = $this->htmlEscape($source);
-
-            $front = $this->tsvEscape(
-                $exampleEnHtml . "<br><br> <strong>" . $lemmaHtml . "</strong> / " . $surfaceHtml . " / " . $posHtml
-            );
-            $back = $this->tsvEscape(
-                "<strong>中文释义</strong><br>" . $senseZhHtml . "<br><br> <strong>英文释义</strong><br>" . $senseEnHtml
-                . "<br><br> <strong>例句翻译</strong><br>" . $exampleZhHtml
-                . "<br><br> <strong>近义译法</strong><br>" . $aliasesZhHtml
-                . "<br><br> <strong>搭配</strong><br>" . $collocationsHtml
-                . "<br><br> <strong>来源</strong><br>" . $sourceHtml
-            );
-
-            $row = [
-                $front,
-                $back,
-                $lemma,
-                $surface,
-                $pos,
-                $senseZh,
-                $senseEn,
-                $exampleEn,
-                $exampleZh,
-                $aliasesZh,
-                $collocations,
-                $source,
-                $fsrsState,
-            ];
-
-            $lines[] = implode("\t", $row);
-        }
-
-        $tsv = implode("\n", $lines);
+        $tsv = $this->exportService->buildAnkiTsv($items);
         $filename = 'review-cards-anki-' . now()->format('Ymd-His') . '.tsv';
 
         return response($tsv, 200)
@@ -303,58 +192,30 @@ class ReviewCardManageController extends Controller
         $query = $this->buildManageQuery($request, $userId, $language);
         $total = $query->count();
 
-        if ($total > self::EXPORT_LIMIT) {
+        if ($total > ReviewCardExportService::EXPORT_LIMIT) {
             return response()->json([
-                'message' => '当前筛选结果超过 ' . self::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
+                'message' => '当前筛选结果超过 ' . ReviewCardExportService::EXPORT_LIMIT . ' 条，请缩小筛选范围后再导出。',
                 'total' => $total,
-                'limit' => self::EXPORT_LIMIT,
+                'limit' => ReviewCardExportService::EXPORT_LIMIT,
             ], 422);
         }
 
         $cards = $query->get();
         $items = $this->buildItems($cards, $userId, $language);
 
-        // Field selection — same as export()
         $requestedFields = $request->input('fields', []);
         if (!is_array($requestedFields)) {
             $requestedFields = [];
         }
 
-        $selectedFields = [];
-        if (!empty($requestedFields)) {
-            $validFields = array_intersect($requestedFields, self::EXPORT_FIELDS);
-            if (empty($validFields)) {
-                return response()->json([
-                    'message' => '请选择至少一个有效导出字段。',
-                    'allowed_fields' => self::EXPORT_FIELDS,
-                ], 422);
-            }
-            $selectedFields = array_values($validFields);
-        } else {
-            $selectedFields = self::EXPORT_FIELDS;
+        $fieldResult = $this->exportService->resolveFields($requestedFields);
+        if ($fieldResult['error'] !== null) {
+            return response()->json($fieldResult['error'], 422);
         }
 
-        // Build CSV using fputcsv with in-memory stream
-        $stream = fopen('php://temp', 'r+');
+        $selectedFields = $fieldResult['selectedFields'];
 
-        // UTF-8 BOM
-        fwrite($stream, "\xEF\xBB\xBF");
-
-        // Header row
-        fputcsv($stream, $selectedFields);
-
-        foreach ($items as $item) {
-            $row = [];
-            foreach ($selectedFields as $field) {
-                $row[] = $this->csvCellValue($item[$field] ?? null);
-            }
-            fputcsv($stream, $row);
-        }
-
-        rewind($stream);
-        $csv = stream_get_contents($stream);
-        fclose($stream);
-
+        $csv = $this->exportService->buildCsv($items, $selectedFields);
         $filename = 'review-cards-' . now()->format('Ymd-His') . '.csv';
 
         return response($csv, 200)
@@ -363,57 +224,6 @@ class ReviewCardManageController extends Controller
             ->header('X-Export-Count', count($items));
     }
 
-    /**
-     * Convert a buildItems value to a CSV-safe cell string.
-     * - null → ''
-     * - array → '；'-joined string
-     * - Applies Excel formula injection protection (prefixes with quote)
-     */
-    private function csvCellValue($value): string
-    {
-        if ($value === null) {
-            return '';
-        }
-
-        if (is_array($value)) {
-            $value = $this->joinArray($value);
-        }
-
-        $value = (string) $value;
-
-        // Excel formula injection protection
-        $trimmed = ltrim($value);
-        if ($trimmed !== '' && in_array($trimmed[0], ['=', '+', '-', '@', "\t", "\r", "\n"], true)) {
-            $value = "'" . $value;
-        }
-
-        return $value;
-    }
-
-    private function tsvEscape(?string $value): string
-    {
-        if ($value === null) return '';
-        $value = str_replace(["\t", "\r", "\n"], [' ', ' ', ' '], $value);
-        return $value;
-    }
-
-    private function htmlEscape(?string $value): string
-    {
-        if ($value === null) return '';
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
-    }
-
-    private function joinArray(?array $arr): string
-    {
-        if (empty($arr)) return '';
-        return implode('；', $arr);
-    }
-
-    /**
-     * GET /review-cards/manage/{reviewCard}/logs
-     * Return the most recent 20 ReviewLog entries for a manageable sense card.
-     * Read-only — no delete, no export, no pagination, no charts.
-     */
     public function logs(int $reviewCard): JsonResponse
     {
         [$card, $sense] = $this->findManageableSenseCard($reviewCard);
