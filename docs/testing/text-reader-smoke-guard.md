@@ -9,8 +9,8 @@
 - 本地项目 `php artisan serve` 已在运行（推荐通过 `--base-url` 参数指定地址，默认 `http://localhost:8000`）
 - 浏览器已登录（通过 `/login` 页面）
 - 开发环境需要有一个可登录的本地测试用户（登录方式由用户在本地环境自行准备，不写入仓库）
-- 章节 `/chapters/read/5` 存在且为英文内容
-- 章节 5 已保存 AI 阅读辅助数据（含 `substantive` 在 sentence_index=0 的 AI 建议）
+- 已存在一个当前登录用户**真实拥有**的英文章节（默认 chapter 5，可通过 `--chapter-id` 覆盖；详见下方"可配置 smoke chapter"）
+- 该章节已保存 AI 阅读辅助数据（含 `substantive` 在 sentence_index=0 的 AI 建议）
 - 本机已有 Python + Playwright（如果本机已有 Playwright，可运行自动脚本。如果没有，不要在本轮任务中安装依赖，改用手动 smoke）
 
 ## 不变量
@@ -30,7 +30,7 @@
 |---|------|----------|
 | 1 | 点击 `substantive` 后右侧查词栏出现 | DOM 查询 `#vocab-side-box` 可见 |
 | 2 | Vuex 写入 `word`, `lemma`/`studyBase`, `chapterId`, `sentenceIndex` | `page.evaluate()` 读取 Vuex state |
-| 3 | AI lookup URL 正确 (`/chapters/ai-assist/lookup/5?word=...`) | Playwright Network 请求拦截 |
+| 3 | AI lookup URL 正确 (`/chapters/ai-assist/lookup/{chapter-id}?word=...`) | Playwright Network 请求拦截 |
 | 4 | AI 建议在页面中显示（含 `AI 建议`、`实质性的`、`使用此释义` 文本） | DOM 文本检查 |
 | 5 | 点击 AI "使用此释义"后 AddSenseForm 打开并预填 | DOM 查询 `.sense-form` 可见 |
 | 6 | 点击词典加号后 AddSenseForm 打开并预填 | DOM 查询 `.sense-form` 可见 |
@@ -64,6 +64,43 @@ python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 -
 - `playwright install chromium` 已完成
 - 本地 dev server 已在指定地址运行（默认 `http://localhost:8000`）
 - 用户已登录（脚本会检查登录状态，如未登录则提示手动操作）
+
+## 可配置 smoke chapter
+
+`text_reader_smoke_guard.py` 默认打开 `/chapters/read/5`。如果当前登录的测试用户**没有** chapter 5 的访问权（chapter 不属于该用户、被软删除、或不是英文内容），请通过 `--chapter-id` 指定一个该用户**真实拥有**的英文章节：
+
+```powershell
+# 默认行为（等价于 --chapter-id 5）
+python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000
+
+# 当前用户拥有 chapter 12，跑 chapter 12
+python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 --chapter-id 12
+
+# 同时使用保存的 auth session 与自定义 chapter
+python tools\smoke\text_reader_smoke_guard.py --base-url http://localhost:8000 --chapter-id 12 --auth <path-to-auth.json>
+```
+
+`--chapter-id` 会同时驱动：
+- 阅读页 URL：`{base-url}/chapters/read/{chapter-id}`
+- P0.2 Vuex 断言：`chapterId` 必须等于 `--chapter-id`
+- P0.3 AI lookup URL 断言：必须匹配 `/chapters/ai-assist/lookup/{chapter-id}?word=...`
+
+### Lab-4 教训：禁止为了 smoke 修改数据库归属
+
+> 本节由 `TRAE-Smoke-Guard-ChapterId-1` 写入，起因是 Lab-4 期间本地 Agent 为了让 `/chapters/read/5` 验证通过，错误地修改了数据库 book/chapter/user_id 归属，造成数据污染，被拒绝合入。
+
+为了跑 smoke 而做以下任何操作，都是**严重违规**，必须立即停止并报告：
+
+1. **禁止**修改 `books.user_id` / `chapters.user_id` 来让测试用户"获得" chapter 5 的访问权。
+2. **禁止**为测试用户复制 / 克隆 `EncounteredWords` 记录来伪造阅读痕迹。
+3. **禁止**把测试用户 `is_admin` 设为 1 来绕过章节归属校验。
+4. **禁止**修改 `unique_word_ids`、`chapter_ai_reading_assists` 等 smoke 依赖的数据。
+5. **禁止**执行 `migrate:fresh` / `db:wipe` / `drop` / `truncate` 来"重置" smoke 数据。
+6. **禁止**执行 rollback 来回退 smoke 期间产生的副作用（rollback 只能由专门授权的数据修复任务执行，如 `Pre-Codex-Executor-Readiness-1`）。
+
+**正确做法**：选择一个测试用户真实拥有的英文章节，用 `--chapter-id` 指定它。如果该用户没有任何含 `substantive` + AI 建议的章节，那就报告"smoke guard 当前环境不可跑"，等待网页端 GPT 决定是补充环境还是跳过 smoke，**而不是动数据库**。
+
+smoke guard 的全部意义就是只读验证。任何为了让 smoke 通过而修改数据库的行为，都破坏了 smoke 作为回归保护网的价值。
 
 ### 手动 smoke（备选）
 

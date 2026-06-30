@@ -4,12 +4,18 @@ Text Reader Smoke Guard
 Zero-dependency browser smoke tests for reading page core behaviors.
 
 Usage:
-    python tools/smoke/text_reader_smoke_guard.py [--auth AUTH_FILE] [--base-url URL]
+    python tools/smoke/text_reader_smoke_guard.py [--auth AUTH_FILE] [--base-url URL] [--chapter-id N]
 
     --auth AUTH_FILE  Optional: path to Playwright storage state JSON file
                       (pre-saved session cookie). Use this to skip manual login.
     --base-url URL    Optional: base URL of the dev server.
                       Default: http://localhost:8000
+    --chapter-id N    Optional: chapter id to open on the reader page.
+                      The smoke opens {base-url}/chapters/read/{N}.
+                      Default: 5. Choose a chapter the logged-in user actually
+                      owns — NEVER modify book/chapter/user_id to make chapter 5
+                      accessible. See docs/testing/text-reader-smoke-guard.md
+                      "可配置 smoke chapter" for the rationale (Lab-4 lesson).
 
 Requirements:
     - Python 3.8+
@@ -70,12 +76,14 @@ ensure_dir()
 parser = argparse.ArgumentParser(description="Text Reader Smoke Guard")
 parser.add_argument("--auth", type=str, default=None, help="Path to Playwright storage state JSON file")
 parser.add_argument("--base-url", type=str, default=DEFAULT_BASE_URL, help="Base URL of the dev server (default: http://localhost:8000)")
+parser.add_argument("--chapter-id", type=int, default=5, help="Chapter id to open on the reader page (default: 5). Pick a chapter the logged-in user actually owns; do NOT modify DB ownership to make chapter 5 accessible.")
 args = parser.parse_args()
 
 base_url = args.base_url.rstrip("/")
-chapter_url = f"{base_url}/chapters/read/5"
+chapter_url = f"{base_url}/chapters/read/{args.chapter_id}"
 print(f"  Base URL: {base_url}")
 print(f"  Chapter URL: {chapter_url}")
+print(f"  Chapter ID: {args.chapter_id}")
 
 with sync_playwright() as p:
     browser = p.chromium.launch(headless=True)
@@ -210,12 +218,12 @@ with sync_playwright() as p:
         report("P0.2: Vuex state readable", False, vuex_state["error"])
     else:
         word_ok = vuex_state.get("word") == "substantive"
-        chapter_ok = vuex_state.get("chapterId") == 5 or vuex_state.get("chapterId") == "5"
+        chapter_ok = vuex_state.get("chapterId") == args.chapter_id or vuex_state.get("chapterId") == str(args.chapter_id)
         si_ok = vuex_state.get("sentenceIndex") is not None
         all_ok = word_ok and chapter_ok and si_ok
         detail = f"word={vuex_state.get('word')} chapterId={vuex_state.get('chapterId')} sentenceIndex={vuex_state.get('sentenceIndex')}"
         report("P0.2: Vuex word=substantive", word_ok, detail)
-        report("P0.2: Vuex chapterId=5", chapter_ok, detail)
+        report(f"P0.2: Vuex chapterId={args.chapter_id}", chapter_ok, detail)
         report("P0.2: Vuex sentenceIndex set", si_ok, detail)
         report("P0.2: All Vuex assertions", all_ok, detail)
 
@@ -229,9 +237,9 @@ with sync_playwright() as p:
         has_word_param = "word=substantive" in ai_lookup_url
         has_lemma_param = "lemma=" in ai_lookup_url
         has_si_param = "sentence_index=" in ai_lookup_url
-        has_chapter5 = "/lookup/5" in ai_lookup_url
-        url_ok = has_word_param and has_chapter5
-        report(f"P0.3: AI lookup URL matches /lookup/5", has_chapter5, ai_lookup_url)
+        has_chapter_id = f"/lookup/{args.chapter_id}" in ai_lookup_url
+        url_ok = has_word_param and has_chapter_id
+        report(f"P0.3: AI lookup URL matches /lookup/{args.chapter_id}", has_chapter_id, ai_lookup_url)
         report(f"P0.3: AI lookup URL has word=substantive", has_word_param, ai_lookup_url)
         report(f"P0.3: AI lookup URL has sentence_index", has_si_param, ai_lookup_url)
         report("P0.3: AI lookup URL passes all checks", url_ok, ai_lookup_url)
