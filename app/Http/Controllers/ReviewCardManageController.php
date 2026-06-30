@@ -28,20 +28,7 @@ class ReviewCardManageController extends Controller
     )
     {
     }
-    /**
-     * Whitelist of fields allowed for normal edit.
-     */
-    private const EDITABLE_FIELDS = [
-        'pos',
-        'sense_zh',
-        'sense_en',
-        'example_sentence_en',
-        'example_sentence_zh',
-        'aliases_zh',
-        'collocations',
-    ];
-
-    public function data(Request $request): JsonResponse
+        public function data(Request $request): JsonResponse
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
@@ -243,42 +230,12 @@ class ReviewCardManageController extends Controller
     {
         [$card, $sense] = $this->findManageableSenseCard($reviewCard);
 
-        // Whitelist-only update — set each field individually
-        foreach (self::EDITABLE_FIELDS as $field) {
-            if ($request->has($field)) {
-                $value = $request->input($field);
-
-                // Normalize array fields: accept comma-separated strings or arrays
-                if (in_array($field, ['aliases_zh', 'collocations'], true)) {
-                    $value = $this->normalizeArray($value);
-                }
-
-                $sense->{$field} = $value;
-            }
-        }
-
-        $sense->save();
+        $this->mutationService->updateSenseTextFields($sense, $request);
 
         return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense->fresh()));
     }
 
-    /**
-     * Normalize a value to an array of trimmed, non-empty strings.
-     * Accepts arrays or comma-separated strings.
-     */
-    private function normalizeArray(mixed $values): array
-    {
-        if (!is_array($values)) {
-            $values = explode(',', (string) $values);
-        }
-
-        return array_values(array_filter(
-            array_map(fn ($value) => trim((string) $value), $values),
-            fn ($value) => $value !== ''
-        ));
-    }
-
-    /**
+        /**
      * PATCH /review-cards/manage/{reviewCard}/enabled
      * Toggle fsrs_enabled only.
      */
