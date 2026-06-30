@@ -2,11 +2,10 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Chapter;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
-use App\Models\WordSenseOccurrence;
+use App\Services\ReviewCardManageItemSerializerService;
 use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
 use App\Services\ReviewCardManageQueryService;
@@ -24,6 +23,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardService $reviewCardService,
         private ReviewCardExportService $exportService,
         private ReviewCardManageQueryService $queryService,
+        private ReviewCardManageItemSerializerService $itemSerializer,
     )
     {
     }
@@ -52,7 +52,7 @@ class ReviewCardManageController extends Controller
         $paginator = $query->paginate($perPage);
         $cards = $paginator->getCollection();
 
-        $items = $this->buildItems($cards, $userId, $language);
+        $items = $this->itemSerializer->buildItems($cards, $userId, $language);
 
         return response()->json([
             'items' => $items,
@@ -87,7 +87,7 @@ class ReviewCardManageController extends Controller
         }
 
         $cards = $query->get();
-        $items = $this->buildItems($cards, $userId, $language);
+        $items = $this->itemSerializer->buildItems($cards, $userId, $language);
 
         $requestedFields = $request->input('fields', []);
         if (!is_array($requestedFields)) {
@@ -143,7 +143,7 @@ class ReviewCardManageController extends Controller
         }
 
         $cards = $query->get();
-        $items = $this->buildItems($cards, $userId, $language);
+        $items = $this->itemSerializer->buildItems($cards, $userId, $language);
 
         $tsv = $this->exportService->buildAnkiTsv($items);
         $filename = 'review-cards-anki-' . now()->format('Ymd-His') . '.tsv';
@@ -177,7 +177,7 @@ class ReviewCardManageController extends Controller
         }
 
         $cards = $query->get();
-        $items = $this->buildItems($cards, $userId, $language);
+        $items = $this->itemSerializer->buildItems($cards, $userId, $language);
 
         $requestedFields = $request->input('fields', []);
         if (!is_array($requestedFields)) {
@@ -258,7 +258,7 @@ class ReviewCardManageController extends Controller
 
         $sense->save();
 
-        return response()->json($this->serializeCard($card->fresh(), $sense->fresh()));
+        return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense->fresh()));
     }
 
     /**
@@ -288,7 +288,7 @@ class ReviewCardManageController extends Controller
         $card->fsrs_enabled = $request->boolean('enabled');
         $card->save();
 
-        return response()->json($this->serializeCard($card->fresh(), $sense));
+        return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
     }
 
     /**
@@ -302,7 +302,7 @@ class ReviewCardManageController extends Controller
         $card->fsrs_due_at = Carbon::now();
         $card->save();
 
-        return response()->json($this->serializeCard($card->fresh(), $sense));
+        return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
     }
 
     /**
@@ -322,7 +322,7 @@ class ReviewCardManageController extends Controller
 
         return response()->json(array_merge(
             ['message' => '已重置为新学卡。该卡会重新进入复习队列。'],
-            $this->serializeCard($card->fresh(), $sense->fresh())
+            $this->itemSerializer->serializeCard($card->fresh(), $sense->fresh())
         ));
     }
 
@@ -463,111 +463,6 @@ class ReviewCardManageController extends Controller
     // ==================== Private helpers ====================
 
     
-    private function buildItems($cards, int $userId, string $language)
-    {
-        // Collect all sense IDs
-        $senseIds = $cards->pluck('target_id')->filter()->unique()->values()->toArray();
-
-        // Batch-fetch occurrence chapters for all senses at once
-        $occurrenceChapters = [];
-        if (!empty($senseIds)) {
-            $occurrenceChapters = WordSenseOccurrence::query()
-                ->select('word_sense_id', 'chapter_id')
-                ->whereIn('word_sense_id', $senseIds)
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->where('status', WordSenseOccurrence::STATUS_BOUND)
-                ->whereNotNull('chapter_id')
-                ->get()
-                ->groupBy('word_sense_id')
-                ->map(fn($group) => $group->first()->chapter_id)
-                ->toArray();
-        }
-
-        // Collect all relevant chapter IDs and fetch chapters in one query
-        $chapterIds = collect();
-        foreach ($cards as $card) {
-            $sense = $card->sense;
-            if ($sense) {
-                if ($sense->source_chapter_id) {
-                    $chapterIds->push($sense->source_chapter_id);
-                }
-            }
-            $sid = $card->target_id;
-            if (isset($occurrenceChapters[$sid])) {
-                $chapterIds->push($occurrenceChapters[$sid]);
-            }
-        }
-        $chapterIds = $chapterIds->filter()->unique()->values()->toArray();
-
-        $chapters = [];
-        if (!empty($chapterIds)) {
-            $chapters = Chapter::query()
-                ->whereIn('id', $chapterIds)
-                ->where('user_id', $userId)
-                ->where('language', $language)
-                ->pluck('name', 'id')
-                ->toArray();
-        }
-
-        // Map items
-        return $cards->map(function (ReviewCard $card) use ($chapters, $occurrenceChapters) {
-            $sense = $card->sense;
-            $senseId = $card->target_id;
-
-            if (!$sense) {
-                return null;
-            }
-
-            $occChapterId = $occurrenceChapters[$senseId] ?? null;
-            $sourceChapterId = $sense->source_chapter_id ?? $occChapterId;
-
-            $sourceKind = $this->inferSourceKind(
-                $sense->source_chapter_id,
-                $occChapterId,
-                $sense->example_sentence_en
-            );
-
-            $sourceChapterTitle = null;
-            if ($sourceChapterId && isset($chapters[$sourceChapterId])) {
-                $sourceChapterTitle = $chapters[$sourceChapterId];
-            }
-
-            return [
-                'review_card_id' => $card->id,
-                'word_sense_id' => $senseId,
-                'lemma' => $sense->lemma,
-                'surface_form' => $sense->surface_form,
-                'pos' => $sense->pos,
-                'sense_zh' => $sense->sense_zh,
-                'sense_en' => $sense->sense_en,
-                'example_sentence_en' => $sense->example_sentence_en,
-                'example_sentence_zh' => $sense->example_sentence_zh,
-                'source_chapter_id' => $sourceChapterId,
-                'source_chapter_title' => $sourceChapterTitle,
-                'source_kind' => $sourceKind,
-                'fsrs_state' => $card->fsrs_state,
-                'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
-                'fsrs_stability' => $card->fsrs_stability,
-                'fsrs_difficulty' => $card->fsrs_difficulty,
-                'fsrs_reps' => $card->fsrs_reps,
-                'fsrs_lapses' => $card->fsrs_lapses,
-                'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
-                'aliases_zh' => $sense->aliases_zh ?: [],
-                'collocations' => $sense->collocations ?: [],
-                'fsrs_enabled' => $card->fsrs_enabled,
-                'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
-                'missing_example' => empty($sense->example_sentence_en),
-                'missing_source' => empty($sense->source_chapter_id) && empty($occChapterId),
-            ];
-        })->filter()->values();
-    }
-
-    /**
-     * Security query: find a manageable sense card scoped to current user/language.
-     *
-     * @return array{0: ReviewCard, 1: WordSense}
-     */
     private function findManageableSenseCard(int $reviewCardId): array
     {
         $userId = Auth::user()->id;
@@ -596,70 +491,4 @@ class ReviewCardManageController extends Controller
         }
 
         return [$card, $sense];
-    }
-
-    private function inferSourceKind(?int $sourceChapterId, ?int $occurrenceChapterId, ?string $exampleSentenceEn): string
-    {
-        if ($sourceChapterId) {
-            return 'chapter';
-        }
-        if ($occurrenceChapterId) {
-            return 'occurrence_chapter';
-        }
-        if (!empty($exampleSentenceEn)) {
-            return 'card_example';
-        }
-        return 'missing';
-    }
-
-    private function serializeCard(ReviewCard $card, WordSense $sense): array
-    {
-        $occurrenceChapterId = WordSenseOccurrence::query()
-            ->where('word_sense_id', $sense->id)
-            ->where('user_id', $sense->user_id)
-            ->where('language_id', $sense->language_id)
-            ->where('status', WordSenseOccurrence::STATUS_BOUND)
-            ->whereNotNull('chapter_id')
-            ->value('chapter_id');
-
-        $sourceChapterId = $sense->source_chapter_id ?? $occurrenceChapterId;
-        $sourceKind = $this->inferSourceKind($sense->source_chapter_id, $occurrenceChapterId, $sense->example_sentence_en);
-
-        $sourceChapterTitle = null;
-        if ($sourceChapterId) {
-            $sourceChapterTitle = Chapter::query()
-                ->where('id', $sourceChapterId)
-                ->where('user_id', $sense->user_id)
-                ->where('language', $sense->language_id)
-                ->value('name');
-        }
-
-        return [
-            'review_card_id' => $card->id,
-            'word_sense_id' => $sense->id,
-            'lemma' => $sense->lemma,
-            'surface_form' => $sense->surface_form,
-            'pos' => $sense->pos,
-            'sense_zh' => $sense->sense_zh,
-            'sense_en' => $sense->sense_en,
-            'example_sentence_en' => $sense->example_sentence_en,
-            'example_sentence_zh' => $sense->example_sentence_zh,
-            'aliases_zh' => $sense->aliases_zh ?: [],
-            'collocations' => $sense->collocations ?: [],
-            'source_chapter_id' => $sourceChapterId,
-            'source_chapter_title' => $sourceChapterTitle,
-            'source_kind' => $sourceKind,
-            'fsrs_state' => $card->fsrs_state,
-            'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
-            'fsrs_stability' => $card->fsrs_stability,
-            'fsrs_difficulty' => $card->fsrs_difficulty,
-            'fsrs_reps' => $card->fsrs_reps,
-            'fsrs_lapses' => $card->fsrs_lapses,
-            'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
-            'fsrs_enabled' => $card->fsrs_enabled,
-            'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
-            'missing_example' => empty($sense->example_sentence_en),
-            'missing_source' => empty($sense->source_chapter_id) && empty($occurrenceChapterId),
-        ];
-    }
-}
+    }}
