@@ -28,7 +28,7 @@ class ReviewCardManageController extends Controller
     )
     {
     }
-        public function data(Request $request): JsonResponse
+    public function data(Request $request): JsonResponse
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
@@ -235,7 +235,7 @@ class ReviewCardManageController extends Controller
         return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense->fresh()));
     }
 
-        /**
+    /**
      * PATCH /review-cards/manage/{reviewCard}/enabled
      * Toggle fsrs_enabled only.
      */
