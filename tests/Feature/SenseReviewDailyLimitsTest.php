@@ -77,9 +77,9 @@ class SenseReviewDailyLimitsTest extends TestCase
         ], $overrides));
     }
 
-    private function createTodayReviewLog(ReviewCard $card): ReviewLog
+    private function createTodayReviewLog(ReviewCard $card, array $overrides = []): ReviewLog
     {
-        return ReviewLog::forceCreate([
+        return ReviewLog::forceCreate(array_merge([
             'user_id' => $this->user->id,
             'language_id' => $this->language,
             'language' => $this->language,
@@ -93,7 +93,7 @@ class SenseReviewDailyLimitsTest extends TestCase
             'previous_difficulty' => 5.0,
             'new_difficulty' => 4.5,
             'source' => 'sense_review',
-        ]);
+        ], $overrides));
     }
 
     // ── Tests ────────────────────────────────────
@@ -337,5 +337,69 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->assertCount(2, $response->json('cards'));
         $this->assertEquals(0, $response->json('summary.hidden_due_count'));
         $this->assertTrue($response->json('summary.ignore_daily_limits'));
+    }
+
+    public function test_daily_new_limit_zero_hides_new_cards(): void
+    {
+        // New limit = 0, even with new_cards_ignore_review_limit = true
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(10)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+        Setting::forceCreate(['name' => 'daily_new_limit', 'user_id' => -1, 'value' => json_encode(0)]);
+        Setting::forceCreate(['name' => 'daily_new_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+        Setting::forceCreate(['name' => 'new_cards_ignore_review_limit', 'user_id' => -1, 'value' => json_encode(true)]);
+
+        // 2 new sense cards (no review-state cards)
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_a']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_b']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $this->assertCount(0, $response->json('reviews'));
+        $summary = $response->json('summary');
+        $this->assertEquals(2, $summary['total_due_count']);
+        $this->assertEquals(0, $summary['visible_count']);
+        $this->assertEquals(2, $summary['hidden_due_count']);
+        $this->assertEquals(2, $summary['hidden_by_new_limit']);
+    }
+
+    public function test_reset_logs_do_not_reduce_remaining_review_slots(): void
+    {
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(2)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+
+        // Card A with a reset review log today
+        $cardA = $this->createSenseCard($this->createSense(['lemma' => 'word_a']));
+        $this->createTodayReviewLog($cardA, [
+            'rating' => 'reset',
+            'source' => 'reset',
+        ]);
+        // Push card A's due_at to the future so it does not appear in the due queue
+        $cardA->fsrs_due_at = Carbon::now()->addDay();
+        $cardA->save();
+
+        // 2 more due sense cards
+        $this->createSenseCard($this->createSense(['lemma' => 'word_b']));
+        $this->createSenseCard($this->createSense(['lemma' => 'word_c']));
+
+        $response = $this->actingAs($this->user)->postJson('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $summary = $response->json('summary');
+
+        // Reset logs should NOT count toward reviewed_today_count
+        $this->assertEquals(0, $summary['reviewed_today_count']);
+        $this->assertEquals(2, $summary['remaining_review_slots']);
+        $this->assertCount(2, $response->json('reviews'));
+        $this->assertEquals(0, $summary['hidden_due_count']);
+        $this->assertFalse($summary['limit_reached']);
     }
 }
