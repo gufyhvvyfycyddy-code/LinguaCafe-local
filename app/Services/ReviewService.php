@@ -7,11 +7,13 @@ use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
+use App\Services\ReviewLimitSummaryService;
 
 class ReviewService {
     
     public function __construct(
         private SenseReviewService $senseReviewService,
+        private ReviewLimitSummaryService $reviewLimitSummaryService,
     ) {
     }
 
@@ -50,29 +52,10 @@ class ReviewService {
 
     /**
      * Return an empty review summary for scoped (book/chapter) mode,
-     * matching the shape of SenseReviewService::buildLimitSummary().
+     * delegating to ReviewLimitSummaryService for the canonical shape.
      */
     private function emptyReviewSummary(): array
     {
-        return [
-            'due_count' => 0,
-            'visible_count' => 0,
-            'total_due_count' => 0,
-            'hidden_due_count' => 0,
-            'hidden_by_review_limit' => 0,
-            'hidden_by_new_limit' => 0,
-            'daily_review_limit_enabled' => false,
-            'daily_review_limit' => 0,
-            'daily_new_limit_enabled' => false,
-            'daily_new_limit' => 0,
-            'new_cards_ignore_review_limit' => false,
-            'reviewed_today_count' => 0,
-            'remaining_review_slots' => 0,
-            'is_queue_enforced' => true,
-            'ignore_daily_limits' => false,
-            'limit_reached' => false,
-            'can_continue_over_limit' => false,
-            'limit_message' => null,
-        ];
+        return $this->reviewLimitSummaryService->emptyScoped();
     }
 }
