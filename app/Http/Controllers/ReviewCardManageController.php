@@ -9,8 +9,8 @@ use App\Services\ReviewCardManageItemSerializerService;
 use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
 use App\Services\ReviewCardManageQueryService;
+use App\Services\ReviewCardManageMutationService;
 use App\Services\WordSenseService;
-use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,6 +24,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardExportService $exportService,
         private ReviewCardManageQueryService $queryService,
         private ReviewCardManageItemSerializerService $itemSerializer,
+        private ReviewCardManageMutationService $mutationService,
     )
     {
     }
@@ -285,8 +286,7 @@ class ReviewCardManageController extends Controller
     {
         [$card, $sense] = $this->findManageableSenseCard($reviewCard);
 
-        $card->fsrs_enabled = $request->boolean('enabled');
-        $card->save();
+        $this->mutationService->setEnabled($card, $request->boolean('enabled'));
 
         return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
     }
@@ -299,8 +299,7 @@ class ReviewCardManageController extends Controller
     {
         [$card, $sense] = $this->findManageableSenseCard($reviewCard);
 
-        $card->fsrs_due_at = Carbon::now();
-        $card->save();
+        $this->mutationService->setDueNow($card);
 
         return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
     }
