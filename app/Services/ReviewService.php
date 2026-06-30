@@ -26,7 +26,7 @@ class ReviewService {
         if ($bookId !== -1 || $chapterId !== -1) {
             return [
                 'reviews' => [],
-                'summary' => $this->emptyReviewSummary(),
+                'summary' => $this->reviewLimitSummaryService->emptyScoped(),
             ];
         }
 
@@ -50,12 +50,4 @@ class ReviewService {
         ];
     }
 
-    /**
-     * Return an empty review summary for scoped (book/chapter) mode,
-     * delegating to ReviewLimitSummaryService for the canonical shape.
-     */
-    private function emptyReviewSummary(): array
-    {
-        return $this->reviewLimitSummaryService->emptyScoped();
-    }
 }

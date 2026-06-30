@@ -117,7 +117,7 @@ class SenseReviewService
 
             return [
                 'cards' => $visibleCards,
-                'summary' => $this->buildLimitSummary(
+                'summary' => $this->reviewLimitSummaryService->build(
                     totalDueCount: $totalDueCount,
                     visibleCount: $visibleCards->count(),
                     reviewedTodayCount: $reviewedTodayCount,
@@ -194,7 +194,7 @@ class SenseReviewService
 
         return [
             'cards' => $visibleCards,
-            'summary' => $this->buildLimitSummary(
+            'summary' => $this->reviewLimitSummaryService->build(
                 totalDueCount: $totalDueCount,
                 visibleCount: $visibleCount,
                 reviewedTodayCount: $reviewedTodayCount,
@@ -213,47 +213,6 @@ class SenseReviewService
                 canContinueOverLimit: $canContinueOverLimit,
             ),
         ];
-    }
-
-    /**
-     * Build a standardized daily limits summary array.
-     */
-    private function buildLimitSummary(
-        int $totalDueCount = 0,
-        int $visibleCount = 0,
-        int $reviewedTodayCount = 0,
-        int $remainingReviewSlots = 0,
-        int $reviewLimit = 200,
-        bool $reviewLimitEnabled = true,
-        int $newLimit = 20,
-        bool $newLimitEnabled = true,
-        bool $newIgnoreReviewLimit = false,
-        bool $ignoreDailyLimits = false,
-        bool $limitReached = false,
-        int $hiddenDueCount = 0,
-        int $hiddenByReviewLimit = 0,
-        int $hiddenByNewLimit = 0,
-        bool $isQueueEnforced = true,
-        bool $canContinueOverLimit = false
-    ): array {
-        return $this->reviewLimitSummaryService->build(
-            totalDueCount: $totalDueCount,
-            visibleCount: $visibleCount,
-            reviewedTodayCount: $reviewedTodayCount,
-            remainingReviewSlots: $remainingReviewSlots,
-            reviewLimit: $reviewLimit,
-            reviewLimitEnabled: $reviewLimitEnabled,
-            newLimit: $newLimit,
-            newLimitEnabled: $newLimitEnabled,
-            newIgnoreReviewLimit: $newIgnoreReviewLimit,
-            ignoreDailyLimits: $ignoreDailyLimits,
-            limitReached: $limitReached,
-            hiddenDueCount: $hiddenDueCount,
-            hiddenByReviewLimit: $hiddenByReviewLimit,
-            hiddenByNewLimit: $hiddenByNewLimit,
-            isQueueEnforced: $isQueueEnforced,
-            canContinueOverLimit: $canContinueOverLimit,
-        );
     }
 
     public function serializeCard(ReviewCard $card): array
