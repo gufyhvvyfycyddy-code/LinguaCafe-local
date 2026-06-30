@@ -351,6 +351,24 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
 7. 网页端 GPT 查 GitHub 最新 commit 后验收。
 8. 只有网页端 GPT 给出 Accept，才视为该 Phase 完成。
 
+### 14.1 三员工提示词顺序规则
+
+1. 网页端 GPT 每次同时使用 CodeBuddy、WorkBuddy、OpenCode 时，必须显式写明本轮顺序。
+2. 顺序要写成：
+   - 第 1 棒：谁
+   - 第 2 棒：谁
+   - 第 3 棒：谁
+3. 顺序不是固定的，可以根据任务类型调整。
+4. 调整顺序时必须说明原因。
+5. 后一棒必须读取或参考前一棒的结论，不能当成三个互相独立的并行任务。
+6. 常见默认顺序：
+   - 架构 / 服务边界任务：CodeBuddy → WorkBuddy → OpenCode
+   - 产品 / UI / 手动体验任务：WorkBuddy → CodeBuddy → OpenCode
+   - 失败复盘 / 报告核验任务：OpenCode → CodeBuddy → WorkBuddy
+7. OpenCode 通常放在最后，因为它是执行端，不能在前两棒边界未收敛前直接改代码。
+8. 如果本轮只需要一个员工，也必须说明"本轮只使用 X，不启动另外两个员工"的原因。
+9. 网页端 GPT 最终仍负责合并三方结论，并决定 Accept / Refuse / 下一轮 Prompt。
+
 ## 15. 服务边界 / 架构优化原则
 
 1. **Controller 只做编排。** Controller 可以负责读取 Request、调用 Service、组装 HTTP response，但不应长期持有复杂 query、导出格式、row payload、写操作事务等大块逻辑。
