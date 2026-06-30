@@ -40,7 +40,7 @@
                         v-if="hasSavedAiAssist"
                         :title="showAiTranslations ? '隐藏 AI 译文' : '显示 AI 译文'"
                         icon
-                        @click="showAiTranslations = !showAiTranslations"
+                        @click="toggleAiTranslations"
                     >
                         <v-icon :color="showAiTranslations ? 'primary' : ''">mdi-translate</v-icon>
                     </v-btn>
@@ -570,6 +570,15 @@
             togglePlainTextMode() {
                 this.settings.plainTextMode = !this.settings.plainTextMode;
                 this.toolbarSettingChanged();
+            },
+            toggleHotkeyDialog() {
+                this.hotkeyDialog = !this.hotkeyDialog;
+            },
+            openAiAssistDialog() {
+                this.aiAssistDialog = true;
+            },
+            toggleAiTranslations() {
+                this.showAiTranslations = !this.showAiTranslations;
             },
             finish() {
                 this.leveledUpWordsAndPhrases = this.$refs.interactiveText.getLeveledUpWordsAndPhrases();
