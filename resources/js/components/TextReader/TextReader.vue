@@ -389,8 +389,7 @@
                 this.languageSpaces = data.languageSpaces;
                 this.chapters = data.chapters;
 
-                window.addEventListener('resize', this.updateToolbarPosition);
-                window.addEventListener('resize', this.vocabularySidebarTest);
+                window.addEventListener('resize', this.handleReaderResize);
                 window.addEventListener('scroll', this.updateToolbarPosition);
                 document.getElementById('fullscreen-box').addEventListener('fullscreenchange', this.updateFullscreen);
                 for (let i = 0; i < this.chapters.length; i++) {
@@ -419,8 +418,7 @@
             if (this.sourceHighlightTimer) {
                 clearTimeout(this.sourceHighlightTimer);
             }
-            window.removeEventListener('resize', this.updateToolbarPosition);
-            window.removeEventListener('resize', this.vocabularySidebarTest);
+            window.removeEventListener('resize', this.handleReaderResize);
             window.removeEventListener('scroll', this.updateToolbarPosition);
         },
         // this runs after the initial data
@@ -485,6 +483,10 @@
             updateFullscreen: function() {
                 this.fullscreenMode = document.fullscreenElement !== null;
             },
+            handleReaderResize() {
+                this.updateToolbarPosition();
+                this.vocabularySidebarTest();
+            },
             updateToolbarPosition: function(event) {
                 this.toolbarTop = 28 - document.documentElement.scrollTop;
 
@@ -497,7 +499,9 @@
                 this.$forceUpdate();
 
                 setTimeout(() => {
-                    this.$refs.interactiveText.updateVocabBoxPosition();
+                    if (this.$refs.interactiveText) {
+                        this.$refs.interactiveText.updateVocabBoxPosition();
+                    }
                 }, 200);
             },
             toolbarSettingChanged() {
