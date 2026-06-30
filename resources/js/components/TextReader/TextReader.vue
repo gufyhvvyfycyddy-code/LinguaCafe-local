@@ -268,7 +268,6 @@
                     glossary: false,
                     chapters: false
                 },
-                maximumTextWidthData: ['800px', '900px', '1000px', '1200px', '1400px', '1600px', '100%'],
                 toolbarTop: 68,
                 theme: DefaultLocalStorageManager.loadSetting('theme') || 'light',
                 vocabularySidebarFits: true,
