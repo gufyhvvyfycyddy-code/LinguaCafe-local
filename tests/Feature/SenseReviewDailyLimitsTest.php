@@ -402,4 +402,71 @@ class SenseReviewDailyLimitsTest extends TestCase
         $this->assertEquals(0, $summary['hidden_due_count']);
         $this->assertFalse($summary['limit_reached']);
     }
+
+    public function test_new_limit_disabled_respects_review_limit_when_new_cards_do_not_ignore_review_limit(): void
+    {
+        // daily_new_limit_enabled=false, new_cards_ignore_review_limit=false
+        // New cards should still be constrained by the daily review limit.
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(1)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+        Setting::forceCreate(['name' => 'daily_new_limit_enabled', 'user_id' => -1, 'value' => json_encode(false)]);
+        Setting::forceCreate(['name' => 'new_cards_ignore_review_limit', 'user_id' => -1, 'value' => json_encode(false)]);
+
+        // 1 review card + 2 new cards
+        $this->createSenseCard($this->createSense(['lemma' => 'review_card']), ['fsrs_state' => 'review']);
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_a']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_b']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        // Only 1 review card should be visible; 2 new cards hidden by new limit
+        $this->assertCount(1, $response->json('reviews'));
+        $summary = $response->json('summary');
+        $this->assertEquals(3, $summary['total_due_count']);
+        $this->assertEquals(1, $summary['visible_count']);
+        $this->assertEquals(2, $summary['hidden_due_count']);
+        $this->assertEquals(2, $summary['hidden_by_new_limit']);
+        $this->assertTrue($summary['limit_reached']);
+        $this->assertTrue($summary['can_continue_over_limit']);
+    }
+
+    public function test_new_limit_disabled_allows_all_new_cards_when_new_cards_ignore_review_limit(): void
+    {
+        // daily_new_limit_enabled=false, new_cards_ignore_review_limit=true
+        // New cards bypass the daily review limit entirely.
+        Setting::forceCreate(['name' => 'daily_review_limit', 'user_id' => -1, 'value' => json_encode(1)]);
+        Setting::forceCreate(['name' => 'daily_review_limit_enabled', 'user_id' => -1, 'value' => json_encode(true)]);
+        Setting::forceCreate(['name' => 'daily_new_limit_enabled', 'user_id' => -1, 'value' => json_encode(false)]);
+        Setting::forceCreate(['name' => 'new_cards_ignore_review_limit', 'user_id' => -1, 'value' => json_encode(true)]);
+
+        // 1 review card + 2 new cards
+        $this->createSenseCard($this->createSense(['lemma' => 'review_card']), ['fsrs_state' => 'review']);
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_a']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+        $this->createSenseCard($this->createSense(['lemma' => 'new_card_b']), [
+            'fsrs_state' => 'new', 'fsrs_stability' => null, 'fsrs_difficulty' => null,
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/reviews', [
+            'bookId' => -1, 'chapterId' => -1, 'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        // All 3 cards visible (new cards ignore review limit)
+        $this->assertCount(3, $response->json('reviews'));
+        $summary = $response->json('summary');
+        $this->assertEquals(3, $summary['total_due_count']);
+        $this->assertEquals(3, $summary['visible_count']);
+        $this->assertEquals(0, $summary['hidden_due_count']);
+        $this->assertEquals(0, $summary['hidden_by_new_limit']);
+        $this->assertFalse($summary['limit_reached']);
+    }
 }

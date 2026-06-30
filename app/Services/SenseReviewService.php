@@ -193,8 +193,16 @@ class SenseReviewService
                 $hiddenByNewLimit = $newCount;
             }
         } elseif (!$newLimitEnabled) {
-            // No new card limit — show all new cards (subject to review limit)
-            $allowedNewCards = $newCards;
+            // No separate new-card limit — new cards are still subject to the
+            // daily review limit unless new_cards_ignore_review_limit is enabled.
+            if ($newIgnoreReviewLimit) {
+                $allowedNewCards = $newCards;
+            } elseif ($remainingAfterKnown > 0) {
+                $allowedNewCards = $newCards->slice(0, $remainingAfterKnown);
+                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
+            } else {
+                $hiddenByNewLimit = $newCount;
+            }
         }
 
         // Merge known + new, preserving order (known first, ordered by due_at)
