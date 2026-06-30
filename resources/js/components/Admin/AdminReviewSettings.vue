@@ -134,7 +134,7 @@
                                         ></v-text-field>
                                     </v-col>
                                 </v-row>
-                                <div class="caption grey--text ml-2 mt-n2 mb-2">控制每天最多引入多少新卡。新卡越多，未来复习量越大。</div>
+                                <div class="caption grey--text ml-2 mt-n2 mb-2">控制每天最多加入多少张新卡。关闭后，新卡没有单独数量上限；如果未开启"新卡无视复习上限"，新卡仍会占用每日复习名额。</div>
 
                                 <v-row dense align="center" class="mb-2">
                                     <v-col cols="6">
@@ -173,7 +173,7 @@
                                         ></v-switch>
                                     </v-col>
                                 </v-row>
-                                <div class="caption grey--text ml-2 mt-n2 mb-3">关闭时，如果复习积压较多，会优先复习旧卡，不继续增加新卡压力。</div>
+                                <div class="caption grey--text ml-2 mt-n2 mb-3">开启后，新卡可以不受每日复习上限影响；关闭时，会优先复习旧卡，避免在复习积压时继续增加新卡压力。</div>
 
                                 <v-btn
                                     small
