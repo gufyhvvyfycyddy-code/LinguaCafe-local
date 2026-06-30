@@ -123,7 +123,7 @@ class ReviewCardManageController extends Controller
     /**
      * GET /review-cards/manage/export-anki-tsv
      * Export current filtered/sorted results as Anki-compatible TSV.
-     * Reuses buildManageQuery — no mode, no card_ids, no all/selected.
+     * Reuses ReviewCardManageQueryService via queryService->build() — no mode, no card_ids, no all/selected.
      * Fixed 13 columns, Front/Back are HTML-rendered question/answer faces.
      */
     public function exportAnkiTsv(Request $request): \Illuminate\Http\Response
@@ -157,7 +157,7 @@ class ReviewCardManageController extends Controller
     /**
      * GET /review-cards/manage/export-csv
      * Export current filtered/sorted results as CSV download.
-     * Reuses buildManageQuery, buildItems, EXPORT_FIELDS, EXPORT_LIMIT.
+     * Reuses ReviewCardManageQueryService, buildItems, and ReviewCardExportService export field/limit rules.
      * No mode, no card_ids, no all/selected. Uses fputcsv + BOM.
      */
     public function exportCsv(Request $request): \Illuminate\Http\Response
