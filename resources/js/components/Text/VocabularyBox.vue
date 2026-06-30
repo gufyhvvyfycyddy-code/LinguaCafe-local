@@ -314,6 +314,7 @@
     import WordSensesList from './WordSensesList.vue';
     import {
         buildAiSuggestionLookupContext,
+        buildAiSuggestionLookupKey,
         fetchAiSuggestions,
         buildAiVocabSensePayload,
         buildAiPhraseSensePayload,
@@ -370,6 +371,7 @@
                 // ui data
                 tab: 0,
                 showLegacyTranslation: false,
+                latestAiLookupKey: '',
                 searchField: '',
                 searchResults: [],
             };
@@ -458,20 +460,34 @@
                     baseWord: this._baseWord,
                 });
                 if (!context) {
+                    this.latestAiLookupKey = '';
+                    this.$store.commit('vocabularyBox/setAiLookupError', '');
+                    this.$store.commit('vocabularyBox/setAiLookupLoading', false);
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
                     this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
                     return;
                 }
+                const lookupKey = buildAiSuggestionLookupKey(context);
+                this.latestAiLookupKey = lookupKey;
                 this.$store.commit('vocabularyBox/setAiLookupLoading', true);
                 this.$store.commit('vocabularyBox/setAiLookupError', '');
                 fetchAiSuggestions(axios, context).then((result) => {
+                    if (this.latestAiLookupKey !== lookupKey) {
+                        return;
+                    }
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', result.vocabularySuggestions);
                     this.$store.commit('vocabularyBox/setAiPhraseSuggestions', result.phraseSuggestions);
                 }).catch(() => {
+                    if (this.latestAiLookupKey !== lookupKey) {
+                        return;
+                    }
                     this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
                     this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
                     this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
                 }).finally(() => {
+                    if (this.latestAiLookupKey !== lookupKey) {
+                        return;
+                    }
                     this.$store.commit('vocabularyBox/setAiLookupLoading', false);
                 });
             },

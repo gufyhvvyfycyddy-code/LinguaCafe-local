@@ -43,6 +43,27 @@ export function buildAiSuggestionLookupContext({ chapterId, sentenceIndex, word,
 }
 
 /**
+ * Build a stable lookup key for guarding against stale AI lookup responses.
+ *
+ * The key stays frontend-local and is only used to compare whether the
+ * response still belongs to the latest requested word.
+ *
+ * @param {{chapterId: *, word: string, lemma: string, sentenceIndex: number}|null} context
+ * @returns {string}
+ */
+export function buildAiSuggestionLookupKey(context) {
+    if (!context) {
+        return '';
+    }
+    return [
+        context.chapterId,
+        context.sentenceIndex,
+        context.word,
+        context.lemma,
+    ].join('|');
+}
+
+/**
  * Issue the AI suggestion lookup request and shape the response.
  *
  * The service does NOT touch Vuex; it only returns a normalized result so the
