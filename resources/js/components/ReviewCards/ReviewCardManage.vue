@@ -689,6 +689,7 @@
                 <v-card-title>批量归档</v-card-title>
                 <v-card-text>
                     <p>即将批量归档 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
+                    <p>归档后，这些词义卡不会进入日常复习，但释义、例句、复习历史都会保留。</p>
                     <p>操作只影响当前选中的 sense review cards。</p>
                     <p class="font-weight-bold">是否继续？</p>
                 </v-card-text>
@@ -706,6 +707,7 @@
                 <v-card-title>批量恢复</v-card-title>
                 <v-card-text>
                     <p>即将批量恢复 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
+                    <p>恢复后，这些词义卡会重新进入日常复习，释义、例句、复习历史都会保留。</p>
                     <p>操作只影响当前选中的 sense review cards。</p>
                     <p class="font-weight-bold">是否继续？</p>
                 </v-card-text>
