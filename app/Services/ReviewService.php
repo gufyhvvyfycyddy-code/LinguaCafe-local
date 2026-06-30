@@ -10,7 +10,9 @@ use App\Models\ReviewCard;
 
 class ReviewService {
     
-    public function __construct() {
+    public function __construct(
+        private SenseReviewService $senseReviewService,
+    ) {
     }
 
     public function getReviewItems($userId, $language, $bookId, $chapterId, $practiceMode, $languagesWithoutSpaces, $ignoreDailyLimits = false) {
@@ -24,13 +26,12 @@ class ReviewService {
         }
 
         // 日常复习只保留 sense card，孤立 word card 不再进入复习
-        $senseReviewService = app(\App\Services\SenseReviewService::class);
-        $result = $senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
         $senseCards = $result['cards'];
 
         $reviews = [];
         foreach ($senseCards as $card) {
-            $serialized = $senseReviewService->serializeCard($card);
+            $serialized = $this->senseReviewService->serializeCard($card);
             $serialized['type'] = 'sense';
             $reviews[] = (object) $serialized;
         }
