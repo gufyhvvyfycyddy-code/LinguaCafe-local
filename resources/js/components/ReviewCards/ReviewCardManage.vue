@@ -667,18 +667,27 @@
         </v-dialog>
 
         <!-- Bulk delete confirmation dialog -->
-        <v-dialog v-model="bulkDeleteDialog" max-width="520">
+        <v-dialog v-model="bulkDeleteDialog" max-width="560">
             <v-card>
                 <v-card-title class="error--text">批量彻底删除词义复习卡</v-card-title>
                 <v-card-text>
                     <p>将删除已选的 <strong>{{ selectedIds.length }}</strong> 张词义复习卡，并让对应释义不再出现在阅读页点词结果中。</p>
+                    <div v-if="visibleBulkDeleteItems.length > 0" class="bulk-delete-list mb-3">
+                        <div v-for="item in visibleBulkDeleteItems" :key="item.review_card_id" class="bulk-delete-item">
+                            <span class="lemma">{{ item.lemma }}</span>
+                            <span class="sense-zh">— {{ item.sense_zh || '无中文释义' }}</span>
+                        </div>
+                        <div v-if="hiddenBulkDeleteCount > 0" class="bulk-delete-more">
+                            还有 {{ hiddenBulkDeleteCount }} 张未显示。
+                        </div>
+                    </div>
                     <p class="font-weight-bold">阅读材料、原文位置和复习历史会保留。</p>
                     <p class="error--text">此操作不可恢复。确定删除吗？</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="bulkDeleteDialog = false">取消</v-btn>
-                    <v-btn color="error" @click="doBulkDelete">彻底删除 {{ selectedIds.length }} 张</v-btn>
+                    <v-btn color="error" @click="doBulkDelete">确定删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -953,6 +962,15 @@ export default {
             if (!this.isColumnVisible('example_sentence_en')) width -= 140;
             if (!this.isColumnVisible('example_sentence_zh')) width -= 140;
             return width + 'px';
+        },
+        selectedBulkDeleteItems() {
+            return this.items.filter(item => this.selectedIds.includes(item.review_card_id));
+        },
+        visibleBulkDeleteItems() {
+            return this.selectedBulkDeleteItems.slice(0, 20);
+        },
+        hiddenBulkDeleteCount() {
+            return Math.max(this.selectedBulkDeleteItems.length - 20, 0);
         },
     },
     mounted() {
@@ -1895,5 +1913,35 @@ export default {
     background: #fafafa;
     border-radius: 4px;
     border: 1px solid #f0f0f0;
+}
+
+.bulk-delete-list {
+    max-height: 240px;
+    overflow-y: auto;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 8px 12px;
+    background: #fafafa;
+}
+
+.bulk-delete-item {
+    padding: 4px 0;
+    font-size: 0.9rem;
+    line-height: 1.5;
+}
+
+.bulk-delete-item .lemma {
+    font-weight: 600;
+}
+
+.bulk-delete-item .sense-zh {
+    color: rgba(0, 0, 0, 0.66);
+}
+
+.bulk-delete-more {
+    padding: 6px 0 2px;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.54);
+    font-style: italic;
 }
 </style>
