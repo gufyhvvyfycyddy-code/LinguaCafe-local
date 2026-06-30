@@ -30,7 +30,7 @@
                     <v-btn title="退出全屏" icon @click="exitFullscreen" v-if="fullscreenMode"><v-icon>mdi-arrow-collapse-all</v-icon></v-btn>
                     <v-btn title="阅读设置" icon @click="openDialog('settings')"><v-icon>mdi-cog</v-icon></v-btn>
                     <v-btn title="章节" icon @click="openDialog('chapters')"><v-icon>mdi-book-alphabet</v-icon></v-btn>
-                    <v-btn title="词汇表" icon @click="openDialog('glossary')"><v-icon>mdi-translate</v-icon></v-btn>
+                    <v-btn title="词汇表" icon @click="openDialog('glossary')"><v-icon>mdi-format-list-bulleted</v-icon></v-btn>
                     <v-btn title="增大字号" icon @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
                     <v-btn title="减小字号" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
                     <v-btn title="切换纯文本模式" icon @click="togglePlainTextMode"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-format-text</v-icon></v-btn>
