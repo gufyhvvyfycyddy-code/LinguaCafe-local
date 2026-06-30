@@ -33,9 +33,9 @@
                     <v-btn title="词汇表" icon @click="openDialog('glossary')"><v-icon>mdi-translate</v-icon></v-btn>
                     <v-btn title="增大字号" icon @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
                     <v-btn title="减小字号" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
-                    <v-btn title="切换纯文本模式" icon @click="settings.plainTextMode = !settings.plainTextMode; toolbarSettingChanged();"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-format-text</v-icon></v-btn>
-                    <v-btn title="查看快捷键" icon @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
-                    <v-btn title="AI 阅读辅助" icon @click="aiAssistDialog = true;"><v-icon>mdi-robot</v-icon></v-btn>
+                    <v-btn title="切换纯文本模式" icon @click="togglePlainTextMode"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-format-text</v-icon></v-btn>
+                    <v-btn title="查看快捷键" icon @click="toggleHotkeyDialog"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
+                    <v-btn title="AI 阅读辅助" icon @click="openAiAssistDialog"><v-icon>mdi-robot</v-icon></v-btn>
                     <v-btn
                         v-if="hasSavedAiAssist"
                         :title="showAiTranslations ? '隐藏 AI 译文' : '显示 AI 译文'"
