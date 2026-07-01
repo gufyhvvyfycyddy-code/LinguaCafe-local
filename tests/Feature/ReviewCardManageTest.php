@@ -497,6 +497,7 @@ class ReviewCardManageTest extends TestCase
             'sense_zh', 'sense_en', 'example_sentence_en', 'example_sentence_zh',
             'aliases_zh', 'collocations',
             'source_chapter_id', 'source_chapter_title', 'source_kind',
+            'source_display_status', 'source_display_label',
             'fsrs_state', 'fsrs_due_at', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled',
             'missing_definition', 'missing_example', 'missing_source',
         ];
