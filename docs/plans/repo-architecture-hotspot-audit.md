@@ -306,6 +306,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **SenseReviewMapping-SmokeTests-1** | MCP Chrome 空状态 smoke：/senses/review 与 /reviews/senses 页面打开、标题/统计/筛选/批量区/空状态、console、无数据副作用 | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 + 缺口契约测试。侦查已输出 18 个风险点 + contract tests 计划。Gap 测试补了 5 个 preview + 5 个 confirmPreflight，全 58 个测试通过 | 🟡 中 | 🔴 高 | B-先契约 |
 | ✅ 已完成 | **TextBlockService-CreateNewEncounteredWordsContractTests-1** | 12 个 characterization tests 锁定 createNewEncounteredWords 行为：新词创建/去重/隔离/study_base/skip/CJK/lemma 保留/batch insert | 🟢 高 | 🟡 中 | B-先契约 |
+| ✅ 已完成 | **EncounteredWordCreationService-Extract-1** | 从 TextBlockService 提取 encountered_words 写入逻辑到独立 Service。createNewEncounteredWords 保持 public facade。行为无变化 | 🟢 高 | 🟢 低 | A |
 | 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
 
 ### 7.2 候选任务详情
@@ -487,7 +488,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - 未改 `TextBlockService.php`
 - 未改任何业务代码
 
-**下一个候选**：候选 6a（EncounteredWordCreationService 提取）— 或下一轮决定是否拆出新 Service
+**候选 6a 已完成**：EncounteredWordCreationService-Extract-1 — 成功提取创建 encountered_words 的写入逻辑到独立 Service。TextBlockService::createNewEncounteredWords() 保持 public facade。12 个 characterization tests 全部通过。新增 EncounteredWordCreationService 直接调用测试。
+
+**下一个候选**：候选 7（WordSenseService destroy/restore 只读风险审计）或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）
 
 #### 候选 7：WordSenseService destroy/restore 只读风险审计
 
@@ -538,7 +541,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 6 已完成 contract tests**：TextBlockService-CreateNewEncounteredWordsContractTests-1 — 12 个 characterization tests 锁定 createNewEncounteredWords 行为。未提取 Service，未改业务逻辑，未改 tokenizer。
 
-**新的最推荐下一阶段**：**候选 6a（EncounteredWordCreationService 提取）** — 基于已有 contract tests 安全拆出新 Service。或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
+**候选 6a 已完成 Service 提取**：EncounteredWordCreationService-Extract-1 — 从 TextBlockService 提取 encountered_words 写入逻辑到独立 Service。createNewEncounteredWords() 保持 public facade。12 个原 characterization tests + 1 个直接调用测试共 13 测试全绿。
+
+**新的最推荐下一阶段**：**候选 7（WordSenseService destroy/restore 只读风险审计）** 或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
 
 ---
 

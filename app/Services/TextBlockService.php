@@ -370,93 +370,18 @@ class TextBlockService
         This function creates records in encountered_words 
         database table for each new word that the user 
         encounters for the first time.
+
+        Delegates to EncounteredWordCreationService for the
+        actual write logic. The public facade signature and
+        external behaviour are unchanged.
     */
     public function createNewEncounteredWords() {
-        $wordsToSkip = config('linguacafe.words_to_skip');      
-
-        // a regular expression for japanese kanji characters
-        $kanjipattern = "/[a-zA-Z0-9０-９あ-んア-ンー。、:？！＜＞： 「」（）｛｝≪≫〈〉《》【】『』〔〕［］・\n\r\t\s\(\)　]/u";
-        DB::disableQueryLog();
-        
-
-        DB::transaction(function () use ($wordsToSkip, $kanjipattern) {
-            $encounteredWords = DB::table('encountered_words')
-                ->select('word')
-                ->where('user_id', $this->userId)
-                ->where('language', $this->language)
-                ->whereIn('word', $this->uniqueWords)
-                ->lockForUpdate()
-                ->pluck('word')
-                ->toArray();
-
-            $encounteredWordsToInsert = [];
-            for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
-                if (
-                    in_array(mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8'), $encounteredWords, true) ||
-                    VocabularyTokenFilter::shouldSkip($this->processedWords[$wordIndex]->word, $this->language)
-                ){
-                    continue;
-                }
-
-                $encounteredWords[] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
-                
-                if ($this->language == 'japanese' || $this->language == 'chinese') {
-                    $kanji = preg_replace($kanjipattern, "", $this->processedWords[$wordIndex]->word);
-                    $kanji = preg_split("//u", $kanji, -1, PREG_SPLIT_NO_EMPTY);
-                }
-
-                $encounteredWord = [];
-                $encounteredWord['user_id'] = $this->userId;
-                $encounteredWord['language'] = $this->language;
-                $encounteredWord['word'] = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
-                $encounteredWord['lemma'] = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-                $grammaticalLemma = mb_strtolower($this->processedWords[$wordIndex]->lemma);
-                $encounteredWord['base_word'] = $grammaticalLemma;
-
-                // study_base: use user rule if exists, otherwise default to grammatical lemma
-                $surfaceLower = mb_strtolower($this->processedWords[$wordIndex]->word, 'UTF-8');
-                $userRule = \App\Models\UserStudyBaseRule::where('user_id', $this->userId)
-                    ->where('language', $this->language)
-                    ->where('surface', $surfaceLower)
-                    ->first();
-                $encounteredWord['study_base'] = $userRule
-                    ? $userRule->study_base
-                    : $grammaticalLemma;
-                $encounteredWord['reading'] = $this->processedWords[$wordIndex]->reading;
-                $encounteredWord['kanji'] = $this->language == 'japanese' || $this->language == 'chinese' ? implode('', $kanji) : '';
-                $encounteredWord['base_word_reading'] = $this->processedWords[$wordIndex]->lemma_reading;
-                $encounteredWord['stage'] = 2;
-                $encounteredWord['translation'] = '';
-                $encounteredWord['created_at'] =  Carbon::now();
-                $encounteredWord['updated_at'] = Carbon::now();
-
-                
-                if (in_array($this->processedWords[$wordIndex]->word, $wordsToSkip, true) || VocabularyTokenFilter::shouldSkip($this->processedWords[$wordIndex]->word, $this->language)) {
-                    $encounteredWord['stage'] = 1;
-                    $encounteredWord['base_word'] = '';
-                    $encounteredWord['lemma'] = '';
-                    $encounteredWord['study_base'] = '';
-                    $encounteredWord['reading'] = '';
-                    $encounteredWord['base_word_reading'] = '';
-                }
-
-                // Only clear lemma/base_word for CJK languages where lemma==word is the default.
-                // English and other European languages: keep base_word even if it matches the surface
-                // (e.g., "series" → lemma "series" is correct; clearing it breaks WordSense lookups).
-                $isCJK = in_array($this->language, ['japanese', 'chinese', 'korean', 'thai'], true);
-                if ($isCJK && $encounteredWord['base_word'] == $encounteredWord['word']) {
-                    $encounteredWord['base_word'] = '';
-                    $encounteredWord['lemma'] = '';
-                    $encounteredWord['study_base'] = '';
-                    $encounteredWord['base_word_reading'] = '';
-                }
-
-                $encounteredWordsToInsert[] = $encounteredWord;
-            }
-            if (count($encounteredWordsToInsert)) {
-                DB::table('encountered_words')->insert($encounteredWordsToInsert);
-            }
-        });
+        app(EncounteredWordCreationService::class)->create(
+            $this->userId,
+            $this->language,
+            $this->processedWords,
+            $this->uniqueWords
+        );
     }
 
     public function collectUniqueWords() {
