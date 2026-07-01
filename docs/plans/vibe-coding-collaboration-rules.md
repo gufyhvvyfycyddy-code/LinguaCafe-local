@@ -845,3 +845,65 @@ WorkBuddy 最终报告必须说明本轮使用的专家名称，例如：
 
 > 本轮使用 WorkBuddy 内置专家：网页端体验师
 > （每轮只使用一个专家）
+
+## 20. oh-my-opencode-slim 必用 skill 规则
+
+### 20.1 必用规则
+
+从现在开始，网页端 GPT 给 OpenCode 的每一个任务提示词，都必须包含：
+
+```
+必用辅助 skill：oh-my-opencode-slim
+```
+
+OpenCode 每次进入任务后，必须先调用或阅读本地已安装的 `oh-my-opencode-slim` skill。
+
+### 20.2 适用场景
+
+`oh-my-opencode-slim` 用于检查和约束 OpenCode / agent / model / prompt / skill / MCP / preset / plugin behavior 相关设置。
+
+如果任务涉及以下任一内容，更必须使用它：
+- MCP Chrome
+- agent 行为
+- 模型档位
+- skills
+- OpenCode 执行习惯
+- 报告格式
+- 重复性工作流摩擦
+- preset / plugin behavior
+
+### 20.3 配置修改权限
+
+- 默认不允许 OpenCode 修改 oh-my-opencode-slim 配置。
+- 只有当前任务明确授权时，才允许修改以下文件：
+  - `~/.config/opencode/oh-my-opencode-slim.json`
+  - `~/.config/opencode/oh-my-opencode-slim.jsonc`
+  - `<project>/.opencode/oh-my-opencode-slim.json`
+  - agent prompt append 文件（`~/.config/opencode/oh-my-opencode-slim/{agent}_append.md`）
+- 如果发现配置问题，默认只报告事实和最小修复建议，不擅自改配置。
+
+### 20.4 配置修改报告要求
+
+如果确实修改配置，最终报告必须说明：
+- 修改了哪个文件；
+- 为什么修改；
+- 是否影响模型费用；
+- 是否影响 agent 权限；
+- 是否影响 MCP 权限；
+- 是否需要重启 OpenCode。
+
+### 20.5 不覆盖其它硬规则
+
+本条规则不覆盖 LinguaCafe 原有禁止规则：
+- DCP 默认禁止；
+- notification script 默认禁止；
+- `.env` 禁止读取/修改；
+- `AGENTS.md` 禁止修改；
+- `.omo/` 禁止处理；
+- MCP Chrome 真实验收规则仍然有效；
+- OpenCode 后置 CodeBuddy 仍然有效；
+- 涉及页面时 WorkBuddy 仍然有效。
+
+### 20.6 未使用说明的后果
+
+如果 OpenCode 报告中没有说明是否使用了 `oh-my-opencode-slim`，网页端 GPT 应标记为 Incomplete 或要求补充说明。
