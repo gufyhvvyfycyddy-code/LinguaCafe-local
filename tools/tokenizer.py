@@ -336,13 +336,11 @@ def tokenizeText(text, language, sentenceIndexStart = 0):
                     except Exception:
                         pass  # LemmInflect is best-effort; spaCy lemma stays
             
-            # English irregular override: correct edge cases that the
-            # spaCy + LemmInflect fallback pipeline cannot handle.
-            # Only for English; only for explicitly listed surfaces.
-            if language == 'english' and word.lower() in ENGLISH_IRREGULAR_OVERRIDES:
-                override = ENGLISH_IRREGULAR_OVERRIDES[word.lower()]
-                if override != lemma:
-                    lemma = override
+            # NOTE(health-only): ENGLISH_IRREGULAR_OVERRIDES (geese→goose,
+            # better→good, best→good) are evaluated in the health check endpoint
+            # (english_lemma_health) but are NOT applied at tokenize time.
+            # These overrides require further validation before enabling in the
+            # real tokenization pipeline — see archive health task.
             
             # get hiragana reading
             reading = list()
@@ -670,8 +668,16 @@ LANGUAGE_MODELS = {
     'thai': 'spacy_thai',
 }
 
-def language_health(lang):
+def language_health(lang, lightweight=True):
     """Check availability of a spaCy model for a given language.
+
+    When lightweight=True (default): uses spacy.util.is_package() to detect
+    whether the model is installed without loading the full pipeline.
+    This is fast and safe — no expensive spacy.load().
+
+    When lightweight=False: actually loads the model (used only for the
+    primary language, English, where real lemma tests are needed).
+
     Returns dict with available, status, model, error keys.
     Safe: never throws 500, returns error details on failure."""
     result = {
@@ -687,12 +693,21 @@ def language_health(lang):
         return result
     result['model'] = model_name
     try:
-        nlp = spacy.load(model_name)
-        result['available'] = True
-        result['status'] = 'available'
-    except OSError:
-        result['status'] = 'not_installed'
-        result['error'] = f'spaCy model "{model_name}" not installed. Run: python -m spacy download {model_name}'
+        if lightweight or lang != 'english':
+            # Lightweight check: detect package without loading
+            import spacy.util
+            installed = spacy.util.get_installed_models()
+            if model_name in installed:
+                result['available'] = True
+                result['status'] = 'available'
+            else:
+                result['status'] = 'not_installed'
+                result['error'] = f'spaCy model "{model_name}" not installed. Run: python -m spacy download {model_name}'
+        else:
+            # Full check: actual load (only for English deep checks)
+            nlp = spacy.load(model_name)
+            result['available'] = True
+            result['status'] = 'available'
     except Exception as e:
         result['status'] = 'failed'
         result['error'] = str(e)
@@ -701,8 +716,11 @@ def language_health(lang):
 
 def english_lemma_health():
     """Check English lemmatization accuracy with irregular cases.
+    Loads English spaCy model and LemmInflect ONCE, then runs all samples.
+
     Returns list of check results with surface, expected, actual, passed keys.
-    Safe: catches exceptions per-case, returns failing check with error."""
+    Safe: catches exceptions per-case, returns failing check with error.
+    If English model or LemmInflect is unavailable, all checks fail with error."""
     results = []
     irregular_cases = [
         ('ran',    'VERB', 'run'),
@@ -716,6 +734,19 @@ def english_lemma_health():
         ('studies','VERB', 'study'),
         ('was',    'VERB', 'be'),
     ]
+    # Load English model and LemmInflect once, outside the loop
+    nlp = None
+    lemminflect_available = False
+    try:
+        nlp = spacy.load('en_core_web_sm')
+    except Exception:
+        pass
+    try:
+        import lemminflect
+        lemminflect_available = True
+    except Exception:
+        pass
+
     for surface, pos, expected in irregular_cases:
         check = {
             'surface': surface,
@@ -724,13 +755,19 @@ def english_lemma_health():
             'passed': False,
             'error': None,
         }
+        if nlp is None:
+            check['error'] = 'en_core_web_sm not loaded'
+            results.append(check)
+            continue
+        if not lemminflect_available:
+            check['error'] = 'lemminflect not available'
+            results.append(check)
+            continue
         try:
-            nlp = spacy.load('en_core_web_sm')
-            import lemminflect
             doc = nlp(surface)
             token = doc[0]
             lemma = token.lemma_
-            # Apply the same fallback logic as tokenizeText
+            # Apply fallback logic matching tokenizeText
             if lemma == token.text.lower():
                 if token.pos_ in ('VERB', 'NOUN', 'ADJ', 'ADV'):
                     try:

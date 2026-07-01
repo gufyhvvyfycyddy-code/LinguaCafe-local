@@ -291,6 +291,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | TextBlockService-ReaderDataContract-1 | 契约锁定 — 已完成输出结构文档 + 9 个 characterization tests | — | — | — |
 | ✅ 已完成 | TextBlockService-ReaderDataService-Extract-1 | **ReaderDataService 已提取** — 新增 `app/Services/ReaderDataService.php`，TextBlockService 保持外部接口不变 | 4/10 | 🟢 高 | A |
 | ✅ 已完成 | TokenizerHealth-Contract-1 | tokenizer health 增强已完成 — health_check 新增 version/languages/english/checks 字段，PHP doctor 兼容新旧 JSON，新增 6 个 unit tests | 3/10 | 🟢 高 | A |
+| ✅ 已完成 | TokenizerHealth-Contract-Fix-1 | 收口 fix：移除非验收的 tokenizeText `ENGLISH_IRREGULAR_OVERRIDES`（保留在 health 诊断中）；language_health 改为轻量检测（spacy.util.get_installed_models），不再加载 26 个模型；english_lemma_health 单次加载 English 模型而非每样例加载；清理 PHP doctor 临时代码；6 个测试全绿。 |
 | 3️⃣ | **SenseSourceContextService test + 查询/渲染分离** | 3/10 | 🟡 中 | 🟢 低 | A/B-待启动 |
 | 2️⃣ | **tokenizer health 增强 + PHP 端 health 独立** | 3/10 | 🟢 高 | 🟢 低 | A-立即 |
 | 3️⃣ | **SenseSourceContextService test + 查询/渲染分离** | 3/10 | 🟡 中 | 🟢 低 | A/B |

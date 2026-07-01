@@ -278,13 +278,7 @@ Checks:
         }
 
         // 2.6. English lemma checks detail
-        $englishInfo = $results['languages']['english'] ?? [];
-        $lemmaChecksEnglish = $englishInfo['checks_passed'] ?? false;
         if (!empty($results['languages'])) {
-            $lemmaFromChecks = $results['english']['lemma_checks'] ?? [];
-            $hasFutureDue = false; // placeholder for future
-
-            // Check if detailed checks show passes/fails
             $checkDetail = $results['checks']['english_lemma'] ?? [];
             if (!empty($checkDetail)) {
                 $total = $checkDetail['total'] ?? 0;
