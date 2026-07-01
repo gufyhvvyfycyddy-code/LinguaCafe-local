@@ -158,3 +158,17 @@ FSRS 熟悉度: XX%
 12. 不影响 ECDICT 词典查询。
 13. 不影响 AI 阅读辅助。
 14. 不影响复习卡管理。
+
+### MCP Chrome 真实点击验收记录（Workflow-ContinuePromptRule-And-LemmaDisplayClick-1）
+
+**测试日期**：2026-07-01 | **测试人**：OpenCode + MCP Chrome
+
+| 操作 | 结果 | 实际显示（accessibility tree 首两项） |
+|------|------|--------------------------------------|
+| 点击 geese | ✅ | `geese` (surface) → `goose` (lemma) |
+| 点击 better | ✅ | `better` (surface) → `good` (lemma) |
+| 点击 best | ✅ | `best` (surface) → `good` (lemma) |
+| 词典搜索框 | ✅ | 仍预填 lemma（goose / good） |
+| 添加释义 | ✅ | 按钮正常，ECDICT 结果正常 |
+
+**验证环境**：LinguaCafe v0.14.1, Chrome 浏览器, MCP chrome-devtools 工具链。测试章节 "Test Sentences"（chapter 7）。
