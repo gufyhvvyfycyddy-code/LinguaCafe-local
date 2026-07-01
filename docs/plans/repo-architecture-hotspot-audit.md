@@ -302,7 +302,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 |------|--------|----------|------|------|------|
 | ✅ 已完成 | **DictionaryImportService-CharacterizationTests-1** | 13 tests 覆盖文件识别/CSV测试/导入validation/导入成功路径 | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **TextBlockGroup-SmokeTests-1** | MCP Chrome 真实验收完成（读取渲染/hover 词汇/点词打开侧栏/console error 检查/不创建学习数据） | 🟢 高 | 🟢 低 | A |
-| 3️⃣ | **VocabularyService query/search contract + test** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| ✅ 已完成 | **VocabularyService-QuerySearchContractTests-1** | 15 tests 覆盖返回结构/text+reading搜索/stage/translation/only words+only phrases+union/4种排序/分页/export | 🟡 中 | 🟢 低 | A |
 | 4️⃣ | **SenseReview / SenseMappingReview smoke tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
 | 5️⃣ | **FsrsReschedulePreviewService contract + scouting** | 未开始 | 🟡 中 | 🔴 高 | B-先侦查 |
 | 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
@@ -346,21 +346,25 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - 不改 reader 组件
 - 不改后端
 
-#### 候选 3：VocabularyService query/search contract tests
+#### ~~候选 3~~ 已完成：VocabularyService-QuerySearchContractTests-1
 
-**当前状态**：未开始。995 行，搜索/分页/导入后处理混合。
+**状态**：已完成。15 个 contract tests 已锁定搜索/分页/过滤行为。
+**更新日期**：2026-07-01
 
-**推荐模型**：复杂度 10
-**是否需要 CodeBuddy**：可选
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：否
-**为什么现在做**：搜索和分页逻辑可以安全补 characterization tests。不依赖其他任务。
-**允许修改文件**：
-- `tests/Feature/VocabularySearchTest.php`（新增）
-- `docs/plans/*`
-**禁止范围**：
-- 不改 VocabularyService 核心语义
-- 不改导入流程
+**覆盖内容**：
+- 返回顶层结构（wordCount/words/books/pageCount/currentPage/languageSpaces）
+- text 搜索匹配 word + reading
+- stage 过滤
+- translation = not empty 过滤
+- only words / only phrases / words+phrases union
+- orderBy words/words desc/stage/stage desc
+- pagination（30 条/页，pageCount float 兼容）
+- exportToCsv 复用搜索查询
+
+**改动范围**：
+- 仅新增 `tests/Feature/VocabularySearchTest.php`
+- 未改 `VocabularyService.php`
+- 未改查询语义
 
 #### 候选 4：SenseReview / SenseMappingReview smoke tests
 
@@ -454,7 +458,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 2 已完成**：TextBlockGroup-SmokeTests-1 — MCP Chrome 真实验收阅读页渲染、token 点击、vocab 侧栏。
 
-**新的最推荐下一阶段**：**候选 3（VocabularyService query/search contract tests）** — VocabularyService 995 行，搜索/分页逻辑需要测试覆盖。
+**候选 3 已完成**：VocabularyService-QuerySearchContractTests-1 — 15 tests 覆盖搜索全链路。
+
+**新的最推荐下一阶段**：**候选 4（SenseReview / SenseMappingReview smoke tests）** — 词义确认/拒绝影响阅读页点词候选，需要 WorkBuddy + MCP Chrome 验收。
 
 ---
 
