@@ -304,7 +304,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **TextBlockGroup-SmokeTests-1** | MCP Chrome 真实验收完成（读取渲染/hover 词汇/点词打开侧栏/console error 检查/不创建学习数据） | 🟢 高 | 🟢 低 | A |
 | ✅ 已完成 | **VocabularyService-QuerySearchContractTests-1** | 15 tests 覆盖返回结构/text+reading搜索/stage/translation/only words+only phrases+union/4种排序/分页/export | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **SenseReviewMapping-SmokeTests-1** | MCP Chrome 空状态 smoke：/senses/review 与 /reviews/senses 页面打开、标题/统计/筛选/批量区/空状态、console、无数据副作用 | 🟡 中 | 🟢 低 | A |
-| 🔍 侦查中 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 preview/confirmPreflight/confirmAndApply 全链路 — 已输出 18 个风险点 + preview+confirmPreflight contract tests 计划 | 🟡 中 | 🔴 高 | B-先契约 |
+| ✅ 已完成 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 + 缺口契约测试。侦查已输出 18 个风险点 + contract tests 计划。Gap 测试补了 5 个 preview + 5 个 confirmPreflight，全 58 个测试通过 | 🟡 中 | 🔴 高 | B-先契约 |
 | 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
 | 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
 
@@ -396,10 +396,11 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **下一个候选**：候选 5（FsrsReschedulePreviewService contract + scouting）
 
-#### 🔍 侦查已完成：FsrsReschedulePreviewService-ContractScouting-1
+#### ✅ 侦查 + 缺口测试已完成：FsrsReschedulePreviewService-ContractScouting-1 + GapContractTests-1
 
-**状态**：只读侦查已完成。未改业务代码，未补测试，未执行 FSRS 重排。
+**状态**：只读侦查 + 缺口契约测试已完成。未改业务代码，未执行 FSRS 重排。
 **侦查日期**：2026-07-02
+**缺口测试完成日期**：2026-07-02
 
 **侦查范围**：
 - `app/Services/FsrsReschedulePreviewService.php`（780 行）
@@ -422,7 +423,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - **中**：skipped_count 不一致、write_enabled 命名误导、preview 和 apply 之间 FSRS params 变化时仅校验 hash
 - **低**：days_change 符号代码冗余、newly_due_today 不覆盖降低今日负荷场景
 
-**下一个候选**：候选 5a（FsrsReschedulePreviewService-PreviewContractTests-1）— 先补 preview + confirmPreflight 契约测试，暂不做 confirmAndApply 写入测试
+**缺口测试已补强**：FsrsReschedulePreviewService-GapContractTests-1 — 在已有 51 个测试基础上新增 5 个 preview + 5 个 confirmPreflight 缺口测试。覆盖 empty candidate hash、stability/difficulty hash 敏感度、语言隔离、confirmPreflight apply=false high/blocked/不写 snapshot/risk_confirm 忽略。confirmAndApply 成功写入路径仍暂缓。
+
+**下一个候选**：**候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）** — 如果决策进入 confirmAndApply 写入测试，先补安全契约。或候选 6（TextBlockService createNewEncounteredWords 提取）。
 
 ### 7.3 FsrsReschedulePreviewService 风险清单
 
@@ -525,7 +528,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 5 已完成侦查**：FsrsReschedulePreviewService-ContractScouting-1 — 只读侦查 preview/confirmPreflight/confirmAndApply 全链路，已输出 18 个风险点 + preview+confirmPreflight contract tests 计划，未改业务代码，未补测试，未执行 FSRS 重排。
 
-**新的最推荐下一阶段**：**候选 5a（FsrsReschedulePreviewService-PreviewContractTests-1）** — 先补 preview + confirmPreflight 契约测试，暂不做 confirmAndApply 写入测试。
+**候选 5 已完成侦查 + 缺口测试补强**：FsrsReschedulePreviewService-ContractScouting-1 + GapContractTests-1 — 只读侦查 + 10 个缺口契约测试共 58 个测试全绿。未改业务代码，未补 confirmAndApply 成功写入测试，未执行真实重排。
+
+**新的最推荐下一阶段**：**候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）** — 如果决策进入 confirmAndApply 写入测试，先补安全契约。或候选 6（TextBlockService createNewEncounteredWords 提取）。
 
 ---
 

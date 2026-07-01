@@ -518,6 +518,91 @@ class FsrsReschedulePreviewTest extends TestCase
     }
 
     // ════════════════════════════════════════════════════════════════
+    //  Preview hash gap tests
+    // ════════════════════════════════════════════════════════════════
+
+    public function test_preview_empty_english_returns_preview_hash(): void
+    {
+        // No eligible cards at all — english user with zero candidates
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('preview_available', true);
+        $response->assertJsonPath('total_candidates', 0);
+        $response->assertJsonPath('total_changed', 0);
+        $response->assertJsonPath('skipped_count', 0);
+        $this->assertNotNull($response->json('preview_hash'));
+        $this->assertIsString($response->json('preview_hash'));
+        $warnings = $response->json('warnings');
+        $this->assertNotEmpty($warnings);
+        $this->assertStringContainsString('没有符合条件的卡片', $warnings[1] ?? $warnings[0]);
+    }
+
+    public function test_preview_hash_changes_when_stability_changes(): void
+    {
+        $card = $this->createEligibleReviewCard();
+
+        $response1 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash1 = $response1->json('preview_hash');
+
+        $card->fsrs_stability = 99.9;
+        $card->save();
+
+        $response2 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash2 = $response2->json('preview_hash');
+
+        $this->assertNotEquals($hash1, $hash2);
+    }
+
+    public function test_preview_hash_changes_when_difficulty_changes(): void
+    {
+        $card = $this->createEligibleReviewCard();
+
+        $response1 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash1 = $response1->json('preview_hash');
+
+        $card->fsrs_difficulty = 1.5;
+        $card->save();
+
+        $response2 = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash2 = $response2->json('preview_hash');
+
+        $this->assertNotEquals($hash1, $hash2);
+    }
+
+    public function test_preview_excludes_other_language_cards(): void
+    {
+        // Create own eligible English card
+        $this->createEligibleReviewCard('english_word');
+        // Create a sense card for the same user but with japanese language
+        $jpSense = $this->createSense('jp_word', '日本語', 'japanese', [
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+        ]);
+        $this->createSenseCard($jpSense, [
+            'language_id' => 'japanese',
+            'language' => 'japanese',
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $this->assertEquals(1, $response->json('total_candidates'));
+    }
+
+    public function test_preview_risk_assessment_empty_is_none(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+
+        $response->assertOk();
+        $risk = $response->json('risk_assessment');
+        $this->assertEquals('none', $risk['level']);
+        $this->assertIsBool($risk['can_apply']);
+    }
+
+    // ════════════════════════════════════════════════════════════════
     //  Helpers
     // ════════════════════════════════════════════════════════════════
 

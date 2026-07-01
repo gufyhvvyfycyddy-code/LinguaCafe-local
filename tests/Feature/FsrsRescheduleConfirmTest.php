@@ -78,6 +78,8 @@ class FsrsRescheduleConfirmTest extends TestCase
 
         $card->fsrs_due_at = $card->fsrs_due_at->copy()->addDay();
         $card->save();
+        $dueBeforeConfirm = $card->fsrs_due_at?->toIso8601String();
+        $stabilityBeforeConfirm = $card->fsrs_stability;
 
         $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
             'preview_hash' => $oldHash,
@@ -88,6 +90,11 @@ class FsrsRescheduleConfirmTest extends TestCase
         $response->assertJsonPath('success', false);
         $response->assertJsonPath('message', '预览已过期，请重新获取预览后再确认。');
         $this->assertNotNull($response->json('preview_hash'));
+        // Stale hash stops before any write — no ReviewCard change, no snapshot
+        $card->refresh();
+        $this->assertEquals($dueBeforeConfirm, $card->fsrs_due_at?->toIso8601String());
+        $this->assertEquals($stabilityBeforeConfirm, $card->fsrs_stability);
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -514,6 +521,115 @@ class FsrsRescheduleConfirmTest extends TestCase
         $disabledCard->refresh();
         // Disabled card should not have fsrs_due_at changed (still past due)
         $this->assertTrue($disabledCard->fsrs_due_at->lt(now())); // should not be touched
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  ConfirmPreflight gap tests (apply=false)
+    // ════════════════════════════════════════════════════════════════
+
+    public function test_confirm_apply_false_high_risk_returns_risk_level(): void
+    {
+        $this->injectThresholdService(0, 10);
+        // Create cards that will be newly_due_today (due far in future, last reviewed long ago)
+        for ($i = 0; $i < 5; $i++) {
+            $sense = $this->createSense("high_{$i}", "高_{$i}", "high_{$i}");
+            $card = $this->createSenseCard($sense, [
+                'fsrs_due_at' => now()->addDays(30),
+                'fsrs_stability' => 0.5,
+                'fsrs_difficulty' => 5.0,
+                'fsrs_last_reviewed_at' => now()->subDays(60),
+            ]);
+            $this->addReviewLog($card);
+        }
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => false,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath('risk_level', 'high');
+        $response->assertJsonPath('requires_risk_confirm', true);
+        $response->assertJsonPath('write_enabled', false);
+        // Must not write ReviewCard or create snapshot
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
+    }
+
+    public function test_confirm_apply_false_blocked_returns_blocked_level(): void
+    {
+        $this->injectThresholdService(10, 2); // maxTotalChanged=2
+        $this->createEligibleReviewCard('card1');
+        $this->createEligibleReviewCard('card2');
+        $this->createEligibleReviewCard('card3');
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => false,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('risk_level', 'blocked');
+        $response->assertJsonPath('requires_risk_confirm', false);
+        $response->assertJsonPath('write_enabled', false);
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
+    }
+
+    public function test_confirm_apply_false_does_not_create_snapshot(): void
+    {
+        $this->injectThresholdService(10, 10);
+        $this->createEligibleReviewCard();
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => false,
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('confirm_available', true);
+        $response->assertJsonPath('write_enabled', false);
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
+    }
+
+    public function test_confirm_apply_false_risk_confirm_still_does_not_write(): void
+    {
+        $this->injectThresholdService(10, 10);
+        $card = $this->createEligibleReviewCard();
+        $originalDue = $card->fsrs_due_at?->toIso8601String();
+        $beforeLogCount = ReviewLog::count();
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => false,
+            'risk_confirm' => true,
+        ]);
+
+        // apply=false path — risk_confirm is ignored, confirmPreflight is called
+        $response->assertOk();
+        $response->assertJsonPath('write_enabled', false);
+        $this->assertArrayNotHasKey('applied', $response->json());
+
+        $card->refresh();
+        $this->assertEquals($originalDue, $card->fsrs_due_at?->toIso8601String());
+        $this->assertEquals($beforeLogCount, ReviewLog::count());
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
     }
 
     // ════════════════════════════════════════════════════════════════
