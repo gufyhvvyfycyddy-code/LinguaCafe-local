@@ -73,18 +73,18 @@ FSRS 熟悉度: XX%
 
 ### 第一轮只做：
 
-1. **改 `VocabularySideBox.vue`**（查词侧栏信息面板）。
-2. **改 `VocabularyBox.vue`**（浮动查词弹窗）。原显示为 `lemma → surface`（错误顺序），已修正为 `surface → lemma`。
-2. 把"当前词形：X  词元：Y"标签格式改为箭头格式。
-3. 箭头格式位置：替换当前"当前词形：X  词元：Y"这一行。
-4. 具体位置：`VocabularySideBox.vue` 第 42-65 行的 word info 区域。
-5. 保留"词元：[修改]"功能（用户可编辑 baseWord）。
-6. 保留 FSRS 熟悉度显示。
+1. **改 `VocabularySideBox.vue`**（查词侧栏信息面板）：
+   - 把"当前词形：X  词元：Y"标签格式改为箭头格式。
+   - 原词与 lemma 相同时只显示原词，不显示箭头。
+   - 保留"词元：[修改]"功能和 FSRS 熟悉度。
+
+2. **改 `VocabularyBox.vue`**（浮动查词弹窗）：
+   - 仅修正显示方向：原为 `lemma → surface`（错误），修正为 `surface → lemma`。
+   - 不改保存逻辑、store、API、WordSense、ReviewCard、FSRS。
 
 ### 不改：
 
 - 不改 `TextBlockGroup.vue`。
-- 不改 `VocabularyBox.vue`（查词侧栏之外的弹出框）。
 - 不改 `VocabularyHoverBox.vue`（悬停查词）。
 - 不改 `TextReader.vue`。
 - 不改后端接口。
