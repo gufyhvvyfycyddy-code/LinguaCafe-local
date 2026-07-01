@@ -1268,6 +1268,95 @@ class ReviewCardManageTest extends TestCase
         $this->assertArrayHasKey('fsrs_enabled', $data);
     }
 
+    // ==================== Source display fields ====================
+
+    public function test_serialize_card_contains_source_display_fields(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", []);
+        $response->assertOk();
+        $data = $response->json();
+
+        // serializeCard must include source_display_status and source_display_label
+        $this->assertArrayHasKey('source_display_status', $data);
+        $this->assertArrayHasKey('source_display_label', $data);
+    }
+
+    public function test_source_display_status_real_chapter(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        // Give sense a real source_chapter_id
+        $chapter = \App\Models\Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 1,
+            'language' => 'english',
+            'name' => 'Test Chapter for Source',
+            'processed_text' => gzcompress(json_encode([]), 1),
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'raw_text' => '',
+            'type' => 'text',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+            'read_count' => 0,
+            'word_count' => 0,
+        ]);
+        $sense->update(['source_chapter_id' => $chapter->id]);
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", []);
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertSame('real_chapter', $data['source_display_status']);
+        $this->assertStringContainsString('Test Chapter', $data['source_display_label']);
+    }
+
+    public function test_source_display_status_card_example_only(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        // Remove source_chapter_id, ensure example_sentence_en exists
+        $sense->update(['source_chapter_id' => null, 'example_sentence_en' => 'A test example.', 'sentence_id' => null]);
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", []);
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertSame('card_example_only', $data['source_display_status']);
+        $this->assertStringContainsString('保存例句', $data['source_display_label']);
+    }
+
+    public function test_source_display_status_missing(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        // Remove both source_chapter_id and example_sentence_en
+        $sense->update(['source_chapter_id' => null, 'example_sentence_en' => null]);
+
+        $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", []);
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertSame('missing', $data['source_display_status']);
+        $this->assertStringContainsString('缺溯源', $data['source_display_label']);
+    }
+
+    public function test_source_display_fields_in_list_data(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
+        $response->assertOk();
+        $items = $response->json('items');
+
+        $item = collect($items)->firstWhere('review_card_id', $card->id);
+        $this->assertNotNull($item, 'item must be in data list');
+        $this->assertArrayHasKey('source_display_status', $item);
+        $this->assertArrayHasKey('source_display_label', $item);
+    }
+
     // ==================== Archive/Restore + Review Queue tests ====================
 
     public function test_archive_preserves_word_sense_status(): void

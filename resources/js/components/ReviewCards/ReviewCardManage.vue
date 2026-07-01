@@ -513,10 +513,6 @@
                                 <span class="detail-label">来源章节 ID</span>
                                 <span class="detail-value">{{ displayValue(detailTarget.source_chapter_id) }}</span>
                             </div>
-                            <div class="detail-row">
-                                <span class="detail-label">缺溯源</span>
-                                <span class="detail-value">{{ detailTarget.missing_source ? '是' : '否' }}</span>
-                            </div>
                         </div>
 
                         <v-divider class="my-3" />
@@ -591,18 +587,18 @@
 
                         <!-- 缺失状态 -->
                         <div class="detail-section">
-                            <div class="detail-section-title">FSRS 信息</div>
+                            <div class="detail-section-title">缺失状态</div>
                             <div class="detail-row">
-                                <span class="detail-label">缺溯源</span>
-                                <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句' : '否（已定位原文）') }}</span>
+                                <span class="detail-label">缺释义</span>
+                                <span class="detail-value">{{ detailTarget.missing_definition ? '是' : '否' }}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">缺例句</span>
                                 <span class="detail-value">{{ detailTarget.missing_example ? '是' : '否' }}</span>
                             </div>
                             <div class="detail-row">
-                                <span class="detail-label">缺溯源</span>
-                                <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句' : '否（已定位原文）') }}</span>
+                                <span class="detail-label">溯源状态</span>
+                                <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句（未定位原章节）' : '否（已定位原文）') }}</span>
                             </div>
                         </div>
                     </v-card-text>
