@@ -4035,6 +4035,65 @@ class ReviewCardManageTest extends TestCase
         );
     }
 
+    // ==================== Reset Response Message ====================
+
+    public function test_reset_returns_重置复习进度_message(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $response = $this->actingAs($this->user)
+            ->post("/review-cards/manage/{$card->id}/reset");
+
+        $response->assertOk();
+        $message = $response->json('message');
+        $this->assertNotNull($message, 'Reset response must include a message');
+        $this->assertStringContainsString('重置复习进度', $message);
+    }
+
+    // ==================== Bulk Enabled Response Shape After Extraction ====================
+
+    public function test_bulk_enabled_response_shape_unchanged_after_service_extraction(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => false,
+        ]);
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertArrayHasKey('affected', $data);
+        $this->assertArrayHasKey('skipped', $data);
+        $this->assertArrayHasKey('enabled', $data);
+        $this->assertArrayHasKey('message', $data);
+        $this->assertSame(2, $data['affected']);
+        $this->assertSame(0, $data['skipped']);
+        $this->assertFalse($data['enabled']);
+    }
+
+    // ==================== Bulk Destroy Skipped Response Shape ====================
+
+    public function test_bulk_destroy_response_contains_skipped_field(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $nonExistentId = 999999999;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id, $nonExistentId],
+        ]);
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertArrayHasKey('deleted', $data);
+        $this->assertArrayHasKey('skipped', $data);
+        $this->assertArrayHasKey('message', $data);
+        $this->assertSame(1, $data['deleted']);
+        $this->assertSame(1, $data['skipped']);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

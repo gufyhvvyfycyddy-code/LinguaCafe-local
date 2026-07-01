@@ -263,6 +263,11 @@ public function bulkSetEnabled(array $ids, bool $enabled, int $userId, string $l
 - skipped 语义
 - response shape: affected/skipped/enabled/message
 
+**后续验收闭环（ReviewCardManage-ComplexSmokeAndCompliance-1 完成）**：
+- MCP Chrome 真实验收：批量归档 → "已归档 N 张复习卡。它们不会进入日常复习。"；批量恢复 → "已恢复 N 张复习卡。它们会重新进入日常复习。"；dueNow → "已设为立即到期。该卡会进入复习队列。"；reset 弹窗 → 标题"重置复习进度"，按钮"确认重置复习进度"；批量删除弹窗 → 显示 lemma/zh 列表。
+- skipped > 0 场景：MCP Chrome 无法构造（需要混合其他用户卡 ID，UI 不支持跨用户选择），已由自动测试 `test_bulk_enabled_skips_other_user_cards` 等覆盖。
+- destroy/bulkDestroy 核心删除语义仍未改，下一阶段才进入独立 Phase。
+
 **UX 反馈补强（本轮同时完成）**：
 - bulkEnabled skipped>0 时 snackbar 追加 "其中有 N 张跳过处理。"
 - bulkDestroy skipped>0 时 snackbar 追加 "其中有 N 张跳过处理。"
