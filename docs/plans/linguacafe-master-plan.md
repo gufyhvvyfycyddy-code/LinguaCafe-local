@@ -109,6 +109,7 @@
 | Docs-WorkflowFollowupRules-1 | 已写入阶段推进规则（不默认停下来询问）、提示词时机规则（等待报告时不提前写 OpenCode 提示词）、小任务合并与复杂任务搭载规则、CodeBuddy/WorkBuddy 结论复核规则、本地登录与管理员测试账号规则（具体账号密码不进入 GitHub 文档/代码/测试/日志/报告）。不属于 FSRS 功能本体，属于协作流程与本地验收规则。 |
 | Docs-OpenCodeCodeBuddyPairing-1 | 已写入 OpenCode 不允许单独出现、只要有 OpenCode 就必须同时安排 CodeBuddy、CodeBuddy 可后置复核 OpenCode 输出也可并行做无关侦查、CodeBuddy/WorkBuddy 可以单独出现。不属于 FSRS 功能本体，属于协作流程规则。 |
 | Docs-AgentSkillRequirement-1 | 已补充智能体提示词必须显式写 skill 的规则（vibe-coding-collaboration-rules.md §14.6）。**已顺手修正 WorkBuddy 不使用 CodeBuddy/OpenCode skills，改为使用内置专家。** 不属于 FSRS 功能本体，属于协作流程规则。 |
+| ReviewCardManage-HighRiskMutationContract-1 | 已锁定 reset / destroy / bulkDestroy 高风险写操作契约。明确"重置复习进度"文案、彻底删除不可恢复、ReviewLog 保留、WordSense rejected、EncounteredWord 条件性恢复、删除类逻辑独立 Phase。本轮只做文档，不改业务代码，不进入 service extraction。 |
 | ReviewCardManage-BulkEnabledContract-1 | 已锁定 bulkEnabled 抽取到 MutationService 前的输入/输出/权限/事务/测试契约。只做文档，不改业务代码，不进入 service extraction。下一轮若 CodeBuddy 复核通过，可进入 bulkEnabled 最小实现。 |
 | ReviewCardManage-MutationBoundary-Scout-1 | 已新增 ReviewCard 管理页危险写操作边界侦查文档（docs/plans/review-card-manage-mutation-boundary-scout.md）。只读侦查 update/enabled/dueNow/reset/destroy/bulkEnabled/bulkDestroy 等写操作，不改业务代码，不进入 service extraction。顺手修正 WorkBuddy 不使用 CodeBuddy/OpenCode skills 的协作规则，并记录纯小文档规则修正不得孤立开任务。 |
 | Workflow-ContinuePromptRule-And-LemmaDisplayClick-1 | 已补充"验收后必须继续给下一阶段提示词"规则（vibe-coding-collaboration-rules.md §16.1）。已补充 geese → goose 真实点击验收记录。不改业务代码，不进入新功能开发。 |

@@ -290,3 +290,180 @@ public function bulkSetEnabled(array $ids, bool $enabled, int $userId, string $l
 | 10 | 恢复后重新进入复习队列 | 复习接口重新返回该卡 |
 | 11 | MCP Chrome 批量归档 | 选中多卡 → 批量归档弹窗 → 确认 → snackbar 提示 → 卡片消失 |
 | 12 | MCP Chrome 批量恢复 | 筛选 disabled 卡 → 选中多卡 → 批量恢复弹窗 → 确认 → snackbar 提示 |
+
+## 10. reset / destroy / bulkDestroy 高风险写操作契约锁定
+
+> 本节只锁定契约，不进入实现。删除类逻辑必须独立 Phase，每轮必须 MCP Chrome 真实验收。
+
+### 10.1 reset 契约
+
+#### 输入契约
+
+- **输入**：reviewCard id（路径参数）。
+- **权限过滤**：`findManageableSenseCard()` 保证 user_id / language_id / target_type=TARGET_SENSE / WordSense status=CONFIRMED。
+- **不处理**：legacy word card（TARGET_WORD 类型）、已拒绝的 sense、其他用户卡片。
+- **越权/不存在**：404。
+
+#### 数据影响契约
+
+reset 会影响以下 `review_cards` 字段：
+
+| 字段 | 变化 |
+|------|------|
+| `fsrs_state` | → `'new'` |
+| `fsrs_due_at` | → `now()` |
+| `fsrs_stability` | → `null` |
+| `fsrs_difficulty` | → `null` |
+| `fsrs_reps` | → `0` |
+| `fsrs_lapses` | → `0` |
+| `fsrs_last_reviewed_at` | → `null` |
+| `fsrs_enabled` | → `true`（强制解归档） |
+
+**不修改**：WordSense 文本、EncounteredWord、ReviewCard 记录本身不删除。
+
+**新增 ReviewLog**：是。会创建一条 `rating='reset', source='reset'` 的 ReviewLog，记录全部 FSRS 前后状态。
+
+**不可逆后果**：
+- FSRS 稳定性/难度参数丢失。
+- 被归档的卡片会强制重新进入复习队列。
+- 现有 ReviewLog 保留（日志保留，不删除）。
+
+#### UX 契约
+
+- **文案固定**：`"消息" => "已重置为新学卡。该卡会重新进入复习队列。"`。
+- **弹窗说明**：清空该卡的复习进度（FSRS 记忆参数），不会删除释义、例句、复习历史。
+- **不使用**："重新开始学习"、"归档"、"彻底删除" 等混淆术语。
+- **不与归档操作在同一 UI 分组内并列**（重置弹窗和归档弹窗应有文案区分）。
+
+#### 后续实现边界
+
+下一轮如果优化 reset：
+- 只允许优化 Controller 编排或文案补强。
+- 不得改变 `ReviewCardService::resetCard()` 的事务语义。
+- 不得改变 ReviewLog 保留策略。
+- 不得删除或新增 ReviewCard 字段。
+- 不得与 destroy / bulkDestroy 同轮编码。
+- 不改 FSRS 算法。
+
+### 10.2 destroy 契约
+
+#### 输入契约
+
+- **输入**：reviewCard id（路径参数）。
+- **权限过滤**：`findManageableSenseCard()` 保证 user_id / language_id / target_type / WordSense status=CONFIRMED。
+- **越权/不存在**：404。
+
+#### 数据影响契约
+
+| 模型 | 操作 |
+|------|------|
+| ReviewCard | **硬删**（`delete()`） |
+| WordSense | `status = STATUS_REJECTED`（保留记录，不出现在阅读页候选） |
+| ReviewLog | **默认保留**（`$deleteReviewLogs = false`） |
+| WordSenseOccurrence | `auto_fsrs_allowed = false`，`review_card_id = null` |
+| EncounteredWord | **条件性**恢复为 New（`stage=2`），仅当该 encountered_word_id 再无其他已确认 sense 且当前为 Learning 状态 |
+
+**删除链路**：`removeSenseFromReviewSystem($sense, deleteReviewCard=true, deleteReviewLogs=false)`
+**不可恢复**：ReviewCard 硬删，WordSense 标记 REJECTED。
+
+#### UX 契约
+
+- **文案固定**：`"已彻底删除词义复习卡。该释义不会再出现在阅读页，阅读记录和复习历史已保留。"`。
+- **必须有 confirm 弹窗**（已在前端实现）。
+- **弹窗说明**：此操作不可恢复，不会只是不进入复习，而是会从复习系统移除。
+- **弹窗显示待删除 lemma / 中文释义**（BulkDeleteList-1 在批量弹窗已实现；单卡弹窗目前已有三段风险文案）。
+- **不要求输入确认词**。
+- **不与归档混淆**（归档不会删除卡片，只是不进入复习队列）。
+- **不与重置混淆**（重置不会删除卡片，只是清除 FSRS 参数）。
+
+#### 后续实现边界
+
+下一轮如果优化 destroy：
+- **必须独立 Phase**，不与 reset 同轮编码。
+- 不得改变 `removeSenseFromReviewSystem` 的核心语义。
+- 不得删除 ReviewLog。
+- 不得改变 EncounteredWord 条件性恢复逻辑。
+- 不得清库。
+
+### 10.3 bulkDestroy 契约
+
+#### 输入契约
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `ids` | `int[]` | 要批量删除的卡片 ID 列表，必填 |
+| `enabled` | `bool` | 不用于删除接口 |
+
+- **ids 为空时**：返回 422，`{"message": "请选择至少一张复习卡。"}`。
+- **ids 含无效 / 越权 / 非 sense / 非 confirmed 的卡**：跳过，计入 `skipped`，不报错。**保留当前部分成功语义**。
+- **重复 ids**：允许。每条 id 都会尝试查询 + 删除，重复 id 会在第二次遇到时跳过（已被删除）。
+- **ids 上限**：当前不限制。若未来遇到性能问题，可考虑在 Controller 层限制。第一轮不新增。
+
+#### 数据影响契约
+
+对每张合法卡调用 `removeSenseFromReviewSystem($sense, true)`：
+
+| 模型 | 每张卡操作 |
+|------|-----------|
+| ReviewCard | 硬删 |
+| WordSense | `status = REJECTED` |
+| ReviewLog | 默认保留 |
+| WordSenseOccurrence | 清关联 |
+| EncounteredWord | 条件性恢复 |
+
+**不可恢复**：所有成功删除的卡均不恢复。
+
+#### 输出契约
+
+当前代码返回结构（Controller 内联实现）：
+
+```json
+{
+  "deleted": 3,
+  "skipped": 1,
+  "message": "已彻底删除 3 张词义复习卡。对应释义不会再出现在阅读页，阅读记录和复习历史已保留。"
+}
+```
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `deleted` | `int` | 实际删除成功的卡片数 |
+| `skipped` | `int` | 被过滤跳过（不匹配权限/类型/状态/已删除）的卡片数 |
+| `message` | `string` | 用户可见提示文案 |
+
+**注意**：bulkDestroy 的 `deleted` 字段名与 bulkEnabled 的 `affected` 不同。前端已适配当前字段名。后续抽取 Service 不得改变字段名。
+
+#### UX 契约
+
+- **已有确认列表保护**：BulkDeleteList-1 已实装，列表显示 lemma + 中文释义，最多 20 条，超限显示 "还有 N 张未显示"。
+- **不要求输入确认词**。
+- **必须有弹窗确认**。
+- **文案必须和归档明显区分**：归档是 "不会进入日常复习"，删除是 "不可恢复，删除后不会出现在阅读页"。
+- **文案必须和重置明显区分**：重置是 "清空复习进度"，删除是 "彻底移除"。
+
+#### 后续实现边界
+
+下一轮如果优化 bulkDestroy：
+- **必须独立 Phase**。
+- 不与 bulkEnabled 同轮编码。
+- 不与 reset 同轮编码。
+- 不得改变 `removeSenseFromReviewSystem` 核心语义。
+- 不得改变 ReviewLog 保留策略。
+- 不得新增清库 / migration / 数据重建。
+- 不得改变 deleted/skipped/message 字段名。
+
+### 10.4 实现顺序建议
+
+| 编码轮次 | 内容 | 风险级别 | 理由 |
+|---------|------|----------|------|
+| 第 1 轮 | `bulkEnabled` 最小抽取到 MutationService | 低 | 可恢复，单字段 `fsrs_enabled`，已有契约锁定 |
+| 第 2 轮 | `dueNow` 成功反馈或 reset UX 文案补强 | 中低 | 不改变行为，只改提示 |
+| 第 3 轮 | `reset` 边界优化（编排或安全确认） | 中 | 丢 FSRS 参数，强制解归档，不可逆 |
+| 第 4 轮 | `destroy` 单卡边界优化（安全确认） | 高 | ReviewCard 硬删，WordSense rejected，不可恢复 |
+| 第 5 轮 | `bulkDestroy` 边界优化（安全确认） | 高 | 批量硬删，不可恢复 |
+
+**原则**：
+- 每轮都是独立 Phase，不合并高风险操作。
+- 每轮必须 MCP Chrome 真实验收。
+- 每轮必须由 CodeBuddy 复核 diff 范围，确保没越界。
+- 删除类操作（destroy / bulkDestroy）必须走在最安全方向：不改核心 Semantics，只抽编排层。
