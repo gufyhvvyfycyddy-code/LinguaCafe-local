@@ -300,7 +300,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 | 排名 | 任务名 | 当前状态 | 收益 | 风险 | 类型 |
 |------|--------|----------|------|------|------|
-| 1️⃣ | **DictionaryImportService characterization tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| ✅ 已完成 | **DictionaryImportService-CharacterizationTests-1** | 13 tests 覆盖文件识别/CSV测试/导入validation/导入成功路径 | 🟡 中 | 🟢 低 | A |
 | 2️⃣ | **TextBlockGroup.vue Playwright smoke tests** | 未开始 | 🟢 高 | 🟢 低 | A-立即 |
 | 3️⃣ | **VocabularyService query/search contract + test** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
 | 4️⃣ | **SenseReview / SenseMappingReview smoke tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
@@ -310,21 +310,23 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 ### 7.2 候选任务详情
 
-#### 候选 1：DictionaryImportService characterization tests
+#### ~~候选 1~~ 已完成：DictionaryImportService-CharacterizationTests-1
 
-**当前状态**：未开始。文件 990 行，极少测试。导入失败后难以排查。
+**状态**：已完成。13 个 characterization tests 已锁定现有行为。
+**更新日期**：2026-07-01
 
-**推荐模型**：复杂度 10
-**是否需要 CodeBuddy**：可选
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：否
-**为什么现在做**：低风险，补测试不改变实现，可构建第一道回归防线。不依赖其他任务。
-**允许修改文件**：
-- `tests/Feature/DictionaryImportTest.php`（新增）
-- `docs/plans/*`
-**禁止范围**：
-- 不改 DictionaryImportService 核心逻辑
-- 不改导入流程
+**覆盖内容**：
+- CEDICT/HanDeDict/dict.cc/wiktionary 文件识别 + unsupported txt/tsv
+- CSV sample testing（成功/错误路径）
+- 自定义 CSV 导入 validation（非法表名/过长名称/表已存在/表不存在可建）
+- 自定义 CSV 导入成功路径（建表/写行/创建 Dictionary 记录/清理）
+
+**改动范围**：
+- 仅修改 `tests/Feature/DictionaryImportTest.php`
+- 未改 `DictionaryImportService.php`
+- 未改导入流程
+
+**下一个候选**：候选 2（TextBlockGroup.vue Playwright smoke）— 阅读页零前端测试。
 
 #### 候选 2：TextBlockGroup.vue Playwright smoke tests
 
@@ -448,7 +450,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **是否需要 MCP Chrome**：否。
 
-**候选 1 之后的下一个阶段**：候选 2（TextBlockGroup.vue Playwright smoke）— 阅读页零前端测试是高风险点，需要 WorkBuddy 验收。
+**候选 1 已完成**：DictionaryImportService-CharacterizationTests-1（13 tests）。
+
+**新的最推荐下一阶段**：**候选 2（TextBlockGroup.vue Playwright smoke）** — 阅读页零前端测试是高风险点，需要 WorkBuddy 验收。
 
 ---
 
