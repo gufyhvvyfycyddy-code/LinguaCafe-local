@@ -460,7 +460,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 3 已完成**：VocabularyService-QuerySearchContractTests-1 — 15 tests 覆盖搜索全链路。
 
-**新的最推荐下一阶段**：**候选 4（SenseReview / SenseMappingReview smoke tests）** — 词义确认/拒绝影响阅读页点词候选，需要 WorkBuddy + MCP Chrome 验收。
+**候选 4 已完成**：SenseReviewMapping-SmokeTests-1 — MCP Chrome 验收 `/senses/review` 和 `/reviews/senses` 页面。
+
+**新的最推荐下一阶段**：**候选 5（FsrsReschedulePreviewService contract + scouting）** — 715 行高风险批量写操作，需要先 CodeBuddy 侦查链路。
 
 ---
 
