@@ -557,6 +557,31 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | L4 | **WordSenseOccurrence rows 不删除** | 即使 occurrence 已无实用价值，当前设计保留行 | 数据膨胀但可控 |
 | L5 | **restore 忽略成就更新 (ignoreAchivement=true)** | 不触发送达目标的计算 | 符合恢复语义 |
 
+### 7.5 总设计师复判（DesignerWorkflow-CodeBuddyRiskRoleAndPlanRefresh-1）
+
+CodeBuddy 事实描述多数准确，但风险分级需要降噪。总设计师根据"反驳核验规则"（§4.x）重新评定：
+
+| CodeBuddy 原始风险 | CodeBuddy 等级 | 复判结论 | 复判等级 | 理由 |
+|---|---|---|---|---|
+| archiveSense 不清除 occurrence review_card_id | **高** | 保留 | **中高** | 两条归档路径语义确实不一致，但用户数据不会被直接破坏，优先补测试锁定 |
+| rejectSense 无调用方 | **高** | 降级 | **低** | 方法存在但无调用路径，不影响当前用户。标记为疑似遗留方法 / 清理候选，不是紧急 bug |
+| deleteReviewLogs=true 无前端入口 | **高** | 降级 | **低** | 参数存在但前端从未传入 true。未来风险，不是当前 bug |
+| permanent delete 默认不删 ReviewLog | **高** | 保留 | **中** | 设计意图是有意保留日志，不是 bug。需要 contract tests 锁定此设计行为 |
+| findManageableSenseCard 只允许 status=confirmed | **中** | 保留 | **中** | 已归档卡不能通过管理页操作，但用户可通过 occurrence 层操作。记录为设计约束 |
+| rejectSense 无事务 | **中** | 降级 | **低** | 无调用方的方法无事务影响。若未来启用，需先加事务 |
+| restore 只按 encountered_word_id 不按 lemma | **中** | **不采纳** | — | 这是防误伤的安全设计：用 encountered_word_id 精确匹配，不会误恢复同 lemma 其他词。不是 bug |
+| archiveSense 不 restore EncounteredWord | **中** | **不采纳** | — | 归档 ≠ 永久删除。归档语义是暂停复习，不是把词恢复 New。设计正确 |
+| bulkDestroy 批量删除无额外确认 | **中** | 保留 | **中** | 前端确认弹窗和 UI 风险需核实，属于待核实项 |
+
+**更新后统计**：3 项优先补测试（中高/中/中）+ 2 项待核实 + 2 项降级（低）+ 2 项不采纳（安全设计/归档语义）
+
+**下一推荐任务**：`WordSenseService-DestroyRestoreContractTests-1`
+- 范围：按总设计师复判后的风险范围补 contract tests；
+- 优先锁定：archiveSense occurrence unlink 行为、permanent delete ReviewLog 保留设计、bulkDestroy 确认机制、restore 条件；
+- 不做 UI；
+- 不做恢复功能；
+- 不做真实数据删除。
+
 ---
 
 ## 8. 最推荐的下一阶段（PostStabilization-1 刷新）
@@ -592,9 +617,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 6a 已完成 Service 提取**：EncounteredWordCreationService-Extract-1 — 从 TextBlockService 提取 encountered_words 写入逻辑到独立 Service。createNewEncounteredWords() 保持 public facade。12 个原 characterization tests + 1 个直接调用测试共 13 测试全绿。
 
-**候选 7 已完成只读风险审计**：WordSenseService-DestroyRestore-RiskAudit-1 — 审计 WordSense 删除/归档/恢复全链路，输出 14 个风险点（4 高/5 中/5 低）+ contract tests 计划。未改业务代码，未执行删除/归档/恢复。
+**候选 7 已完成只读风险审计**：WordSenseService-DestroyRestore-RiskAudit-1 — 审计 WordSense 删除/归档/恢复全链路。CodeBuddy 原始风险分级（4 高/5 中/5 低）经总设计师反驳核验后（§7.5）调整为：3 项优先补测试 + 2 项待核实 + 2 项降级 + 2 项不采纳（安全设计/归档语义）。未改业务代码，未执行删除/归档/恢复。
 
-**新的最推荐下一阶段**：**候选 7a（WordSenseService-DestroyRestoreContractTests-1）** — 先补低风险 contract tests。或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
+**新的最推荐下一阶段**：**候选 7a（WordSenseService-DestroyRestoreContractTests-1）** — 按总设计师复判后的风险范围补 contract tests，优先锁定 archiveSense occurrence unlink 行为和 permanent delete ReviewLog 保留设计。或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
 
 ---
 
