@@ -307,7 +307,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 + 缺口契约测试。侦查已输出 18 个风险点 + contract tests 计划。Gap 测试补了 5 个 preview + 5 个 confirmPreflight，全 58 个测试通过 | 🟡 中 | 🔴 高 | B-先契约 |
 | ✅ 已完成 | **TextBlockService-CreateNewEncounteredWordsContractTests-1** | 12 个 characterization tests 锁定 createNewEncounteredWords 行为：新词创建/去重/隔离/study_base/skip/CJK/lemma 保留/batch insert | 🟢 高 | 🟡 中 | B-先契约 |
 | ✅ 已完成 | **EncounteredWordCreationService-Extract-1** | 从 TextBlockService 提取 encountered_words 写入逻辑到独立 Service。createNewEncounteredWords 保持 public facade。行为无变化 | 🟢 高 | 🟢 低 | A |
-| 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
+| 🔍 已审计 | **WordSenseService-DestroyRestore-RiskAudit-1** | 只读审计 WordSense 删除/归档/恢复链路 — 输出 14 个风险点 + contract tests 计划 | 🟢 低 | 🔴 高 | C-暂缓 |
 
 ### 7.2 候选任务详情
 
@@ -492,21 +492,70 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **下一个候选**：候选 7（WordSenseService destroy/restore 只读风险审计）或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）
 
-#### 候选 7：WordSenseService destroy/restore 只读风险审计
+#### 🔍 已审计：WordSenseService-DestroyRestore-RiskAudit-1
 
-**当前状态**：未开始。`removeSenseFromReviewSystem` 涉及硬删、拒绝、条件性恢复。
+**当前状态**：只读风险审计已完成。未改业务代码，未执行删除/归档/恢复。
+**审计日期**：2026-07-02
 
-**推荐模型**：复杂度 10
-**是否需要 CodeBuddy**：✅ 必须
-**是否需要 WorkBuddy**：否
-**是否需要 MCP Chrome**：否
-**为什么暂缓**：核心删除语义无用户反馈问题，已有足够测试覆盖。没有安全收益就不值得碰高风险。
-**允许修改文件**：
-- `docs/plans/*`（仅限风险审计文档）
-**禁止范围**：
-- 不改 WordSenseService
-- 不改 ReviewCard
-- 不改任何模型
+**审计范围**：
+- `app/Services/WordSenseService.php`（413 行）：rejectSense / archiveSense / removeSenseFromReviewSystem / restoreEncounteredWordIfNoActiveSenses
+- `app/Services/ReviewCardService.php`
+- `app/Http/Controllers/ReviewCardManageController.php`（destroy / bulkDestroy）
+- `app/Http/Controllers/SenseOccurrenceController.php`（archiveSense）
+- `app/Models/WordSense.php`、`ReviewCard.php`、`ReviewLog.php`、`WordSenseOccurrence.php`、`EncounteredWord.php`
+- 现有测试：`tests/Feature/WordSenseTest.php`（3106 行，但无 removeSenseFromReviewSystem / archiveSense / rejectSense 直接测试）
+
+**关键事实**：
+
+| 方法 | 行为 | 事务 | 入口 |
+|------|------|------|------|
+| `rejectSense()` | 仅 status→rejected，不碰其它表 | ❌ | ❌ 无 controller 调用（方法存在但无 UI 路径） |
+| `archiveSense()` | status→rejected，ReviewCard fsrs_enabled=false，不清 occurrence（与 removeSenseFromReviewSystem(false) 语义不一致） | ✅ | PUT /senses/{id}/archive (SenseOccurrenceController) |
+| `removeSenseFromReviewSystem(delCard=true)` | status→rejected，delete ReviewCard，preserve ReviewLog，clear occurrence refs，restore EncounteredWord if last sense | ✅ | DELETE /review-cards/manage/{id} |
+| `removeSenseFromReviewSystem(delCard=false)` | status→rejected，fsrs_enabled=false，clear occurrence refs（不 restore EncounteredWord） | ✅ | 同方法但当前无 controller 传 false |
+| `restoreEncounteredWordIfNoActiveSenses()` | Learning→New 当为最后一个 confirmed sense；只按 encountered_word_id 找 | (私有) | 仅从 removeSenseFromReviewSystem(true) 调用 |
+
+**关键发现**：
+1. `rejectSense()` 方法存在但无任何 controller 调用 —— 疑似 dead code。
+2. `archiveSense()` 不清除 occurrence 的 `review_card_id` 和 `auto_fsrs_allowed`，与 `removeSenseFromReviewSystem(false)` 语义不一致。
+3. `deleteReviewLogs=true` 参数存在但无任何前端入口 —— 前端永远传 `apply=false`。
+4. `findManageableSenseCard()` 只允许 `status=confirmed`，归档/拒绝后的卡片无法通过该路径操作，除非直接走 occurrence 层。
+5. WordSenseTest 有 3106 行但无 removeSenseFromReviewSystem / archiveSense / rejectSense 测试。
+
+**风险清单**（详见下方 §7.4）：14 个风险点（4 高 / 5 中 / 5 低）
+
+**下一个候选**：候选 7a（WordSenseService-DestroyRestoreContractTests-1）— 先补低风险 contract tests，不做 UI 删除，不做真实数据删除
+
+### 7.4 WordSenseService Destroy/Restore 风险清单
+
+**高（4项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| H1 | **archiveSense 不清除 Occurrence review_card_id** | archiveSense 设置 fsrs_enabled=false 但不清除 Occurrence 引用。removeSenseFromReviewSystem(false) 却会清除。两条归档路径行为不一致 | Occurrence 仍指向已禁用的卡，后续操作可能误触 |
+| H2 | **rejectSense 无调用方（疑似 dead code）** | 方法存在但无任何 controller 调用，也无事务包裹。如果被误调用，只改 WordSense status 不改其他表 | 可能留下可复习的卡片 |
+| H3 | **deleteReviewLogs 无前端入口** | removeSenseFromReviewSystem 参数接受 deleteReviewLogs=true，但前端没有提供此选项。如果未来前端直接传 true，随机删除日志不可逆 | 日志删除不可恢复 |
+| H4 | **permanent delete 默认不删 ReviewLog** | 删除 ReviewCard 后 ReviewLog 保留，形成孤儿 log（review_card_id 指向已删除记录） | 数据不一致 |
+
+**中（5项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| M1 | **findManageableSenseCard 只允许 status=confirmed** | 已归档/拒绝的 WordSense 无法通过 review-card-manage 端点操作。用户需通过 SenseOccurrenceController::archiveSense 操作 | 用户体验：只能业务层操作 |
+| M2 | **rejectSense 无事务** | 同行多个 rejectSense 调用，其中一个失败时另一个已写入 | 数据一致性问题 |
+| M3 | **restoreEncounteredWordIfNoActiveSenses 只查 encountered_word_id** | 不按 lemma 匹配，不同 encountered_word_id 的同 lemma 其他 sense 不会阻止 restore | EncounteredWord 可能被错误恢复 |
+| M4 | **archiveSense 不 restore EncounteredWord** | 归档时不调 restoreEncounteredWordIfNoActiveSenses，即使这是最后一个活跃 sense | 词一直处于 Learning 状态 |
+| M5 | **bulkDestroy 批量删除无额外确认** | 批量永久删除走 mutationService，但 controller 层没有增加额外的风险确认机制 | 批量误删 |
+
+**低（5项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| L1 | **restore 不恢复 Known/Ignored/New** | 当前设计有意不恢复，符合预期 | 行为正确 |
+| L2 | **status=rejected 被查询排除** | rejected 状态 sense 不在阅读页候选（符合预期） | 行为正确 |
+| L3 | **restore setStage(2,true) 设置 next_review=null** | 从 Learning→New 取消 next_review | 行为正确 |
+| L4 | **WordSenseOccurrence rows 不删除** | 即使 occurrence 已无实用价值，当前设计保留行 | 数据膨胀但可控 |
+| L5 | **restore 忽略成就更新 (ignoreAchivement=true)** | 不触发送达目标的计算 | 符合恢复语义 |
 
 ---
 
@@ -543,7 +592,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 6a 已完成 Service 提取**：EncounteredWordCreationService-Extract-1 — 从 TextBlockService 提取 encountered_words 写入逻辑到独立 Service。createNewEncounteredWords() 保持 public facade。12 个原 characterization tests + 1 个直接调用测试共 13 测试全绿。
 
-**新的最推荐下一阶段**：**候选 7（WordSenseService destroy/restore 只读风险审计）** 或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
+**候选 7 已完成只读风险审计**：WordSenseService-DestroyRestore-RiskAudit-1 — 审计 WordSense 删除/归档/恢复全链路，输出 14 个风险点（4 高/5 中/5 低）+ contract tests 计划。未改业务代码，未执行删除/归档/恢复。
+
+**新的最推荐下一阶段**：**候选 7a（WordSenseService-DestroyRestoreContractTests-1）** — 先补低风险 contract tests。或候选 7b（TextBlockService 剩余 phrase/index/read data 逻辑继续拆解）或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
 
 ---
 
