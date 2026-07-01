@@ -304,7 +304,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **TextBlockGroup-SmokeTests-1** | MCP Chrome 真实验收完成（读取渲染/hover 词汇/点词打开侧栏/console error 检查/不创建学习数据） | 🟢 高 | 🟢 低 | A |
 | ✅ 已完成 | **VocabularyService-QuerySearchContractTests-1** | 15 tests 覆盖返回结构/text+reading搜索/stage/translation/only words+only phrases+union/4种排序/分页/export | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **SenseReviewMapping-SmokeTests-1** | MCP Chrome 空状态 smoke：/senses/review 与 /reviews/senses 页面打开、标题/统计/筛选/批量区/空状态、console、无数据副作用 | 🟡 中 | 🟢 低 | A |
-| 5️⃣ | **FsrsReschedulePreviewService contract + scouting** | 未开始 | 🟡 中 | 🔴 高 | B-先侦查 |
+| 🔍 侦查中 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 preview/confirmPreflight/confirmAndApply 全链路 — 已输出 18 个风险点 + preview+confirmPreflight contract tests 计划 | 🟡 中 | 🔴 高 | B-先契约 |
 | 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
 | 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
 
@@ -396,21 +396,68 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **下一个候选**：候选 5（FsrsReschedulePreviewService contract + scouting）
 
-#### 候选 5：FsrsReschedulePreviewService contract + scouting
+#### 🔍 侦查已完成：FsrsReschedulePreviewService-ContractScouting-1
 
-**当前状态**：未开始。715 行，批量写 review_cards，高风险。
+**状态**：只读侦查已完成。未改业务代码，未补测试，未执行 FSRS 重排。
+**侦查日期**：2026-07-02
 
-**推荐模型**：复杂度 20
-**是否需要 CodeBuddy**：✅ 必须（先侦查 preview/confirm/apply 全链路）
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：否
-**为什么现在做**：暂缓。必须先 CodeBuddy 侦查链路，锁定契约，才能进入编码。风险高，需要独立 CodeBuddy 轮次。
-**允许修改文件**：
-- `docs/plans/*`（仅限侦查文档）
-**禁止范围**：
-- 不改 FsrsReschedulePreviewService
-- 不改 ReviewCard
-- 不改 FSRS 算法
+**侦查范围**：
+- `app/Services/FsrsReschedulePreviewService.php`（780 行）
+- `app/Services/FsrsSchedulingService.php`
+- `app/Services/FsrsRescheduleSnapshotService.php`
+- `app/Models/ReviewCard.php`、`WordSense.php`、`RescheduleSnapshot.php`、`RescheduleSnapshotItem.php`
+- `app/Http/Controllers/SettingsController.php`（reschedulePreview/rescheduleConfirm）
+- 现有测试：`FsrsReschedulePreviewTest`（31 tests）、`FsrsRescheduleConfirmTest`（18 tests）
+
+**关键发现**：
+1. **preview 已充分测试**（31 tests）：覆盖 candidate 排除条件、hash 稳定性、只读保证、20 samples cap、non-english 语言
+2. **confirmPreflight 已基本覆盖**（18 tests）：hash 过期/409、missing hash/422、confirm=false/422、non-english、threshold 拦截、只读保证
+3. **confirmAndApply 测试存在但依赖 fsrs-rs-php 扩展**：apply 路径测试仅在 extension 可用时运行（跳过标记 `2 skipped`）
+4. **高风险写操作**：事务内 lockForUpdate 后写 `fsrs_due_at/stability/difficulty`，不写 ReviewLog/reps/lapses/last_reviewed_at
+5. **snapshot 链路完整**：appliedCount > 0 时创建 snapshot（含之前/之后的 due_at/stability/difficulty）
+6. **candidateIds 来自 preview data**，apply 时重新校验但不重新查询数据库，存在 stale candidate 风险
+
+**已识别的 18 个风险点**（详见下方 §7.3 清单）：
+- **高**：hash 校验后重查 computePreviewData 的开销/一致性问题、snapshot 边界条件、threshold 重合
+- **中**：skipped_count 不一致、write_enabled 命名误导、preview 和 apply 之间 FSRS params 变化时仅校验 hash
+- **低**：days_change 符号代码冗余、newly_due_today 不覆盖降低今日负荷场景
+
+**下一个候选**：候选 5a（FsrsReschedulePreviewService-PreviewContractTests-1）— 先补 preview + confirmPreflight 契约测试，暂不做 confirmAndApply 写入测试
+
+### 7.3 FsrsReschedulePreviewService 风险清单
+
+**高（6项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| H1 | **candidateIds 来自 preview 数据可能 stale** | confirmAndApply 使用 preview 时的 `$data['cards']->pluck('review_card_id')`，preview→apply 间被删除的卡静默跳过，applied_count 减少但不报错 | preview 显示 10 张但实际只应用 8 张，用户无感知 |
+| H2 | **preview_hash 校验后重查 computePreviewData** | confirmPreflight 和 confirmAndApply 各自调用 `computePreviewData()` 并重新校验 hash，FSRS 参数在此期间可能变化，hash 校验通过但 params 不同 | 轻微偏差，概率低但难排查 |
+| H3 | **snapshot 在 appliedCount=0 时不创建** | 所有 candidate 被跳过时 snapshot_batch_id 返回 null，虽然无副作用但 undo 不可用 | 用户体验：无 log 可查 |
+| H4 | **threshold 重合：high 阈值 == max 阈值** | getHighNewlyDueTodayThreshold=200 与 getMaxNewlyDueToday=200 相同，newlyDueToday>200 既触发 high 风险又需要 risk_confirm | 语义混淆：风险级别和绝对限制共用阈值 |
+| H5 | **skipped_count 在 preview 和 apply 之间可能不同** | preview 中的 skip（buildPreviewForCard 返回 null）和 apply 中的 skip（lockForUpdate 找不到、re-validation 失败、build 失败）条件不完全一致 | user sees different numbers |
+| H6 | **extension unavailable 时 success=true** | preview/confirm 返回 `success=true` 但 `preview_available=false`，前端可能误以为操作成功 | 误导性 API 语义 |
+
+**中（7项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| M1 | **`write_enabled` 字段名易造成误解** | confirmPreflight 始终返回 `write_enabled=false`，confirmAndApply 成功返回 `write_enabled=true`。字段名暗示"是否允许写入"，实际含义是"是否已写入" | 前端开发者可能混淆 |
+| M2 | **preview→apply 间 FSRS params 变化仅靠 hash 检测** | computePreviewData 在 apply 中重新计算 params，但 hash 校验通过后不会额外通知用户 params 变化 | 用户无感知的精度变化 |
+| M3 | **lockForUpdate 范围是 candidateIds 但不全表锁** | 只锁了 `ReviewCard::whereIn('id', $candidateIds)`，不影响同用户其他卡片的并发复习 | 可接受，但需注意并发场景 |
+| M4 | **没有对 snapshot 的 TTL 做软限制** | snapshot `expires_at` 默认 7 天，但 undo 路径检查过期，过期后直接拒绝 | 用户 8 天后不能 undo，但数据仍存在 |
+| M5 | **noRiskAssessment() 返回 `can_apply=true`** | 空状态时 risk_assessment 返回 `can_apply=true`，但实际没有可应用的卡片 | 无害但易误导 |
+| M6 | **preview 包含总卡片数但无分页** | total_candidates 理论上可能非常大（>2000），但 samples 只返回 20 条 | 大用户预览响应慢 |
+| M7 | **candidateCardsQuery 无显式排序** | 查询结果顺序由数据库决定，但 preview_hash 内部排序了（sortBy review_card_id），hash 不受影响 | preview 表格顺序不可预期 |
+
+**低（5项）**：
+
+| # | 风险点 | 说明 | 影响 |
+|---|--------|------|------|
+| L1 | **days_change 符号逻辑重复** | diffInDays($currentDueAt, false) 已返回带符号值，后续 if/else 重新计算符号（L394-401） | 代码冗余，可读性差 |
+| L2 | **is_newly_due_today 不覆盖减少今日负荷场景** | 只检测"从未来变今天"，不检测"从今天变未来"（即减少今天负荷） | 不完全的负担描述 |
+| L3 | **emptyPreviewResponse 仍计算和返回 preview_hash** | total_candidates=0 时仍计算 hash，前端可能误以为有候选卡 | 轻微误导 |
+| L4 | **non-english 语言返回 preview_hash=null** | 与 empty 场景不同，non-english 返回 null hash，前端需特殊处理 | API 不一致 |
+| L5 | **getDefault parameters 无缓存** | computePreviewData 每次调用 computePreviewData→getActiveFsrsParameters→可能 fallback 到 get_default_parameters()，无缓存 | 轻微性能浪费 |
 
 #### 候选 6：TextBlockService createNewEncounteredWords 提取
 
@@ -476,7 +523,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 4 已完成空状态 smoke 基线**：SenseReviewMapping-SmokeTests-1 — MCP Chrome 验收 `/senses/review`（词义确认页空状态）和 `/reviews/senses`（词义复习页空状态），仅覆盖页面打开/标题/统计区/筛选区/批量操作区/空状态文案/console 检查/无数据副作用。未覆盖有卡片或有 pending occurrence 的写入路径（评分/确认/拒绝/忽略/改绑/新建/归档/重置/删除）。
 
-**新的最推荐下一阶段**：**候选 5（FsrsReschedulePreviewService contract + scouting）** — 715 行高风险批量写操作，需要先 CodeBuddy 侦查链路。
+**候选 5 已完成侦查**：FsrsReschedulePreviewService-ContractScouting-1 — 只读侦查 preview/confirmPreflight/confirmAndApply 全链路，已输出 18 个风险点 + preview+confirmPreflight contract tests 计划，未改业务代码，未补测试，未执行 FSRS 重排。
+
+**新的最推荐下一阶段**：**候选 5a（FsrsReschedulePreviewService-PreviewContractTests-1）** — 先补 preview + confirmPreflight 契约测试，暂不做 confirmAndApply 写入测试。
 
 ---
 
