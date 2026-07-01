@@ -301,7 +301,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | 排名 | 任务名 | 当前状态 | 收益 | 风险 | 类型 |
 |------|--------|----------|------|------|------|
 | ✅ 已完成 | **DictionaryImportService-CharacterizationTests-1** | 13 tests 覆盖文件识别/CSV测试/导入validation/导入成功路径 | 🟡 中 | 🟢 低 | A |
-| 2️⃣ | **TextBlockGroup.vue Playwright smoke tests** | 未开始 | 🟢 高 | 🟢 低 | A-立即 |
+| ✅ 已完成 | **TextBlockGroup-SmokeTests-1** | MCP Chrome 真实验收完成（读取渲染/hover 词汇/点词打开侧栏/console error 检查/不创建学习数据） | 🟢 高 | 🟢 低 | A |
 | 3️⃣ | **VocabularyService query/search contract + test** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
 | 4️⃣ | **SenseReview / SenseMappingReview smoke tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
 | 5️⃣ | **FsrsReschedulePreviewService contract + scouting** | 未开始 | 🟡 中 | 🔴 高 | B-先侦查 |
@@ -452,7 +452,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 1 已完成**：DictionaryImportService-CharacterizationTests-1（13 tests）。
 
-**新的最推荐下一阶段**：**候选 2（TextBlockGroup.vue Playwright smoke）** — 阅读页零前端测试是高风险点，需要 WorkBuddy 验收。
+**候选 2 已完成**：TextBlockGroup-SmokeTests-1 — MCP Chrome 真实验收阅读页渲染、token 点击、vocab 侧栏。
+
+**新的最推荐下一阶段**：**候选 3（VocabularyService query/search contract tests）** — VocabularyService 995 行，搜索/分页逻辑需要测试覆盖。
 
 ---
 
