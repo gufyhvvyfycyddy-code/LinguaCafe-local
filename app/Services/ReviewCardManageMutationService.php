@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ReviewCard;
 use App\Models\WordSense;
+use App\Services\WordSenseService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,32 @@ class ReviewCardManageMutationService
         'aliases_zh',
         'collocations',
     ];
+
+    /**
+     * Shared private helper: find a sense review card owned by the current user/language
+     * with a confirmed WordSense. Used by both bulkSetEnabled and bulkDestroy.
+     * Returns null (no abort/exception) for skipped counting.
+     *
+     * @param int $id ReviewCard id
+     * @param int $userId
+     * @param string $language
+     * @return ReviewCard|null
+     */
+    private function findManageableSenseCardForMutation(int $id, int $userId, string $language): ?ReviewCard
+    {
+        return ReviewCard::query()
+            ->where('id', $id)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereHas('sense', function ($q) use ($userId, $language) {
+                $q->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('status', WordSense::STATUS_CONFIRMED);
+            })
+            ->first();
+    }
+
     /**
      * Toggle fsrs_enabled on a sense review card.
      * Does NOT write WordSense, ReviewLog, or EncounteredWord.
@@ -49,8 +76,7 @@ class ReviewCardManageMutationService
 
     /**
      * Bulk archive or restore sense review cards.
-     * Iterates through ids, filters by user_id/language_id/target_type=TARGET_SENSE
-     * and WordSense status=CONFIRMED, then toggles fsrs_enabled.
+     * Uses shared findManageableSenseCardForMutation helper.
      * Returns ['affected' => int, 'skipped' => int].
      * Controller handles 422 for empty ids, message assembly, and response shape.
      */
@@ -61,17 +87,7 @@ class ReviewCardManageMutationService
 
         DB::transaction(function () use ($ids, $enabled, $userId, $language, &$affected, &$skipped) {
             foreach ($ids as $id) {
-                $card = ReviewCard::query()
-                    ->where('id', $id)
-                    ->where('user_id', $userId)
-                    ->where('language_id', $language)
-                    ->where('target_type', ReviewCard::TARGET_SENSE)
-                    ->whereHas('sense', function ($q) use ($userId, $language) {
-                        $q->where('user_id', $userId)
-                            ->where('language_id', $language)
-                            ->where('status', WordSense::STATUS_CONFIRMED);
-                    })
-                    ->first();
+                $card = $this->findManageableSenseCardForMutation($id, $userId, $language);
 
                 if (!$card) {
                     $skipped++;
@@ -85,6 +101,44 @@ class ReviewCardManageMutationService
         });
 
         return ['affected' => $affected, 'skipped' => $skipped];
+    }
+
+    /**
+     * Bulk permanently delete sense review cards.
+     * Iterates through ids, filters via findManageableSenseCardForMutation,
+     * then calls WordSenseService::removeSenseFromReviewSystem for each valid card.
+     * Returns ['deleted' => int, 'skipped' => int].
+     * Controller handles 422 for empty ids, message assembly, and response shape.
+     *
+     * Core delete semantics (ReviewLog preserve, WordSense rejected, EncounteredWord
+     * conditional restore) are unchanged — delegated to WordSenseService.
+     */
+    public function bulkDestroy(array $ids, int $userId, string $language, WordSenseService $wordSenseService): array
+    {
+        $deleted = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($ids, $userId, $language, $wordSenseService, &$deleted, &$skipped) {
+            foreach ($ids as $id) {
+                $card = $this->findManageableSenseCardForMutation($id, $userId, $language);
+
+                if (!$card) {
+                    $skipped++;
+                    continue;
+                }
+
+                $sense = WordSense::find($card->target_id);
+                if (!$sense) {
+                    $skipped++;
+                    continue;
+                }
+
+                $wordSenseService->removeSenseFromReviewSystem($sense, true);
+                $deleted++;
+            }
+        });
+
+        return ['deleted' => $deleted, 'skipped' => $skipped];
     }
 
     /**

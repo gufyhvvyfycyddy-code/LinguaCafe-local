@@ -14,7 +14,6 @@ use App\Services\WordSenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 
 class ReviewCardManageController extends Controller
 {
@@ -348,46 +347,17 @@ class ReviewCardManageController extends Controller
             return response()->json(['message' => '请选择至少一张复习卡。'], 422);
         }
 
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-
-        $deleted = 0;
-        $skipped = 0;
-
-        DB::transaction(function () use ($ids, $userId, $language, &$deleted, &$skipped) {
-            foreach ($ids as $id) {
-                $card = ReviewCard::query()
-                    ->where('id', $id)
-                    ->where('user_id', $userId)
-                    ->where('language_id', $language)
-                    ->where('target_type', ReviewCard::TARGET_SENSE)
-                    ->whereHas('sense', function ($q) use ($userId, $language) {
-                        $q->where('user_id', $userId)
-                            ->where('language_id', $language)
-                            ->where('status', WordSense::STATUS_CONFIRMED);
-                    })
-                    ->first();
-
-                if (!$card) {
-                    $skipped++;
-                    continue;
-                }
-
-                $sense = WordSense::find($card->target_id);
-                if (!$sense) {
-                    $skipped++;
-                    continue;
-                }
-
-                $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
-                $deleted++;
-            }
-        });
+        $result = $this->mutationService->bulkDestroy(
+            $ids,
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $this->wordSenseService,
+        );
 
         return response()->json([
-            'deleted' => $deleted,
-            'skipped' => $skipped,
-            'message' => "已彻底删除 {$deleted} 张词义复习卡。对应释义不会再出现在阅读页，阅读记录和复习历史已保留。",
+            'deleted' => $result['deleted'],
+            'skipped' => $result['skipped'],
+            'message' => "已彻底删除 {$result['deleted']} 张词义复习卡。对应释义不会再出现在阅读页，阅读记录和复习历史已保留。",
         ]);
     }
 

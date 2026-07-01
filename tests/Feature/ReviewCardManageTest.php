@@ -4094,6 +4094,120 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame(1, $data['skipped']);
     }
 
+    // ==================== Bulk Destroy Extraction — Post-Extraction Coverage ====================
+
+    public function test_bulk_destroy_response_shape_after_extraction(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'del2', 'surface_form' => 'del2', 'sense_key' => hash('sha256', 'english|del2|noun|测试|test2')]);
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card1->id, $card2->id],
+        ]);
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertArrayHasKey('deleted', $data);
+        $this->assertArrayHasKey('skipped', $data);
+        $this->assertArrayHasKey('message', $data);
+        $this->assertSame(2, $data['deleted']);
+        $this->assertSame(0, $data['skipped']);
+    }
+
+    public function test_bulk_destroy_deletes_review_card(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id],
+        ]);
+
+        $this->assertDatabaseMissing('review_cards', ['id' => $card->id]);
+    }
+
+    public function test_bulk_destroy_rejects_word_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id],
+        ]);
+
+        $sense->refresh();
+        $this->assertSame(WordSense::STATUS_REJECTED, $sense->status);
+    }
+
+    public function test_bulk_destroy_preserves_review_logs_after_extraction(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $log = \App\Models\ReviewLog::create([
+            'review_card_id' => $card->id,
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'reviewed_at' => now(),
+            'rating' => 'good',
+            'source' => 'test',
+            'new_state' => 'review',
+        ]);
+
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id],
+        ]);
+
+        $this->assertDatabaseHas('review_logs', ['id' => $log->id]);
+    }
+
+    public function test_bulk_destroy_skips_other_user_card_after_extraction(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $otherSense = $this->createSense($this->otherUser->id, 'english');
+        $otherCard = $this->createSenseCard($otherSense);
+        $otherCardId = $otherCard->id;
+
+        $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-delete', [
+            'ids' => [$card->id, $otherCard->id],
+        ]);
+
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertSame(1, $data['deleted']);
+        $this->assertSame(1, $data['skipped']);
+        // Other user card should still exist
+        $this->assertDatabaseHas('review_cards', ['id' => $otherCardId]);
+    }
+
+    // ==================== Bulk Enabled Regression (shared helper) ====================
+
+    public function test_bulk_enabled_regression_with_shared_helper(): void
+    {
+        [$card1, $sense1] = $this->createTestSenseCard();
+        [$card2, $sense2] = $this->createTestSenseCard();
+        $sense2->update(['lemma' => 'reg2', 'surface_form' => 'reg2', 'sense_key' => hash('sha256', 'english|reg2|noun|测试|reg')]);
+
+        // Archive via service
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => false,
+        ]);
+
+        $card1->refresh();
+        $card2->refresh();
+        $this->assertFalse($card1->fsrs_enabled);
+        $this->assertFalse($card2->fsrs_enabled);
+
+        // Restore via service
+        $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
+            'ids' => [$card1->id, $card2->id],
+            'enabled' => true,
+        ]);
+
+        $card1->refresh();
+        $card2->refresh();
+        $this->assertTrue($card1->fsrs_enabled);
+        $this->assertTrue($card2->fsrs_enabled);
+    }
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

@@ -125,7 +125,7 @@ DB::transaction {
 | `reset()` | ⏳ 已委托 ReviewCardService | 涉及事务 + ReviewLog，边界安全 |
 | `destroy()` | ⏳ 已委托 WordSenseService | 涉及多表 + 事务 + EncounteredWord |
 | `bulkEnabled()` | ✅ 已抽入 MutationService（Complex-1 完成） | `bulkSetEnabled()` 方法，Controller 只保留校验/组装 |
-| `bulkDestroy()` | ❓ 未抽取 | 逐卡查询 + 事务 + skip 计数 |
+| `bulkDestroy()` | ✅ 已抽入 MutationService（Phase20-1 完成） | `bulkDestroy()` 方法，共享 `findManageableSenseCardForMutation()` helper |
 | `findManageableSenseCard()` | ⛔ 保持 Controller 私有 | 编排层辅助，不应暴露 |
 
 ### 候选提取方向
@@ -276,7 +276,57 @@ public function bulkSetEnabled(array $ids, bool $enabled, int $userId, string $l
 - destroy / bulkDestroy 核心删除语义未改
 - reset 核心 FSRS 语义未改
 
-### 9.6 下一轮测试验收草案
+### 9.7 实现记录（ReviewCardManage-BulkDestroyPhase20-1 完成）
+
+> `bulkDestroy()` 已在本轮抽取到 MutationService。共享权限查询 helper 已提取。
+
+**Service 方法签名**：
+
+```php
+public function bulkDestroy(array $ids, int $userId, string $language, WordSenseService $wordSenseService): array
+// Returns ['deleted' => int, 'skipped' => int]
+```
+
+**Controller 职责（保留）**：
+- request 校验（空数组 422）
+- Auth user / language 获取
+- 调用 service（传入 `$this->wordSenseService`）
+- message 文案组装（deleted 数量嵌入）
+- response JSON 组装
+
+**共享 helper**（MutationService 内部 private）：
+
+```php
+private function findManageableSenseCardForMutation(int $id, int $userId, string $language): ?ReviewCard
+```
+
+**保持不变的契约**：
+- user_id / language_id / target_type=TARGET_SENSE / WordSense confirmed 过滤
+- DB::transaction 包裹
+- deleted/skipped 语义
+- response shape: deleted/skipped/message
+- 核心语义未改：ReviewCard 硬删、WordSense rejected、ReviewLog 保留、WordSenseOccurrence 清关联、EncounteredWord 条件性恢复
+- 仍调用 WordSenseService::removeSenseFromReviewSystem()
+
+**自动测试补强**（6 个新测试）：
+- `test_bulk_destroy_response_shape_after_extraction` — 抽取后 response shape 不变
+- `test_bulk_destroy_deletes_review_card` — 卡片被硬删
+- `test_bulk_destroy_rejects_word_sense` — WordSense 标记 REJECTED
+- `test_bulk_destroy_preserves_review_logs_after_extraction` — ReviewLog 保留
+- `test_bulk_destroy_skips_other_user_card_after_extraction` — 其他用户隔离 + skipped 正确
+- `test_bulk_enabled_regression_with_shared_helper` — bulkSetEnabled 回归（共享 helper 未破坏归档/恢复）
+
+**MCP Chrome 验收**：
+- 管理页 25 张测试卡可见（lemma 前缀 `smoke_p20_`）
+- 批量彻底删除弹窗显示 lemma/zh 列表（20 条，与超限提示逻辑保持）
+- 未执行真实删除
+
+**测试数据保留策略**：
+- 25 张 `smoke_p20_*` 测试卡保留给 WorkBuddy 后置验收
+- 清理命令：`php cleanup_phase20_smoke_data.php`
+- 数据文件：`.phase20_smoke_card_ids.json`
+
+### 9.6 下一轮测试验收草案（历史保留）
 
 下一轮实现时至少需通过以下验收：
 
