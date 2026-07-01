@@ -34,6 +34,13 @@ class TextBlockService
     public $language = '';
     public $userId = -1;
 
+    /**
+     * Optional ReaderDataService instance for reader data preparation.
+     * When set, collectUniqueWords / prepareTextForReader / indexPhrases
+     * delegate to it. TextBlockService remains the external facade.
+     */
+    public ?ReaderDataService $readerDataService = null;
+
     /*
         This variable contains raw untokenized text. 
     */
@@ -73,6 +80,7 @@ class TextBlockService
     function __construct($userId, $language) {
         $this->userId = $userId;
         $this->language = $language;
+        $this->readerDataService = new ReaderDataService($userId, $language);
         $this->pythonService = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
     }
 
@@ -452,6 +460,10 @@ class TextBlockService
     }
 
     public function collectUniqueWords() {
+        if ($this->readerDataService) {
+            $this->uniqueWords = $this->readerDataService->collectUniqueWords($this->processedWords);
+            return;
+        }
         $this->uniqueWords = [];
         for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
             $word = $this->processedWords[$wordIndex]->word;
@@ -566,6 +578,12 @@ class TextBlockService
         for TextBlock vue object for better search speeds.
     */
     public function indexPhrases() {
+        if ($this->readerDataService) {
+            $this->phrases = $this->readerDataService->loadPhrases($this->words);
+            $this->readerDataService->indexPhraseIndexes($this->words, $this->phrases);
+            return;
+        }
+
         // get unique phrase ids
         $phraseIds = [];
         for ($wordIndex = 0; $wordIndex < count($this->words); $wordIndex ++) {
@@ -606,6 +624,24 @@ class TextBlockService
         to work.
     */
     public function prepareTextForReader() {
+        if ($this->readerDataService) {
+            $encounteredWords = DB::table('encountered_words')
+                ->where('user_id', $this->userId)
+                ->where('language', $this->language)
+                ->whereIn('word', $this->uniqueWords)
+                ->get();
+
+            $fwLookup = $this->readerDataService->loadFsrsFamiliarityLookup();
+            $this->words = $this->readerDataService->prepareTextForReader(
+                $this->processedWords,
+                $encounteredWords,
+                $this->uniqueWords,
+                $fwLookup,
+            );
+            $this->uniqueWords = $this->readerDataService->enrichUniqueWords($encounteredWords, $fwLookup);
+            return;
+        }
+
         $tokensWithNoSpaceBefore = config('linguacafe.tokens_with_no_space_before');
         $tokensWithNoSpaceAfter = config('linguacafe.tokens_with_no_space_after');
         $languagesWithoutSpaces = config('linguacafe.languages.languages_without_spaces');

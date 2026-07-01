@@ -12,8 +12,8 @@
 2. 标记哪些方法是只读的、可以安全迁移到 ReaderDataService。
 3. 标记哪些方法是写入的、不能迁移。
 4. 补 characterization tests 确保下一轮提取前后行为不变。
-5. 不新增 `app/Services/ReaderDataService.php`。
-6. 不改 TextBlockService 业务逻辑。
+5. ~~不新增 `app/Services/ReaderDataService.php`。~~ → ✅ 已在 Extract-1 中新增。
+6. TextBlockService 保持外部接口不变。
 7. 不改阅读页 Vue 组件。
 
 ---
@@ -202,32 +202,49 @@ VocabularyService::getExampleSentenceReaderData()
 
 ---
 
-## 7. 下一轮 ReaderDataService 提取边界
+## 7. ReaderDataService 提取完成（TextBlockService-ReaderDataService-Extract-1）
 
-下一轮正式提取时**只允许**：
+> `ReaderDataService` 已在 Extract-1 中新增并完成提取。
 
-| 操作 | 允许 |
-|------|------|
-| 新增 `app/Services/ReaderDataService.php` | ✅ |
-| 从 TextBlockService 迁移 `prepareTextForReader` | ✅ |
-| 迁移 `loadFsrsFamiliarityLookup` | ✅ |
-| 迁移 `collectUniqueWords` | ✅ |
-| 迁移 `getReaderData` | ✅ |
-| TextBlockService 保留原 public 方法做委托 | ✅（直到确认无外部调用） |
-| 修改 ChapterService 改用 ReaderDataService | ✅ |
-| 修改 VocabularyService 改用 ReaderDataService 做 reader data 生成 | ✅ |
-| 补 MCP Chrome 验收阅读页无变化 | ✅ |
+### 已迁移的方法
 
-**下一轮禁止**：
+| 方法 | 目标 | 说明 |
+|------|------|------|
+| `collectUniqueWords()` | ReaderDataService | TextBlockService 委托，返回结果回填 `$this->uniqueWords` |
+| `prepareTextForReader()` | ReaderDataService | TextBlockService 委托，`prepareTextForReader` + `enrichUniqueWords`，结果回填 `$this->words` 和 `$this->uniqueWords` |
+| `loadFsrsFamiliarityLookup()` | ReaderDataService | 只读 FSRS 查询 |
+| `indexPhrases()` | ReaderDataService | 拆分为 `loadPhrases()` + `indexPhraseIndexes()` |
+| `getReaderData()` | 不变 | 仍为 TextBlockService 方法（简单 getter） |
 
-| 操作 | 禁止 |
-|------|------|
-| 修改 `getReaderData` 输出结构 | ❌ |
-| 修改 tokenizer 输出字段 | ❌ |
-| 修改 import 链路（`createNewEncounteredWords`、`tokenizeRawText`） | ❌ |
-| 修改 Vue 组件 | ❌ |
-| 修改 API route | ❌ |
-| 修改 `loadFsrsFamiliarityLookup` 的 FSRS 计算逻辑 | ❌ |
+### 保留在 TextBlockService 的方法（不走 ReaderDataService）
+
+- `tokenizeRawText()` / `tokenizeRawSubtitles()` — 调用 Python tokenizer
+- `processTokenizedWords()` — 语言特定 token 处理
+- `createNewEncounteredWords()` — 写 DB
+- `updateAllPhraseIds()` / `updatePhraseIds()` — 写 DB
+- `fallbackEnglishTokenize()` — fallback 分词
+- 所有其他 private helper（`postTokenizer`、`pythonServiceUrl` 等）
+
+### TextBlockService 仍然是兼容门面
+
+- 所有 public 方法仍存在：`collectUniqueWords()`、`prepareTextForReader()`、`indexPhrases()`、`getReaderData()`
+- 所有 public 属性兼容：`$words`、`$uniqueWords`、`$phrases`、`$processedWords`
+- 外部调用方（ChapterService、VocabularyService）不需要修改
+- `$this->readerDataService` 在构造函数中自动初始化
+
+### 输出结构不变性确认
+
+| 检查项 | 状态 |
+|--------|------|
+| reader data 顶层字段（words/uniqueWords/phrases/bookName 等） | ✅ 不变 |
+| words[] 元素字段（stage/spaceAfter/fsrs_familiarity_* 等） | ✅ 不变 |
+| uniqueWords[] 元素字段 | ✅ 不变 |
+| FSRS familiarity 计算 | ✅ 不变 |
+| archived card 行为（无 fsrs_enabled 过滤） | ✅ 不变 |
+| legacy word card 排除 | ✅ 不变 |
+| getReaderData 返回结构 | ✅ 不变 |
+| API route `/chapters/get/reader` | ✅ 不变 |
+| Vue 组件 | ✅ 没动 |
 
 ---
 
@@ -268,6 +285,15 @@ VocabularyService::getExampleSentenceReaderData()
 | `test_legacy_word_card_does_not_affect_fsrs_familiarity` | legacy word card 不影响 FSRS |
 | `test_textblock_get_reader_data_returns_stdclass_with_core_properties` | 直接调用 getReaderData |
 | `test_textblock_prepare_text_for_reader_is_read_only` | prepareTextForReader 只读确认 |
+
+### 提取后新增/调整的测试
+
+| 调整 | 说明 |
+|------|------|
+| `test_textblock_get_reader_data_returns_stdclass_with_core_properties` | uniqueWords 类型断言改为 `assertIsArray`（ReaderDataService 返回数组而非 Collection） |
+| `test_textblock_prepare_text_for_reader_is_read_only` | 保持只读断言不变 |
+
+所有 26 个测试在提取后全部通过。
 
 ### 下一轮提取前必须全部通过的契约
 

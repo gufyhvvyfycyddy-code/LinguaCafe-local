@@ -288,8 +288,9 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 | 排名 | 任务名 | 复杂度 | 收益 | 风险 | 类型 |
 |------|--------|--------|------|------|------|
-| ⚡ 进行中 | TextBlockService-ReaderDataContract-1 | 契约锁定中 — 已完成输出结构文档 + 9 个 characterization tests | — | — | — |
-| 1️⃣ | **TextBlockService: extract ReaderDataService** | 4/10 | 🟢 高 | 🟢 低 | A-立即 |
+| ✅ 已完成 | TextBlockService-ReaderDataContract-1 | 契约锁定 — 已完成输出结构文档 + 9 个 characterization tests | — | — | — |
+| ✅ 已完成 | TextBlockService-ReaderDataService-Extract-1 | **ReaderDataService 已提取** — 新增 `app/Services/ReaderDataService.php`，TextBlockService 保持外部接口不变 | 4/10 | 🟢 高 | A |
+| 2️⃣ | **tokenizer health 增强 + PHP 端 health 独立** | 3/10 | 🟢 高 | 🟢 低 | A-待启动 |
 | 2️⃣ | **tokenizer health 增强 + PHP 端 health 独立** | 3/10 | 🟢 高 | 🟢 低 | A-立即 |
 | 3️⃣ | **SenseSourceContextService test + 查询/渲染分离** | 3/10 | 🟡 中 | 🟢 低 | A/B |
 | 4️⃣ | **DictionaryImportService characterization tests** | 4/10 | 🟡 中 | 🟢 低 | A/B |

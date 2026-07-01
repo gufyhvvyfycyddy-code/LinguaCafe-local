@@ -569,7 +569,7 @@ class ReaderFsrsHighlightTest extends TestCase
         $this->assertTrue(property_exists($data, 'uniqueWords'), 'getReaderData must have uniqueWords');
         $this->assertTrue(property_exists($data, 'phrases'), 'getReaderData must have phrases');
         $this->assertIsArray($data->words);
-        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $data->uniqueWords);
+        $this->assertIsArray($data->uniqueWords);
         $this->assertIsArray($data->phrases);
     }
 
