@@ -4208,6 +4208,134 @@ class ReviewCardManageTest extends TestCase
         $this->assertTrue($card2->fsrs_enabled);
     }
 
+    // ==================== Reset Characterization Tests ====================
+
+    public function test_reset_sets_fsrs_state_to_new(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_state' => 'review', 'fsrs_stability' => 5.0, 'fsrs_difficulty' => 0.5]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $card->refresh();
+        $this->assertSame('new', $card->fsrs_state);
+    }
+
+    public function test_reset_updates_fsrs_due_at(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_state' => 'review', 'fsrs_due_at' => now()->addDay()]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $card->refresh();
+        $this->assertNotNull($card->fsrs_due_at);
+        // Should be within 5 seconds of "now"
+        $this->assertLessThanOrEqual(5, now()->diffInSeconds($card->fsrs_due_at, true));
+    }
+
+    public function test_reset_clears_fsrs_stability_and_difficulty(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_state' => 'review', 'fsrs_stability' => 5.0, 'fsrs_difficulty' => 0.5]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $card->refresh();
+        $this->assertNull($card->fsrs_stability);
+        $this->assertNull($card->fsrs_difficulty);
+    }
+
+    public function test_reset_sets_reps_and_lapses_to_zero(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_state' => 'review', 'fsrs_reps' => 10, 'fsrs_lapses' => 3]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $card->refresh();
+        $this->assertSame(0, $card->fsrs_reps);
+        $this->assertSame(0, $card->fsrs_lapses);
+    }
+
+    public function test_reset_sets_fsrs_enabled_true_and_clears_last_reviewed_at(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update([
+            'fsrs_state' => 'review',
+            'fsrs_enabled' => false,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $card->refresh();
+        $this->assertTrue($card->fsrs_enabled);
+        $this->assertNull($card->fsrs_last_reviewed_at);
+    }
+
+    public function test_reset_creates_review_log_with_rating_reset(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $card->update(['fsrs_state' => 'review', 'fsrs_stability' => 3.0]);
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $log = \App\Models\ReviewLog::where('review_card_id', $card->id)
+            ->where('rating', 'reset')
+            ->where('source', 'reset')
+            ->first();
+        $this->assertNotNull($log, 'reset must create a ReviewLog with rating=reset and source=reset');
+        $this->assertSame('review', $log->previous_state);
+        $this->assertSame('new', $log->new_state);
+    }
+
+    public function test_reset_preserves_word_sense(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $senseId = $sense->id;
+        $oldLemma = $sense->lemma;
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $freshSense = WordSense::find($senseId);
+        $this->assertNotNull($freshSense);
+        $this->assertSame($oldLemma, $freshSense->lemma);
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $freshSense->status);
+    }
+
+    public function test_reset_preserves_review_card(): void
+    {
+        [$card, $sense] = $this->createTestSenseCard();
+        $cardId = $card->id;
+
+        $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
+
+        $this->assertNotNull(ReviewCard::find($cardId), 'reset must NOT delete the ReviewCard');
+    }
+
+    // ==================== Destroy Characterization — Coverage Note ====================
+    // Single-card destroy coverage is already extensive:
+    //   test_destroy_deletes_own_sense_review_card — ReviewCard deleted ✓
+    //   test_destroy_rejects_word_sense — WordSense rejected ✓
+    //   test_destroy_preserves_review_logs — ReviewLog preserved ✓
+    //   test_destroy_preserves_occurrences_but_clears_review_card_link — occurrence cleared, auto_fsrs_allowed=false ✓
+    //   test_destroy_cannot_delete_other_user_card / other_language / legacy_word — isolation ✓
+    //   test_deleting_last_linked_sense_restores_word_to_new — EncounteredWord conditional restore ✓
+    //   test_deleting_one_sense_when_another_confirmed_sense_exists_does_not_restore_word ✓
+    //   test_destroy_does_not_affect_other_same_lemma_senses ✓
+    // "Does not delete reading materials/chapters/original locations":
+    //   NOT tested here — requires full chapter import infrastructure beyond test helpers.
+    //   The logic is in removeSenseFromReviewSystem() which only touches ReviewCard, WordSense,
+    //   WordSenseOccurrence, EncounteredWord — never chapters/books/materials.
+
+    // ==================== Bulk Destroy Characterization — Extraction Coverage ====================
+    // Already covered by tests added in BulkDestroyPhase20-1:
+    //   test_bulk_destroy_deletes_review_card ✓
+    //   test_bulk_destroy_rejects_word_sense ✓
+    //   test_bulk_destroy_preserves_review_logs_after_extraction ✓
+    //   test_bulk_destroy_skips_other_user_card_after_extraction ✓
+
     private function createTestSenseCard(): array
     {
         $sense = $this->createSense($this->user->id, 'english');

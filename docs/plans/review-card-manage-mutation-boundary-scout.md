@@ -326,6 +326,41 @@ private function findManageableSenseCardForMutation(int $id, int $userId, string
 - 清理命令：`php cleanup_phase20_smoke_data.php`
 - 数据文件：`.phase20_smoke_card_ids.json`
 
+### 9.8 收口稳定化（ReviewCardManage-Phase20Stabilize-1 完成）
+
+> 本轮不做新功能，不改 UI，不改核心业务语义。清理现场 + 补测试防线 + 修正协作规则。
+
+**Phase20 smoke 数据清理**：
+- `smoke_p20_*` 25 张测试卡已通过 ID 列表（26-50）清理。
+- `cleanup_phase20_smoke_data.php` 和 `.phase20_smoke_card_ids.json` 已删除。
+- `git status` 无残留未跟踪文件。
+
+**reset characterization tests**（8 个新测试）：
+| 测试 | 覆盖 |
+|------|------|
+| `test_reset_sets_fsrs_state_to_new` | fsrs_state='new' |
+| `test_reset_updates_fsrs_due_at` | fsrs_due_at 更新到当前时间 |
+| `test_reset_clears_fsrs_stability_and_difficulty` | stability/null, difficulty/null |
+| `test_reset_sets_reps_and_lapses_to_zero` | reps=0, lapses=0 |
+| `test_reset_sets_fsrs_enabled_true_and_clears_last_reviewed_at` | enabled=true, last_reviewed_at=null |
+| `test_reset_creates_review_log_with_rating_reset` | ReviewLog rating=reset/source=reset |
+| `test_reset_preserves_word_sense` | WordSense 仍 confirmed |
+| `test_reset_preserves_review_card` | ReviewCard 不删除 |
+
+**destroy characterization tests** — 已有测试已覆盖：
+- ReviewCard 硬删：`test_destroy_deletes_own_sense_review_card`
+- WordSense rejected：`test_destroy_rejects_word_sense`
+- ReviewLog 保留：`test_destroy_preserves_review_logs`
+- Occurrence 清关联 + auto_fsrs_allowed=false：`test_destroy_preserves_occurrences_but_clears_review_card_link`
+- EncounteredWord 条件性恢复：`test_deleting_last_linked_sense_restores_word_to_new`
+- "不删除阅读材料/章节/原文位置"：未单独测试——removeSenseFromReviewSystem 只接触 ReviewCard/WordSense/Occurrence/EncounteredWord，不接触章节/书籍/阅读材料。需要完整章节导入基础设施，当前测试工具无法安全构造。
+
+**WorkBuddy 单专家规则冲突修正**：
+- `vibe-coding-collaboration-rules.md §14.6` 已修正：明确"多名专家"仅适用于 OpenCode/CodeBuddy 的多个 skill，WorkBuddy 每轮只能一个专家（以 §18 为准）。
+- §18 保留不变。
+
+**下一步风险顺序**（见 §10.5 更新）：
+
 ### 9.6 下一轮测试验收草案（历史保留）
 
 下一轮实现时至少需通过以下验收：
@@ -506,15 +541,36 @@ reset 会影响以下 `review_cards` 字段：
 - 不得新增清库 / migration / 数据重建。
 - 不得改变 deleted/skipped/message 字段名。
 
-### 10.4 实现顺序建议
+### 10.4 实现顺序建议（Phase20Stabilize-1 后更新）
 
-| 编码轮次 | 内容 | 风险级别 | 理由 |
-|---------|------|----------|------|
-| 第 1 轮 | `bulkEnabled` 最小抽取到 MutationService | 低 | 可恢复，单字段 `fsrs_enabled`，已有契约锁定 |
-| 第 2 轮 | `dueNow` 成功反馈或 reset UX 文案补强 | 中低 | 不改变行为，只改提示 |
-| 第 3 轮 | `reset` 边界优化（编排或安全确认） | 中 | 丢 FSRS 参数，强制解归档，不可逆 |
-| 第 4 轮 | `destroy` 单卡边界优化（安全确认） | 高 | ReviewCard 硬删，WordSense rejected，不可恢复 |
-| 第 5 轮 | `bulkDestroy` 边界优化（安全确认） | 高 | 批量硬删，不可恢复 |
+| 状态 | 编码轮次 | 内容 | 风险级别 | 理由 |
+|------|---------|------|----------|------|
+| ✅ 已完成 | 第 1 轮 | `bulkEnabled` 最小抽取到 MutationService | 低 | 可恢复，单字段 `fsrs_enabled`，已有契约锁定 |
+| ✅ 已完成 | 第 2 轮 | `dueNow` 成功反馈或 reset UX 文案补强 | 中低 | 不改变行为，只改提示 |
+| ❌ 待定 | 第 3 轮 | `reset` 边界优化（编排或安全确认） | 中 | 丢 FSRS 参数，强制解归档，不可逆 |
+| ❌ 待定 | 第 4 轮 | `destroy` 单卡边界优化（安全确认） | 高 | ReviewCard 硬删，WordSense rejected，不可恢复 |
+| ✅ 已完成 | 第 5 轮 | `bulkDestroy` 边界优化（安全确认） | 高 | 批量硬删，不可恢复 |
+
+### 10.5 当前已完成的架构优化（Phase20Stabilize-1 后）
+
+| 操作 | 架构优化状态 | 说明 |
+|------|-------------|------|
+| `bulkEnabled` | ✅ 已抽到 MutationService | `bulkSetEnabled()` + 共享 helper |
+| `bulkDestroy` | ✅ 已抽到 MutationService | `bulkDestroy()` + 共享 helper |
+| `reset` | ❌ 短期不建议重构核心 | 已有 `ReviewCardService::resetCard()` + lockForUpdate 事务，测试防线已补全 |
+| `destroy` 单卡 | ❌ 短期不建议改核心语义 | 核心在 `WordSenseService::removeSenseFromReviewSystem()`，测试防线已确认足够 |
+| 共享 helper | ✅ `findManageableSenseCardForMutation` | private，仅服务本类，bulkSetEnabled/bulkDestroy 共用 |
+
+### 10.6 下一阶段风险顺序建议
+
+1. **destroy 单卡的测试/验收/文案安全强化**（不改核心删除函数）
+   - 不改变 `removeSenseFromReviewSystem`。
+   - 只改 Controller 编排或前端确认弹窗。
+   - 必须独立 Phase + MCP Chrome 验收。
+2. **reset 边界优化或 UX 文案补强**（不改核心 FSRS 语义）
+   - 不改 `ReviewCardService::resetCard()`。
+   - 只改 Controller/前端。
+3. 如果上述都已完成且稳定，才考虑低频低风险优化。
 
 **原则**：
 - 每轮都是独立 Phase，不合并高风险操作。
