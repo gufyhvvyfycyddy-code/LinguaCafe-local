@@ -393,4 +393,204 @@ class ReaderFsrsHighlightTest extends TestCase
         $response->assertOk();
         $this->assertStringContainsString('ARTICLE_TEXT_START', $response->json('prompt'));
     }
+
+    // ==================== Reader Data Output Structure Characterization ====================
+
+    public function test_reader_data_contains_core_top_level_fields(): void
+    {
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $data = $response->json();
+        $this->assertArrayHasKey('type', $data);
+        $this->assertArrayHasKey('subtitleTimestamps', $data);
+        $this->assertArrayHasKey('words', $data);
+        $this->assertArrayHasKey('uniqueWords', $data);
+        $this->assertArrayHasKey('phrases', $data);
+        $this->assertArrayHasKey('bookName', $data);
+        $this->assertArrayHasKey('chapterId', $data);
+        $this->assertArrayHasKey('chapterName', $data);
+        $this->assertArrayHasKey('bookId', $data);
+        $this->assertArrayHasKey('language', $data);
+        $this->assertArrayHasKey('languageSpaces', $data);
+        $this->assertArrayHasKey('chapters', $data);
+        $this->assertArrayHasKey('wordCount', $data);
+    }
+
+    public function test_reader_words_object_has_expected_fields(): void
+    {
+        $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $words = $response->json('words');
+        $word = $words[0] ?? [];
+        $this->assertNotEmpty($word, 'words array should not be empty');
+
+        // Core word fields (from tokenizer output)
+        $this->assertArrayHasKey('word', $word);
+        $this->assertArrayHasKey('lemma', $word);
+        $this->assertArrayHasKey('pos', $word);
+        $this->assertArrayHasKey('sentence_index', $word);
+        $this->assertArrayHasKey('phrase_ids', $word);
+
+        // Reader-dedicated fields (set by prepareTextForReader)
+        $this->assertArrayHasKey('id', $word);
+        $this->assertArrayHasKey('stage', $word);
+        $this->assertArrayHasKey('lookup_count', $word);
+        $this->assertArrayHasKey('furigana', $word);
+        $this->assertArrayHasKey('selected', $word);
+        $this->assertArrayHasKey('hover', $word);
+        $this->assertArrayHasKey('spaceAfter', $word);
+        $this->assertArrayHasKey('phraseStage', $word);
+        $this->assertArrayHasKey('phraseStart', $word);
+        $this->assertArrayHasKey('phraseEnd', $word);
+        $this->assertArrayHasKey('phraseIndexes', $word);
+        $this->assertArrayHasKey('subtitleIndex', $word);
+    }
+
+    public function test_reader_unique_words_has_expected_fields(): void
+    {
+        $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        $uniqueWords = $response->json('uniqueWords');
+        $uw = $uniqueWords[0] ?? [];
+        $this->assertNotEmpty($uw, 'uniqueWords array should not be empty');
+
+        $this->assertArrayHasKey('id', $uw);
+        $this->assertArrayHasKey('word', $uw);
+        $this->assertArrayHasKey('stage', $uw);
+        $this->assertArrayHasKey('lookup_count', $uw);
+        $this->assertArrayHasKey('definitions_checked', $uw);
+    }
+
+    public function test_reader_does_not_create_review_cards_or_senses(): void
+    {
+        $originalReviewCount = ReviewCard::count();
+        $originalSenseCount = WordSense::count();
+        $originalEncounteredCount = EncounteredWord::count();
+
+        $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $this->loadReader();
+
+        // Reader should not create any review cards or word senses
+        $this->assertEquals($originalEncounteredCount + 1, EncounteredWord::count(), 'one encountered word created in test setup');
+        $this->assertEquals($originalReviewCount, ReviewCard::count(), 'reader should not create review cards');
+        $this->assertEquals($originalSenseCount, WordSense::count(), 'reader should not create word senses');
+    }
+
+    public function test_reader_does_not_modify_chapters(): void
+    {
+        $originalChapterCount = Chapter::count();
+        $originalName = $this->chapter->name;
+
+        $this->loadReader();
+
+        $this->assertEquals($originalChapterCount, Chapter::count());
+        $this->chapter->refresh();
+        $this->assertEquals($originalName, $this->chapter->name);
+    }
+
+    public function test_archived_card_behavior(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        $rc = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 1,
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $ws->id,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => Carbon::now()->addDay(),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 1,
+            'fsrs_lapses' => 0,
+            'fsrs_enabled' => false, // archived
+        ]);
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        // Archived cards should still contribute FSRS familiarity (loadFsrsFamiliarityLookup
+        // does NOT filter by fsrs_enabled — it only checks target_type, status, stage < 0)
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertNotNull($phen['fsrs_familiarity_score'] ?? null,
+            'archived card should still have familiarity score (loadFsrsFamiliarityLookup does not exclude disabled)');
+    }
+
+    public function test_legacy_word_card_does_not_affect_fsrs_familiarity(): void
+    {
+        $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -7);
+        $ws = $this->createWordSense($ew);
+        // Create a TARGET_WORD (legacy) card instead of TARGET_SENSE
+        ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 1,
+            'language' => 'english',
+            'target_type' => 'word', // NOT TARGET_SENSE
+            'target_id' => $ew->id,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => Carbon::now()->addDay(),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 1,
+            'fsrs_lapses' => 0,
+        ]);
+
+        $response = $this->loadReader();
+        $response->assertOk();
+
+        // Legacy word card should be excluded from FSRS familiarity lookups
+        $phen = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $this->assertEquals(-7, $phen['stage'], 'legacy word card should not affect FSRS familiarity');
+        $this->assertArrayNotHasKey('fsrs_familiarity_score', $phen);
+    }
+
+    // ==================== Direct TextBlockService Contract Tests ====================
+
+    public function test_textblock_get_reader_data_returns_stdclass_with_core_properties(): void
+    {
+        $processedWords = [
+            (object) ['word' => 'direct', 'lemma' => 'direct', 'pos' => 'ADJ', 'sentence_index' => 0, 'phrase_ids' => []],
+        ];
+
+        $tbs = new \App\Services\TextBlockService($this->user->id, 'english');
+        $tbs->setProcessedWords($processedWords);
+        $tbs->collectUniqueWords();
+        $tbs->prepareTextForReader();
+
+        $data = $tbs->getReaderData();
+
+        $this->assertTrue(property_exists($data, 'words'), 'getReaderData must have words');
+        $this->assertTrue(property_exists($data, 'uniqueWords'), 'getReaderData must have uniqueWords');
+        $this->assertTrue(property_exists($data, 'phrases'), 'getReaderData must have phrases');
+        $this->assertIsArray($data->words);
+        $this->assertInstanceOf(\Illuminate\Support\Collection::class, $data->uniqueWords);
+        $this->assertIsArray($data->phrases);
+    }
+
+    public function test_textblock_prepare_text_for_reader_is_read_only(): void
+    {
+        $originalReviewCount = ReviewCard::count();
+        $originalSenseCount = WordSense::count();
+        $originalEncounteredCount = EncounteredWord::count();
+
+        $processedWords = [
+            (object) ['word' => 'test', 'lemma' => 'test', 'pos' => 'NOUN', 'sentence_index' => 0, 'phrase_ids' => []],
+        ];
+
+        $tbs = new \App\Services\TextBlockService($this->user->id, 'english');
+        $tbs->setProcessedWords($processedWords);
+        $tbs->collectUniqueWords();
+        $tbs->prepareTextForReader();
+
+        // prepareTextForReader should not create/modify any DB records
+        $this->assertEquals($originalReviewCount, ReviewCard::count());
+        $this->assertEquals($originalSenseCount, WordSense::count());
+        $this->assertEquals($originalEncounteredCount, EncounteredWord::count());
+    }
 }
