@@ -1588,6 +1588,112 @@ class SenseSourceContextTest extends TestCase
         $this->assertNotEmpty($response->json('items'));
     }
 
+    // ==================== Supplementary characterization tests ====================
+
+    public function test_chapter_recovered_writes_back_source_fields(): void
+    {
+        // Create a chapter that will be matched by example sentence
+        $processedWords = [
+            (object) ['word' => 'The', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'quick', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'brown', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'fox', 'sentence_index' => '0', 'spaceAfter' => false],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $chapter = $this->createTestChapter($processedWords, ['name' => 'Fox Chapter']);
+
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'fox',
+            'surface_form' => 'fox',
+            'pos' => 'noun',
+            'sense_zh' => '狐狸',
+            'sense_en' => 'a clever animal',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'The quick brown fox.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+        // Ensure no source_chapter_id or sentence_id to trigger recovery
+        $sense->update(['source_chapter_id' => null, 'sentence_id' => null]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertSame('chapter_recovered', $data['source_kind']);
+
+        // Verify write-back
+        $sense->refresh();
+        $this->assertNotNull($sense->source_chapter_id);
+    }
+
+    public function test_card_example_does_not_write_back_to_sense(): void
+    {
+        // Sense with example sentence but no chapter match
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'cardex',
+            'surface_form' => 'cardex',
+            'pos' => 'noun',
+            'sense_zh' => '例句不回写',
+            'sense_en' => 'test sense that should not write back',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'This is just a card example.',
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+        $sense->update(['source_chapter_id' => null, 'sentence_id' => null]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+        $response->assertOk();
+        $data = $response->json();
+        $this->assertSame('card_example', $data['source_kind']);
+
+        // Verify no write-back happened
+        $sense->refresh();
+        $this->assertNull($sense->source_chapter_id, 'card_example must NOT write back source_chapter_id');
+        $this->assertNull($sense->sentence_id, 'card_example must NOT write back sentence_id');
+    }
+
+    public function test_unavailable_structure_is_stable(): void
+    {
+        $sense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'unavail',
+            'surface_form' => 'unavail',
+            'pos' => 'noun',
+            'sense_zh' => '不可用',
+            'sense_en' => 'unavailable test',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => null,
+            'example_sentence_zh' => '',
+        ]);
+        $sense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $response = $this->actingAs($this->user)->get('/senses/' . $sense->id . '/source-context');
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertFalse($data['source_available']);
+        $this->assertNull($data['source_kind']);
+        $this->assertNull($data['chapter_id']);
+        $this->assertNull($data['chapter_title']);
+        $this->assertNull($data['sentence_id']);
+        $this->assertNull($data['sentence_hash']);
+        $this->assertSame([], $data['context_tokens']);
+        $this->assertSame([], $data['target_indexes']);
+        $this->assertSame('暂无可用原文位置', $data['fallback_message']);
+    }
+
     private function createTestChapter(array $processedWords, array $overrides = []): Chapter
     {
         return Chapter::forceCreate(array_merge([
