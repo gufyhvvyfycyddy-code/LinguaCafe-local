@@ -35,8 +35,52 @@
 | MCP Chrome 登录验收可靠流程 | ✅ 已完成 | 诊断 isolatedContext 根因，建立 playbook，协作规则 §14.10 |
 | 协作规则体系 | ✅ 已完成 | WorkBuddy 单专家、复杂度 100、oh-my-opencode-slim 必用、设计师自动推进 |
 | destroy 单卡核心语义 | ❌ 不建议改 | 核心在 `WordSenseService::removeSenseFromReviewSystem()` |
+| TextBlockService phrase/index characterization tests | ✅ 已完成 | `TextBlockPhraseIndexingTest` 锁定 phrase 命中、跨 NEWLINE 命中、缺词不命中、phraseIndexes 排序映射、用户/语言隔离；不改业务代码 |
 
 ---
+
+## 2.1 Codex-ArchitectureOptimizationLoop-1 增量审计（2026-07-02）
+
+> **基准 commit**：`095a3dd docs: prepare Codex handoff working plan`
+> **性质**：Codex 架构总审计 + 第一轮低风险测试护栏。不是完成全部架构优化。
+
+### P0：数据安全或用户状态风险
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| 本轮未发现新的 P0 | — | — | — | 否 | 现有高危写入集中在 WordSense / ReviewCard / FSRS / import，已有专项测试或需要单独授权；本轮不扩大写入语义 |
+
+### P1：高收益、低风险、测试可覆盖的架构优化
+
+| 问题 | 文件 | 用户影响 | 为什么是架构问题 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|---|
+| TextBlockService 剩余 phrase/index 逻辑缺少直接 characterization tests | `app/Services/TextBlockService.php`、`app/Services/ReaderDataService.php` | 短语高亮、短语查询、阅读页 phraseIndexes 若回归，会直接影响阅读页交互 | phrase 标注仍由 TextBlockService 内存算法负责，ReaderDataService 再把 `phrase_ids` 映射为前端 `phraseIndexes`；这是 reader 数据契约的一部分 | 新增 `tests/Feature/TextBlockPhraseIndexingTest.php`，5 tests / 18 assertions | 是 | 只补测试，不改业务逻辑；覆盖现有文档候选的 "TextBlockService 剩余 phrase/index/read data 逻辑侦查 + characterization tests" 中最安全部分 |
+| TextBlockService 仍保留 ReaderDataService fallback 分支导致代码重复 | `app/Services/TextBlockService.php` | 暂无直接用户影响，但后续维护者可能误改旧分支 | 构造函数总是创建 `ReaderDataService`，旧内联 `prepareTextForReader` / `indexPhrases` 分支成为兼容残留，增加理解成本 | ReaderDataService 相关测试 + 本轮 phrase/index 测试 | 否 | 删除旧分支会触碰 reader 数据核心路径，需单独只读确认调用方是否允许去掉兼容分支 |
+| ReviewCardManageController 仍持有 `logs()` payload 和单卡 find helper | `app/Http/Controllers/ReviewCardManageController.php` | 日志抽屉字段若漂移会影响管理页查看复习历史 | 查询/导出/序列化/批量写入已下沉，`logs()` 仍是 controller 内 payload 组装 | ReviewCardManageTest 已覆盖 logs / 权限 / 过滤 | 否 | 收益中等但不是本轮最小风险；可后续提取 `ReviewCardManageLogService` 或纳入 serializer |
+
+### P2：可做但不急的结构清理
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| SenseOccurrenceController 同时做表单 validation、序列化、service 编排 | `app/Http/Controllers/SenseOccurrenceController.php` | 若字段漂移会影响 `/senses/review`、手动释义、来源例句 | WordSense / SenseReview 相关 Feature tests + 空状态 MCP smoke | 否 | 需要接口/序列化边界设计，可能触及 Vue 页面契约 |
+| TextBlockGroup.vue 仍是 reader 前端状态大组件 | `resources/js/components/Text/TextBlockGroup.vue` | 阅读页点词、hover、短语、词典、学习侧栏都受影响 | 已有 MCP Chrome smoke 基线，但没有组件级测试 | 否 | 高价值但必须页面验收，且不适合在本轮后端测试任务中拆组件 |
+| VocabularyService 查询/导入/词汇处理职责仍宽 | `app/Services/VocabularyService.php` | 搜索、CSV 导出、导入后处理可能互相影响 | VocabularySearchTest / DictionaryImportTest | 否 | 已补查询测试；真正拆服务需单独边界设计 |
+
+### 暂缓：风险大、需要产品决策或页面验收成本高
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| FSRS confirmAndApply safe write contract tests / 写入路径调整 | `app/Services/FsrsReschedulePreviewService.php` | 可能改变大量 ReviewCard 到期时间和 FSRS 参数 | FsrsReschedulePreviewTest / FsrsRescheduleConfirmTest | 否 | 写入路径风险高，需单独任务；本轮不执行真实重排 |
+| WordSense 删除 / 归档 / 恢复语义调整 | `app/Services/WordSenseService.php`、相关 controllers | 可能影响 ReviewCard、ReviewLog、Occurrence、EncounteredWord | WordSenseDestroyRestoreTest / ReviewCardManageTest | 否 | 产品语义已做取舍，本轮不改删除/归档/恢复 |
+| SenseReview 有卡片 / pending occurrence 的完整页面写入 smoke | `resources/js/components/Senses/SenseReview.vue`、`resources/js/components/Senses/SenseMappingReview.vue` | 直接影响复习评分、确认、拒绝、忽略、改绑、新建 | 后端 Feature tests + 空状态 MCP smoke | 否 | 必须 MCP Chrome 真实页面验收，且需要测试账号/数据准备 |
+
+### 本轮实际落地
+
+- 新增 `tests/Feature/TextBlockPhraseIndexingTest.php`。
+- 锁定 `TextBlockService::updatePhraseIds()` 的 exact match、跨 `NEWLINE` match、缺词 early return。
+- 锁定 `ReaderDataService` 路径下 `TextBlockService::indexPhrases()` 的 phrase id → phraseIndexes 映射和用户/语言隔离。
+- 不改 `TextBlockService.php`、`ReaderDataService.php`、Vue、Controller、数据库结构、权限、FSRS、WordSense 删除语义。
+- 下一轮建议优先在以下三者中选一项：`FsrsRescheduleConfirmApply-SafeWriteContractTests-1`、`SenseReview-FullWriteSmoke-1`、`TextBlockService-TokenizerFallbackScouting-1`。
 
 ## 3. 全仓库热点总览
 

@@ -7,7 +7,7 @@
 
 ## 1. 当前阶段一句话
 
-处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、TextBlock encountered_words 提取线、WordSense 删除/归档测试线、删除成功提示文案收口，准备进入下一候选方向前的文档治理和目标整理。
+处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、TextBlock encountered_words 提取线、TextBlock phrase/index characterization tests、WordSense 删除/归档测试线、删除成功提示文案收口。下一阶段仍需由网页端总设计师选择，不自动进入下一任务。
 
 ## 2. 最近已完成任务
 
@@ -22,13 +22,17 @@
 | DesignerWorkflow-CodeBuddyRiskRoleAndPlanRefresh-1 | 修正 CodeBuddy 风险角色规则 + 大计划修正 |
 | WordSenseService-DestroyRestoreContractTests-1 | 15 个 contract tests 锁定归档/删除/恢复语义 |
 | ReviewCardDeleteSnackbar-HistoryPreservedCopy-1 | 补管理页删除成功 snackbar/fallback 文案，MCP Chrome 验收 |
+| Codex-ArchitectureOptimizationLoop-1 | Codex 增量架构总审计；新增 5 个 TextBlock phrase/index characterization tests；更新 master plan / hotspot audit / 当前工作台 |
 
 ## 3. 当前未最终关闭的事项
 
-- **CodexHandoff-DocsAndWorkingPlanRefresh-1**（本轮）：
-  - 上一轮 CodeBuddy 已确认该 commit 此前不存在；
-  - 本轮正在补做 Codex 交接文档和临时工作台；
-  - 只有当本轮 commit 成功 push 后，Codex 交接准备才算完成。
+- **CodexHandoff-DocsAndWorkingPlanRefresh-1**：
+  - 已完成并成为当前 Codex 交接入口；
+  - 后续 Codex 任务仍应先读本文，再读 master plan、协作规则、hotspot audit。
+- **Codex-ArchitectureOptimizationLoop-1**（本轮）：
+  - 已选择第一轮低风险实现：只新增 TextBlock phrase/index characterization tests；
+  - 不改业务代码，不改 Vue，不改数据库，不改变 import / FSRS / WordSense 语义；
+  - 只有当本轮 commit 成功 push 后，本文记录才算 GitHub 已同步。
 - **旧交接文档**：
   - `docs/CODEX_HANDOFF.md`（2026-06-23）是旧交接文档，记录了 tokenizer 根治阶段的工作；
   - `docs/handovers/2026-06-24-c12-c-handoff.md`（2026-06-24）是 C.12-c 任务交接文档；
@@ -52,7 +56,8 @@
 
 ### A. TextBlockService-RemainingExtractionScouting-1
 
-- 只读侦查 TextBlockService 剩余 phrase/index/read data 逻辑；
+- phrase/index 最小 characterization tests 已在 Codex-ArchitectureOptimizationLoop-1 中补充；
+- 后续若继续该方向，建议聚焦 tokenizer/fallback 或旧 ReaderDataService fallback 分支的只读侦查；
 - 不直接拆，先看剩余职责和测试缺口；
 - 适合 Codex 接盘，但必须先给禁止范围和验收命令。
 

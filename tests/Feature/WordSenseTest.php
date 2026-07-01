@@ -446,7 +446,8 @@ class WordSenseTest extends TestCase
         $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
         $senseCard = $this->wordSenseService->createReviewCardForSense($sense);
 
-        $reviews = app(ReviewService::class)->getReviewItems($this->user->id, 'english', -1, -1, false, []);
+        $result = app(ReviewService::class)->getReviewItems($this->user->id, 'english', -1, -1, false, []);
+        $reviews = $result['reviews'];
 
         // 日常复习只保留 sense card：word card 不再进入队列
         $this->assertCount(1, $reviews);
