@@ -303,7 +303,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **DictionaryImportService-CharacterizationTests-1** | 13 tests 覆盖文件识别/CSV测试/导入validation/导入成功路径 | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **TextBlockGroup-SmokeTests-1** | MCP Chrome 真实验收完成（读取渲染/hover 词汇/点词打开侧栏/console error 检查/不创建学习数据） | 🟢 高 | 🟢 低 | A |
 | ✅ 已完成 | **VocabularyService-QuerySearchContractTests-1** | 15 tests 覆盖返回结构/text+reading搜索/stage/translation/only words+only phrases+union/4种排序/分页/export | 🟡 中 | 🟢 低 | A |
-| 4️⃣ | **SenseReview / SenseMappingReview smoke tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| ✅ 已完成 | **SenseReviewMapping-SmokeTests-1** | MCP Chrome 空状态 smoke：/senses/review 与 /reviews/senses 页面打开、标题/统计/筛选/批量区/空状态、console、无数据副作用 | 🟡 中 | 🟢 低 | A |
 | 5️⃣ | **FsrsReschedulePreviewService contract + scouting** | 未开始 | 🟡 中 | 🔴 高 | B-先侦查 |
 | 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
 | 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
@@ -366,21 +366,35 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - 未改 `VocabularyService.php`
 - 未改查询语义
 
-#### 候选 4：SenseReview / SenseMappingReview smoke tests
+#### ~~候选 4~~ 已完成：SenseReviewMapping-SmokeTests-1
 
-**当前状态**：未开始。SenseReview.vue 649 行，SenseMappingReview.vue 455 行，均无前端测试。
+**状态**：已完成。MCP Chrome 空状态 smoke 基线已完成。
+**更新日期**：2026-07-02
 
-**推荐模型**：复杂度 10
-**是否需要 CodeBuddy**：可选
-**是否需要 WorkBuddy**：✅ 需要（确认词义确认/拒绝交互路径）
-**是否需要 MCP Chrome**：✅ 需要
-**为什么现在做**：词义确认/拒绝操作影响后续阅读页点词候选。补 smoke 可捕捉回归。
-**允许修改文件**：
-- `tests/Browser/SenseReviewSmokeTest.php`（新增）
-- `docs/plans/*`
-**禁止范围**：
-- 不改 SenseReview.vue
-- 不改后端 sense review 逻辑
+**覆盖内容**：
+- `/senses/review` 页面（词义确认）：
+  - 标题"词义确认"
+  - 筛选区（状态/词元/GPT判断/最低置信度/自动FSRS/刷新/清空）
+  - 批量操作区（选择当前页/已选择0/批量确认/批量拒绝/批量高置信度）
+  - 空状态："没有匹配的词义记录。"
+  - 统计标签（待确认0/已绑定1/已忽略0/已拒绝0）
+- `/reviews/senses` 页面（词义复习）：
+  - 标题"词义复习"
+  - 统计区（到期数量0/已复习0/剩余0/今日已复习0）
+  - 空状态："当前没有到期词义卡。"
+
+**未覆盖（后续增强）**：
+- `/reviews/senses` 有卡片时的"显示答案"、评分按钮真实点击、更多菜单写入动作
+- `/senses/review` 有 pending occurrence 时的确认/改绑/新建/拒绝/忽略写入动作
+- 当前仅为空状态 smoke 基线，未创建 WordSense/ReviewCard/ReviewLog，未执行评分/确认/拒绝/忽略/改绑/新建保存/归档/重置/删除
+
+**改动范围**：
+- 仅修改 `docs/plans/repo-architecture-hotspot-audit.md`（后续收口任务）
+- 未改 SenseReview.vue / SenseMappingReview.vue
+- 未改任何 Vue 页面组件
+- 未改 Controller / routes / Service / 模型 / 测试文件
+
+**下一个候选**：候选 5（FsrsReschedulePreviewService contract + scouting）
 
 #### 候选 5：FsrsReschedulePreviewService contract + scouting
 
@@ -460,7 +474,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 3 已完成**：VocabularyService-QuerySearchContractTests-1 — 15 tests 覆盖搜索全链路。
 
-**候选 4 已完成**：SenseReviewMapping-SmokeTests-1 — MCP Chrome 验收 `/senses/review` 和 `/reviews/senses` 页面。
+**候选 4 已完成空状态 smoke 基线**：SenseReviewMapping-SmokeTests-1 — MCP Chrome 验收 `/senses/review`（词义确认页空状态）和 `/reviews/senses`（词义复习页空状态），仅覆盖页面打开/标题/统计区/筛选区/批量操作区/空状态文案/console 检查/无数据副作用。未覆盖有卡片或有 pending occurrence 的写入路径（评分/确认/拒绝/忽略/改绑/新建/归档/重置/删除）。
 
 **新的最推荐下一阶段**：**候选 5（FsrsReschedulePreviewService contract + scouting）** — 715 行高风险批量写操作，需要先 CodeBuddy 侦查链路。
 
