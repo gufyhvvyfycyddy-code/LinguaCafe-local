@@ -424,6 +424,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - **低**：days_change 符号代码冗余、newly_due_today 不覆盖降低今日负荷场景
 
 **缺口测试已补强**：FsrsReschedulePreviewService-GapContractTests-1 — 在已有 51 个测试基础上新增 5 个 preview + 5 个 confirmPreflight 缺口测试。覆盖 empty candidate hash、stability/difficulty hash 敏感度、语言隔离、confirmPreflight apply=false high/blocked/不写 snapshot/risk_confirm 忽略。confirmAndApply 成功写入路径仍暂缓。
+**缺口测试 Scope Fix 已收口**：FsrsRescheduleGapContractTests-ScopeFix-1 — 将越界写入 `FsrsRescheduleSnapshotTest.php` 的两个测试移回其职责边界内（语义已在 ConfirmTest 中有等价覆盖）。总测试语义不减少，65 测试全绿。无业务逻辑变更。
 
 **下一个候选**：**候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）** — 如果决策进入 confirmAndApply 写入测试，先补安全契约。或候选 6（TextBlockService createNewEncounteredWords 提取）。
 

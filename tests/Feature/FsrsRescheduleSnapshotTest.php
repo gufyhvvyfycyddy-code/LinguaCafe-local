@@ -226,47 +226,6 @@ class FsrsRescheduleSnapshotTest extends TestCase
         $this->assertEquals($originalLastReviewed, $card->fsrs_last_reviewed_at?->toIso8601String());
     }
 
-    public function test_preflight_does_not_create_snapshot(): void
-    {
-        $this->injectThresholdService(10, 10);
-        $this->createEligibleReviewCard();
-
-        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
-        $hash = $previewResponse->json('preview_hash');
-
-        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
-            'preview_hash' => $hash,
-            'confirm' => true,
-            'apply' => false,
-        ]);
-        $response->assertOk();
-
-        $this->assertDatabaseCount('reschedule_snapshots', 0);
-        $this->assertDatabaseCount('reschedule_snapshot_items', 0);
-    }
-
-    public function test_stale_hash_does_not_create_snapshot(): void
-    {
-        $this->injectThresholdService(10, 10);
-        $card = $this->createEligibleReviewCard();
-
-        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
-        $oldHash = $previewResponse->json('preview_hash');
-
-        $card->fsrs_due_at = $card->fsrs_due_at->copy()->addDay();
-        $card->save();
-
-        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
-            'preview_hash' => $oldHash,
-            'confirm' => true,
-            'apply' => true,
-        ]);
-        $response->assertStatus(409);
-
-        $this->assertDatabaseCount('reschedule_snapshots', 0);
-        $this->assertDatabaseCount('reschedule_snapshot_items', 0);
-    }
-
     public function test_response_contains_snapshot_batch_id(): void
     {
         $this->injectThresholdService(10, 10);
