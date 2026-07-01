@@ -83,8 +83,15 @@ Checks:
             // Check 2-5: Use health endpoint for detailed checks
             $health = $this->fetchHealth();
             if ($health) {
+                // Backward-compatible fields (work with both old and new health JSON)
                 $results['spacy_model_loaded'] = $health['en_core_web_sm_loaded'] ?? false;
                 $results['lemminflect_available'] = $health['lemminflect_available'] ?? false;
+
+                // New health JSON fields
+                $results['health_version'] = $health['version'] ?? 1;
+                $results['health_status'] = $health['status'] ?? 'unknown';
+                $results['languages'] = $health['languages'] ?? [];
+                $englishInfo = $health['english'] ?? [];
 
                 // Verify test cases
                 $tests = $health['tests'] ?? [];
@@ -112,6 +119,11 @@ Checks:
 
                 // English irregular lemma cases
                 $irregular = $health['english_irregular'] ?? [];
+                // Also support new format lemma_checks if that's the primary source
+                $lemmaChecks = $englishInfo['lemma_checks'] ?? [];
+                if (!empty($lemmaChecks) && empty($irregular)) {
+                    $irregular = $lemmaChecks;
+                }
                 $results['english_irregular_cases'] = $irregular;
                 $results['english_irregular_correct'] = !empty($irregular)
                     && collect($irregular)->every(fn ($c) => ($c['passed'] ?? false) === true);
@@ -252,6 +264,35 @@ Checks:
             $results['lemminflect_lemmas_correct'],
             $liDetail
         );
+
+        // 2.5. Language models overview (new health JSON)
+        $languages = $results['languages'] ?? [];
+        if (!empty($languages)) {
+            $langParts = [];
+            foreach ($languages as $code => $info) {
+                $status = $info['status'] ?? 'unknown';
+                $icon = $status === 'available' ? '✓' : ($status === 'not_installed' ? '⚠' : '✗');
+                $langParts[] = "{$code}[{$icon}{$status}]";
+            }
+            $this->line('  Languages: ' . implode(', ', $langParts));
+        }
+
+        // 2.6. English lemma checks detail
+        $englishInfo = $results['languages']['english'] ?? [];
+        $lemmaChecksEnglish = $englishInfo['checks_passed'] ?? false;
+        if (!empty($results['languages'])) {
+            $lemmaFromChecks = $results['english']['lemma_checks'] ?? [];
+            $hasFutureDue = false; // placeholder for future
+
+            // Check if detailed checks show passes/fails
+            $checkDetail = $results['checks']['english_lemma'] ?? [];
+            if (!empty($checkDetail)) {
+                $total = $checkDetail['total'] ?? 0;
+                $passed = $checkDetail['passed_count'] ?? 0;
+                $failed = $checkDetail['failed_count'] ?? 0;
+                $this->line("  English lemma checks: {$passed}/{$total} passed, {$failed} failed");
+            }
+        }
 
         // 5. English irregular lemmas
         $irregular = $results['english_irregular_cases'] ?? [];

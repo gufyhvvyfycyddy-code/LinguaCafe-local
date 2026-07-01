@@ -640,42 +640,70 @@ model_name: dict[str, str] = {
     "spacy-thai": "Thai",
 }
 
-@route('/tokenizer/health', method = 'GET')
-def health_check():
-    """Health check endpoint for tokenizer:doctor.
-    Reports spaCy model availability, LemmInflect presence, and test cases."""
+# Language → spaCy model mapping for health checks
+LANGUAGE_MODELS = {
+    'english': 'en_core_web_sm',
+    'german': 'de_core_news_sm',
+    'japanese': 'ja_core_news_sm',
+    'korean': 'ko_core_news_sm',
+    'norwegian': 'nb_core_news_sm',
+    'spanish': 'es_core_news_sm',
+    'chinese': 'zh_core_web_sm',
+    'dutch': 'nl_core_news_sm',
+    'finnish': 'fi_core_news_sm',
+    'french': 'fr_core_news_sm',
+    'italian': 'it_core_news_sm',
+    'russian': 'ru_core_news_sm',
+    'swedish': 'sv_core_news_sm',
+    'ukrainian': 'uk_core_news_sm',
+    'greek': 'el_core_news_sm',
+    'turkish': 'tr_core_news_md',
+    'catalan': 'ca_core_news_sm',
+    'croatian': 'hr_core_news_sm',
+    'danish': 'da_core_news_sm',
+    'lithuanian': 'lt_core_news_sm',
+    'macedonian': 'mk_core_news_sm',
+    'polish': 'pl_core_news_sm',
+    'portuguese': 'pt_core_news_sm',
+    'romanian': 'ro_core_news_sm',
+    'slovenian': 'sl_core_news_sm',
+    'thai': 'spacy_thai',
+}
+
+def language_health(lang):
+    """Check availability of a spaCy model for a given language.
+    Returns dict with available, status, model, error keys.
+    Safe: never throws 500, returns error details on failure."""
     result = {
-        'spacy_available': True,
-        'en_core_web_sm_loaded': False,
-        'lemminflect_available': False,
-        'tests': {}
+        'available': False,
+        'status': 'not_loaded',
+        'model': None,
+        'error': None,
     }
-    # Check spaCy English model
+    model_name = LANGUAGE_MODELS.get(lang)
+    if not model_name:
+        result['status'] = 'not_installed'
+        result['error'] = 'No spaCy model configured for this language'
+        return result
+    result['model'] = model_name
     try:
-        nlp = spacy.load('en_core_web_sm')
-        result['en_core_web_sm_loaded'] = True
-        # Test cases: verify spaCy lemmatization for known problematic words
-        test_words = ['opened', 'called', 'stopped', 'running', 'walking']
-        doc = nlp(' '.join(test_words))
-        for token in doc:
-            result['tests'][token.text] = token.lemma_
+        nlp = spacy.load(model_name)
+        result['available'] = True
+        result['status'] = 'available'
+    except OSError:
+        result['status'] = 'not_installed'
+        result['error'] = f'spaCy model "{model_name}" not installed. Run: python -m spacy download {model_name}'
     except Exception as e:
-        result['spacy_available'] = False
-        result['spacy_error'] = str(e)
-    # Check LemmInflect
-    try:
-        import lemminflect
-        result['lemminflect_available'] = True
-        # Verify LemmInflect on common cases
-        for word, pos in [('opened', 'VERB'), ('called', 'VERB'), ('children', 'NOUN')]:
-            lemmas = lemminflect.getLemma(word, upos=pos)
-            result['tests'][f'lemminflect_{word}'] = lemmas[0] if lemmas else None
-    except ImportError:
-        result['lemminflect_available'] = False
-    # English irregular lemma check: replicate tokenizeText full pipeline
-    # (spaCy → LemmInflect fallback → ENGLISH_IRREGULAR_OVERRIDES)
-    # so health accurately reflects real lemmatization output.
-    result['english_irregular'] = []
+        result['status'] = 'failed'
+        result['error'] = str(e)
+    return result
+
+
+def english_lemma_health():
+    """Check English lemmatization accuracy with irregular cases.
+    Returns list of check results with surface, expected, actual, passed keys.
+    Safe: catches exceptions per-case, returns failing check with error."""
+    results = []
     irregular_cases = [
         ('ran',    'VERB', 'run'),
         ('running','VERB', 'run'),
@@ -688,14 +716,21 @@ def health_check():
         ('studies','VERB', 'study'),
         ('was',    'VERB', 'be'),
     ]
-    if result['en_core_web_sm_loaded'] and result['lemminflect_available']:
-        nlp = spacy.load('en_core_web_sm')
-        import lemminflect
-        for surface, pos, expected in irregular_cases:
+    for surface, pos, expected in irregular_cases:
+        check = {
+            'surface': surface,
+            'expected': expected,
+            'actual': None,
+            'passed': False,
+            'error': None,
+        }
+        try:
+            nlp = spacy.load('en_core_web_sm')
+            import lemminflect
             doc = nlp(surface)
             token = doc[0]
             lemma = token.lemma_
-            # Apply the same fallback logic as tokenizeText (lines 314-326)
+            # Apply the same fallback logic as tokenizeText
             if lemma == token.text.lower():
                 if token.pos_ in ('VERB', 'NOUN', 'ADJ', 'ADV'):
                     try:
@@ -713,12 +748,103 @@ def health_check():
                 override = ENGLISH_IRREGULAR_OVERRIDES[surface.lower()]
                 if override != lemma:
                     lemma = override
-            result['english_irregular'].append({
-                'surface': surface,
-                'expected': expected,
-                'actual': lemma,
-                'passed': lemma == expected,
-            })
+            check['actual'] = lemma
+            check['passed'] = (lemma == expected)
+        except Exception as e:
+            check['error'] = str(e)
+            check['actual'] = None
+        results.append(check)
+    return results
+
+
+@route('/tokenizer/health', method = 'GET')
+def health_check():
+    """Health check endpoint for tokenizer:doctor.
+    Reports spaCy model availability, LemmInflect presence, and test cases.
+    Backward-compatible: old fields preserved, new fields appended."""
+    result = {
+        # Old fields (backward compatible)
+        'spacy_available': True,
+        'en_core_web_sm_loaded': False,
+        'lemminflect_available': False,
+        'tests': {},
+        'english_irregular': [],
+        # New fields
+        'status': 'checking',
+        'version': 2,
+        'spacy_version': spacy.__version__ if hasattr(spacy, '__version__') else 'unknown',
+        'languages': {},
+        'english': {
+            'model_loaded': False,
+            'lemminflect_available': False,
+            'lemma_checks': [],
+            'checks_passed': False,
+        },
+        'checks': {},
+    }
+    # Check spaCy English model
+    en_health = language_health('english')
+    result['languages']['english'] = en_health
+    result['en_core_web_sm_loaded'] = en_health['available']
+    result['english']['model_loaded'] = en_health['available']
+
+    # Check other configured languages (safe model query)
+    for lang_code in LANGUAGE_MODELS:
+        if lang_code not in result['languages']:
+            result['languages'][lang_code] = language_health(lang_code)
+
+    # Test cases (old format) — spaCy basic lemmas
+    if en_health['available']:
+        try:
+            nlp = spacy.load('en_core_web_sm')
+            test_words = ['opened', 'called', 'stopped', 'running', 'walking']
+            doc = nlp(' '.join(test_words))
+            for token in doc:
+                result['tests'][token.text] = token.lemma_
+        except Exception as e:
+            result['spacy_available'] = False
+            result['spacy_error'] = str(e)
+            result['checks']['spacy_lemmas'] = {'passed': False, 'error': str(e)}
+
+    # Check LemmInflect
+    try:
+        import lemminflect
+        result['lemminflect_available'] = True
+        result['english']['lemminflect_available'] = True
+        for word, pos in [('opened', 'VERB'), ('called', 'VERB'), ('children', 'NOUN')]:
+            lemmas = lemminflect.getLemma(word, upos=pos)
+            result['tests'][f'lemminflect_{word}'] = lemmas[0] if lemmas else None
+        result['checks']['lemminflect'] = {'passed': True}
+    except ImportError as e:
+        result['lemminflect_available'] = False
+        result['english']['lemminflect_available'] = False
+        result['checks']['lemminflect'] = {'passed': False, 'error': 'lemminflect not installed'}
+    except Exception as e:
+        result['checks']['lemminflect'] = {'passed': False, 'error': str(e)}
+
+    # English irregular lemma check (replicate full tokenizeText pipeline)
+    lemma_results = english_lemma_health()
+    result['english_irregular'] = []
+    for cr in lemma_results:
+        result['english_irregular'].append(cr)
+    result['english']['lemma_checks'] = lemma_results
+    all_lemma_passed = all(cr.get('passed', False) for cr in lemma_results) if lemma_results else False
+    result['english']['checks_passed'] = all_lemma_passed
+    result['checks']['english_lemma'] = {
+        'passed': all_lemma_passed,
+        'total': len(lemma_results),
+        'passed_count': sum(1 for cr in lemma_results if cr.get('passed', False)),
+        'failed_count': sum(1 for cr in lemma_results if not cr.get('passed', False)),
+    }
+
+    # Overall status
+    all_ok = (
+        result['en_core_web_sm_loaded']
+        and result['lemminflect_available']
+        and all_lemma_passed
+    )
+    result['status'] = 'healthy' if all_ok else 'degraded'
+
     return json.dumps(result)
 
 @route('/models/install', method = 'POST')
