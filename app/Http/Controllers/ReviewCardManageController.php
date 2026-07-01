@@ -277,7 +277,7 @@ class ReviewCardManageController extends Controller
         );
 
         return response()->json(array_merge(
-            ['message' => '已重置为新学卡。该卡会重新进入复习队列。'],
+            ['message' => '已重置复习进度。该卡会重新进入复习队列。'],
             $this->itemSerializer->serializeCard($card->fresh(), $sense->fresh())
         ));
     }
@@ -316,46 +316,21 @@ class ReviewCardManageController extends Controller
         }
 
         $enabled = $request->boolean('enabled');
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
 
-        $affected = 0;
-        $skipped = 0;
-
-        DB::transaction(function () use ($ids, $enabled, $userId, $language, &$affected, &$skipped) {
-            foreach ($ids as $id) {
-                $card = ReviewCard::query()
-                    ->where('id', $id)
-                    ->where('user_id', $userId)
-                    ->where('language_id', $language)
-                    ->where('target_type', ReviewCard::TARGET_SENSE)
-                    ->whereHas('sense', function ($q) use ($userId, $language) {
-                        $q->where('user_id', $userId)
-                            ->where('language_id', $language)
-                            ->where('status', WordSense::STATUS_CONFIRMED);
-                    })
-                    ->first();
-
-                if (!$card) {
-                    $skipped++;
-                    continue;
-                }
-
-                $card->fsrs_enabled = $enabled;
-                $card->save();
-                $affected++;
-            }
-        });
-
-        $actionLabel = $enabled ? '恢复' : '归档';
+        $result = $this->mutationService->bulkSetEnabled(
+            $ids,
+            $enabled,
+            Auth::user()->id,
+            Auth::user()->selected_language,
+        );
 
         return response()->json([
-            'affected' => $affected,
-            'skipped' => $skipped,
+            'affected' => $result['affected'],
+            'skipped' => $result['skipped'],
             'enabled' => $enabled,
             'message' => $enabled
-                ? "已恢复 {$affected} 张复习卡。它们会重新进入日常复习。"
-                : "已归档 {$affected} 张复习卡。它们不会进入日常复习。",
+                ? "已恢复 {$result['affected']} 张复习卡。它们会重新进入日常复习。"
+                : "已归档 {$result['affected']} 张复习卡。它们不会进入日常复习。",
         ]);
     }
 

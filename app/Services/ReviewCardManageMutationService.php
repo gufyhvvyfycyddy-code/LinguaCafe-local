@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Models\WordSense;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ReviewCardManageMutationService
 {
@@ -44,6 +45,46 @@ class ReviewCardManageMutationService
         $card->save();
 
         return $card;
+    }
+
+    /**
+     * Bulk archive or restore sense review cards.
+     * Iterates through ids, filters by user_id/language_id/target_type=TARGET_SENSE
+     * and WordSense status=CONFIRMED, then toggles fsrs_enabled.
+     * Returns ['affected' => int, 'skipped' => int].
+     * Controller handles 422 for empty ids, message assembly, and response shape.
+     */
+    public function bulkSetEnabled(array $ids, bool $enabled, int $userId, string $language): array
+    {
+        $affected = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($ids, $enabled, $userId, $language, &$affected, &$skipped) {
+            foreach ($ids as $id) {
+                $card = ReviewCard::query()
+                    ->where('id', $id)
+                    ->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('target_type', ReviewCard::TARGET_SENSE)
+                    ->whereHas('sense', function ($q) use ($userId, $language) {
+                        $q->where('user_id', $userId)
+                            ->where('language_id', $language)
+                            ->where('status', WordSense::STATUS_CONFIRMED);
+                    })
+                    ->first();
+
+                if (!$card) {
+                    $skipped++;
+                    continue;
+                }
+
+                $card->fsrs_enabled = $enabled;
+                $card->save();
+                $affected++;
+            }
+        });
+
+        return ['affected' => $affected, 'skipped' => $skipped];
     }
 
     /**

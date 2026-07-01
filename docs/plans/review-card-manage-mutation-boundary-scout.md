@@ -124,7 +124,7 @@ DB::transaction {
 | `dueNow()` | ✅ 已抽入 MutationService（1A 完成） | 单字段 save |
 | `reset()` | ⏳ 已委托 ReviewCardService | 涉及事务 + ReviewLog，边界安全 |
 | `destroy()` | ⏳ 已委托 WordSenseService | 涉及多表 + 事务 + EncounteredWord |
-| `bulkEnabled()` | ❓ 未抽取 | 逐卡查询 + 事务 + skip 计数 |
+| `bulkEnabled()` | ✅ 已抽入 MutationService（Complex-1 完成） | `bulkSetEnabled()` 方法，Controller 只保留校验/组装 |
 | `bulkDestroy()` | ❓ 未抽取 | 逐卡查询 + 事务 + skip 计数 |
 | `findManageableSenseCard()` | ⛔ 保持 Controller 私有 | 编排层辅助，不应暴露 |
 
@@ -239,38 +239,37 @@ reset/destroy/bulk 有以下共同点：
 - 跳过不会触发回滚，只是不处理该 ID。
 - 如果某条 save 失败，整个事务回滚（含之前已 save 的卡片）。
 
-### 9.5 下一轮实现边界
+### 9.5 实现记录（ReviewCardManage-MutationService-Complex-1 完成）
 
-下一轮正式编码（`ReviewCardManage-MutationService-Extract-1D` 或类似命名）**只允许**：
+> `bulkEnabled()` 已在本轮抽取到 MutationService。以下为实际实现记录：
 
-| 操作 | 允许 |
-|------|------|
-| 在 `MutationService` 新增 `bulkEnabled(array $ids, bool $enabled, int $userId, string $language): array` | ✅ |
-| Controller `bulkEnabled()` 改为调用 service | ✅ |
-| 修改 `app/Services/ReviewCardManageMutationService.php` | ✅ |
-| 修改 `app/Http/Controllers/ReviewCardManageController.php` | ✅ |
-| 修改 `tests/Feature/ReviewCardManageTest.php`（极小调整） | ✅ |
-| 修改 `docs/plans/linguacafe-master-plan.md` | ✅ |
-| 改 route | ❌ |
-| 改 Vue | ❌ |
-| 改 `ReviewCardService` | ❌ |
-| 改 `WordSenseService` | ❌ |
-| 改 `ReviewCardManageQueryService` | ❌ |
-| 改 `ReviewCardExportService` | ❌ |
-| 改 `ReviewCardManageItemSerializerService` | ❌ |
-| 改数据库 | ❌ |
-| 新增 migration | ❌ |
-| 改 reset / destroy / bulkDestroy | ❌ |
-| 改"重置复习进度"文案 | ❌ |
-
-**Service 方法签名候选**：
+**Service 方法签名**：
 
 ```php
 public function bulkSetEnabled(array $ids, bool $enabled, int $userId, string $language): array
 // Returns ['affected' => int, 'skipped' => int]
 ```
 
-同样可以在 Controller 层处理 422 空数组校验，让 Service 只做纯业务。
+**Controller 职责（保留）**：
+- request 校验（空数组 422）
+- Auth user / language 获取
+- 调用 service
+- message 文案组装（affected 数量嵌入）
+- response JSON 组装
+
+**保持不变的契约**：
+- user_id / language_id / target_type=TARGET_SENSE / WordSense confirmed 过滤
+- DB::transaction 包裹
+- skipped 语义
+- response shape: affected/skipped/enabled/message
+
+**UX 反馈补强（本轮同时完成）**：
+- bulkEnabled skipped>0 时 snackbar 追加 "其中有 N 张跳过处理。"
+- bulkDestroy skipped>0 时 snackbar 追加 "其中有 N 张跳过处理。"
+- dueNow 成功后显示 "已设为立即到期。该卡会进入复习队列。"
+- reset 文案统一为"重置复习进度"（弹窗标题、正文、按钮、Controller message 均已更新）
+- destroy / bulkDestroy 核心删除语义未改
+- reset 核心 FSRS 语义未改
 
 ### 9.6 下一轮测试验收草案
 
@@ -330,7 +329,7 @@ reset 会影响以下 `review_cards` 字段：
 
 #### UX 契约
 
-- **文案固定**：`"消息" => "已重置为新学卡。该卡会重新进入复习队列。"`。
+- **文案固定**：`"消息" => "已重置复习进度。该卡会重新进入复习队列。"`。
 - **弹窗说明**：清空该卡的复习进度（FSRS 记忆参数），不会删除释义、例句、复习历史。
 - **不使用**："重新开始学习"、"归档"、"彻底删除" 等混淆术语。
 - **不与归档操作在同一 UI 分组内并列**（重置弹窗和归档弹窗应有文案区分）。

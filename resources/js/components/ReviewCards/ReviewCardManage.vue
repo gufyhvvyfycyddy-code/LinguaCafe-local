@@ -633,18 +633,18 @@
         <!-- Reset confirmation dialog -->
         <v-dialog v-model="resetDialog" max-width="500">
             <v-card>
-                <v-card-title>重置为新学卡</v-card-title>
+                <v-card-title>重置复习进度</v-card-title>
                 <v-card-text>
-                    <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
+                    <p>这会清空这张词义卡的复习进度（FSRS 记忆参数），并重新设为新学卡。</p>
                     <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
                     <p>如果这张卡已归档，重置后会重新启用并进入复习队列。</p>
-                    <p class="error--text">此操作不可恢复。重置后 FSRS 记忆状态将被清除。</p>
-                    <p class="font-weight-bold">确定重置吗？</p>
+                    <p class="error--text">此操作不可恢复。重置后 FSRS 复习进度将被清除。</p>
+                    <p class="font-weight-bold">确定重置复习进度吗？</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
-                    <v-btn color="primary" :loading="resetLoading" @click="doReset">确认重置</v-btn>
+                    <v-btn color="primary" :loading="resetLoading" @click="doReset">确认重置复习进度</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -1189,7 +1189,7 @@ export default {
                 .then((response) => {
                     this.resetDialog = false;
                     this.resetTarget = null;
-                    this.showSnackbar(response.data.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
+                    this.showSnackbar(response.data.message || '已重置复习进度。该卡会重新进入复习队列。', 'success');
                     this.loadData();
                     this.loadFsrsStats();
                 })
@@ -1236,7 +1236,12 @@ export default {
             axios.post('/review-cards/manage/bulk-delete', { ids })
                 .then((response) => {
                     this.clearSelection();
-                    this.showSnackbar(response.data.message || '已彻底删除词义复习卡。', 'success');
+                    const data = response.data;
+                    let msg = data.message || '已彻底删除词义复习卡。';
+                    if (data.skipped > 0) {
+                        msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
+                    }
+                    this.showSnackbar(msg, 'success');
                     this.loadData();
                     this.loadFsrsStats();
                 })
@@ -1257,7 +1262,12 @@ export default {
             axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: false })
                 .then((response) => {
                     this.clearSelection();
-                    this.showSnackbar(response.data.message || '已批量归档。', 'warning');
+                    const data = response.data;
+                    let msg = data.message || '已批量归档。';
+                    if (data.skipped > 0) {
+                        msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
+                    }
+                    this.showSnackbar(msg, 'warning');
                     this.loadData();
                     this.loadFsrsStats();
                 })
@@ -1278,7 +1288,12 @@ export default {
             axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: true })
                 .then((response) => {
                     this.clearSelection();
-                    this.showSnackbar(response.data.message || '已批量恢复。', 'success');
+                    const data = response.data;
+                    let msg = data.message || '已批量恢复。';
+                    if (data.skipped > 0) {
+                        msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
+                    }
+                    this.showSnackbar(msg, 'success');
                     this.loadData();
                     this.loadFsrsStats();
                 })
@@ -1298,6 +1313,7 @@ export default {
                     if (idx >= 0) {
                         this.$set(this.items, idx, response.data);
                     }
+                    this.showSnackbar('已设为立即到期。该卡会进入复习队列。', 'success');
                     this.loadFsrsStats();
                 })
                 .catch((err) => {
