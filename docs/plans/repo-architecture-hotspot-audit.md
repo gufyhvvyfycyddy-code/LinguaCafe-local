@@ -16,16 +16,25 @@
 
 ---
 
-## 2. 已完成的架构优化
+## 2. 已完成的架构优化（Roadmap 刷新后）
+
+> **审计日期**：2026-07-01（第二次刷新）
+> **基准 commit**：`a1e67e8`
 
 | 优化项 | 状态 | 说明 |
 |--------|------|------|
 | ReviewCardManage bulkEnabled 抽取 | ✅ 已完成 | `bulkSetEnabled()` 在 MutationService + 共享 helper |
 | ReviewCardManage bulkDestroy 抽取 | ✅ 已完成 | `bulkDestroy()` 在 MutationService + 共享 helper |
-| reset 已有完整事务+锁 | ✅ 已有 | `ReviewCardService::resetCard()` 含 `lockForUpdate`，8 个 characterization tests 已补 |
+| reset 完整 characterization tests | ✅ 已完成 | 8 个测试覆盖全部 FSRS 字段变化 + ReviewLog + 只读保护 |
+| destroy 单卡 characterization tests | ✅ 确认已有 | 现有测试覆盖删除/拒绝/日志保留/关联清除/条件恢复 |
+| bulkDestroy 抽取 + 共享 helper | ✅ 已完成 | `bulkDestroy()` 在 MutationService，`findManageableSenseCardForMutation()` 共享 |
+| TextBlockService ReaderDataService 提取 | ✅ 已完成 | 新增 `ReaderDataService`，TextBlockService 保持门面接口不变 |
+| Tokenizer health 诊断增强 | ✅ 已完成 | health_check 新增 version/languages/english/checks，轻量检测，单次加载 |
+| SenseSourceContext 查询/渲染分离 | ✅ 已完成 | 新增 `SenseSourceContextResolverService`，SourceService 保持 public 门面 |
+| ReviewCardManage 来源列一致性修复 | ✅ 已完成 | 新增 `source_display_status`/`source_display_label`，三级语义（real_chapter/card_example_only/missing）|
+| MCP Chrome 登录验收可靠流程 | ✅ 已完成 | 诊断 isolatedContext 根因，建立 playbook，协作规则 §14.10 |
+| 协作规则体系 | ✅ 已完成 | WorkBuddy 单专家、复杂度 100、oh-my-opencode-slim 必用、设计师自动推进 |
 | destroy 单卡核心语义 | ❌ 不建议改 | 核心在 `WordSenseService::removeSenseFromReviewSystem()` |
-| WorkBuddy 单专家规则 | ✅ 已修正 | §14.6 与 §18 冲突已消除 |
-| Phase20 smoke 数据 | ✅ 已清理 | 25 张测试卡已删除 |
 
 ---
 
@@ -33,14 +42,15 @@
 
 | 文件 | 行数 | 职责 | 风险等级 | 测试状态 | 优先级 | 建议 |
 |------|------|------|----------|----------|--------|------|
-| `app/Services/TextBlockService.php` | 1239→1376 | 分词、tokenizer 调用、生词创建、阅读页数据准备 | 🔴 高 | 极少直接测试 | **A-立即** |
-| `resources/js/components/Text/TextBlockGroup.vue` | 2182 | 阅读页核心组件、hover/click/vocab box 状态管理、Vuex 重度使用 | 🔴 高 | 无前端测试 | A-补测试 |
-| `resources/js/components/ReviewCards/ReviewCardManage.vue` | 1826 | 复习卡管理页（批量操作/弹窗/筛选/排序/导出） | 🟡 中 | 后端测试全面 | B-考虑拆分 |
-| `app/Services/VocabularyService.php` | 995→1176 | 词汇搜索、分页、导入后词汇处理 | 🟡 中 | 部分 | B-可拆 |
-| `app/Services/DictionaryImportService.php` | 990 | 词典导入（ECDICT/Stardict/EPWING） | 🟡 中 | 极少 | B-契约锁定 |
-| `app/Services/SenseSourceContextService.php` | 630→751 | 原文位置查询、词汇侧栏上下文展示 | 🟡 中 | 有测试 | **A-去重** |
+| `app/Services/TextBlockService.php` | 1271 | 分词、tokenizer 调用、生词创建、token 处理 | 🔴 高 | 极少直接测试 | **A-继续拆 EncounteredWord 创建** |
+| `app/Services/VocabularyService.php` | 995 | 词汇搜索、分页、导入后词汇处理 | 🟡 中 | 部分 | **A-查询/搜索测试** |
+| `app/Services/DictionaryImportService.php` | 990 | 词典导入（ECDICT/Stardict/EPWING） | 🟡 中 | 极少 | **A-契约锁定** |
+| `resources/js/components/Text/TextBlockGroup.vue` | 2182 | 阅读页核心组件、hover/click/vocab box、Vuex 重度 | 🔴 高 | 无前端测试 | **B-Playwright smoke** |
+| `resources/js/components/Senses/SenseReview.vue` | 649 | 词义确认流程 | 🟡 中 | 无前端测试 | B-补 smoke |
 | `app/Services/FsrsReschedulePreviewService.php` | 715 | FSRS 重新排程预览/确认/应用 | 🔴 高 | 部分 | **暂不动** |
-| `tools/tokenizer.py` | 708 | Python tokenizer 服务（多语言/回退/health） | 🟡 中 | 无 Python 测试 | **A-整理** |
+| `app/Services/SettingsService.php` | 772 | 用户设置读写 | 🟢 低 | 部分 | 不动 |
+| `resources/js/components/ReviewCards/ReviewCardManage.vue` | 1842 | 复习卡管理页 | 🟢 低 | 后端 256 测试 | 不动 |
+| `app/Services/SenseSourceContextService.php` | 328 | 原文位置查询门面 | 🟢 低 | 29 测试 | 已完成 |
 | `resources/js/components/TextReader/TextReader.vue` | 646 | 阅读页顶层容器 | 🟢 低 | 无 | C-不动 |
 | `resources/js/components/Senses/SenseReview.vue` | 649 | 词义确认 | 🟡 中 | 无 | B-补测试 |
 | `app/Services/WordSenseService.php` | 359→413 | WordSense CRUD + `removeSenseFromReviewSystem` | 🔴 高 | 已有 | **暂不动** |
@@ -282,81 +292,33 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 ---
 
-## 7. 下一批任务排序
+## 7. 下一批任务排序（PostStabilization-1 刷新）
 
-### 7.1 候选任务优先级排序（最高→最低）
+> 已完成任务的候选条目已清理。以下为当前最新排序。
 
-| 排名 | 任务名 | 复杂度 | 收益 | 风险 | 类型 |
-|------|--------|--------|------|------|------|
-| ✅ 已完成 | TextBlockService-ReaderDataContract-1 | 契约锁定 — 已完成输出结构文档 + 9 个 characterization tests | — | — | — |
-| ✅ 已完成 | TextBlockService-ReaderDataService-Extract-1 | **ReaderDataService 已提取** — 新增 `app/Services/ReaderDataService.php`，TextBlockService 保持外部接口不变 | 4/10 | 🟢 高 | A |
-| ✅ 已完成 | TokenizerHealth-Contract-1 | tokenizer health 增强已完成 — health_check 新增 version/languages/english/checks 字段，PHP doctor 兼容新旧 JSON，新增 6 个 unit tests | 3/10 | 🟢 高 | A |
-| ✅ 已完成 | TokenizerHealth-Contract-Fix-1 | 收口 fix：移除非验收的 tokenizeText `ENGLISH_IRREGULAR_OVERRIDES`（保留在 health 诊断中）；language_health 改为轻量检测（spacy.util.get_installed_models），不再加载 26 个模型；english_lemma_health 单次加载 English 模型而非每样例加载；清理 PHP doctor 临时代码；6 个测试全绿。 |
-| ✅ 拆分完成 | SenseSourceContext-QueryRenderExtract-1 | 查询/渲染分离：新增 `SenseSourceContextResolverService`，查询/定位逻辑迁移到 Resolver。SenseSourceContextService 保持 public `sourceContext()` 门面不变。29 测试全绿 + MCP Chrome API 200。 | — | 🟢 | 已完成 |
-| 4️⃣ | **DictionaryImportService characterization tests** | 4/10 | 🟡 中 | 🟢 低 | A/B-待启动 |
-| 2️⃣ | **tokenizer health 增强 + PHP 端 health 独立** | 3/10 | 🟢 高 | 🟢 低 | A-立即 |
-| 3️⃣ | **SenseSourceContextService test + 查询/渲染分离** | 3/10 | 🟡 中 | 🟢 低 | A/B |
-| 4️⃣ | **DictionaryImportService characterization tests** | 4/10 | 🟡 中 | 🟢 低 | A/B |
-| 5️⃣ | **TextBlockGroup.vue Playwright smoke tests** | 6/10 | 🟢 高 | 🟡 中 | B |
+### 7.1 候选任务优先级排序
+
+| 排名 | 任务名 | 当前状态 | 收益 | 风险 | 类型 |
+|------|--------|----------|------|------|------|
+| 1️⃣ | **DictionaryImportService characterization tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| 2️⃣ | **TextBlockGroup.vue Playwright smoke tests** | 未开始 | 🟢 高 | 🟢 低 | A-立即 |
+| 3️⃣ | **VocabularyService query/search contract + test** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| 4️⃣ | **SenseReview / SenseMappingReview smoke tests** | 未开始 | 🟡 中 | 🟢 低 | A-立即 |
+| 5️⃣ | **FsrsReschedulePreviewService contract + scouting** | 未开始 | 🟡 中 | 🔴 高 | B-先侦查 |
+| 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
+| 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
 
 ### 7.2 候选任务详情
 
-#### 候选 1：TextBlockService → 提取 ReaderDataService
+#### 候选 1：DictionaryImportService characterization tests
 
-**推荐模型**：复杂度 10
-**是否需要 CodeBuddy**：✅ 需要（scout 现有 `prepareTextForReader` + `loadFsrsFamiliarityLookup` 调用链）
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：✅ 需要（验收阅读页无变化）
-**允许修改文件**：
-- `app/Services/TextBlockService.php`（删除被提取的方法）
-- `app/Services/ReaderDataService.php`（新增）
-- `app/Services/WordSenseService.php`（可能调整）
-- `tests/Feature/TextBlockServiceTest.php`（新增测试）
-- `docs/plans/*
-**禁止范围**：
-- 不改 tokenizer.py
-- 不改 Vue 组件
-- 不改 EncounteredWord/ReviewCard/WordSense 模型
-- 不改分词协议
-- 不改 `getReaderData()` 的输出结构
-
-#### 候选 2：tokenizer health 增强 + PHP 端 health 独立
-
-**推荐模型**：复杂度 3
-**是否需要 CodeBuddy**：否
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：否
-**允许修改文件**：
-- `tools/tokenizer.py`（health_check 增强）
-- `app/Services/TextBlockService.php`（health 相关逻辑独立）
-- `tests/Feature/HealthCheckTest.php`（新增）
-**禁止范围**：
-- 不改 tokenization 协议
-- 不改 Vue
-- 不改 import 链路
-
-#### 候选 3：SenseSourceContextService test + 查询/渲染分离
+**当前状态**：未开始。文件 990 行，极少测试。导入失败后难以排查。
 
 **推荐模型**：复杂度 10
 **是否需要 CodeBuddy**：可选
 **是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：可选（验收原文位置不变即可）
-**允许修改文件**：
-- `app/Services/SenseSourceContextService.php`
-- `app/Services/SenseTokenPayloadService.php`
-- `tests/Feature/SenseSourceContextTest.php`（新增/补强）
-- `docs/plans/*`
-**禁止范围**：
-- 不改 Vue
-- 不改 reader 组件
-- 不改 WordSenseOccurrence
-
-#### 候选 4：DictionaryImportService characterization tests
-
-**推荐模型**：复杂度 6
-**是否需要 CodeBuddy**：可选
-**是否需要 WorkBuddy**：可选
 **是否需要 MCP Chrome**：否
+**为什么现在做**：低风险，补测试不改变实现，可构建第一道回归防线。不依赖其他任务。
 **允许修改文件**：
 - `tests/Feature/DictionaryImportTest.php`（新增）
 - `docs/plans/*`
@@ -364,12 +326,15 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - 不改 DictionaryImportService 核心逻辑
 - 不改导入流程
 
-#### 候选 5：TextBlockGroup.vue Playwright smoke tests
+#### 候选 2：TextBlockGroup.vue Playwright smoke tests
+
+**当前状态**：未开始。2182 行，零前端测试，是前端最核心的组件。
 
 **推荐模型**：复杂度 20
 **是否需要 CodeBuddy**：可选
 **是否需要 WorkBuddy**：✅ 需要（确认用户操作路径）
-**是否需要 MCP Chrome**：✅ 需要（但用 Playwright 代替）
+**是否需要 MCP Chrome**：✅ 需要（或用 Playwright + MCP Chrome 联合验收）
+**为什么现在做**：阅读页是学习流程核心，零测试风险高。Playwright 可以捕获 hover/click/vocab box 等关键交互。不需要改业务代码。
 **允许修改文件**：
 - `tests/Browser/TextReaderSmokeTest.php`（新增）
 - `playwright.config.js`（新增/修改）
@@ -379,26 +344,111 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - 不改 reader 组件
 - 不改后端
 
+#### 候选 3：VocabularyService query/search contract tests
+
+**当前状态**：未开始。995 行，搜索/分页/导入后处理混合。
+
+**推荐模型**：复杂度 10
+**是否需要 CodeBuddy**：可选
+**是否需要 WorkBuddy**：可选
+**是否需要 MCP Chrome**：否
+**为什么现在做**：搜索和分页逻辑可以安全补 characterization tests。不依赖其他任务。
+**允许修改文件**：
+- `tests/Feature/VocabularySearchTest.php`（新增）
+- `docs/plans/*`
+**禁止范围**：
+- 不改 VocabularyService 核心语义
+- 不改导入流程
+
+#### 候选 4：SenseReview / SenseMappingReview smoke tests
+
+**当前状态**：未开始。SenseReview.vue 649 行，SenseMappingReview.vue 455 行，均无前端测试。
+
+**推荐模型**：复杂度 10
+**是否需要 CodeBuddy**：可选
+**是否需要 WorkBuddy**：✅ 需要（确认词义确认/拒绝交互路径）
+**是否需要 MCP Chrome**：✅ 需要
+**为什么现在做**：词义确认/拒绝操作影响后续阅读页点词候选。补 smoke 可捕捉回归。
+**允许修改文件**：
+- `tests/Browser/SenseReviewSmokeTest.php`（新增）
+- `docs/plans/*`
+**禁止范围**：
+- 不改 SenseReview.vue
+- 不改后端 sense review 逻辑
+
+#### 候选 5：FsrsReschedulePreviewService contract + scouting
+
+**当前状态**：未开始。715 行，批量写 review_cards，高风险。
+
+**推荐模型**：复杂度 20
+**是否需要 CodeBuddy**：✅ 必须（先侦查 preview/confirm/apply 全链路）
+**是否需要 WorkBuddy**：可选
+**是否需要 MCP Chrome**：否
+**为什么现在做**：暂缓。必须先 CodeBuddy 侦查链路，锁定契约，才能进入编码。风险高，需要独立 CodeBuddy 轮次。
+**允许修改文件**：
+- `docs/plans/*`（仅限侦查文档）
+**禁止范围**：
+- 不改 FsrsReschedulePreviewService
+- 不改 ReviewCard
+- 不改 FSRS 算法
+
+#### 候选 6：TextBlockService createNewEncounteredWords 提取
+
+**当前状态**：未开始。TextBlockService 仍保持 1271 行，`createNewEncounteredWords` 是写入 DB 的核心方法。
+
+**推荐模型**：复杂度 20
+**是否需要 CodeBuddy**：✅ 需要（先侦查调用链 + 事务边界）
+**是否需要 WorkBuddy**：可选
+**是否需要 MCP Chrome**：✅ 需要（验收导入后阅读页无变化）
+**为什么现在做**：暂缓。需要先做候选 1（补好 DictionaryImport 测试）才能有安全基础来动导入相关代码。候选 6 依赖候选 1。
+**允许修改文件**：
+- `app/Services/TextBlockService.php`
+- `app/Services/EncounteredWordService.php`（新增）
+- `tests/Feature/EncounteredWordTest.php`（新增）
+- `docs/plans/*`
+**禁止范围**：
+- 不改 tokenizer
+- 不改 import 主线流程语义
+- 不改 EncounteredWord 模型
+
+#### 候选 7：WordSenseService destroy/restore 只读风险审计
+
+**当前状态**：未开始。`removeSenseFromReviewSystem` 涉及硬删、拒绝、条件性恢复。
+
+**推荐模型**：复杂度 10
+**是否需要 CodeBuddy**：✅ 必须
+**是否需要 WorkBuddy**：否
+**是否需要 MCP Chrome**：否
+**为什么暂缓**：核心删除语义无用户反馈问题，已有足够测试覆盖。没有安全收益就不值得碰高风险。
+**允许修改文件**：
+- `docs/plans/*`（仅限风险审计文档）
+**禁止范围**：
+- 不改 WordSenseService
+- 不改 ReviewCard
+- 不改任何模型
+
 ---
 
-## 8. 最推荐的下一阶段
+## 8. 最推荐的下一阶段（PostStabilization-1 刷新）
 
-**推荐任务**：**候选 1：TextBlockService → 提取 ReaderDataService**
+**推荐任务**：**候选 1：DictionaryImportService characterization tests**
 
 推荐原因：
-1. **最高收益**：TextBlockService（1239 行）是后端最大的 Service，职责最杂。提取 ReaderDataService 可立即减少复杂度。
-2. **最安全**：`prepareTextForReader` + `loadFsrsFamiliarityLookup` 是纯查询方法，无写入，无事务，可安全移动到新 Service。
-3. **验收最简单**：阅读页输出不变即可。MCP Chrome 验收只需要确认阅读页无变化。
-4. **不依赖其他候选**：完全独立，与 tokenizer/import/Vue 无关。
-5. **比继续 reset/destroy 更安全**：reset/destroy 涉及数据删除和 FSRS 参数变更，风险等级高，验收成本高。ReaderDataService 提取是**只读查询拆分**，不改变任何业务语义，不会影响用户数据。
+1. **最低风险**：只补测试，不改业务代码。DictionaryImportService 990 行且极少测试，存在真实的回归风险。
+2. **最高独立度**：不依赖其他任务，不依赖前端，不需要 MCP Chrome。
+3. **最容易验收**：测试通过即验收通过。
+4. **为后续开路**：候选 6（createNewEncounteredWords 提取）需要先稳定的导入测试防线。先做候选 1 可以降低后续风险。
+5. **所有高危任务已有足够防线**：ReviewCardManage（256 测试）、SenseSourceContext（29 测试）、Tokenizer health（6 测试）、ReaderDataService（26 测试）。DictionaryImport 是唯一完全没有 regression 测试的大型 Service。
 
-**复杂度**：4/10。主要是理解 `getReaderData()` 的完整数据流和所有子方法调用链。
+**复杂度**：10。主要是理解多格式解析和写入流程，但只补测试不改变实现。
 
-**是否需要 CodeBuddy**：✅ 需要。先由 CodeBuddy 侦查 `getReaderData()` → `prepareTextForReader()` → `loadFsrsFamiliarityLookup()` 的调用链，确认没有写入操作或不期望的副作用。
+**是否需要 CodeBuddy**：可选。测试编写相对独立。
 
-**是否需要 WorkBuddy**：可选。如果担心阅读页体验受影响，可用 WorkBuddy "网页端体验师" 验收。
+**是否需要 WorkBuddy**：可选。不涉及页面。
 
-**是否需要 MCP Chrome**：✅ 需要，验收阅读页无变化。
+**是否需要 MCP Chrome**：否。
+
+**候选 1 之后的下一个阶段**：候选 2（TextBlockGroup.vue Playwright smoke）— 阅读页零前端测试是高风险点，需要 WorkBuddy 验收。
 
 ---
 
