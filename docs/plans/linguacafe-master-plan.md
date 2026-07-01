@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (WordSenseService-DestroyRestoreContractTests-1)
+> **最后更新**：2026-07-02 (ReviewCardDeleteSnackbar-HistoryPreservedCopy-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -151,6 +151,7 @@
 | WordSenseService-DestroyRestore-RiskAudit-1 | 只读审计 WordSenseService 的删除/归档/恢复链路（rejectSense/archiveSense/removeSenseFromReviewSystem/restoreEncounteredWordIfNoActiveSenses）。覆盖 413 行 Service 逻辑 + 2 个 Controller + 5 个模型。已输出 14 个风险点并记录为 §7.4。CodeBuddy 原分级（4 高/5 中/5 低）经总设计师反驳核验后调整为：真正优先测试的仅 3 项（archiveSense 与 removeSenseFromReviewSystem 的 occurrence unlink 不一致、permanent delete ReviewLog 保留设计需锁定、bulkDestroy 批量删无确认）；rejectSense 无调用方降级为疑似遗留方法；deleteReviewLogs=true 无前端入口降级为未来入口风险；restore 按 encountered_word_id 不按 lemma 是安全设计不采纳为风险；archive 不 restore 是归档语义不采纳为 bug。已输出下一轮 contract tests 计划。不改业务代码，不执行删除/归档/恢复，不写数据库。 |
 | DesignerWorkflow-CodeBuddyRiskRoleAndPlanRefresh-1 | 根据总设计师对 CodeBuddy 报告的反驳式评估，修正 CodeBuddy 角色定位写入协作规则 §4.x。CodeBuddy 以后更侧重风险线索和 bug 可能性；事实核查和最终采纳由网页端总设计师负责。不把 AI 交接成本/文档冗余自动当成高风险。真正升权的是数据删除、写入、跨用户/语言、不可逆操作和用户误触。同步修正 master plan 中 WordSense 删除审计的风险描述和下一推荐任务范围。 |
 | WordSenseService-DestroyRestoreContractTests-1 | 按总设计师复判后的范围补 15 个 contract tests 锁定 WordSense 删除/归档/恢复语义。覆盖 archiveSense 禁用卡/不改 occurrence、removeSenseFromReviewSystem(false) 禁用+解绑 occurrence、permanent delete 删卡+解绑+restore Learning→New、deleteReviewLogs=true 三重过滤、deleteReviewLogs=false 默认保留、另一个 confirmed sense 阻止 restore、Known/Ignored/New 不恢复、encountered_word_id restore 安全设计、legacy word card 不受影响、rejectSense 当前行为、route 权限隔离。不改业务逻辑，不做 UI，不执行真实数据删除。15 测试全绿。 |
+| ReviewCardDeleteSnackbar-HistoryPreservedCopy-1 | 根据 WorkBuddy 产品决策，补管理页删除成功 snackbar / fallback 文案。单张删除 fallback 改为"该释义不会再出现在阅读页，复习历史已保留"；批量删除 fallback 改为"已彻底删除词义复习卡，复习历史已保留"；SenseReview 删除 fallback 改为"已彻底删除词义复习卡，复习历史已保留"。后端返回文案已有"复习历史已保留"，MCP Chrome 真实验收确认。不改删除逻辑，不改后端，不改数据。 |
 
 ---
 

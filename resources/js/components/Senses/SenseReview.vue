@@ -657,7 +657,7 @@
                 axios.delete(`/review-cards/manage/${this.currentCard.review_card_id}`)
                     .then((response) => {
                         this.deleteDialog = false;
-                        const message = response.data?.message || '已彻底删除词义复习卡。';
+                        const message = response.data?.message || '已彻底删除词义复习卡，复习历史已保留。';
                         this.showSnackbar(message, 'success');
                         this.loadCards();
                         this.loadFsrsStats();

@@ -1210,7 +1210,7 @@ export default {
 
             axios.delete('/review-cards/manage/' + item.review_card_id)
                 .then((response) => {
-                    this.showSnackbar(response.data.message || '已彻底删除词义复习卡。该释义不会再出现在阅读页。', 'success');
+                    this.showSnackbar(response.data.message || '已彻底删除词义复习卡。该释义不会再出现在阅读页，复习历史已保留。', 'success');
                     this.selectedIds = this.selectedIds.filter(id => id !== item.review_card_id);
                     this.loadData();
                     this.loadFsrsStats();
@@ -1233,7 +1233,7 @@ export default {
                 .then((response) => {
                     this.clearSelection();
                     const data = response.data;
-                    let msg = data.message || '已彻底删除词义复习卡。';
+                    let msg = data.message || '已彻底删除词义复习卡，复习历史已保留。';
                     if (data.skipped > 0) {
                         msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
                     }
