@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (FsrsRescheduleGapContractTests-ScopeFix-1)
+> **最后更新**：2026-07-02 (TextBlockService-CreateNewEncounteredWordsContractTests-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -146,6 +146,7 @@
 | FsrsReschedulePreviewService-ContractScouting-1 | 只读侦查 FsrsReschedulePreviewService 全链路（preview/confirmPreflight/confirmAndApply）。覆盖 780 行 Service 代码 + 4 个模型 + Controller + 现有 49 个测试。已输出 18 个风险点（6 高/7 中/5 低）并记录为 §7.3。已输出下一轮 contract tests 计划（A.preview 只读测试 9 项 + B.confirmPreflight 测试 7 项）。confirmAndApply 写入测试标记为高风险暂缓单独任务。不改业务代码，不执行重排，不写 ReviewCard/ReviewLog/snapshot。 |
 | FsrsReschedulePreviewService-GapContractTests-1 | 在已有 51 个 FSRS 重排测试基础上补缺口 contract tests。新增 5 个 preview 测试：empty candidate 仍返回 preview_hash、stability 变化使 hash 变化、difficulty 变化使 hash 变化、其他语言隔离、空状态 risk_assessment。新增 5 个 confirmPreflight 测试：apply=false high risk 返回 risk_level + 不写 snapshot、apply=false blocked、preflight 成功不创建 snapshot、apply=false + risk_confirm 仍走 preflight 路径不写、stale hash 不写 ReviewCard/snapshot。不改 FSRS 业务逻辑，不执行真实重排，不新增 confirmAndApply 成功写入测试。58 测试全绿。 |
 | FsrsRescheduleGapContractTests-ScopeFix-1 | 收口上一轮 gap contract tests 的测试文件边界。从 `FsrsRescheduleSnapshotTest.php` 移除越界新增的两个测试（`test_preflight_does_not_create_snapshot` 和 `test_stale_hash_does_not_create_snapshot`），这两个测试的语义已分别由 `FsrsRescheduleConfirmTest` 中的等价测试覆盖。总测试语义不减少，65 测试全绿。不改 FSRS 业务逻辑，不执行真实重排，不新增 confirmAndApply 成功写入测试。 |
+| TextBlockService-CreateNewEncounteredWordsContractTests-1 | 为 `TextBlockService::createNewEncounteredWords()` 补 12 个 characterization tests。覆盖新词创建（word/lemma/base_word/study_base/stage/translation）、已存在词去重、user/language 隔离、UserStudyBaseRule 覆盖、VocabularyTokenFilter 跳过、words_to_skip 过滤、CJK 语言 base_word 清空（lemma==word 时）、English 保留 base_word（如 series）、uniqueWords/processedWords 当前关系、lowercasing、255 长度边界（DB 异常）、batch insert。不改 TextBlockService，不改 tokenizer，不改 import 流程，不提取 Service。12 测试全绿。 |
 
 ---
 

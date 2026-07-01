@@ -305,7 +305,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | ✅ 已完成 | **VocabularyService-QuerySearchContractTests-1** | 15 tests 覆盖返回结构/text+reading搜索/stage/translation/only words+only phrases+union/4种排序/分页/export | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **SenseReviewMapping-SmokeTests-1** | MCP Chrome 空状态 smoke：/senses/review 与 /reviews/senses 页面打开、标题/统计/筛选/批量区/空状态、console、无数据副作用 | 🟡 中 | 🟢 低 | A |
 | ✅ 已完成 | **FsrsReschedulePreviewService-ContractScouting-1** | 只读侦查 + 缺口契约测试。侦查已输出 18 个风险点 + contract tests 计划。Gap 测试补了 5 个 preview + 5 个 confirmPreflight，全 58 个测试通过 | 🟡 中 | 🔴 高 | B-先契约 |
-| 6️⃣ | **TextBlockService createNewEncounteredWords 提取** | 未开始 | 🟢 高 | 🟡 中 | B-先契约 |
+| ✅ 已完成 | **TextBlockService-CreateNewEncounteredWordsContractTests-1** | 12 个 characterization tests 锁定 createNewEncounteredWords 行为：新词创建/去重/隔离/study_base/skip/CJK/lemma 保留/batch insert | 🟢 高 | 🟡 中 | B-先契约 |
 | 7️⃣ | **WordSenseService destroy/restore 只读风险审计** | 未开始 | 🟢 低 | 🔴 高 | C-暂缓 |
 
 ### 7.2 候选任务详情
@@ -463,24 +463,31 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | L4 | **non-english 语言返回 preview_hash=null** | 与 empty 场景不同，non-english 返回 null hash，前端需特殊处理 | API 不一致 |
 | L5 | **getDefault parameters 无缓存** | computePreviewData 每次调用 computePreviewData→getActiveFsrsParameters→可能 fallback 到 get_default_parameters()，无缓存 | 轻微性能浪费 |
 
-#### 候选 6：TextBlockService createNewEncounteredWords 提取
+#### ~~候选 6~~ 已完成：TextBlockService-CreateNewEncounteredWordsContractTests-1
 
-**当前状态**：未开始。TextBlockService 仍保持 1271 行，`createNewEncounteredWords` 是写入 DB 的核心方法。
+**当前状态**：contract tests 已完成。未提取 Service，未改业务逻辑，未改 tokenizer，未改 import 流程。
+**完成日期**：2026-07-02
 
-**推荐模型**：复杂度 20
-**是否需要 CodeBuddy**：✅ 需要（先侦查调用链 + 事务边界）
-**是否需要 WorkBuddy**：可选
-**是否需要 MCP Chrome**：✅ 需要（验收导入后阅读页无变化）
-**为什么现在做**：暂缓。需要先做候选 1（补好 DictionaryImport 测试）才能有安全基础来动导入相关代码。候选 6 依赖候选 1。
-**允许修改文件**：
-- `app/Services/TextBlockService.php`
-- `app/Services/EncounteredWordService.php`（新增）
-- `tests/Feature/EncounteredWordTest.php`（新增）
-- `docs/plans/*`
-**禁止范围**：
-- 不改 tokenizer
-- 不改 import 主线流程语义
-- 不改 EncounteredWord 模型
+**覆盖行为（12 tests）**：
+- **新词创建**：English processed words → encountered_words 记录（word/lemma/base_word/study_base/stage/translation 正确）
+- **去重**：已存在的 word 不再重复插入
+- **user/language 隔离**：不同用户的同词各自创建
+- **UserStudyBaseRule**：surface→study_base 映射覆盖 grammatical lemma
+- **VocabularyTokenFilter**：NEWLINE 等 filter token 被跳过
+- **words_to_skip**：当前 config 的标点词被 filter 层跳过（words_to_skip 块内 stage=1 分支在现有 config 下不可达，属于二次安全网）
+- **CJK base clearing**：japanese 语言中 lemma==word 时清空 base_word/lemma/study_base/base_word_reading
+- **English lemma 保留**：English 语言中 lemma==word 时保留（如 series）
+- **uniqueWords/processedWords 关系**：lookup 用 uniqueWords，insert 遍历 processedWords
+- **lowercasing**：word/lemma 被小写化
+- **255 长度边界**：word > 255 时 DB 报错，无应用层跳过
+- **batch insert**：3 个新词同时插入
+
+**改动范围**：
+- 仅新增 `tests/Feature/TextBlockCreateNewEncounteredWordsTest.php`
+- 未改 `TextBlockService.php`
+- 未改任何业务代码
+
+**下一个候选**：候选 6a（EncounteredWordCreationService 提取）— 或下一轮决定是否拆出新 Service
 
 #### 候选 7：WordSenseService destroy/restore 只读风险审计
 
@@ -527,11 +534,11 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 **候选 4 已完成空状态 smoke 基线**：SenseReviewMapping-SmokeTests-1 — MCP Chrome 验收 `/senses/review`（词义确认页空状态）和 `/reviews/senses`（词义复习页空状态），仅覆盖页面打开/标题/统计区/筛选区/批量操作区/空状态文案/console 检查/无数据副作用。未覆盖有卡片或有 pending occurrence 的写入路径（评分/确认/拒绝/忽略/改绑/新建/归档/重置/删除）。
 
-**候选 5 已完成侦查**：FsrsReschedulePreviewService-ContractScouting-1 — 只读侦查 preview/confirmPreflight/confirmAndApply 全链路，已输出 18 个风险点 + preview+confirmPreflight contract tests 计划，未改业务代码，未补测试，未执行 FSRS 重排。
+**候选 5 已完成侦查 + 缺口测试补强 + Scope Fix**：FsrsReschedulePreviewService-ContractScouting-1 + GapContractTests-1 + ScopeFix-1 — 只读侦查 + 10 个缺口契约测试 + scope 收口共 65 测试全绿。未改业务代码，未补 confirmAndApply 成功写入测试，未执行真实重排。
 
-**候选 5 已完成侦查 + 缺口测试补强**：FsrsReschedulePreviewService-ContractScouting-1 + GapContractTests-1 — 只读侦查 + 10 个缺口契约测试共 58 个测试全绿。未改业务代码，未补 confirmAndApply 成功写入测试，未执行真实重排。
+**候选 6 已完成 contract tests**：TextBlockService-CreateNewEncounteredWordsContractTests-1 — 12 个 characterization tests 锁定 createNewEncounteredWords 行为。未提取 Service，未改业务逻辑，未改 tokenizer。
 
-**新的最推荐下一阶段**：**候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）** — 如果决策进入 confirmAndApply 写入测试，先补安全契约。或候选 6（TextBlockService createNewEncounteredWords 提取）。
+**新的最推荐下一阶段**：**候选 6a（EncounteredWordCreationService 提取）** — 基于已有 contract tests 安全拆出新 Service。或候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）。
 
 ---
 
