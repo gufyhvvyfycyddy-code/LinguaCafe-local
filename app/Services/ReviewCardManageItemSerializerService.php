@@ -83,6 +83,8 @@ class ReviewCardManageItemSerializerService
                 $sourceChapterTitle = $chapters[$sourceChapterId];
             }
 
+            $displayStatus = $this->inferDisplayStatus($sourceChapterId, $occChapterId, $sense->example_sentence_en);
+
             return [
                 'review_card_id' => $card->id,
                 'word_sense_id' => $senseId,
@@ -96,6 +98,9 @@ class ReviewCardManageItemSerializerService
                 'source_chapter_id' => $sourceChapterId,
                 'source_chapter_title' => $sourceChapterTitle,
                 'source_kind' => $sourceKind,
+                // New additive fields for display consistency
+                'source_display_status' => $displayStatus,
+                'source_display_label' => $this->displayLabel($displayStatus, $sourceChapterTitle),
                 'fsrs_state' => $card->fsrs_state,
                 'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
                 'fsrs_stability' => $card->fsrs_stability,
@@ -139,6 +144,8 @@ class ReviewCardManageItemSerializerService
                 ->value('name');
         }
 
+        $displayStatus = $this->inferDisplayStatus($sourceChapterId, $occurrenceChapterId, $sense->example_sentence_en);
+
         return [
             'review_card_id' => $card->id,
             'word_sense_id' => $sense->id,
@@ -154,6 +161,9 @@ class ReviewCardManageItemSerializerService
             'source_chapter_id' => $sourceChapterId,
             'source_chapter_title' => $sourceChapterTitle,
             'source_kind' => $sourceKind,
+            // New additive fields for display consistency
+            'source_display_status' => $displayStatus,
+            'source_display_label' => $this->displayLabel($displayStatus, $sourceChapterTitle),
             'fsrs_state' => $card->fsrs_state,
             'fsrs_due_at' => optional($card->fsrs_due_at)->toISOString(),
             'fsrs_stability' => $card->fsrs_stability,
@@ -166,6 +176,33 @@ class ReviewCardManageItemSerializerService
             'missing_example' => empty($sense->example_sentence_en),
             'missing_source' => empty($sense->source_chapter_id) && empty($occurrenceChapterId),
         ];
+    }
+
+    /**
+     * Infer a display-friendly status string:
+     *  - 'real_chapter' — has a real chapter source (source_chapter_id or occurrence)
+     *  - 'card_example_only' — no real chapter, but has example_sentence_en
+     *  - 'missing' — no source at all
+     */
+    private function inferDisplayStatus(?int $sourceChapterId, ?int $occurrenceChapterId, ?string $exampleSentenceEn): string
+    {
+        if ($sourceChapterId || $occurrenceChapterId) {
+            return 'real_chapter';
+        }
+        if (!empty($exampleSentenceEn)) {
+            return 'card_example_only';
+        }
+        return 'missing';
+    }
+
+    private function displayLabel(string $status, ?string $chapterTitle): string
+    {
+        return match ($status) {
+            'real_chapter' => $chapterTitle ?: '已定位原文',
+            'card_example_only' => '保存例句（未定位原章节）',
+            'missing' => '缺溯源',
+            default => $status,
+        };
     }
 
     private function inferSourceKind(?int $sourceChapterId, ?int $occurrenceChapterId, ?string $exampleSentenceEn): string

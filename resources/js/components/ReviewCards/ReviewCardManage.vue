@@ -318,8 +318,8 @@
                                 </template>
                                 <template v-else>{{ item.example_sentence_zh || '—' }}</template>
                             </td>
-                            <td class="col-source" :class="{ 'text--secondary': item.missing_source }" v-if="isColumnVisible('source')">
-                                {{ item.source_chapter_title || sourceKindLabel(item.source_kind) }}
+                            <td class="col-source" :class="sourceDisplayClass(item)" v-if="isColumnVisible('source')">
+                                {{ item.source_display_label || item.source_chapter_title || sourceKindLabel(item.source_kind) }}
                             </td>
                             <td class="col-status">
                                 <v-chip x-small :color="item.fsrs_enabled ? 'success' : 'grey'">
@@ -501,9 +501,9 @@
                             <div class="detail-section-title">溯源信息</div>
                             <div class="detail-row">
                                 <span class="detail-label">来源</span>
-                                <span class="detail-value" :class="{ 'text--secondary': detailTarget.missing_source }">
-                                    {{ detailTarget.source_chapter_title || sourceKindLabel(detailTarget.source_kind) }}
-                                </span>
+                            <span class="detail-value" :class="detailSourceClass(detailTarget)">
+                                {{ detailTarget.source_display_label || detailTarget.source_chapter_title || sourceKindLabel(detailTarget.source_kind) }}
+                            </span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">来源类型</span>
@@ -591,10 +591,10 @@
 
                         <!-- 缺失状态 -->
                         <div class="detail-section">
-                            <div class="detail-section-title">缺失状态</div>
+                            <div class="detail-section-title">FSRS 信息</div>
                             <div class="detail-row">
-                                <span class="detail-label">缺释义</span>
-                                <span class="detail-value">{{ detailTarget.missing_definition ? '是' : '否' }}</span>
+                                <span class="detail-label">缺溯源</span>
+                                <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句' : '否（已定位原文）') }}</span>
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">缺例句</span>
@@ -602,7 +602,7 @@
                             </div>
                             <div class="detail-row">
                                 <span class="detail-label">缺溯源</span>
-                                <span class="detail-value">{{ detailTarget.missing_source ? '是' : '否' }}</span>
+                                <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句' : '否（已定位原文）') }}</span>
                             </div>
                         </div>
                     </v-card-text>
@@ -1335,6 +1335,12 @@ export default {
                 .then((response) => {
                     this.sourcePayload = { card: card, context: response.data };
                     this.sourceDialog = true;
+                    // If the source-context API recovered source (wrote back chapter_id),
+                    // refresh the list item so the outer display updates.
+                    const ctx = response.data;
+                    if (ctx && (ctx.source_kind === 'chapter_recovered' || ctx.source_kind === 'chapter_fuzzy' || ctx.source_kind === 'chapter_fuzzy_title')) {
+                        this.loadData();
+                    }
                 })
                 .catch(() => {
                     this.sourcePayload = { card: card, context: null, error: '获取原文失败。' };
@@ -1547,6 +1553,22 @@ export default {
                 missing: '缺失',
             };
             return labels[kind] || kind;
+        },
+
+        sourceDisplayClass(item) {
+            if (!item) return '';
+            const s = item.source_display_status;
+            if (s === 'missing') return 'error--text';
+            if (s === 'card_example_only') return 'warning--text text--darken-1';
+            return '';
+        },
+
+        detailSourceClass(item) {
+            if (!item) return '';
+            const s = item.source_display_status;
+            if (s === 'missing') return 'error--text';
+            if (s === 'card_example_only') return 'warning--text text--darken-1';
+            return '';
         },
 
         formatDueAt(isoString) {
