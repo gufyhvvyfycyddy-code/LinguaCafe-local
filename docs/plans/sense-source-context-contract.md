@@ -126,16 +126,58 @@
 
 ---
 
-## 8. 下一轮允许做什么
+## 8. 拆分已完成（SenseSourceContext-QueryRenderExtract-1）
 
-下一轮如果正式拆分，只允许：
-- 提取查询 helper（`findSourceSentenceKey`、`contextEntriesAroundGroup` 等）
-- 提取 token payload / rendering helper（`simplifyContextToken` 等）
-- 保持 `SenseSourceContextService` 的 public 输出方法不变
-- 保持 API shape 不变
-- 保持 `source_kind` 字符串不变
-- 保持 fallback 顺序不变
-- 保持写回条件不变
+### 新增的文件
+
+- `app/Services/SenseSourceContextResolverService.php` — 查询/定位层
+
+### 迁移到 Resolver 的逻辑
+
+| 方法 | 目标 |
+|------|------|
+| `resolveSense()` / `resolveSourceOccurrence()` / `resolveExampleOccurrence()` | Resolver |
+| `findChapterById()` | Resolver |
+| `groupTokensBySentenceWithIndexes()` | Resolver |
+| `findSourceSentenceKey()` | Resolver |
+| `contextEntriesAroundGroup()` | Resolver |
+| `findMatchingChapterByExampleText()` | Resolver |
+| `findMatchingChapterByFuzzyMatch()` | Resolver |
+| `writeBackRecoveredSource()` | Resolver |
+| `meaningfulTextTokens()` / `targetTerms()` / `fuzzySourceScore()` | Resolver |
+| `collectTargetIndexes()` / `logSourceContextResult()` | Resolver |
+
+### 保留在 SenseSourceContextService 的逻辑
+
+- `sourceContext()` public 入口（门面方法，委托 Resolver + Payload）
+- 响应组装（`buildChapterResult`、`buildContextToken`）
+- `buildContextToken()` 仍使用 SenseTokenPayloadService
+
+### 保持不变的契约
+
+- `sourceContext(int $userId, string $language, int $senseId): array` 签名不变
+- API response JSON shape 不变
+- `source_kind` 字符串不变（chapter/chapter_recovered/chapter_title/chapter_fuzzy/chapter_fuzzy_title/card_example/null）
+- fallback 顺序不变
+- `fallback_message` 文案不变
+- `writeBackRecoveredSource` 写回条件不变
+- fuzzy 阈值不变（含目标词≥0.55 不含≥0.82）
+- `radius=5` 不变
+- 用户/语言隔离不变
+
+### 下一轮禁止做什么
+
+【以下为历史保留，拆分已完成】
+
+下轮禁止：
+- 不改 Vue 组件（TextBlockGroup / VocabularySideBox / review 弹窗）
+- 不改 `GET /senses/{id}/source-context` route
+- 不改 Controller 返回值结构
+- 不改 `WordSense` / `WordSenseOccurrence` 模型
+- 不改 `ReviewCard` / `Chapter` 模型
+- 不改阅读页跳转逻辑
+- 不改复习页弹窗交互
+- 不新增 migration
 
 ---
 
