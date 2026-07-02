@@ -167,7 +167,6 @@ class FinishedReadingSafetyTest extends TestCase
             'base_word' => $word,
             'base_word_reading' => '',
             'translation' => '',
-            'example_sentence' => '',
             'lookup_count' => 0,
             'read_count' => 0,
             'relearning' => false,
