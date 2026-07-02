@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (Codex-SpecToHarnessHardeningTargetMode-1)
+> **最后更新**：2026-07-02 (Codex-SenseReviewRealWorkflowHardeningTargetMode-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -28,16 +28,17 @@
 | Codex-ArchitectureFinalGoalMode-1 | Codex 面向 sense-only 最终架构目标做增量审计；补 2 个 FSRS confirmAndApply 拒绝写入 contract tests；更新 master plan / hotspot audit / 当前工作台 |
 | OpenCode-ArchitectureTargetMode-Batch1 | 综合推进：SenseReview 到期卡真实显示并评分（MCP Chrome）、TextBlock fallback 只读侦查、ReviewCardManage logs payload 只读侦查。阶段性完成，仍有缺口：pending occurrence 写入未跑通、current-working-handoff 上轮漏更新、TextBlock fallback 缺测试、logs payload 缺 contract tests。 |
 | Codex-SpecToHarnessHardeningTargetMode-1 | 将两个软规则转成测试护栏：新增 TextBlock fallback tokenizer 单元测试；补 ReviewCardManage logs payload 精确字段/日期格式与同卡 user/language 过滤 contract tests；不改业务代码。 |
+| Codex-SenseReviewRealWorkflowHardeningTargetMode-1 | 将 SenseReview 真实页面 smoke 转为可复验 harness：新增 `smoke:sense-review-data` 命令（只接受已有用户、不创建账号、不接收密码、marker 可识别、不清库）；新增命令 feature test 锁定 marker 形状；新增 smoke playbook。MCP Chrome 真实验收覆盖评分/More/查看原文/确认/改绑/拒绝/忽略/新建。不改 Vue/FSRS/WordSense 语义/ReviewLog/DB schema/AI study card。 |
 
 ## 3. 当前未最终关闭的事项
 
 本节只放真实未完成事项。已完成任务详情进入 `docs/plans/linguacafe-master-plan.md`，历史材料进入 `docs/HISTORY_INDEX.md`。
 
 - **OpenCode-ArchitectureTargetMode-Batch1 剩余缺口**：
-  - pending occurrence 写入未真实跑通（数据准备问题，非代码 bug）；
+  - pending occurrence 写入路径已由 Codex-SenseReviewRealWorkflowHardeningTargetMode-1 的 marker data 命令 + 真实页面 smoke + playbook 覆盖；
   - TextBlock fallback 最小测试缺口已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；
   - ReviewCardManage logs payload 最小 contract tests 已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；
-  - SenseReview FullMenu / occurrence 写入路径仍建议后续 MCP Chrome smoke。
+  - SenseReview FullMenu / occurrence 写入路径已由 Codex-SenseReviewRealWorkflowHardeningTargetMode-1 关闭（marker data + 真实页面 smoke + playbook）。
 - **Codex-ProjectDocsGovernanceTargetMode-1**：
   - 本轮只做文档治理，不改业务代码和测试；
   - 新增入口索引、历史索引、ADR-0002、spec→harness 候选清单；
@@ -109,8 +110,8 @@
 
 ### G. SenseReview-FullMenuSmoke-1
 
-- 补 SenseReview 页面完整 More 菜单和 occurrence 写入路径的 MCP Chrome smoke；
-- 不改代码，除非发现真实 UI bug。
+- ✅ 已由 Codex-SenseReviewRealWorkflowHardeningTargetMode-1 完成：marker data 命令 + 命令测试 + playbook + MCP Chrome 真实页面验收；
+- 后续仅在 SenseReview 页面交互发生变更时按 playbook 重跑。
 
 ### H. SpecToHarness-Hardening-1
 
