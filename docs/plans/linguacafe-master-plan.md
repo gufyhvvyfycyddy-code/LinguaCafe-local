@@ -332,3 +332,11 @@
 | 6 | Sense-Example-Link-1 | 释义卡多例句绑定 | 提升释义卡质量 |
 | 7 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
 | 8 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 清理旧 SRS 遗留逻辑 |
+
+## Recent Update: Codex-SenseReviewRealWorkflowHardeningTargetMode-1
+
+- Added `smoke:sense-review-data` to prepare marker data for an existing local test user without creating accounts or storing credentials.
+- Added `tests/Feature/SenseReviewSmokeDataCommandTest.php` to lock the marker shape for due review card and pending occurrence paths.
+- Added `docs/plans/sense-review-real-workflow-smoke-playbook.md` and linked it from the documentation index / spec-to-harness list.
+- Real Chrome acceptance covered `/reviews/senses` rating, More menu, source fallback, and `/senses/review` confirm, ignore, reject, rebind, and create-new flows.
+- This task did not change Vue components, FSRS scheduling semantics, WordSense delete/archive/restore semantics, schema, or AI study card behavior.

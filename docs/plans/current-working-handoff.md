@@ -147,3 +147,10 @@
 3. 过期事项要移动到 master plan 或删除。
 4. 不允许让本文和 master plan 冲突。
 5. 如冲突，以 master plan 为准，并修正本文。
+
+## Recent Update: Codex-SenseReviewRealWorkflowHardeningTargetMode-1
+
+- Added a local marker-data command and feature test for SenseReview real workflow smoke data.
+- Added `docs/plans/sense-review-real-workflow-smoke-playbook.md` as the replayable page-smoke guide.
+- Real browser acceptance covered `/reviews/senses` rating, More menu, source fallback, and `/senses/review` confirm, ignore, reject, rebind, and create-new paths.
+- No Vue, FSRS scheduling semantics, WordSense delete/archive/restore semantics, schema, or AI study card implementation changed.

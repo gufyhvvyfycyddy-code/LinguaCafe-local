@@ -20,7 +20,7 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 |---|---|---|---|---|
 | TextBlock fallback tokenizer | `fallbackEnglishTokenize` remains callable and should not silently drift | Completed in `tests/Unit/TextBlockFallbackTokenizerTest.php`: conservative lemma behavior, irregular table use, structural markers, numbers/punctuation, blank text exception | `TextBlockService` / tokenizer fallback | Done |
 | ReviewCardManage logs payload | Logs drawer payload should keep stable fields, ordering, and user/language/card isolation | Completed in `tests/Feature/ReviewCardManageTest.php`: exact payload fields/date shape plus same-card user/language filtering; existing tests cover order, limit, empty state, cross-card, legacy/rejected cards | `ReviewCardManageController::logs()` | Done |
-| SenseReview full menu and occurrence writes | Sense review and occurrence actions must work in real UI, not just backend tests | MCP Chrome smoke with prepared data for rating, More menu, confirm/reject/ignore/rebind/new sense paths | `/reviews/senses`, `/senses/review` | P1 |
+| SenseReview full menu and occurrence writes | Sense review and occurrence actions must work in real UI, not just backend tests | Completed by `smoke:sense-review-data`, `tests/Feature/SenseReviewSmokeDataCommandTest.php`, and `docs/plans/sense-review-real-workflow-smoke-playbook.md`: marker data plus real-page rating, More/source fallback, confirm/reject/ignore/rebind/create-new smoke | `/reviews/senses`, `/senses/review` | Done |
 | AI recommended words exclude user selections | AI suggestions must not duplicate words/phrases manually selected by the user | Future contract tests plus MCP Chrome confirmation modal smoke | Planned AI study card flow | P1 before implementation |
 | AI recommended words default unchecked | User confirmation must be explicit | MCP Chrome smoke for modal initial state | Planned AI study card flow | P1 before implementation |
 | AI translations do not create review cards | Reading aid must not write learning data by itself | Existing tests plus a regression test around confirm/current endpoints if gaps appear | AI reading assist | P1 |
@@ -34,18 +34,19 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 ## 3. Current Implementation Notes
 
 1. Codex-SpecToHarnessHardeningTargetMode-1 converted the TextBlock fallback tokenizer and ReviewCardManage logs payload soft rules into PHPUnit coverage.
-2. The conversion did not change `TextBlockService`, `ReviewCardManageController`, API response semantics, tokenizer/import behavior, FSRS, WordSense, ReviewLog preservation, Vue, routes, or schema.
-3. Do not weaken existing tests to make a future candidate easier.
-4. For browser flows, do not replace MCP Chrome with API calls.
-5. For AI study cards, first run architecture scouting. Do not invent DB schema or endpoint names in this candidate list.
+2. Codex-SenseReviewRealWorkflowHardeningTargetMode-1 converted the SenseReview full menu and occurrence write soft rule into a marker-data command, a command feature test, and a real-page smoke playbook.
+3. These conversions did not change `TextBlockService`, `ReviewCardManageController`, API response semantics, tokenizer/import behavior, FSRS, WordSense, ReviewLog preservation, Vue, routes, or schema.
+4. Do not weaken existing tests to make a future candidate easier.
+5. For browser flows, do not replace MCP Chrome with API calls.
+6. For AI study cards, first run architecture scouting. Do not invent DB schema or endpoint names in this candidate list.
 
 ## 4. Next Candidate Shortlist
 
 If the project owner asks for the next hardening task, the lowest-risk remaining candidates are:
 
-1. `SenseReview-FullMenuSmoke-1`
-2. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
-3. `AIStudyCard-HarnessScouting-1` as docs/harness planning only; no schema/API implementation.
+1. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
+2. `AIStudyCard-HarnessScouting-1` as docs/harness planning only; no schema/API implementation.
+3. `SenseReview-SmokeReplay-1` only when the real page flow needs to be replayed with a fresh marker.
 
 Selection still belongs to the project owner / webpage-side designer. Agents must not auto-enter the next task.
 
@@ -53,7 +54,7 @@ Selection still belongs to the project owner / webpage-side designer. Agents mus
 
 | Candidate | Deferred reason |
 |---|---|
-| SenseReview full menu and occurrence writes | Requires MCP Chrome, marker test data, and real page evidence; should remain a standalone page-smoke task. |
+| SenseReview full menu and occurrence writes | Completed as a standalone page-smoke task; future work should replay the playbook only when this surface changes. |
 | Legacy word cards stay out of daily mainline | Existing `ReviewFsrsTest` already covers sense-only queue targeting and word-card exclusion; add more only if a concrete gap appears. |
 | ReviewLog preserved by default | Existing `ReviewCardManageTest` and `WordSenseDestroyRestoreTest` already cover preserve-by-default paths; duplicating them would add noise. |
 | AI study card future hardening | Product boundary is documented in ADR-0002, but implementation/schema/API do not exist yet; only docs/harness scouting is safe before architecture approval. |

@@ -26,7 +26,7 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Architecture risks | Module responsibilities, hotspots, candidate routes | `repo-architecture-hotspot-audit.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
-| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md` |
+| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |
 
 ## 3. Current ADRs
