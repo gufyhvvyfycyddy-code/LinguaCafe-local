@@ -105,8 +105,27 @@
                     <div v-if="type == 'word'" class="d-flex flex-wrap mb-3">
                         <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
                         <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
-                        <v-btn small rounded depressed color="error" class="mb-2" @click="deleteWord">回归为新词</v-btn>
+                        <v-btn small rounded depressed color="error" class="mr-2 mb-2" @click="deleteWord">回归为新词</v-btn>
+                        <v-btn
+                            small
+                            rounded
+                            outlined
+                            color="primary"
+                            class="mb-2"
+                            :loading="aiStudyCardPendingLoading"
+                            @click="markAiStudyCardPending"
+                        >
+                            <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
+                            待 AI 解释
+                        </v-btn>
                     </div>
+                    <v-alert
+                        v-if="aiStudyCardPendingMessage"
+                        dense
+                        text
+                        class="mb-3"
+                        :type="aiStudyCardPendingError ? 'error' : 'success'"
+                    >{{ aiStudyCardPendingMessage }}</v-alert>
                 </template>
 
                 <!-- Saved Senses (compact, no empty groups) -->
@@ -274,6 +293,7 @@ export default {
             fsrsFamiliarityHasData: state => state.vocabularyBox.fsrsFamiliarityHasData,
             _chapterId: state => state.vocabularyBox.chapterId,
             _sentenceIndex: state => state.vocabularyBox.sentenceIndex,
+            _sentenceText: state => state.vocabularyBox.sentenceText,
             aiVocabSuggestions: state => state.vocabularyBox.aiVocabSuggestions,
             aiPhraseSuggestions: state => state.vocabularyBox.aiPhraseSuggestions,
             aiLookupLoading: state => state.vocabularyBox.aiLookupLoading,
@@ -284,6 +304,7 @@ export default {
         word() {
             this.updateDataFromStore();
             this.loadAiSuggestions();
+            this.resetAiStudyCardPendingFeedback();
         },
         phrase() { this.updateDataFromStore(); },
         // Re-trigger AI lookup when sentence changes (new word in same sentence or different sentence)
@@ -317,6 +338,9 @@ export default {
             translationText: '',
             searchField: '',
             latestAiLookupKey: '',
+            aiStudyCardPendingLoading: false,
+            aiStudyCardPendingMessage: '',
+            aiStudyCardPendingError: false,
         };
     },
     methods: {
@@ -456,6 +480,53 @@ export default {
                     return;
                 }
                 this.$store.commit('vocabularyBox/setAiLookupLoading', false);
+            });
+        },
+        resetAiStudyCardPendingFeedback() {
+            this.aiStudyCardPendingLoading = false;
+            this.aiStudyCardPendingMessage = '';
+            this.aiStudyCardPendingError = false;
+        },
+        markAiStudyCardPending() {
+            if (this.type !== 'word') {
+                return;
+            }
+
+            const chapterId = this.$store.state.vocabularyBox.chapterId;
+            const sentenceIndex = this.$store.state.vocabularyBox.sentenceIndex;
+            if (!chapterId || sentenceIndex === null || sentenceIndex === undefined || !this.word) {
+                this.aiStudyCardPendingError = true;
+                this.aiStudyCardPendingMessage = '缺少章节或句子位置，暂时无法加入待 AI 解释。';
+                return;
+            }
+
+            this.aiStudyCardPendingLoading = true;
+            this.aiStudyCardPendingError = false;
+            this.aiStudyCardPendingMessage = '';
+
+            axios.post('/ai-study-card/pending-items', {
+                chapter_id: chapterId,
+                text_block_index: sentenceIndex,
+                sentence_index: sentenceIndex,
+                sentence_id: String(sentenceIndex),
+                word: this.word,
+                surface: this.word,
+                lemma: this.studyBase || this.baseWord || this.word,
+                sentence_text: this.$store.state.vocabularyBox.sentenceText || '',
+                source_payload: {
+                    source: 'reader_vocabulary_side_box',
+                },
+            }).then((response) => {
+                this.aiStudyCardPendingMessage = response.data && response.data.message
+                    ? response.data.message
+                    : '已加入待 AI 解释。';
+            }).catch((error) => {
+                this.aiStudyCardPendingError = true;
+                this.aiStudyCardPendingMessage = error.response && error.response.data && error.response.data.message
+                    ? error.response.data.message
+                    : '加入待 AI 解释失败。';
+            }).finally(() => {
+                this.aiStudyCardPendingLoading = false;
             });
         },
         openManualAddForm() {

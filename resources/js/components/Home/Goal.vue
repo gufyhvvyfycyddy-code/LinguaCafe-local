@@ -37,7 +37,7 @@
         <v-spacer></v-spacer>
         <v-card-actions>
             <v-spacer></v-spacer> 
-            <v-btn plain to="/review/false/-1/-1" v-if="name == 'Reviews'">开始复习</v-btn>
+            <v-btn plain to="/reviews/senses" v-if="name == 'Reviews'">开始复习</v-btn>
             <v-btn plain to="/books" v-if="name == 'Reading' || name == 'New words'">阅读材料</v-btn>
         </v-card-actions>
     </v-card>

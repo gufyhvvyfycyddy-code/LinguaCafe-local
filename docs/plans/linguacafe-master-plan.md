@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (Codex-FinalArchitectureClosureTargetMode-1)
+> **最后更新**：2026-07-02 (Codex-AIStudyCardV1-And-ReviewEntryUnification-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -168,6 +168,7 @@
 | OpenCode-DesignerProgressAndScoutingRules-1 | 写入总设计师提示词前进度说明规则（§22）与三方架构侦查规则（§23）。新增 current-working-handoff §7 当前主线进度。更新 DOCUMENTATION_INDEX 引用。不改业务代码，不改测试。 |
 | OpenCode-AIStudyCardArchitectureScouting-And-ProgressRuleFix-1 | 复合任务：(A) 修正进度规则为固定五条主线，删除"文档治理"固定线，写入"零进度任务不得单独派发"规则；(B) 完成 AI 示意卡架构侦查，新增 `docs/plans/ai-study-card-architecture-scout.md`，覆盖 8 大现有能力地图、未来理想流程、12 个代码接入点、5 个不能改的危险区、第一轮最小目标建议（阅读页标记"待AI解释"）。AI 示意卡规划从 10% → 25%，总体架构收口从 79% → 81%。MCP Chrome 只读观察阅读页、复习入口。不改业务代码，不改测试，不改 Vue。 |
 | Codex-FinalArchitectureClosureTargetMode-1 | 最终架构收口。新增三份冻结文档：`final-architecture-closure-report.md`（收口报告，五条主线最终状态、旧系统地基检查、已有硬护栏、不阻塞收口的未完成事项、下一阶段三步路线）、`ai-study-card-v1-frozen-plan.md`（AI 示意卡第一版路线冻结，含目标/用户流程/数据边界/前端边界/后端边界/禁止范围/验收/进度）、`frontend-review-entry-unification-plan.md`（前端复习入口统一路线冻结，含现状/命名规则/未来统一方式/第一轮最小改法/禁止一次性删除旧页面/MCP Chrome 验收/WorkBuddy 复验）。MCP Chrome 只读复核阅读页、查词侧栏、AI 阅读辅助按钮、复习入口、词义确认入口、复习卡管理入口。关键发现：导航仍暴露"单词复习/词义确认"内部名称；首页"开始复习"指向 legacy word review 而非 `/reviews/senses`；"待 AI 解释"按钮尚不存在。五条主线进度更新：总体架构收口 81%→100%（不代表全项目完成）、复习主线稳定 86%→91%、页面真实验收 90%→91%、AI 示意卡规划 25%→55%、前端入口整理 50%→65%。不改业务代码、测试、Vue、Controller、Service、routes、migration、DB schema、FSRS 语义、删除/归档/恢复语义、ReviewLog 保留语义、legacy word card 兼容层、SenseReview、SenseMappingReview。 |
+| Codex-AIStudyCardV1-And-ReviewEntryUnification-1 | AI 示意卡第一版实现 + 前端复习入口统一第一轮。新增 pending 表/API/Service/Controller 和阅读页查词区「待 AI 解释」按钮（覆盖 `VocabularySideBox.vue` 与响应式 `VocabularyBox.vue`）；重复点击幂等；后端 tests 覆盖鉴权、用户/语言隔离、反向 contract（不写 WordSense/ReviewCard/ReviewLog/EncounteredWord）。首页「开始复习」和导航「复习」进入 `/reviews/senses`，旧 `/senses/review`、`/review-cards/manage`、`/review/false/-1/-1` 保留。进度更新：总体架构收口 100%、复习主线稳定 94%、页面真实验收 96%、AI 示意卡规划 90%、前端入口整理 92%。不调用 AI、不生成释义/复习卡、不改 FSRS、不改删除/归档/恢复、不删除 SenseReview/SenseMappingReview/legacy word 兼容。 |
 
 ## 4. 未完成任务总表
 
@@ -347,3 +348,11 @@
 - Five-line progress updated: Overall architecture closure 81% → 100% (not full project completion), Review mainline 86% → 91%, Page real acceptance 90% → 91%, AI study card planning 25% → 55%, Frontend entry cleanup 50% → 65%.
 - This task did NOT change business code, tests, Vue, Controller, Service, routes, migration, DB schema, FSRS semantics, delete/archive/restore semantics, ReviewLog retention, legacy word card compatibility layer, SenseReview, or SenseMappingReview.
 - Next stage should NOT continue infinite scouting. The recommended next minimum implementation is AI study card v1 (pending item only), followed by frontend review entry unification round 1, followed by AI recommendation popup and card generation loop.
+
+## Recent Update: Codex-AIStudyCardV1-And-ReviewEntryUnification-1
+
+- AI study card v1 pending marker is implemented: reading-page word click exposes「待 AI 解释」and stores a pending row only.
+- Frontend review entry unification round 1 is implemented: homepage and nav daily review entry now target `/reviews/senses`; legacy routes remain available.
+- Contract coverage added for pending item auth, user/language isolation, idempotent duplicate clicks, and no writes to learning/review tables.
+- Five-line progress: Overall architecture closure 100%, Review mainline stability 94%, Page real acceptance 96%, AI study card planning 90%, Frontend entry cleanup 92%.
+- Not implemented: AI recommendation modal, AI meaning generation, automatic WordSense/ReviewCard generation, FSRS integration, full card-generation loop, or final cleanup/removal of old routes.

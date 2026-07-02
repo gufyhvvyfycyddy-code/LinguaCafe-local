@@ -252,6 +252,9 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/chapters/ai-assist/current/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'current']);
     Route::get('/chapters/ai-assist/lookup/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'lookup']);
 
+    // AI study card pending markers
+    Route::post('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'store']);
+
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);
     Route::post('/youtube/get-subtitle-list', [App\Http\Controllers\ImportController::class, 'getYoutubeSubtitles']);

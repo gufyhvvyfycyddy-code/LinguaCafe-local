@@ -1,10 +1,10 @@
 # AI 示意卡第一版可开发路线冻结
 
-> 状态：**路线冻结（Frozen Plan）**，未实现功能。
+> 状态：**第一版已实现（Pending Marker V1 Done）**。后续 AI 推荐弹窗 / AI 释义生成 / 复习卡生成闭环未实现。
 > 起点文档：`docs/plans/ai-study-card-architecture-scout.md`
 > 配套文档：`docs/plans/final-architecture-closure-report.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`
 > 适用阶段：架构收口 100% 之后的第一个最小实现任务。
-> 本文档不授权立即写代码；写代码前仍需通过 Architecture Gate 与 ADR 评审。
+> 本文档记录第一版落地边界；后续任何生成 / 推荐 / FSRS 联动仍需通过 Architecture Gate 与 ADR 评审。
 
 ---
 
@@ -30,6 +30,14 @@
 - 不做词组拖选（理由见 §4.2）。
 - 不做与复习卡的联动。
 - 不做与 SenseReview 的联动。
+
+### 1.4 实现状态（2026-07-02）
+
+- 已新增 `ai_study_card_pending_items` 表、`AiStudyCardPendingItem` Model、`AiStudyCardPendingItemService`、`AiStudyCardPendingItemController`、`POST /ai-study-card/pending-items`。
+- 已在 `VocabularySideBox.vue` 与响应式 `VocabularyBox.vue` 增加「待 AI 解释」按钮。
+- 已实现重复点击幂等：同一用户、语言、章节、位置、单词的 pending 项重复提交返回已有记录，不无限新增。
+- 已实现用户隔离、语言隔离、章节归属检查。
+- 已通过后端 contract tests 确认不写 `WordSense` / `ReviewCard` / `ReviewLog` / `EncounteredWord`。
 
 ---
 
@@ -91,9 +99,9 @@
 
 建议表名：`ai_study_card_pending_items`（或同等语义名称，最终以实现轮 ADR 为准）。
 
-### 3.4 本轮 schema 改动
+### 3.4 已落地 schema
 
-**本轮（路线冻结）不写 migration，不改 DB schema。** 实际 schema 在下一轮经 ADR 评审后再写。
+第一版已新增独立表 `ai_study_card_pending_items`。该表只表达待解释意图，不复用 `WordSenseOccurrence`、`EncounteredWord` 或 `ReviewCard`，不包含 FSRS 调度字段。
 
 ---
 
@@ -101,7 +109,7 @@
 
 ### 4.1 入口位置
 
-- 唯一入口：阅读页点词侧栏 `VocabularySideBox.vue`。
+- 唯一入口：阅读页点词查词区域，桌面侧栏为 `VocabularySideBox.vue`，窄屏 / 响应式查词框为 `VocabularyBox.vue`。
 - 按钮放在词典结果区域附近，名称建议为「待 AI 解释」。
 - 按钮必须明显，但不打扰现有查词 / 添加释义流程。
 
@@ -132,22 +140,21 @@
 
 - 第一版**不修改** `TextBlockGroup.vue` 主流程。
 - 第一版**不修改** `TextReader.vue` 主流程。
-- 第一版**只**在 `VocabularySideBox.vue` 增加一个按钮 + 一个 store action 调用。
+- 第一版**只**在 `VocabularySideBox.vue` / `VocabularyBox.vue` 增加按钮与同一 pending API 调用。
 - 若发现需要改 `TextBlockGroup.vue` 才能拿到选区，则第一版范围必须收缩为「只单词点选」。
 
 ---
 
 ## 5. 第一版后端边界
 
-### 5.1 需要的接口（建议）
+### 5.1 已落地接口
 
-- `POST /ai-study-card/pending-items`：创建一条待解释项。
+- `POST /ai-study-card/pending-items`：创建或返回已有待解释项。
   - 入参：`chapter_id`、`word`、`text_block_index`、可选 `word_range`。
   - 出参：创建后的记录 id 与状态。
   - 必须用户隔离、语言隔离。
-- `GET /ai-study-card/pending-items`：列出当前用户的待解释项（第一版可只给最小列表，主要给后端测试用，UI 可不暴露）。
-- `DELETE /ai-study-card/pending-items/{id}`：删除一条待解释项（第一版可保留接口位，UI 可不暴露）。
-- `PATCH /ai-study-card/pending-items/{id}/status`：状态流转（第一版可只支持 `pending → dismissed`，UI 可不暴露）。
+
+未落地接口：列表、删除、状态流转。第一版 UI 不暴露待解释列表。
 
 ### 5.2 不做什么
 
@@ -192,7 +199,7 @@
 9. 不统一导航（导航统一见 `frontend-review-entry-unification-plan.md`，是独立路线）。
 10. 不大改 `TextBlockGroup.vue`。
 11. 不改 legacy word card 兼容层。
-12. 不在本轮直接写 migration（本轮只是路线冻结）。
+12. 不再新增超出 pending marker 的 migration（第一版已新增独立 pending 表）。
 13. 不把待解释项混入 `WordSenseOccurrence` 或 `EncounteredWord`。
 14. 不引入新前端依赖。
 15. 不引入新 PHP composer 依赖。
@@ -252,16 +259,16 @@
 - AI 示意卡规划：25% → 55%（本轮贡献）。
 - 本轮**不**把 AI 示意卡规划推到 70%。
 
-### 8.2 真正实现第一版之后的进度
+### 8.2 第一版实现后的进度
 
-- AI 示意卡规划：55% → 约 70%。
+- AI 示意卡规划：55% → 90%（本轮任务指定口径）。
 - 总体架构收口：保持 100%（不再回退侦查）。
-- 复习主线稳定：保持 91%。
-- 页面真实验收：91% → 约 93%（新增一个真实可观察入口）。
-- 前端入口整理：65% → 约 70%（侧栏多了一个统一风格的入口）。
+- 复习主线稳定：94%。
+- 页面真实验收：96%。
+- 前端入口整理：92%（与前端复习入口统一第一轮同轮完成）。
 
 ### 8.3 明确声明
 
-- 本轮只是路线冻结，不是功能实现。
-- 路线冻结后，下一轮才进入实现，且实现轮必须先过 Architecture Gate 与 ADR。
-- 不允许把「路线冻结」当作「功能完成」上报进度。
+- 第一版 pending marker 已实现，不等于 AI 示意卡完整闭环完成。
+- 不允许把「待 AI 解释」记录写成 AI 释义生成、AI 推荐弹窗或复习卡生成已完成。
+- 后续实现必须继续保持：用户确认优先、AI 推荐默认不选、不自动污染 WordSense/ReviewCard/FSRS。

@@ -141,27 +141,13 @@
                         bottomNav: true,
                     },
                     {
-                        name: '单词复习',
-                        url: '',
-                        click: this.openStartReviewDialog,
-                        icon: 'mdi-playlist-check',
+                        name: '复习',
+                        url: '/reviews/senses',
+                        icon: 'mdi-brain',
                         bottomNav: false,
                     },
                     {
-                        name: '词义确认',
-                        url: '/senses/review',
-                        icon: 'mdi-check-decagram',
-                        bottomNav: false,
-                    },
-                    // 词义复习入口已合并到单词复习，保留注释供日后恢复
-                    // {
-                    //     name: '词义复习',
-                    //     url: '/reviews/senses',
-                    //     icon: 'mdi-brain',
-                    //     bottomNav: false,
-                    // },
-                    {
-                        name: '复习卡管理',
+                        name: '高级复习卡管理',
                         url: '/review-cards/manage',
                         icon: 'mdi-card-account-details',
                         bottomNav: false,
@@ -308,7 +294,7 @@
                 DefaultLocalStorageManager.saveSetting('navbar-collapsed', this.navbarCollapsed);
             },
             navigationClick(itemName, event) {
-                if (itemName === '单词复习' || itemName === 'Review') {
+                if (itemName === 'Review') {
                     this.startReviewDialog = true;
                     event.preventDefault();
                 }
