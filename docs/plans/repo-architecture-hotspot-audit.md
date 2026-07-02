@@ -363,6 +363,86 @@
 
 > **本轮合计提升 80%（25 + 55）是子阶段进度提升，不是固定五条主线的虚假上涨。** 固定五条主线仅在「前端入口整理」从 98% 提到 100%，其余保持。AI 推荐词仍未实现，AI 释义生成仍未实现，WordSense/ReviewCard 生成闭环仍未实现，外部 AI 调用仍未实现。
 
+## 2.9 GLM-AIRecommendationConfirmationLoop-V4-1 增量审计（2026-07-02）
+
+> **性质**：AI 示意卡 V4 AI 推荐词确认闭环。实现前已按 Architecture Gate 复核，本轮在 V3 安全生成包边界上做最小扩展：补 AI 推荐词粘贴导入、解析容错、前端 + 后端双重去重、AI 推荐词默认不选、用户勾选确认、最终候选包接口。改动仍集中在 pending item Service/Controller/routes、阅读侧栏 VocabularySideBox/VocabularyBox、相关 feature tests、计划文档。
+
+### 本轮落地
+
+- 新增 `POST /ai-study-card/pending-items/final-candidates-package` 后端接口：返回 `schema_version=ai-study-card-final-candidates-v1` 的安全 JSON 包，含 `user_selected_items` / `ai_recommended_selected_items` / `ai_recommended_unselected_items` / `dedupe_summary` / `generation_rules`（5 条，新增 `user_confirmation_required_before_card_generation`） / `safety_flags`（6 条，新增 `ai_response_pasted_by_user` 与 `user_confirmation_required_before_card_generation`） / `created_at` / `source_preview_package_schema_version`。
+- 路由放置在 `{id}` 通配路由之前，避免 `final-candidates-package` 被误匹配为 id。
+- `AiStudyCardPendingItemService::buildFinalCandidatesPackage()`：
+  - 用户/语言/状态三重隔离：只打包当前用户、当前语言、pending 状态的 item。
+  - 后端二次去重：AI 推荐词与用户已选词去重、AI 推荐词内部去重、unselected_ai_recommendations 与 selected_ai_recommendations 之间去重。
+  - 空结果保护：`selected_item_ids` 与 `selected_ai_recommendations` 都为空 → 返回 422；查询后用户已选词被全部过滤掉且 AI 推荐词也为空 → 返回 422。
+  - 数量上限：最多 100 个用户已选词；最多 200 个 AI 推荐词（selected + unselected）。
+  - 字段容错：缺 `word` 丢弃；缺 `lemma` 用 `word` 代替；缺 `surface` 用 `word` 代替；缺 `confidence` 为 null；缺 `reason` 为「无说明」；缺 `sentence_text` 为 null。
+  - 不调用 AI；不生成 WordSense/ReviewCard/ReviewLog；不触发 FSRS；不改变 pending item 状态；不保存 AI 推荐词或勾选状态到 DB。
+- `VocabularySideBox.vue` 与响应式 `VocabularyBox.vue` 升级 V4 完整 UI：
+  - 「粘贴 AI 推荐词 JSON」文本框（v-textarea multi-line）+ 「解析推荐词」「清空推荐词」按钮。
+  - 解析错误提示（JSON 格式错误 / recommended_items 不是数组 / 全部无效）。
+  - 解析摘要（original_count / valid_count / dropped_missing_word / dropped_duplicate_with_user / dropped_ai_internal_duplicate）。
+  - AI 推荐词列表带 checkbox（默认 unchecked）+ 「全选推荐词」「全不选推荐词」按钮。
+  - 用户已选词区域与 AI 推荐词区域使用 v-divider 视觉分区，不混成一组。
+  - 「生成最终候选包」按钮（v-card-actions 中，与 V3「准备生成」并列）。
+  - 最终候选包 JSON 展示区 + 「复制最终候选包」按钮 + 成功/失败 toast。
+- 前端 `parseAiRecommendations()` 实现：JSON.parse 容错 + recommended_items 数组校验 + 用户已选词 lemma/word 集合预构建 + AI 推荐词 lemma 优先去重 + 缺 word 丢弃 + 默认 unchecked（aiSelectedRecommendationIndices = []）。
+- 前端 `redeedupeAiRecommendationsAfterUserSelectionChange()` 实现：用户勾选/取消用户已选词后，自动重新过滤 AI 推荐词，避免出现重复词显示。
+- 新增 `docs/plans/ai-recommendation-confirmation-loop-plan.md`。
+
+### 边界与测试护栏
+
+| 风险 | 本轮处理 |
+|---|---|
+| final-candidates-package 泄露其他用户/语言/状态 item | Service 内三重过滤：user_id / language_id / status=pending；feature tests 覆盖用户隔离、语言隔离、状态隔离（dismissed 不能进入） |
+| final-candidates-package 改变 pending item 状态 | Service 不修改 pending item；feature test 覆盖 status 不变 |
+| final-candidates-package 误调用 AI | Service 内不调用任何 AI 服务；MCP Chrome 验收确认 Network 仅本地请求 |
+| final-candidates-package 误生成 WordSense/ReviewCard/ReviewLog | Service 不写这些表；feature tests 反向 contract 覆盖 count 不变 |
+| final-candidates-package 误触发 FSRS | Service 不调用 FSRS；feature test 覆盖 ReviewCard 8 个 FSRS 字段（fsrs_state/fsrs_due_at/fsrs_stability/fsrs_difficulty/fsrs_reps/fsrs_lapses/fsrs_last_reviewed_at/fsrs_enabled）不变 |
+| AI 推荐词与用户已选词重复 | 前端 parseAiRecommendations 先去重 + 后端二次去重；feature test 覆盖 |
+| AI 推荐词内部重复 | 前端 seenKeys 去重 + 后端二次去重；feature test 覆盖 |
+| AI 推荐词默认全选 | 前端 aiSelectedRecommendationIndices = []；后端 generation_rules.ai_recommended_default_unchecked=true；feature test 覆盖 unselected_ai_recommendations 字段 |
+| 空 selected_item_ids + 空 selected_ai_recommendations 越过校验 | Controller nullable array + Service empty 检查返回 422；feature test 覆盖 |
+| 查询后空结果（item_ids 非空但被三重隔离过滤掉）越过校验 | Service 在 userSelectedItems 映射后再次检查 empty(userSelectedItems) && empty(cleanSelectedAi) 返回 422；feature tests 覆盖用户隔离、语言隔离、状态隔离三类场景 |
+| 超 100 用户已选词 / 超 200 AI 推荐词 DoS | Service 内 count 检查返回 422；feature test 覆盖 |
+| AI 推荐词 unselected 与 selected 之间重复 | 后端二次去重时把 selected 的 key 加入 seenAiKeys，再过滤 unselected；feature test 覆盖 |
+| 前端粘贴 malformed JSON 致页面崩溃 | 前端 try/catch JSON.parse + 显示「JSON 格式错误：...」+ 不崩溃；MCP Chrome 验收确认 |
+| 前端「生成最终候选包」按钮在无任何勾选时仍可点击 | 前端 `:disabled` 绑定 selectedItemIds.length === 0 && aiSelectedRecommendationIndices.length === 0；MCP Chrome 验收确认 |
+| 复制最终候选包失败静默 | 前端 `navigator.clipboard.writeText` Promise reject 时显示「复制失败」toast；MCP Chrome 验收确认成功提示 |
+| 用户已选词被 AI 推荐词覆盖 | 前端 V3/V4 用户已选词区域保留 V3 勾选状态；AI 推荐词在独立分区；MCP Chrome 验收确认 |
+| 重复词显示两次 | 前端 parseAiRecommendations 去重；redeedupeAiRecommendationsAfterUserSelectionChange 在用户取消勾选时重新过滤；MCP Chrome 验收确认 |
+
+### 本轮未做
+
+- 不调用真实 AI，不保存 AI key，不新增 AI 配置页。
+- 不生成 AI 释义，不生成 WordSense/ReviewCard/ReviewLog。
+- 不改 FSRS、ReviewCard reset/delete/archive/restore、WordSense 删除/归档/恢复。
+- 不删除 SenseReview、SenseMappingReview、legacy word review 兼容层。
+- 不新增 migration（复用 V1 `ai_study_card_pending_items` 表）。
+- 不在 DB 中保存 AI 推荐词或前端 checkbox 勾选状态（本轮纯前端 state + 后端响应）。
+- 不在 DB 中保存最终候选包（最终候选包是临时 JSON，复制即走）。
+- 不把最终候选包发送给外部 AI。
+
+### 五条主线进度
+
+| 主线 | V3 后 | V4 后 |
+|---|---|---|
+| 总体架构收口 | 100% | 100% |
+| 复习主线稳定 | 96% | 96% |
+| 页面真实验收 | 100% | 100% |
+| AI 示意卡规划 | 100% | 100% |
+| 前端入口整理 | 100% | 100% |
+
+### 子阶段进度
+
+| 子阶段 | V3 后 | V4 后 | 说明 |
+|---|---|---|---|
+| AI 示意卡生成闭环 | 95% | 95% | 保持（V4 不改变 AI 示意卡生成闭环子阶段进度） |
+| AI 生成安全契约 | 55% | 85% | V4 新增最终候选包 schema（`ai-study-card-final-candidates-v1`）+ 6 条 safety_flags + 5 条 generation_rules + 后端二次去重 + 18 个反向 contract tests。**85% 是子阶段进度，非五条主线虚假上调。** API key 安全存储、真实 AI 调用边界仍未实现。 |
+| AI 推荐词确认闭环 | — | 80% | 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，非五条主线虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
+
+> **本轮合计提升 110%（30 + 80）是子阶段进度提升，不是固定五条主线的虚假上涨。** 固定五条主线全部保持不变。AI 真实推荐仍未实现，AI 释义生成仍未实现，WordSense/ReviewCard 生成闭环仍未实现，外部 AI 调用仍未实现。
+
 ## 3. 全仓库热点总览
 
 | 文件 | 行数 | 职责 | 风险等级 | 测试状态 | 优先级 | 建议 |

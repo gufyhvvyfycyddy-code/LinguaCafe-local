@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (GLM-AIStudyCardV3-SafePreviewPackage-1)
+> **最后更新**：2026-07-02 (GLM-AIRecommendationConfirmationLoop-V4-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1 pending marker 与前端复习入口统一第一轮已实现；AI 示意卡 V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现；AI 示意卡 V3 已取消项恢复按钮、真实预览内容、安全生成包已实现。下一步仍应由网页端总设计师选择，不自动进入 AI 推荐词、AI 释义生成或完整闭环。
+架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1 pending marker 与前端复习入口统一第一轮已实现；AI 示意卡 V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现；AI 示意卡 V3 已取消项恢复按钮、真实预览内容、安全生成包已实现；AI 示意卡 V4 AI 推荐词粘贴导入、去重、默认不选、用户确认、最终候选包已实现。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环。
 
 ## 2. 最近已完成任务
 
@@ -33,13 +33,15 @@
 | Codex-AIStudyCardV1-And-ReviewEntryUnification-1 | AI 示意卡第一版最小实现 + 前端复习入口统一第一轮。新增 `ai_study_card_pending_items` pending 表、Model/Service/Controller/POST route、侧栏「待 AI 解释」按钮、幂等与隔离 tests；首页「开始复习」和导航「复习」进入 `/reviews/senses`，旧 `/senses/review`、`/review-cards/manage`、`/review/false/-1/-1` 保留。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | GLM-AIStudyCardV2-GenerationLoop-1 | AI 示意卡 V2 生成闭环第一阶段。新增 `GET /ai-study-card/pending-items`（支持 chapter_id 过滤）、`POST /ai-study-card/pending-items/{id}/dismiss`、`POST /ai-study-card/pending-items/{id}/restore`；改造 `createOrGetPending` 支持 dismissed 恢复；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释列表面板、取消按钮、生成前预览弹窗雏形。新增 16 个 V2 feature tests（23 tests / 105 assertions 全绿）。MCP Chrome 真实页面验收 24 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | GLM-AIStudyCardV3-SafePreviewPackage-1 | AI 示意卡 V3 安全生成包。扩展 `GET /ai-study-card/pending-items` 支持 `status=pending\|dismissed\|all` 过滤；新增 `POST /ai-study-card/pending-items/preview-package` 后端安全包接口（schema_version=ai-study-card-preview-package-v1，含 selected_items/generation_rules/safety_flags）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释/已取消视图切换、已取消项恢复按钮、真实预览弹窗（用户已选词列表/来源句子/章节位置/勾选取消/全不选禁用生成/AI 推荐词占位/安全说明/生成规则）、「准备生成」按钮触发后端安全包、JSON 展示与复制按钮。新增 14 个 V3 feature tests（37 tests / 184 assertions 全绿）。MCP Chrome 真实页面验收 28 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
+| GLM-AIRecommendationConfirmationLoop-V4-1 | AI 示意卡 V4 AI 推荐词确认闭环。新增 `POST /ai-study-card/pending-items/final-candidates-package` 后端接口（schema_version=ai-study-card-final-candidates-v1，含 user_selected_items/ai_recommended_selected_items/ai_recommended_unselected_items/dedupe_summary/generation_rules 5条/safety_flags 6条；三重隔离 + 后端二次去重 + 空结果 422 + 数量上限保护）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增 V4 完整 UI（粘贴 AI 推荐词 JSON 文本框 + 解析/清空按钮 + 解析错误提示 + 解析摘要 + AI 推荐词列表默认 unchecked + 全选/全不选 + 用户已选词/AI 推荐词视觉分区 + 「生成最终候选包」按钮 + JSON 展示与复制按钮）。新增 18 个 V4 feature tests（56 tests / 294 assertions 全绿）。MCP Chrome 真实页面验收 33 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 
 ## 3. 当前未最终关闭的事项
 
 本节只放真实未完成事项。已完成任务详情进入 `docs/plans/linguacafe-master-plan.md`，历史材料进入 `docs/HISTORY_INDEX.md`。
 
 - **架构收口阶段已结束**（Codex-FinalArchitectureClosureTargetMode-1）：总体架构收口 100% 不代表全项目完成，只代表旧系统地基已检查、sense-only 复习主线边界清楚、AI 示意卡第一版可进入开发设计。详见 `docs/plans/final-architecture-closure-report.md`。
-- **AI 示意卡 V3 安全生成包已实现**：详见 `docs/plans/ai-study-card-v3-safe-preview-package-plan.md`。已取消项恢复按钮、真实预览内容、安全生成包已落地。AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。
+- **AI 示意卡 V3 安全生成包已实现**：详见 `docs/plans/ai-study-card-v3-safe-preview-package-plan.md`。已取消项恢复按钮、真实预览内容、安全生成包已落地。
+- **AI 示意卡 V4 AI 推荐词确认闭环已实现**：详见 `docs/plans/ai-recommendation-confirmation-loop-plan.md`。AI 推荐词粘贴导入、去重、默认不选、用户确认、最终候选包已落地。AI 真实推荐（自动调 AI）、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。
 - **前端复习入口统一第一轮已实现**：详见 `docs/plans/frontend-review-entry-unification-plan.md`。首页"开始复习"和导航"复习"指向 `/reviews/senses`；`/senses/review`、`/review-cards/manage`、legacy `/review/false/-1/-1` 保留。
 - **Codex-ProjectDocsGovernanceTargetMode-1**：
   - 本轮只做文档治理，不改业务代码和测试；
@@ -47,8 +49,8 @@
   - 旧 `CURRENT_STATUS` / `NEXT_TASK` / `FSRS_PHASE*` / 旧 handoff 已降权为历史参考；
   - 完成后仍由网页端总设计师选择下一任务，不自动进入下一阶段。
 - **AIStudyCardGenerationWorkflow**：
-  - V1 pending marker 已实现，V2 列表/取消/预览雏形已实现，V3 已取消视图/恢复按钮/真实预览/安全生成包已实现；
-  - AI 推荐词、AI 释义生成、AI 示意卡生成闭环仍未实现；
+  - V1 pending marker 已实现，V2 列表/取消/预览雏形已实现，V3 已取消视图/恢复按钮/真实预览/安全生成包已实现，V4 AI 推荐词粘贴导入/去重/默认不选/用户确认/最终候选包已实现；
+  - AI 真实推荐（自动调 AI）、AI 释义生成、AI 示意卡生成闭环仍未实现；
   - 后续任何生成 / 推荐 / 复习卡联动前必须先过 Architecture Gate 与 ADR，不删除现有 SenseMappingReview / SenseReview 能力，不删除 legacy word card 兼容层。
 
 ## 4. 当前产品决策
@@ -148,8 +150,9 @@
 
 | 子阶段 | 进度 | 说明 |
 |--------|------|------|
-| AI 示意卡生成闭环 | ≈ 95% | V3 已取消视图/恢复按钮/真实预览/安全生成包已完成（95%）。**这个 95% 是「AI 示意卡生成闭环」子阶段的进度，不是固定五条主线的虚假上调。** AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
-| AI 生成安全契约 | ≈ 55% | V3 新增安全生成包 schema_version=ai-study-card-preview-package-v1，含 generation_rules（4 条）+ safety_flags（4 条 no_ai_called/no_review_card_created/no_word_sense_created/no_fsrs_changed）；新增 14 个 V3 feature tests 覆盖用户隔离/语言隔离/状态隔离/反向 contract。AI 真实调用、AI 推荐词、用户确认生成等阶段仍未实现。 |
+| AI 示意卡生成闭环 | ≈ 95% | V3 已取消视图/恢复按钮/真实预览/安全生成包已完成（95%）。**这个 95% 是「AI 示意卡生成闭环」子阶段的进度，不是固定五条主线的虚假上调。** AI 真实推荐、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
+| AI 生成安全契约 | ≈ 85% | V3 安全生成包（schema_version=ai-study-card-preview-package-v1）+ V4 最终候选包（schema_version=ai-study-card-final-candidates-v1）已完成。V4 safety_flags 6 条：no_ai_called_by_linguacafe / ai_response_pasted_by_user / no_review_card_created / no_word_sense_created / no_fsrs_changed / user_confirmation_required_before_card_generation；generation_rules 5 条。V3 + V4 共 32 个反向 contract tests 覆盖用户/语言/状态隔离 + 去重 + 默认不选 + 空结果 + 数量上限。**85% 是子阶段进度，不是固定五条主线的虚假上调。** API key 安全存储、真实 AI 调用边界、用户确认后生成 WordSense/ReviewCard 仍未实现。 |
+| AI 推荐词确认闭环 | ≈ 80% | V4 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，不是固定五条主线的虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
 
 > 如果任务失败或 Incomplete，对应进度不得上调。
 > 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。
@@ -210,5 +213,18 @@
 - MCP Chrome real-page acceptance 28/28 passed: login → reading page → click word → mark → list → cancel → dismissed view → restore → real preview modal → checkbox toggle → all-uncheck disables button → 准备生成 → safe package JSON → copy → no AI calls → no WordSense/ReviewCard/ReviewLog writes → main/old review entry points work → console/network clean.
 - Five-line progress: Overall architecture closure 100%, Review mainline stability 96%, Page real acceptance 100%, AI study card planning 100%, Frontend entry cleanup 100%.
 - Sub-phase progress: AI study card generation loop 70% → 95%; AI generation safety contract 0% → 55%. **These are sub-phase progress, NOT a fake uplift of the five main lines.** AI recommended words, AI meaning generation, WordSense/ReviewCard generation loop, and real AI calls are still not implemented.
+- No AI calls, no API key saved, no WordSense/ReviewCard/ReviewLog created, no FSRS changes, no delete/archive/restore changes, no SenseReview/SenseMappingReview/legacy word card removal.
+- Did NOT enter the next task automatically.
+
+## Recent Update: GLM-AIRecommendationConfirmationLoop-V4-1
+
+- AI study card v4 AI recommendation confirmation loop is implemented: paste AI recommendation JSON, dedupe, default unchecked, user confirmation, final candidates package.
+- Backend: added `POST /ai-study-card/pending-items/final-candidates-package` that returns a safe JSON package (schema_version=ai-study-card-final-candidates-v1) with user_selected_items / ai_recommended_selected_items / ai_recommended_unselected_items / dedupe_summary / generation_rules (5 rules) / safety_flags (6 flags: no_ai_called_by_linguacafe / ai_response_pasted_by_user / no_review_card_created / no_word_sense_created / no_fsrs_changed / user_confirmation_required_before_card_generation). Backend enforces user/language/status triple isolation, secondary dedupe (AI vs user-selected, AI internal, unselected vs selected), empty-result 422, post-query empty 422, and size limits (max 100 user-selected, max 200 AI recommendations).
+- Frontend: `VocabularySideBox.vue` and `VocabularyBox.vue` upgraded with V4 paste-AI-recommendation-JSON textarea, parse/clear buttons, parse error message, parse summary (original/valid/dropped-missing-word/dropped-duplicate-with-user/dropped-ai-internal-duplicate), AI recommendation list with checkbox per item default unchecked, select-all/select-none for AI recommendations, visual separation between user-selected words and AI recommendations (v-divider), "生成最终候选包" button in v-card-actions, final candidates package JSON display, and "复制最终候选包" button with success/failure toast.
+- Added 18 new V4 feature tests (56 tests / 294 assertions total, all green). Covers auth, user/language/status isolation, AI dedupe vs user-selected, AI internal dedupe, default-unchecked reflected in data structure, empty selected + empty AI returns 422, only user-selected without AI allowed, invalid AI does not crash, no WordSense/ReviewCard/ReviewLog creation, no pending status change, no FSRS field changes (fsrs_state/fsrs_due_at/fsrs_stability/fsrs_difficulty/fsrs_reps/fsrs_lapses/fsrs_last_reviewed_at/fsrs_enabled), safety_flags correct, unselected AI deduped against selected AI, max items limit, source_preview_package preserved.
+- MCP Chrome real-page acceptance 33/33 passed: login → reading page → click word → mark → list → preview modal → safe package → paste valid JSON (agency + mediation) → parse summary 2/2/0 → default 0 checked → paste duplicate JSON (substantive + agency + Agency) → parse summary 3/1/1/1 → paste malformed JSON → "JSON 格式错误" error → no crash → select one AI recommendation → select all → select none → re-select agency → 生成最终候选包 → final package JSON with schema_version=ai-study-card-final-candidates-v1, user_selected_items(3), ai_recommended_selected_items(1: agency), ai_recommended_unselected_items(1: mediation), dedupe_summary, generation_rules(5), safety_flags(6) → 复制最终候选包 → "已复制到剪贴板" → no external AI network requests (only local POST /final-candidates-package 200 OK) → no WordSense/ReviewCard/ReviewLog writes → /reviews/senses main entry works → /review-cards/manage old entry works → console/network clean.
+- Five-line progress: Overall architecture closure 100%, Review mainline stability 96%, Page real acceptance 100%, AI study card planning 100%, Frontend entry cleanup 100%.
+- Sub-phase progress: AI study card generation loop 95% (unchanged); AI generation safety contract 55% → 85%; AI recommendation confirmation loop 0% → 80% (new sub-phase). **These are sub-phase progress, NOT a fake uplift of the five main lines.** AI real recommendation (auto AI call), AI meaning generation, WordSense/ReviewCard generation loop, and real AI calls are still not implemented.
+- Regression: ReviewFsrsTest 61/364, FsrsSchedulingServiceTest 9/46, WordSense (DestroyRestore+Test) 149/595 all green. npm run development compiled successfully.
 - No AI calls, no API key saved, no WordSense/ReviewCard/ReviewLog created, no FSRS changes, no delete/archive/restore changes, no SenseReview/SenseMappingReview/legacy word card removal.
 - Did NOT enter the next task automatically.

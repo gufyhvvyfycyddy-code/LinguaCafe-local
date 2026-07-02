@@ -535,30 +535,110 @@
                         </div>
                     </div>
 
-                    <!-- AI 推荐词区域（占位，本轮不真正推荐） -->
+                    <!-- AI 推荐词区域（V4: 粘贴导入 + 解析 + 去重 + 默认不选 + 勾选） -->
                     <div class="mt-5">
-                        <div class="text-subtitle-1 font-weight-medium mb-2">
+                        <div class="d-flex align-center mb-2">
                             <v-icon x-small class="mr-1">mdi-robot</v-icon>
-                            AI 推荐词（下一阶段由 AI 推荐）
+                            <span class="text-subtitle-1 font-weight-medium">AI 推荐词</span>
+                            <v-spacer />
+                            <span class="text-caption text--secondary">
+                                共 {{ aiRecommendations.length }} 条，已勾选 {{ aiSelectedRecommendationIndices.length }} 条
+                            </span>
                         </div>
-                        <div class="text-caption text--secondary pa-3 rounded" style="border: 1px dashed var(--v-gray2-base);">
-                            <v-icon x-small class="mr-1">mdi-clock-outline</v-icon>
-                            下一阶段开放。本轮不会请求 AI 推荐。
+
+                        <!-- V4: 粘贴 AI 推荐词 JSON -->
+                        <div class="pa-3 rounded" style="border: 1px dashed var(--v-gray2-base);">
+                            <div class="text-caption font-weight-medium mb-2">粘贴 AI 返回的推荐词 JSON：</div>
+                            <v-textarea
+                                v-model="aiRecommendationJsonInput"
+                                outlined
+                                dense
+                                rows="4"
+                                placeholder='{"schema_version":"ai-study-card-recommendations-v1","recommended_items":[{"word":"agency","lemma":"agency","surface":"agency","reason":"...","sentence_text":"...","confidence":0.86}]}'
+                                class="text-caption"
+                                hide-details
+                            />
+                            <div class="d-flex mt-2">
+                                <v-btn x-small color="primary" depressed @click="parseAiRecommendations" :loading="false">
+                                    <v-icon x-small class="mr-1">mdi-refresh</v-icon>
+                                    解析推荐词
+                                </v-btn>
+                                <v-btn x-small text color="secondary" class="ml-2" @click="clearAiRecommendations">
+                                    <v-icon x-small class="mr-1">mdi-eraser</v-icon>
+                                    清空推荐词
+                                </v-btn>
+                            </div>
+                            <div class="text-caption text--secondary mt-2">
+                                规则：AI 推荐词默认不选；不会与你已选的词重复；需手动勾选才会进入最终候选包。
+                            </div>
                         </div>
-                        <div class="text-caption text--secondary mt-2">
-                            规则预览：AI 推荐词默认不选；不会与你已选的词重复；需你手动确认才会进入生成范围。
+
+                        <!-- V4: 解析错误提示 -->
+                        <v-alert
+                            v-if="aiRecommendationParseError"
+                            dense
+                            text
+                            type="error"
+                            class="mt-2 mb-0"
+                        >{{ aiRecommendationParseError }}</v-alert>
+
+                        <!-- V4: 解析摘要 -->
+                        <div v-if="aiRecommendationSummary" class="mt-2 pa-2 rounded text-caption" style="background: var(--v-gray1-base);">
+                            <div class="font-weight-medium mb-1">解析摘要：</div>
+                            <div>原始推荐数量：{{ aiRecommendationSummary.original_count }}</div>
+                            <div>有效推荐数量：{{ aiRecommendationSummary.valid_count }}</div>
+                            <div>缺少 word 被丢弃：{{ aiRecommendationSummary.dropped_missing_word }}</div>
+                            <div>与用户已选词重复被丢弃：{{ aiRecommendationSummary.dropped_duplicate_with_user }}</div>
+                            <div>AI 推荐词内部重复被丢弃：{{ aiRecommendationSummary.dropped_ai_internal_duplicate }}</div>
+                        </div>
+
+                        <!-- V4: AI 推荐词列表（默认不选，每项 checkbox，reason/confidence/sentence_text 可见） -->
+                        <div v-if="aiRecommendations.length > 0" class="mt-2">
+                            <div class="d-flex align-center mb-2">
+                                <v-btn x-small text color="primary" @click="selectAllAiRecommendations">全选推荐词</v-btn>
+                                <v-btn x-small text color="secondary" class="ml-2" @click="deselectAllAiRecommendations">全不选推荐词</v-btn>
+                            </div>
+                            <v-list dense class="rounded" style="border: 1px solid var(--v-gray2-base);">
+                                <v-list-item v-for="(rec, idx) in aiRecommendations" :key="'ai-rec-' + idx" class="px-2">
+                                    <v-list-item-action class="mr-2">
+                                        <v-checkbox
+                                            :input-value="aiSelectedRecommendationIndices.includes(idx)"
+                                            @change="toggleAiRecommendationSelection(idx)"
+                                            hide-details
+                                            dense
+                                        />
+                                    </v-list-item-action>
+                                    <v-list-item-content>
+                                        <v-list-item-title class="d-flex align-center">
+                                            <span class="font-weight-medium default-font">{{ rec.word }}</span>
+                                            <span v-if="rec.lemma && rec.lemma !== rec.word" class="text-caption text--secondary ml-2">({{ rec.lemma }})</span>
+                                            <v-chip x-small class="ml-2" color="purple" text-color="white">AI 推荐</v-chip>
+                                            <span v-if="rec.confidence !== null && rec.confidence !== undefined" class="text-caption text--secondary ml-2">
+                                                置信度 {{ Math.round(rec.confidence * 100) }}%
+                                            </span>
+                                        </v-list-item-title>
+                                        <v-list-item-subtitle v-if="rec.reason" class="text-caption text--secondary mt-1" style="white-space: normal; line-height: 1.4;">
+                                            原因：{{ rec.reason }}
+                                        </v-list-item-subtitle>
+                                        <v-list-item-subtitle v-if="rec.sentence_text" class="text-caption text--secondary mt-1" style="white-space: normal; line-height: 1.4;">
+                                            来源句子：{{ rec.sentence_text }}
+                                        </v-list-item-subtitle>
+                                    </v-list-item-content>
+                                </v-list-item>
+                            </v-list>
                         </div>
                     </div>
 
                     <!-- 规则说明 -->
                     <div class="mt-5 pa-3 rounded" style="background: var(--v-gray1-base);">
-                        <div class="text-caption font-weight-medium mb-1">未来生成规则预览：</div>
+                        <div class="text-caption font-weight-medium mb-1">生成规则说明：</div>
                         <ul class="text-caption text--secondary" style="line-height: 1.6;">
-                            <li>你已选的词会自动进入生成范围。</li>
+                            <li>你已选的词会自动进入最终候选包。</li>
                             <li>AI 推荐词默认不选，需手动勾选。</li>
                             <li>AI 推荐词不会与你已选的词重复。</li>
-                            <li>只有你确认后，才会真正生成示意卡。</li>
-                            <li>本轮「准备生成」只生成安全预览包，不调用 AI。</li>
+                            <li>只有你确认后，才会生成最终候选包。</li>
+                            <li>最终候选包不会生成复习卡，也不会调用 AI。</li>
+                            <li>下一阶段才会基于最终候选包生成 WordSense / ReviewCard（需用户再次确认）。</li>
                         </ul>
                     </div>
 
@@ -605,6 +685,50 @@
                         type="error"
                         class="mt-3"
                     >{{ aiPreviewPackageError }}</v-alert>
+
+                    <!-- V4: 最终候选包展示区域 -->
+                    <div v-if="aiFinalCandidatesPackage" class="mt-5">
+                        <div class="d-flex align-center mb-2">
+                            <v-icon x-small class="mr-1">mdi-check-decagram</v-icon>
+                            <span class="text-subtitle-1 font-weight-medium">最终候选包</span>
+                            <v-spacer />
+                            <v-btn
+                                x-small
+                                rounded
+                                depressed
+                                color="primary"
+                                @click="copyFinalCandidatesPackage"
+                            >
+                                <v-icon x-small class="mr-1">mdi-content-copy</v-icon>
+                                复制最终候选包
+                            </v-btn>
+                        </div>
+                        <v-alert
+                            v-if="aiFinalCopyMessage"
+                            dense
+                            text
+                            :type="aiFinalCopied ? 'success' : 'error'"
+                            class="mb-2"
+                        >{{ aiFinalCopyMessage }}</v-alert>
+                        <v-alert
+                            dense
+                            text
+                            type="warning"
+                            class="mb-2"
+                        >
+                            这只是最终候选包，不是 AI 输出，不会生成复习卡。下一阶段需你再次确认才会生成 WordSense / ReviewCard。
+                        </v-alert>
+                        <pre class="pa-3 rounded text-caption" style="background: var(--v-gray1-base); max-height: 280px; overflow: auto; white-space: pre-wrap; word-break: break-all;">{{ JSON.stringify(aiFinalCandidatesPackage, null, 2) }}</pre>
+                    </div>
+
+                    <!-- V4: 最终候选包错误提示 -->
+                    <v-alert
+                        v-if="aiFinalCandidatesError"
+                        dense
+                        text
+                        type="error"
+                        class="mt-3"
+                    >{{ aiFinalCandidatesError }}</v-alert>
                 </v-card-text>
                 <v-card-actions class="d-flex pa-3">
                     <v-btn text @click="aiStudyCardPreviewDialog = false">关闭</v-btn>
@@ -617,6 +741,16 @@
                     >
                         <v-icon small class="mr-1">mdi-package-variant</v-icon>
                         准备生成
+                    </v-btn>
+                    <v-btn
+                        color="success"
+                        :disabled="(aiPreviewSelectedItemIds.length === 0 && aiSelectedRecommendationIndices.length === 0) || aiFinalCandidatesLoading || !aiPreviewPackage"
+                        :loading="aiFinalCandidatesLoading"
+                        @click="generateFinalCandidatesPackage"
+                        class="ml-2"
+                    >
+                        <v-icon small class="mr-1">mdi-check-decagram</v-icon>
+                        生成最终候选包
                     </v-btn>
                 </v-card-actions>
             </v-card>
@@ -713,6 +847,17 @@
                 aiPreviewPackageError: '',
                 aiPreviewCopyMessage: '',
                 aiPreviewCopied: false,
+                // V4: AI 推荐词粘贴导入 + 去重 + 默认不选 + 勾选 + 最终候选包
+                aiRecommendationJsonInput: '',
+                aiRecommendations: [],
+                aiSelectedRecommendationIndices: [],
+                aiRecommendationParseError: '',
+                aiRecommendationSummary: null,
+                aiFinalCandidatesPackage: null,
+                aiFinalCandidatesLoading: false,
+                aiFinalCandidatesError: '',
+                aiFinalCopyMessage: '',
+                aiFinalCopied: false,
             };
         },
         watch: {
@@ -919,11 +1064,22 @@
             // V3: 打开生成预览弹窗，初始化勾选状态
             openAiStudyCardPreview() {
                 this.aiStudyCardPreviewDialog = true;
+                // 默认全部勾选
                 this.aiPreviewSelectedItemIds = this.aiPendingItems.map(i => i.id);
                 this.aiPreviewPackage = null;
                 this.aiPreviewPackageError = '';
                 this.aiPreviewCopyMessage = '';
                 this.aiPreviewCopied = false;
+                // V4: 清空 AI 推荐词相关状态
+                this.aiRecommendationJsonInput = '';
+                this.aiRecommendations = [];
+                this.aiSelectedRecommendationIndices = [];
+                this.aiRecommendationParseError = '';
+                this.aiRecommendationSummary = null;
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCandidatesError = '';
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
             },
             // V3: 切换某个词的勾选状态
             togglePreviewItemSelection(itemId) {
@@ -933,9 +1089,15 @@
                 } else {
                     this.aiPreviewSelectedItemIds.push(itemId);
                 }
+                // 清空已生成的包（因为选择变了）
                 this.aiPreviewPackage = null;
                 this.aiPreviewCopyMessage = '';
                 this.aiPreviewCopied = false;
+                // V4: 用户已选词变化时，重新对 AI 推荐词去重并清空最终候选包
+                this.rededupeAiRecommendationsAfterUserSelectionChange();
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
             },
             // V3: 全选
             selectAllPreviewItems() {
@@ -943,6 +1105,11 @@
                 this.aiPreviewPackage = null;
                 this.aiPreviewCopyMessage = '';
                 this.aiPreviewCopied = false;
+                // V4: 重新对 AI 推荐词去重
+                this.rededupeAiRecommendationsAfterUserSelectionChange();
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
             },
             // V3: 全不选
             deselectAllPreviewItems() {
@@ -950,6 +1117,262 @@
                 this.aiPreviewPackage = null;
                 this.aiPreviewCopyMessage = '';
                 this.aiPreviewCopied = false;
+                // V4: 重新对 AI 推荐词去重
+                this.rededupeAiRecommendationsAfterUserSelectionChange();
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+            },
+            // V4: 解析 AI 推荐词 JSON
+            parseAiRecommendations() {
+                this.aiRecommendationParseError = '';
+                this.aiRecommendationSummary = null;
+                this.aiRecommendations = [];
+                this.aiSelectedRecommendationIndices = [];
+
+                const text = (this.aiRecommendationJsonInput || '').trim();
+                if (!text) {
+                    this.aiRecommendationParseError = '请粘贴 AI 推荐词 JSON。';
+                    return;
+                }
+
+                let parsed;
+                try {
+                    parsed = JSON.parse(text);
+                } catch (e) {
+                    this.aiRecommendationParseError = 'JSON 格式错误：' + (e.message || '无法解析。');
+                    return;
+                }
+
+                if (!parsed || typeof parsed !== 'object') {
+                    this.aiRecommendationParseError = 'JSON 根对象必须是对象。';
+                    return;
+                }
+
+                const schemaVersion = parsed.schema_version || 'unknown';
+                if (schemaVersion !== 'ai-study-card-recommendations-v1') {
+                    // 不强制要求 schema_version，但给出提示
+                    // 仅警告，不阻止解析
+                }
+
+                const items = parsed.recommended_items;
+                if (!Array.isArray(items)) {
+                    this.aiRecommendationParseError = 'recommended_items 必须是数组。';
+                    return;
+                }
+
+                const userSelectedKeys = {};
+                const selectedItems = this.aiPendingItems.filter(i => this.aiPreviewSelectedItemIds.includes(i.id));
+                selectedItems.forEach(item => {
+                    const key = (item.lemma || item.word || '').trim().toLowerCase();
+                    if (key) userSelectedKeys[key] = true;
+                });
+
+                const validRecommendations = [];
+                const seenKeys = {};
+                let droppedMissingWord = 0;
+                let droppedDuplicateWithUser = 0;
+                let droppedAiInternalDuplicate = 0;
+
+                items.forEach((raw) => {
+                    if (!raw || typeof raw !== 'object') {
+                        droppedMissingWord++;
+                        return;
+                    }
+                    const word = (raw.word || '').toString().trim();
+                    if (!word) {
+                        droppedMissingWord++;
+                        return;
+                    }
+                    const lemma = (raw.lemma || '').toString().trim() || word;
+                    const key = lemma.toLowerCase();
+                    if (userSelectedKeys[key]) {
+                        droppedDuplicateWithUser++;
+                        return;
+                    }
+                    if (seenKeys[key]) {
+                        droppedAiInternalDuplicate++;
+                        return;
+                    }
+                    seenKeys[key] = true;
+                    validRecommendations.push({
+                        word: word,
+                        lemma: lemma,
+                        surface: (raw.surface || '').toString().trim() || word,
+                        reason: (raw.reason || '').toString().trim() || '无说明',
+                        sentence_text: raw.sentence_text ? (raw.sentence_text).toString().trim() : '',
+                        confidence: raw.confidence !== undefined && raw.confidence !== null ? raw.confidence : null,
+                    });
+                });
+
+                this.aiRecommendations = validRecommendations;
+                // 默认全部不选
+                this.aiSelectedRecommendationIndices = [];
+                this.aiRecommendationSummary = {
+                    original_count: items.length,
+                    valid_count: validRecommendations.length,
+                    dropped_missing_word: droppedMissingWord,
+                    dropped_duplicate_with_user: droppedDuplicateWithUser,
+                    dropped_ai_internal_duplicate: droppedAiInternalDuplicate,
+                };
+
+                if (validRecommendations.length === 0) {
+                    this.aiRecommendationParseError = '没有有效的 AI 推荐词。';
+                }
+            },
+            // V4: 清空 AI 推荐词
+            clearAiRecommendations() {
+                this.aiRecommendationJsonInput = '';
+                this.aiRecommendations = [];
+                this.aiSelectedRecommendationIndices = [];
+                this.aiRecommendationParseError = '';
+                this.aiRecommendationSummary = null;
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCandidatesError = '';
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+            },
+            // V4: 用户已选词变化后，重新对 AI 推荐词去重
+            // 如果之前已解析出推荐词，重新过滤一遍，把和新选词重复的移除
+            rededupeAiRecommendationsAfterUserSelectionChange() {
+                if (this.aiRecommendations.length === 0) {
+                    return;
+                }
+                const userSelectedKeys = {};
+                const selectedItems = this.aiPendingItems.filter(i => this.aiPreviewSelectedItemIds.includes(i.id));
+                selectedItems.forEach(item => {
+                    const key = (item.lemma || item.word || '').trim().toLowerCase();
+                    if (key) userSelectedKeys[key] = true;
+                });
+
+                const kept = [];
+                const keptIndices = [];
+                let dropped = 0;
+                this.aiRecommendations.forEach((rec, idx) => {
+                    const key = (rec.lemma || rec.word || '').trim().toLowerCase();
+                    if (userSelectedKeys[key]) {
+                        dropped++;
+                        return;
+                    }
+                    kept.push(rec);
+                    if (this.aiSelectedRecommendationIndices.includes(idx)) {
+                        keptIndices.push(kept.length - 1);
+                    }
+                });
+
+                this.aiRecommendations = kept;
+                this.aiSelectedRecommendationIndices = keptIndices;
+                if (this.aiRecommendationSummary) {
+                    this.aiRecommendationSummary.valid_count = kept.length;
+                    this.aiRecommendationSummary.dropped_duplicate_with_user += dropped;
+                }
+            },
+            // V4: 切换 AI 推荐词勾选
+            toggleAiRecommendationSelection(idx) {
+                const i = this.aiSelectedRecommendationIndices.indexOf(idx);
+                if (i >= 0) {
+                    this.aiSelectedRecommendationIndices.splice(i, 1);
+                } else {
+                    this.aiSelectedRecommendationIndices.push(idx);
+                }
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+            },
+            // V4: 全选 AI 推荐词
+            selectAllAiRecommendations() {
+                this.aiSelectedRecommendationIndices = this.aiRecommendations.map((_, idx) => idx);
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+            },
+            // V4: 全不选 AI 推荐词
+            deselectAllAiRecommendations() {
+                this.aiSelectedRecommendationIndices = [];
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+            },
+            // V4: 生成最终候选包
+            generateFinalCandidatesPackage() {
+                if (this.aiPreviewSelectedItemIds.length === 0 && this.aiSelectedRecommendationIndices.length === 0) {
+                    return;
+                }
+                if (!this.aiPreviewPackage) {
+                    this.aiFinalCandidatesError = '请先点击「准备生成」生成安全预览包。';
+                    return;
+                }
+                this.aiFinalCandidatesLoading = true;
+                this.aiFinalCandidatesError = '';
+                this.aiFinalCandidatesPackage = null;
+                this.aiFinalCopyMessage = '';
+                this.aiFinalCopied = false;
+
+                const selectedAi = this.aiSelectedRecommendationIndices.map(idx => this.aiRecommendations[idx]).filter(Boolean);
+                const unselectedAi = this.aiRecommendations
+                    .map((rec, idx) => ({ rec, idx }))
+                    .filter(({ idx }) => !this.aiSelectedRecommendationIndices.includes(idx))
+                    .map(({ rec }) => rec);
+
+                axios.post('/ai-study-card/pending-items/final-candidates-package', {
+                    selected_item_ids: this.aiPreviewSelectedItemIds,
+                    selected_ai_recommendations: selectedAi,
+                    unselected_ai_recommendations: unselectedAi,
+                    dedupe_summary: this.aiRecommendationSummary || {
+                        original_ai_count: 0,
+                        valid_ai_count: 0,
+                        dropped_missing_word: 0,
+                        dropped_duplicate_with_user: 0,
+                        dropped_ai_internal_duplicate: 0,
+                    },
+                    source_preview_package: this.aiPreviewPackage,
+                }).then((response) => {
+                    if (response.data && response.data.success) {
+                        this.aiFinalCandidatesPackage = response.data.package;
+                    } else {
+                        this.aiFinalCandidatesError = response.data && response.data.message
+                            ? response.data.message
+                            : '生成最终候选包失败。';
+                    }
+                }).catch((error) => {
+                    this.aiFinalCandidatesError = error.response && error.response.data && error.response.data.message
+                        ? error.response.data.message
+                        : '生成最终候选包失败。';
+                }).finally(() => {
+                    this.aiFinalCandidatesLoading = false;
+                });
+            },
+            // V4: 复制最终候选包
+            copyFinalCandidatesPackage() {
+                if (!this.aiFinalCandidatesPackage) {
+                    return;
+                }
+                const text = JSON.stringify(this.aiFinalCandidatesPackage, null, 2);
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        this.aiFinalCopied = true;
+                        this.aiFinalCopyMessage = '已复制到剪贴板。';
+                    }).catch(() => {
+                        this.aiFinalCopied = false;
+                        this.aiFinalCopyMessage = '复制失败，请手动选择文本复制。';
+                    });
+                } else {
+                    try {
+                        const textarea = document.createElement('textarea');
+                        textarea.value = text;
+                        textarea.style.position = 'fixed';
+                        textarea.style.opacity = '0';
+                        document.body.appendChild(textarea);
+                        textarea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textarea);
+                        this.aiFinalCopied = true;
+                        this.aiFinalCopyMessage = '已复制到剪贴板。';
+                    } catch (e) {
+                        this.aiFinalCopied = false;
+                        this.aiFinalCopyMessage = '复制失败，请手动选择文本复制。';
+                    }
+                }
             },
             // V3: 生成安全预览包
             generatePreviewPackage() {

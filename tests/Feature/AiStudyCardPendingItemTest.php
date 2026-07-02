@@ -760,6 +760,447 @@ class AiStudyCardPendingItemTest extends TestCase
         $this->assertCount(2, $response->json('package.selected_items'));
     }
 
+    // ===== V4: final-candidates-package tests =====
+
+    public function test_final_candidates_package_generates_for_own_pending_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonStructure([
+            'success',
+            'message',
+            'package' => [
+                'schema_version',
+                'source_preview_package_schema_version',
+                'created_at',
+                'user_selected_items',
+                'ai_recommended_selected_items',
+                'ai_recommended_unselected_items',
+                'dedupe_summary',
+                'generation_rules',
+                'safety_flags',
+            ],
+        ]);
+
+        $package = $response->json('package');
+        $this->assertSame('ai-study-card-final-candidates-v1', $package['schema_version']);
+        $this->assertCount(1, $package['user_selected_items']);
+        $this->assertSame($itemId, $package['user_selected_items'][0]['item_id']);
+        $this->assertSame('landscape', $package['user_selected_items'][0]['word']);
+        $this->assertSame('user_selected', $package['user_selected_items'][0]['source']);
+
+        // safety flags (V4 6 条)
+        $this->assertTrue($package['safety_flags']['no_ai_called_by_linguacafe']);
+        $this->assertTrue($package['safety_flags']['ai_response_pasted_by_user']);
+        $this->assertTrue($package['safety_flags']['no_review_card_created']);
+        $this->assertTrue($package['safety_flags']['no_word_sense_created']);
+        $this->assertTrue($package['safety_flags']['no_fsrs_changed']);
+        $this->assertTrue($package['safety_flags']['user_confirmation_required_before_card_generation']);
+
+        // generation rules (V4 5 条)
+        $this->assertTrue($package['generation_rules']['no_auto_review_card']);
+        $this->assertTrue($package['generation_rules']['ai_recommended_default_unchecked']);
+        $this->assertTrue($package['generation_rules']['ai_recommended_exclude_user_selected']);
+        $this->assertTrue($package['generation_rules']['user_confirmation_required_before_generation']);
+        $this->assertTrue($package['generation_rules']['user_confirmation_required_before_card_generation']);
+    }
+
+    public function test_final_candidates_package_unauthenticated_user_cannot_generate(): void
+    {
+        $this->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [1],
+        ])->assertUnauthorized();
+    }
+
+    public function test_final_candidates_package_user_isolation_rejects_other_users_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        // 后端把不属于自己的 item 过滤掉，user_selected_items 为空
+        // 由于 selected_ai_recommendations 也为空，触发 422
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_final_candidates_package_excludes_dismissed_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        // dismissed item 被过滤掉，user_selected_items 为空
+        // selected_ai_recommendations 也为空，触发 422
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_final_candidates_package_language_isolation(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        // 英文 item 在 spanish 语言下被过滤掉
+        // selected_ai_recommendations 也为空，触发 422
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_final_candidates_package_ai_recommendations_deduped_against_user_selected(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // AI 推荐词 lemma=landscape，与用户已选词重复
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => 'landscape', 'lemma' => 'landscape', 'reason' => 'should be dropped'],
+            ],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        // 推荐词被后端去重，ai_recommended_selected_items 应为空
+        $this->assertCount(0, $package['ai_recommended_selected_items']);
+        // 去重摘要应反映后端去重
+        $this->assertGreaterThan(0, $package['dedupe_summary']['dropped_duplicate_with_user']);
+        $this->assertTrue($package['dedupe_summary']['backend_deduplication_applied']);
+    }
+
+    public function test_final_candidates_package_ai_recommendations_internal_dedupe(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 两条 AI 推荐词 lemma 相同（大小写不同）
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'first'],
+                ['word' => 'Agency', 'lemma' => 'agency', 'reason' => 'duplicate'],
+            ],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        // 只保留第一条
+        $this->assertCount(1, $package['ai_recommended_selected_items']);
+        $this->assertSame('agency', $package['ai_recommended_selected_items'][0]['word']);
+        $this->assertGreaterThan(0, $package['dedupe_summary']['dropped_ai_internal_duplicate']);
+    }
+
+    public function test_final_candidates_package_default_unselected_reflected_in_data_structure(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 前端默认不选 → unselected_ai_recommendations 包含所有 AI 推荐词
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'not selected by user'],
+            ],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        $this->assertCount(0, $package['ai_recommended_selected_items']);
+        $this->assertCount(1, $package['ai_recommended_unselected_items']);
+        $this->assertSame('agency', $package['ai_recommended_unselected_items'][0]['word']);
+    }
+
+    public function test_final_candidates_package_empty_selected_and_empty_ai_returns_error(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_final_candidates_package_only_user_selected_without_ai_allowed(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $package = $response->json('package');
+        $this->assertCount(1, $package['user_selected_items']);
+        $this->assertCount(0, $package['ai_recommended_selected_items']);
+        $this->assertCount(0, $package['ai_recommended_unselected_items']);
+    }
+
+    public function test_final_candidates_package_invalid_ai_recommendations_does_not_crash(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 各种无效的 AI 推荐词
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => ''],  // 空 word
+                ['lemma' => 'no-word'],  // 缺少 word
+                'not-an-array-element',  // 不是数组
+                ['word' => 'valid', 'lemma' => 'valid'],
+                null,
+            ],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        // 只保留一条有效推荐
+        $this->assertCount(1, $package['ai_recommended_selected_items']);
+        $this->assertSame('valid', $package['ai_recommended_selected_items'][0]['word']);
+    }
+
+    public function test_final_candidates_package_does_not_create_learning_data(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $before = [
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+            'review_logs' => ReviewLog::count(),
+            'encountered_words' => EncounteredWord::count(),
+            'word_sense_occurrences' => WordSenseOccurrence::count(),
+        ];
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'test'],
+            ],
+            'unselected_ai_recommendations' => [],
+        ])->assertOk();
+
+        $this->assertSame($before['word_senses'], WordSense::count());
+        $this->assertSame($before['review_cards'], ReviewCard::count());
+        $this->assertSame($before['review_logs'], ReviewLog::count());
+        $this->assertSame($before['encountered_words'], EncounteredWord::count());
+        $this->assertSame($before['word_sense_occurrences'], WordSenseOccurrence::count());
+    }
+
+    public function test_final_candidates_package_does_not_change_pending_item_status(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ])->assertOk();
+
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_final_candidates_package_does_not_change_fsrs_fields(): void
+    {
+        // 创建一个带 ReviewCard 的 fixture，验证 final-candidates-package 不改 FSRS 字段
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $reviewCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'target_type' => 'sense',
+            'target_id' => 1,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDays(3),
+            'fsrs_stability' => 1.5,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 2,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+            'fsrs_enabled' => true,
+        ]);
+
+        $beforeStability = $reviewCard->fsrs_stability;
+        $beforeDifficulty = $reviewCard->fsrs_difficulty;
+        $beforeDueAt = $reviewCard->fsrs_due_at;
+        $beforeFsrsState = $reviewCard->fsrs_state;
+        $beforeReps = $reviewCard->fsrs_reps;
+        $beforeLapses = $reviewCard->fsrs_lapses;
+        $beforeEnabled = $reviewCard->fsrs_enabled;
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ])->assertOk();
+
+        $reviewCard->refresh();
+        $this->assertSame($beforeStability, $reviewCard->fsrs_stability);
+        $this->assertSame($beforeDifficulty, $reviewCard->fsrs_difficulty);
+        $this->assertEquals($beforeDueAt, $reviewCard->fsrs_due_at);
+        $this->assertSame($beforeFsrsState, $reviewCard->fsrs_state);
+        $this->assertSame($beforeReps, $reviewCard->fsrs_reps);
+        $this->assertSame($beforeLapses, $reviewCard->fsrs_lapses);
+        $this->assertSame($beforeEnabled, $reviewCard->fsrs_enabled);
+    }
+
+    public function test_final_candidates_package_with_source_preview_package(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $previewPackage = [
+            'schema_version' => 'ai-study-card-preview-package-v1',
+            'created_at' => now()->toIso8601String(),
+            'selected_items' => [],
+            'generation_rules' => [],
+            'safety_flags' => [],
+        ];
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+            'source_preview_package' => $previewPackage,
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        $this->assertSame('ai-study-card-preview-package-v1', $package['source_preview_package_schema_version']);
+    }
+
+    public function test_final_candidates_package_ai_recommendation_missing_word_dropped(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => '', 'lemma' => 'empty-word'],  // 空 word 被丢弃
+                ['word' => 'valid', 'lemma' => 'valid'],  // 有效
+            ],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        $this->assertCount(1, $package['ai_recommended_selected_items']);
+        $this->assertSame('valid', $package['ai_recommended_selected_items'][0]['word']);
+    }
+
+    public function test_final_candidates_package_max_items_limit(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 101 个 selected_item_ids
+        $itemIds = array_fill(0, 101, $itemId);
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => $itemIds,
+            'selected_ai_recommendations' => [],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        // 后端限制最多 100 个
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_final_candidates_package_unselected_ai_deduped_against_selected_ai(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // selected_ai 和 unselected_ai 都有 agency，unselected 的应被丢弃
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'selected'],
+            ],
+            'unselected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'duplicate with selected'],
+            ],
+        ]);
+
+        $response->assertOk();
+        $package = $response->json('package');
+        $this->assertCount(1, $package['ai_recommended_selected_items']);
+        $this->assertCount(0, $package['ai_recommended_unselected_items']);
+    }
+
+    public function test_final_candidates_package_safety_flags_correct(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/final-candidates-package', [
+            'selected_item_ids' => [$itemId],
+            'selected_ai_recommendations' => [
+                ['word' => 'agency', 'lemma' => 'agency', 'reason' => 'test'],
+            ],
+            'unselected_ai_recommendations' => [],
+        ]);
+
+        $response->assertOk();
+        $flags = $response->json('package.safety_flags');
+        $this->assertTrue($flags['no_ai_called_by_linguacafe']);
+        $this->assertTrue($flags['ai_response_pasted_by_user']);
+        $this->assertTrue($flags['no_review_card_created']);
+        $this->assertTrue($flags['no_word_sense_created']);
+        $this->assertTrue($flags['no_fsrs_changed']);
+        $this->assertTrue($flags['user_confirmation_required_before_card_generation']);
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([

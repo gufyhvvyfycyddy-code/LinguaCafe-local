@@ -246,6 +246,230 @@ class AiStudyCardPendingItemService
     }
 
     /**
+     * V4: 构建最终候选包（final-candidates-package）。
+     *
+     * 入参：
+     *   - selected_item_ids: 用户已选 pending item id 列表
+     *   - selected_ai_recommendations: 用户勾选的 AI 推荐词（已去重，前端已勾选）
+     *   - unselected_ai_recommendations: 用户未勾选的 AI 推荐词（已去重，前端未勾选）
+     *   - dedupe_summary: 前端去重摘要（可选）
+     *   - source_preview_package: 来源 V3 安全生成包（可选，仅作记录）
+     *
+     * 后端二次去重：
+     *   - selected_item_ids 必须属于当前用户/当前语言/pending
+     *   - selected_ai_recommendations 不能和用户已选词重复（lemma 或 word，大小写不敏感）
+     *   - selected_ai_recommendations 之间不能重复
+     *   - unselected_ai_recommendations 不能和 selected_ai_recommendations 重复
+     *
+     * 不调用 AI，不生成 WordSense/ReviewCard/ReviewLog，不触发 FSRS。
+     * 不改变 pending item 状态。
+     */
+    public function buildFinalCandidatesPackage(User $user, array $payload): array
+    {
+        $selectedItemIds = is_array($payload['selected_item_ids'] ?? null) ? $payload['selected_item_ids'] : [];
+        $selectedAi = is_array($payload['selected_ai_recommendations'] ?? null) ? $payload['selected_ai_recommendations'] : [];
+        $unselectedAi = is_array($payload['unselected_ai_recommendations'] ?? null) ? $payload['unselected_ai_recommendations'] : [];
+        $dedupeSummary = is_array($payload['dedupe_summary'] ?? null) ? $payload['dedupe_summary'] : [];
+        $sourcePreviewPackage = is_array($payload['source_preview_package'] ?? null) ? $payload['source_preview_package'] : null;
+
+        // 至少要有用户已选词或 AI 推荐词被选中
+        if (empty($selectedItemIds) && empty($selectedAi)) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '请至少选择一个用户已选词或勾选一个 AI 推荐词。',
+            ];
+        }
+
+        // 限制 selected_item_ids 数量
+        if (count($selectedItemIds) > 100) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '单次最终候选包最多 100 个用户已选词。',
+            ];
+        }
+
+        // 限制 AI 推荐词数量
+        $aiCount = count($selectedAi) + count($unselectedAi);
+        if ($aiCount > 200) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '单次最终候选包最多 200 个 AI 推荐词。',
+            ];
+        }
+
+        $language = $user->selected_language;
+
+        // 查询用户已选词，三重隔离：user_id / language_id / status=pending
+        $items = !empty($selectedItemIds)
+            ? AiStudyCardPendingItem::where('user_id', $user->id)
+                ->where('language_id', $language)
+                ->where('status', AiStudyCardPendingItem::STATUS_PENDING)
+                ->whereIn('id', $selectedItemIds)
+                ->get()
+            : collect();
+
+        // 用户已选词的 lemma/word 集合（用于排除 AI 推荐词）
+        $userSelectedKeys = [];
+        foreach ($items as $item) {
+            $key = $this->dedupeKey($item->lemma, $item->word);
+            if ($key !== '') {
+                $userSelectedKeys[$key] = true;
+            }
+        }
+
+        // 后端二次去重：selected_ai_recommendations
+        $seenAiKeys = [];
+        $cleanSelectedAi = [];
+        $droppedDuplicateWithUser = 0;
+        $droppedAiInternalDuplicate = 0;
+        foreach ($selectedAi as $rec) {
+            $word = trim((string) ($rec['word'] ?? ''));
+            if ($word === '') {
+                continue;
+            }
+            $lemma = trim((string) ($rec['lemma'] ?? '')) ?: $word;
+            $key = $this->dedupeKey($lemma, $word);
+            if ($key === '') {
+                continue;
+            }
+            if (isset($userSelectedKeys[$key])) {
+                $droppedDuplicateWithUser++;
+                continue;
+            }
+            if (isset($seenAiKeys[$key])) {
+                $droppedAiInternalDuplicate++;
+                continue;
+            }
+            $seenAiKeys[$key] = true;
+            $cleanSelectedAi[] = $this->normalizeAiRecommendation($rec, $word, $lemma);
+        }
+
+        // unselected_ai_recommendations 去重（不与 selected_ai 重复，不与用户已选词重复）
+        $cleanUnselectedAi = [];
+        foreach ($unselectedAi as $rec) {
+            $word = trim((string) ($rec['word'] ?? ''));
+            if ($word === '') {
+                continue;
+            }
+            $lemma = trim((string) ($rec['lemma'] ?? '')) ?: $word;
+            $key = $this->dedupeKey($lemma, $word);
+            if ($key === '') {
+                continue;
+            }
+            if (isset($userSelectedKeys[$key])) {
+                continue;
+            }
+            if (isset($seenAiKeys[$key])) {
+                continue;
+            }
+            $seenAiKeys[$key] = true;
+            $cleanUnselectedAi[] = $this->normalizeAiRecommendation($rec, $word, $lemma);
+        }
+
+        $userSelectedItems = $items->map(function ($item) {
+            return [
+                'item_id' => $item->id,
+                'chapter_id' => $item->chapter_id,
+                'text_block_index' => $item->text_block_index,
+                'sentence_index' => $item->sentence_index,
+                'word' => $item->word,
+                'normalized_word' => $item->normalized_word,
+                'surface' => $item->surface,
+                'lemma' => $item->lemma,
+                'sentence_text' => $item->sentence_text,
+                'status' => $item->status,
+                'source' => 'user_selected',
+            ];
+        })->values()->toArray();
+
+        // V4: 查询后再次检查 — 如果用户已选词被全部过滤掉（不属于当前用户/语言/pending），
+        // 且 AI 推荐词也为空，则返回 422。
+        // 这防止了 selected_item_ids 非空但实际查询结果为空的边界情况。
+        if (empty($userSelectedItems) && empty($cleanSelectedAi)) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '没有有效的用户已选词或 AI 推荐词可打包（可能已被取消、不属于当前用户或语言不匹配）。',
+            ];
+        }
+
+        // 合并前后端去重摘要
+        $mergedDedupeSummary = [
+            'original_ai_count' => $dedupeSummary['original_ai_count'] ?? count($selectedAi) + count($unselectedAi),
+            'valid_ai_count' => count($cleanSelectedAi) + count($cleanUnselectedAi),
+            'dropped_missing_word' => $dedupeSummary['dropped_missing_word'] ?? 0,
+            'dropped_duplicate_with_user' => ($dedupeSummary['dropped_duplicate_with_user'] ?? 0) + $droppedDuplicateWithUser,
+            'dropped_ai_internal_duplicate' => ($dedupeSummary['dropped_ai_internal_duplicate'] ?? 0) + $droppedAiInternalDuplicate,
+            'backend_deduplication_applied' => $droppedDuplicateWithUser + $droppedAiInternalDuplicate > 0,
+        ];
+
+        $package = [
+            'schema_version' => 'ai-study-card-final-candidates-v1',
+            'source_preview_package_schema_version' => $sourcePreviewPackage['schema_version'] ?? null,
+            'created_at' => now()->toIso8601String(),
+            'user_selected_items' => $userSelectedItems,
+            'ai_recommended_selected_items' => $cleanSelectedAi,
+            'ai_recommended_unselected_items' => $cleanUnselectedAi,
+            'dedupe_summary' => $mergedDedupeSummary,
+            'generation_rules' => [
+                'no_auto_review_card' => true,
+                'ai_recommended_default_unchecked' => true,
+                'ai_recommended_exclude_user_selected' => true,
+                'user_confirmation_required_before_generation' => true,
+                'user_confirmation_required_before_card_generation' => true,
+            ],
+            'safety_flags' => [
+                'no_ai_called_by_linguacafe' => true,
+                'ai_response_pasted_by_user' => true,
+                'no_review_card_created' => true,
+                'no_word_sense_created' => true,
+                'no_fsrs_changed' => true,
+                'user_confirmation_required_before_card_generation' => true,
+            ],
+        ];
+
+        return [
+            'success' => true,
+            'package' => $package,
+            'message' => '已生成最终候选包（未调用 AI，未生成复习卡）。',
+        ];
+    }
+
+    /**
+     * V4: 去重 key：优先 lemma，否则 word；大小写不敏感；前后空格忽略。
+     */
+    private function dedupeKey(?string $lemma, ?string $word): string
+    {
+        $candidate = trim((string) $lemma);
+        if ($candidate === '') {
+            $candidate = trim((string) $word);
+        }
+        if ($candidate === '') {
+            return '';
+        }
+        return mb_strtolower($candidate, 'UTF-8');
+    }
+
+    /**
+     * V4: 归一化 AI 推荐词条目。
+     */
+    private function normalizeAiRecommendation(array $rec, string $word, string $lemma): array
+    {
+        return [
+            'word' => $word,
+            'lemma' => $lemma,
+            'surface' => trim((string) ($rec['surface'] ?? '')) ?: $word,
+            'reason' => trim((string) ($rec['reason'] ?? '')) ?: '无说明',
+            'sentence_text' => trim((string) ($rec['sentence_text'] ?? '')) ?: null,
+            'confidence' => array_key_exists('confidence', $rec) ? $rec['confidence'] : null,
+            'source' => 'ai_recommended',
+        ];
+    }
+
+    /**
      * V2: 取消（dismiss）一个待解释项。
      * 不物理删除，状态从 pending 改为 dismissed。
      */

@@ -142,6 +142,44 @@ class AiStudyCardPendingItemController extends Controller
     }
 
     /**
+     * V4: 生成最终候选包（final-candidates-package）。
+     *
+     * 用户粘贴 AI 返回的推荐词 JSON，前端解析并勾选后调用本接口。
+     * 后端二次去重，确保不与用户已选词重复、AI 推荐词之间不重复。
+     * 不调用 AI，不生成 WordSense/ReviewCard/ReviewLog，不触发 FSRS。
+     * 不改变 pending item 状态。
+     */
+    public function finalCandidatesPackage(Request $request)
+    {
+        $validated = $request->validate([
+            'selected_item_ids' => ['nullable', 'array'],
+            'selected_item_ids.*' => ['integer', 'min:1'],
+            'selected_ai_recommendations' => ['nullable', 'array'],
+            'unselected_ai_recommendations' => ['nullable', 'array'],
+            'dedupe_summary' => ['nullable', 'array'],
+            'source_preview_package' => ['nullable', 'array'],
+        ]);
+
+        $result = $this->pendingItemService->buildFinalCandidatesPackage(
+            $request->user(),
+            $validated
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], $result['status'] ?? 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'package' => $result['package'],
+        ]);
+    }
+
+    /**
      * V2: 取消（dismiss）一个待解释项。
      * 状态从 pending 改为 dismissed，不物理删除。
      */

@@ -370,3 +370,40 @@
 - 真实 AI 调用的请求/响应边界。
 - 用户确认后生成 WordSense/ReviewCard 的事务边界。
 - 失败回滚与重试策略。
+
+---
+
+## 10. V4 衔接说明（2026-07-02）
+
+V3 完成后，V4 (`GLM-AIRecommendationConfirmationLoop-V4-1`) 在 V3 安全生成包基础上继续推进，已实现 AI 推荐词确认闭环。V4 路线冻结文档：`docs/plans/ai-recommendation-confirmation-loop-plan.md`。
+
+### 10.1 V4 复用 V3 的部分
+
+- V4 复用 V3 的预览弹窗结构、用户已选词列表、勾选/全选/全不选逻辑。
+- V4 复用 V3 的 `preview-package` 接口的隔离/去重/数量上限设计。
+- V4 的 `source_preview_package` 字段是可选的引用，用于追溯 V3 安全生成包。
+- V4 不调用 V3 的 `preview-package` 接口；V4 的最终候选包接口是独立的。
+
+### 10.2 V4 新增的部分
+
+- 后端：新增 `POST /ai-study-card/pending-items/final-candidates-package`，返回 `schema_version=ai-study-card-final-candidates-v1`，含 `user_selected_items` / `ai_recommended_selected_items` / `ai_recommended_unselected_items` / `dedupe_summary` / `generation_rules`(5 条) / `safety_flags`(6 条)。
+- 前端：VocabularySideBox.vue / VocabularyBox.vue 新增「粘贴 AI 推荐词 JSON」文本框 + 「解析推荐词」「清空推荐词」按钮 + 解析错误提示 + 解析摘要 + AI 推荐词列表（默认 unchecked）+ 全选/全不选 + 用户已选词/AI 推荐词视觉分区 + 「生成最终候选包」按钮 + 最终候选包 JSON 展示 + 「复制最终候选包」按钮。
+- 测试：新增 18 个 V4 feature tests（AiStudyCardPendingItemTest 56 tests / 294 assertions 全绿）。
+- MCP Chrome 真实页面验收 33 项全通过。
+
+### 10.3 V4 的 safety_flags 与 generation_rules 扩展
+
+- V4 的 `safety_flags` 在 V3 的 4 条基础上新增 2 条：
+  - `ai_response_pasted_by_user`（V4 新增）
+  - `user_confirmation_required_before_card_generation`（V4 新增）
+- V4 的 `generation_rules` 在 V3 的 4 条基础上新增 1 条：
+  - `user_confirmation_required_before_card_generation`（V4 新增）
+
+### 10.4 V4 仍未实现
+
+- AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。
+- AI 释义生成仍未实现。
+- WordSense / ReviewCard 生成闭环仍未实现。
+- 真正 AI 调用仍未实现。
+- API key 安全存储仍未实现。
+- 后续实现必须继续保持：用户确认优先、AI 推荐默认不选、不自动污染 WordSense/ReviewCard/FSRS。

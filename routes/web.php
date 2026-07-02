@@ -257,6 +257,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'store']);
     // V3: preview-package route must be before {id} wildcard routes
     Route::post('/ai-study-card/pending-items/preview-package', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'previewPackage']);
+    // V4: final-candidates-package route must be before {id} wildcard routes
+    Route::post('/ai-study-card/pending-items/final-candidates-package', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'finalCandidatesPackage']);
     Route::post('/ai-study-card/pending-items/{id}/dismiss', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'dismiss']);
     Route::post('/ai-study-card/pending-items/{id}/restore', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'restore']);
 
