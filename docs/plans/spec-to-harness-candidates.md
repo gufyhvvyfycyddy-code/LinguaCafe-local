@@ -38,7 +38,7 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 3. These conversions did not change `TextBlockService`, `ReviewCardManageController`, API response semantics, tokenizer/import behavior, FSRS, WordSense, ReviewLog preservation, Vue, routes, or schema.
 4. Do not weaken existing tests to make a future candidate easier.
 5. For browser flows, do not replace MCP Chrome with API calls.
-6. For AI study cards, first run architecture scouting. Do not invent DB schema or endpoint names in this candidate list.
+6. AI study card architecture scouting is complete (`docs/plans/ai-study-card-architecture-scout.md`). The scout covers code access points, danger zones, and a minimum target proposal. Do not implement before product decision approval. Do not invent DB schema or endpoint names in this candidate list.
 
 ## 4. Next Candidate Shortlist
 

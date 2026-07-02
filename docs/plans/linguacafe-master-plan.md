@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (Codex-SenseReviewRealWorkflowHardeningTargetMode-1)
+> **最后更新**：2026-07-02 (OpenCode-AIStudyCardArchitectureScouting-And-ProgressRuleFix-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -165,6 +165,8 @@
 | Codex-ProjectDocsGovernanceTargetMode-1 | 基于 Vibe Coding / spec / harness 字幕原则和 CodeBuddy 文档盘点报告治理项目文档体系。新增 `docs/DOCUMENTATION_INDEX.md`、`docs/HISTORY_INDEX.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`、`docs/plans/spec-to-harness-candidates.md`；给旧 `CURRENT_STATUS` / `NEXT_TASK` / `FSRS_PHASE*` / 旧 handoff / 旧 FSRS roadmap 加历史降权标记；收敛 current-working-handoff、hotspot audit、协作规则中的入口职责。不改业务代码，不改测试，不把 AI 示意卡写成已实现。下一轮仍由总设计师选择，不自动执行。 |
 | Codex-SpecToHarnessHardeningTargetMode-1 | 将文档中的两个关键软规则转为可执行测试护栏：新增 `tests/Unit/TextBlockFallbackTokenizerTest.php`，锁定 fallbackEnglishTokenize 的保守 lemma、irregular table、安全标记、数字/标点、空文本异常；补 `tests/Feature/ReviewCardManageTest.php` 的 logs payload 精确字段/ISO 日期格式与同一 review_card_id 下 user/language 过滤。只改测试和计划文档，不改 TextBlockService、ReviewCardManageController、tokenizer/import/FSRS/WordSense/ReviewLog 语义。 |
 | Codex-SenseReviewRealWorkflowHardeningTargetMode-1 | 将 SenseReview 真实页面 smoke 转为可复验 harness：新增 `smoke:sense-review-data` Artisan 命令（只接受已有本地用户邮箱，不创建账号，不接收密码，不写凭据，marker 可识别，不清库）；新增 `tests/Feature/SenseReviewSmokeDataCommandTest.php` 锁定 marker 数据形状；新增 `docs/plans/sense-review-real-workflow-smoke-playbook.md` 作为可复验页面 smoke 指南。MCP Chrome 真实页面验收覆盖 `/reviews/senses` 评分/More 菜单/查看原文 fallback 和 `/senses/review` 确认/改绑/拒绝/忽略/新建。不改 Vue、FSRS、WordSense 删除/归档/恢复、ReviewLog、DB schema、AI study card。 |
+| OpenCode-DesignerProgressAndScoutingRules-1 | 写入总设计师提示词前进度说明规则（§22）与三方架构侦查规则（§23）。新增 current-working-handoff §7 当前主线进度。更新 DOCUMENTATION_INDEX 引用。不改业务代码，不改测试。 |
+| OpenCode-AIStudyCardArchitectureScouting-And-ProgressRuleFix-1 | 复合任务：(A) 修正进度规则为固定五条主线，删除"文档治理"固定线，写入"零进度任务不得单独派发"规则；(B) 完成 AI 示意卡架构侦查，新增 `docs/plans/ai-study-card-architecture-scout.md`，覆盖 8 大现有能力地图、未来理想流程、12 个代码接入点、5 个不能改的危险区、第一轮最小目标建议（阅读页标记"待AI解释"）。AI 示意卡规划从 10% → 25%，总体架构收口从 79% → 81%。MCP Chrome 只读观察阅读页、复习入口。不改业务代码，不改测试，不改 Vue。 |
 
 ## 4. 未完成任务总表
 
