@@ -20,9 +20,6 @@
                 <span class="text--secondary mr-1">词元：</span>
                 <strong class="default-font">{{ effectiveLemma || '未识别' }}</strong>
             </div>
-            <div v-if="legacyTranslation" class="legacy-translation mt-2 text-caption text--secondary">
-                旧词条释义：{{ legacyTranslation }}
-            </div>
         </div>
 
         <div v-if="loading" class="search-result disabled">

@@ -1,7 +1,7 @@
 # LinguaCafe 产品原则与旧代码清理计划
 
 > **性质**：产品定位 / 长期原则 / 功能行为约束
-> **最新更新**：2026-07-02
+> **最新更新**：2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1)
 > **本文件优先于早期计划文档。如冲突，以本文为准。**
 
 ---
@@ -138,19 +138,21 @@ AI 可以做的是：
 | 是否写 ReviewLog | ❌ 不写 |
 | 是否触发 FSRS | ❌ 不触发 |
 | 是否影响删除/归档语义 | ❌ 不影响 |
-| 当前状态 | 合规，建议保留 |
+| 当前状态 | 已加测试护栏，建议保留 |
+| 本轮补强 | `FinishedReadingSafetyTest` 锁定 yellow `stage=2` → known、green stage 不变、WordSense/ReviewCard/ReviewLog/FSRS 不变、用户/语言隔离、关闭 `autoMoveWordsToKnown` 时不自动 known |
+| 本轮修复 | 自动 known 分支增加当前 `language` 过滤，防止构造 payload 改到同用户其他语言词 |
 
 ### 9.2 旧版入口
 
 | 项目 | 结果 |
 |------|------|
-| "旧词条释义" | ✅ 存在，`WordSensesList.vue` 中作为 computed property 显示 ECDICT 翻译 |
-| 用户能否看到 | ✅ 在查词侧栏中，旧词条释义以灰色 caption 显示 |
-| 入口用途 | 显示 ECDICT 旧词典翻译（legacy） |
-| 是否属于当前主线 | ❌ 过渡性兼容，建议后续逐步移除显示 |
-| 代码依赖 | 无（纯显示逻辑） |
-| 测试依赖 | 无 |
-| 建议 | 当前保留为显示辅助，后续可考虑隐藏 |
+| "旧词条释义" | 本轮已从普通查词组件显示中隐藏 |
+| 用户能否看到 | 普通查词 UI 不再展示旧版释义入口文案 |
+| 入口用途 | 原用途为显示 / 编辑 ECDICT 旧词典翻译（legacy） |
+| 是否属于当前主线 | ❌ 过渡性兼容，普通入口已隐藏 |
+| 代码依赖 | 兼容字段和传参仍保留，后端兼容层未删除 |
+| 测试依赖 | 新增 `LegacyEntryUiGuardTest` 防止旧入口文案回到普通查词组件 |
+| 建议 | 继续保留后端兼容；未来若删除字段/路径，必须先做依赖审计 |
 
 ### 9.3 Legacy 兼容层
 
@@ -177,10 +179,11 @@ AI 可以做的是：
 - 逐步隐藏 SenseMappingReview / SenseReview 的内部概念入口
 - 前端入口整理
 
-### 第三阶段：旧词条释义移除（测试护栏确认后）
-- 确认没有测试依赖
-- 从 `WordSensesList.vue` 移除 legacy 显示
-- MCP Chrome 验收
+### 第三阶段：旧词条释义普通入口隐藏（已完成）
+- 从 `WordSensesList.vue` 移除 legacy 显示文案
+- 从普通查词组件隐藏旧版释义折叠编辑入口
+- 新增源码 guard，防止旧入口文案回到 `WordSensesList.vue` / `VocabularySideBox.vue` / `VocabularyBox.vue`
+- 后端 legacy 兼容层未删除
 
 ### 第四阶段：Legacy word card 代码审计（长远）
 - 确认 `target_type=word` 的未使用路径

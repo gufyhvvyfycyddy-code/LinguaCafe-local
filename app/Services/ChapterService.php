@@ -223,6 +223,7 @@ class ChapterService {
                 EncounteredWord
                     ::where('id', $uniqueWordData->id)
                     ->where('user_id', $userId)
+                    ->where('language', $language)
                     ->update($saveData);
             }
         }

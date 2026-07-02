@@ -443,6 +443,49 @@
 
 > **本轮合计提升 110%（30 + 80）是子阶段进度提升，不是固定五条主线的虚假上涨。** 固定五条主线全部保持不变。AI 真实推荐仍未实现，AI 释义生成仍未实现，WordSense/ReviewCard 生成闭环仍未实现，外部 AI 调用仍未实现。
 
+## 2.10 Codex-LegacyEntry-FinishedReading-ExampleGuard-1 增量审计（2026-07-02）
+
+> **性质**：产品原则落地的第一轮低风险执行。改动边界控制在普通查词 UI 旧入口隐藏、Finished reading 自动 known 分支安全过滤、测试护栏、路线冻结文档。不删除后端 legacy 兼容层，不删除 `target_type=word`，不改 FSRS / ReviewCard / WordSense 删除归档恢复语义。
+
+### 本轮落地
+
+- `WordSensesList.vue` 不再在普通查词区域显示 `legacyTranslation` 的旧词条释义 caption。
+- `VocabularySideBox.vue` 和响应式 `VocabularyBox.vue` 隐藏旧版释义折叠编辑入口；兼容数据字段和现有传参保留。
+- `ChapterService::finishChapter()` 的 `autoMoveWordsToKnown` 分支新增当前 `language` 过滤，避免构造 payload 改到同用户其他语言词。
+- 新增 `tests/Feature/FinishedReadingSafetyTest.php`，锁定 Finished reading 只将当前用户/当前语言 yellow `stage=2` 设为 known；green 学习词 stage、WordSense、ReviewCard、ReviewLog、FSRS 字段、其他用户、其他语言均保持。
+- 新增 `tests/Feature/LegacyEntryUiGuardTest.php`，防止 `旧词条释义` / `旧版释义` / `旧版示意` / `legacy word review` 文案回到普通查词组件。
+- 新增 `docs/plans/reading-inline-review-and-example-pool-plan.md`，冻结阅读中刷卡、多例句轮换、熟词僻义衔接、surface/lemma 绑定路线；本轮不实现。
+
+### 边界与测试护栏
+
+| 风险 | 本轮处理 |
+|---|---|
+| 普通用户继续看到旧入口 | 删除普通查词组件显式旧入口 UI，并新增源码 guard |
+| 误删后端 legacy 兼容 | 未删除 `ReviewCard::TARGET_WORD`、legacy route/service/tests、DB 字段或兼容查询 |
+| Finished reading 改到绿色学习词 | 新测试断言 `stage < 0` 的学习词 stage 不变；本轮不改变阅读页颜色系统 |
+| Finished reading 写 ReviewCard / ReviewLog / FSRS | 新测试断言 ReviewCard count、ReviewLog count、8 个 FSRS 字段不变 |
+| Finished reading 跨用户/跨语言 | 既有 user 过滤保留；本轮新增 language 过滤并用测试锁定 |
+| 把阅读中刷卡写成已实现 | 仅新增路线冻结文档，明确未实现 |
+
+### 本轮未做
+
+- 不删除 legacy word card 兼容层。
+- 不删除 `target_type=word`。
+- 不删除 SenseReview、SenseMappingReview、legacy route/service/tests。
+- 不改 FSRS 主流程。
+- 不改 ReviewCard / WordSense 删除、归档、恢复语义。
+- 不实现阅读中刷卡、多例句轮换、真实 AI 调用、WordSense/ReviewCard 生成。
+
+### 子阶段进度
+
+| 子阶段 | 本轮前 | 本轮后 | 说明 |
+|---|---|---|---|
+| 旧版入口清理执行 | 0% | 80% | 普通查词入口已隐藏，并加源码 guard；后端兼容层未删。 |
+| Finished reading 安全护栏 | 0% | 50% | 新增测试护栏并修复 language 过滤；仍需真实页面验收环境稳定后复跑。 |
+| 阅读中复习 / 多例句轮换路线 | 20% | 50% | 路线冻结文档已补齐；未实现。 |
+
+> **本轮合计提升 160%（80 + 50 + 30）是三个子阶段进度提升，不是固定五条主线的虚假上涨。**
+
 ## 3. 全仓库热点总览
 
 | 文件 | 行数 | 职责 | 风险等级 | 测试状态 | 优先级 | 建议 |

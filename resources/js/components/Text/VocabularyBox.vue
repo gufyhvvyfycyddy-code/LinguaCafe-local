@@ -153,27 +153,6 @@
                             >{{ aiStudyCardPendingMessage }}</v-alert>
                         </template>
                       
-                        <!-- Translation (legacy) -->
-                        <div class="vocab-box-subheader d-flex align-center mt-2" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
-                            <span>旧词条释义（兼容）</span>
-                            <v-spacer />
-                            <v-icon small :color="showLegacyTranslation ? 'primary' : ''">{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                        </div>
-                        <v-textarea
-                            v-if="showLegacyTranslation"
-                            :class="{'mt-2': $props.language !== 'japanese' && $props.language !== 'chinese'}"
-                            label="旧词条释义（兼容，不推荐使用此编辑入口）"
-                            filled
-                            dense
-                            no-resize
-                            rounded
-                            hide-details
-                            height="80"
-                            v-model="translationText"
-                            @keyup="inputChanged('translation')"
-                            @keydown.stop=";"
-                        ></v-textarea>
-
                         <!-- Search field -->
                         <v-text-field 
                             placeholder="词典搜索"
@@ -820,7 +799,6 @@
 
                 // ui data
                 tab: 0,
-                showLegacyTranslation: false,
                 latestAiLookupKey: '',
                 searchField: '',
                 searchResults: [],

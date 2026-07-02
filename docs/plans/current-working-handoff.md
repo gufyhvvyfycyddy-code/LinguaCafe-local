@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (GLM-AIRecommendationConfirmationLoop-V4-1)
+> **最后更新**：2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -34,6 +34,7 @@
 | GLM-AIStudyCardV2-GenerationLoop-1 | AI 示意卡 V2 生成闭环第一阶段。新增 `GET /ai-study-card/pending-items`（支持 chapter_id 过滤）、`POST /ai-study-card/pending-items/{id}/dismiss`、`POST /ai-study-card/pending-items/{id}/restore`；改造 `createOrGetPending` 支持 dismissed 恢复；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释列表面板、取消按钮、生成前预览弹窗雏形。新增 16 个 V2 feature tests（23 tests / 105 assertions 全绿）。MCP Chrome 真实页面验收 24 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | GLM-AIStudyCardV3-SafePreviewPackage-1 | AI 示意卡 V3 安全生成包。扩展 `GET /ai-study-card/pending-items` 支持 `status=pending\|dismissed\|all` 过滤；新增 `POST /ai-study-card/pending-items/preview-package` 后端安全包接口（schema_version=ai-study-card-preview-package-v1，含 selected_items/generation_rules/safety_flags）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释/已取消视图切换、已取消项恢复按钮、真实预览弹窗（用户已选词列表/来源句子/章节位置/勾选取消/全不选禁用生成/AI 推荐词占位/安全说明/生成规则）、「准备生成」按钮触发后端安全包、JSON 展示与复制按钮。新增 14 个 V3 feature tests（37 tests / 184 assertions 全绿）。MCP Chrome 真实页面验收 28 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | GLM-AIRecommendationConfirmationLoop-V4-1 | AI 示意卡 V4 AI 推荐词确认闭环。新增 `POST /ai-study-card/pending-items/final-candidates-package` 后端接口（schema_version=ai-study-card-final-candidates-v1，含 user_selected_items/ai_recommended_selected_items/ai_recommended_unselected_items/dedupe_summary/generation_rules 5条/safety_flags 6条；三重隔离 + 后端二次去重 + 空结果 422 + 数量上限保护）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增 V4 完整 UI（粘贴 AI 推荐词 JSON 文本框 + 解析/清空按钮 + 解析错误提示 + 解析摘要 + AI 推荐词列表默认 unchecked + 全选/全不选 + 用户已选词/AI 推荐词视觉分区 + 「生成最终候选包」按钮 + JSON 展示与复制按钮）。新增 18 个 V4 feature tests（56 tests / 294 assertions 全绿）。MCP Chrome 真实页面验收 33 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
+| Codex-LegacyEntry-FinishedReading-ExampleGuard-1 | 旧版入口清理执行 + Finished reading 安全护栏 + 阅读例句路线冻结。普通查词组件不再展示“旧词条释义 / 旧版释义 / 旧版示意 / legacy word review”入口文案；后端 legacy 兼容层、`ReviewCard::TARGET_WORD`、legacy route/service/tests 保留。新增 `FinishedReadingSafetyTest` 锁定 Finished reading 只把当前用户/当前语言 `stage=2` 黄词设为 known，且不改绿词 stage、WordSense、ReviewCard、ReviewLog、FSRS；发现并修复自动 known 分支缺少 `language` 过滤。新增 `LegacyEntryUiGuardTest` 防止旧入口文案回到普通查词组件。新增 `reading-inline-review-and-example-pool-plan.md`，只冻结阅读中刷卡/多例句轮换路线，不实现。 |
 
 ## 3. 当前未最终关闭的事项
 
@@ -52,6 +53,10 @@
   - V1 pending marker 已实现，V2 列表/取消/预览雏形已实现，V3 已取消视图/恢复按钮/真实预览/安全生成包已实现，V4 AI 推荐词粘贴导入/去重/默认不选/用户确认/最终候选包已实现；
   - AI 真实推荐（自动调 AI）、AI 释义生成、AI 示意卡生成闭环仍未实现；
   - 后续任何生成 / 推荐 / 复习卡联动前必须先过 Architecture Gate 与 ADR，不删除现有 SenseMappingReview / SenseReview 能力，不删除 legacy word card 兼容层。
+- **旧版入口与 Finished reading 护栏**：
+  - 普通查词 UI 的旧版释义入口已完成最小隐藏，兼容字段和后端 legacy 兼容层未删除；
+  - Finished reading 自动 known 分支新增测试护栏，并修复当前语言过滤缺口；
+  - 本地 MySQL 未启动时 PHP Feature tests 会被数据库连接阻塞，不能用 SQLite 可靠替代（旧迁移含 MySQL collation）。
 
 ## 4. 当前产品决策
 
@@ -73,6 +78,8 @@
 | AI 推荐词默认不选 | "AI 生成示意卡"弹窗中 AI 推荐词默认全不选，提供"全选"按钮 |
 | 确认后才生成 | 只有被用户确认的 AI 推荐词才进入示意卡生成 |
 | legacy word card | 只作兼容，不作为新功能和日常复习主线 |
+| Finished reading | 保留章节完成能力；自动 known 只处理当前用户/当前语言黄色新词，不写 WordSense/ReviewCard/ReviewLog/FSRS，不等同复习完成 |
+| 阅读中刷卡 / 多例句轮换 | 路线已冻结为 WordSense-only 与真实来源例句池；当前未实现 |
 
 ## 5. 下一候选方向
 
@@ -153,6 +160,9 @@
 | AI 示意卡生成闭环 | ≈ 95% | V3 已取消视图/恢复按钮/真实预览/安全生成包已完成（95%）。**这个 95% 是「AI 示意卡生成闭环」子阶段的进度，不是固定五条主线的虚假上调。** AI 真实推荐、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
 | AI 生成安全契约 | ≈ 85% | V3 安全生成包（schema_version=ai-study-card-preview-package-v1）+ V4 最终候选包（schema_version=ai-study-card-final-candidates-v1）已完成。V4 safety_flags 6 条：no_ai_called_by_linguacafe / ai_response_pasted_by_user / no_review_card_created / no_word_sense_created / no_fsrs_changed / user_confirmation_required_before_card_generation；generation_rules 5 条。V3 + V4 共 32 个反向 contract tests 覆盖用户/语言/状态隔离 + 去重 + 默认不选 + 空结果 + 数量上限。**85% 是子阶段进度，不是固定五条主线的虚假上调。** API key 安全存储、真实 AI 调用边界、用户确认后生成 WordSense/ReviewCard 仍未实现。 |
 | AI 推荐词确认闭环 | ≈ 80% | V4 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，不是固定五条主线的虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
+| 旧版入口清理执行 | ≈ 80% | 普通查词界面的旧入口文案已隐藏，并加源码 guard；后端兼容层和 legacy route/service/tests 保留。**80% 是子阶段进度，不是固定五条主线的虚假上调。** 更深层删除必须另做依赖审计。 |
+| Finished reading 安全护栏 | ≈ 50% | 新增 Feature test 覆盖 yellow→known、green/WordSense/ReviewCard/ReviewLog/FSRS/用户/语言隔离，并修复语言过滤缺口。**50% 是子阶段进度，不是固定五条主线的虚假上调。** |
+| 阅读中复习 / 多例句轮换路线 | ≈ 50% | 新增路线冻结文档，明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则；未实现。**50% 是子阶段进度，不是固定五条主线的虚假上调。** |
 
 > 如果任务失败或 Incomplete，对应进度不得上调。
 > 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。

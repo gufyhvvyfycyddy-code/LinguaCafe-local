@@ -154,15 +154,6 @@
                     @word-learning-updated="$emit('word-learning-updated', $event)"
                 />
 
-                <!-- Legacy translation (collapsible, minimal) -->
-                <div class="vocab-box-subheader d-flex align-center mt-2" @click="showLegacyTranslation = !showLegacyTranslation" style="cursor:pointer;">
-                    <v-icon x-small class="mr-1">mdi-pencil-outline</v-icon>
-                    <span class="text-caption text--secondary">旧版释义（兼容）</span>
-                    <v-spacer />
-                    <v-icon x-small>{{ showLegacyTranslation ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                </div>
-                <v-textarea v-if="showLegacyTranslation" class="mb-2 mt-1" placeholder="旧词条释义（兼容保留）" filled dense no-resize rounded hide-details height="60" v-model="translationText" @keyup="inputChanged('translation')" @keydown.stop=";" />
-
                 <!-- Unified 添加新释义 panel -->
                 <div class="add-sense-panel mt-3" v-if="type === 'word'">
                     <div class="vocab-box-subheader d-flex align-center pa-2 rounded" @click="showAddSensePanel = !showAddSensePanel" style="cursor:pointer; border: 1px solid var(--v-primary-base);">
@@ -754,7 +745,6 @@ export default {
     data() {
         return {
             tab: 0,
-            showLegacyTranslation: false,
             showDictionaryResults: false,
             showAddSensePanel: false,
             editingLemma: false,
