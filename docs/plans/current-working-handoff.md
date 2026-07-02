@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-03 (Codex-MorphologyMatrix-ImportRegression-1)
+> **最后更新**：2026-07-03 (GLM-RealMorphologyImportClickCompletion-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。近期已新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗、词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）。本轮补齐形态变化测试矩阵、项目可控文章 fixture 导入回归、known-sense/FSRS 只读护栏、前端源码级 UI guard。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
+架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。近期已新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗、词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）。本轮补齐真实 tokenizer/importer 端到端覆盖、8 类形态真实页面点击（MCP Chrome/Playwright 18 个真实点击）、词性歧义（published/used/broken/left）真实点击验证、测试命名纠偏（data-layer fixture 重命名为 DataLayerTest）、文档纠偏与计划同步。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
 
 ## 2. 最近已完成任务
 
@@ -38,6 +38,7 @@
 | Trae-ExamplePool-ReviewRotation-SourceCarousel-1 | 多例句池 + 复习页题面例句轮换 + 答案后补充例句不重复 + 多来源溯源 carousel + Finished reading 确认弹窗。新增 `WordSenseExamplePoolService`（复用 `WordSenseOccurrence` + card example fallback，不新增 migration，不调用 AI），`SenseReviewCardSerializerService` payload 新增 `example_candidates` / `example_candidates_count` / `supplementary_example`，稳定 seed 轮换（review_card_id + fsrs_reps + day-of-year，crc32）；`SenseSourceContextService` 新增 `sourceContextList` 方法 + 新路由 `GET /senses/{id}/source-context-list`，`SenseExampleDialog.vue` 支持来源 1/N 切换；`TextReader.vue` 「完成阅读」按钮新增确认弹窗（说明影响 + 取消/确认）。新增 18 个 feature tests（WordSenseExamplePoolTest 12 + SenseSourceContextMultiSourceTest 6，全绿）。MCP Chrome 真实页面验收：登录 → /reviews/senses 题面正常 → 查看答案 → 单例句无重复补充 → 单来源无切换按钮（符合规则） → 阅读页完成阅读确认弹窗 → 取消不执行 → console/network 正常。**阅读中刷卡仍未实现；AI 不生成例句。** |
 | Trae-LemmaKnownSenseBridge-1 | 词形原型绑定 + 已学词义候选 + 熟词僻义前置结构 + 例句池性能优化。新增 `WordSenseKnownSenseService`（只读：`listConfirmedSensesForLemma` + `knownSenseLookupPayload`，批量预加载 occurrence count，不写 ReviewLog/WordSense/ReviewCard/FSRS，不调 AI）；新增端点 `GET /senses/known-sense-lookup?lemma=...&language=...`；`WordSensesList.vue` 新增「已学词义候选」面板（confirmed WordSense 列表，含 sense_zh/sense_en/pos/FSRS chip/复习次数）和「熟词僻义」前置 info alert（明确标注「未调用 AI 判断」）；`WordSenseExamplePoolService::exampleCandidates()` 消除 N+1（批量 whereIn 预加载 Chapter）；`SenseSourceContextService::sourceContextList()` 消除循环内 findChapterById（批量 whereIn 预加载 + limit 12 + PHP unique+take(3) 保持跨数据库兼容）。surface/lemma 绑定：阅读页点词显示 surface（如 geese）+ lemma（如 goose）+ [修改] 入口；搜索/添加新释义优先使用 lemma（搜索框 value=lemma）；用户通过 VocabularySideBox saveLemma 修正 lemma 后，后续添加新释义使用修正后的 lemma；不无条件绑定 published→publish。新增 13 个 feature tests（WordSenseKnownSenseBridgeTest）。MCP Chrome 真实页面验收：登录 → 阅读页点击 geese → 显示 geese→goose→[修改] → 添加新释义搜索框 value=goose → 创建 confirmed sense 后重新点击 geese → 「已学词义候选」面板显示 + 「熟词僻义」提示显示 → /senses/known-sense-lookup 端点 200 → 复习页显示答案 + 例句正常 → 查看原文多来源溯源正常 → console 仅预期 WebSocket 降级 → network 全 200。**阅读中刷卡评分仍未实现；AI 不生成例句；不写 ReviewLog；不改 FSRS；熟词僻义仅前置结构，AI 判断仍未实现。** |
 | Codex-MorphologyMatrix-ImportRegression-1 | 形态变化测试矩阵 + 文章 fixture 导入回归 + lemma bridge 覆盖增强。新增 `MorphologyMatrixImportRegressionTest`：覆盖规则复数（ways/technologies）、不规则复数（mice/children）、第三人称（studies/watches）、过去式（ran/went）、过去分词（written/published）、进行时（running/studying）、比较级/最高级（better/worse）、词性歧义（used/broken）；项目可控文章 fixture 的 `processed_text` 保留 surface/lemma/pos；known-sense lookup 只按 lemma 返回 confirmed WordSense，保持 user/language/status 隔离，`read_only=true`，不写 ReviewLog，不创建 ReviewCard，不改 FSRS；`published/running/used/broken` 等歧义词不自动绑定、不自动刷卡。新增 `MorphologyMatrixUiGuardTest` 锁定 `WordSensesList.vue` 仍显示 surface+lemma、add-sense payload 仍用 `lemma: effectiveLemma` + `surface_form: surfaceWord`、熟词僻义文案仍标注未调用 AI、旧入口仍隐藏。**阅读中刷卡评分仍未实现；AI 判断熟词僻义仍未实现；不写 ReviewLog；不改 FSRS；AI 不生成例句。** |
+| GLM-RealMorphologyImportClickCompletion-1 | 真实 tokenizer/importer 覆盖 + 8 类形态真实点击与页面验收补完。将旧 `MorphologyMatrixImportRegressionTest`（硬编码 fixture）重命名为 `MorphologyMatrixLemmaBridgeDataLayerTest`，新增真正的 `MorphologyMatrixImportRegressionTest`：真实调用 `ChapterService::processChapterText()` → Python spaCy tokenizer（127.0.0.1:8678）→ `processTokenizedWords()` → `setProcessedText()`，验证真实 `processed_text` 包含 surface/lemma/pos/sentence_index；覆盖 8 类形态各 ≥2 词 + 词性歧义 4 词（published/used/broken/left）；验证 published/used/broken/left 不自动绑定、不写 ReviewLog、不创建 ReviewCard、不改 FSRS；known-sense lookup 保持 `read_only=true`。MCP Chrome（Playwright）真实页面点击 18 个 token，8/8 类别覆盖，4 个词性歧义真实点击，每个词记录 surface/lemma/searchBox/knownSenseCandidates/legacyEntry/AI judgment；`published` 显示"已学词义候选"+"未调用 AI 判断"；无 API/axios/fetch 替代。**阅读中刷卡评分仍未实现；AI 判断熟词僻义仍未实现；不写 ReviewLog；不改 FSRS；AI 不生成例句；705% 是子阶段提升，不是固定五条主线虚假上涨。** |
 
 ## 3. 当前未最终关闭的事项
 

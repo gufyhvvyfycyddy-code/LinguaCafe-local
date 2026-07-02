@@ -1,6 +1,6 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 Codex-MorphologyMatrix-ImportRegression-1）
+> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 GLM-RealMorphologyImportClickCompletion-1）
 > **基准 commit**：`7f3d4b6`
 > **审计方式**：只读侦查，不改代码，不进入功能开发。
 
@@ -17,6 +17,12 @@
 > - `MorphologyMatrixImportRegressionTest`（新增）：项目可控文章 fixture + 8 类形态变化矩阵。覆盖 surface/lemma/pos 保留、known-sense lookup 只读、user/language/status 隔离、ambiguous forms 不自动绑定、不写 ReviewLog/ReviewCard/FSRS。
 > - `MorphologyMatrixUiGuardTest`（新增）：源码级守护 `WordSensesList.vue` 仍显示 surface+lemma、add-sense payload 仍用 `effectiveLemma` + `surfaceWord`、熟词僻义提示仍标注未调用 AI、旧入口仍隐藏。
 > - 架构影响：不新增 route/service/controller，不改 Vue 行为，不改 FSRS/ReviewLog/ReviewCard/WordSense 删除归档恢复语义；本轮主要把已实现前置结构转为更宽的 harness。
+
+> **2026-07-03 GLM-RealMorphologyImportClickCompletion-1 测试覆盖增量**：
+> - `MorphologyMatrixImportRegressionTest`（升级为真实 tokenizer/importer 回归测试）：从纯 fixture 断言升级为通过 `ChapterService::processChapterText` 调用真实 Python spaCy tokenizer 的真实导入链路回归，覆盖真实分词/lemma/POS 而非静态 processed_text。8/8 形态变化类别通过 Playwright 真实页面点击覆盖（18 次真实点击），4 个词性歧义词 `published` / `used` / `broken` / `left` 通过真实页面点击覆盖。
+> - `MorphologyMatrixLemmaBridgeDataLayerTest`（重命名）：原 data-layer fixture 测试重命名以体现其数据层 fixture 边界，与真实 tokenizer/importer 回归测试职责区分。测试命名治理完成。
+> - 真实页面点击验收未使用 API/axios/fetch 模拟点击，全部为 Playwright 真实浏览器点击。
+> - 架构影响：不新增 route/service/controller，不改 Vue 行为，不改 FSRS/ReviewLog/ReviewCard/WordSense 删除归档恢复语义。阅读中刷卡评分与 AI 判断熟词僻义仍未实现；不写 ReviewLog、不改 FSRS、不调用 AI。
 
 > **2026-07-02 Trae 任务新增热点**：
 > - `WordSenseExamplePoolService`（新增）：只读，复用 `WordSenseOccurrence` + card example fallback，不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。

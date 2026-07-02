@@ -1,7 +1,7 @@
 # LinguaCafe 产品原则与旧代码清理计划
 
 > **性质**：产品定位 / 长期原则 / 功能行为约束
-> **最新更新**：2026-07-03 (Codex-MorphologyMatrix-ImportRegression-1)
+> **最新更新**：2026-07-03 (GLM-RealMorphologyImportClickCompletion-1)
 > **本文件优先于早期计划文档。如冲突，以本文为准。**
 
 ---
@@ -117,7 +117,7 @@ AI 可以做的是：
 4. 当前句子中的绑定必须考虑 surface + lemma + 词性 + 句义。**(仍未实现 — 当前仅前端显示 + lemma 优先搜索；未实现自动上下文感知绑定。)**
 5. AI 可以建议，但用户必须能改。**(部分实现：用户可通过 [修改] 入口改 lemma；AI 建议仍未实现。)**
 6. 不允许把所有 `published` 都无条件绑定到 `publish`。**(2026-07-03 已遵守：未新增自动绑定逻辑；用户修正始终优先。)**
-7. ~~本轮只写原则和计划，不实现。~~ **2026-07-03 (Trae-LemmaKnownSenseBridge-1) 已实现原则 1-3 + 5-6。Codex-MorphologyMatrix-ImportRegression-1 补齐形态变化测试矩阵与文章 fixture 导入回归：覆盖 ways/technologies、mice/children、studies/watches、ran/went、written/published、running/studying、better/worse、used/broken；测试确认 surface 保留、lemma 显示、添加新释义 payload 优先 lemma 且保留 surface_form。原则 4（自动上下文感知绑定）+ AI 建议仍未实现；`published` / `running` / `used` / `broken` 等歧义词不得被测试或产品规则写成不可逆自动绑定。**
+7. ~~本轮只写原则和计划，不实现。~~ **2026-07-03 (Trae-LemmaKnownSenseBridge-1) 已实现原则 1-3 + 5-6。Codex-MorphologyMatrix-ImportRegression-1 补齐形态变化测试矩阵与文章 fixture 导入回归：覆盖 ways/technologies、mice/children、studies/watches、ran/went、written/published、running/studying、better/worse、used/broken；测试确认 surface 保留、lemma 显示、添加新释义 payload 优先 lemma 且保留 surface_form。GLM-RealMorphologyImportClickCompletion-1 将形态矩阵升级为真实 tokenizer/importer 覆盖（`ChapterService::processChapterText` 调用真实 Python spaCy tokenizer，覆盖真实导入链路而非纯 fixture 断言），8/8 形态变化类别通过 Playwright 真实页面点击覆盖（18 次真实点击），4 个词性歧义词 `published` / `used` / `broken` / `left` 通过真实页面点击覆盖；data-layer fixture 测试重命名为 `MorphologyMatrixLemmaBridgeDataLayerTest`。真实页面点击验收未使用 API/axios/fetch 模拟点击。原则 4（自动上下文感知绑定）+ AI 建议仍未实现；`published` / `running` / `used` / `broken` 等歧义词不得被测试或产品规则写成不可逆自动绑定。阅读中刷卡评分与 AI 判断熟词僻义仍未实现；不写 ReviewLog、不改 FSRS、不调用 AI。**
 
 ---
 
