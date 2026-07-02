@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、FSRS confirmAndApply 拒绝写入安全护栏、TextBlock encountered_words 提取线、TextBlock phrase/index characterization tests、WordSense 删除/归档测试线、删除成功提示文案收口。下一阶段仍需由网页端总设计师选择，不自动进入下一任务。
+处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、FSRS confirmAndApply 拒绝写入安全护栏、TextBlock encountered_words 提取线、TextBlock phrase/index characterization tests、WordSense 删除/归档测试线、删除成功提示文案收口、TextBlock fallback tokenizer 测试护栏、ReviewCardManage logs payload contract tests、SenseReview 真实页面 smoke harness（marker data 命令 + 命令测试 + 可复验 playbook）。下一阶段仍需由网页端总设计师选择，不自动进入下一任务。
 
 ## 2. 最近已完成任务
 

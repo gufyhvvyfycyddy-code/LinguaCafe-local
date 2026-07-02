@@ -35,6 +35,52 @@ Rules:
 - Use a unique marker for each replay, for example `codex_sense_smoke_YYYYMMDD_x`.
 - The marker should appear in lemmas and example sentences so the real page can be filtered visually.
 - Do not clear the database or storage to rerun the smoke. Create a new marker instead.
+- Marker data is scoped to the `--email` user only; it never touches other users' data.
+- Do not delete real user data to make room for marker data. If the test user has too much old marker data, create a fresh local test user instead.
+
+## Marker Identification and Cleanup
+
+After the smoke completes, marker data stays in the local database. It is low-risk because it is scoped to the test user and uses a unique prefix, but you should be able to identify and optionally clean it up.
+
+### How to identify marker data
+
+All marker data uses the marker string as a prefix in the following fields:
+
+- `word_senses.lemma` — e.g. `codex_sense_smoke_20260702_review`
+- `word_sense_occurrences.sentence_id` — e.g. `codex_sense_smoke_20260702_confirm_sentence`
+- `word_sense_occurrences.sentence_en` — contains the marker string in the example sentence text
+- `word_sense_occurrences.evidence` — contains `{"marker": "<marker>", "path": "<suffix>"}`
+
+To find all marker data for a specific run:
+
+```sql
+-- Find marker WordSense rows
+SELECT id, lemma, status FROM word_senses
+WHERE user_id = <test-user-id>
+  AND lemma LIKE '<marker>%';
+
+-- Find marker WordSenseOccurrence rows
+SELECT id, sentence_id, status, decision FROM word_sense_occurrences
+WHERE user_id = <test-user-id>
+  AND sentence_id LIKE '<marker>%';
+```
+
+### Optional cleanup
+
+If you want to remove old marker data before a new replay, delete only rows that match the marker prefix for the test user. Never run `db:wipe`, `migrate:fresh`, or any command that clears the entire database.
+
+```sql
+-- Delete only marker-scoped rows for the test user
+DELETE FROM word_sense_occurrences
+WHERE user_id = <test-user-id>
+  AND sentence_id LIKE '<marker>%';
+
+DELETE FROM word_senses
+WHERE user_id = <test-user-id>
+  AND lemma LIKE '<marker>%';
+```
+
+ReviewCard rows linked to deleted marker WordSense rows should be cleaned up separately if needed. Do not delete ReviewCard or ReviewLog rows that belong to real user data.
 
 ## Expected Marker Shape
 
