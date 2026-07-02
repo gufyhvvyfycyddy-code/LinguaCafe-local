@@ -37,6 +37,7 @@
 | destroy 单卡核心语义 | ❌ 不建议改 | 核心在 `WordSenseService::removeSenseFromReviewSystem()` |
 | TextBlockService phrase/index characterization tests | ✅ 已完成 | `TextBlockPhraseIndexingTest` 锁定 phrase 命中、跨 NEWLINE 命中、缺词不命中、phraseIndexes 排序映射、用户/语言隔离；不改业务代码 |
 | FSRS confirmAndApply 拒绝写入安全测试 | ✅ 已完成 | `FsrsRescheduleConfirmTest` 新增 2 个 tests，锁定 `apply=true` 高风险未二次确认 / blocked 超量时不写 ReviewCard、不建 snapshot、不写 ReviewLog；不改业务代码 |
+| 文档入口治理 / 历史降权 | ✅ 已完成 | 新增 `DOCUMENTATION_INDEX` / `HISTORY_INDEX` / ADR-0002 / spec→harness 候选清单；旧 `NEXT_TASK`、`CURRENT_STATUS`、`FSRS_PHASE*`、旧 handoff 已标记为历史参考；不改业务代码 |
 
 ---
 
@@ -124,6 +125,35 @@
 - blocked 超量：断言 HTTP 422、`risk_level=blocked`、`requires_risk_confirm=false`，即使传 `risk_confirm=true` 也不写 ReviewCard、不建 snapshot、不写 ReviewLog。
 - 不改 `FsrsReschedulePreviewService.php`、`FsrsSchedulingService.php`、`ReviewCardService.php`、Vue、Controller、数据库结构、FSRS 参数算法、ReviewLog 保留语义。
 - 下一轮建议优先在以下三者中选一项：`SenseReview-FullWriteSmoke-1`、`TextBlockService-TokenizerFallbackScouting-1`、`ReviewCardManage-LogsPayloadBoundary-1`。
+
+## 2.3 Codex-ProjectDocsGovernanceTargetMode-1 文档治理审计（2026-07-02）
+
+> **基准 commit**：`aea1a6a docs: plan AI study card workflow`
+> **性质**：只做文档治理，不做代码架构重构。
+
+### 上下文风险：旧文档污染
+
+| 风险 | 文件 | 影响 | 本轮处理 | 后续要求 |
+|---|---|---|---|---|
+| 旧 next/current/final 文档被 agent 当作当前入口 | `docs/NEXT_TASK.md`、`docs/CURRENT_STATUS.md`、`docs/FSRS_FINAL_STATUS.md` | 可能让 Codex 从旧任务开始执行，绕过当前 handoff 和 master plan | 顶部加历史标记，新增 `docs/HISTORY_INDEX.md` | 新任务必须先读 `docs/DOCUMENTATION_INDEX.md` |
+| 旧 FSRS phase 文档分散且名字像状态源 | `docs/FSRS_PHASE*.md`、`docs/FSRS_NEXT_STEPS.md`、`docs/FSRS_USER_GUIDE.md` | 可能把旧 FSRS 分阶段计划误读为当前 sense-only 主线 | 顶部加历史标记，历史索引归类 | 当前 FSRS/sense-only 以 master plan、handoff、ADR-0002 为准 |
+| 旧 handoff 名称吸引 Codex 优先读取 | `docs/CODEX_HANDOFF.md`、`docs/handovers/**` | Codex 可能从旧交接文档恢复过期上下文 | 顶部加历史标记，current-working-handoff 明确当前入口 | 不从旧 handoff 直接开始任务 |
+| 软规则缺硬验证 | 多个计划/协作规则 | 文档写了“不要破坏”，但未来仍可能被忽略 | 新增 `docs/plans/spec-to-harness-candidates.md` | 每轮只选一个候选转 tests / smoke / harness |
+
+### 后续候选保留
+
+| 候选 | 状态 | 为什么仍保留 |
+|---|---|---|
+| TextBlock fallback tests | 未实现 | `fallbackEnglishTokenize` 仍可调用，缺少直接 characterization tests |
+| ReviewCardManage logs contract tests | 未实现 | logs payload 字段、过滤和空状态仍只有侦查记录 |
+| SenseReview occurrence / FullMenu MCP Chrome smoke | 未实现 | 有数据页面写入流程仍需要真实浏览器验收 |
+| AIStudyCard scaffolding | 未实现 | 已有产品边界和 ADR，但实现前仍需架构侦查，不能写死 DB/API |
+
+### 本轮成果边界
+
+- 本轮降低的是 AI 上下文误读风险，不是完成全部架构优化。
+- 不改变 `TextBlockService`、`ReviewCardManageController`、`SenseReview`、FSRS、WordSense 或 AI study card 代码。
+- 不把 AI 示意卡写成已实现；只把已拍板边界抽为 ADR，后续实现仍需独立任务和页面验收。
 
 ## 3. 全仓库热点总览
 

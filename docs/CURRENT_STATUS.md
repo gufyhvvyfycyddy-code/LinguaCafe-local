@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文记录的是旧阶段状态，文件名中的“当前”不代表 2026-07-02 之后的当前状态。新任务请先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`。
+
 # LinguaCafe 本地改造项目 — 当前完成状态
 
 > 最后更新：2026-06-22

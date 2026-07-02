@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文是旧 FSRS Phase 1 的下一步记录，不是当前下一任务。当前候选方向以 `docs/plans/current-working-handoff.md` 为准。
+
 # FSRS Phase 1 Next Steps
 
 ## Resume checklist

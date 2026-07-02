@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文是 2026-06-23 附近的旧 Codex 交接记录，不是当前任务入口。新任务请先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`。若本文与当前入口文档冲突，以当前入口文档为准。
+
 # LinguaCafe Codex 交接报告
 
 > 最后更新：2026-06-23

@@ -1,7 +1,9 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02
+> **最后更新**：2026-07-02 (Codex-ProjectDocsGovernanceTargetMode-1)
+> **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
+> **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
 
 ---
 
@@ -28,39 +30,21 @@
 
 ## 3. 当前未最终关闭的事项
 
-- **CodexHandoff-DocsAndWorkingPlanRefresh-1**：
-  - 已完成并成为当前 Codex 交接入口；
-  - 后续 Codex 任务仍应先读本文，再读 master plan、协作规则、hotspot audit。
-- **Codex-ArchitectureOptimizationLoop-1**（本轮）：
-  - 已选择第一轮低风险实现：只新增 TextBlock phrase/index characterization tests；
-  - 不改业务代码，不改 Vue，不改数据库，不改变 import / FSRS / WordSense 语义；
-  - 只有当本轮 commit 成功 push 后，本文记录才算 GitHub 已同步。
-- **Codex-ArchitectureOptimizationLoop-1 后续清理**：
-  - Codex 执行后遗留了本地 `data/` 和 `CODEX_SESSION_DIAGNOSIS.txt` artifact；
-  - 已通过 `CodexWorkspaceArtifactCleanup-1` 删除并添加最小 `.gitignore` 保护，防止后续 agent 误提交。
-- **CodexWorkspaceArtifactCleanup-Followup-1**：
-  - 修正 master plan 头部日期为 followup 任务名；
-  - 核查 `.codex/` — 确认其为 Codex/session 本地 artifact（含 agent .toml 文件），已加入 `.gitignore`；
-  - 更新 current-working-handoff 记录收口状态；
-  - 不改业务代码，不改测试，不继续架构优化。
-- **Codex-ArchitectureFinalGoalMode-1**（本轮）：
-  - 已选择本轮低风险 P1：只补 FSRS confirmAndApply 拒绝写入安全测试；
-  - 不改 FSRS 算法，不改 `FsrsReschedulePreviewService`，不执行真实重排，不改 ReviewCard / ReviewLog / WordSense 语义；
-  - 只有当本轮 commit 成功 push 后，本文记录才算 GitHub 已同步。
-- **OpenCode-ArchitectureTargetMode-Batch1**（阶段性完成 / 仍有缺口）：
-  - ✅ 已完成：SenseReview 到期卡真实显示 + Good 评分真实执行 + ReviewLog 创建 + ReviewCard due_at/reps 更新；
-  - ✅ 已完成：TextBlock fallback 只读侦查（fallbackEnglishTokenize 仍可调用但无测试覆盖）；
-  - ✅ 已完成：ReviewCardManage logs payload 只读侦查（字段已盘点，contract tests 待补）；
-  - ❌ 未完成：pending occurrence 写入未真实跑通（数据准备问题，非代码 bug）；
-  - ❌ 未完成：current-working-handoff 上轮漏更新；
-  - ❌ 未完成：TextBlock fallback 仍缺测试；
-  - ❌ 未完成：logs payload 仍缺 contract tests；
-  - ❌ 未完成：SenseReview FullMenu / occurrence 写入路径仍建议后续 smoke。
-- **旧交接文档**：
-  - `docs/CODEX_HANDOFF.md`（2026-06-23）是旧交接文档，记录了 tokenizer 根治阶段的工作；
-  - `docs/handovers/2026-06-24-c12-c-handoff.md`（2026-06-24）是 C.12-c 任务交接文档；
-  - 当前 Codex 交接入口以本文为准。
-  - **不要让 Codex 直接从旧文档开始执行任务**。
+本节只放真实未完成事项。已完成任务详情进入 `docs/plans/linguacafe-master-plan.md`，历史材料进入 `docs/HISTORY_INDEX.md`。
+
+- **OpenCode-ArchitectureTargetMode-Batch1 剩余缺口**：
+  - pending occurrence 写入未真实跑通（数据准备问题，非代码 bug）；
+  - TextBlock fallback 仍缺测试；
+  - ReviewCardManage logs payload 仍缺 contract tests；
+  - SenseReview FullMenu / occurrence 写入路径仍建议后续 MCP Chrome smoke。
+- **Codex-ProjectDocsGovernanceTargetMode-1**：
+  - 本轮只做文档治理，不改业务代码和测试；
+  - 新增入口索引、历史索引、ADR-0002、spec→harness 候选清单；
+  - 旧 `CURRENT_STATUS` / `NEXT_TASK` / `FSRS_PHASE*` / 旧 handoff 已降权为历史参考；
+  - 完成后仍由网页端总设计师选择下一任务，不自动进入下一阶段。
+- **AIStudyCardGenerationWorkflow**：
+  - 当前是产品规划和 ADR 边界，不是已实现功能；
+  - 后续实现前必须先做架构侦查，不改 DB schema，不删除现有 SenseMappingReview / SenseReview 能力，不删除 legacy word card 兼容层。
 
 ## 4. 当前产品决策
 
@@ -81,6 +65,7 @@
 | AI 推荐词不重复 | AI 推荐词必须排除用户已选择的词 |
 | AI 推荐词默认不选 | "AI 生成示意卡"弹窗中 AI 推荐词默认全不选，提供"全选"按钮 |
 | 确认后才生成 | 只有被用户确认的 AI 推荐词才进入示意卡生成 |
+| legacy word card | 只作兼容，不作为新功能和日常复习主线 |
 
 ## 5. 下一候选方向
 
@@ -124,13 +109,20 @@
 - 补 SenseReview 页面完整 More 菜单和 occurrence 写入路径的 MCP Chrome smoke；
 - 不改代码，除非发现真实 UI bug。
 
-### H. Codex 大任务候选
+### H. SpecToHarness-Hardening-1
+
+- 参考 `docs/plans/spec-to-harness-candidates.md`；
+- 只选择一个软约束转测试 / smoke / harness；
+- 不把候选清单当作实现授权。
+
+### I. Codex 大任务候选
 
 由网页端总设计师决定。Codex 任务不应从脏上下文开始，必须先看：
 1. `docs/plans/current-working-handoff.md`（本文）
 2. `docs/plans/linguacafe-master-plan.md`
 3. `docs/plans/vibe-coding-collaboration-rules.md`
 4. `docs/plans/repo-architecture-hotspot-audit.md`
+5. 按需读 `docs/DOCUMENTATION_INDEX.md`、`docs/HISTORY_INDEX.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`
 
 ## 6. Codex 交接原则
 

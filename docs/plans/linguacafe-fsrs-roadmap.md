@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本 roadmap 已被总控计划和当前工作台超车。保留用于追溯 FSRS 阶段历史；当前计划以 `docs/plans/linguacafe-master-plan.md` 和 `docs/plans/current-working-handoff.md` 为准。
+
 # LinguaCafe FSRS / Sense Review Roadmap
 
 > **最后更新**：2026-06-30 (TRAE-Smoke-Guard-ChapterId-1)

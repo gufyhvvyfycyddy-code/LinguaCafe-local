@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本用户手册属于旧 FSRS 阶段说明，部分流程可能仍有参考价值，但不能作为当前产品/架构入口。当前规则请先读 `docs/DOCUMENTATION_INDEX.md`。
+
 # LinguaCafe FSRS 用户手册
 
 ## 1. 现在能做什么

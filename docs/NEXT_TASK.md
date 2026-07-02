@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文是旧阶段“下一步”记录，不是当前下一任务。不得从本文直接开始执行；当前候选方向以 `docs/plans/current-working-handoff.md` 和 `docs/plans/linguacafe-master-plan.md` 为准。
+
 # NEXT_TASK — 阅读页点词显示已有词义
 
 > 创建时间：2026-06-22

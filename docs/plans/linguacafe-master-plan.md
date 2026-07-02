@@ -1,20 +1,22 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (OpenCode-AiStudyCardWorkflowPlan-And-Batch1DocFix-1)
+> **最后更新**：2026-07-02 (Codex-ProjectDocsGovernanceTargetMode-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
+> **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
 
 ---
 
 ## 1. 文档目的
 
 1. 本文档是 LinguaCafe 项目的**总控计划**，统一管理所有任务方向。
-2. `linguacafe-fsrs-roadmap.md` 是 FSRS / Sense Review 专项路线图。
+2. `linguacafe-fsrs-roadmap.md` 是历史 FSRS / Sense Review 专项路线图，保留用于追溯，不再作为当前入口。
 3. `ai-reading-assist-plan.md` 是 AI 阅读辅助专项计划。
 4. `ai-reading-assist-schema-experiment.md` 是 AI schema 设计与实验记录。
 5. `fsrs-anki-management-optimization-plan.md` 是 FSRS Anki 管理优化专项。
 6. 本文档用于防止旧计划被遗忘：插队任务**不等于**取消旧任务。
 7. 新增任务不自动删除旧任务，除非网页端 GPT 明确同意并更新相关文档。
+8. `current-working-handoff.md` 是短期工作台；本文是长期总账本。短期候选和已完成任务可以互相引用，但不要把旧 handoff / 旧 NEXT_TASK 重新升格为当前入口。
 
 ---
 
@@ -160,6 +162,7 @@
 | OpenCode-ArchitectureTargetMode-Batch1 | 综合推进：SenseReview 到期卡真实验收（MCP Chrome 显示 + Good 评分 + ReviewLog 创建）；TextBlock fallback 只读侦查（fallbackEnglishTokenize 仍可被调用但无测试覆盖）；ReviewCardManage logs payload 只读侦查（20 条最近日志、user/language/card 三重过滤，字段已盘点，contract tests 待补）。阶段性完成，仍有缺口：pending occurrence 写入未跑通、TextBlock fallback 缺测试、logs payload 缺 contract tests。 |
 | AIStudyCardGenerationWorkflow-Plan | 产品目标冻结：AI 译文 ≠ AI 示意卡；用户选词优先（点击单词/拖动词组→手动添加释义→直接生成可复习卡）；用户可标记"待 AI 解释"词；AI 推荐词必须排除用户已选词；弹窗确认机制中 AI 推荐词默认不选，提供全选按钮；只有被用户确认后才生成示意卡。前端主入口不再展示"词义确认/词义复习"，统一为"复习"。当前不实现。后续实现前必须先做架构侦查，不改 DB schema，不删除现有 SenseMappingReview/SenseReview 能力，不删除旧 word card 兼容层。 |
 | OpenCode-AiStudyCardWorkflowPlan-And-Batch1DocFix-1 | 修正 Batch1 文档收口：current-working-handoff 补充 Batch1 阶段性完成状态、未完成缺口、产品决策（复习入口统一/AI 译文≠AI 示意卡/用户选词优先/AI 推荐词不重复/默认不选）。修正 master plan 和 hotspot audit 中"字段已锁定"的夸大表述。记录 AI 示意卡生成流程产品目标，冻结实现前不得直接改 DB schema、不得删除现有能力。不改业务代码，不改测试。 |
+| Codex-ProjectDocsGovernanceTargetMode-1 | 基于 Vibe Coding / spec / harness 字幕原则和 CodeBuddy 文档盘点报告治理项目文档体系。新增 `docs/DOCUMENTATION_INDEX.md`、`docs/HISTORY_INDEX.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`、`docs/plans/spec-to-harness-candidates.md`；给旧 `CURRENT_STATUS` / `NEXT_TASK` / `FSRS_PHASE*` / 旧 handoff / 旧 FSRS roadmap 加历史降权标记；收敛 current-working-handoff、hotspot audit、协作规则中的入口职责。不改业务代码，不改测试，不把 AI 示意卡写成已实现。下一轮仍由总设计师选择，不自动执行。 |
 
 ## 4. 未完成任务总表
 

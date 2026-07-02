@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文是旧 FSRS Phase 8 的 Quicker 工作流记录。它不是当前自动化授权，不得据此执行当前任务；当前入口见 `docs/DOCUMENTATION_INDEX.md`。
+
 # FSRS Phase 8 Quicker Workflow
 
 This workflow is semi-automatic. Quicker can call local scripts, open folders, and open browser pages, but it should not click through ChatGPT, bypass browser limits, store accounts or cookies, or automatically import GPT output without validation.

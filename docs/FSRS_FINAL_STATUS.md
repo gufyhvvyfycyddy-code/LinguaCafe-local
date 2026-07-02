@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> “最终状态”仅指旧 FSRS 阶段总结，不代表当前 sense-only 架构最终状态。当前 FSRS / sense-only 主线请读 `docs/plans/current-working-handoff.md`、`docs/plans/linguacafe-master-plan.md` 和 `docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`。
+
 # LinguaCafe FSRS 最终状态总结
 
 ## Phase 1 到 Phase 8 完成内容

@@ -1,3 +1,6 @@
+> **历史文档 / Historical reference only**
+> 本文是旧 FSRS Phase 3 状态记录。不要把其中的 next phase 当作当前任务入口；当前入口见 `docs/DOCUMENTATION_INDEX.md`。
+
 # FSRS Phase 3 Status
 
 ## Scope

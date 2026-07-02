@@ -1,8 +1,51 @@
 # LinguaCafe Vibe Coding 协作原则
 
-> LinguaCafe FSRS 改造系列中，网页端 GPT（产品决策方）与本地 OpenCode Agent（执行方）的协作规范。
+> LinguaCafe 长期本地改造中，网页端 GPT（产品决策方）与本地 OpenCode / Codex / CodeBuddy / WorkBuddy（执行或审计方）的协作规范。
+> 本文是协作规则和红线，不是业务总计划；业务现状先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`。
 
 ---
+
+## 0. 如何阅读本文
+
+1. 新任务不要把本文全文当作唯一上下文。先读 `docs/DOCUMENTATION_INDEX.md`，按任务只加载相关章节。
+2. 本文只记录长期协作规则、安全红线、验收规则和角色边界；业务计划放在 master plan，当前入口放在 current-working-handoff，历史材料放在 `docs/HISTORY_INDEX.md`。
+3. 如果本文与当前任务提示词冲突，先遵守更严格的安全边界；如果是产品方向冲突，交给网页端总设计师判断。
+4. 文档规则是软约束；高风险规则应逐步转为 tests / smoke / harness，候选见 `docs/plans/spec-to-harness-candidates.md`。
+
+### 0.1 最重要红线
+
+- 不改 `.env`。
+- 不清库，不运行 `migrate:fresh` / `db:wipe` / drop / truncate。
+- 不修改 `AGENTS.md`，除非任务明确授权。
+- 不处理 `.omo/`。
+- 不使用 force push。
+- 不运行 DCP，除非任务明确授权。
+- 不运行 notification script，包括 `notify.ps1`。
+- 不自动进入下一任务。
+- 页面任务不能用 API 调用替代 MCP Chrome 真实页面验收。
+
+### 0.2 目录
+
+| 章节 | 主题 |
+|---|---|
+| 1-3 | 网页端 GPT、本地 Agent、用户职责 |
+| 4-4.y | 报告验收、CodeBuddy 风险角色、上下文/文档分层 |
+| 5-9 | 文件范围、实验任务、计划保全、Anki 参考、报告格式 |
+| 10-13 | Anti-Mud、Architecture Gate、MCP 视觉验证、安全红线 |
+| 14 | 三员工工作流与 OpenCode / CodeBuddy / WorkBuddy 规则 |
+| 15-16 | 服务边界、切换对话后的接续规则 |
+| 17-21 | notification script、WorkBuddy、复杂度、oh-my-opencode-slim、网页端自动推进 |
+
+### 0.3 文档治理原则
+
+1. 文档不是越多越好；过期文档和临时修复记录会污染上下文。
+2. 入口、总计划、模块文档、ADR、测试/smoke/harness、历史归档必须分层。
+3. spec 只固化已经拍板、长期有效、后续不应反复讨论的决定。
+4. MVP 或探索阶段可以少写 spec；进入长期迭代后必须补边界和验收。
+5. 不把未来规划写成已实现，不把临时方案写成永久原则。
+6. 不把所有规则合并成一个巨型万能文档；按需加载比一次性读全更可靠。
+7. 旧 handoff / 旧 next task / 旧 phase status 必须降权为历史参考。
+8. 关键边界不能只写“不要破坏”，应逐步进入 tests / smoke / harness。
 
 ## 1. 网页端 GPT 的职责
 
