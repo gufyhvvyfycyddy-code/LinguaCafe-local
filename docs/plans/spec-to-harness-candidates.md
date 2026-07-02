@@ -1,7 +1,7 @@
 # Spec To Tests / Smoke / Harness Candidates
 
 > **Status**: Candidate list plus completed conversions.
-> **Last updated**: 2026-07-02.
+> **Last updated**: 2026-07-02 (Codex-FinalArchitectureClosureTargetMode-1).
 
 This document turns soft project rules into executable verification candidates. Completed rows record what has already moved from prose into tests/smoke/harness; open rows remain candidates and do not authorize code changes by themselves.
 
@@ -39,14 +39,16 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 4. Do not weaken existing tests to make a future candidate easier.
 5. For browser flows, do not replace MCP Chrome with API calls.
 6. AI study card architecture scouting is complete (`docs/plans/ai-study-card-architecture-scout.md`). The scout covers code access points, danger zones, and a minimum target proposal. Do not implement before product decision approval. Do not invent DB schema or endpoint names in this candidate list.
+7. Codex-FinalArchitectureClosureTargetMode-1 froze the AI study card v1 plan (`docs/plans/ai-study-card-v1-frozen-plan.md`) and the frontend review entry unification plan (`docs/plans/frontend-review-entry-unification-plan.md`). Both are route-frozen only — no schema, API, Vue, or route changes were made. Implementation rounds must still pass Architecture Gate and ADR review before code changes.
 
 ## 4. Next Candidate Shortlist
 
 If the project owner asks for the next hardening task, the lowest-risk remaining candidates are:
 
-1. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
-2. `AIStudyCard-HarnessScouting-1` as docs/harness planning only; no schema/API implementation.
-3. `SenseReview-SmokeReplay-1` only when the real page flow needs to be replayed with a fresh marker.
+1. `AIStudyCard-PendingItem-ContractTests-1` — once AI study card v1 implementation begins, add contract tests including reverse-contract tests asserting no writes to `ReviewCard` / `ReviewLog` / `WordSense` / `WordSenseOccurrence` / `EncounteredWord`. Route-frozen plan: `docs/plans/ai-study-card-v1-frozen-plan.md`.
+2. `FrontendReviewEntry-Unification-McpSmoke-1` — once frontend review entry unification round 1 is implemented, add MCP Chrome smoke covering: homepage "开始复习" → `/reviews/senses`, nav "复习" → `/reviews/senses`, `/senses/review` and `/review/false/-1/-1` and `/review-cards/manage` routes still accessible. Route-frozen plan: `docs/plans/frontend-review-entry-unification-plan.md`.
+3. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
+4. `SenseReview-SmokeReplay-1` only when the real page flow needs to be replayed with a fresh marker.
 
 Selection still belongs to the project owner / webpage-side designer. Agents must not auto-enter the next task.
 

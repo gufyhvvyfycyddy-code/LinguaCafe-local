@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-02.
+> **Last updated**: 2026-07-02 (Codex-FinalArchitectureClosureTargetMode-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -13,6 +13,7 @@ Read these in order for a new Codex / OpenCode / CodeBuddy / WorkBuddy task:
 2. `docs/plans/linguacafe-master-plan.md` — long-term ledger of product lines, completed work, and preserved future directions.
 3. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
 4. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
+5. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).
 
 Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_STATUS.md`, or `docs/FSRS_PHASE*.md`. Those are historical references.
 
@@ -24,6 +25,8 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Long-term ledger | Preserve product directions and completed task history | `linguacafe-master-plan.md` |
 | Collaboration rules | Role boundaries, safety red lines, test/smoke/report rules | `vibe-coding-collaboration-rules.md` |
 | Architecture risks | Module responsibilities, hotspots, candidate routes | `repo-architecture-hotspot-audit.md` |
+| Architecture closure | Final closure conclusion and next-stage roadmap | `final-architecture-closure-report.md` |
+| Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
 | Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md` |
@@ -36,6 +39,15 @@ New rules and process notes are documented in:
 - `vibe-coding-collaboration-rules.md` §22 — 总设计师提示词前进度说明规则（每次给提示词前必须先说明当前进度）。
 - `vibe-coding-collaboration-rules.md` §23 — 三方架构侦查规则（网页端总设计师/CodeBuddy/OpenCode 三方分工）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
+
+## 2.6 Frozen Plans (Route-Frozen, Not Implemented)
+
+| Plan | Status | What it freezes |
+|---|---|---|
+| `ai-study-card-v1-frozen-plan.md` | Frozen, not implemented | AI study card v1 target, user flow, data/frontend/backend boundaries, forbidden scope, acceptance. Implementation round must still pass Architecture Gate and ADR. |
+| `frontend-review-entry-unification-plan.md` | Frozen, not implemented | Frontend review entry unification direction, current entry state, future unified layout, round-1 minimum change, forbidden one-shot deletion of old pages, MCP Chrome / WorkBuddy acceptance. |
+
+Do not treat frozen plans as implementation authorization. They only freeze the route; the next implementation round must still pass Architecture Gate and ADR review.
 
 ## 3. Current ADRs
 
