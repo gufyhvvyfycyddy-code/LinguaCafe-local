@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-03 (Trae-LemmaKnownSenseBridge-1).
+> **Last updated**: 2026-07-03 (Codex-MorphologyMatrix-ImportRegression-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -53,7 +53,7 @@ New rules and process notes are documented in:
 | `ai-study-card-v2-generation-loop-plan.md` | Frozen, implemented (2026-07-02) | AI study card v2 generation loop phase 1: pending item list, dismiss/restore, preview modal placeholder. |
 | `ai-study-card-v3-safe-preview-package-plan.md` | Frozen, implemented (2026-07-02) | AI study card v3 safe preview package: dismissed-view restore button, real preview content, safe preview package (`schema_version=ai-study-card-preview-package-v1`). |
 | `ai-recommendation-confirmation-loop-plan.md` | Frozen, implemented (2026-07-02) | AI study card v4 AI recommendation confirmation loop: paste AI recommendation JSON, dedupe, default unchecked, user confirmation, final candidates package (`schema_version=ai-study-card-final-candidates-v1`). |
-| `reading-inline-review-and-example-pool-plan.md` | Frozen, partially implemented (2026-07-03) | Reading inline review and multi-example pool route: WordSense-only inline review (still frozen), real-source example rotation (implemented 2026-07-02), known-sense-new-meaning bridge front-only structure (implemented 2026-07-03, no AI judgment), and surface/lemma binding rules (front-end display + lemma-prefer search implemented 2026-07-03). |
+| `reading-inline-review-and-example-pool-plan.md` | Frozen, partially implemented (2026-07-03) | Reading inline review and multi-example pool route: WordSense-only inline review (still frozen), real-source example rotation (implemented 2026-07-02), known-sense-new-meaning bridge front-only structure (implemented 2026-07-03, no AI judgment), surface/lemma binding rules (front-end display + lemma-prefer search implemented 2026-07-03), and morphology matrix/import-regression guards (implemented 2026-07-03). |
 
 Do not treat frozen plans as implementation authorization. They only freeze the route; the next implementation round must still pass Architecture Gate and ADR review.
 

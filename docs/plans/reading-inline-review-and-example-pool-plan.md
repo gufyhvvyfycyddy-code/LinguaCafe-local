@@ -1,7 +1,7 @@
 # Reading Inline Review And Example Pool Plan
 
-> **Status**: Multi-example pool / rotation / multi-source carousel implemented (2026-07-02). Lemma/surface binding display + lemma-prefer search + known-sense candidates front-only panel + known-sense-new-meaning hint front-only structure implemented (2026-07-03). Reading inline review scoring still frozen, not implemented.
-> **Last updated**: 2026-07-03 (Trae-LemmaKnownSenseBridge-1).
+> **Status**: Multi-example pool / rotation / multi-source carousel implemented (2026-07-02). Lemma/surface binding display + lemma-prefer search + known-sense candidates front-only panel + known-sense-new-meaning hint front-only structure implemented (2026-07-03). Morphology matrix/import-regression guards implemented (2026-07-03). Reading inline review scoring still frozen, not implemented.
+> **Last updated**: 2026-07-03 (Codex-MorphologyMatrix-ImportRegression-1).
 
 This plan records the next route for reading-inline review and multi-example rotation. It is not implementation authorization. Future work still needs Architecture Gate, interface review, tests, and MCP Chrome page acceptance.
 
@@ -14,7 +14,7 @@ This document freezes four product routes:
 3. Known-sense-new-meaning confirmation must stay separate from ordinary AI recommendations. **(Front-only structure implemented 2026-07-03: `WordSenseKnownSenseService` + `GET /senses/known-sense-lookup` + `WordSensesList.vue` 「已学词义候选」 panel + 「熟词僻义」 info alert. AI judgment for "is this a known-sense-new-meaning case?" is still NOT implemented.)**
 4. Surface/lemma binding must remain context-aware and user-correctable. **(Front-end display + lemma-prefer search + user-correction flow implemented 2026-07-03. Automatic context-aware binding (surface + lemma + pos + sentence meaning) and AI suggestions are still NOT implemented.)**
 
-The 2026-07-02 Trae round implemented route #2 and the multi-source carousel portion of route #8 in §4.2. The 2026-07-03 Trae round implemented the front-end display and lemma-prefer search portions of route #4 plus the front-only structure of route #3. Neither round implemented reading-inline review scoring, real AI calls, WordSense generation, ReviewCard generation, FSRS write paths, AI-generated examples, automatic context-aware binding, or AI known-sense-new-meaning judgment.
+The 2026-07-02 Trae round implemented route #2 and the multi-source carousel portion of route #8 in §4.2. The 2026-07-03 Trae round implemented the front-end display and lemma-prefer search portions of route #4 plus the front-only structure of route #3. Codex-MorphologyMatrix-ImportRegression-1 added test guards for eight morphology categories and a project-controlled article fixture, but did not add automatic context-aware binding. None of these rounds implemented reading-inline review scoring, real AI calls, WordSense generation by AI, ReviewCard generation by AI, FSRS write paths, AI-generated examples, automatic context-aware binding, or AI known-sense-new-meaning judgment.
 
 ## 4.1 Reading Inline Review Principles
 
@@ -58,7 +58,7 @@ The 2026-07-02 Trae round implemented route #2 and the multi-source carousel por
 3. After the user corrects lemma, later add-sense flows should use the corrected lemma. **(Implemented 2026-07-03: `VocabularySideBox::saveLemma` → `commit setStudyBase` → `POST /vocabulary/word/update`; `effectiveLemma` prefers `studyBase` after correction. Test `test_add_new_sense_uses_corrected_lemma_after_user_edit` confirms lemma and surface_form stored independently.)**
 4. Binding must consider surface, lemma, part of speech, and sentence meaning. **(Still NOT implemented — only front-end display + lemma-prefer search; no automatic context-aware binding.)**
 5. Do not bind every published-like surface unconditionally to a single lemma such as `publish`. **(Honored 2026-07-03: no auto-binding logic added; user correction always overrides.)**
-6. ~~This round does not implement binding changes.~~ **Principles 1-3 + 5 implemented 2026-07-03 (Trae-LemmaKnownSenseBridge-1). Principles 4 + 6 (automatic context-aware binding, AI suggestions) are still NOT implemented.**
+6. ~~This round does not implement binding changes.~~ **Principles 1-3 + 5 implemented 2026-07-03 (Trae-LemmaKnownSenseBridge-1), and Codex-MorphologyMatrix-ImportRegression-1 added matrix guards for regular/irregular plurals, third-person forms, past tense, past participles, progressive forms, comparative/superlative forms, and adjectival ambiguity. Principles 4 + 6 (automatic context-aware binding, AI suggestions) are still NOT implemented.**
 
 ## 5. Required Future Harness
 

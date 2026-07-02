@@ -1,6 +1,6 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 Trae-LemmaKnownSenseBridge-1）
+> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 Codex-MorphologyMatrix-ImportRegression-1）
 > **基准 commit**：`7f3d4b6`
 > **审计方式**：只读侦查，不改代码，不进入功能开发。
 
@@ -12,6 +12,11 @@
 > - `SenseSourceContextService::sourceContextList()`（修改）：消除循环内 `findChapterById`，改为批量 `whereIn` 预加载 Chapter + `limit(12)` + PHP `unique('chapter_id')->take(3)`。跨数据库兼容（SQLite 不支持 GROUP BY + orderByRaw 组合，故保留 PHP 层 dedupe）。返回字段和 fallback 不变。
 > - `routes/web.php`（修改）：新增 `Route::get('/senses/known-sense-lookup', ...)`。无路由冲突。
 > - 测试覆盖：13 个 feature tests（WordSenseKnownSenseBridgeTest）+ 完整回归测试套件全绿（WordSense 174/718, ReviewFsrsTest 61/364, FsrsSchedulingServiceTest 9/46, WordSenseExamplePoolTest 12/85, SenseSourceContextMultiSourceTest 6/33, FinishedReadingSafetyTest 2/27, LegacyEntryUiGuardTest 1/12）。npm run development 编译成功。
+
+> **2026-07-03 Codex 任务新增测试矩阵热点**：
+> - `MorphologyMatrixImportRegressionTest`（新增）：项目可控文章 fixture + 8 类形态变化矩阵。覆盖 surface/lemma/pos 保留、known-sense lookup 只读、user/language/status 隔离、ambiguous forms 不自动绑定、不写 ReviewLog/ReviewCard/FSRS。
+> - `MorphologyMatrixUiGuardTest`（新增）：源码级守护 `WordSensesList.vue` 仍显示 surface+lemma、add-sense payload 仍用 `effectiveLemma` + `surfaceWord`、熟词僻义提示仍标注未调用 AI、旧入口仍隐藏。
+> - 架构影响：不新增 route/service/controller，不改 Vue 行为，不改 FSRS/ReviewLog/ReviewCard/WordSense 删除归档恢复语义；本轮主要把已实现前置结构转为更宽的 harness。
 
 > **2026-07-02 Trae 任务新增热点**：
 > - `WordSenseExamplePoolService`（新增）：只读，复用 `WordSenseOccurrence` + card example fallback，不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。

@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-03 (Trae-LemmaKnownSenseBridge-1)
+> **最后更新**：2026-07-03 (Codex-MorphologyMatrix-ImportRegression-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。上轮新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗。本轮新增词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
+架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。近期已新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗、词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）。本轮补齐形态变化测试矩阵、项目可控文章 fixture 导入回归、known-sense/FSRS 只读护栏、前端源码级 UI guard。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
 
 ## 2. 最近已完成任务
 
@@ -37,6 +37,7 @@
 | Codex-LegacyEntry-FinishedReading-ExampleGuard-1 | 旧版入口清理执行 + Finished reading 安全护栏 + 阅读例句路线冻结。普通查词组件不再展示“旧词条释义 / 旧版释义 / 旧版示意 / legacy word review”入口文案；后端 legacy 兼容层、`ReviewCard::TARGET_WORD`、legacy route/service/tests 保留。新增 `FinishedReadingSafetyTest` 锁定 Finished reading 只把当前用户/当前语言 `stage=2` 黄词设为 known，且不改绿词 stage、WordSense、ReviewCard、ReviewLog、FSRS；发现并修复自动 known 分支缺少 `language` 过滤。新增 `LegacyEntryUiGuardTest` 防止旧入口文案回到普通查词组件。新增 `reading-inline-review-and-example-pool-plan.md`，只冻结阅读中刷卡/多例句轮换路线，不实现。 |
 | Trae-ExamplePool-ReviewRotation-SourceCarousel-1 | 多例句池 + 复习页题面例句轮换 + 答案后补充例句不重复 + 多来源溯源 carousel + Finished reading 确认弹窗。新增 `WordSenseExamplePoolService`（复用 `WordSenseOccurrence` + card example fallback，不新增 migration，不调用 AI），`SenseReviewCardSerializerService` payload 新增 `example_candidates` / `example_candidates_count` / `supplementary_example`，稳定 seed 轮换（review_card_id + fsrs_reps + day-of-year，crc32）；`SenseSourceContextService` 新增 `sourceContextList` 方法 + 新路由 `GET /senses/{id}/source-context-list`，`SenseExampleDialog.vue` 支持来源 1/N 切换；`TextReader.vue` 「完成阅读」按钮新增确认弹窗（说明影响 + 取消/确认）。新增 18 个 feature tests（WordSenseExamplePoolTest 12 + SenseSourceContextMultiSourceTest 6，全绿）。MCP Chrome 真实页面验收：登录 → /reviews/senses 题面正常 → 查看答案 → 单例句无重复补充 → 单来源无切换按钮（符合规则） → 阅读页完成阅读确认弹窗 → 取消不执行 → console/network 正常。**阅读中刷卡仍未实现；AI 不生成例句。** |
 | Trae-LemmaKnownSenseBridge-1 | 词形原型绑定 + 已学词义候选 + 熟词僻义前置结构 + 例句池性能优化。新增 `WordSenseKnownSenseService`（只读：`listConfirmedSensesForLemma` + `knownSenseLookupPayload`，批量预加载 occurrence count，不写 ReviewLog/WordSense/ReviewCard/FSRS，不调 AI）；新增端点 `GET /senses/known-sense-lookup?lemma=...&language=...`；`WordSensesList.vue` 新增「已学词义候选」面板（confirmed WordSense 列表，含 sense_zh/sense_en/pos/FSRS chip/复习次数）和「熟词僻义」前置 info alert（明确标注「未调用 AI 判断」）；`WordSenseExamplePoolService::exampleCandidates()` 消除 N+1（批量 whereIn 预加载 Chapter）；`SenseSourceContextService::sourceContextList()` 消除循环内 findChapterById（批量 whereIn 预加载 + limit 12 + PHP unique+take(3) 保持跨数据库兼容）。surface/lemma 绑定：阅读页点词显示 surface（如 geese）+ lemma（如 goose）+ [修改] 入口；搜索/添加新释义优先使用 lemma（搜索框 value=lemma）；用户通过 VocabularySideBox saveLemma 修正 lemma 后，后续添加新释义使用修正后的 lemma；不无条件绑定 published→publish。新增 13 个 feature tests（WordSenseKnownSenseBridgeTest）。MCP Chrome 真实页面验收：登录 → 阅读页点击 geese → 显示 geese→goose→[修改] → 添加新释义搜索框 value=goose → 创建 confirmed sense 后重新点击 geese → 「已学词义候选」面板显示 + 「熟词僻义」提示显示 → /senses/known-sense-lookup 端点 200 → 复习页显示答案 + 例句正常 → 查看原文多来源溯源正常 → console 仅预期 WebSocket 降级 → network 全 200。**阅读中刷卡评分仍未实现；AI 不生成例句；不写 ReviewLog；不改 FSRS；熟词僻义仅前置结构，AI 判断仍未实现。** |
+| Codex-MorphologyMatrix-ImportRegression-1 | 形态变化测试矩阵 + 文章 fixture 导入回归 + lemma bridge 覆盖增强。新增 `MorphologyMatrixImportRegressionTest`：覆盖规则复数（ways/technologies）、不规则复数（mice/children）、第三人称（studies/watches）、过去式（ran/went）、过去分词（written/published）、进行时（running/studying）、比较级/最高级（better/worse）、词性歧义（used/broken）；项目可控文章 fixture 的 `processed_text` 保留 surface/lemma/pos；known-sense lookup 只按 lemma 返回 confirmed WordSense，保持 user/language/status 隔离，`read_only=true`，不写 ReviewLog，不创建 ReviewCard，不改 FSRS；`published/running/used/broken` 等歧义词不自动绑定、不自动刷卡。新增 `MorphologyMatrixUiGuardTest` 锁定 `WordSensesList.vue` 仍显示 surface+lemma、add-sense payload 仍用 `lemma: effectiveLemma` + `surface_form: surfaceWord`、熟词僻义文案仍标注未调用 AI、旧入口仍隐藏。**阅读中刷卡评分仍未实现；AI 判断熟词僻义仍未实现；不写 ReviewLog；不改 FSRS；AI 不生成例句。** |
 
 ## 3. 当前未最终关闭的事项
 
@@ -164,7 +165,7 @@
 | AI 推荐词确认闭环 | ≈ 80% | V4 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，不是固定五条主线的虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
 | 旧版入口清理执行 | ≈ 80% | 普通查词界面的旧入口文案已隐藏，并加源码 guard；后端兼容层和 legacy route/service/tests 保留。**80% 是子阶段进度，不是固定五条主线的虚假上调。** 更深层删除必须另做依赖审计。 |
 | Finished reading 安全护栏 | ≈ 70% | Feature test 覆盖 yellow→known、green/WordSense/ReviewCard/ReviewLog/FSRS/用户/语言隔离，并修复语言过滤缺口。本轮新增「完成阅读」确认弹窗（说明影响 + 取消/确认），不污染真实数据。**70% 是子阶段进度，不是固定五条主线的虚假上调。** |
-| 阅读中复习 / 多例句轮换路线 | ≈ 50% | 路线冻结文档明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则。上轮已实现多例句池 + 复习页题面例句轮换 + 答案后补充例句不重复 + 多来源溯源 carousel（共 4 个子阶段：多例句池 60% / 题面轮换 50% / 多来源溯源 30% / Finished reading 误触保护 20%）。本轮新增 4 个子阶段：词形原型绑定 10%→60% / 熟词僻义识别 15%→65% / 阅读中刷卡前置匹配 0%→40% / 多例句池性能与来源查询优化 0%→20%，合计 160% 子阶段进度。**阅读中刷卡评分仍未实现。AI 不生成例句。熟词僻义仅前置结构，AI 判断仍未实现。** |
+| 阅读中复习 / 多例句轮换路线 | ≈ 60% | 路线冻结文档明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则。已实现多例句池、题面例句轮换、补充例句不重复、多来源溯源、词形原型绑定前置、known-sense 候选、例句池/来源查询性能优化。本轮新增形态变化测试矩阵 0%→100%、文章 fixture 导入回归 0%→100%、词形原型绑定 60%→90%、熟词僻义识别前置 65%→85%、阅读中刷卡前置匹配 40%→60%、多例句池性能与来源查询优化 20%→50%、页面验收覆盖增强、文档与测试矩阵治理 0%→100%。这些是子阶段进度，不是固定五条主线虚假上涨。**阅读中刷卡评分仍未实现。AI 不生成例句。熟词僻义仅前置结构，AI 判断仍未实现。** |
 
 > 如果任务失败或 Incomplete，对应进度不得上调。
 > 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。
