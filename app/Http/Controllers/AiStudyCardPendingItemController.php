@@ -62,17 +62,22 @@ class AiStudyCardPendingItemController extends Controller
 
     /**
      * V2: 列出当前用户的待 AI 解释项。
-     * 可选 chapter_id 过滤；只返回 pending 状态。
+     * V3: 扩展支持 status=pending|dismissed|all，默认 pending。
+     * 可选 chapter_id 过滤。
      */
     public function index(Request $request)
     {
         $validated = $request->validate([
             'chapter_id' => ['nullable', 'integer', 'min:1'],
+            'status' => ['nullable', 'string', 'in:pending,dismissed,all'],
         ]);
+
+        $statusFilter = $validated['status'] ?? 'pending';
 
         $result = $this->pendingItemService->listPending(
             $request->user(),
-            isset($validated['chapter_id']) ? (int) $validated['chapter_id'] : null
+            isset($validated['chapter_id']) ? (int) $validated['chapter_id'] : null,
+            $statusFilter
         );
 
         if (!$result['success']) {
@@ -101,6 +106,38 @@ class AiStudyCardPendingItemController extends Controller
         return response()->json([
             'success' => true,
             'items' => $items,
+        ]);
+    }
+
+    /**
+     * V3: 生成安全预览包（preview-package）。
+     *
+     * 只打包当前用户、当前语言、pending 状态的 item。
+     * 不调用 AI，不生成 WordSense/ReviewCard/ReviewLog，不触发 FSRS。
+     */
+    public function previewPackage(Request $request)
+    {
+        $validated = $request->validate([
+            'item_ids' => ['required', 'array', 'min:1'],
+            'item_ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $result = $this->pendingItemService->buildPreviewPackage(
+            $request->user(),
+            $validated['item_ids']
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], $result['status'] ?? 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'package' => $result['package'],
         ]);
     }
 

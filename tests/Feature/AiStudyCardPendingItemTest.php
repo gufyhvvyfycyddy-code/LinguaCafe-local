@@ -492,6 +492,274 @@ class AiStudyCardPendingItemTest extends TestCase
         $this->assertTrue((bool) $card->fsrs_enabled);
     }
 
+    // ===== V3 tests: dismissed list / preview-package / reverse contracts =====
+
+    public function test_list_with_status_dismissed_returns_only_dismissed_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss it
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        // status=dismissed should return the dismissed item
+        $response = $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=dismissed');
+        $response->assertOk();
+        $response->assertJsonCount(1, 'items');
+        $response->assertJsonPath('items.0.status', AiStudyCardPendingItem::STATUS_DISMISSED);
+        $response->assertJsonPath('items.0.word', 'landscape');
+    }
+
+    public function test_list_with_status_all_returns_both_pending_and_dismissed(): void
+    {
+        $create1 = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $create2 = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload([
+            'word' => 'mountain',
+            'text_block_index' => 1,
+        ]))->assertOk();
+
+        // dismiss the first one
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $create1->json('item.id') . '/dismiss')
+            ->assertOk();
+
+        // status=all should return both
+        $response = $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=all');
+        $response->assertOk();
+        $response->assertJsonCount(2, 'items');
+    }
+
+    public function test_list_with_status_dismissed_respects_user_isolation(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $create->json('item.id') . '/dismiss')
+            ->assertOk();
+
+        // other user should not see dismissed items
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->getJson('/ai-study-card/pending-items?status=dismissed');
+        $response->assertOk();
+        $response->assertJsonCount(0, 'items');
+    }
+
+    public function test_list_with_status_dismissed_respects_language_isolation(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $create->json('item.id') . '/dismiss')
+            ->assertOk();
+
+        // switch to spanish — should not see english dismissed items
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=dismissed')
+            ->assertOk()
+            ->assertJsonCount(0, 'items');
+    }
+
+    public function test_restore_via_list_returns_to_pending(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        // verify dismissed list has it
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=dismissed')
+            ->assertOk()
+            ->assertJsonCount(1, 'items');
+
+        // restore
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/restore')
+            ->assertOk()
+            ->assertJsonPath('item.status', AiStudyCardPendingItem::STATUS_PENDING);
+
+        // verify pending list has it again
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=pending')
+            ->assertOk()
+            ->assertJsonCount(1, 'items');
+
+        // verify dismissed list no longer has it
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?status=dismissed')
+            ->assertOk()
+            ->assertJsonCount(0, 'items');
+    }
+
+    public function test_preview_package_generates_safe_package_for_own_pending_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonStructure([
+            'success',
+            'message',
+            'package' => [
+                'schema_version',
+                'created_at',
+                'selected_items',
+                'generation_rules',
+                'safety_flags',
+            ],
+        ]);
+
+        $package = $response->json('package');
+        $this->assertSame('ai-study-card-preview-package-v1', $package['schema_version']);
+        $this->assertCount(1, $package['selected_items']);
+        $this->assertSame($itemId, $package['selected_items'][0]['item_id']);
+        $this->assertSame('landscape', $package['selected_items'][0]['word']);
+
+        // safety flags
+        $this->assertTrue($package['safety_flags']['no_ai_called']);
+        $this->assertTrue($package['safety_flags']['no_review_card_created']);
+        $this->assertTrue($package['safety_flags']['no_word_sense_created']);
+        $this->assertTrue($package['safety_flags']['no_fsrs_changed']);
+
+        // generation rules
+        $this->assertTrue($package['generation_rules']['no_auto_review_card']);
+        $this->assertTrue($package['generation_rules']['ai_recommended_default_unchecked']);
+        $this->assertTrue($package['generation_rules']['ai_recommended_exclude_user_selected']);
+        $this->assertTrue($package['generation_rules']['user_confirmation_required_before_generation']);
+    }
+
+    public function test_preview_package_unauthenticated_user_cannot_generate(): void
+    {
+        $this->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [1],
+        ])->assertUnauthorized();
+    }
+
+    public function test_preview_package_user_isolation_rejects_other_users_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // other user tries to package this user's item
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ]);
+
+        // should fail (no valid items found)
+        $response->assertStatus(404);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_preview_package_excludes_dismissed_items(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss it
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        // try to package a dismissed item — should fail (no valid pending items)
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ]);
+
+        $response->assertStatus(404);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_preview_package_language_isolation(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // switch to spanish — should not be able to package english items
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ]);
+
+        $response->assertStatus(404);
+        $response->assertJsonPath('success', false);
+    }
+
+    public function test_preview_package_empty_item_ids_returns_validation_error(): void
+    {
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [],
+        ]);
+
+        $response->assertStatus(422);
+    }
+
+    public function test_preview_package_does_not_create_learning_data(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $before = [
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+            'review_logs' => ReviewLog::count(),
+            'encountered_words' => EncounteredWord::count(),
+            'word_sense_occurrences' => WordSenseOccurrence::count(),
+        ];
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ])->assertOk();
+
+        $this->assertSame($before['word_senses'], WordSense::count());
+        $this->assertSame($before['review_cards'], ReviewCard::count());
+        $this->assertSame($before['review_logs'], ReviewLog::count());
+        $this->assertSame($before['encountered_words'], EncounteredWord::count());
+        $this->assertSame($before['word_sense_occurrences'], WordSenseOccurrence::count());
+    }
+
+    public function test_preview_package_does_not_change_pending_item_status(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$itemId],
+        ])->assertOk();
+
+        // item should still be pending
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_preview_package_with_multiple_items(): void
+    {
+        $create1 = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $create2 = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload([
+            'word' => 'mountain',
+            'text_block_index' => 1,
+        ]))->assertOk();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/preview-package', [
+            'item_ids' => [$create1->json('item.id'), $create2->json('item.id')],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $this->assertCount(2, $response->json('package.selected_items'));
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([

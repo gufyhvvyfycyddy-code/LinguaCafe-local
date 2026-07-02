@@ -114,16 +114,24 @@ class AiStudyCardPendingItemService
 
     /**
      * V2: 列出当前用户的待 AI 解释项。
-     * 只返回 pending 状态，不返回 dismissed。
+     * V3: 扩展支持 status=pending|dismissed|all，默认 pending。
      * 支持按 chapter_id 过滤（可选）。
      */
-    public function listPending(User $user, ?int $chapterId = null): array
+    public function listPending(User $user, ?int $chapterId = null, string $statusFilter = 'pending'): array
     {
         $language = $user->selected_language;
 
         $query = AiStudyCardPendingItem::where('user_id', $user->id)
-            ->where('language_id', $language)
-            ->where('status', AiStudyCardPendingItem::STATUS_PENDING);
+            ->where('language_id', $language);
+
+        // V3: status 过滤。只接受 pending / dismissed / all，其他值回退为 pending。
+        if ($statusFilter === 'all') {
+            // 不加 status 条件
+        } elseif ($statusFilter === 'dismissed') {
+            $query->where('status', AiStudyCardPendingItem::STATUS_DISMISSED);
+        } else {
+            $query->where('status', AiStudyCardPendingItem::STATUS_PENDING);
+        }
 
         if ($chapterId !== null) {
             // 仅当章节属于当前用户当前语言时才过滤；否则忽略过滤返回空集，避免泄露。
@@ -148,6 +156,92 @@ class AiStudyCardPendingItemService
         return [
             'success' => true,
             'items' => $items,
+        ];
+    }
+
+    /**
+     * V3: 构建安全生成包（preview-package）。
+     *
+     * 只打包当前用户、当前语言、pending 状态的 item。
+     * dismissed 项不能进入生成包。
+     * 不调用 AI，不生成 WordSense/ReviewCard/ReviewLog，不触发 FSRS。
+     * 不改变 pending item 状态。
+     */
+    public function buildPreviewPackage(User $user, array $itemIds): array
+    {
+        if (empty($itemIds)) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '请至少选择一个待解释项。',
+            ];
+        }
+
+        // 限制单次打包数量，避免过大 payload。
+        if (count($itemIds) > 100) {
+            return [
+                'success' => false,
+                'status' => 422,
+                'message' => '单次生成包最多 100 项。',
+            ];
+        }
+
+        $language = $user->selected_language;
+
+        // 只查当前用户、当前语言、pending 状态的 item。
+        // dismissed / 其他用户 / 其他语言的 item 会被自动排除。
+        $items = AiStudyCardPendingItem::where('user_id', $user->id)
+            ->where('language_id', $language)
+            ->where('status', AiStudyCardPendingItem::STATUS_PENDING)
+            ->whereIn('id', $itemIds)
+            ->get();
+
+        if ($items->isEmpty()) {
+            return [
+                'success' => false,
+                'status' => 404,
+                'message' => '没有可打包的待解释项（可能已被取消或不属于当前用户）。',
+            ];
+        }
+
+        $selectedItems = $items->map(function ($item) {
+            return [
+                'item_id' => $item->id,
+                'chapter_id' => $item->chapter_id,
+                'text_block_index' => $item->text_block_index,
+                'sentence_index' => $item->sentence_index,
+                'word' => $item->word,
+                'normalized_word' => $item->normalized_word,
+                'surface' => $item->surface,
+                'lemma' => $item->lemma,
+                'sentence_text' => $item->sentence_text,
+                'status' => $item->status,
+                'created_at' => $item->created_at?->toIso8601String(),
+            ];
+        })->values()->toArray();
+
+        $package = [
+            'schema_version' => 'ai-study-card-preview-package-v1',
+            'created_at' => now()->toIso8601String(),
+            'selected_items' => $selectedItems,
+            'generation_rules' => [
+                'no_auto_review_card' => true,
+                'ai_recommended_default_unchecked' => true,
+                'ai_recommended_exclude_user_selected' => true,
+                'user_confirmation_required_before_generation' => true,
+            ],
+            'safety_flags' => [
+                'no_ai_called' => true,
+                'no_review_card_created' => true,
+                'no_word_sense_created' => true,
+                'no_fsrs_changed' => true,
+            ],
+        ];
+
+        return [
+            'success' => true,
+            'package' => $package,
+            'message' => '已生成安全预览包（未调用 AI，未生成复习卡）。',
         ];
     }
 

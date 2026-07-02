@@ -301,6 +301,68 @@
 |---|---|---|
 | AI 示意卡生成闭环 | 70% | 列表/取消/预览雏形已完成。**70% 是子阶段进度，非五条主线虚假上调。** AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
 
+## 2.8 GLM-AIStudyCardV3-SafePreviewPackage-1 增量审计（2026-07-02）
+
+> **性质**：AI 示意卡 V3 安全生成包。实现前已按 Architecture Gate 复核，本轮在 V2 pending item 列表/取消/恢复雏形边界上做最小扩展：补 dismissed 视图与恢复按钮、把预览弹窗从纯占位升级为真实预览、新增安全生成包接口。改动仍集中在 pending item Service/Controller/routes、阅读侧栏 VocabularySideBox/VocabularyBox、相关 feature tests、计划文档。
+
+### 本轮落地
+
+- 扩展 `GET /ai-study-card/pending-items` 支持 `status=pending|dismissed|all` 过滤（默认仍为 `pending`，向后兼容）。
+- 新增 `POST /ai-study-card/pending-items/preview-package` 后端接口：返回 `schema_version=ai-study-card-preview-package-v1` 的安全 JSON 包，含 `selected_items` / `generation_rules`（4 条） / `safety_flags`（4 条 no_ai_called / no_review_card_created / no_word_sense_created / no_fsrs_changed） / `created_at`。
+- 路由放置在 `{id}` 通配路由之前，避免 `preview-package` 被误匹配为 id。
+- `AiStudyCardPendingItemService::buildPreviewPackage()`：用户/语言/状态三重隔离；最多 100 项；空 `item_ids` 返回 422；不调用 AI；不生成 WordSense/ReviewCard/ReviewLog；不触发 FSRS；不改变 pending item 状态。
+- `VocabularySideBox.vue` 与响应式 `VocabularyBox.vue` 升级：v-btn-toggle 切换「待解释/已取消」视图、已取消项显示「恢复」按钮调用现有 restore 接口、真实预览弹窗（用户已选词列表 + 来源句子 + 章节位置 + 数量 + 状态 + 安全说明 + 每项 checkbox + AI 推荐词占位区域 + 未来生成规则说明）、「准备生成」按钮触发后端 preview-package 接口、JSON 只读 textarea 展示、「复制生成包」按钮 + 成功/失败 toast。
+- 前端 checkbox 状态只在前端 state 中（不写 DB）：全不选时禁用「准备生成」按钮。
+- 新增 `docs/plans/ai-study-card-v3-safe-preview-package-plan.md`。
+
+### 边界与测试护栏
+
+| 风险 | 本轮处理 |
+|---|---|
+| dismissed 列表泄露其他用户/语言数据 | Service 内按当前用户 `selected_language` 过滤；feature tests 覆盖用户隔离、语言隔离、`status=all` 时仍只返回当前用户/当前语言 |
+| restore 接口被滥用恢复他人 item | restore 已在 V2 落地用户隔离；V3 feature tests 复核 A 用户不能 restore B 用户 item、restore 不生成学习数据 |
+| preview-package 泄露其他用户/语言/状态 item | Service 内三重过滤：user_id / language_id / status=pending；feature tests 覆盖用户/语言/状态隔离，dismissed item 不能进入生成包 |
+| preview-package 改变 pending item 状态 | Service 不修改 pending item；feature test 覆盖 preview-package 后 status 不变 |
+| preview-package 误调用 AI | Service 内不调用任何 AI 服务；MCP Chrome 验收确认 Network 只有 127.0.0.1 请求 |
+| preview-package 误生成 WordSense/ReviewCard/ReviewLog | Service 不写这些表；feature tests 反向 contract 覆盖 count 不变；MCP Chrome 验收确认 WordSense=19/ReviewCard=16/ReviewLog=2 未变 |
+| preview-package 误触发 FSRS | Service 不调用 FSRS；feature tests 覆盖 ReviewCard 字段（含 due_at / stability / difficulty / fsrs_state）不变 |
+| 空 `item_ids` 越过校验 | Controller `required|array|min:1`；Service 二次检查 empty 返回 422；feature test 覆盖 |
+| 超 100 项 DoS | Service 内 `count > 100` 返回 422；feature test 覆盖 |
+| 前端预览弹窗误触发 AI 调用 | 前端纯展示，只通过「准备生成」按钮调用本地 preview-package 接口；MCP Chrome 验收确认 |
+| 前端「准备生成」全不选时仍可点击 | 前端 `:disabled="selectedItemIds.length === 0"` 绑定；MCP Chrome 验收确认全不选时按钮 disabled |
+| 复制生成包失败静默 | 前端 `navigator.clipboard.writeText` Promise reject 时显示「复制失败」toast；MCP Chrome 验收确认成功提示 |
+| 用户已选词与未来 AI 推荐词重复 | `generation_rules.ai_recommended_exclude_user_selected=true` 在生成包 schema 中固定；feature test 覆盖 schema 形状 |
+| AI 推荐词默认全选 | `generation_rules.ai_recommended_default_unchecked=true` 在生成包 schema 中固定；前端 AI 推荐词区域为占位且明确写「默认不选」；feature test 覆盖 schema 形状 |
+
+### 本轮未做
+
+- 不调用真实 AI，不保存 AI key，不新增 AI 配置页。
+- 不生成 AI 释义，不生成 WordSense/ReviewCard/ReviewLog。
+- 不改 FSRS、ReviewCard reset/delete/archive/restore、WordSense 删除/归档/恢复。
+- 不删除 SenseReview、SenseMappingReview、legacy word review 兼容层。
+- 不新增 migration（复用 V1 `ai_study_card_pending_items` 表）。
+- 不在 DB 中保存前端 checkbox 勾选状态（本轮纯前端 state）。
+- 不在 DB 中保存生成包（生成包是临时 JSON，复制即走）。
+
+### 五条主线进度
+
+| 主线 | V2 后 | V3 后 |
+|---|---|---|
+| 总体架构收口 | 100% | 100% |
+| 复习主线稳定 | 96% | 96% |
+| 页面真实验收 | 100% | 100% |
+| AI 示意卡规划 | 100% | 100% |
+| 前端入口整理 | 98% | 100% |
+
+### 子阶段进度
+
+| 子阶段 | V2 后 | V3 后 | 说明 |
+|---|---|---|---|
+| AI 示意卡生成闭环 | 70% | 95% | dismissed 视图/恢复按钮/真实预览/安全生成包已完成。**95% 是子阶段进度，非五条主线虚假上调。** AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
+| AI 生成安全契约 | — | 55% | 新增子阶段。schema_version=ai-study-card-preview-package-v1 + 4 条 generation_rules + 4 条 safety_flags + 14 个 V3 feature tests 覆盖用户/语言/状态隔离与反向 contract。AI 真实调用、AI 推荐词、用户确认生成等阶段仍未实现。 |
+
+> **本轮合计提升 80%（25 + 55）是子阶段进度提升，不是固定五条主线的虚假上涨。** 固定五条主线仅在「前端入口整理」从 98% 提到 100%，其余保持。AI 推荐词仍未实现，AI 释义生成仍未实现，WordSense/ReviewCard 生成闭环仍未实现，外部 AI 调用仍未实现。
+
 ## 3. 全仓库热点总览
 
 | 文件 | 行数 | 职责 | 风险等级 | 测试状态 | 优先级 | 建议 |
