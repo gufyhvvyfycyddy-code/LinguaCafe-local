@@ -36,6 +36,11 @@
 - **Codex-ArchitectureOptimizationLoop-1 后续清理**：
   - Codex 执行后遗留了本地 `data/` 和 `CODEX_SESSION_DIAGNOSIS.txt` artifact；
   - 已通过 `CodexWorkspaceArtifactCleanup-1` 删除并添加最小 `.gitignore` 保护，防止后续 agent 误提交。
+- **CodexWorkspaceArtifactCleanup-Followup-1**：
+  - 修正 master plan 头部日期为 followup 任务名；
+  - 核查 `.codex/` — 确认其为 Codex/session 本地 artifact（含 agent .toml 文件），已加入 `.gitignore`；
+  - 更新 current-working-handoff 记录收口状态；
+  - 不改业务代码，不改测试，不继续架构优化。
 - **旧交接文档**：
   - `docs/CODEX_HANDOFF.md`（2026-06-23）是旧交接文档，记录了 tokenizer 根治阶段的工作；
   - `docs/handovers/2026-06-24-c12-c-handoff.md`（2026-06-24）是 C.12-c 任务交接文档；

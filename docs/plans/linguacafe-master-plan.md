@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (Codex-ArchitectureOptimizationLoop-1)
+> **最后更新**：2026-07-02 (CodexWorkspaceArtifactCleanup-Followup-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -154,6 +154,7 @@
 | ReviewCardDeleteSnackbar-HistoryPreservedCopy-1 | 根据 WorkBuddy 产品决策，补管理页删除成功 snackbar / fallback 文案。单张删除 fallback 改为"该释义不会再出现在阅读页，复习历史已保留"；批量删除 fallback 改为"已彻底删除词义复习卡，复习历史已保留"；SenseReview 删除 fallback 改为"已彻底删除词义复习卡，复习历史已保留"。后端返回文案已有"复习历史已保留"，MCP Chrome 真实验收确认。不改删除逻辑，不改后端，不改数据。 |
 | CodexHandoff-DocsAndWorkingPlanRefresh-1 | 根据 AI 工程化字幕内容整理 Codex 交接前文档治理。新增 `current-working-handoff.md` 临时工作台，记录当前阶段、最近完成任务、产品决策、候选方向、Codex 交接原则。在协作规则中新增 §4.y（AI 上下文/文档分层/可执行验收）。明确文档不是硬约束，关键边界必须进入测试/smoke/harness；明确 Codex 虽可接更复杂任务，但仍需禁止范围、验收命令和总设计师核验。记录上一轮 CodeBuddy 已确认本任务此前未真正 push。不改业务代码。 |
 | CodexWorkspaceArtifactCleanup-1 | 清理 Codex-ArchitectureOptimizationLoop-1 后遗留的本地 `data/` 和 `CODEX_SESSION_DIAGNOSIS.txt` artifact（Codex/session 工具产物）。添加最小 `.gitignore` 规则 `/data/` 和 `/CODEX_SESSION_DIAGNOSIS.txt` 防止后续 agent 误提交。不改业务代码，不改测试语义，不继续架构优化。 |
+| CodexWorkspaceArtifactCleanup-Followup-1 | 修正 master plan 头部日期为 followup 任务名；核查 `.codex/` 本地 artifact 并加入 `.gitignore`；更新 current-working-handoff 记录收口状态。不改业务代码，不改测试，不继续架构优化。 |
 | Codex-ArchitectureOptimizationLoop-1 | Codex 基于最新 master 做架构总审计增量，并选择第一轮低风险实现：新增 `TextBlockPhraseIndexingTest` 锁定 TextBlockService 剩余 phrase/index 行为（exact match、跨 NEWLINE、缺词不命中、phraseIndexes 映射、用户/语言隔离）。不改业务代码，不改 TextBlockService / ReaderDataService / Vue / Controller / DB schema，不完成全部架构优化。下一轮候选保留为 FSRS confirmAndApply safe write tests、SenseReview 完整写入 smoke、TextBlock tokenizer fallback 只读侦查。 |
 
 ---

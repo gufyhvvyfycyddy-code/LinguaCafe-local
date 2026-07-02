@@ -35,3 +35,4 @@ yarn-error.log
 # Local Codex / session artifacts
 /data/
 /CODEX_SESSION_DIAGNOSIS.txt
+.codex/
