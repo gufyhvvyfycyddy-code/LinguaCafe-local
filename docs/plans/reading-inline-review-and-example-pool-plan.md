@@ -1,7 +1,7 @@
 # Reading Inline Review And Example Pool Plan
 
-> **Status**: Multi-example pool / rotation / multi-source carousel implemented (2026-07-02). Reading inline review still frozen, not implemented.
-> **Last updated**: 2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1).
+> **Status**: Multi-example pool / rotation / multi-source carousel implemented (2026-07-02). Lemma/surface binding display + lemma-prefer search + known-sense candidates front-only panel + known-sense-new-meaning hint front-only structure implemented (2026-07-03). Reading inline review scoring still frozen, not implemented.
+> **Last updated**: 2026-07-03 (Trae-LemmaKnownSenseBridge-1).
 
 This plan records the next route for reading-inline review and multi-example rotation. It is not implementation authorization. Future work still needs Architecture Gate, interface review, tests, and MCP Chrome page acceptance.
 
@@ -9,12 +9,12 @@ This plan records the next route for reading-inline review and multi-example rot
 
 This document freezes four product routes:
 
-1. Reading inline review must be WordSense-based. **(Still not implemented.)**
+1. Reading inline review must be WordSense-based. **(Still not implemented — scoring path frozen.)**
 2. Review card examples must rotate from real source examples. **(Implemented 2026-07-02: `WordSenseExamplePoolService` + `SenseReviewCardSerializerService` rotation + supplementary example.)**
-3. Known-sense-new-meaning confirmation must stay separate from ordinary AI recommendations. **(Still not implemented.)**
-4. Surface/lemma binding must remain context-aware and user-correctable. **(Still not implemented.)**
+3. Known-sense-new-meaning confirmation must stay separate from ordinary AI recommendations. **(Front-only structure implemented 2026-07-03: `WordSenseKnownSenseService` + `GET /senses/known-sense-lookup` + `WordSensesList.vue` 「已学词义候选」 panel + 「熟词僻义」 info alert. AI judgment for "is this a known-sense-new-meaning case?" is still NOT implemented.)**
+4. Surface/lemma binding must remain context-aware and user-correctable. **(Front-end display + lemma-prefer search + user-correction flow implemented 2026-07-03. Automatic context-aware binding (surface + lemma + pos + sentence meaning) and AI suggestions are still NOT implemented.)**
 
-The 2026-07-02 Trae round implemented route #2 and the multi-source carousel portion of route #8 in §4.2. It did NOT implement reading-inline review, real AI calls, WordSense generation, ReviewCard generation, FSRS write paths, or AI-generated examples.
+The 2026-07-02 Trae round implemented route #2 and the multi-source carousel portion of route #8 in §4.2. The 2026-07-03 Trae round implemented the front-end display and lemma-prefer search portions of route #4 plus the front-only structure of route #3. Neither round implemented reading-inline review scoring, real AI calls, WordSense generation, ReviewCard generation, FSRS write paths, AI-generated examples, automatic context-aware binding, or AI known-sense-new-meaning judgment.
 
 ## 4.1 Reading Inline Review Principles
 
@@ -44,21 +44,21 @@ The 2026-07-02 Trae round implemented route #2 and the multi-source carousel por
 
 ## 4.3 Known-Sense-New-Meaning And Inline Review Bridge
 
-1. AI recommended words and known-sense-new-meaning candidates are separate areas.
+1. AI recommended words and known-sense-new-meaning candidates are separate areas. **(Front-only separation implemented 2026-07-03: `WordSensesList.vue` 「已学词义候选」 panel is separate from ordinary AI recommendation area. AI judgment that decides whether a case is "known-sense-new-meaning" is still NOT implemented.)**
 2. On first reading, the user marks only genuinely unknown words.
-3. During AI analysis, the system can also judge whether already-learned words match the current sentence meaning.
+3. During AI analysis, the system can also judge whether already-learned words match the current sentence meaning. **(Still NOT implemented — no AI analysis step.)**
 4. On a second reading, words already matched to a `WordSense` may enter inline review.
-5. Suspected known-sense-new-meaning candidates enter confirmation, not direct legacy card review.
-6. This round does not implement this bridge.
+5. Suspected known-sense-new-meaning candidates enter confirmation, not direct legacy card review. **(Front-only hint implemented 2026-07-03: 「熟词僻义」 info alert + 「已学词义候选」 panel as candidates only. Confirmation flow that creates new WordSense is still the existing add-sense flow; no new confirmation path added.)**
+6. ~~This round does not implement this bridge.~~ **Front-only structure implemented 2026-07-03 (Trae-LemmaKnownSenseBridge-1). AI judgment, inline review, and automatic known-sense-new-meaning detection are still NOT implemented.**
 
 ## 4.4 Surface And Lemma Binding
 
-1. Surface display keeps the original word form.
-2. Search and add-sense flows should prefer lemma.
-3. After the user corrects lemma, later add-sense flows should use the corrected lemma.
-4. Binding must consider surface, lemma, part of speech, and sentence meaning.
-5. Do not bind every published-like surface unconditionally to a single lemma such as `publish`.
-6. This round does not implement binding changes.
+1. Surface display keeps the original word form. **(Implemented 2026-07-03: reading-page click on `geese` shows `geese → goose [修改]`; `WordSensesList.vue` `lemma-surface-card` shows surface + lemma.)**
+2. Search and add-sense flows should prefer lemma. **(Implemented 2026-07-03: search box `value=lemma`; `WordSensesList.vue` `effectiveLemma` (studyBase → baseWord → lemma → surface → word) feeds search.)**
+3. After the user corrects lemma, later add-sense flows should use the corrected lemma. **(Implemented 2026-07-03: `VocabularySideBox::saveLemma` → `commit setStudyBase` → `POST /vocabulary/word/update`; `effectiveLemma` prefers `studyBase` after correction. Test `test_add_new_sense_uses_corrected_lemma_after_user_edit` confirms lemma and surface_form stored independently.)**
+4. Binding must consider surface, lemma, part of speech, and sentence meaning. **(Still NOT implemented — only front-end display + lemma-prefer search; no automatic context-aware binding.)**
+5. Do not bind every published-like surface unconditionally to a single lemma such as `publish`. **(Honored 2026-07-03: no auto-binding logic added; user correction always overrides.)**
+6. ~~This round does not implement binding changes.~~ **Principles 1-3 + 5 implemented 2026-07-03 (Trae-LemmaKnownSenseBridge-1). Principles 4 + 6 (automatic context-aware binding, AI suggestions) are still NOT implemented.**
 
 ## 5. Required Future Harness
 

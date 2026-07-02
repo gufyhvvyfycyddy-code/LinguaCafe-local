@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\SenseSourceContextService;
+use App\Services\WordSenseKnownSenseService;
 use App\Services\WordSenseOccurrenceService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
@@ -19,6 +20,7 @@ class SenseOccurrenceController extends Controller
         private WordSenseOccurrenceService $occurrenceService,
         private WordSenseService $wordSenseService,
         private SenseSourceContextService $senseSourceContextService,
+        private WordSenseKnownSenseService $knownSenseService,
     )
     {
     }
@@ -70,6 +72,31 @@ class SenseOccurrenceController extends Controller
         $senses = $this->occurrenceService->candidates($userId, $language, $lemma, $request->query('pos'));
 
         return response()->json($senses->map(fn (WordSense $sense) => $this->serializeSense($sense))->values());
+    }
+
+    /**
+     * Return confirmed WordSense candidates for a lemma (Trae-LemmaKnownSenseBridge-1).
+     *
+     * Read-only payload used by the vocabulary box to render an
+     * "已学词义候选" panel and a "熟词僻义" hint. Does not write anything.
+     */
+    public function knownSenseLookup(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $lemma = (string) $request->query('lemma');
+        if ($lemma === '') {
+            abort(422, 'The lemma parameter is required.');
+        }
+
+        return response()->json(
+            $this->knownSenseService->knownSenseLookupPayload($userId, $language, $lemma)
+        );
     }
 
     public function possibleDuplicates(Request $request)

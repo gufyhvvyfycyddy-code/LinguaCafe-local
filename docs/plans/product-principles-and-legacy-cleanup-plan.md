@@ -1,7 +1,7 @@
 # LinguaCafe 产品原则与旧代码清理计划
 
 > **性质**：产品定位 / 长期原则 / 功能行为约束
-> **最新更新**：2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1)
+> **最新更新**：2026-07-03 (Trae-LemmaKnownSenseBridge-1)
 > **本文件优先于早期计划文档。如冲突，以本文为准。**
 
 ---
@@ -72,7 +72,7 @@ AI 可以做的是：
 3. 熟词僻义**不应混入普通推荐词列表**。
 4. 熟词僻义需要单独区域、单独统计、单独确认。
 5. 只有用户确认后，才能进入新 WordSense / ReviewCard 的后续流程。
-6. 本轮只写原则和计划，不实现。
+6. ~~本轮只写原则和计划，不实现。~~ **2026-07-03 (Trae-LemmaKnownSenseBridge-1) 已落地前置结构：`WordSenseKnownSenseService::listConfirmedSensesForLemma` 只返回当前用户/语言/lemma 的 confirmed WordSense（排除 rejected/ai_suggested）；`WordSensesList.vue` 「已学词义候选」面板与普通 AI 推荐词区域物理分离；「熟词僻义」info alert 明确标注「未调用 AI 判断」。AI 判断「是否是熟词僻义」、自动推荐、自动确认仍未实现。不写 ReviewLog、不改 FSRS、不生成 WordSense/ReviewCard。**
 
 ## 6. 阅读中刷卡原则
 
@@ -111,13 +111,13 @@ AI 可以做的是：
 - `published` 可能是 publish 的过去分词，也可能是形容词"已发表的 / 已出版的"。
 
 因此：
-1. 显示保留 surface，例如 `ways`。
-2. 搜索和添加释义优先使用 lemma，例如 `way`。
-3. 用户手动修正 lemma 后，后续添加新释义应使用修正后的 lemma。
-4. 当前句子中的绑定必须考虑 surface + lemma + 词性 + 句义。
-5. AI 可以建议，但用户必须能改。
-6. 不允许把所有 `published` 都无条件绑定到 `publish`。
-7. 本轮只写原则和计划，不实现。
+1. 显示保留 surface，例如 `ways`。**(2026-07-03 已实现：阅读页点词显示 surface + lemma + [修改] 入口；`WordSensesList.vue` `lemma-surface-card` 显示当前词形与词元。)**
+2. 搜索和添加释义优先使用 lemma，例如 `way`。**(2026-07-03 已实现：搜索框 `value=lemma`；`WordSensesList.vue` `effectiveLemma` (studyBase → baseWord → lemma → surface → word) 优先使用 studyBase/baseWord/lemma。)**
+3. 用户手动修正 lemma 后，后续添加新释义应使用修正后的 lemma。**(2026-07-03 已实现：`VocabularySideBox::saveLemma` → `commit setStudyBase` → `POST /vocabulary/word/update`；`effectiveLemma` 优先使用 `studyBase`。测试 `test_add_new_sense_uses_corrected_lemma_after_user_edit` 验证 lemma 与 surface_form 独立存储。)**
+4. 当前句子中的绑定必须考虑 surface + lemma + 词性 + 句义。**(仍未实现 — 当前仅前端显示 + lemma 优先搜索；未实现自动上下文感知绑定。)**
+5. AI 可以建议，但用户必须能改。**(部分实现：用户可通过 [修改] 入口改 lemma；AI 建议仍未实现。)**
+6. 不允许把所有 `published` 都无条件绑定到 `publish`。**(2026-07-03 已遵守：未新增自动绑定逻辑；用户修正始终优先。)**
+7. ~~本轮只写原则和计划，不实现。~~ **2026-07-03 (Trae-LemmaKnownSenseBridge-1) 已实现原则 1-3 + 5-6。原则 4（自动上下文感知绑定）+ AI 建议仍未实现。**
 
 ---
 

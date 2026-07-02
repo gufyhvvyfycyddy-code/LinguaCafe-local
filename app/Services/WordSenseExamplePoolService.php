@@ -55,6 +55,18 @@ class WordSenseExamplePoolService
             ->limit(10)
             ->get();
 
+        // Batch-load all referenced chapters in one query to avoid N+1.
+        $chapterIds = $occurrences->pluck('chapter_id')->filter()->unique()->values()->all();
+        $chaptersById = [];
+        if (!empty($chapterIds)) {
+            $chaptersById = Chapter::query()
+                ->whereIn('id', $chapterIds)
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->pluck('name', 'id')
+                ->all();
+        }
+
         $candidates = [];
         $seenKeys = [];
         $seenSentences = []; // sentence-only index, used to dedupe card fallback
@@ -65,13 +77,7 @@ class WordSenseExamplePoolService
                 continue;
             }
 
-            $chapter = $occurrence->chapter_id
-                ? Chapter::query()
-                    ->where('id', $occurrence->chapter_id)
-                    ->where('user_id', $sense->user_id)
-                    ->where('language', $sense->language_id)
-                    ->first()
-                : null;
+            $chapterName = $occurrence->chapter_id ? ($chaptersById[$occurrence->chapter_id] ?? null) : null;
 
             $dedupeKey = $this->dedupeKey($occurrence->chapter_id, $sentenceEn);
             if (isset($seenKeys[$dedupeKey])) {
@@ -85,9 +91,9 @@ class WordSenseExamplePoolService
                 'sentence_en' => $sentenceEn,
                 'sentence_zh' => $occurrence->sentence_zh ?: null,
                 'chapter_id' => $occurrence->chapter_id,
-                'chapter_title' => $chapter?->name,
+                'chapter_title' => $chapterName,
                 'sentence_id' => $occurrence->sentence_id,
-                'source_label' => $chapter ? 'chapter' : 'occurrence',
+                'source_label' => $chapterName !== null ? 'chapter' : 'occurrence',
                 'is_card_fallback' => false,
             ];
         }

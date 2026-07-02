@@ -1,8 +1,17 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01（最近任务刷新 2026-07-02 Trae-ExamplePool-ReviewRotation-SourceCarousel-1）
+> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 Trae-LemmaKnownSenseBridge-1）
 > **基准 commit**：`7f3d4b6`
 > **审计方式**：只读侦查，不改代码，不进入功能开发。
+
+> **2026-07-03 Trae 任务新增热点**：
+> - `WordSenseKnownSenseService`（新增）：只读服务，`listConfirmedSensesForLemma` + `knownSenseLookupPayload`，批量 `whereIn` + `groupBy` 预加载 occurrence count 消除 N+1。不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。
+> - `SenseOccurrenceController::knownSenseLookup`（新增方法）：`GET /senses/known-sense-lookup`，鉴权 + 用户/语言隔离 + 422 空 lemma。无新依赖。
+> - `WordSensesList.vue`（修改）：新增「已学词义候选」面板 + 「熟词僻义」info alert + `fetchKnownSenseLookup` stale-guard。`effectiveLemma` (studyBase → baseWord → lemma → surface → word) 同时触发 `fetchSenses` 和 `fetchKnownSenseLookup`。需要后续关注面板与已保存释义区的视觉重叠（同一 sense 可能同时出现在两个区域）。
+> - `WordSenseExamplePoolService::exampleCandidates()`（修改）：消除 N+1 Chapter 查询，改为批量 `whereIn` 预加载 chapter names。返回字段不变。
+> - `SenseSourceContextService::sourceContextList()`（修改）：消除循环内 `findChapterById`，改为批量 `whereIn` 预加载 Chapter + `limit(12)` + PHP `unique('chapter_id')->take(3)`。跨数据库兼容（SQLite 不支持 GROUP BY + orderByRaw 组合，故保留 PHP 层 dedupe）。返回字段和 fallback 不变。
+> - `routes/web.php`（修改）：新增 `Route::get('/senses/known-sense-lookup', ...)`。无路由冲突。
+> - 测试覆盖：13 个 feature tests（WordSenseKnownSenseBridgeTest）+ 完整回归测试套件全绿（WordSense 174/718, ReviewFsrsTest 61/364, FsrsSchedulingServiceTest 9/46, WordSenseExamplePoolTest 12/85, SenseSourceContextMultiSourceTest 6/33, FinishedReadingSafetyTest 2/27, LegacyEntryUiGuardTest 1/12）。npm run development 编译成功。
 
 > **2026-07-02 Trae 任务新增热点**：
 > - `WordSenseExamplePoolService`（新增）：只读，复用 `WordSenseOccurrence` + card example fallback，不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。

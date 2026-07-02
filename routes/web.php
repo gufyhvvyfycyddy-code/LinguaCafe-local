@@ -193,6 +193,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // sense mapping review
     Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);
     Route::get('/senses/candidates', [App\Http\Controllers\SenseOccurrenceController::class, 'candidates']);
+    Route::get('/senses/known-sense-lookup', [App\Http\Controllers\SenseOccurrenceController::class, 'knownSenseLookup']);
     Route::get('/senses/possible-duplicates', [App\Http\Controllers\SenseOccurrenceController::class, 'possibleDuplicates']);
     Route::post('/senses/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'storeManualSense']);
     Route::put('/senses/{id}/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'updateManualSense']);

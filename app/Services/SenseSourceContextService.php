@@ -105,6 +105,10 @@ class SenseSourceContextService
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
 
+        // Keep PHP-level unique('chapter_id') for cross-database compatibility
+        // (SQLite test env does not support MySQL's GROUP BY + orderByRaw
+        // combination reliably), but cap the raw fetch at a smaller window
+        // to reduce wasted rows and batch-load chapters to eliminate N+1.
         $occurrences = WordSenseOccurrence::query()
             ->where('user_id', $sense->user_id)
             ->where('language_id', $sense->language_id)
@@ -113,17 +117,55 @@ class SenseSourceContextService
             ->whereNotNull('chapter_id')
             ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
             ->orderByDesc('id')
-            ->limit(20)
+            ->limit(12)
             ->get()
             ->unique('chapter_id')
             ->take(3);
 
+        // Batch-load all chapters referenced by the selected occurrences in
+        // one query instead of one findChapterById() call per source.
+        $chapterIds = $occurrences->pluck('chapter_id')->unique()->values()->all();
+        $chaptersById = [];
+        if (!empty($chapterIds)) {
+            $chaptersById = \App\Models\Chapter::query()
+                ->whereIn('id', $chapterIds)
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->get()
+                ->keyBy('id')
+                ->all();
+        }
+
         $sources = [];
         foreach ($occurrences as $occurrence) {
-            $context = $this->buildChapterSourceContextForOccurrence($sense, $occurrence);
-            if ($context !== null) {
-                $sources[] = $context;
+            $chapter = $chaptersById[$occurrence->chapter_id] ?? null;
+            if (!$chapter) {
+                continue;
             }
+
+            $context = $this->sourceContextFromChapter(
+                $chapter,
+                $sense,
+                $occurrence,
+                $occurrence->sentence_id,
+                $occurrence->sentence_hash,
+                $occurrence->sentence_en,
+            );
+
+            if ($context === null) {
+                continue;
+            }
+
+            $result = $this->buildChapterResult(
+                $sense,
+                $chapter,
+                $occurrence->sentence_id,
+                $occurrence->sentence_hash,
+                $context,
+            );
+            $result['occurrence_id'] = $occurrence->id;
+            $result['source_sentence_en'] = $occurrence->sentence_en;
+            $sources[] = $result;
         }
 
         if (empty($sources)) {
@@ -143,49 +185,6 @@ class SenseSourceContextService
             'sources' => $sources,
             'count' => count($sources),
         ];
-    }
-
-    /**
-     * Build a chapter source context for a specific occurrence. Returns null
-     * if the chapter cannot be loaded or the sentence cannot be located.
-     */
-    private function buildChapterSourceContextForOccurrence(
-        WordSense $sense,
-        WordSenseOccurrence $occurrence
-    ): ?array {
-        $chapter = $this->resolver->findChapterById(
-            $occurrence->chapter_id,
-            $sense->user_id,
-            $sense->language_id,
-        );
-
-        if (!$chapter) {
-            return null;
-        }
-
-        $context = $this->sourceContextFromChapter(
-            $chapter,
-            $sense,
-            $occurrence,
-            $occurrence->sentence_id,
-            $occurrence->sentence_hash,
-            $occurrence->sentence_en,
-        );
-
-        if ($context === null) {
-            return null;
-        }
-
-        $result = $this->buildChapterResult(
-            $sense,
-            $chapter,
-            $occurrence->sentence_id,
-            $occurrence->sentence_hash,
-            $context,
-        );
-        $result['occurrence_id'] = $occurrence->id;
-        $result['source_sentence_en'] = $occurrence->sentence_en;
-        return $result;
     }
 
     // ==================== Private/Internal helpers ====================

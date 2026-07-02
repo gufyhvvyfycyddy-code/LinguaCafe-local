@@ -35,8 +35,47 @@
         <v-alert v-if="message" dense text type="success" class="mt-2 mb-2">{{ message }}</v-alert>
         <v-alert v-if="saveError" dense text type="error" class="mt-2 mb-2">{{ saveError }}</v-alert>
 
+        <!-- Known-sense candidates panel (Trae-LemmaKnownSenseBridge-1) -->
+        <div v-if="!loading && !error && knownSenses.length > 0" class="known-sense-panel rounded pa-2 mb-3">
+            <div class="d-flex align-center mb-1">
+                <v-icon small color="success" class="mr-1">mdi-bookmark-check</v-icon>
+                <strong class="known-sense-title">已学词义候选</strong>
+                <v-chip x-small class="ml-2">{{ knownSenses.length }}</v-chip>
+                <v-spacer />
+                <span class="text-caption text--secondary">词元 {{ effectiveLemma || '未识别' }}</span>
+            </div>
+            <div v-for="sense in knownSenses" :key="sense.sense_id" class="known-sense-item rounded pa-2 mb-1">
+                <div class="d-flex align-center mb-1">
+                    <v-chip x-small color="success" class="mr-1">已学</v-chip>
+                    <v-chip v-if="sense.pos" x-small outlined class="mr-1">{{ sense.pos }}</v-chip>
+                    <v-chip v-if="sense.has_review_card" x-small outlined color="primary">FSRS</v-chip>
+                    <v-spacer />
+                    <span class="text-caption text--secondary" v-if="sense.fsrs_reps !== null && sense.fsrs_reps !== undefined">
+                        已复习 {{ sense.fsrs_reps }} 次
+                    </span>
+                </div>
+                <div v-if="sense.sense_zh" class="sense-zh mb-1"><strong>{{ sense.sense_zh }}</strong></div>
+                <div v-if="sense.sense_en" class="sense-en mb-1 text--secondary">{{ sense.sense_en }}</div>
+            </div>
+        </div>
+
+        <!-- Known-sense-new-meaning hint (熟词僻义前置结构, no AI) -->
+        <v-alert
+            v-if="!loading && !error && knownSenses.length > 0"
+            dense
+            text
+            type="info"
+            icon="mdi-lightbulb-outline"
+            class="mb-3 known-sense-new-meaning-hint"
+        >
+            <div class="known-sense-new-meaning-title">这个词你学过一些意思，但这里可能是新意思。</div>
+            <div class="text-caption text--secondary mt-1">
+                如上述已学词义都不符合当前句意，可添加新释义。此提示仅为前置结构，未调用 AI 判断。
+            </div>
+        </v-alert>
+
         <!-- Compact empty state -->
-        <div v-if="compact && !loading && !error && visibleSenseGroups.length === 0" class="text-caption text--secondary mb-2">
+        <div v-if="compact && !loading && !error && visibleSenseGroups.length === 0 && knownSenses.length === 0" class="text-caption text--secondary mb-2">
             暂无已保存释义，可添加新释义。
         </div>
 
@@ -278,15 +317,21 @@ export default {
             immediate: true,
             handler() {
                 this.fetchSenses();
+                this.fetchKnownSenseLookup();
             },
         },
         language() {
             this.fetchSenses();
+            this.fetchKnownSenseLookup();
         },
     },
     data() {
         return {
             senses: [],
+            knownSenses: [],
+            knownSenseLoading: false,
+            knownSenseError: false,
+            latestKnownSenseLookupKey: '',
             loading: false,
             error: false,
             saving: false,
@@ -319,6 +364,42 @@ export default {
             // The effectiveLemma watcher normally handles this, but this provides
             // a direct reset point for external callers.
             this.fetchSenses();
+            this.fetchKnownSenseLookup();
+        },
+        fetchKnownSenseLookup() {
+            // Trae-LemmaKnownSenseBridge-1: fetch confirmed-sense candidates
+            // for the current lemma to render the "已学词义候选" panel and the
+            // "熟词僻义" hint. Read-only — does not write anything.
+            const lemma = this.effectiveLemma;
+            const language = this.language;
+            if (!lemma) {
+                this.latestKnownSenseLookupKey = '';
+                this.knownSenses = [];
+                this.knownSenseLoading = false;
+                this.knownSenseError = false;
+                return;
+            }
+
+            const lookupKey = language + '|' + lemma;
+            this.latestKnownSenseLookupKey = lookupKey;
+            this.knownSenseLoading = true;
+            this.knownSenseError = false;
+
+            axios.get('/senses/known-sense-lookup', {
+                params: { lemma: lemma, language: language },
+            }).then((response) => {
+                if (this.latestKnownSenseLookupKey !== lookupKey) return;
+                const data = response && response.data;
+                const confirmed = (data && Array.isArray(data.confirmed_senses)) ? data.confirmed_senses : [];
+                this.knownSenses = confirmed;
+            }).catch(() => {
+                if (this.latestKnownSenseLookupKey !== lookupKey) return;
+                this.knownSenseError = true;
+                this.knownSenses = [];
+            }).finally(() => {
+                if (this.latestKnownSenseLookupKey !== lookupKey) return;
+                this.knownSenseLoading = false;
+            });
         },
         emptyForm() {
             return {
