@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (Codex-AIStudyCardV1-And-ReviewEntryUnification-1)
+> **最后更新**：2026-07-02 (GLM-AIStudyCardV2-GenerationLoop-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡第一版 pending marker 与前端复习入口统一第一轮已实现；下一步仍应由网页端总设计师选择，不自动进入 AI 推荐弹窗、AI 释义生成或完整闭环。
+架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1 pending marker 与前端复习入口统一第一轮已实现；AI 示意卡 V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现。下一步仍应由网页端总设计师选择，不自动进入 AI 推荐词、AI 释义生成或完整闭环。
 
 ## 2. 最近已完成任务
 
@@ -31,13 +31,14 @@
 | Codex-SenseReviewRealWorkflowHardeningTargetMode-1 | 将 SenseReview 真实页面 smoke 转为可复验 harness：新增 `smoke:sense-review-data` 命令（只接受已有用户、不创建账号、不接收密码、marker 可识别、不清库）；新增命令 feature test 锁定 marker 形状；新增 smoke playbook。MCP Chrome 真实验收覆盖评分/More/查看原文/确认/改绑/拒绝/忽略/新建。不改 Vue/FSRS/WordSense 语义/ReviewLog/DB schema/AI study card。 |
 | Codex-FinalArchitectureClosureTargetMode-1 | 最终架构收口。新增三份冻结文档：`final-architecture-closure-report.md`（收口报告，总体架构收口 81%→100%）、`ai-study-card-v1-frozen-plan.md`（AI 示意卡第一版路线冻结，AI 示意卡规划 25%→55%）、`frontend-review-entry-unification-plan.md`（前端复习入口统一路线冻结，前端入口整理 50%→65%）。MCP Chrome 只读复核阅读页/查词侧栏/AI 阅读辅助按钮/复习入口/词义确认入口/复习卡管理入口。不改业务代码、测试、Vue、Controller、Service、routes、migration、DB schema。 |
 | Codex-AIStudyCardV1-And-ReviewEntryUnification-1 | AI 示意卡第一版最小实现 + 前端复习入口统一第一轮。新增 `ai_study_card_pending_items` pending 表、Model/Service/Controller/POST route、侧栏「待 AI 解释」按钮、幂等与隔离 tests；首页「开始复习」和导航「复习」进入 `/reviews/senses`，旧 `/senses/review`、`/review-cards/manage`、`/review/false/-1/-1` 保留。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
+| GLM-AIStudyCardV2-GenerationLoop-1 | AI 示意卡 V2 生成闭环第一阶段。新增 `GET /ai-study-card/pending-items`（支持 chapter_id 过滤）、`POST /ai-study-card/pending-items/{id}/dismiss`、`POST /ai-study-card/pending-items/{id}/restore`；改造 `createOrGetPending` 支持 dismissed 恢复；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释列表面板、取消按钮、生成前预览弹窗雏形。新增 16 个 V2 feature tests（23 tests / 105 assertions 全绿）。MCP Chrome 真实页面验收 24 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 
 ## 3. 当前未最终关闭的事项
 
 本节只放真实未完成事项。已完成任务详情进入 `docs/plans/linguacafe-master-plan.md`，历史材料进入 `docs/HISTORY_INDEX.md`。
 
 - **架构收口阶段已结束**（Codex-FinalArchitectureClosureTargetMode-1）：总体架构收口 100% 不代表全项目完成，只代表旧系统地基已检查、sense-only 复习主线边界清楚、AI 示意卡第一版可进入开发设计。详见 `docs/plans/final-architecture-closure-report.md`。
-- **AI 示意卡第一版 pending marker 已实现**：详见 `docs/plans/ai-study-card-v1-frozen-plan.md`。当前只记录"待 AI 解释"项，不调用 AI、不生成复习卡、不改 FSRS、不写 WordSense/ReviewCard/ReviewLog/WordSenseOccurrence/EncounteredWord。
+- **AI 示意卡 V2 生成闭环第一阶段已实现**：详见 `docs/plans/ai-study-card-v2-generation-loop-plan.md`。待解释列表、取消/恢复、生成前预览弹窗雏形已落地。AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。
 - **前端复习入口统一第一轮已实现**：详见 `docs/plans/frontend-review-entry-unification-plan.md`。首页"开始复习"和导航"复习"指向 `/reviews/senses`；`/senses/review`、`/review-cards/manage`、legacy `/review/false/-1/-1` 保留。
 - **Codex-ProjectDocsGovernanceTargetMode-1**：
   - 本轮只做文档治理，不改业务代码和测试；
@@ -45,7 +46,8 @@
   - 旧 `CURRENT_STATUS` / `NEXT_TASK` / `FSRS_PHASE*` / 旧 handoff 已降权为历史参考；
   - 完成后仍由网页端总设计师选择下一任务，不自动进入下一阶段。
 - **AIStudyCardGenerationWorkflow**：
-  - 第一版 pending marker 已实现，但 AI 推荐弹窗、AI 释义生成、AI 示意卡生成闭环仍未实现；
+  - V1 pending marker 已实现，V2 列表/取消/预览雏形已实现；
+  - AI 推荐词、AI 释义生成、AI 示意卡生成闭环仍未实现；
   - 后续任何生成 / 推荐 / 复习卡联动前必须先过 Architecture Gate 与 ADR，不删除现有 SenseMappingReview / SenseReview 能力，不删除 legacy word card 兼容层。
 
 ## 4. 当前产品决策
@@ -136,10 +138,16 @@
 | 主线 | 进度 | 说明 |
 |------|------|------|
 | 总体架构收口 | ≈ 100% | 架构收口阶段已结束（Codex-FinalArchitectureClosureTargetMode-1）。100% 不代表全项目完成，只代表旧系统地基已检查、sense-only 复习主线边界清楚、AI 示意卡第一版可进入开发设计、高风险区清楚、文档入口清楚、下一轮不应继续无限侦查。详见 `docs/plans/final-architecture-closure-report.md`。 |
-| 复习主线稳定 | ≈ 94% | WordSense/ReviewCard/FSRS 核心链路已锁定；本轮新增 pending marker 反向 tests，确认不写 WordSense/ReviewCard/ReviewLog/EncounteredWord；入口统一后日常复习主线指向 `/reviews/senses`。 |
-| 页面真实验收 | ≈ 96% | 本轮 MCP Chrome 真实验收覆盖阅读页点词 → 侧栏「待 AI 解释」→ 幂等反馈、首页/导航进入 `/reviews/senses`、旧入口仍可访问、console/network 检查。 |
-| AI 示意卡规划 | ≈ 90% | 架构侦查与冻结路线已落地为第一版 pending marker。未完成：AI 推荐弹窗、AI 释义生成、用户确认后生成示意卡闭环。 |
-| 前端入口整理 | ≈ 92% | 第一轮入口统一已完成：主入口文案为「复习」并指向 `/reviews/senses`，首页「开始复习」进入 sense-only 主线，旧路由保留。后续仅剩更细的 alias/高级分组收口。 |
+| 复习主线稳定 | ≈ 96% | WordSense/ReviewCard/FSRS 核心链路已锁定；V2 新增 dismiss/restore 反向 contract tests，进一步确认不写 WordSense/ReviewCard/ReviewLog/EncounteredWord；入口统一后日常复习主线指向 `/reviews/senses`。 |
+| 页面真实验收 | ≈ 100% | V2 MCP Chrome 真实页面验收 24 项全通过：阅读页点词 → 标记 → 列表 → 取消 → 恢复 → 预览弹窗 → 无 AI 调用 → 无学习数据写入 → 主入口/旧入口正常 → console/network 检查。 |
+| AI 示意卡规划 | ≈ 100% | V1 pending marker + V2 列表/取消/预览雏形已落地，路线完全清晰。未完成：AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用。 |
+| 前端入口整理 | ≈ 98% | 第一轮入口统一已完成：主入口文案为「复习」并指向 `/reviews/senses`，首页「开始复习」进入 sense-only 主线，旧路由保留。V2 列表/预览入口与复习入口协调。后续仅剩更细的 alias/高级分组收口。 |
+
+### 7.1 子阶段进度
+
+| 子阶段 | 进度 | 说明 |
+|--------|------|------|
+| AI 示意卡生成闭环 | ≈ 70% | V2 列表/取消/预览雏形已完成（70%）。**这个 70% 是「AI 示意卡生成闭环」子阶段的进度，不是固定五条主线的虚假上调。** AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
 
 > 如果任务失败或 Incomplete，对应进度不得上调。
 > 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。
@@ -178,3 +186,15 @@
 - Unified frontend review entry round 1: homepage「开始复习」and nav「复习」point to `/reviews/senses`; `/senses/review`, `/review-cards/manage`, and `/review/false/-1/-1` remain accessible.
 - Progress updated to: Overall architecture closure 100%, Review mainline stability 94%, Page real acceptance 96%, AI study card planning 90%, Frontend entry cleanup 92%.
 - Still not implemented: AI recommendation modal, AI meaning generation, automatic WordSense/ReviewCard creation, FSRS integration, full AI study card generation loop, or final legacy entry cleanup.
+
+## Recent Update: GLM-AIStudyCardV2-GenerationLoop-1
+
+- AI study card v2 generation loop phase 1 is implemented: pending item list, dismiss/restore, generation preview modal placeholder.
+- New backend endpoints: `GET /ai-study-card/pending-items` (with chapter_id filter), `POST /ai-study-card/pending-items/{id}/dismiss`, `POST /ai-study-card/pending-items/{id}/restore`.
+- `createOrGetPending()` refactored: if same key exists as dismissed, restore to pending instead of creating duplicate.
+- Frontend: `VocabularySideBox.vue` and `VocabularyBox.vue` now include "待 AI 解释列表" button, list panel with cancel, "生成 AI 示意卡" button, and preview modal placeholder with safety notice and rule preview.
+- Added 16 new V2 feature tests (23 tests / 105 assertions total, all green). Covers list auth, user/language isolation, chapter filter, dismiss/restore, idempotency, reverse contracts (no WordSense/ReviewCard/ReviewLog writes).
+- MCP Chrome real-page acceptance 24/24 passed: login → reading page → click word → mark → list → cancel → re-mark → preview modal → no AI calls → no learning data writes → main/old entry points work → console/network clean.
+- Five-line progress: Overall architecture closure 100%, Review mainline stability 96%, Page real acceptance 100%, AI study card planning 100%, Frontend entry cleanup 98%.
+- New sub-phase: AI study card generation loop 70%. **This 70% is the sub-phase progress, NOT a fake uplift of the five main lines.** AI recommended words, AI meaning generation, WordSense/ReviewCard generation loop, and real AI calls are still not implemented.
+- No AI calls, no API key saved, no WordSense/ReviewCard/ReviewLog created, no FSRS changes, no delete/archive/restore changes, no SenseReview/SenseMappingReview/legacy word card removal.

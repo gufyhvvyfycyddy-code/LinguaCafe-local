@@ -10,6 +10,7 @@ class AiStudyCardPendingItem extends Model
     use HasFactory;
 
     public const STATUS_PENDING = 'pending';
+    public const STATUS_DISMISSED = 'dismissed';
 
     protected $fillable = [
         'user_id',

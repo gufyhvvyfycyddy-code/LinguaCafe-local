@@ -177,6 +177,321 @@ class AiStudyCardPendingItemTest extends TestCase
         $this->assertTrue((bool) $card->fsrs_enabled);
     }
 
+    // ===== V2 tests: list / dismiss / restore / re-mark =====
+
+    public function test_logged_in_user_can_list_own_pending_items(): void
+    {
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+
+        $response = $this->actingAs($this->user)->getJson('/ai-study-card/pending-items');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonCount(1, 'items');
+        $response->assertJsonPath('items.0.word', 'landscape');
+        $response->assertJsonPath('items.0.status', AiStudyCardPendingItem::STATUS_PENDING);
+    }
+
+    public function test_unauthenticated_user_cannot_list_pending_items(): void
+    {
+        $this->getJson('/ai-study-card/pending-items')->assertUnauthorized();
+    }
+
+    public function test_user_isolation_on_list(): void
+    {
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+
+        // other user should not see this user's pending items
+        // 切换用户前清空 session，避免 AuthenticateSession middleware 因 password_hash 不匹配而 401
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->getJson('/ai-study-card/pending-items');
+
+        $response->assertOk();
+        $response->assertJsonCount(0, 'items');
+    }
+
+    public function test_list_filters_by_chapter_id(): void
+    {
+        $otherChapter = $this->createChapter($this->user, 'english');
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload([
+            'chapter_id' => $otherChapter->id,
+            'word' => 'mountain',
+        ]))->assertOk();
+
+        // list all
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items')
+            ->assertOk()
+            ->assertJsonCount(2, 'items');
+
+        // list filtered by original chapter
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items?chapter_id=' . $this->chapter->id)
+            ->assertOk()
+            ->assertJsonCount(1, 'items')
+            ->assertJsonPath('items.0.word', 'landscape');
+    }
+
+    public function test_list_returns_404_for_other_users_chapter(): void
+    {
+        $otherUserChapter = $this->createChapter($this->otherUser, 'english');
+
+        $this->actingAs($this->user)
+            ->getJson('/ai-study-card/pending-items?chapter_id=' . $otherUserChapter->id)
+            ->assertStatus(404);
+    }
+
+    public function test_list_only_returns_pending_not_dismissed(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss it
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        // list should be empty (dismissed items not returned)
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items')
+            ->assertOk()
+            ->assertJsonCount(0, 'items');
+
+        // still exists in DB as dismissed
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_DISMISSED,
+        ]);
+    }
+
+    public function test_language_isolation_on_list(): void
+    {
+        // create english pending item
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+
+        // switch to spanish — should not see english items
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items')
+            ->assertOk()
+            ->assertJsonCount(0, 'items');
+    }
+
+    public function test_user_can_dismiss_own_pending_item(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss');
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('item.status', AiStudyCardPendingItem::STATUS_DISMISSED);
+
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_DISMISSED,
+        ]);
+    }
+
+    public function test_user_cannot_dismiss_other_users_pending_item(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->app['session']->flush();
+        $this->actingAs($this->otherUser)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertStatus(404);
+
+        // still pending, not dismissed
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_PENDING,
+        ]);
+    }
+
+    public function test_dismiss_does_not_create_word_sense_or_review_card_or_review_log(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $before = [
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+            'review_logs' => ReviewLog::count(),
+            'encountered_words' => EncounteredWord::count(),
+            'word_sense_occurrences' => WordSenseOccurrence::count(),
+        ];
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $this->assertSame($before['word_senses'], WordSense::count());
+        $this->assertSame($before['review_cards'], ReviewCard::count());
+        $this->assertSame($before['review_logs'], ReviewLog::count());
+        $this->assertSame($before['encountered_words'], EncounteredWord::count());
+        $this->assertSame($before['word_sense_occurrences'], WordSenseOccurrence::count());
+    }
+
+    public function test_dismiss_is_idempotent(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss twice — second should still return success
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $this->assertSame(1, AiStudyCardPendingItem::where('id', $itemId)->count());
+    }
+
+    public function test_dismissed_item_can_be_re_marked_via_restore(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        // restore
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/restore')
+            ->assertOk()
+            ->assertJsonPath('item.status', AiStudyCardPendingItem::STATUS_PENDING);
+
+        // should appear in list again
+        $this->actingAs($this->user)->getJson('/ai-study-card/pending-items')
+            ->assertOk()
+            ->assertJsonCount(1, 'items');
+
+        // still only 1 row, not 2
+        $this->assertSame(1, AiStudyCardPendingItem::where('normalized_word', 'landscape')->count());
+    }
+
+    public function test_dismissed_item_is_re_activated_when_re_marked_via_store(): void
+    {
+        // V2: re-clicking "待 AI 解释" on a dismissed word should restore the dismissed row
+        // rather than creating a new pending row, avoiding duplicate history rows.
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $originalId = $create->json('item.id');
+
+        // dismiss
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $originalId . '/dismiss')
+            ->assertOk();
+
+        // re-mark same word via store
+        $reMark = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload());
+        $reMark->assertOk();
+        $reMark->assertJsonPath('created', false);
+        $reMark->assertJsonPath('item.id', $originalId);
+        $reMark->assertJsonPath('item.status', AiStudyCardPendingItem::STATUS_PENDING);
+
+        // only 1 row in DB (restored, not duplicated)
+        $this->assertSame(1, AiStudyCardPendingItem::where('normalized_word', 'landscape')->count());
+    }
+
+    public function test_restore_does_not_create_learning_data(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $before = [
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+            'review_logs' => ReviewLog::count(),
+            'encountered_words' => EncounteredWord::count(),
+        ];
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/restore')
+            ->assertOk();
+
+        $this->assertSame($before['word_senses'], WordSense::count());
+        $this->assertSame($before['review_cards'], ReviewCard::count());
+        $this->assertSame($before['review_logs'], ReviewLog::count());
+        $this->assertSame($before['encountered_words'], EncounteredWord::count());
+    }
+
+    public function test_user_cannot_restore_other_users_item(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')
+            ->assertOk();
+
+        $this->app['session']->flush();
+        $this->actingAs($this->otherUser)
+            ->postJson('/ai-study-card/pending-items/' . $itemId . '/restore')
+            ->assertStatus(404);
+    }
+
+    public function test_dismiss_or_restore_does_not_touch_existing_sense_and_card_state(): void
+    {
+        $sense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'existing',
+            'surface_form' => 'existing',
+            'pos' => 'noun',
+            'sense_key' => 'existing-key',
+            'sense_zh' => '已有释义',
+            'sense_en' => 'existing sense',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+        ]);
+
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 2,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+            'fsrs_enabled' => true,
+        ]);
+
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // dismiss then restore
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/' . $itemId . '/dismiss')->assertOk();
+        $this->actingAs($this->user)->postJson('/ai-study-card/pending-items/' . $itemId . '/restore')->assertOk();
+
+        $sense->refresh();
+        $card->refresh();
+
+        $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
+        $this->assertSame('review', $card->fsrs_state);
+        $this->assertSame(2, $card->fsrs_reps);
+        $this->assertTrue((bool) $card->fsrs_enabled);
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([

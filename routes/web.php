@@ -253,7 +253,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/chapters/ai-assist/lookup/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'lookup']);
 
     // AI study card pending markers
+    Route::get('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'index']);
     Route::post('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'store']);
+    Route::post('/ai-study-card/pending-items/{id}/dismiss', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'dismiss']);
+    Route::post('/ai-study-card/pending-items/{id}/restore', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'restore']);
 
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);

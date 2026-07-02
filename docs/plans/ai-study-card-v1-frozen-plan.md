@@ -1,6 +1,6 @@
 # AI 示意卡第一版可开发路线冻结
 
-> 状态：**第一版已实现（Pending Marker V1 Done）**。后续 AI 推荐弹窗 / AI 释义生成 / 复习卡生成闭环未实现。
+> 状态：**第一版已实现（Pending Marker V1 Done）**。V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现（详见 `docs/plans/ai-study-card-v2-generation-loop-plan.md`）。后续 AI 推荐词 / AI 释义生成 / 复习卡生成闭环未实现。
 > 起点文档：`docs/plans/ai-study-card-architecture-scout.md`
 > 配套文档：`docs/plans/final-architecture-closure-report.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`
 > 适用阶段：架构收口 100% 之后的第一个最小实现任务。
@@ -270,5 +270,6 @@
 ### 8.3 明确声明
 
 - 第一版 pending marker 已实现，不等于 AI 示意卡完整闭环完成。
+- V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现（详见 `docs/plans/ai-study-card-v2-generation-loop-plan.md`）。
 - 不允许把「待 AI 解释」记录写成 AI 释义生成、AI 推荐弹窗或复习卡生成已完成。
 - 后续实现必须继续保持：用户确认优先、AI 推荐默认不选、不自动污染 WordSense/ReviewCard/FSRS。

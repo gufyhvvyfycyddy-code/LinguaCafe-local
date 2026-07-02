@@ -132,6 +132,17 @@
                                     <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
                                     待 AI 解释
                                 </v-btn>
+                                <v-btn
+                                    small
+                                    rounded
+                                    depressed
+                                    color="info"
+                                    class="mb-2"
+                                    @click="openAiPendingListDialog"
+                                >
+                                    <v-icon x-small class="mr-1">mdi-format-list-bulleted</v-icon>
+                                    待 AI 解释列表
+                                </v-btn>
                             </div>
                             <v-alert
                                 v-if="aiStudyCardPendingMessage"
@@ -325,6 +336,164 @@
             <v-btn icon @click="tab = 2;" title="显示变形" v-if="tab == 0 && inflections.length"><v-icon>mdi-list-box</v-icon></v-btn>
             <v-btn icon @click="tab = 0;" v-if="tab !== 0" title="返回"><v-icon>mdi-arrow-left</v-icon></v-btn>
         </div>
+
+        <!-- V2: 待 AI 解释列表面板 -->
+        <v-dialog v-model="aiPendingListDialog" max-width="640" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon small class="mr-2">mdi-format-list-bulleted</v-icon>
+                    待 AI 解释的词
+                    <v-spacer />
+                    <v-btn icon small @click="aiPendingListDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+                </v-card-title>
+                <v-card-text style="max-height: 60vh;">
+                    <v-alert
+                        v-if="aiPendingListError"
+                        dense
+                        text
+                        type="error"
+                        class="mt-2"
+                    >{{ aiPendingListError }}</v-alert>
+                    <v-alert
+                        v-if="aiPendingListMessage"
+                        dense
+                        text
+                        type="success"
+                        class="mt-2"
+                    >{{ aiPendingListMessage }}</v-alert>
+
+                    <div v-if="aiPendingListLoading" class="text-center pa-4">
+                        <v-progress-circular indeterminate color="primary" />
+                    </div>
+
+                    <div v-else-if="aiPendingItems.length === 0" class="text-center text--secondary pa-4">
+                        暂无待 AI 解释的词。
+                    </div>
+
+                    <v-list v-else dense>
+                        <v-list-item v-for="item in aiPendingItems" :key="item.id" class="px-0">
+                            <v-list-item-content>
+                                <v-list-item-title class="d-flex align-center">
+                                    <span class="font-weight-medium default-font">{{ item.word }}</span>
+                                    <span v-if="item.lemma && item.lemma !== item.word" class="text-caption text--secondary ml-2">({{ item.lemma }})</span>
+                                </v-list-item-title>
+                                <v-list-item-subtitle v-if="item.sentence_text" class="text-caption text--secondary mt-1" style="white-space: normal; line-height: 1.4;">
+                                    {{ item.sentence_text }}
+                                </v-list-item-subtitle>
+                                <v-list-item-subtitle class="text-caption text--secondary mt-1">
+                                    状态：{{ item.status === 'pending' ? '待解释' : item.status }}
+                                    <span class="ml-2">| 添加于 {{ formatDate(item.created_at) }}</span>
+                                </v-list-item-subtitle>
+                            </v-list-item-content>
+                            <v-list-item-action>
+                                <v-btn
+                                    x-small
+                                    rounded
+                                    depressed
+                                    color="error"
+                                    :loading="aiPendingDismissLoadingId === item.id"
+                                    @click="dismissAiPendingItem(item.id)"
+                                >
+                                    <v-icon x-small class="mr-1">mdi-close</v-icon>
+                                    取消
+                                </v-btn>
+                            </v-list-item-action>
+                        </v-list-item>
+                    </v-list>
+                </v-card-text>
+                <v-card-actions class="d-flex flex-column align-stretch pa-3">
+                    <v-btn
+                        block
+                        color="primary"
+                        :disabled="aiPendingItems.length === 0"
+                        @click="openAiStudyCardPreview"
+                    >
+                        <v-icon small class="mr-1">mdi-rocket-launch</v-icon>
+                        生成 AI 示意卡
+                    </v-btn>
+                    <div class="text-caption text--secondary text-center mt-2">
+                        当前共 {{ aiPendingItems.length }} 个待解释词
+                    </div>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- V2: 生成 AI 示意卡预览弹窗雏形 -->
+        <v-dialog v-model="aiStudyCardPreviewDialog" max-width="720" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon small class="mr-2">mdi-rocket-launch</v-icon>
+                    生成 AI 示意卡预览
+                    <v-spacer />
+                    <v-btn icon small @click="aiStudyCardPreviewDialog = false"><v-icon>mdi-close</v-icon></v-btn>
+                </v-card-title>
+                <v-card-text style="max-height: 65vh;">
+                    <v-alert
+                        dense
+                        text
+                        type="info"
+                        class="mt-2"
+                    >
+                        当前只是预览，不会调用 AI，也不会生成复习卡。
+                    </v-alert>
+
+                    <div class="mt-4">
+                        <div class="text-subtitle-1 font-weight-medium mb-2">
+                            <v-icon x-small class="mr-1">mdi-account-check</v-icon>
+                            你已选的词（自动进入生成范围）
+                        </div>
+                        <div v-if="aiPendingItems.length === 0" class="text-caption text--secondary pa-3 rounded" style="border: 1px dashed var(--v-gray2-base);">
+                            暂无已选词。请先在阅读页点词并加入「待 AI 解释」。
+                        </div>
+                        <div v-else class="d-flex flex-wrap">
+                            <v-chip
+                                v-for="item in aiPendingItems"
+                                :key="item.id"
+                                small
+                                color="primary"
+                                text-color="white"
+                                class="ma-1"
+                            >
+                                <v-icon x-small class="mr-1">mdi-check</v-icon>
+                                {{ item.word }}
+                            </v-chip>
+                        </div>
+                    </div>
+
+                    <div class="mt-5">
+                        <div class="text-subtitle-1 font-weight-medium mb-2">
+                            <v-icon x-small class="mr-1">mdi-robot</v-icon>
+                            AI 推荐词（下一阶段由 AI 推荐）
+                        </div>
+                        <div class="text-caption text--secondary pa-3 rounded" style="border: 1px dashed var(--v-gray2-base);">
+                            <v-icon x-small class="mr-1">mdi-clock-outline</v-icon>
+                            下一阶段开放。本轮不会请求 AI 推荐。
+                        </div>
+                        <div class="text-caption text--secondary mt-2">
+                            规则预览：AI 推荐词默认不选；不会与你已选的词重复；需你手动确认才会进入生成范围。
+                        </div>
+                    </div>
+
+                    <div class="mt-5 pa-3 rounded" style="background: var(--v-gray1-base);">
+                        <div class="text-caption font-weight-medium mb-1">未来生成规则预览：</div>
+                        <ul class="text-caption text--secondary" style="line-height: 1.6;">
+                            <li>你已选的词会自动进入生成范围。</li>
+                            <li>AI 推荐词默认不选，需手动勾选。</li>
+                            <li>AI 推荐词不会与你已选的词重复。</li>
+                            <li>只有你确认后，才会真正生成示意卡。</li>
+                        </ul>
+                    </div>
+                </v-card-text>
+                <v-card-actions class="d-flex pa-3">
+                    <v-btn text @click="aiStudyCardPreviewDialog = false">关闭</v-btn>
+                    <v-spacer />
+                    <v-btn color="primary" disabled>
+                        <v-icon small class="mr-1">mdi-lock</v-icon>
+                        确认生成（下一阶段开放）
+                    </v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </v-card>
 </template>
 
@@ -397,6 +566,15 @@
                 aiStudyCardPendingLoading: false,
                 aiStudyCardPendingMessage: '',
                 aiStudyCardPendingError: false,
+                // V2: 待解释列表面板状态
+                aiPendingListDialog: false,
+                aiPendingListLoading: false,
+                aiPendingListMessage: '',
+                aiPendingListError: '',
+                aiPendingItems: [],
+                aiPendingDismissLoadingId: null,
+                // V2: 生成预览弹窗状态
+                aiStudyCardPreviewDialog: false,
             };
         },
         watch: {
@@ -500,6 +678,74 @@
                 }).finally(() => {
                     this.aiStudyCardPendingLoading = false;
                 });
+            },
+            // V2: 打开待解释列表面板
+            openAiPendingListDialog() {
+                this.aiPendingListDialog = true;
+                this.aiPendingListMessage = '';
+                this.aiPendingListError = '';
+                this.loadAiPendingItems();
+            },
+            // V2: 加载待解释项
+            loadAiPendingItems() {
+                this.aiPendingListLoading = true;
+                this.aiPendingListError = '';
+                const chapterId = this.$store.state.vocabularyBox.chapterId;
+                const params = {};
+                if (chapterId) {
+                    params.chapter_id = chapterId;
+                }
+                axios.get('/ai-study-card/pending-items', { params })
+                    .then((response) => {
+                        const items = response.data && response.data.items ? response.data.items : [];
+                        this.aiPendingItems = items;
+                    })
+                    .catch((error) => {
+                        this.aiPendingListError = error.response && error.response.data && error.response.data.message
+                            ? error.response.data.message
+                            : '加载待解释列表失败。';
+                        this.aiPendingItems = [];
+                    })
+                    .finally(() => {
+                        this.aiPendingListLoading = false;
+                    });
+            },
+            // V2: 取消待解释项
+            dismissAiPendingItem(itemId) {
+                this.aiPendingDismissLoadingId = itemId;
+                this.aiPendingListMessage = '';
+                this.aiPendingListError = '';
+                axios.post(`/ai-study-card/pending-items/${itemId}/dismiss`)
+                    .then((response) => {
+                        this.aiPendingListMessage = response.data && response.data.message
+                            ? response.data.message
+                            : '已取消。';
+                        this.aiPendingItems = this.aiPendingItems.filter(i => i.id !== itemId);
+                    })
+                    .catch((error) => {
+                        this.aiPendingListError = error.response && error.response.data && error.response.data.message
+                            ? error.response.data.message
+                            : '取消失败。';
+                    })
+                    .finally(() => {
+                        this.aiPendingDismissLoadingId = null;
+                    });
+            },
+            // V2: 打开生成预览弹窗
+            openAiStudyCardPreview() {
+                this.aiStudyCardPreviewDialog = true;
+            },
+            // V2: 日期格式化
+            formatDate(value) {
+                if (!value) return '';
+                const date = new Date(value);
+                if (isNaN(date.getTime())) return value;
+                const yyyy = date.getFullYear();
+                const mm = String(date.getMonth() + 1).padStart(2, '0');
+                const dd = String(date.getDate()).padStart(2, '0');
+                const hh = String(date.getHours()).padStart(2, '0');
+                const mi = String(date.getMinutes()).padStart(2, '0');
+                return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
             },
             updateVocabBoxTranslationList() {
                 this.translationList = this._translationText.split(';');

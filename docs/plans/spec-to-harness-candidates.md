@@ -1,7 +1,7 @@
 # Spec To Tests / Smoke / Harness Candidates
 
 > **Status**: Candidate list plus completed conversions.
-> **Last updated**: 2026-07-02 (Codex-AIStudyCardV1-And-ReviewEntryUnification-1).
+> **Last updated**: 2026-07-02 (GLM-AIStudyCardV2-GenerationLoop-1).
 
 This document turns soft project rules into executable verification candidates. Completed rows record what has already moved from prose into tests/smoke/harness; open rows remain candidates and do not authorize code changes by themselves.
 
@@ -22,6 +22,9 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 | ReviewCardManage logs payload | Logs drawer payload should keep stable fields, ordering, and user/language/card isolation | Completed in `tests/Feature/ReviewCardManageTest.php`: exact payload fields/date shape plus same-card user/language filtering; existing tests cover order, limit, empty state, cross-card, legacy/rejected cards | `ReviewCardManageController::logs()` | Done |
 | SenseReview full menu and occurrence writes | Sense review and occurrence actions must work in real UI, not just backend tests | Completed by `smoke:sense-review-data`, `tests/Feature/SenseReviewSmokeDataCommandTest.php`, and `docs/plans/sense-review-real-workflow-smoke-playbook.md`: marker data plus real-page rating, More/source fallback, confirm/reject/ignore/rebind/create-new smoke | `/reviews/senses`, `/senses/review` | Done |
 | AI study card pending marker | Reading-page "待 AI 解释" must only record user intent, not create learning/review data | Completed in `tests/Feature/AiStudyCardPendingItemTest.php`: auth, user/language isolation, duplicate idempotency, no WordSense/ReviewCard/ReviewLog/EncounteredWord writes | AI study card v1 | Done |
+| AI study card pending item list | List endpoint must only return current user's pending items, filtered by language and optionally chapter | Completed in `tests/Feature/AiStudyCardPendingItemTest.php`: list auth, user isolation, language isolation, chapter filter, 404 for other users' chapters, only-pending not dismissed | AI study card v2 | Done |
+| AI study card dismiss/restore | Dismiss must not physically delete; restore must not create duplicate; neither must write learning data | Completed in `tests/Feature/AiStudyCardPendingItemTest.php`: dismiss idempotent, restore checks unique conflict, reverse contracts for no WordSense/ReviewCard/ReviewLog, dismissed re-mark via store restores | AI study card v2 | Done |
+| AI study card preview modal safety | Preview modal must not call AI, must not generate cards, must show safety notice and disabled confirm | Completed by MCP Chrome real-page smoke: no AI network requests, no WordSense/ReviewCard/ReviewLog writes, safety notice visible, confirm button disabled | AI study card v2 | Done |
 | Frontend review entry unification | Daily review entry should be user-facing "复习" and enter sense-only mainline | Completed by code change plus MCP Chrome smoke: homepage/nav → `/reviews/senses`; old `/senses/review`, `/review/false/-1/-1`, `/review-cards/manage` remain accessible | Homepage/nav/review routes | Done |
 | AI recommended words exclude user selections | AI suggestions must not duplicate words/phrases manually selected by the user | Future contract tests plus MCP Chrome confirmation modal smoke | Future AI study card recommendation flow | P1 before implementation |
 | AI recommended words default unchecked | User confirmation must be explicit | MCP Chrome smoke for modal initial state | Future AI study card recommendation flow | P1 before implementation |
@@ -43,14 +46,16 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 6. AI study card architecture scouting is complete (`docs/plans/ai-study-card-architecture-scout.md`). The scout covers code access points, danger zones, and a minimum target proposal. Do not implement before product decision approval. Do not invent DB schema or endpoint names in this candidate list.
 7. Codex-FinalArchitectureClosureTargetMode-1 froze the AI study card v1 plan (`docs/plans/ai-study-card-v1-frozen-plan.md`) and the frontend review entry unification plan (`docs/plans/frontend-review-entry-unification-plan.md`).
 8. Codex-AIStudyCardV1-And-ReviewEntryUnification-1 implemented the first executable harness for AI study card pending markers and completed frontend review entry round-1 browser smoke. The future AI recommendation modal and card generation loop still need separate tests/smoke before implementation.
+9. GLM-AIStudyCardV2-GenerationLoop-1 extended the pending marker harness to cover list, dismiss/restore, and preview modal safety. The preview modal is a placeholder only — no AI calls, no card generation. The future AI recommendation, AI meaning generation, and WordSense/ReviewCard generation loop still need separate architecture review and harness before implementation.
 
 ## 4. Next Candidate Shortlist
 
 If the project owner asks for the next hardening task, the lowest-risk remaining candidates are:
 
-1. `AIStudyCard-RecommendationModal-Harness-1` — before building the next AI study card step, add tests/smoke for user-selected-word exclusion, default-unchecked AI recommendations, explicit confirmation, and no automatic card generation.
-2. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
-3. `SenseReview-SmokeReplay-1` only when the real page flow needs to be replayed with a fresh marker.
+1. `AIStudyCard-RecommendationModal-Harness-1` — before building the next AI study card step, add tests/smoke for user-selected-word exclusion, default-unchecked AI recommendations, explicit confirmation, and no automatic card generation. The V2 preview modal placeholder already shows the future rules; the next step is to wire real AI recommendation behind the same safety boundary.
+2. `AIStudyCard-MeaningGeneration-Harness-1` — after recommendation modal, add tests/smoke for AI meaning generation that does not auto-create WordSense/ReviewCard without user confirmation.
+3. `LegacyWordCards-DailyMainlineGuard-1` only if existing ReviewFsrs coverage is judged insufficient.
+4. `SenseReview-SmokeReplay-1` only when the real page flow needs to be replayed with a fresh marker.
 
 Selection still belongs to the project owner / webpage-side designer. Agents must not auto-enter the next task.
 
@@ -61,4 +66,4 @@ Selection still belongs to the project owner / webpage-side designer. Agents mus
 | SenseReview full menu and occurrence writes | Completed as a standalone page-smoke task; future work should replay the playbook only when this surface changes. |
 | Legacy word cards stay out of daily mainline | Existing `ReviewFsrsTest` already covers sense-only queue targeting and word-card exclusion; add more only if a concrete gap appears. |
 | ReviewLog preserved by default | Existing `ReviewCardManageTest` and `WordSenseDestroyRestoreTest` already cover preserve-by-default paths; duplicating them would add noise. |
-| AI study card future hardening | Pending marker v1 now exists and is tested. Recommendation modal, AI generation, and card creation remain future work requiring separate architecture review and harness. |
+| AI study card future hardening | V1 pending marker and V2 list/dismiss/restore/preview are now implemented and tested. AI recommendation modal, AI meaning generation, WordSense/ReviewCard generation loop, and real AI calls remain future work requiring separate architecture review and harness. |
