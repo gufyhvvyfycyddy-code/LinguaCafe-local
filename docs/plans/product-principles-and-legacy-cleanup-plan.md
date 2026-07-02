@@ -1,7 +1,7 @@
 # LinguaCafe 产品原则与旧代码清理计划
 
 > **性质**：产品定位 / 长期原则 / 功能行为约束
-> **最新更新**：2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1)
+> **最新更新**：2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1)
 > **本文件优先于早期计划文档。如冲突，以本文为准。**
 
 ---
@@ -90,16 +90,16 @@ AI 可以做的是：
 ## 7. 多例句轮换原则
 
 题面例句也必须轮换，不能一直显示同一句。
-1. 每个 WordSense 应有例句池。
-2. 题面例句从例句池中轮换。
-3. 查看答案后的补充例句必须和题面例句不同。
-4. 如果只有一条例句，不显示重复补充例句。
-5. 例句来自真实原文，不来自 AI 伪造。
-6. 同一句不重复添加。
-7. 同章节不同位置、不同句子可以分别添加。
-8. 溯源列表支持多个来源。
-9. 来源切换顺序要"轮换 + 轻度洗牌"，避免每次 ABC 顺序完全一样。
-10. 本轮只写原则和计划，不实现。
+1. 每个 WordSense 应有例句池。**(2026-07-02 已实现：`WordSenseExamplePoolService::exampleCandidates()`。)** 
+2. 题面例句从例句池中轮换。**(2026-07-02 已实现：稳定 seed 轮换（review_card_id + fsrs_reps + day-of-year，crc32）。)**
+3. 查看答案后的补充例句必须和题面例句不同。**(2026-07-02 已实现：`pickSupplementaryIndex()` 独立 seed + 保证不同。)**
+4. 如果只有一条例句，不显示重复补充例句。**(2026-07-02 已实现：单例句时 supplementary 为 null；前端防御性去重。)**
+5. 例句来自真实原文，不来自 AI 伪造。**(2026-07-02 已强制：来源仅 `WordSenseOccurrence` + card example fallback，不调 AI。)** 
+6. 同一句不重复添加。**(2026-07-02 已实现：chapter + sentence 去重；card fallback 用 sentence-only 去重。)** 
+7. 同章节不同位置、不同句子可以分别添加。**(2026-07-02 已实现：同章节同句子折叠，同章节不同句子保留。)** 
+8. 溯源列表支持多个来源。**(2026-07-02 已实现：`SenseSourceContextService::sourceContextList()` + `/senses/{id}/source-context-list` + `SenseExampleDialog.vue` carousel。)** 
+9. 来源切换顺序要"轮换 + 轻度洗牌"，避免每次 ABC 顺序完全一样。**(2026-07-02 部分：来源按 manual-sense-add-first + id desc 排序；轻度洗牌未实现。)** 
+10. ~~本轮只写原则和计划，不实现。~~ **2026-07-02 已实现原则 1-8；原则 9 仍部分实现。**
 
 ## 8. 词形原型绑定原则
 

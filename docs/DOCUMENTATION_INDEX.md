@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1).
+> **Last updated**: 2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 

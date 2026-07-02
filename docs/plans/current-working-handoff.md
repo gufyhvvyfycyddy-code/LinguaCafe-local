@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1)
+> **最后更新**：2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -9,7 +9,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1 pending marker 与前端复习入口统一第一轮已实现；AI 示意卡 V2 待解释列表、取消/恢复、生成前预览弹窗雏形已实现；AI 示意卡 V3 已取消项恢复按钮、真实预览内容、安全生成包已实现；AI 示意卡 V4 AI 推荐词粘贴导入、去重、默认不选、用户确认、最终候选包已实现。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环。
+架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。本轮新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
 
 ## 2. 最近已完成任务
 
@@ -35,6 +35,7 @@
 | GLM-AIStudyCardV3-SafePreviewPackage-1 | AI 示意卡 V3 安全生成包。扩展 `GET /ai-study-card/pending-items` 支持 `status=pending\|dismissed\|all` 过滤；新增 `POST /ai-study-card/pending-items/preview-package` 后端安全包接口（schema_version=ai-study-card-preview-package-v1，含 selected_items/generation_rules/safety_flags）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释/已取消视图切换、已取消项恢复按钮、真实预览弹窗（用户已选词列表/来源句子/章节位置/勾选取消/全不选禁用生成/AI 推荐词占位/安全说明/生成规则）、「准备生成」按钮触发后端安全包、JSON 展示与复制按钮。新增 14 个 V3 feature tests（37 tests / 184 assertions 全绿）。MCP Chrome 真实页面验收 28 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | GLM-AIRecommendationConfirmationLoop-V4-1 | AI 示意卡 V4 AI 推荐词确认闭环。新增 `POST /ai-study-card/pending-items/final-candidates-package` 后端接口（schema_version=ai-study-card-final-candidates-v1，含 user_selected_items/ai_recommended_selected_items/ai_recommended_unselected_items/dedupe_summary/generation_rules 5条/safety_flags 6条；三重隔离 + 后端二次去重 + 空结果 422 + 数量上限保护）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增 V4 完整 UI（粘贴 AI 推荐词 JSON 文本框 + 解析/清空按钮 + 解析错误提示 + 解析摘要 + AI 推荐词列表默认 unchecked + 全选/全不选 + 用户已选词/AI 推荐词视觉分区 + 「生成最终候选包」按钮 + JSON 展示与复制按钮）。新增 18 个 V4 feature tests（56 tests / 294 assertions 全绿）。MCP Chrome 真实页面验收 33 项全通过。不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复。 |
 | Codex-LegacyEntry-FinishedReading-ExampleGuard-1 | 旧版入口清理执行 + Finished reading 安全护栏 + 阅读例句路线冻结。普通查词组件不再展示“旧词条释义 / 旧版释义 / 旧版示意 / legacy word review”入口文案；后端 legacy 兼容层、`ReviewCard::TARGET_WORD`、legacy route/service/tests 保留。新增 `FinishedReadingSafetyTest` 锁定 Finished reading 只把当前用户/当前语言 `stage=2` 黄词设为 known，且不改绿词 stage、WordSense、ReviewCard、ReviewLog、FSRS；发现并修复自动 known 分支缺少 `language` 过滤。新增 `LegacyEntryUiGuardTest` 防止旧入口文案回到普通查词组件。新增 `reading-inline-review-and-example-pool-plan.md`，只冻结阅读中刷卡/多例句轮换路线，不实现。 |
+| Trae-ExamplePool-ReviewRotation-SourceCarousel-1 | 多例句池 + 复习页题面例句轮换 + 答案后补充例句不重复 + 多来源溯源 carousel + Finished reading 确认弹窗。新增 `WordSenseExamplePoolService`（复用 `WordSenseOccurrence` + card example fallback，不新增 migration，不调用 AI），`SenseReviewCardSerializerService` payload 新增 `example_candidates` / `example_candidates_count` / `supplementary_example`，稳定 seed 轮换（review_card_id + fsrs_reps + day-of-year，crc32）；`SenseSourceContextService` 新增 `sourceContextList` 方法 + 新路由 `GET /senses/{id}/source-context-list`，`SenseExampleDialog.vue` 支持来源 1/N 切换；`TextReader.vue` 「完成阅读」按钮新增确认弹窗（说明影响 + 取消/确认）。新增 18 个 feature tests（WordSenseExamplePoolTest 12 + SenseSourceContextMultiSourceTest 6，全绿）。MCP Chrome 真实页面验收：登录 → /reviews/senses 题面正常 → 查看答案 → 单例句无重复补充 → 单来源无切换按钮（符合规则） → 阅读页完成阅读确认弹窗 → 取消不执行 → console/network 正常。**阅读中刷卡仍未实现；AI 不生成例句。** |
 
 ## 3. 当前未最终关闭的事项
 
@@ -161,8 +162,8 @@
 | AI 生成安全契约 | ≈ 85% | V3 安全生成包（schema_version=ai-study-card-preview-package-v1）+ V4 最终候选包（schema_version=ai-study-card-final-candidates-v1）已完成。V4 safety_flags 6 条：no_ai_called_by_linguacafe / ai_response_pasted_by_user / no_review_card_created / no_word_sense_created / no_fsrs_changed / user_confirmation_required_before_card_generation；generation_rules 5 条。V3 + V4 共 32 个反向 contract tests 覆盖用户/语言/状态隔离 + 去重 + 默认不选 + 空结果 + 数量上限。**85% 是子阶段进度，不是固定五条主线的虚假上调。** API key 安全存储、真实 AI 调用边界、用户确认后生成 WordSense/ReviewCard 仍未实现。 |
 | AI 推荐词确认闭环 | ≈ 80% | V4 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，不是固定五条主线的虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
 | 旧版入口清理执行 | ≈ 80% | 普通查词界面的旧入口文案已隐藏，并加源码 guard；后端兼容层和 legacy route/service/tests 保留。**80% 是子阶段进度，不是固定五条主线的虚假上调。** 更深层删除必须另做依赖审计。 |
-| Finished reading 安全护栏 | ≈ 50% | 新增 Feature test 覆盖 yellow→known、green/WordSense/ReviewCard/ReviewLog/FSRS/用户/语言隔离，并修复语言过滤缺口。**50% 是子阶段进度，不是固定五条主线的虚假上调。** |
-| 阅读中复习 / 多例句轮换路线 | ≈ 50% | 新增路线冻结文档，明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则；未实现。**50% 是子阶段进度，不是固定五条主线的虚假上调。** |
+| Finished reading 安全护栏 | ≈ 70% | Feature test 覆盖 yellow→known、green/WordSense/ReviewCard/ReviewLog/FSRS/用户/语言隔离，并修复语言过滤缺口。本轮新增「完成阅读」确认弹窗（说明影响 + 取消/确认），不污染真实数据。**70% 是子阶段进度，不是固定五条主线的虚假上调。** |
+| 阅读中复习 / 多例句轮换路线 | ≈ 50% | 路线冻结文档明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则。本轮已实现多例句池 + 复习页题面例句轮换 + 答案后补充例句不重复 + 多来源溯源 carousel（共 4 个子阶段：多例句池 60% / 题面轮换 50% / 多来源溯源 30% / Finished reading 误触保护 20%，合计 160% 子阶段进度）。**阅读中刷卡仍未实现。AI 不生成例句。** |
 
 > 如果任务失败或 Incomplete，对应进度不得上调。
 > 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。
@@ -237,4 +238,21 @@
 - Sub-phase progress: AI study card generation loop 95% (unchanged); AI generation safety contract 55% → 85%; AI recommendation confirmation loop 0% → 80% (new sub-phase). **These are sub-phase progress, NOT a fake uplift of the five main lines.** AI real recommendation (auto AI call), AI meaning generation, WordSense/ReviewCard generation loop, and real AI calls are still not implemented.
 - Regression: ReviewFsrsTest 61/364, FsrsSchedulingServiceTest 9/46, WordSense (DestroyRestore+Test) 149/595 all green. npm run development compiled successfully.
 - No AI calls, no API key saved, no WordSense/ReviewCard/ReviewLog created, no FSRS changes, no delete/archive/restore changes, no SenseReview/SenseMappingReview/legacy word card removal.
+- Did NOT enter the next task automatically.
+
+## Recent Update: Trae-ExamplePool-ReviewRotation-SourceCarousel-1
+
+- Multi-example pool + review-page question example rotation + answer-side supplementary example non-duplication + multi-source carousel + Finished reading confirmation dialog are implemented.
+- New backend service `WordSenseExamplePoolService`: collects real-source example candidates from `WordSenseOccurrence` (status=BOUND, sentence_en non-empty) + card example fallback. Dedupe by chapter + sentence text; sentence-only dedupe for card fallback against any occurrence. Read-only: no ReviewLog, no WordSense, no ReviewCard, no FSRS writes. No AI calls.
+- `SenseReviewCardSerializerService` payload extended with `example_candidates`, `example_candidates_count`, `supplementary_example`. Question example index chosen by stable seed (review_card_id * 31 + fsrs_reps * 7 + day-of-year, crc32 hash). Supplementary index chosen by independent seed (review_card_id * 17 + fsrs_reps * 13 + day-of-year + 1009), guaranteed different from question index. Supplementary is null when only one candidate exists.
+- `SenseSourceContextService::sourceContextList()` returns `{ sense_id, sources: [...], count }` with up to 3 distinct chapter sources. Same-chapter duplicates collapse. Falls back to single-element source list when no chapter sources exist. New route `GET /senses/{id}/source-context-list`.
+- `SenseExampleDialog.vue` rewritten to support multi-source carousel: 来源 1/N chip, prev/next buttons, scrollTargetIntoView on source change. Single-source cards do not show switching buttons (rule compliance). `context` computed preserved as legacy alias.
+- `SenseReview.vue` answer side adds supplementary-example block with defensive dedup check (supplementary_example.sentence_en === currentCard.example_sentence_en → null). `viewSource()` now calls `/source-context-list` endpoint.
+- `TextReader.vue` 「完成阅读」 button now opens confirmation dialog first. Dialog explains: yellow (new) words marked known; green (learning) words do not enter review; existing WordSense review cards and review history are not affected. Cancel does not execute; confirm runs the original `finish()` method. Backend semantics unchanged.
+- Added 18 new feature tests (WordSenseExamplePoolTest 12 + SenseSourceContextMultiSourceTest 6, all green): multiple occurrences produce multiple candidates; duplicate sentences collapsed; card example fallback; card fallback dedupe against occurrences; question rotation not always first; question rotation stable for same seed; question rotation changes with reps; supplementary different from question; supplementary null for single candidate; pool does not write ReviewLog/WordSense/ReviewCard; serializer payload includes candidates + supplementary; serializer payload supplementary null for single candidate; source-context-list shape; multiple distinct chapters produce multiple sources; same-chapter duplicates collapse; no-chapter fallback to single source list; read-only; cross-user isolation.
+- Regression: FinishedReadingSafetyTest 2/27, LegacyEntryUiGuardTest 1/12, ReviewFsrsTest 61/364, FsrsSchedulingServiceTest 9/46, WordSense (DestroyRestore+ExamplePool+Test) 161/680, SenseSourceContextTest 29/186 all green. npm run development compiled successfully.
+- MCP Chrome real-page acceptance: login (1816529781@qq.com) → /reviews/senses question example displayed → 显示答案 → single-example card shows no duplicate supplementary (rule compliance) → 更多 → 查看原文 → single-source dialog shows no switching buttons (rule compliance) → /chapters/read/5 → 「完成阅读」 button → confirmation dialog with correct text ("确认完成阅读？" + yellow/green/history explanation + 取消/确认完成) → click 取消 → dialog closes, page does NOT enter "阅读完成" state → console only WebSocket (Pusher local log fallback, expected per AGENTS.md) → network all 200.
+- Five-line progress: Overall architecture closure 100%, Review mainline stability 96%, Page real acceptance 100%, AI study card planning 100%, Frontend entry cleanup 100%.
+- New sub-phase progress: multi-example pool 0% → 60%; review-page question rotation 0% → 50%; multi-source carousel 0% → 30%; Finished reading misclick protection 0% → 20%. Total sub-phase uplift: 160%. **This 160% is four sub-phase progress values, NOT a fake uplift of the five main lines.**
+- **Reading inline review (阅读中刷卡) is still NOT implemented. AI does NOT generate examples. No AI calls. No WordSense/ReviewCard/ReviewLog created. No FSRS changes. No delete/archive/restore changes. No SenseReview/SenseMappingReview/legacy word card removal. No new migration.**
 - Did NOT enter the next task automatically.

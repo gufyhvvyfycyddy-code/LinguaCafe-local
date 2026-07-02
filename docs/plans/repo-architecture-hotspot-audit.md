@@ -1,8 +1,16 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01
+> **审计日期**：2026-07-01（最近任务刷新 2026-07-02 Trae-ExamplePool-ReviewRotation-SourceCarousel-1）
 > **基准 commit**：`7f3d4b6`
 > **审计方式**：只读侦查，不改代码，不进入功能开发。
+
+> **2026-07-02 Trae 任务新增热点**：
+> - `WordSenseExamplePoolService`（新增）：只读，复用 `WordSenseOccurrence` + card example fallback，不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。
+> - `SenseReviewCardSerializerService`（修改）：payload 新增 `example_candidates` / `example_candidates_count` / `supplementary_example`。需要后续关注 payload 大小增长（最多 10 个 occurrence 候选 + 1 个 card fallback）。
+> - `SenseSourceContextService::sourceContextList()`（新增方法）：复用现有 `sourceContext` fallback 链，最多返回 3 个 distinct chapter sources。无新依赖。
+> - `SenseExampleDialog.vue`（重写）：从单 context 改为 sources carousel。保留了 `context` computed 作为 legacy alias，避免破坏外部调用。
+> - `TextReader.vue`（修改）：新增 `finishConfirmDialog` data + `openFinishConfirmDialog` 方法 + v-dialog。不改后端语义。
+> - 测试覆盖：18 个 feature tests（WordSenseExamplePoolTest 12 + SenseSourceContextMultiSourceTest 6）+ 完整回归测试套件全绿。
 
 ---
 

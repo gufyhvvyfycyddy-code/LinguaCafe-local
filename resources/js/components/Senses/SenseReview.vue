@@ -132,6 +132,17 @@
                             <div class="text--secondary mt-2">{{ currentCard.example_sentence_zh }}</div>
                         </v-sheet>
 
+                        <template v-if="supplementaryExample">
+                            <div class="caption text--secondary">补充例句</div>
+                            <v-sheet outlined rounded class="pa-3 mb-4 supplementary-example">
+                                <div class="default-font">{{ supplementaryExample.sentence_en }}</div>
+                                <div class="text--secondary mt-2">{{ supplementaryExample.sentence_zh || '' }}</div>
+                                <div v-if="supplementaryExample.chapter_title" class="text-caption text--secondary mt-2">
+                                    来源：{{ supplementaryExample.chapter_title }}
+                                </div>
+                            </v-sheet>
+                        </template>
+
                         <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
                             FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
                             <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
@@ -394,6 +405,22 @@
             remainingCount() {
                 return this.cards.length;
             },
+            supplementaryExample() {
+                if (!this.currentCard) {
+                    return null;
+                }
+                const supp = this.currentCard.supplementary_example;
+                if (!supp || !supp.sentence_en) {
+                    return null;
+                }
+                // Defensive: never show a supplementary example that duplicates
+                // the question example (backend guarantees this, but we guard
+                // against regressions here too).
+                if (supp.sentence_en === this.currentCard.example_sentence_en) {
+                    return null;
+                }
+                return supp;
+            },
         },
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
@@ -578,13 +605,22 @@
                     example_sentence_zh: this.currentCard.example_sentence_zh,
                 };
 
-                axios.get(`/senses/${this.currentCard.word_sense_id}/source-context`)
+                axios.get(`/senses/${this.currentCard.word_sense_id}/source-context-list`)
                     .then((response) => {
-                        this.sourcePayload = { card: card, context: response.data };
+                        const data = response.data || {};
+                        const sources = Array.isArray(data.sources) ? data.sources : [];
+                        // First source is the primary; older single-context shape
+                        // is preserved as `context` for backward compatibility.
+                        this.sourcePayload = {
+                            card: card,
+                            context: sources[0] || null,
+                            sources: sources,
+                            sourceCount: data.count || sources.length,
+                        };
                         this.sourceDialog = true;
                     })
                     .catch(() => {
-                        this.sourcePayload = { card: card, context: null, error: '获取原文失败。' };
+                        this.sourcePayload = { card: card, context: null, sources: [], sourceCount: 0, error: '获取原文失败。' };
                         this.sourceDialog = true;
                     });
             },

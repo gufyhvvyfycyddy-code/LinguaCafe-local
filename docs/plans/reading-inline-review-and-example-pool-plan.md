@@ -1,7 +1,7 @@
 # Reading Inline Review And Example Pool Plan
 
-> **Status**: Route frozen, not implemented.
-> **Last updated**: 2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1).
+> **Status**: Multi-example pool / rotation / multi-source carousel implemented (2026-07-02). Reading inline review still frozen, not implemented.
+> **Last updated**: 2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1).
 
 This plan records the next route for reading-inline review and multi-example rotation. It is not implementation authorization. Future work still needs Architecture Gate, interface review, tests, and MCP Chrome page acceptance.
 
@@ -9,12 +9,12 @@ This plan records the next route for reading-inline review and multi-example rot
 
 This document freezes four product routes:
 
-1. Reading inline review must be WordSense-based.
-2. Review card examples must rotate from real source examples.
-3. Known-sense-new-meaning confirmation must stay separate from ordinary AI recommendations.
-4. Surface/lemma binding must remain context-aware and user-correctable.
+1. Reading inline review must be WordSense-based. **(Still not implemented.)**
+2. Review card examples must rotate from real source examples. **(Implemented 2026-07-02: `WordSenseExamplePoolService` + `SenseReviewCardSerializerService` rotation + supplementary example.)**
+3. Known-sense-new-meaning confirmation must stay separate from ordinary AI recommendations. **(Still not implemented.)**
+4. Surface/lemma binding must remain context-aware and user-correctable. **(Still not implemented.)**
 
-This round does not implement reading-inline review, multi-example rotation, real AI calls, WordSense generation, ReviewCard generation, or FSRS write paths.
+The 2026-07-02 Trae round implemented route #2 and the multi-source carousel portion of route #8 in §4.2. It did NOT implement reading-inline review, real AI calls, WordSense generation, ReviewCard generation, FSRS write paths, or AI-generated examples.
 
 ## 4.1 Reading Inline Review Principles
 
@@ -31,16 +31,16 @@ This round does not implement reading-inline review, multi-example rotation, rea
 
 ## 4.2 Multi-Example Rotation Principles
 
-1. Each `WordSense` should have an example pool.
-2. The front-side review example must rotate.
-3. Supplemental examples shown after answer reveal must differ from the front-side example.
-4. If only one example exists, do not show it again as a duplicate supplemental example.
-5. Examples must come from real source text, not AI-generated text.
-6. Do not add the same sentence twice.
-7. Different positions or different sentences in the same chapter may be separate sources.
-8. Source lists must support multiple sources.
-9. Source switching should use rotation plus light shuffle, not fixed ABC order every time.
-10. This round does not implement multi-example rotation.
+1. Each `WordSense` should have an example pool. **(Implemented 2026-07-02: `WordSenseExamplePoolService::exampleCandidates()`.)**
+2. The front-side review example must rotate. **(Implemented 2026-07-02: stable seed rotation in `SenseReviewCardSerializerService`.)**
+3. Supplemental examples shown after answer reveal must differ from the front-side example. **(Implemented 2026-07-02: `pickSupplementaryIndex()` guaranteed-different.)**
+4. If only one example exists, do not show it again as a duplicate supplemental example. **(Implemented 2026-07-02: supplementary is null when total < 2; `SenseReview.vue` defensive dedup.)**
+5. Examples must come from real source text, not AI-generated text. **(Enforced 2026-07-02: sources are `WordSenseOccurrence` + card example fallback only; no AI.)**
+6. Do not add the same sentence twice. **(Implemented 2026-07-02: dedupe by chapter + sentence; sentence-only dedupe for card fallback.)**
+7. Different positions or different sentences in the same chapter may be separate sources. **(Implemented 2026-07-02: same-chapter same-sentence collapses; same-chapter different-sentence keeps.)**
+8. Source lists must support multiple sources. **(Implemented 2026-07-02: `SenseSourceContextService::sourceContextList()` + `/senses/{id}/source-context-list` route + `SenseExampleDialog.vue` carousel.)**
+9. Source switching should use rotation plus light shuffle, not fixed ABC order every time. **(Partial 2026-07-02: sources are ordered by manual-sense-add-first then id desc; light shuffle not implemented.)**
+10. ~~This round does not implement multi-example rotation.~~ **Implemented 2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1) for routes 1-8. Route 9 light shuffle still partial.**
 
 ## 4.3 Known-Sense-New-Meaning And Inline Review Bridge
 

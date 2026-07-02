@@ -90,6 +90,104 @@ class SenseSourceContextService
         return $empty;
     }
 
+    /**
+     * Build a list of distinct source contexts for a sense.
+     *
+     * Used by the review page source dialog to support multi-source
+     * navigation ("来源 1 / N"). Each source corresponds to a distinct
+     * chapter_id from the sense's bound occurrences. When no chapter-based
+     * source is available, falls back to a single sourceContext entry
+     * (which may itself be the card_example fallback or unavailable).
+     *
+     * At most 3 sources are returned to keep the dialog fast.
+     */
+    public function sourceContextList(int $userId, string $language, int $senseId): array
+    {
+        $sense = $this->resolver->resolveSense($userId, $language, $senseId);
+
+        $occurrences = WordSenseOccurrence::query()
+            ->where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('word_sense_id', $sense->id)
+            ->where('status', WordSenseOccurrence::STATUS_BOUND)
+            ->whereNotNull('chapter_id')
+            ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
+            ->orderByDesc('id')
+            ->limit(20)
+            ->get()
+            ->unique('chapter_id')
+            ->take(3);
+
+        $sources = [];
+        foreach ($occurrences as $occurrence) {
+            $context = $this->buildChapterSourceContextForOccurrence($sense, $occurrence);
+            if ($context !== null) {
+                $sources[] = $context;
+            }
+        }
+
+        if (empty($sources)) {
+            // No chapter-based sources — fall back to the existing single
+            // sourceContext flow so the dialog still shows whatever fallback
+            // (card_example / unavailable) is appropriate.
+            $primary = $this->sourceContext($userId, $language, $senseId);
+            return [
+                'sense_id' => $sense->id,
+                'sources' => [$primary],
+                'count' => 1,
+            ];
+        }
+
+        return [
+            'sense_id' => $sense->id,
+            'sources' => $sources,
+            'count' => count($sources),
+        ];
+    }
+
+    /**
+     * Build a chapter source context for a specific occurrence. Returns null
+     * if the chapter cannot be loaded or the sentence cannot be located.
+     */
+    private function buildChapterSourceContextForOccurrence(
+        WordSense $sense,
+        WordSenseOccurrence $occurrence
+    ): ?array {
+        $chapter = $this->resolver->findChapterById(
+            $occurrence->chapter_id,
+            $sense->user_id,
+            $sense->language_id,
+        );
+
+        if (!$chapter) {
+            return null;
+        }
+
+        $context = $this->sourceContextFromChapter(
+            $chapter,
+            $sense,
+            $occurrence,
+            $occurrence->sentence_id,
+            $occurrence->sentence_hash,
+            $occurrence->sentence_en,
+        );
+
+        if ($context === null) {
+            return null;
+        }
+
+        $result = $this->buildChapterResult(
+            $sense,
+            $chapter,
+            $occurrence->sentence_id,
+            $occurrence->sentence_hash,
+            $context,
+        );
+        $result['occurrence_id'] = $occurrence->id;
+        $result['source_sentence_en'] = $occurrence->sentence_en;
+        return $result;
+    }
+
     // ==================== Private/Internal helpers ====================
 
     private function sourceContextFromChapter(

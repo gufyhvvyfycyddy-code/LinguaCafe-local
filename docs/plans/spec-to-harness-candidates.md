@@ -1,7 +1,7 @@
 # Spec To Tests / Smoke / Harness Candidates
 
 > **Status**: Candidate list plus completed conversions.
-> **Last updated**: 2026-07-02 (Codex-LegacyEntry-FinishedReading-ExampleGuard-1).
+> **Last updated**: 2026-07-02 (Trae-ExamplePool-ReviewRotation-SourceCarousel-1).
 
 This document turns soft project rules into executable verification candidates. Completed rows record what has already moved from prose into tests/smoke/harness; open rows remain candidates and do not authorize code changes by themselves.
 
@@ -46,6 +46,12 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 | MCP Chrome not replaced by API | Page tasks need true browser evidence | Final-report checklist and possible scriptable smoke templates | Browser-facing tasks | P2 |
 | DCP default forbidden | DCP cannot run unless a task explicitly authorizes it | Final-report checklist; no automated command needed | Process compliance | P2 |
 | Notification script default forbidden | `notify.ps1` and any OS notification scripts are not part of task completion | Final-report checklist; no automated command needed | Process compliance | P2 |
+| Multi-example pool real-source only | Examples must come from real `WordSenseOccurrence` rows or card example fallback, never AI | Completed in `tests/Feature/WordSenseExamplePoolTest.php`: pool only returns `WordSenseOccurrence` + `card_example` fallback, no AI; reverse contracts for no ReviewLog/WordSense/ReviewCard writes | `WordSenseExamplePoolService` | Done |
+| Multi-example pool dedupe | Same chapter + same sentence must collapse; card fallback must dedupe against any occurrence sentence | Completed in `tests/Feature/WordSenseExamplePoolTest.php`: duplicate sentences in same chapter collapse; card fallback skipped when identical to occurrence sentence | `WordSenseExamplePoolService` | Done |
+| Review question example rotation | Question example must rotate by stable seed and not always be the first candidate | Completed in `tests/Feature/WordSenseExamplePoolTest.php`: rotation produces multiple distinct indices across cards; same seed produces same index; incrementing fsrs_reps shifts index | `WordSenseExamplePoolService::pickQuestionIndex` / `SenseReviewCardSerializerService` | Done |
+| Supplementary example differs from question | Supplementary example must differ from question example; null when only one candidate | Completed in `tests/Feature/WordSenseExamplePoolTest.php`: supplementary differs across 30 cards; null when total < 2; serializer payload includes supplementary and is null for single candidate | `WordSenseExamplePoolService::pickSupplementaryIndex` / `SenseReviewCardSerializerService` | Done |
+| Multi-source carousel | Source list must support multiple sources; same-chapter duplicates collapse; fallback to single source when no chapter sources | Completed in `tests/Feature/SenseSourceContextMultiSourceTest.php`: shape, multiple distinct chapters produce multiple sources, same-chapter collapse, no-chapter fallback single source, read-only, cross-user isolation | `SenseSourceContextService::sourceContextList` / `/senses/{id}/source-context-list` | Done |
+| Finished reading misclick protection | 「完成阅读」 must open a confirmation dialog first; cancel does not execute | Completed by MCP Chrome real-page smoke: confirmation dialog with correct text appears, 取消 button closes dialog without entering "阅读完成" state; backend semantics unchanged | `TextReader.vue` | Done |
 
 ## 3. Current Implementation Notes
 

@@ -140,7 +140,7 @@
                         'mb-3': $vuetify.breakpoint.xsOnly,
                     }">
                         <v-spacer></v-spacer>
-                        <v-btn rounded color="primary" @click="finish()"><v-icon>mdi-text-box-check</v-icon> 完成阅读</v-btn>
+                        <v-btn rounded color="primary" @click="openFinishConfirmDialog()"><v-icon>mdi-text-box-check</v-icon> 完成阅读</v-btn>
                     </div>
                 </v-card-text>
             </v-card>&nbsp;
@@ -246,6 +246,27 @@
                 </v-card-actions>
             </v-card>
         </div>
+
+        <!-- Finished reading confirmation dialog (UX guard against accidental clicks) -->
+        <v-dialog v-model="finishConfirmDialog" max-width="480">
+            <v-card>
+                <v-card-title>确认完成阅读？</v-card-title>
+                <v-card-text>
+                    <p>点击「确认完成」后：</p>
+                    <ul class="mb-3">
+                        <li>本章中标记为<Strong>黄色（新词）</Strong>的词将被标为已知；</li>
+                        <li>标记为<Strong>绿色（学习中）</Strong>的词不会进入复习；</li>
+                        <li>已有的词义复习卡与复习历史不会被影响。</li>
+                    </ul>
+                    <p class="text--secondary text-caption">此操作用于整理本章阅读状态，可随时继续阅读本章。</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text :disabled="saving" @click="finishConfirmDialog = false">取消</v-btn>
+                    <v-btn color="primary" :loading="saving" @click="finish()">确认完成</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
     </div>
 </template>
 
@@ -319,6 +340,7 @@
                 // finish
                 finished: false,
                 finishError: false,
+                finishConfirmDialog: false,
                 leveledUpWordsAndPhrases: null,
                 saving: false,
 
@@ -594,7 +616,14 @@
             toggleAiTranslations() {
                 this.showAiTranslations = !this.showAiTranslations;
             },
+            openFinishConfirmDialog() {
+                // UX guard against accidental clicks on "完成阅读". The
+                // backend `/chapters/finish` semantics are unchanged — this
+                // dialog only inserts a confirmation step before the request.
+                this.finishConfirmDialog = true;
+            },
             finish() {
+                this.finishConfirmDialog = false;
                 this.leveledUpWordsAndPhrases = this.$refs.interactiveText.getLeveledUpWordsAndPhrases();
                 this.saving = true;
                 this.finished = true;

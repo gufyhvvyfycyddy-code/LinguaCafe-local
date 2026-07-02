@@ -308,6 +308,21 @@ class SenseOccurrenceController extends Controller
         ));
     }
 
+    /**
+     * Multi-source variant of sourceContext: returns a list of distinct
+     * chapter-based source contexts (up to 3) for the review page source
+     * dialog carousel. Falls back to a single-entry list when no
+     * chapter-based sources are available.
+     */
+    public function sourceContextList(int $id)
+    {
+        return response()->json($this->senseSourceContextService->sourceContextList(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $id,
+        ));
+    }
+
     public function archiveSense(int $id)
     {
         $sense = WordSense::where('id', $id)

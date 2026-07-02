@@ -4,6 +4,9 @@
             <v-card-title>
                 原文与译文
                 <v-spacer />
+                <v-chip v-if="sourceCount > 1" small outlined class="mr-2">
+                    来源 {{ activeSourceIndex + 1 }} / {{ sourceCount }}
+                </v-chip>
                 <v-btn icon @click="close"><v-icon>mdi-close</v-icon></v-btn>
             </v-card-title>
 
@@ -11,6 +14,20 @@
                 <v-alert v-if="message" type="info" dense text class="mb-3">
                     {{ message }}
                 </v-alert>
+
+                <div v-if="sourceCount > 1" class="d-flex align-center mb-3 source-carousel-bar">
+                    <v-btn small text :disabled="activeSourceIndex === 0" @click="prevSource">
+                        <v-icon small left>mdi-chevron-left</v-icon>上一来源
+                    </v-btn>
+                    <v-spacer />
+                    <span class="text-caption text--secondary">
+                        {{ activeSourceChapterTitle || '来源 ' + (activeSourceIndex + 1) }}
+                    </span>
+                    <v-spacer />
+                    <v-btn small text :disabled="activeSourceIndex === sourceCount - 1" @click="nextSource">
+                        下一来源<v-icon small right>mdi-chevron-right</v-icon>
+                    </v-btn>
+                </div>
 
                 <div v-if="tokens.length" ref="scrollBox" class="source-scroll-box">
                     <div class="text-block-group source-context" :style="{ 'font-size': fontSize + 'px' }">
@@ -41,8 +58,8 @@
                     <div>{{ translation }}</div>
                 </div>
 
-                <div v-if="context && context.debug" class="mt-2 text-caption text--secondary">
-                    匹配方式：{{ context.source_kind }}，得分：{{ context.debug.match_score }}
+                <div v-if="activeContext && activeContext.debug" class="mt-2 text-caption text--secondary">
+                    匹配方式：{{ activeContext.source_kind }}，得分：{{ activeContext.debug.match_score }}
                 </div>
             </v-card-text>
 
@@ -65,6 +82,7 @@
         data() {
             return {
                 autoScrolled: false,
+                activeSourceIndex: 0,
             };
         },
         computed: {
@@ -79,12 +97,35 @@
             card() {
                 return this.payload && this.payload.card ? this.payload.card : null;
             },
+            sources() {
+                if (this.payload && Array.isArray(this.payload.sources) && this.payload.sources.length) {
+                    return this.payload.sources;
+                }
+                // Backward compat: if only `context` is provided (single-source
+                // shape), treat it as a one-element source list.
+                if (this.payload && this.payload.context) {
+                    return [this.payload.context];
+                }
+                return [];
+            },
+            sourceCount() {
+                return this.sources.length;
+            },
+            activeContext() {
+                return this.sources[this.activeSourceIndex] || null;
+            },
             context() {
-                return this.payload && this.payload.context ? this.payload.context : null;
+                // Kept for legacy template bindings; alias of activeContext.
+                return this.activeContext;
+            },
+            activeSourceChapterTitle() {
+                return this.activeContext && this.activeContext.chapter_title
+                    ? this.activeContext.chapter_title
+                    : '';
             },
             tokens() {
-                if (this.context && Array.isArray(this.context.context_tokens) && this.context.context_tokens.length) {
-                    return this.context.context_tokens;
+                if (this.activeContext && Array.isArray(this.activeContext.context_tokens) && this.activeContext.context_tokens.length) {
+                    return this.activeContext.context_tokens;
                 }
 
                 if (this.card && Array.isArray(this.card.example_sentence_tokens)) {
@@ -113,36 +154,38 @@
                     return this.payload.error;
                 }
 
-                if (!this.context) {
+                if (!this.activeContext) {
                     return '未定位到原章节，以下为复习卡保存的例句。';
                 }
 
-                if (!this.context.source_available) {
-                    return this.context.fallback_message || '暂无可用原文位置。';
+                if (!this.activeContext.source_available) {
+                    return this.activeContext.fallback_message || '暂无可用原文位置。';
                 }
 
-                if (this.context.source_kind === 'chapter') {
-                    return '已定位到原文位置。';
+                if (this.activeContext.source_kind === 'chapter') {
+                    return this.sourceCount > 1
+                        ? '已定位到原文位置（来源 ' + (this.activeSourceIndex + 1) + ' / ' + this.sourceCount + '）。'
+                        : '已定位到原文位置。';
                 }
 
-                if (this.context.source_kind === 'chapter_recovered') {
+                if (this.activeContext.source_kind === 'chapter_recovered') {
                     return '已根据复习卡例句定位到原章节。';
                 }
 
-                if (this.context.source_kind === 'chapter_fuzzy') {
+                if (this.activeContext.source_kind === 'chapter_fuzzy') {
                     return '已根据复习卡例句模糊定位到原文位置。';
                 }
 
-                if (this.context.source_kind === 'chapter_fuzzy_title') {
+                if (this.activeContext.source_kind === 'chapter_fuzzy_title') {
                     return '已根据复习卡例句模糊定位到章节标题。';
                 }
 
-                if (this.context.source_kind === 'chapter_title') {
+                if (this.activeContext.source_kind === 'chapter_title') {
                     return '该例句来自章节标题。';
                 }
 
-                if (this.context.source_kind === 'card_example') {
-                    return this.context.fallback_message || '未找到原章节位置，以下为复习卡保存的例句。';
+                if (this.activeContext.source_kind === 'card_example') {
+                    return this.activeContext.fallback_message || '未找到原章节位置，以下为复习卡保存的例句。';
                 }
 
                 return '';
@@ -151,16 +194,33 @@
         watch: {
             value(newValue) {
                 if (newValue) {
+                    this.activeSourceIndex = 0;
                     this.autoScrolled = false;
                     this.$nextTick(() => {
                         this.scrollTargetIntoView();
                     });
                 }
             },
+            activeSourceIndex() {
+                this.autoScrolled = false;
+                this.$nextTick(() => {
+                    this.scrollTargetIntoView();
+                });
+            },
         },
         methods: {
             close() {
                 this.$emit('input', false);
+            },
+            prevSource() {
+                if (this.activeSourceIndex > 0) {
+                    this.activeSourceIndex--;
+                }
+            },
+            nextSource() {
+                if (this.activeSourceIndex < this.sourceCount - 1) {
+                    this.activeSourceIndex++;
+                }
             },
             scrollTargetIntoView() {
                 this.$nextTick(() => {
@@ -179,3 +239,9 @@
         },
     };
 </script>
+
+<style scoped>
+    .source-carousel-bar {
+        gap: 8px;
+    }
+</style>
