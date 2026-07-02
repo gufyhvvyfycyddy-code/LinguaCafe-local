@@ -39,6 +39,9 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 New rules and process notes are documented in:
 - `vibe-coding-collaboration-rules.md` §22 — 总设计师提示词前进度说明规则（每次给提示词前必须先说明当前进度）。
 - `vibe-coding-collaboration-rules.md` §23 — 三方架构侦查规则（网页端总设计师/CodeBuddy/OpenCode 三方分工）。
+- `vibe-coding-collaboration-rules.md` §24 — 进度条显示规则（100% 项隐藏、涨幅标注、样式）。
+- `vibe-coding-collaboration-rules.md` §25 — 计划审查规则（入任务前审查全部未满项）。
+- `vibe-coding-collaboration-rules.md` §26 — 模式选择规则（OpenCode 微任务 / Codex 目标模式）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
 
 ## 2.6 Frozen Plans (Route-Frozen, Not Implemented)
