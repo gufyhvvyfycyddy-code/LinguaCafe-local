@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (OpenCode-ArchitectureTargetMode-Batch1)
+> **最后更新**：2026-07-02 (OpenCode-AiStudyCardWorkflowPlan-And-Batch1DocFix-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -157,7 +157,9 @@
 | CodexWorkspaceArtifactCleanup-Followup-1 | 修正 master plan 头部日期为 followup 任务名；核查 `.codex/` 本地 artifact 并加入 `.gitignore`；更新 current-working-handoff 记录收口状态。不改业务代码，不改测试，不继续架构优化。 |
 | Codex-ArchitectureOptimizationLoop-1 | Codex 基于最新 master 做架构总审计增量，并选择第一轮低风险实现：新增 `TextBlockPhraseIndexingTest` 锁定 TextBlockService 剩余 phrase/index 行为（exact match、跨 NEWLINE、缺词不命中、phraseIndexes 映射、用户/语言隔离）。不改业务代码，不改 TextBlockService / ReaderDataService / Vue / Controller / DB schema，不完成全部架构优化。下一轮候选保留为 FSRS confirmAndApply safe write tests、SenseReview 完整写入 smoke、TextBlock tokenizer fallback 只读侦查。 |
 | Codex-ArchitectureFinalGoalMode-1 | Codex 面向 sense-only 最终架构目标做第二轮增量审计，并选择 FSRS confirmAndApply 拒绝写入路径作为本轮低风险 P1 安全护栏。新增 2 个 contract tests：`apply=true` 高风险未 `risk_confirm` 时不写 ReviewCard、不建 reschedule snapshot、不写 ReviewLog；blocked 超量时即使传 `risk_confirm` 也不写。只改测试和计划文档，不改 `FsrsReschedulePreviewService`、FSRS 算法、ReviewCard/ReviewLog/WordSense 业务语义，不执行真实重排。`php artisan test --filter=FsrsReschedule` 为 98 tests / 479 assertions 全绿。下一轮候选保留为 SenseReview 有数据页面 smoke、TextBlock tokenizer/fallback 只读侦查、ReviewCardManage logs payload serializer 边界。 |
-| OpenCode-ArchitectureTargetMode-Batch1 | 综合推进：SenseReview 页面真实验收（MCP Chrome 打开 `/reviews/senses`，确认到期 card 显示，执行 Good 评分，ReviewLog 创建，ReviewCard due_at/reps 正确更新）；TextBlockService tokenizer/fallback 只读侦查（fallbackEnglishTokenize 仍可被调用但无测试覆盖，ReaderDataService 边界清晰）；ReviewCardManage logs payload 只读侦查（20 条最近日志、user/language/card 三重过滤，字段已锁定）；后端测试全绿，前端构建通过。 |
+| OpenCode-ArchitectureTargetMode-Batch1 | 综合推进：SenseReview 到期卡真实验收（MCP Chrome 显示 + Good 评分 + ReviewLog 创建）；TextBlock fallback 只读侦查（fallbackEnglishTokenize 仍可被调用但无测试覆盖）；ReviewCardManage logs payload 只读侦查（20 条最近日志、user/language/card 三重过滤，字段已盘点，contract tests 待补）。阶段性完成，仍有缺口：pending occurrence 写入未跑通、TextBlock fallback 缺测试、logs payload 缺 contract tests。 |
+| AIStudyCardGenerationWorkflow-Plan | 产品目标冻结：AI 译文 ≠ AI 示意卡；用户选词优先（点击单词/拖动词组→手动添加释义→直接生成可复习卡）；用户可标记"待 AI 解释"词；AI 推荐词必须排除用户已选词；弹窗确认机制中 AI 推荐词默认不选，提供全选按钮；只有被用户确认后才生成示意卡。前端主入口不再展示"词义确认/词义复习"，统一为"复习"。当前不实现。后续实现前必须先做架构侦查，不改 DB schema，不删除现有 SenseMappingReview/SenseReview 能力，不删除旧 word card 兼容层。 |
+| OpenCode-AiStudyCardWorkflowPlan-And-Batch1DocFix-1 | 修正 Batch1 文档收口：current-working-handoff 补充 Batch1 阶段性完成状态、未完成缺口、产品决策（复习入口统一/AI 译文≠AI 示意卡/用户选词优先/AI 推荐词不重复/默认不选）。修正 master plan 和 hotspot audit 中"字段已锁定"的夸大表述。记录 AI 示意卡生成流程产品目标，冻结实现前不得直接改 DB schema、不得删除现有能力。不改业务代码，不改测试。 |
 
 ## 4. 未完成任务总表
 
