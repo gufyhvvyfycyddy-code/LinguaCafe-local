@@ -29,6 +29,13 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |
 
+## 2.5 Key Rule References
+
+New rules and process notes are documented in:
+- `vibe-coding-collaboration-rules.md` §22 — 总设计师提示词前进度说明规则（每次给提示词前必须先说明当前进度）。
+- `vibe-coding-collaboration-rules.md` §23 — 三方架构侦查规则（网页端总设计师/CodeBuddy/OpenCode 三方分工）。
+- `current-working-handoff.md` §7 — 当前主线进度估算。
+
 ## 3. Current ADRs
 
 | ADR | Status | Scope |
