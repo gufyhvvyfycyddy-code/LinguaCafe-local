@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (GLM-AIRecommendationConfirmationLoop-V4-1)
+> **最后更新**：2026-07-02 (OpenCode-ProductPrinciples-And-LegacyCleanupPlan-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -171,6 +171,7 @@
 | Codex-AIStudyCardV1-And-ReviewEntryUnification-1 | AI 示意卡第一版实现 + 前端复习入口统一第一轮。新增 pending 表/API/Service/Controller 和阅读页查词区「待 AI 解释」按钮（覆盖 `VocabularySideBox.vue` 与响应式 `VocabularyBox.vue`）；重复点击幂等；后端 tests 覆盖鉴权、用户/语言隔离、反向 contract（不写 WordSense/ReviewCard/ReviewLog/EncounteredWord）。首页「开始复习」和导航「复习」进入 `/reviews/senses`，旧 `/senses/review`、`/review-cards/manage`、`/review/false/-1/-1` 保留。进度更新：总体架构收口 100%、复习主线稳定 94%、页面真实验收 96%、AI 示意卡规划 90%、前端入口整理 92%。不调用 AI、不生成释义/复习卡、不改 FSRS、不改删除/归档/恢复、不删除 SenseReview/SenseMappingReview/legacy word 兼容。 |
 | GLM-AIStudyCardV2-GenerationLoop-1 | AI 示意卡 V2 生成闭环第一阶段。新增 `GET /ai-study-card/pending-items`（支持 chapter_id 过滤）、`POST dismiss`、`POST restore`；改造 `createOrGetPending` 支持 dismissed 恢复（恢复而非新建，避免重复行）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释列表面板、取消按钮、「生成 AI 示意卡」按钮、预览弹窗雏形（显示用户已选词 chips + AI 推荐词占位 + 安全说明 + 规则预览 + disabled 确认按钮）。新增 16 个 V2 feature tests（23 tests / 105 assertions 全绿）。MCP Chrome 真实页面验收 24 项全通过。新增 `docs/plans/ai-study-card-v2-generation-loop-plan.md`。进度更新：复习主线稳定 96%、页面真实验收 100%、AI 示意卡规划 100%、前端入口整理 98%；新增子阶段「AI 示意卡生成闭环」70%。**70% 是子阶段进度，非五条主线虚假上调。** 不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复、不删除 SenseReview/SenseMappingReview/legacy word 兼容。 |
 | GLM-AIStudyCardV3-SafePreviewPackage-1 | AI 示意卡 V3 安全生成包。扩展 `GET /ai-study-card/pending-items` 支持 `status=pending\|dismissed\|all` 过滤；新增 `POST /ai-study-card/pending-items/preview-package` 后端安全包接口（schema_version=ai-study-card-preview-package-v1，含 selected_items/generation_rules/safety_flags 4 条 no_ai_called/no_review_card_created/no_word_sense_created/no_fsrs_changed）；在 `VocabularySideBox.vue` / `VocabularyBox.vue` 新增待解释/已取消视图切换、已取消项恢复按钮、真实预览弹窗（用户已选词列表 + 来源句子 + 章节位置 + 数量 + 状态 + 安全说明 + 勾选取消 + 全不选禁用「准备生成」+ AI 推荐词占位区域 + 未来生成规则说明）、「准备生成」按钮触发后端安全包、JSON 展示与复制按钮（成功/失败 toast）。新增 14 个 V3 feature tests（37 tests / 184 assertions 全绿）。MCP Chrome 真实页面验收 28 项全通过。新增 `docs/plans/ai-study-card-v3-safe-preview-package-plan.md`。进度更新：前端入口整理 98%→100%；子阶段「AI 示意卡生成闭环」70%→95%；新增子阶段「AI 生成安全契约」0%→55%。**80% 是子阶段进度提升，非固定五条主线虚假上涨。** 不调用 AI、不生成 WordSense/ReviewCard/ReviewLog、不改 FSRS/删除归档恢复、不删除 SenseReview/SenseMappingReview/legacy word 兼容。 |
+| OpenCode-ProductPrinciples-And-LegacyCleanupPlan-1 | 写入 8 条产品核心原则（产品定位、旧版入口、Finished reading、AI 例句、熟词僻义、阅读中刷卡、多例句轮换、词形原型绑定）。新增 `docs/plans/product-principles-and-legacy-cleanup-plan.md`。只读侦查确认 Finished reading 合规（仅处理 EncounteredWord stage=2），记录旧版入口（旧词条释义显示）和 legacy target_type=word 兼容层状态。计划冲突检查未发现重大冲突。不可用 MCP Chrome（MySQL 未运行），基于代码侦查完成。不改业务代码、Vue、Controller、Service、routes、migration。 |
 
 ## 4. 未完成任务总表
 
