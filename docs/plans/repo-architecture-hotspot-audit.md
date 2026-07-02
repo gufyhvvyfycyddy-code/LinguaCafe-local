@@ -38,6 +38,7 @@
 | TextBlockService phrase/index characterization tests | ✅ 已完成 | `TextBlockPhraseIndexingTest` 锁定 phrase 命中、跨 NEWLINE 命中、缺词不命中、phraseIndexes 排序映射、用户/语言隔离；不改业务代码 |
 | FSRS confirmAndApply 拒绝写入安全测试 | ✅ 已完成 | `FsrsRescheduleConfirmTest` 新增 2 个 tests，锁定 `apply=true` 高风险未二次确认 / blocked 超量时不写 ReviewCard、不建 snapshot、不写 ReviewLog；不改业务代码 |
 | 文档入口治理 / 历史降权 | ✅ 已完成 | 新增 `DOCUMENTATION_INDEX` / `HISTORY_INDEX` / ADR-0002 / spec→harness 候选清单；旧 `NEXT_TASK`、`CURRENT_STATUS`、`FSRS_PHASE*`、旧 handoff 已标记为历史参考；不改业务代码 |
+| Spec-to-harness 第一轮硬化 | ✅ 已完成 | `TextBlockFallbackTokenizerTest` 锁定 fallback tokenizer 保守语义；`ReviewCardManageTest` 补 logs payload 精确字段/日期格式和同卡 user/language 过滤；不改业务代码 |
 
 ---
 
@@ -144,8 +145,8 @@
 
 | 候选 | 状态 | 为什么仍保留 |
 |---|---|---|
-| TextBlock fallback tests | 未实现 | `fallbackEnglishTokenize` 仍可调用，缺少直接 characterization tests |
-| ReviewCardManage logs contract tests | 未实现 | logs payload 字段、过滤和空状态仍只有侦查记录 |
+| TextBlock fallback tests | 已实现 | 最小测试缺口已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；后续只在要拆 tokenizer 服务时再扩展 |
+| ReviewCardManage logs contract tests | 已实现 | 最小 payload/filter contract tests 已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；后续只在要抽 serializer/service 时再扩展 |
 | SenseReview occurrence / FullMenu MCP Chrome smoke | 未实现 | 有数据页面写入流程仍需要真实浏览器验收 |
 | AIStudyCard scaffolding | 未实现 | 已有产品边界和 ADR，但实现前仍需架构侦查，不能写死 DB/API |
 
@@ -154,6 +155,26 @@
 - 本轮降低的是 AI 上下文误读风险，不是完成全部架构优化。
 - 不改变 `TextBlockService`、`ReviewCardManageController`、`SenseReview`、FSRS、WordSense 或 AI study card 代码。
 - 不把 AI 示意卡写成已实现；只把已拍板边界抽为 ADR，后续实现仍需独立任务和页面验收。
+
+## 2.4 Codex-SpecToHarnessHardeningTargetMode-1 增量审计（2026-07-02）
+
+> **性质**：把已记录的软规则转为第一轮低风险测试护栏；不做业务实现，不做架构重构。
+
+### 本轮选择
+
+| 软规则 | 文件 | 本轮硬化 | 边界 |
+|---|---|---|---|
+| TextBlock fallback tokenizer 不应静默漂移 | `tests/Unit/TextBlockFallbackTokenizerTest.php` | 新增 3 个 tests：保守 lemma/irregular table、安全标记+数字+标点、空文本异常 | 不改 `TextBlockService`，不改 tokenizer/import/ReaderDataService 语义 |
+| ReviewCardManage logs payload 稳定 | `tests/Feature/ReviewCardManageTest.php` | 新增 2 个 tests：精确字段顺序+ISO 日期格式、同一 review_card_id 下仍按 user/language 过滤 | 不改 `ReviewCardManageController`，不改 response 结构 |
+
+### 本轮暂缓
+
+| 候选 | 暂缓原因 |
+|---|---|
+| SenseReview FullMenu / occurrence 写入 smoke | 必须用 MCP Chrome、真实页面和 marker test data；应作为独立页面 smoke 任务 |
+| Legacy word card mainline guard | `ReviewFsrsTest` 已有 sense-only queue / word-card exclusion 覆盖；暂不重复 |
+| ReviewLog preservation | `ReviewCardManageTest` 和 `WordSenseDestroyRestoreTest` 已覆盖默认保留语义；暂不重复 |
+| AI study card future harness | 当前只有 ADR/产品边界，没有实现/schema/API；实现前只能做架构侦查 |
 
 ## 3. 全仓库热点总览
 

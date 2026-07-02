@@ -3532,6 +3532,123 @@ class ReviewCardManageTest extends TestCase
         }
     }
 
+    public function test_logs_payload_contract_uses_exact_fields_and_iso_dates(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'payloadContract']);
+        $card = $this->createSenseCard($sense);
+
+        $reviewedAt = \Carbon\Carbon::parse('2026-01-02 03:04:05', 'UTC');
+        $previousDueAt = \Carbon\Carbon::parse('2026-01-03 04:05:06', 'UTC');
+        $newDueAt = \Carbon\Carbon::parse('2026-01-04 05:06:07', 'UTC');
+
+        $log = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'easy',
+            'source' => 'review',
+            'reviewed_at' => $reviewedAt,
+            'previous_state' => 'learning',
+            'new_state' => 'review',
+            'previous_due_at' => $previousDueAt,
+            'new_due_at' => $newDueAt,
+            'previous_stability' => 1.25,
+            'new_stability' => 2.5,
+            'previous_difficulty' => 6.75,
+            'new_difficulty' => 5.5,
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $card->id . '/logs');
+        $response->assertOk();
+
+        $item = $response->json('items.0');
+        $this->assertSame([
+            'id',
+            'rating',
+            'source',
+            'reviewed_at',
+            'previous_state',
+            'new_state',
+            'previous_due_at',
+            'new_due_at',
+            'previous_stability',
+            'new_stability',
+            'previous_difficulty',
+            'new_difficulty',
+        ], array_keys($item));
+        $this->assertSame($log->id, $item['id']);
+        $this->assertSame('easy', $item['rating']);
+        $this->assertSame('review', $item['source']);
+        $this->assertSame($reviewedAt->toISOString(), $item['reviewed_at']);
+        $this->assertSame('learning', $item['previous_state']);
+        $this->assertSame('review', $item['new_state']);
+        $this->assertSame($previousDueAt->toISOString(), $item['previous_due_at']);
+        $this->assertSame($newDueAt->toISOString(), $item['new_due_at']);
+        $this->assertEqualsWithDelta(1.25, $item['previous_stability'], 0.001);
+        $this->assertEqualsWithDelta(2.5, $item['new_stability'], 0.001);
+        $this->assertEqualsWithDelta(6.75, $item['previous_difficulty'], 0.001);
+        $this->assertEqualsWithDelta(5.5, $item['new_difficulty'], 0.001);
+    }
+
+    public function test_logs_filters_review_logs_by_user_and_language_even_for_same_card(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'sameCardScope']);
+        $card = $this->createSenseCard($sense);
+
+        $validLog = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'source' => 'review',
+            'reviewed_at' => now(),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 1.0,
+            'previous_difficulty' => null,
+            'new_difficulty' => 5.0,
+        ]);
+
+        ReviewLog::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'language_id' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'again',
+            'source' => 'review',
+            'reviewed_at' => now()->addMinute(),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 1.0,
+            'previous_difficulty' => null,
+            'new_difficulty' => 5.0,
+        ]);
+
+        ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'spanish',
+            'review_card_id' => $card->id,
+            'rating' => 'easy',
+            'source' => 'review',
+            'reviewed_at' => now()->addMinutes(2),
+            'previous_state' => 'new',
+            'new_state' => 'learning',
+            'previous_stability' => null,
+            'new_stability' => 1.0,
+            'previous_difficulty' => null,
+            'new_difficulty' => 5.0,
+        ]);
+
+        $response = $this->actingAs($this->user)->get('/review-cards/manage/' . $card->id . '/logs');
+        $response->assertOk();
+
+        $items = $response->json('items');
+        $this->assertCount(1, $items);
+        $this->assertSame($validLog->id, $items[0]['id']);
+        $this->assertSame('good', $items[0]['rating']);
+    }
+
     public function test_logs_limits_to_20(): void
     {
         $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'limitTest']);

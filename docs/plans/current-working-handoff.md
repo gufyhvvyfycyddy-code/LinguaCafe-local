@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-02 (Codex-ProjectDocsGovernanceTargetMode-1)
+> **最后更新**：2026-07-02 (Codex-SpecToHarnessHardeningTargetMode-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -27,6 +27,7 @@
 | Codex-ArchitectureOptimizationLoop-1 | Codex 增量架构总审计；新增 5 个 TextBlock phrase/index characterization tests；更新 master plan / hotspot audit / 当前工作台 |
 | Codex-ArchitectureFinalGoalMode-1 | Codex 面向 sense-only 最终架构目标做增量审计；补 2 个 FSRS confirmAndApply 拒绝写入 contract tests；更新 master plan / hotspot audit / 当前工作台 |
 | OpenCode-ArchitectureTargetMode-Batch1 | 综合推进：SenseReview 到期卡真实显示并评分（MCP Chrome）、TextBlock fallback 只读侦查、ReviewCardManage logs payload 只读侦查。阶段性完成，仍有缺口：pending occurrence 写入未跑通、current-working-handoff 上轮漏更新、TextBlock fallback 缺测试、logs payload 缺 contract tests。 |
+| Codex-SpecToHarnessHardeningTargetMode-1 | 将两个软规则转成测试护栏：新增 TextBlock fallback tokenizer 单元测试；补 ReviewCardManage logs payload 精确字段/日期格式与同卡 user/language 过滤 contract tests；不改业务代码。 |
 
 ## 3. 当前未最终关闭的事项
 
@@ -34,8 +35,8 @@
 
 - **OpenCode-ArchitectureTargetMode-Batch1 剩余缺口**：
   - pending occurrence 写入未真实跑通（数据准备问题，非代码 bug）；
-  - TextBlock fallback 仍缺测试；
-  - ReviewCardManage logs payload 仍缺 contract tests；
+  - TextBlock fallback 最小测试缺口已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；
+  - ReviewCardManage logs payload 最小 contract tests 已由 Codex-SpecToHarnessHardeningTargetMode-1 关闭；
   - SenseReview FullMenu / occurrence 写入路径仍建议后续 MCP Chrome smoke。
 - **Codex-ProjectDocsGovernanceTargetMode-1**：
   - 本轮只做文档治理，不改业务代码和测试；
@@ -96,12 +97,14 @@
 
 ### E. TextBlockService-TokenizerFallbackScouting-1
 
-- 补 TextBlockService fallbackEnglishTokenize 路径的测试缺口；
+- 最小 contract tests 已在 Codex-SpecToHarnessHardeningTargetMode-1 中补充；
+- 已覆盖保守 lemma、irregular table、安全标记、数字/标点、空文本异常；
 - 不改 tokenizer 算法，不改 ReaderDataService，不改 import 语义。
 
 ### F. ReviewCardManage-LogsContractTests-1
 
-- 补 logs endpoint 的 contract tests：user/language/card 三重过滤、字段结构、空状态；
+- 最小 contract tests 已在 Codex-SpecToHarnessHardeningTargetMode-1 中补充；
+- 已覆盖精确 payload 字段、日期格式、同卡脏数据的 user/language 过滤；既有测试已覆盖排序、limit、空状态、跨卡隔离、legacy/rejected 拒绝；
 - 不改 response 结构，不改 Controller。
 
 ### G. SenseReview-FullMenuSmoke-1
