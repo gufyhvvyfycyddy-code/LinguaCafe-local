@@ -31,3 +31,7 @@ yarn-error.log
 
 # OpenCode runtime data (not tracked, per AGENTS.md)
 .omo/
+
+# Local Codex / session artifacts
+/data/
+/CODEX_SESSION_DIAGNOSIS.txt

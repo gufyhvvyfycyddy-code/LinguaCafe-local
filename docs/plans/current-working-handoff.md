@@ -33,6 +33,9 @@
   - 已选择第一轮低风险实现：只新增 TextBlock phrase/index characterization tests；
   - 不改业务代码，不改 Vue，不改数据库，不改变 import / FSRS / WordSense 语义；
   - 只有当本轮 commit 成功 push 后，本文记录才算 GitHub 已同步。
+- **Codex-ArchitectureOptimizationLoop-1 后续清理**：
+  - Codex 执行后遗留了本地 `data/` 和 `CODEX_SESSION_DIAGNOSIS.txt` artifact；
+  - 已通过 `CodexWorkspaceArtifactCleanup-1` 删除并添加最小 `.gitignore` 保护，防止后续 agent 误提交。
 - **旧交接文档**：
   - `docs/CODEX_HANDOFF.md`（2026-06-23）是旧交接文档，记录了 tokenizer 根治阶段的工作；
   - `docs/handovers/2026-06-24-c12-c-handoff.md`（2026-06-24）是 C.12-c 任务交接文档；
