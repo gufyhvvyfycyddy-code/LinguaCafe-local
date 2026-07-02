@@ -472,6 +472,75 @@ class FsrsRescheduleConfirmTest extends TestCase
         $response->assertJsonPath('write_enabled', true);
     }
 
+    public function test_confirm_apply_true_high_risk_without_risk_confirm_does_not_write(): void
+    {
+        $this->injectThresholdService(0, 10);
+        $cards = [];
+        for ($i = 0; $i < 3; $i++) {
+            $sense = $this->createSense("high_apply_{$i}", "高风险_{$i}", "high_apply_{$i}");
+            $card = $this->createSenseCard($sense, [
+                'fsrs_due_at' => now()->addDays(30),
+                'fsrs_stability' => 0.5,
+                'fsrs_difficulty' => 5.0,
+                'fsrs_last_reviewed_at' => now()->subDays(60),
+            ]);
+            $this->addReviewLog($card);
+            $cards[] = $card;
+        }
+
+        $originals = $this->snapshotCardFields($cards);
+        $reviewLogCount = ReviewLog::count();
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $previewResponse->assertOk();
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => true,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath('risk_level', 'high');
+        $response->assertJsonPath('requires_risk_confirm', true);
+        $response->assertJsonPath('write_enabled', false);
+        $this->assertCardsMatchSnapshot($cards, $originals);
+        $this->assertEquals($reviewLogCount, ReviewLog::count());
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
+    }
+
+    public function test_confirm_apply_true_blocked_risk_does_not_write(): void
+    {
+        $this->injectThresholdService(10, 1);
+        $cards = [
+            $this->createEligibleReviewCard('blocked_apply_1'),
+            $this->createEligibleReviewCard('blocked_apply_2'),
+        ];
+        $originals = $this->snapshotCardFields($cards);
+        $reviewLogCount = ReviewLog::count();
+
+        $previewResponse = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-preview');
+        $previewResponse->assertOk();
+        $hash = $previewResponse->json('preview_hash');
+
+        $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => $hash,
+            'confirm' => true,
+            'apply' => true,
+            'risk_confirm' => true,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $response->assertJsonPath('risk_level', 'blocked');
+        $response->assertJsonPath('requires_risk_confirm', false);
+        $this->assertCardsMatchSnapshot($cards, $originals);
+        $this->assertEquals($reviewLogCount, ReviewLog::count());
+        $this->assertEquals(0, \App\Models\RescheduleSnapshot::count());
+    }
+
     public function test_confirm_apply_false_still_does_not_write(): void
     {
         $this->injectThresholdService(10, 10);
@@ -743,5 +812,35 @@ class FsrsRescheduleConfirmTest extends TestCase
         $this->addReviewLog($card);
 
         return $card;
+    }
+
+    private function snapshotCardFields(array $cards): array
+    {
+        $snapshot = [];
+        foreach ($cards as $card) {
+            $snapshot[$card->id] = [
+                'fsrs_due_at' => $card->fsrs_due_at?->toIso8601String(),
+                'fsrs_stability' => $card->fsrs_stability,
+                'fsrs_difficulty' => $card->fsrs_difficulty,
+                'fsrs_reps' => $card->fsrs_reps,
+                'fsrs_lapses' => $card->fsrs_lapses,
+                'fsrs_last_reviewed_at' => $card->fsrs_last_reviewed_at?->toIso8601String(),
+            ];
+        }
+
+        return $snapshot;
+    }
+
+    private function assertCardsMatchSnapshot(array $cards, array $snapshot): void
+    {
+        foreach ($cards as $card) {
+            $card->refresh();
+            $this->assertEquals($snapshot[$card->id]['fsrs_due_at'], $card->fsrs_due_at?->toIso8601String());
+            $this->assertEquals($snapshot[$card->id]['fsrs_stability'], $card->fsrs_stability);
+            $this->assertEquals($snapshot[$card->id]['fsrs_difficulty'], $card->fsrs_difficulty);
+            $this->assertEquals($snapshot[$card->id]['fsrs_reps'], $card->fsrs_reps);
+            $this->assertEquals($snapshot[$card->id]['fsrs_lapses'], $card->fsrs_lapses);
+            $this->assertEquals($snapshot[$card->id]['fsrs_last_reviewed_at'], $card->fsrs_last_reviewed_at?->toIso8601String());
+        }
     }
 }

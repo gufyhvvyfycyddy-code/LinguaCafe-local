@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-02 (CodexWorkspaceArtifactCleanup-Followup-1)
+> **最后更新**：2026-07-02 (Codex-ArchitectureFinalGoalMode-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 
@@ -156,6 +156,7 @@
 | CodexWorkspaceArtifactCleanup-1 | 清理 Codex-ArchitectureOptimizationLoop-1 后遗留的本地 `data/` 和 `CODEX_SESSION_DIAGNOSIS.txt` artifact（Codex/session 工具产物）。添加最小 `.gitignore` 规则 `/data/` 和 `/CODEX_SESSION_DIAGNOSIS.txt` 防止后续 agent 误提交。不改业务代码，不改测试语义，不继续架构优化。 |
 | CodexWorkspaceArtifactCleanup-Followup-1 | 修正 master plan 头部日期为 followup 任务名；核查 `.codex/` 本地 artifact 并加入 `.gitignore`；更新 current-working-handoff 记录收口状态。不改业务代码，不改测试，不继续架构优化。 |
 | Codex-ArchitectureOptimizationLoop-1 | Codex 基于最新 master 做架构总审计增量，并选择第一轮低风险实现：新增 `TextBlockPhraseIndexingTest` 锁定 TextBlockService 剩余 phrase/index 行为（exact match、跨 NEWLINE、缺词不命中、phraseIndexes 映射、用户/语言隔离）。不改业务代码，不改 TextBlockService / ReaderDataService / Vue / Controller / DB schema，不完成全部架构优化。下一轮候选保留为 FSRS confirmAndApply safe write tests、SenseReview 完整写入 smoke、TextBlock tokenizer fallback 只读侦查。 |
+| Codex-ArchitectureFinalGoalMode-1 | Codex 面向 sense-only 最终架构目标做第二轮增量审计，并选择 FSRS confirmAndApply 拒绝写入路径作为本轮低风险 P1 安全护栏。新增 2 个 contract tests：`apply=true` 高风险未 `risk_confirm` 时不写 ReviewCard、不建 reschedule snapshot、不写 ReviewLog；blocked 超量时即使传 `risk_confirm` 也不写。只改测试和计划文档，不改 `FsrsReschedulePreviewService`、FSRS 算法、ReviewCard/ReviewLog/WordSense 业务语义，不执行真实重排。`php artisan test --filter=FsrsReschedule` 为 98 tests / 479 assertions 全绿。下一轮候选保留为 SenseReview 有数据页面 smoke、TextBlock tokenizer/fallback 只读侦查、ReviewCardManage logs payload serializer 边界。 |
 
 ---
 

@@ -36,6 +36,7 @@
 | 协作规则体系 | ✅ 已完成 | WorkBuddy 单专家、复杂度 100、oh-my-opencode-slim 必用、设计师自动推进 |
 | destroy 单卡核心语义 | ❌ 不建议改 | 核心在 `WordSenseService::removeSenseFromReviewSystem()` |
 | TextBlockService phrase/index characterization tests | ✅ 已完成 | `TextBlockPhraseIndexingTest` 锁定 phrase 命中、跨 NEWLINE 命中、缺词不命中、phraseIndexes 排序映射、用户/语言隔离；不改业务代码 |
+| FSRS confirmAndApply 拒绝写入安全测试 | ✅ 已完成 | `FsrsRescheduleConfirmTest` 新增 2 个 tests，锁定 `apply=true` 高风险未二次确认 / blocked 超量时不写 ReviewCard、不建 snapshot、不写 ReviewLog；不改业务代码 |
 
 ---
 
@@ -81,6 +82,48 @@
 - 锁定 `ReaderDataService` 路径下 `TextBlockService::indexPhrases()` 的 phrase id → phraseIndexes 映射和用户/语言隔离。
 - 不改 `TextBlockService.php`、`ReaderDataService.php`、Vue、Controller、数据库结构、权限、FSRS、WordSense 删除语义。
 - 下一轮建议优先在以下三者中选一项：`FsrsRescheduleConfirmApply-SafeWriteContractTests-1`、`SenseReview-FullWriteSmoke-1`、`TextBlockService-TokenizerFallbackScouting-1`。
+
+## 2.2 Codex-ArchitectureFinalGoalMode-1 增量审计（2026-07-02）
+
+> **基准 commit**：`daa2e6f docs: finalize Codex artifact cleanup`
+> **性质**：面向 sense-only 最终架构目标的第二轮增量优化。不是完成全部架构优化。
+
+### P0：数据安全或用户状态风险
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| 本轮未发现新的 P0 | — | — | — | 否 | 当前高危写入仍集中在 FSRS apply、WordSense 删除/归档、import；本轮只补拒绝写入路径测试，不改变任何写入语义 |
+
+### P1：高收益、低风险、测试可覆盖的架构优化
+
+| 问题 | 文件 | 用户影响 | 为什么是架构问题 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|---|
+| FSRS confirmAndApply 高风险拒绝路径缺少明确“不写”断言 | `app/Services/FsrsReschedulePreviewService.php`、`tests/Feature/FsrsRescheduleConfirmTest.php` | 若未来改动误让高风险未二次确认或 blocked 超量路径写入，会批量改动 sense review card 到期时间，影响日常复习队列 | confirmAndApply 是 sense-only 复习系统里最大批量写入口之一；拒绝路径必须和成功写入路径一样有 contract tests | 新增 `test_confirm_apply_true_high_risk_without_risk_confirm_does_not_write` 和 `test_confirm_apply_true_blocked_risk_does_not_write`，锁定 ReviewCard 字段、ReviewLog count、RescheduleSnapshot count | 是 | 只加强测试，不改 Service；直接推进“FSRS 只服务真实 sense card，legacy word card 不回主线”的安全边界 |
+| TextBlockService 旧 ReaderDataService fallback 分支仍待确认是否可删除 | `app/Services/TextBlockService.php` | 暂无直接用户影响，但继续保留会增加 reader 数据链路理解成本 | ReaderDataService 已抽出，旧分支可能成为未来 agent 误改点 | ReaderDataService tests + TextBlockPhraseIndexingTest | 否 | 需要单独只读确认调用路径；删除兼容分支可能触及阅读页核心契约 |
+| ReviewCardManageController `logs()` payload 仍在 Controller 内 | `app/Http/Controllers/ReviewCardManageController.php` | 管理页复习历史抽屉字段若漂移会影响用户追溯 ReviewLog | 查询/导出/行序列化已抽 Service，logs payload 仍是未收敛边界 | ReviewCardManageTest logs 相关断言 | 否 | 与本轮 FSRS 写入测试无关；建议后续单独抽 serializer/service 或先补 payload contract |
+
+### P2：可做但不急的结构清理
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| SenseReview 有卡片 / pending occurrence 页面流程仍缺完整 MCP Chrome 写入 smoke | `resources/js/components/Senses/SenseReview.vue`、`resources/js/components/Senses/SenseMappingReview.vue` | 评分、确认、拒绝、忽略、改绑、新建是 sense-only 用户主流程 | 后端 Feature tests + 空状态 smoke | 否 | 需要真实页面账号/数据准备；本轮未改 Vue，不做 API 代替页面验收 |
+| VocabularyService 查询/导入/导出职责仍宽 | `app/Services/VocabularyService.php` | 搜索、CSV 导出、导入后处理可能互相影响 | VocabularySearchTest / DictionaryImport tests | 否 | 需要单独拆分计划；不是本轮最高风险写入 |
+
+### 暂缓：风险大、需要产品决策或页面验收成本高
+
+| 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
+|---|---|---|---|---|---|
+| FSRS confirmAndApply 写入语义调整、stale candidate 事务 hook、appliedCount=0 snapshot 语义 | `app/Services/FsrsReschedulePreviewService.php` | 可能改变大量 ReviewCard 到期时间或撤销语义 | FsrsReschedule 系列 98 tests | 否 | 会改变或重新定义写入语义，需要单独侦查和产品确认；本轮只锁定拒绝路径不写 |
+| WordSense 删除 / 归档 / 恢复语义调整 | `app/Services/WordSenseService.php`、相关 controllers | 可能影响 ReviewCard、ReviewLog、Occurrence、EncounteredWord | WordSenseDestroyRestoreTest / ReviewCardManageTest | 否 | 产品语义已做取舍，本轮不改删除/归档/恢复 |
+| TextBlockGroup.vue 组件拆分 | `resources/js/components/Text/TextBlockGroup.vue` | 阅读页点词、hover、查词侧栏均受影响 | TextBlockGroup smoke baseline | 否 | 高价值但需要页面验收；不适合与 FSRS 后端测试同轮混做 |
+
+### 本轮实际落地
+
+- 修改 `tests/Feature/FsrsRescheduleConfirmTest.php`，新增 2 个 confirmAndApply 拒绝写入 contract tests。
+- 高风险未 `risk_confirm`：断言 HTTP 422、`risk_level=high`、`write_enabled=false`，并确认 ReviewCard 字段、ReviewLog、RescheduleSnapshot 均未变化。
+- blocked 超量：断言 HTTP 422、`risk_level=blocked`、`requires_risk_confirm=false`，即使传 `risk_confirm=true` 也不写 ReviewCard、不建 snapshot、不写 ReviewLog。
+- 不改 `FsrsReschedulePreviewService.php`、`FsrsSchedulingService.php`、`ReviewCardService.php`、Vue、Controller、数据库结构、FSRS 参数算法、ReviewLog 保留语义。
+- 下一轮建议优先在以下三者中选一项：`SenseReview-FullWriteSmoke-1`、`TextBlockService-TokenizerFallbackScouting-1`、`ReviewCardManage-LogsPayloadBoundary-1`。
 
 ## 3. 全仓库热点总览
 
@@ -458,7 +501,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 **关键发现**：
 1. **preview 已充分测试**（31 tests）：覆盖 candidate 排除条件、hash 稳定性、只读保证、20 samples cap、non-english 语言
 2. **confirmPreflight 已基本覆盖**（18 tests）：hash 过期/409、missing hash/422、confirm=false/422、non-english、threshold 拦截、只读保证
-3. **confirmAndApply 测试存在但依赖 fsrs-rs-php 扩展**：apply 路径测试仅在 extension 可用时运行（跳过标记 `2 skipped`）
+3. **confirmAndApply 测试已覆盖成功写入与部分拒绝写入路径**：当前本地 `FsrsReschedule` 过滤器为 98 tests / 479 assertions 全绿；仍不把成功写入语义改成新产品决策
 4. **高风险写操作**：事务内 lockForUpdate 后写 `fsrs_due_at/stability/difficulty`，不写 ReviewLog/reps/lapses/last_reviewed_at
 5. **snapshot 链路完整**：appliedCount > 0 时创建 snapshot（含之前/之后的 due_at/stability/difficulty）
 6. **candidateIds 来自 preview data**，apply 时重新校验但不重新查询数据库，存在 stale candidate 风险
@@ -468,10 +511,11 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - **中**：skipped_count 不一致、write_enabled 命名误导、preview 和 apply 之间 FSRS params 变化时仅校验 hash
 - **低**：days_change 符号代码冗余、newly_due_today 不覆盖降低今日负荷场景
 
-**缺口测试已补强**：FsrsReschedulePreviewService-GapContractTests-1 — 在已有 51 个测试基础上新增 5 个 preview + 5 个 confirmPreflight 缺口测试。覆盖 empty candidate hash、stability/difficulty hash 敏感度、语言隔离、confirmPreflight apply=false high/blocked/不写 snapshot/risk_confirm 忽略。confirmAndApply 成功写入路径仍暂缓。
+**缺口测试已补强**：FsrsReschedulePreviewService-GapContractTests-1 — 在已有 51 个测试基础上新增 5 个 preview + 5 个 confirmPreflight 缺口测试。覆盖 empty candidate hash、stability/difficulty hash 敏感度、语言隔离、confirmPreflight apply=false high/blocked/不写 snapshot/risk_confirm 忽略。
 **缺口测试 Scope Fix 已收口**：FsrsRescheduleGapContractTests-ScopeFix-1 — 将越界写入 `FsrsRescheduleSnapshotTest.php` 的两个测试移回其职责边界内（语义已在 ConfirmTest 中有等价覆盖）。总测试语义不减少，65 测试全绿。无业务逻辑变更。
+**拒绝写入路径已补强**：Codex-ArchitectureFinalGoalMode-1 — 新增 2 个 confirmAndApply contract tests，锁定 `apply=true` 高风险未二次确认与 blocked 超量两类场景均不写 ReviewCard、不建 snapshot、不写 ReviewLog。不改业务代码，不执行真实重排。
 
-**下一个候选**：**候选 5b（FsrsRescheduleConfirmApply-SafeWriteContractTests-1）** — 如果决策进入 confirmAndApply 写入测试，先补安全契约。或候选 6（TextBlockService createNewEncounteredWords 提取）。
+**剩余候选**：如果继续 FSRS 方向，先只读侦查 stale candidate、FSRS params 变化、appliedCount=0 snapshot 等剩余边界；不要直接改写入语义。
 
 ### 7.3 FsrsReschedulePreviewService 风险清单
 

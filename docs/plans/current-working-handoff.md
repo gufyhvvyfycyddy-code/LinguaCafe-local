@@ -7,7 +7,7 @@
 
 ## 1. 当前阶段一句话
 
-处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、TextBlock encountered_words 提取线、TextBlock phrase/index characterization tests、WordSense 删除/归档测试线、删除成功提示文案收口。下一阶段仍需由网页端总设计师选择，不自动进入下一任务。
+处于 Post-Stabilization 架构收口阶段，已完成 FSRS preview/confirmPreflight 测试线、FSRS confirmAndApply 拒绝写入安全护栏、TextBlock encountered_words 提取线、TextBlock phrase/index characterization tests、WordSense 删除/归档测试线、删除成功提示文案收口。下一阶段仍需由网页端总设计师选择，不自动进入下一任务。
 
 ## 2. 最近已完成任务
 
@@ -23,6 +23,7 @@
 | WordSenseService-DestroyRestoreContractTests-1 | 15 个 contract tests 锁定归档/删除/恢复语义 |
 | ReviewCardDeleteSnackbar-HistoryPreservedCopy-1 | 补管理页删除成功 snackbar/fallback 文案，MCP Chrome 验收 |
 | Codex-ArchitectureOptimizationLoop-1 | Codex 增量架构总审计；新增 5 个 TextBlock phrase/index characterization tests；更新 master plan / hotspot audit / 当前工作台 |
+| Codex-ArchitectureFinalGoalMode-1 | Codex 面向 sense-only 最终架构目标做增量审计；补 2 个 FSRS confirmAndApply 拒绝写入 contract tests；更新 master plan / hotspot audit / 当前工作台 |
 
 ## 3. 当前未最终关闭的事项
 
@@ -41,6 +42,10 @@
   - 核查 `.codex/` — 确认其为 Codex/session 本地 artifact（含 agent .toml 文件），已加入 `.gitignore`；
   - 更新 current-working-handoff 记录收口状态；
   - 不改业务代码，不改测试，不继续架构优化。
+- **Codex-ArchitectureFinalGoalMode-1**（本轮）：
+  - 已选择本轮低风险 P1：只补 FSRS confirmAndApply 拒绝写入安全测试；
+  - 不改 FSRS 算法，不改 `FsrsReschedulePreviewService`，不执行真实重排，不改 ReviewCard / ReviewLog / WordSense 语义；
+  - 只有当本轮 commit 成功 push 后，本文记录才算 GitHub 已同步。
 - **旧交接文档**：
   - `docs/CODEX_HANDOFF.md`（2026-06-23）是旧交接文档，记录了 tokenizer 根治阶段的工作；
   - `docs/handovers/2026-06-24-c12-c-handoff.md`（2026-06-24）是 C.12-c 任务交接文档；
@@ -71,9 +76,9 @@
 
 ### B. FsrsRescheduleConfirmApply-SafeWriteContractTests-1
 
-- 高风险 FSRS 写入链路 contract tests；
-- 只补 safe write tests，暂不做产品 UI；
-- 应先参考 FsrsReschedulePreviewService-ContractScouting-1 的风险清单 (§7.3)。
+- 拒绝写入路径的最小 contract tests 已在 Codex-ArchitectureFinalGoalMode-1 中补充；
+- 已锁定 `apply=true` 高风险未二次确认、blocked 超量两类场景均不写 ReviewCard、不建 snapshot、不写 ReviewLog；
+- 后续若继续该方向，建议只读侦查 stale candidate / params 变化 / snapshot appliedCount=0 等剩余边界，不直接改 FSRS 语义。
 
 ### C. ReviewCardDeleteSnackbar-FullMenuSmoke-1
 
