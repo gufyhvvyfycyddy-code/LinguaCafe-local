@@ -80,9 +80,10 @@ class ReadingInlineSenseConfirmationService
             $chapter = Chapter::query()
                 ->where('id', $chapterId)
                 ->where('user_id', $userId)
+                ->where('language', $language)
                 ->first();
             if ($chapter === null) {
-                throw new \DomainException('Chapter not found for current user.');
+                throw new \DomainException('Chapter not found for current user/language.');
             }
         }
 

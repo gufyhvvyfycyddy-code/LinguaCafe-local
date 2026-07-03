@@ -298,6 +298,29 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         $this->assertSame(0, ReadingInlineSenseConfirmation::count());
     }
 
+    // ==================== 9b. Chapter language mismatch (same user, wrong language) ====================
+
+    public function test_chapter_language_mismatch_is_rejected(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        // Chapter belongs to the current user BUT has a different language.
+        $spanishChapter = $this->createChapter($this->user->id, 'spanish');
+
+        $response = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose',
+            'surface' => 'geese',
+            'language' => 'english',
+            'chapter_id' => $spanishChapter->id,
+            'sentence_index' => 0,
+            'word_sense_id' => $sense->id,
+            'choice' => 'match',
+        ]);
+
+        $response->assertStatus(500);
+        $this->assertStringContainsString('Chapter not found for current user/language.', $response->json('message') ?? '');
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count());
+    }
+
     // ==================== 10. Invalid choice is rejected ====================
 
     public function test_invalid_choice_is_rejected(): void
@@ -537,7 +560,7 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         return $sense->fresh();
     }
 
-    private function createChapter(int $userId): Chapter
+    private function createChapter(int $userId, string $language = 'english'): Chapter
     {
         return Chapter::forceCreate([
             'user_id' => $userId,
@@ -545,7 +568,7 @@ class ReadingInlineSenseConfirmationTest extends TestCase
             'name' => 'test-chapter-' . Str::random(6),
             'read_count' => 0,
             'word_count' => 0,
-            'language' => 'english',
+            'language' => $language,
             'raw_text' => '',
             'unique_words' => '[]',
             'unique_word_ids' => '[]',
