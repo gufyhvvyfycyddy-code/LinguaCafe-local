@@ -246,6 +246,286 @@ class WordSenseExamplePoolTest extends TestCase
         $this->assertNull($serialized['supplementary_example'], 'supplementary must be null when only 1 candidate');
     }
 
+    // ==================== GLM-ArchitectureFirst1000-SafeStability-1 edge cases ====================
+
+    public function test_pool_returns_empty_when_no_occurrences_and_no_card_example(): void
+    {
+        // Sub-stage 5 edge case: completely empty — no occurrences, no card
+        // example sentence. Should return [] (not throw).
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertSame([], $candidates, 'empty pool must return []');
+    }
+
+    public function test_pool_excludes_occurrences_from_other_user(): void
+    {
+        // Sub-stage 5 edge case: WordSenseOccurrence rows belonging to a
+        // different user must not appear in this user's pool even if they
+        // share the same word_sense_id (defensive — should never happen
+        // in practice, but the query must still guard).
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapter = $this->createTestChapter([], ['name' => 'Chapter A']);
+        $this->createOccurrence($sense, $chapter, 'My own sentence.');
+
+        // Other user's occurrence bound to the same sense id
+        $otherUser = $this->createUser('pool-other@example.com', 'english');
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $otherUser->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '1',
+            'sentence_en' => 'Other user sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertNotContains('Other user sentence.', $sentences, 'other user occurrences must be excluded');
+        $this->assertContains('My own sentence.', $sentences);
+        $this->assertCount(1, $candidates);
+    }
+
+    public function test_pool_excludes_occurrences_from_other_language(): void
+    {
+        // Sub-stage 5 edge case: language isolation. Even with the same
+        // word_sense_id, occurrences tagged with a different language_id
+        // must not appear.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapter = $this->createTestChapter([], ['name' => 'Chapter A']);
+        $this->createOccurrence($sense, $chapter, 'English sentence.');
+
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '1',
+            'sentence_en' => 'Japanese sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertNotContains('Japanese sentence.', $sentences, 'other-language occurrences must be excluded');
+        $this->assertContains('English sentence.', $sentences);
+        $this->assertCount(1, $candidates);
+    }
+
+    public function test_pool_excludes_pending_rejected_ignored_occurrences(): void
+    {
+        // Sub-stage 5 edge case: only STATUS_BOUND occurrences should
+        // appear. pending / rejected / ignored must be filtered out.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapter = $this->createTestChapter([], ['name' => 'Chapter A']);
+        $this->createOccurrence($sense, $chapter, 'Bound occurrence.');
+
+        foreach ([WordSenseOccurrence::STATUS_PENDING, WordSenseOccurrence::STATUS_REJECTED, WordSenseOccurrence::STATUS_IGNORED] as $status) {
+            WordSenseOccurrence::forceCreate([
+                'user_id' => $this->user->id,
+                'language' => 'english',
+                'language_id' => 'english',
+                'word_sense_id' => $sense->id,
+                'chapter_id' => $chapter->id,
+                'sentence_id' => '1',
+                'sentence_en' => 'Non-bound ' . $status . ' sentence.',
+                'sentence_zh' => '',
+                'type' => WordSenseOccurrence::TYPE_WORD,
+                'surface' => $sense->surface_form,
+                'lemma' => $sense->lemma,
+                'pos' => $sense->pos,
+                'decision' => 'match_existing_sense',
+                'confidence' => 1.0,
+                'status' => $status,
+                'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            ]);
+        }
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertCount(1, $candidates, 'only STATUS_BOUND should be returned');
+        $this->assertSame('Bound occurrence.', $candidates[0]['sentence_en']);
+    }
+
+    public function test_pool_caps_at_most_10_candidates(): void
+    {
+        // Sub-stage 5 edge case: the limit(10) guard inside exampleCandidates
+        // must cap the raw fetch. With 15 distinct-chapter occurrences, the
+        // pool must not return more than 10 candidates.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        for ($i = 1; $i <= 15; $i++) {
+            $chapter = $this->createTestChapter([], ['name' => "Chapter {$i}"]);
+            $this->createOccurrence($sense, $chapter, "Sentence number {$i}.");
+        }
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertLessThanOrEqual(10, count($candidates), 'pool must be capped at 10 candidates');
+    }
+
+    public function test_pool_chapter_title_resolves_null_when_chapter_belongs_to_other_user(): void
+    {
+        // Sub-stage 5 edge case: when an occurrence references a chapter
+        // that belongs to a different user, the chapter filter inside the
+        // batch preload must drop it. The candidate's chapter_title must
+        // then be null and source_label must fall back to 'occurrence'.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $otherUser = $this->createUser('pool-chapter-other@example.com', 'english');
+        $otherChapter = Chapter::forceCreate([
+            'user_id' => $otherUser->id,
+            'book_id' => 1,
+            'name' => 'Other User Chapter',
+            'read_count' => 0,
+            'word_count' => 0,
+            'language' => 'english',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'raw_text' => '',
+            'type' => 'text',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode([]), 1),
+        ]);
+
+        $this->createOccurrence($sense, $otherChapter, 'Sentence referencing foreign chapter.');
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertCount(1, $candidates);
+        $this->assertNull($candidates[0]['chapter_title'], 'foreign-user chapter title must not be resolved');
+        $this->assertSame('occurrence', $candidates[0]['source_label'], 'source_label must fall back to occurrence when chapter is filtered out');
+        $this->assertFalse($candidates[0]['is_card_fallback']);
+    }
+
+    public function test_pool_card_fallback_keeps_card_label_even_when_source_chapter_id_set(): void
+    {
+        // Sub-stage 5 edge case: fallback card_example must never be
+        // mislabelled as a chapter source, even if the WordSense has a
+        // source_chapter_id pointing somewhere. The is_card_fallback
+        // flag must be true and source_label must be 'card_example'.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'The bureau opened at noon.');
+        // Set source_chapter_id to a non-zero value to make the test stricter.
+        $sense->update(['source_chapter_id' => 999]);
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertCount(1, $candidates);
+        $this->assertTrue($candidates[0]['is_card_fallback']);
+        $this->assertSame('card_example', $candidates[0]['source_label']);
+        $this->assertNull($candidates[0]['chapter_title'], 'card_example must not resolve a chapter title');
+    }
+
+    public function test_pool_does_not_trigger_n_plus_1_chapter_queries(): void
+    {
+        // Sub-stage 5 edge case: regression guard. Building the pool for a
+        // sense with N occurrences spread across M chapters must use a
+        // single batched whereIn query — NOT one query per chapter. We
+        // enable the query log, run the pool, and assert that the number
+        // of `select * from chapters` queries stays constant regardless
+        // of how many distinct chapters are referenced.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        for ($i = 1; $i <= 6; $i++) {
+            $chapter = $this->createTestChapter([], ['name' => "Chapter {$i}"]);
+            $this->createOccurrence($sense, $chapter, "Sentence {$i}.");
+        }
+
+        \DB::enableQueryLog();
+        $this->poolService->exampleCandidates($sense);
+        $log = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        $chapterQueries = array_filter($log, function (array $entry) {
+            return stripos($entry['query'], 'select * from "chapters"') === 0
+                || preg_match('/^select .* from "chapters"/i', $entry['query']);
+        });
+        // One batched whereIn query — never one per chapter.
+        $this->assertLessThanOrEqual(1, count($chapterQueries), 'N+1 regression: pool must use a single batched chapter query, got ' . count($chapterQueries));
+    }
+
+    public function test_pool_does_not_write_fsrs_or_review_card_fields(): void
+    {
+        // Sub-stage 5 edge case: read-only guarantee — building the pool
+        // must not touch any FSRS field on existing ReviewCards.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapter = $this->createTestChapter([], ['name' => 'Chapter A']);
+        $this->createOccurrence($sense, $chapter, 'The Census Bureau released data.');
+
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => 'sense',
+            'target_id' => $sense->id,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_stability' => 2.5,
+            'fsrs_difficulty' => 4.8,
+            'fsrs_reps' => 7,
+            'fsrs_lapses' => 1,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $before = [
+            'fsrs_state' => $card->fsrs_state,
+            'fsrs_stability' => $card->fsrs_stability,
+            'fsrs_difficulty' => $card->fsrs_difficulty,
+            'fsrs_reps' => $card->fsrs_reps,
+            'fsrs_lapses' => $card->fsrs_lapses,
+            'fsrs_enabled' => $card->fsrs_enabled,
+        ];
+
+        $this->poolService->exampleCandidates($sense);
+        $this->poolService->pickQuestionIndex(5, $card->id, $card->fsrs_reps, 100);
+        $this->poolService->pickSupplementaryIndex(5, 0, $card->id, $card->fsrs_reps, 100);
+
+        $card->refresh();
+        $this->assertSame($before['fsrs_state'], $card->fsrs_state);
+        $this->assertSame($before['fsrs_stability'], $card->fsrs_stability);
+        $this->assertSame($before['fsrs_difficulty'], $card->fsrs_difficulty);
+        $this->assertSame($before['fsrs_reps'], $card->fsrs_reps);
+        $this->assertSame($before['fsrs_lapses'], $card->fsrs_lapses);
+        $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
+    }
+
+    public function test_pool_dedup_across_different_chapters_keeps_both_when_sentences_differ(): void
+    {
+        // Sub-stage 5 edge case: the dedup key is (chapter_id, sentence).
+        // Two occurrences with different sentences in different chapters
+        // must both be kept (no over-aggressive dedup).
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapter1 = $this->createTestChapter([], ['name' => 'Chapter A']);
+        $chapter2 = $this->createTestChapter([], ['name' => 'Chapter B']);
+        $this->createOccurrence($sense, $chapter1, 'Bureau opened today.');
+        $this->createOccurrence($sense, $chapter2, 'Bureau will close tomorrow.');
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $this->assertCount(2, $candidates, 'distinct sentences in distinct chapters must both be kept');
+    }
+
     // ==================== Helpers ====================
 
     private function createConfirmedSense(string $lemma, string $surfaceForm, string $exampleEn = '', string $exampleZh = ''): WordSense

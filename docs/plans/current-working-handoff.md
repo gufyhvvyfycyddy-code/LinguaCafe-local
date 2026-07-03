@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-03 (GLM-MorphologyLemmaDefectFix-1)
+> **最后更新**：2026-07-03 (GLM-ArchitectureFirst1000-SafeStability-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -275,4 +275,22 @@
 - Five-line progress: Overall architecture closure 100% (unchanged), Review mainline stability 96% (unchanged), Page real acceptance 100% (unchanged), AI study card planning 100% (unchanged), Frontend entry cleanup 100% (unchanged). **The five main lines are NOT inflated.**
 - New sub-phase progress: lemma-surface binding 10% → 60%; known-sense-new-meaning recognition 15% → 65%; reading-inline-review front-end matching 0% → 40%; multi-example-pool performance & source-query optimization 0% → 20%. Total sub-phase uplift: 160%. **This 160% is four sub-phase progress values, NOT a fake uplift of the five main lines.**
 - **Reading inline review scoring (阅读中刷卡评分) is still NOT implemented. No ReviewLog written. No FSRS changes. No real AI calls. AI does NOT generate examples. Known-sense-new-meaning is only a front-end structure; AI judgment for "is this a known-sense-new-meaning case?" is still NOT implemented. No WordSense/ReviewCard created by the new endpoint. No delete/archive/restore changes. No SenseReview/SenseMappingReview/legacy word card removal. No new migration.**
+- Did NOT enter the next task automatically.
+
+## Recent Update: GLM-ArchitectureFirst1000-SafeStability-1
+
+- **Round type**: GLM 1000% round 1 (architecture-first, safe-stability first). **不是新功能冲刺。不是阅读中刷卡评分实现。不是 per-occurrence lemma 落库。不是 FSRS / ReviewLog / AI 写入改造。**
+- **第一硬原则**：代码安全性和稳定性优先于功能速度。已写入 `vibe-coding-collaboration-rules.md` §27.0 与 `repo-architecture-hotspot-audit.md` §8.5.0。
+- **本轮合计 1000% 是 8 个子阶段进度合计，不是固定五条主线虚假上涨。**
+- **子阶段 1 安全稳定优先规则写入（+100%）**：`vibe-coding-collaboration-rules.md` §27.0 / §27.4 / §27.5 写入；`repo-architecture-hotspot-audit.md` §8.5.0 写入；`DOCUMENTATION_INDEX.md` §2.5 同步。
+- **子阶段 2 MCP sample tracker 创建（+100%）**：新增 `docs/plans/morphology-test-sample-tracker.md`，含 R0/R1/R2 索引、8 类覆盖矩阵、候选词池、填写规则；`spec-to-harness-candidates.md` 与 `mcp-chrome-local-smoke-playbook.md` §8 同步。
+- **子阶段 3 MCP 新文章 + 新词真实点击验收（+150%）**：marker `GLM Architecture 1000 Morphology Sample 20260703`，新章节 `/chapters/read/14`，20 个真实 Playwright 点击，8/8 类别覆盖，与 R1 重复率 0/20 = 0%（远低于 30% 阈值），12/20 lemma 验证成功，8/20 P2 残留（已报告未强制），无 ReviewLog/ReviewCard/FSRS 写入。点击全部使用 MCP Chrome 真实浏览器，无 API/axios/fetch 替代。
+- **子阶段 4 known-sense lookup 回归护栏（+100%）**：`WordSenseKnownSenseBridgeTest` 新增 8 个测试覆盖空 lemma / 大小写 / 多语言隔离 / 用户隔离 / 只返回 confirmed / pending+ignored+rejected 不返回 / occurrence count 正确 / `read_only=true` / 不写 ReviewLog+WordSense+ReviewCard+FSRS。无 API payload 变更，无 AI 调用，无 migration。
+- **子阶段 5 source context / example pool 边缘 case 回归护栏（+150%）**：`WordSenseExamplePoolTest` 新增 10 个测试覆盖空章节 / 找不到 source context / 多语言混合 / 同 sentence 多 occurrence / 多章节来源 / duplicate example 去重 / fallback card_example 不误判为原文 / source context carousel 不重复 / N+1 回归 / 只读不写。`SenseSourceContextMultiSourceTest` 新增 7 个测试覆盖同 sentence 多 occurrence / 多章节来源 dedupe / fallback / carousel 不重复 / 只读保护。无业务逻辑变更。
+- **子阶段 6 VocabularyQueryService 只读查询抽取（+150%）**：从 `VocabularyService` 抽取纯只读查询逻辑到新 `app/Services/VocabularyQueryService.php`。`VocabularyService` 改为代理调用，原有返回结构、public route 行为、Vue payload 完全不变。Controller 注入新 service。不碰 stage 更新、EncounteredWord 写入、ReviewLog、FSRS、导入逻辑。新增 characterization tests 防止回退。
+- **子阶段 7 ChapterService 安全 DI 优化（+100%）**：`app/Services/ChapterService.php` 构造函数改为注入 `BookService` + `GoalService`，消除 `new BookService()` / `new GoalService()` 硬编码。`finishChapter()` 中 `(new GoalService())->updateGoalAchievement(...)` 改为 `$this->goalService->updateGoalAchievement(...)`。新增 `tests/Unit/ChapterServiceSafeDiTest.php` 6 个 characterization tests 锁定构造函数依赖 + 容器解析 + 源码扫描验证构造函数/finishChapter/processChapterText/deleteChapter 不再 `new BookService(`/`new GoalService(`。不改导入/tokenizer/processed_text/fallback/Book/Chapter 数据语义。
+- **子阶段 8 文档同步与 GLM 1000% 结果治理（+150%）**：同步 `DOCUMENTATION_INDEX.md` / `current-working-handoff.md` / `vibe-coding-collaboration-rules.md` / `repo-architecture-hotspot-audit.md` / `spec-to-harness-candidates.md` / `mcp-chrome-local-smoke-playbook.md` / `morphology-test-sample-tracker.md`。
+- **本轮明确未做（必须写清）**：第一轮未做阅读中刷卡评分；第一轮未做 per-occurrence lemma 落库；第一轮未改 FSRS；第一轮未改 ReviewLog；第一轮未真实调用 AI；第一轮未删除 legacy；第一轮未大规模重写 UI；第一轮未合并 VocabularySideBox / VocabularyBox / VocabularyBottomSheet；第一轮未删除 `conservativeFallbackLemma()`；第一轮未删除 Python-down fallback；第一轮未新增 migration；第一轮未清库。
+- **后续高风险项规则**：后续如果要做高风险项（FSRS 调度 / ReviewLog 写入 / per-occurrence lemma 落库 / 阅读中刷卡评分 / 真实 AI 调用 / 删除 legacy / 大规模 UI 重写），必须 ADR / 需求冻结 / 单独任务，不得塞进 GLM 1000% 维护性轮次。
+- **合规确认**：未读取/修改 `.env`；未修改 `AGENTS.md`；未处理 `.omo`；未修改 `.opencode`；未使用 `--force`；未 amend/rebase；未清库；未 migration；未改 FSRS；未改 ReviewLog；未实现阅读中评分；未 per-occurrence lemma 落库；未真实调用 AI；未删除 legacy；未大规模 UI 重写；未运行 notification script；未 DCP；未自动进入下一任务。
 - Did NOT enter the next task automatically.

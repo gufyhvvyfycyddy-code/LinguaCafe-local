@@ -233,6 +233,297 @@ class SenseSourceContextMultiSourceTest extends TestCase
         }
     }
 
+    // ==================== GLM-ArchitectureFirst1000-SafeStability-1 edge cases ====================
+
+    public function test_source_context_list_caps_at_3_sources(): void
+    {
+        // Sub-stage 5 edge case: sourceContextList must cap at 3 sources.
+        // Even with 5 distinct-chapter occurrences, the response must
+        // contain no more than 3 sources (the take(3) guard).
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        for ($i = 1; $i <= 5; $i++) {
+            $chapter = $this->createTestChapter($chapterWords, ['name' => "Chapter {$i}"]);
+            $this->createOccurrence($sense, $chapter, '0', "Bureau opened. {$i}");
+        }
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $this->assertLessThanOrEqual(3, $json['count'], 'carousel must cap at 3 sources');
+        $this->assertCount($json['count'], $json['sources']);
+    }
+
+    public function test_source_context_list_skips_occurrences_referencing_missing_chapter(): void
+    {
+        // Sub-stage 5 edge case: when an occurrence points at a chapter_id
+        // that no longer exists (or was filtered out by user/language),
+        // the resolver must skip it silently and continue building sources
+        // from remaining occurrences. The endpoint must never 500.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+
+        // Real chapter for source 1
+        $realChapter = $this->createTestChapter($chapterWords, ['name' => 'Real Chapter']);
+        $this->createOccurrence($sense, $realChapter, '0', 'Bureau opened.');
+
+        // Occurrence referencing a chapter_id that does not exist
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => 999999,
+            'sentence_id' => '0',
+            'sentence_en' => 'Missing chapter sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        // Should still return at least 1 source (the real chapter). The
+        // missing-chapter occurrence must be silently skipped.
+        $this->assertGreaterThanOrEqual(1, $json['count']);
+        foreach ($json['sources'] as $source) {
+            if (isset($source['chapter_id'])) {
+                $this->assertNotSame(999999, $source['chapter_id'], 'missing chapter must not appear in carousel');
+            }
+        }
+    }
+
+    public function test_source_context_list_language_isolation_strict(): void
+    {
+        // Sub-stage 5 edge case: even if occurrences share the same
+        // word_sense_id and same user_id, an occurrence tagged with a
+        // different language_id must not appear in the carousel.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $chapter = $this->createTestChapter($chapterWords, ['name' => 'English Chapter']);
+        $this->createOccurrence($sense, $chapter, '0', 'Bureau opened.');
+
+        // Same user, different language tagging on occurrence
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '0',
+            'sentence_en' => 'Japanese leaked sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        foreach ($json['sources'] as $source) {
+            if (isset($source['source_sentence_en'])) {
+                $this->assertNotSame('Japanese leaked sentence.', $source['source_sentence_en'], 'japanese-tagged occurrence must not leak into english carousel');
+            }
+        }
+    }
+
+    public function test_source_context_list_excludes_pending_rejected_ignored_occurrences(): void
+    {
+        // Sub-stage 5 edge case: only STATUS_BOUND occurrences feed the
+        // carousel. pending / rejected / ignored must be filtered out
+        // so the user never sees discarded occurrences as sources.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $chapter = $this->createTestChapter($chapterWords, ['name' => 'Bound Chapter']);
+        $this->createOccurrence($sense, $chapter, '0', 'Bound sentence.');
+
+        foreach ([WordSenseOccurrence::STATUS_PENDING, WordSenseOccurrence::STATUS_REJECTED, WordSenseOccurrence::STATUS_IGNORED] as $status) {
+            WordSenseOccurrence::forceCreate([
+                'user_id' => $this->user->id,
+                'language' => 'english',
+                'language_id' => 'english',
+                'word_sense_id' => $sense->id,
+                'chapter_id' => $chapter->id,
+                'sentence_id' => '0',
+                'sentence_en' => 'Non-bound ' . $status . ' sentence.',
+                'sentence_zh' => '',
+                'type' => WordSenseOccurrence::TYPE_WORD,
+                'surface' => $sense->surface_form,
+                'lemma' => $sense->lemma,
+                'pos' => $sense->pos,
+                'decision' => 'match_existing_sense',
+                'confidence' => 1.0,
+                'status' => $status,
+                'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            ]);
+        }
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        foreach ($json['sources'] as $source) {
+            if (isset($source['source_sentence_en'])) {
+                $this->assertStringNotContainsString('Non-bound', $source['source_sentence_en'], 'non-bound occurrences must not appear in carousel');
+            }
+        }
+    }
+
+    public function test_source_context_list_does_not_trigger_n_plus_1_chapter_queries(): void
+    {
+        // Sub-stage 5 edge case: regression guard. Building the carousel
+        // for a sense with N distinct-chapter occurrences must use a single
+        // batched whereIn query — NOT one findChapterById() per source.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        for ($i = 1; $i <= 3; $i++) {
+            $chapter = $this->createTestChapter($chapterWords, ['name' => "Chapter {$i}"]);
+            $this->createOccurrence($sense, $chapter, '0', "Bureau opened. {$i}");
+        }
+
+        \DB::enableQueryLog();
+        $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list')
+            ->assertOk();
+        $log = \DB::getQueryLog();
+        \DB::disableQueryLog();
+
+        $chapterQueries = array_filter($log, function (array $entry) {
+            return preg_match('/^select .* from "chapters"/i', $entry['query']);
+        });
+        // One batched whereIn query — never one per chapter.
+        $this->assertLessThanOrEqual(1, count($chapterQueries), 'N+1 regression: carousel must use a single batched chapter query, got ' . count($chapterQueries));
+    }
+
+    public function test_source_context_list_does_not_modify_fsrs_fields(): void
+    {
+        // Sub-stage 5 edge case: read-only guarantee — calling the carousel
+        // endpoint must not modify any FSRS field on existing ReviewCards.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $chapter = $this->createTestChapter($chapterWords, ['name' => 'Chapter A']);
+        $this->createOccurrence($sense, $chapter, '0', 'Bureau opened.');
+
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => 'sense',
+            'target_id' => $sense->id,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_stability' => 3.2,
+            'fsrs_difficulty' => 4.4,
+            'fsrs_reps' => 5,
+            'fsrs_lapses' => 2,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $before = [
+            'fsrs_state' => $card->fsrs_state,
+            'fsrs_stability' => $card->fsrs_stability,
+            'fsrs_difficulty' => $card->fsrs_difficulty,
+            'fsrs_reps' => $card->fsrs_reps,
+            'fsrs_lapses' => $card->fsrs_lapses,
+            'fsrs_enabled' => $card->fsrs_enabled,
+        ];
+
+        $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list')
+            ->assertOk();
+
+        $card->refresh();
+        $this->assertSame($before['fsrs_state'], $card->fsrs_state);
+        $this->assertSame($before['fsrs_stability'], $card->fsrs_stability);
+        $this->assertSame($before['fsrs_difficulty'], $card->fsrs_difficulty);
+        $this->assertSame($before['fsrs_reps'], $card->fsrs_reps);
+        $this->assertSame($before['fsrs_lapses'], $card->fsrs_lapses);
+        $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
+    }
+
+    public function test_source_context_list_distinct_chapter_ids_in_carousel(): void
+    {
+        // Sub-stage 5 edge case: source context carousel must never
+        // repeat the same chapter_id across sources — the unique('chapter_id')
+        // guard guarantees this.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        $chapterWords = [
+            (object) ['word' => 'Bureau', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => 'opened', 'sentence_index' => '0', 'spaceAfter' => true],
+            (object) ['word' => '.', 'sentence_index' => '0', 'spaceAfter' => false],
+        ];
+        $chapter1 = $this->createTestChapter($chapterWords, ['name' => 'Chapter A']);
+        $chapter2 = $this->createTestChapter($chapterWords, ['name' => 'Chapter B']);
+        $chapter3 = $this->createTestChapter($chapterWords, ['name' => 'Chapter C']);
+
+        // Multiple occurrences per chapter — should still produce only one
+        // source per chapter.
+        $this->createOccurrence($sense, $chapter1, '0', 'Bureau opened 1.');
+        $this->createOccurrence($sense, $chapter1, '0', 'Bureau opened 2.');
+        $this->createOccurrence($sense, $chapter2, '0', 'Bureau opened 3.');
+        $this->createOccurrence($sense, $chapter2, '0', 'Bureau opened 4.');
+        $this->createOccurrence($sense, $chapter3, '0', 'Bureau opened 5.');
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list');
+
+        $response->assertOk();
+        $json = $response->json();
+
+        $chapterIds = array_filter(array_column($json['sources'], 'chapter_id'));
+        $unique = array_unique($chapterIds);
+        $this->assertSame(count($chapterIds), count($unique), 'carousel chapter_ids must be unique (no duplicates)');
+    }
+
     // ==================== Helpers ====================
 
     private function createConfirmedSense(string $lemma, string $surfaceForm): WordSense

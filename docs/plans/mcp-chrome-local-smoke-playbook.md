@@ -120,9 +120,13 @@ MCP Chrome 验收报告必须说明：
 
 ## 8. Lemma / Morphology Click Sample Rotation
 
+### 8.0 Sample tracker
+
+每轮 MCP 形态点击验收必须记录到 `docs/plans/morphology-test-sample-tracker.md`。该 tracker 是活文档，追加行不删除历史。tracker 包含：marker、`/chapters/read/{id}`、本轮测试词、与上一轮重复词、重复比例、8 类覆盖、是否新文章、是否 MCP 真实点击、是否 API 替代、是否 Incomplete。
+
 ### 8.1 规则
 
-硬规则参考 `vibe-coding-collaboration-rules.md` §27.5。本节只记录 MCP Chrome 操作指南。
+硬规则参考 `vibe-coding-collaboration-rules.md` §27.0（第一硬原则：代码安全性和稳定性优先于功能速度）/ §27.5。本节只记录 MCP Chrome 操作指南。
 
 ### 8.2 每轮新文章准备
 

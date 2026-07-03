@@ -275,6 +275,199 @@ class WordSenseKnownSenseBridgeTest extends TestCase
         $this->assertSame('ways', $sense->surface_form, 'surface_form should be preserved');
     }
 
+    // ==================== GLM-ArchitectureFirst1000-SafeStability-1 edge cases ====================
+
+    public function test_known_sense_lookup_service_returns_empty_for_empty_lemma(): void
+    {
+        // Service-level: empty string lemma returns [] candidates (not an exception).
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', ''
+        );
+
+        $this->assertFalse($payload['has_confirmed_senses']);
+        $this->assertSame([], $payload['confirmed_senses']);
+        $this->assertSame('', $payload['lemma']);
+        $this->assertTrue($payload['read_only']);
+    }
+
+    public function test_known_sense_lookup_service_returns_empty_for_whitespace_only_lemma(): void
+    {
+        // Whitespace-only lemma should be trimmed to empty and return [].
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', '   '
+        );
+
+        $this->assertFalse($payload['has_confirmed_senses']);
+        $this->assertSame([], $payload['confirmed_senses']);
+    }
+
+    public function test_known_sense_lookup_normalizes_uppercase_and_mixed_case_lemma(): void
+    {
+        // "WAY" / "Way" / "wAy" should all match lemma "way" (mb_strtolower normalization).
+        $this->createConfirmedSense('way', 'ways', '路');
+
+        foreach (['WAY', 'Way', 'wAy', '  WaY  '] as $query) {
+            $payload = $this->knownSenseService->knownSenseLookupPayload(
+                $this->user->id, 'english', $query
+            );
+            $this->assertCount(1, $payload['confirmed_senses'], "lemma query [{$query}] should match 1 confirmed sense");
+            $this->assertSame('way', $payload['confirmed_senses'][0]['lemma']);
+        }
+    }
+
+    public function test_known_sense_lookup_does_not_leak_across_languages(): void
+    {
+        // A sense created under japanese should not appear when querying english,
+        // even if the lemma is identical. We use a fake 'japanese' language entry
+        // via forceCreate on WordSense directly to avoid language table constraints.
+        $englishSense = $this->createConfirmedSense('run', 'running', 'to run (english)');
+
+        $japaneseSense = $this->wordSenseService->createSense([
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+            'lemma' => 'run',
+            'surface_form' => 'running',
+            'pos' => 'verb',
+            'sense_zh' => '走る (japanese)',
+            'sense_en' => '',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => '',
+            'example_sentence_zh' => '',
+        ]);
+        $japaneseSense->update(['status' => WordSense::STATUS_CONFIRMED]);
+
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', 'run'
+        );
+
+        $this->assertCount(1, $payload['confirmed_senses'], 'only english sense should be returned');
+        $this->assertSame($englishSense->id, $payload['confirmed_senses'][0]['sense_id']);
+        $this->assertSame('to run (english)', $payload['confirmed_senses'][0]['sense_zh']);
+    }
+
+    public function test_known_sense_lookup_excludes_pending_occurrences_from_count(): void
+    {
+        // occurrence_count should only count STATUS_BOUND; pending/ignored/rejected
+        // occurrences must not inflate the count.
+        $sense = $this->createConfirmedSense('way', 'ways', '路');
+        $chapter = $this->createTestChapter([
+            ['w' => 'ways', 'l' => 'way', 's' => 0],
+        ]);
+
+        $this->createOccurrence($sense, $chapter, '1', 'Find a way.');
+        $this->createOccurrence($sense, $chapter, '2', 'Another way.');
+
+        // Add a pending occurrence (should not count).
+        $pending = WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_id' => '3',
+            'sentence_en' => 'Pending way.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_PENDING,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', 'way'
+        );
+
+        $this->assertCount(1, $payload['confirmed_senses']);
+        $this->assertSame(2, $payload['confirmed_senses'][0]['occurrence_count'], 'pending occurrence must not be counted');
+    }
+
+    public function test_known_sense_lookup_returns_multiple_confirmed_senses_for_same_lemma(): void
+    {
+        // When a user has multiple confirmed senses for the same lemma, all should
+        // be returned (verifies no LIMIT 1 or early return).
+        $sense1 = $this->createConfirmedSense('way', 'ways', '方法');
+        $sense2 = $this->createConfirmedSense('way', 'ways', '道路');
+
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', 'way'
+        );
+
+        $this->assertTrue($payload['has_confirmed_senses']);
+        $this->assertCount(2, $payload['confirmed_senses']);
+        $returnedIds = array_column(array_map(function ($s) {
+            return ['sense_id' => $s['sense_id']];
+        }, $payload['confirmed_senses']), 'sense_id');
+        $this->assertContains($sense1->id, $returnedIds);
+        $this->assertContains($sense2->id, $returnedIds);
+    }
+
+    public function test_known_sense_lookup_payload_shape_stays_stable(): void
+    {
+        // Payload must always contain the documented top-level keys, even with 0 candidates.
+        $payload = $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', 'nonexistent-lemma-' . uniqid()
+        );
+
+        $this->assertArrayHasKey('lemma', $payload);
+        $this->assertArrayHasKey('has_confirmed_senses', $payload);
+        $this->assertArrayHasKey('confirmed_senses', $payload);
+        $this->assertArrayHasKey('known_sense_new_meaning_hint', $payload);
+        $this->assertArrayHasKey('read_only', $payload);
+        $this->assertTrue($payload['read_only']);
+        $this->assertFalse($payload['has_confirmed_senses']);
+        $this->assertIsArray($payload['confirmed_senses']);
+    }
+
+    public function test_known_sense_lookup_does_not_modify_fsrs_fields(): void
+    {
+        // FSRS fields on an existing ReviewCard must not change after a read-only lookup.
+        $sense = $this->createConfirmedSense('way', 'ways', '路');
+
+        // Manually attach a ReviewCard with known FSRS values (using target_id, not word_sense_id).
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_stability' => 1.5,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 3,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $before = [
+            'fsrs_state' => $card->fsrs_state,
+            'fsrs_reps' => $card->fsrs_reps,
+            'fsrs_stability' => $card->fsrs_stability,
+            'fsrs_difficulty' => $card->fsrs_difficulty,
+            'fsrs_lapses' => $card->fsrs_lapses,
+            'fsrs_enabled' => $card->fsrs_enabled,
+        ];
+
+        $this->knownSenseService->knownSenseLookupPayload(
+            $this->user->id, 'english', 'way'
+        );
+
+        $card->refresh();
+        $this->assertSame($before['fsrs_state'], $card->fsrs_state);
+        $this->assertSame($before['fsrs_reps'], $card->fsrs_reps);
+        $this->assertSame($before['fsrs_stability'], $card->fsrs_stability);
+        $this->assertSame($before['fsrs_difficulty'], $card->fsrs_difficulty);
+        $this->assertSame($before['fsrs_lapses'], $card->fsrs_lapses);
+        $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
+    }
+
     // ==================== Helpers ====================
 
     private function createConfirmedSense(string $lemma, string $surfaceForm, string $senseZh): WordSense

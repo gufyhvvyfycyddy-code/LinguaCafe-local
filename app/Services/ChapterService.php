@@ -18,9 +18,25 @@ use Illuminate\Support\Facades\Log;
 
 class ChapterService {
     private $bookService;
+    private $goalService;
 
-    public function __construct() {
-        $this->bookService = new BookService();
+    /**
+     * Safe DI optimization (GLM-ArchitectureFirst1000-SafeStability-1).
+     *
+     * BookService and GoalService were previously instantiated inline via
+     * `new BookService()` / `new GoalService()`. They are now resolved
+     * through the Laravel container so tests and jobs that resolve
+     * ChapterService via `app(ChapterService::class)` (or constructor
+     * injection in ProcessChapter / ChapterController) can substitute
+     * mocks/bindings if needed. Behavior is unchanged: both services
+     * have empty constructors and no internal state.
+     */
+    public function __construct(
+        BookService $bookService,
+        GoalService $goalService
+    ) {
+        $this->bookService = $bookService;
+        $this->goalService = $goalService;
     }
 
     public function getChaptersForBook($userId, $bookId) {
@@ -244,7 +260,7 @@ class ChapterService {
         $chapter->save();
 
         // updage today's reading achievement
-        (new GoalService())->updateGoalAchievement($userId, $language, 'read_words', $chapter->word_count);
+        $this->goalService->updateGoalAchievement($userId, $language, 'read_words', $chapter->word_count);
 
         // level up phrases
         if (!$autoLevelUpWords) {
