@@ -293,4 +293,5 @@
 - **本轮明确未做（必须写清）**：第一轮未做阅读中刷卡评分；第一轮未做 per-occurrence lemma 落库；第一轮未改 FSRS；第一轮未改 ReviewLog；第一轮未真实调用 AI；第一轮未删除 legacy；第一轮未大规模重写 UI；第一轮未合并 VocabularySideBox / VocabularyBox / VocabularyBottomSheet；第一轮未删除 `conservativeFallbackLemma()`；第一轮未删除 Python-down fallback；第一轮未新增 migration；第一轮未清库。
 - **后续高风险项规则**：后续如果要做高风险项（FSRS 调度 / ReviewLog 写入 / per-occurrence lemma 落库 / 阅读中刷卡评分 / 真实 AI 调用 / 删除 legacy / 大规模 UI 重写），必须 ADR / 需求冻结 / 单独任务，不得塞进 GLM 1000% 维护性轮次。
 - **合规确认**：未读取/修改 `.env`；未修改 `AGENTS.md`；未处理 `.omo`；未修改 `.opencode`；未使用 `--force`；未 amend/rebase；未清库；未 migration；未改 FSRS；未改 ReviewLog；未实现阅读中评分；未 per-occurrence lemma 落库；未真实调用 AI；未删除 legacy；未大规模 UI 重写；未运行 notification script；未 DCP；未自动进入下一任务。
+- **已知风险**：testing DB `linguacafe_fsrs_test` 在 45 个 `RefreshDatabase` 测试文件共享时存在并行竞争条件，已通过 `tests/bootstrap.php` + `flock` 进程锁治理。详见 `docs/plans/testing-db-health-playbook.md`。
 - Did NOT enter the next task automatically.

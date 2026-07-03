@@ -1266,6 +1266,19 @@ OpenCode 每次进入任务后，必须先调用或阅读本地已安装的 `oh-
 - 但必须拆清楚每个子阶段，不得虚假进度。
 - 子阶段进度上涨必须来自真实代码、测试、文档、页面验收或架构侦查成果。
 
+### 27.7 Testing DB 健康检查规则
+
+1. **每轮大型任务、GLM 1000% 子阶段、涉及 Feature tests 的任务，必须先跑 DB health check。**
+2. 运行：`php artisan test --filter=TestingDatabaseHealthTest` 和 `php artisan test --filter=TestingDatabaseHealthConfigTest`。
+3. 如果 health check 失败，必须先修复 testing DB 环境，不允许跳过 health check 直接跑 feature tests。
+4. 45 个 test files 使用 `RefreshDatabase` 共享 `linguacafe_fsrs_test` MySQL 数据库。PHPUnit process lock (`tests/bootstrap.php` + `flock`) 防止并发进程冲突。
+5. 禁止运行 `php artisan migrate:fresh --env=testing`、`php artisan db:wipe --env=testing`、`drop/truncate/delete` 全表。
+6. 如果 health check 发现 testing DB 状态异常：
+   - 允许的安全修复：`php artisan migrate --env=testing`。
+   - 禁止的命令：`migrate:fresh`、`migrate:refresh`、`migrate:reset`、`db:wipe`。
+   - 必须在报告中列出完整的错误信息和 DB 配置。
+   - 不得把 health check 失败写成通过。
+
 ## 27. 高内聚低耦合架构规则与 GLM 1000% 分层规则
 
 ### 27.0 第一硬原则：代码安全性和稳定性优先于功能速度

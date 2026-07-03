@@ -46,6 +46,8 @@ New rules and process notes are documented in:
 - `repo-architecture-hotspot-audit.md` §8.5 — 下一轮架构优化必须遵守的边界。
 - `mcp-chrome-local-smoke-playbook.md` §8 — Lemma / Morphology click sample rotation（词元测试样本轮换操作指南）。
 - `morphology-test-sample-tracker.md` — MCP 词元测试样本追踪文档（每轮 marker / 文章 / 测试词 / 重复比例 / 8 类覆盖 / 真实点击标记 / API 替代标记 / Incomplete 标记）。
+- `vibe-coding-collaboration-rules.md` §27.7 — Testing DB 健康检查规则（每轮大型任务必须先跑 DB health check）。
+- `testing-db-health-playbook.md` — Testing DB 健康检查操作指南（health check / 进程锁 / 禁止命令 / 故障报告）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
 
 ## 2.6 Frozen Plans (Route-Frozen, Not Implemented)
