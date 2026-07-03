@@ -7,12 +7,12 @@
                 {{ previewData.candidate_count }}
             </v-chip>
             <v-spacer />
-            <span class="text-caption text--secondary">read-only</span>
+            <span class="text-caption text--secondary">read-only preview</span>
         </div>
 
-        <!-- Safety banner: this round does not write anything -->
+        <!-- Safety banner: this is NOT a review rating -->
         <div class="inline-preview-safety-banner text-caption text--secondary mb-2">
-            这是候选预览。本轮不会写入复习记录，不会改变 FSRS。
+            这是候选预览。这不是复习评分，不会写入复习记录，不会改变 FSRS。
         </div>
 
         <!-- Surface / lemma / sentence context -->
@@ -49,7 +49,7 @@
                 v-for="candidate in previewData.candidates"
                 :key="candidate.sense_id"
                 class="inline-preview-candidate rounded pa-2 mb-2"
-                :class="{ 'is-selected': userChoice[candidate.sense_id] === 'yes', 'is-rejected': userChoice[candidate.sense_id] === 'no' }"
+                :class="{ 'is-selected': effectiveChoice(candidate) === 'match', 'is-rejected': effectiveChoice(candidate) === 'not_match' }"
             >
                 <div class="d-flex align-center mb-1">
                     <v-chip v-if="candidate.pos" x-small outlined class="mr-1">{{ candidate.pos }}</v-chip>
@@ -65,39 +65,66 @@
                     已复习 {{ candidate.fsrs_reps }} 次
                 </div>
 
-                <!-- Front-end only choice buttons (this round) -->
-                <div class="d-flex mt-2 align-center">
+                <!-- Persisted confirmation buttons (GLM-ReadingInlineConfirmationPersistence-1000-1) -->
+                <div class="d-flex mt-2 align-center flex-wrap">
                     <v-btn
                         x-small
                         depressed
-                        :color="userChoice[candidate.sense_id] === 'yes' ? 'success' : ''"
-                        class="inline-preview-btn-yes mr-2"
-                        @click="setChoice(candidate.sense_id, 'yes')"
+                        :color="effectiveChoice(candidate) === 'match' ? 'success' : ''"
+                        class="inline-preview-btn-yes mr-2 mb-1"
+                        :loading="savingSenseId === candidate.sense_id && pendingChoice === 'match'"
+                        :disabled="savingSenseId !== null"
+                        @click="persistChoice(candidate, 'match')"
                     >
                         是这个意思
                     </v-btn>
                     <v-btn
                         x-small
                         depressed
-                        :color="userChoice[candidate.sense_id] === 'no' ? 'error' : ''"
-                        class="inline-preview-btn-no"
-                        @click="setChoice(candidate.sense_id, 'no')"
+                        :color="effectiveChoice(candidate) === 'not_match' ? 'error' : ''"
+                        class="inline-preview-btn-no mb-1"
+                        :loading="savingSenseId === candidate.sense_id && pendingChoice === 'not_match'"
+                        :disabled="savingSenseId !== null"
+                        @click="persistChoice(candidate, 'not_match')"
                     >
                         不是这个意思
                     </v-btn>
                 </div>
+
+                <!-- Persisted confirmation echo -->
+                <div v-if="effectiveChoice(candidate)" class="text-caption mt-1 inline-preview-persisted-echo">
+                    <v-icon x-small class="mr-1">mdi-check-circle-outline</v-icon>
+                    <span v-if="effectiveChoice(candidate) === 'match'" class="inline-preview-saved-match">
+                        已保存：是这个意思
+                    </span>
+                    <span v-else class="inline-preview-saved-not-match">
+                        已保存：不是这个意思
+                    </span>
+                    <span class="text--secondary ml-1">（这不是复习评分，不会写入复习记录，不会改变 FSRS）</span>
+                </div>
+
+                <!-- Per-candidate save error -->
+                <v-alert
+                    v-if="saveErrors[candidate.sense_id]"
+                    dense
+                    text
+                    type="error"
+                    class="mt-1 mb-0 inline-preview-save-error"
+                >
+                    保存失败：{{ saveErrors[candidate.sense_id] }}
+                </v-alert>
             </div>
 
-            <!-- Choice notice: explicitly tells user this is front-end only -->
+            <!-- Choice notice: persisted, not a review rating -->
             <v-alert
-                v-if="hasAnyChoice"
+                v-if="hasAnyPersistedChoice"
                 dense
                 text
                 type="info"
                 icon="mdi-information-outline"
                 class="mt-2 mb-0 inline-preview-choice-notice"
             >
-                你的选择仅在本面板内记录，不会写入复习记录，不会改变 FSRS，不会创建词义或复习卡。
+                你的选择已保存为阅读位置级别的确认。这不是复习评分，不会写入复习记录，不会改变 FSRS，不会创建词义或复习卡。
             </v-alert>
         </div>
     </div>
@@ -107,28 +134,39 @@
 import axios from 'axios';
 
 /**
- * InlineSensePreviewPanel (GLM-ReadingInlinePreview-First-1)
+ * InlineSensePreviewPanel
  *
- * A READ-ONLY preview panel shown inside WordSensesList after the user
- * clicks a token in the reading page. It shows:
+ * (GLM-ReadingInlinePreview-First-1 + GLM-ReadingInlineConfirmationPersistence-1000-1)
+ *
+ * A preview panel shown inside WordSensesList after the user clicks a token
+ * in the reading page. It shows:
  *  - the current surface form (e.g. "geese");
  *  - the current lemma (e.g. "goose");
  *  - the sentence the token appears in;
  *  - confirmed WordSense candidates for this lemma;
  *  - each candidate's sense text + whether it has a sense ReviewCard;
- *  - a read-only FSRS status summary per candidate.
+ *  - a read-only FSRS status summary per candidate;
+ *  - the persisted match / not_match choice per candidate, echoed from the
+ *    `reading_inline_sense_confirmations` table.
  *
- * The "是这个意思 / 不是这个意思" buttons are FRONT-END ONLY this round.
- * They store the user's choice in `userChoice` (a local data object) and
- * DO NOT call any POST endpoint. They do not write ReviewLog, FSRS,
- * WordSense, or ReviewCard. The only backend call is the GET
- * `/senses/inline-preview` endpoint, which is itself read-only.
+ * The "是这个意思 / 不是这个意思" buttons now call POST
+ * `/senses/inline-confirmation` to persist the user's choice. The choice is
+ * occurrence-level (chapter + sentence + surface + lemma + sense) and is
+ * NOT a review rating. It does NOT write ReviewLog, does NOT change FSRS,
+ * does NOT create WordSense / ReviewCard. See ADR-0003.
  *
- * This component does NOT emit events to the parent for the choice
- * buttons — the choice stays inside this component. A future round that
- * wants to turn the choice into a real write MUST pass an Architecture
- * Gate + ADR first and remove the corresponding safety_flag from the
- * backend payload.
+ * Safety contract enforced by the backend:
+ *  - `POST /senses/inline-confirmation` validates user / language / chapter /
+ *    sense ownership and WordSense STATUS_CONFIRMED.
+ *  - The backend returns `safety_flags` with `not_a_review_rating: true`.
+ *
+ * This component does NOT emit events to the parent for the choice buttons.
+ * The choice is persisted in the backend and echoed via the GET preview
+ * endpoint on reload.
+ *
+ * A future round that wants to turn the choice into an FSRS rating MUST
+ * pass an Architecture Gate + new ADR first (ADR-0003 explicitly forbids
+ * reusing `/senses/inline-confirmation` for rating).
  */
 export default {
     name: 'InlineSensePreviewPanel',
@@ -149,10 +187,14 @@ export default {
             type: String,
             default: 'english',
         },
-        /**
-         * When true, the panel is hidden entirely. Used by parent to
-         * disable the preview in contexts where it should not appear.
-         */
+        chapterId: {
+            type: Number,
+            default: null,
+        },
+        sentenceIndex: {
+            type: Number,
+            default: null,
+        },
         disabled: {
             type: Boolean,
             default: false,
@@ -164,8 +206,13 @@ export default {
             error: false,
             previewData: null,
             latestLookupKey: '',
-            // { [sense_id]: 'yes' | 'no' } — front-end only, never sent to backend
-            userChoice: {},
+            // Optimistic local override of persisted_choice per sense_id.
+            // { [sense_id]: 'match' | 'not_match' }
+            localOverride: {},
+            savingSenseId: null,
+            pendingChoice: null,
+            // { [sense_id]: string errorMessage }
+            saveErrors: {},
         };
     },
     computed: {
@@ -183,8 +230,9 @@ export default {
             if (!this.effectiveLemma) return false;
             return true;
         },
-        hasAnyChoice() {
-            return Object.keys(this.userChoice).length > 0;
+        hasAnyPersistedChoice() {
+            if (!this.previewData || !this.previewData.candidates) return false;
+            return this.previewData.candidates.some(c => this.effectiveChoice(c));
         },
     },
     watch: {
@@ -197,6 +245,12 @@ export default {
         language() {
             this.fetchInlinePreview();
         },
+        chapterId() {
+            this.fetchInlinePreview();
+        },
+        sentenceIndex() {
+            this.fetchInlinePreview();
+        },
     },
     methods: {
         fetchInlinePreview() {
@@ -207,15 +261,18 @@ export default {
                 this.previewData = null;
                 this.loading = false;
                 this.error = false;
-                this.userChoice = {};
+                this.localOverride = {};
+                this.saveErrors = {};
                 return;
             }
 
-            const lookupKey = language + '|' + lemma + '|' + this.surfaceWord + '|' + this.sentenceText;
+            const lookupKey = language + '|' + lemma + '|' + this.surfaceWord + '|' + this.sentenceText
+                + '|' + (this.chapterId ?? '') + '|' + (this.sentenceIndex ?? '');
             this.latestLookupKey = lookupKey;
             this.loading = true;
             this.error = false;
-            this.userChoice = {};
+            this.localOverride = {};
+            this.saveErrors = {};
 
             axios.get('/senses/inline-preview', {
                 params: {
@@ -223,6 +280,8 @@ export default {
                     language: language,
                     surface: this.surfaceWord,
                     sentence: this.sentenceText,
+                    chapter_id: this.chapterId,
+                    sentence_index: this.sentenceIndex,
                 },
             }).then((response) => {
                 if (this.latestLookupKey !== lookupKey) return;
@@ -237,14 +296,57 @@ export default {
                 this.loading = false;
             });
         },
-        setChoice(senseId, choice) {
-            // Front-end only. Do NOT call any backend endpoint here.
-            // Toggle off if clicking the same choice again.
-            if (this.userChoice[senseId] === choice) {
-                this.$delete(this.userChoice, senseId);
-            } else {
-                this.$set(this.userChoice, senseId, choice);
+        effectiveChoice(candidate) {
+            const sid = candidate.sense_id;
+            if (Object.prototype.hasOwnProperty.call(this.localOverride, sid)) {
+                return this.localOverride[sid];
             }
+            return candidate.persisted_choice || null;
+        },
+        persistChoice(candidate, choice) {
+            const senseId = candidate.sense_id;
+
+            // If clicking the same choice that is already persisted, do not re-send.
+            if (this.effectiveChoice(candidate) === choice) {
+                return;
+            }
+
+            // Clear any previous per-candidate error.
+            this.$delete(this.saveErrors, senseId);
+
+            this.savingSenseId = senseId;
+            this.pendingChoice = choice;
+
+            // Optimistic local override so the UI updates immediately.
+            this.$set(this.localOverride, senseId, choice);
+
+            axios.post('/senses/inline-confirmation', {
+                lemma: this.effectiveLemma,
+                surface: this.surfaceWord,
+                language: this.language,
+                chapter_id: this.chapterId,
+                sentence_index: this.sentenceIndex,
+                sentence_text: this.sentenceText,
+                word_sense_id: senseId,
+                choice: choice,
+            }).then((response) => {
+                const data = response && response.data;
+                // If the backend returned an updated preview, replace the whole payload.
+                if (data && data.updated_preview) {
+                    this.previewData = data.updated_preview;
+                }
+                // Clear the local override; the preview payload now carries persisted_choice.
+                this.$delete(this.localOverride, senseId);
+            }).catch((err) => {
+                // Revert the optimistic override.
+                this.$delete(this.localOverride, senseId);
+                const msg = (err && err.response && err.response.data && err.response.data.message)
+                    || '网络或校验错误';
+                this.$set(this.saveErrors, senseId, msg);
+            }).finally(() => {
+                this.savingSenseId = null;
+                this.pendingChoice = null;
+            });
         },
     },
 };
@@ -281,5 +383,19 @@ export default {
 
 .inline-preview-choice-notice {
     font-size: 0.75rem;
+}
+
+.inline-preview-persisted-echo {
+    font-size: 0.75rem;
+}
+
+.inline-preview-saved-match {
+    color: var(--v-success-base);
+    font-weight: 600;
+}
+
+.inline-preview-saved-not-match {
+    color: var(--v-error-base);
+    font-weight: 600;
 }
 </style>

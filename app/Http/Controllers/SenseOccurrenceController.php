@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\ReadingInlineSenseConfirmationService;
 use App\Services\SenseSourceContextService;
 use App\Services\WordSenseKnownSenseService;
 use App\Services\WordSenseOccurrenceService;
@@ -21,6 +22,7 @@ class SenseOccurrenceController extends Controller
         private WordSenseService $wordSenseService,
         private SenseSourceContextService $senseSourceContextService,
         private WordSenseKnownSenseService $knownSenseService,
+        private ReadingInlineSenseConfirmationService $inlineConfirmationService,
     )
     {
     }
@@ -131,6 +133,8 @@ class SenseOccurrenceController extends Controller
 
         $surface = (string) $request->query('surface', '');
         $sentence = (string) $request->query('sentence', '');
+        $chapterId = $request->query('chapter_id') !== null ? (int) $request->query('chapter_id') : null;
+        $sentenceIndex = $request->query('sentence_index') !== null ? (int) $request->query('sentence_index') : null;
 
         return response()->json(
             $this->knownSenseService->previewInlineSenseCandidates(
@@ -138,9 +142,76 @@ class SenseOccurrenceController extends Controller
                 $language,
                 $lemma,
                 $surface,
-                $sentence
+                $sentence,
+                $chapterId,
+                $sentenceIndex
             )
         );
+    }
+
+    /**
+     * Persist (or update) the user's match / not_match choice for a
+     * reading-inline sense candidate (ADR-0003).
+     *
+     * This endpoint is the ONLY write entrypoint for the
+     * `reading_inline_sense_confirmations` table. It does NOT write
+     * ReviewLog, does NOT change FSRS, does NOT create WordSense /
+     * ReviewCard, does NOT call AI. The choice is NOT a review rating.
+     */
+    public function storeInlineConfirmation(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $data = $request->validate([
+            'language' => ['sometimes', 'string'],
+            'lemma' => ['required', 'string'],
+            'surface' => ['required', 'string'],
+            'chapter_id' => ['nullable', 'integer'],
+            'sentence_index' => ['nullable', 'integer'],
+            'sentence_hash' => ['nullable', 'string'],
+            'sentence_text' => ['nullable', 'string'],
+            'word_sense_id' => ['required', 'integer'],
+            'choice' => ['required', Rule::in(['match', 'not_match'])],
+        ]);
+
+        if (isset($data['language']) && $data['language'] !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $result = $this->inlineConfirmationService->storeConfirmation([
+            'user_id' => $userId,
+            'language' => $language,
+            'chapter_id' => $data['chapter_id'] ?? null,
+            'sentence_index' => $data['sentence_index'] ?? null,
+            'sentence_hash' => $data['sentence_hash'] ?? null,
+            'sentence_text' => $data['sentence_text'] ?? null,
+            'surface' => $data['surface'],
+            'lemma' => $data['lemma'],
+            'word_sense_id' => $data['word_sense_id'],
+            'choice' => $data['choice'],
+        ]);
+
+        // Also return the updated preview payload so the frontend can refresh
+        // the echoed persisted_choice without a second round-trip.
+        $previewPayload = $this->knownSenseService->previewInlineSenseCandidates(
+            $userId,
+            $language,
+            $data['lemma'],
+            $data['surface'],
+            $data['sentence_text'] ?? '',
+            $data['chapter_id'] ?? null,
+            $data['sentence_index'] ?? null
+        );
+
+        return response()->json([
+            'confirmation_id' => $result['confirmation_id'],
+            'choice' => $result['choice'],
+            'persisted' => $result['persisted'],
+            'updated_at' => $result['updated_at'],
+            'safety_flags' => $result['safety_flags'],
+            'updated_preview' => $previewPayload,
+        ]);
     }
 
     public function possibleDuplicates(Request $request)

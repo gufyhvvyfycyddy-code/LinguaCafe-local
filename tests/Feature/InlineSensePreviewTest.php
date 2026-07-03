@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Chapter;
+use App\Models\ReadingInlineSenseConfirmation;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
@@ -428,6 +429,187 @@ class InlineSensePreviewTest extends TestCase
             ->assertOk();
 
         $this->assertTrue($response->json('safety_flags.read_only'));
+    }
+
+    // ==================== Echo persisted confirmations (GLM-ReadingInlineConfirmationPersistence-1000-1) ====================
+
+    public function test_inline_preview_echoes_persisted_match_choice(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 0,
+            'name' => 'echo-chapter-' . Str::random(6),
+            'language' => 'english',
+            'raw_text' => '',
+            'word_count' => 0,
+            'read_count' => 0,
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'processed_text' => gzcompress(json_encode([]), 1),
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
+
+        ReadingInlineSenseConfirmation::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 2,
+            'sentence_text' => 'The geese flew.',
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => ReadingInlineSenseConfirmation::CHOICE_MATCH,
+            'source' => ReadingInlineSenseConfirmation::SOURCE_READING_INLINE_PREVIEW,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese&chapter_id=' . $chapter->id . '&sentence_index=2')
+            ->assertOk();
+
+        $candidate = $response->json('candidates.0');
+        $this->assertSame('match', $candidate['persisted_choice'], 'persisted_choice must echo match');
+        $this->assertNotNull($candidate['confirmation_id'], 'confirmation_id must be present');
+        $this->assertNotNull($candidate['confirmed_at'], 'confirmed_at must be present');
+    }
+
+    public function test_inline_preview_echoes_persisted_not_match_choice(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        ReadingInlineSenseConfirmation::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => null,
+            'sentence_index' => 0,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => ReadingInlineSenseConfirmation::CHOICE_NOT_MATCH,
+            'source' => ReadingInlineSenseConfirmation::SOURCE_READING_INLINE_PREVIEW,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese&sentence_index=0')
+            ->assertOk();
+
+        $candidate = $response->json('candidates.0');
+        $this->assertSame('not_match', $candidate['persisted_choice'], 'persisted_choice must echo not_match');
+        $this->assertNotNull($candidate['confirmation_id']);
+    }
+
+    public function test_inline_preview_returns_null_persisted_choice_when_no_confirmation(): void
+    {
+        $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese')
+            ->assertOk();
+
+        $candidate = $response->json('candidates.0');
+        $this->assertNull($candidate['persisted_choice'], 'persisted_choice must be null when no confirmation exists');
+        $this->assertNull($candidate['confirmation_id']);
+        $this->assertNull($candidate['confirmed_at']);
+    }
+
+    public function test_inline_preview_returns_persisted_summary(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        ReadingInlineSenseConfirmation::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => null,
+            'sentence_index' => 0,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => ReadingInlineSenseConfirmation::CHOICE_MATCH,
+            'source' => ReadingInlineSenseConfirmation::SOURCE_READING_INLINE_PREVIEW,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese&sentence_index=0')
+            ->assertOk();
+
+        $summary = $response->json('persisted_summary');
+        $this->assertIsArray($summary);
+        $this->assertSame(1, $summary['match_count']);
+        $this->assertSame(0, $summary['not_match_count']);
+        $this->assertSame(0, $summary['pending_count']);
+    }
+
+    public function test_inline_preview_does_not_echo_other_users_confirmation(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        // user A's confirmation (user_id = $this->user->id)
+        ReadingInlineSenseConfirmation::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => null,
+            'sentence_index' => 0,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => ReadingInlineSenseConfirmation::CHOICE_MATCH,
+            'source' => ReadingInlineSenseConfirmation::SOURCE_READING_INLINE_PREVIEW,
+        ]);
+
+        // Use service directly to confirm other user cannot see it (avoids
+        // auth.session mid-test user switch redirect).
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $otherUserResult = $service->listConfirmationsForOccurrence(
+            $this->otherUser->id,
+            'english',
+            null,
+            0,
+            'geese',
+            'goose',
+            [$sense->id]
+        );
+        $this->assertSame([], $otherUserResult, 'other user must not see confirmation');
+
+        $myResult = $service->listConfirmationsForOccurrence(
+            $this->user->id,
+            'english',
+            null,
+            0,
+            'geese',
+            'goose',
+            [$sense->id]
+        );
+        $this->assertCount(1, $myResult, 'owner must see their confirmation');
+    }
+
+    public function test_inline_preview_echo_does_not_write_review_log_or_fsrs(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        $reviewLogBefore = ReviewLog::count();
+        $reviewCardBefore = ReviewCard::count();
+        $wordSenseBefore = WordSense::count();
+
+        ReadingInlineSenseConfirmation::create([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'chapter_id' => null,
+            'sentence_index' => 0,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => ReadingInlineSenseConfirmation::CHOICE_MATCH,
+            'source' => ReadingInlineSenseConfirmation::SOURCE_READING_INLINE_PREVIEW,
+        ]);
+
+        $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese')
+            ->assertOk();
+
+        $this->assertSame($reviewLogBefore, ReviewLog::count(), 'echo must not write ReviewLog');
+        $this->assertSame($reviewCardBefore, ReviewCard::count(), 'echo must not create ReviewCard');
+        $this->assertSame($wordSenseBefore, WordSense::count(), 'echo must not create WordSense');
     }
 
     // ==================== Helpers ====================

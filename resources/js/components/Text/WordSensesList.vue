@@ -35,14 +35,18 @@
         <v-alert v-if="message" dense text type="success" class="mt-2 mb-2">{{ message }}</v-alert>
         <v-alert v-if="saveError" dense text type="error" class="mt-2 mb-2">{{ saveError }}</v-alert>
 
-        <!-- Inline sense preview panel (GLM-ReadingInlinePreview-First-1)
-             READ-ONLY preview + front-end-only "是这个意思 / 不是这个意思" buttons.
-             Does NOT write ReviewLog / FSRS / WordSense / ReviewCard. -->
+        <!-- Inline sense preview panel (GLM-ReadingInlinePreview-First-1 +
+             GLM-ReadingInlineConfirmationPersistence-1000-1)
+             READ-ONLY preview + persisted "是这个意思 / 不是这个意思" buttons.
+             Persisted confirmations are NOT review ratings; they do NOT
+             write ReviewLog / FSRS / WordSense / ReviewCard. -->
         <inline-sense-preview-panel
             :lemma="effectiveLemma"
             :surface="surfaceWord"
             :sentence="sentenceText"
             :language="language"
+            :chapter-id="chapterId"
+            :sentence-index="sentenceIndex"
         />
 
         <!-- Known-sense candidates panel (Trae-LemmaKnownSenseBridge-1) -->

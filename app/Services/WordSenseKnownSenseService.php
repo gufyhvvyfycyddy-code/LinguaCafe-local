@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\ReadingInlineSenseConfirmationService;
 
 /**
  * Bridges lemma lookup to "already-learned sense" candidates.
@@ -29,6 +30,11 @@ use App\Models\WordSenseOccurrence;
  */
 class WordSenseKnownSenseService
 {
+    public function __construct(
+        private readonly ReadingInlineSenseConfirmationService $confirmationService,
+    )
+    {
+    }
     /**
      * List confirmed WordSense rows for a given lemma.
      *
@@ -139,7 +145,7 @@ class WordSenseKnownSenseService
 
     /**
      * Build a READ-ONLY inline preview payload for the reading page
-     * (GLM-ReadingInlinePreview-First-1).
+     * (GLM-ReadingInlinePreview-First-1, extended GLM-ReadingInlineConfirmationPersistence-1000-1).
      *
      * Product role:
      *  - When the user clicks a token in the reading page, the frontend can
@@ -149,10 +155,9 @@ class WordSenseKnownSenseService
      *      * the sentence the token appears in (passed through for display);
      *      * confirmed WordSense candidates for this lemma;
      *      * each candidate's sense text + whether it has a sense ReviewCard;
-     *      * a read-only FSRS status summary per candidate.
-     *  - The user may click "是这个意思" / "不是这个意思". Those buttons are
-     *    FRONT-END ONLY this round. This method does not record the user's
-     *    choice, does not create any pending row, and does not write anything.
+     *      * a read-only FSRS status summary per candidate;
+     *      * (new) each candidate's persisted inline confirmation choice
+     *        for THIS occurrence, if any (match / not_match / null).
      *
      * Safety contract — this method:
      *  - does NOT call ReviewLog::create / ReviewCardService::recordReview /
@@ -160,21 +165,26 @@ class WordSenseKnownSenseService
      *  - does NOT create WordSense / ReviewCard / WordSenseOccurrence;
      *  - does NOT call AI;
      *  - does NOT perform any DB write.
+     *  - DOES read from `reading_inline_sense_confirmations` (read-only).
      *
      * The returned safety_flags are a hard contract that the frontend and
      * tests can rely on. If a future round wants to turn "是这个意思" into a
-     * real write, it MUST remove the corresponding safety flag and pass an
-     * Architecture Gate + ADR first.
+     * real FSRS write, it MUST remove the corresponding safety flag and
+     * pass an Architecture Gate + ADR first (see ADR-0003).
      *
      * @param string $surface The surface form clicked by the user (e.g. "geese").
      * @param string $sentence The sentence the token appears in (display only).
+     * @param int|null $chapterId The chapter the token appears in (for echo lookup).
+     * @param int|null $sentenceIndex The sentence index (for echo lookup).
      */
     public function previewInlineSenseCandidates(
         int $userId,
         string $language,
         string $lemma,
         string $surface = '',
-        string $sentence = ''
+        string $sentence = '',
+        ?int $chapterId = null,
+        ?int $sentenceIndex = null
     ): array {
         $normalizedLemma = mb_strtolower(trim($lemma));
         $normalizedSurface = trim($surface);
@@ -182,13 +192,47 @@ class WordSenseKnownSenseService
 
         $candidates = $this->listConfirmedSensesForLemma($userId, $language, $normalizedLemma);
 
+        // Read-only echo of persisted inline confirmations for this occurrence.
+        // Only returns choices owned by the current user + language; does not
+        // leak other users' confirmations.
+        $persistedMap = [];
+        if (!empty($candidates) && ($chapterId !== null || $sentenceIndex !== null || $normalizedSurface !== '')) {
+            $senseIds = array_map(fn ($c) => $c['sense_id'], $candidates);
+            $persistedMap = $this->confirmationService->listConfirmationsForOccurrence(
+                $userId,
+                $language,
+                $chapterId,
+                $sentenceIndex,
+                $normalizedSurface,
+                $normalizedLemma,
+                $senseIds
+            );
+        }
+
+        // Attach persisted_choice / confirmation_id / confirmed_at to each candidate.
+        foreach ($candidates as &$candidate) {
+            $sid = $candidate['sense_id'];
+            $entry = $persistedMap[$sid] ?? null;
+            $candidate['persisted_choice'] = $entry['choice'] ?? null;
+            $candidate['confirmation_id'] = $entry['confirmation_id'] ?? null;
+            $candidate['confirmed_at'] = $entry['updated_at'] ?? null;
+        }
+        unset($candidate);
+
         return [
             'lemma' => $normalizedLemma,
             'surface' => $normalizedSurface,
             'sentence' => $trimmedSentence,
+            'chapter_id' => $chapterId,
+            'sentence_index' => $sentenceIndex,
             'has_confirmed_senses' => !empty($candidates),
             'candidates' => $candidates,
             'candidate_count' => count($candidates),
+            'persisted_summary' => [
+                'match_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === 'match')),
+                'not_match_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === 'not_match')),
+                'pending_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === null)),
+            ],
             'safety_flags' => [
                 'read_only' => true,
                 'no_review_log_created' => true,
@@ -197,7 +241,7 @@ class WordSenseKnownSenseService
                 'no_word_sense_created' => true,
                 'no_ai_called' => true,
             ],
-            'ui_hint' => '本轮「是这个意思 / 不是这个意思」按钮仅改变前端状态，不会写入复习记录、不会改变 FSRS、不会创建词义或复习卡。',
+            'ui_hint' => '「是这个意思 / 不是这个意思」按钮会保存为阅读位置级别的确认，不是复习评分，不会写入复习记录，不会改变 FSRS，不会创建词义或复习卡。',
         ];
     }
 }
