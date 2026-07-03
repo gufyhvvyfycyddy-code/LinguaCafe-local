@@ -42,6 +42,9 @@ New rules and process notes are documented in:
 - `vibe-coding-collaboration-rules.md` §24 — 进度条显示规则（100% 项隐藏、涨幅标注、样式）。
 - `vibe-coding-collaboration-rules.md` §25 — 计划审查规则（入任务前审查全部未满项）。
 - `vibe-coding-collaboration-rules.md` §26 — 模式选择规则（OpenCode 微任务 / Codex 目标模式）。
+- `vibe-coding-collaboration-rules.md` §27 — 高内聚低耦合架构规则与 GLM 1000% 分层规则、MCP 词元测试样本治理规则、视频字幕架构经验规则。
+- `repo-architecture-hotspot-audit.md` §8.5 — 下一轮架构优化必须遵守的边界。
+- `mcp-chrome-local-smoke-playbook.md` §8 — Lemma / Morphology click sample rotation（词元测试样本轮换操作指南）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
 
 ## 2.6 Frozen Plans (Route-Frozen, Not Implemented)

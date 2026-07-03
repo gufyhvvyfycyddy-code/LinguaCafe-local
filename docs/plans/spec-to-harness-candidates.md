@@ -91,6 +91,28 @@ If the project owner asks for the next hardening task, the lowest-risk remaining
 
 Selection still belongs to the project owner / webpage-side designer. Agents must not auto-enter the next task.
 
+### 4.6 MCP Lemma Sample Rotation Harness
+
+**硬规则来源**：`vibe-coding-collaboration-rules.md` §27.5 — MCP 词元测试样本治理规则。
+
+**候选目标**：建立 MCP 形态测试词轮换机制，确保每轮使用不同测试词，不重复上一轮全部词汇。
+
+**检查项**：
+
+1. 每轮 MCP lemma 测试必须使用不同单词；
+2. 不得整轮复用上一轮同一批词（允许 ≤30% 重复）；
+3. 新测试文章必须短、可控、无版权长文、带 marker；
+4. 每轮报告必须列出本轮测试词和上一轮测试词重复比例；
+5. 每轮至少覆盖 8 类形态；
+6. MCP 不可用时必须 Incomplete；
+7. 不允许 API / axios / fetch 替代真实点击。
+
+**建议实现方式**：
+- 不新增自动化命令（纯流程规则）。
+- 建议在 `mcp-chrome-local-smoke-playbook.md` 新增一节 `lemma / morphology click sample rotation` 作为操作指南。
+- CodeBuddy 在每轮 MCP 测试后核查测试词是否与上一轮重复。
+- 如果重复比例超过 30%，网页端总设计师应当标记 Incomplete 或要求补充新词。
+
 ## 5. Deferred Candidate Rationale
 
 | Candidate | Deferred reason |

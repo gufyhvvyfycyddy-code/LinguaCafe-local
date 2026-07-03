@@ -1265,3 +1265,133 @@ OpenCode 每次进入任务后，必须先调用或阅读本地已安装的 `oh-
 - 可以设定 600% 或更高的子阶段进度目标。
 - 但必须拆清楚每个子阶段，不得虚假进度。
 - 子阶段进度上涨必须来自真实代码、测试、文档、页面验收或架构侦查成果。
+
+## 27. 高内聚低耦合架构规则与 GLM 1000% 分层规则
+
+### 27.1 规则目的
+
+本节写入总设计师设定的架构规则，作为所有 GLM 1000% 子阶段和后续开发的硬约束。
+OpenCode / Codex / Trae 只能在规则内执行，不能自行决定架构原则。
+CodeBuddy 只核查事实和越界。
+WorkBuddy 只做体验验收。
+
+### 27.2 高内聚规则
+
+一个模块只能围绕一个清楚的产品责任组织。以下边界必须保持：
+
+1. **Tokenizer 边界**：`tools/tokenizer.py` 只负责分词和 lemma 标注，不涉及读者数据、复习调度或页面渲染。PHP 侧 `TextBlockService` 中的 tokenizer fallback `conservativeFallbackLemma()` 只负责 tokenizer 降级时的 lemma 安全还原，不扩展为通用 NLP 服务。
+2. **Importer 边界**：`ChapterService::processChapterText` / `ImportService` / `BookService` 只负责内容导入和初始分词，不涉及后续读者数据准备或复习卡创建。
+3. **Reader 边界**：`ReaderDataService` 和 `TextBlockGroup.vue` 只负责阅读页数据准备和 token 渲染，不涉及词典查询、词义确认或复习评分。
+4. **Dictionary 边界**：`DictionaryController` / `DictionaryService` / `DictionaryImportService` 只负责词典查询和词典文件导入，不涉及 WordSense 创建或 EncounteredWord 修改。
+5. **WordSense 边界**：`WordSenseService` / `WordSenseKnownSenseService` / `WordSenseOccurrenceService` 只负责词义和 occurrence 管理，已知词义查询必须是只读（`read_only=true`）。
+6. **Review 边界**：`SenseReviewService` / `ReviewCardService` / `FsrsSchedulingService` 只负责复习调度和 FSRS，不涉及 tokenizer 或词典。
+7. **AI 边界**：AI 模块（`AiReadingAssistService` / `AiStudyCardPendingItemService`）只产出 preview / candidate / package，不直接写 WordSense、ReviewCard、ReviewLog。
+8. **MCP 测试治理边界**：MCP 形态测试独立于主业务流程，使用独立测试文章和测试词库，不影响真实学习数据。
+
+**不允许**：
+- 一个 Service 同时承担导入、分词、查词、复习、AI 写入、页面展示、日志写入。
+- 一个 Vue 组件同时承担过多职责而没有子组件边界。`VocabularySideBox.vue`(1470行)、`VocabularyBox.vue`(1498行)、`TextBlockGroup.vue`(2516行) 属于过渡状态，必须在后续拆分。
+- 如果一个文件必须暂时承担多职责，必须在文档中标注"过渡状态"，并有后续拆分路线。
+
+### 27.3 低耦合规则
+
+1. **Controller 不依赖 Controller**。Controller 之间不得互相注入或调用；编排逻辑通过 Service 层完成。
+2. **页面组件不直接理解 FSRS 调度细节**。FSRS 状态通过 `SenseReviewCardSerializerService` 等 serializer / payload 契约暴露给前端，不通过组件内直接 import FSRS 模型或算法。
+3. **AI 推荐 / AI 判断默认只产出 preview / candidate / package**，不直接写 WordSense、ReviewCard、ReviewLog。V3 `safety_flags` (`no_review_card_created` / `no_word_sense_created` / `no_fsrs_changed`) 和 V4 `safety_flags` (`no_ai_called_by_linguacafe` / `ai_response_pasted_by_user` / `user_confirmation_required_before_card_generation`) 是所有 AI 模块必须遵守的最低安全契约。
+4. **阅读页点击 token 优先通过稳定 service / serializer 契约获得数据**，不散落在 Vue 组件内拼装。`ReaderDataService` 和 `SenseReviewCardSerializerService` 是稳定数据入口。
+5. **ReviewLog / FSRS 只能由明确的 review service 入口写入**。`SenseReviewService::rateSense` → `ReviewCardService::logReview` → `FsrsSchedulingService::schedule` 是唯一的写入链。其他模块不得绕过这条链直接操作 ReviewLog 或 FSRS 字段。
+6. **Source context / example pool / known sense lookup 必须保持只读边界**。`SenseSourceContextService`、`WordSenseExamplePoolService`、`WordSenseKnownSenseService` 三者都不写 ReviewLog、WordSense、ReviewCard、FSRS。
+7. **跨模块通信要通过 DTO / payload / serializer / service contract**，不通过隐式共享状态（如 Vuex 中直接存后端模型字段）。
+8. **EncounteredWord 单 lemma 限制**：同 surface 多 lemma 场景（如 `left` 是 `leave` 还是方向）通过 `study_base` + 用户修正 + processed_text per-token 数据缓解，不允许为 per-occurrence lemma 添加复杂 migration 或大规模改写 EncounteredWord 语义，除非经过单独的 ADR。
+
+### 27.4 GLM 1000% 分层规则
+
+GLM 1000% 不是"大包大揽乱改"，而是多个安全子阶段合计。必须分层：
+
+| 层 | 职责 | 风险 |
+|----|------|------|
+| **测试治理层** | 补测试护栏、参数化 fixture、软约束转硬测试 | 低 |
+| **MCP 新样本验收层** | 每轮新测试文章 + 新测试词 + MCP Chrome 真实点击 | 低 |
+| **低风险 service 边界整理层** | 拆分过大的 Service（TextBlockService、VocabularyService），抽取只读查询 | 低-中 |
+| **只读 Vue 展示组件拆分层** | 拆分 `WordSensesList.vue`、`VocabularySideBox.vue` 中的展示子组件 | 中（需 MCP 验收） |
+| **文档与 ADR 路线冻结层** | 更新 master plan、ADR、协作规则 | 低 |
+| **source context / example pool 回归护栏层** | 补边缘 case 测试、性能回归保护 | 低 |
+| **legacy prop / dead prop 清理层** | 移除 Vue 组件中不再使用的 prop、data、computed | 低 |
+
+#### 27.4.1 GLM 1000% 第一轮禁止项
+
+以下事项**禁止在 GLM 1000% 第一轮中直接做**。如果任务涉及以下禁止项，必须先 ADR / 需求冻结 / 单独任务：
+
+1. **Migration** — 新增或修改数据库表结构。
+2. **FSRS 调度改动** — 修改 `FsrsSchedulingService`、`ReviewCardService::logReview`、`SenseReviewService::rateSense` 的核心调度逻辑。
+3. **ReviewLog 写入改动** — 新增 ReviewLog 写入入口、修改现有 rating 语义、改变 ReviewLog 保留策略。
+4. **真实 AI 写入** — 自动调用外部 AI API 并直接处理返回结果（用户粘贴 AI 输出始终允许）。
+5. **阅读中刷卡评分** — 在阅读页内实现 WordSense 评分 UI 和 ReviewLog/FSRS 写入（路线已冻结但实现需单独 ADR）。
+6. **删除 legacy 兼容层** — 删除 `ReviewCard::TARGET_WORD`、legacy route、`target_type=word` 相关兼容代码。
+7. **Per-occurrence lemma 数据结构落库** — 修改 `encountered_words` 表或新增 per-occurrence lemma 表。
+8. **大规模重写 TextReader / TextBlockGroup** — 超过 50% 组件内容重写。
+9. **合并多个查词入口为一个新大组件** — 将 `VocabularySideBox` / `VocabularyBox` / `VocabularyBottomSheet` 合并为一个组件。
+
+#### 27.4.2 允许第一轮做的示例
+
+- 添加或增强测试（PHPUnit / feature / unit 测试）。
+- 导入新测试文章并执行 MCP Chrome 真实点击验收。
+- 拆分只读的后端 Service（不改变路由、payload、Vue 契约）。
+- 拆分 Vue 展示子组件（不改变父组件 props/events 签名）。
+- 更新文档、协作规则、ADR、master plan。
+- 添加边缘 case 测试和回归护栏。
+- 清理无用的 prop / data / computed。
+
+### 27.5 MCP 词元测试样本治理规则
+
+#### 27.5.1 核心规则
+
+1. **每轮 MCP lemma / 词元测试必须使用不同单词**。不得整轮复用上一轮同一批词。
+2. **可以导入新的短测试文章完成测试**。新文章必须满足：短（建议 3-5 句）、可控、无版权长文。
+3. **每篇测试文章必须有 marker**。marker 格式：`GLM Real Morphology Completion YYYYMMDD`。
+4. **每轮报告必须列出本轮测试词**，并说明是否与上一轮重复。
+5. **每轮至少覆盖以下 8 类**，但每类的示例词必须不同：
+   - 规则复数（如 `technologies`、`boxes` — 上一轮已用，本轮换词）
+   - 不规则复数（如 `mice`、`children` — 上一轮已用，本轮换词）
+   - 第三人称单数（如 `goes`、`watches` — 上一轮已用，本轮换词）
+   - 过去式（如 `ran`、`went` — 上一轮已用，本轮换词）
+   - 过去分词（如 `written`、`published` — 上一轮已用，本轮换词）
+   - 进行时（如 `running`、`studying` — 上一轮已用，本轮换词）
+   - 比较级 / 最高级（如 `better`、`oldest` — 上一轮已用，本轮换词）
+   - 词性歧义（如 `used`、`left`、`broken`、`published` — 上一轮已用，本轮换词）
+6. **每轮必须说明是否使用新文章**。如果使用旧文章只测新词，必须说明。
+7. **MCP 不可用必须 Incomplete**。不允许伪造页面验收。
+8. **不允许用 API / axios / fetch 替代真实点击**。
+9. **如果为了定位 token 使用 DOM 查询，只能用于定位坐标，最终仍必须真实点击**。
+10. **如果 Playwright / MCP 连续点击失败，按顺序尝试**：换词 → 换文章 → 刷新页面 → 单词逐个重新打开页面 → DOM 辅助定位后真实点击。不得退回 API。
+
+#### 27.5.2 候选词池建议
+
+为每类形态准备至少 20 个候选词，每轮从候选词池中选择不重复的子集。禁止连续两轮使用超过 30% 的重复词。候选词池建议（仅供参考，不作硬编码）：
+- 规则复数：books / cats / dogs / cars / pens / tables / chairs / windows / doors / rooms
+- 不规则复数：feet / teeth / men / women / oxen / sheep / deer / fish / people / geese
+- 第三人称单数：makes / takes / gives / tells / asks / keeps / puts / lets / gets / sets
+- 过去式：ate / drank / swam / sang / spoke / broke / drove / wrote / rose / fell
+- 过去分词：eaten / driven / spoken / broken / drawn / known / thrown / grown / blown / flown
+- 进行时：making / taking / giving / telling / keeping / putting / getting / setting / riding / writing
+- 比较级 / 最高级：bigger / smaller / faster / slower / higher / lower / richer / poorer / wider / deeper
+- 词性歧义：walked / turned / opened / closed / finished / started / changed / worked / played / showed
+
+#### 27.5.3 测试文章管理
+
+- 每轮新测试文章应使用不同句子，避免测试用户"背出"特定文章内容。
+- 测试文章不要求有完整作品版权，仅用于验证 tokenizer lemma 和页面点击。
+- 测试文章创建后通过 `/chapters/read/{id}` 访问，执行完毕后不删除（保留为历史记录）。
+- 旧测试文章可以复用，但必须测不同词。
+
+### 27.6 视频字幕架构经验规则
+
+基于以下经验，当总设计师未设定明确架构约束时，AI（包括 OpenCode / Codex / Trae）倾向于沿既有架构延续而非创造新架构：
+
+1. AI 更擅长延续已有架构，**不擅长从混乱中凭空创造好架构**。架构混乱时，AI 会沿着混乱继续扩张，而不是自动修复。
+2. **每个 GLM 1000% 主任务前必须先冻结边界**。不能假设 AI 会自动识别哪些代码不该改。
+3. **总设计师负责设定架构规则**（本节即为此目的）。规则必须明确禁止范围和允许范围。
+4. **OpenCode / GLM 只能在规则内执行**，不能自我授权扩大范围。
+5. **CodeBuddy 只核查事实和越界**，不做架构规则设定。
+6. **WorkBuddy 只做体验验收**，不判断代码实现正确性。
+7. **不能让执行模型自己决定架构原则**。总设计师必须在每个主任务前设定明确的模块边界、禁止事项和验收条件。

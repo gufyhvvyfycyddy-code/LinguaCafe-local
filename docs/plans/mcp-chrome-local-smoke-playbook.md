@@ -117,3 +117,50 @@ MCP Chrome 验收报告必须说明：
 | C: `navigate_page(target)` → 重定向 login → `fill_form` → `click login` → redirect back | ❌ 失败 | Cookie 跨 navigate 丢失 |
 | D: `new_page(no isolated)` → login → `navigate_page(target)` | ❌ 失败 | 无 isolatedContext 时 Cookie 丢失 |
 | E: Same host, fetch login → `navigate_page(target)` | ❌ 失败 | fetch 不共享 Cookie |
+
+## 8. Lemma / Morphology Click Sample Rotation
+
+### 8.1 规则
+
+硬规则参考 `vibe-coding-collaboration-rules.md` §27.5。本节只记录 MCP Chrome 操作指南。
+
+### 8.2 每轮新文章准备
+
+1. 创建新的短测试文章（3-5 句，无版权内容），包含 8 类形态变化各至少 2 个词，以及 3-4 个词性歧义词。
+2. 文章第一行 marker 格式：`GLM Real Morphology Completion YYYYMMDD`。
+3. 通过页面或 API 导入章节。
+4. 记录新文章的 `/chapters/read/{id}` 路径。
+
+### 8.3 词元测试执行步骤
+
+1. 按 §3.2 标准登录流程登录。
+2. 使用 `navigate_page` 或点击导航链接打开新测试文章。
+3. 按 8 类形态逐一点击 token（每类至少 2 个词）。
+4. 每点击一个词后关闭 vocab-box（按 Esc 或点击外部空白）。
+5. 每轮记录：本轮测试词列表、与上一轮重复词数、使用的新文章 ID。
+6. 如果连续点击失败，按以下顺序尝试：
+   a. 关闭 vocab-box 后再点击同词；
+   b. 刷新页面后重试；
+   c. 单个词打开新页面 `/chapters/read/{id}` 再点击；
+   d. 使用 `take_snapshot` 定位 token DOM 后点击；
+   e. 使用截图辅助坐标定位后点击；
+   f. 换词测试（该词无法定位时跳过，换同类另一词）；
+   g. 换文章测试（整篇文章 token 无法正常渲染时）；
+   h. **不得退回 API 验证**。
+
+### 8.4 报告格式
+
+MCP 形态点击验收报告必须包含：
+
+```
+* 本轮测试文章 ID：/chapters/read/{id}
+* 是否新文章：✅ / ❌
+* 本轮测试词列表：[词1, 词2, ...]
+* 与上一轮重复词数：N
+* 重复比例：N%
+* 是否全部真实点击：✅ / ❌（必须为 ✅）
+* 是否使用 API / axios / fetch 替代：❌（必须为 ❌）
+* 是否覆盖 8/8 类：✅ / ❌
+* 8 类分别列出 surface → lemma 结果
+* MCP 不可用时是否报告 Incomplete：✅ / ❌
+```
