@@ -136,4 +136,68 @@ class WordSenseKnownSenseService
             'read_only' => true,
         ];
     }
+
+    /**
+     * Build a READ-ONLY inline preview payload for the reading page
+     * (GLM-ReadingInlinePreview-First-1).
+     *
+     * Product role:
+     *  - When the user clicks a token in the reading page, the frontend can
+     *    call this payload to render a preview panel that shows:
+     *      * current surface form (e.g. "geese");
+     *      * current lemma (e.g. "goose");
+     *      * the sentence the token appears in (passed through for display);
+     *      * confirmed WordSense candidates for this lemma;
+     *      * each candidate's sense text + whether it has a sense ReviewCard;
+     *      * a read-only FSRS status summary per candidate.
+     *  - The user may click "是这个意思" / "不是这个意思". Those buttons are
+     *    FRONT-END ONLY this round. This method does not record the user's
+     *    choice, does not create any pending row, and does not write anything.
+     *
+     * Safety contract — this method:
+     *  - does NOT call ReviewLog::create / ReviewCardService::recordReview /
+     *    ReviewCardService::resetCard / FsrsSchedulingService::schedule;
+     *  - does NOT create WordSense / ReviewCard / WordSenseOccurrence;
+     *  - does NOT call AI;
+     *  - does NOT perform any DB write.
+     *
+     * The returned safety_flags are a hard contract that the frontend and
+     * tests can rely on. If a future round wants to turn "是这个意思" into a
+     * real write, it MUST remove the corresponding safety flag and pass an
+     * Architecture Gate + ADR first.
+     *
+     * @param string $surface The surface form clicked by the user (e.g. "geese").
+     * @param string $sentence The sentence the token appears in (display only).
+     */
+    public function previewInlineSenseCandidates(
+        int $userId,
+        string $language,
+        string $lemma,
+        string $surface = '',
+        string $sentence = ''
+    ): array {
+        $normalizedLemma = mb_strtolower(trim($lemma));
+        $normalizedSurface = trim($surface);
+        $trimmedSentence = trim($sentence);
+
+        $candidates = $this->listConfirmedSensesForLemma($userId, $language, $normalizedLemma);
+
+        return [
+            'lemma' => $normalizedLemma,
+            'surface' => $normalizedSurface,
+            'sentence' => $trimmedSentence,
+            'has_confirmed_senses' => !empty($candidates),
+            'candidates' => $candidates,
+            'candidate_count' => count($candidates),
+            'safety_flags' => [
+                'read_only' => true,
+                'no_review_log_created' => true,
+                'no_fsrs_changed' => true,
+                'no_review_card_created' => true,
+                'no_word_sense_created' => true,
+                'no_ai_called' => true,
+            ],
+            'ui_hint' => '本轮「是这个意思 / 不是这个意思」按钮仅改变前端状态，不会写入复习记录、不会改变 FSRS、不会创建词义或复习卡。',
+        ];
+    }
 }

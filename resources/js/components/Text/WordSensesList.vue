@@ -35,6 +35,16 @@
         <v-alert v-if="message" dense text type="success" class="mt-2 mb-2">{{ message }}</v-alert>
         <v-alert v-if="saveError" dense text type="error" class="mt-2 mb-2">{{ saveError }}</v-alert>
 
+        <!-- Inline sense preview panel (GLM-ReadingInlinePreview-First-1)
+             READ-ONLY preview + front-end-only "是这个意思 / 不是这个意思" buttons.
+             Does NOT write ReviewLog / FSRS / WordSense / ReviewCard. -->
+        <inline-sense-preview-panel
+            :lemma="effectiveLemma"
+            :surface="surfaceWord"
+            :sentence="sentenceText"
+            :language="language"
+        />
+
         <!-- Known-sense candidates panel (Trae-LemmaKnownSenseBridge-1) -->
         <div v-if="!loading && !error && knownSenses.length > 0" class="known-sense-panel rounded pa-2 mb-3">
             <div class="d-flex align-center mb-1">
@@ -227,6 +237,7 @@
 <script>
 import { mapState } from 'vuex';
 import AddSenseForm from './AddSenseForm.vue';
+import InlineSensePreviewPanel from './InlineSensePreviewPanel.vue';
 import {
     buildWordSenseCandidateLookupContext,
     buildWordSenseCandidateLookupKey,
@@ -247,6 +258,7 @@ const POS_OPTIONS = [
 export default {
     components: {
         AddSenseForm,
+        InlineSensePreviewPanel,
     },
     props: {
         lemma: {

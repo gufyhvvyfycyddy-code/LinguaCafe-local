@@ -35,6 +35,16 @@
 > - 真实页面点击验收未使用 API/axios/fetch 模拟点击，全部为 Playwright 真实浏览器点击。
 > - 架构影响：不新增 route/service/controller，不改 Vue 行为，不改 FSRS/ReviewLog/ReviewCard/WordSense 删除归档恢复语义。阅读中刷卡评分与 AI 判断熟词僻义仍未实现；不写 ReviewLog、不改 FSRS、不调用 AI。
 
+> **2026-07-03 GLM-ReadingInlinePreview-First-1 新增热点（read-only inline sense preview panel）**：
+> - `WordSenseKnownSenseService::previewInlineSenseCandidates()`（新增方法）：纯只读，返回 `lemma` / `surface` / `sentence` / `has_confirmed_senses` / `candidates` / `candidate_count` / `safety_flags`（6 条：`read_only` / `no_review_log_created` / `no_fsrs_changed` / `no_review_card_created` / `no_word_sense_created` / `no_ai_called`）/ `ui_hint`。复用 `listConfirmedSensesForLemma()`，不写 ReviewLog / FSRS / WordSense / ReviewCard，不调 AI。低风险。
+> - `SenseOccurrenceController::inlinePreview()`（新增方法）：`GET /senses/inline-preview`，鉴权 + 用户/语言隔离 + 422 空 lemma + 403 language mismatch。无新依赖。与 `knownSenseLookup()` 同一边界。
+> - `routes/web.php`（修改）：新增 `Route::get('/senses/inline-preview', ...)`。无路由冲突。
+> - `InlineSensePreviewPanel.vue`（新增只读子组件）：嵌入 `WordSensesList.vue`，通过 GET 拉 preview payload。safety banner + 「是这个意思 / 不是这个意思」按钮只改本地 `userChoice`，不 POST/PUT/DELETE。**需要后续关注**：如果未来要实现阅读中评分，必须新增 ADR + 接口审查，不允许直接在该组件上加 POST 入口。
+> - `WordSensesList.vue`（修改）：在 `v-alert saveError` 之后、`known-sense-panel` 之前嵌入 `InlineSensePreviewPanel`。不改父组件 props/events 大结构。
+> - `InlineSensePreviewTest`（新增 20 tests / 80 assertions）：endpoint 行为护栏，证明 no writes / no AI / only confirmed / pending+ignored+rejected excluded / cross-user+cross-language isolation / empty lemma safe empty state。
+> - `InlineSensePreviewUiGuardTest`（新增 11 tests / 44 assertions）：源码级 UI 守护，证明 preview/safety 文案存在、无「立即评分」/肯定性「写入复习记录」/「AI 已判断」、不触发 rating route。
+> - 架构影响：不新增 migration；不改 FSRS / ReviewLog / WordSenseService 删除归档恢复语义；不删除 legacy 兼容层；不实现阅读中刷卡评分；不 per-occurrence lemma 落库；不真实调用 AI；不大规模重写 UI。800% 是 7 个子阶段合计提升，不是固定五条主线虚假上涨。
+
 > **2026-07-02 Trae 任务新增热点**：
 > - `WordSenseExamplePoolService`（新增）：只读，复用 `WordSenseOccurrence` + card example fallback，不写 ReviewLog/WordSense/ReviewCard/FSRS。无 migration。低风险。
 > - `SenseReviewCardSerializerService`（修改）：payload 新增 `example_candidates` / `example_candidates_count` / `supplementary_example`。需要后续关注 payload 大小增长（最多 10 个 occurrence 候选 + 1 个 card fallback）。

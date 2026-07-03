@@ -99,6 +99,50 @@ class SenseOccurrenceController extends Controller
         );
     }
 
+    /**
+     * Return a READ-ONLY inline preview payload for the reading page
+     * (GLM-ReadingInlinePreview-First-1).
+     *
+     * This endpoint powers the "InlineSensePreviewPanel" shown after the user
+     * clicks a token in the reading page. It returns:
+     *  - the lemma / surface / sentence passed through for display;
+     *  - confirmed WordSense candidates for this lemma (with read-only FSRS
+     *    status summary per candidate);
+     *  - a hard safety_flags contract proving nothing is written.
+     *
+     * The "是这个意思 / 不是这个意思" buttons on the frontend are FRONT-END
+     * ONLY this round — they do not call any POST endpoint, do not record
+     * the user's choice, do not write ReviewLog / FSRS / WordSense /
+     * ReviewCard. This GET endpoint is the only backend call involved.
+     */
+    public function inlinePreview(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $lemma = (string) $request->query('lemma');
+        if ($lemma === '') {
+            abort(422, 'The lemma parameter is required.');
+        }
+
+        $surface = (string) $request->query('surface', '');
+        $sentence = (string) $request->query('sentence', '');
+
+        return response()->json(
+            $this->knownSenseService->previewInlineSenseCandidates(
+                $userId,
+                $language,
+                $lemma,
+                $surface,
+                $sentence
+            )
+        );
+    }
+
     public function possibleDuplicates(Request $request)
     {
         $userId = Auth::user()->id;
