@@ -533,7 +533,344 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         ])->assertStatus(401);
     }
 
+    // ====================================================================
+    // GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1
+    // Sub-stage 7 (+150%): read-only `summaryForSenseCandidates` guards.
+    // ====================================================================
+
+    /**
+     * The summary method must aggregate match / not_match counts across ALL
+     * occurrences for the requested sense ids (not just one occurrence).
+     */
+    public function test_summary_aggregates_counts_across_occurrences(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // Save 3 matches at different occurrences + 2 not_match.
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 2,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'goose', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 3,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 4,
+            'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'goose', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 5,
+            'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $summary = $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+
+        $this->assertArrayHasKey($sense->id, $summary);
+        $entry = $summary[$sense->id];
+        $this->assertSame(3, $entry['match_count'], 'match_count should aggregate across occurrences');
+        $this->assertSame(2, $entry['not_match_count'], 'not_match_count should aggregate across occurrences');
+        $this->assertTrue($entry['has_any_confirmation']);
+        $this->assertContains($entry['last_choice'], ['match', 'not_match']);
+        $this->assertNotNull($entry['last_confirmed_at']);
+        $this->assertCount(3, $entry['recent_examples'], 'recent_examples capped at 3');
+    }
+
+    /**
+     * The summary must isolate by user — user B must not see user A's
+     * confirmations even if they share the same sense id (impossible in
+     * practice due to user-scoped sense ownership, but the summary must
+     * still enforce user isolation at the SQL layer).
+     */
+    public function test_summary_isolates_by_user(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $userBSummary = $service->summaryForSenseCandidates($this->otherUser->id, 'english', [$sense->id]);
+
+        $this->assertArrayHasKey($sense->id, $userBSummary);
+        $this->assertSame(0, $userBSummary[$sense->id]['match_count'], 'user B must not see user A match count');
+        $this->assertSame(0, $userBSummary[$sense->id]['not_match_count']);
+        $this->assertFalse($userBSummary[$sense->id]['has_any_confirmation']);
+        $this->assertNull($userBSummary[$sense->id]['last_choice']);
+        $this->assertEmpty($userBSummary[$sense->id]['recent_examples']);
+    }
+
+    /**
+     * The summary must isolate by language — querying with a different
+     * language must return empty even for the same user.
+     */
+    public function test_summary_isolates_by_language(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $japaneseSummary = $service->summaryForSenseCandidates($this->user->id, 'japanese', [$sense->id]);
+
+        $this->assertSame(0, $japaneseSummary[$sense->id]['match_count'], 'japanese summary must be empty');
+        $this->assertFalse($japaneseSummary[$sense->id]['has_any_confirmation']);
+    }
+
+    /**
+     * The summary is strictly read-only — it must NOT write any table.
+     * We verify by counting rows before / after.
+     */
+    public function test_summary_is_strictly_read_only(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+
+        $before = [
+            'confirmations' => ReadingInlineSenseConfirmation::count(),
+            'review_logs' => ReviewLog::count(),
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+        ];
+
+        $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+
+        $after = [
+            'confirmations' => ReadingInlineSenseConfirmation::count(),
+            'review_logs' => ReviewLog::count(),
+            'word_senses' => WordSense::count(),
+            'review_cards' => ReviewCard::count(),
+        ];
+
+        $this->assertSame($before, $after, 'summary must not write any table');
+    }
+
+    /**
+     * The summary must NOT write ReviewLog even when there are confirmations.
+     */
+    public function test_summary_does_not_write_review_log(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $before = ReviewLog::count();
+        $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+        $this->assertSame($before, ReviewLog::count(), 'summary must not write ReviewLog');
+    }
+
+    /**
+     * The summary must NOT change any ReviewCard FSRS field.
+     */
+    public function test_summary_does_not_change_fsrs_fields(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_stability' => 2.0,
+            'fsrs_difficulty' => 4.5,
+            'fsrs_reps' => 5,
+            'fsrs_lapses' => 1,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $before = [
+            'fsrs_state' => $card->fsrs_state,
+            'fsrs_reps' => $card->fsrs_reps,
+            'fsrs_stability' => $card->fsrs_stability,
+            'fsrs_difficulty' => $card->fsrs_difficulty,
+            'fsrs_lapses' => $card->fsrs_lapses,
+            'fsrs_enabled' => $card->fsrs_enabled,
+        ];
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+
+        $card->refresh();
+        $this->assertSame($before['fsrs_state'], $card->fsrs_state);
+        $this->assertSame($before['fsrs_reps'], $card->fsrs_reps);
+        $this->assertSame($before['fsrs_stability'], $card->fsrs_stability);
+        $this->assertSame($before['fsrs_difficulty'], $card->fsrs_difficulty);
+        $this->assertSame($before['fsrs_lapses'], $card->fsrs_lapses);
+        $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
+    }
+
+    /**
+     * The summary must NOT create WordSense or ReviewCard.
+     */
+    public function test_summary_does_not_create_word_sense_or_review_card(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $beforeSense = WordSense::count();
+        $beforeCard = ReviewCard::count();
+
+        $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+
+        $this->assertSame($beforeSense, WordSense::count(), 'summary must not create WordSense');
+        $this->assertSame($beforeCard, ReviewCard::count(), 'summary must not create ReviewCard');
+    }
+
+    /**
+     * recent_examples must NOT leak other users' confirmations.
+     * Already covered by test_summary_isolates_by_user, but this test
+     * explicitly checks the recent_examples array content.
+     */
+    public function test_summary_recent_examples_does_not_leak_other_users(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // User A saves a confirmation.
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // User A's summary should see their own recent_examples.
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $userASummary = $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+        $this->assertCount(1, $userASummary[$sense->id]['recent_examples']);
+        $this->assertSame('geese', $userASummary[$sense->id]['recent_examples'][0]['surface']);
+
+        // User B's summary recent_examples must be empty.
+        $userBSummary = $service->summaryForSenseCandidates($this->otherUser->id, 'english', [$sense->id]);
+        $this->assertEmpty($userBSummary[$sense->id]['recent_examples'], 'user B must not see user A recent_examples');
+    }
+
+    /**
+     * When called with an empty sense id list, the summary returns an empty
+     * array (defensive — must not error).
+     */
+    public function test_summary_returns_empty_array_for_empty_sense_ids(): void
+    {
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $result = $service->summaryForSenseCandidates($this->user->id, 'english', []);
+        $this->assertSame([], $result);
+    }
+
+    /**
+     * When called with sense ids that have NO confirmations, the summary
+     * returns a zeroed entry per sense id (not missing).
+     */
+    public function test_summary_returns_zeroed_entry_for_sense_without_confirmations(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $service = app(\App\Services\ReadingInlineSenseConfirmationService::class);
+        $result = $service->summaryForSenseCandidates($this->user->id, 'english', [$sense->id]);
+
+        $this->assertArrayHasKey($sense->id, $result);
+        $this->assertSame(0, $result[$sense->id]['match_count']);
+        $this->assertSame(0, $result[$sense->id]['not_match_count']);
+        $this->assertFalse($result[$sense->id]['has_any_confirmation']);
+        $this->assertNull($result[$sense->id]['last_choice']);
+        $this->assertNull($result[$sense->id]['last_confirmed_at']);
+        $this->assertEmpty($result[$sense->id]['recent_examples']);
+    }
+
+    /**
+     * The GET /senses/inline-preview payload must include usage_summary
+     * fields per candidate (match_count / not_match_count / last_choice /
+     * last_confirmed_at).
+     */
+    public function test_inline_preview_payload_includes_usage_summary(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // Save one match + one not_match.
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'goose', 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 2,
+            'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=goose&language=english&surface=geese&chapter_id=' . $chapter->id . '&sentence_index=1')
+            ->assertOk();
+
+        $candidates = $response->json('candidates');
+        $this->assertNotEmpty($candidates);
+        $candidate = $candidates[0];
+        $this->assertSame($sense->id, $candidate['sense_id']);
+        $this->assertArrayHasKey('usage_summary', $candidate);
+        $this->assertSame(1, $candidate['usage_match_count'], 'usage_match_count should be 1');
+        $this->assertSame(1, $candidate['usage_not_match_count'], 'usage_not_match_count should be 1');
+        $this->assertNotNull($candidate['usage_last_choice']);
+        $this->assertNotNull($candidate['usage_last_confirmed_at']);
+    }
+
+    /**
+     * For a lemma with NO confirmed WordSense candidates (unknown lemma),
+     * the preview payload returns candidate_count=0 and no usage summary.
+     */
+    public function test_inline_preview_returns_empty_summary_for_unknown_lemma(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->get('/senses/inline-preview?lemma=zzzunknown&language=english&surface=zzzunknown')
+            ->assertOk();
+
+        $this->assertSame(0, $response->json('candidate_count'));
+        $this->assertSame([], $response->json('candidates'));
+    }
+
     // ==================== Helpers ====================
+
 
     private function createConfirmedSense(string $lemma, string $surfaceForm, string $senseZh): WordSense
     {

@@ -6,6 +6,7 @@ use Tests\TestCase;
 
 /**
  * GLM-ReadingInlinePreview-First-1 + GLM-ReadingInlineConfirmationPersistence-1000-1
+ * + GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1
  *
  * Frontend / UI guard tests for the inline sense preview panel.
  *
@@ -17,15 +18,18 @@ use Tests\TestCase;
  *
  * Covers:
  *  1. preview 文案 exists in InlineSensePreviewPanel.vue;
- *  2. safety 文案 exists ("不会写入复习记录" / "不会改变 FSRS" / "这不是复习评分");
+ *  2. safety 文案 exists ("不会写入复习记录" / "不会改变复习进度（FSRS）" / "这不是复习评分");
  *  3. persisted-echo 文案 exists ("已保存：是这个意思" / "已保存：不是这个意思");
- *  4. no "立即评分" copy;
- *  5. no "写入复习记录" copy;
- *  6. no "AI 已判断" copy;
- *  7. no Good / Easy / Hard / Again rating buttons;
- *  8. component POSTs only to /senses/inline-confirmation (the safe writer),
+ *  4. usage-surface 文案 exists ("阅读中确认过" / "阅读中排除过" / "最近一次");
+ *  5. friendlier copy ("不会改变复习进度") preferred over bare "FSRS";
+ *  6. no "立即评分" copy;
+ *  7. no "写入复习记录" copy;
+ *  8. no "AI 已判断" copy;
+ *  9. no Good / Easy / Hard / Again rating buttons;
+ * 10. no "删除词义" / "拒绝词义" copy used for not_match;
+ * 11. component POSTs only to /senses/inline-confirmation (the safe writer),
  *     never to /reviews/rate, /reviews/senses/.../rate, /review-log, /fsrs;
- *  9. legacy entry copy not re-introduced.
+ * 12. legacy entry copy not re-introduced.
  */
 class InlineSensePreviewUiGuardTest extends TestCase
 {
@@ -56,8 +60,42 @@ class InlineSensePreviewUiGuardTest extends TestCase
     {
         $contents = file_get_contents($this->panelPath);
         $this->assertStringContainsString('不会写入复习记录', $contents, 'panel must state no review log written.');
-        $this->assertStringContainsString('不会改变 FSRS', $contents, 'panel must state no FSRS change.');
+        // Friendlier phrasing preferred per ADR-0003 Usage Surface Layer §6.
+        // "不会改变复习进度（FSRS）" keeps FSRS as parenthetical clarification.
+        $this->assertStringContainsString('不会改变复习进度', $contents, 'panel must state no review progress change (friendlier copy).');
         $this->assertStringContainsString('这不是复习评分', $contents, 'panel must state this is not a review rating.');
+    }
+
+    /**
+     * GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1
+     *
+     * The panel must display per-sense usage summary copy so users can see
+     * "这个词义在阅读中确认过 N 次" / "排除过 N 次" / "最近一次".
+     */
+    public function test_panel_contains_usage_surface_copy(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $this->assertStringContainsString('阅读中确认过', $contents, 'panel must show reading-inline match count copy.');
+        $this->assertStringContainsString('阅读中排除过', $contents, 'panel must show reading-inline not-match count copy.');
+        $this->assertStringContainsString('最近一次', $contents, 'panel must show last choice copy.');
+        $this->assertStringContainsString('是这个意思', $contents, 'panel must show "是这个意思" in usage summary or button.');
+        $this->assertStringContainsString('不是这个意思', $contents, 'panel must show "不是这个意思" in usage summary or button.');
+    }
+
+    /**
+     * GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1
+     *
+     * The panel must NOT use "删除词义" / "拒绝词义" copy for the not_match
+     * button, because not_match is occurrence-scoped, not a global rejection
+     * (ADR-0003 §12).
+     */
+    public function test_panel_does_not_use_global_negation_copy_for_not_match(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $blocked = ['删除词义', '拒绝词义', '删除这个词义', '拒绝这个词义', '全局排除'];
+        foreach ($blocked as $copy) {
+            $this->assertStringNotContainsString($copy, $contents, 'panel must not use global-negation copy for not_match [' . $copy . '].');
+        }
     }
 
     public function test_panel_contains_persisted_echo_copy(): void

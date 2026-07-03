@@ -12,7 +12,7 @@
 
         <!-- Safety banner: this is NOT a review rating -->
         <div class="inline-preview-safety-banner text-caption text--secondary mb-2">
-            这是候选预览。这不是复习评分，不会写入复习记录，不会改变 FSRS。
+            这是候选预览。这不是复习评分，不会写入复习记录，不会改变复习进度（FSRS）。
         </div>
 
         <!-- Surface / lemma / sentence context -->
@@ -65,6 +65,22 @@
                     已复习 {{ candidate.fsrs_reps }} 次
                 </div>
 
+                <!-- Usage surface: per-sense reading confirmation summary (GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1) -->
+                <div
+                    v-if="hasUsageSummary(candidate)"
+                    class="inline-preview-usage-summary text-caption mt-1 mb-1"
+                >
+                    <div v-if="candidate.usage_match_count > 0" class="inline-preview-usage-match">
+                        这个词义在阅读中确认过 {{ candidate.usage_match_count }} 次
+                    </div>
+                    <div v-if="candidate.usage_not_match_count > 0" class="inline-preview-usage-not-match">
+                        这个词义在阅读中排除过 {{ candidate.usage_not_match_count }} 次
+                    </div>
+                    <div v-if="candidate.usage_last_choice" class="inline-preview-usage-last text--secondary">
+                        最近一次：<span v-if="candidate.usage_last_choice === 'match'">是这个意思</span><span v-else>不是这个意思</span>
+                    </div>
+                </div>
+
                 <!-- Persisted confirmation buttons (GLM-ReadingInlineConfirmationPersistence-1000-1) -->
                 <div class="d-flex mt-2 align-center flex-wrap">
                     <v-btn
@@ -100,7 +116,7 @@
                     <span v-else class="inline-preview-saved-not-match">
                         已保存：不是这个意思
                     </span>
-                    <span class="text--secondary ml-1">（这不是复习评分，不会写入复习记录，不会改变 FSRS）</span>
+                    <span class="text--secondary ml-1">（这不是复习评分，不会写入复习记录，不会改变复习进度）</span>
                 </div>
 
                 <!-- Per-candidate save error -->
@@ -124,7 +140,7 @@
                 icon="mdi-information-outline"
                 class="mt-2 mb-0 inline-preview-choice-notice"
             >
-                你的选择已保存为阅读位置级别的确认。这不是复习评分，不会写入复习记录，不会改变 FSRS，不会创建词义或复习卡。
+                你的选择已保存为阅读位置级别的确认。这不是复习评分，不会写入复习记录，不会改变复习进度（FSRS），不会创建词义或复习卡。
             </v-alert>
         </div>
     </div>
@@ -303,6 +319,22 @@ export default {
             }
             return candidate.persisted_choice || null;
         },
+        /**
+         * Returns true when the candidate carries any reading-inline confirmation
+         * usage summary worth displaying. Used by the template to gate the
+         * usage summary block so empty confirmations don't render an empty box.
+         *
+         * (GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1)
+         */
+        hasUsageSummary(candidate) {
+            if (!candidate) return false;
+            const matchCount = candidate.usage_match_count;
+            const notMatchCount = candidate.usage_not_match_count;
+            const lastChoice = candidate.usage_last_choice;
+            return (typeof matchCount === 'number' && matchCount > 0)
+                || (typeof notMatchCount === 'number' && notMatchCount > 0)
+                || (lastChoice !== null && lastChoice !== undefined && lastChoice !== '');
+        },
         persistChoice(candidate, choice) {
             const senseId = candidate.sense_id;
 
@@ -397,5 +429,27 @@ export default {
 .inline-preview-saved-not-match {
     color: var(--v-error-base);
     font-weight: 600;
+}
+
+/* Usage surface: per-sense reading confirmation summary
+   (GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1) */
+.inline-preview-usage-summary {
+    line-height: 1.5;
+    border-left: 2px solid rgba(var(--v-primary-base), 0.35);
+    padding-left: 6px;
+}
+
+.inline-preview-usage-match {
+    color: var(--v-success-base);
+    font-weight: 500;
+}
+
+.inline-preview-usage-not-match {
+    color: var(--v-error-base);
+    font-weight: 500;
+}
+
+.inline-preview-usage-last {
+    font-size: 0.7rem;
 }
 </style>

@@ -143,3 +143,29 @@ This ADR is validated by:
 - This ADR does NOT authorize per-occurrence lemma persistence into `EncounteredWord`.
 - This ADR does NOT delete or alter any existing table.
 - The `source` column is reserved for future source types but this round only writes `reading_inline_preview`.
+
+## Usage Surface Layer (added 2026-07-03 by GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1)
+
+This section freezes the **usage surface** rules for already-persisted inline confirmations. It does NOT change the persistence contract above; it only clarifies how the persisted rows may be READ and DISPLAYED.
+
+1. A reading inline confirmation is **reading evidence**, not a review rating.
+2. Confirmation rows MAY be read for:
+   - reading-page display (echoing the persisted choice),
+   - per-candidate summary statistics (match_count / not_match_count / last_choice / last_confirmed_at),
+   - future statistics dashboards,
+   - as a pre-stage input for a FUTURE reading-inline-review round that is NOT implemented by this ADR.
+3. Confirmation rows MUST NOT be used to:
+   - write `ReviewLog`,
+   - change any `ReviewCard` FSRS field (state / reps / due_at / stability / difficulty / lapses / enabled),
+   - auto-create `WordSense` or `ReviewCard`,
+   - call AI,
+   - globally negate a `WordSense` (a `not_match` only negates the current occurrence + current candidate).
+4. The usage-surface payload is **read-only**. It MUST NOT perform any DB write.
+5. The usage-surface payload is **isolated by user + language**. It MUST NOT leak other users' confirmations or other languages' confirmations.
+6. New copy shown to the user SHOULD prefer the friendlier phrase "复习进度" over the technical term "FSRS" where possible; "FSRS" may be kept as a parenthetical clarification. This is a copy guideline, not a code contract.
+7. The candidate card MAY display:
+   - "这个词义在阅读中确认过 N 次" (match_count),
+   - "这个词义在阅读中排除过 N 次" (not_match_count),
+   - "最近一次：是这个意思" / "最近一次：不是这个意思" (last_choice),
+   - the current occurrence's persisted_choice (already implemented in the previous round).
+8. If a future round wants to turn a confirmation into an FSRS rating, it MUST open a separate ADR / requirement freeze / dedicated task. This usage-surface layer does NOT authorize that.

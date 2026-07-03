@@ -1,6 +1,6 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 GLM-ArchitectureFirst1000-SafeStability-1）
+> **审计日期**：2026-07-01（最近任务刷新 2026-07-03 GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1）
 > **基准 commit**：`7f3d4b6`
 > **审计方式**：只读侦查，不改代码，不进入功能开发。
 
@@ -34,6 +34,16 @@
 > - `MorphologyMatrixLemmaBridgeDataLayerTest`（重命名）：原 data-layer fixture 测试重命名以体现其数据层 fixture 边界，与真实 tokenizer/importer 回归测试职责区分。测试命名治理完成。
 > - 真实页面点击验收未使用 API/axios/fetch 模拟点击，全部为 Playwright 真实浏览器点击。
 > - 架构影响：不新增 route/service/controller，不改 Vue 行为，不改 FSRS/ReviewLog/ReviewCard/WordSense 删除归档恢复语义。阅读中刷卡评分与 AI 判断熟词僻义仍未实现；不写 ReviewLog、不改 FSRS、不调用 AI。
+
+> **2026-07-03 GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1 新增热点（inline confirmation usage surface + R3 morphology round）**：
+> - `app/Services/ReadingInlineSenseConfirmationService.php`（修改）：新增 `summaryForSenseCandidates(int $userId, string $language, array $senseIds)` 只读方法。聚合 ALL occurrences 的 per-sense 统计：`match_count` / `not_match_count` / `last_choice` / `last_confirmed_at` / `has_any_confirmation` / `recent_examples`（最多 3 条，按 created_at desc）。按 user+language 隔离。不写 ReviewLog / FSRS / WordSense / ReviewCard。**风险等级：🟢 低（纯只读查询，无写入语义变更）**。
+> - `app/Services/WordSenseKnownSenseService.php`（修改）：`previewInlineSenseCandidates()` 方法新增 `$summaryMap` 调用，每个 candidate 附带 `usage_summary` / `usage_match_count` / `usage_not_match_count` / `usage_last_choice` / `usage_last_confirmed_at`。保持只读。向后兼容：旧前端不读取这些字段不会崩溃。**风险等级：🟢 低（payload 扩展，无写入语义变更）**。
+> - `docs/adr/ADR-0003-reading-inline-sense-confirmation-persistence.md`（修改）：Notes 章节后新增 "Usage Surface Layer" 章节，8 条规则冻结使用层产品边界（confirmation 是阅读证据、可用于显示/统计、不等于评分、不影响 FSRS、不写 ReviewLog、not_match 不全局否定、FSRS 面向用户可改述为复习进度、后续转评分须另开 ADR）。
+> - `resources/js/components/Text/InlineSensePreviewPanel.vue`（修改）：新增使用层显示块（`hasUsageSummary()` 模板门控 + 「阅读中确认过 N 次」/「阅读中排除过 N 次」/「最近一次：是这个意思 / 不是这个意思」文案）；安全文案更新（`不会改变 FSRS` → `不会改变复习进度（FSRS）`，更友好但保留 FSRS 括号补充）；新增 CSS 样式 `.inline-preview-usage-summary` / `.inline-preview-usage-match` / `.inline-preview-usage-not-match` / `.inline-preview-usage-last`。**风险等级：🟢 低（纯展示层增强，无 POST/PUT/DELETE 新增，无 rating route）**。
+> - `tests/Feature/ReadingInlineSenseConfirmationTest.php`（修改）：新增 12 个 summary guard tests（聚合统计/用户隔离/语言隔离/严格只读/不写 ReviewLog/不改 FSRS/不创建 WordSense+ReviewCard/recent_examples 不泄漏/空 sense_ids/无确认零值条目/preview payload 含 summary/未知 lemma 空 summary）。
+> - `tests/Feature/InlineSensePreviewUiGuardTest.php`（修改）：新增 `test_panel_contains_usage_surface_copy`（验证「阅读中确认过」/「阅读中排除过」/「最近一次」文案存在）+ `test_panel_does_not_use_global_negation_copy_for_not_match`（验证不使用「删除词义」/「拒绝词义」等全局否定文案）；更新 `test_panel_contains_safety_copy`（检查「不会改变复习进度」替代纯「不会改变 FSRS」）。
+> - `docs/plans/morphology-test-sample-tracker.md`（修改）：新增 R3 round 记录（marker `GLM Reading Inline Confirmation Usage Surface Morphology 20260703`，chapter 15，10 real Playwright clicks，10/10 correct，0% repeat vs R0/R1/R2，8/8 categories，tokenizer confirmed via irregular forms feet→foot/teeth→tooth/ate→eat/driven→drive）；更新 8-category coverage matrix 添加 R3 列；更新规则 #3 click count 阈值从硬编码 16 改为任务指定最小值（通常 ≥10）。
+> - 架构影响：本轮不新增 migration；不改 FSRS / ReviewLog 写入链 / WordSenseService 删除归档恢复语义 / ReviewCard due/reps/state；不删除 legacy 兼容层；不实现阅读中刷卡评分；不 per-occurrence lemma 落库到 EncounteredWord；不真实调用 AI；不大规模重写 UI（只增强 InlineSensePreviewPanel 展示层）。1000% 是 10 个子阶段合计提升，不是固定五条主线虚假上涨。
 
 > **2026-07-03 GLM-ReadingInlineConfirmationPersistence-1000-1 新增热点（inline sense confirmation persistence + ADR-0003）**：
 > - `docs/adr/ADR-0003-reading-inline-sense-confirmation-persistence.md`（新增）：产品冻结 ADR。明确确认结果只用于回显/统计/未来评分前置，不等于评分；不写 ReviewLog；不改 FSRS；不改 review_card due/reps/state；不自动创建 WordSense/ReviewCard；不真实调用 AI；occurrence 级别保存（user_id+language+chapter_id+sentence_index+surface+lemma+word_sense_id）；「不是这个意思」只否定当前 occurrence 不全局否定；后续转评分必须另开 ADR。比较 A（前端 only）/ B（复用 WordSenseOccurrence）/ C（新增轻量表）三方案，选择 C：最安全、最清晰、最少耦合。

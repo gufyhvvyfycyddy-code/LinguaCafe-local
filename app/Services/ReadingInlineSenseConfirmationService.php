@@ -200,4 +200,106 @@ class ReadingInlineSenseConfirmationService
         }
         return $result;
     }
+
+    /**
+     * Read-only: return a per-sense usage summary aggregated across ALL
+     * occurrences for the given candidate sense ids.
+     *
+     * Returned per sense_id:
+     *  - match_count:       total match confirmations across all occurrences
+     *  - not_match_count:   total not_match confirmations across all occurrences
+     *  - last_choice:       the most recent choice ('match' | 'not_match' | null)
+     *  - last_confirmed_at: ISO timestamp of the most recent confirmation (or null)
+     *  - has_any_confirmation: true when at least one confirmation exists
+     *  - recent_examples:   up to 3 recent confirmation rows (occurrence-level),
+     *                        each with surface / lemma / choice / chapter_id /
+     *                        sentence_index / updated_at. Only the current
+     *                        user/language. Does NOT leak other users.
+     *
+     * Safety contract:
+     *  - This method is strictly read-only. It does NOT write any table.
+     *  - It does NOT call ReviewLog / FSRS / AI / WordSense / ReviewCard writes.
+     *  - It is isolated by user_id + language.
+     *
+     * @param list<int> $wordSenseIds
+     * @return array<int, array{
+     *     match_count:int,
+     *     not_match_count:int,
+     *     last_choice:string|null,
+     *     last_confirmed_at:string|null,
+     *     has_any_confirmation:bool,
+     *     recent_examples:list<array{
+     *         surface:string,
+     *         lemma:string,
+     *         choice:string,
+     *         chapter_id:int|null,
+     *         sentence_index:int|null,
+     *         updated_at:string|null
+     *     }>
+     * }>
+     */
+    public function summaryForSenseCandidates(
+        int $userId,
+        string $language,
+        array $wordSenseIds
+    ): array {
+        if (empty($wordSenseIds)) {
+            return [];
+        }
+
+        // Aggregate counts + last choice per sense.
+        $rows = ReadingInlineSenseConfirmation::query()
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->whereIn('word_sense_id', $wordSenseIds)
+            ->orderBy('updated_at', 'desc')
+            ->get();
+
+        $result = [];
+        foreach ($wordSenseIds as $sid) {
+            $result[(int) $sid] = [
+                'match_count' => 0,
+                'not_match_count' => 0,
+                'last_choice' => null,
+                'last_confirmed_at' => null,
+                'has_any_confirmation' => false,
+                'recent_examples' => [],
+            ];
+        }
+
+        foreach ($rows as $row) {
+            $sid = (int) $row->word_sense_id;
+            if (!isset($result[$sid])) {
+                // Defensive: sense id not requested — skip (shouldn't happen due to whereIn).
+                continue;
+            }
+            $entry = &$result[$sid];
+            if ($row->choice === ReadingInlineSenseConfirmation::CHOICE_MATCH) {
+                $entry['match_count']++;
+            } elseif ($row->choice === ReadingInlineSenseConfirmation::CHOICE_NOT_MATCH) {
+                $entry['not_match_count']++;
+            }
+            $entry['has_any_confirmation'] = true;
+            // Rows are ordered by updated_at desc, so the first row encountered
+            // for each sense is the most recent.
+            if ($entry['last_choice'] === null) {
+                $entry['last_choice'] = $row->choice;
+                $entry['last_confirmed_at'] = $row->updated_at?->toISOString();
+            }
+            // Collect up to 3 recent examples per sense.
+            if (count($entry['recent_examples']) < 3) {
+                $entry['recent_examples'][] = [
+                    'surface' => $row->surface,
+                    'lemma' => $row->lemma,
+                    'choice' => $row->choice,
+                    'chapter_id' => $row->chapter_id !== null ? (int) $row->chapter_id : null,
+                    'sentence_index' => $row->sentence_index !== null ? (int) $row->sentence_index : null,
+                    'updated_at' => $row->updated_at?->toISOString(),
+                ];
+            }
+        }
+        unset($entry);
+
+        return $result;
+    }
 }

@@ -196,26 +196,50 @@ class WordSenseKnownSenseService
         // Only returns choices owned by the current user + language; does not
         // leak other users' confirmations.
         $persistedMap = [];
-        if (!empty($candidates) && ($chapterId !== null || $sentenceIndex !== null || $normalizedSurface !== '')) {
+        $summaryMap = [];
+        if (!empty($candidates)) {
             $senseIds = array_map(fn ($c) => $c['sense_id'], $candidates);
-            $persistedMap = $this->confirmationService->listConfirmationsForOccurrence(
+            if ($chapterId !== null || $sentenceIndex !== null || $normalizedSurface !== '') {
+                $persistedMap = $this->confirmationService->listConfirmationsForOccurrence(
+                    $userId,
+                    $language,
+                    $chapterId,
+                    $sentenceIndex,
+                    $normalizedSurface,
+                    $normalizedLemma,
+                    $senseIds
+                );
+            }
+            // Per-sense aggregated usage summary across ALL occurrences (read-only).
+            $summaryMap = $this->confirmationService->summaryForSenseCandidates(
                 $userId,
                 $language,
-                $chapterId,
-                $sentenceIndex,
-                $normalizedSurface,
-                $normalizedLemma,
                 $senseIds
             );
         }
 
-        // Attach persisted_choice / confirmation_id / confirmed_at to each candidate.
+        // Attach persisted_choice / confirmation_id / confirmed_at + usage summary to each candidate.
         foreach ($candidates as &$candidate) {
             $sid = $candidate['sense_id'];
             $entry = $persistedMap[$sid] ?? null;
             $candidate['persisted_choice'] = $entry['choice'] ?? null;
             $candidate['confirmation_id'] = $entry['confirmation_id'] ?? null;
             $candidate['confirmed_at'] = $entry['updated_at'] ?? null;
+
+            $summary = $summaryMap[$sid] ?? [
+                'match_count' => 0,
+                'not_match_count' => 0,
+                'last_choice' => null,
+                'last_confirmed_at' => null,
+                'has_any_confirmation' => false,
+                'recent_examples' => [],
+            ];
+            $candidate['usage_summary'] = $summary;
+            // Friendly copy fields for the frontend (kept in sync with usage_summary).
+            $candidate['usage_match_count'] = $summary['match_count'];
+            $candidate['usage_not_match_count'] = $summary['not_match_count'];
+            $candidate['usage_last_choice'] = $summary['last_choice'];
+            $candidate['usage_last_confirmed_at'] = $summary['last_confirmed_at'];
         }
         unset($candidate);
 
@@ -241,7 +265,7 @@ class WordSenseKnownSenseService
                 'no_word_sense_created' => true,
                 'no_ai_called' => true,
             ],
-            'ui_hint' => '「是这个意思 / 不是这个意思」按钮会保存为阅读位置级别的确认，不是复习评分，不会写入复习记录，不会改变 FSRS，不会创建词义或复习卡。',
+            'ui_hint' => '「是这个意思 / 不是这个意思」按钮会保存为阅读位置级别的确认，不是复习评分，不会写入复习记录，不会改变复习进度（FSRS），不会创建词义或复习卡。',
         ];
     }
 }
