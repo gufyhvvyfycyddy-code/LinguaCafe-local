@@ -816,13 +816,23 @@ class TextBlockService
     /**
      * Ultra-conservative English lemmatization for Python-down fallback ONLY.
      *
-     * This method is intentionally minimal. It must NEVER produce wrong lemmas
-     * like "opene", "cal", or "walke". When in doubt, it keeps the surface form.
+     * This method must NEVER produce wrong lemmas like "opene", "cal", or
+     * "walke". When in doubt, it keeps the surface form.
      *
      * Rules (order matters):
      *   1. Very short words (< 3 chars) — preserve as-is (is→is, am→am)
-     *   2. Irregular verb/noun table (was → be, children → child) — high confidence
-     *   3. Everything else — return lowercase surface (NO morphological guessing)
+     *   2. Irregular verb/noun table (was → be, children → child, does → do,
+     *      goes → go, left → leave, broken → break) — hand-curated, high confidence
+     *   3. ECDICT-gated -ies → -y / -ie (technologies → technology, stories →
+     *      story, bodies → body; brownies → brownie via -ie fallback). Only
+     *      applied when ECDICT validates the candidate, so wrong lemmas like
+     *      "browny" are never emitted.
+     *   4. -ches/-shes/-xes/-zes → strip -es (watches → watch, fixes → fix,
+     *      boxes → box, buzzes → buzz). Ultra-safe: no English lemma ends in
+     *      "watche"/"boxe"/"fixe". Applied regardless of ECDICT availability.
+     *      -ses is excluded (houses→house vs buses→bus is ambiguous);
+     *      -oes is handled by the irregular table (does→do, goes→go).
+     *   5. Everything else — return lowercase surface (NO -ed/-ing/-s guessing)
      *
      * For full lemmatization, the Python tokenizer (spaCy + LemmInflect) must be running.
      */
@@ -850,9 +860,35 @@ class TextBlockService
             return $irregular;
         }
 
-        // 3. Everything else: return lowercase surface.
-        //    NO -ed/-ing/-s/-es/-ies/-ves morphological rules.
-        //    NO ECDICT lookups for candidate validation.
+        // 3. ECDICT-gated -ies → -y / -ie suffix rule.
+        //    Only applied when ECDICT is available to validate the candidate,
+        //    so wrong lemmas (browny) are never emitted. When ECDICT is
+        //    unavailable, fall through to the safe surface form below.
+        if ($this->ecdictAvailable() && preg_match('/^(.+)ies$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
+            // -y (technologies → technology, stories → story, bodies → body)
+            $candidateY = $m[1] . 'y';
+            if ($this->lemmaInEcdict($candidateY)) {
+                return $candidateY;
+            }
+            // -ie plural (brownies → brownie, cookies → cookie, movies → movie)
+            $candidateIe = $m[1] . 'ie';
+            if ($this->lemmaInEcdict($candidateIe)) {
+                return $candidateIe;
+            }
+        }
+
+        // 4. -ches/-shes/-xes/-zes → strip -es (watches → watch, fixes → fix,
+        //    boxes → box, buzzes → buzz, washes → wash).
+        //    Ultra-safe: no English lemma ends in "watche"/"boxe"/"fixe", so
+        //    this rule is applied regardless of ECDICT availability.
+        //    -ses is excluded (houses→house vs buses→bus is ambiguous);
+        //    -oes is handled by the irregular table (does→do, goes→go).
+        if (preg_match('/^(.+)(?:ch|sh|x|z)es$/u', $lower, $m) && mb_strlen($m[1]) >= 1) {
+            return preg_replace('/es$/u', '', $lower);
+        }
+
+        // 5. Everything else: return lowercase surface.
+        //    NO -ed/-ing/-s morphological guessing (would risk opene/walke).
         //    opened→opened, called→called, facts→facts, walking→walking.
         //    This is safe: the surface form is always recognizable to the user.
         return $lower;
@@ -1248,8 +1284,12 @@ class TextBlockService
      * Check if a word exists in ECDICT.
      * When ECDICT is not available, returns false — downstream rules
      * should handle the unavailable case gracefully with heuristics.
+     *
+     * Protected so test subclasses can override the dictionary lookup and
+     * exercise the ECDICT-gated suffix rules in conservativeFallbackLemma()
+     * without a real dictionary table.
      */
-    private function lemmaInEcdict(string $word): bool
+    protected function lemmaInEcdict(string $word): bool
     {
         static $cache = [];
         static $available = null;
@@ -1295,8 +1335,12 @@ class TextBlockService
 
     /**
      * Check if ECDICT is available (table exists and has data).
+     *
+     * Protected so test subclasses can override the availability check and
+     * exercise the ECDICT-gated suffix rules in conservativeFallbackLemma()
+     * without a real dictionary table.
      */
-    private function ecdictAvailable(): bool
+    protected function ecdictAvailable(): bool
     {
         static $available = null;
         if ($available === null) {
