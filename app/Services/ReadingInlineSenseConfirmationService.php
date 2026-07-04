@@ -302,4 +302,180 @@ class ReadingInlineSenseConfirmationService
 
         return $result;
     }
+
+    /**
+     * Read-only management list: return the current user's confirmations
+     * with WordSense summary + Chapter name + source sentence, scoped by
+     * the given filters (ADR-0003 Management Surface Layer).
+     *
+     * Safety contract:
+     *  - Strictly read-only. Does NOT write any table.
+     *  - Isolated by user_id + language.
+     *  - Does NOT call ReviewLog / FSRS / AI / WordSense / ReviewCard writes.
+     *
+     * @param array{
+     *     choice?: string,
+     *     lemma?: string,
+     *     surface?: string,
+     *     word_sense_id?: int,
+     *     chapter_id?: int,
+     *     date_from?: string,
+     *     date_to?: string,
+     *     per_page?: int
+     * } $filters
+     * @return array{
+     *     data: list<array{
+     *         confirmation_id:int,
+     *         choice:string,
+     *         surface:string,
+     *         lemma:string,
+     *         word_sense_id:int,
+     *         sense_zh:string|null,
+     *         sense_en:string|null,
+     *         pos:string|null,
+     *         chapter_id:int|null,
+     *         chapter_name:string|null,
+     *         sentence_index:int|null,
+     *         sentence_text:string|null,
+     *         updated_at:string|null,
+     *         source:string|null,
+     *         can_revoke:bool
+     *     }>,
+     *     pagination: array{
+     *         current_page:int,
+     *         per_page:int,
+     *         total:int,
+     *         last_page:int
+     *     }
+     * }
+     */
+    public function listConfirmationsForManagement(
+        int $userId,
+        string $language,
+        array $filters = []
+    ): array {
+        $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 20)));
+
+        $query = ReadingInlineSenseConfirmation::query()
+            ->where('user_id', $userId)
+            ->where('language', $language);
+
+        if (isset($filters['choice']) && $filters['choice'] !== 'all' && $filters['choice'] !== '') {
+            $choice = $filters['choice'];
+            if (in_array($choice, [ReadingInlineSenseConfirmation::CHOICE_MATCH, ReadingInlineSenseConfirmation::CHOICE_NOT_MATCH], true)) {
+                $query->where('choice', $choice);
+            }
+        }
+        if (isset($filters['lemma']) && $filters['lemma'] !== '') {
+            $query->where('lemma', 'like', '%' . mb_strtolower(trim((string) $filters['lemma'])) . '%');
+        }
+        if (isset($filters['surface']) && $filters['surface'] !== '') {
+            $query->where('surface', 'like', '%' . trim((string) $filters['surface']) . '%');
+        }
+        if (isset($filters['word_sense_id']) && $filters['word_sense_id'] > 0) {
+            $query->where('word_sense_id', (int) $filters['word_sense_id']);
+        }
+        if (isset($filters['chapter_id']) && $filters['chapter_id'] > 0) {
+            $query->where('chapter_id', (int) $filters['chapter_id']);
+        }
+        if (isset($filters['date_from']) && $filters['date_from'] !== '') {
+            $query->where('updated_at', '>=', (string) $filters['date_from']);
+        }
+        if (isset($filters['date_to']) && $filters['date_to'] !== '') {
+            $query->where('updated_at', '<=', (string) $filters['date_to']);
+        }
+
+        $query->orderBy('updated_at', 'desc');
+
+        $paged = $query->paginate($perPage);
+
+        // Preload WordSense + Chapter summaries in bulk to avoid N+1.
+        $senseIds = $paged->getCollection()->pluck('word_sense_id')->unique()->filter()->values()->all();
+        $chapterIds = $paged->getCollection()->pluck('chapter_id')->unique()->filter()->values()->all();
+
+        $senses = empty($senseIds) ? collect() : WordSense::query()
+            ->whereIn('id', $senseIds)
+            ->get()
+            ->keyBy('id');
+        $chapters = empty($chapterIds) ? collect() : Chapter::query()
+            ->whereIn('id', $chapterIds)
+            ->get()
+            ->keyBy('id');
+
+        $data = $paged->getCollection()->map(function ($row) use ($senses, $chapters) {
+            $sense = $senses->get($row->word_sense_id);
+            $chapter = $row->chapter_id !== null ? $chapters->get($row->chapter_id) : null;
+            return [
+                'confirmation_id' => (int) $row->id,
+                'choice' => $row->choice,
+                'surface' => $row->surface,
+                'lemma' => $row->lemma,
+                'word_sense_id' => (int) $row->word_sense_id,
+                'sense_zh' => $sense?->sense_zh,
+                'sense_en' => $sense?->sense_en,
+                'pos' => $sense?->pos,
+                'chapter_id' => $row->chapter_id !== null ? (int) $row->chapter_id : null,
+                'chapter_name' => $chapter?->name,
+                'sentence_index' => $row->sentence_index !== null ? (int) $row->sentence_index : null,
+                'sentence_text' => $row->sentence_text,
+                'updated_at' => $row->updated_at?->toISOString(),
+                'source' => $row->source,
+                'can_revoke' => true,
+            ];
+        })->values();
+
+        return [
+            'data' => $data->all(),
+            'pagination' => [
+                'current_page' => $paged->currentPage(),
+                'per_page' => $paged->perPage(),
+                'total' => $paged->total(),
+                'last_page' => $paged->lastPage(),
+            ],
+        ];
+    }
+
+    /**
+     * Revoke (delete) a single confirmation row owned by the current
+     * user + current language (ADR-0003 Management Surface Layer).
+     *
+     * Safety contract:
+     *  - Only deletes a row in `reading_inline_sense_confirmations`.
+     *  - Does NOT delete WordSense / ReviewCard / ReviewLog / EncounteredWord.
+     *  - Does NOT call ReviewLog::create / FSRS / AI.
+     *  - Does NOT modify any ReviewCard FSRS field.
+     *  - Returns safety_flags proving the above.
+     *
+     * @return array{
+     *     revoked:bool,
+     *     confirmation_id:int,
+     *     safety_flags:array<string,bool>
+     * }
+     * @throws \Illuminate\Database\Eloquent\ModelNotFoundException when the
+     *   row does not exist or does not belong to the current user/language.
+     */
+    public function revokeConfirmation(int $userId, string $language, int $confirmationId): array
+    {
+        $confirmation = ReadingInlineSenseConfirmation::query()
+            ->where('id', $confirmationId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->firstOrFail();
+
+        $confirmationId = (int) $confirmation->id;
+        $confirmation->delete();
+
+        return [
+            'revoked' => true,
+            'confirmation_id' => $confirmationId,
+            'safety_flags' => [
+                'no_review_log_created' => true,
+                'no_fsrs_changed' => true,
+                'no_review_card_changed' => true,
+                'no_word_sense_deleted' => true,
+                'no_review_card_deleted' => true,
+                'not_a_review_rating' => true,
+            ],
+        ];
+    }
 }

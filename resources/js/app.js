@@ -228,6 +228,7 @@ const TextReader = require('./components/TextReader/TextReader.vue').default;
 const Review = require('./components/Review/Review.vue').default;
 const SenseMappingReview = require('./components/Senses/SenseMappingReview.vue').default;
 const SenseReview = require('./components/Senses/SenseReview.vue').default;
+const ReadingInlineConfirmationManage = require('./components/Senses/ReadingInlineConfirmationManage.vue').default;
 const ReviewCardManage = require('./components/ReviewCards/ReviewCardManage.vue').default;
 const Vocabulary = require('./components/Vocabulary/Vocabulary.vue').default;
 const KanjiList = require('./components/Kanji/KanjiList.vue').default;
@@ -252,6 +253,7 @@ const router = new VueRouter({
         { path: '/review/:practiceMode?/:bookId?/:chapterId?', component: Review },
         { path: '/reviews/senses', component: SenseReview },
         { path: '/senses/review', component: SenseMappingReview },
+        { path: '/senses/inline-confirmations/manage', component: ReadingInlineConfirmationManage },
         { path: '/review-cards/manage', component: ReviewCardManage },
         { path: '/vocabulary/search', component: Vocabulary },
         { path: '/vocabulary/search/:text/:stage/:book/:chapter/:translation/:phrases/:orderBy/:page', component: Vocabulary },

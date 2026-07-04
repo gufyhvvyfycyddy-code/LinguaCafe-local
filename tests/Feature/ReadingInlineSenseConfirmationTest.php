@@ -869,6 +869,472 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         $this->assertSame([], $response->json('candidates'));
     }
 
+    // ================================================================
+    // GLM-ReadingInlineConfirmationManagementSurface-1000-1 (sub-stage 7)
+    // Management surface guard tests: list + revoke endpoints.
+    // ================================================================
+
+    /**
+     * GET /senses/inline-confirmations returns only the current user's rows.
+     *
+     * Note: we cannot switch users mid-test via actingAs because the
+     * `auth.session` middleware invalidates the session on user switch
+     * and returns a 401. The cross-user isolation guarantee is enforced
+     * at the SQL layer via `where('user_id', ...)`, so we insert user B's
+     * row directly via the model and verify user A's list does not see it.
+     */
+    public function test_list_endpoint_returns_only_current_user_rows(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // user A saves a match
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // user B saves a different confirmation directly via model
+        // (avoids actingAs user-switch which would invalidate the session)
+        $otherSense = $this->createConfirmedSenseForUser($this->otherUser, 'goose', 'geese', 'other-鹅');
+        $otherChapter = $this->createChapter($this->otherUser->id);
+        ReadingInlineSenseConfirmation::forceCreate([
+            'user_id' => $this->otherUser->id, 'language' => 'english',
+            'chapter_id' => $otherChapter->id, 'sentence_index' => 1,
+            'sentence_hash' => null, 'sentence_text' => 'Other geese.',
+            'surface' => 'geese', 'lemma' => 'goose',
+            'word_sense_id' => $otherSense->id,
+            'choice' => 'not_match', 'source' => 'reading_inline_preview',
+        ]);
+
+        // user A lists: should only see their own row
+        $response = $this->actingAs($this->user)
+            ->getJson('/senses/inline-confirmations?language=english')
+            ->assertOk();
+
+        $rows = $response->json('data');
+        $this->assertCount(1, $rows, 'list endpoint only returns current user rows');
+        $this->assertSame('match', $rows[0]['choice']);
+        $this->assertSame($chapter->id, $rows[0]['chapter_id']);
+    }
+
+    /**
+     * GET /senses/inline-confirmations isolates by language.
+     */
+    public function test_list_endpoint_isolates_by_language(): void
+    {
+        $user = $this->createUser('lang-isolate@example.com', 'english');
+        // create an English confirmation
+        $englishSense = $this->createConfirmedSenseForUser($user, 'goose', 'geese', '鹅');
+        $englishChapter = $this->createChapter($user->id, 'english');
+        $this->actingAs($user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $englishChapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $englishSense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // create a Spanish confirmation (different language)
+        // sense_key is required by the DB schema; WordSenseService::createSense
+        // generates it via generateSenseKey(), so we mirror that format here.
+        $spanishSense = WordSense::forceCreate([
+            'user_id' => $user->id, 'language' => 'spanish', 'language_id' => 'spanish',
+            'lemma' => 'ganso', 'surface_form' => 'gansos', 'pos' => 'noun',
+            'sense_zh' => '鹅', 'sense_en' => '', 'aliases_zh' => '[]', 'collocations' => '[]',
+            'example_sentence_en' => '', 'example_sentence_zh' => '',
+            'sense_key' => 'spanish-ganso-' . Str::random(6),
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        $spanishChapter = $this->createChapter($user->id, 'spanish');
+        ReadingInlineSenseConfirmation::forceCreate([
+            'user_id' => $user->id, 'language' => 'spanish', 'chapter_id' => $spanishChapter->id,
+            'sentence_index' => 1, 'sentence_hash' => null, 'sentence_text' => 'Los gansos.',
+            'surface' => 'gansos', 'lemma' => 'ganso', 'word_sense_id' => $spanishSense->id,
+            'choice' => 'match', 'source' => 'reading_inline_preview',
+        ]);
+
+        // English listing: should only see English row
+        $response = $this->actingAs($user)
+            ->getJson('/senses/inline-confirmations?language=english')
+            ->assertOk();
+
+        $rows = $response->json('data');
+        $this->assertCount(1, $rows, 'only english rows returned for english user');
+        $this->assertSame('goose', $rows[0]['lemma']);
+    }
+
+    /**
+     * GET /senses/inline-confirmations supports choice filter.
+     */
+    public function test_list_endpoint_supports_choice_filter(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 2, 'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+
+        $all = $this->actingAs($this->user)->getJson('/senses/inline-confirmations?language=english&choice=all')->assertOk()->json('data');
+        $this->assertCount(2, $all);
+
+        $matchOnly = $this->actingAs($this->user)->getJson('/senses/inline-confirmations?language=english&choice=match')->assertOk()->json('data');
+        $this->assertCount(1, $matchOnly);
+        $this->assertSame('match', $matchOnly[0]['choice']);
+
+        $notMatchOnly = $this->actingAs($this->user)->getJson('/senses/inline-confirmations?language=english&choice=not_match')->assertOk()->json('data');
+        $this->assertCount(1, $notMatchOnly);
+        $this->assertSame('not_match', $notMatchOnly[0]['choice']);
+    }
+
+    /**
+     * GET /senses/inline-confirmations supports lemma filter.
+     */
+    public function test_list_endpoint_supports_lemma_filter(): void
+    {
+        $gooseSense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $runSense = $this->createConfirmedSense('run', 'runs', '跑');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $gooseSense->id, 'choice' => 'match',
+        ])->assertOk();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'run', 'surface' => 'runs', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $runSense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $filtered = $this->actingAs($this->user)
+            ->getJson('/senses/inline-confirmations?language=english&lemma=goose')
+            ->assertOk()
+            ->json('data');
+
+        $this->assertCount(1, $filtered);
+        $this->assertSame('goose', $filtered[0]['lemma']);
+    }
+
+    /**
+     * GET /senses/inline-confirmations returns WordSense summary + chapter + sentence.
+     */
+    public function test_list_endpoint_returns_sense_summary_chapter_sentence(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'sentence_text' => 'The geese went to the lake.',
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $row = $this->actingAs($this->user)
+            ->getJson('/senses/inline-confirmations?language=english')
+            ->assertOk()
+            ->json('data.0');
+
+        $this->assertSame('鹅', $row['sense_zh']);
+        $this->assertSame('noun', $row['pos']);
+        $this->assertSame($chapter->name, $row['chapter_name']);
+        $this->assertSame('The geese went to the lake.', $row['sentence_text']);
+        $this->assertSame(1, $row['sentence_index']);
+        $this->assertTrue($row['can_revoke']);
+    }
+
+    /**
+     * DELETE /senses/inline-confirmations/{id} revokes the user's own confirmation.
+     */
+    public function test_revoke_endpoint_deletes_current_user_confirmation(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+
+        $response = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $this->assertTrue($response->json('revoked'));
+        $this->assertSame($confirmationId, $response->json('confirmation_id'));
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count(), 'row is deleted');
+        $this->assertSame(1, WordSense::count(), 'WordSense is NOT deleted');
+    }
+
+    /**
+     * DELETE /senses/inline-confirmations/{id} cannot revoke another user's row.
+     *
+     * Note: we insert user B's confirmation directly via the model to avoid
+     * actingAs user-switch (which would invalidate the session). The
+     * cross-user isolation is enforced at the SQL layer via
+     * `where('user_id', ...)` in revokeConfirmation().
+     */
+    public function test_revoke_endpoint_cannot_delete_other_user_confirmation(): void
+    {
+        $sense = $this->createConfirmedSenseForUser($this->otherUser, 'goose', 'geese', 'other-鹅');
+        $chapter = $this->createChapter($this->otherUser->id);
+
+        // user B saves a confirmation directly via model
+        // (avoids actingAs user-switch which would invalidate the session)
+        ReadingInlineSenseConfirmation::forceCreate([
+            'user_id' => $this->otherUser->id, 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'sentence_hash' => null, 'sentence_text' => 'Other geese.',
+            'surface' => 'geese', 'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => 'match', 'source' => 'reading_inline_preview',
+        ]);
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+
+        // user A attempts to revoke user B's confirmation → 404
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertNotFound();
+
+        // row is still present
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count());
+    }
+
+    /**
+     * DELETE /senses/inline-confirmations/{id} cannot revoke another language's row.
+     */
+    public function test_revoke_endpoint_cannot_delete_other_language_confirmation(): void
+    {
+        // create a spanish confirmation owned by $this->user (same user, different language)
+        // sense_key is required by the DB schema; WordSenseService::createSense
+        // generates it via generateSenseKey(), so we mirror that format here.
+        $spanishSense = WordSense::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'spanish', 'language_id' => 'spanish',
+            'lemma' => 'ganso', 'surface_form' => 'gansos', 'pos' => 'noun',
+            'sense_zh' => '鹅', 'sense_en' => '', 'aliases_zh' => '[]', 'collocations' => '[]',
+            'example_sentence_en' => '', 'example_sentence_zh' => '',
+            'sense_key' => 'spanish-ganso-' . Str::random(6),
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        $spanishChapter = $this->createChapter($this->user->id, 'spanish');
+        ReadingInlineSenseConfirmation::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'spanish', 'chapter_id' => $spanishChapter->id,
+            'sentence_index' => 1, 'sentence_hash' => null, 'sentence_text' => 'Los gansos.',
+            'surface' => 'gansos', 'lemma' => 'ganso', 'word_sense_id' => $spanishSense->id,
+            'choice' => 'match', 'source' => 'reading_inline_preview',
+        ]);
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+
+        // user is english-selected, attempts to revoke spanish confirmation → 404
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertNotFound();
+
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count(), 'row is NOT deleted');
+    }
+
+    /**
+     * Revoke does NOT write ReviewLog.
+     */
+    public function test_revoke_does_not_write_review_log(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $logBefore = ReviewLog::count();
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $this->assertSame($logBefore, ReviewLog::count(), 'no review log written by revoke');
+    }
+
+    /**
+     * Revoke does NOT change ReviewCard FSRS fields.
+     */
+    public function test_revoke_does_not_change_fsrs_fields(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // create a ReviewCard to verify it is untouched
+        // Note: review_cards schema does not have `state` or `due_at` columns;
+        // the FSRS fields are fsrs_state / fsrs_due_at / fsrs_reps / etc.
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'english', 'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $sense->id, 'fsrs_state' => 'Review', 'fsrs_reps' => 5,
+            'fsrs_due_at' => now()->addDay(), 'fsrs_stability' => 1.2, 'fsrs_difficulty' => 0.3,
+            'fsrs_lapses' => 0, 'fsrs_enabled' => true,
+        ]);
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $card->refresh();
+        $this->assertSame(5, $card->fsrs_reps);
+        $this->assertSame('Review', $card->fsrs_state);
+        $this->assertTrue($card->fsrs_enabled);
+        $this->assertSame(1, ReviewCard::count(), 'ReviewCard is NOT deleted by revoke');
+    }
+
+    /**
+     * Revoke does NOT delete WordSense.
+     */
+    public function test_revoke_does_not_delete_word_sense(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $senseId = $sense->id;
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $this->assertNotNull(WordSense::find($senseId), 'WordSense is NOT deleted');
+    }
+
+    /**
+     * Revoke does NOT delete ReviewCard.
+     */
+    public function test_revoke_does_not_delete_review_card(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'english', 'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $sense->id, 'fsrs_state' => 'Review', 'fsrs_reps' => 5,
+            'fsrs_due_at' => now()->addDay(), 'fsrs_stability' => 1.2, 'fsrs_difficulty' => 0.3,
+            'fsrs_lapses' => 0, 'fsrs_enabled' => true,
+        ]);
+        $cardId = $card->id;
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $this->assertNotNull(ReviewCard::find($cardId), 'ReviewCard is NOT deleted');
+    }
+
+    /**
+     * Revoke returns safety_flags proving the safety contract.
+     */
+    public function test_revoke_returns_safety_flags(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $response = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $flags = $response->json('safety_flags');
+        $this->assertTrue($flags['no_review_log_created'] ?? false);
+        $this->assertTrue($flags['no_fsrs_changed'] ?? false);
+        $this->assertTrue($flags['no_review_card_changed'] ?? false);
+        $this->assertTrue($flags['no_word_sense_deleted'] ?? false);
+        $this->assertTrue($flags['no_review_card_deleted'] ?? false);
+        $this->assertTrue($flags['not_a_review_rating'] ?? false);
+    }
+
+    /**
+     * After revoking a confirmation, the preview endpoint no longer echoes
+     * it as persisted_choice for that occurrence + candidate.
+     */
+    public function test_revoke_updates_preview_summary(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'sentence_text' => 'The geese went to the lake.',
+            'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // before revoke: preview echoes persisted_choice = match
+        $before = $this->actingAs($this->user)
+            ->getJson('/senses/inline-preview?language=english&lemma=goose&surface=geese&chapter_id=' . $chapter->id . '&sentence_index=1')
+            ->assertOk()
+            ->json('candidates.0');
+        $this->assertSame('match', $before['persisted_choice']);
+
+        // revoke
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        // after revoke: preview no longer echoes persisted_choice
+        $after = $this->actingAs($this->user)
+            ->getJson('/senses/inline-preview?language=english&lemma=goose&surface=geese&chapter_id=' . $chapter->id . '&sentence_index=1')
+            ->assertOk()
+            ->json('candidates.0');
+        $this->assertNull($after['persisted_choice']);
+        $this->assertSame(0, $after['usage_match_count']);
+    }
+
+    /**
+     * Unknown confirmation id results in 404 safe failure.
+     */
+    public function test_revoke_unknown_id_safely_fails(): void
+    {
+        $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/999999')
+            ->assertNotFound();
+    }
+
+    /**
+     * GET /senses/inline-confirmations requires authentication.
+     */
+    public function test_list_endpoint_requires_authentication(): void
+    {
+        $this->getJson('/senses/inline-confirmations')->assertUnauthorized();
+    }
+
+    /**
+     * GET /senses/inline-confirmations rejects language mismatch.
+     */
+    public function test_list_endpoint_rejects_language_mismatch(): void
+    {
+        $this->actingAs($this->user)
+            ->getJson('/senses/inline-confirmations?language=spanish')
+            ->assertForbidden();
+    }
+
     // ==================== Helpers ====================
 
 

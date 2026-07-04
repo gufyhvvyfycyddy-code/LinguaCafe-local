@@ -142,6 +142,17 @@
             >
                 你的选择已保存为阅读位置级别的确认。这不是复习评分，不会写入复习记录，不会改变复习进度（FSRS），不会创建词义或复习卡。
             </v-alert>
+
+            <!-- Management entry: view / filter / revoke all reading-inline confirmations (GLM-ReadingInlineConfirmationManagementSurface-1000-1) -->
+            <div class="mt-2 text-caption">
+                <a
+                    href="/senses/inline-confirmations/manage"
+                    class="inline-preview-manage-link text-decoration-none"
+                >
+                    <v-icon x-small class="mr-1">mdi-format-list-bulleted</v-icon>
+                    查看全部阅读确认记录
+                </a>
+            </div>
         </div>
     </div>
 </template>

@@ -169,3 +169,38 @@ This section freezes the **usage surface** rules for already-persisted inline co
    - "最近一次：是这个意思" / "最近一次：不是这个意思" (last_choice),
    - the current occurrence's persisted_choice (already implemented in the previous round).
 8. If a future round wants to turn a confirmation into an FSRS rating, it MUST open a separate ADR / requirement freeze / dedicated task. This usage-surface layer does NOT authorize that.
+
+## Management Surface Layer (added 2026-07-04 by GLM-ReadingInlineConfirmationManagementSurface-1000-1)
+
+This section freezes the **management surface** rules for already-persisted inline confirmations. It does NOT change the persistence or usage-surface contracts above; it only clarifies how the persisted rows may be LISTED, FILTERED, and REVOKED by their owning user.
+
+1. A reading inline confirmation is **reading evidence**, not a review rating, not a review log, not an FSRS scheduling event.
+2. The management surface only manages confirmation rows in `reading_inline_sense_confirmations`. It MUST NOT manage `ReviewLog`, `ReviewCard`, `WordSense`, or `EncounteredWord`.
+3. The user MAY view their own confirmations via a read-only list endpoint.
+4. The user MAY filter by:
+   - `choice` (`match` = "是这个意思", `not_match` = "不是这个意思"),
+   - `lemma`,
+   - `surface`,
+   - `word_sense_id`,
+   - `chapter_id`,
+   - date range.
+5. The list endpoint MUST return the source sentence text, chapter name, and WordSense summary (sense_zh / sense_en / pos) for context.
+6. The user MAY revoke a single confirmation row.
+7. **Revocation semantics**:
+   - Revocation ONLY deletes the current user's single `reading_inline_sense_confirmations` row.
+   - Revocation is **NOT** "forget" / "Again" / "review failure".
+   - Revocation is **NOT** "delete the WordSense".
+   - Revocation is **NOT** "delete the ReviewCard".
+   - Revocation is **NOT** "delete the ReviewLog".
+   - Revocation is **NOT** a review rating.
+   - Revocation MUST NOT write `ReviewLog`.
+   - Revocation MUST NOT change any `ReviewCard` FSRS field (state / reps / due_at / stability / difficulty / lapses / enabled).
+   - Revocation MUST NOT delete or modify `WordSense`.
+   - Revocation MUST NOT delete or modify `ReviewCard`.
+   - Revocation MUST NOT call AI.
+   - Revocation MUST NOT auto-create any new row in any table.
+8. The management surface is **isolated by user + language**. A user MUST NOT view or revoke another user's confirmations or another language's confirmations.
+9. The management surface MUST NOT introduce batch revocation, scoring conversion, or AI-assisted summarization in this round. These require a separate task / ADR.
+10. The management surface does NOT introduce any new migration, any new column, any new table. Revocation is a `DELETE` on the existing `reading_inline_sense_confirmations` row scoped to the current user + current language.
+11. After revocation, the reading-page preview panel MUST no longer echo the revoked confirmation as `persisted_choice` for that occurrence + candidate.
+12. If a future round wants to introduce batch revocation, scoring conversion, AI-assisted summarization, automatic sentence scrolling, or per-token highlight on the reading page, it MUST open a separate ADR / requirement freeze / dedicated task. This management-surface layer does NOT authorize that.

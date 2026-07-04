@@ -226,6 +226,57 @@ class SenseOccurrenceController extends Controller
         return response()->json($this->occurrenceService->possibleDuplicates($userId, $language, $request->query('lemma')));
     }
 
+    /**
+     * Read-only management list: return the current user's reading-inline
+     * confirmations with filters + WordSense / Chapter summary
+     * (ADR-0003 Management Surface Layer).
+     *
+     * This endpoint is READ-ONLY. It does NOT write any table. It does NOT
+     * call ReviewLog / FSRS / AI. It is isolated by user + language.
+     */
+    public function listInlineConfirmations(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        if ($request->query('language') && $request->query('language') !== $language) {
+            abort(403, 'Language does not match the selected language.');
+        }
+
+        $filters = [
+            'choice' => $request->query('choice', 'all'),
+            'lemma' => $request->query('lemma'),
+            'surface' => $request->query('surface'),
+            'word_sense_id' => $request->query('word_sense_id') !== null ? (int) $request->query('word_sense_id') : null,
+            'chapter_id' => $request->query('chapter_id') !== null ? (int) $request->query('chapter_id') : null,
+            'date_from' => $request->query('date_from'),
+            'date_to' => $request->query('date_to'),
+            'per_page' => (int) $request->query('per_page', 20),
+        ];
+
+        return response()->json(
+            $this->inlineConfirmationService->listConfirmationsForManagement($userId, $language, $filters)
+        );
+    }
+
+    /**
+     * Revoke (delete) a single reading-inline confirmation owned by the
+     * current user + current language (ADR-0003 Management Surface Layer).
+     *
+     * This endpoint ONLY deletes a row in `reading_inline_sense_confirmations`.
+     * It does NOT delete WordSense / ReviewCard / ReviewLog / EncounteredWord.
+     * It does NOT call ReviewLog::create / FSRS / AI. It is NOT a review rating.
+     */
+    public function revokeInlineConfirmation(int $id)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $result = $this->inlineConfirmationService->revokeConfirmation($userId, $language, $id);
+
+        return response()->json($result);
+    }
+
     public function storeManualSense(Request $request)
     {
         $data = $request->validate([

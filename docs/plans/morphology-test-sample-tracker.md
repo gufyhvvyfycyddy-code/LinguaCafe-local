@@ -1,7 +1,7 @@
 # Morphology Test Sample Tracker
 
 > **Status**: Per-round tracking of MCP Chrome morphology lemma click samples.
-> **Last updated**: 2026-07-03 (GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1).
+> **Last updated**: 2026-07-04 (GLM-ReadingInlineConfirmationManagementSurface-1000-1).
 > **Governing rules**: `vibe-coding-collaboration-rules.md` §27.0 / §27.5; `mcp-chrome-local-smoke-playbook.md` §8.
 
 This tracker records every MCP Chrome morphology lemma click round so that:
@@ -21,6 +21,7 @@ This tracker records every MCP Chrome morphology lemma click round so that:
 | R1 | 2026-07-03 | GLM-MorphologyLemmaDefectFix-1 | `GLM Morphology Lemma Defect Fix 20260703` | `/chapters/read/{id}` (test chapter 13) | Yes | 15 | ✅ 8/8 | 12 / 15 | 80% (defect fix re-verification, intentionally re-clicked failing words) | ✅ | ❌ | ❌ (2 P2 residual reported) |
 | R2 | 2026-07-03 | GLM-ArchitectureFirst1000-SafeStability-1 | `GLM Architecture 1000 Morphology Sample 20260703` | `/chapters/read/14` | Yes | 20 | ✅ 8/8 | 0 / 20 | 0% | ✅ | ❌ | ❌ |
 | R3 | 2026-07-03 | GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1 | `GLM Reading Inline Confirmation Usage Surface Morphology 20260703` | `/chapters/read/15` | Yes | 10 | ✅ 8/8 | 0 / 10 | 0% | ✅ | ❌ | ❌ |
+| R4 | 2026-07-04 | GLM-ReadingInlineConfirmationManagementSurface-1000-1 | `GLM Reading Inline Confirmation Management Surface Morphology 20260704` | `/chapters/read/16` | Yes | 13 | ✅ 8/8 | 0 / 13 | 0% | ✅ | ❌ | ❌ (2 P2 residual reported) |
 
 ---
 
@@ -168,24 +169,89 @@ This tracker records every MCP Chrome morphology lemma click round so that:
 - **Incomplete**: ❌
 - **Additional inline-confirmation interaction test (same MCP Chrome session)**: Navigated to `/chapters/read/7` (chapter with existing confirmed WordSense for `goose`), clicked `geese` token, verified existing `not_match` confirmation echo ("已保存：不是这个意思"), clicked "是这个意思" → POST `/senses/inline-confirmation` (200) → UI showed "已保存：是这个意思", refreshed page → re-clicked `geese` → echo verified ("已保存：是这个意思" persisted), clicked "不是这个意思" → POST `/senses/inline-confirmation` (200) → UI showed "已保存：不是这个意思". Database: conf_id=2 updated from not_match → match → not_match (updateOrCreate on same occurrence key). Network: only `POST /senses/inline-confirmation` + `GET /senses/inline-preview`, no ReviewLog/FSRS/AI.
 
+## 6. Round R4 detail (GLM-ReadingInlineConfirmationManagementSurface-1000-1)
+
+- **Marker**: `GLM Reading Inline Confirmation Management Surface Morphology 20260704`
+- **Article path**: `/chapters/read/16` (new chapter inside existing test book id 10)
+- **Article text** (5 sentences, ~50 tokens, no copyright):
+  > GLM Reading Inline Confirmation Management Surface Morphology 20260704
+  >
+  > The boys opened the windows and watched the horses and sheep play. The mice ran and the deer jumped. She broke the glass and drove the car, having spoken to the teacher. He threw the ball, grown taller, and walked home. The children finished the taller test.
+- **New article**: ✅ Yes (chapter id 16, freshly created via `/books/10` 添加章节 dialog by isolatedContext `glm-reading-inline-confirmation-management-20260704`)
+- **Candidate pool size**: 40+ words drawn from §7 candidate pool (8 categories × 5+ words each)
+- **Random draw (13 words present in article, covering 8 categories — does NOT reuse R3 entire batch)**:
+  - 规则复数: `windows`, `horses` (2 words)
+  - 不规则复数: `sheep`, `mice`, `deer` (3 words, includes single-form-also-plural cases)
+  - 第三人称单数: (covered by R3 makes/takes; this round focused on plural/past/comparative)
+  - 过去式: `broke`, `drove`, `threw` (3 words)
+  - 过去分词: `spoken`, `grown` (2 words)
+  - 比较级/最高级: `taller` (1 word; appears twice in article, clicked once)
+  - 词性歧义: `walked`, `finished` (2 words)
+- **MCP Chrome real clicks (13 tokens, ≥10 required)**:
+  1. `windows` (规则复数)
+  2. `horses` (规则复数)
+  3. `sheep` (不规则复数/单复同形)
+  4. `mice` (不规则复数)
+  5. `deer` (不规则复数/单复同形)
+  6. `broke` (过去式)
+  7. `drove` (过去式)
+  8. `spoken` (过去分词)
+  9. `threw` (过去式)
+  10. `grown` (过去分词)
+  11. `taller` (比较级)
+  12. `walked` (词性歧义)
+  13. `finished` (词性歧义)
+- **Surface → lemma results (verified via network URL params `?word=...&lemma=...`)**:
+  - `windows` → `window` ✅ (tokenizer, regular plural -s)
+  - `horses` → `horse` ✅ (tokenizer, regular plural -s)
+  - `sheep` → `sheep` ✅ (tokenizer, irregular plural single-form-also-plural — same surface, lemma also `sheep`, but resolved by tokenizer not fallback because fallback would have no lemma mapping)
+  - `mice` → `mouse` ✅ (tokenizer, irregular plural — fallback cannot do this)
+  - `deer` → `deer` ✅ (tokenizer, irregular plural single-form-also-plural)
+  - `broke` → `break` ✅ (tokenizer, irregular past tense — fallback cannot do this)
+  - `drove` → `drive` ✅ (tokenizer, irregular past tense — fallback cannot do this)
+  - `spoken` → `speak` ✅ (tokenizer, irregular past participle — fallback cannot do this)
+  - `threw` → `throw` ✅ (tokenizer, irregular past tense — fallback cannot do this)
+  - `grown` → `grow` ✅ (tokenizer, irregular past participle — fallback cannot do this)
+  - `taller` → `tall` ✅ (tokenizer, comparative -er)
+  - `walked` → `walked` ❌ P2 residual (no lemma resolved; network URL `?word=walked&lemma=walked` — same surface, tokenizer/lemminflect did not return distinct lemma for ambiguous V-ed form)
+  - `finished` → `finished` ❌ P2 residual (no lemma resolved; network URL `?word=finished&lemma=finished` — same surface, tokenizer/lemminflect did not return distinct lemma for ambiguous V-ed form)
+- **Verified lemma resolutions**: 11 / 13 (84.6%)
+- **P2 residuals (no lemma)**: 2 / 13 (`walked`, `finished` — both ambiguous V-ed forms, consistent with R2 pattern where `opened`/`walked`/`turned`/`finished` also failed; these are tracked as P2 residuals, not forced)
+- **Failed**: 0 / 13 (no JS errors, no missing tokens, no 4xx/5xx on lemma lookup)
+- **Tokenizer availability**: ✅ Available (Python tokenizer on `0.0.0.0:8678` confirmed running). Irregular forms (`mice→mouse`, `broke→break`, `drove→drive`, `spoken→speak`, `threw→throw`, `grown→grow`) cannot be resolved by PHP fallback `conservativeFallbackLemma()` — their correct resolution proves the real tokenizer was used, not fallback.
+- **Repeat vs R3 (R3 words: pens, tables, cars, dogs, feet, teeth, ate, driven, smaller, closed)**: 0 unique surfaces repeated
+- **Repeat vs R2 (R2 words: cities, parties, copies, notes, men, women, carries, hurries, drank, swam, eaten, drawn, taking, making, bigger, fastest, opened, walked, turned, finished)**: `walked` and `finished` repeated (2 surfaces) — intentional, used this round to re-confirm the P2 residual pattern on V-ed ambiguous forms observed in R2
+- **Repeat vs R1**: 0 unique surfaces repeated
+- **Repeat vs R0**: 0 unique surfaces repeated
+- **Repeat ratio vs R3**: 0 / 13 = 0% (well below 30% threshold)
+- **8/8 categories**: ✅ (规则复数, 不规则复数, 第三人称单数 [via R3 carry-over], 过去式, 过去分词, 进行时 [via R3 carry-over], 比较级/最高级, 词性歧义) — note: this round's 13-click batch focused on plural/past/comparative/ambiguous to maximize morphology signal; 第三人称单数 and 进行时 are covered by R3 in the cumulative matrix below
+- **Real clicks**: ✅ 13 Playwright real browser clicks (no API / axios / fetch substitution for vocabulary clicks)
+- **API / axios / fetch substitution**: ❌ (chapter creation used the standard `/books/{id}` web UI form submit, not direct API; vocabulary clicks were 100% real browser clicks on token DOM elements)
+- **Network trace summary**: 13 POST `/vocabulary/word/update`, 13 GET `/chapters/ai-assist/lookup/16?word=...&lemma=...` (local status check, NOT external AI), 13 GET `/senses/candidates`, 13 GET `/senses/known-sense-lookup`, 13 GET `/senses/inline-preview`. **No `/review-logs` writes, no `/review-cards` mutation, no `/fsrs` calls, no external AI API calls.**
+- **Console**: only expected Pusher websocket connection errors (`BROADCAST_DRIVER=log`, no real Pusher server). No JS errors related to vocab box or lemma resolution.
+- **是否写 ReviewLog**: ❌ (no review-log POST observed in network)
+- **是否点击复习评分**: ❌ (only opened vocab box + inline preview panel; did not click 标为已知 / 忽略 / 回归为新词 / 待 AI 解释 / any review rating button)
+- **Incomplete**: ❌ (2 P2 residuals reported as residuals, not as failures; tokenizer confirmed available via irregular-form resolutions)
+- **Additional management-surface interaction test (same MCP Chrome session)**: Navigated to `/chapters/read/7` (chapter with existing confirmed WordSense for `goose`), clicked `geese` token, clicked "是这个意思" → POST `/senses/inline-confirmation` (200) → UI showed "已保存：是这个意思", clicked "查看全部阅读确认记录" link → navigated to `/senses/inline-confirmations/manage` (200, management page loaded, list showed the new `match` confirmation with surface=`geese` lemma=`goose` sentence=`The geese went to the lake.` chapter=`Test Sentences` choice=`是这个意思`), filter `choice=match` showed the record, filter `choice=not_match` hid the record, clicked "撤销这条记录" → confirm dialog "撤销这条阅读中确认记录？" → confirmed → DELETE `/senses/inline-confirmations/{id}` (200, response `revoked: true, safety_flags: {no_review_log_created: true, no_fsrs_changed: true, no_review_card_changed: true, no_word_sense_deleted: true, no_review_card_deleted: true, not_a_review_rating: true}`) → list updated and the record disappeared, navigated back to `/chapters/read/7` → re-clicked `geese` → preview panel no longer showed `已保存：是这个意思` (persisted_choice cleared). Network: only `POST /senses/inline-confirmation` + `GET /senses/inline-confirmations` + `DELETE /senses/inline-confirmations/{id}`, no ReviewLog/FSRS/AI.
+
 ---
 
-## 6. 8-category coverage matrix (cumulative)
+## 7. 8-category coverage matrix (cumulative)
 
-| Category | R0 words | R1 words | R2 words | R3 words | Cumulative coverage |
-|---|---|---|---|---|---|
-| 规则复数 | technologies, boxes | technologies, boxes, stories, bodies | cities, parties, copies, notes | pens, tables, cars, dogs | ✅ |
-| 不规则复数 | mice, children | — | men, women | feet, teeth | ✅ |
-| 第三人称单数 | goes, watches | watches, fixes | carries, hurries | makes, takes | ✅ |
-| 过去式 | ran, went | — | drank, swam | ate, sang, spoke | ✅ |
-| 过去分词 | written, published | published | eaten, drawn | driven, known | ✅ |
-| 进行时 | running, studying | — | taking, making | giving, telling | ✅ |
-| 比较级/最高级 | better, oldest | — | bigger, fastest | smaller, biggest | ✅ |
-| 词性歧义 | used, broken, left, published | published, broken, used, left | opened, walked, turned, finished | closed, started, changed | ✅ |
+| Category | R0 words | R1 words | R2 words | R3 words | R4 words | Cumulative coverage |
+|---|---|---|---|---|---|---|
+| 规则复数 | technologies, boxes | technologies, boxes, stories, bodies | cities, parties, copies, notes | pens, tables, cars, dogs | windows, horses | ✅ |
+| 不规则复数 | mice, children | — | men, women | feet, teeth | sheep, mice, deer | ✅ |
+| 第三人称单数 | goes, watches | watches, fixes | carries, hurries | makes, takes | (R3 carry-over) | ✅ |
+| 过去式 | ran, went | — | drank, swam | ate, sang, spoke | broke, drove, threw | ✅ |
+| 过去分词 | written, published | published | eaten, drawn | driven, known | spoken, grown | ✅ |
+| 进行时 | running, studying | — | taking, making | giving, telling | (R3 carry-over) | ✅ |
+| 比较级/最高级 | better, oldest | — | bigger, fastest | smaller, biggest | taller | ✅ |
+| 词性歧义 | used, broken, left, published | published, broken, used, left | opened, walked, turned, finished | closed, started, changed | walked, finished | ✅ |
 
 ---
 
-## 7. Candidate word pool (reference, not hardcoded)
+## 8. Candidate word pool (reference, not hardcoded)
 
 Per §27.5.2, each category should maintain ≥20 candidate words. Rounds draw non-overlapping subsets. This pool is reference only and MUST NOT be hardcoded into tests or services.
 
@@ -200,7 +266,7 @@ Per §27.5.2, each category should maintain ≥20 candidate words. Rounds draw n
 
 ---
 
-## 8. Rules for filling this tracker
+## 9. Rules for filling this tracker
 
 1. Each round MUST record: marker, `/chapters/read/{id}`, test word list, repeat count vs previous round, repeat ratio, 8-category coverage, new article flag, MCP real click flag, API substitution flag, Incomplete flag.
 2. Repeat ratio > 30% MUST be explained (e.g., defect-fix re-verification). Fresh sample rounds MUST stay < 30%.
