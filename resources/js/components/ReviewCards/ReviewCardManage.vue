@@ -346,8 +346,8 @@
                                     <v-btn x-small text @click="startEdit(item)">编辑</v-btn>
                                     <v-btn x-small text @click="openDetail(item)">详情</v-btn>
                                     <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
-                                    <v-btn v-else x-small text color="success" @click="toggleEnabled(item)">恢复</v-btn>
-                                    <v-btn v-if="item.fsrs_enabled" x-small text @click="setDueNow(item)">立即到期</v-btn>
+                                    <v-btn v-else x-small text color="success" @click="confirmRestore(item)">恢复</v-btn>
+                                    <v-btn v-if="item.fsrs_enabled" x-small text @click="confirmDueNow(item)">立即到期</v-btn>
                                     <v-menu offset-y>
                                         <template #activator="{ on, attrs }">
                                             <v-btn x-small text v-bind="attrs" v-on="on">更多</v-btn>
@@ -614,14 +614,47 @@
         <!-- Archive confirmation dialog -->
         <v-dialog v-model="archiveDialog" max-width="480">
             <v-card>
-                <v-card-title>确认归档</v-card-title>
+                <v-card-title class="review-card-manage-archive-title">归档这张复习卡？</v-card-title>
                 <v-card-text>
-                    归档后，这张词义卡不会进入日常复习，但释义、例句、复习历史都会保留。确定归档吗？
+                    <p class="review-card-manage-archive-body">归档后，这张词义卡不会进入日常复习。</p>
+                    <p class="review-card-manage-archive-note text--secondary">不会删除词义，不会删除复习历史，也不会改变阅读页中的来源记录。你之后可以在管理页恢复它。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="archiveDialog = false">取消</v-btn>
-                    <v-btn color="warning" @click="doArchive">归档</v-btn>
+                    <v-btn color="warning" class="review-card-manage-archive-confirm" @click="doArchive">确认归档</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Restore confirmation dialog -->
+        <v-dialog v-model="restoreDialog" max-width="480">
+            <v-card>
+                <v-card-title class="review-card-manage-restore-title">恢复这张复习卡？</v-card-title>
+                <v-card-text>
+                    <p class="review-card-manage-restore-body">恢复后，这张词义卡会重新进入日常复习。</p>
+                    <p class="review-card-manage-restore-note text--secondary">不会重置复习进度，也不会删除复习历史。</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="restoreDialog = false">取消</v-btn>
+                    <v-btn color="success" class="review-card-manage-restore-confirm" @click="doRestore">确认恢复</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- Due now confirmation dialog -->
+        <v-dialog v-model="dueNowDialog" max-width="480">
+            <v-card>
+                <v-card-title class="review-card-manage-due-now-title">让这张卡立即到期？</v-card-title>
+                <v-card-text>
+                    <p class="review-card-manage-due-now-body">确认后，这张卡会尽快出现在复习队列中。</p>
+                    <p class="review-card-manage-due-now-note text--secondary">这不是一次复习评分，不会写入复习历史，也不会改变 FSRS 记忆。</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="dueNowDialog = false">取消</v-btn>
+                    <v-btn color="primary" class="review-card-manage-due-now-confirm" @click="doDueNow">确认立即到期</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -629,18 +662,15 @@
         <!-- Reset confirmation dialog -->
         <v-dialog v-model="resetDialog" max-width="500">
             <v-card>
-                <v-card-title>重置复习进度</v-card-title>
+                <v-card-title class="review-card-manage-reset-title">重置这张复习卡的进度？</v-card-title>
                 <v-card-text>
-                    <p>这会清空这张词义卡的复习进度（FSRS 记忆参数），并重新设为新学卡。</p>
-                    <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
-                    <p>如果这张卡已归档，重置后会重新启用并进入复习队列。</p>
-                    <p class="error--text">此操作不可恢复。重置后 FSRS 复习进度将被清除。</p>
-                    <p class="font-weight-bold">确定重置复习进度吗？</p>
+                    <p class="review-card-manage-reset-body">这会把这张词义卡恢复为新卡状态，并清空当前 FSRS 记忆。</p>
+                    <p class="review-card-manage-reset-note text--secondary">旧复习历史会保留，并会新增一条 "reset" 记录。不会删除词义，也不会删除阅读来源。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
-                    <v-btn color="primary" :loading="resetLoading" @click="doReset">确认重置复习进度</v-btn>
+                    <v-btn color="primary" :loading="resetLoading" class="review-card-manage-reset-confirm" @click="doReset">确认重置</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -648,16 +678,16 @@
         <!-- Delete confirmation dialog -->
         <v-dialog v-model="deleteDialog" max-width="500">
             <v-card>
-                <v-card-title class="error--text">彻底删除词义复习卡</v-card-title>
+                <v-card-title class="error--text review-card-manage-delete-title">彻底删除这张词义复习卡？</v-card-title>
                 <v-card-text>
-                    <p>这会删除这张词义复习卡，并让该释义不再出现在阅读页点词结果中。</p>
-                    <p class="font-weight-bold">阅读材料、原文位置和复习历史会保留。</p>
-                    <p class="error--text">此操作不可恢复。确定删除吗？</p>
+                    <p class="review-card-manage-delete-body">这会移除这张词义复习卡，并让该释义不再作为已确认词义出现在阅读页候选中。</p>
+                    <p class="review-card-manage-delete-note text--secondary">复习历史会保留，阅读来源记录会保留。不会删除其他词义。</p>
+                    <p class="review-card-manage-delete-last-sense text--secondary">如果这是该单词最后一个已确认词义，该单词会回到"新词"状态。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="deleteDialog = false">取消</v-btn>
-                    <v-btn color="error" @click="doDelete">彻底删除</v-btn>
+                    <v-btn color="error" class="review-card-manage-delete-confirm" @click="doDelete">确认彻底删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -665,9 +695,9 @@
         <!-- Bulk delete confirmation dialog -->
         <v-dialog v-model="bulkDeleteDialog" max-width="560">
             <v-card>
-                <v-card-title class="error--text">批量彻底删除词义复习卡</v-card-title>
+                <v-card-title class="error--text review-card-manage-bulk-delete-title">批量彻底删除选中的词义复习卡？</v-card-title>
                 <v-card-text>
-                    <p>将删除已选的 <strong>{{ selectedIds.length }}</strong> 张词义复习卡，并让对应释义不再出现在阅读页点词结果中。</p>
+                    <p class="review-card-manage-bulk-delete-scope">只会处理你当前勾选的复习卡，不会按筛选条件全量删除。</p>
                     <div v-if="visibleBulkDeleteItems.length > 0" class="bulk-delete-list mb-3">
                         <div v-for="item in visibleBulkDeleteItems" :key="item.review_card_id" class="bulk-delete-item">
                             <span class="lemma">{{ item.lemma }}</span>
@@ -677,13 +707,13 @@
                             还有 {{ hiddenBulkDeleteCount }} 张未显示。
                         </div>
                     </div>
-                    <p class="font-weight-bold">阅读材料、原文位置和复习历史会保留。</p>
-                    <p class="error--text">此操作不可恢复。确定删除吗？</p>
+                    <p class="review-card-manage-bulk-delete-note text--secondary">对应释义会退出已确认词义候选，复习历史会保留，阅读来源记录会保留。</p>
+                    <p class="review-card-manage-bulk-delete-last-sense text--secondary">如果某个单词没有其他已确认词义，它会回到"新词"状态。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="bulkDeleteDialog = false">取消</v-btn>
-                    <v-btn color="error" @click="doBulkDelete">确定删除</v-btn>
+                    <v-btn color="error" class="review-card-manage-bulk-delete-confirm" @click="doBulkDelete">确认批量彻底删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -691,17 +721,15 @@
         <!-- Bulk archive confirmation dialog -->
         <v-dialog v-model="bulkArchiveDialog" max-width="500">
             <v-card>
-                <v-card-title>批量归档</v-card-title>
+                <v-card-title class="review-card-manage-bulk-archive-title">批量归档选中的复习卡？</v-card-title>
                 <v-card-text>
-                    <p>即将批量归档 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
-                    <p>归档后，这些词义卡不会进入日常复习，但释义、例句、复习历史都会保留。</p>
-                    <p>操作只影响当前选中的 sense review cards。</p>
-                    <p class="font-weight-bold">是否继续？</p>
+                    <p class="review-card-manage-bulk-archive-scope">只会归档你当前勾选的复习卡，不会按筛选条件全量操作。</p>
+                    <p class="review-card-manage-bulk-archive-note text--secondary">归档后，这些卡不会进入日常复习。不会删除词义或复习历史。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="bulkArchiveDialog = false">取消</v-btn>
-                    <v-btn color="warning" @click="doBulkArchive">确认归档</v-btn>
+                    <v-btn color="warning" class="review-card-manage-bulk-archive-confirm" @click="doBulkArchive">确认批量归档</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -709,17 +737,15 @@
         <!-- Bulk restore confirmation dialog -->
         <v-dialog v-model="bulkRestoreDialog" max-width="500">
             <v-card>
-                <v-card-title>批量恢复</v-card-title>
+                <v-card-title class="review-card-manage-bulk-restore-title">批量恢复选中的复习卡？</v-card-title>
                 <v-card-text>
-                    <p>即将批量恢复 <strong>{{ selectedIds.length }}</strong> 张复习卡。</p>
-                    <p>恢复后，这些词义卡会重新进入日常复习，释义、例句、复习历史都会保留。</p>
-                    <p>操作只影响当前选中的 sense review cards。</p>
-                    <p class="font-weight-bold">是否继续？</p>
+                    <p class="review-card-manage-bulk-restore-scope">只会恢复你当前勾选的复习卡，不会按筛选条件全量操作。</p>
+                    <p class="review-card-manage-bulk-restore-note text--secondary">恢复后，这些卡会重新进入日常复习。不会重置复习进度。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="bulkRestoreDialog = false">取消</v-btn>
-                    <v-btn color="success" @click="doBulkRestore">确认恢复</v-btn>
+                    <v-btn color="success" class="review-card-manage-bulk-restore-confirm" @click="doBulkRestore">确认批量恢复</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -774,6 +800,10 @@ export default {
             detailLogsError: '',
             archiveDialog: false,
             archiveTarget: null,
+            restoreDialog: false,
+            restoreTarget: null,
+            dueNowDialog: false,
+            dueNowTarget: null,
             resetDialog: false,
             resetTarget: null,
             resetLoading: false,
@@ -1169,6 +1199,55 @@ export default {
             .catch((err) => {
                 this.error = '操作失败：' + (err.response?.data?.message || err.message);
             });
+        },
+
+        confirmRestore(item) {
+            this.restoreTarget = item;
+            this.restoreDialog = true;
+        },
+
+        doRestore() {
+            if (!this.restoreTarget) return;
+            const item = this.restoreTarget;
+            this.restoreDialog = false;
+            this.restoreTarget = null;
+
+            axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
+                enabled: true,
+            })
+            .then(() => {
+                this.showSnackbar('已恢复。该卡会重新进入日常复习。', 'success');
+                this.loadData();
+                this.loadFsrsStats();
+            })
+            .catch((err) => {
+                this.error = '操作失败：' + (err.response?.data?.message || err.message);
+            });
+        },
+
+        confirmDueNow(item) {
+            this.dueNowTarget = item;
+            this.dueNowDialog = true;
+        },
+
+        doDueNow() {
+            if (!this.dueNowTarget) return;
+            const item = this.dueNowTarget;
+            this.dueNowDialog = false;
+            this.dueNowTarget = null;
+
+            axios.post('/review-cards/manage/' + item.review_card_id + '/due-now')
+                .then((response) => {
+                    const idx = this.items.findIndex(i => i.review_card_id === item.review_card_id);
+                    if (idx >= 0) {
+                        this.$set(this.items, idx, response.data);
+                    }
+                    this.showSnackbar('已设为立即到期。该卡会进入复习队列。', 'success');
+                    this.loadFsrsStats();
+                })
+                .catch((err) => {
+                    this.error = '操作失败：' + (err.response?.data?.message || err.message);
+                });
         },
 
         confirmReset(item) {
