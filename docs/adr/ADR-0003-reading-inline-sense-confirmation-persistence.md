@@ -204,3 +204,59 @@ This section freezes the **management surface** rules for already-persisted inli
 10. The management surface does NOT introduce any new migration, any new column, any new table. Revocation is a `DELETE` on the existing `reading_inline_sense_confirmations` row scoped to the current user + current language.
 11. After revocation, the reading-page preview panel MUST no longer echo the revoked confirmation as `persisted_choice` for that occurrence + candidate.
 12. If a future round wants to introduce batch revocation, scoring conversion, AI-assisted summarization, automatic sentence scrolling, or per-token highlight on the reading page, it MUST open a separate ADR / requirement freeze / dedicated task. This management-surface layer does NOT authorize that.
+
+## Undo Hotkey Layer (added 2026-07-04 by OpenCode-ReadingInlineConfirmationUndoHotkey-800-1)
+
+This section freezes the **Anki-style Ctrl+Z undo** rules for inline confirmations. It does NOT change the persistence, usage-surface, or management-surface contracts above; it only clarifies how the most recent inline-confirmation action (store / choice-switch / revoke) MAY be undone by the owning user via a short-lived, backend-signed undo token.
+
+1. Ctrl+Z is **"undo the most recent reading-inline-confirmation action"**. It is NOT a review rating. It is NOT "forget". It is NOT "Again". It is NOT "delete the WordSense". It is NOT "delete the ReviewCard". It is NOT "delete the ReviewLog".
+2. The undo hotkey layer supports three undo scenarios:
+   - **store undo**: user just stored a new `match` / `not_match` on an occurrence that previously had no persisted choice → Ctrl+Z deletes the just-created confirmation row.
+   - **choice-switch undo**: user just switched from `match` → `not_match` (or `not_match` → `match`) on an occurrence that already had a persisted choice → Ctrl+Z restores the previous choice.
+   - **revoke undo**: user just revoked (deleted) a confirmation row from the management page → Ctrl+Z re-inserts the revoked row with its previous fields restored.
+3. The undo mechanism MUST be a **backend-signed undo token** returned by `POST /senses/inline-confirmation` and `DELETE /senses/inline-confirmations/{id}`. The frontend MUST NOT fabricate or modify the token.
+4. The undo token MUST encode:
+   - `user_id` (must equal the current authenticated user),
+   - `language` (must equal the current selected language),
+   - `action_type` (`store` | `revoke`),
+   - `confirmation_id`,
+   - `before_state` (the previous choice, or null for a fresh store),
+   - `after_state` (the new choice, or `revoked` for a revoke),
+   - `restore_payload` (for revoke undo: the full row fields needed to re-insert),
+   - `expires_at` (short-lived, default 120 seconds).
+5. The undo token MUST be signed/encrypted by the backend (Laravel `Crypt::encryptString` over a JSON payload). The frontend treats it as an opaque string. Token forgery by the frontend MUST be rejected by the backend on `POST /senses/inline-confirmations/undo`.
+6. The undo endpoint `POST /senses/inline-confirmations/undo` MUST:
+   - decrypt and validate the token,
+   - reject expired tokens,
+   - reject tokens whose `user_id` ≠ current user,
+   - reject tokens whose `language` ≠ current selected language,
+   - reject tokens whose WordSense no longer exists / no longer belongs to the current user / no longer `STATUS_CONFIRMED`,
+   - reject tokens whose Chapter (if present) no longer belongs to the current user / current language,
+   - enforce `choice ∈ {match, not_match}` on any restore,
+   - perform the undo atomically (DELETE for store undo, UPDATE for choice-switch undo, INSERT for revoke undo),
+   - return `undone: true`, `action_type`, `restored_choice` or `persisted_choice`, `confirmation_id`, optional `updated_preview`, and `safety_flags`.
+7. The undo safety_flags MUST include all of:
+   - `no_review_log_created: true`,
+   - `no_fsrs_changed: true`,
+   - `no_review_card_changed: true`,
+   - `no_word_sense_deleted: true`,
+   - `no_review_card_deleted: true`,
+   - `no_word_sense_created: true`,
+   - `no_review_card_created: true`,
+   - `not_a_review_rating: true`.
+8. The undo layer MUST NOT write `ReviewLog`. MUST NOT change any `ReviewCard` FSRS field. MUST NOT call `ReviewCardService::recordReview` or `FsrsSchedulingService::schedule`. MUST NOT call AI. MUST NOT auto-create `WordSense`. MUST NOT auto-create `ReviewCard`. MUST NOT delete `WordSense` / `ReviewCard` / `ReviewLog` / `EncounteredWord`.
+9. The undo layer MUST NOT introduce any new migration, any new column, any new table, any new Redis/cache dependency. The undo token is stateless and self-contained (signed payload only).
+10. **Frontend Ctrl+Z behavior**:
+    - Both `InlineSensePreviewPanel.vue` (reading page) and `ReadingInlineConfirmationManage.vue` (management page) register a `keydown` listener for `Ctrl+Z` (or `Meta+Z` on macOS).
+    - If the keyboard focus is inside an `<input>`, `<textarea>`, `<select>`, or `contenteditable` element, the listener MUST NOT intercept Ctrl+Z — the browser's native text undo remains available.
+    - If no undo token is available (or it has been consumed), Ctrl+Z MUST NOT throw and MUST NOT show an error; it MAY show a light snackbar "无可撤销的阅读判断" or do nothing.
+    - After a successful undo, the frontend clears the local undo token and refreshes the preview/list.
+    - A new store/revoke action overwrites the previous undo token (only the most recent action is undoable).
+    - The undo layer does NOT implement Ctrl+Y / Redo. It does NOT implement multi-level undo. It does NOT sync across devices.
+11. **Copy contract**:
+    - After store: snackbar/alert copy MUST include "按 Ctrl+Z 可撤销刚才的阅读判断".
+    - After revoke: snackbar copy MUST include "按 Ctrl+Z 可恢复".
+    - The management-page revoke button text changes from "撤销这条记录" to "撤销这条阅读判断" (the dialog title and safety copy remain unchanged).
+    - Copy MUST NOT include "删除词义" / "复习失败" / "忘记了" as the undo meaning.
+    - Copy MUST NOT include any rating button label (Good / Easy / Hard / Again).
+12. If a future round wants to introduce multi-level undo, cross-device undo sync, Redo (Ctrl+Y), batch undo, or undo for ReviewLog / FSRS / ReviewCard writes, it MUST open a separate ADR / requirement freeze / dedicated task. This undo-hotkey layer does NOT authorize that.

@@ -1335,6 +1335,512 @@ class ReadingInlineSenseConfirmationTest extends TestCase
             ->assertForbidden();
     }
 
+    // ================================================================
+    // OpenCode-ReadingInlineConfirmationUndoHotkey-800-1 (sub-stage 6)
+    // Ctrl+Z undo safety guard tests.
+    // ================================================================
+
+    /**
+     * 1. POST /senses/inline-confirmation returns a backend-signed undo_token.
+     */
+    public function test_store_confirmation_returns_undo_token(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $response = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $response->assertJsonPath('undo_token', fn ($v) => is_string($v) && $v !== '');
+        $response->assertJsonPath('undo_expires_at', fn ($v) => is_string($v) && $v !== '');
+        $this->assertSame('按 Ctrl+Z 可撤销刚才的阅读判断。', $response->json('undo_hint'));
+    }
+
+    /**
+     * 2. DELETE /senses/inline-confirmations/{id} returns a backend-signed undo_token.
+     */
+    public function test_revoke_confirmation_returns_undo_token(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $response = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+
+        $response->assertJsonPath('undo_token', fn ($v) => is_string($v) && $v !== '');
+        $response->assertJsonPath('undo_expires_at', fn ($v) => is_string($v) && $v !== '');
+        $this->assertSame('按 Ctrl+Z 可恢复。', $response->json('undo_hint'));
+    }
+
+    /**
+     * 3. Undo a fresh store (before_state=null) deletes the just-created confirmation.
+     */
+    public function test_undo_store_from_none_deletes_confirmation(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $undoToken = $storeResp->json('undo_token');
+        $confirmationId = $storeResp->json('confirmation_id');
+
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count());
+
+        $undoResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertOk();
+
+        $undoResp->assertJsonPath('undone', true);
+        $undoResp->assertJsonPath('action_type', 'store');
+        $undoResp->assertJsonPath('confirmation_id', $confirmationId);
+        $undoResp->assertJsonPath('restored_choice', null);
+        $undoResp->assertJsonPath('persisted_choice', null);
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count(), 'row deleted by undo');
+    }
+
+    /**
+     * 4. Undo a choice switch (match → not_match) restores match.
+     */
+    public function test_undo_store_from_match_to_not_match_restores_match(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // First save: match
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // Second save: switch to not_match → returns undo token with before_state=match
+        $switchResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+        $undoToken = $switchResp->json('undo_token');
+
+        $this->assertSame('not_match', ReadingInlineSenseConfirmation::first()->choice);
+
+        // Undo: should restore match
+        $undoResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertOk();
+
+        $undoResp->assertJsonPath('undone', true);
+        $undoResp->assertJsonPath('restored_choice', 'match');
+        $undoResp->assertJsonPath('persisted_choice', 'match');
+        $this->assertSame('match', ReadingInlineSenseConfirmation::first()->choice, 'choice restored to match');
+    }
+
+    /**
+     * 5. Undo a choice switch (not_match → match) restores not_match.
+     */
+    public function test_undo_store_from_not_match_to_match_restores_not_match(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        // First save: not_match
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'not_match',
+        ])->assertOk();
+
+        // Second save: switch to match → returns undo token with before_state=not_match
+        $switchResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $undoToken = $switchResp->json('undo_token');
+
+        $this->assertSame('match', ReadingInlineSenseConfirmation::first()->choice);
+
+        // Undo: should restore not_match
+        $undoResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertOk();
+
+        $undoResp->assertJsonPath('restored_choice', 'not_match');
+        $this->assertSame('not_match', ReadingInlineSenseConfirmation::first()->choice, 'choice restored to not_match');
+    }
+
+    /**
+     * 6. Undo a revoke re-inserts the deleted confirmation row.
+     */
+    public function test_undo_revoke_restores_deleted_confirmation(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $revokeResp = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+        $undoToken = $revokeResp->json('undo_token');
+
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count(), 'row deleted by revoke');
+
+        $undoResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertOk();
+
+        $undoResp->assertJsonPath('undone', true);
+        $undoResp->assertJsonPath('action_type', 'revoke');
+        $undoResp->assertJsonPath('restored_choice', 'match');
+        $undoResp->assertJsonPath('persisted_choice', 'match');
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count(), 'row re-inserted by undo');
+        $row = ReadingInlineSenseConfirmation::first();
+        $this->assertSame('match', $row->choice);
+        $this->assertSame('goose', $row->lemma);
+        $this->assertSame('geese', $row->surface);
+    }
+
+    /**
+     * 7. An invalid (non-encrypted / tampered) undo token is rejected with 422.
+     */
+    public function test_undo_invalid_token_rejected(): void
+    {
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => 'not-a-valid-encrypted-token',
+        ])->assertStatus(422);
+    }
+
+    /**
+     * 8. An expired undo token is rejected with 422.
+     */
+    public function test_undo_expired_token_rejected(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        // Forge an expired token by re-encrypting a payload with past expires_at.
+        $confirmationId = $storeResp->json('confirmation_id');
+        $expiredToken = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
+            'v' => 1,
+            'action_type' => 'store',
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 1,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'confirmation_id' => $confirmationId,
+            'before_state' => null,
+            'after_state' => 'match',
+            'expires_at' => now()->subSeconds(10)->getTimestamp(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $expiredToken,
+        ])->assertStatus(422);
+
+        // Row still exists (undo did not execute)
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count());
+    }
+
+    /**
+     * 9. A cross-user undo token is rejected with 422.
+     */
+    public function test_undo_cross_user_token_rejected(): void
+    {
+        $sense = $this->createConfirmedSenseForUser($this->otherUser, 'goose', 'geese', 'other-鹅');
+        $chapter = $this->createChapter($this->otherUser->id);
+
+        // user B saves a confirmation directly via model (avoids actingAs switch)
+        $row = ReadingInlineSenseConfirmation::forceCreate([
+            'user_id' => $this->otherUser->id, 'language' => 'english',
+            'chapter_id' => $chapter->id, 'sentence_index' => 1,
+            'sentence_hash' => null, 'sentence_text' => 'Other geese.',
+            'surface' => 'geese', 'lemma' => 'goose',
+            'word_sense_id' => $sense->id,
+            'choice' => 'match', 'source' => 'reading_inline_preview',
+        ]);
+
+        // Forge a token owned by user B
+        $crossUserToken = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
+            'v' => 1,
+            'action_type' => 'store',
+            'user_id' => $this->otherUser->id,
+            'language' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 1,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'confirmation_id' => $row->id,
+            'before_state' => null,
+            'after_state' => 'match',
+            'expires_at' => now()->addSeconds(60)->getTimestamp(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        // user A attempts to undo user B's token → 422
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $crossUserToken,
+        ])->assertStatus(422);
+
+        // user B's row is untouched
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count());
+    }
+
+    /**
+     * 10. A cross-language undo token is rejected with 422.
+     */
+    public function test_undo_cross_language_token_rejected(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+        $confirmationId = $storeResp->json('confirmation_id');
+
+        // Forge a token with language=japanese (mismatch)
+        $crossLangToken = \Illuminate\Support\Facades\Crypt::encryptString(json_encode([
+            'v' => 1,
+            'action_type' => 'store',
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $chapter->id,
+            'sentence_index' => 1,
+            'surface' => 'geese',
+            'lemma' => 'goose',
+            'confirmation_id' => $confirmationId,
+            'before_state' => null,
+            'after_state' => 'match',
+            'expires_at' => now()->addSeconds(60)->getTimestamp(),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $crossLangToken,
+        ])->assertStatus(422);
+
+        $this->assertSame(1, ReadingInlineSenseConfirmation::count(), 'row untouched by cross-language undo');
+    }
+
+    /**
+     * 11. Undo revoke is rejected when the WordSense no longer belongs to the current user.
+     */
+    public function test_undo_revoke_rejects_when_word_sense_owned_by_other_user(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $revokeResp = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+        $undoToken = $revokeResp->json('undo_token');
+
+        // Simulate: WordSense ownership transferred to another user after revoke.
+        $sense->user_id = $this->otherUser->id;
+        $sense->save();
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertStatus(422);
+
+        // Row NOT re-inserted
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count());
+    }
+
+    /**
+     * 12. Undo revoke is rejected when the Chapter no longer belongs to the current user.
+     */
+    public function test_undo_revoke_rejects_when_chapter_owned_by_other_user(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $confirmationId = ReadingInlineSenseConfirmation::first()->id;
+        $revokeResp = $this->actingAs($this->user)
+            ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
+            ->assertOk();
+        $undoToken = $revokeResp->json('undo_token');
+
+        // Simulate: Chapter ownership transferred to another user after revoke.
+        $chapter->user_id = $this->otherUser->id;
+        $chapter->save();
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $undoToken,
+        ])->assertStatus(422);
+
+        $this->assertSame(0, ReadingInlineSenseConfirmation::count(), 'row NOT re-inserted');
+    }
+
+    /**
+     * 13. Undo does NOT write ReviewLog.
+     */
+    public function test_undo_does_not_write_review_log(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $logBefore = ReviewLog::count();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $storeResp->json('undo_token'),
+        ])->assertOk();
+        $this->assertSame($logBefore, ReviewLog::count(), 'undo must not write ReviewLog');
+    }
+
+    /**
+     * 14. Undo does NOT change ReviewCard FSRS fields.
+     */
+    public function test_undo_does_not_change_fsrs_fields(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE, 'target_id' => $sense->id,
+            'fsrs_enabled' => true, 'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(), 'fsrs_stability' => 2.5,
+            'fsrs_difficulty' => 4.0, 'fsrs_reps' => 7, 'fsrs_lapses' => 1,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $before = [
+            'fsrs_state' => $card->fsrs_state, 'fsrs_reps' => $card->fsrs_reps,
+            'fsrs_stability' => $card->fsrs_stability, 'fsrs_difficulty' => $card->fsrs_difficulty,
+            'fsrs_lapses' => $card->fsrs_lapses, 'fsrs_enabled' => $card->fsrs_enabled,
+        ];
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $storeResp->json('undo_token'),
+        ])->assertOk();
+
+        $card->refresh();
+        $this->assertSame($before['fsrs_state'], $card->fsrs_state);
+        $this->assertSame($before['fsrs_reps'], $card->fsrs_reps);
+        $this->assertSame($before['fsrs_stability'], $card->fsrs_stability);
+        $this->assertSame($before['fsrs_difficulty'], $card->fsrs_difficulty);
+        $this->assertSame($before['fsrs_lapses'], $card->fsrs_lapses);
+        $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
+    }
+
+    /**
+     * 15. Undo does NOT create WordSense.
+     */
+    public function test_undo_does_not_create_word_sense(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $before = WordSense::count();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $storeResp->json('undo_token'),
+        ])->assertOk();
+        $this->assertSame($before, WordSense::count(), 'undo must not create WordSense');
+    }
+
+    /**
+     * 16. Undo does NOT create ReviewCard.
+     */
+    public function test_undo_does_not_create_review_card(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $before = ReviewCard::count();
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $storeResp->json('undo_token'),
+        ])->assertOk();
+        $this->assertSame($before, ReviewCard::count(), 'undo must not create ReviewCard');
+    }
+
+    /**
+     * 17. Undo does NOT delete WordSense / ReviewCard / ReviewLog.
+     */
+    public function test_undo_does_not_delete_word_sense_or_review_card_or_review_log(): void
+    {
+        $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
+        $chapter = $this->createChapter($this->user->id);
+        $card = ReviewCard::forceCreate([
+            'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE, 'target_id' => $sense->id,
+            'fsrs_enabled' => true, 'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(), 'fsrs_stability' => 1.0,
+            'fsrs_difficulty' => 5.0, 'fsrs_reps' => 1, 'fsrs_lapses' => 0,
+        ]);
+        $log = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'review_card_id' => $card->id, 'rating' => 'good',
+            'previous_state' => 'review', 'new_state' => 'review',
+            'previous_stability' => 1.0, 'new_stability' => 1.5,
+            'previous_difficulty' => 5.0, 'new_difficulty' => 4.5,
+            'reviewed_at' => now(),
+        ]);
+
+        $storeResp = $this->actingAs($this->user)->postJson('/senses/inline-confirmation', [
+            'lemma' => 'goose', 'surface' => 'geese', 'chapter_id' => $chapter->id,
+            'sentence_index' => 1, 'word_sense_id' => $sense->id, 'choice' => 'match',
+        ])->assertOk();
+
+        $beforeSense = WordSense::count();
+        $beforeCard = ReviewCard::count();
+        $beforeLog = ReviewLog::count();
+
+        $this->actingAs($this->user)->postJson('/senses/inline-confirmations/undo', [
+            'undo_token' => $storeResp->json('undo_token'),
+        ])->assertOk();
+
+        $this->assertSame($beforeSense, WordSense::count(), 'WordSense not deleted by undo');
+        $this->assertSame($beforeCard, ReviewCard::count(), 'ReviewCard not deleted by undo');
+        $this->assertSame($beforeLog, ReviewLog::count(), 'ReviewLog not deleted by undo');
+        $this->assertNotNull(WordSense::find($sense->id));
+        $this->assertNotNull(ReviewCard::find($card->id));
+        $this->assertNotNull(ReviewLog::find($log->id));
+    }
+
     // ==================== Helpers ====================
 
 

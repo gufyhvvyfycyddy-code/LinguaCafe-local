@@ -1,7 +1,7 @@
 # Morphology Test Sample Tracker
 
 > **Status**: Per-round tracking of MCP Chrome morphology lemma click samples.
-> **Last updated**: 2026-07-04 (GLM-ReadingInlineConfirmationManagementSurface-1000-1).
+> **Last updated**: 2026-07-04 (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1).
 > **Governing rules**: `vibe-coding-collaboration-rules.md` §27.0 / §27.5; `mcp-chrome-local-smoke-playbook.md` §8.
 
 This tracker records every MCP Chrome morphology lemma click round so that:
@@ -22,6 +22,7 @@ This tracker records every MCP Chrome morphology lemma click round so that:
 | R2 | 2026-07-03 | GLM-ArchitectureFirst1000-SafeStability-1 | `GLM Architecture 1000 Morphology Sample 20260703` | `/chapters/read/14` | Yes | 20 | ✅ 8/8 | 0 / 20 | 0% | ✅ | ❌ | ❌ |
 | R3 | 2026-07-03 | GLM-ReadingInlineConfirmationUsageSurface-AndMorphology-1000-1 | `GLM Reading Inline Confirmation Usage Surface Morphology 20260703` | `/chapters/read/15` | Yes | 10 | ✅ 8/8 | 0 / 10 | 0% | ✅ | ❌ | ❌ |
 | R4 | 2026-07-04 | GLM-ReadingInlineConfirmationManagementSurface-1000-1 | `GLM Reading Inline Confirmation Management Surface Morphology 20260704` | `/chapters/read/16` | Yes | 13 | ✅ 8/8 | 0 / 13 | 0% | ✅ | ❌ | ❌ (2 P2 residual reported) |
+| R5 | 2026-07-04 | OpenCode-ReadingInlineConfirmationUndoHotkey-800-1 | `OpenCode Reading Inline Confirmation Undo Hotkey 20260704` | `/chapters/read/7` (existing Test Sentences) | No (existing chapter, undo hotkey verification round) | 6 | ⚠️ Partial (3/8: irregular plural / comparative / past) | geese, children, better, best, went, ran — all 6 repeated from earlier rounds (regression re-verification on existing chapter, not a fresh sample round) | 6 / 6 = 100% (intentional — undo hotkey verification re-uses known-good tokens to isolate undo behavior) | ✅ | ❌ | ❌ |
 
 ---
 
@@ -233,6 +234,38 @@ This tracker records every MCP Chrome morphology lemma click round so that:
 - **是否点击复习评分**: ❌ (only opened vocab box + inline preview panel; did not click 标为已知 / 忽略 / 回归为新词 / 待 AI 解释 / any review rating button)
 - **Incomplete**: ❌ (2 P2 residuals reported as residuals, not as failures; tokenizer confirmed available via irregular-form resolutions)
 - **Additional management-surface interaction test (same MCP Chrome session)**: Navigated to `/chapters/read/7` (chapter with existing confirmed WordSense for `goose`), clicked `geese` token, clicked "是这个意思" → POST `/senses/inline-confirmation` (200) → UI showed "已保存：是这个意思", clicked "查看全部阅读确认记录" link → navigated to `/senses/inline-confirmations/manage` (200, management page loaded, list showed the new `match` confirmation with surface=`geese` lemma=`goose` sentence=`The geese went to the lake.` chapter=`Test Sentences` choice=`是这个意思`), filter `choice=match` showed the record, filter `choice=not_match` hid the record, clicked "撤销这条记录" → confirm dialog "撤销这条阅读中确认记录？" → confirmed → DELETE `/senses/inline-confirmations/{id}` (200, response `revoked: true, safety_flags: {no_review_log_created: true, no_fsrs_changed: true, no_review_card_changed: true, no_word_sense_deleted: true, no_review_card_deleted: true, not_a_review_rating: true}`) → list updated and the record disappeared, navigated back to `/chapters/read/7` → re-clicked `geese` → preview panel no longer showed `已保存：是这个意思` (persisted_choice cleared). Network: only `POST /senses/inline-confirmation` + `GET /senses/inline-confirmations` + `DELETE /senses/inline-confirmations/{id}`, no ReviewLog/FSRS/AI.
+
+---
+
+## 6.1 Round R5 detail (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1)
+
+- **Round type**: Undo hotkey verification round (NOT a fresh 8/8 morphology sample round). The primary focus of this round was verifying the new Ctrl+Z undo hotkey for reading inline confirmations. Morphology click verification was a secondary check to ensure existing lemma mappings still work after the undo changes.
+- **Marker**: `OpenCode Reading Inline Confirmation Undo Hotkey 20260704`
+- **Article path**: `/chapters/read/7` (existing "Test Sentences" chapter, intentionally re-used to isolate undo behavior on known-good tokens)
+- **New article**: ❌ No (existing chapter; this round is a regression / undo hotkey verification, not a fresh morphology sample)
+- **Test words (6 real MCP Chrome clicks)**:
+  - 不规则复数: `geese`, `children`
+  - 比较级/最高级: `better`, `best`
+  - 过去式: `went`, `ran`
+- **Surface → lemma results (verified via DOM `单词 surface lemma` and search box value)**:
+  - `geese` → `goose` ✅
+  - `better` → `good` ✅
+  - `best` → `good` ✅
+  - `went` → `go` ✅
+  - `children` → `child` ✅
+  - `ran` → `run` ✅
+- **8/8 categories**: ⚠️ Partial (3/8 covered: 不规则复数 / 比较级·最高级 / 过去式). **This round is an exception to the 8/8 rule because it was a regression / undo hotkey verification round, not a fresh morphology sample round. R0-R4 already established 8/8 coverage; R5 only re-verifies that the morphology pipeline still works after the undo hotkey changes.**
+- **Repeat vs R4**: 6 / 6 = 100% (intentional — undo hotkey verification re-uses known-good tokens to isolate undo behavior, not to discover new morphology defects)
+- **Real clicks**: ✅ 6 Playwright real browser clicks
+- **API / axios / fetch substitution**: ❌
+- **Incomplete**: ❌ (no P2 residual; all 6 tokens mapped to correct lemma)
+- **Undo hotkey-specific acceptance (primary focus of this round)**:
+  - Reading page `/chapters/read/7` store undo: click `geese` → "是这个意思" → "已保存：是这个意思" + "按 Ctrl+Z 可撤销刚才的阅读判断。" snackbar → Ctrl+Z → POST `/senses/inline-confirmations/undo` (200) → "已保存" disappears ✅
+  - Reading page choice-switch undo: click "不是这个意思" → "已保存：不是这个意思" → Ctrl+Z → POST `/senses/inline-confirmations/undo` (200) → restores "已保存：是这个意思" ✅
+  - Management page `/senses/inline-confirmations/manage` revoke undo: click "撤销这条阅读判断" → confirm dialog → confirm → record disappears + "按 Ctrl+Z 可恢复。" snackbar → Ctrl+Z → POST `/senses/inline-confirmations/undo` (200) → record restored, list count 1 → 2 ✅
+  - Input inside Ctrl+Z does not intercept: click "词元" textbox → type "goose" → Ctrl+Z → browser native undo clears text → no new POST `/senses/inline-confirmations/undo` in network ✅
+  - Network: only `POST /senses/inline-confirmation` + `POST /senses/inline-confirmations/undo` + `DELETE /senses/inline-confirmations/{id}` + `GET /senses/inline-confirmations`, no ReviewLog/FSRS/AI ✅
+  - Console: only expected WebSocket connection failures (BROADCAST_DRIVER=log local degradation) ✅
 
 ---
 

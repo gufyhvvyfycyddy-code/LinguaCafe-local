@@ -140,7 +140,7 @@
                                 @click="openRevokeDialog(item)"
                             >
                                 <v-icon left x-small>mdi-undo</v-icon>
-                                撤销这条记录
+                                撤销这条阅读判断
                             </v-btn>
                         </div>
                     </v-list-item-content>
@@ -193,6 +193,27 @@
                 </v-card-actions>
             </v-card>
         </v-dialog>
+
+        <!-- Undo snackbar: shown after a revoke action
+             (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1) -->
+        <v-snackbar
+            v-model="undoSnackbar.show"
+            :timeout="undoSnackbar.timeout"
+            :color="undoSnackbar.color"
+            class="inline-confirmation-undo-snackbar"
+        >
+            <span class="inline-confirmation-undo-hint">{{ undoSnackbar.text }}</span>
+            <template v-slot:action="{ attrs }">
+                <v-btn
+                    text
+                    v-bind="attrs"
+                    @click="triggerUndo"
+                    class="inline-confirmation-undo-btn"
+                >
+                    撤销
+                </v-btn>
+            </template>
+        </v-snackbar>
     </v-container>
 </template>
 
@@ -248,10 +269,26 @@ export default {
                 loading: false,
                 item: null,
             },
+            // Undo token (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1):
+            // opaque backend-signed string returned by DELETE
+            // /senses/inline-confirmations/{id}. Only the most recent revoke
+            // is undoable. Cleared after use.
+            undoToken: null,
+            undoSnackbar: {
+                show: false,
+                text: '',
+                color: 'info',
+                timeout: 6000,
+            },
+            undoLoading: false,
         };
     },
     mounted() {
         this.reload();
+        window.addEventListener('keydown', this.handleKeyDown);
+    },
+    beforeDestroy() {
+        window.removeEventListener('keydown', this.handleKeyDown);
     },
     methods: {
         reload() {
@@ -301,10 +338,24 @@ export default {
             if (!this.revokeDialog.item) return;
             this.revokeDialog.loading = true;
             axios.delete('/senses/inline-confirmations/' + this.revokeDialog.item.confirmation_id)
-                .then(() => {
+                .then((response) => {
+                    const data = response && response.data;
                     this.items = this.items.filter(i => i.confirmation_id !== this.revokeDialog.item.confirmation_id);
                     this.pagination.total = Math.max(0, this.pagination.total - 1);
                     this.closeRevokeDialog();
+
+                    // Save the undo token returned by the backend and show
+                    // a snackbar telling the user they can press Ctrl+Z
+                    // (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1).
+                    if (data && typeof data.undo_token === 'string' && data.undo_token) {
+                        this.undoToken = data.undo_token;
+                        this.undoSnackbar = {
+                            show: true,
+                            text: data.undo_hint || '按 Ctrl+Z 可恢复。',
+                            color: 'info',
+                            timeout: 6000,
+                        };
+                    }
                 })
                 .catch(() => {
                     // leave dialog open so user can retry
@@ -312,6 +363,72 @@ export default {
                 .finally(() => {
                     this.revokeDialog.loading = false;
                 });
+        },
+        /**
+         * Keydown handler for Ctrl+Z / Cmd+Z (Anki-style undo).
+         * - If focus is inside an input / textarea / select / contenteditable,
+         *   do NOT intercept — let the browser do native text undo.
+         * - If no undo token is available, do nothing (no error).
+         * - Otherwise, call the undo endpoint to restore the revoked row.
+         *
+         * (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1, ADR-0003 Undo Hotkey Layer)
+         */
+        handleKeyDown(event) {
+            const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+            if (!isCtrlOrCmd || event.key !== 'z' && event.key !== 'Z') {
+                return;
+            }
+            if (this.isFocusInsideEditableInput()) {
+                return;
+            }
+            if (!this.undoToken || this.undoLoading) {
+                return;
+            }
+            event.preventDefault();
+            this.triggerUndo();
+        },
+        isFocusInsideEditableInput() {
+            const el = document.activeElement;
+            if (!el) return false;
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+                return true;
+            }
+            if (el.isContentEditable) {
+                return true;
+            }
+            return false;
+        },
+        triggerUndo() {
+            if (!this.undoToken || this.undoLoading) {
+                return;
+            }
+            this.undoLoading = true;
+            axios.post('/senses/inline-confirmations/undo', {
+                undo_token: this.undoToken,
+            }).then(() => {
+                // Token consumed — clear it so it cannot be replayed.
+                this.undoToken = null;
+                this.undoSnackbar = {
+                    show: true,
+                    text: '已恢复刚才撤销的阅读判断。',
+                    color: 'success',
+                    timeout: 4000,
+                };
+                // Refresh the list so the restored row reappears.
+                this.reload();
+            }).catch(() => {
+                // Token invalid / expired / cross-user / cross-language.
+                this.undoToken = null;
+                this.undoSnackbar = {
+                    show: true,
+                    text: '撤销失败：撤销令牌已过期或无效。',
+                    color: 'error',
+                    timeout: 4000,
+                };
+            }).finally(() => {
+                this.undoLoading = false;
+            });
         },
         formatTime(iso) {
             if (!iso) return '';

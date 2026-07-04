@@ -90,12 +90,16 @@ class ReadingInlineConfirmationManageUiGuardTest extends TestCase
         $this->assertStringContainsString('不是这个意思', $contents, 'manage page must show "不是这个意思" copy.');
     }
 
-    // ==================== 5. "撤销这条记录" ====================
+    // ==================== 5. "撤销这条阅读判断" (updated by UndoHotkey task) ====================
 
     public function test_manage_page_contains_revoke_copy(): void
     {
         $contents = file_get_contents($this->managePath);
-        $this->assertStringContainsString('撤销这条记录', $contents, 'manage page must show "撤销这条记录" button.');
+        // OpenCode-ReadingInlineConfirmationUndoHotkey-800-1: button copy
+        // changed from "撤销这条记录" to "撤销这条阅读判断" to clarify that
+        // the action only removes a reading-inline judgment, not a review card
+        // or a word sense.
+        $this->assertStringContainsString('撤销这条阅读判断', $contents, 'manage page must show "撤销这条阅读判断" button.');
     }
 
     public function test_manage_page_contains_revoke_dialog(): void
@@ -162,10 +166,19 @@ class ReadingInlineConfirmationManageUiGuardTest extends TestCase
     {
         $contents = file_get_contents($this->managePath);
         // No real AI calls from the management page.
-        $blocked = ['/ai/', '/openai', '/chatgpt', '/gpt', 'axios.post'];
+        // Note: axios.post is now allowed for the undo endpoint
+        // (POST /senses/inline-confirmations/undo, added by
+        // OpenCode-ReadingInlineConfirmationUndoHotkey-800-1).
+        $blocked = ['/ai/', '/openai', '/chatgpt', '/gpt'];
         foreach ($blocked as $route) {
-            $this->assertStringNotContainsString($route, $contents, 'manage page must not call AI or any POST route [' . $route . '].');
+            $this->assertStringNotContainsString($route, $contents, 'manage page must not call AI route [' . $route . '].');
         }
+        // Any axios.post must be ONLY to the undo endpoint, never to AI / rating / review-log.
+        $this->assertStringContainsString("axios.post('/senses/inline-confirmations/undo'", $contents, 'manage page axios.post must target the undo endpoint.');
+        $this->assertStringNotContainsString("axios.post('/ai", $contents, 'manage page must not POST to AI.');
+        $this->assertStringNotContainsString("axios.post('/reviews", $contents, 'manage page must not POST to reviews.');
+        $this->assertStringNotContainsString("axios.post('/review-log", $contents, 'manage page must not POST to review-log.');
+        $this->assertStringNotContainsString("axios.post('/fsrs", $contents, 'manage page must not POST to fsrs.');
     }
 
     public function test_manage_page_only_calls_safe_endpoints(): void
@@ -249,5 +262,105 @@ class ReadingInlineConfirmationManageUiGuardTest extends TestCase
     {
         $contents = file_get_contents($this->managePath);
         $this->assertStringContainsString('暂无阅读中词义确认记录', $contents, 'manage page must show empty-state copy.');
+    }
+
+    // ================================================================
+    // OpenCode-ReadingInlineConfirmationUndoHotkey-800-1 (sub-stage 7)
+    // Ctrl+Z undo UI guard tests.
+    // ================================================================
+
+    /**
+     * The management page must show "按 Ctrl+Z 可恢复" copy after a revoke,
+     * so the user knows they can press Ctrl+Z to restore the deleted row.
+     */
+    public function test_manage_page_contains_undo_hint_copy(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('按 Ctrl+Z 可恢复', $contents, 'manage page must show "按 Ctrl+Z 可恢复" undo hint.');
+    }
+
+    /**
+     * The management page must register a keydown event listener for Ctrl+Z
+     * and must clean it up on component destroy.
+     */
+    public function test_manage_page_registers_and_removes_keydown_listener(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString("addEventListener('keydown'", $contents, 'manage page must add keydown listener on mount.');
+        $this->assertStringContainsString("removeEventListener('keydown'", $contents, 'manage page must remove keydown listener on destroy.');
+        $this->assertStringContainsString('handleKeyDown', $contents, 'manage page must define handleKeyDown method.');
+    }
+
+    /**
+     * The management page must NOT intercept Ctrl+Z when the focus is inside
+     * an editable input (input / textarea / select / contenteditable), so the
+     * browser's native text-undo still works.
+     */
+    public function test_manage_page_has_input_guard_for_ctrl_z(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('isFocusInsideEditableInput', $contents, 'manage page must define isFocusInsideEditableInput method.');
+    }
+
+    /**
+     * The management page must call the undo endpoint via POST, not via
+     * any rating / review-log / fsrs route.
+     */
+    public function test_manage_page_calls_undo_endpoint_safely(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('/senses/inline-confirmations/undo', $contents, 'manage page must call POST /senses/inline-confirmations/undo.');
+        // Must NOT call any rating / FSRS / review-log route from the undo path.
+        $blocked = ['/reviews/rate', '/reviews/senses/', '/fsrs', '/review-log'];
+        foreach ($blocked as $route) {
+            $this->assertStringNotContainsString($route, $contents, 'manage page must not call rating/fsrs/review-log route [' . $route . '].');
+        }
+    }
+
+    /**
+     * The management page must clear the undo token after using it, so the
+     * user cannot undo the same action twice.
+     */
+    public function test_manage_page_clears_undo_token_after_use(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('this.undoToken = null', $contents, 'manage page must clear undoToken after use.');
+    }
+
+    /**
+     * The preview panel must show "按 Ctrl+Z 可撤销刚才的阅读判断" copy
+     * after a store action, so the user knows they can press Ctrl+Z.
+     */
+    public function test_preview_panel_contains_undo_hint_copy(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $this->assertStringContainsString('按 Ctrl+Z 可撤销刚才的阅读判断', $contents, 'preview panel must show undo hint copy.');
+    }
+
+    /**
+     * The preview panel must register / remove a keydown listener and must
+     * have the input-guard method.
+     */
+    public function test_preview_panel_has_keydown_and_input_guard(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $this->assertStringContainsString("addEventListener('keydown'", $contents, 'preview panel must add keydown listener.');
+        $this->assertStringContainsString("removeEventListener('keydown'", $contents, 'preview panel must remove keydown listener.');
+        $this->assertStringContainsString('handleKeyDown', $contents, 'preview panel must define handleKeyDown.');
+        $this->assertStringContainsString('isFocusInsideEditableInput', $contents, 'preview panel must define isFocusInsideEditableInput.');
+    }
+
+    /**
+     * The preview panel must call the undo endpoint via POST and must NOT
+     * call any rating / FSRS / review-log route.
+     */
+    public function test_preview_panel_calls_undo_endpoint_safely(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $this->assertStringContainsString('/senses/inline-confirmations/undo', $contents, 'preview panel must call POST /senses/inline-confirmations/undo.');
+        $blocked = ['/reviews/rate', '/reviews/senses/', '/fsrs', '/review-log'];
+        foreach ($blocked as $route) {
+            $this->assertStringNotContainsString($route, $contents, 'preview panel must not call rating/fsrs/review-log route [' . $route . '].');
+        }
     }
 }

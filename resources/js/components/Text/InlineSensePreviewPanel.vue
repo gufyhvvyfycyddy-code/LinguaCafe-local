@@ -154,6 +154,27 @@
                 </a>
             </div>
         </div>
+
+        <!-- Undo snackbar: shown after a store / choice-switch action
+             (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1) -->
+        <v-snackbar
+            v-model="undoSnackbar.show"
+            :timeout="undoSnackbar.timeout"
+            :color="undoSnackbar.color"
+            class="inline-preview-undo-snackbar"
+        >
+            <span class="inline-preview-undo-hint">{{ undoSnackbar.text }}</span>
+            <template v-slot:action="{ attrs }">
+                <v-btn
+                    text
+                    v-bind="attrs"
+                    @click="triggerUndo"
+                    class="inline-preview-undo-btn"
+                >
+                    撤销
+                </v-btn>
+            </template>
+        </v-snackbar>
     </div>
 </template>
 
@@ -240,6 +261,17 @@ export default {
             pendingChoice: null,
             // { [sense_id]: string errorMessage }
             saveErrors: {},
+            // Undo token (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1):
+            // opaque backend-signed string returned by POST /senses/inline-confirmation.
+            // Only the most recent action is undoable. Cleared after use.
+            undoToken: null,
+            undoSnackbar: {
+                show: false,
+                text: '',
+                color: 'info',
+                timeout: 6000,
+            },
+            undoLoading: false,
         };
     },
     computed: {
@@ -278,6 +310,12 @@ export default {
         sentenceIndex() {
             this.fetchInlinePreview();
         },
+    },
+    mounted() {
+        window.addEventListener('keydown', this.handleKeyDown);
+    },
+    beforeDestroy() {
+        window.removeEventListener('keydown', this.handleKeyDown);
     },
     methods: {
         fetchInlinePreview() {
@@ -380,6 +418,19 @@ export default {
                 }
                 // Clear the local override; the preview payload now carries persisted_choice.
                 this.$delete(this.localOverride, senseId);
+
+                // Save the undo token returned by the backend and show a
+                // snackbar telling the user they can press Ctrl+Z
+                // (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1).
+                if (data && typeof data.undo_token === 'string' && data.undo_token) {
+                    this.undoToken = data.undo_token;
+                    this.undoSnackbar = {
+                        show: true,
+                        text: data.undo_hint || '按 Ctrl+Z 可撤销刚才的阅读判断。',
+                        color: 'info',
+                        timeout: 6000,
+                    };
+                }
             }).catch((err) => {
                 // Revert the optimistic override.
                 this.$delete(this.localOverride, senseId);
@@ -389,6 +440,83 @@ export default {
             }).finally(() => {
                 this.savingSenseId = null;
                 this.pendingChoice = null;
+            });
+        },
+        /**
+         * Keydown handler for Ctrl+Z / Cmd+Z (Anki-style undo).
+         * - If focus is inside an input / textarea / select / contenteditable,
+         *   do NOT intercept — let the browser do native text undo.
+         * - If no undo token is available, do nothing (no error).
+         * - Otherwise, call the undo endpoint.
+         *
+         * (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1, ADR-0003 Undo Hotkey Layer)
+         */
+        handleKeyDown(event) {
+            const isCtrlOrCmd = event.ctrlKey || event.metaKey;
+            if (!isCtrlOrCmd || event.key !== 'z' && event.key !== 'Z') {
+                return;
+            }
+            // Do not intercept when the user is editing text.
+            if (this.isFocusInsideEditableInput()) {
+                return;
+            }
+            if (!this.undoToken || this.undoLoading) {
+                // No token / already running — silently ignore (per ADR-0003 §10).
+                return;
+            }
+            event.preventDefault();
+            this.triggerUndo();
+        },
+        isFocusInsideEditableInput() {
+            const el = document.activeElement;
+            if (!el) return false;
+            const tag = (el.tagName || '').toLowerCase();
+            if (tag === 'input' || tag === 'textarea' || tag === 'select') {
+                return true;
+            }
+            if (el.isContentEditable) {
+                return true;
+            }
+            return false;
+        },
+        triggerUndo() {
+            if (!this.undoToken || this.undoLoading) {
+                return;
+            }
+            this.undoLoading = true;
+            axios.post('/senses/inline-confirmations/undo', {
+                undo_token: this.undoToken,
+                lemma: this.effectiveLemma,
+                surface: this.surfaceWord,
+                sentence: this.sentenceText,
+                chapter_id: this.chapterId,
+                sentence_index: this.sentenceIndex,
+            }).then((response) => {
+                const data = response && response.data;
+                // Refresh the preview payload if the backend returned one.
+                if (data && data.updated_preview) {
+                    this.previewData = data.updated_preview;
+                }
+                // Clear the token so it cannot be replayed.
+                this.undoToken = null;
+                this.undoSnackbar = {
+                    show: true,
+                    text: '已撤销刚才的阅读判断。',
+                    color: 'success',
+                    timeout: 4000,
+                };
+            }).catch(() => {
+                // Token invalid / expired / cross-user / cross-language.
+                // Backend rejected — clear the token and show a light notice.
+                this.undoToken = null;
+                this.undoSnackbar = {
+                    show: true,
+                    text: '撤销失败：撤销令牌已过期或无效。',
+                    color: 'error',
+                    timeout: 4000,
+                };
+            }).finally(() => {
+                this.undoLoading = false;
             });
         },
     },

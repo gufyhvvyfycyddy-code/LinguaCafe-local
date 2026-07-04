@@ -211,6 +211,9 @@ class SenseOccurrenceController extends Controller
             'updated_at' => $result['updated_at'],
             'safety_flags' => $result['safety_flags'],
             'updated_preview' => $previewPayload,
+            'undo_token' => $result['undo_token'],
+            'undo_expires_at' => $result['undo_expires_at'],
+            'undo_hint' => $result['undo_hint'],
         ]);
     }
 
@@ -266,6 +269,9 @@ class SenseOccurrenceController extends Controller
      * This endpoint ONLY deletes a row in `reading_inline_sense_confirmations`.
      * It does NOT delete WordSense / ReviewCard / ReviewLog / EncounteredWord.
      * It does NOT call ReviewLog::create / FSRS / AI. It is NOT a review rating.
+     *
+     * Returns a backend-signed `undo_token` so the user can press Ctrl+Z
+     * to restore the revoked row (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1).
      */
     public function revokeInlineConfirmation(int $id)
     {
@@ -273,6 +279,62 @@ class SenseOccurrenceController extends Controller
         $language = Auth::user()->selected_language;
 
         $result = $this->inlineConfirmationService->revokeConfirmation($userId, $language, $id);
+
+        return response()->json($result);
+    }
+
+    /**
+     * Undo the most recent reading-inline-confirmation action described
+     * by a backend-signed undo token
+     * (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1, ADR-0003 Undo Hotkey Layer).
+     *
+     * The token is returned by `POST /senses/inline-confirmation` (store)
+     * or `DELETE /senses/inline-confirmations/{id}` (revoke) and is short-lived.
+     *
+     * This endpoint ONLY performs INSERT / UPDATE / DELETE on the
+     * `reading_inline_sense_confirmations` table. It does NOT write
+     * ReviewLog, does NOT change FSRS, does NOT create / delete
+     * WordSense / ReviewCard, does NOT call AI. It is NOT a review rating.
+     */
+    public function undoInlineConfirmation(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $data = $request->validate([
+            'undo_token' => ['required', 'string'],
+            // Optional: lemma / surface / chapter_id / sentence_index allow
+            // the backend to also return an updated preview payload for the
+            // reading page so the frontend can refresh without a second
+            // round-trip.
+            'lemma' => ['sometimes', 'string'],
+            'surface' => ['sometimes', 'string'],
+            'sentence' => ['sometimes', 'string'],
+            'chapter_id' => ['sometimes', 'nullable', 'integer'],
+            'sentence_index' => ['sometimes', 'nullable', 'integer'],
+        ]);
+
+        $result = $this->inlineConfirmationService->undoLastInlineConfirmationAction(
+            $userId,
+            $language,
+            (string) $data['undo_token']
+        );
+
+        // If the caller passed lemma/surface/sentence/chapter/sentence_index,
+        // also return an updated preview payload so the reading page can
+        // refresh the echoed persisted_choice without a second round-trip.
+        if (isset($data['lemma']) && $data['lemma'] !== '') {
+            $previewPayload = $this->knownSenseService->previewInlineSenseCandidates(
+                $userId,
+                $language,
+                (string) $data['lemma'],
+                (string) ($data['surface'] ?? ''),
+                (string) ($data['sentence'] ?? ''),
+                isset($data['chapter_id']) ? (int) $data['chapter_id'] : null,
+                isset($data['sentence_index']) ? (int) $data['sentence_index'] : null
+            );
+            $result['updated_preview'] = $previewPayload;
+        }
 
         return response()->json($result);
     }

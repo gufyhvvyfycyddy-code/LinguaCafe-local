@@ -198,6 +198,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/senses/inline-confirmation', [App\Http\Controllers\SenseOccurrenceController::class, 'storeInlineConfirmation']);
     Route::get('/senses/inline-confirmations', [App\Http\Controllers\SenseOccurrenceController::class, 'listInlineConfirmations']);
     Route::get('/senses/inline-confirmations/manage', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::post('/senses/inline-confirmations/undo', [App\Http\Controllers\SenseOccurrenceController::class, 'undoInlineConfirmation']);
     Route::delete('/senses/inline-confirmations/{id}', [App\Http\Controllers\SenseOccurrenceController::class, 'revokeInlineConfirmation']);
     Route::get('/senses/possible-duplicates', [App\Http\Controllers\SenseOccurrenceController::class, 'possibleDuplicates']);
     Route::post('/senses/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'storeManualSense']);
