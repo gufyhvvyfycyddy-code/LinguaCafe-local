@@ -76,6 +76,29 @@
                 </v-col>
             </v-row>
 
+            <!-- Visible undo affordance: persistent banner shown while undo_token is valid
+                 (OpenCode-ReadingInlineConfirmationUndoAffordanceFix-1) -->
+            <v-alert
+                v-if="undoToken && !undoLoading"
+                dense
+                text
+                type="info"
+                icon="mdi-undo-variant"
+                class="mt-4 mb-2 inline-confirmation-undo-affordance"
+            >
+                <div class="d-flex align-center flex-wrap">
+                    <span class="inline-confirmation-undo-affordance-hint mr-2">刚才撤销了一条阅读判断。按 Ctrl+Z 或点击下方按钮可恢复。</span>
+                    <v-btn
+                        text
+                        color="primary"
+                        class="inline-confirmation-undo-button"
+                        @click="triggerUndo"
+                    >
+                        恢复刚才撤销的阅读判断
+                    </v-btn>
+                </div>
+            </v-alert>
+
             <!-- Empty state -->
             <div v-if="!loading && !items.length" class="text-center text--secondary pa-8 inline-confirmation-empty">
                 <v-icon large color="grey lighten-1">mdi-format-list-bulleted</v-icon>

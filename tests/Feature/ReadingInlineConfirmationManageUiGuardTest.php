@@ -328,6 +328,21 @@ class ReadingInlineConfirmationManageUiGuardTest extends TestCase
     }
 
     /**
+     * OpenCode-ReadingInlineConfirmationUndoAffordanceFix-1
+     *
+     * The manage page must show a visible "恢复刚才撤销的阅读判断" button and
+     * the "按 Ctrl+Z 或点击下方按钮可恢复" hint when an undo token is available.
+     */
+    public function test_manage_page_contains_visible_undo_button_and_hint(): void
+    {
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('恢复刚才撤销的阅读判断', $contents, 'manage page must show "恢复刚才撤销的阅读判断" undo affordance button.');
+        $this->assertStringContainsString('按 Ctrl+Z 或点击下方按钮可恢复', $contents, 'manage page must show "按 Ctrl+Z 或点击下方按钮可恢复" affordance hint.');
+        $this->assertStringContainsString('inline-confirmation-undo-button', $contents, 'manage page must have undo button CSS class.');
+        $this->assertStringContainsString('inline-confirmation-undo-affordance', $contents, 'manage page must have undo affordance CSS class.');
+    }
+
+    /**
      * The preview panel must show "按 Ctrl+Z 可撤销刚才的阅读判断" copy
      * after a store action, so the user knows they can press Ctrl+Z.
      */

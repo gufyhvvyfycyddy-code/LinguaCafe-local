@@ -204,6 +204,21 @@ class InlineSensePreviewUiGuardTest extends TestCase
         $this->assertStringContainsString(':sentence-index', $contents, 'WordSensesList must pass sentence-index to InlineSensePreviewPanel.');
     }
 
+    /**
+     * OpenCode-ReadingInlineConfirmationUndoAffordanceFix-1
+     *
+     * The preview panel must show a visible "撤回刚才的阅读判断" button and
+     * the "按 Ctrl+Z 或点击下方按钮撤回" hint when an undo token is available.
+     */
+    public function test_preview_panel_contains_visible_undo_button_and_hint(): void
+    {
+        $contents = file_get_contents($this->panelPath);
+        $this->assertStringContainsString('撤回刚才的阅读判断', $contents, 'preview panel must show "撤回刚才的阅读判断" undo affordance button.');
+        $this->assertStringContainsString('按 Ctrl+Z 或点击下方按钮撤回', $contents, 'preview panel must show "按 Ctrl+Z 或点击下方按钮撤回" affordance hint.');
+        $this->assertStringContainsString('inline-preview-undo-button', $contents, 'preview panel must have undo button CSS class.');
+        $this->assertStringContainsString('inline-preview-undo-affordance', $contents, 'preview panel must have undo affordance CSS class.');
+    }
+
     public function test_legacy_entry_copy_not_reintroduced_in_lookup_components(): void
     {
         $componentPaths = [

@@ -155,6 +155,29 @@
             </div>
         </div>
 
+        <!-- Visible undo affordance: persistent button + hint shown while undo_token is valid
+             (OpenCode-ReadingInlineConfirmationUndoAffordanceFix-1) -->
+        <v-alert
+            v-if="undoToken && !undoLoading"
+            dense
+            text
+            type="info"
+            icon="mdi-undo-variant"
+            class="mt-2 mb-0 inline-preview-undo-affordance"
+        >
+            <div class="d-flex align-center flex-wrap">
+                <span class="inline-preview-undo-affordance-hint mr-2">点错了？按 Ctrl+Z 或点击下方按钮撤回。</span>
+                <v-btn
+                    text
+                    color="primary"
+                    class="inline-preview-undo-button"
+                    @click="triggerUndo"
+                >
+                    撤回刚才的阅读判断
+                </v-btn>
+            </div>
+        </v-alert>
+
         <!-- Undo snackbar: shown after a store / choice-switch action
              (OpenCode-ReadingInlineConfirmationUndoHotkey-800-1) -->
         <v-snackbar
