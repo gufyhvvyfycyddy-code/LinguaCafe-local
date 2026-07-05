@@ -387,11 +387,14 @@ class WordSenseExamplePoolTest extends TestCase
 
     public function test_pool_chapter_title_resolves_null_when_chapter_belongs_to_other_user(): void
     {
-        // Sub-stage 5 edge case: when an occurrence references a chapter
-        // that belongs to a different user, the chapter filter inside the
-        // batch preload must drop it. The candidate's chapter_title must
-        // then be null and source_label must fall back to 'occurrence'.
-        $sense = $this->createConfirmedSense('bureau', 'Bureau');
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: when an
+        // occurrence references a chapter that belongs to a different
+        // user, the occurrence is untrusted — its sentence_en may have
+        // been copied from another user's chapter content. The pool MUST
+        // skip the occurrence entirely so the foreign sentence does not
+        // leak into the candidate pool, the question example, or the
+        // supplementary example.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'Safe fallback sentence.');
         $otherUser = $this->createUser('pool-chapter-other@example.com', 'english');
         $otherChapter = Chapter::forceCreate([
             'user_id' => $otherUser->id,
@@ -413,10 +416,164 @@ class WordSenseExamplePoolTest extends TestCase
 
         $candidates = $this->poolService->exampleCandidates($sense);
 
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertNotContains('Sentence referencing foreign chapter.', $sentences, 'foreign-user occurrence sentence must not leak');
+        // Card fallback is still safe to return because it comes from the
+        // WordSense itself, not from the foreign chapter.
+        $this->assertCount(1, $candidates, 'only the card_example fallback should remain');
+        $this->assertTrue($candidates[0]['is_card_fallback']);
+        $this->assertSame('card_example', $candidates[0]['source_label']);
+    }
+
+    public function test_pool_skips_occurrence_when_chapter_belongs_to_other_language(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: cross-language
+        // guard. Even if the chapter user_id matches, a language mismatch
+        // means the occurrence is untrusted and must be skipped.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'Safe fallback sentence.');
+        $otherLanguageChapter = Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => 1,
+            'name' => 'Other Language Chapter',
+            'read_count' => 0,
+            'word_count' => 0,
+            'language' => 'japanese',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'raw_text' => '',
+            'type' => 'text',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode([]), 1),
+        ]);
+
+        $this->createOccurrence($sense, $otherLanguageChapter, 'Foreign language sentence.');
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertNotContains('Foreign language sentence.', $sentences, 'cross-language occurrence sentence must not leak');
+        $this->assertCount(1, $candidates, 'only the card_example fallback should remain');
+        $this->assertTrue($candidates[0]['is_card_fallback']);
+    }
+
+    public function test_pool_skips_occurrence_with_invalid_chapter_id(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: dangling
+        // chapter_id (chapter row deleted, or corrupted id). The
+        // occurrence is untrusted because the chapter cannot be verified
+        // to belong to the current user/language.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'Safe fallback sentence.');
+
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => 999999, // non-existent chapter
+            'sentence_id' => '1',
+            'sentence_en' => 'Sentence with invalid chapter id.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertNotContains('Sentence with invalid chapter id.', $sentences, 'invalid-chapter occurrence sentence must not leak');
+        $this->assertCount(1, $candidates, 'only the card_example fallback should remain');
+        $this->assertTrue($candidates[0]['is_card_fallback']);
+    }
+
+    public function test_pool_keeps_chapterless_occurrence_as_occurrence_only_example(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: occurrence
+        // without a chapter_id is still allowed as an occurrence-only
+        // example, as long as it belongs to the current user/language/sense
+        // and has a non-empty sentence_en. This is the safe path for
+        // occurrences created from card examples or manual sense-add flows
+        // that do not reference a chapter.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'Card example sentence.');
+
+        WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => null,
+            'sentence_id' => '',
+            'sentence_en' => 'Chapterless occurrence sentence.',
+            'sentence_zh' => '',
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $sense->surface_form,
+            'lemma' => $sense->lemma,
+            'pos' => $sense->pos,
+            'decision' => 'match_existing_sense',
+            'confidence' => 1.0,
+            'status' => WordSenseOccurrence::STATUS_BOUND,
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        $sentences = array_column($candidates, 'sentence_en');
+        $this->assertContains('Chapterless occurrence sentence.', $sentences, 'chapterless occurrence should be kept');
+        // Find the chapterless candidate and verify its source_label
+        $chapterless = null;
+        foreach ($candidates as $c) {
+            if ($c['sentence_en'] === 'Chapterless occurrence sentence.') {
+                $chapterless = $c;
+                break;
+            }
+        }
+        $this->assertNotNull($chapterless);
+        $this->assertSame('occurrence', $chapterless['source_label'], 'chapterless occurrence must be labelled occurrence');
+        $this->assertNull($chapterless['chapter_id']);
+        $this->assertNull($chapterless['chapter_title']);
+        $this->assertFalse($chapterless['is_card_fallback']);
+    }
+
+    public function test_pool_supplementary_example_does_not_come_from_untrusted_occurrence(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: even when the
+        // question example is the safe card_example fallback, the
+        // supplementary example must not be picked from an untrusted
+        // occurrence that references a foreign chapter.
+        $sense = $this->createConfirmedSense('bureau', 'Bureau', 'Card example sentence.');
+        $otherUser = $this->createUser('pool-sup-other@example.com', 'english');
+        $otherChapter = Chapter::forceCreate([
+            'user_id' => $otherUser->id,
+            'book_id' => 1,
+            'name' => 'Other User Chapter',
+            'read_count' => 0,
+            'word_count' => 0,
+            'language' => 'english',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'raw_text' => '',
+            'type' => 'text',
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode([]), 1),
+        ]);
+
+        $this->createOccurrence($sense, $otherChapter, 'Foreign supplementary sentence.');
+
+        $candidates = $this->poolService->exampleCandidates($sense);
+
+        // Only the card_example fallback should be present — the foreign
+        // occurrence must not appear in candidates at all, so there is no
+        // way for pickSupplementaryIndex to select it.
         $this->assertCount(1, $candidates);
-        $this->assertNull($candidates[0]['chapter_title'], 'foreign-user chapter title must not be resolved');
-        $this->assertSame('occurrence', $candidates[0]['source_label'], 'source_label must fall back to occurrence when chapter is filtered out');
-        $this->assertFalse($candidates[0]['is_card_fallback']);
+        $this->assertSame('Card example sentence.', $candidates[0]['sentence_en']);
+        $this->assertTrue($candidates[0]['is_card_fallback']);
     }
 
     public function test_pool_card_fallback_keeps_card_label_even_when_source_chapter_id_set(): void

@@ -722,6 +722,157 @@ class ReviewFsrsTest extends TestCase
         $this->assertSame('This should not leak.', $reviews[0]['example_sentence_en']);
     }
 
+    public function test_senses_endpoint_payload_does_not_leak_cross_user_occurrence_sentence(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: the same
+        // ownership guard must protect /reviews/senses (the dedicated
+        // sense-review endpoint) as well as /reviews. A WordSenseOccurrence
+        // owned by the current user but pointing at another user's chapter
+        // must NOT contribute its sentence_en to the payload.
+        $otherChapter = \App\Models\Chapter::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'book_id' => 1,
+            'name' => 'Other Chapter',
+            'read_count' => 0,
+            'word_count' => 20,
+            'language' => 'english',
+            'raw_text' => 'Other user secret text.',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'subtitle_timestamps' => '[]',
+            'type' => 'text',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode((object) [
+                'words' => [
+                    (object) ['word' => 'Other', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'user', 'stage' => 2, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'secret', 'stage' => -7, 'spaceAfter' => true, 'sentence_index' => 0],
+                    (object) ['word' => 'text', 'stage' => 2, 'spaceAfter' => false, 'sentence_index' => 0],
+                ],
+                'phrases' => [],
+                'uniqueWords' => [],
+            ]), 1),
+        ]);
+
+        $sense = $this->createSense($this->user->id, 'english', 'crossscope2', 'noun', '跨域测试2', 'cross scope test 2');
+        $sense->example_sentence_en = 'Safe card example.';
+        $sense->save();
+
+        \App\Models\WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $otherChapter->id,
+            'sentence_id' => '0',
+            'sentence_en' => 'Other user secret text.',
+            'surface' => 'secret',
+            'lemma' => 'secret',
+            'type' => \App\Models\WordSenseOccurrence::TYPE_WORD,
+            'pos' => 'noun',
+            'decision' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'evidence' => ['source' => 'test'],
+            'auto_fsrs_allowed' => true,
+            'status' => \App\Models\WordSenseOccurrence::STATUS_BOUND,
+            'source' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->getJson('/reviews/senses');
+
+        $response->assertOk();
+        $cards = $response->json('cards');
+        $this->assertCount(1, $cards);
+
+        // example_sentence_en must be the safe WordSense fallback, not the
+        // foreign occurrence sentence.
+        $this->assertSame('Safe card example.', $cards[0]['example_sentence_en']);
+        // example_candidates must not contain the foreign sentence
+        $candidateSentences = array_column($cards[0]['example_candidates'], 'sentence_en');
+        $this->assertNotContains('Other user secret text.', $candidateSentences);
+        // supplementary_example must not be the foreign sentence (null when
+        // only the card_example fallback is present).
+        if ($cards[0]['supplementary_example'] !== null) {
+            $this->assertNotSame('Other user secret text.', $cards[0]['supplementary_example']['sentence_en']);
+        }
+        // token source must be synthetic (chapter lookup fails for other user)
+        $this->assertSame('synthetic', $cards[0]['example_sentence_token_source']);
+    }
+
+    public function test_reviews_endpoint_payload_falls_back_to_word_sense_example_when_occurrence_untrusted(): void
+    {
+        // GLM-ReviewPayloadSourceOwnershipHardening-1000-1: explicit
+        // fallback contract — when an occurrence is skipped because its
+        // chapter is untrusted, the payload MUST fall back to
+        // WordSense.example_sentence_en and the token source MUST be
+        // 'synthetic'. This is the same contract as the cross-user test
+        // above but with clearer, more focused assertions on the
+        // fallback behaviour itself.
+        $otherChapter = \App\Models\Chapter::forceCreate([
+            'user_id' => $this->otherUser->id,
+            'book_id' => 1,
+            'name' => 'Other Chapter Fallback',
+            'read_count' => 0,
+            'word_count' => 1,
+            'language' => 'english',
+            'raw_text' => 'Leak candidate.',
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'subtitle_timestamps' => '[]',
+            'type' => 'text',
+            'processing_status' => 'processed',
+            'processed_text' => gzcompress(json_encode([]), 1),
+        ]);
+
+        $sense = $this->createSense($this->user->id, 'english', 'fallbacklemma', 'noun', '回退', 'fallback');
+        $sense->example_sentence_en = 'WordSense fallback sentence.';
+        $sense->save();
+
+        \App\Models\WordSenseOccurrence::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'word_sense_id' => $sense->id,
+            'chapter_id' => $otherChapter->id,
+            'sentence_id' => '0',
+            'sentence_en' => 'Leak candidate.',
+            'surface' => 'fallback',
+            'lemma' => 'fallback',
+            'type' => \App\Models\WordSenseOccurrence::TYPE_WORD,
+            'pos' => 'noun',
+            'decision' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'confidence' => 1.0,
+            'evidence' => ['source' => 'test'],
+            'auto_fsrs_allowed' => true,
+            'status' => \App\Models\WordSenseOccurrence::STATUS_BOUND,
+            'source' => \App\Models\WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            'raw_payload' => [],
+        ]);
+
+        app(\App\Services\ReviewCardService::class)->ensureSenseCard($sense);
+
+        $response = $this->actingAs($this->user)->post('/reviews', [
+            'bookId' => -1,
+            'chapterId' => -1,
+            'practiceMode' => false,
+        ]);
+
+        $response->assertOk();
+        $reviews = $response->json('reviews');
+        $this->assertCount(1, $reviews);
+
+        // Fallback MUST be WordSense.example_sentence_en
+        $this->assertSame('WordSense fallback sentence.', $reviews[0]['example_sentence_en']);
+        // Token source MUST be synthetic (no real chapter accessible)
+        $this->assertSame('synthetic', $reviews[0]['example_sentence_token_source']);
+        // example_candidates MUST NOT contain the leak candidate
+        $candidateSentences = array_column($reviews[0]['example_candidates'], 'sentence_en');
+        $this->assertNotContains('Leak candidate.', $candidateSentences);
+    }
+
     public function test_sense_review_payload_extracts_tokens_from_nested_processed_text(): void
     {
         // Create chapter with nested processed_text (not simple words at top level)

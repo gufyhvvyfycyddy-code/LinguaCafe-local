@@ -77,6 +77,17 @@ class WordSenseExamplePoolService
                 continue;
             }
 
+            // Ownership guard: when an occurrence references a chapter_id,
+            // the chapter must belong to the same user and language. The
+            // batch-loaded $chaptersById above already filters by
+            // user_id + language, so a missing entry means the occurrence
+            // points to another user's (or another language's) chapter.
+            // Such an occurrence is untrusted: skip it entirely so its
+            // sentence_en does not leak into the candidate pool.
+            if ($occurrence->chapter_id !== null && !isset($chaptersById[$occurrence->chapter_id])) {
+                continue;
+            }
+
             $chapterName = $occurrence->chapter_id ? ($chaptersById[$occurrence->chapter_id] ?? null) : null;
 
             $dedupeKey = $this->dedupeKey($occurrence->chapter_id, $sentenceEn);
