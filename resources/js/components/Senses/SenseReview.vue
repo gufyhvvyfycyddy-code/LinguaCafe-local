@@ -22,6 +22,17 @@
                 </div>
             </v-expand-transition>
             <v-alert v-if="statsError" type="warning" dense text class="mt-2 mb-0">{{ statsError }}</v-alert>
+            <v-alert v-if="summary.limit_message && !ignoreDailyLimits" type="info" dense outlined class="mt-2 mb-0">
+                <div>{{ summary.limit_message }}</div>
+                <div v-if="summary.can_continue_over_limit" class="mt-2">
+                    <v-btn small color="primary" @click="continueOverLimit">继续复习超额卡片</v-btn>
+                </div>
+            </v-alert>
+            <v-alert v-if="ignoreDailyLimits" type="warning" dense outlined class="mt-2 mb-0 d-flex align-center">
+                <span>当前已忽略每日上限。所有到期词义卡都会出现。</span>
+                <v-spacer />
+                <v-btn small text color="primary" @click="restoreLimits">恢复上限</v-btn>
+            </v-alert>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -396,6 +407,8 @@
                 statsDetailOpen: false,
                 fsrsDetailOpen: false,
                 showAnswer: false,
+                // Whether the user is in "ignore daily limits" mode (over-limit review)
+                ignoreDailyLimits: false,
             }
         },
         computed: {
@@ -448,7 +461,11 @@
             loadCards() {
                 this.loading = true;
                 this.error = '';
-                axios.get('/reviews/senses').then((response) => {
+                const params = {};
+                if (this.ignoreDailyLimits) {
+                    params.ignoreDailyLimits = true;
+                }
+                axios.get('/reviews/senses', { params: params }).then((response) => {
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;  // Reset FSRS collapse on card change
@@ -466,9 +483,11 @@
 
                 this.rating = true;
                 this.error = '';
-                axios.post(`/reviews/senses/${this.currentCard.review_card_id}/rate`, {
-                    rating: rating,
-                }).then((response) => {
+                const payload = { rating: rating };
+                if (this.ignoreDailyLimits) {
+                    payload.ignoreDailyLimits = true;
+                }
+                axios.post(`/reviews/senses/${this.currentCard.review_card_id}/rate`, payload).then((response) => {
                     this.reviewedCount++;
                     this.summary = response.data.summary;
                     this.loadCards();
@@ -478,6 +497,16 @@
                 }).finally(() => {
                     this.rating = false;
                 });
+            },
+            // Enter "ignore daily limits" mode so all due cards become visible
+            continueOverLimit() {
+                this.ignoreDailyLimits = true;
+                this.loadCards();
+            },
+            // Return to the default daily-limit-enforced queue
+            restoreLimits() {
+                this.ignoreDailyLimits = false;
+                this.loadCards();
             },
             // UI-Review-c: keyboard shortcuts
             handleHotkey(event) {

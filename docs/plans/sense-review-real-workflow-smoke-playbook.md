@@ -1,7 +1,7 @@
 # SenseReview Real Workflow Smoke Playbook
 
 > Status: Current local smoke playbook.
-> Last updated: 2026-07-02.
+> Last updated: 2026-07-05.
 
 This playbook records the low-risk harness used for the real SenseReview page workflow. It is for local verification only and must not be treated as permission to change SenseReview, FSRS, WordSense, archive/delete/restore, or AI study card behavior.
 
@@ -13,6 +13,10 @@ This playbook records the low-risk harness used for the real SenseReview page wo
   - More menu opens.
   - source fallback dialog works when no chapter position exists.
   - one rating action creates a normal `ReviewLog`.
+  - Space / 1 / 2 / 3 / 4 hotkeys work for show-answer and again/hard/good/easy.
+  - daily review limit message is displayed when the queue is enforced and the user has reached the daily review limit.
+  - "continue over limit" entry exists when `summary.can_continue_over_limit` is true and switches the queue into `ignoreDailyLimits=true` mode.
+  - "restore limits" entry exists in `ignoreDailyLimits` mode and switches back to the default daily-limit-enforced queue.
 - Page B: `/senses/review`
   - confirm existing AI-suggested sense.
   - ignore occurrence.
@@ -108,6 +112,37 @@ Use MCP Chrome or Chrome DevTools against the local app. Do not replace the page
 8. Open `/senses/review`.
 9. Run the marker occurrence flows: create new, rebind, reject, ignore, confirm.
 10. Read back the database state only after the page actions complete, to verify side effects created by the UI.
+
+## Hotkey Acceptance
+
+Verify the following hotkeys on `/reviews/senses`:
+
+- `Space` shows the answer when the answer is hidden.
+- `1` rates the current card as Again (only after the answer is shown).
+- `2` rates the current card as Hard (only after the answer is shown).
+- `3` rates the current card as Good (only after the answer is shown).
+- `4` rates the current card as Easy (only after the answer is shown).
+
+Rules:
+
+- Hotkeys must not fire when focus is inside an `input`, `textarea`, `select`, or `contenteditable` element.
+- Hotkeys must not fire when any dialog (edit / archive / reset / delete / source) is open.
+- Hotkeys must not fire while a rating / archive / reset / delete / loading request is in flight.
+- The same card must not be submitted twice.
+
+## Daily Limit Acceptance
+
+The daily-limit UX is part of the SenseReview main line. Verify it without faking the result:
+
+1. If the current user has not reached the daily review limit, the page must not show a `limit_message` and the "continue over limit" entry must not appear.
+2. If the user has reached the daily review limit and there are still due cards hidden by the queue:
+   - The page must show `summary.limit_message` as an info alert.
+   - The "继续复习超额卡片" button must appear inside the alert when `summary.can_continue_over_limit` is true.
+3. Clicking "继续复习超额卡片" must issue `GET /reviews/senses?ignoreDailyLimits=true` and reveal the previously hidden due cards.
+4. While in `ignoreDailyLimits` mode, the page must show a warning alert with a "恢复上限" button.
+5. Clicking "恢复上限" must issue `GET /reviews/senses` (without `ignoreDailyLimits`) and hide the over-limit cards again.
+6. Rating a card in `ignoreDailyLimits` mode must send `ignoreDailyLimits=true` in the POST body so the next-card summary stays consistent.
+7. If the current data cannot naturally trigger the daily limit, do not fake the MCP result. Either construct a temporary scenario with a clear marker and restore it immediately, or fall back to read-only code review + the existing `SenseReviewDailyLimitsTest` suite.
 
 ## Required Readback
 
