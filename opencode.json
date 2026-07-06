@@ -1,0 +1,49 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  "provider": {
+    "deepseek": {
+      "api_base": "https://api.deepseek.com/v1",
+      "model": "deepseek-v4-flash"
+    }
+  },
+
+  "model": {
+    "default": "deepseek-v4-flash",
+    "fallback": null
+  },
+
+  "experimental": {
+    "max_auto_retry": 0,
+    "disable_fallback": true
+  },
+
+  "agent": {
+    "explore": {
+      "disable": true
+    },
+    "general": {
+      "disable": true
+    }
+  },
+
+  "plugin": [
+    "~/.config/opencode/node_modules/superpowers"
+  ],
+
+  "skills": {
+    "paths": [
+      ".opencode/skills",
+      "~/.config/opencode/skills",
+      "~/.config/opencode/node_modules/superpowers/skills"
+    ]
+  },
+
+  "permission": {
+    "edit": "allow",
+    "bash": "allow",
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow"
+  }
+}

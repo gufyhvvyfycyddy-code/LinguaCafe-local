@@ -1,0 +1,21 @@
+- main [ref=e5]:
+  - generic [ref=e8]:
+    - generic [ref=e9]:
+      - generic [ref=e10]: 󰀄
+      - text: 登录
+      - button / [ref=e11] [cursor=pointer]:
+        - generic [ref=e12]:
+          - generic [ref=e13]: 󰖙
+          - text: /
+          - generic [ref=e14]: 󰖔
+    - generic [ref=e16]:
+      - generic [ref=e17]: 邮箱
+      - textbox "邮箱" [ref=e22]
+      - generic [ref=e25]: 密码
+      - textbox "密码" [ref=e30]
+    - generic [ref=e33]:
+      - link "注册 / 创建账号" [ref=e34] [cursor=pointer]:
+        - /url: /register
+        - generic [ref=e35]: 注册 / 创建账号
+      - button "登录" [disabled]:
+        - generic: 登录

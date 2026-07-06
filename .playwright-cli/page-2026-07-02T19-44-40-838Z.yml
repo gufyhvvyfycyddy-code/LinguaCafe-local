@@ -1,0 +1,155 @@
+- generic [ref=f2e4]:
+  - navigation [ref=f2e5]:
+    - generic [ref=f2e6]:
+      - generic [ref=f2e7]:
+        - img [ref=f2e8]
+        - generic [ref=f2e9]: Lingua Cafe
+      - generic [ref=f2e10]:
+        - link "首页" [ref=f2e11] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f2e12]: 󰋜
+          - generic [ref=f2e13]: 首页
+        - link "阅读材料" [ref=f2e14] [cursor=pointer]:
+          - /url: /books
+          - generic [ref=f2e15]: 󱉟
+          - generic [ref=f2e16]: 阅读材料
+        - link "词汇" [ref=f2e17] [cursor=pointer]:
+          - /url: /vocabulary/search
+          - generic [ref=f2e18]: 󰗊
+          - generic [ref=f2e19]: 词汇
+        - link "复习" [ref=f2e20] [cursor=pointer]:
+          - /url: /reviews/senses
+          - generic [ref=f2e21]: 󰧑
+          - generic [ref=f2e22]: 复习
+        - link "高级复习卡管理" [ref=f2e23] [cursor=pointer]:
+          - /url: /review-cards/manage
+          - generic [ref=f2e24]: 󰗒
+          - generic [ref=f2e25]: 高级复习卡管理
+        - link "设置" [ref=f2e26] [cursor=pointer]:
+          - /url: /user-settings
+          - generic [ref=f2e27]: 󱍰
+          - generic [ref=f2e28]: 设置
+        - link "用户手册" [ref=f2e29] [cursor=pointer]:
+          - /url: /user-manual
+          - generic [ref=f2e30]: 󰭙
+          - generic [ref=f2e31]: 用户手册
+        - link "管理员设置" [ref=f2e32] [cursor=pointer]:
+          - /url: /admin
+          - generic [ref=f2e33]: 󰦝
+          - generic [ref=f2e34]: 管理员设置
+        - generic [ref=f2e35] [cursor=pointer]:
+          - generic [ref=f2e36]: 󰍃
+          - generic [ref=f2e37]: 退出登录
+    - generic [ref=f2e39]:
+      - generic [ref=f2e40] [cursor=pointer]:
+        - generic [ref=f2e41]: 󰞓
+        - generic [ref=f2e42]: 收起
+      - generic [ref=f2e43] [cursor=pointer]:
+        - generic [ref=f2e44]: 󰏘
+        - generic [ref=f2e45]: 主题
+      - generic [ref=f2e52] [cursor=pointer]: 学习语言：英语
+  - text: 󰍜 󰋜 󱉟 󰗊
+  - main [ref=f2e54]:
+    - generic [ref=f2e57]:
+      - generic [ref=f2e59]:
+        - button "全屏" [ref=f2e60] [cursor=pointer]:
+          - generic [ref=f2e62]: 󰁌
+        - button "阅读设置" [ref=f2e63] [cursor=pointer]:
+          - generic [ref=f2e65]: 󰒓
+        - button "章节" [ref=f2e66] [cursor=pointer]:
+          - generic [ref=f2e68]: 󰘝
+        - button "词汇表" [ref=f2e69] [cursor=pointer]:
+          - generic [ref=f2e71]: 󰉹
+        - button "增大字号" [ref=f2e72] [cursor=pointer]:
+          - generic [ref=f2e74]: 󰍋
+        - button "减小字号" [ref=f2e75] [cursor=pointer]:
+          - generic [ref=f2e77]: 󰍊
+        - button "切换纯文本模式" [ref=f2e78] [cursor=pointer]:
+          - generic [ref=f2e80]: 󰊄
+        - button "查看快捷键" [ref=f2e81] [cursor=pointer]:
+          - generic [ref=f2e83]: 󰥻
+        - button "AI 阅读辅助" [ref=f2e84] [cursor=pointer]:
+          - generic [ref=f2e86]: 󰚩
+        - button "暂无已保存 AI 译文" [disabled]:
+          - generic:
+            - generic: 󰸆
+      - generic [ref=f2e88]:
+        - generic [ref=f2e89]: GLM Real Morphology Completion 20260703
+        - generic [ref=f2e91]:
+          - generic [ref=f2e92] [cursor=pointer]: The
+          - generic [ref=f2e93] [cursor=pointer]: boxes
+          - generic [ref=f2e94] [cursor=pointer]: and
+          - generic [ref=f2e95] [cursor=pointer]: technologies
+          - generic [ref=f2e96] [cursor=pointer]: changed
+          - generic [ref=f2e97] [cursor=pointer]: quickly
+          - generic [ref=f2e98] [cursor=pointer]: .
+          - generic [ref=f2e99] [cursor=pointer]: The
+          - generic [ref=f2e100] [cursor=pointer]: mice
+          - generic [ref=f2e101] [cursor=pointer]: and
+          - generic [ref=f2e102] [cursor=pointer]: children
+          - generic [ref=f2e103] [cursor=pointer]: watched
+          - generic [ref=f2e104] [cursor=pointer]: as
+          - generic [ref=f2e105] [cursor=pointer]: the
+          - generic [ref=f2e106] [cursor=pointer]: robot
+          - generic [ref=f2e107] [cursor=pointer]: goes
+          - generic [ref=f2e108] [cursor=pointer]: and
+          - generic [ref=f2e109] [cursor=pointer]: watches
+          - generic [ref=f2e110] [cursor=pointer]: the
+          - generic [ref=f2e111] [cursor=pointer]: old
+          - generic [ref=f2e112] [cursor=pointer]: screen
+          - generic [ref=f2e113] [cursor=pointer]: .
+          - generic [ref=f2e114] [cursor=pointer]: The
+          - generic [ref=f2e115] [cursor=pointer]: runners
+          - generic [ref=f2e116] [cursor=pointer]: ran
+          - generic [ref=f2e117] [cursor=pointer]: and
+          - generic [ref=f2e118] [cursor=pointer]: went
+          - generic [ref=f2e119] [cursor=pointer]: home
+          - generic [ref=f2e120] [cursor=pointer]: .
+          - generic [ref=f2e121] [cursor=pointer]: The
+          - generic [ref=f2e122] [cursor=pointer]: written
+          - generic [ref=f2e123] [cursor=pointer]: note
+          - generic [ref=f2e124] [cursor=pointer]: and
+          - generic [ref=f2e125] [cursor=pointer]: the
+          - generic [ref=f2e126] [cursor=pointer]: published
+          - generic [ref=f2e127] [cursor=pointer]: author
+          - generic [ref=f2e128] [cursor=pointer]: were
+          - generic [ref=f2e129] [cursor=pointer]: discussed
+          - generic [ref=f2e130] [cursor=pointer]: .
+          - generic [ref=f2e131] [cursor=pointer]: The
+          - generic [ref=f2e132] [cursor=pointer]: workers
+          - generic [ref=f2e133] [cursor=pointer]: are
+          - generic [ref=f2e134] [cursor=pointer]: running
+          - generic [ref=f2e135] [cursor=pointer]: and
+          - generic [ref=f2e136] [cursor=pointer]: studying
+          - generic [ref=f2e137] [cursor=pointer]: .
+          - generic [ref=f2e138] [cursor=pointer]: The
+          - generic [ref=f2e139] [cursor=pointer]: better
+          - generic [ref=f2e140] [cursor=pointer]: answer
+          - generic [ref=f2e141] [cursor=pointer]: was
+          - generic [ref=f2e142] [cursor=pointer]: the
+          - generic [ref=f2e143] [cursor=pointer]: oldest
+          - generic [ref=f2e144] [cursor=pointer]: one
+          - generic [ref=f2e145] [cursor=pointer]: .
+          - generic [ref=f2e146] [cursor=pointer]: The
+          - generic [ref=f2e147] [cursor=pointer]: used
+          - generic [ref=f2e148] [cursor=pointer]: car
+          - generic [ref=f2e149] [cursor=pointer]: stood
+          - generic [ref=f2e150] [cursor=pointer]: near
+          - generic [ref=f2e151] [cursor=pointer]: a
+          - generic [ref=f2e152] [cursor=pointer]: broken
+          - generic [ref=f2e153] [cursor=pointer]: window
+          - generic [ref=f2e154] [cursor=pointer]: ","
+          - generic [ref=f2e155] [cursor=pointer]: and
+          - generic [ref=f2e156] [cursor=pointer]: the
+          - generic [ref=f2e157] [cursor=pointer]: left
+          - generic [ref=f2e158] [cursor=pointer]: side
+          - generic [ref=f2e159] [cursor=pointer]: of
+          - generic [ref=f2e160] [cursor=pointer]: the
+          - generic [ref=f2e161] [cursor=pointer]: room
+          - generic [ref=f2e162] [cursor=pointer]: was
+          - generic [ref=f2e163] [cursor=pointer]: dark
+          - generic [ref=f2e164] [cursor=pointer]: .
+        - button "完成阅读" [ref=f2e167] [cursor=pointer]:
+          - generic [ref=f2e168]:
+            - generic [ref=f2e169]: 󰺦
+            - text: 完成阅读

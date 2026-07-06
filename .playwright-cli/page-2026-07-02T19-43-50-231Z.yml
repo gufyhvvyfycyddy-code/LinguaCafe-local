@@ -1,0 +1,338 @@
+- generic [ref=f1e4]:
+  - navigation [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - generic [ref=f1e7]:
+        - img [ref=f1e8]
+        - generic [ref=f1e9]: Lingua Cafe
+      - generic [ref=f1e10]:
+        - link "首页" [ref=f1e11] [cursor=pointer]:
+          - /url: /
+          - generic [ref=f1e12]: 󰋜
+          - generic [ref=f1e13]: 首页
+        - link "阅读材料" [ref=f1e14] [cursor=pointer]:
+          - /url: /books
+          - generic [ref=f1e15]: 󱉟
+          - generic [ref=f1e16]: 阅读材料
+        - link "词汇" [ref=f1e17] [cursor=pointer]:
+          - /url: /vocabulary/search
+          - generic [ref=f1e18]: 󰗊
+          - generic [ref=f1e19]: 词汇
+        - link "复习" [ref=f1e20] [cursor=pointer]:
+          - /url: /reviews/senses
+          - generic [ref=f1e21]: 󰧑
+          - generic [ref=f1e22]: 复习
+        - link "高级复习卡管理" [ref=f1e23] [cursor=pointer]:
+          - /url: /review-cards/manage
+          - generic [ref=f1e24]: 󰗒
+          - generic [ref=f1e25]: 高级复习卡管理
+        - link "设置" [ref=f1e26] [cursor=pointer]:
+          - /url: /user-settings
+          - generic [ref=f1e27]: 󱍰
+          - generic [ref=f1e28]: 设置
+        - link "用户手册" [ref=f1e29] [cursor=pointer]:
+          - /url: /user-manual
+          - generic [ref=f1e30]: 󰭙
+          - generic [ref=f1e31]: 用户手册
+        - link "管理员设置" [ref=f1e32] [cursor=pointer]:
+          - /url: /admin
+          - generic [ref=f1e33]: 󰦝
+          - generic [ref=f1e34]: 管理员设置
+        - generic [ref=f1e35] [cursor=pointer]:
+          - generic [ref=f1e36]: 󰍃
+          - generic [ref=f1e37]: 退出登录
+    - generic [ref=f1e39]:
+      - generic [ref=f1e40] [cursor=pointer]:
+        - generic [ref=f1e41]: 󰞓
+        - generic [ref=f1e42]: 收起
+      - generic [ref=f1e43] [cursor=pointer]:
+        - generic [ref=f1e44]: 󰏘
+        - generic [ref=f1e45]: 主题
+      - generic [ref=f1e50] [cursor=pointer]: 学习语言：英语
+  - text: 󰍜 󰋜 󱉟 󰗊
+  - main [ref=f1e52]:
+    - generic [ref=f1e55]:
+      - generic [ref=f1e56]:
+        - generic [ref=f1e57]:
+          - text: 日历
+          - button "显示目标" [ref=f1e59] [cursor=pointer]:
+            - generic [ref=f1e60]:
+              - generic [ref=f1e61]: 显示目标
+              - generic [ref=f1e62]: 󰅀
+          - button "2026年7月" [ref=f1e63] [cursor=pointer]:
+            - generic [ref=f1e64]:
+              - generic [ref=f1e65]: 2026年7月
+              - generic [ref=f1e66]: 󰃭
+        - generic [ref=f1e68]:
+          - generic [ref=f1e69]:
+            - generic [ref=f1e70]: 2026年7月
+            - generic [ref=f1e71]:
+              - generic [ref=f1e74] [cursor=pointer]: "1"
+              - generic [ref=f1e77] [cursor=pointer]: "2"
+              - generic [ref=f1e80] [cursor=pointer]: "3"
+              - generic [ref=f1e83] [cursor=pointer]: "4"
+              - generic [ref=f1e86] [cursor=pointer]: "5"
+              - generic [ref=f1e89] [cursor=pointer]: "6"
+              - generic [ref=f1e92] [cursor=pointer]: "7"
+              - generic [ref=f1e95] [cursor=pointer]: "8"
+              - generic [ref=f1e98] [cursor=pointer]: "9"
+              - generic [ref=f1e101] [cursor=pointer]: "10"
+              - generic [ref=f1e104] [cursor=pointer]: "11"
+              - generic [ref=f1e107] [cursor=pointer]: "12"
+              - generic [ref=f1e110] [cursor=pointer]: "13"
+              - generic [ref=f1e113] [cursor=pointer]: "14"
+              - generic [ref=f1e116] [cursor=pointer]: "15"
+              - generic [ref=f1e119] [cursor=pointer]: "16"
+              - generic [ref=f1e122] [cursor=pointer]: "17"
+              - generic [ref=f1e125] [cursor=pointer]: "18"
+              - generic [ref=f1e128] [cursor=pointer]: "19"
+              - generic [ref=f1e131] [cursor=pointer]: "20"
+              - generic [ref=f1e134] [cursor=pointer]: "21"
+              - generic [ref=f1e137] [cursor=pointer]: "22"
+              - generic [ref=f1e140] [cursor=pointer]: "23"
+              - generic [ref=f1e143] [cursor=pointer]: "24"
+              - generic [ref=f1e146] [cursor=pointer]: "25"
+              - generic [ref=f1e149] [cursor=pointer]: "26"
+              - generic [ref=f1e152] [cursor=pointer]: "27"
+              - generic [ref=f1e155] [cursor=pointer]: "28"
+              - generic [ref=f1e158] [cursor=pointer]: "29"
+              - generic [ref=f1e161] [cursor=pointer]: "30"
+              - generic [ref=f1e164] [cursor=pointer]: "31"
+          - generic [ref=f1e165]:
+            - generic [ref=f1e166]: 2026年6月
+            - generic [ref=f1e167]:
+              - generic [ref=f1e170] [cursor=pointer]: "1"
+              - generic [ref=f1e173] [cursor=pointer]: "2"
+              - generic [ref=f1e176] [cursor=pointer]: "3"
+              - generic [ref=f1e179] [cursor=pointer]: "4"
+              - generic [ref=f1e182] [cursor=pointer]: "5"
+              - generic [ref=f1e185] [cursor=pointer]: "6"
+              - generic [ref=f1e188] [cursor=pointer]: "7"
+              - generic [ref=f1e191] [cursor=pointer]: "8"
+              - generic [ref=f1e194] [cursor=pointer]: "9"
+              - generic [ref=f1e197] [cursor=pointer]: "10"
+              - generic [ref=f1e200] [cursor=pointer]: "11"
+              - generic [ref=f1e203] [cursor=pointer]: "12"
+              - generic [ref=f1e206] [cursor=pointer]: "13"
+              - generic [ref=f1e209] [cursor=pointer]: "14"
+              - generic [ref=f1e212] [cursor=pointer]: "15"
+              - generic [ref=f1e215] [cursor=pointer]: "16"
+              - generic [ref=f1e218] [cursor=pointer]: "17"
+              - generic [ref=f1e221] [cursor=pointer]: "18"
+              - generic [ref=f1e224] [cursor=pointer]: "19"
+              - generic [ref=f1e227] [cursor=pointer]: "20"
+              - generic [ref=f1e230] [cursor=pointer]: "21"
+              - generic [ref=f1e233] [cursor=pointer]: "22"
+              - generic [ref=f1e236] [cursor=pointer]: "23"
+              - generic [ref=f1e239] [cursor=pointer]: "24"
+              - generic [ref=f1e242] [cursor=pointer]: "25"
+              - generic [ref=f1e245] [cursor=pointer]: "26"
+              - generic [ref=f1e248] [cursor=pointer]: "27"
+              - generic [ref=f1e251] [cursor=pointer]: "28"
+              - generic [ref=f1e254] [cursor=pointer]: "29"
+              - generic [ref=f1e257] [cursor=pointer]: "30"
+          - generic [ref=f1e258]:
+            - generic [ref=f1e259]: 2026年5月
+            - generic [ref=f1e260]:
+              - generic [ref=f1e263] [cursor=pointer]: "1"
+              - generic [ref=f1e266] [cursor=pointer]: "2"
+              - generic [ref=f1e269] [cursor=pointer]: "3"
+              - generic [ref=f1e272] [cursor=pointer]: "4"
+              - generic [ref=f1e275] [cursor=pointer]: "5"
+              - generic [ref=f1e278] [cursor=pointer]: "6"
+              - generic [ref=f1e281] [cursor=pointer]: "7"
+              - generic [ref=f1e284] [cursor=pointer]: "8"
+              - generic [ref=f1e287] [cursor=pointer]: "9"
+              - generic [ref=f1e290] [cursor=pointer]: "10"
+              - generic [ref=f1e293] [cursor=pointer]: "11"
+              - generic [ref=f1e296] [cursor=pointer]: "12"
+              - generic [ref=f1e299] [cursor=pointer]: "13"
+              - generic [ref=f1e302] [cursor=pointer]: "14"
+              - generic [ref=f1e305] [cursor=pointer]: "15"
+              - generic [ref=f1e308] [cursor=pointer]: "16"
+              - generic [ref=f1e311] [cursor=pointer]: "17"
+              - generic [ref=f1e314] [cursor=pointer]: "18"
+              - generic [ref=f1e317] [cursor=pointer]: "19"
+              - generic [ref=f1e320] [cursor=pointer]: "20"
+              - generic [ref=f1e323] [cursor=pointer]: "21"
+              - generic [ref=f1e326] [cursor=pointer]: "22"
+              - generic [ref=f1e329] [cursor=pointer]: "23"
+              - generic [ref=f1e332] [cursor=pointer]: "24"
+              - generic [ref=f1e335] [cursor=pointer]: "25"
+              - generic [ref=f1e338] [cursor=pointer]: "26"
+              - generic [ref=f1e341] [cursor=pointer]: "27"
+              - generic [ref=f1e344] [cursor=pointer]: "28"
+              - generic [ref=f1e347] [cursor=pointer]: "29"
+              - generic [ref=f1e350] [cursor=pointer]: "30"
+              - generic [ref=f1e353] [cursor=pointer]: "31"
+          - generic [ref=f1e354]:
+            - generic [ref=f1e355]: 2026年4月
+            - generic [ref=f1e356]:
+              - generic [ref=f1e359] [cursor=pointer]: "1"
+              - generic [ref=f1e362] [cursor=pointer]: "2"
+              - generic [ref=f1e365] [cursor=pointer]: "3"
+              - generic [ref=f1e368] [cursor=pointer]: "4"
+              - generic [ref=f1e371] [cursor=pointer]: "5"
+              - generic [ref=f1e374] [cursor=pointer]: "6"
+              - generic [ref=f1e377] [cursor=pointer]: "7"
+              - generic [ref=f1e380] [cursor=pointer]: "8"
+              - generic [ref=f1e383] [cursor=pointer]: "9"
+              - generic [ref=f1e386] [cursor=pointer]: "10"
+              - generic [ref=f1e389] [cursor=pointer]: "11"
+              - generic [ref=f1e392] [cursor=pointer]: "12"
+              - generic [ref=f1e395] [cursor=pointer]: "13"
+              - generic [ref=f1e398] [cursor=pointer]: "14"
+              - generic [ref=f1e401] [cursor=pointer]: "15"
+              - generic [ref=f1e404] [cursor=pointer]: "16"
+              - generic [ref=f1e407] [cursor=pointer]: "17"
+              - generic [ref=f1e410] [cursor=pointer]: "18"
+              - generic [ref=f1e413] [cursor=pointer]: "19"
+              - generic [ref=f1e416] [cursor=pointer]: "20"
+              - generic [ref=f1e419] [cursor=pointer]: "21"
+              - generic [ref=f1e422] [cursor=pointer]: "22"
+              - generic [ref=f1e425] [cursor=pointer]: "23"
+              - generic [ref=f1e428] [cursor=pointer]: "24"
+              - generic [ref=f1e431] [cursor=pointer]: "25"
+              - generic [ref=f1e434] [cursor=pointer]: "26"
+              - generic [ref=f1e437] [cursor=pointer]: "27"
+              - generic [ref=f1e440] [cursor=pointer]: "28"
+              - generic [ref=f1e443] [cursor=pointer]: "29"
+              - generic [ref=f1e446] [cursor=pointer]: "30"
+          - generic [ref=f1e447]:
+            - generic [ref=f1e448]: 2026年3月
+            - generic [ref=f1e449]:
+              - generic [ref=f1e452] [cursor=pointer]: "1"
+              - generic [ref=f1e455] [cursor=pointer]: "2"
+              - generic [ref=f1e458] [cursor=pointer]: "3"
+              - generic [ref=f1e461] [cursor=pointer]: "4"
+              - generic [ref=f1e464] [cursor=pointer]: "5"
+              - generic [ref=f1e467] [cursor=pointer]: "6"
+              - generic [ref=f1e470] [cursor=pointer]: "7"
+              - generic [ref=f1e473] [cursor=pointer]: "8"
+              - generic [ref=f1e476] [cursor=pointer]: "9"
+              - generic [ref=f1e479] [cursor=pointer]: "10"
+              - generic [ref=f1e482] [cursor=pointer]: "11"
+              - generic [ref=f1e485] [cursor=pointer]: "12"
+              - generic [ref=f1e488] [cursor=pointer]: "13"
+              - generic [ref=f1e491] [cursor=pointer]: "14"
+              - generic [ref=f1e494] [cursor=pointer]: "15"
+              - generic [ref=f1e497] [cursor=pointer]: "16"
+              - generic [ref=f1e500] [cursor=pointer]: "17"
+              - generic [ref=f1e503] [cursor=pointer]: "18"
+              - generic [ref=f1e506] [cursor=pointer]: "19"
+              - generic [ref=f1e509] [cursor=pointer]: "20"
+              - generic [ref=f1e512] [cursor=pointer]: "21"
+              - generic [ref=f1e515] [cursor=pointer]: "22"
+              - generic [ref=f1e518] [cursor=pointer]: "23"
+              - generic [ref=f1e521] [cursor=pointer]: "24"
+              - generic [ref=f1e524] [cursor=pointer]: "25"
+              - generic [ref=f1e527] [cursor=pointer]: "26"
+              - generic [ref=f1e530] [cursor=pointer]: "27"
+              - generic [ref=f1e533] [cursor=pointer]: "28"
+              - generic [ref=f1e536] [cursor=pointer]: "29"
+              - generic [ref=f1e539] [cursor=pointer]: "30"
+              - generic [ref=f1e542] [cursor=pointer]: "31"
+      - generic [ref=f1e543]:
+        - generic [ref=f1e544]: 每日目标
+        - generic [ref=f1e545]:
+          - generic [ref=f1e546]:
+            - generic [ref=f1e547]: 复习
+            - generic [ref=f1e548]:
+              - progressbar [ref=f1e549]:
+                - img [ref=f1e550]
+                - generic [ref=f1e553]: 0 / 4
+              - generic [ref=f1e554]: 复习今天到期的 4 张卡片。
+            - link "开始复习" [ref=f1e557] [cursor=pointer]:
+              - /url: /reviews/senses
+              - generic [ref=f1e558]: 开始复习
+          - generic [ref=f1e559]:
+            - generic [ref=f1e560]:
+              - text: 阅读
+              - button [ref=f1e561] [cursor=pointer]:
+                - generic [ref=f1e563]: 󰏫
+            - generic [ref=f1e564]:
+              - progressbar [ref=f1e565]:
+                - img [ref=f1e566]
+                - generic [ref=f1e569]: 0 / 1000
+              - generic [ref=f1e570]: 从任意阅读材料中阅读 1000 个词。
+            - link "阅读材料" [ref=f1e573] [cursor=pointer]:
+              - /url: /books
+              - generic [ref=f1e574]: 阅读材料
+          - generic [ref=f1e575]:
+            - generic [ref=f1e576]:
+              - text: 新词
+              - button [ref=f1e577] [cursor=pointer]:
+                - generic [ref=f1e579]: 󰏫
+            - generic [ref=f1e580]:
+              - progressbar [ref=f1e581]:
+                - img [ref=f1e582]
+                - generic [ref=f1e585]: 3 / 10
+              - generic [ref=f1e586]: 高亮并保存 10 个新词用于复习。
+            - link "阅读材料" [ref=f1e589] [cursor=pointer]:
+              - /url: /books
+              - generic [ref=f1e590]: 阅读材料
+      - generic [ref=f1e591]:
+        - generic [ref=f1e592]: 统计
+        - generic [ref=f1e593]:
+          - generic [ref=f1e594]:
+            - generic [ref=f1e596]: 󰃯
+            - generic [ref=f1e597]:
+              - generic [ref=f1e598]: "3"
+              - generic [ref=f1e599]: Days of activity
+          - generic [ref=f1e600]:
+            - generic [ref=f1e602]: 󱓷
+            - generic [ref=f1e603]:
+              - generic [ref=f1e604]: "0"
+              - generic [ref=f1e605]: Read words
+          - generic [ref=f1e606]:
+            - generic [ref=f1e608]: 󱏐
+            - generic [ref=f1e609]:
+              - generic [ref=f1e610]: "0"
+              - generic [ref=f1e611]: Known words
+          - generic [ref=f1e612]:
+            - generic [ref=f1e614]: 󰑴
+            - generic [ref=f1e615]:
+              - generic [ref=f1e616]: "5"
+              - generic [ref=f1e617]: Words currently studied
+          - generic [ref=f1e618]:
+            - generic [ref=f1e620]: 󰬓
+            - generic [ref=f1e621]:
+              - generic [ref=f1e622]: "0"
+              - generic [ref=f1e623]: Known lemmas
+      - generic [ref=f1e624]: 关于
+      - generic [ref=f1e625]:
+        - generic [ref=f1e626]:
+          - generic [ref=f1e627]: LinguaCafe
+          - generic [ref=f1e628]:
+            - text: 可以通过这些链接了解 LinguaCafe。
+            - link "版权与致谢" [ref=f1e630] [cursor=pointer]:
+              - /url: /attributions
+              - generic [ref=f1e631]: 󰗦
+              - text: 版权与致谢
+            - link "项目介绍" [ref=f1e633] [cursor=pointer]:
+              - /url: https://simjanos-dev.github.io/LinguaCafeHome/
+              - generic [ref=f1e634]: 󰈙
+              - text: 项目介绍
+        - generic [ref=f1e635]:
+          - generic [ref=f1e636]: 联系
+          - generic [ref=f1e637]:
+            - text: 可以通过这些平台联系 LinguaCafe 开发者。
+            - link "Discord chat" [ref=f1e639] [cursor=pointer]:
+              - /url: https://discord.gg/wZYZYrdaeP
+              - generic [ref=f1e640]: 󰍩
+              - text: Discord chat
+            - link "Github" [ref=f1e642] [cursor=pointer]:
+              - /url: https://github.com/simjanos-dev/LinguaCafe
+              - generic [ref=f1e643]: 󰊤
+              - text: Github
+            - link "Reddit" [ref=f1e645] [cursor=pointer]:
+              - /url: https://www.reddit.com/r/linguacafe/
+              - generic [ref=f1e646]: 󰑍
+              - text: Reddit
+        - generic [ref=f1e647]:
+          - generic [ref=f1e648]: 版本
+          - generic [ref=f1e649]:
+            - text: 当前 LinguaCafe 版本是 v0.14.1。
+            - link "更新说明" [ref=f1e651] [cursor=pointer]:
+              - /url: /patch-notes
+              - generic [ref=f1e652]: 󰚰
+              - text: 更新说明

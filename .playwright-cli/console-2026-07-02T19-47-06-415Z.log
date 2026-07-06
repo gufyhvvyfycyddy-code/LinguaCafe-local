@@ -1,0 +1,9 @@
+[     348ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:8000/fonts/VarelaRound-Regular.ttf @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:175133
+[     348ms] [INFO] Slow network is detected. See https://www.chromestatus.com/feature/5636954674692096 for more details. Fallback font will be used while loading: http://127.0.0.1:8000/fonts/vendor/@mdi/materialdesignicons-webfont.woff2?ec024da790d2972da002c9e3f0625ba5 @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:175133
+[     352ms] [INFO] Download the Vue Devtools extension for a better development experience:
+https://github.com/vuejs/vue-devtools @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:137621
+[     352ms] [INFO] You are running Vue in development mode.
+Make sure to turn on production mode when deploying for production.
+See more tips at https://vuejs.org/guide/deployment.html @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:137629
+[    2359ms] [ERROR] WebSocket connection to 'ws://127.0.0.1:6001/app/wjp2pou6ebgibtwccqsj?protocol=7&client=js&version=8.5.0&flash=false' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:110276
+[    4393ms] [ERROR] WebSocket connection to 'wss://127.0.0.1/app/wjp2pou6ebgibtwccqsj?protocol=7&client=js&version=8.5.0&flash=false' failed: Error in connection establishment: net::ERR_CONNECTION_REFUSED @ http://127.0.0.1:8000/js/app.js?id=2a0523b82cc6cd2b509f09cc19640c9b:110276
