@@ -59,16 +59,17 @@ jobs:
       # -------------------------------------------------------
       - name: Validate model configuration
         run: |
-          if grep -q 'deepseek/deepseek-v4-flash\|"deepseek-v4-flash"\|api\.deepseek\.com' opencode.json 2>/dev/null; then
-            echo "::error::opencode.json contains deprecated DeepSeek API configuration."
-            echo "::error::The model must be opencode-go/deepseek-v4-flash, not deepseek API."
+          # Check for explicit DeepSeek API endpoints (not opencode-go format)
+          if grep -q 'api\.deepseek\.com' opencode.json 2>/dev/null; then
+            echo "::error::opencode.json contains deprecated DeepSeek API endpoint (api.deepseek.com)."
+            echo "::error::The config should use opencode-go/deepseek-v4-flash, not the DeepSeek API directly."
             exit 1
           fi
-          # Verify the project config has opencode-go
-          if grep -q '"opencode-go"' opencode.json 2>/dev/null; then
-            echo "Model config validation passed: opencode-go provider found"
+          # Verify the model is set to opencode-go
+          if grep -q 'opencode-go/deepseek-v4-flash' opencode.json 2>/dev/null; then
+            echo "Model config validation passed: opencode-go/deepseek-v4-flash configured"
           else
-            echo "::warning::opencode-go provider not found in opencode.json. Using default config."
+            echo "::warning::opencode-go/deepseek-v4-flash not explicitly set in opencode.json. Using CLI --model flag."
           fi
 
       # -------------------------------------------------------

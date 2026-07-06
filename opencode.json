@@ -1,12 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
 
-  "provider": {
-    "opencode-go": {
-      "model": "opencode-go/deepseek-v4-flash"
-    }
-  },
-
   "model": {
     "default": "opencode-go/deepseek-v4-flash",
     "fallback": null
@@ -17,24 +11,9 @@
     "disable_fallback": true
   },
 
-  "agent": {
-    "explore": {
-      "disable": true
-    },
-    "general": {
-      "disable": true
-    }
-  },
-
-  "plugin": [
-    "~/.config/opencode/node_modules/superpowers"
-  ],
-
   "skills": {
     "paths": [
-      ".opencode/skills",
-      "~/.config/opencode/skills",
-      "~/.config/opencode/node_modules/superpowers/skills"
+      ".opencode/skills"
     ]
   },
 
