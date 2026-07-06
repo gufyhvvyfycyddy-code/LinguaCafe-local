@@ -173,13 +173,19 @@ jobs:
           OPENCODE_SERVER_PASSWORD: ""
         shell: bash
         run: |
-          # Read task from file (handles multi-line safely)
-          TASK_CONTENT=$(cat /tmp/opencode_task.txt)
+          # Build prompt by concatenating parts (avoids heredoc injection issues)
+          ATTEMPT="${{ steps.attempt.outputs.value }}"
+          BRANCH="${{ steps.branch.outputs.name }}"
 
-          FULL_PROMPT=$(cat <<-PROMPT_END
-          ## Task (Attempt ${{ steps.attempt.outputs.value }})
+          # Write header with task content from file (multi-line safe)
+          echo "## Task (Attempt $ATTEMPT)" > /tmp/opencode_final_prompt.txt
+          echo "" >> /tmp/opencode_final_prompt.txt
+          cat /tmp/opencode_task.txt >> /tmp/opencode_final_prompt.txt
+          echo "" >> /tmp/opencode_final_prompt.txt
+          echo "" >> /tmp/opencode_final_prompt.txt
 
-          $TASK_CONTENT
+          # Append the rest of the prompt
+          cat >> /tmp/opencode_final_prompt.txt << 'PROMPT_EOF'
 
           ## Model Requirement
           You MUST use the model: opencode-go/deepseek-v4-flash (OpenCode Go plan).
@@ -194,7 +200,7 @@ jobs:
           If the skill tool is unavailable or finds no skills, state that explicitly.
 
           ## Branch
-          You are on branch: ${{ steps.branch.outputs.name }}
+          You are on branch: $BRANCH
           Make ALL changes on this branch. Do NOT touch master.
 
           ## Safety
@@ -207,7 +213,7 @@ jobs:
           After completing the work, output a structured report inside <open-code-report> tags:
 
           <open-code-report>
-          [attempt: ${{ steps.attempt.outputs.value }}]
+          [attempt: $ATTEMPT]
           [model: opencode-go/deepseek-v4-flash]
           [skills: <list what you used, or "none" with reason>]
           [modified_files: <list files changed>]
@@ -219,13 +225,13 @@ jobs:
           </open-code-report>
 
           Append a machine-readable marker at the very end:
-          <!-- opencode-loop: attempt=${{ steps.attempt.outputs.value }} status=running -->
-          PROMPT_END
+          <!-- opencode-loop: attempt=$ATTEMPT status=running -->
+          PROMPT_EOF
 
           echo "Running OpenCode with opencode-go/deepseek-v4-flash..."
 
           set -o pipefail
-          opencode run "$FULL_PROMPT" \
+          opencode run "$(cat /tmp/opencode_final_prompt.txt)" \
             --model opencode-go/deepseek-v4-flash \
             --dangerously-skip-permissions \
             --print-logs 2>&1 | tee opencode_output.txt
