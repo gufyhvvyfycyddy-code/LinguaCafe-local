@@ -229,4 +229,62 @@ class AiStudyCardPendingItemController extends Controller
             ],
         ]);
     }
+
+    /**
+     * V5: 从用户确认的最终候选项生成学习卡。
+     *
+     * 接收由用户在 V4 最终候选包基础上确认（输入释义）后的候选项列表，
+     * 为每个候选项创建 confirmed WordSense + target_type=sense ReviewCard + 来源例句。
+     *
+     * 安全边界：
+     * - 不调用 AI。
+     * - 不写 ReviewLog。
+     * - 不改 FSRS 调度（新卡 fsrs_state='new', fsrs_due_at=now()）。
+     * - 不创建 legacy word ReviewCard。
+     * - 不删除 WordSense/ReviewCard/ReviewLog。
+     * - 严格校验：当前用户、当前语言、pending item 归属、chapter 归属、lemma/surface/sense_zh 合法。
+     */
+    public function generateCards(Request $request)
+    {
+        $validated = $request->validate([
+            'final_candidates_package' => ['required', 'array'],
+            'confirmed_items' => ['required', 'array', 'min:1'],
+            'confirmed_items.*.source' => ['required', 'string', 'in:user_selected,ai_recommended'],
+            'confirmed_items.*.item_id' => ['nullable', 'integer', 'min:1'],
+            'confirmed_items.*.word' => ['required', 'string', 'max:255'],
+            'confirmed_items.*.lemma' => ['nullable', 'string', 'max:255'],
+            'confirmed_items.*.surface' => ['nullable', 'string', 'max:255'],
+            'confirmed_items.*.chapter_id' => ['nullable', 'integer', 'min:1'],
+            'confirmed_items.*.text_block_index' => ['nullable', 'integer', 'min:0'],
+            'confirmed_items.*.sentence_index' => ['nullable', 'integer', 'min:0'],
+            'confirmed_items.*.sentence_id' => ['nullable', 'string', 'max:255'],
+            'confirmed_items.*.sentence_text' => ['nullable', 'string', 'max:2000'],
+            // 释义必填，不接受空释义（trim 后非空由 service 校验）
+            'confirmed_items.*.sense_zh' => ['required', 'string', 'max:1000'],
+            'confirmed_items.*.sense_en' => ['nullable', 'string', 'max:2000'],
+            'confirmed_items.*.pos' => ['nullable', 'string', 'max:64'],
+            'confirmed_items.*.aliases_zh' => ['nullable', 'array'],
+            'confirmed_items.*.collocations' => ['nullable', 'array'],
+        ]);
+
+        $result = $this->pendingItemService->generateCardsFromConfirmedCandidates(
+            $request->user(),
+            $validated['confirmed_items'],
+            $validated['final_candidates_package']
+        );
+
+        if (!$result['success']) {
+            return response()->json([
+                'success' => false,
+                'message' => $result['message'],
+            ], $result['status'] ?? 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $result['message'],
+            'results' => $result['results'],
+            'safety_flags' => $result['safety_flags'],
+        ]);
+    }
 }

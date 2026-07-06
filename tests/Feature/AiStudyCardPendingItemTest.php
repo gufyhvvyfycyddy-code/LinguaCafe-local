@@ -1201,6 +1201,490 @@ class AiStudyCardPendingItemTest extends TestCase
         $this->assertTrue($flags['user_confirmation_required_before_card_generation']);
     }
 
+    // ===== V5: generate-cards tests =====
+
+    public function test_generate_cards_creates_confirmed_word_sense(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'surface' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景；景观',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        $response->assertJsonPath('results.summary.created_count', 1);
+
+        $this->assertDatabaseHas('word_senses', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'lemma' => 'landscape',
+            'sense_zh' => '风景；景观',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+    }
+
+    public function test_generate_cards_creates_target_type_sense_review_card(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $sense = WordSense::where('user_id', $this->user->id)
+            ->where('language_id', 'english')
+            ->where('lemma', 'landscape')
+            ->first();
+
+        $this->assertNotNull($sense);
+        $this->assertDatabaseHas('review_cards', [
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $sense->id,
+            'fsrs_state' => 'new',
+            'fsrs_enabled' => true,
+        ]);
+    }
+
+    public function test_generate_cards_does_not_create_legacy_word_review_card(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $beforeWordCards = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $afterWordCards = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+        $this->assertSame($beforeWordCards, $afterWordCards, '不应创建 legacy word ReviewCard。');
+    }
+
+    public function test_generate_cards_does_not_write_review_log(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $before = ReviewLog::count();
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame($before, ReviewLog::count(), '不应写入 ReviewLog。');
+        $flags = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景2',
+                ],
+            ],
+        ])->assertOk()->json('safety_flags');
+        $this->assertTrue($flags['no_review_log_written']);
+    }
+
+    public function test_generate_cards_does_not_reschedule_existing_fsrs_cards(): void
+    {
+        // 先创建一张已存在的 sense card，并设置 FSRS 调度数据
+        $existingSense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'existing',
+            'surface_form' => 'existing',
+            'sense_key' => hash('sha256', 'english|existing||存在||'),
+            'sense_zh' => '存在',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+        ]);
+        $existingCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $existingSense->id,
+            'fsrs_state' => 'review',
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 0.3,
+            'fsrs_due_at' => '2099-01-01 00:00:00',
+            'fsrs_reps' => 7,
+            'fsrs_lapses' => 1,
+            'fsrs_enabled' => true,
+        ]);
+
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 生成一个不相关的卡（不影响已存在的卡）
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        // 验证已存在的卡 FSRS 调度数据未被修改
+        $existingCard->refresh();
+        $this->assertSame('review', $existingCard->fsrs_state);
+        $this->assertSame(5.0, (float) $existingCard->fsrs_stability);
+        $this->assertSame(0.3, (float) $existingCard->fsrs_difficulty);
+        $this->assertSame(7, (int) $existingCard->fsrs_reps);
+        $this->assertSame(1, (int) $existingCard->fsrs_lapses);
+        $this->assertTrue((bool) $existingCard->fsrs_enabled);
+    }
+
+    public function test_generate_cards_unselected_items_not_generated(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // final_candidates_package 中有 user_selected_items，
+        // 但 confirmed_items 为空（用户未确认任何项）—— 应被 Laravel validate 拒绝
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->count());
+        $this->assertSame(0, ReviewCard::where('user_id', $this->user->id)->count());
+    }
+
+    public function test_generate_cards_deduplicates_duplicate_candidates(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 第一次生成
+        $first = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+        $first->assertJsonPath('results.summary.created_count', 1);
+        $first->assertJsonPath('results.summary.duplicate_count', 0);
+
+        // 第二次生成同样的候选——应被识别为重复
+        $second = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+        $second->assertJsonPath('results.summary.created_count', 0);
+        $second->assertJsonPath('results.summary.duplicate_count', 1);
+
+        // 数据库中只有 1 个 sense + 1 个 card
+        $this->assertSame(1, WordSense::where('user_id', $this->user->id)->where('lemma', 'landscape')->count());
+        $this->assertSame(1, ReviewCard::where('user_id', $this->user->id)->where('target_type', ReviewCard::TARGET_SENSE)->count());
+    }
+
+    public function test_generate_cards_rejects_cross_user_pending_item(): void
+    {
+        // user1 创建 pending item
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 切换到 otherUser 前先清除 session（参考 V4 同类测试）
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id, // 也不属于 otherUser
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        // 应被跳过（invalid_pending_item + invalid_chapter）
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+
+        // otherUser 不应有任何 sense/card
+        $this->assertSame(0, WordSense::where('user_id', $this->otherUser->id)->count());
+        $this->assertSame(0, ReviewCard::where('user_id', $this->otherUser->id)->count());
+    }
+
+    public function test_generate_cards_rejects_cross_language_pending_item(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 切换到 spanish
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        // pending item 和 chapter 都不属于 spanish，应被跳过
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+
+        // spanish 语言下不应创建任何 sense/card
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->where('language_id', 'spanish')->count());
+        $this->assertSame(0, ReviewCard::where('user_id', $this->user->id)->where('language_id', 'spanish')->count());
+    }
+
+    public function test_generate_cards_safely_fails_on_invalid_chapter_or_pending_item(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // invalid chapter_id（不存在的 chapter）
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, 999999),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => 999999, // invalid chapter
+                    'sense_zh' => '风景',
+                ],
+                [
+                    'source' => 'user_selected',
+                    'item_id' => 999999, // invalid pending item
+                    'word' => 'ghost',
+                    'lemma' => 'ghost',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '幽灵',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('success', true);
+        // 两项都应被跳过
+        $response->assertJsonPath('results.summary.skipped_count', 2);
+        $response->assertJsonPath('results.summary.created_count', 0);
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->count());
+    }
+
+    public function test_generate_cards_rejects_empty_sense_zh(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // sense_zh 为空字符串——Laravel validate required 应拒绝
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '', // 空释义
+                ],
+            ],
+        ]);
+
+        $response->assertStatus(422); // Laravel validate required 拒绝空字符串
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->count());
+    }
+
+    public function test_generate_cards_rejects_oversized_batch(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 51 个候选项（超过 50 上限）
+        $confirmedItems = [];
+        for ($i = 0; $i < 51; $i++) {
+            $confirmedItems[] = [
+                'source' => 'ai_recommended',
+                'word' => 'word' . $i,
+                'lemma' => 'word' . $i,
+                'sense_zh' => '释义' . $i,
+            ];
+        }
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => $confirmedItems,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->count());
+    }
+
+    public function test_generate_cards_returns_frontend_displayable_payload(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'success',
+            'message',
+            'results' => [
+                'created',
+                'skipped',
+                'duplicate',
+                'failed',
+                'summary' => [
+                    'total',
+                    'created_count',
+                    'skipped_count',
+                    'duplicate_count',
+                    'failed_count',
+                ],
+            ],
+            'safety_flags' => [
+                'no_ai_called_by_linguacafe',
+                'ai_response_pasted_by_user',
+                'no_review_log_written',
+                'no_fsrs_rescheduled',
+                'no_legacy_word_card_created',
+                'user_confirmation_received',
+            ],
+        ]);
+
+        $created = $response->json('results.created');
+        $this->assertCount(1, $created);
+        $this->assertSame('landscape', $created[0]['word']);
+        $this->assertNotNull($created[0]['sense_id']);
+        $this->assertNotNull($created[0]['review_card_id']);
+    }
+
+    private function finalCandidatesPackage(int $itemId, ?int $chapterId): array
+    {
+        return [
+            'schema_version' => 'ai-study-card-final-candidates-v1',
+            'user_selected_items' => [
+                [
+                    'item_id' => $itemId,
+                    'chapter_id' => $chapterId,
+                    'text_block_index' => 0,
+                    'sentence_index' => 0,
+                    'word' => 'landscape',
+                    'normalized_word' => 'landscape',
+                    'surface' => 'landscape',
+                    'lemma' => 'landscape',
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'status' => 'pending',
+                    'source' => 'user_selected',
+                ],
+            ],
+            'ai_recommended_selected_items' => [],
+            'ai_recommended_unselected_items' => [],
+            'dedupe_summary' => [],
+            'generation_rules' => [],
+            'safety_flags' => [],
+        ];
+    }
+
     private function payload(array $overrides = []): array
     {
         return array_merge([

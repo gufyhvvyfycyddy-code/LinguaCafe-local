@@ -269,6 +269,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/ai-study-card/pending-items/final-candidates-package', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'finalCandidatesPackage']);
     Route::post('/ai-study-card/pending-items/{id}/dismiss', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'dismiss']);
     Route::post('/ai-study-card/pending-items/{id}/restore', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'restore']);
+    // V5: generate sense review cards from user-confirmed AI study candidates
+    Route::post('/ai-study-card/generate-cards', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'generateCards']);
 
     // library import
     Route::post('/import', [App\Http\Controllers\ImportController::class, 'import']);
