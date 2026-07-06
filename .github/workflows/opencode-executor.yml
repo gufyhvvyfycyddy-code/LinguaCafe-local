@@ -93,7 +93,7 @@ jobs:
       # -------------------------------------------------------
       - name: Install OpenCode
         run: |
-          npm install -g opencode@latest
+          npm install -g opencode-ai@latest
           echo "OpenCode version: $(opencode --version)"
 
       # -------------------------------------------------------
