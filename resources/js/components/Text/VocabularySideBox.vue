@@ -21,26 +21,26 @@
         @mouseup.stop=";"
     >
         <v-alert id="no-word-selected-title" prominent color="foreground" class="text--text" v-if="type == 'empty'">
-            璇烽€夋嫨涓€涓崟璇嶆垨鐭
+            请选择一个单词或短语
         </v-alert>
 
         <div class="pa-0 w-full" v-if="type !== 'empty'">
             <div class="vocab-box-subheader d-flex mb-2">
-                <span id="vocab-side-box-title" v-if="type == 'new-phrase'">鏂扮煭璇</span>
-                <span id="vocab-side-box-title" v-else>{{ type === 'word' ? '鍗曡瘝' : '鐭' }}</span>
+                <span id="vocab-side-box-title" v-if="type == 'new-phrase'">新短语</span>
+                <span id="vocab-side-box-title" v-else>{{ type === 'word' ? '单词' : '短语' }}</span>
                 <v-spacer />
-                <v-btn v-if="tab == 0 && inflections.length" icon title="鏄剧ず鍙樺舰" @click="tab = 1;"><v-icon>mdi-list-box</v-icon></v-btn>
-                <v-btn v-if="tab == 0 && $props.textToSpeechAvailable" icon title="鏈楄" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
-                <v-btn v-if="tab == 0 && type !== 'new-phrase'" icon title="鍙戦€佸埌 Anki" @mouseup.stop="addSelectedWordToAnki"><v-icon>mdi-cards</v-icon></v-btn>
-                <v-btn v-if="tab == 1" icon title="杩斿洖鍗曡瘝" @click="tab = 0;"><v-icon>mdi-arrow-left</v-icon></v-btn>
-                <v-btn dark icon title="鍙栨秷閫夋嫨" @click="close"><v-icon>mdi-close</v-icon></v-btn>
+                <v-btn v-if="tab == 0 && inflections.length" icon title="显示变形" @click="tab = 1;"><v-icon>mdi-list-box</v-icon></v-btn>
+                <v-btn v-if="tab == 0 && $props.textToSpeechAvailable" icon title="朗读" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+                <v-btn v-if="tab == 0 && type !== 'new-phrase'" icon title="发送到 Anki" @mouseup.stop="addSelectedWordToAnki"><v-icon>mdi-cards</v-icon></v-btn>
+                <v-btn v-if="tab == 1" icon title="返回单词" @click="tab = 0;"><v-icon>mdi-arrow-left</v-icon></v-btn>
+                <v-btn dark icon title="取消选择" @click="close"><v-icon>mdi-close</v-icon></v-btn>
             </div>
         </div>
 
         <v-tabs-items v-model="tab" v-if="type !== 'empty'">
             <v-tab-item :value="0" class="sidebar-tab">
                 <div class="word-basic-info rounded pa-3 mb-3" v-if="type == 'word'">
-                    <div class="text-caption font-weight-bold mb-1">鍗曡瘝鍩虹淇℃伅</div>
+                    <div class="text-caption font-weight-bold mb-1">单词基础信息</div>
                     <div class="d-flex align-center">
                         <div>
                             <div class="text-h6 default-font mb-1">
@@ -49,11 +49,11 @@
                                         <span class="default-font">{{ word }}</span>
                                         <span class="mx-1 text--secondary">&rarr;</span>
                                         <span class="default-font">{{ lemmaDisplay }}</span>
-                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[淇敼]</span>
+                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[修改]</span>
                                     </span>
                                     <span v-else class="d-flex align-center flex-wrap">
                                         <span class="default-font">{{ word }}</span>
-                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[淇敼]</span>
+                                        <span class="lemma-edit-link ml-1 text-caption" @click="startEditLemma">[修改]</span>
                                     </span>
                                 </template>
                                 <template v-if="editingLemma">
@@ -74,10 +74,10 @@
                             </div>
                         </div>
                                 <v-spacer />
-                                <v-btn v-if="$props.textToSpeechAvailable" icon title="鍙戦煶" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+                                <v-btn v-if="$props.textToSpeechAvailable" icon title="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
                             </div>
                             <div v-if="fsrsFamiliarityHasData" class="d-flex align-center mt-1">
-                                <span class="text-caption grey--text mr-2" style="white-space: nowrap;">FSRS 鐔熸倝搴︼細{{ fsrsFamiliarityPercent }}%</span>
+                                <span class="text-caption grey--text mr-2" style="white-space: nowrap;">FSRS 熟悉度：{{ fsrsFamiliarityPercent }}%</span>
                                 <v-progress-linear
                                     :value="fsrsFamiliarityPercent"
                                     color="#4CAF50"
@@ -88,25 +88,25 @@
                                 ></v-progress-linear>
                             </div>
                             <div v-else-if="stage <= -1" class="text-caption grey--text mt-1">
-                                FSRS 鐔熸倝搴︼細灏氭湭澶嶄範
+                                FSRS 熟悉度：尚未复习
                             </div>
                         </div>
 
                 <div class="d-flex" v-if="type == 'word' && ($props.language == 'japanese' || $props.language == 'chinese')">
-                    <v-text-field class="default-font my-2" hide-details placeholder="璇嶅厓璇婚煶" title="璇嶅厓璇婚煶" filled dense rounded v-model="baseWordReading" @keyup="inputChanged" @keydown.stop=";" />
+                    <v-text-field class="default-font my-2" hide-details placeholder="词元读音" title="词元读音" filled dense rounded v-model="baseWordReading" @keyup="inputChanged" @keydown.stop=";" />
                     <v-icon class="mt-1 mx-1">mdi-arrow-right</v-icon>
-                    <v-text-field class="default-font my-2" hide-details placeholder="璇婚煶" title="璇婚煶" filled dense rounded v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
+                    <v-text-field class="default-font my-2" hide-details placeholder="读音" title="读音" filled dense rounded v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
                 </div>
 
-                <v-textarea v-if="type !== 'word'" class="default-font my-2" label="鐭" filled dense no-resize rounded hide-details height="80" disabled :value="phraseText" @keydown.stop=";" />
-                <v-textarea v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')" class="default-font my-2" label="璇婚煶" filled dense no-resize rounded hide-details height="80" v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
+                <v-textarea v-if="type !== 'word'" class="default-font my-2" label="短语" filled dense no-resize rounded hide-details height="80" disabled :value="phraseText" @keydown.stop=";" />
+                <v-textarea v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')" class="default-font my-2" label="读音" filled dense no-resize rounded hide-details height="80" v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
 
                 <template v-if="type !== 'new-phrase'">
                     <div v-if="type == 'word'" class="d-flex flex-wrap mb-3">
-                        <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">蹇界暐</v-btn>
-                        <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">鏍囦负宸茬煡</v-btn>
-                        <v-btn small rounded depressed color="error" class="mr-2 mb-2" @click="deleteWord">鍥炲綊涓烘柊璇</v-btn>
-                        <!-- V1-V5: AI study card workflow 鐢卞叡浜?feature island 缁勪欢璐熻矗 -->
+                        <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
+                        <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
+                        <v-btn small rounded depressed color="error" class="mr-2 mb-2" @click="deleteWord">回归为新词</v-btn>
+                        <!-- V1-V5: AI study card workflow 由共享 feature island 组件负责 -->
                         <AiStudyCardDesktopWorkflow ref="aiStudyCardWorkflow" />
                     </div>
                 </template>
@@ -126,17 +126,17 @@
                     @word-learning-updated="$emit('word-learning-updated', $event)"
                 />
 
-                <!-- Unified 娣诲姞鏂伴噴涔?panel -->
+                <!-- Unified 添加新释义 panel -->
                 <div class="add-sense-panel mt-3" v-if="type === 'word'">
                     <div class="vocab-box-subheader d-flex align-center pa-2 rounded" @click="showAddSensePanel = !showAddSensePanel" style="cursor:pointer; border: 1px solid var(--v-primary-base);">
                         <v-icon small color="primary" class="mr-2">mdi-plus-circle-outline</v-icon>
-                        <span class="font-weight-medium primary--text">娣诲姞鏂伴噴涔</span>
+                        <span class="font-weight-medium primary--text">添加新释义</span>
                         <v-chip
                             v-if="!showAddSensePanel && (aiVocabSuggestions.length + aiPhraseSuggestions.length)"
                             x-small
                             color="primary"
                             class="ml-2"
-                        >{{ aiVocabSuggestions.length + aiPhraseSuggestions.length }} 鏉″缓璁</v-chip>
+                        >{{ aiVocabSuggestions.length + aiPhraseSuggestions.length }} 条建议</v-chip>
                         <v-spacer />
                         <v-icon x-small :color="showAddSensePanel ? 'primary' : ''">{{ showAddSensePanel ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                     </div>
@@ -145,7 +145,7 @@
                         <!-- Section: Unified candidate list (AI + dictionary) -->
                         <div class="mt-2">
                             <v-text-field
-                                placeholder="鎼滅储璇嶅吀..."
+                                placeholder="搜索词典..."
                                 class="dictionary-search-field default-font"
                                 dense
                                 filled
@@ -158,7 +158,7 @@
                             />
                             <div class="vocab-box-subheader d-flex align-center mt-1" @click="showDictionaryResults = !showDictionaryResults" style="cursor:pointer;">
                                 <v-icon x-small class="mr-1">mdi-book-open-variant</v-icon>
-                                <span class="text-caption">鍊欓€夌粨鏋滐紙AI + 璇嶅吀锛</span>
+                                <span class="text-caption">候选结果（AI + 词典）</span>
                                 <v-spacer />
                                 <v-icon x-small>{{ showDictionaryResults ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
                             </div>
@@ -182,7 +182,7 @@
                         <div class="mt-2 mb-2">
                             <v-btn small text color="primary" block @click="openManualAddForm">
                                 <v-icon x-small class="mr-1">mdi-pencil</v-icon>
-                                鎵嬪姩杈撳叆閲婁箟
+                                手动输入释义
                             </v-btn>
                         </div>
                     </template>
@@ -190,14 +190,14 @@
 
                 <div v-if="type !== 'word'" class="d-flex mt-2 pl-0">
                     <v-spacer />
-                    <v-btn small rounded color="success" @click="addNewPhrase" v-if="type == 'new-phrase'">淇濆瓨鐭</v-btn>
-                    <v-btn small rounded color="error" @click="deletePhrase" v-if="type == 'phrase'">鍒犻櫎鐭</v-btn>
+                    <v-btn small rounded color="success" @click="addNewPhrase" v-if="type == 'new-phrase'">保存短语</v-btn>
+                    <v-btn small rounded color="error" @click="deletePhrase" v-if="type == 'phrase'">删除短语</v-btn>
                 </div>
             </v-tab-item>
 
             <v-tab-item :value="1">
                 <v-simple-table v-if="inflections.length" class="border rounded-lg no-hover mx-auto default-font">
-                    <thead><tr><th class="text-center">褰㈠紡</th><th class="text-center">鑲畾</th><th class="text-center">鍚﹀畾</th></tr></thead>
+                    <thead><tr><th class="text-center">形式</th><th class="text-center">肯定</th><th class="text-center">否定</th></tr></thead>
                     <tbody>
                         <tr v-for="(inflection, index) in inflections" :key="index">
                             <td class="px-2">{{ inflection.name }}</td>
@@ -445,7 +445,7 @@ export default {
                 if (this.latestAiLookupKey !== lookupKey) {
                     return;
                 }
-                this.$store.commit('vocabularyBox/setAiLookupError', '鏃犳硶璇诲彇 AI 寤鸿銆?');
+                this.$store.commit('vocabularyBox/setAiLookupError', '无法读取 AI 建议。');
                 this.$store.commit('vocabularyBox/setAiVocabSuggestions', []);
                 this.$store.commit('vocabularyBox/setAiPhraseSuggestions', []);
             }).finally(() => {
