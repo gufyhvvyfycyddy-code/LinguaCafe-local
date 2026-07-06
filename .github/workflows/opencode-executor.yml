@@ -21,7 +21,7 @@ on:
 # Environment variable used by OpenCode to authenticate with OpenCode Go
 # OPENCODE_GO_API_KEY must be set in GitHub Secrets
 env:
-  OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
+  _OPENCODE_GO_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
 
 jobs:
   opencode-execute:
@@ -42,9 +42,9 @@ jobs:
 
     steps:
       # -------------------------------------------------------
-      # Step 1: Validate Secret
+      # Step 1: Validate Secret and set up OpenCode Go auth
       # -------------------------------------------------------
-      - name: Check OpenCode Go API Key
+      - name: Check and configure OpenCode Go
         run: |
           if [ -z "${{ secrets.OPENCODE_GO_API_KEY }}" ]; then
             echo "::error::OPENCODE_GO_API_KEY is not set."
@@ -53,6 +53,9 @@ jobs:
             exit 1
           fi
           echo "OPENCODE_GO_API_KEY configured successfully"
+
+          # Create OpenCode auth file via Python (safe for any key chars)
+          python3 -c "import json,os;key=os.environ.get('_OPENCODE_GO_KEY','');open(os.path.expanduser('~/.local/share/opencode/auth.json'),'w').write(json.dumps({'opencode-go':{'type':'api','key':key}}))"
 
       # -------------------------------------------------------
       # Step 2: Validate model config (no accidental DeepSeek references)
