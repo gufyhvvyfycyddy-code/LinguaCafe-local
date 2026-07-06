@@ -1,12 +1,13 @@
 # ============================================================
 # Auto-Fix Scheduler
 #
-# Acts as the automated "Codex" dispatcher for auto-fix attempts.
+# Acts as the automated dispatcher for auto-fix attempts.
 # Triggered by opencode-executor.yml when tests fail and attempts < 3.
 # Reads the failure report, generates a new /opencode command,
 # and posts it to the issue/PR to start the next attempt.
 #
 # Max 3 total attempts. After 3, adds needs-human-review and stops.
+# Uses double-check mechanism: HTML comment markers + GitHub labels.
 # ============================================================
 
 name: Auto-Fix Scheduler
@@ -16,10 +17,6 @@ on:
     inputs:
       issue_number:
         description: 'Issue or PR number'
-        required: true
-        type: string
-      repository:
-        description: 'Repository full name (owner/repo)'
         required: true
         type: string
       attempt:
@@ -42,7 +39,7 @@ jobs:
 
     steps:
       # -------------------------------------------------------
-      # Step 1: Calculate next attempt number
+      # Step 1: Calculate next attempt
       # -------------------------------------------------------
       - name: Calculate next attempt
         id: calc
@@ -53,7 +50,7 @@ jobs:
           echo "NEXT_ATTEMPT=$NEXT" >> $GITHUB_ENV
 
       # -------------------------------------------------------
-      # Step 2: Read the previous execution report
+      # Step 2: Read previous execution report
       # -------------------------------------------------------
       - name: Read previous execution report
         id: read_report
@@ -61,18 +58,35 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ISSUE_NUM="${{ env.ISSUE_NUMBER }}"
-          PREV_ATT="${{ env.PREV_ATTEMPT }}"
 
-          echo "Reading report for issue/PR #$ISSUE_NUM, previous attempt $PREV_ATT"
+          echo "Reading report for issue/PR #$ISSUE_NUM, previous attempt ${{ env.PREV_ATTEMPT }}"
 
-          # Fetch the last OpenCode report comment
+          # Read ALL comments and find the last OpenCode report
           COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
-            --jq '.[-1] | .body')
+            --jq '.[].body' 2>/dev/null)
 
-          # Extract the report section if available
-          REPORT=$(echo "$COMMENTS" | sed -n '/<open-code-report>/,/<\/open-code-report>/p')
+          # Try to read the machine-readable HTML comment markers first
+          MARKERS=$(echo "$COMMENTS" | grep -oP '<!-- opencode-loop: attempt=\d+ status=(passed|failed) -->' | tail -1)
+          MARKER_ATTEMPT=$(echo "$MARKERS" | grep -oP 'attempt=\K\d+')
+          MARKER_STATUS=$(echo "$MARKERS" | grep -oP 'status=\K\w+')
+
+          if [ -n "$MARKER_ATTEMPT" ] && [ -n "$MARKER_STATUS" ]; then
+            echo "Found machine-readable marker: attempt=$MARKER_ATTEMPT status=$MARKER_STATUS"
+            echo "marker_attempt=$MARKER_ATTEMPT" >> $GITHUB_OUTPUT
+            echo "marker_status=$MARKER_STATUS" >> $GITHUB_OUTPUT
+          else
+            echo "No machine-readable marker found. Will fall back to label detection."
+            echo "marker_attempt=" >> $GITHUB_OUTPUT
+            echo "marker_status=" >> $GITHUB_OUTPUT
+          fi
+
+          # Extract the report from the last OpenCode execution comment
+          LAST_OC_COMMENT=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
+            --jq '.[-1] | .body' 2>/dev/null)
+          REPORT=$(echo "$LAST_OC_COMMENT" | sed -n '/<open-code-report>/,/<\/open-code-report>/p')
+
           if [ -z "$REPORT" ]; then
-            REPORT="[No structured report found. Previous execution may have failed before generating a report.]"
+            REPORT="[No structured report found. Previous execution may have failed early.]"
           fi
 
           echo "report<<EOF" >> $GITHUB_OUTPUT
@@ -80,7 +94,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------------
-      # Step 2: Check if we should continue
+      # Step 3: Check continuation conditions
       # -------------------------------------------------------
       - name: Check continuation conditions
         id: check
@@ -88,57 +102,79 @@ jobs:
           ISSUE_NUM="${{ env.ISSUE_NUMBER }}"
           NEXT_ATT="${{ env.NEXT_ATTEMPT }}"
 
-          # Check for needs-human-review label - if present, don't continue
-          HAS_REVIEW_LABEL=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
-            --jq '.[] | select(.name == "needs-human-review") | .name' 2>/dev/null)
+          # Get current labels
+          LABELS=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
+            --jq '.[].name' 2>/dev/null)
 
-          if [ -n "$HAS_REVIEW_LABEL" ]; then
-            echo "needs-human-review label is present. Stopping auto-fix."
+          # Priority 1: Check machine-readable markers
+          MARKER_ATTEMPT="${{ steps.read_report.outputs.marker_attempt }}"
+          MARKER_STATUS="${{ steps.read_report.outputs.marker_status }}"
+
+          if [ -n "$MARKER_STATUS" ]; then
+            echo "Machine marker indicates previous attempt ended with status: $MARKER_STATUS"
+
+            if [ "$MARKER_STATUS" = "passed" ]; then
+              echo "Tests already passed (per marker). Stopping."
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              # Add passed label if missing
+              if ! echo "$LABELS" | grep -q "auto-fix/passed"; then
+                gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
+                  --method POST --field "labels[]=auto-fix/passed" --silent 2>/dev/null || true
+              fi
+              exit 0
+            fi
+          fi
+
+          # Priority 2: Check labels
+          if echo "$LABELS" | grep -q "needs-human-review"; then
+            echo "needs-human-review label present. Stopping."
             echo "should_run=false" >> $GITHUB_OUTPUT
-
-            # Post comment explaining why
             gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
               --method POST \
-              --field "body=Auto-fix scheduler was triggered but \`needs-human-review\` label is already present. The auto-fix cycle has stopped.
-
-            To restart, remove the \`needs-human-review\` label and comment \`继续自动修复\`."
+              --field "body=Auto-fix scheduler stopped: \`needs-human-review\` label is already present.
+            To restart, remove the label and comment \`继续自动修复\`."
             exit 0
           fi
 
-          # Check for auto-fix/passed label
-          HAS_PASSED=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
-            --jq '.[] | select(.name == "auto-fix/passed") | .name' 2>/dev/null)
-
-          if [ -n "$HAS_PASSED" ]; then
-            echo "Tests already passed. Stopping."
+          if echo "$LABELS" | grep -q "auto-fix/passed"; then
+            echo "auto-fix/passed label present. Stopping."
             echo "should_run=false" >> $GITHUB_OUTPUT
             exit 0
           fi
 
-          # Check that the comment history doesn't already show 3+ attempts
-          # by looking for the machine-readable markers
+          # Priority 3: Count completed attempts from HTML markers
           ALL_COMMENTS=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
             --jq '.[].body' 2>/dev/null)
+          COMPLETED=$(echo "$ALL_COMMENTS" | grep -oP '<!-- opencode-loop: attempt=\d+ status=(passed|failed) -->' | wc -l)
 
-          COMPLETED_ATTEMPTS=$(echo "$ALL_COMMENTS" | grep -oP '<!-- opencode-loop: attempt=\d+ status=(?:passed|failed) -->' | wc -l)
-
-          if [ "$COMPLETED_ATTEMPTS" -ge 3 ]; then
-            echo "Already completed 3 attempts. Stopping."
+          if [ "$COMPLETED" -ge 3 ]; then
+            echo "Already completed $COMPLETED attempts (from markers). Stopping."
             echo "should_run=false" >> $GITHUB_OUTPUT
-
-            # Add needs-human-review label
             gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
-              --method POST \
-              --field "labels[]=needs-human-review" \
-              --silent 2>/dev/null || true
+              --method POST --field "labels[]=needs-human-review" --silent 2>/dev/null || true
+            exit 0
+          fi
+
+          # Check label-based attempt count as fallback
+          LABEL_COUNT=0
+          echo "$LABELS" | grep -q "auto-fix/attempt-1" && LABEL_COUNT=$((LABEL_COUNT + 1))
+          echo "$LABELS" | grep -q "auto-fix/attempt-2" && LABEL_COUNT=$((LABEL_COUNT + 1))
+          echo "$LABELS" | grep -q "auto-fix/attempt-3" && LABEL_COUNT=$((LABEL_COUNT + 1))
+
+          # If markers and labels conflict, stop for safety
+          if [ "$COMPLETED" -ne "$LABEL_COUNT" ] && [ "$COMPLETED" -gt 0 ] && [ "$LABEL_COUNT" -gt 0 ]; then
+            echo "::warning::Marker count ($COMPLETED) and label count ($LABEL_COUNT) conflict."
+            echo "::warning::Stopping auto-fix for safety. Manual review required."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+            gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/labels" \
+              --method POST --field "labels[]=needs-human-review" --silent 2>/dev/null || true
             exit 0
           fi
 
           echo "should_run=true" >> $GITHUB_OUTPUT
-          echo "next_attempt=$NEXT_ATT" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------------
-      # Step 3: Generate next /opencode command
+      # Step 4: Generate next /opencode command
       # -------------------------------------------------------
       - name: Generate next /opencode command
         id: generate
@@ -148,7 +184,6 @@ jobs:
         run: |
           NEXT_ATT="${{ env.NEXT_ATTEMPT }}"
 
-          # Build the /opencode dispatch command with all required elements
           OPENCODE_COMMAND="/opencode
 
           ## Auto-Fix Cycle (Attempt $NEXT_ATT of 3)
@@ -160,18 +195,24 @@ jobs:
 
           ### Prohibited Scope
           - Do NOT modify: .github/workflows/, opencode.json, docs/codex-opencode-loop.md, AGENTS.md
+          - Do NOT modify business code (PHP, Vue, JS, CSS, migrations) unless the task requires it
           - Do NOT push to master branch
           - Do NOT auto-merge any PR
 
           ### Key Files to Check
-          - Review the failing tests and affected source files from the previous report
-          - Focus on files related to failed tests
+          - Review failing tests and affected source files from the previous report
 
           ### Model Requirement
-          This task MUST use DeepSeek Flash (deepseek-v4-flash). If this model is unavailable, fail immediately. Do NOT fall back to any other model.
+          This task MUST use the OpenCode Go plan model: opencode-go/deepseek-v4-flash.
+          NEVER use deepseek/deepseek-v4-flash, bare deepseek-v4-flash, or any other model.
+          If opencode-go/deepseek-v4-flash is unavailable, fail immediately.
+          Do NOT fall back to any other model.
 
-          ### Superpowers / Skills Requirement
-          Before starting work, use the OpenCode skill tool to discover available skills. Select the most appropriate skill(s) based on this task type (debugging/fix cycle). After completing the work, report which skill(s) you actually used.
+          ### Skills / Superpowers Requirement
+          Before starting work, use the OpenCode skill tool to discover available skills.
+          Select the most appropriate skill(s) based on this task type (debugging/fix cycle).
+          After completing the work, report which skill(s) you actually used.
+          If no skill was appropriate or if the skill tool is unavailable, explain why.
 
           ### Test Requirement
           Run:
@@ -186,7 +227,7 @@ jobs:
           <open-code-report>
           [attempt: $NEXT_ATT]
           [model: <model used>]
-          [skills: <skills used>]
+          [skills: <skills used, or "none" with reason>]
           [modified_files: <list>]
           [changes: <summary>]
           [tests_run: <list>]
@@ -199,14 +240,14 @@ jobs:
           <!-- opencode-loop: attempt=$NEXT_ATT status=running -->
 
           ### Stop Rule
-          If this is attempt 3 and tests still fail, the system will stop automatically and request human review."
+          If this is attempt 3 and tests still fail, the system will stop automatically and add needs-human-review."
 
           echo "command<<EOF" >> $GITHUB_OUTPUT
           echo "$OPENCODE_COMMAND" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------------
-      # Step 4: Post /opencode command to issue/PR
+      # Step 5: Post /opencode command to issue/PR
       # -------------------------------------------------------
       - name: Post next /opencode command
         if: steps.check.outputs.should_run == 'true'
@@ -217,23 +258,8 @@ jobs:
 
           echo "Posting /opencode command for attempt ${{ env.NEXT_ATTEMPT }}..."
 
-          # Post the generated command as a comment
           gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM/comments" \
             --method POST \
             --field "body=$NEXT_COMMAND"
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
-
-      # -------------------------------------------------------
-      # Step 5: Log final state
-      # -------------------------------------------------------
-      - name: Log final state
-        if: always()
-        run: |
-          echo "========================================"
-          echo "Auto-Fix Scheduler finished"
-          echo "Issue/PR: ${{ env.ISSUE_NUMBER }}"
-          echo "Previous attempt: ${{ env.PREV_ATTEMPT }}"
-          echo "Next attempt: ${{ env.NEXT_ATTEMPT }}"
-          echo "Should continue: ${{ steps.check.outputs.should_run }}"
-          echo "========================================"

@@ -1,12 +1,15 @@
 # ============================================================
 # OpenCode Executor
-# 
+#
 # Triggered by /opencode or /oc comments on Issues or PRs.
-# Runs OpenCode with the specified task, model, and skills.
+# Runs OpenCode with OpenCode Go plan (opencode-go/deepseek-v4-flash).
 # Reports results back as a comment.
 #
-# Security: requires DEEPSEEK_API_KEY secret.
-# Branch protection: never pushes to master, never auto-merges.
+# Security:
+#   - Requires OPENCODE_GO_API_KEY secret (NOT DeepSeek API Key)
+#   - Never pushes to master, never auto-merges
+#   - Model locked to opencode-go/deepseek-v4-flash, no fallback
+#   - Report must include [skills:] field to verify Superpowers usage
 # ============================================================
 
 name: OpenCode Executor
@@ -14,6 +17,11 @@ name: OpenCode Executor
 on:
   issue_comment:
     types: [created]
+
+# Environment variable used by OpenCode to authenticate with OpenCode Go
+# OPENCODE_GO_API_KEY must be set in GitHub Secrets
+env:
+  OPENCODE_GO_API_KEY: ${{ secrets.OPENCODE_GO_API_KEY }}
 
 jobs:
   opencode-execute:
@@ -27,28 +35,44 @@ jobs:
 
     permissions:
       contents: write
-      issues: write
       pull-requests: write
-      checks: read
-
-    env:
-      DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-      OPENCODE_MODEL: deepseek-v4-flash
+      issues: write
+      actions: read
+      id-token: write
 
     steps:
       # -------------------------------------------------------
-      # Step 1: Validate Secrets
+      # Step 1: Validate Secret
       # -------------------------------------------------------
-      - name: Check DeepSeek API Key
+      - name: Check OpenCode Go API Key
         run: |
-          if [ -z "${{ secrets.DEEPSEEK_API_KEY }}" ]; then
-            echo "::error::DEEPSEEK_API_KEY is not set. Please configure it in repository Secrets."
+          if [ -z "${{ secrets.OPENCODE_GO_API_KEY }}" ]; then
+            echo "::error::OPENCODE_GO_API_KEY is not set."
+            echo "::error::Please configure it in repository Settings -> Secrets and variables -> Actions."
+            echo "::error::This is your OpenCode Go API Key, NOT a DeepSeek API Key."
             exit 1
           fi
-          echo "DEEPSEEK_API_KEY configured successfully"
+          echo "OPENCODE_GO_API_KEY configured successfully"
 
       # -------------------------------------------------------
-      # Step 2: Checkout repository
+      # Step 2: Validate model config (no accidental DeepSeek references)
+      # -------------------------------------------------------
+      - name: Validate model configuration
+        run: |
+          if grep -q 'deepseek/deepseek-v4-flash\|"deepseek-v4-flash"\|api\.deepseek\.com' opencode.json 2>/dev/null; then
+            echo "::error::opencode.json contains deprecated DeepSeek API configuration."
+            echo "::error::The model must be opencode-go/deepseek-v4-flash, not deepseek API."
+            exit 1
+          fi
+          # Verify the project config has opencode-go
+          if grep -q '"opencode-go"' opencode.json 2>/dev/null; then
+            echo "Model config validation passed: opencode-go provider found"
+          else
+            echo "::warning::opencode-go provider not found in opencode.json. Using default config."
+          fi
+
+      # -------------------------------------------------------
+      # Step 3: Checkout repository
       # -------------------------------------------------------
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,7 +81,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # -------------------------------------------------------
-      # Step 3: Setup Node.js
+      # Step 4: Setup Node.js
       # -------------------------------------------------------
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -65,56 +89,44 @@ jobs:
           node-version: '22'
 
       # -------------------------------------------------------
-      # Step 4: Install OpenCode
+      # Step 5: Install OpenCode
       # -------------------------------------------------------
       - name: Install OpenCode
         run: |
           npm install -g opencode@latest
-          opencode --version
+          echo "OpenCode version: $(opencode --version)"
 
       # -------------------------------------------------------
-      # Step 5: Parse task from comment
+      # Step 6: Parse task from comment
       # -------------------------------------------------------
       - name: Parse task from comment
         id: parse
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
-          ISSUE_NUMBER: ${{ github.event.issue.number }}
-          PR_NUMBER: ${{ github.event.issue.pull_request.number }}
         run: |
-          # Extract the comment body
           BODY="${{ github.event.comment.body }}"
 
           # Remove the trigger prefix (/opencode or /oc)
           TASK=$(echo "$BODY" | sed 's/^\/opencode\s*//;s/^\/oc\s*//')
 
-          # Determine the target: issue or PR
           TARGET_TYPE="issue"
-          TARGET_NUMBER="${{ github.event.issue.number }}"
-
           if [ -n "${{ github.event.issue.pull_request.url }}" ]; then
             TARGET_TYPE="pr"
-            TARGET_NUMBER="${{ github.event.issue.number }}"
           fi
 
           echo "task<<EOF" >> $GITHUB_OUTPUT
           echo "$TASK" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
           echo "target_type=$TARGET_TYPE" >> $GITHUB_OUTPUT
-          echo "target_number=$TARGET_NUMBER" >> $GITHUB_OUTPUT
+          echo "target_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
 
-          # Also store for later steps
           echo "TASK=$TASK" >> $GITHUB_ENV
-          echo "TARGET_TYPE=$TARGET_TYPE" >> $GITHUB_ENV
-          echo "TARGET_NUMBER=$TARGET_NUMBER" >> $GITHUB_ENV
+          echo "TARGET_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
 
       # -------------------------------------------------------
-      # Step 6: Determine attempt number from labels
+      # Step 7: Determine attempt number from labels
       # -------------------------------------------------------
       - name: Determine attempt number
         id: attempt
         run: |
-          # Get current labels on the issue/PR
           LABELS_JSON=$(gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/labels" \
             --jq '.[].name' 2>/dev/null || echo "")
 
@@ -127,8 +139,6 @@ jobs:
             ATTEMPT=2
           fi
 
-          # If attempt >= 3 and we're here, this is a continuation
-          # Check that this was approved
           if [ "$ATTEMPT" -ge 4 ]; then
             echo "::error::Max auto-fix attempts (3) already reached. Needs human review."
             echo "attempt=3" >> $GITHUB_OUTPUT
@@ -140,7 +150,7 @@ jobs:
           echo "Current attempt: $ATTEMPT"
 
       # -------------------------------------------------------
-      # Step 7: Create feature branch
+      # Step 8: Create feature branch (never master)
       # -------------------------------------------------------
       - name: Create feature branch
         id: branch
@@ -155,43 +165,51 @@ jobs:
           echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_ENV
 
       # -------------------------------------------------------
-      # Step 8: Run OpenCode
+      # Step 9: Run OpenCode with OpenCode Go
       # -------------------------------------------------------
       - name: Run OpenCode
         id: opencode
         env:
           OPENCODE_SERVER_USERNAME: ""
           OPENCODE_SERVER_PASSWORD: ""
+        shell: bash
         run: |
           TASK_CONTENT="${{ steps.parse.outputs.task }}"
 
-          # Build the full task prompt with all requirements
           FULL_PROMPT=$(cat <<-PROMPT_END
           ## Task (Attempt ${{ steps.attempt.outputs.value }})
 
           $TASK_CONTENT
 
           ## Model Requirement
-          You MUST use the model: deepseek-v4-flash (DeepSeek Flash).
-          Do NOT fall back to any other model. If deepseek-v4-flash is unavailable, fail immediately.
+          You MUST use the model: opencode-go/deepseek-v4-flash (OpenCode Go plan).
+          NEVER use deepseek API directly, deepseek/deepseek-v4-flash, or any other model.
+          If opencode-go/deepseek-v4-flash is unavailable, fail immediately.
 
-          ## Superpowers / Skills Requirement
+          ## Skills / Superpowers Requirement
           Before starting work, use the OpenCode skill tool to discover available skills.
-          Select the most appropriate skill(s) for this task based on the task type.
+          Select the most appropriate skill(s) for this task.
           After completing the work, report which skill(s) you actually used.
           If no skill was appropriate, explain why.
+          If the skill tool is unavailable or finds no skills, state that explicitly.
 
           ## Branch
           You are on branch: ${{ steps.branch.outputs.name }}
-          Make all changes on this branch. Do NOT push to master.
+          Make ALL changes on this branch. Do NOT touch master.
 
-          ## Task Output Format
+          ## Safety
+          - Do NOT modify: .github/workflows/, opencode.json, docs/codex-opencode-loop.md, AGENTS.md
+          - Do NOT modify business code (PHP, Vue, JS, CSS, database migrations) unless the task requires it
+          - NEVER push to master
+          - NEVER auto-merge
+
+          ## Report Format
           After completing the work, output a structured report inside <open-code-report> tags:
 
           <open-code-report>
           [attempt: ${{ steps.attempt.outputs.value }}]
-          [model: deepseek-v4-flash]
-          [skills: <list what you used>]
+          [model: opencode-go/deepseek-v4-flash]
+          [skills: <list what you used, or "none" with reason>]
           [modified_files: <list files changed>]
           [changes: <summary of changes>]
           [tests_run: <list tests executed>]
@@ -200,68 +218,60 @@ jobs:
           [next_step: <suggestion>]
           </open-code-report>
 
-          Also append a machine-readable marker at the very end:
+          Append a machine-readable marker at the very end:
           <!-- opencode-loop: attempt=${{ steps.attempt.outputs.value }} status=running -->
           PROMPT_END
 
-          echo "Running OpenCode with deepseek-v4-flash..."
+          echo "Running OpenCode with opencode-go/deepseek-v4-flash..."
 
-          # Run opencode with the provider configured in the project's opencode.json
-          # Use pipefail so that opencode failure is not masked by tee
           set -o pipefail
           opencode run "$FULL_PROMPT" \
-            --model deepseek-v4-flash \
+            --model opencode-go/deepseek-v4-flash \
             --dangerously-skip-permissions \
             --print-logs 2>&1 | tee opencode_output.txt
 
-          # Check if the model was actually used
-          if grep -qi "model.*not found\|model.*unavailable\|failed to load model\|fallback" opencode_output.txt 2>/dev/null; then
-            echo "::error::deepseek-v4-flash was unavailable or a fallback was attempted!"
+          # Verify the correct model was used (reject fallback)
+          if grep -q "model not found\|model.*unavailable\|fallback\|deepseek API\|deepseek/deepseek" opencode_output.txt 2>/dev/null; then
+            echo "::error::Wrong model or fallback detected! Only opencode-go/deepseek-v4-flash is allowed."
             echo "model_ok=false" >> $GITHUB_OUTPUT
             exit 1
           fi
           echo "model_ok=true" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------------
-      # Step 9: Create PR (if changes exist)
+      # Step 10: Create PR (never auto-merge)
       # -------------------------------------------------------
       - name: Create Pull Request
         id: pr
         run: |
           cd "${{ github.workspace }}"
 
-          # Check if there are changes
           if git diff --quiet HEAD~1 -- . 2>/dev/null || git diff --stat --exit-code 2>/dev/null; then
-            echo "No changes detected."
+            echo "No changes detected. Skipping PR creation."
             echo "created=false" >> $GITHUB_OUTPUT
           else
-            # Stage and commit changes
             git add -A
-            TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S")
             git commit -m "fix: auto-fix attempt ${{ steps.attempt.outputs.value }} [skip ci]
 
             Auto-generated by OpenCode Executor (attempt ${{ steps.attempt.outputs.value }}).
-            Triggered by ${{ github.event.comment.html_url }}
-
-            OpenCode model: deepseek-v4-flash
+            Model: opencode-go/deepseek-v4-flash
+            Trigger: ${{ github.event.comment.html_url }}
             "
 
-            # Push to the feature branch
             git push origin "${{ steps.branch.outputs.name }}"
 
-            # Create PR
             PR_URL=$(gh pr create \
               --base master \
               --head "${{ steps.branch.outputs.name }}" \
               --title "Auto-fix: attempt ${{ steps.attempt.outputs.value }}" \
-              --body "Auto-fix attempt ${{ steps.attempt.outputs.value }} by OpenCode.
+              --body "Auto-fix attempt ${{ steps.attempt.outputs.value }} by OpenCode (OpenCode Go).
 
             Trigger: ${{ github.event.comment.html_url }}
 
-            ⚠️ This PR was auto-generated. It must NOT be auto-merged.
+            ## NOT auto-merge
+            This PR is auto-generated and must be reviewed manually. Do NOT auto-merge.
             " \
-              --label "auto-fix" \
-              --reviewer "${{ github.repository_owner }}")
+              --label "auto-fix")
 
             echo "created=true" >> $GITHUB_OUTPUT
             echo "url=$PR_URL" >> $GITHUB_OUTPUT
@@ -269,17 +279,15 @@ jobs:
           fi
 
       # -------------------------------------------------------
-      # Step 10: Run tests on PR
+      # Step 11: Run tests on PR
       # -------------------------------------------------------
       - name: Run tests
         id: tests
         continue-on-error: true
         run: |
-          # For this Laravel project, run the project's tests
           TESTS_PASSED=true
 
-          # Check if PHP is available (Laravel project)
-          if command -v php &> /dev/null; then
+          if command -v php &> /dev/null && [ -f "artisan" ]; then
             composer install --no-interaction --prefer-dist --quiet 2>/dev/null || true
 
             echo "Running ReviewFsrsTest..."
@@ -291,8 +299,7 @@ jobs:
             echo "Running WordSense tests..."
             php artisan test --filter=WordSense --quiet 2>&1 || TESTS_PASSED=false
           else
-            echo "PHP not available in runner, using generic test detection"
-            TESTS_PASSED=true
+            echo "PHP/artisan not available in runner. Tests skipped."
           fi
 
           if [ "$TESTS_PASSED" = "true" ]; then
@@ -302,20 +309,18 @@ jobs:
           fi
 
       # -------------------------------------------------------
-      # Step 11: Report results as comment
+      # Step 12: Post result comment
       # -------------------------------------------------------
       - name: Post result comment
         id: report
-        env:
-          ATTEMPT: ${{ steps.attempt.outputs.value }}
-          PR_CREATED: ${{ steps.pr.outputs.created }}
-          PR_URL: ${{ steps.pr.outputs.url }}
-          TESTS_PASSED: ${{ steps.tests.outputs.passed }}
         run: |
-          # Read OpenCode output for the structured report
+          ATTEMPT="${{ steps.attempt.outputs.value }}"
+          PR_CREATED="${{ steps.pr.outputs.created }}"
+          PR_URL="${{ steps.pr.outputs.url }}"
+          TESTS_PASSED="${{ steps.tests.outputs.passed }}"
+
           REPORT=""
           if [ -f opencode_output.txt ]; then
-            # Extract report from opencode output (between <open-code-report> tags)
             REPORT=$(sed -n '/<open-code-report>/,/<\/open-code-report>/p' opencode_output.txt 2>/dev/null)
           fi
 
@@ -323,20 +328,27 @@ jobs:
             REPORT="[No structured report was generated by OpenCode]"
           fi
 
-          STATUS=""
+          STATUS="failed"
           if [ "$TESTS_PASSED" = "true" ]; then
             STATUS="passed"
-          else
-            STATUS="failed"
           fi
 
-          # Build summary
-          SUMMARY="## 🤖 OpenCode Execution Report (Attempt $ATTEMPT)
+          # Verify report contains skills field
+          SKILLS_MENTIONED=""
+          if echo "$REPORT" | grep -qi '\[skills:'; then
+            SKILLS_MENTIONED="yes"
+          else
+            SKILLS_MENTIONED="no"
+            echo "::warning::OpenCode report did not include [skills:] field. Superpowers usage not confirmed."
+          fi
 
-          **Model:** deepseek-v4-flash
+          SUMMARY="## OpenCode Execution Report (Attempt $ATTEMPT)
+
+          **Model:** opencode-go/deepseek-v4-flash (OpenCode Go)
           **Tests passed:** $TESTS_PASSED
           **PR created:** $PR_CREATED
           **PR URL:** $PR_URL
+          **Skills reported:** $SKILLS_MENTIONED
 
           ### Execution Details
 
@@ -346,7 +358,6 @@ jobs:
 
           <!-- opencode-loop: attempt=$ATTEMPT status=$STATUS -->"
 
-          # Post to issue/PR
           gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
             --method POST \
             --field "body=$SUMMARY"
@@ -354,14 +365,14 @@ jobs:
           echo "status=$STATUS" >> $GITHUB_OUTPUT
 
       # -------------------------------------------------------
-      # Step 12: Update labels
+      # Step 13: Update labels
       # -------------------------------------------------------
       - name: Update labels
         run: |
           ATTEMPT="${{ steps.attempt.outputs.value }}"
           STATUS="${{ steps.report.outputs.status }}"
 
-          # Remove previous attempt labels
+          # Remove previous attempt labels (1-3)
           for i in 1 2 3; do
             gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/labels/auto-fix/attempt-$i" \
               --method DELETE --silent 2>/dev/null || true
@@ -375,7 +386,6 @@ jobs:
               --silent 2>/dev/null || true
           fi
 
-          # If tests passed, add passed label
           if [ "$STATUS" = "passed" ]; then
             gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/labels" \
               --method POST \
@@ -384,7 +394,7 @@ jobs:
           fi
 
       # -------------------------------------------------------
-      # Step 13: Trigger auto-fix scheduler if tests failed
+      # Step 14: Trigger auto-fix scheduler if tests failed
       # -------------------------------------------------------
       - name: Trigger auto-fix scheduler on failure
         if: steps.report.outputs.status == 'failed'
@@ -393,40 +403,27 @@ jobs:
 
           if [ "$ATTEMPT" -lt 3 ]; then
             echo "Tests failed on attempt $ATTEMPT. Firing auto-fix-scheduler for attempt $((ATTEMPT + 1))."
-            # Dispatch the scheduler workflow
             gh workflow run auto-fix-scheduler.yml \
               --ref master \
               --field issue_number=${{ github.event.issue.number }} \
               --field repository=${{ github.repository }} \
               --field attempt=$ATTEMPT
           else
-            echo "Tests failed on attempt $ATTEMPT (maximum). Adding needs-human-review label."
+            echo "Tests failed on attempt $ATTEMPT (max). Adding needs-human-review label."
             gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/labels" \
               --method POST \
               --field "labels[]=needs-human-review" \
               --silent 2>/dev/null || true
 
-            # Post a summary for human review
             gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
               --method POST \
-              --field "body=## ⛔ Auto-fix stopped after $ATTEMPT attempts
+              --field "body=## Auto-fix stopped after $ATTEMPT attempts
 
-            OpenCode has attempted to fix this issue $ATTEMPT times without success.
+            OpenCode attempted to fix this $ATTEMPT times without success.
 
-            - **Attempts made:** $ATTEMPT
-            - **Label:** needs-human-review has been added
-            - **What to do:** Review the execution reports above, examine the changes, and determine next steps.
+            - **Attempts:** $ATTEMPT (max)
+            - **Label:** needs-human-review added
+            - **Next:** Review the reports above, examine the changes, and fix manually.
 
-            If you want to continue auto-fixing, comment \`继续自动修复\` to reset and start a new cycle."
+            To restart the auto-fix cycle, remove \`needs-human-review\` label and comment \`继续自动修复\` or \`/opencode continue\`."
           fi
-
-      # -------------------------------------------------------
-      # Step 14: Final status output
-      # -------------------------------------------------------
-      - name: Final status
-        run: |
-          echo "========================================"
-          echo "OpenCode Executor finished"
-          echo "Attempt: ${{ steps.attempt.outputs.value }}"
-          echo "Tests: ${{ steps.report.outputs.status }}"
-          echo "========================================"
