@@ -708,6 +708,69 @@
                         type="error"
                         class="mt-3"
                     >{{ aiFinalCandidatesError }}</v-alert>
+
+                    <!-- V5: 生成学习卡结果展示（窄屏 parity，与 VocabularySideBox.vue 行为一致） -->
+                    <div v-if="aiGenerateCardsResult" class="mt-4 pa-3 rounded" style="border: 1px solid var(--v-success-base);">
+                        <div class="d-flex align-center mb-2">
+                            <v-icon x-small color="success" class="mr-1">mdi-check-circle</v-icon>
+                            <span class="text-subtitle-2 font-weight-medium">生成学习卡结果</span>
+                        </div>
+                        <v-alert
+                            :type="aiGenerateCardsResult.success ? 'success' : 'error'"
+                            dense
+                            text
+                            class="mb-2"
+                        >{{ aiGenerateCardsResult.message }}</v-alert>
+                        <div v-if="aiGenerateCardsResult.results" class="mb-2">
+                            <div class="text-caption mb-1">
+                                <v-chip x-small color="success" class="mr-2">创建 {{ aiGenerateCardsResult.results.summary.created_count }}</v-chip>
+                                <v-chip x-small color="warning" class="mr-2">跳过 {{ aiGenerateCardsResult.results.summary.skipped_count }}</v-chip>
+                                <v-chip x-small color="info" class="mr-2">重复 {{ aiGenerateCardsResult.results.summary.duplicate_count }}</v-chip>
+                                <v-chip x-small color="error" class="mr-2">失败 {{ aiGenerateCardsResult.results.summary.failed_count }}</v-chip>
+                            </div>
+                            <div v-if="aiGenerateCardsResult.results.created && aiGenerateCardsResult.results.created.length" class="mt-2">
+                                <div class="text-caption font-weight-bold mb-1">新建学习卡：</div>
+                                <div v-for="(item, idx) in aiGenerateCardsResult.results.created" :key="'created-' + idx" class="text-caption ml-2">
+                                    <v-icon x-small color="success" class="mr-1">mdi-card-plus-outline</v-icon>
+                                    {{ item.word }} → 释义 #{{ item.sense_id }} / 复习卡 #{{ item.review_card_id }}
+                                    <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
+                                </div>
+                            </div>
+                            <div v-if="aiGenerateCardsResult.results.skipped && aiGenerateCardsResult.results.skipped.length" class="mt-2">
+                                <div class="text-caption font-weight-bold mb-1">跳过项：</div>
+                                <div v-for="(item, idx) in aiGenerateCardsResult.results.skipped" :key="'skipped-' + idx" class="text-caption ml-2">
+                                    <v-icon x-small color="warning" class="mr-1">mdi-skip-next</v-icon>
+                                    {{ item.word || '(空)' }} — {{ item.reason }}
+                                </div>
+                            </div>
+                            <div v-if="aiGenerateCardsResult.results.duplicate && aiGenerateCardsResult.results.duplicate.length" class="mt-2">
+                                <div class="text-caption font-weight-bold mb-1">重复项（已存在，未重复创建）：</div>
+                                <div v-for="(item, idx) in aiGenerateCardsResult.results.duplicate" :key="'dup-' + idx" class="text-caption ml-2">
+                                    <v-icon x-small color="info" class="mr-1">mdi-content-duplicate</v-icon>
+                                    {{ item.word }} → 释义 #{{ item.sense_id }}
+                                    <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
+                                </div>
+                            </div>
+                            <div v-if="aiGenerateCardsResult.results.failed && aiGenerateCardsResult.results.failed.length" class="mt-2">
+                                <div class="text-caption font-weight-bold mb-1">失败项：</div>
+                                <div v-for="(item, idx) in aiGenerateCardsResult.results.failed" :key="'failed-' + idx" class="text-caption ml-2">
+                                    <v-icon x-small color="error" class="mr-1">mdi-alert-circle</v-icon>
+                                    {{ item.word || '(空)' }} — {{ item.reason }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="d-flex align-center mt-3">
+                            <v-btn small color="primary" @click="goToSenseReviews">
+                                <v-icon x-small class="mr-1">mdi-school</v-icon>
+                                进入 /reviews/senses 复习
+                            </v-btn>
+                            <v-spacer />
+                            <v-btn small text @click="aiGenerateCardsResult = null">关闭结果</v-btn>
+                        </div>
+                        <v-alert type="info" dense text class="mt-2 mb-0">
+                            这不是 AI 自动调用，是你粘贴 AI 返回内容后的人工确认生成。
+                        </v-alert>
+                    </div>
                 </v-card-text>
                 <v-card-actions class="d-flex pa-3">
                     <v-btn text @click="aiStudyCardPreviewDialog = false">关闭</v-btn>
@@ -731,7 +794,94 @@
                         <v-icon small class="mr-1">mdi-check-decagram</v-icon>
                         生成最终候选包
                     </v-btn>
+                    <!-- V5: 生成学习卡按钮（窄屏 parity） -->
+                    <v-btn
+                        color="error"
+                        :disabled="!aiFinalCandidatesPackage || aiGenerateCardsLoading"
+                        :loading="aiGenerateCardsLoading"
+                        @click="openGenerateCardsDialog"
+                        class="ml-2"
+                    >
+                        <v-icon small class="mr-1">mdi-cards-outline</v-icon>
+                        生成学习卡
+                    </v-btn>
                 </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- V5: 确认生成学习卡对话框（窄屏 parity，与 VocabularySideBox.vue 行为一致） -->
+        <v-dialog v-model="aiGenerateCardsDialog" max-width="800" eager>
+            <v-card>
+                <v-card-title class="text-h6">
+                    <v-icon small class="mr-2">mdi-cards-outline</v-icon>
+                    确认生成学习卡
+                </v-card-title>
+                <v-card-text>
+                    <v-alert type="info" dense text class="mb-3">
+                        这不是 AI 自动调用，是你粘贴 AI 返回内容后的人工确认生成。每个候选项需要填写中文释义（必填），未填写的项会被跳过。英文解释可留空，后续再补。
+                    </v-alert>
+                    <div v-if="aiGenerateCardsItems.length === 0" class="text-center pa-4 text--secondary">
+                        没有可确认的候选项。
+                    </div>
+                    <div v-for="(item, idx) in aiGenerateCardsItems" :key="'gen-' + idx" class="mb-3 pa-2 rounded" style="border: 1px solid var(--v-gray2-base);">
+                        <div class="d-flex align-center mb-1">
+                            <v-chip
+                                x-small
+                                :color="item.source === 'user_selected' ? 'primary' : 'info'"
+                                class="mr-2"
+                            >{{ item.source === 'user_selected' ? '已选词' : 'AI 推荐' }}</v-chip>
+                            <span class="font-weight-medium">{{ item.word }}</span>
+                            <span v-if="item.lemma && item.lemma !== item.word" class="ml-1 text--secondary text-caption">({{ item.lemma }})</span>
+                        </div>
+                        <div v-if="item.reason" class="text-caption mb-1 pa-1 rounded" style="background: var(--v-gray2-base); color: var(--v-secondary-base);">
+                            <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
+                            推荐理由（参考说明，不是释义）：{{ item.reason }}
+                        </div>
+                        <v-text-field
+                            v-model="item.sense_zh"
+                            label="中文释义（必填）"
+                            dense
+                            filled
+                            rounded
+                            hide-details
+                            class="mt-1"
+                            placeholder="填写中文释义，留空将跳过此项。推荐理由不是释义，请填写中文释义。"
+                        />
+                        <v-text-field
+                            v-model="item.sense_en"
+                            label="英文解释（可选，可留空）"
+                            dense
+                            filled
+                            rounded
+                            hide-details
+                            class="mt-2"
+                            placeholder="可留空，后续再补"
+                        />
+                        <div v-if="item.sentence_text" class="text-caption mt-1 text--secondary">
+                            <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>{{ item.sentence_text }}
+                        </div>
+                    </div>
+                </v-card-text>
+                <v-card-actions class="pa-3">
+                    <v-btn text @click="aiGenerateCardsDialog = false">取消</v-btn>
+                    <v-spacer />
+                    <span class="text-caption mr-2">
+                        共 {{ aiGenerateCardsItems.length }} 项，
+                        已填 {{ aiGenerateCardsItems.filter(i => i.sense_zh && i.sense_zh.trim()).length }} 项
+                    </span>
+                    <v-btn
+                        color="error"
+                        :loading="aiGenerateCardsLoading"
+                        :disabled="aiGenerateCardsItems.length === 0"
+                        @click="confirmGenerateCards"
+                    >
+                        <v-icon small class="mr-1">mdi-check</v-icon>
+                        确认生成学习卡
+                    </v-btn>
+                </v-card-actions>
+                <v-alert v-if="aiGenerateCardsError" type="error" dense text class="mx-3 mb-3">
+                    {{ aiGenerateCardsError }}
+                </v-alert>
             </v-card>
         </v-dialog>
     </v-card>
@@ -836,6 +986,12 @@
                 aiFinalCandidatesError: '',
                 aiFinalCopyMessage: '',
                 aiFinalCopied: false,
+                // V5: 生成学习卡确认对话框 + 结果展示
+                aiGenerateCardsDialog: false,
+                aiGenerateCardsItems: [],
+                aiGenerateCardsLoading: false,
+                aiGenerateCardsError: '',
+                aiGenerateCardsResult: null,
             };
         },
         watch: {
@@ -1319,6 +1475,114 @@
                 }).finally(() => {
                     this.aiFinalCandidatesLoading = false;
                 });
+            },
+            // V5: 打开"生成学习卡"确认对话框
+            // 从 V4 最终候选包中提取候选项，让用户为每项输入/确认中文释义
+            // 与 VocabularySideBox.vue 中同名方法保持行为一致（窄屏 parity）
+            openGenerateCardsDialog() {
+                if (!this.aiFinalCandidatesPackage) {
+                    return;
+                }
+
+                const items = [];
+                const pkg = this.aiFinalCandidatesPackage;
+
+                // user_selected items（来自 V4 候选包的 user_selected_items）
+                if (Array.isArray(pkg.user_selected_items)) {
+                    for (const item of pkg.user_selected_items) {
+                        items.push({
+                            source: 'user_selected',
+                            item_id: item.item_id || null,
+                            word: item.word || '',
+                            lemma: item.lemma || item.word || '',
+                            surface: item.surface || item.word || '',
+                            chapter_id: item.chapter_id || null,
+                            text_block_index: item.text_block_index ?? null,
+                            sentence_index: item.sentence_index ?? null,
+                            sentence_id: null, // V4 候选包未携带 sentence_id
+                            sentence_text: item.sentence_text || '',
+                            sense_zh: '', // 用户需要输入
+                            sense_en: '',
+                            pos: '',
+                            aliases_zh: [],
+                            collocations: [],
+                        });
+                    }
+                }
+
+                // ai_recommended_selected items（来自 V4 候选包的 ai_recommended_selected_items）
+                if (Array.isArray(pkg.ai_recommended_selected_items)) {
+                    for (const item of pkg.ai_recommended_selected_items) {
+                        items.push({
+                            source: 'ai_recommended',
+                            item_id: null,
+                            word: item.word || '',
+                            lemma: item.lemma || item.word || '',
+                            surface: item.surface || item.word || '',
+                            chapter_id: null, // AI 推荐词没有 chapter_id
+                            text_block_index: null,
+                            sentence_index: null,
+                            sentence_id: null,
+                            sentence_text: item.sentence_text || '',
+                            // V5 hardening: reason 只是推荐理由，不自动填入 sense_zh。
+                            // 用户必须手动填写中文释义，避免把"推荐理由"误当释义保存。
+                            reason: item.reason || '', // 仅作为参考说明展示
+                            sense_zh: '', // 用户需要输入
+                            sense_en: '', // 允许为空，后续再补
+                            pos: '',
+                            aliases_zh: [],
+                            collocations: [],
+                        });
+                    }
+                }
+
+                this.aiGenerateCardsItems = items;
+                this.aiGenerateCardsResult = null;
+                this.aiGenerateCardsError = '';
+                this.aiGenerateCardsDialog = true;
+            },
+            // V5: 确认生成学习卡
+            // 前端预过滤空释义项，后端也会严格校验
+            confirmGenerateCards() {
+                if (this.aiGenerateCardsItems.length === 0) {
+                    return;
+                }
+
+                this.aiGenerateCardsLoading = true;
+                this.aiGenerateCardsError = '';
+
+                // 前端预过滤：只发送 sense_zh 非空的项
+                const confirmedItems = this.aiGenerateCardsItems.filter(item => item.sense_zh && item.sense_zh.trim() !== '');
+
+                if (confirmedItems.length === 0) {
+                    this.aiGenerateCardsError = '请至少为一个候选项填写中文释义。';
+                    this.aiGenerateCardsLoading = false;
+                    return;
+                }
+
+                axios.post('/ai-study-card/generate-cards', {
+                    final_candidates_package: this.aiFinalCandidatesPackage,
+                    confirmed_items: confirmedItems,
+                }).then((response) => {
+                    if (response.data && response.data.success) {
+                        this.aiGenerateCardsResult = response.data;
+                        this.aiGenerateCardsDialog = false;
+                    } else {
+                        this.aiGenerateCardsError = response.data && response.data.message
+                            ? response.data.message
+                            : '生成学习卡失败。';
+                    }
+                }).catch((error) => {
+                    this.aiGenerateCardsError = error.response && error.response.data && error.response.data.message
+                        ? error.response.data.message
+                        : '生成学习卡失败。';
+                }).finally(() => {
+                    this.aiGenerateCardsLoading = false;
+                });
+            },
+            // V5: 跳转到 /reviews/senses 复习主线
+            goToSenseReviews() {
+                window.location.href = '/reviews/senses';
             },
             // V4: 复制最终候选包
             copyFinalCandidatesPackage() {
