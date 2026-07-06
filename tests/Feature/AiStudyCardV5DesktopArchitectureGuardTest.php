@@ -96,13 +96,20 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
 
     /**
      * 4. VocabularySideBox must reference the workflow feature island, which
-     *    in turn references the shared dialog + result components.
+     *    in turn references the shared dialog (directly) + result (via PreviewDialog).
      *
      *    After Round 2 (GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2),
      *    VocabularySideBox.vue no longer imports AiStudyCardGenerateCardsDialog
      *    or AiStudyCardGenerateCardsResult directly. It renders
      *    <AiStudyCardDesktopWorkflow />, which is the only place that imports
      *    those shared V5 components.
+     *
+     *    After Round 4 (GM52-AIStudyCardDesktopWorkflowDeepModuleSplit-1000-4),
+     *    the workflow still directly imports + renders AiStudyCardGenerateCardsDialog
+     *    (V5 confirm dialog). AiStudyCardGenerateCardsResult is now imported +
+     *    rendered by AiStudyCardPreviewDialog (a presentational sub-component of
+     *    the workflow). The contract is locked at the workflow-surface boundary:
+     *    the Result component must still be reachable from the workflow surface.
      */
     public function test_side_box_references_shared_components(): void
     {
@@ -111,17 +118,27 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
         $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $contents, 'VocabularySideBox must render <AiStudyCardDesktopWorkflow> in template.');
         $this->assertStringContainsString('AiStudyCardDesktopWorkflow,', $contents, 'VocabularySideBox must register AiStudyCardDesktopWorkflow in components.');
 
-        // The shared dialog/result are now imported only by the workflow component.
+        // The shared dialog is still imported + rendered directly by the workflow.
         $workflowContents = file_get_contents($this->workflowPath);
         $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsDialog.');
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsResult.');
         $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsDialog>.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsResult>.');
+
+        // The shared result is now imported + rendered by AiStudyCardPreviewDialog
+        // (a presentational sub-component of the workflow surface).
+        $previewDialogPath = resource_path('js/components/Text/AiStudyCardPreviewDialog.vue');
+        $this->assertFileExists($previewDialogPath, 'AiStudyCardPreviewDialog.vue must exist as the V3-V5 preview sub-component.');
+        $previewContents = file_get_contents($previewDialogPath);
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $previewContents, 'AiStudyCardPreviewDialog must import AiStudyCardGenerateCardsResult.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $previewContents, 'AiStudyCardPreviewDialog must render <AiStudyCardGenerateCardsResult>.');
+
+        // The workflow must render <AiStudyCardPreviewDialog> and pass the result payload to it.
+        $this->assertStringContainsString('<AiStudyCardPreviewDialog', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardPreviewDialog>.');
+        $this->assertStringContainsString(':ai-generate-cards-result="aiGenerateCardsResult"', $workflowContents, 'AiStudyCardDesktopWorkflow must pass aiGenerateCardsResult to AiStudyCardPreviewDialog.');
     }
 
     /**
      * 5. VocabularyBox must reference the workflow feature island, which in
-     *    turn references the shared dialog + result components.
+     *    turn references the shared dialog (directly) + result (via PreviewDialog).
      */
     public function test_vocabulary_box_references_shared_components(): void
     {
@@ -130,10 +147,14 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
         $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $contents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> in template.');
         $this->assertStringContainsString('AiStudyCardDesktopWorkflow,', $contents, 'VocabularyBox must register AiStudyCardDesktopWorkflow in components.');
 
-        // The shared dialog/result registration lives in the workflow component (single source of truth).
+        // The shared dialog registration lives in the workflow component.
         $workflowContents = file_get_contents($this->workflowPath);
         $this->assertStringContainsString('AiStudyCardGenerateCardsDialog,', $workflowContents, 'AiStudyCardDesktopWorkflow must register AiStudyCardGenerateCardsDialog in components.');
-        $this->assertStringContainsString('AiStudyCardGenerateCardsResult,', $workflowContents, 'AiStudyCardDesktopWorkflow must register AiStudyCardGenerateCardsResult in components.');
+
+        // The shared result registration lives in AiStudyCardPreviewDialog (workflow sub-component).
+        $previewDialogPath = resource_path('js/components/Text/AiStudyCardPreviewDialog.vue');
+        $previewContents = file_get_contents($previewDialogPath);
+        $this->assertStringContainsString('AiStudyCardGenerateCardsResult,', $previewContents, 'AiStudyCardPreviewDialog must register AiStudyCardGenerateCardsResult in components.');
     }
 
     /**

@@ -123,18 +123,36 @@ class VocabularyBoxV5UiGuardTest extends TestCase
 
     /**
      * 3. VocabularyBox must reference the AiStudyCardDesktopWorkflow feature island,
-     *    which in turn references the shared AiStudyCardGenerateCardsResult.
+     *    which in turn references the shared AiStudyCardGenerateCardsResult (via
+     *    AiStudyCardPreviewDialog after Round 4 deep module split).
+     *
+     *    After Round 4 (GM52-AIStudyCardDesktopWorkflowDeepModuleSplit-1000-4),
+     *    AiStudyCardGenerateCardsResult is imported + rendered by
+     *    AiStudyCardPreviewDialog (a presentational sub-component of the workflow).
+     *    The workflow passes aiGenerateCardsResult down to PreviewDialog, which
+     *    in turn binds it to the Result component. The contract is locked at the
+     *    workflow-surface boundary.
      */
     public function test_vocabulary_box_references_shared_result_component(): void
     {
         $boxContents = file_get_contents($this->vocabularyBoxPath);
         $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $boxContents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> in template.');
 
+        // The workflow must render <AiStudyCardPreviewDialog> and pass the result
+        // payload + go-to-sense-reviews handler down to it.
         $workflowContents = file_get_contents($this->workflowPath);
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsResult.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsResult> in template.');
-        $this->assertStringContainsString(':result="aiGenerateCardsResult"', $workflowContents, 'AiStudyCardDesktopWorkflow must bind aiGenerateCardsResult to the shared result component.');
-        $this->assertStringContainsString('@go-to-sense-reviews="goToSenseReviews"', $workflowContents, 'AiStudyCardDesktopWorkflow must wire @go-to-sense-reviews to goToSenseReviews.');
+        $this->assertStringContainsString('<AiStudyCardPreviewDialog', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardPreviewDialog>.');
+        $this->assertStringContainsString(':ai-generate-cards-result="aiGenerateCardsResult"', $workflowContents, 'AiStudyCardDesktopWorkflow must pass aiGenerateCardsResult to AiStudyCardPreviewDialog.');
+        $this->assertStringContainsString('@go-to-sense-reviews="goToSenseReviews"', $workflowContents, 'AiStudyCardDesktopWorkflow must wire @go-to-sense-reviews to goToSenseReviews on AiStudyCardPreviewDialog.');
+
+        // The shared result component is now imported + rendered by AiStudyCardPreviewDialog.
+        $previewDialogPath = resource_path('js/components/Text/AiStudyCardPreviewDialog.vue');
+        $this->assertFileExists($previewDialogPath, 'AiStudyCardPreviewDialog.vue must exist.');
+        $previewContents = file_get_contents($previewDialogPath);
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $previewContents, 'AiStudyCardPreviewDialog must import AiStudyCardGenerateCardsResult.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $previewContents, 'AiStudyCardPreviewDialog must render <AiStudyCardGenerateCardsResult> in template.');
+        $this->assertStringContainsString(':result="aiGenerateCardsResult"', $previewContents, 'AiStudyCardPreviewDialog must bind aiGenerateCardsResult to the shared result component.');
+        $this->assertStringContainsString("@go-to-sense-reviews=\"\$emit('go-to-sense-reviews')\"", $previewContents, 'AiStudyCardPreviewDialog must bubble go-to-sense-reviews event.');
     }
 
     /**

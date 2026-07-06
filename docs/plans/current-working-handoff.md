@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-06 (GM52-AIStudyCardV5-SideBoxMojibakeRegressionFix-1000-3)
+> **最后更新**：2026-07-06 (GM52-AIStudyCardDesktopWorkflowDeepModuleSplit-1000-4)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -317,6 +317,65 @@
 - **合规确认**：未读取/修改 `.env`；未修改 `AGENTS.md`；未处理 `.omo`；未修改 `.opencode`；未使用 `--force`；未 amend/rebase；未清库；未 migration；未改 FSRS；未改 ReviewLog；未实现阅读中评分；未 per-occurrence lemma 落库；未真实调用 AI；未删除 legacy；未大规模 UI 重写；未运行 notification script；未 DCP；未自动进入下一任务。
 - **已知风险**：testing DB `linguacafe_fsrs_test` 在 45 个 `RefreshDatabase` 测试文件共享时存在并行竞争条件，已通过 `tests/bootstrap.php` + `flock` 进程锁治理。详见 `docs/plans/testing-db-health-playbook.md`。
 - Did NOT enter the next task automatically.
+
+## Recent Update: GM52-AIStudyCardDesktopWorkflowDeepModuleSplit-1000-4
+
+- **Round type**: GM5.2 1000% closed-loop round 4 (deep-module split). **本轮同时完成检测 + 编码，不是只检测报告。不新增产品功能。不进入 V6。不实现手机端 / BottomSheet。不自动调用 AI。不改后端业务逻辑。**
+- **起点 commit**：`03eec56 fix: restore vocabulary side box Chinese text`（基于 GitHub master 最新状态继续，未回退、未 force push）。
+- **架构检测事实**（拆分前 `AiStudyCardDesktopWorkflow.vue`）：
+  - 总行数：约 1020 行；
+  - template 行数：约 480 行；
+  - script 行数：约 540 行；
+  - data 字段数量：25 个；
+  - methods 数量：22 个；
+  - 直接 axios / workflow service 调用：3 类（PendingWorkflowService / RecommendationParserService / GenerateCardsService）；
+  - 直接 DOM / clipboard 逻辑：1 处 `document.createElement('textarea')` + `document.execCommand('copy')` fallback；
+  - 同时承担的职责数量：10 类（待 AI 解释入口、pending/dismissed 列表、preview package、AI 推荐词 JSON 粘贴、推荐词解析去重默认不选、final candidates package、V5 生成学习卡确认对话框、生成结果展示、JSON 复制、`/reviews/senses` 跳转）。
+- **拆分决策**：
+  - 已拆：pending/dismissed 列表 → `AiStudyCardPendingListDialog.vue`（183 行）；AI 推荐词面板 → `AiStudyCardRecommendationPanel.vue`（132 行）；package JSON 展示与复制按钮 → `AiStudyCardPackagePanel.vue`（67 行）；V3-V5 预览弹窗（组合以上三者 + Result）→ `AiStudyCardPreviewDialog.vue`（253 行）；clipboard fallback → `AiStudyCardClipboardService.js`（70 行）。
+  - 未拆及原因：V5 生成学习卡对话框 `AiStudyCardGenerateCardsDialog.vue` 保持原样（上一轮 feature island 已收敛，本轮不再拆）；顶层状态与跨子组件事件协调保留在 container（`AiStudyCardDesktopWorkflow.vue`）以保证单一入口、单一 Vuex 接入点；service 层（PendingWorkflowService / RecommendationParserService / GenerateCardsService）保持不变，避免本轮触碰后端契约。
+- **拆分后 container 状态**：`AiStudyCardDesktopWorkflow.vue` 从 1020 行降至 448 行（满足 ≤450 限制，未触发 P2 例外说明）。template 仅保留入口按钮 + 3 个子组件 + 1 个 V5 对话框；script 保留 25 个 data 字段、22 个 methods（满足现有 `AiStudyCardDesktopWorkflowArchitectureGuardTest` 指纹）；`copyJsonToClipboard` 改为委托 `AiStudyCardClipboardService.copyTextToClipboard`。
+- **新增文件**：
+  - `resources/js/services/AiStudyCardClipboardService.js`（70 行，导出 `copyTextToClipboard(text)`，封装 navigator.clipboard + textarea fallback，不访问 Vue/Vuex/后端）；
+  - `resources/js/components/Text/AiStudyCardPendingListDialog.vue`（183 行，props in / events out，不 import axios / Vuex）；
+  - `resources/js/components/Text/AiStudyCardRecommendationPanel.vue`（132 行，props in / events out，不 import axios / Vuex）；
+  - `resources/js/components/Text/AiStudyCardPackagePanel.vue`（67 行，props in / events out，不 import axios / Vuex / clipboard API）；
+  - `resources/js/components/Text/AiStudyCardPreviewDialog.vue`（253 行，组合 RecommendationPanel + PackagePanel + GenerateCardsResult，不 import axios / Vuex）；
+  - `tests/Feature/AiStudyCardDesktopWorkflowDeepModuleGuardTest.php`（27 项 / 221 assertions）。
+- **修改文件**：
+  - `resources/js/components/Text/AiStudyCardDesktopWorkflow.vue`（重构为薄 container，448 行）；
+  - `tests/Feature/AiStudyCardV5DesktopArchitectureGuardTest.php`（适配：workflow 直接 import/render `AiStudyCardGenerateCardsDialog`，`AiStudyCardGenerateCardsResult` 由 `AiStudyCardPreviewDialog` 负责；workflow 渲染 `<AiStudyCardPreviewDialog>` 并传递 `:ai-generate-cards-result`）；
+  - `tests/Feature/VocabularyBoxV5UiGuardTest.php`（同上适配）。
+- **测试结果**（全绿，未把失败写成通过）：
+  - `AiStudyCardDesktopWorkflowDeepModuleGuardTest`: 27 passed (221 assertions)；
+  - `VocabularySideBoxChineseTextIntegrityTest`: 5 passed (42 assertions)；
+  - `AiStudyCardDesktopWorkflowArchitectureGuardTest`: 22 passed (293 assertions)；
+  - `AiStudyCardV5DesktopArchitectureGuardTest`: 17 passed (149 assertions)；
+  - `VocabularyBoxV5UiGuardTest`: 16 passed (135 assertions)；
+  - `AiStudyCardPendingItemTest`: 86 passed (484 assertions)；
+  - `WordSenseTest`: 134 passed (555 assertions)；
+  - `ReviewFsrsTest`: 63 passed (374 assertions)；
+  - `SenseReviewDailyLimitsTest` + `SenseReviewSmokeDataCommandTest`: 19 passed (98 assertions)；
+  - `SenseTokenPayloadTest`: 16 passed (45 assertions)；
+  - `TestingDatabaseHealthConfigTest`: 6 passed (50 assertions)；
+  - `TestingDatabaseHealthTest`: 6 passed (47 assertions)；
+  - 合计 417 tests / 2159 assertions 全绿。
+- **前端构建**：`npm run development` Compiled Successfully in 5209ms。
+- **MCP Chrome 真实页面验收**（GLM 自己执行，未用 API 200 代替）：
+  - 账号：本地管理员测试账号（不写入仓库 / 日志 / 报告）。
+  - 宽屏 1920x900：`/chapters/read/6` → 点击 construed → VocabularySideBox 显示 → 中文文案正常无 mojibake → V1 mark pending → V3 list dialog → V3 preview dialog → V3 preview package → V4 粘贴/解析 AI 推荐词（默认不选）→ V4 勾选 agency → V4 final candidates package → V5 generate cards dialog → V5 填写中文释义（agency="代理机构"）→ V5 确认生成 → "已生成 1 张学习卡" → "进入 /reviews/senses 复习" 跳转成功。Network 全部本地，无外部 AI 请求；Console 无阻塞错误。
+  - 半屏 900x900：`/chapters/read/6` → 点击 construed → VocabularyBox 显示 → 中文文案正常无 mojibake → 完整 V1-V5（construed="半屏解释" + agency="代理机构"）→ "已生成 2 张学习卡"。Network 全部本地，无外部 AI 请求；Console 无阻塞错误。
+  - 未做 390x844 / 430x932 mobile viewport 主流程验收（当前产品无手机端）。
+- **数据库事实**（MCP Chrome 过程中真实生成）：
+  - WordSense 新增：宽屏 1 条（agency lemma）；半屏 2 条（construe / agency lemma）；
+  - ReviewCard 新增：宽屏 #84 target_type=sense；半屏 #85/#86 均 target_type=sense；
+  - ReviewLog：未新增；
+  - legacy word ReviewCard：未新增；
+  - 已有卡 FSRS：未变；
+  - 无 duplicate 路径被误写成 created。
+- **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog；未改 FSRS；未重排已有 ReviewCard；未创建 legacy word ReviewCard；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未回滚 feature island；未重新制造 SideBox / Box 复制；未再次制造中文 mojibake。
+- **commit / push**：`refactor: split AI study card desktop workflow modules`（无 `--force`，未提交 untracked 临时文件）。
+- Did NOT enter the next task automatically. 等待网页端总流程设计师验收。
 
 ## Recent Update: GLM-ReadingInlinePreview-First-1
 
