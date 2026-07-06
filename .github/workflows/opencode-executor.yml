@@ -54,8 +54,16 @@ jobs:
           fi
           echo "OPENCODE_GO_API_KEY configured successfully"
 
-          # Create OpenCode auth file via Python (safe for any key chars)
-          python3 -c "import json,os;key=os.environ.get('_OPENCODE_GO_KEY','');open(os.path.expanduser('~/.local/share/opencode/auth.json'),'w').write(json.dumps({'opencode-go':{'type':'api','key':key}}))"
+          # Create OpenCode auth file for the Go provider
+          python3 << 'PYEOF'
+          import json, os
+          key = os.environ.get('_OPENCODE_GO_KEY', '')
+          d = os.path.expanduser('~/.local/share/opencode')
+          os.makedirs(d, exist_ok=True)
+          with open(os.path.join(d, 'auth.json'), 'w') as f:
+              json.dump({'opencode-go': {'type': 'api', 'key': key}}, f)
+          print('OpenCode Go auth file created')
+          PYEOF
 
       # -------------------------------------------------------
       # Step 2: Validate model config (no accidental DeepSeek references)
