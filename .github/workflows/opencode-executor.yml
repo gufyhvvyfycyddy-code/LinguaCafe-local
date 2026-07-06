@@ -362,25 +362,38 @@ jobs:
             echo "::warning::OpenCode report did not include [skills:] field. Superpowers usage not confirmed."
           fi
 
-          SUMMARY="## OpenCode Execution Report (Attempt $ATTEMPT)
+          # Save the report content (may be empty if OpenCode didn't produce a structured report)
+          echo "$REPORT" > /tmp/opencode_report.txt
 
-          **Model:** opencode-go/deepseek-v4-flash (OpenCode Go)
-          **Tests passed:** $TESTS_PASSED
-          **PR created:** $PR_CREATED
-          **PR URL:** $PR_URL
-          **Skills reported:** $SKILLS_MENTIONED
-
-          ### Execution Details
-
-          $REPORT
-
-          ### Machine-readable marker
-
-          <!-- opencode-loop: attempt=$ATTEMPT status=$STATUS -->"
-
-          gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" \
-            --method POST \
-            --field "body=$SUMMARY"
+          # Build JSON and post comment using Python heredoc (safe for YAML)
+          python3 << 'PYEOF' | gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" --method POST --input -
+          import json, os
+          att = os.environ.get('ATTEMPT', '?')
+          pcr = os.environ.get('PR_CREATED', 'false')
+          purl = os.environ.get('PR_URL', '')
+          tests = os.environ.get('TESTS_PASSED', 'false')
+          skills = os.environ.get('SKILLS_MENTIONED', 'no')
+          report_file = '/tmp/opencode_report.txt'
+          report = open(report_file).read() if os.path.exists(report_file) else '[No report]'
+          lines = [
+              '## OpenCode Execution Report (Attempt ' + att + ')',
+              '',
+              '**Model:** opencode-go/deepseek-v4-flash (OpenCode Go)',
+              '**Tests passed:** ' + tests,
+              '**PR created:** ' + pcr,
+              '**PR URL:** ' + purl,
+              '**Skills reported:** ' + skills,
+              '',
+              '### Execution Details',
+              '',
+              report,
+              '',
+              '### Machine-readable marker',
+              '',
+              '<!-- opencode-loop: attempt=' + att + ' status=' + tests + ' -->',
+          ]
+          print(json.dumps({'body': '\n'.join(lines)}))
+          PYEOF
 
           echo "status=$STATUS" >> $GITHUB_OUTPUT
 
