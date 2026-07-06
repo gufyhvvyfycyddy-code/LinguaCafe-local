@@ -362,10 +362,13 @@ jobs:
             echo "::warning::OpenCode report did not include [skills:] field. Superpowers usage not confirmed."
           fi
 
-          # Save the report content (may be empty if OpenCode didn't produce a structured report)
+          # Save the report content
           echo "$REPORT" > /tmp/opencode_report.txt
 
-          # Build JSON and post comment using Python heredoc (safe for YAML)
+          # Export shell variables so Python can read them
+          export ATTEMPT STATUS TESTS_PASSED PR_CREATED PR_URL SKILLS_MENTIONED
+
+          # Build JSON and post comment using Python heredoc
           python3 << 'PYEOF' | gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/comments" --method POST --input -
           import json, os
           att = os.environ.get('ATTEMPT', '?')
@@ -373,6 +376,7 @@ jobs:
           purl = os.environ.get('PR_URL', '')
           tests = os.environ.get('TESTS_PASSED', 'false')
           skills = os.environ.get('SKILLS_MENTIONED', 'no')
+          status_val = os.environ.get('STATUS', 'failed')
           report_file = '/tmp/opencode_report.txt'
           report = open(report_file).read() if os.path.exists(report_file) else '[No report]'
           lines = [
@@ -390,7 +394,7 @@ jobs:
               '',
               '### Machine-readable marker',
               '',
-              '<!-- opencode-loop: attempt=' + att + ' status=' + tests + ' -->',
+              '<!-- opencode-loop: attempt=' + att + ' status=' + status_val + ' -->',
           ]
           print(json.dumps({'body': '\n'.join(lines)}))
           PYEOF
