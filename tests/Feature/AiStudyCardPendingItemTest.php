@@ -1658,7 +1658,565 @@ class AiStudyCardPendingItemTest extends TestCase
         $this->assertNotNull($created[0]['review_card_id']);
     }
 
-    private function finalCandidatesPackage(int $itemId, ?int $chapterId): array
+    // ===== V5 hardening tests (16 items) =====
+
+    public function test_v5_hardening_ai_recommended_must_exist_in_final_package(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // final package 中 ai_recommended_selected_items 包含 "agency"
+        $pkg = $this->finalCandidatesPackageWithAi($itemId, $this->chapter->id, [
+            ['word' => 'agency', 'lemma' => 'agency', 'surface' => 'agency', 'reason' => '推荐', 'sentence_text' => 'xxx'],
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => [
+                [
+                    'source' => 'ai_recommended',
+                    'word' => 'agency',
+                    'lemma' => 'agency',
+                    'sense_zh' => '代理；机构',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.created_count', 1);
+        $this->assertDatabaseHas('word_senses', [
+            'user_id' => $this->user->id,
+            'lemma' => 'agency',
+            'sense_zh' => '代理；机构',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+    }
+
+    public function test_v5_hardening_ai_recommended_not_in_final_package_is_skipped(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // final package 中没有 ai_recommended_selected_items
+        $pkg = $this->finalCandidatesPackage($itemId, $this->chapter->id);
+
+        // 前端临时塞入一个不在 final package 里的 ai_recommended 新词
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => [
+                [
+                    'source' => 'ai_recommended',
+                    'word' => 'rogue',
+                    'lemma' => 'rogue',
+                    'sense_zh' => '无赖',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+        $this->assertDatabaseMissing('word_senses', [
+            'user_id' => $this->user->id,
+            'lemma' => 'rogue',
+        ]);
+    }
+
+    public function test_v5_hardening_user_selected_item_id_must_exist_in_final_package(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // final package 中 user_selected_items 的 item_id 是 $itemId
+        $pkg = $this->finalCandidatesPackage($itemId, $this->chapter->id);
+
+        // 前端塞入一个不在 final package 里的 item_id
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => 999999, // 不在 final package 里
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+    }
+
+    public function test_v5_hardening_user_selected_word_lemma_mismatch_with_final_package_skipped(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // final package 中是 landscape，但 confirmed_items 中传 ghost
+        $pkg = $this->finalCandidatesPackage($itemId, $this->chapter->id);
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'ghost', // 与 final package 的 landscape 不匹配
+                    'lemma' => 'ghost',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '幽灵',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+        $this->assertDatabaseMissing('word_senses', [
+            'user_id' => $this->user->id,
+            'lemma' => 'ghost',
+        ]);
+    }
+
+    public function test_v5_hardening_only_sense_zh_with_empty_sense_en_can_create(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                    'sense_en' => '', // 空字符串
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.created_count', 1);
+
+        $sense = WordSense::where('user_id', $this->user->id)->where('lemma', 'landscape')->first();
+        $this->assertNotNull($sense);
+        $this->assertNull($sense->sense_en); // 空字符串被归一化为 null
+    }
+
+    public function test_v5_hardening_only_sense_zh_with_null_sense_en_can_create(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                    // sense_en 不传，应为 null
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.created_count', 1);
+
+        $sense = WordSense::where('user_id', $this->user->id)->where('lemma', 'landscape')->first();
+        $this->assertNotNull($sense);
+        $this->assertNull($sense->sense_en);
+    }
+
+    public function test_v5_hardening_ai_reason_not_saved_as_sense_zh(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $pkg = $this->finalCandidatesPackageWithAi($itemId, $this->chapter->id, [
+            ['word' => 'agency', 'lemma' => 'agency', 'surface' => 'agency', 'reason' => '推荐理由文本', 'sentence_text' => 'xxx'],
+        ]);
+
+        // 用户手动填写 sense_zh="代理"，不应保存 reason
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => [
+                [
+                    'source' => 'ai_recommended',
+                    'word' => 'agency',
+                    'lemma' => 'agency',
+                    'sense_zh' => '代理',
+                    'sense_en' => '',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $sense = WordSense::where('user_id', $this->user->id)->where('lemma', 'agency')->first();
+        $this->assertNotNull($sense);
+        $this->assertSame('代理', $sense->sense_zh);
+        $this->assertNotSame('推荐理由文本', $sense->sense_zh); // reason 没有被当作 sense_zh 保存
+    }
+
+    public function test_v5_hardening_explicit_sentence_id_creates_occurrence(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sentence_id' => 'explicit-sent-123',
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $created = $response->json('results.created');
+        $this->assertCount(1, $created);
+        $this->assertTrue($created[0]['occurrence_created']);
+        $this->assertNotNull($created[0]['occurrence_id']);
+        $this->assertSame('来源已绑定', $created[0]['source_binding_status']);
+
+        $this->assertDatabaseHas('word_sense_occurrences', [
+            'user_id' => $this->user->id,
+            'chapter_id' => $this->chapter->id,
+            'sentence_id' => 'explicit-sent-123',
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+    }
+
+    public function test_v5_hardening_synthetic_sentence_id_creates_occurrence(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 没有 sentence_id，但有 chapter_id + sentence_text + text_block_index + sentence_index
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'text_block_index' => 0,
+                    'sentence_index' => 0,
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $created = $response->json('results.created');
+        $this->assertCount(1, $created);
+        $this->assertTrue($created[0]['occurrence_created']);
+        $this->assertNotNull($created[0]['occurrence_id']);
+        $this->assertSame('来源已绑定（合成 sentence_id）', $created[0]['source_binding_status']);
+
+        // synthetic sentence_id 格式：ai-study-card:{chapter_id}:{tb}:{si}:{word}
+        $this->assertDatabaseHas('word_sense_occurrences', [
+            'user_id' => $this->user->id,
+            'chapter_id' => $this->chapter->id,
+            'sentence_id' => 'ai-study-card:' . $this->chapter->id . ':0:0:landscape',
+            'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+        ]);
+    }
+
+    public function test_v5_hardening_insufficient_source_info_skips_occurrence_but_creates_card(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 没有 sentence_id, 没有 text_block_index, 没有 sentence_index, 但有 sentence_text + chapter_id
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                    // 不传 sentence_id / text_block_index / sentence_index
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $created = $response->json('results.created');
+        $this->assertCount(1, $created);
+        $this->assertFalse($created[0]['occurrence_created']);
+        $this->assertNull($created[0]['occurrence_id']);
+        $this->assertSame('来源信息不足，已创建卡片但未绑定来源', $created[0]['source_binding_status']);
+        $this->assertSame('insufficient_source_info', $created[0]['source_binding_reason']);
+
+        // 卡仍然创建
+        $this->assertDatabaseHas('word_senses', [
+            'user_id' => $this->user->id,
+            'lemma' => 'landscape',
+            'status' => WordSense::STATUS_CONFIRMED,
+        ]);
+        // occurrence 不应被创建
+        $this->assertDatabaseMissing('word_sense_occurrences', [
+            'user_id' => $this->user->id,
+            'lemma' => 'landscape',
+        ]);
+    }
+
+    public function test_v5_hardening_cross_user_chapter_does_not_create_occurrence(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // otherUser 的 chapter
+        $otherChapter = $this->createChapter($this->otherUser, 'english');
+
+        $this->app['session']->flush();
+        $response = $this->actingAs($this->otherUser)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $otherChapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $otherChapter->id, // 不属于 otherUser 的 chapter（这里故意构造，但实际会被跳过）
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        // pending item 不属于 otherUser，chapter 也不属于 otherUser —— 应被跳过
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+
+        $this->assertDatabaseMissing('word_sense_occurrences', [
+            'user_id' => $this->otherUser->id,
+            'chapter_id' => $otherChapter->id,
+        ]);
+    }
+
+    public function test_v5_hardening_cross_language_chapter_does_not_create_occurrence(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $this->user->selected_language = 'spanish';
+        $this->user->save();
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('results.summary.skipped_count', 1);
+        $response->assertJsonPath('results.summary.created_count', 0);
+
+        $this->assertDatabaseMissing('word_sense_occurrences', [
+            'user_id' => $this->user->id,
+            'chapter_id' => $this->chapter->id,
+        ]);
+    }
+
+    public function test_v5_hardening_does_not_write_review_log(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $before = ReviewLog::count();
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sentence_id' => 'sent-1',
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $this->assertSame($before, ReviewLog::count(), 'V5 hardening 不应写入 ReviewLog。');
+    }
+
+    public function test_v5_hardening_does_not_reschedule_existing_fsrs_cards(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 先创建一张已调度的卡
+        $existingCard = ReviewCard::create([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => 99999,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDays(7),
+            'fsrs_stability' => 5.5,
+            'fsrs_difficulty' => 0.3,
+            'fsrs_reps' => 3,
+            'fsrs_lapses' => 1,
+            'fsrs_enabled' => true,
+        ]);
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $existingCard->refresh();
+        $this->assertSame('review', $existingCard->fsrs_state);
+        $this->assertSame(3, $existingCard->fsrs_reps);
+        $this->assertSame(1, $existingCard->fsrs_lapses);
+        $this->assertSame(5.5, $existingCard->fsrs_stability);
+    }
+
+    public function test_v5_hardening_does_not_create_legacy_word_review_card(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $beforeWordCards = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+
+        $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ])->assertOk();
+
+        $afterWordCards = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+        $this->assertSame($beforeWordCards, $afterWordCards, 'V5 hardening 不应创建 legacy word ReviewCard。');
+    }
+
+    public function test_v5_hardening_oversized_batch_still_rejected(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        // 构造 51 个 ai_recommended 项，且都在 final package 中
+        $aiRecommended = [];
+        $confirmedItems = [];
+        for ($i = 0; $i < 51; $i++) {
+            $word = 'word' . $i;
+            $aiRecommended[] = ['word' => $word, 'lemma' => $word, 'surface' => $word, 'reason' => 'r', 'sentence_text' => 's'];
+            $confirmedItems[] = [
+                'source' => 'ai_recommended',
+                'word' => $word,
+                'lemma' => $word,
+                'sense_zh' => '释义' . $i,
+            ];
+        }
+
+        $pkg = $this->finalCandidatesPackageWithAi($itemId, $this->chapter->id, $aiRecommended);
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $pkg,
+            'confirmed_items' => $confirmedItems,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('success', false);
+        $this->assertSame(0, WordSense::where('user_id', $this->user->id)->count());
+    }
+
+    public function test_v5_hardening_result_payload_contains_source_binding_status(): void
+    {
+        $create = $this->actingAs($this->user)->postJson('/ai-study-card/pending-items', $this->payload())->assertOk();
+        $itemId = $create->json('item.id');
+
+        $response = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
+            'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
+            'confirmed_items' => [
+                [
+                    'source' => 'user_selected',
+                    'item_id' => $itemId,
+                    'word' => 'landscape',
+                    'lemma' => 'landscape',
+                    'chapter_id' => $this->chapter->id,
+                    'text_block_index' => 0,
+                    'sentence_index' => 0,
+                    'sentence_text' => 'The intellectual landscape changed quickly.',
+                    'sense_zh' => '风景',
+                ],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'results' => [
+                'created' => [
+                    '*' => ['word', 'lemma', 'sense_id', 'review_card_id', 'occurrence_created', 'occurrence_id', 'source_binding_status', 'source_binding_reason'],
+                ],
+            ],
+        ]);
+
+        $created = $response->json('results.created');
+        $this->assertCount(1, $created);
+        $this->assertArrayHasKey('occurrence_created', $created[0]);
+        $this->assertArrayHasKey('occurrence_id', $created[0]);
+        $this->assertArrayHasKey('source_binding_status', $created[0]);
+        $this->assertArrayHasKey('source_binding_reason', $created[0]);
+    }
+
+    private function finalCandidatesPackage(int $itemId, ?int $chapterId, array $aiRecommendedSelected = []): array
     {
         return [
             'schema_version' => 'ai-study-card-final-candidates-v1',
@@ -1677,12 +2235,20 @@ class AiStudyCardPendingItemTest extends TestCase
                     'source' => 'user_selected',
                 ],
             ],
-            'ai_recommended_selected_items' => [],
+            'ai_recommended_selected_items' => $aiRecommendedSelected,
             'ai_recommended_unselected_items' => [],
             'dedupe_summary' => [],
             'generation_rules' => [],
             'safety_flags' => [],
         ];
+    }
+
+    /**
+     * V5 hardening: 构造包含 ai_recommended_selected_items 的 final candidates package。
+     */
+    private function finalCandidatesPackageWithAi(int $itemId, ?int $chapterId, array $aiRecommendedSelected): array
+    {
+        return $this->finalCandidatesPackage($itemId, $chapterId, $aiRecommendedSelected);
     }
 
     private function payload(array $overrides = []): array

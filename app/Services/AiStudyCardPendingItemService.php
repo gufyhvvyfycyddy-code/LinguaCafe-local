@@ -617,12 +617,30 @@ class AiStudyCardPendingItemService
 
         $language = $user->selected_language;
 
-        // 提取 V4 候选包中的 pending item_id 集合（用于交叉校验 user_selected 项）
+        // ===== V5 hardening: 反向校验 final_candidates_package =====
+        // 提取 V4 候选包中的 user_selected item_id 集合 + ai_recommended 安全 key 集合
         $packageSelectedItemIds = [];
+        $packageAiRecommendedKeys = []; // normalized_lemma|normalized_word => true
+        $packageUserSelectedKeys = [];  // item_id => normalized_lemma|normalized_word
+
         if (isset($finalCandidatesPackage['user_selected_items']) && is_array($finalCandidatesPackage['user_selected_items'])) {
             foreach ($finalCandidatesPackage['user_selected_items'] as $pkgItem) {
                 if (isset($pkgItem['item_id'])) {
-                    $packageSelectedItemIds[] = (int) $pkgItem['item_id'];
+                    $id = (int) $pkgItem['item_id'];
+                    $packageSelectedItemIds[] = $id;
+                    $key = $this->packageDedupeKey($pkgItem['lemma'] ?? null, $pkgItem['word'] ?? null);
+                    if ($key !== '') {
+                        $packageUserSelectedKeys[$id] = $key;
+                    }
+                }
+            }
+        }
+
+        if (isset($finalCandidatesPackage['ai_recommended_selected_items']) && is_array($finalCandidatesPackage['ai_recommended_selected_items'])) {
+            foreach ($finalCandidatesPackage['ai_recommended_selected_items'] as $pkgItem) {
+                $key = $this->packageDedupeKey($pkgItem['lemma'] ?? null, $pkgItem['word'] ?? null);
+                if ($key !== '') {
+                    $packageAiRecommendedKeys[$key] = true;
                 }
             }
         }
@@ -670,42 +688,69 @@ class AiStudyCardPendingItemService
                 $itemId = !empty($confirmedItem['item_id']) ? (int) $confirmedItem['item_id'] : null;
                 $sentenceId = $confirmedItem['sentence_id'] ?? null;
                 $sentenceText = trim((string) ($confirmedItem['sentence_text'] ?? ''));
+                $textBlockIndex = isset($confirmedItem['text_block_index']) && $confirmedItem['text_block_index'] !== null
+                    ? (int) $confirmedItem['text_block_index']
+                    : null;
+                $sentenceIndex = isset($confirmedItem['sentence_index']) && $confirmedItem['sentence_index'] !== null
+                    ? (int) $confirmedItem['sentence_index']
+                    : null;
 
                 // ===== 严格校验 =====
-                // 4a. 必填字段：word / sense_zh 非空（Laravel 已校验 max 长度，这里校验 trim 后非空）
+                // 4a. 必填字段：word / sense_zh 非空
                 if ($word === '') {
-                    $skipped[] = ['source' => $source, 'word' => '', 'reason' => 'empty_word'];
+                    $skipped[] = $this->skippedResult($source, '', 'empty_word', null, null);
                     continue;
                 }
                 if ($senseZh === '') {
-                    $skipped[] = ['source' => $source, 'word' => $word, 'reason' => 'empty_sense_zh'];
+                    $skipped[] = $this->skippedResult($source, $word, 'empty_sense_zh', $lemma, $itemId);
                     continue;
                 }
 
                 // 4b. source 合法
                 if (!in_array($source, ['user_selected', 'ai_recommended'], true)) {
-                    $skipped[] = ['source' => $source, 'word' => $word, 'reason' => 'invalid_source'];
+                    $skipped[] = $this->skippedResult($source, $word, 'invalid_source', $lemma, $itemId);
                     continue;
                 }
 
-                // 4c. pending item 归属（仅 user_selected）
+                // 4c. V5 hardening: 反向校验 — confirmed item 必须来自 final_candidates_package
                 if ($source === 'user_selected') {
-                    if (!$itemId || !$validPendingItems->has($itemId)) {
-                        $skipped[] = ['source' => $source, 'word' => $word, 'reason' => 'invalid_pending_item'];
+                    // item_id 必须在 final package.user_selected_items 中
+                    if (!$itemId || !in_array($itemId, $packageSelectedItemIds, true)) {
+                        $skipped[] = $this->skippedResult($source, $word, 'not_in_final_package_user_selected', $lemma, $itemId);
+                        continue;
+                    }
+                    // item_id 必须属于当前用户/语言/pending
+                    if (!$validPendingItems->has($itemId)) {
+                        $skipped[] = $this->skippedResult($source, $word, 'invalid_pending_item', $lemma, $itemId);
+                        continue;
+                    }
+                    // V5 hardening: word/lemma 必须与 final package 中该 item_id 对应的 word/lemma 匹配
+                    $expectedKey = $packageUserSelectedKeys[$itemId] ?? '';
+                    $actualKey = $this->packageDedupeKey($lemma, $word);
+                    if ($expectedKey !== '' && $actualKey !== '' && $expectedKey !== $actualKey) {
+                        $skipped[] = $this->skippedResult($source, $word, 'word_lemma_mismatch_with_final_package', $lemma, $itemId);
+                        continue;
+                    }
+                } else { // ai_recommended
+                    // 必须在 final package.ai_recommended_selected_items 中找到对应 key
+                    $actualKey = $this->packageDedupeKey($lemma, $word);
+                    if ($actualKey === '' || !isset($packageAiRecommendedKeys[$actualKey])) {
+                        $skipped[] = $this->skippedResult($source, $word, 'not_in_final_package_ai_recommended', $lemma, $itemId);
                         continue;
                     }
                 }
 
                 // 4d. chapter 归属
                 if ($chapterId !== null && !$validChapters->has($chapterId)) {
-                    $skipped[] = ['source' => $source, 'word' => $word, 'reason' => 'invalid_chapter'];
+                    $skipped[] = $this->skippedResult($source, $word, 'invalid_chapter', $lemma, $itemId);
                     continue;
                 }
 
-                // ===== 创建/查找 WordSense（事务内） =====
+                // ===== 创建/查找 WordSense + ReviewCard + Occurrence（事务内） =====
                 $result = DB::transaction(function () use (
                     $user, $language, $confirmedItem, $word, $lemma, $surface,
-                    $senseZh, $chapterId, $sentenceId, $sentenceText
+                    $senseZh, $chapterId, $sentenceId, $sentenceText,
+                    $textBlockIndex, $sentenceIndex
                 ) {
                     $senseData = [
                         'user_id' => $user->id,
@@ -715,7 +760,8 @@ class AiStudyCardPendingItemService
                         'surface_form' => $surface,
                         'pos' => $confirmedItem['pos'] ?? null,
                         'sense_zh' => $senseZh,
-                        'sense_en' => $confirmedItem['sense_en'] ?? null,
+                        // V5 hardening: sense_en 允许为空（null 或空字符串都接受）
+                        'sense_en' => $this->normalizeNullableString($confirmedItem['sense_en'] ?? null),
                         'aliases_zh' => $confirmedItem['aliases_zh'] ?? [],
                         'collocations' => $confirmedItem['collocations'] ?? [],
                         'example_sentence_en' => $sentenceText !== '' ? $sentenceText : null,
@@ -728,26 +774,51 @@ class AiStudyCardPendingItemService
                     // createOrFindSense 内部按 sense_key + alias 去重
                     $sense = $this->wordSenseService->createOrFindSense($senseData);
                     $senseWasNewlyCreated = $sense->wasRecentlyCreated;
-                    // 如果 sense 已存在但不是 confirmed（如 ai_suggested），升级为 confirmed
                     $senseNeededUpgrade = !$senseWasNewlyCreated && $sense->status !== WordSense::STATUS_CONFIRMED;
                     if ($senseNeededUpgrade) {
                         $this->wordSenseService->confirmSense($sense);
                         $sense->refresh();
                     }
 
-                    // 创建/确保 target_type=sense ReviewCard（firstOrCreate 幂等）
                     $card = $this->wordSenseService->createReviewCardForSense($sense);
                     $cardWasNewlyCreated = $card ? $card->wasRecentlyCreated : false;
 
-                    // 保存来源例句（WordSenseOccurrence）
-                    if ($sentenceId !== null && $sentenceId !== '' && $sentenceText !== '') {
-                        WordSenseOccurrence::updateOrCreate(
+                    // ===== V5 hardening: 来源例句/occurrence 绑定收口 =====
+                    // 1. 有 sentence_id + sentence_text：直接写 occurrence
+                    // 2. 无 sentence_id 但有 chapter_id + sentence_text + (text_block_index 或 sentence_index)：
+                    //    生成 synthetic sentence_id: ai-study-card:{chapter_id}:{text_block_index}:{sentence_index}:{normalized_word}
+                    // 3. 无足够来源信息：不写 occurrence，但仍创建 sense/card
+                    // 4. chapter 不属于当前用户/语言：不写 occurrence（已在 4d 跳过）
+                    $occurrenceCreated = false;
+                    $occurrenceId = null;
+                    $occurrenceReason = null;
+                    $effectiveSentenceId = $sentenceId;
+
+                    if ($sentenceText === '') {
+                        $occurrenceReason = 'no_sentence_text';
+                    } elseif ($chapterId === null) {
+                        $occurrenceReason = 'no_chapter_id';
+                    } elseif ($textBlockIndex === null && $sentenceIndex === null && ($sentenceId === null || $sentenceId === '')) {
+                        $occurrenceReason = 'insufficient_source_info';
+                    } else {
+                        // 生成 synthetic sentence_id（如果原 sentence_id 为空）
+                        if ($effectiveSentenceId === null || $effectiveSentenceId === '') {
+                            $tb = $textBlockIndex ?? 0;
+                            $si = $sentenceIndex ?? 0;
+                            $normalizedWord = mb_strtolower(trim($word), 'UTF-8');
+                            $effectiveSentenceId = 'ai-study-card:' . $chapterId . ':' . $tb . ':' . $si . ':' . $normalizedWord;
+                            $occurrenceReason = 'synthetic_sentence_id';
+                        } else {
+                            $occurrenceReason = 'explicit_sentence_id';
+                        }
+
+                        $occurrence = WordSenseOccurrence::updateOrCreate(
                             [
                                 'user_id' => $sense->user_id,
                                 'language_id' => $sense->language_id,
                                 'word_sense_id' => $sense->id,
                                 'chapter_id' => $chapterId,
-                                'sentence_id' => (string) $sentenceId,
+                                'sentence_id' => (string) $effectiveSentenceId,
                                 'surface' => $surface,
                                 'source' => WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
                             ],
@@ -770,9 +841,12 @@ class AiStudyCardPendingItemService
                                     'aliases_zh' => $sense->aliases_zh ?: [],
                                     'collocations' => $sense->collocations ?: [],
                                     'confirmed_from' => 'ai_study_card_candidate',
+                                    'sentence_id_source' => $occurrenceReason,
                                 ],
                             ]
                         );
+                        $occurrenceCreated = true;
+                        $occurrenceId = $occurrence->id;
                     }
 
                     $isCreated = $senseWasNewlyCreated || $senseNeededUpgrade || $cardWasNewlyCreated;
@@ -781,30 +855,39 @@ class AiStudyCardPendingItemService
                         'sense' => $sense,
                         'card' => $card,
                         'is_created' => $isCreated,
+                        'occurrence_created' => $occurrenceCreated,
+                        'occurrence_id' => $occurrenceId,
+                        'occurrence_reason' => $occurrenceReason,
+                        'effective_sentence_id' => $effectiveSentenceId,
                     ];
                 });
 
+                // V5 hardening: 来源绑定状态文案
+                $sourceBindingStatus = $this->resolveSourceBindingStatus(
+                    $result['occurrence_created'],
+                    $result['occurrence_reason']
+                );
+
+                $baseResult = [
+                    'source' => $source,
+                    'item_id' => $itemId,
+                    'word' => $word,
+                    'lemma' => $result['sense']->lemma,
+                    'sense_id' => $result['sense']->id,
+                    'review_card_id' => $result['card']?->id,
+                    'occurrence_created' => $result['occurrence_created'],
+                    'occurrence_id' => $result['occurrence_id'],
+                    'source_binding_status' => $sourceBindingStatus,
+                    'source_binding_reason' => $result['occurrence_reason'],
+                ];
+
                 if ($result['is_created']) {
-                    $created[] = [
-                        'source' => $source,
-                        'item_id' => $itemId,
-                        'word' => $word,
-                        'lemma' => $result['sense']->lemma,
-                        'sense_id' => $result['sense']->id,
-                        'review_card_id' => $result['card']?->id,
-                        'is_new_sense' => !$result['sense']->exists || $result['sense']->wasRecentlyCreated,
-                        'is_new_card' => $result['card'] ? $result['card']->wasRecentlyCreated : false,
-                    ];
+                    $baseResult['is_new_sense'] = !$result['sense']->exists || $result['sense']->wasRecentlyCreated;
+                    $baseResult['is_new_card'] = $result['card'] ? $result['card']->wasRecentlyCreated : false;
+                    $created[] = $baseResult;
                 } else {
-                    $duplicate[] = [
-                        'source' => $source,
-                        'item_id' => $itemId,
-                        'word' => $word,
-                        'lemma' => $result['sense']->lemma,
-                        'sense_id' => $result['sense']->id,
-                        'review_card_id' => $result['card']?->id,
-                        'reason' => 'sense_and_card_already_exist',
-                    ];
+                    $baseResult['reason'] = 'sense_and_card_already_exist';
+                    $duplicate[] = $baseResult;
                 }
             } catch (Throwable $e) {
                 $failed[] = [
@@ -847,6 +930,61 @@ class AiStudyCardPendingItemService
                 'no_legacy_word_card_created' => true,
                 'user_confirmation_received' => true,
             ],
+        ];
+    }
+
+    /**
+     * V5 hardening: 反向校验用的 dedupe key（与 V4 buildFinalCandidatesPackage 一致）。
+     * 优先 lemma，否则 word；大小写不敏感。
+     */
+    private function packageDedupeKey(?string $lemma, ?string $word): string
+    {
+        $candidate = trim((string) $lemma);
+        if ($candidate === '') {
+            $candidate = trim((string) $word);
+        }
+        if ($candidate === '') {
+            return '';
+        }
+        return mb_strtolower($candidate, 'UTF-8');
+    }
+
+    /**
+     * V5 hardening: 归一化可空字符串。空字符串转 null，其余 trim。
+     */
+    private function normalizeNullableString($value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $trimmed = trim((string) $value);
+        return $trimmed === '' ? null : $trimmed;
+    }
+
+    /**
+     * V5 hardening: 根据 occurrence 创建结果返回前端可读的来源绑定状态。
+     */
+    private function resolveSourceBindingStatus(bool $occurrenceCreated, ?string $reason): string
+    {
+        if ($occurrenceCreated) {
+            return $reason === 'synthetic_sentence_id'
+                ? '来源已绑定（合成 sentence_id）'
+                : '来源已绑定';
+        }
+        return '来源信息不足，已创建卡片但未绑定来源';
+    }
+
+    /**
+     * V5 hardening: 统一构造 skipped 结果项。
+     */
+    private function skippedResult(string $source, string $word, string $reason, ?string $lemma, ?int $itemId): array
+    {
+        return [
+            'source' => $source,
+            'word' => $word,
+            'lemma' => $lemma,
+            'item_id' => $itemId,
+            'reason' => $reason,
         ];
     }
 }

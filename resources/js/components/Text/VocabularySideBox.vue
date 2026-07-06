@@ -654,6 +654,7 @@
                                 <div v-for="(item, idx) in aiGenerateCardsResult.results.created" :key="'created-' + idx" class="text-caption ml-2">
                                     <v-icon x-small color="success" class="mr-1">mdi-card-plus-outline</v-icon>
                                     {{ item.word }} → 释义 #{{ item.sense_id }} / 复习卡 #{{ item.review_card_id }}
+                                    <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
                                 </div>
                             </div>
                             <div v-if="aiGenerateCardsResult.results.skipped && aiGenerateCardsResult.results.skipped.length" class="mt-2">
@@ -668,6 +669,7 @@
                                 <div v-for="(item, idx) in aiGenerateCardsResult.results.duplicate" :key="'dup-' + idx" class="text-caption ml-2">
                                     <v-icon x-small color="info" class="mr-1">mdi-content-duplicate</v-icon>
                                     {{ item.word }} → 释义 #{{ item.sense_id }}
+                                    <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
                                 </div>
                             </div>
                             <div v-if="aiGenerateCardsResult.results.failed && aiGenerateCardsResult.results.failed.length" class="mt-2">
@@ -736,7 +738,7 @@
                 </v-card-title>
                 <v-card-text>
                     <v-alert type="info" dense text class="mb-3">
-                        这不是 AI 自动调用，是你粘贴 AI 返回内容后的人工确认生成。每个候选项需要填写中文释义（必填），未填写的项会被跳过。
+                        这不是 AI 自动调用，是你粘贴 AI 返回内容后的人工确认生成。每个候选项需要填写中文释义（必填），未填写的项会被跳过。英文解释可留空，后续再补。
                     </v-alert>
                     <div v-if="aiGenerateCardsItems.length === 0" class="text-center pa-4 text--secondary">
                         没有可确认的候选项。
@@ -751,6 +753,10 @@
                             <span class="font-weight-medium">{{ item.word }}</span>
                             <span v-if="item.lemma && item.lemma !== item.word" class="ml-1 text--secondary text-caption">({{ item.lemma }})</span>
                         </div>
+                        <div v-if="item.reason" class="text-caption mb-1 pa-1 rounded" style="background: var(--v-gray2-base); color: var(--v-secondary-base);">
+                            <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
+                            推荐理由（参考说明，不是释义）：{{ item.reason }}
+                        </div>
                         <v-text-field
                             v-model="item.sense_zh"
                             label="中文释义（必填）"
@@ -759,7 +765,17 @@
                             rounded
                             hide-details
                             class="mt-1"
-                            placeholder="填写中文释义，留空将跳过此项"
+                            placeholder="填写中文释义，留空将跳过此项。推荐理由不是释义，请填写中文释义。"
+                        />
+                        <v-text-field
+                            v-model="item.sense_en"
+                            label="英文解释（可选，可留空）"
+                            dense
+                            filled
+                            rounded
+                            hide-details
+                            class="mt-2"
+                            placeholder="可留空，后续再补"
                         />
                         <div v-if="item.sentence_text" class="text-caption mt-1 text--secondary">
                             <v-icon x-small class="mr-1">mdi-format-quote-open</v-icon>{{ item.sentence_text }}
@@ -1580,8 +1596,11 @@ export default {
                         sentence_index: null,
                         sentence_id: null,
                         sentence_text: item.sentence_text || '',
-                        sense_zh: item.reason || '', // 默认填入 reason 作为释义草稿
-                        sense_en: '',
+                        // V5 hardening: reason 只是推荐理由，不自动填入 sense_zh。
+                        // 用户必须手动填写中文释义，避免把"推荐理由"误当释义保存。
+                        reason: item.reason || '', // 仅作为参考说明展示
+                        sense_zh: '', // 用户需要输入
+                        sense_en: '', // 允许为空，后续再补
                         pos: '',
                         aliases_zh: [],
                         collocations: [],
