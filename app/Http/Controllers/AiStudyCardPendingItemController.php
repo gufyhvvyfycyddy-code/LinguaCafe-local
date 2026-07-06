@@ -69,7 +69,7 @@ class AiStudyCardPendingItemController extends Controller
     {
         $validated = $request->validate([
             'chapter_id' => ['nullable', 'integer', 'min:1'],
-            'status' => ['nullable', 'string', 'in:pending,dismissed,all'],
+            'status' => ['nullable', 'string', 'in:pending,dismissed,processed,all'],
         ]);
 
         $statusFilter = $validated['status'] ?? 'pending';

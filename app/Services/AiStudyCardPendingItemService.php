@@ -133,11 +133,13 @@ class AiStudyCardPendingItemService
         $query = AiStudyCardPendingItem::where('user_id', $user->id)
             ->where('language_id', $language);
 
-        // V3: status 过滤。只接受 pending / dismissed / all，其他值回退为 pending。
+        // V3/V5-lifecycle: status 过滤。接受 pending / dismissed / processed / all，其他值回退为 pending。
         if ($statusFilter === 'all') {
             // 不加 status 条件
         } elseif ($statusFilter === 'dismissed') {
             $query->where('status', AiStudyCardPendingItem::STATUS_DISMISSED);
+        } elseif ($statusFilter === 'processed') {
+            $query->where('status', AiStudyCardPendingItem::STATUS_PROCESSED);
         } else {
             $query->where('status', AiStudyCardPendingItem::STATUS_PENDING);
         }
@@ -881,6 +883,18 @@ class AiStudyCardPendingItemService
                     'source_binding_reason' => $result['occurrence_reason'],
                 ];
 
+                // V5-lifecycle: user_selected + created/duplicate → mark pending item as processed.
+                // ai_recommended → no pending item to update.
+                if ($source === 'user_selected' && $itemId) {
+                    $lifecycle = $this->markPendingItemProcessed(
+                        $user, $language, $itemId,
+                        $result['is_created'] ? 'created' : 'duplicate'
+                    );
+                } else {
+                    $lifecycle = $this->emptyPendingLifecycleInfo();
+                }
+                $baseResult = array_merge($baseResult, $lifecycle);
+
                 if ($result['is_created']) {
                     $baseResult['is_new_sense'] = !$result['sense']->exists || $result['sense']->wasRecentlyCreated;
                     $baseResult['is_new_card'] = $result['card'] ? $result['card']->wasRecentlyCreated : false;
@@ -890,10 +904,16 @@ class AiStudyCardPendingItemService
                     $duplicate[] = $baseResult;
                 }
             } catch (Throwable $e) {
+                $failedItemId = !empty($confirmedItem['item_id']) ? (int) $confirmedItem['item_id'] : null;
                 $failed[] = [
                     'source' => $confirmedItem['source'] ?? '',
                     'word' => $confirmedItem['word'] ?? '',
                     'reason' => 'exception: ' . $e->getMessage(),
+                    'pending_item_id' => $failedItemId,
+                    'pending_item_status_before' => null,
+                    'pending_item_status_after' => null,
+                    'pending_item_processed' => false,
+                    'pending_item_process_reason' => null,
                 ];
             }
         }
@@ -976,6 +996,7 @@ class AiStudyCardPendingItemService
 
     /**
      * V5 hardening: 统一构造 skipped 结果项。
+     * V5-lifecycle: 包含 pending_item 生命周期字段（skipped 不标记 processed）。
      */
     private function skippedResult(string $source, string $word, string $reason, ?string $lemma, ?int $itemId): array
     {
@@ -985,6 +1006,59 @@ class AiStudyCardPendingItemService
             'lemma' => $lemma,
             'item_id' => $itemId,
             'reason' => $reason,
+            'pending_item_id' => $itemId,
+            'pending_item_status_before' => null,
+            'pending_item_status_after' => null,
+            'pending_item_processed' => false,
+            'pending_item_process_reason' => null,
+        ];
+    }
+
+    /**
+     * V5-lifecycle: 将 user_selected pending item 标记为 processed。
+     * 只更新当前用户/当前语言/状态=pending 的 item，保证幂等与安全。
+     * 返回生命周期信息供前端展示。
+     */
+    private function markPendingItemProcessed(User $user, string $language, int $itemId, string $processReason): array
+    {
+        try {
+            $updated = AiStudyCardPendingItem::where('id', $itemId)
+                ->where('user_id', $user->id)
+                ->where('language_id', $language)
+                ->where('status', AiStudyCardPendingItem::STATUS_PENDING)
+                ->update(['status' => AiStudyCardPendingItem::STATUS_PROCESSED, 'updated_at' => now()]);
+
+            return [
+                'pending_item_id' => $itemId,
+                'pending_item_status_before' => AiStudyCardPendingItem::STATUS_PENDING,
+                'pending_item_status_after' => $updated > 0
+                    ? AiStudyCardPendingItem::STATUS_PROCESSED
+                    : AiStudyCardPendingItem::STATUS_PENDING,
+                'pending_item_processed' => $updated > 0,
+                'pending_item_process_reason' => $updated > 0 ? $processReason : null,
+            ];
+        } catch (Throwable $e) {
+            return [
+                'pending_item_id' => $itemId,
+                'pending_item_status_before' => AiStudyCardPendingItem::STATUS_PENDING,
+                'pending_item_status_after' => AiStudyCardPendingItem::STATUS_PENDING,
+                'pending_item_processed' => false,
+                'pending_item_process_reason' => null,
+            ];
+        }
+    }
+
+    /**
+     * V5-lifecycle: 空的生命周期信息（用于 ai_recommended 或无 pending item 的场景）。
+     */
+    private function emptyPendingLifecycleInfo(): array
+    {
+        return [
+            'pending_item_id' => null,
+            'pending_item_status_before' => null,
+            'pending_item_status_after' => null,
+            'pending_item_processed' => false,
+            'pending_item_process_reason' => null,
         ];
     }
 }

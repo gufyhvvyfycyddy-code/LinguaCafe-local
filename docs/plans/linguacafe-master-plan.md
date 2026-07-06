@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-06 (GM52-AIStudyCardDesktopWorkflowDeepModuleSplit-1000-4)
+> **最后更新**：2026-07-07 (GM52-AIStudyCardPendingLifecycleClosure-1000-5)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -468,4 +468,32 @@
   - 未做 mobile viewport 主流程验收（当前产品无手机端）。
 - **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog；未改 FSRS；未重排已有 ReviewCard；未创建 legacy word ReviewCard；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未回滚 feature island；未重新制造 SideBox / Box 复制；未再次制造中文 mojibake。
 - **commit / push**：`refactor: split AI study card desktop workflow modules`（无 `--force`，未提交 untracked 临时文件）。
+- **下一步仍由网页端总流程设计师决定**，不自动进入 V6。
+
+## Recent Update: GM52-AIStudyCardPendingLifecycleClosure-1000-5
+
+- **Round type**: GM5.2 1000% closed-loop round 5 (pending item lifecycle closure). 本轮同时完成检测 + 编码，不是只检测报告。基于 GitHub master `282f808` 继续。
+- **本轮目标**：收口 AIStudyCard pending item 生命周期。用户完成「生成学习卡」后，原 pending item 应标记为 `processed`，不再出现在 pending 列表中；同时保持所有现有 V1-V5 行为、deep-module split 架构、安全契约不变。
+- **5 条生命周期规则冻结**：
+  1. `user_selected + created` → pending item 标记为 `processed`
+  2. `user_selected + duplicate` → pending item 标记为 `processed`
+  3. `user_selected + skipped/failed` → 保持 `pending`
+  4. `ai_recommended` → 不修改任何 pending item
+  5. `dismissed` item 不应被 processed
+- **后端修改**：
+  - `app/Models/AiStudyCardPendingItem.php` 新增常量 `STATUS_PROCESSED = 'processed'`；
+  - `app/Services/AiStudyCardPendingItemService.php` `listPending` 支持 `processed` 过滤；新增私有方法 `markPendingItemProcessed(int $pendingItemId): bool`（安全、幂等，只 UPDATE WHERE status=pending AND user_id AND language）；新增私有方法 `emptyPendingLifecycleInfo()` 用于 ai_recommended；`generateCardsFromConfirmedCandidates` 中按 confirmed_items payload 的 `source` 字段合并 lifecycle 处理；`skippedResult` 和 `$failed` 数组都包含 `pending_item_lifecycle` 字段（含 `pending_item_id` / `source` / `previous_status` / `new_status` / `marked_processed`）；
+  - `app/Http/Controllers/AiStudyCardPendingItemController.php` validator 接受 `processed`：`'status' => ['nullable', 'string', 'in:pending,dismissed,processed,all']`。
+- **前端修改**：
+  - `resources/js/components/Text/AiStudyCardPendingListDialog.vue` 新增第三个 tab「已处理」+ processed items 列表（只读，无操作按钮，显示「状态：已处理 \| 处理于 {{ updated_at }}」）；新增 `processedItems` prop；
+  - `resources/js/components/Text/AiStudyCardDesktopWorkflow.vue` data 新增 `aiPendingProcessedItems: []`；`loadAiPendingDismissedItems()` 同时加载 processed；`confirmGenerateCards` 成功后刷新 pending list；模板绑定 `:processed-items`；行数 444 ≤ 450 限制（与上一轮持平，未恶化）。
+- **新增测试** `tests/Feature/AiStudyCardPendingLifecycleTest.php`（15 项测试）：覆盖 R1-R5 全部 5 条规则 + 跨用户隔离 + 跨语言隔离 + 不写 ReviewLog + 不改 FSRS + 不创建 legacy word card + processed 可查询 + 响应字段结构 + 幂等性（其中 R3 failed 路径使用 Mockery 模拟 WordSenseService 抛出异常）。
+- **修改测试** `tests/Feature/AiStudyCardPendingItemTest.php` 中 `test_generate_cards_deduplicates_duplicate_candidates`：新 lifecycle 逻辑下，第一次 generate-cards 后 pending item 变 processed，第二次该 item 已不在 `validPendingItems` 中（status=pending 过滤），所以进入 `skipped` 而非 `duplicate`。断言改为 `skipped_count=1` / `duplicate_count=0`。
+- **测试结果**：13 个测试套件全绿（554 tests / 0 failures）；`npm run development` Compiled Successfully。
+- **MCP Chrome 真实页面双 viewport 验收**（GLM 自己执行，未用 API 200 代替）：
+  - 宽屏 1920x900：`/chapters/read/6` 点击 construed → SideBox → V1-V5 完整闭环 → POST `/ai-study-card/generate-cards` 200 → 结果显示「已生成 1 张学习卡」+「已从待解释移至已处理」chip → pending list 自动刷新「待解释 (0) / 已处理 (1)」→ processed 视图显示 construed「状态：已处理 \| 处理于 2026-07-07 00:32」→ `/reviews/senses` 正常显示 sense card。数据库：pending item #5 status=processed, ReviewLog=13（未增加）, TARGET_WORD=6（未增加）, TARGET_SENSE=34（含 #87 新增）。Network 全部 127.0.0.1:8000，Console 仅 WebSocket 降级。
+  - 半屏 900x900：点击 entanglement → VocabularyBox → V1-V5 完整闭环 → POST 200 → 「已生成 1 张学习卡」+「已从待解释移至已处理」chip → pending list 自动刷新「待解释 (0) / 已处理 (2)」（construed + entanglement）。数据库：pending item #6 status=processed, ReviewLog=13（未增加）, TARGET_WORD=6（未增加）, TARGET_SENSE=35（含 #88 新增）。Network 全部本地，Console 仅 WebSocket 降级。
+  - 未做 mobile viewport 主流程验收（当前产品无手机端）。
+- **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog（验收后总数仍 13）；未改 FSRS（未触及任何 fsrs_* 字段）；未重排已有 ReviewCard；未创建 legacy word ReviewCard（验收后 TARGET_WORD 仍 6）；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未回滚 deep-module split；未重新制造 SideBox / Box 复制；未再次制造中文 mojibake；未新增 migration（仅 UPDATE 现有 status 字段值）。
+- **commit / push**：`feat: close AI study card pending lifecycle`（无 `--force`，未提交 untracked 临时文件）。
 - **下一步仍由网页端总流程设计师决定**，不自动进入 V6。

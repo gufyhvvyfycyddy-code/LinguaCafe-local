@@ -36,7 +36,7 @@
         <AiStudyCardPendingListDialog
             v-model="aiPendingListDialog"
             :pending-items="aiPendingItems"
-            :dismissed-items="aiPendingDismissedItems"
+            :dismissed-items="aiPendingDismissedItems" :processed-items="aiPendingProcessedItems"
             :status-filter="aiPendingListStatusFilter"
             @update:status-filter="aiPendingListStatusFilter = $event"
             :loading="aiPendingListLoading"
@@ -155,7 +155,7 @@ export default {
             // V2/V3: pending list dialog
             aiPendingListDialog: false, aiPendingListLoading: false, aiPendingListMessage: '', aiPendingListError: '',
             aiPendingItems: [], aiPendingDismissLoadingId: null, aiPendingListStatusFilter: 'pending',
-            aiPendingDismissedItems: [], aiPendingRestoreLoadingId: null,
+            aiPendingDismissedItems: [], aiPendingRestoreLoadingId: null, aiPendingProcessedItems: [],
             // V3: preview dialog + selected ids + preview package
             aiStudyCardPreviewDialog: false, aiPreviewSelectedItemIds: [], aiPreviewPackage: null,
             aiPreviewPackageLoading: false, aiPreviewPackageError: '', aiPreviewCopyMessage: '', aiPreviewCopied: false,
@@ -236,6 +236,7 @@ export default {
             listPendingItems(axios, { chapterId: this._chapterId, status: 'dismissed' })
                 .then(({ items }) => { this.aiPendingDismissedItems = items; })
                 .catch(() => { this.aiPendingDismissedItems = []; });
+            listPendingItems(axios, { chapterId: this._chapterId, status: 'processed' }).then(({ items }) => { this.aiPendingProcessedItems = items; }).catch(() => { this.aiPendingProcessedItems = []; });
         },
         dismissAiPendingItem(itemId) {
             this.aiPendingDismissLoadingId = itemId;
@@ -426,6 +427,7 @@ export default {
                     this.aiGenerateCardsResult = data;
                     this.aiGenerateCardsDialog = false;
                     this.$emit('generated', data);
+                    this.loadAiPendingItems(); this.loadAiPendingDismissedItems();
                 })
                 .catch((error) => { this.aiGenerateCardsError = error.message || '生成学习卡失败。'; })
                 .finally(() => { this.aiGenerateCardsLoading = false; });

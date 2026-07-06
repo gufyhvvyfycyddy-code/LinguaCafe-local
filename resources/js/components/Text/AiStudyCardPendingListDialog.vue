@@ -8,7 +8,7 @@
                 <v-btn icon small @click="$emit('input', false)"><v-icon>mdi-close</v-icon></v-btn>
             </v-card-title>
             <v-card-text style="max-height: 60vh;">
-                <!-- V3: 待解释 / 已取消 切换 -->
+                <!-- V3: 待解释 / 已取消 / 已处理 切换 -->
                 <div class="d-flex align-center mt-2 mb-2">
                     <v-btn-toggle :value="statusFilter" @change="$emit('update:status-filter', $event)" dense mandatory>
                         <v-btn x-small value="pending">
@@ -16,6 +16,9 @@
                         </v-btn>
                         <v-btn x-small value="dismissed">
                             已取消 ({{ dismissedItems.length }})
+                        </v-btn>
+                        <v-btn x-small value="processed">
+                            已处理 ({{ processedItems.length }})
                         </v-btn>
                     </v-btn-toggle>
                 </div>
@@ -112,6 +115,30 @@
                         </v-list-item>
                     </v-list>
                 </template>
+
+                <!-- V5-lifecycle: 已处理列表（只读，无操作按钮） -->
+                <template v-else-if="statusFilter === 'processed'">
+                    <div v-if="processedItems.length === 0" class="text-center text--secondary pa-4">
+                        暂无已处理的词。
+                    </div>
+                    <v-list v-else dense>
+                        <v-list-item v-for="item in processedItems" :key="item.id" class="px-0">
+                            <v-list-item-content>
+                                <v-list-item-title class="d-flex align-center">
+                                    <span class="font-weight-medium default-font">{{ item.word }}</span>
+                                    <span v-if="item.lemma && item.lemma !== item.word" class="text-caption text--secondary ml-2">({{ item.lemma }})</span>
+                                </v-list-item-title>
+                                <v-list-item-subtitle v-if="item.sentence_text" class="text-caption text--secondary mt-1" style="white-space: normal; line-height: 1.4;">
+                                    {{ item.sentence_text }}
+                                </v-list-item-subtitle>
+                                <v-list-item-subtitle class="text-caption text--secondary mt-1">
+                                    状态：已处理
+                                    <span class="ml-2">| 处理于 {{ formatDate(item.updated_at) }}</span>
+                                </v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list>
+                </template>
             </v-card-text>
             <v-card-actions class="d-flex flex-column align-stretch pa-3">
                 <v-btn
@@ -159,6 +186,7 @@ export default {
         value: { type: Boolean, default: false },
         pendingItems: { type: Array, default: () => [] },
         dismissedItems: { type: Array, default: () => [] },
+        processedItems: { type: Array, default: () => [] },
         statusFilter: { type: String, default: 'pending' },
         loading: { type: Boolean, default: false },
         error: { type: String, default: '' },

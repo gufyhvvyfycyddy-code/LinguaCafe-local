@@ -1431,7 +1431,13 @@ class AiStudyCardPendingItemTest extends TestCase
         $first->assertJsonPath('results.summary.created_count', 1);
         $first->assertJsonPath('results.summary.duplicate_count', 0);
 
-        // 第二次生成同样的候选——应被识别为重复
+        // V5-lifecycle: 第一次生成后 pending item 已标记为 processed
+        $this->assertDatabaseHas('ai_study_card_pending_items', [
+            'id' => $itemId,
+            'status' => AiStudyCardPendingItem::STATUS_PROCESSED,
+        ]);
+
+        // 第二次生成同样的候选——pending item 已 processed，不在 validPendingItems 中，应被跳过（幂等）
         $second = $this->actingAs($this->user)->postJson('/ai-study-card/generate-cards', [
             'final_candidates_package' => $this->finalCandidatesPackage($itemId, $this->chapter->id),
             'confirmed_items' => [
@@ -1446,7 +1452,8 @@ class AiStudyCardPendingItemTest extends TestCase
             ],
         ])->assertOk();
         $second->assertJsonPath('results.summary.created_count', 0);
-        $second->assertJsonPath('results.summary.duplicate_count', 1);
+        $second->assertJsonPath('results.summary.skipped_count', 1);
+        $second->assertJsonPath('results.summary.duplicate_count', 0);
 
         // 数据库中只有 1 个 sense + 1 个 card
         $this->assertSame(1, WordSense::where('user_id', $this->user->id)->where('lemma', 'landscape')->count());

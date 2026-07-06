@@ -27,6 +27,7 @@
                     <v-icon x-small color="success" class="mr-1">mdi-card-plus-outline</v-icon>
                     {{ item.word }} → 释义 #{{ item.sense_id }} / 复习卡 #{{ item.review_card_id }}
                     <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
+                    <v-chip v-if="item.pending_item_processed" x-small color="primary" class="ml-1">已从待解释移至已处理</v-chip>
                 </div>
             </div>
             <div v-if="result.results.skipped && result.results.skipped.length" class="mt-2">
@@ -42,6 +43,7 @@
                     <v-icon x-small color="info" class="mr-1">mdi-content-duplicate</v-icon>
                     {{ item.word }} → 释义 #{{ item.sense_id }}
                     <v-chip x-small :color="item.occurrence_created ? 'success' : 'warning'" class="ml-2">{{ item.source_binding_status }}</v-chip>
+                    <v-chip v-if="item.pending_item_processed" x-small color="primary" class="ml-1">已从待解释移至已处理</v-chip>
                 </div>
             </div>
             <div v-if="result.results.failed && result.results.failed.length" class="mt-2">

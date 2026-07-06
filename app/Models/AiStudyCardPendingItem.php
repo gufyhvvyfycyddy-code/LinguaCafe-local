@@ -11,6 +11,7 @@ class AiStudyCardPendingItem extends Model
 
     public const STATUS_PENDING = 'pending';
     public const STATUS_DISMISSED = 'dismissed';
+    public const STATUS_PROCESSED = 'processed';
 
     protected $fillable = [
         'user_id',
