@@ -7,6 +7,7 @@ use Tests\TestCase;
 /**
  * GM52-AIStudyCardV5-VocabularyBoxNarrowScreenParity-1000-1
  * + GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1
+ * + GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2
  *
  * Frontend / UI guard tests for the V5 "generate study cards" flow inside the
  * narrow-screen fallback VocabularyBox.vue.
@@ -18,28 +19,35 @@ use Tests\TestCase;
  * (e.g. @vue/test-utils), these guards should be upgraded to true component
  * render assertions.
  *
- * After GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1, the V5
- * dialog template and result template live in shared components
- * (AiStudyCardGenerateCardsDialog.vue / AiStudyCardGenerateCardsResult.vue)
- * and the V5 item-building / request logic lives in a shared service
- * (AiStudyCardGenerateCardsService.js). VocabularyBox.vue still owns:
- *   - the "生成学习卡" entry button,
- *   - the dialog open state (aiGenerateCardsDialog),
- *   - the items / loading / error / result data fields,
- *   - the openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews
- *     methods (which now delegate to the shared service).
+ * Round 1 (GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1):
+ *   The V5 dialog template and result template moved into shared components
+ *   (AiStudyCardGenerateCardsDialog.vue / AiStudyCardGenerateCardsResult.vue)
+ *   and the V5 item-building / request logic moved into a shared service
+ *   (AiStudyCardGenerateCardsService.js). VocabularyBox.vue still owned the
+ *   V5 dialog open state, items / loading / error / result data fields, and
+ *   the openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews
+ *   methods (delegating to the shared service).
  *
- * UI-contract assertions that previously scanned VocabularyBox.vue for
- * template copy (e.g. "中文释义（必填）") now scan the shared component
- * files, while VocabularyBox.vue is checked for wiring (component import +
- * template usage). This locks the contract at the new single source of
- * truth and prevents drift.
+ * Round 2 (GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2):
+ *   The entire V1-V5 desktop workflow (including the V5 dialog/result state
+ *   and methods previously held by VocabularyBox.vue) was extracted into a
+ *   single feature island component: AiStudyCardDesktopWorkflow.vue.
+ *   VocabularyBox.vue now ONLY renders <AiStudyCardDesktopWorkflow />; it no
+ *   longer imports the shared V5 dialog / result / service modules directly,
+ *   and no longer carries the V5 data fields or methods.
  *
- * Covers (narrow-screen VocabularyBox.vue + shared V5 components):
- *  1. "生成学习卡" entry button exists in VocabularyBox;
- *  2. VocabularyBox references shared AiStudyCardGenerateCardsDialog;
- *  3. VocabularyBox references shared AiStudyCardGenerateCardsResult;
- *  4. VocabularyBox imports the shared service helpers;
+ * UI-contract assertions that previously scanned VocabularyBox.vue for V5
+ * state / methods / template now scan AiStudyCardDesktopWorkflow.vue (the
+ * new single source of truth), while VocabularyBox.vue is checked only for
+ * wiring (workflow component import + template usage). This locks the
+ * contract at the feature island boundary and prevents drift.
+ *
+ * Covers (narrow-screen VocabularyBox.vue + AiStudyCardDesktopWorkflow +
+ *        shared V5 components):
+ *  1. "生成学习卡" entry button exists in the workflow component;
+ *  2. VocabularyBox references AiStudyCardDesktopWorkflow (feature island);
+ *  3. AiStudyCardDesktopWorkflow references shared dialog + result;
+ *  4. AiStudyCardDesktopWorkflow imports the shared service helpers;
  *  5. "中文释义（必填）" copy exists in the shared dialog;
  *  6. "英文解释（可选，可留空）" copy exists in the shared dialog;
  *  7. AI reason displayed as "推荐理由（参考说明，不是释义）" in the shared dialog;
@@ -48,14 +56,16 @@ use Tests\TestCase;
  * 10. "进入 /reviews/senses 复习" entry exists in the shared result component;
  * 11. No external AI provider calls anywhere in the V5 shared surface;
  * 12. No ReviewLog / FSRS rating / legacy word ReviewCard creation calls;
- * 13. openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews methods exist;
- * 14. V5 data fields exist in VocabularyBox;
+ * 13. openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews methods
+ *     exist in the workflow component (not in VocabularyBox);
+ * 14. V5 data fields exist in the workflow component (not in VocabularyBox);
  * 15. V5 safety copy "这不是 AI 自动调用" exists in shared components;
  * 16. Result section shows created / skipped / duplicate / failed counts.
  */
 class VocabularyBoxV5UiGuardTest extends TestCase
 {
     private string $vocabularyBoxPath;
+    private string $workflowPath;
     private string $dialogPath;
     private string $resultPath;
     private string $servicePath;
@@ -64,6 +74,7 @@ class VocabularyBoxV5UiGuardTest extends TestCase
     {
         parent::setUp();
         $this->vocabularyBoxPath = resource_path('js/components/Text/VocabularyBox.vue');
+        $this->workflowPath = resource_path('js/components/Text/AiStudyCardDesktopWorkflow.vue');
         $this->dialogPath = resource_path('js/components/Text/AiStudyCardGenerateCardsDialog.vue');
         $this->resultPath = resource_path('js/components/Text/AiStudyCardGenerateCardsResult.vue');
         $this->servicePath = resource_path('js/services/AiStudyCardGenerateCardsService.js');
@@ -76,51 +87,73 @@ class VocabularyBoxV5UiGuardTest extends TestCase
 
     /**
      * 1. "生成学习卡" entry button must exist so narrow-screen users can enter V5.
+     *    After Round 2, the button lives inside AiStudyCardDesktopWorkflow.vue
+     *    (the feature island). VocabularyBox.vue must render that workflow
+     *    component so the entry button is reachable from the narrow-screen
+     *    fallback surface.
      */
     public function test_vocabulary_box_contains_generate_cards_entry_button(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString('@click="openGenerateCardsDialog"', $contents, 'VocabularyBox must have a button calling openGenerateCardsDialog.');
-        $this->assertStringContainsString('生成学习卡', $contents, 'VocabularyBox must show "生成学习卡" button label.');
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $boxContents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> so the V5 entry button is reachable.');
+
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString('生成学习卡', $workflowContents, 'AiStudyCardDesktopWorkflow must show "生成学习卡" button label.');
     }
 
     /**
-     * 2. VocabularyBox must reference the shared AiStudyCardGenerateCardsDialog component
-     *    (import + template usage). This is the architecture-convergence contract.
+     * 2. VocabularyBox must reference the AiStudyCardDesktopWorkflow feature island
+     *    (import + components registration + template usage). The workflow component
+     *    in turn references the shared AiStudyCardGenerateCardsDialog.
      */
     public function test_vocabulary_box_references_shared_dialog_component(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $contents, 'VocabularyBox must import AiStudyCardGenerateCardsDialog.');
-        $this->assertStringContainsString('AiStudyCardGenerateCardsDialog', $contents, 'VocabularyBox must register/use AiStudyCardGenerateCardsDialog.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $contents, 'VocabularyBox must render <AiStudyCardGenerateCardsDialog> in template.');
-        $this->assertStringContainsString('v-model="aiGenerateCardsDialog"', $contents, 'VocabularyBox must bind aiGenerateCardsDialog via v-model on the shared dialog.');
-        $this->assertStringContainsString('@confirm="confirmGenerateCards"', $contents, 'VocabularyBox must wire @confirm to confirmGenerateCards.');
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        $this->assertStringContainsString("import AiStudyCardDesktopWorkflow from './AiStudyCardDesktopWorkflow.vue'", $boxContents, 'VocabularyBox must import AiStudyCardDesktopWorkflow.');
+        $this->assertStringContainsString('AiStudyCardDesktopWorkflow,', $boxContents, 'VocabularyBox must register AiStudyCardDesktopWorkflow in components.');
+        $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $boxContents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> in template.');
+
+        // The shared dialog is now imported only by the workflow component.
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsDialog.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsDialog> in template.');
+        $this->assertStringContainsString('v-model="aiGenerateCardsDialog"', $workflowContents, 'AiStudyCardDesktopWorkflow must bind aiGenerateCardsDialog via v-model on the shared dialog.');
+        $this->assertStringContainsString('@confirm="confirmGenerateCards"', $workflowContents, 'AiStudyCardDesktopWorkflow must wire @confirm to confirmGenerateCards.');
     }
 
     /**
-     * 3. VocabularyBox must reference the shared AiStudyCardGenerateCardsResult component.
+     * 3. VocabularyBox must reference the AiStudyCardDesktopWorkflow feature island,
+     *    which in turn references the shared AiStudyCardGenerateCardsResult.
      */
     public function test_vocabulary_box_references_shared_result_component(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $contents, 'VocabularyBox must import AiStudyCardGenerateCardsResult.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $contents, 'VocabularyBox must render <AiStudyCardGenerateCardsResult> in template.');
-        $this->assertStringContainsString(':result="aiGenerateCardsResult"', $contents, 'VocabularyBox must bind aiGenerateCardsResult to the shared result component.');
-        $this->assertStringContainsString('@go-to-sense-reviews="goToSenseReviews"', $contents, 'VocabularyBox must wire @go-to-sense-reviews to goToSenseReviews.');
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $boxContents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> in template.');
+
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsResult.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsResult> in template.');
+        $this->assertStringContainsString(':result="aiGenerateCardsResult"', $workflowContents, 'AiStudyCardDesktopWorkflow must bind aiGenerateCardsResult to the shared result component.');
+        $this->assertStringContainsString('@go-to-sense-reviews="goToSenseReviews"', $workflowContents, 'AiStudyCardDesktopWorkflow must wire @go-to-sense-reviews to goToSenseReviews.');
     }
 
     /**
-     * 4. VocabularyBox must import the shared service helpers (buildGenerateCardItems,
-     *    filterConfirmedGenerateCardItems, generateAiStudyCards).
+     * 4. AiStudyCardDesktopWorkflow (the feature island) must import the shared
+     *    service helpers (buildGenerateCardItems, filterConfirmedGenerateCardItems,
+     *    generateAiStudyCards). VocabularyBox.vue no longer imports them directly.
      */
     public function test_vocabulary_box_imports_shared_service_helpers(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString("from './../../services/AiStudyCardGenerateCardsService'", $contents, 'VocabularyBox must import from AiStudyCardGenerateCardsService.');
-        $this->assertStringContainsString('buildGenerateCardItems', $contents, 'VocabularyBox must import buildGenerateCardItems.');
-        $this->assertStringContainsString('filterConfirmedGenerateCardItems', $contents, 'VocabularyBox must import filterConfirmedGenerateCardItems.');
-        $this->assertStringContainsString('generateAiStudyCards', $contents, 'VocabularyBox must import generateAiStudyCards.');
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString("from '../../services/AiStudyCardGenerateCardsService", $workflowContents, 'AiStudyCardDesktopWorkflow must import from AiStudyCardGenerateCardsService.');
+        $this->assertStringContainsString('buildGenerateCardItems', $workflowContents, 'AiStudyCardDesktopWorkflow must import buildGenerateCardItems.');
+        $this->assertStringContainsString('filterConfirmedGenerateCardItems', $workflowContents, 'AiStudyCardDesktopWorkflow must import filterConfirmedGenerateCardItems.');
+        $this->assertStringContainsString('generateAiStudyCards', $workflowContents, 'AiStudyCardDesktopWorkflow must import generateAiStudyCards.');
+
+        // VocabularyBox must NOT import the shared service helpers directly anymore.
+        // Match both './' and '../../' prefix variants to be robust.
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        $this->assertStringNotContainsString('services/AiStudyCardGenerateCardsService', $boxContents, 'VocabularyBox must NOT import AiStudyCardGenerateCardsService directly — use <AiStudyCardDesktopWorkflow> instead.');
     }
 
     /**
@@ -176,7 +209,8 @@ class VocabularyBoxV5UiGuardTest extends TestCase
 
     /**
      * 10. "进入 /reviews/senses 复习" entry must exist. Now lives in the shared result component,
-     *     and VocabularyBox must still own the goToSenseReviews method + navigation.
+     *     and the workflow component (not VocabularyBox) owns the goToSenseReviews
+     *     method + navigation.
      */
     public function test_vocabulary_box_contains_reviews_senses_entry(): void
     {
@@ -184,14 +218,19 @@ class VocabularyBoxV5UiGuardTest extends TestCase
         $this->assertStringContainsString('进入 /reviews/senses 复习', $resultContents, 'AiStudyCardGenerateCardsResult must show entry to /reviews/senses.');
         $this->assertStringContainsString("@click=\"\$emit('go-to-sense-reviews')\"", $resultContents, 'AiStudyCardGenerateCardsResult must emit go-to-sense-reviews.');
 
+        // After Round 2, the goToSenseReviews method lives in AiStudyCardDesktopWorkflow.
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString('goToSenseReviews', $workflowContents, 'AiStudyCardDesktopWorkflow must have goToSenseReviews method.');
+        $this->assertStringContainsString("window.location.href = '/reviews/senses'", $workflowContents, 'AiStudyCardDesktopWorkflow must navigate to /reviews/senses.');
+
+        // VocabularyBox must NOT own the V5 navigation method anymore.
         $boxContents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString('goToSenseReviews', $boxContents, 'VocabularyBox must have goToSenseReviews method.');
-        $this->assertStringContainsString("window.location.href = '/reviews/senses'", $boxContents, 'VocabularyBox must navigate to /reviews/senses.');
+        $this->assertStringNotContainsString('goToSenseReviews', $boxContents, 'VocabularyBox must NOT own goToSenseReviews — it now lives in AiStudyCardDesktopWorkflow.');
     }
 
     /**
      * 11. No external AI provider calls — only local /ai-study-card/* endpoints.
-     *     Check both VocabularyBox and the shared service.
+     *     Check VocabularyBox, the workflow component, and the shared service.
      */
     public function test_v5_surface_has_no_external_ai_provider_calls(): void
     {
@@ -205,7 +244,10 @@ class VocabularyBoxV5UiGuardTest extends TestCase
             'http://api.',
         ];
 
-        foreach ([$this->vocabularyBoxPath, $this->dialogPath, $this->resultPath, $this->servicePath] as $path) {
+        foreach ([$this->vocabularyBoxPath, $this->workflowPath, $this->dialogPath, $this->resultPath, $this->servicePath] as $path) {
+            if (!file_exists($path)) {
+                continue;
+            }
             $contents = file_get_contents($path);
             foreach ($forbiddenPatterns as $pattern) {
                 $this->assertStringNotContainsString($pattern, $contents, basename($path) . " must not call external AI provider: $pattern");
@@ -220,7 +262,7 @@ class VocabularyBoxV5UiGuardTest extends TestCase
 
     /**
      * 12. No ReviewLog / FSRS rating / legacy word ReviewCard creation calls
-     *     anywhere in the V5 shared surface.
+     *     anywhere in the V5 shared surface (including the workflow component).
      */
     public function test_v5_surface_has_no_review_log_fsrs_rating_or_legacy_word_card_calls(): void
     {
@@ -234,7 +276,10 @@ class VocabularyBoxV5UiGuardTest extends TestCase
             "target_type' => 'word'",
         ];
 
-        foreach ([$this->vocabularyBoxPath, $this->dialogPath, $this->resultPath, $this->servicePath] as $path) {
+        foreach ([$this->vocabularyBoxPath, $this->workflowPath, $this->dialogPath, $this->resultPath, $this->servicePath] as $path) {
+            if (!file_exists($path)) {
+                continue;
+            }
             $contents = file_get_contents($path);
             foreach ($forbiddenPatterns as $pattern) {
                 $this->assertStringNotContainsString($pattern, $contents, basename($path) . " must not reference forbidden pattern: $pattern");
@@ -243,22 +288,32 @@ class VocabularyBoxV5UiGuardTest extends TestCase
     }
 
     /**
-     * 13. openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews methods must exist.
+     * 13. openGenerateCardsDialog / confirmGenerateCards / goToSenseReviews methods
+     *     must exist in AiStudyCardDesktopWorkflow (the feature island), NOT in
+     *     VocabularyBox. After Round 2, VocabularyBox no longer owns V5 methods.
      */
     public function test_vocabulary_box_has_v5_methods(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
-        $this->assertStringContainsString('openGenerateCardsDialog()', $contents, 'VocabularyBox must define openGenerateCardsDialog method.');
-        $this->assertStringContainsString('confirmGenerateCards()', $contents, 'VocabularyBox must define confirmGenerateCards method.');
-        $this->assertStringContainsString('goToSenseReviews()', $contents, 'VocabularyBox must define goToSenseReviews method.');
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString('openGenerateCardsDialog()', $workflowContents, 'AiStudyCardDesktopWorkflow must define openGenerateCardsDialog method.');
+        $this->assertStringContainsString('confirmGenerateCards()', $workflowContents, 'AiStudyCardDesktopWorkflow must define confirmGenerateCards method.');
+        $this->assertStringContainsString('goToSenseReviews()', $workflowContents, 'AiStudyCardDesktopWorkflow must define goToSenseReviews method.');
+
+        // VocabularyBox must NOT own these V5 methods anymore.
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        $this->assertStringNotContainsString('openGenerateCardsDialog()', $boxContents, 'VocabularyBox must NOT define openGenerateCardsDialog — it now lives in AiStudyCardDesktopWorkflow.');
+        $this->assertStringNotContainsString('confirmGenerateCards()', $boxContents, 'VocabularyBox must NOT define confirmGenerateCards — it now lives in AiStudyCardDesktopWorkflow.');
+        $this->assertStringNotContainsString('goToSenseReviews()', $boxContents, 'VocabularyBox must NOT define goToSenseReviews — it now lives in AiStudyCardDesktopWorkflow.');
     }
 
     /**
-     * 14. V5 data fields must exist in VocabularyBox (state ownership stays in parent).
+     * 14. V5 data fields must exist in AiStudyCardDesktopWorkflow (the feature
+     *     island), NOT in VocabularyBox. After Round 2, VocabularyBox no longer
+     *     owns V5 state.
      */
     public function test_vocabulary_box_has_v5_data_fields(): void
     {
-        $contents = file_get_contents($this->vocabularyBoxPath);
+        $workflowContents = file_get_contents($this->workflowPath);
         $requiredFields = [
             'aiGenerateCardsDialog:',
             'aiGenerateCardsItems:',
@@ -267,7 +322,13 @@ class VocabularyBoxV5UiGuardTest extends TestCase
             'aiGenerateCardsResult:',
         ];
         foreach ($requiredFields as $field) {
-            $this->assertStringContainsString($field, $contents, "VocabularyBox must define data field: $field");
+            $this->assertStringContainsString($field, $workflowContents, "AiStudyCardDesktopWorkflow must define data field: $field");
+        }
+
+        // VocabularyBox must NOT own these V5 data fields anymore.
+        $boxContents = file_get_contents($this->vocabularyBoxPath);
+        foreach ($requiredFields as $field) {
+            $this->assertStringNotContainsString($field, $boxContents, "VocabularyBox must NOT define data field: $field — it now lives in AiStudyCardDesktopWorkflow.");
         }
     }
 

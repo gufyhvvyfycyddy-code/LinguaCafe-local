@@ -6,22 +6,25 @@ use Tests\TestCase;
 
 /**
  * GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1
+ * + GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2
  *
  * Architecture guard tests for the desktop AIStudyCard V5 convergence.
  *
- * Previously VocabularySideBox.vue and VocabularyBox.vue each carried their
+ * Round 1 (GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1)
+ * previously VocabularySideBox.vue and VocabularyBox.vue each carried their
  * own copy of the V5 "generate study cards" flow: result template, confirm
- * dialog template, item-building logic, and POST request. Any future change
- * to V5 rules would have to be applied in two places, risking drift between
- * the wide-screen and narrow-screen experiences.
- *
- * This round extracts the shared surface into:
+ * dialog template, item-building logic, and POST request. That round
+ * extracted the shared V5 surface into:
  *   - resources/js/services/AiStudyCardGenerateCardsService.js (pure helpers)
  *   - resources/js/components/Text/AiStudyCardGenerateCardsDialog.vue (shared dialog)
  *   - resources/js/components/Text/AiStudyCardGenerateCardsResult.vue (shared result panel)
  *
- * Both desktop entry points (VocabularySideBox + VocabularyBox) now reference
- * these shared modules instead of duplicating the templates and logic.
+ * Round 2 (GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2) further
+ * converged the entire V1-V5 desktop workflow into a single feature island
+ * component AiStudyCardDesktopWorkflow.vue, which is now the only place that
+ * imports the shared dialog/result components and the shared V5 service
+ * helpers. VocabularySideBox.vue and VocabularyBox.vue no longer import the
+ * shared V5 modules directly — they render <AiStudyCardDesktopWorkflow />.
  *
  * These guards lock the convergence so a future edit cannot silently
  * re-introduce duplicate V5 templates / logic into either parent component.
@@ -30,9 +33,11 @@ use Tests\TestCase;
  *  1. Shared service file exists;
  *  2. Shared dialog component file exists;
  *  3. Shared result component file exists;
- *  4. VocabularySideBox references shared dialog + result;
- *  5. VocabularyBox references shared dialog + result;
- *  6. Both parents import the shared service helpers;
+ *  4. VocabularySideBox references the workflow feature island (which in turn
+ *     references shared dialog + result);
+ *  5. VocabularyBox references the workflow feature island (which in turn
+ *     references shared dialog + result);
+ *  6. AiStudyCardDesktopWorkflow imports the shared service helpers;
  *  7. Neither parent still contains the large duplicated V5 confirm dialog template;
  *  8. Neither parent still contains the large duplicated V5 result template;
  *  9. Neither parent duplicates buildGenerateCardItems item-construction logic;
@@ -48,6 +53,7 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
     private string $sideBoxPath;
     private string $boxPath;
     private string $bottomSheetPath;
+    private string $workflowPath;
     private string $dialogPath;
     private string $resultPath;
     private string $servicePath;
@@ -58,6 +64,7 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
         $this->sideBoxPath = resource_path('js/components/Text/VocabularySideBox.vue');
         $this->boxPath = resource_path('js/components/Text/VocabularyBox.vue');
         $this->bottomSheetPath = resource_path('js/components/Text/VocabularyBottomSheet.vue');
+        $this->workflowPath = resource_path('js/components/Text/AiStudyCardDesktopWorkflow.vue');
         $this->dialogPath = resource_path('js/components/Text/AiStudyCardGenerateCardsDialog.vue');
         $this->resultPath = resource_path('js/components/Text/AiStudyCardGenerateCardsResult.vue');
         $this->servicePath = resource_path('js/services/AiStudyCardGenerateCardsService.js');
@@ -88,45 +95,65 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
     }
 
     /**
-     * 4. VocabularySideBox must reference shared dialog + result components.
+     * 4. VocabularySideBox must reference the workflow feature island, which
+     *    in turn references the shared dialog + result components.
+     *
+     *    After Round 2 (GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2),
+     *    VocabularySideBox.vue no longer imports AiStudyCardGenerateCardsDialog
+     *    or AiStudyCardGenerateCardsResult directly. It renders
+     *    <AiStudyCardDesktopWorkflow />, which is the only place that imports
+     *    those shared V5 components.
      */
     public function test_side_box_references_shared_components(): void
     {
         $contents = file_get_contents($this->sideBoxPath);
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $contents, 'VocabularySideBox must import AiStudyCardGenerateCardsDialog.');
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $contents, 'VocabularySideBox must import AiStudyCardGenerateCardsResult.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $contents, 'VocabularySideBox must render <AiStudyCardGenerateCardsDialog>.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $contents, 'VocabularySideBox must render <AiStudyCardGenerateCardsResult>.');
-        // Registration in components:{...}
-        $this->assertStringContainsString('AiStudyCardGenerateCardsDialog,', $contents, 'VocabularySideBox must register AiStudyCardGenerateCardsDialog in components.');
-        $this->assertStringContainsString('AiStudyCardGenerateCardsResult,', $contents, 'VocabularySideBox must register AiStudyCardGenerateCardsResult in components.');
+        $this->assertStringContainsString("import AiStudyCardDesktopWorkflow from './AiStudyCardDesktopWorkflow.vue'", $contents, 'VocabularySideBox must import AiStudyCardDesktopWorkflow (the feature island).');
+        $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $contents, 'VocabularySideBox must render <AiStudyCardDesktopWorkflow> in template.');
+        $this->assertStringContainsString('AiStudyCardDesktopWorkflow,', $contents, 'VocabularySideBox must register AiStudyCardDesktopWorkflow in components.');
+
+        // The shared dialog/result are now imported only by the workflow component.
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsDialog.');
+        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $workflowContents, 'AiStudyCardDesktopWorkflow must import AiStudyCardGenerateCardsResult.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsDialog>.');
+        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $workflowContents, 'AiStudyCardDesktopWorkflow must render <AiStudyCardGenerateCardsResult>.');
     }
 
     /**
-     * 5. VocabularyBox must reference shared dialog + result components.
+     * 5. VocabularyBox must reference the workflow feature island, which in
+     *    turn references the shared dialog + result components.
      */
     public function test_vocabulary_box_references_shared_components(): void
     {
         $contents = file_get_contents($this->boxPath);
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsDialog from './AiStudyCardGenerateCardsDialog.vue'", $contents, 'VocabularyBox must import AiStudyCardGenerateCardsDialog.');
-        $this->assertStringContainsString("import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue'", $contents, 'VocabularyBox must import AiStudyCardGenerateCardsResult.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsDialog', $contents, 'VocabularyBox must render <AiStudyCardGenerateCardsDialog>.');
-        $this->assertStringContainsString('<AiStudyCardGenerateCardsResult', $contents, 'VocabularyBox must render <AiStudyCardGenerateCardsResult>.');
-        $this->assertStringContainsString('AiStudyCardGenerateCardsDialog,', $contents, 'VocabularyBox must register AiStudyCardGenerateCardsDialog in components.');
-        $this->assertStringContainsString('AiStudyCardGenerateCardsResult,', $contents, 'VocabularyBox must register AiStudyCardGenerateCardsResult in components.');
+        $this->assertStringContainsString("import AiStudyCardDesktopWorkflow from './AiStudyCardDesktopWorkflow.vue'", $contents, 'VocabularyBox must import AiStudyCardDesktopWorkflow (the feature island).');
+        $this->assertStringContainsString('<AiStudyCardDesktopWorkflow', $contents, 'VocabularyBox must render <AiStudyCardDesktopWorkflow> in template.');
+        $this->assertStringContainsString('AiStudyCardDesktopWorkflow,', $contents, 'VocabularyBox must register AiStudyCardDesktopWorkflow in components.');
+
+        // The shared dialog/result registration lives in the workflow component (single source of truth).
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString('AiStudyCardGenerateCardsDialog,', $workflowContents, 'AiStudyCardDesktopWorkflow must register AiStudyCardGenerateCardsDialog in components.');
+        $this->assertStringContainsString('AiStudyCardGenerateCardsResult,', $workflowContents, 'AiStudyCardDesktopWorkflow must register AiStudyCardGenerateCardsResult in components.');
     }
 
     /**
-     * 6. Both parents must import the shared service helpers.
+     * 6. AiStudyCardDesktopWorkflow (the feature island) must import the
+     *    shared service helpers. Parents no longer import these directly.
      */
     public function test_both_parents_import_shared_service_helpers(): void
     {
+        // The workflow component is now the only importer of the V5 helpers.
+        $workflowContents = file_get_contents($this->workflowPath);
+        $this->assertStringContainsString("from '../../services/AiStudyCardGenerateCardsService", $workflowContents, 'AiStudyCardDesktopWorkflow must import from AiStudyCardGenerateCardsService.');
+        $this->assertStringContainsString('buildGenerateCardItems', $workflowContents, 'AiStudyCardDesktopWorkflow must import buildGenerateCardItems.');
+        $this->assertStringContainsString('filterConfirmedGenerateCardItems', $workflowContents, 'AiStudyCardDesktopWorkflow must import filterConfirmedGenerateCardItems.');
+        $this->assertStringContainsString('generateAiStudyCards', $workflowContents, 'AiStudyCardDesktopWorkflow must import generateAiStudyCards.');
+
+        // Parents must NOT import the shared service helpers directly anymore.
+        // Match both './' and '../../' prefix variants to be robust.
         foreach ([$this->sideBoxPath => 'VocabularySideBox', $this->boxPath => 'VocabularyBox'] as $path => $label) {
             $contents = file_get_contents($path);
-            $this->assertStringContainsString("from './../../services/AiStudyCardGenerateCardsService'", $contents, "$label must import from AiStudyCardGenerateCardsService.");
-            $this->assertStringContainsString('buildGenerateCardItems', $contents, "$label must import buildGenerateCardItems.");
-            $this->assertStringContainsString('filterConfirmedGenerateCardItems', $contents, "$label must import filterConfirmedGenerateCardItems.");
-            $this->assertStringContainsString('generateAiStudyCards', $contents, "$label must import generateAiStudyCards.");
+            $this->assertStringNotContainsString('services/AiStudyCardGenerateCardsService', $contents, "$label must NOT import AiStudyCardGenerateCardsService directly — use <AiStudyCardDesktopWorkflow> instead.");
         }
     }
 
@@ -263,7 +290,7 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
             'http://api.',
         ];
 
-        $paths = [$this->sideBoxPath, $this->boxPath, $this->dialogPath, $this->resultPath, $this->servicePath];
+        $paths = [$this->sideBoxPath, $this->boxPath, $this->workflowPath, $this->dialogPath, $this->resultPath, $this->servicePath];
         foreach ($paths as $path) {
             if (!file_exists($path)) {
                 continue;
@@ -291,7 +318,7 @@ class AiStudyCardV5DesktopArchitectureGuardTest extends TestCase
             "target_type' => 'word'",
         ];
 
-        $paths = [$this->sideBoxPath, $this->boxPath, $this->dialogPath, $this->resultPath, $this->servicePath];
+        $paths = [$this->sideBoxPath, $this->boxPath, $this->workflowPath, $this->dialogPath, $this->resultPath, $this->servicePath];
         foreach ($paths as $path) {
             if (!file_exists($path)) {
                 continue;
