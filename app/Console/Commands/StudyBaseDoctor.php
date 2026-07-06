@@ -46,6 +46,50 @@ suggests corrections, and applies them with --fix.';
     ];
 
     /**
+     * Words that ARE the base form even though they look inflected.
+     * computeLemma returns them unchanged so the doctor does not suggest
+     * bogus lemmas like this→thi, indeed→inde, breed→bre, etc.
+     *
+     * These are words ECDICT happens to contain bogus short stems for
+     * (thi, inde, bre, ble, gre, twe) which the old -ed/-s rules used to
+     * pick up. The list is intentionally tiny and only covers words that
+     * have actually been observed as doctor false positives.
+     */
+    private const PROTECTED_BASE_WORDS = [
+        // Pronouns / function words
+        'this', 'that', 'those', 'these',
+        // Adverbs / discourse markers ending in -ed
+        'indeed', 'instead',
+        // -eed words that ARE the base form (verb or noun)
+        'breed', 'bleed', 'greed', 'tweed', 'knead',
+        // Philosophy-text sanity guards: must NOT be over-lemmatized
+        'recently', 'code', 'red', 'bed',
+    ];
+
+    /**
+     * ECDICT stems that exist in the dictionary but are NOT valid English
+     * lemmas. When the -ed/-s rules hit one of these stems, they must
+     * keep looking (stem+'e', etc.) instead of returning the bogus stem.
+     *
+     * Example: derived → stem "deriv" exists in ECDICT, but the real
+     * lemma is "derive". Without this guard the doctor would suggest
+     * derived→deriv.
+     */
+    private const BAD_STEMS = [
+        'deriv',  // derive (derived → derive, not deriv)
+        'thi',    // this (this → this, not thi)
+        'inde',   // indeed (indeed → indeed, not inde)
+        'bre',    // breed (breed → breed, not bre)
+        'ble',    // bleed (bleed → bleed, not ble)
+        'fre',    // free (freed → free, not fre)
+        'gre',    // greed (greed → greed, not gre)
+        'twe',    // tweed (tweed → tweed, not twe)
+        'explor', // explore (explored → explore, not explor)
+        'not',    // note (noted → note, not not — 'not' is a real word but not the lemma of 'noted')
+        'stat',   // state (stated → state, not stat)
+    ];
+
+    /**
      * Tier 1: Known bad lemmas produced by the old PHP fallback (pre-Commit-1 fix).
      * These are hardcoded stem+'e' errors on regular -ed/-ing verbs, and
      * double-consonant errors (called→cal instead of call).
@@ -305,7 +349,23 @@ suggests corrections, and applies them with --fix.';
             ];
 
             if ($fix) {
+                // Repair study_base (primary goal of this phase).
                 $word->study_base = $suggested;
+                // Also repair lemma / base_word when they are stuck at the
+                // surface form (self-lemma). This is the philosophy-text
+                // case where the old PHP fallback produced construed→construed
+                // instead of construed→construe. We only touch lemma/base_word
+                // when they equal the surface — never overwrite a user-set
+                // value that differs from the surface.
+                $lowerSurface = mb_strtolower($word->word, 'UTF-8');
+                $lowerLemma = mb_strtolower((string) $word->lemma, 'UTF-8');
+                $lowerBaseWord = mb_strtolower((string) $word->base_word, 'UTF-8');
+                if ($lowerLemma === $lowerSurface) {
+                    $word->lemma = $suggested;
+                }
+                if ($lowerBaseWord === $lowerSurface) {
+                    $word->base_word = $suggested;
+                }
                 $word->save();
                 $this->stats['fixed']++;
             }
@@ -379,6 +439,13 @@ suggests corrections, and applies them with --fix.';
             return $lower;
         }
 
+        // Protected base words: these ARE the base form even though they
+        // look inflected (this, indeed, breed, etc.). Return unchanged so
+        // the doctor does not suggest bogus lemmas.
+        if (in_array($lower, self::PROTECTED_BASE_WORDS, true)) {
+            return $lower;
+        }
+
         // Structural markers
         if (preg_match('/^(paragraph_break|newline|\[[a-z]\]|zz(para|newl|sect))/i', $lower)) {
             return $lower;
@@ -406,16 +473,17 @@ suggests corrections, and applies them with --fix.';
             return $this->ecdictSafe($m[1] . $m[2], $lower);
         }
 
-        // -es
-        if (preg_match('/^(.+)es$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
+        // -es (require stem length >= 3 to avoid this→th+is, be→b+es, etc.)
+        if (preg_match('/^(.+)es$/u', $lower, $m) && mb_strlen($m[1]) >= 3) {
             if ($this->ecdictExists($m[1] . 'e')) return $m[1] . 'e';
-            if ($this->ecdictExists($m[1])) return $m[1];
+            // Skip bogus stems (BAD_STEMS); only return stem if it is a real word
+            if (!in_array($m[1], self::BAD_STEMS, true) && $this->ecdictExists($m[1])) return $m[1];
             return $this->ecdictSafe($m[1] . 'e', $lower);
         }
 
-        // -s
+        // -s (skip bogus stems like "thi" which ECDICT contains but is not a real lemma)
         if (preg_match('/^(.+)s$/u', $lower, $m) && mb_strlen($m[1]) >= 3) {
-            if ($this->ecdictExists($m[1])) return $m[1];
+            if (!in_array($m[1], self::BAD_STEMS, true) && $this->ecdictExists($m[1])) return $m[1];
         }
 
         // -ing (with ll/ss/zz → bare stem, others → de-double)
@@ -436,8 +504,8 @@ suggests corrections, and applies them with --fix.';
             if ($this->ecdictExists($stem . 'e')) return $stem . 'e';
         }
 
-        // -ed (with ll/ss/zz → bare stem, others → de-double)
-        if (preg_match('/^(.+)ed$/iu', $lower, $m) && mb_strlen($m[1]) >= 2) {
+        // -ed (require stem length >= 3 to avoid need→ne+ed, feed→fe+ed, etc.)
+        if (preg_match('/^(.+)ed$/iu', $lower, $m) && mb_strlen($m[1]) >= 3) {
             $stem = $m[1];
             if (mb_strlen($stem) >= 3 && mb_substr($stem, -1) === mb_substr($stem, -2, 1)) {
                 $lastChar = mb_substr($stem, -1);
@@ -449,7 +517,8 @@ suggests corrections, and applies them with --fix.';
             }
             // No double consonant: try bare stem FIRST, then -ied→-y, then +e
             // (bare stem prevents opened→opene when "opene" exists in ECDICT)
-            if ($this->ecdictExists($stem)) return $stem;
+            // (BAD_STEMS guard prevents derived→deriv, freed→fre, etc.)
+            if (!in_array($stem, self::BAD_STEMS, true) && $this->ecdictExists($stem)) return $stem;
             if (preg_match('/^(.+)i$/u', $stem, $m2)) {
                 if ($this->ecdictExists($m2[1] . 'y')) return $m2[1] . 'y';
             }

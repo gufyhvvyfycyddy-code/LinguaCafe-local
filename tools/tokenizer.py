@@ -715,12 +715,15 @@ def language_health(lang, lightweight=True):
 
 
 def english_lemma_health():
-    """Check English lemmatization accuracy with irregular cases.
+    """Check English lemmatization accuracy with irregular cases and
+    philosophy-text inflected forms (past tense / past participle / plural).
+
     Loads English spaCy model and LemmInflect ONCE, then runs all samples.
 
-    Returns list of check results with surface, expected, actual, passed keys.
-    Safe: catches exceptions per-case, returns failing check with error.
-    If English model or LemmInflect is unavailable, all checks fail with error."""
+    Returns list of check results with surface, expected, actual, passed,
+    category keys. Safe: catches exceptions per-case, returns failing check
+    with error. If English model or LemmInflect is unavailable, all checks
+    fail with error."""
     results = []
     irregular_cases = [
         ('ran',    'VERB', 'run'),
@@ -733,6 +736,30 @@ def english_lemma_health():
         ('children','NOUN','child'),
         ('studies','VERB', 'study'),
         ('was',    'VERB', 'be'),
+    ]
+    # Philosophy-text inflected forms: past tense / past participle / plural
+    # that the old PHP fallback used to leave as their own lemma. The live
+    # Python tokenizer must merge these to the base verb / noun.
+    philosophy_cases = [
+        ('construed',    'VERB', 'construe'),
+        ('mediated',     'VERB', 'mediate'),
+        ('constituted',  'VERB', 'constitute'),
+        ('presupposed',  'VERB', 'presuppose'),
+        ('determined',   'VERB', 'determine'),
+        ('derived',      'VERB', 'derive'),
+        ('grounded',     'VERB', 'ground'),
+        ('posited',      'VERB', 'posit'),
+        ('interpreted',  'VERB', 'interpret'),
+        ('conditions',   'NOUN', 'condition'),
+    ]
+    # Sanity guards: these must NOT be over-lemmatized by the live tokenizer.
+    # They are included so tokenizer:doctor can flag regressions where a
+    # philosophy-text fix accidentally breaks short common words.
+    philosophy_guard_cases = [
+        ('recently', 'ADV', 'recently'),
+        ('code',     'NOUN', 'code'),
+        ('red',      'ADJ',  'red'),
+        ('bed',      'NOUN', 'bed'),
     ]
     # Load English model and LemmInflect once, outside the loop
     nlp = None
@@ -747,13 +774,20 @@ def english_lemma_health():
     except Exception:
         pass
 
-    for surface, pos, expected in irregular_cases:
+    all_cases = (
+        [(s, p, e, 'irregular') for s, p, e in irregular_cases]
+        + [(s, p, e, 'philosophy') for s, p, e in philosophy_cases]
+        + [(s, p, e, 'philosophy_guard') for s, p, e in philosophy_guard_cases]
+    )
+
+    for surface, pos, expected, category in all_cases:
         check = {
             'surface': surface,
             'expected': expected,
             'actual': None,
             'passed': False,
             'error': None,
+            'category': category,
         }
         if nlp is None:
             check['error'] = 'en_core_web_sm not loaded'
@@ -816,6 +850,10 @@ def health_check():
             'lemminflect_available': False,
             'lemma_checks': [],
             'checks_passed': False,
+            'philosophy_lemma_checks': [],
+            'philosophy_checks_passed': False,
+            'philosophy_guard_checks': [],
+            'philosophy_guard_checks_passed': False,
         },
         'checks': {},
     }
@@ -859,7 +897,9 @@ def health_check():
     except Exception as e:
         result['checks']['lemminflect'] = {'passed': False, 'error': str(e)}
 
-    # English irregular lemma check (replicate full tokenizeText pipeline)
+    # English irregular lemma check (replicate full tokenizeText pipeline).
+    # lemma_results includes irregular + philosophy + philosophy_guard cases,
+    # each tagged with a 'category' field.
     lemma_results = english_lemma_health()
     result['english_irregular'] = []
     for cr in lemma_results:
@@ -872,6 +912,33 @@ def health_check():
         'total': len(lemma_results),
         'passed_count': sum(1 for cr in lemma_results if cr.get('passed', False)),
         'failed_count': sum(1 for cr in lemma_results if not cr.get('passed', False)),
+    }
+
+    # Philosophy-text inflected form checks (past tense / past participle /
+    # plural). These are the cases the old PHP fallback used to leave as their
+    # own lemma. The live Python tokenizer must merge them to the base form.
+    philosophy_results = [cr for cr in lemma_results if cr.get('category') == 'philosophy']
+    result['english']['philosophy_lemma_checks'] = philosophy_results
+    philosophy_passed = all(cr.get('passed', False) for cr in philosophy_results) if philosophy_results else False
+    result['english']['philosophy_checks_passed'] = philosophy_passed
+    result['checks']['english_philosophy_lemma'] = {
+        'passed': philosophy_passed,
+        'total': len(philosophy_results),
+        'passed_count': sum(1 for cr in philosophy_results if cr.get('passed', False)),
+        'failed_count': sum(1 for cr in philosophy_results if not cr.get('passed', False)),
+    }
+
+    # Philosophy sanity guards: short common words that must NOT be
+    # over-lemmatized (recently→recently, code→code, red→red, bed→bed).
+    guard_results = [cr for cr in lemma_results if cr.get('category') == 'philosophy_guard']
+    result['english']['philosophy_guard_checks'] = guard_results
+    guard_passed = all(cr.get('passed', False) for cr in guard_results) if guard_results else False
+    result['english']['philosophy_guard_checks_passed'] = guard_passed
+    result['checks']['english_philosophy_guard'] = {
+        'passed': guard_passed,
+        'total': len(guard_results),
+        'passed_count': sum(1 for cr in guard_results if cr.get('passed', False)),
+        'failed_count': sum(1 for cr in guard_results if not cr.get('passed', False)),
     }
 
     # Overall status

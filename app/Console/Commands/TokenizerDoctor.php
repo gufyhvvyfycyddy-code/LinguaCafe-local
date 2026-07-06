@@ -20,8 +20,10 @@ Checks:
   2. spaCy en_core_web_sm model loaded
   3. spaCy returns correct lemmas for opened→open, called→call
   4. LemmInflect importable and returns correct lemmas
-   5. English irregular lemma cases (ran→run, mice→mouse, better→good, etc.)
-   6. (optional) Scan encountered_words for known bad lemmas';
+  5. English irregular lemma cases (ran→run, mice→mouse, better→good, etc.)
+  6. English philosophy-text lemma cases (construed→construe, mediated→mediate, etc.)
+  7. English philosophy sanity guards (recently→recently, code→code, red→red, bed→bed)
+  8. (optional) Scan encountered_words for known bad lemmas';
 
     /**
      * Known bad lemmas that the old PHP fallback could produce.
@@ -73,6 +75,10 @@ Checks:
             'test_cases' => [],
             'english_irregular_cases' => [],
             'english_irregular_correct' => false,
+            'philosophy_lemma_cases' => [],
+            'philosophy_lemma_correct' => false,
+            'philosophy_guard_cases' => [],
+            'philosophy_guard_correct' => false,
             'bad_lemmas' => [],
         ];
 
@@ -125,8 +131,29 @@ Checks:
                     $irregular = $lemmaChecks;
                 }
                 $results['english_irregular_cases'] = $irregular;
-                $results['english_irregular_correct'] = !empty($irregular)
-                    && collect($irregular)->every(fn ($c) => ($c['passed'] ?? false) === true);
+                // When category field exists (new health endpoint), irregular_correct
+                // only reflects irregular category, not philosophy/guard cases.
+                $hasCategory = collect($irregular)->contains(fn ($c) => isset($c['category']));
+                if ($hasCategory) {
+                    $irregularOnly = collect($irregular)->filter(fn ($c) => ($c['category'] ?? '') === 'irregular')->values()->all();
+                    $results['english_irregular_correct'] = !empty($irregularOnly)
+                        && collect($irregularOnly)->every(fn ($c) => ($c['passed'] ?? false) === true);
+                } else {
+                    $results['english_irregular_correct'] = !empty($irregular)
+                        && collect($irregular)->every(fn ($c) => ($c['passed'] ?? false) === true);
+                }
+
+                // Philosophy-text inflected form cases (construed→construe, etc.)
+                $philosophyChecks = $englishInfo['philosophy_lemma_checks'] ?? [];
+                $results['philosophy_lemma_cases'] = $philosophyChecks;
+                $results['philosophy_lemma_correct'] = !empty($philosophyChecks)
+                    && collect($philosophyChecks)->every(fn ($c) => ($c['passed'] ?? false) === true);
+
+                // Philosophy sanity guards (recently→recently, code→code, etc.)
+                $guardChecks = $englishInfo['philosophy_guard_checks'] ?? [];
+                $results['philosophy_guard_cases'] = $guardChecks;
+                $results['philosophy_guard_correct'] = !empty($guardChecks)
+                    && collect($guardChecks)->every(fn ($c) => ($c['passed'] ?? false) === true);
             }
         }
 
@@ -145,7 +172,9 @@ Checks:
         $allOk = $results['tokenizer_reachable']
             && $results['spacy_model_loaded']
             && $results['spacy_lemmas_correct']
-            && $results['english_irregular_correct'];
+            && $results['english_irregular_correct']
+            && $results['philosophy_lemma_correct']
+            && $results['philosophy_guard_correct'];
 
         if (!$allOk) {
             return 1;
@@ -290,10 +319,17 @@ Checks:
 
         // 5. English irregular lemmas
         $irregular = $results['english_irregular_cases'] ?? [];
-        if (!empty($irregular)) {
+        // Filter to only irregular category (legacy behavior) when category exists
+        $irregularOnly = $irregular;
+        $hasCategory = collect($irregular)->contains(fn ($c) => isset($c['category']));
+        if ($hasCategory) {
+            $irregularOnly = collect($irregular)->filter(fn ($c) => ($c['category'] ?? '') === 'irregular')->values()->all();
+        }
+        if (!empty($irregularOnly)) {
             $passed = $results['english_irregular_correct'];
+            // If we have category info, irregular_correct only reflects irregular cases
             $parts = [];
-            foreach ($irregular as $c) {
+            foreach ($irregularOnly as $c) {
                 $surface = $c['surface'] ?? '?';
                 $expected = $c['expected'] ?? '?';
                 $actual = $c['actual'] ?? '?';
@@ -310,6 +346,44 @@ Checks:
                 'English irregular lemma cases',
                 false,
                 'Not available — tokenizer health endpoint may be outdated. Run: tokenizer-start.bat'
+            );
+        }
+
+        // 5b. Philosophy-text inflected form lemmas (construed→construe, etc.)
+        $philosophy = $results['philosophy_lemma_cases'] ?? [];
+        if (!empty($philosophy)) {
+            $passed = $results['philosophy_lemma_correct'];
+            $parts = [];
+            foreach ($philosophy as $c) {
+                $surface = $c['surface'] ?? '?';
+                $expected = $c['expected'] ?? '?';
+                $actual = $c['actual'] ?? '?';
+                $flag = ($c['passed'] ?? false) ? '' : ' ✗';
+                $parts[] = "{$surface}→{$actual}(expected:{$expected}){$flag}";
+            }
+            $this->renderCheck(
+                'English philosophy-text lemma cases (construed→construe, mediated→mediate, etc.)',
+                $passed,
+                implode(', ', $parts)
+            );
+        }
+
+        // 5c. Philosophy sanity guards (recently→recently, code→code, etc.)
+        $guards = $results['philosophy_guard_cases'] ?? [];
+        if (!empty($guards)) {
+            $passed = $results['philosophy_guard_correct'];
+            $parts = [];
+            foreach ($guards as $c) {
+                $surface = $c['surface'] ?? '?';
+                $expected = $c['expected'] ?? '?';
+                $actual = $c['actual'] ?? '?';
+                $flag = ($c['passed'] ?? false) ? '' : ' ✗';
+                $parts[] = "{$surface}→{$actual}(expected:{$expected}){$flag}";
+            }
+            $this->renderCheck(
+                'English philosophy sanity guards (recently→recently, code→code, red→red, bed→bed)',
+                $passed,
+                implode(', ', $parts)
             );
         }
 
@@ -333,7 +407,9 @@ Checks:
         $allOk = $results['tokenizer_reachable']
             && $results['spacy_model_loaded']
             && $results['spacy_lemmas_correct']
-            && $results['english_irregular_correct'];
+            && $results['english_irregular_correct']
+            && $results['philosophy_lemma_correct']
+            && $results['philosophy_guard_correct'];
 
         if ($allOk) {
             $this->info('✓ Tokenizer is healthy.');
