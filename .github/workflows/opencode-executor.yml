@@ -331,6 +331,8 @@ jobs:
       # -------------------------------------------------------
       - name: Post result comment
         id: report
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ATTEMPT="${{ steps.attempt.outputs.value }}"
           PR_CREATED="${{ steps.pr.outputs.created }}"
@@ -386,6 +388,8 @@ jobs:
       # Step 13: Update labels
       # -------------------------------------------------------
       - name: Update labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ATTEMPT="${{ steps.attempt.outputs.value }}"
           STATUS="${{ steps.report.outputs.status }}"
@@ -416,6 +420,8 @@ jobs:
       # -------------------------------------------------------
       - name: Trigger auto-fix scheduler on failure
         if: steps.report.outputs.status == 'failed'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ATTEMPT="${{ steps.attempt.outputs.value }}"
 
