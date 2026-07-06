@@ -99,27 +99,26 @@ jobs:
       # -------------------------------------------------------
       # Step 6: Parse task from comment
       # -------------------------------------------------------
-      - name: Parse task from comment
+      - name: Save comment body to file
         id: parse
         run: |
-          BODY="${{ github.event.comment.body }}"
+          # Extract comment body from the GitHub event JSON payload (safe for multi-line)
+          jq -r '.comment.body' "$GITHUB_EVENT_PATH" > /tmp/opencode_comment_body.txt
 
-          # Remove the trigger prefix (/opencode or /oc)
-          TASK=$(echo "$BODY" | sed 's/^\/opencode\s*//;s/^\/oc\s*//')
+          # Also save the issue/PR number
+          ISSUE_NUM=$(jq -r '.issue.number // .pull_request.number' "$GITHUB_EVENT_PATH")
+          echo "issue_number=$ISSUE_NUM" >> $GITHUB_OUTPUT
 
-          TARGET_TYPE="issue"
-          if [ -n "${{ github.event.issue.pull_request.url }}" ]; then
-            TARGET_TYPE="pr"
+          # Check if it's a PR
+          PR_URL=$(jq -r '.issue.pull_request.url // ""' "$GITHUB_EVENT_PATH")
+          if [ -n "$PR_URL" ] && [ "$PR_URL" != "null" ]; then
+            echo "target_type=pr" >> $GITHUB_OUTPUT
+          else
+            echo "target_type=issue" >> $GITHUB_OUTPUT
           fi
 
-          echo "task<<EOF" >> $GITHUB_OUTPUT
-          echo "$TASK" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
-          echo "target_type=$TARGET_TYPE" >> $GITHUB_OUTPUT
-          echo "target_number=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
-
-          echo "TASK=$TASK" >> $GITHUB_ENV
-          echo "TARGET_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_ENV
+          # Remove /opencode or /oc prefix and save as task
+          sed 's/^\/opencode\s*//;s/^\/oc\s*//' /tmp/opencode_comment_body.txt > /tmp/opencode_task.txt
 
       # -------------------------------------------------------
       # Step 7: Determine attempt number from labels
@@ -174,7 +173,8 @@ jobs:
           OPENCODE_SERVER_PASSWORD: ""
         shell: bash
         run: |
-          TASK_CONTENT="${{ steps.parse.outputs.task }}"
+          # Read task from file (handles multi-line safely)
+          TASK_CONTENT=$(cat /tmp/opencode_task.txt)
 
           FULL_PROMPT=$(cat <<-PROMPT_END
           ## Task (Attempt ${{ steps.attempt.outputs.value }})
