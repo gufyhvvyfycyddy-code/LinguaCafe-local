@@ -1,10 +1,11 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-07 (CodeX-SenseHttpControllerBoundaries-1)
+> **最后更新**：2026-07-07 (CodeX-AIStudyCardV6Preflight-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
 > **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
+> **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` 与 `docs/plans/ai-study-card-v6-preflight-plan.md`。V6 仍未实现；本轮只建立 preflight 架构门和 guard。
 
 ---
 

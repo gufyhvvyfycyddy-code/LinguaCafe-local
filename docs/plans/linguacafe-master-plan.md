@@ -776,3 +776,54 @@
 7. 是否需要 MCP Chrome 真实页面验收？
 
 不能回答时，下一步不是功能实现，而是先建立架构。
+
+---
+
+## 2026-07-07 CodeX-AIStudyCardV6Preflight-1
+
+**任务**：查看大计划后进入下一步：AI Study Card V6 前置架构门。
+
+**选择理由**：`current-working-handoff.md` §5 把下一候选方向指向 V6 前置设计。V1-V5 已完成本地闭环，但 V6 涉及真实 AI provider / API key / 自动推荐 / 自动释义，是高风险边界；直接实现会制造新的耦合和安全风险。因此本轮只做 preflight，不接真实 AI。
+
+### 新增文档
+
+- `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`
+  - 冻结 V6 的真实 AI 边界。
+  - 明确 V6 只代表 AI 推荐候选，不代表自动建卡。
+  - 明确 provider 调用必须 backend-only、显式用户动作触发、默认 fail closed。
+  - 禁止 API key 出现在代码、前端、文档示例、日志、DB、response payload。
+  - 禁止 provider 输出绕过用户确认直接创建 `WordSense` / `ReviewCard`。
+  - 禁止写 `ReviewLog` 或改 FSRS。
+
+- `docs/plans/ai-study-card-v6-preflight-plan.md`
+  - 冻结 V6 分阶段路线：V6-1 request package preview、V6-2 provider adapter stub disabled by default、V6-3 real provider integration、V6-4 UX integration。
+  - 定义候选 schema：`ai-study-card-v6-request-package-v1` 与 `ai-study-card-v6-recommendation-package-v1`。
+  - 明确 V6 必须回流到现有 V4/V5 用户确认路径，不能新建第二条卡片创建路径。
+
+### 新增 guard 测试
+
+- `tests/Feature/AiStudyCardV6PreflightArchitectureGuardTest.php`
+  - 验证 ADR 和 preflight plan 存在。
+  - 验证文档明确 V6 是 pre-implementation gate，不是实现。
+  - 验证当前 routes 未暴露 V6 provider route。
+  - 验证当前 AI Study Card 前后端关键 surface 没有真实 provider URL / API key pattern。
+  - 验证文档索引注册 ADR-0004 和 V6 preflight plan。
+
+### 不做范围
+
+- 不接真实 AI provider。
+- 不新增 API key。
+- 不修改 `.env`。
+- 不新增真实 V6 route。
+- 不自动推荐。
+- 不自动释义。
+- 不自动创建 WordSense / ReviewCard。
+- 不写 ReviewLog。
+- 不改 FSRS。
+- 不改 V1-V5 业务逻辑。
+- 不改 Vue 产品流程。
+- 不新增 migration。
+
+### 后续允许的下一小步
+
+V6-1：只实现 provider-disabled request-package preview。它仍不调用 AI，只构造 `ai-study-card-v6-request-package-v1`，用于用户复制或后续 provider stub 测试。
