@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-04 (GLM-ReadingInlineConfirmationManagementSurface-1000-1).
+> **Last updated**: 2026-07-07 (CodeX-SenseHttpControllerBoundaries-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -11,9 +11,10 @@ Read these in order for a new Codex / OpenCode / CodeBuddy / WorkBuddy task:
 
 1. `docs/plans/current-working-handoff.md` — current short-term workbench, current decisions, and next candidates.
 2. `docs/plans/linguacafe-master-plan.md` — long-term ledger of product lines, completed work, and preserved future directions.
-3. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
-4. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
-5. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).
+3. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
+4. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
+5. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
+6. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).
 
 Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_STATUS.md`, or `docs/FSRS_PHASE*.md`. Those are historical references.
 
@@ -28,7 +29,7 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Architecture closure | Final closure conclusion and next-stage roadmap | `final-architecture-closure-report.md` |
 | Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
-| Module contracts | Stable module boundaries and output contracts | `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
+| Module contracts | Stable module boundaries and output contracts | `docs/architecture/sense-http-controller-boundaries.md`, `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
 | Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
 | Architecture scout | Read-only architecture investigation reports | `docs/plans/ai-study-card-architecture-scout.md` |
 | Product principles | Long-term product direction, function constraints, and legacy cleanup plan | `docs/plans/product-principles-and-legacy-cleanup-plan.md` |
@@ -43,6 +44,7 @@ New rules and process notes are documented in:
 - `vibe-coding-collaboration-rules.md` §25 — 计划审查规则（入任务前审查全部未满项）。
 - `vibe-coding-collaboration-rules.md` §26 — 模式选择规则（OpenCode 微任务 / Codex 目标模式）。
 - `vibe-coding-collaboration-rules.md` §27 — 高内聚低耦合架构规则与 GLM 1000% 分层规则、MCP 词元测试样本治理规则、视频字幕架构经验规则。§27.0 第一硬原则：代码安全性和稳定性优先于功能速度。
+- `docs/architecture/sense-http-controller-boundaries.md` — sense / review-assist / pending-sense / manual-sense HTTP Controller 落位规则。新功能若无清晰归属，必须先建架构再实现。
 - `repo-architecture-hotspot-audit.md` §8.5 — 下一轮架构优化必须遵守的边界。
 - `mcp-chrome-local-smoke-playbook.md` §8 — Lemma / Morphology click sample rotation（词元测试样本轮换操作指南）。
 - `morphology-test-sample-tracker.md` — MCP 词元测试样本追踪文档（每轮 marker / 文章 / 测试词 / 重复比例 / 8 类覆盖 / 真实点击标记 / API 替代标记 / Incomplete 标记）。

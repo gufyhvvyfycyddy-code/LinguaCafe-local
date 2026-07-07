@@ -3,8 +3,8 @@
 > **契约锁定日期**：2026-07-01
 > **最新边界更新**：2026-07-07
 > **基准 commit**：`36f86ec`
-> **最新核验 commit**：`4ba6a8d`
-> **契约性质**：锁定 source context 查询、恢复、写回和多来源列表边界；小步补测试和文档，不改页面交互。
+> **最新 HTTP 边界核验 commit**：`af4c439`
+> **契约性质**：锁定 source context 查询、恢复、写回和多来源列表边界。source context / 查看原文 / 来源上下文在产品上归类为复习辅助功能，HTTP 入口归属 `SenseSourceContextController`。
 
 ---
 
@@ -17,7 +17,7 @@
 5. 补充少量 characterization tests。
 6. 不修改 `SenseSourceContextService`。
 7. 不修改 `SenseTokenPayloadService`。
-8. 不改 Vue / Controller / route / API shape。
+8. 不改 Vue / route / API shape。HTTP Controller 已拆分为 `SenseSourceContextController`；后续只允许作为 thin wrapper 调用 service。
 
 ---
 
@@ -29,9 +29,9 @@
 - 复习页弹窗：source context 区域
 
 **Controller**：
-`SenseOccurrenceController::sourceContext(int $id)` — `GET /senses/{sense}/source-context`
+`SenseSourceContextController::sourceContext(int $id)` — `GET /senses/{sense}/source-context`
 
-`SenseOccurrenceController::sourceContextList(int $id)` — `GET /senses/{sense}/source-context-list`
+`SenseSourceContextController::sourceContextList(int $id)` — `GET /senses/{sense}/source-context-list`
 
 **Service**：
 `SenseSourceContextService::sourceContext(int $userId, string $language, int $senseId): array`

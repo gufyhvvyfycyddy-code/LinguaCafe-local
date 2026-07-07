@@ -34,7 +34,7 @@
 
 - **文件**：`VocabularySearchBox.vue` → `VocabularySideBox.vue` + `WordSensesList.vue`
 - **当前能力**：用户在阅读页点词后，可在右侧面板手动搜索并添加 WordSense
-- **后端**：`SenseOccurrenceController::storeManualSense` → `WordSenseService::createManualSense`
+- **后端**：`ManualWordSenseController::storeManualSense` → `WordSenseService::createManualSense`
 - **数据流**：用户输入 lemma, pos, sense_zh → 创建 WordSense → 创建 ReviewCard → 成为可复习卡
 - **风险等级**：中（涉及 WordSense 创建和 ReviewCard 创建）
 - **未来角色**：手动添加释义是最简单的“直接生成示意卡”路径
@@ -118,7 +118,7 @@
 
 | 文件 | 当前职责 | 未来作用 | 风险 | 第一轮改？ |
 |------|---------|---------|------|-----------|
-| `SenseOccurrenceController::storeManualSense` | 创建手动 WordSense | 用户手动添加释义的入口基本可用 | 低 | ❌ 不改 |
+| `ManualWordSenseController::storeManualSense` | 创建手动 WordSense | 用户手动添加释义的入口基本可用 | 低 | ❌ 不改 |
 | `WordSenseService::createManualSense` | 创建 WordSense + ReviewCard | 核心创建逻辑可复用 | 中 | ❌ 不改 |
 
 ### AI 推荐词 → 全新功能

@@ -715,3 +715,64 @@
 - 更宽的 WordSense 全量测试命令被工具层拦截，本轮未声称全量通过。
 
 **完成后代码屎山评分**：7.1 / 10。
+
+---
+
+## 2026-07-07 CodeX-SenseHttpControllerBoundaries-1
+
+**任务**：收尾 SenseOccurrenceController 治理，并建立后续功能落位架构。
+
+**背景**：用户明确要求，后续新增功能必须先说明其所在架构；如果架构不存在，先建立架构，再做功能，避免继续生成“屎山”。
+
+### 已完成的 Controller 收口
+
+- `ba75783 architecture-cleanup`：抽出 `SenseOccurrencePayloadSerializerService`。
+- `dec9ff4 refactor: extract sense occurrence examples service`：抽出 examples 查询与 payload。
+- `bd68620 refactor: extract inline confirmation controller`：抽出阅读中词义确认入口到 `ReadingInlineSenseConfirmationController`。
+- `646b225 refactor: extract source context controller`：抽出来源上下文入口到 `SenseSourceContextController`；产品归类为“复习辅助功能”。
+- `9eeb573 refactor: extract sense occurrence action controller`：抽出单条“处理待确认词义”动作到 `SenseOccurrenceActionController`。
+- `02cfbc9 refactor: extract sense occurrence bulk action controller`：抽出批量“处理待确认词义”动作到 `SenseOccurrenceBulkActionController`。
+- `af4c439 refactor: extract manual word sense controller`：抽出手动词义创建/编辑/归档到 `ManualWordSenseController`。
+
+### 新架构文档
+
+新增 `docs/architecture/sense-http-controller-boundaries.md`，作为 sense / review-adjacent HTTP 功能落位的当前架构契约。后续相关功能必须先查该文件。
+
+文档明确：
+
+- 用户侧 product wording：occurrence action 叫“处理待确认词义”。
+- `source context / 查看原文 / 来源上下文` 归类为“复习辅助功能”，不是 reader-only 功能。
+- `SenseOccurrenceController` 只保留查询/候选/预览/例句薄包装，不再承接写入型动作。
+- 新功能若没有明确 Controller / Service / serializer 归属，必须先建架构，不得直接开发。
+- 每次 Controller 迁移必须有 route guard、old-controller forbidden guard、新 Controller method guard、行为测试和必要的 MCP Chrome 验收。
+
+### 同步更新文档
+
+- `docs/DOCUMENTATION_INDEX.md`：把 `docs/architecture/sense-http-controller-boundaries.md` 放入新任务必读入口和 Module contracts 层。
+- `docs/plans/current-working-handoff.md`：顶部新增当前架构硬规则。
+- `docs/plans/sense-source-context-contract.md`：把 source context Controller 引用更新为 `SenseSourceContextController`，并注明复习辅助功能归类。
+- `docs/plans/right-click-panel-word-sense-plan.md`：把手动释义链路更新为 `ManualWordSenseController.storeManualSense()`。
+- `docs/plans/ai-study-card-architecture-scout.md`：把手动释义后端入口更新为 `ManualWordSenseController::storeManualSense`。
+
+### 当前 Controller 边界摘要
+
+- `SenseOccurrenceController`：查询/候选/known sense lookup/read-only inline preview/duplicates/examples。
+- `ReadingInlineSenseConfirmationController`：阅读中词义确认、管理、撤销、undo。
+- `ManualWordSenseController`：手动 WordSense 创建、编辑、归档。
+- `SenseSourceContextController`：复习辅助来源上下文。
+- `SenseOccurrenceActionController`：单条待确认词义动作。
+- `SenseOccurrenceBulkActionController`：批量待确认词义动作。
+
+### 后续功能准入规则
+
+任何 sense / review-adjacent 新功能任务，在进入实现前必须先回答：
+
+1. 属于哪个产品区块？
+2. HTTP 入口属于哪个 Controller？
+3. 业务逻辑属于哪个 Service？
+4. response shape 属于哪个 serializer / payload service？
+5. 是否写 ReviewLog / FSRS / WordSense / ReviewCard / AI 相关状态？
+6. 哪个测试防止它回流到旧 Controller？
+7. 是否需要 MCP Chrome 真实页面验收？
+
+不能回答时，下一步不是功能实现，而是先建立架构。

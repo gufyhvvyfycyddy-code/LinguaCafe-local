@@ -42,7 +42,7 @@
   → WordSensesList.openAddFormFromDictionary(payload)
   → 用户点"保存新释义"
   → POST /senses/manual
-  → SenseOccurrenceController.storeManualSense()
+  → ManualWordSenseController.storeManualSense()
   → WordSenseService.createManualSense()
     → createSense() — WordSense 状态=confirmed
     → createReviewCardForSense() — ReviewCard(target_type=sense)

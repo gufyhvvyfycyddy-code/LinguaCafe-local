@@ -153,7 +153,7 @@
 
 | 问题 | 文件 | 用户影响 | 测试护栏 | 本轮处理 | 原因 |
 |---|---|---|---|---|---|
-| SenseOccurrenceController 同时做表单 validation、序列化、service 编排 | `app/Http/Controllers/SenseOccurrenceController.php` | 若字段漂移会影响 `/senses/review`、手动释义、来源例句 | WordSense / SenseReview 相关 Feature tests + 空状态 MCP smoke | 否 | 需要接口/序列化边界设计，可能触及 Vue 页面契约 |
+| SenseOccurrenceController 同时做表单 validation、序列化、service 编排 | `app/Http/Controllers/SenseOccurrenceController.php` + extracted controller family | 已通过 2026-07-07 CodeX Controller boundary closure 收口。`SenseOccurrenceController` 现主要保留查询/候选/预览/例句薄包装；写入动作已迁到专属 Controller | `SenseOccurrenceControllerArchitectureGuardTest` + WordSense / ReviewFsrs / FSRS scheduling 回归 | 已处理 | 详见 `docs/architecture/sense-http-controller-boundaries.md`。后续新功能必须按该文档落位，不能回流旧 Controller |
 | TextBlockGroup.vue 仍是 reader 前端状态大组件 | `resources/js/components/Text/TextBlockGroup.vue` | 阅读页点词、hover、短语、词典、学习侧栏都受影响 | 已有 MCP Chrome smoke 基线，但没有组件级测试 | 否 | 高价值但必须页面验收，且不适合在本轮后端测试任务中拆组件 |
 | VocabularyService 查询/导入/词汇处理职责仍宽 | `app/Services/VocabularyService.php` | 搜索、CSV 导出、导入后处理可能互相影响 | VocabularySearchTest / DictionaryImportTest | 否 | 已补查询测试；真正拆服务需单独边界设计 |
 
@@ -1127,7 +1127,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 - `app/Services/WordSenseService.php`（413 行）：rejectSense / archiveSense / removeSenseFromReviewSystem / restoreEncounteredWordIfNoActiveSenses
 - `app/Services/ReviewCardService.php`
 - `app/Http/Controllers/ReviewCardManageController.php`（destroy / bulkDestroy）
-- `app/Http/Controllers/SenseOccurrenceController.php`（archiveSense）
+- `app/Http/Controllers/ManualWordSenseController.php`（archiveSense HTTP 入口；2026-07-07 已从 SenseOccurrenceController 拆出）
 - `app/Models/WordSense.php`、`ReviewCard.php`、`ReviewLog.php`、`WordSenseOccurrence.php`、`EncounteredWord.php`
 - 现有测试：`tests/Feature/WordSenseTest.php`（3106 行，但无 removeSenseFromReviewSystem / archiveSense / rejectSense 直接测试）
 
@@ -1136,7 +1136,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 | 方法 | 行为 | 事务 | 入口 |
 |------|------|------|------|
 | `rejectSense()` | 仅 status→rejected，不碰其它表 | ❌ | ❌ 无 controller 调用（方法存在但无 UI 路径） |
-| `archiveSense()` | status→rejected，ReviewCard fsrs_enabled=false，不清 occurrence（与 removeSenseFromReviewSystem(false) 语义不一致） | ✅ | PUT /senses/{id}/archive (SenseOccurrenceController) |
+| `archiveSense()` | status→rejected，ReviewCard fsrs_enabled=false，不清 occurrence（与 removeSenseFromReviewSystem(false) 语义不一致） | ✅ | PUT /senses/{id}/archive (`ManualWordSenseController`) |
 | `removeSenseFromReviewSystem(delCard=true)` | status→rejected，delete ReviewCard，preserve ReviewLog，clear occurrence refs，restore EncounteredWord if last sense | ✅ | DELETE /review-cards/manage/{id} |
 | `removeSenseFromReviewSystem(delCard=false)` | status→rejected，fsrs_enabled=false，clear occurrence refs（不 restore EncounteredWord） | ✅ | 同方法但当前无 controller 传 false |
 | `restoreEncounteredWordIfNoActiveSenses()` | Learning→New 当为最后一个 confirmed sense；只按 encountered_word_id 找 | (私有) | 仅从 removeSenseFromReviewSystem(true) 调用 |
@@ -1167,7 +1167,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 
 | # | 风险点 | 说明 | 影响 |
 |---|--------|------|------|
-| M1 | **findManageableSenseCard 只允许 status=confirmed** | 已归档/拒绝的 WordSense 无法通过 review-card-manage 端点操作。用户需通过 SenseOccurrenceController::archiveSense 操作 | 用户体验：只能业务层操作 |
+| M1 | **findManageableSenseCard 只允许 status=confirmed** | 已归档/拒绝的 WordSense 无法通过 review-card-manage 端点操作。用户需通过 `ManualWordSenseController::archiveSense` 操作 | 用户体验：只能业务层操作 |
 | M2 | **rejectSense 无事务** | 同行多个 rejectSense 调用，其中一个失败时另一个已写入 | 数据一致性问题 |
 | M3 | **restoreEncounteredWordIfNoActiveSenses 只查 encountered_word_id** | 不按 lemma 匹配，不同 encountered_word_id 的同 lemma 其他 sense 不会阻止 restore | EncounteredWord 可能被错误恢复 |
 | M4 | **archiveSense 不 restore EncounteredWord** | 归档时不调 restoreEncounteredWordIfNoActiveSenses，即使这是最后一个活跃 sense | 词一直处于 Learning 状态 |
