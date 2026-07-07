@@ -207,10 +207,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/senses/{id}/examples', [App\Http\Controllers\SenseOccurrenceController::class, 'examples']);
     Route::get('/senses/{id}/source-context', [App\Http\Controllers\SenseSourceContextController::class, 'sourceContext']);
     Route::get('/senses/{id}/source-context-list', [App\Http\Controllers\SenseSourceContextController::class, 'sourceContextList']);
-    Route::post('/senses/occurrences/bulk-confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirm']);
-    Route::post('/senses/occurrences/bulk-ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkIgnore']);
-    Route::post('/senses/occurrences/bulk-reject', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkReject']);
-    Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirmHighConfidence']);
+    Route::post('/senses/occurrences/bulk-confirm', [App\Http\Controllers\SenseOccurrenceBulkActionController::class, 'bulkConfirm']);
+    Route::post('/senses/occurrences/bulk-ignore', [App\Http\Controllers\SenseOccurrenceBulkActionController::class, 'bulkIgnore']);
+    Route::post('/senses/occurrences/bulk-reject', [App\Http\Controllers\SenseOccurrenceBulkActionController::class, 'bulkReject']);
+    Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\Http\Controllers\SenseOccurrenceBulkActionController::class, 'bulkConfirmHighConfidence']);
     Route::post('/senses/occurrences/{id}/confirm', [App\Http\Controllers\SenseOccurrenceActionController::class, 'confirm']);
     Route::post('/senses/occurrences/{id}/bind', [App\Http\Controllers\SenseOccurrenceActionController::class, 'bind']);
     Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceActionController::class, 'createSense']);

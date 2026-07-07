@@ -417,22 +417,89 @@ class SenseOccurrenceControllerArchitectureGuardTest extends TestCase
         }
     }
 
-    public function test_bulk_routes_still_point_to_old_controller(): void
+    // ================================================================
+    // SenseOccurrenceBulkActionController extraction guards.
+    // ================================================================
+
+    public function test_sense_occurrence_controller_no_longer_has_bulk_action_methods(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $blockedMethods = [
+            'bulkConfirm',
+            'bulkIgnore',
+            'bulkReject',
+            'bulkConfirmHighConfidence',
+        ];
+
+        foreach ($blockedMethods as $method) {
+            $this->assertStringNotContainsString(
+                "public function {$method}",
+                $controller,
+                "SenseOccurrenceController must no longer contain bulk action method '$method'"
+            );
+        }
+    }
+
+    public function test_sense_occurrence_bulk_action_controller_exists_and_contains_bulk_methods(): void
+    {
+        $controllerPath = base_path('app/Http/Controllers/SenseOccurrenceBulkActionController.php');
+
+        $this->assertFileExists($controllerPath);
+
+        $controller = file_get_contents($controllerPath);
+        $requiredMethods = [
+            'bulkConfirm',
+            'bulkIgnore',
+            'bulkReject',
+            'bulkConfirmHighConfidence',
+        ];
+
+        foreach ($requiredMethods as $method) {
+            $this->assertStringContainsString(
+                "public function {$method}",
+                $controller,
+                "SenseOccurrenceBulkActionController must contain method '$method'"
+            );
+        }
+    }
+
+    public function test_bulk_routes_point_to_bulk_action_controller(): void
     {
         $routes = file_get_contents(base_path('routes/web.php'));
 
         $routeChecks = [
-            "POST /senses/occurrences/bulk-confirm" => "Route::post('/senses/occurrences/bulk-confirm', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkConfirm'])",
-            "POST /senses/occurrences/bulk-ignore" => "Route::post('/senses/occurrences/bulk-ignore', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkIgnore'])",
-            "POST /senses/occurrences/bulk-reject" => "Route::post('/senses/occurrences/bulk-reject', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkReject'])",
-            "POST /senses/occurrences/bulk-confirm-high-confidence" => "Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkConfirmHighConfidence'])",
+            "POST /senses/occurrences/bulk-confirm" => "Route::post('/senses/occurrences/bulk-confirm', [App\\Http\\Controllers\\SenseOccurrenceBulkActionController::class, 'bulkConfirm'])",
+            "POST /senses/occurrences/bulk-ignore" => "Route::post('/senses/occurrences/bulk-ignore', [App\\Http\\Controllers\\SenseOccurrenceBulkActionController::class, 'bulkIgnore'])",
+            "POST /senses/occurrences/bulk-reject" => "Route::post('/senses/occurrences/bulk-reject', [App\\Http\\Controllers\\SenseOccurrenceBulkActionController::class, 'bulkReject'])",
+            "POST /senses/occurrences/bulk-confirm-high-confidence" => "Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\\Http\\Controllers\\SenseOccurrenceBulkActionController::class, 'bulkConfirmHighConfidence'])",
         ];
 
         foreach ($routeChecks as $label => $expected) {
             $this->assertStringContainsString(
                 $expected,
                 $routes,
-                "Bulk route '$label' must still point to SenseOccurrenceController"
+                "Bulk route '$label' must point to SenseOccurrenceBulkActionController"
+            );
+        }
+    }
+
+    public function test_routes_no_longer_reference_old_controller_for_bulk_actions(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $blocked = [
+            "SenseOccurrenceController::class, 'bulkConfirm'",
+            "SenseOccurrenceController::class, 'bulkIgnore'",
+            "SenseOccurrenceController::class, 'bulkReject'",
+            "SenseOccurrenceController::class, 'bulkConfirmHighConfidence'",
+        ];
+
+        foreach ($blocked as $pattern) {
+            $this->assertStringNotContainsString(
+                $pattern,
+                $routes,
+                "Routes must no longer reference SenseOccurrenceController for bulk occurrence actions: '$pattern'"
             );
         }
     }
