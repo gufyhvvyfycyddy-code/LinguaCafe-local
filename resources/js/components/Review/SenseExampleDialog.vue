@@ -11,6 +11,10 @@
             </v-card-title>
 
             <v-card-text class="source-dialog-body">
+                <v-alert v-if="preferredHint" type="success" dense text class="mb-2" dismissible>
+                    {{ preferredHint }}
+                </v-alert>
+
                 <v-alert v-if="message" type="info" dense text class="mb-3">
                     {{ message }}
                 </v-alert>
@@ -147,6 +151,23 @@
                     return this.card.sense_en;
                 }
 
+                return '';
+            },
+            preferredHint() {
+                // SenseSourceContextFollowDisplayedOccurrence-1000-7:
+                // Lightweight, non-blocking hint that the source dialog
+                // successfully aligned with the example currently shown on
+                // the review card. We only show the positive 'matched' hint
+                // (and the neutral 'fallback' note when the dialog still
+                // opened with other sources). We never expose the database
+                // occurrence id here.
+                const status = this.payload && this.payload.preferredOccurrenceStatus;
+                if (status === 'matched') {
+                    return '已定位到当前复习例句。';
+                }
+                if (status === 'fallback') {
+                    return '未定位到当前例句，已显示其他可用来源。';
+                }
                 return '';
             },
             message() {

@@ -100,8 +100,23 @@ class SenseSourceContextService
      * (which may itself be the card_example fallback or unavailable).
      *
      * At most 3 sources are returned to keep the dialog fast.
+     *
+     * SenseSourceContextFollowDisplayedOccurrence-1000-7:
+     * When $preferredOccurrenceId is provided, the service attempts to
+     * build a source context for THAT occurrence first and places it at
+     * sources[0]. The preferred occurrence must pass strict validation
+     * (owned by user, correct language, correct sense, status=bound, has
+     * chapter or sentence). On any failure, the call silently falls back
+     * to the original multi-source logic and reports
+     * preferred_occurrence_status = 'invalid' / 'not_found' / 'fallback'.
+     *
+     * Payload contract:
+     *   - preferred_occurrence_status: 'matched' | 'invalid' | 'not_found'
+     *     | 'fallback' | 'unavailable'
+     *     'unavailable' is returned when no preferred occurrence id was
+     *     supplied (preserves the old contract for callers that don't care).
      */
-    public function sourceContextList(int $userId, string $language, int $senseId): array
+    public function sourceContextList(int $userId, string $language, int $senseId, ?int $preferredOccurrenceId = null): array
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
 
@@ -137,7 +152,75 @@ class SenseSourceContextService
         }
 
         $sources = [];
+        $usedOccurrenceIds = [];
+        $usedChapterIds = [];
+
+        // SenseSourceContextFollowDisplayedOccurrence-1000-7: try preferred
+        // occurrence first so it lands at sources[0].
+        // Status map:
+        //   unavailable — no preferred id supplied (old callers)
+        //   invalid     — preferred id supplied but not found / wrong owner
+        //                 / wrong language / wrong sense / not bound
+        //   fallback    — preferred is valid but has no usable chapter
+        //   matched     — preferred resolved and placed at sources[0]
+        $preferredStatus = 'unavailable';
+        if ($preferredOccurrenceId !== null) {
+            $preferred = $this->resolvePreferredOccurrence($sense, $preferredOccurrenceId);
+
+            if ($preferred === null) {
+                // Does not exist OR fails any ownership/scope/status check.
+                $preferredStatus = 'invalid';
+            } elseif (!$preferred->chapter_id) {
+                // Exists and is bound to the user's sense, but has no
+                // chapter to locate the original text. Keep fallback.
+                $preferredStatus = 'fallback';
+            } else {
+                $chapter = $chaptersById[$preferred->chapter_id]
+                    ?? $this->resolver->findChapterById($preferred->chapter_id, $sense->user_id, $sense->language_id);
+
+                $context = $chapter
+                    ? $this->sourceContextFromChapter(
+                        $chapter,
+                        $sense,
+                        $preferred,
+                        $preferred->sentence_id,
+                        $preferred->sentence_hash,
+                        $preferred->sentence_en,
+                    )
+                    : null;
+
+                if ($chapter && $context !== null) {
+                    $result = $this->buildChapterResult(
+                        $sense,
+                        $chapter,
+                        $preferred->sentence_id,
+                        $preferred->sentence_hash,
+                        $context,
+                    );
+                    $result['occurrence_id'] = $preferred->id;
+                    $result['source_sentence_en'] = $preferred->sentence_en;
+                    $sources[] = $result;
+                    $usedOccurrenceIds[] = $preferred->id;
+                    $usedChapterIds[] = $preferred->chapter_id;
+                    $preferredStatus = 'matched';
+                } else {
+                    // Chapter missing or sentence not found inside it.
+                    $preferredStatus = 'fallback';
+                }
+            }
+        }
+
         foreach ($occurrences as $occurrence) {
+            if (in_array($occurrence->id, $usedOccurrenceIds, true)) {
+                // Do not duplicate the preferred occurrence in the carousel.
+                continue;
+            }
+            if (in_array($occurrence->chapter_id, $usedChapterIds, true)) {
+                // Do not show another occurrence that shares the preferred's
+                // chapter — the carousel keys visually by chapter, so showing
+                // the same chapter twice would be confusing.
+                continue;
+            }
             $chapter = $chaptersById[$occurrence->chapter_id] ?? null;
             if (!$chapter) {
                 continue;
@@ -171,12 +254,15 @@ class SenseSourceContextService
         if (empty($sources)) {
             // No chapter-based sources — fall back to the existing single
             // sourceContext flow so the dialog still shows whatever fallback
-            // (card_example / unavailable) is appropriate.
+            // (card_example / unavailable) is appropriate. If we reach here,
+            // $preferredStatus is one of not_found / invalid / fallback /
+            // unavailable (matched would have populated $sources above).
             $primary = $this->sourceContext($userId, $language, $senseId);
             return [
                 'sense_id' => $sense->id,
                 'sources' => [$primary],
                 'count' => 1,
+                'preferred_occurrence_status' => $preferredStatus,
             ];
         }
 
@@ -184,7 +270,31 @@ class SenseSourceContextService
             'sense_id' => $sense->id,
             'sources' => $sources,
             'count' => count($sources),
+            'preferred_occurrence_status' => $preferredStatus,
         ];
+    }
+
+    /**
+     * Strictly resolve a preferred occurrence for the source-context-list
+     * endpoint. Returns null when the occurrence does not exist OR fails
+     * any ownership / scope / status check. Never throws — callers fall
+     * back to the original multi-source list on null.
+     *
+     * Checks (SenseSourceContextFollowDisplayedOccurrence-1000-7 rule 2):
+     *   - belongs to the sense's user_id
+     *   - belongs to the sense's language_id
+     *   - belongs to the sense's word_sense_id
+     *   - status = bound
+     */
+    private function resolvePreferredOccurrence(WordSense $sense, int $occurrenceId): ?WordSenseOccurrence
+    {
+        return WordSenseOccurrence::query()
+            ->where('id', $occurrenceId)
+            ->where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('word_sense_id', $sense->id)
+            ->where('status', WordSenseOccurrence::STATUS_BOUND)
+            ->first();
     }
 
     // ==================== Private/Internal helpers ====================

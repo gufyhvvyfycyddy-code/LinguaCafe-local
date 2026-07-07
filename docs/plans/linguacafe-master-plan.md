@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-07 (GM52-SenseMultiExampleBindingAndReviewRotation-1000-6)
+> **最后更新**：2026-07-07 (GM52-SenseSourceContextFollowDisplayedOccurrence-1000-7)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -537,3 +537,96 @@
   3. 测试数据干扰：`codex_sense_smoke_*` 等 lemma 仍存在（本轮不清理，记录为后续 P2）。
 - **commit / push**：`feat: rotate sense review source examples`（无 `--force`，未提交 untracked 临时文件）。
 - **下一步仍由网页端总流程设计师决定**，不自动进入 V6。
+
+---
+
+## Recent Update: GM52-SenseSourceContextFollowDisplayedOccurrence-1000-7
+
+**任务**：Sense source context 跟随 displayed occurrence（关闭上一轮 P2）。
+
+**本轮同轮完成现状检测 + 编码**，不进入计划模式。
+
+### 现状检测结果
+
+- `SenseReviewCardSerializerService` 已返回 `displayed_occurrence_id` / `occurrence_count` / `example_source_status`（Task 6 已实现）。
+- `SenseReview.vue` 点击「查看原文」未传 `preferred_occurrence_id`。
+- `SenseOccurrenceController::sourceContextList` 不读 query 参数。
+- `SenseSourceContextService::sourceContextList` 不支持指定 occurrence。
+- MCP Chrome 可复现：当前显示例句与查看原文第一条来源不一致。
+
+### 产品规则冻结（6 条）
+
+1. 当前显示例句优先：`displayed_occurrence_id = X` 时，sources[0] 必须是 occurrence X。
+2. 必须安全校验 occurrence（user/language/sense/status=bound/有 chapter 或 sentence）。
+3. 失败时保留原 fallback 链 + 返回 `preferred_occurrence_status`。
+4. sources[0] = preferred，其余去重后追加，不重复展示同一 occurrence。
+5. 不新增复杂 UI，只轻量提示（"已定位到当前复习例句" / "未定位到当前例句，已显示其他可用来源"）。
+6. More 菜单「彻底删除」加视觉分隔（小改，<20 行）。
+
+### 后端实现
+
+- `SenseSourceContextService::sourceContextList()` 新增 `?int $preferredOccurrenceId = null` 参数 + `resolvePreferredOccurrence()` 私有方法（严格校验 user/language/sense/bound）。
+- preferred 有效且有 chapter 时构建 source context 放 sources[0]，标记 `matched`。
+- preferred 无效/无 chapter 时标记 `invalid` / `fallback`，走原 fallback 链（chapter → chapter_recovered → chapter_title → chapter_fuzzy → chapter_fuzzy_title → card_example → unavailable）。
+- 返回 payload 新增 `preferred_occurrence_status` 字段。
+- `SenseOccurrenceController::sourceContextList` 读取 `preferred_occurrence_id` query 参数。
+
+### 前端实现
+
+- `SenseReview.vue` `viewSource()` 新增 `preferred_occurrence_id` query 参数传递（仅当 `displayed_occurrence_id` 存在时）。
+- `SenseExampleDialog.vue` 新增 `preferredHint` computed + success alert 展示提示。
+- More 菜单「彻底删除」前加 `<v-divider class="my-1" />` 视觉分隔。
+
+### 新增测试
+
+- `tests/Feature/SenseSourceContextDisplayedOccurrenceTest.php`（14 项 / 53 assertions）：覆盖 valid preferred → sources[0] / 不重复 / 跨用户 fallback / 跨语言 fallback / 跨 sense fallback / 非 bound fallback / 无 chapter 不 500 fallback / 无参数旧行为不变 / payload 含 status / 不写 ReviewLog / 不改 FSRS / 不创建 legacy card / 不新增 occurrence / fallback 链。
+
+### 自动测试结果
+
+14 个套件全绿（443 tests / 0 failures）：SenseSourceContextDisplayedOccurrenceTest 14 (53) — 新增 / SenseReviewExampleRotationTest 10 / SenseMultiExampleBindingTest 13 / SenseSourceContext* 全绿 / SenseReview 19 / SenseTokenPayloadTest 16 / ReviewFsrsTest 63 / WordSenseTest 134 / AiStudyCardPendingLifecycleTest 15 / AiStudyCardPendingItemTest 86 / VocabularySideBoxChineseTextIntegrityTest 5 / TestingDatabaseHealthConfigTest 6 / TestingDatabaseHealthTest 6。
+
+`npm run development` 编译成功。
+
+### MCP Chrome 真实验收
+
+- 宽屏 1920x900：sense#61 (occurrence_count=2) → 显示答案 → More 菜单 divider 确认（DOM: HR.v-divider 位于「重置」与「彻底删除」之间）→ 点击「查看原文」→ Network 确认 `GET /senses/61/source-context-list?preferred_occurrence_id=11 [200]` → source dialog 第一条来源 example 文本与当前卡片显示例句一致 → fallback 提示「未定位到当前例句，已显示其他可用来源。」（occ#11 无 chapter_id，正确 fallback）→ PHP 脚本验证 sense#68 (occ#19/20) 返回 matched → Network 全部 127.0.0.1:8000，Console 仅 WebSocket 降级。
+- 半屏 900x900：无横向滚动（scrollWidth=900=clientWidth）→ dialog fitsWindow=true（852x411.7 在 900x831 内）→ divider 在 900x900 也存在 → 第一条来源仍对应当前例句 → Network 全部本地，Console 仅 WebSocket 降级。
+- 未做 mobile viewport 主流程验收（当前产品无手机端）。
+
+### 数据库事实
+
+- 无新增 ReviewLog（endpoint 只读 occurrence + chapter）。
+- 未改 FSRS（endpoint 不触碰 ReviewCard / fsrs_* 字段）。
+- 无 legacy word card 创建。
+- 无新增 migration（仅 SELECT 现有表）。
+- 无新增 WordSenseOccurrence（endpoint 只 SELECT 现有 occurrence）。
+
+### WorkBuddy P2 处理
+
+- More 菜单危险操作已做视觉分隔（divider + 红色保留），改动 <20 行。
+- 测试数据干扰只记录不清理（`codex_sense_smoke_*` 等 lemma 仍存在）。
+
+### 安全边界确认
+
+未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog；未改 FSRS；未重排已有 ReviewCard；未创建 legacy word ReviewCard；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未新增 migration；未破坏现有 source context fallback 链（无 preferred 参数时行为完全不变；preferred 无效时 fallback 到原链）。
+
+### P0 / P1 / P2 / P3
+
+- P0：无。
+- P1：无。
+- P2（上一轮遗留，本轮已关闭）：
+  1. `SenseSourceContextService::sourceContextList` 未跟随 `displayed_occurrence_id` → **已关闭**（本轮实现 preferred_occurrence_id 支持）。
+  2. More 菜单危险操作未做视觉分隔 → **已关闭**（本轮加 divider）。
+- P3（残留，与上一轮持平）：
+  1. `AiStudyCardDesktopWorkflow.vue` 仍 444 行接近 450 阈值。
+  2. `AiStudyCardPreviewDialog.vue` prop drilling 仍是 P3 待办。
+  3. 手动添加释义/AI 建议添加释义路径不写 occurrence（Task 6 记录的后续任务）。
+  4. 测试数据干扰：`codex_sense_smoke_*` 等 lemma 仍存在（不清理）。
+
+### commit / push
+
+`fix: align sense source context with displayed example`（无 `--force`，未提交 untracked 临时文件）。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入 V6。

@@ -117,6 +117,7 @@
                                 <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
                                 <v-list-item-title>重置</v-list-item-title>
                             </v-list-item>
+                            <v-divider class="my-1" />
                             <v-list-item @click="openDeleteDialog">
                                 <v-list-item-icon><v-icon small color="error">mdi-delete</v-icon></v-list-item-icon>
                                 <v-list-item-title class="error--text">彻底删除</v-list-item-title>
@@ -643,7 +644,18 @@
                     example_sentence_zh: this.currentCard.example_sentence_zh,
                 };
 
-                axios.get(`/senses/${this.currentCard.word_sense_id}/source-context-list`)
+                // SenseSourceContextFollowDisplayedOccurrence-1000-7:
+                // Pass the occurrence currently shown on the review card so
+                // the backend can place it at sources[0]. The id is strictly
+                // validated server-side; on failure the backend falls back
+                // to the original multi-source list and reports the outcome
+                // via preferred_occurrence_status.
+                const params = {};
+                if (this.currentCard.displayed_occurrence_id) {
+                    params.preferred_occurrence_id = this.currentCard.displayed_occurrence_id;
+                }
+
+                axios.get(`/senses/${this.currentCard.word_sense_id}/source-context-list`, { params: params })
                     .then((response) => {
                         const data = response.data || {};
                         const sources = Array.isArray(data.sources) ? data.sources : [];
@@ -654,6 +666,7 @@
                             context: sources[0] || null,
                             sources: sources,
                             sourceCount: data.count || sources.length,
+                            preferredOccurrenceStatus: data.preferred_occurrence_status || null,
                         };
                         this.sourceDialog = true;
                     })
