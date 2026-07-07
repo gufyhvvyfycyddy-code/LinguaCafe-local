@@ -212,7 +212,13 @@ This preflight task is complete when:
 
 ## 9. Current status after preflight
 
-After this preflight, V6-1, and V6-2, the project is allowed to plan V6-3 only after a separate provider configuration/security task is approved.
+After this preflight, V6-1, V6-2, and the V6-3 provider security gate, the project is allowed to plan a real-provider ADR update. It is still not allowed to implement a live provider until that future ADR/config task is approved and browser Network validation is prepared.
+
+V6-3 provider configuration/security gate is documented in `docs/plans/ai-study-card-v6-provider-security-plan.md` and implemented through:
+
+- `config/ai_study_card_v6.php`
+- `AiStudyCardV6ProviderSecurityPolicyService`
+- `AiStudyCardV6ProviderSecurityConfigTest`
 
 It is still not allowed to:
 

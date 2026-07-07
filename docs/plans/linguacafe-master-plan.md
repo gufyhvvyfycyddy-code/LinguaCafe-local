@@ -869,6 +869,24 @@
 
 新增 `tests/Feature/AiStudyCardV6ProviderAdapterTest.php`，覆盖默认 disabled binding、disabled/failing provider safe failure、malformed schema rejection、valid fake provider output validation、无真实 provider URL/API key 材料、学习表不写入等边界。
 
+### V6-3 provider 配置/安全门实现结果
+
+已实现真实 provider 前的配置/安全门：
+
+- 新增 `config/ai_study_card_v6.php`。
+- 新增 `AiStudyCardV6ProviderSecurityPolicyService`。
+- 新增 `tests/Feature/AiStudyCardV6ProviderSecurityConfigTest.php`。
+- 新增 `docs/plans/ai-study-card-v6-provider-security-plan.md`。
+- 默认 `provider.name=disabled`。
+- 默认 `external_requests_enabled=false`。
+- 默认 `secret_source=not_configured` / `secret_reference=null`。
+- 默认 `timeout_seconds=0` / `max_retries=0`，表示真实 provider 尚未配置。
+- 默认 quota / malformed output / network failure 都 fail-closed。
+- 默认禁止 raw prompt / raw response / source text / secret reference / provider headers 日志。
+- 默认 provider 不允许创建 WordSense / ReviewCard / ReviewLog / legacy word card，不允许改 FSRS。
+- 默认要求真实 provider 前必须做浏览器 Network smoke。
+- 测试确认配置与 policy 文件不包含常见 API key 变量名、`env(...)`、token-like 字符串或 live provider endpoint。
+
 ### 后续允许的下一小步
 
-V6-3 前必须先做 provider 配置/安全任务。下一步仍不应直接接真实 API；应先冻结 provider 选择、配置读取、密钥存储位置、日志脱敏、超时、配额错误、MCP Chrome Network 验收脚本。
+下一步仍不应直接接真实 API。应先做 **V6-4 real-provider ADR / implementation plan**：选择唯一 provider 候选，说明 secret storage 机制，说明 timeout / quota / malformed JSON / network failure 行为，说明 redacted logging，说明 dedicated backend route，并写好 MCP Chrome Network 验收脚本。该计划通过后，才允许实现 live provider adapter。
