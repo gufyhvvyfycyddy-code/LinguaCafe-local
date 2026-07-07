@@ -269,6 +269,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/ai-study-card/pending-items/final-candidates-package', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'finalCandidatesPackage']);
     // V6-1: provider-disabled request package. No real AI provider call.
     Route::post('/ai-study-card/v6/recommendations/request-package', [App\Http\Controllers\AiStudyCardV6RecommendationController::class, 'requestPackage']);
+    Route::post('/ai-study-card/v6/recommendations/provider-preview', [App\Http\Controllers\AiStudyCardV6RecommendationController::class, 'providerPreview']);
     Route::post('/ai-study-card/pending-items/{id}/dismiss', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'dismiss']);
     Route::post('/ai-study-card/pending-items/{id}/restore', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'restore']);
     // V5: generate sense review cards from user-confirmed AI study candidates

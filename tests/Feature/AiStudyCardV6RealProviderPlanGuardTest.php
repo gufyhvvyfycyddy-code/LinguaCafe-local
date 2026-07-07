@@ -20,7 +20,6 @@ class AiStudyCardV6RealProviderPlanGuardTest extends TestCase
 
         $required = [
             'does not implement a live provider',
-            'does not add a provider route',
             'does not add a UI trigger',
             'does not add a secret',
             'does not authorize external requests',
@@ -32,10 +31,9 @@ class AiStudyCardV6RealProviderPlanGuardTest extends TestCase
         }
 
         $planRequired = [
-            'Frozen plan only. Not implemented.',
+            'Frozen plan. V6-5 backend provider-preview skeleton implemented disabled/fail-closed.',
             'Still not implemented:',
             'real provider adapter',
-            'provider route',
             'provider UI trigger',
             'secret storage',
             'external requests',
@@ -46,15 +44,18 @@ class AiStudyCardV6RealProviderPlanGuardTest extends TestCase
         }
     }
 
-    public function test_future_provider_route_is_documented_but_not_implemented_yet(): void
+    public function test_provider_route_skeleton_is_allowed_only_as_disabled_backend_boundary(): void
     {
         $adr = file_get_contents(base_path('docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md'));
         $routes = file_get_contents(base_path('routes/web.php'));
+        $controller = file_get_contents(app_path('Http/Controllers/AiStudyCardV6RecommendationController.php'));
 
         $futureRoute = '/ai-study-card/v6/recommendations/provider-preview';
 
         $this->assertStringContainsString($futureRoute, $adr);
-        $this->assertStringNotContainsString($futureRoute, $routes, 'Provider-preview route must not be implemented in the plan-only round.');
+        $this->assertStringContainsString($futureRoute, $routes);
+        $this->assertStringContainsString('providerPreview', $controller);
+        $this->assertStringContainsString('providerPreviewService->preview', $controller);
     }
 
     public function test_network_playbook_requires_browser_validation_and_forbids_api_substitution(): void

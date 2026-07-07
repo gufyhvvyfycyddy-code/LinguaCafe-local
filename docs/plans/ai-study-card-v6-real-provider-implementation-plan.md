@@ -1,6 +1,6 @@
 # AI Study Card V6 Real Provider Implementation Plan
 
-> **Status**: Frozen plan only. Not implemented.
+> **Status**: Frozen plan. V6-5 backend provider-preview skeleton implemented disabled/fail-closed.
 > **Date**: 2026-07-07.
 > **Depends on**: `ADR-0004`, `ADR-0005`, `ai-study-card-v6-preflight-plan.md`, and `ai-study-card-v6-provider-security-plan.md`.
 
@@ -23,10 +23,14 @@ Already implemented:
 - V6-2 provider interface, disabled adapter, schema validator, recommendation service.
 - V6-3 disabled-by-default provider/security config and policy service.
 
+Implemented as disabled/fail-closed skeleton:
+
+- provider-preview backend route skeleton
+- provider-preview service boundary
+
 Still not implemented:
 
 - real provider adapter
-- provider route
 - provider UI trigger
 - secret storage
 - external requests
@@ -57,13 +61,21 @@ Before code changes:
 4. User confirms whether `.env` may be edited manually outside the task.
 5. Browser Network smoke script is prepared before UI integration.
 
-### Step B — backend route skeleton, still disabled
+### Step B — backend route skeleton, still disabled — implemented 2026-07-07
 
-Add exactly one route:
+Added exactly one route:
 
 `POST /ai-study-card/v6/recommendations/provider-preview`
 
-It must reject while real-provider preconditions are not met.
+Controller:
+
+`AiStudyCardV6RecommendationController::providerPreview`
+
+Service:
+
+`AiStudyCardV6ProviderPreviewService::preview`
+
+It rejects while real-provider preconditions are not met. Current default response is fail-closed `503` with `security_policy_blocked=true` and `no_provider_called=true`.
 
 No UI changes yet.
 
@@ -175,11 +187,13 @@ Code review or API tests cannot replace browser validation for this stage.
 
 ## 10. Acceptance for this plan-only task
 
-This plan-only task is complete when:
+This plan and route-skeleton stage is complete when:
 
 - ADR-0005 exists.
 - This plan exists.
 - Documentation index references both.
 - A guard test proves ADR/plan exist and continue to forbid live provider shortcuts.
-- No route, UI, config, or service starts external provider calls.
+- Provider-preview route exists but stays disabled/fail-closed under current security policy.
+- No UI starts provider calls.
+- No config or service starts external provider calls.
 - No secret reference or secret value is added.

@@ -901,6 +901,27 @@
 - 明确 UI 阶段必须做真实浏览器 Network 验收，API/curl/代码审查不能替代。
 - 明确 V5 card generation remains the only card creation path。
 
+### V6-5 provider-preview backend skeleton 实现结果
+
+已实现 provider-preview 后端骨架，仍保持 disabled/fail-closed：
+
+- 新增 `AiStudyCardV6ProviderPreviewService::preview`。
+- `AiStudyCardV6RecommendationController` 新增 `providerPreview()`。
+- 新增路由 `POST /ai-study-card/v6/recommendations/provider-preview`。
+- 路由要求登录。
+- 请求必须包含 `request_package`。
+- request package 必须是 `ai-study-card-v6-request-package-v1`。
+- 当前默认安全配置下一定返回 503 fail-closed。
+- 返回 `security_policy_blocked=true` / `no_provider_called=true`。
+- 不调用 live provider。
+- 不新增 UI。
+- 不写 WordSense / ReviewCard / ReviewLog。
+- 不改 FSRS。
+- 不创建 legacy word card。
+- 不返回 secret-like 信息。
+
+新增 `tests/Feature/AiStudyCardV6ProviderPreviewRouteTest.php`，覆盖 auth、route/controller 绑定、malformed package 422、security preconditions 503 fail-closed、无学习数据写入、disabled response 不暴露 secret/provider 材料、V6 request-package route 不变。
+
 ### 后续允许的下一小步
 
-V6-5 可做 provider-preview backend route skeleton，仍必须保持 disabled/fail-closed，不接真实外部请求，不新增 UI。该 route skeleton 完成后，再到 UI trigger 或 live adapter 阶段时必须停下安排真实浏览器 Network 验收。
+到这里，下一步如果做 UI trigger 或 live adapter，就会进入真实 provider/页面 Network 风险区，必须停下来安排真实浏览器 Network 验收。若还要继续 backend-only，可只做 live adapter 的 fake-HTTP 测试骨架，不启用配置、不接 UI、不发真实请求。
