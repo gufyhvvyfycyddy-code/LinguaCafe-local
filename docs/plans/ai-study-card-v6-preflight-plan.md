@@ -212,7 +212,7 @@ This preflight task is complete when:
 
 ## 9. Current status after preflight
 
-After this preflight, V6-1, V6-2, and the V6-3 provider security gate, the project is allowed to plan a real-provider ADR update. It is still not allowed to implement a live provider until that future ADR/config task is approved and browser Network validation is prepared.
+After this preflight, V6-1, V6-2, V6-3, and ADR-0005, the project has a frozen real-provider implementation plan and browser Network smoke playbook. It is still not allowed to implement a live provider until the user explicitly approves provider choice, secret storage, timeout/failure behavior, and a dedicated implementation task.
 
 V6-3 provider configuration/security gate is documented in `docs/plans/ai-study-card-v6-provider-security-plan.md` and implemented through:
 

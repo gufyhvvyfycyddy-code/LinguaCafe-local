@@ -887,6 +887,20 @@
 - 默认要求真实 provider 前必须做浏览器 Network smoke。
 - 测试确认配置与 policy 文件不包含常见 API key 变量名、`env(...)`、token-like 字符串或 live provider endpoint。
 
+### V6-4 real-provider ADR / implementation plan 实现结果
+
+已完成真实 provider 实现前的计划冻结：
+
+- 新增 `docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`。
+- 新增 `docs/plans/ai-study-card-v6-real-provider-implementation-plan.md`。
+- 新增 `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`。
+- 新增 `tests/Feature/AiStudyCardV6RealProviderPlanGuardTest.php`。
+- 冻结未来只能先实现一个 backend-only OpenAI-compatible adapter，并且必须先由用户确认 provider / secret storage / timeout / failure behavior。
+- 冻结未来 provider route 为 `POST /ai-study-card/v6/recommendations/provider-preview`，但本轮没有实现该 route。
+- 明确禁止把 live provider 调用塞入 request-package、preview-package、final-candidates-package、generate-cards 或 inline-preview。
+- 明确 UI 阶段必须做真实浏览器 Network 验收，API/curl/代码审查不能替代。
+- 明确 V5 card generation remains the only card creation path。
+
 ### 后续允许的下一小步
 
-下一步仍不应直接接真实 API。应先做 **V6-4 real-provider ADR / implementation plan**：选择唯一 provider 候选，说明 secret storage 机制，说明 timeout / quota / malformed JSON / network failure 行为，说明 redacted logging，说明 dedicated backend route，并写好 MCP Chrome Network 验收脚本。该计划通过后，才允许实现 live provider adapter。
+V6-5 可做 provider-preview backend route skeleton，仍必须保持 disabled/fail-closed，不接真实外部请求，不新增 UI。该 route skeleton 完成后，再到 UI trigger 或 live adapter 阶段时必须停下安排真实浏览器 Network 验收。
