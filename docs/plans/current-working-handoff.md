@@ -5,7 +5,7 @@
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
 > **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
-> **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` 与 `docs/plans/ai-study-card-v6-preflight-plan.md`。V6 仍未实现；本轮只建立 preflight 架构门和 guard。
+> **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` 与 `docs/plans/ai-study-card-v6-preflight-plan.md`。V6-1 provider-disabled request package 已实现；真实 provider / API key / 自动推荐仍未实现。
 
 ---
 
@@ -123,7 +123,7 @@
 - V5 已实现最小生成闭环（commit `bff78f1`）。V5 hardening（commit `3d14478`）已收口：ai_recommended 反向校验 final_candidates_package、user_selected item_id + word/lemma 反向校验、sense_zh 必填 sense_en 可空、AI reason 不自动填 sense_zh、synthetic sentence_id 来源绑定、结果 payload 含 occurrence_created / source_binding_status。
 - **V5 桌面端架构收敛已完成**（GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1，commit `e53d116`）：宽屏 `VocabularySideBox.vue` 与半屏 `VocabularyBox.vue` 共用 `AiStudyCardGenerateCardsService.js` + `AiStudyCardGenerateCardsDialog.vue` + `AiStudyCardGenerateCardsResult.vue`；`AiStudyCardV5DesktopArchitectureGuardTest` 17 项 + `VocabularyBoxV5UiGuardTest` 16 项锁定收敛边界；MCP Chrome 双 viewport 回归全通过。明确不处理 `VocabularyBottomSheet.vue`（当前项目无手机端）。
 - **桌面端 V1-V5 工作流 feature island 收敛已完成**（GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2，commit 见 §2 任务表）：把 V1（pending item 标记）→ V2（待解释列表/取消/恢复）→ V3（preview-package）→ V4（粘贴 AI 推荐词 / parse / dedupe / final-candidates-package）→ V5（generate-cards）的完整桌面端流程收敛到一个独立 feature island 组件 `AiStudyCardDesktopWorkflow.vue`（约 1019 行），新增 `AiStudyCardRecommendationParserService.js`（3 个纯函数）+ `AiStudyCardPendingWorkflowService.js`（6 个 API 函数 + re-export 3 个）；两个父组件只负责挂载该组件，不再各自维护完整 AIStudyCard 流程；由 `AiStudyCardDesktopWorkflowArchitectureGuardTest` 22 项 / 293 assertions 锁定边界；MCP Chrome 双 viewport 完整 V1-V5 回归全通过。明确不处理 `VocabularyBottomSheet.vue`。
-- 下一候选方向：V6 前置设计（AI 自动推荐 / AI 自动释义 / 真实 AI provider / API key 安全存储）。V6 仍未实现：自动调用 AI、API key、AI 自动推荐、AI 自动释义、真实 AI provider、自动刷卡评分。任何 V6 实现前必须先过 Architecture Gate 与 ADR。
+- 下一候选方向：V6 后续小步。V6-1 provider-disabled request package 已实现：`POST /ai-study-card/v6/recommendations/request-package` 只生成 `ai-study-card-v6-request-package-v1`，不调用 provider、不建卡、不写 ReviewLog、不改 FSRS。仍未实现：自动调用 AI、API key、AI 自动推荐、AI 自动释义、真实 AI provider、自动刷卡评分。任何 V6-2 及之后任务仍必须遵守 ADR-0004。
 - 继续禁止：自动调 AI、自动生成 WordSense/ReviewCard/ReviewLog（V5 之外的新入口）、改 FSRS、改删除/归档/恢复、删除 legacy word card 兼容层、把 V5 复制进 `VocabularyBottomSheet.vue`。
 
 ### B. 前端复习入口统一后续收口

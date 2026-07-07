@@ -1,6 +1,6 @@
 # AI Study Card V6 Preflight Plan
 
-> **Status**: Frozen architecture preflight. Not implemented.
+> **Status**: Frozen architecture preflight. V6-1 provider-disabled request-package preview implemented.
 > **Date**: 2026-07-07.
 > **Depends on**: `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` and `docs/architecture/sense-http-controller-boundaries.md`.
 
@@ -127,12 +127,16 @@ Required safety flags:
 
 ## 6. Future minimum implementation sequence
 
-### V6-1: Provider-disabled request-package preview
+### V6-1: Provider-disabled request-package preview — implemented 2026-07-07
 
-- Add a local endpoint that builds `ai-study-card-v6-request-package-v1`.
-- It must not call a provider.
-- It proves the request package and safety flags.
-- It can be used for prompt copy / manual provider testing.
+- Local endpoint: `POST /ai-study-card/v6/recommendations/request-package`.
+- Controller: `AiStudyCardV6RecommendationController::requestPackage`.
+- Service: `AiStudyCardV6RequestPackageService::buildRequestPackage`.
+- Builds `ai-study-card-v6-request-package-v1`.
+- Does not call a provider.
+- Proves the request package and safety flags.
+- Can be used for prompt copy / manual provider testing.
+- Covered by `AiStudyCardV6RequestPackageTest` and `AiStudyCardV6PreflightArchitectureGuardTest`.
 
 ### V6-2: Provider adapter stub, disabled by default
 
@@ -193,7 +197,7 @@ This preflight task is complete when:
 
 ## 9. Current status after preflight
 
-After this preflight, the project is allowed to plan V6-1.
+After this preflight and V6-1, the project is allowed to plan V6-2 provider adapter stub, disabled by default.
 
 It is still not allowed to:
 

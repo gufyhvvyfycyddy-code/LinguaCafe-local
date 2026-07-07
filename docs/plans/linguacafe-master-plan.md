@@ -824,6 +824,25 @@
 - 不改 Vue 产品流程。
 - 不新增 migration。
 
+### V6-1 实现结果
+
+已实现 provider-disabled request-package preview：
+
+- 新增 `AiStudyCardV6RecommendationController::requestPackage`。
+- 新增 `AiStudyCardV6RequestPackageService::buildRequestPackage`。
+- 新增路由 `POST /ai-study-card/v6/recommendations/request-package`。
+- 返回 `schema_version=ai-study-card-v6-request-package-v1`。
+- 只打包当前用户、当前语言、pending 状态的 selected items。
+- 过滤跨用户、跨语言、dismissed、processed 项。
+- 不返回 raw `source_payload`。
+- 不调用 provider。
+- 不创建 `WordSense` / `ReviewCard`。
+- 不写 `ReviewLog`。
+- 不改 FSRS。
+- 不改变 pending item 状态。
+
+新增 `tests/Feature/AiStudyCardV6RequestPackageTest.php`，覆盖 request package shape、隔离、状态过滤、raw payload 排除、数量上限、V5 route 不变等边界。
+
 ### 后续允许的下一小步
 
-V6-1：只实现 provider-disabled request-package preview。它仍不调用 AI，只构造 `ai-study-card-v6-request-package-v1`，用于用户复制或后续 provider stub 测试。
+V6-2：provider adapter stub，disabled by default。仍不使用真实 API key，不发真实外部请求，只建立 interface / fake adapter / malformed-output fail-closed 测试。

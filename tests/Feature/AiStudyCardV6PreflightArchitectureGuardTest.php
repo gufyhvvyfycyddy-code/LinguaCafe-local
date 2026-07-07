@@ -52,19 +52,25 @@ class AiStudyCardV6PreflightArchitectureGuardTest extends TestCase
         }
     }
 
-    public function test_current_routes_do_not_expose_v6_provider_routes_yet(): void
+    public function test_routes_only_expose_provider_disabled_v6_request_package(): void
     {
         $routes = file_get_contents(base_path('routes/web.php'));
+
+        $this->assertStringContainsString(
+            "Route::post('/ai-study-card/v6/recommendations/request-package', [App\\Http\\Controllers\\AiStudyCardV6RecommendationController::class, 'requestPackage'])",
+            $routes,
+            'V6-1 may expose only the provider-disabled request-package route.'
+        );
 
         $forbiddenRoutes = [
             '/ai-study-card/v6/recommendations/preview',
             '/ai-study-card/v6/recommendations/parse',
-            '/ai-study-card/v6',
-            'AiStudyCardV6RecommendationController',
+            '/ai-study-card/v6/recommendations/generate',
+            '/ai-study-card/v6/provider',
         ];
 
         foreach ($forbiddenRoutes as $route) {
-            $this->assertStringNotContainsString($route, $routes, "V6 provider route must not exist in this preflight-only round: {$route}");
+            $this->assertStringNotContainsString($route, $routes, "Real V6 provider route must not exist in request-package-only round: {$route}");
         }
     }
 
