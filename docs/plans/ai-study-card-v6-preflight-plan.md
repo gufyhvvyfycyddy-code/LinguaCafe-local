@@ -142,12 +142,23 @@ Required safety flags:
 - Can be used for prompt copy / manual provider testing.
 - Covered by `AiStudyCardV6RequestPackageTest`, `AiStudyCardV6PreflightArchitectureGuardTest`, and `AiStudyCardV6RequestPackageUiGuardTest`.
 
-### V6-2: Provider adapter stub, disabled by default
+### V6-2: Provider adapter stub, disabled by default — implemented 2026-07-07
 
-- Add provider interface and fake provider adapter for tests.
+- Added `AiStudyCardV6ProviderInterface`.
+- Added production default `AiStudyCardV6DisabledProviderAdapter`.
+- Added `AiStudyCardV6ProviderDisabledException`.
+- Added `AiStudyCardV6RecommendationSchemaService`.
+- Added `AiStudyCardV6RecommendationService`.
+- Bound `AiStudyCardV6ProviderInterface` to the disabled adapter in `AppServiceProvider`.
+- Fake provider exists only inside tests, not as a production provider.
 - No real API key.
 - No real network call.
-- Validate malformed output and fail-closed behavior.
+- No new route.
+- No UI change.
+- Malformed provider output fails closed.
+- Provider exception fails closed.
+- Disabled provider fails before any provider result is trusted.
+- Covered by `AiStudyCardV6ProviderAdapterTest`.
 
 ### V6-3: Real provider integration, explicit user action only
 
@@ -201,7 +212,7 @@ This preflight task is complete when:
 
 ## 9. Current status after preflight
 
-After this preflight and V6-1, the project is allowed to plan V6-2 provider adapter stub, disabled by default.
+After this preflight, V6-1, and V6-2, the project is allowed to plan V6-3 only after a separate provider configuration/security task is approved.
 
 It is still not allowed to:
 

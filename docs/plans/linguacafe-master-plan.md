@@ -847,6 +847,28 @@
 
 新增 `tests/Feature/AiStudyCardV6RequestPackageUiGuardTest.php`，锁定桌面 UI 入口、安全文案、本地 endpoint 调用、主 workflow 不新增 V6 状态/方法、无 provider/API key 材料、无 ReviewLog/FSRS/legacy word card 创建调用。
 
+### V6-2 实现结果
+
+已实现 provider adapter stub，disabled by default：
+
+- 新增 `AiStudyCardV6ProviderInterface`。
+- 新增 `AiStudyCardV6DisabledProviderAdapter`。
+- 新增 `AiStudyCardV6ProviderDisabledException`。
+- 新增 `AiStudyCardV6RecommendationSchemaService`。
+- 新增 `AiStudyCardV6RecommendationService`。
+- `AppServiceProvider` 默认把 `AiStudyCardV6ProviderInterface` 绑定到 disabled adapter。
+- fake provider 只存在于测试匿名类中，不作为生产 provider。
+- 没有新增 route。
+- 没有新增 UI。
+- 没有真实 API key。
+- 没有真实外部请求。
+- malformed provider output fail-closed。
+- provider exception fail-closed。
+- disabled provider 在任何 provider result 被信任前直接失败。
+- 合法 fake provider output 也只返回 validated recommendation package，仍要求用户确认，不创建学习数据。
+
+新增 `tests/Feature/AiStudyCardV6ProviderAdapterTest.php`，覆盖默认 disabled binding、disabled/failing provider safe failure、malformed schema rejection、valid fake provider output validation、无真实 provider URL/API key 材料、学习表不写入等边界。
+
 ### 后续允许的下一小步
 
-V6-2：provider adapter stub，disabled by default。仍不使用真实 API key，不发真实外部请求，只建立 interface / fake adapter / malformed-output fail-closed 测试。
+V6-3 前必须先做 provider 配置/安全任务。下一步仍不应直接接真实 API；应先冻结 provider 选择、配置读取、密钥存储位置、日志脱敏、超时、配额错误、MCP Chrome Network 验收脚本。
