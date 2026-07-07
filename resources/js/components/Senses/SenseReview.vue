@@ -54,7 +54,16 @@
 
             <!-- Question side (always visible, shows context) -->
             <div class="mb-4">
-                <div class="caption text--secondary">例句</div>
+                <div class="caption text--secondary d-flex align-center">
+                    <span>例句</span>
+                    <v-chip
+                        v-if="currentCard.occurrence_count > 1"
+                        x-small
+                        outlined
+                        color="info"
+                        class="ml-2"
+                    >本词义已有 {{ currentCard.occurrence_count }} 条来源例句</v-chip>
+                </div>
                 <v-sheet outlined rounded class="pa-3 mb-3">
                     <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
                 </v-sheet>

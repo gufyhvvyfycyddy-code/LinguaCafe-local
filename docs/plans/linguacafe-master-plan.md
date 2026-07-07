@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-07 (GM52-AIStudyCardPendingLifecycleClosure-1000-5)
+> **最后更新**：2026-07-07 (GM52-SenseMultiExampleBindingAndReviewRotation-1000-6)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -496,4 +496,44 @@
   - 未做 mobile viewport 主流程验收（当前产品无手机端）。
 - **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog（验收后总数仍 13）；未改 FSRS（未触及任何 fsrs_* 字段）；未重排已有 ReviewCard；未创建 legacy word ReviewCard（验收后 TARGET_WORD 仍 6）；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未回滚 deep-module split；未重新制造 SideBox / Box 复制；未再次制造中文 mojibake；未新增 migration（仅 UPDATE 现有 status 字段值）。
 - **commit / push**：`feat: close AI study card pending lifecycle`（无 `--force`，未提交 untracked 临时文件）。
+- **下一步仍由网页端总流程设计师决定**，不自动进入 V6。
+
+## Recent Update: GM52-SenseMultiExampleBindingAndReviewRotation-1000-6
+
+- **Round type**: GM5.2 1000% closed-loop round 6 (Sense 多例句绑定 + 复习例句轮换). 本轮同时完成现状检测 + 编码，不是只检测报告。基于 GitHub master `0321502` 继续。
+- **本轮目标**：从"能生成并复习单张 sense card"推进到"一张词义卡可以绑定多个来源例句；复习时可以轮换展示不同例句，避免永远只看同一句"。
+- **6 条产品规则冻结**：
+  1. 一张词义卡可以绑定多个来源例句（同一 WordSense 可有多条 occurrence）
+  2. 不要重复绑定完全相同的来源（`sentence_id` → `chapter_id+text_block_index+sentence_index` → normalized `sentence_text` 三层去重）
+  3. 复习时优先显示来源例句（occurrence → ReviewCard 保存例句 → 空状态）
+  4. 多例句轮换（第一次显示一条，下一次尽量不同，简单轮换即可）
+  5. 记录本次显示的例句（本轮选择**不新增 migration**，用稳定 seed 轮换：`crc32(reviewCardId*31 + fsrsReps*7 + dayOfYear) % total`）
+  6. 查看原文/译文要对应当前显示例句（本轮至少带出 `displayed_occurrence_id`；source context 完全跟随留作 P2）
+- **现状检测事实**：
+  - `word_sense_occurrences` 表已存在（无新增 migration），含 `id`, `word_sense_id`, `chapter_id`, `text_block_index`, `sentence_index`, `sentence_id`, `sentence_en`, `sentence_zh`, `status` 等字段
+  - 一个 WordSense 已可拥有多条 occurrence（一对多）
+  - AIStudyCard created / duplicate / 手动添加 / AI 建议添加 4 条路径检测前已写 occurrence（本轮未改动绑定逻辑）
+  - `/reviews/senses` 卡片例句来源：检测前已由 `SenseReviewCardSerializerService` + `WordSenseExamplePoolService` 构建 candidates 池
+  - 查看原文/译文：`SenseSourceContextService::sourceContextList` 仍按 ReviewCard 默认来源取（**P2**：未跟随 `displayed_occurrence_id`）
+  - 数据库无 `last_shown_occurrence` / example rotation 字段
+  - 检测前无测试覆盖多例句、无测试覆盖复习页例句轮换
+- **后端修改**：
+  - `app/Services/WordSenseExamplePoolService.php` **未修改**（`exampleCandidates` / `pickQuestionIndex` / `pickSupplementaryIndex` 已在 commit `4432ecd` 存在，本轮直接复用稳定 seed 轮换：`crc32($reviewCardId * 31 + $fsrsReps * 7 + $dayOfYear) % $total`）
+  - `app/Services/SenseReviewCardSerializerService.php` `serialize` 新增 3 个 payload 字段：`displayed_occurrence_id`（来自 question example，null 时表示 card fallback 或空） / `occurrence_count`（候选池大小） / `example_source_status`（`occurrence` | `card_fallback` | `empty`）；同时新增 docblock 说明"轮换不持久化 last shown occurrence id"的设计决策
+- **前端修改**：
+  - `resources/js/components/Senses/SenseReview.vue` 答案侧新增多例句提示 chip：`v-if="currentCard.occurrence_count > 1"` 显示「本词义已有 N 条来源例句」；`x-small` + `outlined` + `color="info"`，不挤占评分按钮
+- **新增测试**：
+  - `tests/Feature/SenseMultiExampleBindingTest.php`（13 项 / 45 assertions）：覆盖多条 occurrence 绑定 / sentence_id 去重 / chapter+text_block+sentence_index 去重 / sentence_text 弱去重 / AIStudyCard created 绑定 / duplicate 补绑定 / ai_recommended 无来源不绑定 / 跨用户隔离 / 跨语言隔离 / 不创建 legacy word card / 不写额外 ReviewLog / 不改 FSRS / ReviewCard 唯一约束保留
+  - `tests/Feature/SenseReviewExampleRotationTest.php`（10 项 / 31 assertions）：覆盖单 occurrence 显示该例句 / 3 occurrence 不永远第一条 / 评分后下一次尽量不同 / `displayed_occurrence_id` 在 payload / `occurrence_count` 在 payload / 无 occurrence fallback 到 card 例句 / 无任何例句空状态 / 轮换不写 ReviewLog / 轮换不改 FSRS / 轮换不影响每日上限
+- **测试结果**：13 个测试套件全绿（410 tests / 0 failures）；`npm run development` Compiled Successfully（6403ms，app.js 7.4 MiB）。
+- **MCP Chrome 真实页面双 viewport 验收**（GLM 自己执行，未用 API 200 代替）：
+  - 宽屏 1920x900：登录 `1816529781@qq.com` → `/reviews/senses` 显示 22 张到期 sense card → 筛选出 3 张多例句卡（`occurrence_count=2`）：`codex_sense_smoke_20260702_b_bind_target` / `codex_sense_smoke_20260702_b_confirm_target` / `codexmatrix` → 多例句提示 chip 正确显示「本词义已有 2 条来源例句」 → 显示答案 → 答案侧完整 → 评分 `good` → 跳到下一张多例句卡，提示 chip 同样正确 → 查看原文/译文对话框打开（sourceCount=1，未跟随 occurrence_count=2 → **P2 记录**） → 轮换验证（临时 PHP 脚本对 card#61 reps 0-10 序列化，产生 2 个不同 `displayed_occurrence_id`，DB 未写入）。Network 全部 127.0.0.1:8000，Console 仅 WebSocket 降级。
+  - 半屏 900x900：无横向滚动（`scrollWidth=892=clientWidth=892`）→ 多例句提示 chip 不挤、不挡评分按钮 → 答案侧布局正常 → 查看原文/译文对话框正常打开。Network 全部本地，Console 仅 WebSocket 降级。
+  - 未做 mobile viewport 主流程验收（当前产品无手机端）。
+- **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog（轮换验证后 DB `ReviewLog` 总数未变）；未改 FSRS（轮换验证后 `fsrs_reps` / `fsrs_due_at` / `fsrs_stability` / `fsrs_difficulty` / `fsrs_state` / `fsrs_lapses` 未变）；未重排已有 ReviewCard；未创建 legacy word ReviewCard；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未新增 migration（仅 SELECT 现有 occurrence 数据）；未破坏现有 source context fallback（`SenseSourceContextService` 未修改，仅记录 P2）。
+- **P2 已知问题**：
+  1. `SenseSourceContextService::sourceContextList` 未跟随 `displayed_occurrence_id`（查看原文/译文对话框 sourceCount=1 不跟随 occurrence_count=2）。下一轮需让 source context 跟随 `displayed_occurrence_id`。
+  2. More 菜单危险操作未做视觉分隔（沿用 Task 5 状态，本轮未顺手处理）。
+  3. 测试数据干扰：`codex_sense_smoke_*` 等 lemma 仍存在（本轮不清理，记录为后续 P2）。
+- **commit / push**：`feat: rotate sense review source examples`（无 `--force`，未提交 untracked 临时文件）。
 - **下一步仍由网页端总流程设计师决定**，不自动进入 V6。

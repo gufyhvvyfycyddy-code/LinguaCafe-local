@@ -22,6 +22,19 @@ class SenseReviewCardSerializerService
      * example (different from the question) is also included for the answer
      * side; it is null when the pool has only one example.
      *
+     * Rotation does NOT persist a "last shown occurrence id": the seed-based
+     * selection is deterministic for a given day and shifts naturally across
+     * days and after each successful review (fsrs_reps increments). This
+     * avoids any new migration / write path while still satisfying "do not
+     * always show the first example".
+     *
+     * Payload contract (SenseMultiExampleBindingAndReviewRotation-1000-6):
+     *   - displayed_occurrence_id: id of the occurrence shown this round
+     *     (null when the example comes from the card fallback or is empty).
+     *   - occurrence_count: total number of distinct source examples
+     *     currently bound to this sense (occurrences + card fallback).
+     *   - example_source_status: 'occurrence' | 'card_fallback' | 'empty'.
+     *
      * @return array{review_card_id: int, word_sense_id: int, lemma: string, ...}
      */
     public function serialize(ReviewCard $card): array
@@ -50,6 +63,20 @@ class SenseReviewCardSerializerService
         $exampleSentenceEn = $questionExample['sentence_en'] ?? $sense->example_sentence_en;
         $exampleSentenceZh = $questionExample['sentence_zh'] ?? $sense->example_sentence_zh;
 
+        // SenseMultiExampleBindingAndReviewRotation-1000-6: surface which
+        // occurrence the current display comes from, how many distinct source
+        // examples exist, and whether the display is a real occurrence, the
+        // card fallback, or an empty state.
+        $displayedOccurrenceId = $questionExample['occurrence_id'] ?? null;
+        $occurrenceCount = count($candidates);
+        if ($questionExample === null) {
+            $exampleSourceStatus = $sense->example_sentence_en ? 'card_fallback' : 'empty';
+        } elseif (($questionExample['is_card_fallback'] ?? false) === true) {
+            $exampleSourceStatus = 'card_fallback';
+        } else {
+            $exampleSourceStatus = 'occurrence';
+        }
+
         return [
             'review_card_id' => $card->id,
             'word_sense_id' => $sense->id,
@@ -67,6 +94,14 @@ class SenseReviewCardSerializerService
             'example_candidates' => $candidates,
             'example_candidates_count' => count($candidates),
             'supplementary_example' => $supplementaryExample,
+            // SenseMultiExampleBindingAndReviewRotation-1000-6 fields.
+            // displayed_occurrence_id lets the client (and future source
+            // context dialog) know which occurrence is currently shown.
+            // occurrence_count is the distinct source-example count.
+            // example_source_status signals 'occurrence' / 'card_fallback' / 'empty'.
+            'displayed_occurrence_id' => $displayedOccurrenceId,
+            'occurrence_count' => $occurrenceCount,
+            'example_source_status' => $exampleSourceStatus,
             'fsrs_state' => $card->fsrs_state,
             'fsrs_due_at' => $card->fsrs_due_at,
             'fsrs_stability' => $card->fsrs_stability,
