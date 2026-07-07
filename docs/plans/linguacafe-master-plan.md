@@ -922,6 +922,26 @@
 
 新增 `tests/Feature/AiStudyCardV6ProviderPreviewRouteTest.php`，覆盖 auth、route/controller 绑定、malformed package 422、security preconditions 503 fail-closed、无学习数据写入、disabled response 不暴露 secret/provider 材料、V6 request-package route 不变。
 
+### V6-6 prompt / response contract skeleton 实现结果
+
+已实现 provider prompt / response contract skeleton，仍不接真实 provider：
+
+- 新增 `AiStudyCardV6PromptBuilderService::buildPromptPayload`。
+- 新增 `AiStudyCardV6ProviderResponseParserService::parseAndValidate`。
+- 新增 `tests/Feature/AiStudyCardV6PromptAndResponseContractTest.php`。
+- prompt payload schema：`ai-study-card-v6-provider-prompt-payload-v1`。
+- 输入仍是 `ai-study-card-v6-request-package-v1`。
+- 目标输出仍是 `ai-study-card-v6-recommendation-package-v1`。
+- prompt payload 只包含 selected item 的最小字段。
+- 不包含 raw source payload。
+- 不包含 full chapter text。
+- 长句截断到 500 字符。
+- 不包含 provider endpoint / API key / env / HTTP client 调用。
+- response parser 拒绝空字符串、坏 JSON、数组 JSON、schema-invalid JSON。
+- schema-valid JSON 仍只作为 unchecked recommendation package，要求用户确认。
+- 不写 WordSense / ReviewCard / ReviewLog。
+- 不改 FSRS。
+
 ### 后续允许的下一小步
 
 到这里，下一步如果做 UI trigger 或 live adapter，就会进入真实 provider/页面 Network 风险区，必须停下来安排真实浏览器 Network 验收。若还要继续 backend-only，可只做 live adapter 的 fake-HTTP 测试骨架，不启用配置、不接 UI、不发真实请求。

@@ -23,10 +23,12 @@ Already implemented:
 - V6-2 provider interface, disabled adapter, schema validator, recommendation service.
 - V6-3 disabled-by-default provider/security config and policy service.
 
-Implemented as disabled/fail-closed skeleton:
+Implemented as disabled/fail-closed / contract skeleton:
 
 - provider-preview backend route skeleton
 - provider-preview service boundary
+- provider-neutral prompt payload builder
+- provider raw response parser + schema validation boundary
 
 Still not implemented:
 
@@ -79,19 +81,30 @@ It rejects while real-provider preconditions are not met. Current default respon
 
 No UI changes yet.
 
-### Step C — live adapter implementation, no UI
+### Step C — prompt / response contract skeleton — implemented 2026-07-07
+
+Added provider-neutral prompt / response contract helpers:
+
+- `AiStudyCardV6PromptBuilderService::buildPromptPayload`
+- `AiStudyCardV6ProviderResponseParserService::parseAndValidate`
+
+The prompt payload builder creates `ai-study-card-v6-provider-prompt-payload-v1` from `ai-study-card-v6-request-package-v1` without calling a provider. It includes only selected item fields, excludes raw source payload / full chapter text, truncates long sentence text, and includes safety instructions requiring JSON-only `ai-study-card-v6-recommendation-package-v1` output.
+
+The response parser accepts raw JSON text, rejects empty / invalid / array JSON, passes decoded objects through `AiStudyCardV6RecommendationSchemaService`, and fails closed without writing learning data.
+
+### Step D — live adapter implementation, no UI
 
 Add a live adapter behind `AiStudyCardV6ProviderInterface`.
 
 It may be tested with fake HTTP responses. No real external requests in automated tests.
 
-### Step D — real provider local manual test
+### Step E — real provider local manual test
 
 Only after user supplies runtime configuration outside committed code.
 
 The manual test must be backend-only first, then UI.
 
-### Step E — UI trigger + browser Network validation
+### Step F — UI trigger + browser Network validation
 
 Add a user-triggered button and stop for WorkBuddy / MCP Chrome browser validation.
 
@@ -194,6 +207,8 @@ This plan and route-skeleton stage is complete when:
 - Documentation index references both.
 - A guard test proves ADR/plan exist and continue to forbid live provider shortcuts.
 - Provider-preview route exists but stays disabled/fail-closed under current security policy.
+- Prompt payload builder exists but does not call providers.
+- Response parser exists but trusts only schema-valid JSON.
 - No UI starts provider calls.
 - No config or service starts external provider calls.
 - No secret reference or secret value is added.
