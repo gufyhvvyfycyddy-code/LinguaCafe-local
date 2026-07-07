@@ -630,3 +630,43 @@
 ### 下一步仍由网页端总流程设计师决定
 
 不自动进入 V6。
+
+---
+
+## 2026-07-07 CodeX-SourceContextWriteBoundary-1
+
+**任务**：Source Context read / recover 写入边界收口。
+
+**目标**：把「查看原文」相关入口的读写边界讲清楚，并用测试锁住。用户体验上，打开原文弹窗仍保持原行为；架构上，后续 Agent 不能再把 source context 简单理解成完全只读。
+
+### 核验事实
+
+- `sourceContext()` 的 recovery 分支会通过 `writeBackRecoveredSource()` 写回来源定位字段。
+- `sourceContextList()` 的 direct chapter carousel 路径不应写回来源定位字段。
+- `sourceContextList()` 在没有 chapter-based sources 时会调用 `sourceContext()` 作为单来源 fallback，因此可能触发 recovery 写回。
+- 这个写回只应更新 source location，不应写复习历史、不应创建卡片、不应改 FSRS。
+
+### 本轮改动
+
+- 新增 `tests/Feature/SenseSourceContextWriteBoundaryTest.php`。
+- 更新 `docs/plans/sense-source-context-contract.md`，补充 `sourceContextList()` 调用链、preferred 参数、direct carousel 路径、fallback recovery 路径和写入边界。
+- 更新 `SenseSourceContextMultiSourceTest` 文件头注释，把“只读”改成分路径说明。
+
+### 新增测试
+
+- `test_source_context_list_recovery_fallback_writes_only_source_location_fields`
+  - 验证 `sourceContextList()` fallback recovery 会写回 `WordSense.source_chapter_id / sentence_id`。
+  - 同时验证不写 ReviewLog、不创建 ReviewCard、不新增 WordSenseOccurrence。
+- `test_direct_chapter_source_context_list_does_not_change_source_location_fields`
+  - 验证 direct chapter carousel 路径不会改 `WordSense.source_chapter_id / sentence_id`。
+
+### 自动测试结果
+
+- `php artisan test --filter=SenseSourceContextWriteBoundaryTest --stop-on-failure`
+  - 2 passed，16 assertions。
+- `php artisan test --filter=SenseSourceContext --stop-on-failure`
+  - 58 passed，312 assertions。
+
+### 安全边界确认
+
+未改业务运行逻辑；未改页面；未改 API shape；未写 ReviewLog；未改 FSRS；未创建 legacy word card；未新增 migration；未清库；未读写 `.env`；未 DCP；未运行 notification script；未进入 V6；未自动调用 AI。

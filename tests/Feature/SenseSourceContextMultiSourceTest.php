@@ -25,8 +25,9 @@ use Tests\TestCase;
  *  - Same-chapter duplicates collapse to one source.
  *  - When no chapter-based sources exist, falls back to a single-element
  *    source list (card_example or unavailable).
- *  - Endpoint is read-only: no ReviewLog writes, no WordSense/ReviewCard
- *    creation, no FSRS field changes.
+ *  - Endpoint does not write ReviewLog, create WordSense/ReviewCard, or
+ *    change FSRS fields. Direct chapter-source carousel path is read-only;
+ *    no-source fallback may recover and write back source location fields.
  *  - Cross-user isolation: another user's occurrences are not visible.
  */
 class SenseSourceContextMultiSourceTest extends TestCase

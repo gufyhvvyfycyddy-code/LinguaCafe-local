@@ -1,8 +1,10 @@
 # SenseSourceContext 输出契约与拆分边界
 
 > **契约锁定日期**：2026-07-01
+> **最新边界更新**：2026-07-07
 > **基准 commit**：`36f86ec`
-> **契约性质**：本轮只锁定契约和补测试，不拆 Service，不改页面，不改 API shape。
+> **最新核验 commit**：`4ba6a8d`
+> **契约性质**：锁定 source context 查询、恢复、写回和多来源列表边界；小步补测试和文档，不改页面交互。
 
 ---
 
@@ -29,8 +31,12 @@
 **Controller**：
 `SenseOccurrenceController::sourceContext(int $id)` — `GET /senses/{sense}/source-context`
 
+`SenseOccurrenceController::sourceContextList(int $id)` — `GET /senses/{sense}/source-context-list`
+
 **Service**：
 `SenseSourceContextService::sourceContext(int $userId, string $language, int $senseId): array`
+
+`SenseSourceContextService::sourceContextList(int $userId, string $language, int $senseId, ?int $preferredOccurrenceId = null): array`
 
 **Helper Service**：
 `SenseTokenPayloadService` — token 简化、句子规范化、合成 token
@@ -117,10 +123,16 @@
 - `recoverSourceContextByFuzzyMatch` (chapter_fuzzy, chapter_fuzzy_title) → `writeBackRecoveredSource`
   - 同上
 
-**绝对只读的路径**：
+**只读的路径**：
 - `sourceContextFromChapter` (chapter) — 只读
 - `fallbackCardExampleSourceContext` (card_example) — 只读
 - `emptySourceContext` (unavailable) — 只读
+- `sourceContextList()` 的 direct chapter carousel 路径 — 只读
+
+**容易误判的路径**：
+- `sourceContextList()` 在没有 chapter-based sources 时，会调用 `sourceContext()` 作为单来源 fallback。
+- 因此这一条 fallback 路径可能触发 `chapter_recovered` / `chapter_fuzzy` / `chapter_fuzzy_title` 写回。
+- 该写回只允许更新来源定位字段，不允许写 ReviewLog，不允许创建 ReviewCard，不允许创建新的 WordSenseOccurrence，不允许改 FSRS 字段。
 
 **下一轮拆分时不得改变写入条件**。
 
@@ -233,3 +245,10 @@
 | `test_chapter_recovered_writes_back_source_fields` | writeBackRecoveredSource 确认写回 |
 | `test_card_example_does_not_write_back_to_sense` | card_example 不写回 |
 | `test_unavailable_structure_is_stable` | unavailable 字段值精确 |
+
+### 2026-07-07 写入边界补充测试
+
+| 测试 | 覆盖 |
+|------|------|
+| `SenseSourceContextWriteBoundaryTest::test_source_context_list_recovery_fallback_writes_only_source_location_fields` | `sourceContextList()` fallback recovery 可写回 source location，但不写 ReviewLog、不创建 ReviewCard、不创建 occurrence |
+| `SenseSourceContextWriteBoundaryTest::test_direct_chapter_source_context_list_does_not_change_source_location_fields` | direct chapter carousel 路径不改 WordSense source location |
