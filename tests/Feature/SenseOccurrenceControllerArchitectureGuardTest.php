@@ -282,6 +282,161 @@ class SenseOccurrenceControllerArchitectureGuardTest extends TestCase
         }
     }
 
+    // ================================================================
+    // SenseOccurrenceActionController extraction guards.
+    // ================================================================
+
+    public function test_sense_occurrence_controller_no_longer_has_single_occurrence_action_methods(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $blockedMethods = [
+            'confirm',
+            'bind',
+            'createSense',
+            'reject',
+            'ignore',
+        ];
+
+        foreach ($blockedMethods as $method) {
+            $this->assertStringNotContainsString(
+                "public function $method",
+                $controller,
+                "SenseOccurrenceController must not contain method '$method'"
+            );
+        }
+    }
+
+    public function test_sense_occurrence_controller_no_longer_has_find_occurrence(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $this->assertStringNotContainsString(
+            'private function findOccurrence',
+            $controller,
+            'SenseOccurrenceController must no longer have private findOccurrence'
+        );
+    }
+
+    public function test_sense_occurrence_action_controller_exists(): void
+    {
+        $controllerPath = base_path('app/Http/Controllers/SenseOccurrenceActionController.php');
+        $this->assertFileExists($controllerPath);
+    }
+
+    public function test_sense_occurrence_action_controller_has_required_methods(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceActionController.php'));
+
+        $requiredMethods = [
+            'confirm',
+            'bind',
+            'createSense',
+            'reject',
+            'ignore',
+        ];
+
+        foreach ($requiredMethods as $method) {
+            $this->assertStringContainsString(
+                "public function $method",
+                $controller,
+                "SenseOccurrenceActionController must contain method '$method'"
+            );
+        }
+    }
+
+    public function test_sense_occurrence_action_controller_injects_required_services(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceActionController.php'));
+
+        $this->assertStringContainsString(
+            'WordSenseOccurrenceService $occurrenceService',
+            $controller
+        );
+        $this->assertStringContainsString(
+            'SenseOccurrencePayloadSerializerService $payloadSerializer',
+            $controller
+        );
+    }
+
+    public function test_sense_occurrence_action_controller_has_private_find_occurrence(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceActionController.php'));
+
+        $this->assertStringContainsString(
+            'private function findOccurrence',
+            $controller,
+            'SenseOccurrenceActionController must have private findOccurrence'
+        );
+        $this->assertStringContainsString(
+            'WordSenseOccurrence',
+            $controller,
+            'findOccurrence must return WordSenseOccurrence'
+        );
+    }
+
+    public function test_single_occurrence_action_routes_point_to_new_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $routeChecks = [
+            "POST /senses/occurrences/{id}/confirm" => "Route::post('/senses/occurrences/{id}/confirm', [App\\Http\\Controllers\\SenseOccurrenceActionController::class, 'confirm'])",
+            "POST /senses/occurrences/{id}/bind" => "Route::post('/senses/occurrences/{id}/bind', [App\\Http\\Controllers\\SenseOccurrenceActionController::class, 'bind'])",
+            "POST /senses/occurrences/{id}/create-sense" => "Route::post('/senses/occurrences/{id}/create-sense', [App\\Http\\Controllers\\SenseOccurrenceActionController::class, 'createSense'])",
+            "POST /senses/occurrences/{id}/reject" => "Route::post('/senses/occurrences/{id}/reject', [App\\Http\\Controllers\\SenseOccurrenceActionController::class, 'reject'])",
+            "POST /senses/occurrences/{id}/ignore" => "Route::post('/senses/occurrences/{id}/ignore', [App\\Http\\Controllers\\SenseOccurrenceActionController::class, 'ignore'])",
+        ];
+
+        foreach ($routeChecks as $label => $expected) {
+            $this->assertStringContainsString(
+                $expected,
+                $routes,
+                "Route '$label' must point to SenseOccurrenceActionController"
+            );
+        }
+    }
+
+    public function test_single_occurrence_action_routes_no_longer_point_to_old_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $blocked = [
+            "SenseOccurrenceController::class, 'confirm'",
+            "SenseOccurrenceController::class, 'bind'",
+            "SenseOccurrenceController::class, 'createSense'",
+            "SenseOccurrenceController::class, 'reject'",
+            "SenseOccurrenceController::class, 'ignore'",
+        ];
+
+        foreach ($blocked as $pattern) {
+            $this->assertStringNotContainsString(
+                $pattern,
+                $routes,
+                "Routes must no longer reference SenseOccurrenceController for single occurrence actions: '$pattern'"
+            );
+        }
+    }
+
+    public function test_bulk_routes_still_point_to_old_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $routeChecks = [
+            "POST /senses/occurrences/bulk-confirm" => "Route::post('/senses/occurrences/bulk-confirm', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkConfirm'])",
+            "POST /senses/occurrences/bulk-ignore" => "Route::post('/senses/occurrences/bulk-ignore', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkIgnore'])",
+            "POST /senses/occurrences/bulk-reject" => "Route::post('/senses/occurrences/bulk-reject', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkReject'])",
+            "POST /senses/occurrences/bulk-confirm-high-confidence" => "Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\\Http\\Controllers\\SenseOccurrenceController::class, 'bulkConfirmHighConfidence'])",
+        ];
+
+        foreach ($routeChecks as $label => $expected) {
+            $this->assertStringContainsString(
+                $expected,
+                $routes,
+                "Bulk route '$label' must still point to SenseOccurrenceController"
+            );
+        }
+    }
+
     private function extractMethodBody(string $code, string $methodSignature): string
     {
         $pos = strpos($code, $methodSignature);

@@ -211,11 +211,11 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/senses/occurrences/bulk-ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkIgnore']);
     Route::post('/senses/occurrences/bulk-reject', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkReject']);
     Route::post('/senses/occurrences/bulk-confirm-high-confidence', [App\Http\Controllers\SenseOccurrenceController::class, 'bulkConfirmHighConfidence']);
-    Route::post('/senses/occurrences/{id}/confirm', [App\Http\Controllers\SenseOccurrenceController::class, 'confirm']);
-    Route::post('/senses/occurrences/{id}/bind', [App\Http\Controllers\SenseOccurrenceController::class, 'bind']);
-    Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceController::class, 'createSense']);
-    Route::post('/senses/occurrences/{id}/reject', [App\Http\Controllers\SenseOccurrenceController::class, 'reject']);
-    Route::post('/senses/occurrences/{id}/ignore', [App\Http\Controllers\SenseOccurrenceController::class, 'ignore']);
+    Route::post('/senses/occurrences/{id}/confirm', [App\Http\Controllers\SenseOccurrenceActionController::class, 'confirm']);
+    Route::post('/senses/occurrences/{id}/bind', [App\Http\Controllers\SenseOccurrenceActionController::class, 'bind']);
+    Route::post('/senses/occurrences/{id}/create-sense', [App\Http\Controllers\SenseOccurrenceActionController::class, 'createSense']);
+    Route::post('/senses/occurrences/{id}/reject', [App\Http\Controllers\SenseOccurrenceActionController::class, 'reject']);
+    Route::post('/senses/occurrences/{id}/ignore', [App\Http\Controllers\SenseOccurrenceActionController::class, 'ignore']);
 
     // review card management
     Route::get('/review-cards/stats', [App\Http\Controllers\ReviewStatsController::class, 'index']);
