@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\ReadingInlineSenseConfirmationService;
+use App\Services\SenseOccurrenceExampleService;
 use App\Services\SenseOccurrencePayloadSerializerService;
 use App\Services\SenseSourceContextService;
 use App\Services\WordSenseKnownSenseService;
@@ -25,6 +26,7 @@ class SenseOccurrenceController extends Controller
         private WordSenseKnownSenseService $knownSenseService,
         private ReadingInlineSenseConfirmationService $inlineConfirmationService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
+        private SenseOccurrenceExampleService $exampleService,
     )
     {
     }
@@ -527,33 +529,9 @@ class SenseOccurrenceController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
-        $sense = WordSense::where('id', $id)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->firstOrFail();
-
-        $occurrences = WordSenseOccurrence::where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('word_sense_id', $sense->id)
-            ->whereNotNull('sentence_en')
-            ->where('sentence_en', '<>', '')
-            ->orderBy('created_at', 'desc')
-            ->limit(20)
-            ->get();
-
-        return response()->json([
-            'sense_id' => $sense->id,
-            'lemma' => $sense->lemma,
-            'occurrences' => $occurrences->map(fn (WordSenseOccurrence $o) => [
-                'occurrence_id' => $o->id,
-                'sentence_en' => $o->sentence_en,
-                'sentence_zh' => $o->sentence_zh,
-                'surface' => $o->surface,
-                'chapter_id' => $o->chapter_id,
-                'status' => $o->status,
-                'created_at' => $o->created_at?->toISOString(),
-            ])->values(),
-        ]);
+        return response()->json(
+            $this->exampleService->getExamples($userId, $language, $id)
+        );
     }
 
     public function sourceContext(int $id)
