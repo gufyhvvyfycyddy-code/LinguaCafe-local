@@ -14,7 +14,7 @@ class SenseOccurrenceControllerArchitectureGuardTest extends TestCase
         $this->assertStringContainsString('SenseOccurrencePayloadSerializerService $payloadSerializer', $controller);
         $this->assertStringContainsString('return $this->payloadSerializer->serializeOccurrence($occurrence);', $controller);
         $this->assertStringContainsString('return $this->payloadSerializer->serializeSense($sense);', $controller);
-        $this->assertStringContainsString('return $this->payloadSerializer->normalizeList($value);', $controller);
+        $this->assertStringNotContainsString('private function normalizeList', $controller);
 
         $controllerTail = substr($controller, strpos($controller, 'private function serializeOccurrence'));
         $this->assertStringNotContainsString("'occurrence_id' =>", $controllerTail);
@@ -500,6 +500,98 @@ class SenseOccurrenceControllerArchitectureGuardTest extends TestCase
                 $pattern,
                 $routes,
                 "Routes must no longer reference SenseOccurrenceController for bulk occurrence actions: '$pattern'"
+            );
+        }
+    }
+
+    // ================================================================
+    // ManualWordSenseController extraction guards.
+    // ================================================================
+
+    public function test_sense_occurrence_controller_no_longer_has_manual_word_sense_methods(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $blockedMethods = [
+            'storeManualSense',
+            'updateManualSense',
+            'archiveSense',
+        ];
+
+        foreach ($blockedMethods as $method) {
+            $this->assertStringNotContainsString(
+                "public function {$method}",
+                $controller,
+                "SenseOccurrenceController must no longer contain manual word sense method '$method'"
+            );
+        }
+
+        $this->assertStringNotContainsString('WordSenseService', $controller);
+        $this->assertStringNotContainsString('private const POS_OPTIONS', $controller);
+        $this->assertStringNotContainsString('Illuminate\\Validation\\Rule', $controller);
+    }
+
+    public function test_manual_word_sense_controller_exists_and_contains_manual_methods(): void
+    {
+        $controllerPath = base_path('app/Http/Controllers/ManualWordSenseController.php');
+
+        $this->assertFileExists($controllerPath);
+
+        $controller = file_get_contents($controllerPath);
+        $requiredMethods = [
+            'storeManualSense',
+            'updateManualSense',
+            'archiveSense',
+        ];
+
+        foreach ($requiredMethods as $method) {
+            $this->assertStringContainsString(
+                "public function {$method}",
+                $controller,
+                "ManualWordSenseController must contain method '$method'"
+            );
+        }
+
+        $this->assertStringContainsString('WordSenseService $wordSenseService', $controller);
+        $this->assertStringContainsString('SenseOccurrencePayloadSerializerService $payloadSerializer', $controller);
+        $this->assertStringContainsString('private const POS_OPTIONS', $controller);
+        $this->assertStringContainsString('normalizeList', $controller);
+    }
+
+    public function test_manual_word_sense_routes_point_to_manual_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $routeChecks = [
+            "POST /senses/manual" => "Route::post('/senses/manual', [App\\Http\\Controllers\\ManualWordSenseController::class, 'storeManualSense'])",
+            "PUT /senses/{id}/manual" => "Route::put('/senses/{id}/manual', [App\\Http\\Controllers\\ManualWordSenseController::class, 'updateManualSense'])",
+            "PUT /senses/{id}/archive" => "Route::put('/senses/{id}/archive', [App\\Http\\Controllers\\ManualWordSenseController::class, 'archiveSense'])",
+        ];
+
+        foreach ($routeChecks as $label => $expected) {
+            $this->assertStringContainsString(
+                $expected,
+                $routes,
+                "Manual word sense route '$label' must point to ManualWordSenseController"
+            );
+        }
+    }
+
+    public function test_routes_no_longer_reference_old_controller_for_manual_word_sense_actions(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $blocked = [
+            "SenseOccurrenceController::class, 'storeManualSense'",
+            "SenseOccurrenceController::class, 'updateManualSense'",
+            "SenseOccurrenceController::class, 'archiveSense'",
+        ];
+
+        foreach ($blocked as $pattern) {
+            $this->assertStringNotContainsString(
+                $pattern,
+                $routes,
+                "Routes must no longer reference SenseOccurrenceController for manual word sense actions: '$pattern'"
             );
         }
     }

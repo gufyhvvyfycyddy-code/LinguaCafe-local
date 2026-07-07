@@ -201,9 +201,9 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/senses/inline-confirmations/undo', [App\Http\Controllers\ReadingInlineSenseConfirmationController::class, 'undoInlineConfirmation']);
     Route::delete('/senses/inline-confirmations/{id}', [App\Http\Controllers\ReadingInlineSenseConfirmationController::class, 'revokeInlineConfirmation']);
     Route::get('/senses/possible-duplicates', [App\Http\Controllers\SenseOccurrenceController::class, 'possibleDuplicates']);
-    Route::post('/senses/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'storeManualSense']);
-    Route::put('/senses/{id}/manual', [App\Http\Controllers\SenseOccurrenceController::class, 'updateManualSense']);
-    Route::put('/senses/{id}/archive', [App\Http\Controllers\SenseOccurrenceController::class, 'archiveSense']);
+    Route::post('/senses/manual', [App\Http\Controllers\ManualWordSenseController::class, 'storeManualSense']);
+    Route::put('/senses/{id}/manual', [App\Http\Controllers\ManualWordSenseController::class, 'updateManualSense']);
+    Route::put('/senses/{id}/archive', [App\Http\Controllers\ManualWordSenseController::class, 'archiveSense']);
     Route::get('/senses/{id}/examples', [App\Http\Controllers\SenseOccurrenceController::class, 'examples']);
     Route::get('/senses/{id}/source-context', [App\Http\Controllers\SenseSourceContextController::class, 'sourceContext']);
     Route::get('/senses/{id}/source-context-list', [App\Http\Controllers\SenseSourceContextController::class, 'sourceContextList']);
