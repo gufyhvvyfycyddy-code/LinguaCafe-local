@@ -108,11 +108,13 @@ class SenseSourceContextService
      * (owned by user, correct language, correct sense, status=bound, has
      * chapter or sentence). On any failure, the call silently falls back
      * to the original multi-source logic and reports
-     * preferred_occurrence_status = 'invalid' / 'not_found' / 'fallback'.
+     * preferred_occurrence_status = 'invalid' / 'fallback'.
      *
      * Payload contract:
-     *   - preferred_occurrence_status: 'matched' | 'invalid' | 'not_found'
-     *     | 'fallback' | 'unavailable'
+     *   - preferred_occurrence_status: 'matched' | 'invalid' | 'fallback'
+     *     | 'unavailable'
+     *     'invalid' covers not found, wrong owner, wrong language, wrong
+     *     sense, and non-bound occurrences.
      *     'unavailable' is returned when no preferred occurrence id was
      *     supplied (preserves the old contract for callers that don't care).
      */
@@ -255,8 +257,8 @@ class SenseSourceContextService
             // No chapter-based sources — fall back to the existing single
             // sourceContext flow so the dialog still shows whatever fallback
             // (card_example / unavailable) is appropriate. If we reach here,
-            // $preferredStatus is one of not_found / invalid / fallback /
-            // unavailable (matched would have populated $sources above).
+            // $preferredStatus is one of invalid / fallback / unavailable
+            // (matched would have populated $sources above).
             $primary = $this->sourceContext($userId, $language, $senseId);
             return [
                 'sense_id' => $sense->id,
