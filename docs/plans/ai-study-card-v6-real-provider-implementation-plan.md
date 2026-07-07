@@ -29,6 +29,7 @@ Implemented as disabled/fail-closed / contract skeleton:
 - provider-preview service boundary
 - provider-neutral prompt payload builder
 - provider raw response parser + schema validation boundary
+- OpenAI-compatible adapter skeleton with fake transport tests
 
 Still not implemented:
 
@@ -92,19 +93,33 @@ The prompt payload builder creates `ai-study-card-v6-provider-prompt-payload-v1`
 
 The response parser accepts raw JSON text, rejects empty / invalid / array JSON, passes decoded objects through `AiStudyCardV6RecommendationSchemaService`, and fails closed without writing learning data.
 
-### Step D — live adapter implementation, no UI
+### Step D — OpenAI-compatible adapter skeleton, fake transport only — implemented 2026-07-07
 
-Add a live adapter behind `AiStudyCardV6ProviderInterface`.
+Added backend-only adapter skeleton:
 
-It may be tested with fake HTTP responses. No real external requests in automated tests.
+- `AiStudyCardV6ProviderTransportInterface`
+- `AiStudyCardV6ProviderTransportException`
+- `AiStudyCardV6OpenAiCompatibleProviderAdapter`
 
-### Step E — real provider local manual test
+The adapter implements `AiStudyCardV6ProviderInterface`, builds prompt payload through `AiStudyCardV6PromptBuilderService`, sends the payload only through an injected `AiStudyCardV6ProviderTransportInterface`, extracts OpenAI-compatible `choices.0.message.content`, and parses it through `AiStudyCardV6ProviderResponseParserService`.
+
+It is not bound in `AppServiceProvider`. Default binding remains `AiStudyCardV6DisabledProviderAdapter`.
+
+Automated tests use fake transports only. There is no live endpoint, no HTTP client, no secret, no `.env`, no UI, and no external request.
+
+### Step E — live adapter implementation, no UI
+
+A future task may add a real transport behind `AiStudyCardV6ProviderTransportInterface`, but only after provider/secret/timeout/failure behavior is explicitly approved.
+
+No real external requests in automated tests.
+
+### Step F — real provider local manual test
 
 Only after user supplies runtime configuration outside committed code.
 
 The manual test must be backend-only first, then UI.
 
-### Step F — UI trigger + browser Network validation
+### Step G — UI trigger + browser Network validation
 
 Add a user-triggered button and stop for WorkBuddy / MCP Chrome browser validation.
 
@@ -209,6 +224,7 @@ This plan and route-skeleton stage is complete when:
 - Provider-preview route exists but stays disabled/fail-closed under current security policy.
 - Prompt payload builder exists but does not call providers.
 - Response parser exists but trusts only schema-valid JSON.
+- OpenAI-compatible adapter skeleton exists but uses only injected fake transports in tests and is not default-bound.
 - No UI starts provider calls.
 - No config or service starts external provider calls.
 - No secret reference or secret value is added.

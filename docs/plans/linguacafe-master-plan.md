@@ -942,6 +942,27 @@
 - 不写 WordSense / ReviewCard / ReviewLog。
 - 不改 FSRS。
 
+### V6-7 OpenAI-compatible adapter fake-transport skeleton 实现结果
+
+已实现 OpenAI-compatible adapter skeleton，仍不接真实 provider：
+
+- 新增 `AiStudyCardV6ProviderTransportInterface`。
+- 新增 `AiStudyCardV6ProviderTransportException`。
+- 新增 `AiStudyCardV6OpenAiCompatibleProviderAdapter`。
+- 新增 `tests/Feature/AiStudyCardV6OpenAiCompatibleAdapterTest.php`。
+- 默认 `AppServiceProvider` 仍绑定 disabled adapter，不绑定该 adapter。
+- adapter 只有在测试中注入 fake transport 才执行。
+- adapter 不知道 provider endpoint。
+- adapter 不知道 API key。
+- adapter 不读取 `.env`。
+- adapter 不使用 `Http::` / curl / Guzzle。
+- adapter 使用 `AiStudyCardV6PromptBuilderService` 构造 provider-neutral payload。
+- adapter 从 OpenAI-compatible `choices.0.message.content` 提取 JSON。
+- adapter 使用 `AiStudyCardV6ProviderResponseParserService` 解析和 schema 校验。
+- missing choices / invalid JSON / schema-invalid JSON / transport exception 全部 fail-closed。
+- 不写 WordSense / ReviewCard / ReviewLog。
+- 不改 FSRS。
+
 ### 后续允许的下一小步
 
-到这里，下一步如果做 UI trigger 或 live adapter，就会进入真实 provider/页面 Network 风险区，必须停下来安排真实浏览器 Network 验收。若还要继续 backend-only，可只做 live adapter 的 fake-HTTP 测试骨架，不启用配置、不接 UI、不发真实请求。
+到这里，再继续 backend-only 的空间已经很窄。下一步若要做真实 transport、provider 配置启用、UI trigger 或真实请求，就会进入真实 provider/页面 Network 风险区，必须停下来安排真实浏览器 Network 验收，并且需要用户先确认 provider、secret storage、timeout、quota/failure 行为。
