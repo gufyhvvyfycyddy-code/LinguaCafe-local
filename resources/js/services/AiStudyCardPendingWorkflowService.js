@@ -186,6 +186,42 @@ export function buildFinalCandidatesPackage(axios, payload) {
         });
 }
 
+/**
+ * Build the V6 provider-disabled request package.
+ *
+ * POST /ai-study-card/v6/recommendations/request-package
+ *
+ * This is still a LOCAL LinguaCafe endpoint. It does NOT call any external AI
+ * provider and returns only ai-study-card-v6-request-package-v1.
+ */
+export function buildV6RequestPackage(axios, selectedItemIds, contextPolicy = 'selected_items_with_sentence') {
+    return axios.post('/ai-study-card/v6/recommendations/request-package', {
+        item_ids: selectedItemIds,
+        context_policy: contextPolicy,
+    }).then((response) => {
+        if (response.data && response.data.success) {
+            return { success: true, package: response.data.package };
+        }
+        const msg = response.data && response.data.message
+            ? response.data.message
+            : '生成 V6 请求包失败。';
+        const err = new Error(msg);
+        err.payload = response.data;
+        throw err;
+    }).catch((error) => {
+        if (error && error.payload) {
+            throw error;
+        }
+        const shaped = new Error(
+            error.response && error.response.data && error.response.data.message
+                ? error.response.data.message
+                : '生成 V6 请求包失败。'
+        );
+        shaped.original = error;
+        throw shaped;
+    });
+}
+
 // Re-export the V5 generate-cards helper so callers can import the whole
 // workflow API from a single module if they prefer.
 export {

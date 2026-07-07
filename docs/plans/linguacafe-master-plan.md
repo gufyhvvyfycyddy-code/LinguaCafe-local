@@ -831,6 +831,8 @@
 - 新增 `AiStudyCardV6RecommendationController::requestPackage`。
 - 新增 `AiStudyCardV6RequestPackageService::buildRequestPackage`。
 - 新增路由 `POST /ai-study-card/v6/recommendations/request-package`。
+- 新增桌面 UI 组件 `AiStudyCardV6RequestPackagePanel.vue`，挂载到 `AiStudyCardPreviewDialog.vue`。
+- 新增前端 API wrapper `buildV6RequestPackage()`。
 - 返回 `schema_version=ai-study-card-v6-request-package-v1`。
 - 只打包当前用户、当前语言、pending 状态的 selected items。
 - 过滤跨用户、跨语言、dismissed、processed 项。
@@ -842,6 +844,8 @@
 - 不改变 pending item 状态。
 
 新增 `tests/Feature/AiStudyCardV6RequestPackageTest.php`，覆盖 request package shape、隔离、状态过滤、raw payload 排除、数量上限、V5 route 不变等边界。
+
+新增 `tests/Feature/AiStudyCardV6RequestPackageUiGuardTest.php`，锁定桌面 UI 入口、安全文案、本地 endpoint 调用、主 workflow 不新增 V6 状态/方法、无 provider/API key 材料、无 ReviewLog/FSRS/legacy word card 创建调用。
 
 ### 后续允许的下一小步
 

@@ -79,6 +79,9 @@
                     @deselect-all="$emit('deselect-all-ai-recommendations')"
                 />
 
+                <!-- V6-1: provider-disabled request package -->
+                <AiStudyCardV6RequestPackagePanel :selected-item-ids="selectedItemIds" />
+
                 <!-- 规则说明 -->
                 <div class="mt-5 pa-3 rounded" style="background: var(--v-gray1-base);">
                     <div class="text-caption font-weight-medium mb-1">生成规则说明：</div>
@@ -184,6 +187,7 @@
 import AiStudyCardGenerateCardsResult from './AiStudyCardGenerateCardsResult.vue';
 import AiStudyCardRecommendationPanel from './AiStudyCardRecommendationPanel.vue';
 import AiStudyCardPackagePanel from './AiStudyCardPackagePanel.vue';
+import AiStudyCardV6RequestPackagePanel from './AiStudyCardV6RequestPackagePanel.vue';
 
 /**
  * AiStudyCardPreviewDialog
@@ -226,6 +230,7 @@ export default {
         AiStudyCardGenerateCardsResult,
         AiStudyCardRecommendationPanel,
         AiStudyCardPackagePanel,
+        AiStudyCardV6RequestPackagePanel,
     },
     props: {
         value: { type: Boolean, default: false },

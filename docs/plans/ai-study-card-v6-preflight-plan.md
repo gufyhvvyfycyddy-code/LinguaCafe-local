@@ -132,11 +132,15 @@ Required safety flags:
 - Local endpoint: `POST /ai-study-card/v6/recommendations/request-package`.
 - Controller: `AiStudyCardV6RecommendationController::requestPackage`.
 - Service: `AiStudyCardV6RequestPackageService::buildRequestPackage`.
+- Desktop UI: `AiStudyCardV6RequestPackagePanel.vue`, mounted inside `AiStudyCardPreviewDialog.vue`.
+- Frontend API wrapper: `buildV6RequestPackage()` in `AiStudyCardPendingWorkflowService.js`.
 - Builds `ai-study-card-v6-request-package-v1`.
+- Shows clear provider-disabled safety copy.
+- Provides copy-to-clipboard for the generated request package.
 - Does not call a provider.
 - Proves the request package and safety flags.
 - Can be used for prompt copy / manual provider testing.
-- Covered by `AiStudyCardV6RequestPackageTest` and `AiStudyCardV6PreflightArchitectureGuardTest`.
+- Covered by `AiStudyCardV6RequestPackageTest`, `AiStudyCardV6PreflightArchitectureGuardTest`, and `AiStudyCardV6RequestPackageUiGuardTest`.
 
 ### V6-2: Provider adapter stub, disabled by default
 
