@@ -670,3 +670,48 @@
 ### 安全边界确认
 
 未改业务运行逻辑；未改页面；未改 API shape；未写 ReviewLog；未改 FSRS；未创建 legacy word card；未新增 migration；未清库；未读写 `.env`；未 DCP；未运行 notification script；未进入 V6；未自动调用 AI。
+
+---
+
+## 2026-07-07 CodeX-SenseOccurrenceControllerBoundary-1
+
+**任务**：SenseOccurrenceController 多职责第一刀收口。
+
+**开始前代码屎山评分**：7.8 / 10。
+
+### 目标
+
+把 `SenseOccurrenceController` 中最容易扩散的响应字段数组和列表清洗逻辑移出 Controller。Controller 继续负责 HTTP 边界、权限语言检查、请求校验和调用业务 service；payload shape 由独立 serializer service 持有。
+
+### 本轮改动
+
+- 新增 `app/Services/SenseOccurrencePayloadSerializerService.php`。
+- `SenseOccurrenceController` 注入 `SenseOccurrencePayloadSerializerService`。
+- Controller 底部 `serializeOccurrence()` / `serializeSense()` / `normalizeList()` 保留为薄包装，只委托 serializer，避免本轮大范围替换所有调用点。
+- 新增 `tests/Feature/SenseOccurrenceControllerArchitectureGuardTest.php`，防止响应字段数组和 `array_map('trim')` 清洗逻辑重新回到 Controller 私有方法中。
+
+### 不做范围
+
+- 不改 route。
+- 不改 API shape。
+- 不改 source context。
+- 不改 inline confirmation 业务。
+- 不改 manual sense 创建/编辑语义。
+- 不改 FSRS / ReviewLog / ReviewCard。
+- 不新增 migration。
+
+### 测试结果
+
+- `php -l "app/Http/Controllers/SenseOccurrenceController.php"`：通过。
+- `php -l "app/Services/SenseOccurrencePayloadSerializerService.php"`：通过。
+- `vendor/bin/phpunit "tests/Feature/SenseOccurrenceControllerArchitectureGuardTest.php"`：1 passed，10 assertions。
+- `vendor/bin/phpunit tests/Feature/WordSenseTest.php --filter occurrence_list_returns_only_current_user_language`：1 passed，4 assertions。
+- `vendor/bin/phpunit tests/Feature/WordSenseTest.php --filter bind_current_sense_can_create_sense_review_card`：1 passed，5 assertions。
+
+### 残留风险
+
+- `SenseOccurrenceController` 仍然偏胖，尚未拆出 `examples()`、inline confirmation 管理入口、bulk action 入口。
+- 当前只是 payload shape 第一刀，不是 Controller 完整治理。
+- 更宽的 WordSense 全量测试命令被工具层拦截，本轮未声称全量通过。
+
+**完成后代码屎山评分**：7.1 / 10。

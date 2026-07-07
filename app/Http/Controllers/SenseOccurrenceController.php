@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\ReadingInlineSenseConfirmationService;
+use App\Services\SenseOccurrencePayloadSerializerService;
 use App\Services\SenseSourceContextService;
 use App\Services\WordSenseKnownSenseService;
 use App\Services\WordSenseOccurrenceService;
@@ -23,6 +24,7 @@ class SenseOccurrenceController extends Controller
         private SenseSourceContextService $senseSourceContextService,
         private WordSenseKnownSenseService $knownSenseService,
         private ReadingInlineSenseConfirmationService $inlineConfirmationService,
+        private SenseOccurrencePayloadSerializerService $payloadSerializer,
     )
     {
     }
@@ -46,7 +48,7 @@ class SenseOccurrenceController extends Controller
         ]);
 
         return response()->json([
-            'data' => $occurrences->getCollection()->map(fn (WordSenseOccurrence $occurrence) => $this->serializeOccurrence($occurrence))->values(),
+            'data' => $occurrences->getCollection()->map(fn (WordSenseOccurrence $occurrence) => $this->payloadSerializer->serializeOccurrence($occurrence))->values(),
             'summary' => $this->occurrenceService->statusSummary($userId, $language),
             'pagination' => [
                 'current_page' => $occurrences->currentPage(),
@@ -621,52 +623,16 @@ class SenseOccurrenceController extends Controller
 
     private function serializeOccurrence(WordSenseOccurrence $occurrence): array
     {
-        return [
-            'occurrence_id' => $occurrence->id,
-            'sentence_en' => $occurrence->sentence_en,
-            'sentence_zh' => $occurrence->sentence_zh,
-            'surface' => $occurrence->surface,
-            'lemma' => $occurrence->lemma,
-            'pos' => $occurrence->pos,
-            'decision' => $occurrence->decision,
-            'confidence' => $occurrence->confidence,
-            'evidence' => $occurrence->evidence,
-            'status' => $occurrence->status,
-            'auto_fsrs_allowed' => $occurrence->auto_fsrs_allowed,
-            'sense' => $occurrence->wordSense ? $this->serializeSense($occurrence->wordSense) : null,
-            'raw_payload' => $occurrence->raw_payload,
-        ];
+        return $this->payloadSerializer->serializeOccurrence($occurrence);
     }
 
     private function serializeSense(WordSense $sense): array
     {
-        return [
-            'sense_id' => $sense->id,
-            'lemma' => $sense->lemma,
-            'pos' => $sense->pos,
-            'sense_key' => $sense->sense_key,
-            'sense_zh' => $sense->sense_zh,
-            'sense_en' => $sense->sense_en,
-            'aliases_zh' => $sense->aliases_zh ?: [],
-            'collocations' => $sense->collocations ?: [],
-            'status' => $sense->status,
-            'fsrs_state' => $sense->reviewCard?->fsrs_state,
-            'review_card_id' => $sense->reviewCard?->id,
-            'fsrs_enabled' => $sense->reviewCard?->fsrs_enabled,
-            'fsrs_due_at' => $sense->reviewCard?->fsrs_due_at,
-            'fsrs_stability' => $sense->reviewCard?->fsrs_stability,
-            'fsrs_difficulty' => $sense->reviewCard?->fsrs_difficulty,
-            'fsrs_reps' => $sense->reviewCard?->fsrs_reps,
-            'fsrs_lapses' => $sense->reviewCard?->fsrs_lapses,
-        ];
+        return $this->payloadSerializer->serializeSense($sense);
     }
 
     private function normalizeList(mixed $value): array
     {
-        if (is_array($value)) {
-            return array_values(array_filter(array_map('trim', $value), fn ($item) => $item !== ''));
-        }
-
-        return array_values(array_filter(array_map('trim', explode(',', (string) $value)), fn ($item) => $item !== ''));
+        return $this->payloadSerializer->normalizeList($value);
     }
 }
