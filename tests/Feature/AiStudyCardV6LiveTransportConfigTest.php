@@ -68,9 +68,10 @@ class AiStudyCardV6LiveTransportConfigTest extends TestCase
             'https://api.deepseek.com/chat/completions' => Http::response($this->validProviderHttpResponse(), 200),
         ]);
 
+        $email = 'ai-v6-live-route-' . uniqid() . '@example.test';
         $user = User::forceCreate([
-            'name' => 'ai-v6-live-route@example.test',
-            'email' => 'ai-v6-live-route@example.test',
+            'name' => $email,
+            'email' => $email,
             'password' => Hash::make('password'),
             'selected_language' => 'english',
         ]);
