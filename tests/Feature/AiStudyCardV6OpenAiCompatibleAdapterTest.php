@@ -162,7 +162,7 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
         $adapter = $this->adapterWithTransport(new class implements AiStudyCardV6ProviderTransportInterface {
             public function sendChatCompletions(array $payload, array $options = []): array
             {
-                throw new AiStudyCardV6ProviderTransportException('fake transport failed');
+                throw new AiStudyCardV6ProviderTransportException('provider_network_failure', 'fake transport failed');
             }
         });
         $service = new AiStudyCardV6RecommendationService($adapter, app(AiStudyCardV6RecommendationSchemaService::class));
@@ -170,8 +170,8 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
         $result = $service->recommend($this->validRequestPackage());
 
         $this->assertFalse($result['success']);
-        $this->assertSame(502, $result['status']);
-        $this->assertContains('provider_failed_closed', $result['errors']);
+        $this->assertSame(504, $result['status']);
+        $this->assertContains('provider_network_failure', $result['errors']);
         $this->assertSafeLearningTablesRemainEmpty();
     }
 
@@ -242,6 +242,9 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
             'ai_study_card_v6.provider.external_requests_enabled' => true,
             'ai_study_card_v6.provider.allowed_adapter' => 'openai_compatible',
             'ai_study_card_v6.provider.secret_source' => 'test_fake_secret_source',
+            'ai_study_card_v6.provider.base_url' => 'https://fake-provider.test',
+            'ai_study_card_v6.provider.model' => 'fake-model',
+            'ai_study_card_v6.provider.api_key' => 'test-key-not-real',
             'ai_study_card_v6.request_policy.timeout_seconds' => 15,
             'ai_study_card_v6.network_validation.browser_network_smoke_required_before_real_provider' => true,
         ]);

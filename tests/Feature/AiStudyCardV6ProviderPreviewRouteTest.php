@@ -66,7 +66,9 @@ class AiStudyCardV6ProviderPreviewRouteTest extends TestCase
         $response->assertJsonPath('safety_flags.external_requests_enabled', false);
         $this->assertStringContainsString('external_requests_disabled', $response->getContent());
         $this->assertStringContainsString('provider_name_disabled', $response->getContent());
-        $this->assertStringContainsString('secret_source_not_configured', $response->getContent());
+        $this->assertStringContainsString('adapter_not_openai_compatible', $response->getContent());
+        $this->assertStringContainsString('api_key_not_configured', $response->getContent());
+        $this->assertStringContainsString('base_url_not_configured', $response->getContent());
         $this->assertStringContainsString('timeout_not_configured', $response->getContent());
         $this->assertSafeLearningTablesRemainEmpty();
     }

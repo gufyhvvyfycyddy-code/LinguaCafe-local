@@ -6,18 +6,21 @@ return [
     | AI Study Card V6 Provider Security Configuration
     |--------------------------------------------------------------------------
     |
-    | This config intentionally ships with external provider calls disabled.
-    | It contains no secret value and no concrete provider endpoint. A future
-    | real-provider task must first update the security plan and tests.
+    | Default values keep external provider calls disabled. To test DeepSeek
+    | locally, the user must manually add the documented AI_STUDY_CARD_V6_*
+    | values to the local .env file. Agents must not read or modify .env.
     |
     */
 
     'provider' => [
-        'name' => 'disabled',
-        'external_requests_enabled' => false,
-        'allowed_adapter' => 'disabled',
-        'secret_source' => 'not_configured',
-        'secret_reference' => null,
+        'name' => env('AI_STUDY_CARD_V6_PROVIDER', 'disabled'),
+        'external_requests_enabled' => env('AI_STUDY_CARD_V6_EXTERNAL_REQUESTS_ENABLED', false),
+        'allowed_adapter' => env('AI_STUDY_CARD_V6_ALLOWED_ADAPTER', 'disabled'),
+        'secret_source' => env('AI_STUDY_CARD_V6_SECRET_SOURCE', 'env'),
+        'secret_reference' => env('AI_STUDY_CARD_V6_SECRET_REFERENCE', 'AI_STUDY_CARD_V6_API_KEY'),
+        'base_url' => env('AI_STUDY_CARD_V6_BASE_URL'),
+        'model' => env('AI_STUDY_CARD_V6_MODEL', 'deepseek-chat'),
+        'api_key' => env('AI_STUDY_CARD_V6_API_KEY'),
     ],
 
     'request_policy' => [
@@ -26,7 +29,7 @@ return [
         'page_load_requests_allowed' => false,
         'token_click_requests_allowed' => false,
         'max_items_per_request' => 50,
-        'timeout_seconds' => 0,
+        'timeout_seconds' => (int) env('AI_STUDY_CARD_V6_TIMEOUT_SECONDS', 0),
         'max_retries' => 0,
         'quota_failure_policy' => 'fail_closed',
         'malformed_output_policy' => 'fail_closed',

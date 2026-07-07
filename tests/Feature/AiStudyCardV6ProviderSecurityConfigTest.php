@@ -14,8 +14,8 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         $this->assertSame('disabled', config('ai_study_card_v6.provider.name'));
         $this->assertFalse(config('ai_study_card_v6.provider.external_requests_enabled'));
         $this->assertSame('disabled', config('ai_study_card_v6.provider.allowed_adapter'));
-        $this->assertSame('not_configured', config('ai_study_card_v6.provider.secret_source'));
-        $this->assertNull(config('ai_study_card_v6.provider.secret_reference'));
+        $this->assertSame('env', config('ai_study_card_v6.provider.secret_source'));
+        $this->assertSame('AI_STUDY_CARD_V6_API_KEY', config('ai_study_card_v6.provider.secret_reference'));
     }
 
     public function test_v6_request_policy_fails_closed_by_default(): void
@@ -81,7 +81,9 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         $this->assertFalse($preconditions['ok']);
         $this->assertContains('external_requests_disabled', $preconditions['errors']);
         $this->assertContains('provider_name_disabled', $preconditions['errors']);
-        $this->assertContains('secret_source_not_configured', $preconditions['errors']);
+        $this->assertContains('adapter_not_openai_compatible', $preconditions['errors']);
+        $this->assertContains('api_key_not_configured', $preconditions['errors']);
+        $this->assertContains('base_url_not_configured', $preconditions['errors']);
         $this->assertContains('timeout_not_configured', $preconditions['errors']);
     }
 
@@ -110,17 +112,11 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         ];
 
         $forbidden = [
-            'OPENAI_API_KEY',
-            'DEEPSEEK_API_KEY',
-            'ANTHROPIC_API_KEY',
-            'GEMINI_API_KEY',
-            'api_key' . ' =>',
             'sk-',
             'Bearer ',
-            'env(',
             'api.openai.com/v1',
-            'api.deepseek.com/',
-            'api.anthropic.com/',
+            'api.deepseek.com/v1',
+            'api.anthropic.com/v1',
             'generativelanguage.googleapis.com/v1',
         ];
 

@@ -40,6 +40,23 @@ class AiStudyCardV6ProviderSecurityPolicyService
         return (int) config('ai_study_card_v6.request_policy.max_items_per_request', 50);
     }
 
+    public function allowedAdapter(): string
+    {
+        return (string) config('ai_study_card_v6.provider.allowed_adapter', 'disabled');
+    }
+
+    public function providerBaseUrl(): ?string
+    {
+        $value = config('ai_study_card_v6.provider.base_url');
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
+    public function providerModel(): ?string
+    {
+        $value = config('ai_study_card_v6.provider.model');
+        return is_string($value) && trim($value) !== '' ? trim($value) : null;
+    }
+
     public function browserNetworkSmokeRequiredBeforeRealProvider(): bool
     {
         return (bool) config('ai_study_card_v6.network_validation.browser_network_smoke_required_before_real_provider', true);
@@ -73,8 +90,24 @@ class AiStudyCardV6ProviderSecurityPolicyService
             $errors[] = 'provider_name_disabled';
         }
 
+        if ($this->allowedAdapter() !== 'openai_compatible') {
+            $errors[] = 'adapter_not_openai_compatible';
+        }
+
         if (config('ai_study_card_v6.provider.secret_source') === 'not_configured') {
             $errors[] = 'secret_source_not_configured';
+        }
+
+        if (!is_string(config('ai_study_card_v6.provider.api_key')) || trim((string) config('ai_study_card_v6.provider.api_key')) === '') {
+            $errors[] = 'api_key_not_configured';
+        }
+
+        if ($this->providerBaseUrl() === null) {
+            $errors[] = 'base_url_not_configured';
+        }
+
+        if ($this->providerModel() === null) {
+            $errors[] = 'model_not_configured';
         }
 
         if ($this->timeoutSeconds() <= 0) {

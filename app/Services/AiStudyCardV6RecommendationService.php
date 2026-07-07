@@ -43,6 +43,16 @@ class AiStudyCardV6RecommendationService
                 'errors' => ['provider_disabled'],
                 'safety_flags' => $this->safeFailureFlags(),
             ];
+        } catch (AiStudyCardV6ProviderTransportException $exception) {
+            return [
+                'success' => false,
+                'status' => $this->statusForTransportFailure($exception->failureCode()),
+                'message' => $this->messageForTransportFailure($exception->failureCode()),
+                'provider' => $this->provider->providerName(),
+                'package' => null,
+                'errors' => [$exception->failureCode()],
+                'safety_flags' => $this->safeFailureFlags(),
+            ];
         } catch (\Throwable) {
             return [
                 'success' => false,
@@ -87,6 +97,31 @@ class AiStudyCardV6RecommendationService
                 'no_legacy_word_card_created' => true,
             ],
         ];
+    }
+
+    private function statusForTransportFailure(string $failureCode): int
+    {
+        return match ($failureCode) {
+            'provider_auth_failure' => 401,
+            'provider_quota_failure' => 429,
+            'provider_malformed_response' => 422,
+            'provider_network_failure' => 504,
+            default => 502,
+        };
+    }
+
+    private function messageForTransportFailure(string $failureCode): string
+    {
+        return match ($failureCode) {
+            'provider_auth_failure' => 'AI 推荐失败：Provider 鉴权失败。',
+            'provider_quota_failure' => 'AI 推荐失败：Provider 配额或频率限制。',
+            'provider_malformed_response' => 'AI 推荐失败：Provider 返回格式错误。',
+            'provider_network_failure' => 'AI 推荐失败：网络连接失败或超时。',
+            'provider_base_url_missing' => 'AI 推荐失败：Provider base URL 未配置。',
+            'provider_key_missing' => 'AI 推荐失败：Provider key 未配置。',
+            'provider_model_missing' => 'AI 推荐失败：Provider model 未配置。',
+            default => 'AI 推荐失败：Provider 请求失败。',
+        };
     }
 
     private function safeFailureFlags(): array

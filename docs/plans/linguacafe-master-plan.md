@@ -963,6 +963,21 @@
 - 不写 WordSense / ReviewCard / ReviewLog。
 - 不改 FSRS。
 
+### V6-8 DeepSeek backend transport 实现结果
+
+已实现 backend live transport，但仍不接 UI：
+
+- `config/ai_study_card_v6.php` 支持用户手动本地环境配置。
+- `AppServiceProvider` 默认仍 disabled；只有本地配置允许时才绑定 OpenAI-compatible adapter。
+- 新增 `AiStudyCardV6OpenAiCompatibleHttpTransport`。
+- provider-preview backend route 在配置启用后可经后端 transport 调用 DeepSeek-compatible chat-completions endpoint。
+- 自动测试使用 HTTP fake，不发真实外部请求。
+- 错误分类细化为 auth / quota / malformed response / network / missing base URL / missing key / missing model。
+- 仍不创建 WordSense / ReviewCard / ReviewLog。
+- 仍不改 FSRS。
+- 仍不创建 legacy word card。
+- 仍没有 live provider UI trigger。
+
 ### 后续允许的下一小步
 
-到这里，再继续 backend-only 的空间已经很窄。下一步若要做真实 transport、provider 配置启用、UI trigger 或真实请求，就会进入真实 provider/页面 Network 风险区，必须停下来安排真实浏览器 Network 验收，并且需要用户先确认 provider、secret storage、timeout、quota/failure 行为。
+下一步应让用户手动配置本地环境值后，先做 backend-only provider-preview smoke。再往后如果要加 UI trigger，就必须安排 WorkBuddy 网页端体验师做真实浏览器 Network 验收，确认页面不会在 page load / token click / 打开弹窗时自动调用 provider，并确认浏览器 Network 不暴露 key。
