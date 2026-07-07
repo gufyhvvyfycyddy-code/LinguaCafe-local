@@ -192,6 +192,96 @@ class SenseOccurrenceControllerArchitectureGuardTest extends TestCase
         }
     }
 
+    // ================================================================
+    // SenseSourceContextController extraction guards.
+    // ================================================================
+
+    public function test_sense_occurrence_controller_no_longer_has_source_context_methods(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $blockedMethods = [
+            'sourceContext',
+            'sourceContextList',
+        ];
+
+        foreach ($blockedMethods as $method) {
+            $this->assertStringNotContainsString(
+                "function $method",
+                $controller,
+                "SenseOccurrenceController must not contain method '$method'"
+            );
+        }
+    }
+
+    public function test_sense_occurrence_controller_no_longer_imports_sense_source_context_service(): void
+    {
+        $controller = file_get_contents(base_path('app/Http/Controllers/SenseOccurrenceController.php'));
+
+        $this->assertStringNotContainsString(
+            'SenseSourceContextService',
+            $controller,
+            'SenseOccurrenceController must no longer import or inject SenseSourceContextService'
+        );
+    }
+
+    public function test_sense_source_context_controller_exists_and_has_required_methods(): void
+    {
+        $controllerPath = base_path('app/Http/Controllers/SenseSourceContextController.php');
+        $this->assertFileExists($controllerPath);
+
+        $controller = file_get_contents($controllerPath);
+
+        $requiredMethods = [
+            'sourceContext',
+            'sourceContextList',
+        ];
+
+        foreach ($requiredMethods as $method) {
+            $this->assertStringContainsString(
+                "function $method",
+                $controller,
+                "SenseSourceContextController must contain method '$method'"
+            );
+        }
+    }
+
+    public function test_source_context_routes_point_to_new_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $routeChecks = [
+            "GET /senses/{id}/source-context" => "Route::get('/senses/{id}/source-context', [App\\Http\\Controllers\\SenseSourceContextController::class, 'sourceContext'])",
+            "GET /senses/{id}/source-context-list" => "Route::get('/senses/{id}/source-context-list', [App\\Http\\Controllers\\SenseSourceContextController::class, 'sourceContextList'])",
+        ];
+
+        foreach ($routeChecks as $label => $expected) {
+            $this->assertStringContainsString(
+                $expected,
+                $routes,
+                "Route '$label' must point to SenseSourceContextController"
+            );
+        }
+    }
+
+    public function test_source_context_routes_no_longer_point_to_old_controller(): void
+    {
+        $routes = file_get_contents(base_path('routes/web.php'));
+
+        $blocked = [
+            "SenseOccurrenceController::class, 'sourceContext'",
+            "SenseOccurrenceController::class, 'sourceContextList'",
+        ];
+
+        foreach ($blocked as $pattern) {
+            $this->assertStringNotContainsString(
+                $pattern,
+                $routes,
+                "Routes must no longer reference SenseOccurrenceController for source context: '$pattern'"
+            );
+        }
+    }
+
     private function extractMethodBody(string $code, string $methodSignature): string
     {
         $pos = strpos($code, $methodSignature);
