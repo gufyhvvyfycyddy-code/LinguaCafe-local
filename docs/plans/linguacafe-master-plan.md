@@ -976,8 +976,40 @@
 - 仍不创建 WordSense / ReviewCard / ReviewLog。
 - 仍不改 FSRS。
 - 仍不创建 legacy word card。
-- 仍没有 live provider UI trigger。
+- V6-10 已新增 live provider UI trigger，见下方更新。
+
+### V6-9 provider output contract + backend smoke 实现结果
+
+已完成真实 provider output contract 修复与 backend-only smoke：
+
+- 修复 `AiStudyCardV6PromptBuilderService`，明确要求 provider 返回顶层 `schema_version` / `recommended_items` / `dropped_items` / `provider_metadata_redacted` / `safety_flags`。
+- 明确禁止把推荐数组写成顶层 `recommendations`。
+- 保持 provider result 只作为 unchecked recommendation package，不创建学习数据。
+- backend-only provider-preview smoke 在本地配置启用后返回 `success=true` / `status=200` / `schema=ai-study-card-v6-recommendation-package-v1` / `recommended_count=1`。
+- smoke 前后 `word_senses` / `review_cards` / `review_logs` 计数不变。
+- 不读取 `.env`，不打印 API key，不写 WordSense / ReviewCard / ReviewLog，不改 FSRS，不创建 legacy word card。
+
+### V6-10 provider-preview UI trigger 实现结果
+
+已完成显式 UI trigger 与真实浏览器 Network 验收：
+
+- `AiStudyCardV6RequestPackagePanel.vue` 新增明确按钮「调用 V6 AI 推荐（后端预览）」。
+- 浏览器只调用本地 `POST /ai-study-card/v6/recommendations/provider-preview`。
+- 不在 page load / token click / 打开弹窗 / 生成请求包时自动调用 provider-preview。
+- WorkBuddy 网页端体验师真实浏览器验收确认：provider-preview 返回 200，「V6 AI 推荐预览（默认不勾选）」正常显示，外部 provider 域名请求 0 条，无 secret 暴露，数据库计数不变。
+- 新增/更新 UI guard，确认 V6 UI 无 provider/key material，不调用外部域名，不写 ReviewLog/FSRS，不创建卡片。
+
+### V6-11 recommendation package → V4 default-unchecked list 实现结果
+
+已实现 V6 推荐结果回流到现有 V4/V5 用户确认路径的最小桥接：
+
+- `AiStudyCardV6RequestPackagePanel.vue` 在 V6 推荐预览出现后提供「导入到 AI 推荐词列表（默认不勾选）」按钮。
+- `AiStudyCardPreviewDialog.vue` 只做事件转发，不直接改状态、不调用 axios。
+- `AiStudyCardDesktopWorkflow.vue::applyV6Recommendations()` 将 V6 recommendation package 写入现有 `aiRecommendationJsonInput`，复用既有 `parseAiRecommendations()` 与 V4 去重/默认不选规则。
+- 导入后 `aiSelectedRecommendationIndices=[]`，不会自动勾选。
+- 导入后不会自动生成最终候选包，不会打开生成学习卡对话框，不会创建 WordSense / ReviewCard / ReviewLog，不会改 FSRS。
+- `tests/Feature/AiStudyCardV6RequestPackageUiGuardTest.php` 新增护栏，锁定 V6 推荐回流到 V4 列表但默认 unchecked。
 
 ### 后续允许的下一小步
 
-下一步应让用户手动配置本地环境值后，先做 backend-only provider-preview smoke。再往后如果要加 UI trigger，就必须安排 WorkBuddy 网页端体验师做真实浏览器 Network 验收，确认页面不会在 page load / token click / 打开弹窗时自动调用 provider，并确认浏览器 Network 不暴露 key。
+下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认「V6 AI 推荐预览 → 导入到 AI 推荐词列表」真实页面行为：导入后 AI 推荐词列表出现推荐项，推荐项默认不勾选，用户手动勾选后才能生成最终候选包，最终候选包仍不生成学习卡。验收通过后，才允许考虑下一阶段把 V6 provider 推荐与 V5 人工释义填写/制卡路径做更完整的产品收口。

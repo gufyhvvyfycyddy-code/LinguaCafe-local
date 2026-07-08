@@ -65,6 +65,21 @@
             warning-text="这是 AI 生成的候选建议，默认不勾选；reason 只是参考理由，不会自动写入释义，也不会自动生成学习卡。"
             @copy="copyRecommendationPackage"
         />
+
+        <div v-if="recommendationPackage" class="mt-3">
+            <v-btn
+                small
+                outlined
+                color="success"
+                @click="$emit('apply-recommendations', recommendationPackage)"
+            >
+                <v-icon small class="mr-1">mdi-arrow-up-bold-box-outline</v-icon>
+                导入到 AI 推荐词列表（默认不勾选）
+            </v-btn>
+            <div class="text-caption mt-2">
+                只把推荐候选填入上方列表；不会自动勾选，不会自动生成最终候选包，也不会生成学习卡。
+            </div>
+        </div>
     </div>
 </template>
 

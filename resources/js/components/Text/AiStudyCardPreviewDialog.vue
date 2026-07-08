@@ -79,8 +79,11 @@
                     @deselect-all="$emit('deselect-all-ai-recommendations')"
                 />
 
-                <!-- V6-1: provider-disabled request package -->
-                <AiStudyCardV6RequestPackagePanel :selected-item-ids="selectedItemIds" />
+                <!-- V6: backend provider-preview recommendations, still default-unchecked -->
+                <AiStudyCardV6RequestPackagePanel
+                    :selected-item-ids="selectedItemIds"
+                    @apply-recommendations="$emit('apply-v6-recommendations', $event)"
+                />
 
                 <!-- 规则说明 -->
                 <div class="mt-5 pa-3 rounded" style="background: var(--v-gray1-base);">
@@ -216,6 +219,7 @@ import AiStudyCardV6RequestPackagePanel from './AiStudyCardV6RequestPackagePanel
  *   - deselect-all-ai-recommendations ()
  *   - generate-preview-package ()
  *   - copy-preview-package ()
+ *   - apply-v6-recommendations (recommendationPackage)
  *   - generate-final-candidates-package ()
  *   - copy-final-candidates-package ()
  *   - open-generate-cards-dialog ()

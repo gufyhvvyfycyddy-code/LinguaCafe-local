@@ -82,6 +82,7 @@
             @deselect-all-ai-recommendations="deselectAllAiRecommendations"
             @generate-preview-package="generatePreviewPackage"
             @copy-preview-package="copyPreviewPackage"
+            @apply-v6-recommendations="applyV6Recommendations"
             @generate-final-candidates-package="generateFinalCandidatesPackage"
             @copy-final-candidates-package="copyFinalCandidatesPackage"
             @open-generate-cards-dialog="openGenerateCardsDialog"
@@ -317,6 +318,16 @@ export default {
             this.aiSelectedRecommendationIndices = [];
             this.aiRecommendationParseError = '';
             this.aiRecommendationSummary = null;
+            this._resetFinalCandidatesState();
+        },
+        applyV6Recommendations(recommendationPackage) {
+            if (!recommendationPackage || !Array.isArray(recommendationPackage.recommended_items)) {
+                this.aiRecommendationParseError = 'V6 AI 推荐预览格式无效，无法导入推荐词列表。';
+                return;
+            }
+            this.aiRecommendationJsonInput = JSON.stringify(recommendationPackage, null, 2);
+            this.parseAiRecommendations();
+            this.aiSelectedRecommendationIndices = [];
             this._resetFinalCandidatesState();
         },
         rededupeAiRecommendationsAfterUserSelectionChange() {

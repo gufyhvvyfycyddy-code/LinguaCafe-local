@@ -28,7 +28,9 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $preview = file_get_contents($this->previewDialogPath);
         $this->assertStringContainsString("import AiStudyCardV6RequestPackagePanel from './AiStudyCardV6RequestPackagePanel.vue'", $preview);
         $this->assertStringContainsString('AiStudyCardV6RequestPackagePanel,', $preview);
-        $this->assertStringContainsString('<AiStudyCardV6RequestPackagePanel :selected-item-ids="selectedItemIds" />', $preview);
+        $this->assertStringContainsString('<AiStudyCardV6RequestPackagePanel', $preview);
+        $this->assertStringContainsString(':selected-item-ids="selectedItemIds"', $preview);
+        $this->assertStringContainsString('@apply-recommendations', $preview);
     }
 
     public function test_v6_panel_copy_and_safety_copy_are_visible(): void
@@ -46,6 +48,9 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
             '不会改 FSRS',
             '复制 V6 请求包',
             '复制 V6 AI 推荐预览',
+            '导入到 AI 推荐词列表（默认不勾选）',
+            '不会自动勾选',
+            '不会自动生成最终候选包',
             '这是 AI 生成的候选建议，默认不勾选',
         ];
 
@@ -61,6 +66,7 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
 
         $this->assertStringContainsString('buildV6RequestPackage', $panel);
         $this->assertStringContainsString('buildV6ProviderPreview', $panel);
+        $this->assertStringContainsString('$emit(\'apply-recommendations\', recommendationPackage)', $panel);
         $this->assertStringContainsString('copyTextToClipboard', $panel);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/request-package'", $service);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/provider-preview'", $service);
@@ -113,6 +119,24 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
                 $this->assertStringNotContainsString($needle, $contents, basename($path) . " must not expose provider/key material: {$needle}");
             }
         }
+    }
+
+    public function test_v6_recommendations_flow_into_existing_v4_list_default_unchecked(): void
+    {
+        $workflow = file_get_contents($this->workflowPath);
+        $preview = file_get_contents($this->previewDialogPath);
+        $panel = file_get_contents($this->v6PanelPath);
+
+        $this->assertStringContainsString('@apply-v6-recommendations="applyV6Recommendations"', $workflow);
+        $this->assertStringContainsString('@apply-recommendations="$emit(\'apply-v6-recommendations\', $event)"', $preview);
+        $this->assertStringContainsString('$emit(\'apply-recommendations\', recommendationPackage)', $panel);
+        $this->assertStringContainsString('applyV6Recommendations(recommendationPackage)', $workflow);
+        $this->assertStringContainsString('JSON.stringify(recommendationPackage, null, 2)', $workflow);
+        $this->assertStringContainsString('this.parseAiRecommendations();', $workflow);
+        $this->assertStringContainsString('this.aiSelectedRecommendationIndices = [];', $workflow);
+        $this->assertStringNotContainsString('selectAllAiRecommendations();', $workflow);
+        $this->assertStringNotContainsString('generateFinalCandidatesPackage();', $workflow);
+        $this->assertStringNotContainsString('openGenerateCardsDialog();', $workflow);
     }
 
     public function test_v6_panel_does_not_create_cards_or_review_logs(): void
