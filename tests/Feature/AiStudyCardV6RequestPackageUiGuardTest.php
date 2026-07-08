@@ -49,6 +49,8 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
             '复制 V6 请求包',
             '复制 V6 AI 推荐预览',
             '导入到 AI 推荐词列表（默认不勾选）',
+            '自动丢弃',
+            'AI 本次没有找到新的可加入候选词，重复项已自动丢弃。你可以换一组待解释词再试。',
             '不会自动勾选',
             '不会自动生成最终候选包',
             '这是 AI 生成的候选建议，默认不勾选',
@@ -67,6 +69,9 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $this->assertStringContainsString('buildV6RequestPackage', $panel);
         $this->assertStringContainsString('buildV6ProviderPreview', $panel);
         $this->assertStringContainsString('$emit(\'apply-recommendations\', recommendationPackage)', $panel);
+        $this->assertStringContainsString('recommendedItemCount()', $panel);
+        $this->assertStringContainsString('droppedItemCount()', $panel);
+        $this->assertStringContainsString('allRecommendationsDropped()', $panel);
         $this->assertStringContainsString('copyTextToClipboard', $panel);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/request-package'", $service);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/provider-preview'", $service);

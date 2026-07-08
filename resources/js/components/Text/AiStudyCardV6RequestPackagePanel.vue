@@ -54,6 +54,14 @@
             @copy="copyRequestPackage"
         />
 
+        <v-alert v-if="recommendationPackage" dense text type="success" class="mt-3">
+            本次 AI 返回 {{ recommendedItemCount }} 个新推荐，自动丢弃 {{ droppedItemCount }} 个重复或不合格项。推荐默认不勾选，仍需你手动确认。
+        </v-alert>
+
+        <v-alert v-if="allRecommendationsDropped" dense text type="info" class="mt-3">
+            AI 本次没有找到新的可加入候选词，重复项已自动丢弃。你可以换一组待解释词再试。
+        </v-alert>
+
         <AiStudyCardPackagePanel
             v-if="recommendationPackage"
             title="V6 AI 推荐预览（默认不勾选）"
@@ -116,6 +124,23 @@ export default {
             copyMessage: '',
             previewCopyMessage: '',
         };
+    },
+    computed: {
+        recommendedItemCount() {
+            if (!this.recommendationPackage || !Array.isArray(this.recommendationPackage.recommended_items)) {
+                return 0;
+            }
+            return this.recommendationPackage.recommended_items.length;
+        },
+        droppedItemCount() {
+            if (!this.recommendationPackage || !Array.isArray(this.recommendationPackage.dropped_items)) {
+                return 0;
+            }
+            return this.recommendationPackage.dropped_items.length;
+        },
+        allRecommendationsDropped() {
+            return this.recommendationPackage && this.recommendedItemCount === 0 && this.droppedItemCount > 0;
+        },
     },
     methods: {
         generateRequestPackage() {
