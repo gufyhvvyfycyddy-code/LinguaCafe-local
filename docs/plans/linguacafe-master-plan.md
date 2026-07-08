@@ -1050,6 +1050,18 @@ WorkBuddy 验收 V6-13 时确认推荐摘要真实可见，且数量与 JSON 一
 - `AiStudyCardV6RequestPackageUiGuardTest` 新增护栏，锁定 V6 导入提示必须引导到 V5 人工确认，且不得把 AI reason 写入 `sense_zh`。
 - 自动测试：`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 79 passed / 799 assertions；`php artisan test --filter VocabularyBoxV5UiGuardTest --stop-on-failure` 为 16 passed / 135 assertions；`npm run development` 编译成功。
 
+### V6-15 V5 reason-vs-definition warning 实现结果
+
+WorkBuddy 验收 V6-14 时确认 V5 人工确认路径引导完整通过：V6 推荐导入后能打开 V5 人工确认对话框，AI reason 仅显示为“推荐理由（参考说明，不是释义）”，中文释义字段为空且必填，未点击最终确认时数据库不变。
+
+本轮新增 V5 对话框 reason-vs-definition 强提示：
+
+- `AiStudyCardGenerateCardsDialog.vue` 在存在 AI 推荐项时显示 warning：`AI 推荐理由只解释为什么推荐这个词，不等于中文释义。请自己判断词义后填写“中文释义（必填）”，不要直接把推荐理由当作释义。`
+- 每个 AI 推荐项的 reason 下方显示二次提示：`请根据上下文填写中文释义；推荐理由不会自动保存，也不会替你完成释义。`
+- 仍不自动填 `sense_zh`，不自动确认，不创建 WordSense / ReviewCard / ReviewLog，不改 FSRS。
+- `VocabularyBoxV5UiGuardTest` 增加护栏，锁定强提示存在，并继续确认 `sense_zh` 不会从 reason 自动填入。
+- 自动测试：`php artisan test --filter VocabularyBoxV5UiGuardTest --stop-on-failure` 为 16 passed / 138 assertions；`npm run development` 编译成功。
+
 ### 后续允许的下一小步
 
-下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认 V6 推荐导入后，V4 AI 推荐词区域真实显示“已导入、默认未勾选、手动勾选、最终制卡前必须填写中文释义”的引导提示；并确认导入后仍无新后端请求、不自动勾选、不自动生成最终候选包、不打开生成学习卡对话框、不写学习数据。验收通过后，才允许考虑进一步收口 V5 人工释义填写体验，例如在生成学习卡对话框中更清晰地展示 AI reason 与用户必须填写的中文释义之间的区别。
+下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认 V5 对话框顶部 warning 和每个 AI 推荐项下方的 reason-vs-definition 提示真实可见，且中文释义字段仍为空且必填、AI reason 没有自动写入、未点击最终确认时不创建学习数据。验收通过后，才允许考虑让 V5 对话框在用户填写中文释义后显示更清楚的“已填/未填”状态或跳过规则。

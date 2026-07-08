@@ -14,6 +14,9 @@
                 <v-alert type="info" dense text class="mb-3">
                     这不是 AI 自动调用，是你粘贴 AI 返回内容后的人工确认生成。每个候选项需要填写中文释义（必填），未填写的项会被跳过。英文解释可留空，后续再补。
                 </v-alert>
+                <v-alert v-if="hasAiRecommendedItems" type="warning" dense text class="mb-3">
+                    AI 推荐理由只解释为什么推荐这个词，不等于中文释义。请自己判断词义后填写“中文释义（必填）”，不要直接把推荐理由当作释义。
+                </v-alert>
                 <div v-if="items.length === 0" class="text-center pa-4 text--secondary">
                     没有可确认的候选项。
                 </div>
@@ -30,6 +33,9 @@
                     <div v-if="item.reason" class="text-caption mb-1 pa-1 rounded" style="background: var(--v-gray2-base); color: var(--v-secondary-base);">
                         <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
                         推荐理由（参考说明，不是释义）：{{ item.reason }}
+                    </div>
+                    <div v-if="item.reason && item.source !== 'user_selected'" class="text-caption mb-1 warning--text">
+                        请根据上下文填写中文释义；推荐理由不会自动保存，也不会替你完成释义。
                     </div>
                     <v-text-field
                         v-model="item.sense_zh"
@@ -105,6 +111,11 @@
  */
 export default {
     name: 'AiStudyCardGenerateCardsDialog',
+    computed: {
+        hasAiRecommendedItems() {
+            return this.items.some(item => item && item.source !== 'user_selected');
+        },
+    },
     props: {
         // v-model: whether the dialog is open.
         value: {

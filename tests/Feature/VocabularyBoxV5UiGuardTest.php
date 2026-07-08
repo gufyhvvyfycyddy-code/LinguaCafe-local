@@ -203,6 +203,9 @@ class VocabularyBoxV5UiGuardTest extends TestCase
         $dialogContents = file_get_contents($this->dialogPath);
         $this->assertStringContainsString('推荐理由（参考说明，不是释义）', $dialogContents, 'AiStudyCardGenerateCardsDialog must label AI reason as reference, not definition.');
         $this->assertStringContainsString('推荐理由不是释义，请填写中文释义', $dialogContents, 'AiStudyCardGenerateCardsDialog must warn user that reason is not a definition.');
+        $this->assertStringContainsString('AI 推荐理由只解释为什么推荐这个词，不等于中文释义', $dialogContents, 'AiStudyCardGenerateCardsDialog must show stronger AI reason warning.');
+        $this->assertStringContainsString('请根据上下文填写中文释义；推荐理由不会自动保存', $dialogContents, 'AiStudyCardGenerateCardsDialog must remind user to write their own Chinese definition.');
+        $this->assertStringContainsString('hasAiRecommendedItems()', $dialogContents, 'AiStudyCardGenerateCardsDialog must detect AI recommended items for warning copy.');
 
         // V5 hardening: ai_recommended item's sense_zh must start empty, not pre-filled from reason.
         // This rule now lives in the shared service (single source of truth).
