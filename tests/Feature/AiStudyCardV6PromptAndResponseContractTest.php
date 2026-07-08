@@ -46,6 +46,9 @@ class AiStudyCardV6PromptAndResponseContractTest extends TestCase
         $required = [
             'Return JSON only',
             'ai-study-card-v6-recommendation-package-v1',
+            'recommended_items',
+            'dropped_items',
+            'provider_metadata_redacted',
             'Recommendations are suggestions only',
             'user_confirmation_required',
             'default_unchecked',

@@ -50,6 +50,7 @@ class AiStudyCardV6PromptBuilderService
                             'language' => $requestPackage['language'] ?? null,
                             'selected_items' => $selectedItems,
                             'required_output_schema_version' => self::RESPONSE_SCHEMA_VERSION,
+                            'required_output_contract' => $this->outputContract(),
                             'rules' => $this->rules(),
                         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                     ],
@@ -136,10 +137,55 @@ class AiStudyCardV6PromptBuilderService
             'You are helping LinguaCafe recommend candidate study items.',
             'Return JSON only.',
             'Return schema_version=' . self::RESPONSE_SCHEMA_VERSION . '.',
+            'Return exactly these top-level keys: schema_version, recommended_items, dropped_items, provider_metadata_redacted, safety_flags.',
+            'Use recommended_items as the recommendation array key. Do not use recommendations as a top-level key.',
             'Recommendations are suggestions only and must require user confirmation.',
             'Do not create study cards, write review logs, change FSRS, or write final meanings.',
             'Do not include secrets, provider settings, or unrelated commentary.',
         ]);
+    }
+
+    private function outputContract(): array
+    {
+        return [
+            'required_top_level_keys' => [
+                'schema_version',
+                'recommended_items',
+                'dropped_items',
+                'provider_metadata_redacted',
+                'safety_flags',
+            ],
+            'forbidden_top_level_keys' => [
+                'recommendations',
+            ],
+            'json_template' => [
+                'schema_version' => self::RESPONSE_SCHEMA_VERSION,
+                'recommended_items' => [
+                    [
+                        'word' => 'agency',
+                        'lemma' => 'agency',
+                        'surface' => 'agency',
+                        'sentence_text' => 'Agency is the capacity to act in a situation.',
+                        'reason' => 'Reference-only reason for recommending this candidate.',
+                        'confidence' => 0.9,
+                        'source' => 'ai_provider_v6',
+                    ],
+                ],
+                'dropped_items' => [],
+                'provider_metadata_redacted' => [
+                    'provider' => 'redacted',
+                    'secrets_exposed' => false,
+                ],
+                'safety_flags' => [
+                    'ai_generated_suggestions_only' => true,
+                    'user_confirmation_required' => true,
+                    'default_unchecked' => true,
+                    'no_card_creation' => true,
+                    'no_review_log_created' => true,
+                    'no_fsrs_changed' => true,
+                ],
+            ],
+        ];
     }
 
     private function rules(): array
