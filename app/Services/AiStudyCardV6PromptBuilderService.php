@@ -140,6 +140,8 @@ class AiStudyCardV6PromptBuilderService
             'Return exactly these top-level keys: schema_version, recommended_items, dropped_items, provider_metadata_redacted, safety_flags.',
             'Use recommended_items as the recommendation array key. Do not use recommendations as a top-level key.',
             'Recommendations are suggestions only and must require user confirmation.',
+            'Do not recommend any item whose word, lemma, or surface matches a user-selected selected_items entry.',
+            'When you drop a duplicate, include it in dropped_items with reason=duplicate_with_user_selected_item.',
             'Do not create study cards, write review logs, change FSRS, or write final meanings.',
             'Do not include secrets, provider settings, or unrelated commentary.',
         ]);
@@ -195,6 +197,8 @@ class AiStudyCardV6PromptBuilderService
             'user_confirmation_required' => true,
             'default_unchecked' => true,
             'reason_is_reference_text_not_final_meaning' => true,
+            'exclude_user_selected_items_from_recommended_items' => true,
+            'drop_duplicates_with_reason_duplicate_with_user_selected_item' => true,
             'do_not_create_cards' => true,
             'do_not_rate_reviews' => true,
             'do_not_change_fsrs' => true,

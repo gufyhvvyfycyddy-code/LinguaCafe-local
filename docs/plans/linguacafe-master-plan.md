@@ -1010,6 +1010,20 @@
 - 导入后不会自动生成最终候选包，不会打开生成学习卡对话框，不会创建 WordSense / ReviewCard / ReviewLog，不会改 FSRS。
 - `tests/Feature/AiStudyCardV6RequestPackageUiGuardTest.php` 新增护栏，锁定 V6 推荐回流到 V4 列表但默认 unchecked。
 
+### V6-12 provider duplicate filtering hardening 实现结果
+
+WorkBuddy 验收 V6-11 时发现当前真实 provider 返回的 3 个推荐词全部与用户已选 pending item 重复。前端 V4 去重正确工作，导入后有效推荐数量为 0，且数据库不变、无外部浏览器请求、无 secret 暴露。该场景证明重复去重正确，但尚未证明非重复推荐项成功导入。
+
+本轮新增后端双保险：
+
+- `AiStudyCardV6PromptBuilderService` 明确要求 provider 不得把 user-selected `word` / `lemma` / `surface` 再放入 `recommended_items`。
+- 如果 provider 丢弃重复项，要求写入 `dropped_items`，`reason=duplicate_with_user_selected_item`。
+- `AiStudyCardV6RecommendationService` 新增服务层去重：即使 provider 仍返回重复推荐，也会在 schema validation 后把与 request package `selected_items` 重复的 recommendation 移入 `dropped_items`。
+- 重复判断同时比较 `lemma` / `word` / `surface`，大小写归一。
+- `provider_metadata_redacted.duplicate_with_user_selected_count` 记录服务层丢弃数量。
+- 新增/更新 V6 tests，锁定 duplicate-with-selected 被丢弃、非重复 recommendation 保留、仍 default unchecked、仍不写 WordSense / ReviewCard / ReviewLog、不改 FSRS。
+- 自动测试：`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 78 passed / 782 assertions；`npm run development` 编译成功。
+
 ### 后续允许的下一小步
 
-下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认「V6 AI 推荐预览 → 导入到 AI 推荐词列表」真实页面行为：导入后 AI 推荐词列表出现推荐项，推荐项默认不勾选，用户手动勾选后才能生成最终候选包，最终候选包仍不生成学习卡。验收通过后，才允许考虑下一阶段把 V6 provider 推荐与 V5 人工释义填写/制卡路径做更完整的产品收口。
+下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认「V6 AI 推荐预览 → 导入到 AI 推荐词列表」在后端过滤重复项后的真实页面行为：如果 provider 返回重复推荐，V6 推荐预览应显示 `recommended_items` 已被过滤、`dropped_items` 含 `duplicate_with_user_selected_item`；导入到 AI 推荐词列表后仍不得自动勾选，不得自动生成最终候选包，不得生成学习卡。若 provider 能返回非重复推荐项，还要确认非重复推荐项能成功进入上方列表并默认不勾选。验收通过后，才允许考虑下一阶段把 V6 provider 推荐与 V5 人工释义填写/制卡路径做更完整的产品收口。

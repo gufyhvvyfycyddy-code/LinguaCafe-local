@@ -54,7 +54,7 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame('openai-compatible-skeleton', $result['provider']);
         $this->assertSame('ai-study-card-v6-recommendation-package-v1', $result['package']['schema_version']);
-        $this->assertSame('agency', $result['package']['recommended_items'][0]['word']);
+        $this->assertSame('mediation', $result['package']['recommended_items'][0]['word']);
         $this->assertTrue($result['package']['safety_flags']['user_confirmation_required']);
         $this->assertTrue($result['package']['safety_flags']['default_unchecked']);
         $this->assertTrue($result['safety_flags']['no_card_creation']);
@@ -284,11 +284,11 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
             'schema_version' => 'ai-study-card-v6-recommendation-package-v1',
             'recommended_items' => [
                 [
-                    'word' => 'agency',
-                    'lemma' => 'agency',
-                    'surface' => 'agency',
-                    'sentence_text' => 'Agency is the capacity to act in a situation.',
-                    'reason' => 'Central concept in the sentence.',
+                    'word' => 'mediation',
+                    'lemma' => 'mediation',
+                    'surface' => 'mediation',
+                    'sentence_text' => 'Mediation can describe an intermediate relation between concepts.',
+                    'reason' => 'Related concept that is not already selected by the user.',
                     'confidence' => 0.9,
                     'source' => 'ai_provider_v6',
                 ],

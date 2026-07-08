@@ -79,11 +79,13 @@ class AiStudyCardV6RecommendationService
             ];
         }
 
+        $package = $this->removeDuplicateRecommendationsAgainstRequest($validation['package'], $requestPackage);
+
         return [
             'success' => true,
             'message' => 'V6 provider recommendation package validated. User confirmation is still required.',
             'provider' => $this->provider->providerName(),
-            'package' => $validation['package'],
+            'package' => $package,
             'errors' => [],
             'safety_flags' => [
                 'ai_generated_suggestions_only' => true,
@@ -97,6 +99,68 @@ class AiStudyCardV6RecommendationService
                 'no_legacy_word_card_created' => true,
             ],
         ];
+    }
+
+    private function removeDuplicateRecommendationsAgainstRequest(array $package, array $requestPackage): array
+    {
+        $selectedKeys = [];
+        foreach (($requestPackage['selected_items'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            foreach (['lemma', 'word', 'surface'] as $field) {
+                $key = $this->recommendationKey($item[$field] ?? '');
+                if ($key !== '') {
+                    $selectedKeys[$key] = true;
+                }
+            }
+        }
+
+        if (empty($selectedKeys)) {
+            return $package;
+        }
+
+        $kept = [];
+        $originalDroppedCount = count($package['dropped_items'] ?? []);
+        $dropped = $package['dropped_items'] ?? [];
+        foreach (($package['recommended_items'] ?? []) as $item) {
+            $candidateKeys = array_filter([
+                $this->recommendationKey($item['lemma'] ?? ''),
+                $this->recommendationKey($item['word'] ?? ''),
+                $this->recommendationKey($item['surface'] ?? ''),
+            ], fn (string $key) => $key !== '');
+
+            $duplicatesSelectedItem = false;
+            foreach ($candidateKeys as $key) {
+                if (isset($selectedKeys[$key])) {
+                    $duplicatesSelectedItem = true;
+                    break;
+                }
+            }
+
+            if ($duplicatesSelectedItem) {
+                $dropped[] = [
+                    'word' => (string) ($item['word'] ?? ''),
+                    'lemma' => (string) ($item['lemma'] ?? ($item['word'] ?? '')),
+                    'reason' => 'duplicate_with_user_selected_item',
+                    'source' => 'ai_provider_v6',
+                ];
+                continue;
+            }
+
+            $kept[] = $item;
+        }
+
+        $package['recommended_items'] = array_values($kept);
+        $package['dropped_items'] = array_values($dropped);
+        $package['provider_metadata_redacted']['duplicate_with_user_selected_count'] = count($dropped) - $originalDroppedCount;
+
+        return $package;
+    }
+
+    private function recommendationKey(mixed $value): string
+    {
+        return mb_strtolower(trim((string) $value));
     }
 
     private function statusForTransportFailure(string $failureCode): int

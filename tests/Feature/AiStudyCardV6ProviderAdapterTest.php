@@ -122,13 +122,43 @@ class AiStudyCardV6ProviderAdapterTest extends TestCase
         $this->assertTrue($result['success']);
         $this->assertSame('fake-provider', $result['provider']);
         $this->assertSame('ai-study-card-v6-recommendation-package-v1', $result['package']['schema_version']);
-        $this->assertSame('agency', $result['package']['recommended_items'][0]['word']);
+        $this->assertSame('mediation', $result['package']['recommended_items'][0]['word']);
         $this->assertTrue($result['package']['safety_flags']['user_confirmation_required']);
         $this->assertTrue($result['package']['safety_flags']['default_unchecked']);
         $this->assertTrue($result['safety_flags']['no_card_creation']);
         $this->assertTrue($result['safety_flags']['no_review_log_created']);
         $this->assertTrue($result['safety_flags']['no_fsrs_changed']);
         $this->assertSame(false, $result['package']['provider_metadata_redacted']['api_key_exposed']);
+        $this->assertSafeLearningTablesRemainEmpty();
+    }
+
+    public function test_provider_recommendations_duplicate_with_user_selected_items_are_dropped_after_validation(): void
+    {
+        $package = $this->validRecommendationPackage();
+        array_unshift($package['recommended_items'], [
+            'word' => 'Agency',
+            'lemma' => 'agency',
+            'surface' => 'agency',
+            'sentence_text' => 'Agency is the capacity to act.',
+            'reason' => 'Provider repeated the user-selected item.',
+            'confidence' => 0.95,
+            'source' => 'ai_provider_v6',
+        ]);
+
+        $service = new AiStudyCardV6RecommendationService(
+            $this->providerReturning($package),
+            new AiStudyCardV6RecommendationSchemaService(),
+        );
+
+        $result = $service->recommend($this->validRequestPackage());
+
+        $this->assertTrue($result['success']);
+        $this->assertCount(1, $result['package']['recommended_items']);
+        $this->assertSame('mediation', $result['package']['recommended_items'][0]['lemma']);
+        $this->assertCount(1, $result['package']['dropped_items']);
+        $this->assertSame('duplicate_with_user_selected_item', $result['package']['dropped_items'][0]['reason']);
+        $this->assertSame(1, $result['package']['provider_metadata_redacted']['duplicate_with_user_selected_count']);
+        $this->assertTrue($result['package']['safety_flags']['default_unchecked']);
         $this->assertSafeLearningTablesRemainEmpty();
     }
 
@@ -239,11 +269,11 @@ class AiStudyCardV6ProviderAdapterTest extends TestCase
             'schema_version' => 'ai-study-card-v6-recommendation-package-v1',
             'recommended_items' => [
                 [
-                    'word' => 'agency',
-                    'lemma' => 'agency',
-                    'surface' => 'agency',
-                    'sentence_text' => 'Agency is the capacity to act.',
-                    'reason' => 'Central concept in the selected sentence.',
+                    'word' => 'mediation',
+                    'lemma' => 'mediation',
+                    'surface' => 'mediation',
+                    'sentence_text' => 'Mediation can describe an intermediate relation between concepts.',
+                    'reason' => 'Related concept that is not already selected by the user.',
                     'confidence' => 0.91,
                     'source' => 'ai_provider_v6',
                 ],
