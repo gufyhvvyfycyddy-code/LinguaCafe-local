@@ -38,12 +38,15 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $requiredTexts = [
             'V6 请求包（不调用 AI）',
             'provider disabled',
-            '不会调用真实 AI',
+            '调用 V6 AI 推荐（后端预览）',
+            '浏览器只调用本地后端',
+            '推荐结果默认不勾选',
             '不会生成 WordSense / ReviewCard',
             '不会写 ReviewLog',
             '不会改 FSRS',
             '复制 V6 请求包',
-            '这是 provider-disabled 请求包，不是 AI 输出，也不会生成学习卡。',
+            '复制 V6 AI 推荐预览',
+            '这是 AI 生成的候选建议，默认不勾选',
         ];
 
         foreach ($requiredTexts as $text) {
@@ -57,9 +60,12 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $service = file_get_contents($this->workflowServicePath);
 
         $this->assertStringContainsString('buildV6RequestPackage', $panel);
+        $this->assertStringContainsString('buildV6ProviderPreview', $panel);
         $this->assertStringContainsString('copyTextToClipboard', $panel);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/request-package'", $service);
+        $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/provider-preview'", $service);
         $this->assertStringContainsString('export function buildV6RequestPackage', $service);
+        $this->assertStringContainsString('export function buildV6ProviderPreview', $service);
     }
 
     public function test_v6_ui_does_not_expand_main_workflow_state_or_methods(): void
@@ -70,9 +76,13 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
             'aiV6RequestPackage',
             'aiV6RequestPackageLoading',
             'aiV6RequestPackageError',
+            'aiV6ProviderPreview',
+            'aiV6ProviderPreviewLoading',
             'generateV6RequestPackage()',
             'copyV6RequestPackage()',
+            'generateV6ProviderPreview()',
             'buildV6RequestPackage(axios',
+            'buildV6ProviderPreview(axios',
         ];
 
         foreach ($forbiddenV6State as $fingerprint) {

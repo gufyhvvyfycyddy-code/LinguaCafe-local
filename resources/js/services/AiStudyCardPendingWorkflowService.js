@@ -222,6 +222,46 @@ export function buildV6RequestPackage(axios, selectedItemIds, contextPolicy = 's
     });
 }
 
+/**
+ * Ask the local LinguaCafe backend to run the V6 provider-preview flow.
+ *
+ * POST /ai-study-card/v6/recommendations/provider-preview
+ *
+ * This never calls an external provider from the browser. The browser sends
+ * only the already generated V6 request package to the local backend. Returned
+ * recommendations are preview-only and still require user confirmation.
+ */
+export function buildV6ProviderPreview(axios, requestPackage) {
+    return axios.post('/ai-study-card/v6/recommendations/provider-preview', {
+        request_package: requestPackage,
+    }).then((response) => {
+        if (response.data && response.data.success) {
+            return {
+                success: true,
+                package: response.data.package,
+                safetyFlags: response.data.safety_flags || {},
+            };
+        }
+        const msg = response.data && response.data.message
+            ? response.data.message
+            : '生成 V6 AI 推荐预览失败。';
+        const err = new Error(msg);
+        err.payload = response.data;
+        throw err;
+    }).catch((error) => {
+        if (error && error.payload) {
+            throw error;
+        }
+        const shaped = new Error(
+            error.response && error.response.data && error.response.data.message
+                ? error.response.data.message
+                : '生成 V6 AI 推荐预览失败。'
+        );
+        shaped.original = error;
+        throw shaped;
+    });
+}
+
 // Re-export the V5 generate-cards helper so callers can import the whole
 // workflow API from a single module if they prefer.
 export {
