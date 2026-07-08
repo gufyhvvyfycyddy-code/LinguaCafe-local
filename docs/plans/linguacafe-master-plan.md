@@ -1036,6 +1036,20 @@ WorkBuddy 复验确认 V6-12 后 provider 已返回 3 个非重复推荐词（in
 - `AiStudyCardV6RequestPackageUiGuardTest` 新增护栏，锁定推荐数/丢弃数摘要与重复项空状态提示。
 - 自动测试：`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 78 passed / 787 assertions；`npm run development` 编译成功。
 
+### V6-14 import-to-manual-confirmation guidance 实现结果
+
+WorkBuddy 验收 V6-13 时确认推荐摘要真实可见，且数量与 JSON 一致：`本次 AI 返回 3 个新推荐，自动丢弃 0 个重复或不合格项。` 全部丢弃空状态因 provider 返回非重复项未触发，保留为自然触发场景待后验。
+
+本轮新增 V6 导入后的人工确认路径引导：
+
+- `AiStudyCardRecommendationPanel.vue` 新增 `importNotice` 只读提示位。
+- `AiStudyCardPreviewDialog.vue` 将 `aiRecommendationImportNotice` 传入 V4 推荐词列表区域。
+- `AiStudyCardDesktopWorkflow.vue::applyV6Recommendations()` 在 V6 recommendation package 导入后显示提示：已从 V6 导入多少条推荐词、默认未勾选、需要手动勾选、再点击「准备生成」和「生成最终候选包」，最终生成学习卡前仍必须填写中文释义。
+- 如果 V6 recommendation package 没有可导入的新推荐词，则显示重复项已丢弃、可换一组待解释词再试。
+- 该提示不自动勾选、不自动生成最终候选包、不打开生成学习卡对话框，不创建 WordSense / ReviewCard / ReviewLog，不改 FSRS。
+- `AiStudyCardV6RequestPackageUiGuardTest` 新增护栏，锁定 V6 导入提示必须引导到 V5 人工确认，且不得把 AI reason 写入 `sense_zh`。
+- 自动测试：`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 79 passed / 799 assertions；`php artisan test --filter VocabularyBoxV5UiGuardTest --stop-on-failure` 为 16 passed / 135 assertions；`npm run development` 编译成功。
+
 ### 后续允许的下一小步
 
-下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认 V6 推荐预览摘要与重复项空状态提示在页面上真实可见，且点击「导入到 AI 推荐词列表（默认不勾选）」后仍无新后端请求、默认不勾选、不生成最终候选包、不生成学习卡。验收通过后，才允许考虑下一阶段把 V6 provider 推荐与 V5 人工释义填写/制卡路径做更完整的产品收口。
+下一步必须先做 WorkBuddy 网页端体验师真实浏览器验收，确认 V6 推荐导入后，V4 AI 推荐词区域真实显示“已导入、默认未勾选、手动勾选、最终制卡前必须填写中文释义”的引导提示；并确认导入后仍无新后端请求、不自动勾选、不自动生成最终候选包、不打开生成学习卡对话框、不写学习数据。验收通过后，才允许考虑进一步收口 V5 人工释义填写体验，例如在生成学习卡对话框中更清晰地展示 AI reason 与用户必须填写的中文释义之间的区别。

@@ -59,6 +59,7 @@
             :ai-selected-recommendation-indices="aiSelectedRecommendationIndices"
             :ai-recommendation-parse-error="aiRecommendationParseError"
             :ai-recommendation-summary="aiRecommendationSummary"
+            :ai-recommendation-import-notice="aiRecommendationImportNotice"
             :ai-preview-package="aiPreviewPackage"
             :ai-preview-package-error="aiPreviewPackageError"
             :ai-preview-package-loading="aiPreviewPackageLoading"
@@ -162,7 +163,7 @@ export default {
             aiPreviewPackageLoading: false, aiPreviewPackageError: '', aiPreviewCopyMessage: '', aiPreviewCopied: false,
             // V4: AI recommendation paste + parse + dedupe + selection. AI recommendations default to UNSELECTED.
             aiRecommendationJsonInput: '', aiRecommendations: [], aiSelectedRecommendationIndices: [],
-            aiRecommendationParseError: '', aiRecommendationSummary: null,
+            aiRecommendationParseError: '', aiRecommendationSummary: null, aiRecommendationImportNotice: '',
             // V4: final candidates package
             aiFinalCandidatesPackage: null, aiFinalCandidatesLoading: false, aiFinalCandidatesError: '',
             aiFinalCopyMessage: '', aiFinalCopied: false,
@@ -279,6 +280,7 @@ export default {
             this.aiSelectedRecommendationIndices = [];
             this.aiRecommendationParseError = '';
             this.aiRecommendationSummary = null;
+            this.aiRecommendationImportNotice = '';
             this._resetFinalCandidatesState();
         },
         togglePreviewItemSelection(itemId) {
@@ -300,6 +302,7 @@ export default {
         parseAiRecommendations() {
             this.aiRecommendationParseError = '';
             this.aiRecommendationSummary = null;
+            this.aiRecommendationImportNotice = '';
             this.aiRecommendations = [];
             this.aiSelectedRecommendationIndices = [];
             const result = parseRecommendations(
@@ -318,6 +321,7 @@ export default {
             this.aiSelectedRecommendationIndices = [];
             this.aiRecommendationParseError = '';
             this.aiRecommendationSummary = null;
+            this.aiRecommendationImportNotice = '';
             this._resetFinalCandidatesState();
         },
         applyV6Recommendations(recommendationPackage) {
@@ -328,6 +332,10 @@ export default {
             this.aiRecommendationJsonInput = JSON.stringify(recommendationPackage, null, 2);
             this.parseAiRecommendations();
             this.aiSelectedRecommendationIndices = [];
+            const validCount = this.aiRecommendations.length;
+            this.aiRecommendationImportNotice = validCount > 0
+                ? '已从 V6 AI 推荐预览导入 ' + validCount + ' 条推荐词，默认未勾选。请手动勾选需要的词，再点击「准备生成」和「生成最终候选包」；最终生成学习卡前仍必须填写中文释义。'
+                : 'V6 AI 推荐预览没有可导入的新推荐词。重复项已被丢弃，你可以换一组待解释词再试。';
             this._resetFinalCandidatesState();
         },
         rededupeAiRecommendationsAfterUserSelectionChange() {

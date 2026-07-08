@@ -71,6 +71,7 @@
                     :selected-indices="aiSelectedRecommendationIndices"
                     :parse-error="aiRecommendationParseError"
                     :summary="aiRecommendationSummary"
+                    :import-notice="aiRecommendationImportNotice"
                     @update:json-input="$emit('update:ai-recommendation-json-input', $event)"
                     @parse="$emit('parse-ai-recommendations')"
                     @clear="$emit('clear-ai-recommendations')"
@@ -245,6 +246,7 @@ export default {
         aiSelectedRecommendationIndices: { type: Array, default: () => [] },
         aiRecommendationParseError: { type: String, default: '' },
         aiRecommendationSummary: { type: Object, default: null },
+        aiRecommendationImportNotice: { type: String, default: '' },
         aiPreviewPackage: { type: Object, default: null },
         aiPreviewPackageError: { type: String, default: '' },
         aiPreviewPackageLoading: { type: Boolean, default: false },

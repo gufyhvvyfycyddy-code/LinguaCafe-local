@@ -9,6 +9,7 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
     private string $workflowPath;
     private string $previewDialogPath;
     private string $v6PanelPath;
+    private string $recommendationPanelPath;
     private string $workflowServicePath;
 
     protected function setUp(): void
@@ -18,6 +19,7 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $this->workflowPath = resource_path('js/components/Text/AiStudyCardDesktopWorkflow.vue');
         $this->previewDialogPath = resource_path('js/components/Text/AiStudyCardPreviewDialog.vue');
         $this->v6PanelPath = resource_path('js/components/Text/AiStudyCardV6RequestPackagePanel.vue');
+        $this->recommendationPanelPath = resource_path('js/components/Text/AiStudyCardRecommendationPanel.vue');
         $this->workflowServicePath = resource_path('js/services/AiStudyCardPendingWorkflowService.js');
     }
 
@@ -139,9 +141,29 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $this->assertStringContainsString('JSON.stringify(recommendationPackage, null, 2)', $workflow);
         $this->assertStringContainsString('this.parseAiRecommendations();', $workflow);
         $this->assertStringContainsString('this.aiSelectedRecommendationIndices = [];', $workflow);
+        $this->assertStringContainsString('aiRecommendationImportNotice', $workflow);
+        $this->assertStringContainsString('已从 V6 AI 推荐预览导入', $workflow);
+        $this->assertStringContainsString('最终生成学习卡前仍必须填写中文释义', $workflow);
         $this->assertStringNotContainsString('selectAllAiRecommendations();', $workflow);
         $this->assertStringNotContainsString('generateFinalCandidatesPackage();', $workflow);
         $this->assertStringNotContainsString('openGenerateCardsDialog();', $workflow);
+    }
+
+    public function test_v6_import_notice_guides_user_to_manual_v5_confirmation(): void
+    {
+        $workflow = file_get_contents($this->workflowPath);
+        $preview = file_get_contents($this->previewDialogPath);
+        $recommendationPanel = file_get_contents($this->recommendationPanelPath);
+
+        $this->assertStringContainsString(':ai-recommendation-import-notice="aiRecommendationImportNotice"', $workflow);
+        $this->assertStringContainsString(':import-notice="aiRecommendationImportNotice"', $preview);
+        $this->assertStringContainsString('importNotice: { type: String, default: \'\' }', $recommendationPanel);
+        $this->assertStringContainsString('v-if="importNotice"', $recommendationPanel);
+        $this->assertStringContainsString('已从 V6 AI 推荐预览导入', $workflow);
+        $this->assertStringContainsString('默认未勾选', $workflow);
+        $this->assertStringContainsString('手动勾选', $workflow);
+        $this->assertStringContainsString('最终生成学习卡前仍必须填写中文释义', $workflow);
+        $this->assertStringNotContainsString('sense_zh: item.reason', $workflow);
     }
 
     public function test_v6_panel_does_not_create_cards_or_review_logs(): void

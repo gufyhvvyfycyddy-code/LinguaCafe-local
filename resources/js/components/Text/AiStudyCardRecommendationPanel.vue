@@ -37,6 +37,15 @@
             </div>
         </div>
 
+        <!-- V4/V6: 导入后的下一步提示 -->
+        <v-alert
+            v-if="importNotice"
+            dense
+            text
+            type="info"
+            class="mt-2 mb-0"
+        >{{ importNotice }}</v-alert>
+
         <!-- V4: 解析错误提示 -->
         <v-alert
             v-if="parseError"
@@ -127,6 +136,7 @@ export default {
         selectedIndices: { type: Array, default: () => [] },
         parseError: { type: String, default: '' },
         summary: { type: Object, default: null },
+        importNotice: { type: String, default: '' },
     },
 };
 </script>
