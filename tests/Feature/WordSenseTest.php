@@ -1036,6 +1036,87 @@ class WordSenseTest extends TestCase
         $this->assertSame(0, ReviewLog::count());
     }
 
+    /**
+     * Closed-loop guard for the V5 generate-cards -> /reviews/senses -> rate path.
+     *
+     * Locks the product contract that a freshly generated sense review card
+     * (fsrs_state=new, fsrs_due_at=now) is immediately reviewable and that
+     * rating it produces exactly one ReviewLog, updates only the target card,
+     * and does not create a legacy word card, a new WordSense, or any side
+     * effects on other cards.
+     */
+    public function test_v5_generated_sense_card_is_immediately_reviewable_with_single_log_and_no_side_effects(): void
+    {
+        // Pre-existing scope noise: another sense card (future-dated so it does
+        // not compete for the daily review slot) + a legacy word card. Both
+        // must remain untouched by the target rating.
+        $otherSense = $this->createSense(['sense_key' => 'other-standalone', 'sense_zh' => '其它释义']);
+        $otherCard = $this->wordSenseService->createReviewCardForSense($otherSense);
+        $otherCard->update(['fsrs_due_at' => now()->addDay()]);
+        $word = $this->createWord('standalone-word');
+        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+
+        // Simulate the V5 generation result: a brand-new confirmed sense + sense card.
+        $targetSense = $this->createSense(['sense_key' => 'mediation-loop', 'sense_zh' => '调解；斡旋']);
+        $targetCard = $this->wordSenseService->createReviewCardForSense($targetSense);
+
+        $this->assertSame(ReviewCard::TARGET_SENSE, $targetCard->target_type);
+        $this->assertSame('new', $targetCard->fsrs_state);
+        $this->assertTrue($targetCard->fsrs_enabled);
+
+        // The freshly generated card must appear in the /reviews/senses queue immediately.
+        $queueResponse = $this->actingAs($this->user)->getJson('/reviews/senses?ignoreDailyLimits=1');
+        $queueResponse->assertOk();
+        $queueCardIds = collect($queueResponse->json('cards'))->pluck('review_card_id')->all();
+        $this->assertContains($targetCard->id, $queueCardIds, 'Newly generated sense card must be immediately reviewable');
+
+        // Snapshot counts before rating.
+        $wordSensesBefore = WordSense::count();
+        $reviewCardsBefore = ReviewCard::count();
+        $senseCardsBefore = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count();
+        $legacyWordCardsBefore = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count();
+        $reviewLogsBefore = ReviewLog::count();
+
+        $otherCard->refresh();
+        $wordCard->refresh();
+        $otherCardRepsBefore = $otherCard->fsrs_reps;
+        $wordCardRepsBefore = $wordCard->fsrs_reps;
+
+        // Perform one controlled rating on the target card.
+        $rateResponse = $this->actingAs($this->user)->postJson("/reviews/senses/{$targetCard->id}/rate", [
+            'rating' => 'good',
+        ]);
+        $rateResponse->assertOk();
+
+        // Counts: only review_logs should increase by exactly 1.
+        $this->assertSame($wordSensesBefore, WordSense::count(), 'Rating must not create a new WordSense');
+        $this->assertSame($reviewCardsBefore, ReviewCard::count(), 'Rating must not create a new ReviewCard');
+        $this->assertSame($senseCardsBefore, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count(), 'Rating must not create a new sense card');
+        $this->assertSame($legacyWordCardsBefore, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count(), 'Rating must not create a legacy word card');
+        $this->assertSame($reviewLogsBefore + 1, ReviewLog::count(), 'Rating must create exactly one ReviewLog');
+
+        // Target card FSRS fields must advance.
+        $targetCard->refresh();
+        $this->assertSame(1, $targetCard->fsrs_reps);
+        $this->assertNotNull($targetCard->fsrs_stability);
+        $this->assertNotNull($targetCard->fsrs_difficulty);
+        $this->assertNotNull($targetCard->fsrs_last_reviewed_at);
+        $this->assertNotSame('new', $targetCard->fsrs_state);
+
+        // Non-target cards must be untouched.
+        $otherCard->refresh();
+        $wordCard->refresh();
+        $this->assertSame($otherCardRepsBefore, $otherCard->fsrs_reps, 'Other sense card must not be updated');
+        $this->assertSame($wordCardRepsBefore, $wordCard->fsrs_reps, 'Legacy word card must not be updated');
+
+        // The new ReviewLog must be tied to the target card with source=sense_review.
+        $newLog = ReviewLog::orderByDesc('id')->first();
+        $this->assertNotNull($newLog);
+        $this->assertSame($targetCard->id, $newLog->review_card_id);
+        $this->assertSame('good', $newLog->rating);
+        $this->assertSame('sense_review', $newLog->source);
+    }
+
     public function test_bulk_confirm_only_processes_current_user_language_occurrences(): void
     {
         $sense = $this->createSense(['sense_key' => 'bulk-confirm']);

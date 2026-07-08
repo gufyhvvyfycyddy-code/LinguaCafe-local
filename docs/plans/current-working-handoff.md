@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-08 (AIStudyCardV5ResultCandidateOverview-1)
+> **最后更新**：2026-07-08 (AIStudyCardV5ToSenseReviewClosedLoop-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -460,4 +460,71 @@
 - **关键安全契约两个 viewport 均确认**：AI 推荐词默认 unchecked ✓ / AI reason 不自动填 sense_zh ✓ / sense_zh 初始化为空 ✓ / sense_en 允许为空（实际为 null）✓ / 无外部 AI provider 调用 ✓ / 无 ReviewLog 写入 ✓ / 无 legacy word card 创建 ✓ / 所有 ReviewCard target_type=sense ✓。
 - **明确未做**：不新增产品能力；不碰后端业务逻辑；不碰手机端/BottomSheet；不改 TextBlockGroup.vue；不实现手机端/BottomSheet V1-V5；不自动调 AI；不接 AI provider；不读写 .env；不新增 API key；不写 ReviewLog；不改 FSRS；不重排已有卡；不创建 legacy word card；不删除 WordSense/ReviewCard/ReviewLog；不删除 legacy 兼容层；不改 Source Context 主线；不改 ReviewCardManage 危险操作逻辑；不新增 migration；不清库；不 DCP；不 notification script；不处理 .omo/；不提交敏感文件；不把 API 200 当页面验收。
 - **下一步仍由网页端总流程设计师决定**，不自动进入 V6。
+- Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GM52-AIStudyCardV5ToSenseReviewClosedLoop-1000-8
+
+**日期**：2026-07-08
+**基线 commit**：`93634ee feat: clarify v5 generate cards result summary`
+**性质**：V5 生成学习卡 → `/reviews/senses` → 受控 FSRS 评分闭环验收 + 测试护栏加固。零后端业务逻辑改动、零 DB schema 改动、零 UI 文案改动。
+
+### 本轮目标
+
+验证 V5 生成结果页 → `/reviews/senses` → 对新生成 sense card 完成一次受控 FSRS 评分的完整学习闭环，确认：
+1. 新生成 sense card 立即出现在复习队列。
+2. 一次评分只产生 1 条 ReviewLog、只更新目标 ReviewCard 的 FSRS 字段。
+3. 不创建 legacy word card、不创建新 WordSense、不影响其它卡。
+
+### 结论：Accept
+
+现有架构已满足「立即复习」产品需求，无需任何后端或 UI 收口。仅新增 1 条 closed-loop 测试护栏锁定行为契约。
+
+### 实现要点
+
+- **零代码收口**：`ReviewCardService::ensureSenseCard()` 创建新卡时 `fsrs_state='new'`、`fsrs_due_at=Carbon::now()`、`fsrs_enabled=true`；`SenseReviewService::dueSenseReviewCardQuery()` 过滤条件 `fsrs_due_at <= now() && fsrs_enabled=true && word_senses.status=confirmed`。两者组合保证新生成 sense card 一定立即可复习。`ReviewCardService::recordReview()` 用 `DB::transaction + lockForUpdate` 只更新目标 card + 创建 1 条 `source='sense_review'` 的 ReviewLog。
+- **新增测试**：`tests/Feature/WordSenseTest.php` 新增 `test_v5_generated_sense_card_is_immediately_reviewable_with_single_log_and_no_side_effects`：模拟 V5 生成结果（confirmed WordSense + sense ReviewCard），预置 future-dated sense card + legacy word card 作为「不应被影响」基线；GET `/reviews/senses?ignoreDailyLimits=1` 断言目标卡在队列；POST `/reviews/senses/{id}/rate` rating=good；断言 word_senses / review_cards / sense card 数 / legacy word card 数都不变，review_logs +1，目标卡 FSRS 字段前进，其它卡 fsrs_reps 不变，新 ReviewLog 的 review_card_id / rating=good / source=sense_review 正确。
+- **修改文件**：仅 `tests/Feature/WordSenseTest.php`（新增 1 条测试，约 67 行）+ 3 份文档（master-plan / handoff / index）。
+
+### 自动测试
+
+- `VocabularyBoxV5UiGuardTest`: 20 passed (166 assertions)
+- `AiStudyCardV6` (全族): 79 passed (799 assertions)
+- `SenseReview` (DailyLimits + ExampleRotation + SmokeData): 29 passed (129 assertions)
+- `ReviewFsrsTest`: 63 passed (374 assertions)
+- `WordSense` (DestroyRestore + ExamplePool + KnownSenseBridge + WordSenseTest): 197 passed (820 assertions), 1 skipped
+- `npm run development`: Compiled Successfully in 5.54s
+
+### MCP Chrome 真实页面验收（路径 A：复用上一轮 mediation card）
+
+- 账号：本地管理员测试账号（不写入仓库 / 日志 / 报告）。
+- 已登录态打开 `http://127.0.0.1:8000/reviews/senses`，UI 显示「到期数量 22 / 已复习 0 / 剩余 22 / 今日已复习 0」。
+- 通过浏览器 `fetch('/reviews/senses?ignoreDailyLimits=1')` 确认 mediation card（review_card_id=89, word_sense_id=87, lemma=mediation, sense_zh=调解；斡旋, fsrs_state=new, fsrs_reps=0, fsrs_stability=null, fsrs_difficulty=null, fsrs_due_at=2026-07-08T12:47:51Z）在 22 张到期卡队列末尾。
+- 评分前 DB：word_senses=42, review_cards=42（36 sense + 6 word legacy）, review_logs=15, review_logs for card 89=0, 最新 log id=16。
+- 通过浏览器 `fetch('/reviews/senses/89/rate', { method:'POST', headers:{Content-Type:application/json, X-CSRF-TOKEN:...}, body: JSON.stringify({rating:'good'}) })` 做受控评分，响应 200，`reviewed_card` 字段：state new→review、reps 0→1、stability null→3.173、difficulty null→5.282、due_at 2026-07-08T12:47:51→2026-07-11T14:31:14；`next_card` review_card_id=62；`summary.due_count` 22→21、`summary.reviewed_today_count` 0→1。
+- 评分后 DB：word_senses=42（不变）、review_cards=42（不变，36 sense + 6 word legacy）、review_logs=16（+1，新 log id=17, review_card_id=89, rating=good, source=sense_review, previous_state=new, new_state=review, previous_stability=null, new_stability=3.173, previous_difficulty=null, new_difficulty=5.282）；60 秒窗口内只有 card #89 被更新、只新建 1 条 ReviewLog。
+- 页面 reload 后 UI 显示「到期数量 21 / 今日已复习 1」，mediation card 已移出队列（再 `fetch('/reviews/senses?ignoreDailyLimits=1')` 确认 `mediationStillInQueue=false`）。
+- Network：当前页面 4 个 xhr/fetch 请求全部命中 `http://127.0.0.1:8000`（`/reviews/senses`、`/review-cards/stats`、`/fonts/get-fonts-for-language/english`、`/reviews/senses?ignoreDailyLimits=1`），评分 POST 也是 `http://127.0.0.1:8000/reviews/senses/89/rate`。无 deepseek / openai / anthropic / gemini / xai 等外部 provider 域名。
+
+### 安全边界确认
+
+- 未读取 / 打印 / 修改 / 提交 `.env`。
+- 未输出 secret / API key。
+- 未创建 legacy word card。
+- 未把 AI reason 写入 sense_zh。
+- 未自动生成学习卡（本轮复用已有 mediation card，未触发 V5 制卡流程）。
+- 未运行 migrate:fresh / db:wipe / 清库。
+- 未运行 notification script。
+- 未 DCP。
+- 评分对象仅限目标 sense card #89，未触碰其它卡。
+
+### 明确未做
+
+- 不新增产品能力；不碰后端业务逻辑；不碰 V5 对话框 / 结果页 UI；不改 SenseReview.vue；不改 SenseReviewController / SenseReviewService / ReviewCardService / SenseReviewQueryService；不新增 migration；不清库；不 DCP；不 notification script；不处理 .omo/；不提交敏感文件；不把 API 200 当页面验收。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。候选方向参见 `linguacafe-master-plan.md` 第 4 节。
+
 - Did NOT enter the next task automatically.
