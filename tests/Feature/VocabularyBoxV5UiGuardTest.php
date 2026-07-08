@@ -64,6 +64,10 @@ use Tests\TestCase;
  * 17. V5 dialog shows explicit "将生成 / 将跳过" counts before confirm;
  * 18. V5 dialog disables confirm button and guides user when 0 definitions filled;
  * 19. V5 dialog shows per-candidate "将生成 / 将跳过" status chip based on sense_zh.
+ * 20. V5 result panel shows a candidate overview (total / filled / skipped_unfilled)
+ *     attached by the workflow, so the user can see how many candidates they
+ *     actually filled vs left empty — distinct from the backend summary's
+ *     skipped_count (which only covers reverse-validation failures).
  */
 class VocabularyBoxV5UiGuardTest extends TestCase
 {
@@ -444,5 +448,36 @@ class VocabularyBoxV5UiGuardTest extends TestCase
         // of truth for per-item status), checking sense_zh non-empty.
         $this->assertStringContainsString('isFilled(item) {', $contents, 'AiStudyCardGenerateCardsDialog must define isFilled(item) method.');
         $this->assertStringContainsString('item.sense_zh', $contents, 'AiStudyCardGenerateCardsDialog isFilled must inspect item.sense_zh.');
+    }
+
+    /**
+     * 20. V5 result panel must show a candidate overview (total / filled /
+     * skipped_unfilled) attached by the workflow's confirmGenerateCards
+     * handler. The backend only receives filled items, so backend
+     * summary.skipped_count does NOT include candidates the user left empty.
+     * The overview prevents user confusion by explicitly distinguishing
+     * "未填写 → 未提交、未生成、未删除" from the backend's reverse-validation
+     * skipped list.
+     */
+    public function test_shared_result_shows_candidate_overview_after_confirm(): void
+    {
+        $workflowContents = file_get_contents($this->workflowPath);
+        // The workflow must capture total candidates before filtering and
+        // attach a candidate_overview object to the result payload.
+        $this->assertStringContainsString('totalCandidates', $workflowContents, 'AiStudyCardDesktopWorkflow must capture totalCandidates before filtering confirmed items.');
+        $this->assertStringContainsString('data.candidate_overview = {', $workflowContents, 'AiStudyCardDesktopWorkflow must attach candidate_overview to the result payload.');
+        $this->assertStringContainsString('total: totalCandidates', $workflowContents, 'AiStudyCardDesktopWorkflow candidate_overview must include total.');
+        $this->assertStringContainsString('filled: confirmedItems.length', $workflowContents, 'AiStudyCardDesktopWorkflow candidate_overview must include filled count.');
+        $this->assertStringContainsString('skipped_unfilled: totalCandidates - confirmedItems.length', $workflowContents, 'AiStudyCardDesktopWorkflow candidate_overview must include skipped_unfilled count.');
+
+        $resultContents = file_get_contents($this->resultPath);
+        // The result panel must render the candidate overview when present.
+        $this->assertStringContainsString('result.candidate_overview', $resultContents, 'AiStudyCardGenerateCardsResult must render the candidate overview block.');
+        $this->assertStringContainsString('候选项总览', $resultContents, 'AiStudyCardGenerateCardsResult must label the overview block as "候选项总览".');
+        $this->assertStringContainsString('已填写 → 已提交生成', $resultContents, 'AiStudyCardGenerateCardsResult overview must clarify filled items were submitted for generation.');
+        $this->assertStringContainsString('未填写 → 未提交、未生成、未删除', $resultContents, 'AiStudyCardGenerateCardsResult overview must clarify unfilled items were not submitted / not generated / not deleted.');
+        $this->assertStringContainsString('result.candidate_overview.skipped_unfilled', $resultContents, 'AiStudyCardGenerateCardsResult overview must reference skipped_unfilled count.');
+        // The result panel docblock must document the new candidate_overview field.
+        $this->assertStringContainsString('candidate_overview: { total, filled, skipped_unfilled }', $resultContents, 'AiStudyCardGenerateCardsResult docblock must document the candidate_overview field shape.');
     }
 }

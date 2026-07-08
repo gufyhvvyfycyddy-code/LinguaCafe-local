@@ -435,6 +435,7 @@ export default {
             if (this.aiGenerateCardsItems.length === 0) return;
             this.aiGenerateCardsLoading = true;
             this.aiGenerateCardsError = '';
+            const totalCandidates = this.aiGenerateCardsItems.length;
             const confirmedItems = filterConfirmedGenerateCardItems(this.aiGenerateCardsItems);
             if (confirmedItems.length === 0) {
                 this.aiGenerateCardsError = '请至少为一个候选项填写中文释义。';
@@ -443,6 +444,16 @@ export default {
             }
             generateAiStudyCards(axios, this.aiFinalCandidatesPackage, confirmedItems)
                 .then((data) => {
+                    // V5 result overview: the dialog-level candidate counts. The backend
+                    // only receives filled items, so backend summary.skipped_count does
+                    // NOT include candidates the user left empty. Attach a candidate
+                    // overview so the result panel can show "7 项候选 → 1 项已生成 / 6 项未填写被跳过"
+                    // and prevent user confusion with backend skipped_count.
+                    data.candidate_overview = {
+                        total: totalCandidates,
+                        filled: confirmedItems.length,
+                        skipped_unfilled: totalCandidates - confirmedItems.length,
+                    };
                     this.aiGenerateCardsResult = data;
                     this.aiGenerateCardsDialog = false;
                     this.$emit('generated', data);

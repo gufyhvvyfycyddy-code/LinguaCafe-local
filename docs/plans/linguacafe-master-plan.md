@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-08 (AIStudyCardV5PerCandidateGenerateSkipStatus-1)
+> **最后更新**：2026-07-08 (AIStudyCardV5ResultCandidateOverview-1)
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -1092,9 +1092,22 @@ WorkBuddy 验收 V6-16 时确认 V5 对话框底部已显示明确计数（共 X
 - 自动测试：`php artisan test --filter VocabularyBoxV5UiGuardTest --stop-on-failure` 为 19 passed / 155 assertions；`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 79 passed / 799 assertions；`npm run development` 编译成功。
 - MCP Chrome 真实页面验收：7 项候选（5 用户已选 + 2 AI 推荐 mediation/phenomenology）打开 V5 对话框时每项右侧均显示 `将跳过` chip，底部显示 `共 7 项，将生成 0 张，将跳过 7 项`，按钮显示 `请至少填写 1 个中文释义` 且 disabled，warning alert 可见；手动填写 mediation 中文释义 `调解；斡旋` 后该项 chip 实时变为 `将生成`（success 色），底部变为 `共 7 项，将生成 1 张，将跳过 6 项`，按钮变为 `确认生成 1 张学习卡` 且 enabled，warning alert 消失；删除 mediation 中文释义后该项 chip 回到 `将跳过`（warning 色），底部回到 `共 7 项，将生成 0 张，将跳过 7 项`，按钮回到 `请至少填写 1 个中文释义` 且 disabled，warning alert 重新出现；AI reason 仅显示为「推荐理由（参考说明，不是释义）」，未自动写入 sense_zh；未点击最终确认，数据库 word_sense / review_card / review_log 计数前后不变（41/41/15）；Network 全程仅 127.0.0.1:8000，无外部 provider 域名，无 POST /ai-study-card/generate-cards。
 
+### V6-18 V5 result candidate overview 实现结果
+
+V6-17 收口了 V5 对话框内的逐项状态。本轮收口 V5 最终确认后结果页的「候选项总览」可见性，解决用户困惑：前端 `filterConfirmedGenerateCardItems()` 只发送已填项给后端，所以后端 `summary.skipped_count` 不包含「未填写释义」的项；用户在对话框看到 7 项、只填 1 项，但结果页显示「创建 1 / 跳过 0」会造成误解。
+
+本轮纯前端收口，零后端改动、零 DB schema 改动：
+
+- `AiStudyCardDesktopWorkflow.vue` 的 `confirmGenerateCards()` 在 `.then(data => ...)` 时捕获对话框层面的候选总数（`totalCandidates` = `aiGenerateCardsItems.length`）和已填数（`confirmedItems.length`），附加 `data.candidate_overview = { total, filled, skipped_unfilled }` 到结果 payload。
+- `AiStudyCardGenerateCardsResult.vue` 在 success/error alert 之后、四类计数 chip 之前新增「候选项总览」区块：`共 N 项 · 已填写 X 项 · 未填写 Y 项`，配 `已填写 → 已提交生成`（success chip）和 `未填写 → 未提交、未生成、未删除`（warning chip）；当 `skipped_unfilled > 0` 时额外显示 `未填写的 Y 项不会生成学习卡，也不会被删除，可稍后再次确认`。
+- 仍不自动填 `sense_zh`，不自动确认，不改 FSRS，不创建 ReviewLog，不创建 legacy word card。
+- `VocabularyBoxV5UiGuardTest` 新增 1 条护栏（test 20）：锁定 workflow 中 `totalCandidates` 捕获、`data.candidate_overview = {` 赋值、`total/filled/skipped_unfilled` 三字段，以及 result 组件中 `result.candidate_overview` 渲染、`候选项总览` 文案、`已填写 → 已提交生成` / `未填写 → 未提交、未生成、未删除` 文案、`candidate_overview: { total, filled, skipped_unfilled }` docblock 契约。
+- 自动测试：`php artisan test --filter VocabularyBoxV5UiGuardTest --stop-on-failure` 为 20 passed / 166 assertions；`php artisan test --filter AiStudyCardV6 --stop-on-failure` 为 79 passed / 799 assertions；`php artisan test --filter AiStudyCardV5DesktopArchitectureGuardTest --stop-on-failure` 为 17 passed / 149 assertions；`npm run development` 编译成功（5.42s）。
+- MCP Chrome 真实页面验收（含本轮特殊允许的「点击最终确认」）：7 项候选（5 用户已选 + 2 AI 推荐 mediation/phenomenology），手动填写 mediation 中文释义 `调解；斡旋` 后点击 `确认生成 1 张学习卡`；结果页显示 `候选项总览：共 7 项 · 已填写 1 项 · 未填写 6 项`，`已填写 → 已提交生成` / `未填写 → 未提交、未生成、未删除` chip，`未填写的 6 项不会生成学习卡，也不会被删除，可稍后再次确认`，后端计数 `创建 1 / 跳过 0 / 重复 0 / 失败 0`，新建学习卡 `mediation → 释义 #87 / 复习卡 #89`，`进入 /reviews/senses 复习` 入口可见，`这不是 AI 自动调用` 安全文案可见；数据库 word_senses 41→42 (+1)、review_cards 41→42 (+1)、review_logs 15→15 (+0)，符合预期；Network 45 个请求全部命中 127.0.0.1:8000，包含 `POST /ai-study-card/generate-cards` (reqid=163)，无任何外部 provider 域名。
+
 ### 后续允许的下一小步
 
-V5 对话框逐项「将生成 / 将跳过」状态已收口。下一步可考虑的方向（仍需网页端总流程设计师确认）：
+V5 对话框逐项「将生成 / 将跳过」状态已收口，V5 最终确认后的结果页也已显示候选项总览。下一步可考虑的方向（仍需网页端总流程设计师确认）：
 
 1. V5 对话框内对“将跳过”的项给出更明显的视觉差异（如轻微灰化整项背景），让用户扫一眼就能区分生成区与跳过区。
 2. V6 provider-preview 在本地 SSL 证书修复后做真实 provider 调用端到端验收（当前仅 backend-only smoke 通过）。

@@ -14,6 +14,20 @@
             text
             class="mb-2"
         >{{ result.message }}</v-alert>
+        <div v-if="result.candidate_overview" class="mb-2 pa-2 rounded text-caption" style="background: var(--v-gray2-base);">
+            <v-icon x-small class="mr-1">mdi-format-list-bulleted</v-icon>
+            <span class="font-weight-medium">候选项总览：</span>
+            共 {{ result.candidate_overview.total }} 项 ·
+            已填写 {{ result.candidate_overview.filled }} 项 ·
+            未填写 {{ result.candidate_overview.skipped_unfilled }} 项
+            <div class="mt-1">
+                <v-chip x-small color="success" class="mr-1">已填写 → 已提交生成</v-chip>
+                <v-chip x-small color="warning">未填写 → 未提交、未生成、未删除</v-chip>
+            </div>
+            <div v-if="result.candidate_overview.skipped_unfilled > 0" class="mt-1 text--secondary">
+                未填写的 {{ result.candidate_overview.skipped_unfilled }} 项不会生成学习卡，也不会被删除，可稍后再次确认。
+            </div>
+        </div>
         <div v-if="result.results" class="mb-2">
             <div class="text-caption mb-1">
                 <v-chip x-small color="success" class="mr-2">创建 {{ result.results.summary.created_count }}</v-chip>
@@ -77,7 +91,8 @@
  *
  * Responsibilities:
  *   - Render the result payload returned by `/ai-study-card/generate-cards`:
- *     success/error alert, created / skipped / duplicate / failed counts,
+ *     success/error alert, candidate overview (total/filled/skipped_unfilled),
+ *     created / skipped / duplicate / failed counts,
  *     per-created-item sense_id / review_card_id / source_binding_status,
  *     "进入 /reviews/senses 复习" entry, "关闭结果" button, and the safety
  *     copy "这不是 AI 自动调用".
@@ -95,7 +110,12 @@ export default {
     name: 'AiStudyCardGenerateCardsResult',
     props: {
         // The result payload from /ai-study-card/generate-cards.
-        // Expected shape: { success, message, results: { summary, created, skipped, duplicate, failed }, safety_flags }.
+        // Expected shape: {
+        //   success, message,
+        //   candidate_overview: { total, filled, skipped_unfilled }, // attached by workflow
+        //   results: { summary, created, skipped, duplicate, failed },
+        //   safety_flags
+        // }.
         result: {
             type: Object,
             default: null,
