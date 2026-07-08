@@ -62,7 +62,8 @@ use Tests\TestCase;
  * 15. V5 safety copy "这不是 AI 自动调用" exists in shared components;
  * 16. Result section shows created / skipped / duplicate / failed counts.
  * 17. V5 dialog shows explicit "将生成 / 将跳过" counts before confirm;
- * 18. V5 dialog disables confirm button and guides user when 0 definitions filled.
+ * 18. V5 dialog disables confirm button and guides user when 0 definitions filled;
+ * 19. V5 dialog shows per-candidate "将生成 / 将跳过" status chip based on sense_zh.
  */
 class VocabularyBoxV5UiGuardTest extends TestCase
 {
@@ -417,5 +418,31 @@ class VocabularyBoxV5UiGuardTest extends TestCase
         $this->assertStringContainsString('确认生成', $contents, 'AiStudyCardGenerateCardsDialog button copy must reflect actual generation count.');
         // Warning alert must appear when 0 filled to make the blockage clear.
         $this->assertStringContainsString('还没有填写任何中文释义', $contents, 'AiStudyCardGenerateCardsDialog must show warning alert when 0 definitions filled.');
+    }
+
+    /**
+     * 19. V5 dialog must show a per-candidate "将生成 / 将跳过" status chip so
+     *     the user can see at a glance which items will be generated and which
+     *     will be skipped, without having to inspect each input field.
+     *
+     * The per-item status must be derived from whether item.sense_zh is
+     * non-empty (matching the bottom counts and the backend filter in
+     * filterConfirmedGenerateCardItems()).
+     */
+    public function test_shared_dialog_shows_per_candidate_generate_skip_status(): void
+    {
+        $contents = file_get_contents($this->dialogPath);
+        // Per-item status chip copy must exist for both states.
+        $this->assertStringContainsString('将生成', $contents, 'AiStudyCardGenerateCardsDialog must show "将生成" status on filled candidates.');
+        $this->assertStringContainsString('将跳过', $contents, 'AiStudyCardGenerateCardsDialog must show "将跳过" status on empty candidates.');
+        // The isFilled method must exist and be bound to the chip, so the
+        // per-item status stays in sync with the bottom counts.
+        $this->assertStringContainsString('isFilled(item)', $contents, 'AiStudyCardGenerateCardsDialog must bind per-item status to isFilled(item).');
+        $this->assertStringContainsString('isFilled(item) ? \'success\' : \'warning\'', $contents, 'AiStudyCardGenerateCardsDialog must color the status chip success/warning based on isFilled.');
+        $this->assertStringContainsString('isFilled(item) ? \'将生成\' : \'将跳过\'', $contents, 'AiStudyCardGenerateCardsDialog must render the status chip copy from isFilled.');
+        // The isFilled method definition must live in the dialog (single source
+        // of truth for per-item status), checking sense_zh non-empty.
+        $this->assertStringContainsString('isFilled(item) {', $contents, 'AiStudyCardGenerateCardsDialog must define isFilled(item) method.');
+        $this->assertStringContainsString('item.sense_zh', $contents, 'AiStudyCardGenerateCardsDialog isFilled must inspect item.sense_zh.');
     }
 }

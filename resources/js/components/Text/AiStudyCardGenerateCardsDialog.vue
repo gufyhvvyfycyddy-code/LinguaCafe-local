@@ -29,6 +29,13 @@
                         >{{ item.source === 'user_selected' ? '已选词' : 'AI 推荐' }}</v-chip>
                         <span class="font-weight-medium">{{ item.word }}</span>
                         <span v-if="item.lemma && item.lemma !== item.word" class="ml-1 text--secondary text-caption">({{ item.lemma }})</span>
+                        <v-spacer />
+                        <v-chip
+                            x-small
+                            outlined
+                            :color="isFilled(item) ? 'success' : 'warning'"
+                            class="ml-2"
+                        >{{ isFilled(item) ? '将生成' : '将跳过' }}</v-chip>
                     </div>
                     <div v-if="item.reason" class="text-caption mb-1 pa-1 rounded" style="background: var(--v-gray2-base); color: var(--v-secondary-base);">
                         <v-icon x-small class="mr-1">mdi-lightbulb-outline</v-icon>
@@ -131,6 +138,15 @@ export default {
         // and the copy guides the user to fill at least one.
         canConfirm() {
             return this.items.length > 0 && this.filledCount > 0;
+        },
+    },
+    methods: {
+        // Whether a candidate item has a non-empty Chinese definition (sense_zh).
+        // Filled items will be sent to generate-cards; empty items will be
+        // skipped. Used to render the per-item "将生成 / 将跳过" status chip
+        // and to keep the per-item status in sync with the bottom counts.
+        isFilled(item) {
+            return !!(item && typeof item.sense_zh === 'string' && item.sense_zh.trim() !== '');
         },
     },
     props: {
