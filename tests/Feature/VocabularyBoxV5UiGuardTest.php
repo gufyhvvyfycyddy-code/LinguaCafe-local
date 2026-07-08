@@ -61,6 +61,8 @@ use Tests\TestCase;
  * 14. V5 data fields exist in the workflow component (not in VocabularyBox);
  * 15. V5 safety copy "这不是 AI 自动调用" exists in shared components;
  * 16. Result section shows created / skipped / duplicate / failed counts.
+ * 17. V5 dialog shows explicit "将生成 / 将跳过" counts before confirm;
+ * 18. V5 dialog disables confirm button and guides user when 0 definitions filled.
  */
 class VocabularyBoxV5UiGuardTest extends TestCase
 {
@@ -375,5 +377,45 @@ class VocabularyBoxV5UiGuardTest extends TestCase
         $this->assertStringContainsString('skipped_count', $contents, 'AiStudyCardGenerateCardsResult must show skipped count.');
         $this->assertStringContainsString('duplicate_count', $contents, 'AiStudyCardGenerateCardsResult must show duplicate count.');
         $this->assertStringContainsString('failed_count', $contents, 'AiStudyCardGenerateCardsResult must show failed count.');
+    }
+
+    /**
+     * 17. V5 dialog must show explicit "将生成 / 将跳过" counts before confirm so
+     *     the user knows exactly how many cards will be created and how many
+     *     items will be dropped before clicking the confirm button.
+     *
+     * The copy must reflect the real filter behavior in
+     * filterConfirmedGenerateCardItems() which drops items with empty sense_zh.
+     */
+    public function test_shared_dialog_shows_explicit_generate_and_skip_counts(): void
+    {
+        $contents = file_get_contents($this->dialogPath);
+        $this->assertStringContainsString('将生成', $contents, 'AiStudyCardGenerateCardsDialog must show "将生成" count before confirm.');
+        $this->assertStringContainsString('将跳过', $contents, 'AiStudyCardGenerateCardsDialog must show "将跳过" count before confirm.');
+        $this->assertStringContainsString('filledCount', $contents, 'AiStudyCardGenerateCardsDialog must compute filledCount.');
+        $this->assertStringContainsString('skippedCount', $contents, 'AiStudyCardGenerateCardsDialog must compute skippedCount.');
+        $this->assertStringContainsString('canConfirm', $contents, 'AiStudyCardGenerateCardsDialog must compute canConfirm gate.');
+        // The legacy "已填 X 项" copy must be replaced with the explicit generate/skip copy
+        // to avoid ambiguity about what the confirm button actually does.
+        $this->assertStringNotContainsString('已填 ', $contents, 'AiStudyCardGenerateCardsDialog must replace ambiguous "已填" copy with explicit "将生成/将跳过" counts.');
+    }
+
+    /**
+     * 18. V5 dialog must disable the confirm button and guide the user when
+     *     zero Chinese definitions are filled. This prevents the user from
+     *     clicking "确认生成学习卡" when no cards would actually be created,
+     *     which previously caused confusion.
+     */
+    public function test_shared_dialog_disables_confirm_when_zero_definitions_filled(): void
+    {
+        $contents = file_get_contents($this->dialogPath);
+        // Button must be gated by canConfirm (filledCount > 0), not just items.length > 0.
+        $this->assertStringContainsString(':disabled="!canConfirm"', $contents, 'AiStudyCardGenerateCardsDialog confirm button must be disabled when canConfirm is false (0 filled).');
+        // Button copy must guide the user when 0 filled.
+        $this->assertStringContainsString('请至少填写 1 个中文释义', $contents, 'AiStudyCardGenerateCardsDialog must guide user to fill at least 1 definition when 0 filled.');
+        // Dynamic button copy must reflect actual generation count.
+        $this->assertStringContainsString('确认生成', $contents, 'AiStudyCardGenerateCardsDialog button copy must reflect actual generation count.');
+        // Warning alert must appear when 0 filled to make the blockage clear.
+        $this->assertStringContainsString('还没有填写任何中文释义', $contents, 'AiStudyCardGenerateCardsDialog must show warning alert when 0 definitions filled.');
     }
 }

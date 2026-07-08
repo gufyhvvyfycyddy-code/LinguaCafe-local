@@ -66,19 +66,21 @@
                 <v-btn text @click="$emit('input', false)">取消</v-btn>
                 <v-spacer />
                 <span class="text-caption mr-2">
-                    共 {{ items.length }} 项，
-                    已填 {{ items.filter(i => i.sense_zh && i.sense_zh.trim()).length }} 项
+                    共 {{ items.length }} 项，将生成 {{ filledCount }} 张，将跳过 {{ skippedCount }} 项
                 </span>
                 <v-btn
                     color="error"
                     :loading="loading"
-                    :disabled="items.length === 0"
+                    :disabled="!canConfirm"
                     @click="$emit('confirm')"
                 >
                     <v-icon small class="mr-1">mdi-check</v-icon>
-                    确认生成学习卡
+                    {{ filledCount > 0 ? '确认生成 ' + filledCount + ' 张学习卡' : '请至少填写 1 个中文释义' }}
                 </v-btn>
             </v-card-actions>
+            <v-alert v-if="items.length > 0 && filledCount === 0" type="warning" dense text class="mx-3 mb-3">
+                还没有填写任何中文释义，无法生成学习卡。请至少填写 1 个中文释义后再确认。
+            </v-alert>
             <v-alert v-if="error" type="error" dense text class="mx-3 mb-3">
                 {{ error }}
             </v-alert>
@@ -114,6 +116,21 @@ export default {
     computed: {
         hasAiRecommendedItems() {
             return this.items.some(item => item && item.source !== 'user_selected');
+        },
+        // Number of items with a non-empty Chinese definition (sense_zh).
+        // Only filled items will be sent to generate-cards; skipped items
+        // are dropped before the request.
+        filledCount() {
+            return this.items.filter(i => i && typeof i.sense_zh === 'string' && i.sense_zh.trim() !== '').length;
+        },
+        skippedCount() {
+            return this.items.length - this.filledCount;
+        },
+        // Confirm button requires at least one filled Chinese definition.
+        // 0 filled = no cards would be generated, so the button is disabled
+        // and the copy guides the user to fill at least one.
+        canConfirm() {
+            return this.items.length > 0 && this.filledCount > 0;
         },
     },
     props: {
