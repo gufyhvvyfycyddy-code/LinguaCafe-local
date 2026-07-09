@@ -121,6 +121,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/review/{practiceMode?}/{bookId?}/{chapterId?}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);
     Route::get('/reviews/senses/today-summary', [App\Http\Controllers\SenseReviewController::class, 'todaySummary']);
+    Route::get('/reviews/senses/daily-report', [App\Http\Controllers\SenseReviewController::class, 'dailyReport']);
     Route::get('/senses/review', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);

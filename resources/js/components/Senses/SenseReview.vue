@@ -46,6 +46,11 @@
             <div class="text-center mt-2">
                 <v-btn small text color="info" @click="openTodaySummary">查看今日复习总结</v-btn>
             </div>
+            <!-- Daily report entry: richer four-block daily learning report.
+                 Distinct from the simpler today-summary. Read-only. -->
+            <div class="text-center mt-1">
+                <v-btn small text color="primary" @click="openDailyReport">查看今日学习日报</v-btn>
+            </div>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -74,6 +79,17 @@
                 v-if="showTodaySummary"
                 :summary="todaySummary"
                 @close="closeTodaySummary"
+            />
+        </v-dialog>
+
+        <!-- Daily report dialog (four-block daily learning report). Read-only:
+             the component only renders backend data and emits 'close'. It
+             never writes ReviewLog, never touches FSRS, never creates cards. -->
+        <v-dialog v-model="showDailyReport" max-width="800">
+            <SenseReviewDailyReport
+                v-if="showDailyReport"
+                :report="dailyReport"
+                @close="closeDailyReport"
             />
         </v-dialog>
 
@@ -336,6 +352,7 @@
     import SenseReviewUnderstandingAid from './SenseReviewUnderstandingAid.vue';
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewTodaySummary from './SenseReviewTodaySummary.vue';
+    import SenseReviewDailyReport from './SenseReviewDailyReport.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
 
     /**
@@ -369,6 +386,7 @@
             SenseReviewUnderstandingAid,
             SenseReviewEditDialog,
             SenseReviewTodaySummary,
+            SenseReviewDailyReport,
         },
         data: function() {
             return {
@@ -448,6 +466,32 @@
                     forget_rate: null,
                     focus_senses: [],
                     recent_reviews: [],
+                },
+                // Daily report: richer four-block daily learning report
+                // loaded from the backend GET /reviews/senses/daily-report
+                // endpoint. Read-only — opening/closing never writes
+                // ReviewLog, never touches FSRS, never changes the queue.
+                showDailyReport: false,
+                dailyReportLoading: false,
+                dailyReport: {
+                    timezone: '',
+                    day: '',
+                    day_start: '',
+                    day_end: '',
+                    overview: {
+                        total_reviews: 0,
+                        distinct_senses: 0,
+                        first_review_senses: 0,
+                        review_again_senses: 0,
+                        average_rating: null,
+                    },
+                    quality: {
+                        distribution: { again: 0, hard: 0, good: 0, easy: 0 },
+                        forget_rate: null,
+                        stability_rate: null,
+                    },
+                    focus_senses: [],
+                    progress_senses: [],
                 },
             }
         },
@@ -817,6 +861,27 @@
             },
             closeTodaySummary() {
                 this.showTodaySummary = false;
+            },
+            // ==================== Daily report ====================
+            // Read-only four-block daily learning report. Distinct from the
+            // simpler today-summary. Opening this never writes ReviewLog,
+            // never touches FSRS, never changes the card queue.
+            openDailyReport() {
+                this.showDailyReport = true;
+                this.dailyReportLoading = true;
+                axios.get('/reviews/senses/daily-report')
+                    .then((response) => {
+                        this.dailyReport = response.data;
+                    })
+                    .catch(() => {
+                        this.showSnackbar('日报加载失败。', 'error');
+                    })
+                    .finally(() => {
+                        this.dailyReportLoading = false;
+                    });
+            },
+            closeDailyReport() {
+                this.showDailyReport = false;
             },
             // ==================== Snackbar ====================
             showSnackbar(text, color) {

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ReviewCard;
 use App\Services\ReviewCardService;
 use App\Services\SenseReviewCardSerializerService;
+use App\Services\SenseReviewDailyReportService;
 use App\Services\SenseReviewService;
 use App\Services\SenseReviewTodaySummaryService;
 use Illuminate\Http\Request;
@@ -18,6 +19,7 @@ class SenseReviewController extends Controller
         private HomeController $homeController,
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
         private SenseReviewTodaySummaryService $senseReviewTodaySummaryService,
+        private SenseReviewDailyReportService $senseReviewDailyReportService,
     ) {
     }
 
@@ -93,5 +95,22 @@ class SenseReviewController extends Controller
         $summary = $this->senseReviewTodaySummaryService->build($userId, $language);
 
         return response()->json($summary);
+    }
+
+    /**
+     * SenseReview-DailyReport-1000-1
+     *
+     * Read-only "今日学习日报" — richer four-block daily report (overview,
+     * quality, focus_senses, progress_senses). Distinct from the simpler
+     * today-summary. Source of truth: ReviewLog. No writes, no FSRS changes.
+     */
+    public function dailyReport(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $report = $this->senseReviewDailyReportService->build($userId, $language);
+
+        return response()->json($report);
     }
 }
