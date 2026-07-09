@@ -17,16 +17,19 @@ class SenseReviewCardSerializerService
      * frontend review card payload.
      *
      * The question example is rotated across the sense's real-source example
-     * pool using a stable seed (review_card_id + fsrs_reps + day-of-year) so
-     * the same card does not always show the first example. A supplementary
-     * example (different from the question) is also included for the answer
-     * side; it is null when the pool has only one example.
+     * pool using linear sequence rotation (review_card_id + fsrs_reps +
+     * fsrs_lapses) so consecutive reviews cycle through examples in order
+     * (A -> B -> C -> A ...) and a failed review (lapses increment) shifts
+     * to a different example. A supplementary example (different from the
+     * question) is also included for the answer side; it is null when the
+     * pool has only one example.
      *
-     * Rotation does NOT persist a "last shown occurrence id": the seed-based
-     * selection is deterministic for a given day and shifts naturally across
-     * days and after each successful review (fsrs_reps increments). This
-     * avoids any new migration / write path while still satisfying "do not
-     * always show the first example".
+     * Rotation does NOT persist a "last shown occurrence id": the linear
+     * sequence is deterministic from (card_id, reps, lapses) and shifts
+     * naturally after each review (reps increments on success, lapses
+     * increments on failure). This avoids any new migration / write path
+     * while satisfying "first A, second B, third C" and "failed review
+     * shows a different example".
      *
      * Payload contract (SenseMultiExampleBindingAndReviewRotation-1000-6):
      *   - displayed_occurrence_id: id of the occurrence shown this round
@@ -47,6 +50,7 @@ class SenseReviewCardSerializerService
             count($candidates),
             $card->id,
             (int) ($card->fsrs_reps ?? 0),
+            (int) ($card->fsrs_lapses ?? 0),
         );
 
         $questionExample = $candidates[$questionIndex] ?? null;
@@ -55,6 +59,7 @@ class SenseReviewCardSerializerService
             $questionIndex,
             $card->id,
             (int) ($card->fsrs_reps ?? 0),
+            (int) ($card->fsrs_lapses ?? 0),
         );
         $supplementaryExample = $supplementaryIndex !== null ? $candidates[$supplementaryIndex] ?? null : null;
 

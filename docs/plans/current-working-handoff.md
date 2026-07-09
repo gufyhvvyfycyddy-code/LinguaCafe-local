@@ -591,3 +591,49 @@
 不自动进入下一任务。候选方向参见 `linguacafe-master-plan.md` 第 4 节。
 
 - Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReviewExampleRotationMemory-1
+
+**日期**：2026-07-09
+**基线 commit**：`3a06a7f test: add ai study card full loop regression harness`
+**性质**：将 SenseReview 例句轮换策略从 `crc32(seed) % total` 哈希取模改为 `(reviewCardId + fsrsReps + fsrsLapses) % total` 线性序列，满足"第一次 A、第二次 B、第三次 C"和"复习失败切换例句"需求。零 migration、零新字段、零 FSRS 算法改动。
+
+### 本轮目标
+
+让一个 WordSense 拥有多个例句时，SenseReview 能根据学习历史智能选择例句，帮助用户建立词义迁移。
+
+### 结论：Accept
+
+例句轮换策略已从哈希改为线性序列，4 个新测试 + 10 个现有测试全绿，MCP Chrome 真实页面验收确认例句评分后切换。
+
+### 交付物
+
+1. **`app/Services/WordSenseExamplePoolService.php`** — `pickQuestionIndex` 改为线性序列；`pickSupplementaryIndex` 加 `fsrsLapses` 参数。
+2. **`app/Services/SenseReviewCardSerializerService.php`** — `serialize` 传入 `fsrs_lapses`。
+3. **`tests/Feature/SenseReviewExampleRotationTest.php`** — 新增 4 个测试。
+4. **`docs/testing/sense-review-example-rotation-playbook.md`** — 新增 12 节 playbook。
+
+### 自动测试
+
+- `SenseReviewExampleRotationTest`: 14 passed (39 assertions)
+- 组合运行: 364 passed, 1 skipped (1688 assertions)
+- `npm run development`: webpack compiled successfully (5.04s)
+
+### MCP Chrome 真实页面验收
+
+- card 62 评分前（reps=1）：显示 card_fallback 例句
+- 评分 `good` 后（reps=2）：显示 occurrence_id=11 例句（切换成功）
+- DB：review_logs 16→17（+1），其他不变
+- Network：17 个请求全部 127.0.0.1:8000
+
+### 安全边界确认
+
+- 未读取 / 修改 / 提交 `.env`；未输出 secret；未修改 FSRS 算法；未修改 WordSense/ReviewCard 数据模型边界；serialize 保持只读；未创建 legacy word card；未清库；未 DCP；未 notification script。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.

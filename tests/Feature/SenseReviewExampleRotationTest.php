@@ -333,6 +333,136 @@ class SenseReviewExampleRotationTest extends TestCase
         );
     }
 
+    // ===== Linear sequence rotation tests (GM52-SenseReviewExampleRotationMemory-1000-8) =====
+    //
+    // These tests lock the "first A, second B, third C" sequence contract:
+    // fsrs_reps increments MUST move through the example pool in order rather
+    // than hashing to an unpredictable index. fsrs_lapses increments MUST
+    // shift the starting offset so a failed review shows a different example.
+
+    public function test_linear_rotation_cycles_through_all_examples_with_reps(): void
+    {
+        // With 3 occurrences, reps 0/1/2 must show 3 distinct sentences
+        // (in pool order, offset by card_id). This is the core "first A,
+        // second B, third C" contract.
+        $sense = $this->createConfirmedSense('rotation');
+        $chapter1 = $this->createTestChapter('Chapter A');
+        $chapter2 = $this->createTestChapter('Chapter B');
+        $chapter3 = $this->createTestChapter('Chapter C');
+
+        $sentences = [
+            'First example sentence.',
+            'Second example sentence.',
+            'Third example sentence.',
+        ];
+        $this->createOccurrence($sense, $chapter1, 's1', $sentences[0]);
+        $this->createOccurrence($sense, $chapter2, 's2', $sentences[1]);
+        $this->createOccurrence($sense, $chapter3, 's3', $sentences[2]);
+
+        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
+
+        $shown = [];
+        for ($reps = 0; $reps <= 2; $reps++) {
+            $card->fsrs_reps = $reps;
+            $card->save();
+            $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
+            $shown[] = $payload['example_sentence_en'];
+        }
+
+        $unique = array_unique($shown);
+        $this->assertSame(3, count($unique), 'reps 0/1/2 must show 3 distinct examples, got: ' . implode(' | ', $shown));
+        $this->assertContains($sentences[0], $shown);
+        $this->assertContains($sentences[1], $shown);
+        $this->assertContains($sentences[2], $shown);
+    }
+
+    public function test_linear_rotation_wraps_around_after_pool_size(): void
+    {
+        // With 3 occurrences, reps 3 should wrap back to the same example
+        // as reps 0 (circular rotation).
+        $sense = $this->createConfirmedSense('rotation');
+        $chapter1 = $this->createTestChapter('Chapter A');
+        $chapter2 = $this->createTestChapter('Chapter B');
+        $chapter3 = $this->createTestChapter('Chapter C');
+
+        $this->createOccurrence($sense, $chapter1, 's1', 'First example sentence.');
+        $this->createOccurrence($sense, $chapter2, 's2', 'Second example sentence.');
+        $this->createOccurrence($sense, $chapter3, 's3', 'Third example sentence.');
+
+        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
+
+        $card->fsrs_reps = 0;
+        $card->save();
+        $payload0 = $this->serializerService->serialize($card->fresh()->load('sense'));
+
+        $card->fsrs_reps = 3;
+        $card->save();
+        $payload3 = $this->serializerService->serialize($card->fresh()->load('sense'));
+
+        $this->assertSame(
+            $payload0['example_sentence_en'],
+            $payload3['example_sentence_en'],
+            'reps 3 must wrap back to the same example as reps 0 (circular rotation)'
+        );
+    }
+
+    public function test_lapses_increment_shifts_example(): void
+    {
+        // With 3 occurrences, holding reps constant but incrementing lapses
+        // must shift the displayed example. This is the "failed review shows
+        // a different example" contract.
+        $sense = $this->createConfirmedSense('rotation');
+        $chapter1 = $this->createTestChapter('Chapter A');
+        $chapter2 = $this->createTestChapter('Chapter B');
+        $chapter3 = $this->createTestChapter('Chapter C');
+
+        $this->createOccurrence($sense, $chapter1, 's1', 'First example sentence.');
+        $this->createOccurrence($sense, $chapter2, 's2', 'Second example sentence.');
+        $this->createOccurrence($sense, $chapter3, 's3', 'Third example sentence.');
+
+        $card = $this->createSenseCard($sense, ['fsrs_reps' => 5, 'fsrs_lapses' => 0]);
+
+        $card->fsrs_lapses = 0;
+        $card->save();
+        $payloadLapses0 = $this->serializerService->serialize($card->fresh()->load('sense'));
+
+        $card->fsrs_lapses = 1;
+        $card->save();
+        $payloadLapses1 = $this->serializerService->serialize($card->fresh()->load('sense'));
+
+        $this->assertNotSame(
+            $payloadLapses0['example_sentence_en'],
+            $payloadLapses1['example_sentence_en'],
+            'incrementing fsrs_lapses must shift the displayed example (failed review contract)'
+        );
+    }
+
+    public function test_single_example_stable_across_reps_and_lapses(): void
+    {
+        // With only 1 occurrence, reps and lapses changes must NOT shift
+        // the example — there is nowhere else to go.
+        $sense = $this->createConfirmedSense('rotation');
+        $chapter = $this->createTestChapter('Only Chapter');
+        $this->createOccurrence($sense, $chapter, 's1', 'The only example sentence.');
+
+        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
+
+        $shown = [];
+        foreach ([0, 1, 5, 10] as $reps) {
+            foreach ([0, 1, 3] as $lapses) {
+                $card->fsrs_reps = $reps;
+                $card->fsrs_lapses = $lapses;
+                $card->save();
+                $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
+                $shown[] = $payload['example_sentence_en'];
+            }
+        }
+
+        $unique = array_unique($shown);
+        $this->assertSame(1, count($unique), 'single-example pool must always show the same example');
+        $this->assertSame('The only example sentence.', $shown[0]);
+    }
+
     // ==================== Helpers ====================
 
     private function createConfirmedSense(string $lemma, string $exampleEn = ''): WordSense

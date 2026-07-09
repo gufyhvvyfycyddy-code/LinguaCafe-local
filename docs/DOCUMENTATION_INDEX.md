@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-09 (AIStudyCardFullLoopRegressionHarness-1).
+> **Last updated**: 2026-07-09 (SenseReviewExampleRotationMemory-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -30,7 +30,7 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/architecture/sense-http-controller-boundaries.md`, `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
-| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/testing/ai-study-card-full-loop-regression-playbook.md`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
+| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/testing/ai-study-card-full-loop-regression-playbook.md`, `docs/testing/sense-review-example-rotation-playbook.md`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
 | Architecture scout | Read-only architecture investigation reports | `docs/plans/ai-study-card-architecture-scout.md` |
 | Product principles | Long-term product direction, function constraints, and legacy cleanup plan | `docs/plans/product-principles-and-legacy-cleanup-plan.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |

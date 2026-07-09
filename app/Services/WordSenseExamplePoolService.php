@@ -131,14 +131,25 @@ class WordSenseExamplePoolService
     }
 
     /**
-     * Deterministically pick the question example index from the candidate
-     * list using a stable seed (review_card_id + fsrs_reps + day-of-year).
+     * Pick the question example index using linear sequence rotation.
      *
-     * The rotation is stable for a given day, so the same card reviewed
-     * multiple times in one day shows the same question. Across days or
-     * after successful reviews (fsrs_reps increments), the question shifts.
+     * Strategy (GM52-SenseReviewExampleRotationMemory-1000-8):
+     *  - reviewCardId provides a per-card offset so different cards start
+     *    at different examples (avoids all cards syncing to the same one).
+     *  - fsrsReps increments move through the pool in order (A -> B -> C ->
+     *    A ...), satisfying the "first A, second B, third C" contract.
+     *  - fsrsLapses increments shift the starting offset so a failed review
+     *    shows a different example (lapse → different example next time).
+     *
+     * This is a deterministic linear rotation, not a hash. The same
+     * (cardId, reps, lapses) always yields the same index, but incrementing
+     * reps or lapses always shifts to the next example in the pool.
+     *
+     * The $dayOfYear parameter is retained for backward compatibility but
+     * is no longer used: linear rotation does not need date-based shifting
+     * because reps/lapses already change across reviews.
      */
-    public function pickQuestionIndex(int $total, int $reviewCardId, int $fsrsReps, ?int $dayOfYear = null): int
+    public function pickQuestionIndex(int $total, int $reviewCardId, int $fsrsReps, int $fsrsLapses = 0, ?int $dayOfYear = null): int
     {
         if ($total <= 0) {
             return 0;
@@ -147,17 +158,14 @@ class WordSenseExamplePoolService
             return 0;
         }
 
-        $dayOfYear = $dayOfYear ?? (int) now()->format('z');
-        $seed = ($reviewCardId * 31) + ($fsrsReps * 7) + $dayOfYear;
-        $hash = abs(crc32((string) $seed));
-        return $hash % $total;
+        return ($reviewCardId + $fsrsReps + $fsrsLapses) % $total;
     }
 
     /**
      * Deterministically pick a supplementary example index that differs from
      * the question index. Returns null when there is only one candidate.
      */
-    public function pickSupplementaryIndex(int $total, int $questionIndex, int $reviewCardId, int $fsrsReps, ?int $dayOfYear = null): ?int
+    public function pickSupplementaryIndex(int $total, int $questionIndex, int $reviewCardId, int $fsrsReps, int $fsrsLapses = 0, ?int $dayOfYear = null): ?int
     {
         if ($total < 2) {
             return null;
@@ -166,7 +174,7 @@ class WordSenseExamplePoolService
         $dayOfYear = $dayOfYear ?? (int) now()->format('z');
         // Offset seed so supplementary selection is independent of question
         // selection while still stable for the day.
-        $seed = ($reviewCardId * 17) + ($fsrsReps * 13) + $dayOfYear + 1009;
+        $seed = ($reviewCardId * 17) + ($fsrsReps * 13) + ($fsrsLapses * 5) + $dayOfYear + 1009;
         $hash = abs(crc32((string) $seed));
         $candidate = $hash % $total;
 
