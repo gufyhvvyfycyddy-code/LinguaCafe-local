@@ -1,6 +1,6 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (SenseReview modularization round).
+> **Status**: Current as of 2026-07-10 (daily summary + batch feedback round).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
 
@@ -66,7 +66,16 @@ The container does **not**:
 - **Owns**: form state, pre-fills on dialog open.
 - **Constraints**: calls `PATCH /review-cards/manage/{id}` on save. No direct FSRS/ReviewLog modifications.
 
-### 2.6 SenseReviewSessionTracker.js (~122 lines)
+### 2.6 SenseReviewTodaySummary.vue (~210 lines)
+
+**Responsibility**: Daily cross-session summary display (今日复习总结). Distinct from `SenseReviewSessionSummary` (本次复习总结) which is page-load-scoped.
+
+- **Props**: `summary` (Object from `GET /reviews/senses/today-summary`).
+- **Emits**: `close`.
+- **Constraints**: pure presentational. No API calls, no ReviewLog writes, no FSRS modifications, no card queue mutations. Parent loads the data and passes it in. Empty state shows "今天还没有完成词义卡复习。" with no fake charts.
+- **Content**: timezone/day/day_start/day_end, total_reviews, distinct_senses, 4-rating distribution, forget_rate (null when empty), focus_senses (max 10, aggregated by sense), recent_reviews (max 10, newest first).
+
+### 2.7 SenseReviewSessionTracker.js (~122 lines)
 
 **Responsibility**: Pure-function session tracker (no Vue dependency).
 
@@ -92,18 +101,52 @@ The container does **not**:
 - **Owns**: example selection, occurrence evidence merge, understanding_aid normalization, FSRS field passthrough.
 - **Constraints**: does NOT directly query ReviewLog. Does NOT own rating label logic. Payload shape and semantics remain 100% backward-compatible.
 
-## 4. Props / Events Contract Summary
+### 3.3 SenseReviewTodaySummaryService.php (~200 lines)
+
+**Responsibility**: Read-only cross-session daily aggregate for the "今日复习总结" feature. Distinct from `SenseReviewLearningFeedbackService` (per-card history) — this service aggregates across ALL cards for the current user/language/today.
+
+- **Public method**: `build(int $userId, string $language): array`.
+- **Reuses**: `SenseReviewQueryService::nonResetSenseReviewLogQuery()` for the shared sense-only / user-isolated / language-isolated / reset-excluded log base. This guarantees the reset exclusion rule is identical to `ReviewStatsService::reviewActivity()` and `SenseReviewLearningFeedbackService`.
+- **Computes**: timezone/day/day_start/day_end, total_reviews, distinct_senses, 4-rating distribution, forget_rate (null when empty), focus_senses (max 10, aggregated by sense_id), recent_reviews (max 10, newest first).
+- **Day boundary**: `Carbon::today($timezone)` (00:00:00) to `Carbon::tomorrow($timezone)` (exclusive). Timezone = `config('app.timezone', 'UTC')`. No user timezone introduced this round.
+- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table.
+
+### 3.4 SenseReviewTodaySummary endpoint
+
+- **Route**: `GET /reviews/senses/today-summary`.
+- **Controller**: `SenseReviewController::todaySummary()` — thin: reads user + language, delegates to service, returns JSON.
+- **Auth**: required (middleware). Strict user + language isolation (enforced by service via `SenseReviewQueryService`).
+- **No writes**: does not write ReviewLog, does not change ReviewCard/FSRS, does not create WordSense/ReviewCard.
+
+## 4. Session Summary vs Today Summary
+
+**Session summary (本次复习总结)**:
+- Source: `SenseReviewSessionTracker.js` (pure frontend, page-load scoped).
+- Resets on page refresh.
+- Tracks only ratings that happened AFTER the page was opened.
+- No backend call, no persistence.
+
+**Today summary (今日复习总结)**:
+- Source: backend `ReviewLog` via `GET /reviews/senses/today-summary`.
+- Cross-session: merges ALL of today's real ratings across multiple page sessions.
+- Persists across page refreshes (uses ReviewLog as source of truth).
+- Read-only: never writes ReviewLog, never touches FSRS.
+
+Both coexist on the SenseReview page with clearly distinct wording.
+
+## 5. Props / Events Contract Summary
 
 | Component | Props | Emits |
 |-----------|-------|-------|
 | LearningFeedbackPanel | learningFeedback, fsrsStability | — |
 | RatingControls | disabled | rating(again\|hard\|good\|easy) |
 | SessionSummary | stats, needsAttention | continue-review, exit |
+| TodaySummary | summary | close |
 | UnderstandingAid | aid | — |
 | EditDialog | value (v-model), card | input, saved |
 | SessionTracker | (pure functions, not a component) | — |
 
-## 5. N+1 Risk Assessment
+## 6. N+1 Risk Assessment
 
 **Current state**: `SenseReviewLearningFeedbackService::buildForCard()` queries ReviewLog per card (one query per serialized card). When the `/reviews/senses` endpoint serializes N due cards, this produces N ReviewLog queries.
 
@@ -111,16 +154,9 @@ The container does **not**:
 
 **Current mitigation**: Review queues are typically small (daily due cards, capped by `daily_review_limit`). The per-card query is indexed by `review_card_id` and returns a small result set (latest 6 non-reset logs).
 
-**Batch optimization (NOT implemented this round)**: A future round could add a `buildForCards(array $reviewCardIds): array` method that batch-loads ReviewLogs for all due cards in a single query. This would require:
-1. No change to public payload shape.
-2. No change to Controller routes.
-3. No change to ReviewLog/FSRS semantics.
-4. A query-count regression test.
-5. Architecture review approval.
+**Batch optimization (Task B, this round)**: A `buildForCards(array $reviewCardIds): array` method batch-loads ReviewLogs for all due cards in a single query. See section 7 for details.
 
-**Recorded as**: Next-round P1 architecture candidate.
-
-## 6. Next-Round Architecture Candidates
+## 7. Next-Round Architecture Candidates
 
 1. **Batch ReviewLog aggregation** — eliminate per-card N+1 in queue serialization.
 2. **Source context batch loading** — `SenseSourceContextService::sourceContextList` currently loads chapter data per source; could batch for multi-source cards.

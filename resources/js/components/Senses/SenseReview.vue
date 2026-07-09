@@ -40,6 +40,12 @@
             <div v-if="hasReviewed && !showSessionSummary" class="text-center mt-3">
                 <v-btn small text color="primary" @click="endSession">结束本次复习</v-btn>
             </div>
+            <!-- Today summary entry: always available from the stats area so
+                 the user can check today's cumulative reviews without ending
+                 the current session. Read-only, never writes ReviewLog. -->
+            <div class="text-center mt-2">
+                <v-btn small text color="info" @click="openTodaySummary">查看今日复习总结</v-btn>
+            </div>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -54,6 +60,22 @@
             @continue-review="continueReview"
             @exit-review="exitReview"
         />
+        <!-- Today summary entry on the session-summary screen. Lets the user
+             view today's cumulative reviews before continuing or leaving. -->
+        <div v-if="showSummaryView" class="text-center mt-2">
+            <v-btn small text color="info" @click="openTodaySummary">查看今日复习总结</v-btn>
+        </div>
+
+        <!-- Today summary dialog (cross-session daily aggregate). Read-only:
+             the component only renders backend data and emits 'close'. It
+             never writes ReviewLog, never touches FSRS, never creates cards. -->
+        <v-dialog v-model="showTodaySummary" max-width="720">
+            <SenseReviewTodaySummary
+                v-if="showTodaySummary"
+                :summary="todaySummary"
+                @close="closeTodaySummary"
+            />
+        </v-dialog>
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
             <!-- Lemma / surface form / pos -->
@@ -313,6 +335,7 @@
     import SenseReviewRatingControls from './SenseReviewRatingControls.vue';
     import SenseReviewUnderstandingAid from './SenseReviewUnderstandingAid.vue';
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
+    import SenseReviewTodaySummary from './SenseReviewTodaySummary.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
 
     /**
@@ -345,6 +368,7 @@
             SenseReviewRatingControls,
             SenseReviewUnderstandingAid,
             SenseReviewEditDialog,
+            SenseReviewTodaySummary,
         },
         data: function() {
             return {
@@ -407,6 +431,24 @@
                 // never writes ReviewLog and never touches FSRS.
                 session: SessionTracker.createSession(),
                 showSessionSummary: false,
+                // Today summary: cross-session daily aggregate loaded from
+                // the backend GET /reviews/senses/today-summary endpoint.
+                // Read-only — opening/closing never writes ReviewLog, never
+                // touches FSRS, never changes the card queue.
+                showTodaySummary: false,
+                todaySummaryLoading: false,
+                todaySummary: {
+                    timezone: '',
+                    day: '',
+                    day_start: '',
+                    day_end: '',
+                    total_reviews: 0,
+                    distinct_senses: 0,
+                    distribution: { again: 0, hard: 0, good: 0, easy: 0 },
+                    forget_rate: null,
+                    focus_senses: [],
+                    recent_reviews: [],
+                },
             }
         },
         computed: {
@@ -754,6 +796,27 @@
             },
             exitReview() {
                 window.location.href = '/review-cards/manage';
+            },
+            // ==================== Today summary ====================
+            // Read-only daily aggregate. Opening this never writes ReviewLog,
+            // never touches FSRS, never changes the card queue. The user can
+            // close it and continue reviewing.
+            openTodaySummary() {
+                this.showTodaySummary = true;
+                this.todaySummaryLoading = true;
+                axios.get('/reviews/senses/today-summary')
+                    .then((response) => {
+                        this.todaySummary = response.data;
+                    })
+                    .catch(() => {
+                        this.showSnackbar('今日总结加载失败。', 'error');
+                    })
+                    .finally(() => {
+                        this.todaySummaryLoading = false;
+                    });
+            },
+            closeTodaySummary() {
+                this.showTodaySummary = false;
             },
             // ==================== Snackbar ====================
             showSnackbar(text, color) {

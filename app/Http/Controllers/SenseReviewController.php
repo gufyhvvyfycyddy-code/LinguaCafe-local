@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Services\ReviewCardService;
 use App\Services\SenseReviewCardSerializerService;
 use App\Services\SenseReviewService;
+use App\Services\SenseReviewTodaySummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -16,6 +17,7 @@ class SenseReviewController extends Controller
         private ReviewCardService $reviewCardService,
         private HomeController $homeController,
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
+        private SenseReviewTodaySummaryService $senseReviewTodaySummaryService,
     ) {
     }
 
@@ -67,5 +69,25 @@ class SenseReviewController extends Controller
             'next_card' => $nextCard ? $this->senseReviewCardSerializerService->serialize($nextCard) : null,
             'summary' => $result['summary'],
         ]);
+    }
+
+    /**
+     * SenseReview-TodaySummary-1000-1
+     *
+     * Read-only daily sense review summary. Aggregates ALL of today's real
+     * sense-card ratings across multiple page sessions (unlike the ephemeral
+     * session summary which resets on page reload). Source of truth: ReviewLog.
+     *
+     * Controller stays thin: read current user + language, delegate to
+     * SenseReviewTodaySummaryService, return JSON. No writes, no FSRS changes.
+     */
+    public function todaySummary(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $summary = $this->senseReviewTodaySummaryService->build($userId, $language);
+
+        return response()->json($summary);
     }
 }
