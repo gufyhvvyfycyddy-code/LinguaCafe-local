@@ -32,8 +32,12 @@ class SenseReviewController extends Controller
         $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
         $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
 
+        // SenseReview-BatchFeedback-1000-1: serialize the queue with a single
+        // batch ReviewLog query instead of N per-card queries. The serializer
+        // loads all feedback in one go via buildForCards(); payload shape is
+        // unchanged.
         return response()->json([
-            'cards' => $result['cards']->map(fn (ReviewCard $card) => $this->senseReviewCardSerializerService->serialize($card))->values(),
+            'cards' => $this->senseReviewCardSerializerService->serializeMany($result['cards']),
             'summary' => $result['summary'],
         ]);
     }

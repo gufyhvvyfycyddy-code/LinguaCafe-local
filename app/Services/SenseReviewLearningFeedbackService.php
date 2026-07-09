@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewLog;
+use Illuminate\Support\Collection;
 
 /**
  * SenseReviewLearningFeedbackService
@@ -14,7 +15,7 @@ use App\Models\ReviewLog;
  * so the serializer no longer directly queries ReviewLog.
  *
  * Responsibilities:
- *  - Aggregate non-reset ReviewLog rows for a single review card.
+ *  - Aggregate non-reset ReviewLog rows for one or many review cards.
  *  - Compute total / again / hard / good / easy counts.
  *  - Build the latest-5 recent_reviews list (newest first).
  *  - Compute forgetting_pattern: forget_rate, last_forget_date, trend.
@@ -26,6 +27,8 @@ use App\Models\ReviewLog;
  *    exactly one user).
  *  - Reset-type logs (rating='reset' OR source='reset') are excluded,
  *    matching SenseReviewQueryService::nonResetSenseReviewLogQuery.
+ *  - buildForCard() and buildForCards() share ONE algorithm via
+ *    buildFeedbackFromLogs() — no duplicated aggregation logic.
  */
 class SenseReviewLearningFeedbackService
 {
@@ -45,9 +48,10 @@ class SenseReviewLearningFeedbackService
     /**
      * Build the read-only learning feedback aggregate for one review card.
      *
-     * Pulls only from the ReviewLog table; never writes. Excludes reset-type
-     * logs (rating='reset' OR source='reset') so the aggregate reflects real
-     * review attempts only, matching nonResetSenseReviewLogQuery.
+     * Delegates to buildForCards() so the aggregation algorithm lives in
+     * exactly one place (single source of truth). This keeps the per-card
+     * path backward-compatible while eliminating the old 7-query-per-card
+     * pattern: a single-card call now issues exactly 1 ReviewLog query.
      *
      * Shape:
      *   total_reviews:        int   — count of non-reset logs for this card
@@ -68,23 +72,108 @@ class SenseReviewLearningFeedbackService
      */
     public function buildForCard(int $reviewCardId): array
     {
-        $baseQuery = ReviewLog::query()
-            ->where('review_card_id', $reviewCardId)
+        $map = $this->buildForCards([$reviewCardId]);
+
+        return $map[$reviewCardId] ?? $this->emptyFeedback();
+    }
+
+    /**
+     * Build the read-only learning feedback aggregate for many review cards
+     * in a SINGLE batch ReviewLog query, eliminating the per-card N+1 that
+     * occurred when serializing the review queue.
+     *
+     * SenseReview-BatchFeedback-1000-1
+     *
+     * One query loads all non-reset ReviewLog rows for the target cards
+     * (newest-first). The rows are then grouped by review_card_id in memory
+     * and each card's feedback is computed by the shared
+     * buildFeedbackFromLogs() helper — the same algorithm used by
+     * buildForCard(). Cards with no logs receive the stable empty structure.
+     *
+     * Query count: exactly 1 ReviewLog query regardless of how many card
+     * ids are passed (0 when the list is empty).
+     *
+     * @param  array<int>  $reviewCardIds  Card ids to aggregate. Duplicates
+     *                                      are de-duplicated; each id appears
+     *                                      exactly once in the result map.
+     * @return array<int, array>  Map of review_card_id => feedback payload.
+     *                            Empty array when $reviewCardIds is empty.
+     */
+    public function buildForCards(array $reviewCardIds): array
+    {
+        // Normalize + de-duplicate ids (preserve int keys in the result map).
+        $ids = [];
+        foreach ($reviewCardIds as $id) {
+            $id = (int) $id;
+            if ($id > 0 && !isset($ids[$id])) {
+                $ids[$id] = $id;
+            }
+        }
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        // Single batch query: all non-reset logs for the target cards,
+        // ordered newest-first so the in-memory slicing (recent_reviews,
+        // trend, last_forget_date) matches buildForCard's ordering exactly.
+        $logs = ReviewLog::query()
+            ->whereIn('review_card_id', array_values($ids))
             ->where('rating', '!=', 'reset')
-            ->where('source', '!=', 'reset');
-
-        $total = (clone $baseQuery)->count();
-        $forgetCount = (clone $baseQuery)->where('rating', 'again')->count();
-        $hardCount = (clone $baseQuery)->where('rating', 'hard')->count();
-        $goodCount = (clone $baseQuery)->where('rating', 'good')->count();
-        $easyCount = (clone $baseQuery)->where('rating', 'easy')->count();
-
-        $recent = (clone $baseQuery)
+            ->where('source', '!=', 'reset')
             ->orderByDesc('reviewed_at')
             ->orderByDesc('id')
-            ->limit(5)
-            ->get(['rating', 'reviewed_at']);
+            ->get(['id', 'review_card_id', 'rating', 'reviewed_at']);
 
+        // Group by card id; groupBy preserves the within-group order from
+        // the query (newest-first), which is what buildFeedbackFromLogs
+        // expects.
+        $logsByCard = $logs->groupBy('review_card_id');
+
+        $result = [];
+        foreach ($ids as $cardId) {
+            $cardLogs = $logsByCard->get($cardId, collect());
+            $result[$cardId] = $this->buildFeedbackFromLogs($cardLogs);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Shared aggregation algorithm used by both buildForCard() and
+     * buildForCards(). This is the SINGLE source of truth for the feedback
+     * payload shape, rating counts, recent_reviews slicing, forget rate,
+     * last_forget_date, and trend computation.
+     *
+     * @param  Collection  $logs  Non-reset logs for one card, ordered
+     *                            newest-first (reviewed_at desc, id desc).
+     * @return array{total_reviews: int, forget_count: int, hard_count: int,
+     *               good_count: int, easy_count: int, recent_reviews: list,
+     *               recent_forget_count: int, forgetting_pattern: array}
+     */
+    private function buildFeedbackFromLogs(Collection $logs): array
+    {
+        $total = $logs->count();
+
+        $forgetCount = 0;
+        $hardCount = 0;
+        $goodCount = 0;
+        $easyCount = 0;
+        foreach ($logs as $log) {
+            $rating = $log->rating;
+            if ($rating === 'again') {
+                $forgetCount++;
+            } elseif ($rating === 'hard') {
+                $hardCount++;
+            } elseif ($rating === 'good') {
+                $goodCount++;
+            } elseif ($rating === 'easy') {
+                $easyCount++;
+            }
+        }
+
+        // recent_reviews: latest 5, newest-first (logs are already ordered).
+        $recent = $logs->take(5);
         $recentReviews = [];
         $recentForgetCount = 0;
         foreach ($recent as $log) {
@@ -102,24 +191,20 @@ class SenseReviewLearningFeedbackService
         // forget_rate = again_count / total_reviews (0.0 when no reviews).
         $forgetRate = $total > 0 ? round($forgetCount / $total, 4) : 0.0;
 
-        // Most recent 'again' log date (Y-m-d), null when never forgotten.
-        $lastAgain = (clone $baseQuery)
-            ->where('rating', 'again')
-            ->orderByDesc('reviewed_at')
-            ->orderByDesc('id')
-            ->first();
-        $lastForgetDate = $lastAgain?->reviewed_at?->format('Y-m-d');
+        // Most recent 'again' log date (logs are newest-first, so the first
+        // 'again' row is the last forget date).
+        $lastForgetDate = null;
+        foreach ($logs as $log) {
+            if ($log->rating === 'again') {
+                $lastForgetDate = $log->reviewed_at?->format('Y-m-d');
+                break;
+            }
+        }
 
-        // Trend: take the latest 6 non-reset logs (newest first), reverse to
+        // Trend: take the latest 6 non-reset logs (newest-first), reverse to
         // old→new, then split into early/late halves and compare 'again'
         // counts. <4 logs → 'insufficient' (not enough to compare halves).
-        $trendLogs = (clone $baseQuery)
-            ->orderByDesc('reviewed_at')
-            ->orderByDesc('id')
-            ->limit(6)
-            ->get(['rating'])
-            ->reverse()
-            ->values();
+        $trendLogs = $logs->take(6)->reverse()->values();
         $trend = $this->computeForgettingTrend($trendLogs);
 
         return [
@@ -136,6 +221,31 @@ class SenseReviewLearningFeedbackService
                 'forget_rate' => $forgetRate,
                 'last_forget_date' => $lastForgetDate,
                 'trend' => $trend,
+            ],
+        ];
+    }
+
+    /**
+     * Stable empty feedback structure returned when a card has no non-reset
+     * ReviewLog rows. Matches the shape produced by buildFeedbackFromLogs()
+     * with an empty collection.
+     */
+    private function emptyFeedback(): array
+    {
+        return [
+            'total_reviews' => 0,
+            'forget_count' => 0,
+            'hard_count' => 0,
+            'good_count' => 0,
+            'easy_count' => 0,
+            'recent_reviews' => [],
+            'recent_forget_count' => 0,
+            'forgetting_pattern' => [
+                'total_forget' => 0,
+                'recent_forget_count' => 0,
+                'forget_rate' => 0.0,
+                'last_forget_date' => null,
+                'trend' => 'insufficient',
             ],
         ];
     }

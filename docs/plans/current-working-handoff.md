@@ -859,3 +859,69 @@
 不自动进入下一任务。
 
 - Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReviewTodaySummary-1
+
+**日期**：2026-07-10
+**基线 commit**：`b1ba6a2 refactor: modularize sense review feedback and controls`
+**最终 commit**：`0f6890b feat: add daily sense review summary`
+
+### 本轮目标
+
+新增「今日复习总结」，把同一个自然日内多次页面会话产生的真实词义卡评分合并展示，与已有「本次复习总结」明确区分。
+
+### 交付物
+
+- `SenseReviewTodaySummaryService.php`（~200 行，只读，复用 SenseReviewQueryService）
+- `GET /reviews/senses/today-summary` 路由 + Controller 薄方法
+- `SenseReviewTodaySummary.vue`（~210 行，纯展示，emit close）
+- SenseReview.vue 集成入口按钮（统计区 + 本次总结页 + 队列清空页）
+- 18 项后端测试 + 10 项 Node guard 测试
+
+### 结论：Accept
+
+### 安全边界
+
+- 不改 FSRS；不写 ReviewLog（除用户评分）；不新增 migration；不读取/修改/提交 `.env`。
+
+---
+
+## Recent Update: GLM-SenseReviewBatchFeedback-1
+
+**日期**：2026-07-10
+**基线 commit**：`0f6890b feat: add daily sense review summary`
+**最终 commit**：本轮 pending（perf: batch sense review learning feedback queries）
+
+### 本轮目标
+
+消除 SenseReview 学习反馈的 ReviewLog N+1 查询。原 `buildForCard()` 每张卡 ~7 条查询，20 张卡 = ~140 条。本轮新增 `buildForCards()` 批量方法，将整个队列的 ReviewLog 查询降至常数级（1 条）。
+
+### 交付物
+
+- `SenseReviewLearningFeedbackService::buildForCards(array): array` — 一次查询，内存聚合，单一事实来源（共享 `buildFeedbackFromLogs()`）
+- `SenseReviewCardSerializerService::serializeMany(Collection): array` — 批量序列化，预计算 feedback map
+- `SenseReviewController::index()` 改用 `serializeMany()`
+- `buildForCard()` 委托 `buildForCards([$id])`（向后兼容，单卡也从 7 条降至 1 条）
+- 22 项测试（含查询数量锁定：1/5/20 张卡均为 1 条 review_logs 查询）
+
+### 查询数量优化前后
+
+| 场景 | 优化前 | 优化后 |
+|------|--------|--------|
+| 1 张卡 | ~7 | 1 |
+| 5 张卡 | ~35 | 1 |
+| 20 张卡 | ~140 | 1 |
+
+### 结论：Accept
+
+### 安全边界
+
+- 不改 FSRS；不写 ReviewLog（除用户评分）；不新增 migration；不修改公开 payload 语义；不读取/修改/提交 `.env`。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.

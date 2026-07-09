@@ -84,20 +84,27 @@ The container does **not**:
 
 ## 3. Backend Service Boundaries
 
-### 3.1 SenseReviewLearningFeedbackService.php (~181 lines)
+### 3.1 SenseReviewLearningFeedbackService.php (~280 lines)
 
-**Responsibility**: Single source of truth for ReviewLog aggregation and learning feedback computation.
+**Responsibility**: Single source of truth for ReviewLog aggregation and learning feedback computation. Supports both single-card and batch paths via a shared `buildFeedbackFromLogs()` algorithm.
 
-- **Public method**: `buildForCard(int $reviewCardId): array`.
-- **Computes**: total_reviews, again/hard/good/easy counts, recent_reviews, forgetting_pattern (total_forget, forget_rate, last_forget_date, trend).
+- **Public methods**:
+  - `buildForCard(int $reviewCardId): array` — delegates to `buildForCards([$id])` (single source of truth).
+  - `buildForCards(array $reviewCardIds): array` — batch path: ONE ReviewLog query for all cards, in-memory aggregation by `review_card_id`. Returns `[review_card_id => feedback_payload]`.
+- **Shared algorithm**: `buildFeedbackFromLogs(Collection $logs)` — used by both public methods. No duplicated aggregation logic.
+- **Computes**: total_reviews, again/hard/good/easy counts, recent_reviews (latest 5), forgetting_pattern (total_forget, forget_rate, last_forget_date, trend).
 - **Constants**: `RATING_LABELS` (again→忘了, hard→勉强, good→记得, easy→很熟).
-- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS fields. Excludes reset-type logs (rating='reset' OR source='reset'). User/card isolation via review_card_id scoping.
+- **Query profile**: `buildForCards()` issues exactly 1 ReviewLog query regardless of card count (0 for empty input). `buildForCard()` issues 1 query (down from 7 before optimization).
+- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS fields. Excludes reset-type logs (rating='reset' OR source='reset'). User/card isolation via review_card_id scoping. Duplicate ids in input are de-duplicated.
 
-### 3.2 SenseReviewCardSerializerService.php (~266 lines)
+### 3.2 SenseReviewCardSerializerService.php (~310 lines)
 
 **Responsibility**: Assemble the final card payload for `/reviews/senses` and `rate()`.
 
-- **Delegates**: `learning_feedback` computation to `SenseReviewLearningFeedbackService::buildForCard()`.
+- **Public methods**:
+  - `serialize(ReviewCard $card, array $options = []): array` — single-card path. Accepts optional `learning_feedback` in `$options` to skip the per-card query.
+  - `serializeMany(Collection $cards, array $options = []): array` — batch path: calls `buildForCards()` once, passes the precomputed feedback map to each `serialize()` call. Exactly 1 ReviewLog query regardless of card count.
+- **Delegates**: `learning_feedback` computation to `SenseReviewLearningFeedbackService`.
 - **Owns**: example selection, occurrence evidence merge, understanding_aid normalization, FSRS field passthrough.
 - **Constraints**: does NOT directly query ReviewLog. Does NOT own rating label logic. Payload shape and semantics remain 100% backward-compatible.
 
@@ -148,17 +155,25 @@ Both coexist on the SenseReview page with clearly distinct wording.
 
 ## 6. N+1 Risk Assessment
 
-**Current state**: `SenseReviewLearningFeedbackService::buildForCard()` queries ReviewLog per card (one query per serialized card). When the `/reviews/senses` endpoint serializes N due cards, this produces N ReviewLog queries.
+**Status**: RESOLVED (SenseReview-BatchFeedback-1000-1).
 
-**Risk level**: P1 (potential N+1 for large review queues).
+**Before optimization**: `SenseReviewLearningFeedbackService::buildForCard()` issued ~7 ReviewLog queries per card (count + 4 rating counts + recent + last_forget + trend). When the `/reviews/senses` endpoint serialized N due cards, this produced ~7N ReviewLog queries.
 
-**Current mitigation**: Review queues are typically small (daily due cards, capped by `daily_review_limit`). The per-card query is indexed by `review_card_id` and returns a small result set (latest 6 non-reset logs).
+**After optimization**: `SenseReviewCardSerializerService::serializeMany()` calls `SenseReviewLearningFeedbackService::buildForCards()` which issues exactly 1 ReviewLog query for all cards. `buildForCard()` also delegates to `buildForCards()`, so the single-card path now issues 1 query (down from 7).
 
-**Batch optimization (Task B, this round)**: A `buildForCards(array $reviewCardIds): array` method batch-loads ReviewLogs for all due cards in a single query. See section 7 for details.
+**Query count verification** (locked by `SenseReviewBatchFeedbackTest`):
+- 1 card → 1 review_logs query
+- 5 cards → 1 review_logs query
+- 20 cards → 1 review_logs query
+- Constant regardless of card count.
+
+**Controller integration**: `SenseReviewController::index()` uses `serializeMany()` for the initial queue load. `rate()` uses `serialize()` for reviewed_card + next_card (2 single-card calls = 2 queries, acceptable per spec).
+
+**Shared algorithm**: Both `buildForCard()` and `buildForCards()` delegate to the private `buildFeedbackFromLogs(Collection)` method — single source of truth, no duplicated aggregation logic.
 
 ## 7. Next-Round Architecture Candidates
 
-1. **Batch ReviewLog aggregation** — eliminate per-card N+1 in queue serialization.
-2. **Source context batch loading** — `SenseSourceContextService::sourceContextList` currently loads chapter data per source; could batch for multi-source cards.
-3. **Session summary persistence** — if users request cross-refresh session continuity, consider sessionStorage (still no DB writes).
-4. **Understanding aid occurrence-level evidence** — further merge occurrence-level `explanation` and `meaning_boundary` (currently sense-level only for these two fields).
+1. **Source context batch loading** — `SenseSourceContextService::sourceContextList` currently loads chapter data per source; could batch for multi-source cards.
+2. **Session summary persistence** — if users request cross-refresh session continuity, consider sessionStorage (still no DB writes).
+3. **Understanding aid occurrence-level evidence** — further merge occurrence-level `explanation` and `meaning_boundary` (currently sense-level only for these two fields).
+4. **Historical daily calendar** — extend today summary to arbitrary dates (not implemented this round per spec).

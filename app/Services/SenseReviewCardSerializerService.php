@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use Illuminate\Support\Collection;
 
 /**
  * SenseReviewCardSerializerService
@@ -82,7 +83,10 @@ class SenseReviewCardSerializerService
      *     currently bound to this sense (occurrences + card fallback).
      *   - example_source_status: 'occurrence' | 'card_fallback' | 'empty'.
      *
-     * @param  array  $options  Optional: ['preferred_occurrence_id' => int|null]
+     * @param  array  $options  Optional: ['preferred_occurrence_id' => int|null,
+     *                          'learning_feedback' => array|null (precomputed
+     *                          feedback payload; when present the serializer
+     *                          skips the per-card buildForCard() call)]
      * @return array{review_card_id: int, word_sense_id: int, lemma: string, ...}
      */
     public function serialize(ReviewCard $card, array $options = []): array
@@ -184,8 +188,54 @@ class SenseReviewCardSerializerService
             // FSRS field. Multi-user isolation is guaranteed by
             // review_card_id scoping (a card belongs to exactly one user).
             // Reset-type logs are excluded. Payload shape is unchanged.
-            'learning_feedback' => $this->feedbackService->buildForCard($card->id),
+            //
+            // SenseReview-BatchFeedback-1000-1: when the caller supplies a
+            // precomputed 'learning_feedback' in $options (produced by
+            // buildForCards()), the serializer reuses it instead of issuing
+            // a per-card query. This is how serializeMany() eliminates the
+            // N+1 on the initial queue load.
+            'learning_feedback' => $options['learning_feedback']
+                ?? $this->feedbackService->buildForCard($card->id),
         ];
+    }
+
+    /**
+     * Serialize a collection of ReviewCards into the frontend review card
+     * payload list, using a SINGLE batch ReviewLog query for all cards'
+     * learning feedback.
+     *
+     * SenseReview-BatchFeedback-1000-1
+     *
+     * This eliminates the per-card N+1 that occurred when the controller
+     * mapped serialize() over the due-card queue. The batch query is issued
+     * once via SenseReviewLearningFeedbackService::buildForCards(); each
+     * card's precomputed feedback is then passed into serialize() via the
+     * 'learning_feedback' option so the serializer never re-queries
+     * ReviewLog.
+     *
+     * Query profile: exactly 1 ReviewLog query regardless of card count
+     * (0 when the collection is empty). This is a constant-time improvement
+     * over the old N-query pattern.
+     *
+     * @param  Collection  $cards   ReviewCards with loaded 'sense' relation.
+     * @param  array       $options Optional: ['preferred_occurrence_id' => int|null]
+     * @return list<array>  Serialized payloads, same shape as serialize().
+     */
+    public function serializeMany(Collection $cards, array $options = []): array
+    {
+        if ($cards->isEmpty()) {
+            return [];
+        }
+
+        $cardIds = $cards->map(fn (ReviewCard $card) => $card->id)->all();
+        $feedbackMap = $this->feedbackService->buildForCards($cardIds);
+
+        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $options) {
+            $perCardOptions = $options;
+            $perCardOptions['learning_feedback'] = $feedbackMap[$card->id] ?? null;
+
+            return $this->serialize($card, $perCardOptions);
+        })->values()->all();
     }
 
     /**
