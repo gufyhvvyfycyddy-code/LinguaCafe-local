@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-09 (SenseReviewContextualUnderstanding-1000-10: occurrence-level evidence merge + smart example selection).
+> **最后更新**：2026-07-10 (SenseReviewSessionSummary + SenseReviewModularization: session summary feature + module split into 5 sub-components + learning feedback service extraction).
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -84,6 +84,9 @@
 | GM52-SenseSourceContextFollowDisplayedOccurrence-1000-7 | Sense source context 跟随 displayed occurrence。本轮同轮完成现状检测 + 编码，关闭上一轮 P2（查看原文/译文未跟随当前复习例句）。**现状检测事实**：`SenseReviewCardSerializerService` 已返回 `displayed_occurrence_id` / `occurrence_count` / `example_source_status`；`SenseReview.vue` 点击「查看原文」未传 `preferred_occurrence_id`；source context 路由 `GET /senses/{id}/source-context-list`；`SenseOccurrenceController::sourceContextList` 不读 query 参数；`SenseSourceContextService::sourceContextList` 不支持指定 occurrence；`SenseSourceContextResolverService` 有 `findChapterById` 等 helper 可复用；`WordSenseOccurrence` 有 `STATUS_BOUND` 常量可按 user/language/sense_id/occurrence_id 安全查询；source dialog 已支持多 sources carousel；返回 sources 时无 `occurrence_id` 字段；测试未覆盖「查看原文跟随当前显示例句」；MCP Chrome 可复现：当前显示例句与查看原文第一条来源不一致。**产品规则冻结**：6 条规则（当前显示例句优先 / 必须安全校验 occurrence / 失败时保留原 fallback 链 / source list 第一条必须是 preferred / 不新增复杂 UI / More 菜单危险操作顺手视觉分隔）。**后端实现**：`SenseSourceContextService::sourceContextList()` 新增可选 `?int $preferredOccurrenceId = null` 参数 + `resolvePreferredOccurrence()` 私有方法（严格校验 user/language/sense_id/status=bound，无效返回 null）；preferred 有效且有 chapter 时构建 source context 放在 sources[0] 并标记 `preferred_occurrence_status='matched'`；preferred 无效/无 chapter 时标记 `invalid` / `fallback` 并走原 fallback 链（chapter → chapter_recovered → chapter_title → chapter_fuzzy → chapter_fuzzy_title → card_example → unavailable）；新增 `$usedChapterIds` 数组避免 preferred 与其他 occurrence 共享同一 chapter 时重复展示；返回 payload 新增 `preferred_occurrence_status` 字段。`SenseOccurrenceController::sourceContextList` 读取 `preferred_occurrence_id` query 参数并传给 service。**前端实现**：`SenseReview.vue` `viewSource()` 方法新增 `preferred_occurrence_id` query 参数传递（仅当 `currentCard.displayed_occurrence_id` 存在时）；`sourcePayload` 新增 `preferredOccurrenceStatus` 字段。`SenseExampleDialog.vue` 新增 `preferredHint` computed（matched→"已定位到当前复习例句。" / fallback→"未定位到当前例句，已显示其他可用来源。"）+ 模板顶部 success alert 展示提示。More 菜单「彻底删除」前加 `<v-divider class="my-1" />` 视觉分隔（规则 6，<20 行小改）。**新增测试**：`tests/Feature/SenseSourceContextDisplayedOccurrenceTest.php` 14 项测试（53 assertions）覆盖 valid preferred → sources[0] 是该 occurrence / sources 不重复 preferred / 跨用户 fallback / 跨语言 fallback / 跨 sense fallback / 非 bound 状态 fallback / 无 chapter 不 500 fallback / 无 preferred 参数旧行为不变 / payload 含 preferred_occurrence_status / 不写 ReviewLog / 不改 FSRS / 不创建 legacy word card / 不新增 WordSenseOccurrence / fallback 链仍支持 card_example+unavailable。**自动测试**：14 个套件全绿（443 tests / 0 failures）：SenseSourceContextDisplayedOccurrenceTest 14 passed (53 assertions) / SenseReviewExampleRotationTest 10 passed / SenseMultiExampleBindingTest 13 passed / SenseSourceContext* 全绿 / SenseReview 19 passed / SenseTokenPayloadTest 16 passed / ReviewFsrsTest 63 passed / WordSenseTest 134 passed / AiStudyCardPendingLifecycleTest 15 passed / AiStudyCardPendingItemTest 86 passed / VocabularySideBoxChineseTextIntegrityTest 5 passed / TestingDatabaseHealthConfigTest 6 passed / TestingDatabaseHealthTest 6 passed；`npm run development` 编译成功。**MCP Chrome 真实验收**：宽屏 1920x900 + 半屏 900x900 双 viewport，登录 1816529781@qq.com → /reviews/senses 显示 sense#61 (codex_sense_smoke_20260702_b_confirm_target, occurrence_count=2) → 显示答案 → More 菜单确认 divider 视觉分隔（DOM 验证：6 个子元素，HR.v-divider 位于「重置」与「彻底删除」之间）→ 点击「查看原文」→ Network 确认 `GET /senses/61/source-context-list?preferred_occurrence_id=11 [200]`（前端正确传参）→ source dialog 打开，第一条来源 example 文本与当前卡片显示例句一致 "The marker codex_sense_smoke_20260702_b_confirm appears in this smoke sentence." → 显示 fallback 提示「未定位到当前例句，已显示其他可用来源。」（occ#11 无 chapter_id，正确 fallback 到 chapter_fuzzy_title）→ PHP 脚本验证 sense#68 (occ#19/20) 返回 matched 状态，sources[0].occurrence_id 正确 → 半屏 900x900 dialog fitsWindow=true (852x411.7 在 900x831 内) / hasHScroll=false (scrollWidth=900=clientWidth) / divider 在 900x900 也存在 / Network 全部 127.0.0.1:8000 / Console 仅预期 WebSocket 降级。**WorkBuddy P2 处理**：More 菜单危险操作已做视觉分隔（divider + 红色保留），改动 <20 行；测试数据干扰只记录不清理。**安全边界**：不进入 V6；不自动调 AI；不接 AI provider；不读写 .env；不新增 API key；不写额外 ReviewLog；不改 FSRS；不创建 legacy word ReviewCard；不删除 WordSense/ReviewCard/ReviewLog；不删除 legacy 兼容层；不实现手机端/BottomSheet；不新增 migration；不清库；不 DCP；不 notification script；不处理 .omo/；不提交敏感文件；不把 API 200 当页面验收；不破坏现有 source context fallback 链。** |
 | GLM-SenseReviewUnderstandingAid-1000-7 | SenseReview 理解辅助层（Task 3，sense-level）。在 SenseReview 答案面新增「理解这个词义」可折叠块，帮助用户形成词义边界。新增 migration `2026_07_09_000001_add_understanding_aid_to_word_senses_table.php`（additive-only JSON 列 `understanding_aid`，down() drop column 可逆）；`WordSense` model 新增 `$fillable` + `casts()`；`SenseReviewCardSerializerService::normalizeUnderstandingAid()` 保证 5 字段稳定结构（explanation / meaning_boundary / context_hint / usage_keywords / related_collocations），null/[] 默认值；`SenseReview.vue` 新增 `understandingAidOpen` data + `understandingAid` / `hasUnderstandingAid` computed + 折叠块模板（默认折叠，卡片切换重置，无网络请求，无 ReviewLog/FSRS 影响）；新增 `tests/Feature/SenseReviewUnderstandingAidTest.php` 6 项测试（21 assertions）覆盖 null/empty/部分字段/全字段/折叠不写 ReviewLog/折叠不改 FSRS。自动测试：6 passed (21 assertions) + SenseReview 全量 1 skipped, 244 passed (1001 assertions) + ReviewFsrsTest 63 passed (374 assertions) + FsrsSchedulingServiceTest 9 passed (46 assertions) + npm build 成功。MCP Chrome 真实验收：5 张 sense cards（published/codexmatrix/technology/city/window），理解辅助块默认折叠、点击展开显示 explanation/meaning_boundary/context_hint/usage_keywords、评分按钮/More 菜单/查看原文不受影响、Network 仅 127.0.0.1:8000、ReviewLog 仅 sense_review source。**不改 FSRS；不写 ReviewLog；不创建 legacy word card；不自动调 AI；不新增 migration 之外 schema；不删除 WordSense/ReviewCard/ReviewLog；1000% 是 10 个子阶段合计提升。** |
 | GLM-SenseReviewContextualUnderstanding-1000-10 | SenseReview 智能复习上下文层（Task 4，occurrence-level merge + smart example selection）。把 Task 3 sense-level 理解辅助升级为「sense-level + occurrence-level merged」，让理解辅助跟随当前显示例句，并新增智能例句选择。**后端**：`SenseReviewCardSerializerService::serialize()` 新增 `array $options = []` 参数 + `mergeOccurrenceEvidence()` 私有方法（occurrence `evidence` 中的 `context_hint` / `judgment_basis` / `related_collocations` 非空时覆盖 sense-level 对应字段；`explanation` 与 `meaning_boundary` 始终 sense-level 不被覆盖；override 只在序列化时内存合并，不写数据库）；`normalizeUnderstandingAid()` 新增 `related_collocations` 字段（默认 []）；`WordSenseExamplePoolService::pickQuestionIndexWithContext()` 新增方法支持 `preferred_occurrence_id` 优先匹配 + 线性轮换 fallback `(reviewCardId + fsrsReps + fsrsLapses) % total`；serializer 从请求 options 透传 `preferred_occurrence_id` 到 pool service，再 merge 选中 occurrence 的 evidence。**前端**：`SenseReview.vue` 新增「类似使用」outlined chips 块渲染 `related_collocations`，把「常见搭配关键词」标签改为「判断依据」（匹配 occurrence `judgment_basis` 语义），`hasUnderstandingAid` computed 增加对 `related_collocations` 的检查。**复用已有数据无新 migration**：`WordSenseOccurrence.evidence` JSON 列 pre-existing，本轮仅复用其中 `context_hint` / `judgment_basis` / `related_collocations` 三个 key。**新增测试**：`tests/Feature/SenseReviewContextualUnderstandingTest.php` 8 项测试（23 assertions）覆盖 preferred_occurrence_id 优先匹配 / 无 preferred 时线性轮换 fallback / occurrence evidence override sense-level / explanation 与 meaning_boundary 不被 override / source context 完整 occurrence 优先 / occurrence 不存在 fallback example_sentence / 切换例句不写 ReviewLog / 切换例句不改 FSRS 字段（用 ISO8601 字符串比较避免 Carbon 对象身份问题）。修正 `exampleCandidates()` id DESC 排序假设：candidates[0] 是最高 id（最新创建），不是最低 id。**自动测试**：SenseReviewContextualUnderstandingTest 8 passed (23 assertions) / SenseReviewUnderstandingAidTest 6 passed (21 assertions) / ReviewFsrsTest 63 passed (374 assertions) / FsrsSchedulingServiceTest 9 passed (46 assertions) / SenseReview 全量 1 skipped, 244 passed (1001 assertions) / npm build 成功（5.42s，7.37 MiB app.js）。**MCP Chrome 真实验收**：登录 1816529781@qq.com → /reviews/senses 复习 5 张卡（published 含 understanding_aid + source context / codexmatrix 2 个 source examples + supplementary / technology / city / window）→ 展开理解辅助显示 explanation/meaning_boundary/context_hint/judgment_basis → 查看原文对话框显示「已定位到当前复习例句」（`preferred_occurrence_id=16` working）→ 切换例句 → 评分按钮/More 菜单/快捷键不受影响 → Network 25 个请求全部 127.0.0.1:8000（无 api.deepseek.com / api.openai.com / api.anthropic.com）→ ReviewLog 22 条全部 `source='sense_review'`（展开/折叠/切例句/查看原文均零写入）→ ReviewCard 42 / WordSense 42 计数稳定。**安全边界**：不改 FSRS（stability/difficulty/interval/rating/scheduling）；不写 ReviewLog（除用户评分外）；不创建 legacy word card；不自动创建/合并/修改 WordSense；不自动调 AI；不新增 migration；不删除 WordSense/ReviewCard/ReviewLog；1000% 是 10 个子阶段合计提升，不是固定五条主线虚假上涨。** |
+| GLM-SenseReviewLearningFeedback-1 | SenseReview 学习反馈层。在 SenseReviewCardSerializer payload 新增 `learning_feedback` 只读聚合（total_reviews / again / hard / good / easy 计数 + recent_reviews 最近 5 条 + forgetting_pattern 子结构：total_forget / forget_rate / last_forget_date / trend）。trend 基于最近 6 条非 reset ReviewLog 的前后半 'again' 计数比较（improving / declining / stable / insufficient），纯事实计算无 AI 推测。前端新增「学习状态」「遗忘情况」两个折叠块，默认折叠，卡片切换时重置，不影响评分按钮/快捷键/More/查看原文/FSRS。后端只读：serialize 不写 ReviewLog，不改 FSRS 字段，多用户隔离通过 review_card_id scoping 保证，reset 日志通过 `nonResetSenseReviewLogQuery` 排除。16 项测试 / 72 assertions 覆盖空结构/计数/recent/reset 排除/只读安全/多用户隔离/8 种 forgetting_pattern 场景。commit `cda203a`。**不改 FSRS；不写 ReviewLog；不创建 legacy word card；不自动调 AI；不新增 migration。** |
+| GLM-SenseReviewSessionSummary-1 | SenseReview 本次复习总结（Task A）。用户完成若干张词义卡复习后可主动结束本次复习，查看只属于当前页面会话的总结：本次复习总数 + 四种评分分布 + 需要重点注意的词义列表。总结不是长期统计，不写数据库，不跨刷新保存。needsAttention 规则纯事实：rating=again OR rating=hard OR forgetting_pattern.trend=declining。新增 `SenseReviewSessionTracker.js` 纯函数 helper（创建会话/记录评分/计算分布/计算重点词义/清空，requestId 去重防双击）+ `SenseReviewSessionSummary.vue` 展示组件（继续复习/结束并离开按钮）+ 12 项 Node 内置 assert 测试。队列自然清空时自动显示总结（仅当 ≥1 卡评分）；summary 状态下 Space/1/2/3/4 不再操作卡片；未评分时不显示伪造总结。commit `9b1a0bd`。**不新增 DB 写入；不写 ReviewLog（除用户评分）；不改 FSRS；不创建 legacy word card；不自动调 AI；不新增 migration。** |
+| GLM-SenseReviewModularization-1 | SenseReview 模块职责拆分与学习反馈解耦（Task B）。把 `SenseReview.vue` 从 1153 行降至 771 行，拆出 5 个子组件 + 1 个后端 Service。**前端拆分**：`SenseReviewLearningFeedbackPanel.vue`（学习状态+遗忘情况只读展示，226 行）、`SenseReviewRatingControls.vue`（4 评分按钮+快捷键提示，emit rating 事件，63 行）、`SenseReviewSessionSummary.vue`（本次复习总结展示，144 行）、`SenseReviewUnderstandingAid.vue`（理解辅助折叠块，103 行）、`SenseReviewEditDialog.vue`（编辑弹窗+表单+save API，207 行）。**后端拆分**：新增 `SenseReviewLearningFeedbackService.php`（181 行）作为学习反馈聚合唯一事实来源（ReviewLog 聚合/total/again/hard/good/easy/recent_reviews/forgetting_pattern/trend 计算/用户和卡片隔离），`SenseReviewCardSerializerService.php` 从 396 行降至 266 行，不再直接查询 ReviewLog，委托新 Service。**payload 和语义 100% 兼容**：不改变公开 API、不改变 payload 结构、不改变 Controller 路由、不改变 ReviewLog/FSRS 语义。**N+1 风险**：per-card ReviewLog 查询仍存在（P1，记录为下一轮候选），本轮只做职责解耦不强制批量优化。**测试**：13 项 Service 测试 + 5 项 serializer contract 测试 + 16 项既有回归测试 + 12 项 Node 测试 + npm build 全绿。**MCP Chrome 14 项架构回归验收全通过**。新增 `docs/architecture/sense-review-module-boundaries.md` 架构说明。**不改 FSRS；不写 ReviewLog（除用户评分）；不创建 legacy word card；不自动调 AI；不新增 migration；不修改公开路由；不修改评分 API 语义。** |
 
 ## 3. 当前未最终关闭的事项
 
@@ -685,6 +688,169 @@
 - 未读取 / 修改 / 提交 `.env`；未输出 secret；未修改 FSRS 算法/interval/stability/difficulty/rating 逻辑；未修改 ReviewCard target_type；未修改 ReviewLog 记录逻辑（仍只记录用户评分）；未创建 legacy word card；未自动调用外部 AI；未自动生成/合并 WordSense；未自动修改 sense_zh；未清库；未 migrate:fresh；未 db:wipe；未 DCP；未 notification script。
 - understanding_aid 是 sense-level（非 occurrence-level），例句轮换时保持不变（由 `test_understanding_aid_is_sense_level_not_occurrence_level` 锁定）。
 - serialize 保持只读；展开/折叠是纯前端 `understandingAidOpen` 布尔状态，零网络请求。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReviewLearningFeedback-1
+
+**日期**：2026-07-09
+**基线 commit**：`9b7c2c2 feat: merge occurrence evidence into sense review understanding aid`
+**最终 commit**：`cda203a feat: add sense review learning feedback with forgetting pattern`
+
+### 本轮目标
+
+用户复习一个 sense 时，虽然能看到例句和中文释义，但缺少「这张卡历史上忘了多少次、最近趋势如何」的学习反馈。本轮在 SenseReviewCardSerializer payload 新增 `learning_feedback` 只读聚合，帮助用户了解自己的遗忘模式。
+
+### 结论：Accept
+
+学习反馈层已上线。16 项测试 / 72 assertions 全绿。MCP Chrome 真实页面验收确认：两个折叠块默认折叠、展开正常、不影响评分按钮/快捷键/More/查看原文、Network 仅 localhost、FSRS 不变。
+
+### 交付物
+
+1. **`app/Services/SenseReviewCardSerializerService.php`** — 新增 `buildLearningFeedback()` + `computeForgettingTrend()` 私有方法 + `nonResetSenseReviewLogQuery()` helper + `RATING_LABELS` 常量。
+2. **`resources/js/components/Senses/SenseReview.vue`** — 新增「学习状态」「遗忘情况」两个折叠块 + `learningFeedback` / `forgettingPattern` computed + 空状态文案。
+3. **`tests/Feature/SenseReviewLearningFeedbackTest.php`** — 16 项测试 / 72 assertions。
+
+### 安全边界确认
+
+- 不改 FSRS；不写 ReviewLog（serialize 只读）；不创建 legacy word card；不自动调 AI；不新增 migration；reset 日志排除；多用户隔离通过 review_card_id scoping。
+
+---
+
+## Recent Update: GLM-SenseReviewSessionSummary-1
+
+**日期**：2026-07-09
+**基线 commit**：`cda203a feat: add sense review learning feedback with forgetting pattern`
+**最终 commit**：`9b1a0bd feat: add sense review session summary`
+
+### 本轮目标
+
+用户完成若干张词义卡复习后，可以主动结束本次复习，并看到只属于当前页面会话的总结。总结不是长期统计，不写数据库，不跨刷新保存。
+
+### 结论：Accept
+
+会话总结功能已上线。12 项 Node 测试全绿。MCP Chrome 真实页面验收确认：评分计数实时准确、点击「结束本次复习」进入总结、again/hard 卡出现在重点词义、点击「继续复习」返回剩余队列、队列自然清空时自动显示总结、summary 状态下快捷键不操作卡片、刷新后按新页面会话重新开始。
+
+### 交付物
+
+1. **`resources/js/components/Senses/SenseReviewSessionTracker.js`** — 纯函数 helper（createSession / recordRating / getStats / getNeedsAttention / clearSession），requestId 去重防双击，immutable updates。
+2. **`resources/js/components/Senses/SenseReviewSessionSummary.vue`** — 展示组件（评分分布 + 重点词义 + 继续复习/结束并离开按钮）。
+3. **`resources/js/components/Senses/SenseReview.vue`** — 集成 session tracker + summary 组件 + 「结束本次复习」按钮 + 队列清空自动总结 + summary 状态下禁用快捷键。
+4. **`tests/js/SenseReviewSessionTracker.test.mjs`** — 12 项 Node 内置 assert 测试。
+
+### needsAttention 规则
+
+纯事实规则，不使用 AI 推测：
+- 本次评分为 again；
+- 本次评分为 hard；
+- 或评分后 `forgetting_pattern.trend = declining`。
+
+### 安全边界确认
+
+- 不新增 DB 写入；不写 ReviewLog（除用户评分产生的正常 ReviewLog）；不改 FSRS；不创建 legacy word card；不自动调 AI；不新增 migration；不跨刷新保存（无 sessionStorage/localStorage/DB 持久化）；summary 状态下 Space/1/2/3/4 不操作卡片。
+
+---
+
+## Recent Update: GLM-SenseReviewModularization-1
+
+**日期**：2026-07-10
+**基线 commit**：`9b1a0bd feat: add sense review session summary`
+**最终 commit**：本轮 pending（refactor: modularize sense review feedback and controls）
+
+### 本轮目标
+
+`SenseReview.vue` 已膨胀到 1153 行，同时负责过多页面和业务状态。`SenseReviewCardSerializerService.php` 同时负责例句、语境、理解辅助、学习反馈和 ReviewLog 聚合。本轮做架构优化，把容器回归页面容器职责，把学习反馈聚合提取为独立 Service。
+
+### 架构侦察结论
+
+- `SenseReview.vue` 1153 行，同时负责：队列加载、卡索引、评分 API、弹窗协调、会话状态、学习反馈展示、评分按钮、理解辅助、编辑弹窗、会话总结。
+- `SenseReviewCardSerializerService.php` 396 行，直接查询 ReviewLog 并维护评分中文标签。
+- serializer 的 `buildLearningFeedback()` 方法内联了 ReviewLog 聚合逻辑，与序列化职责混合。
+- per-card ReviewLog 查询存在 N+1 风险（P1，本轮不强制优化）。
+
+### 结论：Accept
+
+模块拆分完成。`SenseReview.vue` 从 1153 行降至 771 行（5 个子组件 + 1 个后端 Service）。serializer 从 396 行降至 266 行。payload 和语义 100% 兼容。MCP Chrome 14 项架构回归验收全通过。
+
+### 拆分前后行数对照
+
+| 文件 | 拆分前 | 拆分后 | 变化 |
+|------|--------|--------|------|
+| `SenseReview.vue` | 1153 | 771 | −382 (−33%) |
+| `SenseReviewCardSerializerService.php` | 396 | 266 | −130 (−33%) |
+
+### 新增组件及职责
+
+| 组件 | 行数 | 职责 |
+|------|------|------|
+| `SenseReviewLearningFeedbackPanel.vue` | 226 | 学习状态+遗忘情况只读展示 |
+| `SenseReviewRatingControls.vue` | 63 | 4 评分按钮+快捷键提示，emit rating |
+| `SenseReviewSessionSummary.vue` | 144 | 本次复习总结展示 |
+| `SenseReviewUnderstandingAid.vue` | 103 | 理解辅助折叠块 |
+| `SenseReviewEditDialog.vue` | 207 | 编辑弹窗+表单+save API |
+
+### 新增 Service 及职责
+
+| Service | 行数 | 职责 |
+|---------|------|------|
+| `SenseReviewLearningFeedbackService.php` | 181 | ReviewLog 聚合/trend 计算/用户隔离，READ-ONLY |
+
+### props / events 契约
+
+| 组件 | Props | Emits |
+|------|-------|-------|
+| LearningFeedbackPanel | learningFeedback, fsrsStability | — |
+| RatingControls | disabled | rating(again\|hard\|good\|easy) |
+| SessionSummary | stats, needsAttention | continue-review, exit |
+| UnderstandingAid | aid | — |
+| EditDialog | value (v-model), card | input, saved |
+
+### 是否改变公开 API / payload 语义
+
+- 否。不改变公开 API、不改变 payload 结构、不改变 Controller 路由、不改变 ReviewLog/FSRS 语义。
+
+### N+1 风险
+
+- per-card ReviewLog 查询仍存在（P1）。本轮只做职责解耦，不强制批量优化。记录为下一轮 P1 架构候选。详见 `docs/architecture/sense-review-module-boundaries.md` §5。
+
+### 自动测试
+
+- `SenseReviewLearningFeedbackServiceTest`: 13 passed (41 assertions)
+- `SenseReviewSerializerContractTest`: 5 passed (67 assertions)
+- `SenseReviewLearningFeedbackTest`: 16 passed (72 assertions)
+- `SenseReviewContextualUnderstandingTest`: 8 passed (23 assertions)
+- `SenseReviewExampleRotationTest`: 14 passed (39 assertions)
+- `SenseReviewDailyLimitsTest`: 17 passed (81 assertions)
+- `ReviewFsrsTest`: 63 passed (374 assertions)
+- Node tests: 12 passed
+- `npm run development`: compiled successfully
+
+### MCP Chrome 真实页面验收（14 项架构回归）
+
+1. 新会话不显示伪造总结 ✓
+2. 显示答案正常 ✓
+3. learning_feedback 结构正确 ✓
+4. understanding_aid 结构正确 ✓
+5. 评分按钮正常 ✓
+6. 会话总结自动显示 ✓
+7. needsAttention 列出 again+hard 卡 ✓
+8. More 菜单 5 项 ✓
+9. 编辑弹窗 7 字段预填 ✓
+10. 查看原文对话框 ✓
+11. summary 状态下快捷键禁用 ✓
+12. Console 仅预存在消息 ✓
+13. Network 仅 127.0.0.1 ✓
+14. 桌面双列布局 ✓
+
+### 安全边界确认
+
+- 不改 FSRS；不写 ReviewLog（除用户评分）；不创建 legacy word card；不自动调 AI；不新增 migration；不修改公开路由；不修改评分 API 语义；不读取/修改/提交 `.env`；不 DCP；不 notification script。
 
 ### 下一步仍由网页端总流程设计师决定
 
