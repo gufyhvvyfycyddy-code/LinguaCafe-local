@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-08 (AIStudyCardV5ToSenseReviewClosedLoop-1)
+> **最后更新**：2026-07-09 (AIStudyCardFullLoopRegressionHarness-1)
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -518,6 +518,69 @@
 - 未运行 notification script。
 - 未 DCP。
 - 评分对象仅限目标 sense card #89，未触碰其它卡。
+
+### 明确未做
+
+- 不新增产品能力；不碰后端业务逻辑；不碰 V5 对话框 / 结果页 UI；不改 SenseReview.vue；不改 SenseReviewController / SenseReviewService / ReviewCardService / SenseReviewQueryService；不新增 migration；不清库；不 DCP；不 notification script；不处理 .omo/；不提交敏感文件；不把 API 200 当页面验收。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。候选方向参见 `linguacafe-master-plan.md` 第 4 节。
+
+- Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-AIStudyCardFullLoopRegressionHarness-1
+
+**日期**：2026-07-09
+**基线 commit**：`4bcb637 feat: validate ai card sense review loop`
+**性质**：把 AI Study Card V6 → V4 → V5 → `/reviews/senses` → FSRS rating 主链路从「只靠聊天报告验收」沉淀成可重复运行的回归防护体系。零后端业务逻辑改动、零 DB schema 改动、零 UI 文案改动。
+
+### 本轮目标
+
+让后续 GLM / OpenCode / WorkBuddy 等任何 agent 改 AI 学习卡时，都能通过统一的 harness / playbook / 自动测试组合判断主链路有没有被改坏，不再依赖聊天记录。
+
+### 结论：Accept
+
+主链路契约已锁定到 3 个新增 guard 测试 + 1 份可执行 playbook + 3 份主文档更新。
+
+### 交付物
+
+1. **新增 guard 测试**：`tests/Feature/AiStudyCardFullLoopGuardTest.php`（3 tests / 84 assertions）
+   - `test_full_loop_v6_to_sense_rating_locks_main_chain_safety_contract`：P2 全链路索引 guard，单个测试走完 V6 request-package → V6 provider-preview（fail-closed）→ V4 final-candidates-package → V5 generate-cards → `/reviews/senses` 队列 → sense card `rate`，断言 12 条安全契约。
+   - `test_v5_generation_safety_contract_index_documented_in_one_place`：V5 生成阶段安全契约索引（5 条断言）。
+   - `test_sense_rating_safety_contract_index_documented_in_one_place`：P3 sense rating 安全契约索引，分散 `WordSenseTest` 单点失败风险。
+2. **新增 playbook**：`docs/testing/ai-study-card-full-loop-regression-playbook.md`（12 节）— 测试命令矩阵（9 条命令 + 期望计数）/ MCP Chrome 真实验收 playbook（轻量 7 步 + 完整 20 步）/ 数据库验收矩阵（每阶段表 delta）/ 网络验收（禁止 provider 域名）/ Refuse 条件（12 条安全契约 + 额外触发器）/ Accept/Refuse/Incomplete 判断 / 允许修改文件边界 / 停止条件 / 文件→测试映射。
+3. **更新 3 份主文档**：`linguacafe-master-plan.md` + 本文件 + `DOCUMENTATION_INDEX.md`。
+
+### 自动测试
+
+- `AiStudyCardFullLoopGuardTest`: 3 passed (84 assertions)
+- 组合运行 `AiStudyCardFullLoopGuardTest|VocabularyBoxV5UiGuardTest|AiStudyCardV6|SenseReview|ReviewFsrsTest|WordSense`: 391 passed, 1 skipped (2372 assertions)
+- `npm run development`: webpack compiled successfully (14.51s, exit code 0)
+
+### MCP Chrome 轻量验收
+
+本轮只改测试和文档，未改 UI / 业务代码，因此按用户授权做轻量验收（详见 todo item 9 / 最终报告）：
+- `/reviews/senses` 可访问、UI 正常渲染。
+- V5 结果页 `/reviews/senses` 入口仍存在（guard 测试锁定）。
+- 前端构建未破坏（`npm run development` 编译成功）。
+
+不重复完整生成/评分流程，原因：V6-19 已在 commit `4bcb637` 完成完整 MCP Chrome 真实页面验收，本轮未改业务代码，重复执行只会再次写学习数据，无新增验证价值。
+
+### 安全边界确认
+
+- 未读取 / 打印 / 修改 / 提交 `.env`。
+- 未输出 secret / API key。
+- 未创建 WordSense / ReviewCard / ReviewLog（本轮不执行完整生成/评分）。
+- 未修改 FSRS。
+- 未创建 legacy word card。
+- 未运行 migrate:fresh / db:wipe / 清库。
+- 未运行 notification script。
+- 未 DCP。
+- 未把后端 smoke 当真实页面验收。
+- 未伪造 MCP Chrome 验收结果。
 
 ### 明确未做
 

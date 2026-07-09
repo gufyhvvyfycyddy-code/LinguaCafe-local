@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-08 (AIStudyCardV5ToSenseReviewClosedLoop-1).
+> **Last updated**: 2026-07-09 (AIStudyCardFullLoopRegressionHarness-1).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -30,7 +30,7 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/architecture/sense-http-controller-boundaries.md`, `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
-| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
+| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/testing/ai-study-card-full-loop-regression-playbook.md`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
 | Architecture scout | Read-only architecture investigation reports | `docs/plans/ai-study-card-architecture-scout.md` |
 | Product principles | Long-term product direction, function constraints, and legacy cleanup plan | `docs/plans/product-principles-and-legacy-cleanup-plan.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |
@@ -51,6 +51,7 @@ New rules and process notes are documented in:
 - `vibe-coding-collaboration-rules.md` §27.7 — Testing DB 健康检查规则（每轮大型任务必须先跑 DB health check）。
 - `testing-db-health-playbook.md` — Testing DB 健康检查操作指南（health check / 进程锁 / 禁止命令 / 故障报告）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
+- `docs/testing/ai-study-card-full-loop-regression-playbook.md` — AI Study Card 主链路（V6 → V4 → V5 → `/reviews/senses` → FSRS rating）回归 harness：测试命令矩阵（9 条命令 + 期望计数）/ MCP Chrome 真实验收 playbook（轻量 7 步 + 完整 20 步）/ 数据库验收矩阵（每阶段表 delta）/ 网络验收（禁止 provider 域名）/ Refuse 条件（12 条安全契约 + 额外触发器）/ Accept/Refuse/Incomplete 判断 / 允许修改文件边界 / 停止条件 / 文件→测试映射。任何 agent 改 AI 学习卡前必须先读本文档并跑 §3 测试命令矩阵。
 
 ## 2.6 Frozen Plans (Route-Frozen, Not Implemented)
 
