@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-09 (SenseReviewUnderstandingAid-1000-7).
+> **Last updated**: 2026-07-09 (SenseReviewContextualUnderstanding-1000-10: occurrence-level evidence merge + smart example selection).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -30,7 +30,7 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/architecture/sense-http-controller-boundaries.md`, `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
-| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/testing/ai-study-card-full-loop-regression-playbook.md`, `docs/testing/sense-review-example-rotation-playbook.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
+| Test / smoke / harness | Executable or semi-executable verification playbooks | `docs/testing/*`, `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`, `docs/testing/ai-study-card-full-loop-regression-playbook.md`, `docs/testing/sense-review-example-rotation-playbook.md`, `docs/testing/sense-review-understanding-helper-playbook.md` (sense-level + Task 4 occurrence-level merge), `docs/plans/*smoke*`, `docs/plans/mcp-chrome-local-smoke-playbook.md`, `docs/plans/sense-review-real-workflow-smoke-playbook.md`, `docs/plans/morphology-test-sample-tracker.md` |
 | Architecture scout | Read-only architecture investigation reports | `docs/plans/ai-study-card-architecture-scout.md` |
 | Product principles | Long-term product direction, function constraints, and legacy cleanup plan | `docs/plans/product-principles-and-legacy-cleanup-plan.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |
@@ -52,6 +52,7 @@ New rules and process notes are documented in:
 - `testing-db-health-playbook.md` — Testing DB 健康检查操作指南（health check / 进程锁 / 禁止命令 / 故障报告）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
 - `docs/testing/ai-study-card-full-loop-regression-playbook.md` — AI Study Card 主链路（V6 → V4 → V5 → `/reviews/senses` → FSRS rating）回归 harness：测试命令矩阵（9 条命令 + 期望计数）/ MCP Chrome 真实验收 playbook（轻量 7 步 + 完整 20 步）/ 数据库验收矩阵（每阶段表 delta）/ 网络验收（禁止 provider 域名）/ Refuse 条件（12 条安全契约 + 额外触发器）/ Accept/Refuse/Incomplete 判断 / 允许修改文件边界 / 停止条件 / 文件→测试映射。任何 agent 改 AI 学习卡前必须先读本文档并跑 §3 测试命令矩阵。
+- `docs/testing/sense-review-understanding-helper-playbook.md` — SenseReview 理解辅助（Task 3 sense-level + Task 4 occurrence-level merge）playbook：两层 `understanding_aid`（`word_senses.understanding_aid` + `word_sense_occurrences.evidence` 复用，无新 migration）/ `SenseReviewCardSerializerService::normalizeUnderstandingAid` + `mergeOccurrenceEvidence` / `WordSenseExamplePoolService::pickQuestionIndexWithContext` 智能例句选择（`preferred_occurrence_id` 优先 + 线性轮换 fallback）/ 前端「理解这个词义」折叠块 + `related_collocations` 「类似使用」chips / FSRS 安全矩阵（展开/折叠/切例句/查看原文均不写 ReviewLog）/ 测试矩阵（`SenseReviewUnderstandingAidTest` 6/21 + `SenseReviewContextualUnderstandingTest` 8/23 + SenseReview 全量 244/1001）/ MCP Chrome 验收 / 13 条 Refuse 条件 / 允许文件边界 / 回滚步骤。任何 agent 改理解辅助或例句选择前必须先读本文档并跑 §7 测试命令矩阵。
 
 ## 2.6 Frozen Plans (Route-Frozen, Not Implemented)
 

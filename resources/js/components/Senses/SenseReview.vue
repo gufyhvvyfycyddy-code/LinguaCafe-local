@@ -146,12 +146,17 @@
                             <span v-if="!currentCard.collocations.length" class="text--secondary">无</span>
                         </div>
 
-                        <!-- Sense-level understanding aid (collapsible, read-only).
-                             SenseReviewUnderstandingAid-1000-7.
+                        <!-- Sense-level + occurrence-level merged understanding
+                             aid (collapsible, read-only).
+                             SenseReviewUnderstandingAid-1000-7 +
+                             SenseReviewContextualUnderstanding-1000-10.
                              Default collapsed; user-initiated viewing only.
                              Does NOT trigger any network call, ReviewLog write,
                              or FSRS change. Only renders when at least one
-                             sub-field has content. -->
+                             sub-field has content. Occurrence-level evidence
+                             (context_hint / judgment_basis / related_collocations)
+                             overrides sense-level values for the same keys, so
+                             the aid follows the currently-displayed occurrence. -->
                         <div v-if="hasUnderstandingAid" class="mt-4">
                             <div
                                 class="caption text--secondary d-flex align-center"
@@ -175,7 +180,7 @@
                                         <span class="body-2">{{ understandingAid.context_hint }}</span>
                                     </div>
                                     <div v-if="understandingAid.usage_keywords && understandingAid.usage_keywords.length">
-                                        <span class="caption text--secondary">常见搭配关键词：</span>
+                                        <span class="caption text--secondary">判断依据：</span>
                                         <div class="mt-1">
                                             <v-chip
                                                 small
@@ -183,6 +188,18 @@
                                                 v-for="kw in understandingAid.usage_keywords"
                                                 :key="kw"
                                             >{{ kw }}</v-chip>
+                                        </div>
+                                    </div>
+                                    <div v-if="understandingAid.related_collocations && understandingAid.related_collocations.length" class="mt-2">
+                                        <span class="caption text--secondary">类似使用：</span>
+                                        <div class="mt-1">
+                                            <v-chip
+                                                small
+                                                outlined
+                                                class="mr-1 mb-1"
+                                                v-for="col in understandingAid.related_collocations"
+                                                :key="col"
+                                            >{{ col }}</v-chip>
                                         </div>
                                     </div>
                                 </div>
@@ -490,10 +507,14 @@
                 }
                 return supp;
             },
-            // SenseReviewUnderstandingAid-1000-7: sense-level understanding aid.
-            // Backend always returns a normalized structure (explanation,
-            // meaning_boundary, context_hint, usage_keywords) with null/empty
-            // defaults when the column is empty, so this is null-safe.
+            // SenseReviewUnderstandingAid-1000-7 +
+            // SenseReviewContextualUnderstanding-1000-10: sense-level +
+            // occurrence-level merged understanding aid. Backend always returns
+            // a normalized structure (explanation, meaning_boundary,
+            // context_hint, usage_keywords, related_collocations) with null/
+            // empty defaults when the column is empty, so this is null-safe.
+            // Occurrence-level evidence overrides sense-level values for
+            // matching keys, so the aid follows the displayed occurrence.
             understandingAid() {
                 if (!this.currentCard || !this.currentCard.understanding_aid) {
                     return null;
@@ -501,7 +522,7 @@
                 return this.currentCard.understanding_aid;
             },
             // Only render the collapsible block when at least one sub-field has
-            // content. Empty sense (all null/[]) hides the block entirely.
+            // content. Empty sense+occurrence (all null/[]) hides the block.
             hasUnderstandingAid() {
                 if (!this.understandingAid) {
                     return false;
@@ -510,7 +531,8 @@
                     this.understandingAid.explanation ||
                     this.understandingAid.meaning_boundary ||
                     this.understandingAid.context_hint ||
-                    (Array.isArray(this.understandingAid.usage_keywords) && this.understandingAid.usage_keywords.length)
+                    (Array.isArray(this.understandingAid.usage_keywords) && this.understandingAid.usage_keywords.length) ||
+                    (Array.isArray(this.understandingAid.related_collocations) && this.understandingAid.related_collocations.length)
                 );
             },
         },

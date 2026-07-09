@@ -31,6 +31,21 @@ class SenseReviewCardSerializerService
      * while satisfying "first A, second B, third C" and "failed review
      * shows a different example".
      *
+     * Smart selection (GM52-SenseReviewContextualUnderstanding-1000-10):
+     * When a preferred_occurrence_id is supplied via $options, the serializer
+     * prefers that occurrence as the question example (priority 1). This lets
+     * the caller keep the currently-displayed occurrence stable across page
+     * reloads without persisting state. When the preferred id is not in the
+     * candidate pool, linear rotation is used as fallback. This is read-only
+     * and never writes to ReviewLog or touches FSRS.
+     *
+     * Contextual understanding aid: when the selected occurrence has evidence
+     * JSON with context_hint / judgment_basis / related_collocations, those
+     * occurrence-level values are merged into the payload's understanding_aid
+     * (overriding sense-level values for the same keys). This makes the
+     * understanding aid follow the currently-displayed occurrence while
+     * keeping sense-level values as fallback.
+     *
      * Payload contract (SenseMultiExampleBindingAndReviewRotation-1000-6):
      *   - displayed_occurrence_id: id of the occurrence shown this round
      *     (null when the example comes from the card fallback or is empty).
@@ -38,19 +53,23 @@ class SenseReviewCardSerializerService
      *     currently bound to this sense (occurrences + card fallback).
      *   - example_source_status: 'occurrence' | 'card_fallback' | 'empty'.
      *
+     * @param  array  $options  Optional: ['preferred_occurrence_id' => int|null]
      * @return array{review_card_id: int, word_sense_id: int, lemma: string, ...}
      */
-    public function serialize(ReviewCard $card): array
+    public function serialize(ReviewCard $card, array $options = []): array
     {
         $sense = $card->sense;
         $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense);
         $candidates = $this->examplePoolService->exampleCandidates($sense);
 
-        $questionIndex = $this->examplePoolService->pickQuestionIndex(
-            count($candidates),
+        $preferredOccurrenceId = $options['preferred_occurrence_id'] ?? null;
+
+        $questionIndex = $this->examplePoolService->pickQuestionIndexWithContext(
+            $candidates,
             $card->id,
             (int) ($card->fsrs_reps ?? 0),
             (int) ($card->fsrs_lapses ?? 0),
+            $preferredOccurrenceId,
         );
 
         $questionExample = $candidates[$questionIndex] ?? null;
@@ -82,6 +101,15 @@ class SenseReviewCardSerializerService
             $exampleSourceStatus = 'occurrence';
         }
 
+        // Contextual understanding aid (GM52-SenseReviewContextualUnderstanding-1000-10):
+        // Start from sense-level understanding_aid, then merge occurrence-level
+        // evidence (context_hint / judgment_basis / related_collocations) when
+        // the displayed occurrence has them. Occurrence-level values override
+        // sense-level values for the same keys; sense-level values remain as
+        // fallback for keys the occurrence doesn't provide.
+        $understandingAid = $this->normalizeUnderstandingAid($sense->understanding_aid);
+        $understandingAid = $this->mergeOccurrenceEvidence($understandingAid, $displayedOccurrenceId, $sense);
+
         return [
             'review_card_id' => $card->id,
             'word_sense_id' => $sense->id,
@@ -92,13 +120,12 @@ class SenseReviewCardSerializerService
             'sense_en' => $sense->sense_en,
             'aliases_zh' => $sense->aliases_zh ?: [],
             'collocations' => $sense->collocations ?: [],
-            // Sense-level understanding aid (explanation / meaning_boundary /
-            // context_hint / usage_keywords). SenseReviewUnderstandingAid-1000-7.
-            // Stays identical regardless of which occurrence is displayed.
+            // Sense-level + occurrence-level merged understanding aid.
+            // SenseReviewUnderstandingAid-1000-7 + SenseReviewContextualUnderstanding-1000-10.
             // Null-safe: always returns a stable normalized structure so the
-            // frontend can render unconditionally even when the column is
-            // empty or only partially populated.
-            'understanding_aid' => $this->normalizeUnderstandingAid($sense->understanding_aid),
+            // frontend can render unconditionally even when both sense and
+            // occurrence data are empty.
+            'understanding_aid' => $understandingAid,
             'example_sentence_en' => $exampleSentenceEn,
             'example_sentence_zh' => $exampleSentenceZh,
             'example_sentence_tokens' => $tokenPayload['tokens'],
@@ -130,7 +157,7 @@ class SenseReviewCardSerializerService
      * read-only and never touches the database; it only shapes the payload.
      *
      * @param  array|null  $value  Raw value from the WordSense model.
-     * @return array{explanation: ?string, meaning_boundary: ?string, context_hint: ?string, usage_keywords: array}
+     * @return array{explanation: ?string, meaning_boundary: ?string, context_hint: ?string, usage_keywords: array, related_collocations: array}
      */
     private function normalizeUnderstandingAid(?array $value): array
     {
@@ -143,6 +170,59 @@ class SenseReviewCardSerializerService
             'usage_keywords' => isset($value['usage_keywords']) && is_array($value['usage_keywords'])
                 ? array_values($value['usage_keywords'])
                 : [],
+            'related_collocations' => isset($value['related_collocations']) && is_array($value['related_collocations'])
+                ? array_values($value['related_collocations'])
+                : [],
         ];
+    }
+
+    /**
+     * Merge occurrence-level evidence into the sense-level understanding_aid.
+     *
+     * Occurrence evidence JSON may contain:
+     *  - context_hint: overrides sense-level context_hint
+     *  - judgment_basis: array of keywords → overrides usage_keywords
+     *  - related_collocations: array → overrides related_collocations
+     *
+     * Keys NOT present in occurrence evidence keep their sense-level values.
+     * This is read-only: it only reads the occurrence from the database (via
+     * the sense's already-loaded relation or a fresh query) and shapes the
+     * payload — it never writes.
+     *
+     * @param  array  $senseAid  Already-normalized sense-level aid.
+     * @param  int|null  $occurrenceId  The displayed occurrence id (null = fallback).
+     * @param  WordSense  $sense  The sense (for scoping the occurrence query).
+     * @return array  Merged aid with occurrence-level overrides applied.
+     */
+    private function mergeOccurrenceEvidence(array $senseAid, ?int $occurrenceId, $sense): array
+    {
+        if ($occurrenceId === null) {
+            return $senseAid;
+        }
+
+        // Load the occurrence scoped to the sense to prevent cross-sense leak.
+        $occurrence = \App\Models\WordSenseOccurrence::query()
+            ->where('id', $occurrenceId)
+            ->where('word_sense_id', $sense->id)
+            ->first();
+
+        if (!$occurrence || !is_array($occurrence->evidence)) {
+            return $senseAid;
+        }
+
+        $evidence = $occurrence->evidence;
+
+        // Occurrence-level overrides (only when the key exists and is non-null).
+        if (isset($evidence['context_hint']) && $evidence['context_hint'] !== null) {
+            $senseAid['context_hint'] = $evidence['context_hint'];
+        }
+        if (isset($evidence['judgment_basis']) && is_array($evidence['judgment_basis'])) {
+            $senseAid['usage_keywords'] = array_values($evidence['judgment_basis']);
+        }
+        if (isset($evidence['related_collocations']) && is_array($evidence['related_collocations'])) {
+            $senseAid['related_collocations'] = array_values($evidence['related_collocations']);
+        }
+
+        return $senseAid;
     }
 }

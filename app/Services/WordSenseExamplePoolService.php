@@ -162,6 +162,51 @@ class WordSenseExamplePoolService
     }
 
     /**
+     * Pick the question example index with an optional preferred occurrence.
+     *
+     * Smart selection priority (GM52-SenseReviewContextualUnderstanding-1000-10):
+     *  1. If a preferred occurrence id is supplied AND that occurrence exists
+     *     in the candidate pool, return its index. This supports "keep the
+     *     currently displayed occurrence" and "prefer the most-recently-used
+     *     occurrence" without persisting any state.
+     *  2. Otherwise, fall back to the linear rotation (pickQuestionIndex).
+     *
+     * This method is read-only and never writes to the database. The
+     * preferred occurrence id is typically the displayed_occurrence_id from
+     * the previous serialization, passed back by the caller — it does NOT
+     * come from ReviewLog (which only records user ratings).
+     *
+     * @param  array  $candidates  The candidate array from exampleCandidates().
+     * @param  int|null  $preferredOccurrenceId  Optional occurrence id to prefer.
+     * @return int  The index into $candidates.
+     */
+    public function pickQuestionIndexWithContext(
+        array $candidates,
+        int $reviewCardId,
+        int $fsrsReps,
+        int $fsrsLapses = 0,
+        ?int $preferredOccurrenceId = null,
+    ): int {
+        $total = count($candidates);
+
+        if ($total <= 0) {
+            return 0;
+        }
+
+        // Priority 1: preferred occurrence exists in the pool.
+        if ($preferredOccurrenceId !== null) {
+            foreach ($candidates as $index => $candidate) {
+                if (($candidate['occurrence_id'] ?? null) === $preferredOccurrenceId) {
+                    return $index;
+                }
+            }
+        }
+
+        // Priority 2: linear rotation fallback.
+        return $this->pickQuestionIndex($total, $reviewCardId, $fsrsReps, $fsrsLapses);
+    }
+
+    /**
      * Deterministically pick a supplementary example index that differs from
      * the question index. Returns null when there is only one candidate.
      */
