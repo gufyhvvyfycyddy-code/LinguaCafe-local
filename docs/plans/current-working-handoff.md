@@ -637,3 +637,55 @@
 不自动进入下一任务。
 
 - Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReviewUnderstandingAid-1000-7
+
+**日期**：2026-07-09
+**基线 commit**：`cf90b63 feat: switch sense review example rotation to linear sequence`
+**性质**：为 SenseReview 答案面增加"理解这个词义"折叠区块，展示 sense-level 的 explanation / meaning_boundary / context_hint / usage_keywords 四个理解辅助字段。新增 `word_senses.understanding_aid` JSON 列（单 migration，可回滚）。serialize 保持只读；展开/折叠纯前端状态，零网络请求、零 ReviewLog、零 FSRS 改动。
+
+### 本轮目标
+
+用户复习一个 sense 时，虽然能看到例句和中文释义，但缺少"为什么这个例句代表这个词义"的理解辅助。本轮增强 SenseReview 的理解层，帮助用户形成词义边界。
+
+### 结论：Accept
+
+理解辅助折叠区块已上线。6 个新测试全绿，379 passed / 1 skipped（1755 assertions）全量回归无回归。MCP Chrome 真实页面验收确认：默认折叠、展开正常、不影响评分按钮/快捷键/More 菜单/查看原文、Network 仅 localhost、FSRS 不变。
+
+### 交付物
+
+1. **`database/migrations/2026_07_09_000001_add_understanding_aid_to_word_senses_table.php`** — 新增 `understanding_aid` JSON nullable 列，可回滚。
+2. **`app/Models/WordSense.php`** — `understanding_aid` 加入 `$fillable` 和 `casts()`（array）。
+3. **`app/Services/SenseReviewCardSerializerService.php`** — 新增 `normalizeUnderstandingAid()` 私有方法，serialize 透传规范化后的 `understanding_aid` 结构。
+4. **`resources/js/components/Senses/SenseReview.vue`** — 答案面左栏增加折叠"理解这个词义"区块；`understandingAid` / `hasUnderstandingAid` computed；`understandingAidOpen` data 字段（卡片切换时重置为 false）。
+5. **`tests/Feature/SenseReviewUnderstandingAidTest.php`** — 新增 6 个测试（21 assertions）。
+6. **`docs/testing/sense-review-understanding-helper-playbook.md`** — 新增 12 节 playbook。
+
+### 自动测试
+
+- `SenseReviewUnderstandingAidTest`: 6 passed (21 assertions)
+- 组合运行: 1 skipped, 379 passed (1755 assertions)
+- `npm run development`: webpack compiled successfully (5.36s)
+
+### MCP Chrome 真实页面验收
+
+- card 63 (lemma: published)：默认折叠（understandingAidOpen=false），展开显示全部 4 个子字段
+- 评分按钮（忘了/勉强记得/记得/很熟）全部 enabled
+- More 菜单按钮 enabled
+- viewSource() 成功打开原文对话框，显示"已定位到当前复习例句"
+- Network：4 个请求全部 127.0.0.1:8000（无 external provider）
+- DB：ReviewLog count 1→1（不变），FSRS 全字段不变
+
+### 安全边界确认
+
+- 未读取 / 修改 / 提交 `.env`；未输出 secret；未修改 FSRS 算法/interval/stability/difficulty/rating 逻辑；未修改 ReviewCard target_type；未修改 ReviewLog 记录逻辑（仍只记录用户评分）；未创建 legacy word card；未自动调用外部 AI；未自动生成/合并 WordSense；未自动修改 sense_zh；未清库；未 migrate:fresh；未 db:wipe；未 DCP；未 notification script。
+- understanding_aid 是 sense-level（非 occurrence-level），例句轮换时保持不变（由 `test_understanding_aid_is_sense_level_not_occurrence_level` 锁定）。
+- serialize 保持只读；展开/折叠是纯前端 `understandingAidOpen` 布尔状态，零网络请求。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.

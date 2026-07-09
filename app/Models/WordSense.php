@@ -27,6 +27,7 @@ class WordSense extends Model
         'sense_en',
         'aliases_zh',
         'collocations',
+        'understanding_aid',
         'example_sentence_en',
         'example_sentence_zh',
         'source_text_id',
@@ -42,6 +43,7 @@ class WordSense extends Model
         return [
             'aliases_zh' => 'array',
             'collocations' => 'array',
+            'understanding_aid' => 'array',
             'is_context_specific' => 'boolean',
         ];
     }

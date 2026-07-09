@@ -92,6 +92,13 @@ class SenseReviewCardSerializerService
             'sense_en' => $sense->sense_en,
             'aliases_zh' => $sense->aliases_zh ?: [],
             'collocations' => $sense->collocations ?: [],
+            // Sense-level understanding aid (explanation / meaning_boundary /
+            // context_hint / usage_keywords). SenseReviewUnderstandingAid-1000-7.
+            // Stays identical regardless of which occurrence is displayed.
+            // Null-safe: always returns a stable normalized structure so the
+            // frontend can render unconditionally even when the column is
+            // empty or only partially populated.
+            'understanding_aid' => $this->normalizeUnderstandingAid($sense->understanding_aid),
             'example_sentence_en' => $exampleSentenceEn,
             'example_sentence_zh' => $exampleSentenceZh,
             'example_sentence_tokens' => $tokenPayload['tokens'],
@@ -113,6 +120,29 @@ class SenseReviewCardSerializerService
             'fsrs_difficulty' => $card->fsrs_difficulty,
             'fsrs_reps' => $card->fsrs_reps,
             'fsrs_lapses' => $card->fsrs_lapses,
+        ];
+    }
+
+    /**
+     * Normalize the understanding_aid JSON column into a stable structure so
+     * the frontend can render unconditionally. Missing keys (when the column
+     * is null or only partially populated) are filled with defaults. This is
+     * read-only and never touches the database; it only shapes the payload.
+     *
+     * @param  array|null  $value  Raw value from the WordSense model.
+     * @return array{explanation: ?string, meaning_boundary: ?string, context_hint: ?string, usage_keywords: array}
+     */
+    private function normalizeUnderstandingAid(?array $value): array
+    {
+        $value = is_array($value) ? $value : [];
+
+        return [
+            'explanation' => $value['explanation'] ?? null,
+            'meaning_boundary' => $value['meaning_boundary'] ?? null,
+            'context_hint' => $value['context_hint'] ?? null,
+            'usage_keywords' => isset($value['usage_keywords']) && is_array($value['usage_keywords'])
+                ? array_values($value['usage_keywords'])
+                : [],
         ];
     }
 }

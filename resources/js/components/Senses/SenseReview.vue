@@ -145,6 +145,49 @@
                             <v-chip small class="mr-1 mb-1" v-for="collocation in currentCard.collocations" :key="collocation">{{ collocation }}</v-chip>
                             <span v-if="!currentCard.collocations.length" class="text--secondary">无</span>
                         </div>
+
+                        <!-- Sense-level understanding aid (collapsible, read-only).
+                             SenseReviewUnderstandingAid-1000-7.
+                             Default collapsed; user-initiated viewing only.
+                             Does NOT trigger any network call, ReviewLog write,
+                             or FSRS change. Only renders when at least one
+                             sub-field has content. -->
+                        <div v-if="hasUnderstandingAid" class="mt-4">
+                            <div
+                                class="caption text--secondary d-flex align-center"
+                                style="cursor: pointer;"
+                                @click="understandingAidOpen = !understandingAidOpen"
+                            >
+                                <v-icon small class="mr-1">{{ understandingAidOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+                                理解这个词义
+                            </div>
+                            <v-expand-transition>
+                                <div v-if="understandingAidOpen" class="mt-2">
+                                    <div v-if="understandingAid.explanation" class="body-2 mb-2">
+                                        {{ understandingAid.explanation }}
+                                    </div>
+                                    <div v-if="understandingAid.meaning_boundary" class="mb-2">
+                                        <span class="caption text--secondary">词义边界：</span>
+                                        <span class="body-2">{{ understandingAid.meaning_boundary }}</span>
+                                    </div>
+                                    <div v-if="understandingAid.context_hint" class="mb-2">
+                                        <span class="caption text--secondary">上下文提示：</span>
+                                        <span class="body-2">{{ understandingAid.context_hint }}</span>
+                                    </div>
+                                    <div v-if="understandingAid.usage_keywords && understandingAid.usage_keywords.length">
+                                        <span class="caption text--secondary">常见搭配关键词：</span>
+                                        <div class="mt-1">
+                                            <v-chip
+                                                small
+                                                class="mr-1 mb-1"
+                                                v-for="kw in understandingAid.usage_keywords"
+                                                :key="kw"
+                                            >{{ kw }}</v-chip>
+                                        </div>
+                                    </div>
+                                </div>
+                            </v-expand-transition>
+                        </div>
                     </v-col>
                     <v-col cols="12" md="6">
                         <div class="caption text--secondary">例句</div>
@@ -416,6 +459,9 @@
                 // UI-Review-a
                 statsDetailOpen: false,
                 fsrsDetailOpen: false,
+                // SenseReviewUnderstandingAid-1000-7: understanding aid collapse.
+                // Default collapsed; reset on card change in loadCards().
+                understandingAidOpen: false,
                 showAnswer: false,
                 // Whether the user is in "ignore daily limits" mode (over-limit review)
                 ignoreDailyLimits: false,
@@ -443,6 +489,29 @@
                     return null;
                 }
                 return supp;
+            },
+            // SenseReviewUnderstandingAid-1000-7: sense-level understanding aid.
+            // Backend always returns a normalized structure (explanation,
+            // meaning_boundary, context_hint, usage_keywords) with null/empty
+            // defaults when the column is empty, so this is null-safe.
+            understandingAid() {
+                if (!this.currentCard || !this.currentCard.understanding_aid) {
+                    return null;
+                }
+                return this.currentCard.understanding_aid;
+            },
+            // Only render the collapsible block when at least one sub-field has
+            // content. Empty sense (all null/[]) hides the block entirely.
+            hasUnderstandingAid() {
+                if (!this.understandingAid) {
+                    return false;
+                }
+                return !!(
+                    this.understandingAid.explanation ||
+                    this.understandingAid.meaning_boundary ||
+                    this.understandingAid.context_hint ||
+                    (Array.isArray(this.understandingAid.usage_keywords) && this.understandingAid.usage_keywords.length)
+                );
             },
         },
         beforeDestroy() {
@@ -479,6 +548,7 @@
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;  // Reset FSRS collapse on card change
+                    this.understandingAidOpen = false;  // SenseReviewUnderstandingAid-1000-7: reset aid collapse on card change
                     this.showAnswer = false;
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
