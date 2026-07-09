@@ -33,11 +33,30 @@
                 <v-spacer />
                 <v-btn small text color="primary" @click="restoreLimits">恢复上限</v-btn>
             </v-alert>
+            <!-- SenseReview-SessionSummary-1000-1: explicit "end session"
+                 button. Only visible after the user has rated at least one
+                 card AND the summary is not already shown. Clicking it
+                 does NOT write ReviewLog or touch FSRS. -->
+            <div v-if="hasReviewed && !showSessionSummary" class="text-center mt-3">
+                <v-btn small text color="primary" @click="endSession">结束本次复习</v-btn>
+            </div>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
 
-        <v-card v-if="currentCard" outlined class="rounded-lg pa-5">
+        <!-- SenseReview-SessionSummary-1000-1: session summary view.
+             Shown when the user explicitly ends the session OR when the
+             queue naturally drains after at least one rating. Mutually
+             exclusive with the review-card view. -->
+        <SenseReviewSessionSummary
+            v-if="showSummaryView"
+            :stats="sessionStats"
+            :has-more-cards="remainingCount > 0"
+            @continue-review="continueReview"
+            @exit-review="exitReview"
+        />
+
+        <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
             <!-- Lemma / surface form / pos — always visible -->
             <div class="d-flex align-center mb-3">
                 <div>
@@ -352,7 +371,7 @@
             </template>
         </v-card>
 
-        <v-alert v-else-if="!loading" type="info" dense outlined>
+        <v-alert v-else-if="!loading && !showSummaryView" type="info" dense outlined>
             当前没有到期词义卡。
         </v-alert>
 
@@ -505,10 +524,13 @@
 
 <script>
     import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
+    import SenseReviewSessionSummary from './SenseReviewSessionSummary.vue';
+    import * as SessionTracker from './SenseReviewSessionTracker.js';
 
     export default {
         components: {
             SenseExampleDialog,
+            SenseReviewSessionSummary,
         },
         data: function() {
             return {
@@ -585,6 +607,14 @@
                 showAnswer: false,
                 // Whether the user is in "ignore daily limits" mode (over-limit review)
                 ignoreDailyLimits: false,
+                // SenseReview-SessionSummary-1000-1: this-session summary.
+                // Tracks ratings completed on the CURRENT page load only.
+                // Reset on page refresh (no persistence). Clicking "结束本次
+                // 复习", viewing the summary, or expanding blocks never writes
+                // ReviewLog and never touches FSRS. Only real user ratings
+                // (via rate()) are recorded.
+                session: SessionTracker.createSession(),
+                showSessionSummary: false,
             }
         },
         computed: {
@@ -721,6 +751,19 @@
                 }
                 return 'text--secondary';
             },
+            // SenseReview-SessionSummary-1000-1: session summary computed.
+            // sessionStats is the aggregate of all ratings in this page
+            // session. hasReviewed gates the summary (no fake "0 张" page).
+            // showSummaryView gates the full-screen summary overlay.
+            sessionStats() {
+                return SessionTracker.sessionStats(this.session);
+            },
+            hasReviewed() {
+                return SessionTracker.hasReviewed(this.session);
+            },
+            showSummaryView() {
+                return this.showSessionSummary && this.hasReviewed;
+            },
         },
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
@@ -760,6 +803,15 @@
                     this.learningFeedbackOpen = false;  // SenseReview-LearningFeedback-1000-1: reset feedback collapse on card change
                     this.forgettingPatternOpen = false;  // SenseReview-ForgettingPattern-1000-3: reset forgetting collapse on card change
                     this.showAnswer = false;
+                    // SenseReview-SessionSummary-1000-1: when the queue
+                    // naturally drains AND the user has reviewed at least
+                    // one card this session, auto-show the summary. When
+                    // the user has not reviewed anything, keep the existing
+                    // empty-state alert ("当前没有到期词义卡。") so we never
+                    // show a fake "本次复习 0 张" summary.
+                    if (this.cards.length === 0 && this.hasReviewed && !this.showSessionSummary) {
+                        this.showSessionSummary = true;
+                    }
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
                 }).finally(() => {
@@ -777,9 +829,31 @@
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;
                 }
+                // SenseReview-SessionSummary-1000-1: generate a unique
+                // requestId per rate() call. The tracker dedupes by this
+                // id so a double-click or accidental re-submit cannot
+                // inflate the session stats. Only recorded AFTER the
+                // backend confirms success.
+                const requestId = 'rate-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+                const cardSnapshot = {
+                    review_card_id: this.currentCard.review_card_id,
+                    lemma: this.currentCard.lemma,
+                    sense_zh: this.currentCard.sense_zh,
+                    rating: rating,
+                };
                 axios.post(`/reviews/senses/${this.currentCard.review_card_id}/rate`, payload).then((response) => {
                     this.reviewedCount++;
                     this.summary = response.data.summary;
+                    // Record this rating into the page session. The
+                    // reviewed_card from the response carries the fresh
+                    // forgetting_pattern (post-rating trend), which the
+                    // tracker uses for the "declining" needs-attention rule.
+                    const reviewedCard = response.data.reviewed_card;
+                    const entry = {
+                        ...cardSnapshot,
+                        forgetting_pattern: reviewedCard?.learning_feedback?.forgetting_pattern || { trend: null },
+                    };
+                    this.session = SessionTracker.recordRating(this.session, entry, requestId);
                     this.loadCards();
                     this.loadFsrsStats();
                 }).catch((error) => {
@@ -800,6 +874,12 @@
             },
             // UI-Review-c: keyboard shortcuts
             handleHotkey(event) {
+                // SenseReview-SessionSummary-1000-1: when the session summary
+                // is shown, Space and 1/2/3/4 must NOT trigger show-answer or
+                // rating. The user must explicitly close the summary first.
+                if (this.showSessionSummary) {
+                    return;
+                }
                 // Ignore when typing in input/textarea/select
                 const tag = event.target?.tagName?.toLowerCase();
                 if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
@@ -1035,6 +1115,27 @@
                     .finally(() => {
                         this.deleteLoading = false;
                     });
+            },
+            // ==================== Session summary ====================
+            // SenseReview-SessionSummary-1000-1: user explicitly ends the
+            // session. Only allowed when at least one card has been rated
+            // (no fake "0 张" summary). Does NOT write ReviewLog, does NOT
+            // touch FSRS — only flips a local UI flag.
+            endSession() {
+                if (!this.hasReviewed) {
+                    return;
+                }
+                this.showSessionSummary = true;
+            },
+            // Continue reviewing: close the summary and go back to the
+            // remaining queue. Only meaningful when cards remain.
+            continueReview() {
+                this.showSessionSummary = false;
+            },
+            // Exit to the review-card management page. Uses a real
+            // navigation so the page session is naturally discarded.
+            exitReview() {
+                window.location.href = '/review-cards/manage';
             },
             // ==================== Snackbar ====================
             showSnackbar(text, color) {
