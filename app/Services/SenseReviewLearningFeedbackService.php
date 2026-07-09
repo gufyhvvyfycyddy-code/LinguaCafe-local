@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\ReviewLog;
 use Illuminate\Support\Collection;
 
 /**
@@ -25,10 +24,14 @@ use Illuminate\Support\Collection;
  *  - READ-ONLY: never writes ReviewLog, never touches any FSRS field.
  *  - Multi-user isolation via review_card_id scoping (a card belongs to
  *    exactly one user).
- *  - Reset-type logs (rating='reset' OR source='reset') are excluded,
- *    matching SenseReviewQueryService::nonResetSenseReviewLogQuery.
+ *  - Reset-type logs (rating='reset' OR source='reset') are excluded via
+ *    SenseReviewAnalyticsQueryService::reviewsForCards(), which delegates
+ *    to SenseReviewQueryService::nonResetCardReviewLogQuery().
  *  - buildForCard() and buildForCards() share ONE algorithm via
  *    buildFeedbackFromLogs() — no duplicated aggregation logic.
+ *  - Rating counting delegates to
+ *    SenseReviewAnalyticsQueryService::ratingDistribution() so the
+ *    counting logic is shared with TodaySummary / DailyReport.
  */
 class SenseReviewLearningFeedbackService
 {
@@ -44,6 +47,11 @@ class SenseReviewLearningFeedbackService
         'good'  => '记得',
         'easy'  => '很熟',
     ];
+
+    public function __construct(
+        private SenseReviewAnalyticsQueryService $analytics,
+    ) {
+    }
 
     /**
      * Build the read-only learning feedback aggregate for one review card.
@@ -114,16 +122,11 @@ class SenseReviewLearningFeedbackService
             return [];
         }
 
-        // Single batch query: all non-reset logs for the target cards,
-        // ordered newest-first so the in-memory slicing (recent_reviews,
-        // trend, last_forget_date) matches buildForCard's ordering exactly.
-        $logs = ReviewLog::query()
-            ->whereIn('review_card_id', array_values($ids))
-            ->where('rating', '!=', 'reset')
-            ->where('source', '!=', 'reset')
-            ->orderByDesc('reviewed_at')
-            ->orderByDesc('id')
-            ->get(['id', 'review_card_id', 'rating', 'reviewed_at']);
+        // Single batch query via the centralized analytics layer. Reset
+        // exclusion is delegated to
+        // SenseReviewQueryService::nonResetCardReviewLogQuery(). Exactly 1
+        // ReviewLog query regardless of how many card ids are passed.
+        $logs = $this->analytics->reviewsForCards(array_values($ids));
 
         // Group by card id; groupBy preserves the within-group order from
         // the query (newest-first), which is what buildFeedbackFromLogs
@@ -155,22 +158,14 @@ class SenseReviewLearningFeedbackService
     {
         $total = $logs->count();
 
-        $forgetCount = 0;
-        $hardCount = 0;
-        $goodCount = 0;
-        $easyCount = 0;
-        foreach ($logs as $log) {
-            $rating = $log->rating;
-            if ($rating === 'again') {
-                $forgetCount++;
-            } elseif ($rating === 'hard') {
-                $hardCount++;
-            } elseif ($rating === 'good') {
-                $goodCount++;
-            } elseif ($rating === 'easy') {
-                $easyCount++;
-            }
-        }
+        // Rating counting delegates to the centralized analytics layer so
+        // the again/hard/good/easy counting logic is shared with
+        // TodaySummary and DailyReport.
+        $dist = $this->analytics->ratingDistribution($logs);
+        $forgetCount = $dist['again'];
+        $hardCount = $dist['hard'];
+        $goodCount = $dist['good'];
+        $easyCount = $dist['easy'];
 
         // recent_reviews: latest 5, newest-first (logs are already ordered).
         $recent = $logs->take(5);

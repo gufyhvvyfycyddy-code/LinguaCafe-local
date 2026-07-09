@@ -77,4 +77,26 @@ class SenseReviewQueryService
             ->where('review_logs.source', '!=', 'reset')
             ->where('review_logs.rating', '!=', 'reset');
     }
+
+    /**
+     * Card-scoped ReviewLog query that excludes reset-type entries.
+     *
+     * Unlike the sense-scoped helpers above, this does NOT join
+     * word_senses — it is scoped purely by review_card_id. User /
+     * language isolation is inherent: a ReviewCard belongs to exactly
+     * one user and one language, so the caller only passes card ids
+     * that belong to the current user.
+     *
+     * Used by the card-scoped analytics path (per-card learning
+     * feedback) so that reset exclusion lives in one place.
+     *
+     * @param  array<int>  $cardIds
+     */
+    public function nonResetCardReviewLogQuery(array $cardIds): Builder
+    {
+        return ReviewLog::query()
+            ->whereIn('review_card_id', $cardIds)
+            ->where('rating', '!=', 'reset')
+            ->where('source', '!=', 'reset');
+    }
 }

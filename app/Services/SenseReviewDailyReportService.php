@@ -21,12 +21,14 @@ use Illuminate\Support\Collection;
  *
  * Responsibilities:
  *  - Compute the natural-day boundary in the app timezone.
- *  - Reuse SenseReviewQueryService::nonResetSenseReviewLogQuery() for the
+ *  - Delegate ReviewLog querying to SenseReviewAnalyticsQueryService so the
  *    shared sense-only / user-isolated / language-isolated / reset-excluded
- *    log base (same rule as TodaySummary and LearningFeedback).
- *  - Determine first-review vs review-again senses by checking whether each
- *    sense had any non-reset review BEFORE today.
- *  - Aggregate rating counts, average rating, forget rate, stability rate.
+ *    query rules live in one place.
+ *  - Delegate rating distribution / forget rate / stability rate / per-sense
+ *    aggregation to the analytics layer so the formulas are shared with
+ *    TodaySummary + LearningFeedback.
+ *  - Determine first-review vs review-again senses via
+ *    SenseReviewAnalyticsQueryService::sensesReviewedBefore().
  *  - Build focus_senses (max 10) with the same factual rules as TodaySummary.
  *  - Build progress_senses by scanning each sense's today rating sequence
  *    for again→good or hard→easy transitions.
@@ -34,9 +36,9 @@ use Illuminate\Support\Collection;
  * Invariants:
  *  - READ-ONLY: never writes ReviewLog, never touches FSRS, never creates
  *    WordSense or ReviewCard.
- *  - Strict user + language isolation (enforced by SenseReviewQueryService).
- *  - ReviewLog sense-only filtering via review_cards.target_type = 'sense'.
- *  - Reset exclusion (rating='reset' OR source='reset').
+ *  - Strict user + language isolation (enforced by analytics layer).
+ *  - ReviewLog sense-only filtering + reset exclusion centralized in
+ *    SenseReviewAnalyticsQueryService / SenseReviewQueryService.
  *  - No new database table, no migration, no FSRS change.
  */
 class SenseReviewDailyReportService
@@ -53,7 +55,7 @@ class SenseReviewDailyReportService
     ];
 
     public function __construct(
-        private SenseReviewQueryService $senseReviewQueryService,
+        private SenseReviewAnalyticsQueryService $analytics,
     ) {
     }
 
@@ -89,40 +91,16 @@ class SenseReviewDailyReportService
         $dayStart = Carbon::today($timezone);
         $dayEnd = Carbon::tomorrow($timezone); // exclusive upper bound
 
-        // Today's non-reset sense review logs, newest-first.
-        $todayLogs = $this->senseReviewQueryService
-            ->nonResetSenseReviewLogQuery($userId, $language, $dayStart)
-            ->where('review_logs.reviewed_at', '<', $dayEnd)
-            ->select([
-                'review_logs.id',
-                'review_logs.review_card_id',
-                'review_logs.rating',
-                'review_logs.reviewed_at',
-                'review_cards.target_id as word_sense_id',
-                'word_senses.lemma',
-                'word_senses.sense_zh',
-            ])
-            ->orderByDesc('review_logs.reviewed_at')
-            ->orderByDesc('review_logs.id')
-            ->get();
+        // Delegate log fetching to the centralized analytics layer.
+        $todayLogs = $this->analytics->reviewsForPeriod($userId, $language, $dayStart, $dayEnd);
 
         // Distinct sense ids reviewed today.
         $todaySenseIds = $todayLogs->pluck('word_sense_id')->unique()->values()->all();
 
-        // Sense ids that had any non-reset review BEFORE today. Used to
-        // distinguish first-review (new today) from review-again (returning).
-        // Use a very early $since so the shared query includes all history;
-        // the < $dayStart constraint narrows to before-today only.
+        // Sense ids reviewed before today (for first-review vs review-again).
         $beforeTodaySenseIds = [];
         if (!empty($todaySenseIds)) {
-            $epoch = Carbon::create(1900, 1, 1, 0, 0, 0);
-            $beforeTodaySenseIds = $this->senseReviewQueryService
-                ->nonResetSenseReviewLogQuery($userId, $language, $epoch)
-                ->where('review_logs.reviewed_at', '<', $dayStart)
-                ->whereIn('review_cards.target_id', $todaySenseIds)
-                ->pluck('review_cards.target_id')
-                ->unique()
-                ->all();
+            $beforeTodaySenseIds = $this->analytics->sensesReviewedBefore($userId, $language, $dayStart);
         }
         $beforeTodaySet = array_flip($beforeTodaySenseIds);
 
@@ -182,26 +160,18 @@ class SenseReviewDailyReportService
     /**
      * Build the quality block: distribution, forget_rate, stability_rate.
      *
+     * Distribution + rates delegate to the analytics layer so the formulas
+     * are shared with TodaySummary + LearningFeedback.
+     *
      * forget_rate = again / total (null when empty).
      * stability_rate = (good + easy) / total (null when empty).
      */
     private function buildQuality(Collection $logs): array
     {
-        $total = $logs->count();
-        $again = $logs->where('rating', 'again')->count();
-        $hard = $logs->where('rating', 'hard')->count();
-        $good = $logs->where('rating', 'good')->count();
-        $easy = $logs->where('rating', 'easy')->count();
-
         return [
-            'distribution' => [
-                'again' => $again,
-                'hard' => $hard,
-                'good' => $good,
-                'easy' => $easy,
-            ],
-            'forget_rate' => $total > 0 ? round($again / $total, 4) : null,
-            'stability_rate' => $total > 0 ? round(($good + $easy) / $total, 4) : null,
+            'distribution' => $this->analytics->ratingDistribution($logs),
+            'forget_rate' => $this->analytics->forgetRate($logs),
+            'stability_rate' => $this->analytics->stabilityRate($logs),
         ];
     }
 
@@ -215,37 +185,14 @@ class SenseReviewDailyReportService
      *  - last rating today is again/hard.
      *
      * Sort: again desc, hard desc, total desc.
+     *
+     * Per-sense aggregation delegates to SenseReviewAnalyticsQueryService::
+     * reviewsBySense(); the focus filter + sort + max-10 are product logic
+     * that stays here.
      */
     private function buildFocusSenses(Collection $logs): array
     {
-        $bySense = [];
-        foreach ($logs as $log) {
-            $sid = $log->word_sense_id;
-            if (!isset($bySense[$sid])) {
-                $bySense[$sid] = [
-                    'word_sense_id' => $sid,
-                    'lemma' => $log->lemma,
-                    'sense_zh' => $log->sense_zh,
-                    'total' => 0,
-                    'again' => 0,
-                    'hard' => 0,
-                    'last_rating' => null,
-                ];
-            }
-            $entry = &$bySense[$sid];
-            $entry['total']++;
-            if ($log->rating === 'again') {
-                $entry['again']++;
-            }
-            if ($log->rating === 'hard') {
-                $entry['hard']++;
-            }
-            // logs are newest-first; first log seen = most recent rating.
-            if ($entry['last_rating'] === null) {
-                $entry['last_rating'] = $log->rating;
-            }
-            unset($entry);
-        }
+        $bySense = $this->analytics->reviewsBySense($logs);
 
         $focus = array_filter($bySense, function ($e) {
             return $e['again'] > 0
@@ -264,7 +211,20 @@ class SenseReviewDailyReportService
             return $b['total'] <=> $a['total'];
         });
 
-        return array_slice(array_values($focus), 0, 10);
+        // Shape to the DailyReport focus_senses contract (no last_reviewed_at).
+        $shaped = array_map(function ($e) {
+            return [
+                'word_sense_id' => $e['word_sense_id'],
+                'lemma' => $e['lemma'],
+                'sense_zh' => $e['sense_zh'],
+                'total' => $e['total'],
+                'again' => $e['again'],
+                'hard' => $e['hard'],
+                'last_rating' => $e['last_rating'],
+            ];
+        }, $focus);
+
+        return array_slice(array_values($shaped), 0, 10);
     }
 
     /**
@@ -278,28 +238,20 @@ class SenseReviewDailyReportService
      * the 'again'/'hard' rating. We scan old→new and report the first
      * qualifying transition per sense. No duplicates: one entry per sense.
      *
+     * Per-sense grouping delegates to SenseReviewAnalyticsQueryService::
+     * reviewsBySense() (ratings array is newest-first; we reverse to
+     * old→new for temporal scanning). The transition detection is product
+     * logic that stays here.
+     *
      * Each item: word_sense_id, lemma, sense_zh, from_rating, to_rating.
      */
     private function buildProgressSenses(Collection $logs): array
     {
-        // Group by sense, preserving newest-first order within each group.
-        $bySense = [];
-        foreach ($logs as $log) {
-            $sid = $log->word_sense_id;
-            if (!isset($bySense[$sid])) {
-                $bySense[$sid] = [
-                    'word_sense_id' => $sid,
-                    'lemma' => $log->lemma,
-                    'sense_zh' => $log->sense_zh,
-                    'ratings' => [], // will be newest-first
-                ];
-            }
-            $bySense[$sid]['ratings'][] = $log->rating;
-        }
+        $bySense = $this->analytics->reviewsBySense($logs);
 
         $progress = [];
         foreach ($bySense as $sid => $info) {
-            // Reverse to old→new for temporal scanning.
+            // ratings are newest-first; reverse to old→new for temporal scan.
             $oldToNew = array_reverse($info['ratings']);
             $transition = $this->findProgressTransition($oldToNew);
             if ($transition !== null) {

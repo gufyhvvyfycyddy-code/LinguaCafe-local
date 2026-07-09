@@ -19,11 +19,11 @@ use Illuminate\Support\Collection;
  *  - Compute the natural-day boundary in the Laravel app timezone (config/app.php
  *    'timezone'). The user timezone is NOT introduced in this round — the app
  *    timezone is the single source so frontend and backend never disagree.
- *  - Reuse SenseReviewQueryService::nonResetSenseReviewLogQuery() for the
+ *  - Delegate ReviewLog querying to SenseReviewAnalyticsQueryService so the
  *    shared sense-only / user-isolated / language-isolated / reset-excluded
- *    log base, so reset exclusion rules are identical to:
- *      * ReviewStatsService::reviewActivity() (reviewed_today counter)
- *      * SenseReviewLearningFeedbackService (per-card feedback aggregate)
+ *    query rules live in one place.
+ *  - Delegate rating counting / forget-rate computation to the analytics
+ *    layer so the formulas are shared with DailyReport + LearningFeedback.
  *  - Aggregate total / again / hard / good / easy counts for today.
  *  - Count distinct WordSenses reviewed today.
  *  - Build focus_senses (aggregated by sense, max 10) using factual rules:
@@ -36,17 +36,15 @@ use Illuminate\Support\Collection;
  * Invariants:
  *  - READ-ONLY: never writes ReviewLog, never touches any FSRS field,
  *    never creates WordSense or ReviewCard.
- *  - Strict user + language isolation (enforced by SenseReviewQueryService).
- *  - ReviewLog sense-only filtering via review_cards.target_type = 'sense'
- *    join — ReviewLog has NO target_type field.
- *  - Reset exclusion (rating='reset' OR source='reset') is delegated to
- *    SenseReviewQueryService::nonResetSenseReviewLogQuery().
+ *  - Strict user + language isolation (enforced by analytics layer).
+ *  - ReviewLog sense-only filtering + reset exclusion centralized in
+ *    SenseReviewAnalyticsQueryService / SenseReviewQueryService.
  *  - No new database table, no migration, no FSRS change.
  */
 class SenseReviewTodaySummaryService
 {
     public function __construct(
-        private SenseReviewQueryService $senseReviewQueryService,
+        private SenseReviewAnalyticsQueryService $analytics,
     ) {
     }
 
@@ -78,30 +76,10 @@ class SenseReviewTodaySummaryService
         $dayStart = Carbon::today($timezone);
         $dayEnd = Carbon::tomorrow($timezone); // exclusive upper bound
 
-        // Reuse the shared non-reset sense review log query, then narrow to
-        // today's [dayStart, dayEnd) window. This guarantees the reset
-        // exclusion rule is identical to ReviewStatsService and
-        // SenseReviewLearningFeedbackService.
-        $baseQuery = $this->senseReviewQueryService
-            ->nonResetSenseReviewLogQuery($userId, $language, $dayStart)
-            ->where('review_logs.reviewed_at', '<', $dayEnd);
-
-        // Pull only the columns we need for aggregation + sense metadata.
-        // Join word_senses is already done by nonResetSenseReviewLogQuery,
-        // so we can select sense columns directly.
-        $logs = (clone $baseQuery)
-            ->select([
-                'review_logs.id',
-                'review_logs.review_card_id',
-                'review_logs.rating',
-                'review_logs.reviewed_at',
-                'review_cards.target_id as word_sense_id',
-                'word_senses.lemma',
-                'word_senses.sense_zh',
-            ])
-            ->orderByDesc('review_logs.reviewed_at')
-            ->orderByDesc('review_logs.id')
-            ->get();
+        // Delegate log fetching to the centralized analytics layer. This
+        // guarantees the reset-exclusion / sense-only / user-language-isolation
+        // rules are identical to DailyReport and LearningFeedback.
+        $logs = $this->analytics->reviewsForPeriod($userId, $language, $dayStart, $dayEnd);
 
         return $this->formatSummary($logs, $timezone, $dayStart, $dayEnd);
     }
@@ -118,13 +96,8 @@ class SenseReviewTodaySummaryService
     private function formatSummary(Collection $logs, string $timezone, Carbon $dayStart, Carbon $dayEnd): array
     {
         $total = $logs->count();
-        $again = $logs->where('rating', 'again')->count();
-        $hard = $logs->where('rating', 'hard')->count();
-        $good = $logs->where('rating', 'good')->count();
-        $easy = $logs->where('rating', 'easy')->count();
-
-        // forget_rate: null when no reviews (frontend shows "无记录", not "0%").
-        $forgetRate = $total > 0 ? round($again / $total, 4) : null;
+        $distribution = $this->analytics->ratingDistribution($logs);
+        $forgetRate = $this->analytics->forgetRate($logs);
 
         $distinctSenses = $logs->pluck('word_sense_id')->unique()->count();
 
@@ -135,12 +108,7 @@ class SenseReviewTodaySummaryService
             'day_end' => $dayEnd->toIso8601String(),
             'total_reviews' => $total,
             'distinct_senses' => $distinctSenses,
-            'distribution' => [
-                'again' => $again,
-                'hard' => $hard,
-                'good' => $good,
-                'easy' => $easy,
-            ],
+            'distribution' => $distribution,
             'forget_rate' => $forgetRate,
             'focus_senses' => $this->buildFocusSenses($logs),
             'recent_reviews' => $this->buildRecentReviews($logs),
@@ -163,45 +131,16 @@ class SenseReviewTodaySummaryService
      * (desc by hard count), then by total count desc. This surfaces the most
      * problematic senses without guessing "why" they were forgotten.
      *
+     * Per-sense aggregation delegates to SenseReviewAnalyticsQueryService::
+     * reviewsBySense(); the focus filter + sort + max-10 are product logic
+     * that stays here.
+     *
      * @param  Collection  $logs  Newest-first log collection.
      * @return list<array>
      */
     private function buildFocusSenses(Collection $logs): array
     {
-        // Group by word_sense_id, preserving newest-first order within each group.
-        $bySense = [];
-        foreach ($logs as $log) {
-            $sid = $log->word_sense_id;
-            if (!isset($bySense[$sid])) {
-                $bySense[$sid] = [
-                    'word_sense_id' => $sid,
-                    'lemma' => $log->lemma,
-                    'sense_zh' => $log->sense_zh,
-                    'total' => 0,
-                    'again' => 0,
-                    'hard' => 0,
-                    'last_rating' => null,
-                    'last_reviewed_at' => null,
-                ];
-            }
-            $entry = &$bySense[$sid];
-            $entry['total']++;
-            if ($log->rating === 'again') {
-                $entry['again']++;
-            }
-            if ($log->rating === 'hard') {
-                $entry['hard']++;
-            }
-            // logs are newest-first, so the first log we see for a sense is
-            // its most recent rating today.
-            if ($entry['last_rating'] === null) {
-                $entry['last_rating'] = $log->rating;
-                $entry['last_reviewed_at'] = $log->reviewed_at
-                    ? $log->reviewed_at->toIso8601String()
-                    : null;
-            }
-            unset($entry);
-        }
+        $bySense = $this->analytics->reviewsBySense($logs);
 
         // Apply the factual focus rules.
         $focus = array_filter($bySense, function ($e) {
@@ -222,7 +161,21 @@ class SenseReviewTodaySummaryService
             return $b['total'] <=> $a['total'];
         });
 
-        return array_slice(array_values($focus), 0, 10);
+        // Shape each item to the TodaySummary focus_senses contract.
+        $shaped = array_map(function ($e) {
+            return [
+                'word_sense_id' => $e['word_sense_id'],
+                'lemma' => $e['lemma'],
+                'sense_zh' => $e['sense_zh'],
+                'total' => $e['total'],
+                'again' => $e['again'],
+                'hard' => $e['hard'],
+                'last_rating' => $e['last_rating'],
+                'last_reviewed_at' => $e['last_reviewed_at'],
+            ];
+        }, $focus);
+
+        return array_slice(array_values($shaped), 0, 10);
     }
 
     /**
