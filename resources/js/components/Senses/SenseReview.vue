@@ -205,6 +205,102 @@
                                 </div>
                             </v-expand-transition>
                         </div>
+
+                        <!-- SenseReview-LearningFeedback-1000-1: read-only
+                             learning feedback (collapsible, default collapsed).
+                             Shows total reviews, recent 5 performance breakdown,
+                             current stability (reuses fsrs_stability), and a
+                             factual "容易忘记" hint when 2+ of recent 5 were
+                             'again'. Only states facts from ReviewLog; never
+                             calls AI, never guesses causes. Does NOT trigger
+                             any network call, ReviewLog write, or FSRS change.
+                             Only renders when the card has >= 1 review log so
+                             first reviews stay uncluttered. -->
+                        <div v-if="hasLearningFeedback" class="mt-4">
+                            <div
+                                class="caption text--secondary d-flex align-center"
+                                style="cursor: pointer;"
+                                @click="learningFeedbackOpen = !learningFeedbackOpen"
+                            >
+                                <v-icon small class="mr-1">{{ learningFeedbackOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+                                学习状态
+                            </div>
+                            <v-expand-transition>
+                                <div v-if="learningFeedbackOpen" class="mt-2">
+                                    <div class="body-2 mb-2">
+                                        已复习 {{ learningFeedback.total_reviews }} 次
+                                    </div>
+                                    <div v-if="learningFeedback.recent_reviews.length" class="mb-2">
+                                        <span class="caption text--secondary">最近 {{ learningFeedback.recent_reviews.length }} 次表现：</span>
+                                        <div class="mt-1">
+                                            <v-chip
+                                                small
+                                                :color="r.rating === 'again' ? 'error' : (r.rating === 'hard' ? 'warning' : (r.rating === 'easy' ? 'success' : 'primary'))"
+                                                class="mr-1 mb-1"
+                                                v-for="(r, i) in learningFeedback.recent_reviews"
+                                                :key="i"
+                                            >{{ r.rating_label }}</v-chip>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <span class="caption text--secondary">当前稳定度：</span>
+                                        <span class="body-2">{{ currentCard.fsrs_stability ? Math.round(currentCard.fsrs_stability) + ' 天' : '-' }}</span>
+                                    </div>
+                                    <div v-if="easyToForgetHint" class="body-2 warning--text">
+                                        {{ easyToForgetHint }}
+                                    </div>
+                                </div>
+                            </v-expand-transition>
+                        </div>
+
+                        <!-- SenseReview-ForgettingPattern-1000-3: read-only
+                             forgetting-pattern block (collapsible, default
+                             collapsed). Sits below the learning-status block.
+                             Empty-state handling:
+                               - 0 < total < 4 (trend='insufficient') → shows
+                                 "复习次数较少,继续积累数据" instead of raw data,
+                                 so a single 'again' never looks like "容易忘记".
+                               - total >= 4 → shows recent review count, forget
+                                 count, forget rate, and a factual trend label.
+                             Read-only: opening it triggers no network call,
+                             no ReviewLog write, no FSRS change. Does NOT affect
+                             show-answer button, rating buttons, hotkeys, More
+                             menu, or view-source. -->
+                        <div class="mt-2">
+                            <div
+                                class="caption text--secondary d-flex align-center"
+                                style="cursor: pointer;"
+                                @click="forgettingPatternOpen = !forgettingPatternOpen"
+                            >
+                                <v-icon small class="mr-1">{{ forgettingPatternOpen ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+                                遗忘情况
+                            </div>
+                            <v-expand-transition>
+                                <div v-if="forgettingPatternOpen" class="mt-2">
+                                    <div v-if="forgettingEmptyHint" class="body-2 text--secondary">
+                                        {{ forgettingEmptyHint }}
+                                    </div>
+                                    <div v-else>
+                                        <div class="body-2 mb-1">
+                                            <span class="caption text--secondary">最近复习：</span>
+                                            {{ learningFeedback.recent_reviews.length }} 次
+                                        </div>
+                                        <div class="body-2 mb-1">
+                                            <span class="caption text--secondary">忘记：</span>
+                                            {{ forgettingPattern.total_forget }} 次
+                                        </div>
+                                        <div class="body-2 mb-1">
+                                            <span class="caption text--secondary">遗忘率：</span>
+                                            {{ Math.round(forgettingPattern.forget_rate * 100) }}%
+                                        </div>
+                                        <div class="body-2">
+                                            <span class="caption text--secondary">趋势：</span>
+                                            <span :class="forgettingTrendColor">{{ forgettingTrendLabel }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </v-expand-transition>
+                        </div>
                     </v-col>
                     <v-col cols="12" md="6">
                         <div class="caption text--secondary">例句</div>
@@ -479,6 +575,13 @@
                 // SenseReviewUnderstandingAid-1000-7: understanding aid collapse.
                 // Default collapsed; reset on card change in loadCards().
                 understandingAidOpen: false,
+                // SenseReview-LearningFeedback-1000-1: learning feedback collapse.
+                // Default collapsed; reset on card change in loadCards(). Read-only:
+                // opening it triggers no network call, no ReviewLog write, no FSRS change.
+                learningFeedbackOpen: false,
+                // SenseReview-ForgettingPattern-1000-3: forgetting pattern collapse.
+                // Default collapsed; reset on card change in loadCards(). Read-only.
+                forgettingPatternOpen: false,
                 showAnswer: false,
                 // Whether the user is in "ignore daily limits" mode (over-limit review)
                 ignoreDailyLimits: false,
@@ -535,6 +638,89 @@
                     (Array.isArray(this.understandingAid.related_collocations) && this.understandingAid.related_collocations.length)
                 );
             },
+            // SenseReview-LearningFeedback-1000-1: read-only learning feedback
+            // aggregate from ReviewLog. Backend always returns a stable shape
+            // (total_reviews / forget_count / hard_count / good_count /
+            // easy_count / recent_reviews[] / recent_forget_count), so this
+            // is null-safe. Opening this block does NOT trigger any network
+            // call, ReviewLog write, or FSRS change.
+            learningFeedback() {
+                if (!this.currentCard || !this.currentCard.learning_feedback) {
+                    return null;
+                }
+                return this.currentCard.learning_feedback;
+            },
+            // Only render the collapsible block when the card has at least one
+            // review log. A brand-new card (total_reviews=0) hides the block
+            // to avoid cluttering the first review.
+            hasLearningFeedback() {
+                if (!this.learningFeedback) {
+                    return false;
+                }
+                return this.learningFeedback.total_reviews > 0;
+            },
+            // "容易忘记" hint: when 2+ of the recent 5 reviews were 'again',
+            // surface a concise factual hint. Only states facts (counts),
+            // never guesses causes and never calls AI.
+            easyToForgetHint() {
+                if (!this.hasLearningFeedback) {
+                    return '';
+                }
+                const fb = this.learningFeedback;
+                if (fb.recent_forget_count >= 2) {
+                    return '过去 ' + fb.recent_reviews.length + ' 次复习中 ' + fb.recent_forget_count + ' 次选择 忘了';
+                }
+                return '';
+            },
+            // SenseReview-ForgettingPattern-1000-3: read-only forgetting-pattern
+            // block. Backend always returns learning_feedback.forgetting_pattern
+            // with a stable shape. Opening this block does NOT trigger any
+            // network call, ReviewLog write, or FSRS change.
+            forgettingPattern() {
+                if (!this.learningFeedback || !this.learningFeedback.forgetting_pattern) {
+                    return null;
+                }
+                return this.learningFeedback.forgetting_pattern;
+            },
+            // Empty-state hint shown INSTEAD of the full data block when there
+            // is not enough data to render a meaningful forgetting analysis:
+            //   - no reviews at all → "暂无复习记录"
+            //   - reviews exist but trend is 'insufficient' (<4 reviews) →
+            //     "复习次数较少,继续积累数据"
+            // Returning '' means "data is sufficient, render the full block".
+            forgettingEmptyHint() {
+                const fb = this.learningFeedback;
+                if (!fb || fb.total_reviews === 0) {
+                    return '暂无复习记录';
+                }
+                const fp = this.forgettingPattern;
+                if (!fp || fp.trend === 'insufficient') {
+                    return '复习次数较少,继续积累数据';
+                }
+                return '';
+            },
+            hasForgettingData() {
+                return this.forgettingEmptyHint === '' && !!this.forgettingPattern;
+            },
+            forgettingTrendLabel() {
+                const t = this.forgettingPattern ? this.forgettingPattern.trend : '';
+                return {
+                    improving: '正在改善',
+                    declining: '正在下降',
+                    stable: '稳定',
+                    insufficient: '数据不足',
+                }[t] || '';
+            },
+            forgettingTrendColor() {
+                const t = this.forgettingPattern ? this.forgettingPattern.trend : '';
+                if (t === 'improving') {
+                    return 'success--text';
+                }
+                if (t === 'declining') {
+                    return 'error--text';
+                }
+                return 'text--secondary';
+            },
         },
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
@@ -571,6 +757,8 @@
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;  // Reset FSRS collapse on card change
                     this.understandingAidOpen = false;  // SenseReviewUnderstandingAid-1000-7: reset aid collapse on card change
+                    this.learningFeedbackOpen = false;  // SenseReview-LearningFeedback-1000-1: reset feedback collapse on card change
+                    this.forgettingPatternOpen = false;  // SenseReview-ForgettingPattern-1000-3: reset forgetting collapse on card change
                     this.showAnswer = false;
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
