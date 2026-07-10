@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-10 (ADR-0006: SenseReview daily report consolidation — TodaySummaryService + today-summary endpoint + SenseReviewTodaySummary.vue deleted; DailyInsightBuilder pure-computation layer added; DailyReportService is single today-report Product Service with five-block payload; Catalog reduced to 3 items; four coexisting summary concepts).
+> **最后更新**：2026-07-10 (ADR-0007: SenseReview report card deep link navigation contract — `ReviewCardManageAccessService` 单一访问校验来源; 只读 `GET /review-cards/manage/{reviewCard}/detail` 端点; `ReviewCardManageDeepLink.js` 纯函数 helper; `SenseReviewDailyInsightBuilder` 在 focus/progress/recent 输出 `review_card_id` + `word_sense_id`，0 DB 查询; ADR-0006 日报合并保持不变)。
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。

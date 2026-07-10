@@ -1,8 +1,8 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (ADR-0006 complete: TodaySummaryService + today-summary endpoint + SenseReviewTodaySummary.vue all deleted; DailyInsightBuilder pure-computation layer added; DailyReportService is the single today-report Product Service with five-block payload; Catalog reduced to 3 items; ReportCenter registers 3 components).
+> **Status**: Current as of 2026-07-10 (ADR-0007 complete: SenseReview report card deep link navigation contract added — `ReviewCardManageAccessService` is the single source of truth for sense-card access control; new read-only `GET /review-cards/manage/{reviewCard}/detail` endpoint; `ReviewCardManageDeepLink.js` pure-function helper; `SenseReviewDailyInsightBuilder` outputs `review_card_id` + `word_sense_id` on focus/progress/recent with 0 DB queries via in-memory map; ADR-0006 daily report consolidation remains intact).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
-> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`.
+> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`, `docs/adr/ADR-0007-sense-review-report-card-deep-link.md`.
 
 ## 0. Six-Layer Report Architecture
 
@@ -227,10 +227,11 @@ The container does **not**:
 - **Public method**: `build(Collection $logs): array` — returns `['focus_senses' => ..., 'progress_senses' => ..., 'recent_reviews' => ...]`.
 - **Uses**: `SenseReviewReportMetricsService::reviewsBySense()` (grouping), `SenseReviewRatingContract::labelFor()` (rating labels).
 - **Forbidden dependencies**: Eloquent, DB, Auth, Request, Controller, config, .env, `SenseReviewAnalyticsQueryService`. Pure in-memory computation only.
-- **focus_senses rules**: includes senses with again>0 OR hard>0 OR same-sense reviewed multiple times today OR last rating is again/hard. Unified superset output: word_sense_id, lemma, sense_zh, total, again, hard, last_rating, last_reviewed_at. Sorted by again desc, hard desc, total desc. Max 10.
-- **progress_senses rules**: again→good or hard→easy transitions detected by real temporal order. Same sense max one entry. Invalid transitions (again→hard, good→easy, etc.) excluded.
-- **recent_reviews rules**: newest first, max 10. Each item: lemma, sense_zh, rating, rating_label (from Contract, hard→"勉强记得"), reviewed_at.
-- **Zero DB queries**: locked by `SenseReviewDailyInsightBuilderTest::test_builder_does_not_access_database`.
+- **Navigation IDs (ADR-0007)**: each item in `focus_senses` / `progress_senses` / `recent_reviews` includes `review_card_id` (int|null) and `word_sense_id` (int). The builder constructs an in-memory `word_sense_id → review_card_id` map from the same `$logs` Collection passed in — 0 DB queries, 0 extra QueryService calls. `recent_reviews` uses each log row's own `review_card_id` directly; `focus_senses` and `progress_senses` use the latest `review_card_id` seen for that `word_sense_id` in the log collection. Invalid/missing IDs become `null` (never fabricated). This is the contract that enables the DailyReport → ReviewCardManage deep link flow without adding DB queries.
+- **focus_senses rules**: includes senses with again>0 OR hard>0 OR same-sense reviewed multiple times today OR last rating is again/hard. Unified superset output: word_sense_id, lemma, sense_zh, total, again, hard, last_rating, last_reviewed_at, review_card_id (from in-memory map, latest log for that sense). Sorted by again desc, hard desc, total desc. Max 10.
+- **progress_senses rules**: again→good or hard→easy transitions detected by real temporal order. Same sense max one entry. Output includes word_sense_id, lemma, sense_zh, from_rating, to_rating, reviewed_at, review_card_id (from in-memory map, the card on which the transition occurred).
+- **recent_reviews rules**: newest first, max 10. Each item: lemma, sense_zh, rating, rating_label (from Contract, hard→"勉强记得"), reviewed_at, review_card_id (from the log row directly), word_sense_id (from the log row directly).
+- **Zero DB queries**: locked by `SenseReviewDailyInsightBuilderTest::test_builder_does_not_access_database` and `test_navigation_ids_do_not_increase_db_queries`.
 
 ### 3.3c SenseReviewSevenDayTrendService.php (~190 lines)
 
@@ -378,3 +379,91 @@ The 7-day trend and 30-day calendar do NOT issue per-day queries. Each issues a 
 - Reading-time / lookup-count / AI-usage statistics.
 - Report export / push / badges / streak / auto-generated study advice.
 - Report snapshot persistence (all reports are real-time ReviewLog reads).
+
+## 9. Report Card Deep Link Navigation (ADR-0007)
+
+### 9.1 Navigation Contract Overview
+
+ADR-0007 freezes the cross-page deep link contract that lets a user click an entry in the DailyReport (focus_senses / progress_senses / recent_reviews) and land on the exact `ReviewCardManage` detail for that sense card — without relying on lemma fuzzy search, without depending on the target card being in the current page/filter, and without any DB writes.
+
+```
+Daily Report Query (reviewsForPeriod, 1 query)
+    ↓
+DailyInsightBuilder (pure in-memory)
+    ↓ outputs review_card_id + word_sense_id on each item
+DailyReport.vue (presentational)
+    ↓ emit open-review-card { review_card_id, word_sense_id, source_section }
+ReportCenter (orchestration)
+    ↓ ReviewCardManageDeepLink.buildReviewCardManageLocation(target, source)
+/review-cards/manage?review_card_id=123&from=daily-report
+    ↓
+ReviewCardManage.vue (parses route query on mount)
+    ↓
+GET /review-cards/manage/{reviewCard}/detail   (read-only)
+    ↓
+ReviewCardManageAccessService::findManageableSenseCardOrFail()
+    ↓ user + language + target_type=sense + confirmed WordSense
+ReviewCardManageItemSerializerService::serializeCard()
+    ↓
+Exact card detail + logs loaded, no list pagination dependency
+```
+
+### 9.2 ReviewCardManageAccessService (Single Source of Truth for Access Control)
+
+`app/Services/ReviewCardManageAccessService.php` is the **only** place that decides whether a given `review_card_id` is manageable as a sense card by the current user. The Controller's former private `findManageableSenseCard()` method was migrated here so that `update`, `enabled`, `dueNow`, `reset`, `destroy`, `logs`, and the new `detail` endpoint all share one access path.
+
+- **Public method**: `findManageableSenseCardOrFail(int $reviewCardId, int $userId, string $language): array{0: ReviewCard, 1: WordSense}`.
+- **Checks (all must pass, else abort 404)**:
+  1. `review_cards.id` exists.
+  2. `review_cards.user_id === $userId`.
+  3. `review_cards.language_id === $language`.
+  4. `review_cards.target_type === ReviewCard::TARGET_SENSE`.
+  5. A `WordSense` exists with `id === review_cards.target_id`.
+  6. `word_senses.user_id === $userId`.
+  7. `word_senses.language_id === $language`.
+  8. `word_senses.status === WordSense::STATUS_CONFIRMED`.
+- **Archived cards**: allowed (`fsrs_enabled=false` is not a 404 reason — the user can still open the detail).
+- **Legacy word cards**: 404 (target_type mismatch).
+- **Rejected / pending / deleted senses**: 404 (status mismatch).
+- **Other user / other language**: 404 (never reveals existence — uniform 404 to avoid leaking card existence).
+- **Never writes**: no ReviewLog, no FSRS mutation, no ReviewCard/WordSense creation/update/delete.
+
+### 9.3 Detail Endpoint Contract
+
+- **Route**: `GET /review-cards/manage/{reviewCard}/detail` (registered in `routes/web.php`, inside the auth middleware group).
+- **Controller**: `ReviewCardManageController::detail(int $reviewCard): JsonResponse`.
+- **Behavior**:
+  1. Delegates to `ReviewCardManageAccessService::findManageableSenseCardOrFail()`.
+  2. On success, returns `ReviewCardManageItemSerializerService::serializeCard($card, $sense)` — **byte-identical payload shape** to the list endpoint's `serializeCard()`, so the management page can reuse the same item renderer for both list rows and the deep-link detail.
+  3. On failure (any of the 8 checks above): 404.
+- **GET-only**: POST / PATCH / DELETE → 405 (locked by `ReviewCardManageDeepLinkTest::test_detail_endpoint_is_get_only`).
+- **No writes**: no ReviewLog write, no FSRS change, no mutation of any field (locked by `test_detail_endpoint_does_not_write_review_log` + `test_detail_endpoint_does_not_change_fsrs`).
+- **Does NOT touch list pagination / filters / queue**: this endpoint returns a single card payload; the management page list query is independent.
+
+### 9.4 ReviewCardManageDeepLink.js (Frontend Pure-Function Helper)
+
+`resources/js/services/ReviewCardManageDeepLink.js` is a pure ES module — no Vue, no Vuex, no axios, no DOM access, no state writes.
+
+- **Exports**:
+  - `DEEP_LINK_SOURCES` — frozen whitelist `['daily-report', 'seven-day-trend', 'thirty-day-calendar']`.
+  - `buildReviewCardManageLocation(target, source)` — returns `{ path: '/review-cards/manage', query: { review_card_id, from } }` or `null` on invalid input. `target.review_card_id` must be a positive integer; `source` must be in the whitelist; `word_sense_id` is accepted as a diagnostic field but never replaces `review_card_id`.
+  - `parseReviewCardManageLocation(query)` — returns `{ review_card_id, from, word_sense_id }` or `null` on invalid input. Coerces numeric strings, rejects 0 / negative / NaN / non-numeric strings / missing keys.
+- **Route contract**: `/review-cards/manage?review_card_id={positive-int}&from={source-whitelist}` (optional `word_sense_id` diagnostic).
+- **Guard tests**: `tests/js/ReviewCardManageDeepLinkGuard.test.mjs` (24 tests covering build/parse/invalid/whitelist/no-axios/no-Vue/no-DOM).
+
+### 9.5 Why review_card_id (not lemma search)
+
+The unique constraint on `review_cards` `(user_id, language_id, target_type, target_id)` means one confirmed WordSense maps to exactly one sense ReviewCard. Using `review_card_id` as the primary key:
+
+- Eliminates the pagination/filter dependency that a lemma search would introduce (the target card may not be on the current page, and forcing it into the list would corrupt the user's filters).
+- Matches the Anki Browser / Card Info model: Anki opens Card Info by exact card ID, not by searching the note text.
+- Allows the deep link to survive a page refresh (the route query stays in the URL).
+
+### 9.6 Frozen Boundaries
+
+- **InsightBuilder**: pure in-memory, 0 DB queries. The navigation IDs are a product-output concern, so they live in the InsightBuilder (not in `SenseReviewReportMetricsService::reviewsBySense()`, which stays focused on metrics aggregation).
+- **DailyReportService**: query budget unchanged (still 1 query empty / ≤2 non-empty). The navigation IDs add 0 queries.
+- **AccessService**: the only place that performs sense-card access control. The Controller must not duplicate user/language/sense-only/confirmed checks.
+- **DeepLink Helper**: pure functions only. No API calls, no Vue imports, no DOM access.
+- **Seven-day trend window**: unchanged (today + previous 6 natural days, NOT natural week). ADR-0007 explicitly does NOT touch `SenseReviewSevenDayTrendService` / `SenseReviewReportPeriodService` / `SenseReviewSevenDayTrend.vue`.
+- **No FSRS / ReviewLog / DB schema change**: the entire deep link flow is read-only.

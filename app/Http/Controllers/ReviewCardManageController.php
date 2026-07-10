@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
+use App\Services\ReviewCardManageAccessService;
 use App\Services\ReviewCardManageItemSerializerService;
 use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
@@ -24,6 +25,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardManageQueryService $queryService,
         private ReviewCardManageItemSerializerService $itemSerializer,
         private ReviewCardManageMutationService $mutationService,
+        private ReviewCardManageAccessService $accessService,
     )
     {
     }
@@ -189,7 +191,9 @@ class ReviewCardManageController extends Controller
 
     public function logs(int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
@@ -227,7 +231,9 @@ class ReviewCardManageController extends Controller
      */
     public function update(Request $request, int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $this->mutationService->updateSenseTextFields($sense, $request);
 
@@ -240,7 +246,9 @@ class ReviewCardManageController extends Controller
      */
     public function enabled(Request $request, int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $this->mutationService->setEnabled($card, $request->boolean('enabled'));
 
@@ -253,7 +261,9 @@ class ReviewCardManageController extends Controller
      */
     public function dueNow(Request $request, int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $this->mutationService->setDueNow($card);
 
@@ -267,7 +277,9 @@ class ReviewCardManageController extends Controller
      */
     public function reset(int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $card = $this->reviewCardService->resetCard(
             Auth::user()->id,
@@ -290,7 +302,9 @@ class ReviewCardManageController extends Controller
      */
     public function destroy(int $reviewCard): JsonResponse
     {
-        [$card, $sense] = $this->findManageableSenseCard($reviewCard);
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
         $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
 
@@ -361,35 +375,30 @@ class ReviewCardManageController extends Controller
         ]);
     }
 
-    // ==================== Private helpers ====================
-
-    
-    private function findManageableSenseCard(int $reviewCardId): array
+    /**
+     * GET /review-cards/manage/{reviewCard}/detail
+     * ADR-0007 — Read-only exact card detail for deep-link navigation.
+     *
+     * Returns the serialized card item (same shape as list serializer) for
+     * a specific sense ReviewCard. Used by the daily report deep link so the
+     * management page can open the exact card without depending on the
+     * target card appearing in the current pagination/filter.
+     *
+     * Access control: ReviewCardManageAccessService (single source of truth).
+     * 404 for: not found, other user, other language, legacy word card,
+     * rejected/deleted sense. Archived cards (fsrs_enabled=false) allowed.
+     *
+     * Read-only: no ReviewLog write, no FSRS change, no filter/pagination
+     * modification.
+     */
+    public function detail(int $reviewCard): JsonResponse
     {
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
+        [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard, Auth::user()->id, Auth::user()->selected_language
+        );
 
-        $card = ReviewCard::query()
-            ->where('id', $reviewCardId)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('target_type', ReviewCard::TARGET_SENSE)
-            ->first();
-
-        if (!$card) {
-            abort(404);
-        }
-
-        $sense = WordSense::query()
-            ->where('id', $card->target_id)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('status', WordSense::STATUS_CONFIRMED)
-            ->first();
-
-        if (!$sense) {
-            abort(404);
-        }
-
-        return [$card, $sense];
-    }}
+        return response()->json(
+            $this->itemSerializer->serializeCard($card, $sense)
+        );
+    }
+}

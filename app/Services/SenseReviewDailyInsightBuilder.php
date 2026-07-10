@@ -90,9 +90,23 @@ class SenseReviewDailyInsightBuilder
      */
     public function build(Collection $logs): array
     {
+        // Build word_sense_id → review_card_id map from the newest-first logs.
+        // The first log seen for a sense is the newest (matching reviewsBySense
+        // semantics). Used by focus_senses and progress_senses for precise
+        // card navigation (ADR-0007). 0 DB queries — reads from in-memory logs.
+        // review_card_id <= 0 → null (do not fabricate fake navigation targets).
+        $cardIdBySense = [];
+        foreach ($logs as $log) {
+            $sid = $log->word_sense_id;
+            if (!isset($cardIdBySense[$sid])) {
+                $rid = $log->review_card_id ?? 0;
+                $cardIdBySense[$sid] = $rid > 0 ? $rid : null;
+            }
+        }
+
         return [
-            'focus_senses' => $this->buildFocusSenses($logs),
-            'progress_senses' => $this->buildProgressSenses($logs),
+            'focus_senses' => $this->buildFocusSenses($logs, $cardIdBySense),
+            'progress_senses' => $this->buildProgressSenses($logs, $cardIdBySense),
             'recent_reviews' => $this->buildRecentReviews($logs),
         ];
     }
@@ -115,7 +129,7 @@ class SenseReviewDailyInsightBuilder
      * @param  Collection  $logs  Newest-first log collection.
      * @return list<array>
      */
-    private function buildFocusSenses(Collection $logs): array
+    private function buildFocusSenses(Collection $logs, array $cardIdBySense): array
     {
         $bySense = $this->metrics->reviewsBySense($logs);
 
@@ -136,9 +150,10 @@ class SenseReviewDailyInsightBuilder
             return $b['total'] <=> $a['total'];
         });
 
-        $shaped = array_map(function ($e) {
+        $shaped = array_map(function ($e) use ($cardIdBySense) {
             return [
                 'word_sense_id' => $e['word_sense_id'],
+                'review_card_id' => $cardIdBySense[$e['word_sense_id']] ?? null,
                 'lemma' => $e['lemma'],
                 'sense_zh' => $e['sense_zh'],
                 'total' => $e['total'],
@@ -167,7 +182,7 @@ class SenseReviewDailyInsightBuilder
      * @param  Collection  $logs  Newest-first log collection.
      * @return list<array>
      */
-    private function buildProgressSenses(Collection $logs): array
+    private function buildProgressSenses(Collection $logs, array $cardIdBySense): array
     {
         $bySense = $this->metrics->reviewsBySense($logs);
 
@@ -179,6 +194,7 @@ class SenseReviewDailyInsightBuilder
             if ($transition !== null) {
                 $progress[] = [
                     'word_sense_id' => $sid,
+                    'review_card_id' => $cardIdBySense[$sid] ?? null,
                     'lemma' => $info['lemma'],
                     'sense_zh' => $info['sense_zh'],
                     'from_rating' => $transition['from'],
@@ -205,7 +221,10 @@ class SenseReviewDailyInsightBuilder
         $recent = [];
         foreach ($logs->take(10) as $log) {
             $rating = $log->rating;
+            $rid = $log->review_card_id ?? 0;
             $recent[] = [
+                'review_card_id' => $rid > 0 ? $rid : null,
+                'word_sense_id' => $log->word_sense_id,
                 'lemma' => $log->lemma,
                 'sense_zh' => $log->sense_zh,
                 'rating' => $rating,

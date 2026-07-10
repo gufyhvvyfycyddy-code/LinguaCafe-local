@@ -1,0 +1,189 @@
+// ReviewCardManageDeepLinkGuard.test.mjs
+//
+// ADR-0007 — SenseReview Report Card Deep Link
+//
+// Node built-in assert tests for the ReviewCardManageDeepLink pure functions.
+// No third-party test framework required — runs with `node <file>`.
+//
+// These tests guard:
+//   1. buildReviewCardManageLocation produces correct path + query.
+//   2. parseReviewCardManageLocation parses valid query correctly.
+//   3. Invalid / zero / negative / string-garbage review_card_id → null.
+//   4. Source whitelist enforced (invalid source → null).
+//   5. word_sense_id is NOT required (diagnostic only).
+//   6. Functions do not call axios / Vue / DOM (pure).
+//   7. File does not import axios or Vue.
+
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const HELPER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'services', 'ReviewCardManageDeepLink.js');
+
+// Dynamic import of the ES module helper
+const {
+    buildReviewCardManageLocation,
+    parseReviewCardManageLocation,
+    DEEP_LINK_SOURCES,
+} = await import('file://' + HELPER_PATH.replace(/\\/g, '/'));
+
+let passed = 0;
+function test(name, fn) {
+    try {
+        fn();
+        passed++;
+        console.log(`  ✓ ${name}`);
+    } catch (e) {
+        console.error(`  ✗ ${name}`);
+        console.error(`    ${e.message}`);
+        process.exitCode = 1;
+    }
+}
+
+console.log('ReviewCardManageDeepLink guard tests\n');
+
+// --- 1. buildReviewCardManageLocation: correct output ---
+
+test('build: valid target + source → correct path + query', () => {
+    const loc = buildReviewCardManageLocation(
+        { review_card_id: 123, word_sense_id: 45 },
+        'daily-report'
+    );
+    assert.deepEqual(loc, {
+        path: '/review-cards/manage',
+        query: { review_card_id: 123, from: 'daily-report' },
+    });
+});
+
+test('build: path is always /review-cards/manage', () => {
+    const loc = buildReviewCardManageLocation(
+        { review_card_id: 1 },
+        'seven-day-trend'
+    );
+    assert.strictEqual(loc.path, '/review-cards/manage');
+});
+
+// --- 2. parseReviewCardManageLocation: valid query ---
+
+test('parse: valid query → { review_card_id, from }', () => {
+    const result = parseReviewCardManageLocation({
+        review_card_id: '123',
+        from: 'daily-report',
+    });
+    assert.deepEqual(result, { review_card_id: 123, from: 'daily-report' });
+});
+
+test('parse: round-trip build → parse', () => {
+    const loc = buildReviewCardManageLocation(
+        { review_card_id: 99 },
+        'thirty-day-calendar'
+    );
+    const parsed = parseReviewCardManageLocation(loc.query);
+    assert.deepEqual(parsed, { review_card_id: 99, from: 'thirty-day-calendar' });
+});
+
+// --- 3. Invalid / zero / negative / string-garbage review_card_id ---
+
+test('build: review_card_id = 0 → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: 0 }, 'daily-report'), null);
+});
+
+test('build: review_card_id = -1 → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: -1 }, 'daily-report'), null);
+});
+
+test('build: review_card_id = "abc" (string) → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: 'abc' }, 'daily-report'), null);
+});
+
+test('build: review_card_id = undefined → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({}, 'daily-report'), null);
+});
+
+test('build: review_card_id = 1.5 (float) → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: 1.5 }, 'daily-report'), null);
+});
+
+test('parse: review_card_id = "0" → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '0', from: 'daily-report' }), null);
+});
+
+test('parse: review_card_id = "-5" → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '-5', from: 'daily-report' }), null);
+});
+
+test('parse: review_card_id = "abc" → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: 'abc', from: 'daily-report' }), null);
+});
+
+test('parse: review_card_id missing → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ from: 'daily-report' }), null);
+});
+
+test('parse: query = null → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation(null), null);
+});
+
+test('parse: query = undefined → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation(undefined), null);
+});
+
+// --- 4. Source whitelist ---
+
+test('build: invalid source → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: 1 }, 'invalid-source'), null);
+});
+
+test('build: empty source → null', () => {
+    assert.strictEqual(buildReviewCardManageLocation({ review_card_id: 1 }, ''), null);
+});
+
+test('parse: invalid from → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '1', from: 'invalid' }), null);
+});
+
+test('parse: missing from → null', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '1' }), null);
+});
+
+test('DEEP_LINK_SOURCES contains exactly 3 sources', () => {
+    assert.strictEqual(DEEP_LINK_SOURCES.length, 3);
+    assert.ok(DEEP_LINK_SOURCES.includes('daily-report'));
+    assert.ok(DEEP_LINK_SOURCES.includes('seven-day-trend'));
+    assert.ok(DEEP_LINK_SOURCES.includes('thirty-day-calendar'));
+});
+
+// --- 5. word_sense_id is NOT required ---
+
+test('build: works without word_sense_id (diagnostic only)', () => {
+    const loc = buildReviewCardManageLocation({ review_card_id: 5 }, 'daily-report');
+    assert.ok(loc !== null);
+    assert.strictEqual(loc.query.review_card_id, 5);
+    assert.strictEqual(loc.query.word_sense_id, undefined);
+});
+
+// --- 6. Functions are pure (no axios / Vue / DOM) ---
+
+test('helper file does not import axios', () => {
+    const content = readFileSync(HELPER_PATH, 'utf-8');
+    const importLines = content.split('\n').filter(l => l.trim().startsWith('import'));
+    assert.ok(!importLines.some(l => l.includes('axios')), 'DeepLink helper must not import axios');
+});
+
+test('helper file does not import Vue', () => {
+    const content = readFileSync(HELPER_PATH, 'utf-8');
+    const importLines = content.split('\n').filter(l => l.trim().startsWith('import'));
+    assert.ok(!importLines.some(l => l.toLowerCase().includes('vue')), 'DeepLink helper must not import Vue');
+});
+
+test('helper file does not reference document/window', () => {
+    const content = readFileSync(HELPER_PATH, 'utf-8');
+    assert.ok(!content.includes('document'), 'DeepLink helper must not access DOM');
+    assert.ok(!content.includes('window'), 'DeepLink helper must not access window');
+});
+
+console.log(`\n${passed} passed`);
