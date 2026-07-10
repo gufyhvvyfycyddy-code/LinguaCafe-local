@@ -68,7 +68,7 @@
                         <v-chip small color="error" outlined>忘了 {{ calendar.summary.distribution.again }}</v-chip>
                     </v-col>
                     <v-col cols="3">
-                        <v-chip small color="warning" outlined>勉强 {{ calendar.summary.distribution.hard }}</v-chip>
+                        <v-chip small color="warning" outlined>勉强记得 {{ calendar.summary.distribution.hard }}</v-chip>
                     </v-col>
                     <v-col cols="3">
                         <v-chip small color="success" outlined>记得 {{ calendar.summary.distribution.good }}</v-chip>
@@ -131,7 +131,7 @@
                             <v-chip x-small color="error" outlined>忘了 {{ selectedDay.distribution.again }}</v-chip>
                         </v-col>
                         <v-col cols="3">
-                            <v-chip x-small color="warning" outlined>勉强 {{ selectedDay.distribution.hard }}</v-chip>
+                            <v-chip x-small color="warning" outlined>勉强记得 {{ selectedDay.distribution.hard }}</v-chip>
                         </v-col>
                         <v-col cols="3">
                             <v-chip x-small color="success" outlined>记得 {{ selectedDay.distribution.good }}</v-chip>

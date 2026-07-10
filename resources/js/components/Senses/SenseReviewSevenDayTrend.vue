@@ -62,7 +62,7 @@
                     <div class="ma-2">
                         <span class="text--secondary">7 天评分分布：</span>
                         <span class="error--text font-weight-medium ml-2">忘 {{ trend.summary.distribution.again }}</span>
-                        <span class="warning--text font-weight-medium ml-2">困难 {{ trend.summary.distribution.hard }}</span>
+                        <span class="warning--text font-weight-medium ml-2">勉强记得 {{ trend.summary.distribution.hard }}</span>
                         <span class="primary--text font-weight-medium ml-2">记得 {{ trend.summary.distribution.good }}</span>
                         <span class="success--text font-weight-medium ml-2">很熟 {{ trend.summary.distribution.easy }}</span>
                     </div>
@@ -103,7 +103,7 @@
                     <!-- 评分分布 + 比率 -->
                     <div v-if="day.total_reviews > 0" class="body-2 d-flex flex-wrap align-center">
                         <v-chip x-small color="error" class="mr-1">忘 {{ day.distribution.again }}</v-chip>
-                        <v-chip x-small color="warning" class="mr-1">困难 {{ day.distribution.hard }}</v-chip>
+                        <v-chip x-small color="warning" class="mr-1">勉强记得 {{ day.distribution.hard }}</v-chip>
                         <v-chip x-small color="primary" class="mr-1">记得 {{ day.distribution.good }}</v-chip>
                         <v-chip x-small color="success" class="mr-1">很熟 {{ day.distribution.easy }}</v-chip>
                         <span class="text--secondary ml-2">

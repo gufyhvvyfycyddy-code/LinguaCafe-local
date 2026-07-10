@@ -77,7 +77,7 @@
                                 <span class="text-caption text--secondary">
                                     今日 {{ item.total }} 次
                                     <span v-if="item.again > 0" class="error--text">· 忘 {{ item.again }}</span>
-                                    <span v-if="item.hard > 0" class="warning--text">· 勉强 {{ item.hard }}</span>
+                                    <span v-if="item.hard > 0" class="warning--text">· 勉强记得 {{ item.hard }}</span>
                                 </span>
                             </v-list-item-subtitle>
                         </v-list-item-content>

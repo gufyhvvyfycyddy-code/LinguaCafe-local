@@ -1,6 +1,6 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (30-day calendar added; five-layer report architecture: Period + Query + Metrics + Series + Product Service; ReportCenter UI orchestration).
+> **Status**: Current as of 2026-07-10 (ReportCatalog + RatingPresentation centralized contracts; ReportCenter v-model=boolean open state with internal selectedReportKey; five-layer report architecture: Period + Query + Metrics + Series + Product Service).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
 
@@ -34,13 +34,46 @@ Controller          SenseReviewController              Request coordination only
 
 ## 0.1 ReportCenter UI Orchestration
 
-`SenseReviewReportCenter.vue` is the single orchestration component for all report dialogs. It replaces the three previously duplicated dialog/loading/payload/GET patterns in `SenseReview.vue`.
+`SenseReviewReportCenter.vue` is the single orchestration component for all report dialogs. It owns the entire report-dialog lifecycle internally; the parent only controls open/close.
 
-- **v-model / activeReport**: `null` | `'today-summary'` | `'daily-report'` | `'seven-day-trend'` | `'thirty-day-calendar'`.
-- **Parent** (`SenseReview.vue`) only sets `activeReport`; ReportCenter handles dialog, loading, GET request, error state, and close (emits `input` null).
+- **v-model (open)**: `boolean` — `false` = closed (resets all internal state); `true` = open.
+- **Parent** (`SenseReview.vue`) only sets `reportCenterOpen = true|false`; ReportCenter handles dialog, loading, GET request, error state, report selection, back-to-list, and close (emits `input` false).
+- **Internal state owned by ReportCenter**: `selectedReportKey` (`null` on home page | `'today-summary'` | `'daily-report'` | `'seven-day-trend'` | `'thirty-day-calendar'`), `loading`, `error`, `payload`, `requestSequence` (monotonic counter for async-race protection).
+- **Home page**: when `selectedReportKey === null`, shows the report catalog selection view. NO GET request is sent on the home page. A GET is sent only after the user selects a specific report.
+- **Back to list**: resets `selectedReportKey` to `null`, clears `error`/`payload`, keeps the dialog open. The user can then choose another report.
+- **Async-race protection**: each report selection increments `requestSequence`; stale responses whose sequence no longer matches the current request are discarded (guard against user switching reports or closing the dialog while a request is in flight).
+- **No duplicate requests**: if the same report is already loading, a second selection does not re-trigger the GET.
 - **Only read-only GET requests**. Never POSTs ratings. Never writes ReviewLog. Never touches FSRS.
 - **SessionSummary is NOT managed here** (it is page-load scoped, not a backend-report dialog).
-- `SenseReview.vue` reduced from 926 → 779 lines after extraction.
+
+## 0.2 SenseReviewReportCatalog.js (Frontend Report Metadata)
+
+`resources/js/components/Senses/SenseReviewReportCatalog.js` is the **single source of truth** for the four report entries on the frontend. Pure configuration — no API calls, no Vuex, no state writes.
+
+- **Exports**: `REPORT_CATALOG` (array), `REPORT_KEYS`, `getReportByKey(key)`, `isReportKey(key)`.
+- **Each catalog entry** has: `key`, `title`, `description`, `icon`, `color`, `endpoint`, `component` (registered component name), `payloadProp` (prop name the rendered component expects), `maxWidth`, `loadingText`.
+- **Fixed order**: `today-summary`, `daily-report`, `seven-day-trend`, `thirty-day-calendar`.
+- **Consumed by**: `SenseReviewReportCenter.vue` (drives home-page cards, endpoint selection, component lookup, payload prop binding, dialog width, loading text).
+- **Constraint**: `SenseReview.vue` does NOT know the four endpoints or report keys. `SenseReviewReportCenter.vue` does NOT maintain a parallel copy of endpoint/width/loading-text maps — all metadata comes from the Catalog.
+- **Component mapping**: ReportCenter keeps a local `COMPONENT_MAP` from component name → imported Vue component. The catalog itself never imports Vue components (keeps it pure/testable).
+
+## 0.3 SenseReviewRatingPresentation.js (Frontend Rating Display Contract)
+
+`resources/js/components/Senses/SenseReviewRatingPresentation.js` is the **single source of truth** for the four rating labels, colors, hotkeys, and scores on the frontend. Pure configuration — no FSRS, no API, no Vuex.
+
+- **Exports**: `RATING_PRESENTATION` (array), `RATING_VALUES`, `getRatingPresentation(value)`, `labelForRating(value)`, `colorForRating(value)`, `hotkeyHintText()`.
+- **Fixed content** (must match backend `SenseReviewRatingContract`):
+
+  | value | label | color | hotkey | score |
+  |-------|-------|-------|--------|-------|
+  | again | 忘了 | error | 1 | 1 |
+  | hard | 勉强记得 | warning | 2 | 2 |
+  | good | 记得 | primary | 3 | 3 |
+  | easy | 很熟 | success | 4 | 4 |
+
+- **Consumed by**: `SenseReviewRatingControls.vue` (renders buttons + hotkey hint from this config), and report components reference `labelForRating()` for rating chips to avoid hardcoded labels.
+- **Cross-stack guard**: `tests/js/SenseReviewRatingPresentationGuard.test.mjs` verifies PHP `SenseReviewRatingContract` and JS `RATING_PRESENTATION` agree on values, labels, scores, and that `hard` → label `勉强记得`, score `2`. Also guards against isolated "勉强" (without "记得") in SenseReview Vue templates.
+- **Never changes**: rating API values (`again`/`hard`/`good`/`easy`), numeric scores (1/2/3/4), hotkey numbers (1/2/3/4), FSRS semantics.
 
 ## 1. Container Responsibilities
 
@@ -269,15 +302,19 @@ The "today" row of the 7-day trend and the 30-day calendar (days[29]) MUST match
 
 | Component | Props | Emits |
 |-----------|-------|-------|
+| ReportCenter | open (v-model boolean) | input(false) |
 | LearningFeedbackPanel | learningFeedback, fsrsStability | — |
 | RatingControls | disabled | rating(again\|hard\|good\|easy) |
 | SessionSummary | stats, needsAttention | continue-review, exit |
-| TodaySummary | summary | close |
+| TodaySummary | summary | close, back |
 | UnderstandingAid | aid | — |
 | EditDialog | value (v-model), card | input, saved |
-| SevenDayTrend | trend | close |
-| ThirtyDayCalendar | calendar | close |
+| SevenDayTrend | trend | close, back |
+| ThirtyDayCalendar | calendar | close, back |
+| DailyReport | report | close, back |
 | SessionTracker | (pure functions, not a component) | — |
+
+> Report sub-components emit `back` to return to the report list (kept inside ReportCenter); `close` closes the whole ReportCenter.
 
 ## 6. N+1 Risk Assessment
 

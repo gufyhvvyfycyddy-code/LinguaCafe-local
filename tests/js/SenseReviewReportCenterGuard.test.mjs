@@ -1,21 +1,25 @@
 // SenseReviewReportCenterGuard.test.mjs
 //
-// SenseReview-ReportCenter-1000-1
+// SenseReview-ReportCenter-1000-2
 //
 // Node built-in assert tests for the SenseReviewReportCenter frontend
-// contract. No third-party test framework required — runs with
-// `node --test` or plain `node <file>`.
+// contract (redesigned in 1000-2). No third-party test framework required.
 //
 // These tests guard:
 //   1. The SenseReviewReportCenter.vue component file exists.
-//   2. The component is read-only — only axios.get, no POST/rating API,
-//      no ReviewLog writes, no FSRS mutations.
-//   3. The component uses v-model / activeReport prop.
-//   4. SenseReview.vue mounts exactly ONE ReportCenter (not three dialogs).
-//   5. SenseReview.vue no longer has three sets of report payload/loading/API.
-//   6. Four report concepts remain clearly distinguished by wording.
-//   7. ReportCenter registers TodaySummary/DailyReport/SevenDayTrend.
-//   8. ReportCenter endpoint map is GET-only.
+//   2. The component is read-only — only axios.get, no POST/rating API.
+//   3. The component uses v-model = boolean open prop (NOT activeReport string).
+//   4. SenseReview.vue mounts exactly ONE ReportCenter.
+//   5. SenseReview.vue uses reportCenterOpen (boolean), NOT activeReport.
+//   6. ReportCenter owns selectedReportKey / loading / error / payload.
+//   7. ReportCenter has requestSequence for async-race protection.
+//   8. ReportCenter consumes SenseReviewReportCatalog.js.
+//   9. ReportCenter registers all four report components.
+//  10. ReportCenter endpoint map is GET-only (via Catalog).
+//  11. Routes define all four GET endpoints.
+//  12. ReportCenter does not import SessionSummary.
+//  13. ReportCenter emits input false on close.
+//  14. ReportCenter has a report home page (no GET until selection).
 
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -26,6 +30,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
+const CATALOG_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCatalog.js');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
@@ -45,6 +50,7 @@ function test(name, fn) {
 console.log('SenseReviewReportCenter frontend guard tests\n');
 
 const centerSrc = existsSync(CENTER_PATH) ? readFileSync(CENTER_PATH, 'utf-8') : '';
+const catalogSrc = existsSync(CATALOG_PATH) ? readFileSync(CATALOG_PATH, 'utf-8') : '';
 const containerSrc = existsSync(CONTAINER_PATH) ? readFileSync(CONTAINER_PATH, 'utf-8') : '';
 const routesSrc = existsSync(ROUTES_PATH) ? readFileSync(ROUTES_PATH, 'utf-8') : '';
 
@@ -60,76 +66,92 @@ test('ReportCenter uses only axios.get (no POST/rating API)', () => {
     assert.ok(!centerSrc.includes('/rate'), 'ReportCenter must NOT call rating API');
 });
 
-// 3. Component uses v-model / activeReport prop.
-test('ReportCenter uses v-model / activeReport prop', () => {
-    assert.ok(centerSrc.includes("activeReport"), 'ReportCenter must have activeReport prop');
-    assert.ok(centerSrc.includes("model:"), 'ReportCenter must define model option for v-model');
-    assert.ok(centerSrc.includes("props:"), 'ReportCenter must define props');
+// 3. Component uses v-model = boolean open prop (NOT activeReport string).
+test('ReportCenter uses v-model = boolean open prop', () => {
+    assert.ok(centerSrc.includes("prop: 'open'"), 'ReportCenter model prop must be open (boolean)');
+    assert.ok(centerSrc.includes('open:'), 'ReportCenter must have open prop');
+    assert.ok(!centerSrc.includes("prop: 'activeReport'"), 'ReportCenter must NOT use activeReport prop');
 });
 
 // 4. SenseReview.vue mounts exactly ONE ReportCenter.
-test('SenseReview.vue mounts exactly one ReportCenter (not three dialogs)', () => {
-    const reportCenterCount = (containerSrc.match(/SenseReviewReportCenter/g) || []).length;
-    assert.ok(reportCenterCount >= 2, 'SenseReview.vue must import and register SenseReviewReportCenter');
+test('SenseReview.vue mounts exactly one ReportCenter', () => {
     const mountCount = (containerSrc.match(/<SenseReviewReportCenter/g) || []).length;
     assert.strictEqual(mountCount, 1, 'SenseReview.vue must mount exactly one <SenseReviewReportCenter>');
 });
 
-// 5. SenseReview.vue no longer has three sets of report payload/loading/API.
-test('SenseReview.vue no longer has three sets of report dialog state', () => {
-    assert.ok(!containerSrc.includes('showTodaySummary'), 'SenseReview.vue must not have showTodaySummary');
-    assert.ok(!containerSrc.includes('showDailyReport'), 'SenseReview.vue must not have showDailyReport');
-    assert.ok(!containerSrc.includes('showSevenDayTrend'), 'SenseReview.vue must not have showSevenDayTrend');
-    assert.ok(!containerSrc.includes('openTodaySummary'), 'SenseReview.vue must not have openTodaySummary');
-    assert.ok(!containerSrc.includes('openDailyReport'), 'SenseReview.vue must not have openDailyReport');
-    assert.ok(!containerSrc.includes('openSevenDayTrend'), 'SenseReview.vue must not have openSevenDayTrend');
-    assert.ok(!containerSrc.includes('todaySummaryLoading'), 'SenseReview.vue must not have todaySummaryLoading');
-    assert.ok(!containerSrc.includes('dailyReportLoading'), 'SenseReview.vue must not have dailyReportLoading');
-    assert.ok(!containerSrc.includes('sevenDayTrendLoading'), 'SenseReview.vue must not have sevenDayTrendLoading');
+// 5. SenseReview.vue uses reportCenterOpen (boolean), NOT activeReport.
+test('SenseReview.vue uses reportCenterOpen (boolean)', () => {
+    assert.ok(containerSrc.includes('reportCenterOpen'), 'SenseReview.vue must have reportCenterOpen');
+    // activeReport should no longer appear as a data property or binding.
+    // (It may still appear in comments, so we check the data/binding context.)
+    assert.ok(!/activeReport\s*[:=]/.test(containerSrc), 'SenseReview.vue must not bind activeReport');
 });
 
-// 6. Four report concepts remain clearly distinguished by wording.
-test('Four report concepts remain distinguished in SenseReview.vue', () => {
-    assert.ok(containerSrc.includes('查看今日复习总结'), 'today summary entry text preserved');
-    assert.ok(containerSrc.includes('查看今日学习日报'), 'daily report entry text preserved');
-    assert.ok(containerSrc.includes('查看近 7 天学习趋势'), 'seven day trend entry text preserved');
+// 6. ReportCenter owns selectedReportKey / loading / error / payload.
+test('ReportCenter owns internal state (selectedReportKey/loading/error/payload)', () => {
+    assert.ok(centerSrc.includes('selectedReportKey'), 'ReportCenter must have selectedReportKey');
+    assert.ok(centerSrc.includes('loading:'), 'ReportCenter must own loading');
+    assert.ok(centerSrc.includes('error:'), 'ReportCenter must own error');
+    assert.ok(centerSrc.includes('payload:'), 'ReportCenter must own payload');
 });
 
-// 7. ReportCenter registers TodaySummary/DailyReport/SevenDayTrend.
-test('ReportCenter registers TodaySummary/DailyReport/SevenDayTrend components', () => {
+// 7. ReportCenter has requestSequence for async-race protection.
+test('ReportCenter has requestSequence for async-race protection', () => {
+    assert.ok(centerSrc.includes('requestSequence'), 'ReportCenter must have requestSequence');
+    assert.ok(centerSrc.includes('seq !== this.requestSequence'), 'ReportCenter must guard stale responses');
+});
+
+// 8. ReportCenter consumes SenseReviewReportCatalog.js.
+test('ReportCenter consumes SenseReviewReportCatalog.js', () => {
+    assert.ok(existsSync(CATALOG_PATH), 'SenseReviewReportCatalog.js must exist');
+    assert.ok(centerSrc.includes('SenseReviewReportCatalog'), 'ReportCenter must import Catalog');
+    assert.ok(catalogSrc.includes('REPORT_CATALOG'), 'Catalog must export REPORT_CATALOG');
+    assert.ok(catalogSrc.includes('today-summary'), 'Catalog must have today-summary');
+    assert.ok(catalogSrc.includes('daily-report'), 'Catalog must have daily-report');
+    assert.ok(catalogSrc.includes('seven-day-trend'), 'Catalog must have seven-day-trend');
+    assert.ok(catalogSrc.includes('thirty-day-calendar'), 'Catalog must have thirty-day-calendar');
+});
+
+// 9. ReportCenter registers all four report components.
+test('ReportCenter registers all four report components', () => {
     assert.ok(centerSrc.includes('SenseReviewTodaySummary'), 'ReportCenter must register SenseReviewTodaySummary');
     assert.ok(centerSrc.includes('SenseReviewDailyReport'), 'ReportCenter must register SenseReviewDailyReport');
     assert.ok(centerSrc.includes('SenseReviewSevenDayTrend'), 'ReportCenter must register SenseReviewSevenDayTrend');
+    assert.ok(centerSrc.includes('SenseReviewThirtyDayCalendar'), 'ReportCenter must register SenseReviewThirtyDayCalendar');
 });
 
-// 8. ReportCenter endpoint map is GET-only.
-test('ReportCenter endpoint map uses GET endpoints', () => {
-    assert.ok(centerSrc.includes('/reviews/senses/today-summary'), 'today-summary endpoint present');
-    assert.ok(centerSrc.includes('/reviews/senses/daily-report'), 'daily-report endpoint present');
-    assert.ok(centerSrc.includes('/reviews/senses/seven-day-trend'), 'seven-day-trend endpoint present');
+// 10. ReportCenter endpoint map is GET-only (via Catalog).
+test('Catalog endpoint map uses GET endpoints', () => {
+    assert.ok(catalogSrc.includes('/reviews/senses/today-summary'), 'today-summary endpoint present');
+    assert.ok(catalogSrc.includes('/reviews/senses/daily-report'), 'daily-report endpoint present');
+    assert.ok(catalogSrc.includes('/reviews/senses/seven-day-trend'), 'seven-day-trend endpoint present');
+    assert.ok(catalogSrc.includes('/reviews/senses/thirty-day-calendar'), 'thirty-day-calendar endpoint present');
 });
 
-// 9. Routes still define all three GET endpoints.
-test('Routes define all three GET report endpoints', () => {
+// 11. Routes define all four GET endpoints.
+test('Routes define all four GET report endpoints', () => {
     assert.ok(routesSrc.includes('/reviews/senses/today-summary'), 'today-summary route present');
     assert.ok(routesSrc.includes('/reviews/senses/daily-report'), 'daily-report route present');
     assert.ok(routesSrc.includes('/reviews/senses/seven-day-trend'), 'seven-day-trend route present');
+    assert.ok(routesSrc.includes('/reviews/senses/thirty-day-calendar'), 'thirty-day-calendar route present');
 });
 
-// 10. ReportCenter does not import SessionSummary (not its responsibility).
+// 12. ReportCenter does not import SessionSummary.
 test('ReportCenter does not manage SessionSummary', () => {
     assert.ok(!centerSrc.includes('import SenseReviewSessionSummary'), 'ReportCenter must NOT import SessionSummary');
-    assert.ok(!centerSrc.includes("'SenseReviewSessionSummary'"), 'ReportCenter must NOT register SessionSummary component');
+    assert.ok(!centerSrc.includes("'SenseReviewSessionSummary'"), 'ReportCenter must NOT register SessionSummary');
 });
 
-// 11. SenseReview.vue has activeReport data property.
-test('SenseReview.vue has activeReport data property', () => {
-    assert.ok(containerSrc.includes('activeReport'), 'SenseReview.vue must have activeReport');
+// 13. ReportCenter emits input false on close.
+test('ReportCenter emits input false on close', () => {
+    assert.ok(centerSrc.includes("this.$emit('input', false)"), 'ReportCenter must emit input false on close');
 });
 
-// 12. ReportCenter emits input event for v-model.
-test('ReportCenter emits input event for v-model close', () => {
-    assert.ok(centerSrc.includes("this.\$emit('input', null)"), 'ReportCenter must emit input null on close');
+// 14. ReportCenter has a report home page (no GET until selection).
+test('ReportCenter has report home page (catalog selection, no GET until selection)', () => {
+    assert.ok(centerSrc.includes('selectReport'), 'ReportCenter must have selectReport method');
+    assert.ok(centerSrc.includes('backToList'), 'ReportCenter must have backToList method');
+    assert.ok(centerSrc.includes('!selectedReportKey'), 'ReportCenter must show home page when no report selected');
 });
 
 console.log(`\n${passed} passed`);

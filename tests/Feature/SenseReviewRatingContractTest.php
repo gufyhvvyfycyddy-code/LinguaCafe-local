@@ -17,7 +17,7 @@ use Tests\TestCase;
  *
  * Contract:
  *  - allowedRatings(): ['again','hard','good','easy'] (order stable).
- *  - labelFor(): again→忘了, hard→勉强, good→记得, easy→很熟.
+ *  - labelFor(): again→忘了, hard→勉强记得, good→记得, easy→很熟.
  *  - scoreFor(): again=1, hard=2, good=3, easy=4.
  *  - isAllowed(): true for the four, false otherwise.
  *  - Invalid / null / wrong-case ratings are NOT silently accepted.
@@ -52,7 +52,7 @@ class SenseReviewRatingContractTest extends TestCase
     public function test_labels(): void
     {
         $this->assertSame('忘了', $this->contract->labelFor('again'));
-        $this->assertSame('勉强', $this->contract->labelFor('hard'));
+        $this->assertSame('勉强记得', $this->contract->labelFor('hard'));
         $this->assertSame('记得', $this->contract->labelFor('good'));
         $this->assertSame('很熟', $this->contract->labelFor('easy'));
     }

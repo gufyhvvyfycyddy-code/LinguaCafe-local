@@ -31,6 +31,7 @@ const __dirname = dirname(__filename);
 const COMPONENT_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewThirtyDayCalendar.vue');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
 const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
+const CATALOG_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCatalog.js');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
@@ -51,6 +52,7 @@ console.log('SenseReviewThirtyDayCalendar frontend guard tests\n');
 const componentSrc = existsSync(COMPONENT_PATH) ? readFileSync(COMPONENT_PATH, 'utf-8') : '';
 const containerSrc = existsSync(CONTAINER_PATH) ? readFileSync(CONTAINER_PATH, 'utf-8') : '';
 const centerSrc = existsSync(CENTER_PATH) ? readFileSync(CENTER_PATH, 'utf-8') : '';
+const catalogSrc = existsSync(CATALOG_PATH) ? readFileSync(CATALOG_PATH, 'utf-8') : '';
 const routesSrc = existsSync(ROUTES_PATH) ? readFileSync(ROUTES_PATH, 'utf-8') : '';
 
 // 1. Component file exists.
@@ -94,10 +96,10 @@ test('ReportCenter registers SenseReviewThirtyDayCalendar', () => {
     assert.ok(/SenseReviewThirtyDayCalendar/.test(centerSrc), 'ReportCenter must register the component');
 });
 
-// 8. SenseReview.vue has the entry button.
-test('SenseReview.vue has the thirty-day-calendar entry button', () => {
+// 8. SenseReview.vue opens report center for the thirty-day-calendar entry.
+test('SenseReview.vue opens report center for the thirty-day-calendar', () => {
     assert.ok(containerSrc.includes('查看近 30 天复习日历'), 'container must have the entry button');
-    assert.ok(containerSrc.includes("'thirty-day-calendar'"), "container must set activeReport to 'thirty-day-calendar'");
+    assert.ok(containerSrc.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
 // 9. Route is registered.
@@ -112,7 +114,7 @@ test('route GET /reviews/senses/thirty-day-calendar is registered', () => {
 // 10. ReportCenter only reads calendar via GET.
 test('ReportCenter only reads thirty day calendar via GET, never writes', () => {
     assert.ok(/axios\.get/.test(centerSrc), 'ReportCenter must use GET');
-    assert.ok(centerSrc.includes('/reviews/senses/thirty-day-calendar'), 'ReportCenter must reference thirty-day-calendar endpoint');
+    assert.ok(catalogSrc.includes('/reviews/senses/thirty-day-calendar'), 'Catalog must reference thirty-day-calendar endpoint');
     assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
 });
 

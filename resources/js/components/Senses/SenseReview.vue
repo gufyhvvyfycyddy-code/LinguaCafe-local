@@ -40,29 +40,20 @@
             <div v-if="hasReviewed && !showSessionSummary" class="text-center mt-3">
                 <v-btn small text color="primary" @click="endSession">结束本次复习</v-btn>
             </div>
-            <!-- Today summary entry: always available from the stats area so
-                 the user can check today's cumulative reviews without ending
-                 the current session. Read-only, never writes ReviewLog. -->
+            <!-- Report center entry: opens the unified learning report
+                 hub. The home page lists all available reports; the user
+                 selects one to trigger its GET endpoint. Read-only. -->
             <div class="text-center mt-2">
-                <v-btn small text color="info" @click="activeReport = 'today-summary'">查看今日复习总结</v-btn>
+                <v-btn small text color="info" @click="reportCenterOpen = true">查看今日复习总结</v-btn>
             </div>
-            <!-- Daily report entry: richer four-block daily learning report.
-                 Distinct from the simpler today-summary. Read-only. -->
             <div class="text-center mt-1">
-                <v-btn small text color="primary" @click="activeReport = 'daily-report'">查看今日学习日报</v-btn>
+                <v-btn small text color="primary" @click="reportCenterOpen = true">查看今日学习日报</v-btn>
             </div>
-            <!-- Seven day trend entry: fixed rolling 7-day window (today +
-                 previous 6 natural days, NOT a natural week). Distinct from
-                 the daily report. Read-only. -->
             <div class="text-center mt-1">
-                <v-btn small text color="info" @click="activeReport = 'seven-day-trend'">查看近 7 天学习趋势</v-btn>
+                <v-btn small text color="info" @click="reportCenterOpen = true">查看近 7 天学习趋势</v-btn>
             </div>
-            <!-- Thirty day calendar entry: fixed rolling 30-day window (today +
-                 previous 29 natural days, NOT a natural month). Distinct from
-                 the 7-day trend (short-term) — this shows historical date
-                 distribution. Read-only. -->
             <div class="text-center mt-1">
-                <v-btn small text color="success" @click="activeReport = 'thirty-day-calendar'">查看近 30 天复习日历</v-btn>
+                <v-btn small text color="success" @click="reportCenterOpen = true">查看近 30 天复习日历</v-btn>
             </div>
         </v-card>
 
@@ -78,17 +69,15 @@
             @continue-review="continueReview"
             @exit-review="exitReview"
         />
-        <!-- Today summary entry on the session-summary screen. Lets the user
-             view today's cumulative reviews before continuing or leaving. -->
+        <!-- Report center entry on the session-summary screen. -->
         <div v-if="showSummaryView" class="text-center mt-2">
-            <v-btn small text color="info" @click="activeReport = 'today-summary'">查看今日复习总结</v-btn>
+            <v-btn small text color="info" @click="reportCenterOpen = true">查看今日复习总结</v-btn>
         </div>
 
-        <!-- Report center: single orchestration component for all report
-             dialogs (today-summary / daily-report / seven-day-trend /
-             thirty-day-calendar). Read-only GET only. Never writes ReviewLog,
-             never touches FSRS, never changes the card queue. -->
-        <SenseReviewReportCenter v-model="activeReport" />
+        <!-- Report center: single orchestration component. v-model is a
+             boolean open state; ReportCenter owns report selection,
+             loading, error, payload and async-race protection internally. -->
+        <SenseReviewReportCenter v-model="reportCenterOpen" />
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
             <!-- Lemma / surface form / pos -->
@@ -444,12 +433,10 @@
                 // never writes ReviewLog and never touches FSRS.
                 session: SessionTracker.createSession(),
                 showSessionSummary: false,
-                // Report center: single source of truth for which report
-                // dialog is open. null = closed; otherwise one of:
-                // 'today-summary' | 'daily-report' | 'seven-day-trend' |
-                // 'thirty-day-calendar'. All dialog/loading/GET/error state
-                // lives inside SenseReviewReportCenter.
-                activeReport: null,
+                // Report center: boolean open state. ReportCenter owns
+                // report selection, loading, error, payload and async-race
+                // protection internally.
+                reportCenterOpen: false,
             }
         },
         computed: {
@@ -799,10 +786,10 @@
                 window.location.href = '/review-cards/manage';
             },
             // ==================== Report dialogs ====================
-            // All report dialogs (today-summary / daily-report /
-            // seven-day-trend / thirty-day-calendar) are now orchestrated by
-            // SenseReviewReportCenter. The parent only sets activeReport;
-            // ReportCenter handles dialog, loading, GET, error, and close.
+            // All reports are orchestrated by SenseReviewReportCenter.
+            // The parent only controls reportCenterOpen (boolean);
+            // ReportCenter owns report selection, loading, GET, error,
+            // async-race protection, and close.
             // No open*/close* methods needed here.
             // ==================== Snackbar ====================
             showSnackbar(text, color) {

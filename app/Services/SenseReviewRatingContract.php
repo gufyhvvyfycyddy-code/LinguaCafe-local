@@ -17,7 +17,7 @@ namespace App\Services;
  *
  * Allowed ratings (stable order):
  *   again → label 忘了, score 1
- *   hard  → label 勉强, score 2
+ *   hard  → label 勉强记得, score 2
  *   good  → label 记得, score 3
  *   easy  → label 很熟, score 4
  *
@@ -47,7 +47,7 @@ class SenseReviewRatingContract
      */
     private const LABELS = [
         'again' => '忘了',
-        'hard'  => '勉强',
+        'hard'  => '勉强记得',
         'good'  => '记得',
         'easy'  => '很熟',
     ];

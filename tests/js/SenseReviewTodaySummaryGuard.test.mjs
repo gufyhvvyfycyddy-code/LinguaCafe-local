@@ -28,6 +28,7 @@ const __dirname = dirname(__filename);
 const COMPONENT_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewTodaySummary.vue');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
 const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
+const CATALOG_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCatalog.js');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
@@ -91,7 +92,7 @@ test('SenseReview.vue registers SenseReviewTodaySummary', () => {
 test('SenseReview.vue has the today-summary entry button', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
     assert.ok(src.includes('查看今日复习总结'), 'container must have the entry button');
-    assert.ok(src.includes("'today-summary'"), "container must set activeReport to 'today-summary'");
+    assert.ok(src.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
 // 8. Container distinguishes session summary from today summary
@@ -116,8 +117,9 @@ test('route GET /reviews/senses/today-summary is registered', () => {
 test('container only reads today summary via GET, never writes', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
     const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    const catalogSrc = readFileSync(CATALOG_PATH, 'utf8');
     assert.ok(/axios\.get/.test(centerSrc), 'ReportCenter must use GET');
-    assert.ok(centerSrc.includes('/reviews/senses/today-summary'), 'ReportCenter must reference today-summary endpoint');
+    assert.ok(catalogSrc.includes('/reviews/senses/today-summary'), 'Catalog must reference today-summary endpoint');
     assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
     // No POST/PUT/DELETE to the today-summary endpoint
     assert.ok(!/axios\.(post|put|delete|patch)\('\/reviews\/senses\/today-summary'/.test(src), 'container must not write to today-summary');
