@@ -12,7 +12,7 @@ Read these in order for a new Codex / OpenCode / CodeBuddy / WorkBuddy task:
 1. `docs/plans/current-working-handoff.md` — current short-term workbench, current decisions, and next candidates.
 2. `docs/plans/linguacafe-master-plan.md` — long-term ledger of product lines, completed work, and preserved future directions.
 3. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
-4. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, session vs today summary, batch feedback, props/events contract, N+1 risk, next-round candidates.
+4. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, four-layer report architecture (Query/Metrics/Product/Controller), rating contract, four coexisting summary concepts (session/today/daily/7-day), props/events contract, query budget, N+1 risk.
 5. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
 6. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
 7. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).

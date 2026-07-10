@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-10 (SenseReviewTodaySummary + batch learning feedback: daily cross-session summary + N+1 elimination).
+> **最后更新**：2026-07-10 (近 7 天 SenseReview 学习趋势 + 评分契约/报表指标纯计算层: Query/Metrics/Product 三层分离).
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -37,6 +37,8 @@
 
 | 任务 | 一句话说明 |
 |------|-----------|
+| GLM-SenseReviewSevenDayTrend-1 | 近 7 天 SenseReview 学习趋势：固定滚动 7 天窗口（今天+前6自然日，非自然周），后端 `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`，前端 `SenseReviewSevenDayTrend.vue` 纯展示，1 次 ReviewLog 查询覆盖全窗口，今天一行与日报一致（契约测试） |
+| GLM-SenseReviewRatingContract-AndMetricsLayer-1 | 评分契约 + 报表指标纯计算层：`SenseReviewRatingContract`（again/hard/good/easy 唯一事实来源）+ `SenseReviewReportMetricsService`（零 DB 查询纯计算），TodaySummary/DailyReport/LearningFeedback 迁移到 Contract+Metrics，AnalyticsQueryService 剥离纯计算方法只留查询，payload 完全兼容 |
 | FsrsReschedulePreviewService-ContractScouting-1 | 只读侦查 FSRS 重排预览/确认/应用链路，输出 18 个风险点 |
 | FsrsReschedulePreviewService-GapContractTests-1 | 补 5 个 preview + 5 个 confirmPreflight 缺口契约测试 |
 | FsrsRescheduleGapContractTests-ScopeFix-1 | 收口越界修改的测试文件 |

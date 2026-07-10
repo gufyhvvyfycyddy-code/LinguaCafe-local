@@ -43,19 +43,10 @@ use Illuminate\Support\Collection;
  */
 class SenseReviewDailyReportService
 {
-    /**
-     * Rating value → numeric score for average rating computation.
-     * again=1, hard=2, good=3, easy=4. 'reset' is absent (excluded).
-     */
-    private const RATING_SCORES = [
-        'again' => 1,
-        'hard'  => 2,
-        'good'  => 3,
-        'easy'  => 4,
-    ];
-
     public function __construct(
         private SenseReviewAnalyticsQueryService $analytics,
+        private SenseReviewRatingContract $contract,
+        private SenseReviewReportMetricsService $metrics,
     ) {
     }
 
@@ -139,11 +130,12 @@ class SenseReviewDailyReportService
         }
 
         // average_rating: null when empty (frontend shows "暂无数据").
+        // Score mapping via SenseReviewRatingContract (single source of truth).
         $averageRating = null;
         if ($total > 0) {
             $sum = 0;
             foreach ($logs as $log) {
-                $sum += self::RATING_SCORES[$log->rating] ?? 0;
+                $sum += $this->contract->scoreFor($log->rating) ?? 0;
             }
             $averageRating = round($sum / $total, 2);
         }
@@ -169,9 +161,9 @@ class SenseReviewDailyReportService
     private function buildQuality(Collection $logs): array
     {
         return [
-            'distribution' => $this->analytics->ratingDistribution($logs),
-            'forget_rate' => $this->analytics->forgetRate($logs),
-            'stability_rate' => $this->analytics->stabilityRate($logs),
+            'distribution' => $this->metrics->ratingDistribution($logs),
+            'forget_rate' => $this->metrics->forgetRate($logs),
+            'stability_rate' => $this->metrics->stabilityRate($logs),
         ];
     }
 
@@ -186,13 +178,13 @@ class SenseReviewDailyReportService
      *
      * Sort: again desc, hard desc, total desc.
      *
-     * Per-sense aggregation delegates to SenseReviewAnalyticsQueryService::
+     * Per-sense aggregation delegates to SenseReviewReportMetricsService::
      * reviewsBySense(); the focus filter + sort + max-10 are product logic
      * that stays here.
      */
     private function buildFocusSenses(Collection $logs): array
     {
-        $bySense = $this->analytics->reviewsBySense($logs);
+        $bySense = $this->metrics->reviewsBySense($logs);
 
         $focus = array_filter($bySense, function ($e) {
             return $e['again'] > 0
@@ -238,7 +230,7 @@ class SenseReviewDailyReportService
      * the 'again'/'hard' rating. We scan old→new and report the first
      * qualifying transition per sense. No duplicates: one entry per sense.
      *
-     * Per-sense grouping delegates to SenseReviewAnalyticsQueryService::
+     * Per-sense grouping delegates to SenseReviewReportMetricsService::
      * reviewsBySense() (ratings array is newest-first; we reverse to
      * old→new for temporal scanning). The transition detection is product
      * logic that stays here.
@@ -247,7 +239,7 @@ class SenseReviewDailyReportService
      */
     private function buildProgressSenses(Collection $logs): array
     {
-        $bySense = $this->analytics->reviewsBySense($logs);
+        $bySense = $this->metrics->reviewsBySense($logs);
 
         $progress = [];
         foreach ($bySense as $sid => $info) {

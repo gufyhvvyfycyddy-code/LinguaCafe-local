@@ -33,10 +33,11 @@ use Tests\TestCase;
  *  - reviewsForPeriod(): non-reset sense logs in [start, end), newest-first.
  *  - sensesReviewedBefore(): sense ids with any non-reset review before a time.
  *  - reviewsForCards(): non-reset logs for given card ids, newest-first.
- *  - ratingDistribution(): again/hard/good/easy counts from a collection.
- *  - forgetRate(): again/total, null when empty.
- *  - stabilityRate(): (good+easy)/total, null when empty.
- *  - reviewsBySense(): per-sense aggregation with counts + ratings sequence.
+ *
+ * Pure computation (ratingDistribution, forgetRate, stabilityRate,
+ * reviewsBySense, averageRating, groupByDay, etc.) lives in
+ * SenseReviewReportMetricsService — NOT here. Rating labels and numeric
+ * scores live in SenseReviewRatingContract — NOT here.
  *
  * Rule tests:
  *  1. user isolation   2. language isolation  3. sense-only filtering
@@ -484,138 +485,19 @@ class SenseReviewAnalyticsQueryServiceTest extends TestCase
         $this->assertSame(1, $queries50, "50 cards: expected 1 review_logs query, got $queries50");
     }
 
-    // ==================== ratingDistribution / forgetRate / stabilityRate ====================
-
-    /**
-     * 18. ratingDistribution counts again/hard/good/easy.
-     */
-    public function test_rating_distribution_counts(): void
-    {
-        $logs = collect([
-            (object) ['rating' => 'again'],
-            (object) ['rating' => 'again'],
-            (object) ['rating' => 'hard'],
-            (object) ['rating' => 'good'],
-            (object) ['rating' => 'good'],
-            (object) ['rating' => 'easy'],
-        ]);
-
-        $dist = $this->service->ratingDistribution($logs);
-
-        $this->assertSame(2, $dist['again']);
-        $this->assertSame(1, $dist['hard']);
-        $this->assertSame(2, $dist['good']);
-        $this->assertSame(1, $dist['easy']);
-    }
-
-    /**
-     * 19. ratingDistribution empty → all zeros.
-     */
-    public function test_rating_distribution_empty(): void
-    {
-        $dist = $this->service->ratingDistribution(collect());
-
-        $this->assertSame(0, $dist['again']);
-        $this->assertSame(0, $dist['hard']);
-        $this->assertSame(0, $dist['good']);
-        $this->assertSame(0, $dist['easy']);
-    }
-
-    /**
-     * 20. forgetRate = again/total, null when empty.
-     */
-    public function test_forget_rate_formula(): void
-    {
-        $logs = collect([
-            (object) ['rating' => 'again'],
-            (object) ['rating' => 'good'],
-            (object) ['rating' => 'good'],
-            (object) ['rating' => 'good'],
-        ]);
-
-        $this->assertSame(0.25, $this->service->forgetRate($logs));
-    }
-
-    /**
-     * 21. forgetRate null when empty.
-     */
-    public function test_forget_rate_null_when_empty(): void
-    {
-        $this->assertNull($this->service->forgetRate(collect()));
-    }
-
-    /**
-     * 22. stabilityRate = (good+easy)/total, null when empty.
-     */
-    public function test_stability_rate_formula(): void
-    {
-        $logs = collect([
-            (object) ['rating' => 'again'],
-            (object) ['rating' => 'hard'],
-            (object) ['rating' => 'good'],
-            (object) ['rating' => 'easy'],
-            (object) ['rating' => 'good'],
-        ]);
-
-        // (good=2 + easy=1) / 5 = 0.6
-        $this->assertSame(0.6, $this->service->stabilityRate($logs));
-    }
-
-    /**
-     * 23. stabilityRate null when empty.
-     */
-    public function test_stability_rate_null_when_empty(): void
-    {
-        $this->assertNull($this->service->stabilityRate(collect()));
-    }
-
-    // ==================== reviewsBySense ====================
-
-    /**
-     * 24. reviewsBySense groups logs by sense with aggregated counts.
-     */
-    public function test_reviews_by_sense_aggregation(): void
-    {
-        // Input MUST be newest-first (contract).
-        $logs = collect([
-            (object) ['word_sense_id' => 1, 'lemma' => 'a', 'sense_zh' => '甲', 'rating' => 'good',  'reviewed_at' => Carbon::create(2026, 7, 2, 10)],
-            (object) ['word_sense_id' => 1, 'lemma' => 'a', 'sense_zh' => '甲', 'rating' => 'again', 'reviewed_at' => Carbon::create(2026, 7, 1, 10)],
-            (object) ['word_sense_id' => 2, 'lemma' => 'b', 'sense_zh' => '乙', 'rating' => 'hard',  'reviewed_at' => Carbon::create(2026, 7, 3, 10)],
-        ]);
-
-        $bySense = $this->service->reviewsBySense($logs);
-
-        $this->assertCount(2, $bySense);
-        $this->assertArrayHasKey(1, $bySense);
-        $this->assertArrayHasKey(2, $bySense);
-
-        $a = $bySense[1];
-        $this->assertSame(1, $a['word_sense_id']);
-        $this->assertSame('a', $a['lemma']);
-        $this->assertSame('甲', $a['sense_zh']);
-        $this->assertSame(2, $a['total']);
-        $this->assertSame(1, $a['again']);
-        $this->assertSame(0, $a['hard']);
-        $this->assertSame(1, $a['good']);
-        $this->assertSame(0, $a['easy']);
-        // logs are newest-first; first seen = most recent = 'good'.
-        $this->assertSame('good', $a['last_rating']);
-        // ratings preserve the input (newest-first) order.
-        $this->assertSame(['good', 'again'], $a['ratings']);
-    }
-
-    /**
-     * 25. reviewsBySense empty → empty array.
-     */
-    public function test_reviews_by_sense_empty(): void
-    {
-        $this->assertSame([], $this->service->reviewsBySense(collect()));
-    }
+    // ==================== ratingDistribution / forgetRate / stabilityRate / reviewsBySense ====================
+    // NOTE: These pure-computation methods moved to SenseReviewReportMetricsService
+    // (see SenseReviewReportMetricsServiceTest). This section intentionally left empty
+    // to preserve the historical test numbering of the query-layer tests below.
 
     // ==================== Read-only safety ====================
 
     /**
      * 26. Analytics service is READ-ONLY: does NOT create ReviewLog.
+     *
+     * Pure-computation methods (ratingDistribution, forgetRate,
+     * stabilityRate, reviewsBySense) moved to SenseReviewReportMetricsService.
+     * They are covered by SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database.
      */
     public function test_service_does_not_write_review_log(): void
     {
@@ -628,10 +510,6 @@ class SenseReviewAnalyticsQueryServiceTest extends TestCase
         $this->service->reviewsForPeriod($this->user->id, 'english', Carbon::today(), Carbon::tomorrow());
         $this->service->reviewsForCards([$card->id]);
         $this->service->sensesReviewedBefore($this->user->id, 'english', Carbon::today());
-        $this->service->ratingDistribution(collect());
-        $this->service->forgetRate(collect());
-        $this->service->stabilityRate(collect());
-        $this->service->reviewsBySense(collect());
 
         $this->assertSame($before, ReviewLog::count());
     }

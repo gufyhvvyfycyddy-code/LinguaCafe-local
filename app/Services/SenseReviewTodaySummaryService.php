@@ -45,6 +45,8 @@ class SenseReviewTodaySummaryService
 {
     public function __construct(
         private SenseReviewAnalyticsQueryService $analytics,
+        private SenseReviewRatingContract $contract,
+        private SenseReviewReportMetricsService $metrics,
     ) {
     }
 
@@ -96,8 +98,8 @@ class SenseReviewTodaySummaryService
     private function formatSummary(Collection $logs, string $timezone, Carbon $dayStart, Carbon $dayEnd): array
     {
         $total = $logs->count();
-        $distribution = $this->analytics->ratingDistribution($logs);
-        $forgetRate = $this->analytics->forgetRate($logs);
+        $distribution = $this->metrics->ratingDistribution($logs);
+        $forgetRate = $this->metrics->forgetRate($logs);
 
         $distinctSenses = $logs->pluck('word_sense_id')->unique()->count();
 
@@ -131,7 +133,7 @@ class SenseReviewTodaySummaryService
      * (desc by hard count), then by total count desc. This surfaces the most
      * problematic senses without guessing "why" they were forgotten.
      *
-     * Per-sense aggregation delegates to SenseReviewAnalyticsQueryService::
+     * Per-sense aggregation delegates to SenseReviewReportMetricsService::
      * reviewsBySense(); the focus filter + sort + max-10 are product logic
      * that stays here.
      *
@@ -140,7 +142,7 @@ class SenseReviewTodaySummaryService
      */
     private function buildFocusSenses(Collection $logs): array
     {
-        $bySense = $this->analytics->reviewsBySense($logs);
+        $bySense = $this->metrics->reviewsBySense($logs);
 
         // Apply the factual focus rules.
         $focus = array_filter($bySense, function ($e) {
@@ -182,8 +184,8 @@ class SenseReviewTodaySummaryService
      * Build the recent-reviews list (max 10, newest first).
      *
      * Each item: lemma, sense_zh, rating, rating_label, reviewed_at.
-     * rating_label uses SenseReviewLearningFeedbackService::RATING_LABELS
-     * so the label mapping is shared with the per-card feedback aggregate.
+     * rating_label uses SenseReviewRatingContract::labelFor() so the label
+     * mapping is the single source of truth shared with all report services.
      *
      * @param  Collection  $logs  Newest-first log collection.
      * @return list<array>
@@ -197,7 +199,7 @@ class SenseReviewTodaySummaryService
                 'lemma' => $log->lemma,
                 'sense_zh' => $log->sense_zh,
                 'rating' => $rating,
-                'rating_label' => SenseReviewLearningFeedbackService::RATING_LABELS[$rating] ?? $rating,
+                'rating_label' => $this->contract->labelFor($rating) ?? $rating,
                 'reviewed_at' => $log->reviewed_at ? $log->reviewed_at->toIso8601String() : null,
             ];
         }

@@ -18,7 +18,7 @@ use Illuminate\Support\Collection;
  *  - Compute total / again / hard / good / easy counts.
  *  - Build the latest-5 recent_reviews list (newest first).
  *  - Compute forgetting_pattern: forget_rate, last_forget_date, trend.
- *  - Map ratings to Chinese labels (RATING_LABELS).
+ *  - Map ratings to Chinese labels via SenseReviewRatingContract.
  *
  * Invariants:
  *  - READ-ONLY: never writes ReviewLog, never touches any FSRS field.
@@ -30,26 +30,17 @@ use Illuminate\Support\Collection;
  *  - buildForCard() and buildForCards() share ONE algorithm via
  *    buildFeedbackFromLogs() — no duplicated aggregation logic.
  *  - Rating counting delegates to
- *    SenseReviewAnalyticsQueryService::ratingDistribution() so the
- *    counting logic is shared with TodaySummary / DailyReport.
+ *    SenseReviewReportMetricsService::ratingDistribution() so the
+ *    counting logic is shared with TodaySummary / DailyReport / SevenDayTrend.
+ *  - Rating labels delegate to SenseReviewRatingContract::labelFor() so
+ *    the label mapping has one source of truth.
  */
 class SenseReviewLearningFeedbackService
 {
-    /**
-     * Rating value → Chinese label shown in the learning feedback block.
-     * Keep in sync with the frontend score-button labels (SenseReview.vue).
-     * 'reset' is intentionally absent — reset logs are excluded from the
-     * feedback aggregate, so they never need a label here.
-     */
-    public const RATING_LABELS = [
-        'again' => '忘了',
-        'hard'  => '勉强',
-        'good'  => '记得',
-        'easy'  => '很熟',
-    ];
-
     public function __construct(
         private SenseReviewAnalyticsQueryService $analytics,
+        private SenseReviewRatingContract $contract,
+        private SenseReviewReportMetricsService $metrics,
     ) {
     }
 
@@ -158,10 +149,10 @@ class SenseReviewLearningFeedbackService
     {
         $total = $logs->count();
 
-        // Rating counting delegates to the centralized analytics layer so
+        // Rating counting delegates to the centralized metrics layer so
         // the again/hard/good/easy counting logic is shared with
-        // TodaySummary and DailyReport.
-        $dist = $this->analytics->ratingDistribution($logs);
+        // TodaySummary, DailyReport and SevenDayTrend.
+        $dist = $this->metrics->ratingDistribution($logs);
         $forgetCount = $dist['again'];
         $hardCount = $dist['hard'];
         $goodCount = $dist['good'];
@@ -178,7 +169,7 @@ class SenseReviewLearningFeedbackService
             }
             $recentReviews[] = [
                 'rating' => $rating,
-                'rating_label' => self::RATING_LABELS[$rating] ?? $rating,
+                'rating_label' => $this->contract->labelFor($rating) ?? $rating,
                 'date' => $log->reviewed_at?->format('Y-m-d'),
             ];
         }

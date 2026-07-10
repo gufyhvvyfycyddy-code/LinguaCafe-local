@@ -1,8 +1,29 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (daily summary + batch feedback round).
+> **Status**: Current as of 2026-07-10 (seven-day trend + rating contract / metrics layer centralization).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
+
+## 0. Four-Layer Report Architecture
+
+All SenseReview analytics flows are split into four layers (Commit `1d4052f` + Commit Task B):
+
+```
+Query Layer        SenseReviewAnalyticsQueryService   DB reads + user/language/sense/reset isolation
+      ↓
+Metrics Layer      SenseReviewReportMetricsService    Pure computation, zero DB queries
+      ↓
+Product Service    TodaySummary / DailyReport /       Decides product payload, focus-sense rules,
+                   SevenDayTrend / LearningFeedback   recent-count, max-10, day-boundary fill
+      ↓
+Controller         SenseReviewController              Request coordination only
+```
+
+- **Query Layer** (`SenseReviewAnalyticsQueryService`): only `reviewsForPeriod()`, `sensesReviewedBefore()`, `reviewsForCards()`. No rating labels, no scores, no product copy, no sort/limit.
+- **Metrics Layer** (`SenseReviewReportMetricsService`): pure functions — `ratingDistribution`, `forgetRate`, `stabilityRate`, `averageRating`, `distinctSenseCount`, `groupByDay`, `reviewsBySense`, `periodMetrics`. Zero DB queries (locked by test). No Auth, no config, no product copy.
+- **Rating Contract** (`SenseReviewRatingContract`): single source of truth for `allowedRatings()`, `isAllowed()`, `labelFor()`, `scoreFor()`. Pure value object, no DB/Auth/config. Fail-closed for invalid rating (returns null, never silently `good`).
+- **Product Services**: compose Query + Metrics + Contract, keep product rules (focus-sense max-10, recent-count, zero-day fill, payload field names).
+- **Controller**: thin — reads user + language, delegates to service, returns JSON.
 
 ## 1. Container Responsibilities
 
@@ -82,19 +103,30 @@ The container does **not**:
 - **Exports**: `createSession()`, `recordRating()`, `getStats()`, `getNeedsAttention()`, `clearSession()`.
 - **Constraints**: immutable updates, requestId dedup, no persistence (page-load scoped).
 
+### 2.8 SenseReviewSevenDayTrend.vue (~200 lines)
+
+**Responsibility**: Presentational display of the fixed rolling 7-day learning trend (近 7 天学习趋势). Distinct from SessionSummary (本次复习总结), TodaySummary (今日复习总结), and DailyReport (今日学习日报).
+
+- **Props**: `trend` (Object from `GET /reviews/senses/seven-day-trend`).
+- **Emits**: `close`.
+- **Constraints**: pure presentational. No API calls, no ReviewLog writes, no FSRS modifications, no card queue mutations, no chart library. Uses Vuetify v-card/v-row/v-col/v-chip + simple CSS bars.
+- **Content**: timezone/start_day/end_day, summary (total_reviews/active_days/distinct_senses/average_per_active_day/distribution/forget_rate/stability_rate), 7 fixed day rows (ascending, zero-filled with null rates for empty days).
+- **Empty state**: "近 7 天还没有完成词义卡复习。" with 7 day rows still shown, no misleading percentages.
+- **Window definition**: today + previous 6 natural days (NOT natural week, NOT configurable). Backend timezone. Real-time ReviewLog reads, no snapshot.
+
 ## 3. Backend Service Boundaries
 
 ### 3.1 SenseReviewLearningFeedbackService.php (~280 lines)
 
-**Responsibility**: Single source of truth for ReviewLog aggregation and learning feedback computation. Supports both single-card and batch paths via a shared `buildFeedbackFromLogs()` algorithm.
+**Responsibility**: Per-card ReviewLog aggregation for the `learning_feedback` payload. Supports both single-card and batch paths via a shared `buildFeedbackFromLogs()` algorithm.
 
 - **Public methods**:
   - `buildForCard(int $reviewCardId): array` — delegates to `buildForCards([$id])` (single source of truth).
   - `buildForCards(array $reviewCardIds): array` — batch path: ONE ReviewLog query for all cards, in-memory aggregation by `review_card_id`. Returns `[review_card_id => feedback_payload]`.
 - **Shared algorithm**: `buildFeedbackFromLogs(Collection $logs)` — used by both public methods. No duplicated aggregation logic.
+- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForCards()` for DB reads, `SenseReviewReportMetricsService` for distribution/forget-rate computation, `SenseReviewRatingContract::labelFor()` for labels (post Task B migration). The `RATING_LABELS` constant has been removed — Contract is now the single source.
 - **Computes**: total_reviews, again/hard/good/easy counts, recent_reviews (latest 5), forgetting_pattern (total_forget, forget_rate, last_forget_date, trend).
-- **Constants**: `RATING_LABELS` (again→忘了, hard→勉强, good→记得, easy→很熟).
-- **Query profile**: `buildForCards()` issues exactly 1 ReviewLog query regardless of card count (0 for empty input). `buildForCard()` issues 1 query (down from 7 before optimization).
+- **Query profile**: `buildForCards()` issues exactly 1 ReviewLog query regardless of card count (0 for empty input). `buildForCard()` issues 1 query (down from 7 before optimization). Batch path unchanged after Task B migration.
 - **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS fields. Excludes reset-type logs (rating='reset' OR source='reset'). User/card isolation via review_card_id scoping. Duplicate ids in input are de-duplicated.
 
 ### 3.2 SenseReviewCardSerializerService.php (~310 lines)
@@ -113,10 +145,63 @@ The container does **not**:
 **Responsibility**: Read-only cross-session daily aggregate for the "今日复习总结" feature. Distinct from `SenseReviewLearningFeedbackService` (per-card history) — this service aggregates across ALL cards for the current user/language/today.
 
 - **Public method**: `build(int $userId, string $language): array`.
-- **Reuses**: `SenseReviewQueryService::nonResetSenseReviewLogQuery()` for the shared sense-only / user-isolated / language-isolated / reset-excluded log base. This guarantees the reset exclusion rule is identical to `ReviewStatsService::reviewActivity()` and `SenseReviewLearningFeedbackService`.
-- **Computes**: timezone/day/day_start/day_end, total_reviews, distinct_senses, 4-rating distribution, forget_rate (null when empty), focus_senses (max 10, aggregated by sense_id), recent_reviews (max 10, newest first).
+- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForPeriod()` for DB reads, `SenseReviewReportMetricsService` for distribution/forget-rate/reviewsBySense, `SenseReviewRatingContract::labelFor()` for labels (post Task B migration).
+- **Product rules**: timezone/day/day_start/day_end, total_reviews, distinct_senses, 4-rating distribution, forget_rate (null when empty), focus_senses (max 10, aggregated by sense_id), recent_reviews (max 10, newest first).
 - **Day boundary**: `Carbon::today($timezone)` (00:00:00) to `Carbon::tomorrow($timezone)` (exclusive). Timezone = `config('app.timezone', 'UTC')`. No user timezone introduced this round.
 - **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table.
+
+### 3.3b SenseReviewDailyReportService.php (~250 lines)
+
+**Responsibility**: Read-only richer four-block daily report for the "今日学习日报" feature. Distinct from TodaySummary (simpler) — DailyReport adds learning-quality, focus-senses, and progress-record sections.
+
+- **Public method**: `build(int $userId, string $language): array`.
+- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForPeriod()` + `sensesReviewedBefore()`, `SenseReviewReportMetricsService` for distribution/forget-rate/stability-rate/reviewsBySense, `SenseReviewRatingContract::scoreFor()` for average-rating computation (post Task B migration — the `RATING_SCORES` private const has been removed).
+- **Product rules**: four sections (今日复习概览 / 今日学习质量 / 今日重点词义 / 今日进步记录), focus-sense max-10, first-review vs review-again detection via `sensesReviewedBefore()`.
+- **Constraints**: READ-ONLY. Same invariants as TodaySummary.
+
+### 3.3c SenseReviewSevenDayTrendService.php (~190 lines)
+
+**Responsibility**: Read-only fixed rolling 7-day trend for the "近 7 天学习趋势" feature.
+
+- **Public method**: `build(int $userId, string $language): array`.
+- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForPeriod()` (single query for the whole 7-day window), `SenseReviewReportMetricsService::groupByDay()` + `ratingDistribution()` + `forgetRate()` + `stabilityRate()` + `distinctSenseCount()`.
+- **Window**: today + previous 6 natural days (NOT natural week). `Carbon::today($timezone)` back 6 days. Backend timezone. Fixed 7-day array, ascending order, zero-filled for empty days (empty days have null rates, NOT "0%").
+- **Summary**: total_reviews, active_days, distinct_senses, average_per_active_day (null when 0 active days), distribution, forget_rate, stability_rate.
+- **Query budget**: exactly 1 ReviewLog query for the entire 7-day window regardless of sense count (1/10/50 senses → 1 query, locked by `SenseReviewSevenDayTrendTest`).
+- **Today-row consistency**: the "today" row must match `GET /reviews/senses/daily-report` for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (locked by contract test `test_today_row_matches_daily_report`).
+- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table. No snapshot persistence.
+
+### 3.3d SenseReviewAnalyticsQueryService.php (Query Layer)
+
+**Responsibility**: Centralized read-only ReviewLog statistics query layer. Single entry point for sense-review analytics DB reads.
+
+- **Public methods** (Query Layer only — no pure computation):
+  - `reviewsForPeriod(int $userId, string $language, Carbon $start, Carbon $end): Collection` — non-reset sense logs in [start, end), newest-first, with sense metadata.
+  - `sensesReviewedBefore(int $userId, string $language, Carbon $before): array` — sense ids with any non-reset review before a time.
+  - `reviewsForCards(array $cardIds): Collection` — non-reset logs for given card ids, newest-first. 1 query regardless of card count.
+- **Removed in Task B**: `ratingDistribution`, `forgetRate`, `stabilityRate`, `reviewsBySense` (moved to `SenseReviewReportMetricsService`).
+- **Delegates**: user/language/sense-only/reset-exclusion isolation to `SenseReviewQueryService::nonResetSenseReviewLogQuery()` / `nonResetCardReviewLogQuery()`.
+- **Constraints**: READ-ONLY. No rating labels, no scores, no product copy, no sort/limit. No new database table.
+
+### 3.3e SenseReviewRatingContract.php (Rating Contract)
+
+**Responsibility**: Single source of truth for SenseReview rating metadata. Pure value object.
+
+- **Methods**: `allowedRatings()`, `isAllowed($rating)`, `labelFor($rating)`, `scoreFor($rating)`.
+- **Allowed ratings**: again / hard / good / easy.
+- **Labels**: again→忘了, hard→勉强, good→记得, easy→很熟.
+- **Scores**: again=1, hard=2, good=3, easy=4.
+- **Invalid handling**: fail-closed — `labelFor`/`scoreFor` return null for invalid/null/case-mismatched ratings. Never silently treats invalid as `good`.
+- **Constraints**: no DB, no Auth, no config, no state writes, no product copy.
+
+### 3.3f SenseReviewReportMetricsService.php (Metrics Layer)
+
+**Responsibility**: Pure computation layer for report metrics. Zero DB queries.
+
+- **Methods**: `ratingDistribution(Collection)`, `forgetRate(Collection)`, `stabilityRate(Collection)`, `averageRating(Collection)`, `distinctSenseCount(Collection)`, `groupByDay(Collection)`, `reviewsBySense(Collection)`, `periodMetrics(Collection)`.
+- **Uses**: `SenseReviewRatingContract::scoreFor()` for average-rating computation (single source of truth for scores).
+- **groupByDay**: returns ONLY days with data (associative array `Y-m-d => Collection`). Zero-fill for empty days is the Product Service's responsibility, NOT Metrics'.
+- **Constraints**: zero DB queries (locked by `SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database`). No Eloquent, no Auth, no config, no product copy, no sort/limit decisions.
 
 ### 3.4 SenseReviewTodaySummary endpoint
 
@@ -125,21 +210,16 @@ The container does **not**:
 - **Auth**: required (middleware). Strict user + language isolation (enforced by service via `SenseReviewQueryService`).
 - **No writes**: does not write ReviewLog, does not change ReviewCard/FSRS, does not create WordSense/ReviewCard.
 
-## 4. Session Summary vs Today Summary
+## 4. Four Coexisting Summary / Report Concepts
 
-**Session summary (本次复习总结)**:
-- Source: `SenseReviewSessionTracker.js` (pure frontend, page-load scoped).
-- Resets on page refresh.
-- Tracks only ratings that happened AFTER the page was opened.
-- No backend call, no persistence.
+The SenseReview page now has four clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
 
-**Today summary (今日复习总结)**:
-- Source: backend `ReviewLog` via `GET /reviews/senses/today-summary`.
-- Cross-session: merges ALL of today's real ratings across multiple page sessions.
-- Persists across page refreshes (uses ReviewLog as source of truth).
-- Read-only: never writes ReviewLog, never touches FSRS.
+1. **本次复习总结 (Session Summary)** — `SenseReviewSessionSummary.vue` + `SenseReviewSessionTracker.js`. Frontend, page-load scoped. Resets on refresh. Tracks only ratings after page open. No backend call, no persistence.
+2. **今日复习总结 (Today Summary)** — `SenseReviewTodaySummary.vue` + `SenseReviewTodaySummaryService` + `GET /reviews/senses/today-summary`. Simpler cross-session backend aggregate for today.
+3. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `GET /reviews/senses/daily-report`. Richer four-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录).
+4. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week).
 
-Both coexist on the SenseReview page with clearly distinct wording.
+The "today" row of the 7-day trend MUST match the DailyReport for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (contract test enforced).
 
 ## 5. Props / Events Contract Summary
 
@@ -151,6 +231,7 @@ Both coexist on the SenseReview page with clearly distinct wording.
 | TodaySummary | summary | close |
 | UnderstandingAid | aid | — |
 | EditDialog | value (v-model), card | input, saved |
+| SevenDayTrend | trend | close |
 | SessionTracker | (pure functions, not a component) | — |
 
 ## 6. N+1 Risk Assessment
@@ -171,9 +252,26 @@ Both coexist on the SenseReview page with clearly distinct wording.
 
 **Shared algorithm**: Both `buildForCard()` and `buildForCards()` delegate to the private `buildFeedbackFromLogs(Collection)` method — single source of truth, no duplicated aggregation logic.
 
-## 7. Next-Round Architecture Candidates
+## 7. Query Budget Summary
 
-1. **Source context batch loading** — `SenseSourceContextService::sourceContextList` currently loads chapter data per source; could batch for multi-source cards.
-2. **Session summary persistence** — if users request cross-refresh session continuity, consider sessionStorage (still no DB writes).
-3. **Understanding aid occurrence-level evidence** — further merge occurrence-level `explanation` and `meaning_boundary` (currently sense-level only for these two fields).
-4. **Historical daily calendar** — extend today summary to arbitrary dates (not implemented this round per spec).
+All SenseReview analytics paths are constant-query regardless of card/sense count:
+
+| Path | ReviewLog queries | Locked by |
+|------|-------------------|-----------|
+| `LearningFeedbackService::buildForCards` (1/5/20 cards) | 1 | `SenseReviewBatchFeedbackTest` |
+| `SevenDayTrendService::build` (1/10/50 senses, 7 days) | 1 | `SenseReviewSevenDayTrendTest` |
+| `ReportMetricsService` (any method) | 0 | `SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database` |
+| `AnalyticsQueryService::reviewsForPeriod` (1/10/50 senses) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
+| `AnalyticsQueryService::reviewsForCards` (1/10/50 cards) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
+
+The 7-day trend does NOT issue 7 separate queries (one per day). It issues a single `reviewsForPeriod` for the whole [start, end) window, then `groupByDay` in memory via the Metrics layer.
+
+## 8. Not Implemented This Round
+
+- Natural-week switching (the 7-day window is a fixed rolling window, NOT a calendar week).
+- Date picker / arbitrary-date query.
+- Monthly / yearly reports.
+- Reading-time / lookup-count / AI-usage statistics.
+- Report export / push / badges / streak / auto-generated study advice.
+- Historical daily calendar.
+- Report snapshot persistence (all reports are real-time ReviewLog reads).
