@@ -1,5 +1,27 @@
 <template>
     <v-container fluid class="review-card-manage pa-4">
+        <!-- Deep link error (ADR-0007): shown when an invalid / not-found
+             review_card_id was opened via /review-cards/manage?review_card_id=... -->
+        <v-alert
+            v-if="deepLink.error"
+            type="warning"
+            dense
+            outlined
+            dismissible
+            class="mb-3"
+            @input="closeDeepLinkError"
+        >{{ deepLink.error }}</v-alert>
+        <!-- Deep link loading indicator -->
+        <v-alert
+            v-if="deepLink.loading"
+            type="info"
+            dense
+            outlined
+            class="mb-3"
+        >
+            <v-progress-circular indeterminate size="16" class="mr-2"></v-progress-circular>
+            正在从学习报告打开卡片详情…
+        </v-alert>
         <!-- Header -->
         <div class="d-flex flex-wrap align-center mb-2">
             <div>
@@ -412,6 +434,15 @@
                             <v-icon>mdi-close</v-icon>
                         </v-btn>
                     </v-card-title>
+                    <!-- Deep link hint (ADR-0007) -->
+                    <v-alert
+                        v-if="deepLink.active"
+                        type="info"
+                        dense
+                        text
+                        class="mx-4 mb-0"
+                        icon="mdi-information-outline"
+                    >从今日学习日报打开。</v-alert>
                     <v-card-subtitle class="pb-0">
                         {{ detailTarget.lemma }} / {{ detailTarget.surface_form }} / {{ detailTarget.pos }}
                     </v-card-subtitle>
@@ -604,6 +635,15 @@
                     </v-card-text>
                     <v-card-actions>
                         <v-btn text @click="closeDetail">关闭</v-btn>
+                        <v-btn
+                            v-if="deepLink.active"
+                            text
+                            color="primary"
+                            @click="backToReport"
+                        >
+                            <v-icon left small>mdi-arrow-left</v-icon>
+                            返回学习报告
+                        </v-btn>
                         <v-spacer />
                         <v-btn text color="primary" @click="viewSource(detailTarget); closeDetail()">查看原文</v-btn>
                     </v-card-actions>
@@ -764,6 +804,7 @@
 import axios from 'axios';
 import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
 import { DefaultLocalStorageManager } from '../../services/LocalStorageManagerService.js';
+import { parseReviewCardManageLocation } from '../../services/ReviewCardManageDeepLink.js';
 
 export default {
     components: {
@@ -815,6 +856,17 @@ export default {
             selectedIds: [],
             selectAll: false,
             snackbar: { show: false, text: '', color: 'success' },
+            // Deep link state (ADR-0007): when the page is opened via
+            // /review-cards/manage?review_card_id=...&from=daily-report,
+            // we load the exact card detail without depending on list
+            // pagination/filters.
+            deepLink: {
+                active: false,
+                loading: false,
+                error: '',
+                source: null,
+                reviewCardId: null,
+            },
             // Advanced filters
             advancedPanelOpen: undefined,
             advancedFilters: {
@@ -1005,6 +1057,7 @@ export default {
         this.loadData();
         this.loadFsrsStats();
         this.initExportFields();
+        this.handleDeepLink();
     },
     methods: {
         loadFsrsStats() {
@@ -1430,6 +1483,51 @@ export default {
             this.detailLogsError = '';
             this.detailDrawer = true;
             this.loadDetailLogs(item);
+        },
+
+        // --- Deep link (ADR-0007) ---
+        handleDeepLink() {
+            const parsed = parseReviewCardManageLocation(this.$route ? this.$route.query : {});
+            if (!parsed) {
+                return;
+            }
+            this.deepLink.source = parsed.from;
+            this.deepLink.reviewCardId = parsed.review_card_id;
+            this.loadDeepLinkDetail(parsed.review_card_id);
+        },
+
+        loadDeepLinkDetail(reviewCardId) {
+            this.deepLink.loading = true;
+            this.deepLink.error = '';
+            this.deepLink.active = false;
+            axios.get('/review-cards/manage/' + reviewCardId + '/detail')
+                .then((response) => {
+                    const item = response.data;
+                    this.deepLink.active = true;
+                    this.openDetail(item);
+                })
+                .catch(() => {
+                    this.deepLink.error = '未找到可管理的词义复习卡，可能已删除、被拒绝或不属于当前语言。';
+                    this.deepLink.active = false;
+                })
+                .finally(() => {
+                    this.deepLink.loading = false;
+                });
+        },
+
+        closeDeepLinkError() {
+            this.deepLink.error = '';
+        },
+
+        backToReport() {
+            // Prefer history back (returns to /reviews/senses where the
+            // report dialog was). Fall back to the sense review page if
+            // there is no usable history.
+            if (window.history.length > 1) {
+                window.history.back();
+            } else {
+                window.location.href = '/reviews/senses';
+            }
         },
 
         closeDetail() {

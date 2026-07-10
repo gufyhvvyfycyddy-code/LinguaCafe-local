@@ -60,6 +60,7 @@
                         :[currentPayloadProp]="payload"
                         @close="close"
                         @back="backToList"
+                        @open-review-card="handleOpenReviewCard"
                     >
                     </component>
                     <div class="d-flex justify-center mt-3">
@@ -77,6 +78,7 @@
 <script>
     import axios from 'axios';
     import { REPORT_CATALOG, getReportByKey, isReportKey } from './SenseReviewReportCatalog.js';
+    import { buildReviewCardManageLocation } from '../../services/ReviewCardManageDeepLink.js';
     import SenseReviewDailyReport from './SenseReviewDailyReport.vue';
     import SenseReviewSevenDayTrend from './SenseReviewSevenDayTrend.vue';
     import SenseReviewThirtyDayCalendar from './SenseReviewThirtyDayCalendar.vue';
@@ -233,6 +235,24 @@
                 this.requestSequence += 1;
                 this.$emit('input', false);
                 this.resetState();
+            },
+            handleOpenReviewCard(payload) {
+                // ADR-0007: navigate to ReviewCardManage with exact
+                // review_card_id. Uses the pure DeepLink helper to build
+                // the route — no manual string concatenation. The `from`
+                // field uses the current report key (whitelist-checked by
+                // the helper); `source_section` is diagnostic only and is
+                // not put in the URL. Navigation is a cross-page redirect
+                // (window.location) so the route query survives refresh.
+                const location = buildReviewCardManageLocation(
+                    { review_card_id: payload.review_card_id, word_sense_id: payload.word_sense_id },
+                    this.selectedReportKey,
+                );
+                if (!location) {
+                    return;
+                }
+                const params = new URLSearchParams(location.query);
+                window.location.href = location.path + '?' + params.toString();
             },
             resetState() {
                 this.selectedReportKey = null;

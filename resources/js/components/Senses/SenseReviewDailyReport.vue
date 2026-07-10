@@ -106,6 +106,9 @@
                     <v-list-item
                         v-for="(item, i) in report.focus_senses"
                         :key="i"
+                        :disabled="!canOpenCard(item)"
+                        :class="{ 'report-clickable': canOpenCard(item) }"
+                        @click="openCard(item, 'focus_senses')"
                     >
                         <v-list-item-content>
                             <v-list-item-title>
@@ -125,6 +128,9 @@
                                 </span>
                             </v-list-item-subtitle>
                         </v-list-item-content>
+                        <v-list-item-action v-if="canOpenCard(item)">
+                            <v-icon small color="primary">mdi-chevron-right</v-icon>
+                        </v-list-item-action>
                     </v-list-item>
                 </v-list>
             </div>
@@ -138,6 +144,9 @@
                     <v-list-item
                         v-for="(item, i) in report.progress_senses"
                         :key="i"
+                        :disabled="!canOpenCard(item)"
+                        :class="{ 'report-clickable': canOpenCard(item) }"
+                        @click="openCard(item, 'progress_senses')"
                     >
                         <v-list-item-content>
                             <v-list-item-title>
@@ -150,6 +159,9 @@
                                 <v-chip x-small :color="ratingColor(item.to_rating)" class="ml-1">{{ ratingLabel(item.to_rating) }}</v-chip>
                             </v-list-item-subtitle>
                         </v-list-item-content>
+                        <v-list-item-action v-if="canOpenCard(item)">
+                            <v-icon small color="primary">mdi-chevron-right</v-icon>
+                        </v-list-item-action>
                     </v-list-item>
                 </v-list>
             </div>
@@ -170,6 +182,9 @@
                     <v-list-item
                         v-for="(item, i) in report.recent_reviews"
                         :key="i"
+                        :disabled="!canOpenCard(item)"
+                        :class="{ 'report-clickable': canOpenCard(item) }"
+                        @click="openCard(item, 'recent_reviews')"
                     >
                         <v-list-item-content>
                             <v-list-item-title>
@@ -185,6 +200,9 @@
                                 <span class="text-caption text--secondary">{{ formatTime(item.reviewed_at) }}</span>
                             </v-list-item-subtitle>
                         </v-list-item-content>
+                        <v-list-item-action v-if="canOpenCard(item)">
+                            <v-icon small color="primary">mdi-chevron-right</v-icon>
+                        </v-list-item-action>
                     </v-list-item>
                 </v-list>
             </div>
@@ -220,15 +238,25 @@
     //
     // Contract:
     //   - Props: report (object from backend daily-report endpoint).
-    //   - Events: close (user wants to dismiss and continue reviewing).
+    //   - Events: close (user wants to dismiss and continue reviewing),
+    //             open-review-card (user clicked a focus/progress/recent
+    //             entry with a valid review_card_id; payload:
+    //             { review_card_id, word_sense_id, source_section }).
     //   - Does NOT call any backend API itself (parent loads the data).
     //   - Does NOT write any review log or touch scheduling state.
     //   - Does NOT create/destroy cards.
+    //   - Does NOT directly navigate (emits open-review-card to parent).
     //   - Does NOT handle hotkeys (parent disables them while shown).
     //   - Empty state shows "今天还没有完成词义卡复习。" with no fake charts.
     //   - average_rating null → "暂无数据".
     //   - Five sections: overview, quality, focus_senses, progress_senses,
     //     recent_reviews (additive, migrated from TodaySummary in ADR-0006).
+    //   - Navigation (ADR-0007): focus_senses / progress_senses /
+    //     recent_reviews items are clickable when review_card_id is a
+    //     positive integer. Invalid/missing IDs disable the item (no
+    //     fake navigation target). The emit payload always includes
+    //     source_section ('focus_senses' | 'progress_senses' |
+    //     'recent_reviews') so the parent can trace the click origin.
     export default {
         name: 'SenseReviewDailyReport',
         props: {
@@ -269,6 +297,19 @@
             },
         },
         methods: {
+            canOpenCard(item) {
+                return typeof item.review_card_id === 'number' && item.review_card_id > 0;
+            },
+            openCard(item, sourceSection) {
+                if (!this.canOpenCard(item)) {
+                    return;
+                }
+                this.$emit('open-review-card', {
+                    review_card_id: item.review_card_id,
+                    word_sense_id: item.word_sense_id || null,
+                    source_section: sourceSection,
+                });
+            },
             ratingLabel(rating) {
                 return {
                     again: '忘了',
@@ -297,3 +338,12 @@
         },
     }
 </script>
+
+<style scoped>
+.report-clickable {
+    cursor: pointer;
+}
+.report-clickable:hover {
+    background-color: rgba(25, 118, 210, 0.08);
+}
+</style>

@@ -186,4 +186,74 @@ test('helper file does not reference document/window', () => {
     assert.ok(!content.includes('window'), 'DeepLink helper must not access window');
 });
 
+// --- 7. ADR-0007 / Task A-3: ReviewCardManage.vue recognizes route query ---
+
+const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+
+test('ReviewCardManage.vue imports parseReviewCardManageLocation', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(/import.*parseReviewCardManageLocation.*ReviewCardManageDeepLink/.test(src), 'ReviewCardManage must import parseReviewCardManageLocation from DeepLink helper');
+});
+
+test('ReviewCardManage.vue calls handleDeepLink on mount', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(/handleDeepLink/.test(src), 'ReviewCardManage must have handleDeepLink method');
+    assert.ok(/mounted\(\)/.test(src), 'ReviewCardManage must have mounted hook');
+    assert.ok(/this\.handleDeepLink\(\)/.test(src), 'ReviewCardManage must call handleDeepLink in mounted');
+});
+
+test('ReviewCardManage.vue calls exact detail endpoint (not list search)', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(/\/review-cards\/manage\/.*\/detail/.test(src), 'ReviewCardManage must call /review-cards/manage/{id}/detail endpoint');
+    // Must NOT fall back to lemma search for deep link
+    const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
+    if (methodMatch) {
+        assert.ok(!/searchQuery\s*=/.test(methodMatch[1]), 'loadDeepLinkDetail must not set searchQuery (no lemma fallback)');
+    }
+});
+
+test('ReviewCardManage.vue does not auto-open first card on invalid ID', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    // Extract the loadDeepLinkDetail method block (from method definition to its closing })
+    const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
+    assert.ok(methodMatch, 'loadDeepLinkDetail method must exist');
+    const methodBody = methodMatch[1];
+    // The catch block within this method must set deepLink.error
+    assert.ok(/deepLink\.error\s*=/.test(methodBody), 'catch block must set deepLink.error');
+    // Must NOT fall back to opening the first card in the list
+    assert.ok(!/this\.items\[0\]/.test(methodBody), 'catch block must NOT open first card in list');
+    assert.ok(!/openDetail\(this\.items/.test(methodBody), 'catch block must NOT call openDetail with list item');
+    // Error message must be present in the component
+    assert.ok(src.includes('未找到可管理的词义复习卡'), 'ReviewCardManage must show safe error message for invalid ID');
+});
+
+test('ReviewCardManage.vue has back-to-report button', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(/backToReport/.test(src), 'ReviewCardManage must have backToReport method');
+    assert.ok(/window\.history\.back/.test(src), 'backToReport must use window.history.back()');
+    assert.ok(/\/reviews\/senses/.test(src), 'backToReport must fall back to /reviews/senses');
+});
+
+test('ReviewCardManage.vue shows deep link hint when opened from report', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(/从今日学习日报打开/.test(src) || /从学习报告打开/.test(src), 'ReviewCardManage must show hint when opened from report');
+    assert.ok(/deepLink\.active/.test(src), 'ReviewCardManage must track deepLink.active state');
+});
+
+test('ReviewCardManage.vue does not write ReviewLog or modify FSRS during deep link', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    // Extract the loadDeepLinkDetail method block
+    const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
+    assert.ok(methodMatch, 'loadDeepLinkDetail method must exist');
+    const methodBody = methodMatch[1];
+    assert.ok(/axios\.get/.test(methodBody), 'loadDeepLinkDetail must use axios.get');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(methodBody), 'loadDeepLinkDetail must NOT use write APIs');
+});
+
+test('ReviewCardManage.vue preserves review_card_id in URL for refresh', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    // handleDeepLink reads from this.$route.query, which survives refresh
+    assert.ok(/\$route\.query/.test(src) || /\$route.*query/.test(src), 'ReviewCardManage must read route query for deep link');
+});
+
 console.log(`\n${passed} passed`);

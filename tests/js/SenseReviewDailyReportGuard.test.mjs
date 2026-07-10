@@ -141,5 +141,47 @@ test('daily report uses report prop, not summary prop', () => {
     assert.ok(!/summary:/.test(src), 'component must not reuse the summary prop name');
 });
 
+// 13. ADR-0007 / Task A-1: three sections emit open-review-card (not direct nav)
+test('component emits open-review-card event from three sections', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(/\$emit\('open-review-card'/.test(src), "component must emit 'open-review-card'");
+    // Three sections must each call openCard with their source_section name.
+    assert.ok(/openCard\(item,\s*['"]focus_senses['"]/.test(src), 'focus_senses must emit with source_section');
+    assert.ok(/openCard\(item,\s*['"]progress_senses['"]/.test(src), 'progress_senses must emit with source_section');
+    assert.ok(/openCard\(item,\s*['"]recent_reviews['"]/.test(src), 'recent_reviews must emit with source_section');
+});
+
+// 14. ADR-0007 / Task A-1: component does NOT directly navigate
+test('component does not directly navigate (no window.location / $router.push)', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(!/window\.location/.test(src), 'component must not use window.location directly');
+    assert.ok(!/\$router\.push/.test(src), 'component must not use $router.push directly');
+    assert.ok(!/\$router\.replace/.test(src), 'component must not use $router.replace directly');
+});
+
+// 15. ADR-0007 / Task A-1: items are disabled when no valid review_card_id
+test('component disables items without valid review_card_id', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(/canOpenCard/.test(src), 'component must have canOpenCard method');
+    assert.ok(/:disabled="!canOpenCard/.test(src), 'component must disable items when canOpenCard is false');
+    // canOpenCard must check for positive integer
+    assert.ok(/review_card_id.*number.*>.*0/.test(src) || /review_card_id.*>\s*0/.test(src), 'canOpenCard must check review_card_id is a positive number');
+});
+
+// 16. ADR-0007 / Task A-1: emit payload includes required fields
+test('open-review-card payload includes review_card_id, word_sense_id, source_section', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(/review_card_id:/.test(src), 'payload must include review_card_id');
+    assert.ok(/word_sense_id:/.test(src), 'payload must include word_sense_id');
+    assert.ok(/source_section:/.test(src), 'payload must include source_section');
+});
+
+// 17. ADR-0007 / Task A-1: component does not call axios for navigation
+test('component does not call axios for card detail navigation', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(!/\/review-cards\/manage\/.*\/detail/.test(src), 'component must not call detail endpoint directly');
+    assert.ok(!/axios\.(get|post|put|delete|patch)/.test(src), 'component must not call any axios method');
+});
+
 console.log(`\n${passed} passed`);
 console.log('Done.');

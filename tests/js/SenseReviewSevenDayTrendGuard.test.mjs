@@ -137,5 +137,34 @@ test('component uses trend prop, not report or summary', () => {
     assert.ok(/trend:/.test(src), 'component must use trend prop');
 });
 
+// 13. ADR-0007 / Task A-5: 7-day rolling window is frozen — no date
+//     picker, no week toggle, no natural week, no weekly snapshot.
+//     The component must NOT introduce UI controls that would let the
+//     user change the fixed rolling window (today + previous 6 natural
+//     days). This guard locks the product decision from ADR-0006/A-5.
+test('component has no date picker, week toggle, or weekly snapshot controls', () => {
+    const src = readFileSync(COMPONENT_PATH, 'utf8');
+    assert.ok(!/v-date-picker|DatePicker|date-picker/i.test(src), 'component must not have a date picker');
+    assert.ok(!/周一|周日|weekStart|week-start|isoWeek/i.test(src), 'component must not have a Mon-Sun week toggle');
+    assert.ok(!/自然周|weekly snapshot|weekReport|week-report/i.test(src), 'component must not reference natural week or weekly snapshot');
+    assert.ok(!/v-switch|v-select/i.test(src), 'component must not have a switch or select to change the window');
+});
+
+// 14. Backend service uses rollingDays(7, tz) — fixed 7-day window
+test('backend service uses rollingDays(7, tz) for fixed 7-day window', () => {
+    const servicePath = join(__dirname, '..', '..', 'app', 'Services', 'SenseReviewSevenDayTrendService.php');
+    const src = readFileSync(servicePath, 'utf8');
+    assert.ok(/rollingDays\(7/.test(src), 'service must call rollingDays(7, ...) for the 7-day window');
+    assert.ok(!/rollingDays\(8|rollingDays\(6|rollingDays\(14|rollingDays\(30/.test(src), 'service must not use other window sizes for seven-day trend');
+});
+
+// 15. Period service implements today + subDays(days-1) semantics
+test('period service implements today + previous (days-1) natural days', () => {
+    const periodPath = join(__dirname, '..', '..', 'app', 'Services', 'SenseReviewReportPeriodService.php');
+    const src = readFileSync(periodPath, 'utf8');
+    assert.ok(/Carbon::today/.test(src), 'period must use Carbon::today as end day');
+    assert.ok(/subDays\(\$days\s*-\s*1\)/.test(src), 'period must subDays(days-1) for start day');
+});
+
 console.log(`\n${passed} passed`);
 console.log('Done.');

@@ -192,4 +192,40 @@ test('Catalog has exactly 3 report entries', () => {
     assert.strictEqual(keyCount, 3, 'Catalog must have exactly 3 report entries (post ADR-0006)');
 });
 
+// 18. ADR-0007 / Task A-2: ReportCenter handles open-review-card from DailyReport
+test('ReportCenter handles open-review-card event from DailyReport', () => {
+    assert.ok(/@open-review-card/.test(centerSrc) || /open-review-card/.test(centerSrc), 'ReportCenter must listen for open-review-card event');
+    assert.ok(/handleOpenReviewCard/.test(centerSrc), 'ReportCenter must have handleOpenReviewCard method');
+});
+
+// 19. ADR-0007 / Task A-2: ReportCenter uses DeepLink helper (not string concat)
+test('ReportCenter imports and uses DeepLink helper', () => {
+    assert.ok(/import.*ReviewCardManageDeepLink/.test(centerSrc), 'ReportCenter must import ReviewCardManageDeepLink');
+    assert.ok(/buildReviewCardManageLocation/.test(centerSrc), 'ReportCenter must use buildReviewCardManageLocation');
+    // Must NOT manually concatenate route strings
+    assert.ok(!/['"]\/review-cards\/manage\?review_card_id=['"]\s*\+/.test(centerSrc), 'ReportCenter must not concatenate route strings manually');
+});
+
+// 20. ADR-0007 / Task A-2: ReportCenter uses window.location.href for cross-page nav
+test('ReportCenter uses window.location.href for cross-page navigation', () => {
+    assert.ok(/window\.location\.href/.test(centerSrc), 'ReportCenter must use window.location.href for cross-page navigation');
+    // Must NOT use $router.push (route query won't survive full page load on management page)
+    assert.ok(!/\$router\.push/.test(centerSrc), 'ReportCenter must not use $router.push for deep link navigation');
+});
+
+// 21. ADR-0007 / Task A-2: ReportCenter navigation is read-only (no POST/PATCH/DELETE)
+test('ReportCenter navigation does not produce write requests', () => {
+    // The handleOpenReviewCard method must not call axios.post/put/delete/patch
+    const methodBlock = centerSrc.match(/handleOpenReviewCard[\s\S]*?\},/);
+    if (methodBlock) {
+        assert.ok(!/axios\.(post|put|delete|patch)/.test(methodBlock[0]), 'handleOpenReviewCard must not call write APIs');
+    }
+    // Must not reference ReviewLog model in actual code (comments are OK)
+    assert.ok(!/ReviewLog::/.test(centerSrc), 'ReportCenter must not reference ReviewLog model in code');
+    assert.ok(!/new\s+ReviewLog/.test(centerSrc), 'ReportCenter must not instantiate ReviewLog');
+    // Must not call FSRS mutation APIs
+    assert.ok(!/\/rate['"]/.test(centerSrc), 'ReportCenter must not call rating API');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not call write APIs at all');
+});
+
 console.log(`\n${passed} passed`);
