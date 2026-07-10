@@ -51,6 +51,12 @@
             <div class="text-center mt-1">
                 <v-btn small text color="primary" @click="openDailyReport">查看今日学习日报</v-btn>
             </div>
+            <!-- Seven day trend entry: fixed rolling 7-day window (today +
+                 previous 6 natural days, NOT a natural week). Distinct from
+                 the daily report. Read-only. -->
+            <div class="text-center mt-1">
+                <v-btn small text color="info" @click="openSevenDayTrend">查看近 7 天学习趋势</v-btn>
+            </div>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
@@ -90,6 +96,17 @@
                 v-if="showDailyReport"
                 :report="dailyReport"
                 @close="closeDailyReport"
+            />
+        </v-dialog>
+
+        <!-- Seven day trend dialog (fixed rolling 7-day window). Read-only:
+             the component only renders backend data and emits 'close'. It
+             never writes ReviewLog, never touches FSRS, never creates cards. -->
+        <v-dialog v-model="showSevenDayTrend" max-width="820">
+            <SenseReviewSevenDayTrend
+                v-if="showSevenDayTrend"
+                :trend="sevenDayTrend"
+                @close="closeSevenDayTrend"
             />
         </v-dialog>
 
@@ -353,6 +370,7 @@
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewTodaySummary from './SenseReviewTodaySummary.vue';
     import SenseReviewDailyReport from './SenseReviewDailyReport.vue';
+    import SenseReviewSevenDayTrend from './SenseReviewSevenDayTrend.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
 
     /**
@@ -387,6 +405,7 @@
             SenseReviewEditDialog,
             SenseReviewTodaySummary,
             SenseReviewDailyReport,
+            SenseReviewSevenDayTrend,
         },
         data: function() {
             return {
@@ -492,6 +511,28 @@
                     },
                     focus_senses: [],
                     progress_senses: [],
+                },
+                // Seven day trend: fixed rolling 7-day window (today +
+                // previous 6 natural days, NOT a natural week). Loaded from
+                // the backend GET /reviews/senses/seven-day-trend endpoint.
+                // Read-only — opening/closing never writes ReviewLog, never
+                // touches FSRS, never changes the queue.
+                showSevenDayTrend: false,
+                sevenDayTrendLoading: false,
+                sevenDayTrend: {
+                    timezone: '',
+                    start_day: '',
+                    end_day: '',
+                    summary: {
+                        total_reviews: 0,
+                        active_days: 0,
+                        distinct_senses: 0,
+                        average_per_active_day: null,
+                        distribution: { again: 0, hard: 0, good: 0, easy: 0 },
+                        forget_rate: null,
+                        stability_rate: null,
+                    },
+                    days: [],
                 },
             }
         },
@@ -882,6 +923,28 @@
             },
             closeDailyReport() {
                 this.showDailyReport = false;
+            },
+            // ==================== Seven day trend ====================
+            // Read-only fixed rolling 7-day window (today + previous 6
+            // natural days, NOT a natural week). Distinct from the daily
+            // report. Opening this never writes ReviewLog, never touches
+            // FSRS, never changes the card queue.
+            openSevenDayTrend() {
+                this.showSevenDayTrend = true;
+                this.sevenDayTrendLoading = true;
+                axios.get('/reviews/senses/seven-day-trend')
+                    .then((response) => {
+                        this.sevenDayTrend = response.data;
+                    })
+                    .catch(() => {
+                        this.showSnackbar('7 天趋势加载失败。', 'error');
+                    })
+                    .finally(() => {
+                        this.sevenDayTrendLoading = false;
+                    });
+            },
+            closeSevenDayTrend() {
+                this.showSevenDayTrend = false;
             },
             // ==================== Snackbar ====================
             showSnackbar(text, color) {

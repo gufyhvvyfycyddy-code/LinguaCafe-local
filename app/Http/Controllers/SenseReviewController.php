@@ -7,6 +7,7 @@ use App\Services\ReviewCardService;
 use App\Services\SenseReviewCardSerializerService;
 use App\Services\SenseReviewDailyReportService;
 use App\Services\SenseReviewService;
+use App\Services\SenseReviewSevenDayTrendService;
 use App\Services\SenseReviewTodaySummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -20,6 +21,7 @@ class SenseReviewController extends Controller
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
         private SenseReviewTodaySummaryService $senseReviewTodaySummaryService,
         private SenseReviewDailyReportService $senseReviewDailyReportService,
+        private SenseReviewSevenDayTrendService $senseReviewSevenDayTrendService,
     ) {
     }
 
@@ -112,5 +114,22 @@ class SenseReviewController extends Controller
         $report = $this->senseReviewDailyReportService->build($userId, $language);
 
         return response()->json($report);
+    }
+
+    /**
+     * SenseReview-SevenDayTrend-1000-1
+     *
+     * Read-only "近 7 天学习趋势" — fixed rolling 7-day window (today +
+     * previous 6 natural days, NOT a natural week). Source of truth:
+     * ReviewLog. Sense-review only, reset excluded. No writes, no FSRS.
+     */
+    public function sevenDayTrend(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $trend = $this->senseReviewSevenDayTrendService->build($userId, $language);
+
+        return response()->json($trend);
     }
 }
