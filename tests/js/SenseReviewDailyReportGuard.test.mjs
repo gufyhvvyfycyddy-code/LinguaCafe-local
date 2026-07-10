@@ -29,6 +29,7 @@ const __dirname = dirname(__filename);
 
 const COMPONENT_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewDailyReport.vue');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
+const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
@@ -91,16 +92,16 @@ test('component contains all four block titles', () => {
 // 7. Container registers the component
 test('SenseReview.vue registers SenseReviewDailyReport', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes("import SenseReviewDailyReport"), 'container must import the component');
-    assert.ok(/SenseReviewDailyReport/.test(src), 'container must register the component');
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(centerSrc.includes("import SenseReviewDailyReport"), 'ReportCenter must import the component');
+    assert.ok(/SenseReviewDailyReport/.test(centerSrc), 'ReportCenter must register the component');
 });
 
 // 8. Container has the "查看今日学习日报" entry button
 test('SenseReview.vue has the daily-report entry button', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
     assert.ok(src.includes('查看今日学习日报'), 'container must have the entry button');
-    assert.ok(/openDailyReport/.test(src), 'container must wire openDailyReport');
-    assert.ok(/closeDailyReport/.test(src), 'container must wire closeDailyReport');
+    assert.ok(src.includes("'daily-report'"), "container must set activeReport to 'daily-report'");
 });
 
 // 9. Three concepts are clearly distinguished by wording
@@ -124,8 +125,10 @@ test('route GET /reviews/senses/daily-report is registered', () => {
 // 11. Container only loads daily report via GET (read-only)
 test('container only reads daily report via GET, never writes', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(/axios\.get\('\/reviews\/senses\/daily-report'\)/.test(src), 'container must GET the daily report');
-    assert.ok(!/axios\.(post|put|delete|patch)\('\/reviews\/senses\/daily-report'/.test(src), 'container must not write to daily-report');
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(/axios\.get/.test(centerSrc), 'ReportCenter must use GET');
+    assert.ok(centerSrc.includes('/reviews/senses/daily-report'), 'ReportCenter must reference daily-report endpoint');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
 });
 
 // 12. Daily report component does not reference the today-summary prop name

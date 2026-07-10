@@ -27,6 +27,7 @@ const __dirname = dirname(__filename);
 
 const COMPONENT_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewTodaySummary.vue');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
+const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
@@ -81,16 +82,16 @@ test('component labels itself as today summary, distinct from session summary', 
 // 6. Container registers the component
 test('SenseReview.vue registers SenseReviewTodaySummary', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes("import SenseReviewTodaySummary"), 'container must import the component');
-    assert.ok(/SenseReviewTodaySummary/.test(src), 'container must register the component');
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(centerSrc.includes("import SenseReviewTodaySummary"), 'ReportCenter must import the component');
+    assert.ok(/SenseReviewTodaySummary/.test(centerSrc), 'ReportCenter must register the component');
 });
 
 // 7. Container has the "查看今日复习总结" entry button
 test('SenseReview.vue has the today-summary entry button', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
     assert.ok(src.includes('查看今日复习总结'), 'container must have the entry button');
-    assert.ok(/openTodaySummary/.test(src), 'container must wire openTodaySummary');
-    assert.ok(/closeTodaySummary/.test(src), 'container must wire closeTodaySummary');
+    assert.ok(src.includes("'today-summary'"), "container must set activeReport to 'today-summary'");
 });
 
 // 8. Container distinguishes session summary from today summary
@@ -114,7 +115,10 @@ test('route GET /reviews/senses/today-summary is registered', () => {
 // 10. Container only loads today summary via GET (read-only)
 test('container only reads today summary via GET, never writes', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(/axios\.get\('\/reviews\/senses\/today-summary'\)/.test(src), 'container must GET the today summary');
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(/axios\.get/.test(centerSrc), 'ReportCenter must use GET');
+    assert.ok(centerSrc.includes('/reviews/senses/today-summary'), 'ReportCenter must reference today-summary endpoint');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
     // No POST/PUT/DELETE to the today-summary endpoint
     assert.ok(!/axios\.(post|put|delete|patch)\('\/reviews\/senses\/today-summary'/.test(src), 'container must not write to today-summary');
 });

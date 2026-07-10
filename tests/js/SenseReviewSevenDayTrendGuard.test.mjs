@@ -31,6 +31,7 @@ const __dirname = dirname(__filename);
 
 const COMPONENT_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewSevenDayTrend.vue');
 const CONTAINER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReview.vue');
+const CENTER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Senses', 'SenseReviewReportCenter.vue');
 const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
@@ -87,19 +88,18 @@ test('component does not import chart library', () => {
     assert.ok(!/chart\.js|ChartJS|echarts|d3|highcharts|apexcharts/i.test(src), 'component must not import chart libraries');
 });
 
-// 7. Container registers the component
-test('SenseReview.vue registers SenseReviewSevenDayTrend', () => {
-    const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes("import SenseReviewSevenDayTrend"), 'container must import the component');
-    assert.ok(/SenseReviewSevenDayTrend/.test(src), 'container must register the component');
+// 7. ReportCenter registers the component (SenseReview.vue delegates to ReportCenter)
+test('SenseReview.vue registers SenseReviewSevenDayTrend via ReportCenter', () => {
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(centerSrc.includes("import SenseReviewSevenDayTrend"), 'ReportCenter must import the component');
+    assert.ok(/SenseReviewSevenDayTrend/.test(centerSrc), 'ReportCenter must register the component');
 });
 
 // 8. Container has the "查看近 7 天学习趋势" entry button
 test('SenseReview.vue has the seven-day-trend entry button', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
     assert.ok(src.includes('查看近 7 天学习趋势'), 'container must have the entry button');
-    assert.ok(/openSevenDayTrend/.test(src), 'container must wire openSevenDayTrend');
-    assert.ok(/closeSevenDayTrend/.test(src), 'container must wire closeSevenDayTrend');
+    assert.ok(src.includes("'seven-day-trend'"), "container must set activeReport to 'seven-day-trend'");
 });
 
 // 9. Four concepts are clearly distinguished by wording
@@ -121,11 +121,12 @@ test('route GET /reviews/senses/seven-day-trend is registered', () => {
     assert.ok(/sevenDayTrend/.test(src), 'route must point to sevenDayTrend method');
 });
 
-// 11. Container only loads seven day trend via GET (read-only)
-test('container only reads seven day trend via GET, never writes', () => {
-    const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(/axios\.get\('\/reviews\/senses\/seven-day-trend'\)/.test(src), 'container must GET the seven day trend');
-    assert.ok(!/axios\.(post|put|delete|patch)\('\/reviews\/senses\/seven-day-trend'/.test(src), 'container must not write to seven-day-trend');
+// 11. ReportCenter only loads seven day trend via GET (read-only)
+test('ReportCenter only reads seven day trend via GET, never writes', () => {
+    const centerSrc = readFileSync(CENTER_PATH, 'utf8');
+    assert.ok(/axios\.get/.test(centerSrc), 'ReportCenter must use GET');
+    assert.ok(centerSrc.includes('/reviews/senses/seven-day-trend'), 'ReportCenter must reference seven-day-trend endpoint');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
 });
 
 // 12. Component uses trend prop (not report or summary)

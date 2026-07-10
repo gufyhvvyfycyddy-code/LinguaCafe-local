@@ -44,18 +44,18 @@
                  the user can check today's cumulative reviews without ending
                  the current session. Read-only, never writes ReviewLog. -->
             <div class="text-center mt-2">
-                <v-btn small text color="info" @click="openTodaySummary">查看今日复习总结</v-btn>
+                <v-btn small text color="info" @click="activeReport = 'today-summary'">查看今日复习总结</v-btn>
             </div>
             <!-- Daily report entry: richer four-block daily learning report.
                  Distinct from the simpler today-summary. Read-only. -->
             <div class="text-center mt-1">
-                <v-btn small text color="primary" @click="openDailyReport">查看今日学习日报</v-btn>
+                <v-btn small text color="primary" @click="activeReport = 'daily-report'">查看今日学习日报</v-btn>
             </div>
             <!-- Seven day trend entry: fixed rolling 7-day window (today +
                  previous 6 natural days, NOT a natural week). Distinct from
                  the daily report. Read-only. -->
             <div class="text-center mt-1">
-                <v-btn small text color="info" @click="openSevenDayTrend">查看近 7 天学习趋势</v-btn>
+                <v-btn small text color="info" @click="activeReport = 'seven-day-trend'">查看近 7 天学习趋势</v-btn>
             </div>
         </v-card>
 
@@ -74,41 +74,14 @@
         <!-- Today summary entry on the session-summary screen. Lets the user
              view today's cumulative reviews before continuing or leaving. -->
         <div v-if="showSummaryView" class="text-center mt-2">
-            <v-btn small text color="info" @click="openTodaySummary">查看今日复习总结</v-btn>
+            <v-btn small text color="info" @click="activeReport = 'today-summary'">查看今日复习总结</v-btn>
         </div>
 
-        <!-- Today summary dialog (cross-session daily aggregate). Read-only:
-             the component only renders backend data and emits 'close'. It
-             never writes ReviewLog, never touches FSRS, never creates cards. -->
-        <v-dialog v-model="showTodaySummary" max-width="720">
-            <SenseReviewTodaySummary
-                v-if="showTodaySummary"
-                :summary="todaySummary"
-                @close="closeTodaySummary"
-            />
-        </v-dialog>
-
-        <!-- Daily report dialog (four-block daily learning report). Read-only:
-             the component only renders backend data and emits 'close'. It
-             never writes ReviewLog, never touches FSRS, never creates cards. -->
-        <v-dialog v-model="showDailyReport" max-width="800">
-            <SenseReviewDailyReport
-                v-if="showDailyReport"
-                :report="dailyReport"
-                @close="closeDailyReport"
-            />
-        </v-dialog>
-
-        <!-- Seven day trend dialog (fixed rolling 7-day window). Read-only:
-             the component only renders backend data and emits 'close'. It
-             never writes ReviewLog, never touches FSRS, never creates cards. -->
-        <v-dialog v-model="showSevenDayTrend" max-width="820">
-            <SenseReviewSevenDayTrend
-                v-if="showSevenDayTrend"
-                :trend="sevenDayTrend"
-                @close="closeSevenDayTrend"
-            />
-        </v-dialog>
+        <!-- Report center: single orchestration component for all report
+             dialogs (today-summary / daily-report / seven-day-trend /
+             thirty-day-calendar). Read-only GET only. Never writes ReviewLog,
+             never touches FSRS, never changes the card queue. -->
+        <SenseReviewReportCenter v-model="activeReport" />
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
             <!-- Lemma / surface form / pos -->
@@ -368,9 +341,7 @@
     import SenseReviewRatingControls from './SenseReviewRatingControls.vue';
     import SenseReviewUnderstandingAid from './SenseReviewUnderstandingAid.vue';
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
-    import SenseReviewTodaySummary from './SenseReviewTodaySummary.vue';
-    import SenseReviewDailyReport from './SenseReviewDailyReport.vue';
-    import SenseReviewSevenDayTrend from './SenseReviewSevenDayTrend.vue';
+    import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
 
     /**
@@ -403,9 +374,7 @@
             SenseReviewRatingControls,
             SenseReviewUnderstandingAid,
             SenseReviewEditDialog,
-            SenseReviewTodaySummary,
-            SenseReviewDailyReport,
-            SenseReviewSevenDayTrend,
+            SenseReviewReportCenter,
         },
         data: function() {
             return {
@@ -468,72 +437,12 @@
                 // never writes ReviewLog and never touches FSRS.
                 session: SessionTracker.createSession(),
                 showSessionSummary: false,
-                // Today summary: cross-session daily aggregate loaded from
-                // the backend GET /reviews/senses/today-summary endpoint.
-                // Read-only — opening/closing never writes ReviewLog, never
-                // touches FSRS, never changes the card queue.
-                showTodaySummary: false,
-                todaySummaryLoading: false,
-                todaySummary: {
-                    timezone: '',
-                    day: '',
-                    day_start: '',
-                    day_end: '',
-                    total_reviews: 0,
-                    distinct_senses: 0,
-                    distribution: { again: 0, hard: 0, good: 0, easy: 0 },
-                    forget_rate: null,
-                    focus_senses: [],
-                    recent_reviews: [],
-                },
-                // Daily report: richer four-block daily learning report
-                // loaded from the backend GET /reviews/senses/daily-report
-                // endpoint. Read-only — opening/closing never writes
-                // ReviewLog, never touches FSRS, never changes the queue.
-                showDailyReport: false,
-                dailyReportLoading: false,
-                dailyReport: {
-                    timezone: '',
-                    day: '',
-                    day_start: '',
-                    day_end: '',
-                    overview: {
-                        total_reviews: 0,
-                        distinct_senses: 0,
-                        first_review_senses: 0,
-                        review_again_senses: 0,
-                        average_rating: null,
-                    },
-                    quality: {
-                        distribution: { again: 0, hard: 0, good: 0, easy: 0 },
-                        forget_rate: null,
-                        stability_rate: null,
-                    },
-                    focus_senses: [],
-                    progress_senses: [],
-                },
-                // Seven day trend: fixed rolling 7-day window (today +
-                // previous 6 natural days, NOT a natural week). Loaded from
-                // the backend GET /reviews/senses/seven-day-trend endpoint.
-                // Read-only — opening/closing never writes ReviewLog, never
-                // touches FSRS, never changes the queue.
-                showSevenDayTrend: false,
-                sevenDayTrendLoading: false,
-                sevenDayTrend: {
-                    timezone: '',
-                    start_day: '',
-                    end_day: '',
-                    summary: {
-                        total_reviews: 0,
-                        active_days: 0,
-                        distinct_senses: 0,
-                        average_per_active_day: null,
-                        distribution: { again: 0, hard: 0, good: 0, easy: 0 },
-                        forget_rate: null,
-                        stability_rate: null,
-                    },
-                    days: [],
-                },
+                // Report center: single source of truth for which report
+                // dialog is open. null = closed; otherwise one of:
+                // 'today-summary' | 'daily-report' | 'seven-day-trend' |
+                // 'thirty-day-calendar'. All dialog/loading/GET/error state
+                // lives inside SenseReviewReportCenter.
+                activeReport: null,
             }
         },
         computed: {
@@ -882,70 +791,12 @@
             exitReview() {
                 window.location.href = '/review-cards/manage';
             },
-            // ==================== Today summary ====================
-            // Read-only daily aggregate. Opening this never writes ReviewLog,
-            // never touches FSRS, never changes the card queue. The user can
-            // close it and continue reviewing.
-            openTodaySummary() {
-                this.showTodaySummary = true;
-                this.todaySummaryLoading = true;
-                axios.get('/reviews/senses/today-summary')
-                    .then((response) => {
-                        this.todaySummary = response.data;
-                    })
-                    .catch(() => {
-                        this.showSnackbar('今日总结加载失败。', 'error');
-                    })
-                    .finally(() => {
-                        this.todaySummaryLoading = false;
-                    });
-            },
-            closeTodaySummary() {
-                this.showTodaySummary = false;
-            },
-            // ==================== Daily report ====================
-            // Read-only four-block daily learning report. Distinct from the
-            // simpler today-summary. Opening this never writes ReviewLog,
-            // never touches FSRS, never changes the card queue.
-            openDailyReport() {
-                this.showDailyReport = true;
-                this.dailyReportLoading = true;
-                axios.get('/reviews/senses/daily-report')
-                    .then((response) => {
-                        this.dailyReport = response.data;
-                    })
-                    .catch(() => {
-                        this.showSnackbar('日报加载失败。', 'error');
-                    })
-                    .finally(() => {
-                        this.dailyReportLoading = false;
-                    });
-            },
-            closeDailyReport() {
-                this.showDailyReport = false;
-            },
-            // ==================== Seven day trend ====================
-            // Read-only fixed rolling 7-day window (today + previous 6
-            // natural days, NOT a natural week). Distinct from the daily
-            // report. Opening this never writes ReviewLog, never touches
-            // FSRS, never changes the card queue.
-            openSevenDayTrend() {
-                this.showSevenDayTrend = true;
-                this.sevenDayTrendLoading = true;
-                axios.get('/reviews/senses/seven-day-trend')
-                    .then((response) => {
-                        this.sevenDayTrend = response.data;
-                    })
-                    .catch(() => {
-                        this.showSnackbar('7 天趋势加载失败。', 'error');
-                    })
-                    .finally(() => {
-                        this.sevenDayTrendLoading = false;
-                    });
-            },
-            closeSevenDayTrend() {
-                this.showSevenDayTrend = false;
-            },
+            // ==================== Report dialogs ====================
+            // All report dialogs (today-summary / daily-report /
+            // seven-day-trend / thirty-day-calendar) are now orchestrated by
+            // SenseReviewReportCenter. The parent only sets activeReport;
+            // ReportCenter handles dialog, loading, GET, error, and close.
+            // No open*/close* methods needed here.
             // ==================== Snackbar ====================
             showSnackbar(text, color) {
                 this.snackbar = { show: true, text, color };

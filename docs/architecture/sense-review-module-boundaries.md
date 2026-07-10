@@ -1,33 +1,49 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (seven-day trend + rating contract / metrics layer centralization).
+> **Status**: Current as of 2026-07-10 (report architecture consolidation: Period + DailySeries + ReportCenter).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
 
-## 0. Four-Layer Report Architecture
+## 0. Five-Layer Report Architecture
 
-All SenseReview analytics flows are split into four layers (Commit `1d4052f` + Commit Task B):
+All SenseReview analytics flows are split into five layers:
 
 ```
-Query Layer        SenseReviewAnalyticsQueryService   DB reads + user/language/sense/reset isolation
+Period Layer        SenseReviewReportPeriodService     Pure time-window math (zero DB)
       ↓
-Metrics Layer      SenseReviewReportMetricsService    Pure computation, zero DB queries
+Query Layer         SenseReviewAnalyticsQueryService   DB reads + user/language/sense/reset isolation
       ↓
-Product Service    TodaySummary / DailyReport /       Decides product payload, focus-sense rules,
-                   SevenDayTrend / LearningFeedback   recent-count, max-10, day-boundary fill
+Metrics Layer       SenseReviewReportMetricsService    Pure computation, zero DB queries
       ↓
-Controller         SenseReviewController              Request coordination only
+Series Layer        SenseReviewDailySeriesBuilder      Zero-fill daily series (reuses Metrics)
+      ↓
+Product Service     TodaySummary / DailyReport /       Decides product payload, focus-sense rules,
+                    SevenDayTrend / LearningFeedback   recent-count, max-10, day-boundary fill
+      ↓
+Controller          SenseReviewController              Request coordination only
 ```
 
+- **Period Layer** (`SenseReviewReportPeriodService`): pure time-window math. `rollingDays(int $days, string $timezone)` returns `start_day`, `end_day`, `start` (inclusive), `end` (exclusive), `day_keys` (ascending). Zero DB queries. No Auth, no config, no .env. Rejects 0/negative/>365.
 - **Query Layer** (`SenseReviewAnalyticsQueryService`): only `reviewsForPeriod()`, `sensesReviewedBefore()`, `reviewsForCards()`. No rating labels, no scores, no product copy, no sort/limit.
 - **Metrics Layer** (`SenseReviewReportMetricsService`): pure functions — `ratingDistribution`, `forgetRate`, `stabilityRate`, `averageRating`, `distinctSenseCount`, `groupByDay`, `reviewsBySense`, `periodMetrics`. Zero DB queries (locked by test). No Auth, no config, no product copy.
-- **Rating Contract** (`SenseReviewRatingContract`): single source of truth for `allowedRatings()`, `isAllowed()`, `labelFor()`, `scoreFor()`. Pure value object, no DB/Auth/config. Fail-closed for invalid rating (returns null, never silently `good`).
-- **Product Services**: compose Query + Metrics + Contract, keep product rules (focus-sense max-10, recent-count, zero-day fill, payload field names).
+- **Series Layer** (`SenseReviewDailySeriesBuilder`): `build(Collection $logs, array $dayKeys): array` — produces one entry per day key, zero-filled for empty days (null rates, NOT "0%"). Reuses Metrics. Zero DB queries. No product copy.
+- **Rating Contract** (`SenseReviewRatingContract`): single source of truth for `allowedRatings()`, `isAllowed()`, `labelFor()`, `scoreFor()`. Pure value object, no DB/Auth/config. Fail-closed for invalid rating.
+- **Product Services**: compose Period + Query + Metrics + Series + Contract, keep product rules (focus-sense max-10, recent-count, payload field names, summary block).
 - **Controller**: thin — reads user + language, delegates to service, returns JSON.
+
+## 0.1 ReportCenter UI Orchestration
+
+`SenseReviewReportCenter.vue` is the single orchestration component for all report dialogs. It replaces the three previously duplicated dialog/loading/payload/GET patterns in `SenseReview.vue`.
+
+- **v-model / activeReport**: `null` | `'today-summary'` | `'daily-report'` | `'seven-day-trend'` | `'thirty-day-calendar'`.
+- **Parent** (`SenseReview.vue`) only sets `activeReport`; ReportCenter handles dialog, loading, GET request, error state, and close (emits `input` null).
+- **Only read-only GET requests**. Never POSTs ratings. Never writes ReviewLog. Never touches FSRS.
+- **SessionSummary is NOT managed here** (it is page-load scoped, not a backend-report dialog).
+- `SenseReview.vue` reduced from 926 → 779 lines after extraction.
 
 ## 1. Container Responsibilities
 
-`resources/js/components/Senses/SenseReview.vue` (~771 lines) is the page container. It is responsible for:
+`resources/js/components/Senses/SenseReview.vue` (~779 lines) is the page container. It is responsible for:
 
 - Loading the review queue (`GET /reviews/senses`).
 - Maintaining the current card index and navigation.
