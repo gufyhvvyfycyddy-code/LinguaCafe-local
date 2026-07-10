@@ -96,9 +96,9 @@ test('ReportCenter registers SenseReviewThirtyDayCalendar', () => {
     assert.ok(/SenseReviewThirtyDayCalendar/.test(centerSrc), 'ReportCenter must register the component');
 });
 
-// 8. SenseReview.vue opens report center for the thirty-day-calendar entry.
-test('SenseReview.vue opens report center for the thirty-day-calendar', () => {
-    assert.ok(containerSrc.includes('查看近 30 天复习日历'), 'container must have the entry button');
+// 8. SenseReview.vue opens report center via single 学习报告 entry.
+test('SenseReview.vue opens report center via single 学习报告 entry', () => {
+    assert.ok(containerSrc.includes('学习报告'), 'container must have the single 学习报告 entry button');
     assert.ok(containerSrc.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
@@ -118,12 +118,12 @@ test('ReportCenter only reads thirty day calendar via GET, never writes', () => 
     assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
 });
 
-// 11. Five concepts are clearly distinguished by wording.
-test('SenseReview.vue keeps five concepts separate', () => {
-    assert.ok(containerSrc.includes('今日复习总结'), 'today summary wording must be present');
-    assert.ok(containerSrc.includes('今日学习日报'), 'daily report wording must be present');
-    assert.ok(containerSrc.includes('近 7 天学习趋势'), 'seven day trend wording must be present');
-    assert.ok(containerSrc.includes('近 30 天复习日历'), 'thirty day calendar wording must be present');
+// 11. Catalog lists all four report titles.
+test('Catalog lists all four report titles', () => {
+    assert.ok(catalogSrc.includes('今日复习总结'), 'today summary title must be in Catalog');
+    assert.ok(catalogSrc.includes('今日学习日报'), 'daily report title must be in Catalog');
+    assert.ok(catalogSrc.includes('近 7 天学习趋势'), 'seven day trend title must be in Catalog');
+    assert.ok(catalogSrc.includes('近 30 天复习日历'), 'thirty day calendar title must be in Catalog');
 });
 
 // 12. Component uses calendar prop.
@@ -142,6 +142,31 @@ test('component has calendar grid for 30 cells', () => {
 test('day detail uses local state only', () => {
     assert.ok(componentSrc.includes('selectedIndex'), 'component must use local selectedIndex state');
     assert.ok(componentSrc.includes('selectDay'), 'component must have selectDay method');
+});
+
+// 15. Calendar intensity is driven by total_reviews / maxDayTotal only.
+test('calendar intensity uses total_reviews / maxDayTotal, not forget_rate or stability_rate', () => {
+    assert.ok(componentSrc.includes('cellIntensityClass'), 'component must have cellIntensityClass method');
+    assert.ok(componentSrc.includes('maxDayTotal'), 'component must compute maxDayTotal');
+    assert.ok(/day\.total_reviews\s*\/\s*this\.maxDayTotal/.test(componentSrc), 'intensity ratio must be total_reviews / maxDayTotal');
+    // Extract the cellIntensityClass method definition (not the template
+    // usage). Match "cellIntensityClass(day) {" which only appears at the
+    // method definition, then capture up to the closing "},".
+    const methodMatch = componentSrc.match(/cellIntensityClass\(day\)\s*\{[\s\S]*?\n\s*\},/);
+    assert.ok(methodMatch, 'cellIntensityClass method body must exist');
+    const methodBody = methodMatch[0];
+    assert.ok(!methodBody.includes('forget_rate'), 'intensity must NOT depend on forget_rate');
+    assert.ok(!methodBody.includes('stability_rate'), 'intensity must NOT depend on stability_rate');
+});
+
+// 16. Zero reviews produces empty style; max reviews produces high style.
+test('zero reviews → empty style, max reviews → high style', () => {
+    const methodMatch = componentSrc.match(/cellIntensityClass\(day\)\s*\{[\s\S]*?\n\s*\},/);
+    assert.ok(methodMatch, 'cellIntensityClass method body must exist');
+    const methodBody = methodMatch[0];
+    assert.ok(methodBody.includes('calendar-cell--empty'), '0 reviews must produce calendar-cell--empty');
+    assert.ok(methodBody.includes('calendar-cell--high'), 'high ratio must produce calendar-cell--high');
+    assert.ok(methodBody.includes('0.75'), 'high threshold must be 0.75');
 });
 
 console.log(`\n${passed} passed`);

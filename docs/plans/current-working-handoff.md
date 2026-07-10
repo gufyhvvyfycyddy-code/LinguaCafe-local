@@ -927,3 +927,35 @@
 不自动进入下一任务。
 
 - Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReview-UnifiedLearningReport-AndRatingPresentation-1000-2
+
+**日期**：2026-07-10
+**基线 commit**：`5be48f2 feat: add thirty day sense review calendar`
+**最终 commits**：Commit 1 `refactor: centralize sense review report and rating presentation contracts` + Commit 2 `feat: add unified sense review learning report hub`
+
+### 本轮目标
+
+1. 架构收敛：把四个报表的 endpoint/width/loading/component 元数据集中到 `SenseReviewReportCatalog.js`；把四个评分 label/color/hotkey/score 集中到 `SenseReviewRatingPresentation.js`；ReportCenter 改为 `v-model=boolean` + 内部状态契约；后端 `SenseReviewRatingContract` hard 标签同步为"勉强记得"。
+2. 统一学习报告入口：`SenseReview.vue` 只保留单一"学习报告"按钮；ReportCenter 首页提供四个报告选择；返回列表交互；30 天日历强度语义保留；全 hard 文案统一为"勉强记得"。
+
+### 关键契约变更
+
+- `SenseReview.vue` 不再知道四个 endpoint 或 report key；只持有 `reportCenterOpen: boolean`。
+- `SenseReviewReportCenter.vue` 内部拥有 `selectedReportKey/loading/error/payload/requestSequence`；首页零 GET；requestSequence 防止异步串台；同一报告 loading 中不重复请求。
+- `SenseReviewRatingPresentation.js` 是前端评分展示唯一来源；与后端 `SenseReviewRatingContract` 由 `SenseReviewRatingPresentationGuard.test.mjs` 跨栈校验。
+- hard 标签：后端 `勉强` → `勉强记得`；前端所有"困难"/"勉强"统一为"勉强记得"。score 仍为 2，rating value 仍为 `hard`。
+
+### 结论：Accept
+
+### 安全边界
+
+- 不改 FSRS；不写 ReviewLog（除用户评分）；不创建 legacy word card；不自动调 AI；不新增 migration；不读取/修改/提交 `.env`；不 DCP；不 notification script；不改 rating API 值；不改 due/stability/difficulty/state。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.

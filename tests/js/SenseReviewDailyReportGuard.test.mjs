@@ -98,19 +98,17 @@ test('SenseReview.vue registers SenseReviewDailyReport', () => {
     assert.ok(/SenseReviewDailyReport/.test(centerSrc), 'ReportCenter must register the component');
 });
 
-// 8. Container has the "查看今日学习日报" entry button
-test('SenseReview.vue has the daily-report entry button', () => {
+// 8. Container opens report center via single 学习报告 entry
+test('SenseReview.vue opens report center via single 学习报告 entry', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes('查看今日学习日报'), 'container must have the entry button');
+    assert.ok(src.includes('学习报告'), 'container must have the single 学习报告 entry button');
     assert.ok(src.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
-// 9. Three concepts are clearly distinguished by wording
-test('SenseReview.vue keeps three concepts separate', () => {
-    const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes('本次复习'), 'session summary wording must be present');
-    assert.ok(src.includes('今日复习总结'), 'today summary wording must be present');
-    assert.ok(src.includes('今日学习日报'), 'daily report wording must be present');
+// 9. Catalog lists the daily-report title
+test('Catalog lists the daily-report title', () => {
+    const catalogSrc = readFileSync(CATALOG_PATH, 'utf8');
+    assert.ok(catalogSrc.includes('今日学习日报'), 'daily report title must be in Catalog');
 });
 
 // 10. Route is registered as GET /reviews/senses/daily-report

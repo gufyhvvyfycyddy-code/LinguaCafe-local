@@ -42,18 +42,10 @@
             </div>
             <!-- Report center entry: opens the unified learning report
                  hub. The home page lists all available reports; the user
-                 selects one to trigger its GET endpoint. Read-only. -->
+                 selects one to trigger its GET endpoint. Read-only.
+                 This is the ONLY report entry on the page. -->
             <div class="text-center mt-2">
-                <v-btn small text color="info" @click="reportCenterOpen = true">查看今日复习总结</v-btn>
-            </div>
-            <div class="text-center mt-1">
-                <v-btn small text color="primary" @click="reportCenterOpen = true">查看今日学习日报</v-btn>
-            </div>
-            <div class="text-center mt-1">
-                <v-btn small text color="info" @click="reportCenterOpen = true">查看近 7 天学习趋势</v-btn>
-            </div>
-            <div class="text-center mt-1">
-                <v-btn small text color="success" @click="reportCenterOpen = true">查看近 30 天复习日历</v-btn>
+                <v-btn small text color="info" @click="reportCenterOpen = true">学习报告</v-btn>
             </div>
         </v-card>
 
@@ -69,10 +61,6 @@
             @continue-review="continueReview"
             @exit-review="exitReview"
         />
-        <!-- Report center entry on the session-summary screen. -->
-        <div v-if="showSummaryView" class="text-center mt-2">
-            <v-btn small text color="info" @click="reportCenterOpen = true">查看今日复习总结</v-btn>
-        </div>
 
         <!-- Report center: single orchestration component. v-model is a
              boolean open state; ReportCenter owns report selection,

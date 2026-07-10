@@ -154,4 +154,15 @@ test('ReportCenter has report home page (catalog selection, no GET until selecti
     assert.ok(centerSrc.includes('!selectedReportKey'), 'ReportCenter must show home page when no report selected');
 });
 
+// 15. SenseReview.vue has exactly ONE "学习报告" entry button and no old report buttons.
+test('SenseReview.vue has single 学习报告 entry, no old report buttons', () => {
+    const reportButtonCount = (containerSrc.match(/学习报告/g) || []).length;
+    assert.ok(reportButtonCount >= 1, 'container must have the 学习报告 entry');
+    // Old individual report entry buttons must be gone.
+    assert.ok(!containerSrc.includes('查看今日复习总结'), 'old today-summary button must be removed');
+    assert.ok(!containerSrc.includes('查看今日学习日报'), 'old daily-report button must be removed');
+    assert.ok(!containerSrc.includes('查看近 7 天学习趋势'), 'old seven-day-trend button must be removed');
+    assert.ok(!containerSrc.includes('查看近 30 天复习日历'), 'old thirty-day-calendar button must be removed');
+});
+
 console.log(`\n${passed} passed`);

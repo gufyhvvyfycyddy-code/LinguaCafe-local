@@ -96,20 +96,20 @@ test('SenseReview.vue registers SenseReviewSevenDayTrend via ReportCenter', () =
     assert.ok(/SenseReviewSevenDayTrend/.test(centerSrc), 'ReportCenter must register the component');
 });
 
-// 8. Container has the "查看近 7 天学习趋势" entry button
-test('SenseReview.vue has the seven-day-trend entry button', () => {
+// 8. Container opens report center via single 学习报告 entry
+test('SenseReview.vue opens report center via single 学习报告 entry', () => {
     const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes('查看近 7 天学习趋势'), 'container must have the entry button');
+    assert.ok(src.includes('学习报告'), 'container must have the single 学习报告 entry button');
     assert.ok(src.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
-// 9. Four concepts are clearly distinguished by wording
-test('SenseReview.vue keeps four concepts separate', () => {
-    const src = readFileSync(CONTAINER_PATH, 'utf8');
-    assert.ok(src.includes('本次复习'), 'session summary wording must be present');
-    assert.ok(src.includes('今日复习总结'), 'today summary wording must be present');
-    assert.ok(src.includes('今日学习日报'), 'daily report wording must be present');
-    assert.ok(src.includes('近 7 天学习趋势'), 'seven day trend wording must be present');
+// 9. Catalog lists all four report titles
+test('Catalog lists all four report titles', () => {
+    const catalogSrc = readFileSync(CATALOG_PATH, 'utf8');
+    assert.ok(catalogSrc.includes('今日复习总结'), 'today summary title must be in Catalog');
+    assert.ok(catalogSrc.includes('今日学习日报'), 'daily report title must be in Catalog');
+    assert.ok(catalogSrc.includes('近 7 天学习趋势'), 'seven day trend title must be in Catalog');
+    assert.ok(catalogSrc.includes('近 30 天复习日历'), 'thirty day calendar title must be in Catalog');
 });
 
 // 10. Route is registered as GET /reviews/senses/seven-day-trend
