@@ -118,12 +118,12 @@ test('ReportCenter only reads thirty day calendar via GET, never writes', () => 
     assert.ok(!/axios\.(post|put|delete|patch)/.test(centerSrc), 'ReportCenter must not use write APIs');
 });
 
-// 11. Catalog lists all four report titles.
-test('Catalog lists all four report titles', () => {
-    assert.ok(catalogSrc.includes('今日复习总结'), 'today summary title must be in Catalog');
+// 11. Catalog lists all three report titles (post ADR-0006).
+test('Catalog lists all three report titles', () => {
     assert.ok(catalogSrc.includes('今日学习日报'), 'daily report title must be in Catalog');
     assert.ok(catalogSrc.includes('近 7 天学习趋势'), 'seven day trend title must be in Catalog');
     assert.ok(catalogSrc.includes('近 30 天复习日历'), 'thirty day calendar title must be in Catalog');
+    assert.ok(!catalogSrc.includes('今日复习总结'), 'today summary title must NOT be in Catalog (ADR-0006)');
 });
 
 // 12. Component uses calendar prop.

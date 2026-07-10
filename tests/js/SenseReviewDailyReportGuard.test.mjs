@@ -75,19 +75,22 @@ test('component contains empty-state text', () => {
     assert.ok(src.includes('今天还没有完成词义卡复习'), 'component must show empty-state text');
 });
 
-// 5. Component clearly labels itself as "今日学习日报" (daily report)
+// 5. Component clearly labels itself as "今日学习日报" (daily report, post ADR-0006)
 test('component labels itself as daily report', () => {
     const src = readFileSync(COMPONENT_PATH, 'utf8');
     assert.ok(src.includes('今日学习日报'), 'component must be titled "今日学习日报"');
+    // The old "今日复习总结" concept has been merged into this daily report.
+    assert.ok(!src.includes('今日复习总结'), 'component must NOT use the old 今日复习总结 title (merged in ADR-0006)');
 });
 
-// 6. Component contains all four block titles
-test('component contains all four block titles', () => {
+// 6. Component contains all five block titles (post ADR-0006 consolidation)
+test('component contains all five block titles', () => {
     const src = readFileSync(COMPONENT_PATH, 'utf8');
     assert.ok(src.includes('今日复习概览'), 'component must have overview block');
     assert.ok(src.includes('今日学习质量'), 'component must have quality block');
     assert.ok(src.includes('今日重点词义'), 'component must have focus_senses block');
     assert.ok(src.includes('今日进步记录'), 'component must have progress_senses block');
+    assert.ok(src.includes('最近复习'), 'component must have recent_reviews block (migrated from TodaySummary)');
 });
 
 // 7. Container registers the component

@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-10 (近 30 天 SenseReview 复习日历 + 报表架构五层收敛: Period + DailySeries + ReportCenter).
+> **最后更新**：2026-07-10 (ADR-0006: SenseReview daily report consolidation — TodaySummaryService + today-summary endpoint + SenseReviewTodaySummary.vue deleted; DailyInsightBuilder pure-computation layer added; DailyReportService is single today-report Product Service with five-block payload; Catalog reduced to 3 items; four coexisting summary concepts).
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
@@ -953,6 +953,43 @@
 ### 安全边界
 
 - 不改 FSRS；不写 ReviewLog（除用户评分）；不创建 legacy word card；不自动调 AI；不新增 migration；不读取/修改/提交 `.env`；不 DCP；不 notification script；不改 rating API 值；不改 due/stability/difficulty/state。
+
+### 下一步仍由网页端总流程设计师决定
+
+不自动进入下一任务。
+
+- Did NOT enter the next task automatically.
+
+---
+
+## Recent Update: GLM-SenseReview-DailyReportConsolidation-AndMergedProduct-1000-3
+
+**日期**：2026-07-10
+**基线 commit**：`1a0a257 feat: add unified sense review learning report hub`
+**最终 commits**：Commit 1 `refactor: consolidate sense review daily report architecture` + Commit 2 `feat: merge sense review daily reports`
+
+### 本轮目标
+
+1. **Task B（架构优化）**：合并两个今日报告（"今日复习总结" TodaySummary + "今日学习日报" DailyReport）的后端架构。新增 `SenseReviewDailyInsightBuilder` 纯计算层（零 DB 查询），收敛 `SenseReviewDailyReportService` 为唯一今日报告 Product Service，删除 `today-summary` endpoint + `SenseReviewTodaySummaryService` + Controller 方法，迁移测试覆盖。
+2. **Task A（产品开发）**：合并后的"今日学习日报"前端。`SenseReviewReportCatalog.js` 从 4 项缩减为 3 项（daily-report / seven-day-trend / thirty-day-calendar），删除 `SenseReviewTodaySummary.vue`，`SenseReviewDailyReport.vue` 展示五个区域（今日概览 / 学习质量 / 重点词义 / 进步记录 / 最近复习记录），每次打开 ReportCenter 回到报告首页。
+
+### 关键架构变更（ADR-0006）
+
+- **六层报表架构**：Period Layer → Query Layer → Metrics Layer → Insight Layer (NEW: `SenseReviewDailyInsightBuilder`) → Series Layer → Product Service → Controller。
+- **DailyInsightBuilder**：纯计算层，`build(Collection $logs): array` 返回 `focus_senses` / `progress_senses` / `recent_reviews`。零 DB 查询（由 `SenseReviewDailyInsightBuilderTest` 锁定）。统一了原 TodaySummary + DailyReport 的 focus/progress/recent 算法。
+- **DailyReportService**：唯一今日报告 Product Service，五段式 payload（overview / quality / focus_senses / progress_senses / recent_reviews）。使用 `PeriodService::rollingDays(1, tz)` + `AnalyticsQueryService` + `MetricsService` + `InsightBuilder` + `RatingContract`。
+- **删除**：`SenseReviewTodaySummaryService.php`、`GET /reviews/senses/today-summary` 路由、`SenseReviewController::todaySummary()` 方法、`SenseReviewTodaySummary.vue`、`tests/Feature/SenseReviewTodaySummaryTest.php`、`tests/js/SenseReviewTodaySummaryGuard.test.mjs`。
+- **查询预算**：空日报 1 次 ReviewLog period query；有记录日报最多 2 次（period + sensesReviewedBefore）；Builder/Metrics 零 DB 查询；recent_reviews 不新增查询。
+- **测试迁移**：TodaySummaryTest 的用户隔离/语言隔离/reset 排除/legacy 排除/日期边界/recent_reviews/focus 规则/no ReviewLog write/no FSRS change/rating label/空状态 全部一对一迁移到 `SenseReviewDailyReportTest` + `SenseReviewDailyInsightBuilderTest`。
+- **产品概念**：从 5 个（session/today/daily/7-day/30-day）收敛为 4 个（session/daily/7-day/30-day）。学习报告首页只含后 3 项。"本次复习总结"继续独立存在。
+
+### 结论
+
+Accept（待真实浏览器验收后最终确认）。
+
+### 安全边界
+
+- 不改 FSRS；不写 ReviewLog（除用户评分）；不创建 legacy word card；不自动调 AI；不新增 migration；不读取/修改/提交 `.env`；不 DCP；不 notification script；不改 rating API 值；不改 due/stability/difficulty/state；不改阅读页；不改 AIStudyCard；不改 tokenizer；不改导入导出；不改 VocabularyBottomSheet。
 
 ### 下一步仍由网页端总流程设计师决定
 

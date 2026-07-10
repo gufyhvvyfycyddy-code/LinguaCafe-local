@@ -1,7 +1,7 @@
 # LinguaCafe Documentation Index
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-10 (SenseReviewTodaySummary + batch learning feedback: daily cross-session summary + N+1 elimination).
+> **Last updated**: 2026-07-10 (ADR-0006: SenseReview daily report consolidation — TodaySummaryService + today-summary endpoint + SenseReviewTodaySummary.vue deleted; SenseReviewDailyInsightBuilder pure-computation layer added; DailyReportService is the single today-report Product Service with five-block payload; Catalog reduced to 3 items; ReportCenter registers 3 components; four coexisting summary concepts: session / daily / 7-day / 30-day).
 
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
@@ -12,7 +12,7 @@ Read these in order for a new Codex / OpenCode / CodeBuddy / WorkBuddy task:
 1. `docs/plans/current-working-handoff.md` — current short-term workbench, current decisions, and next candidates.
 2. `docs/plans/linguacafe-master-plan.md` — long-term ledger of product lines, completed work, and preserved future directions.
 3. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
-4. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, five-layer report architecture (Period/Query/Metrics/Series/Product/Controller), rating contract, five coexisting summary concepts (session/today/daily/7-day/30-day), ReportCenter UI orchestration, props/events contract, query budget, N+1 risk.
+4. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, six-layer report architecture (Period/Query/Metrics/Insight/Series/Product/Controller), rating contract, four coexisting summary concepts (session/daily/7-day/30-day), ReportCenter UI orchestration, props/events contract, query budget, N+1 risk.
 5. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
 6. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
 7. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).
@@ -80,6 +80,7 @@ Do not treat frozen plans as implementation authorization. They only freeze the 
 | `docs/adr/ADR-0003-reading-inline-sense-confirmation-persistence.md` | Accepted (2026-07-03) | Reading inline sense confirmation persistence (match / not_match) via new additive-only `reading_inline_sense_confirmations` table; explicitly NOT a review rating; no ReviewLog / FSRS / WordSense / ReviewCard / AI; future rating must open a new ADR |
 | `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` | Accepted pre-implementation gate (2026-07-07) | AI Study Card V6 real AI boundary. V6 may only recommend candidates after explicit user action; no API key in code/frontend/docs examples/logs; no auto WordSense/ReviewCard creation; no ReviewLog/FSRS mutation; implementation must use a dedicated V6 controller/service boundary. |
 | `docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md` | Accepted planning gate (2026-07-07) | AI Study Card V6 real-provider implementation plan. Allows only one future backend-only OpenAI-compatible adapter after provider/secret/timeout/failure/browser-Network approval; does not implement live calls, route, UI, or secrets. |
+| `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md` | Accepted (2026-07-10) | SenseReview daily report consolidation. Merges "今日复习总结" (TodaySummary) into "今日学习日报" (DailyReport); deletes `today-summary` endpoint + `SenseReviewTodaySummaryService` + `SenseReviewTodaySummary.vue`; adds `SenseReviewDailyInsightBuilder` pure-computation layer (zero DB queries); DailyReportService becomes the single today-report Product Service with five-block payload (overview/quality/focus_senses/progress_senses/recent_reviews); Catalog reduced from 4 to 3 items; no FSRS / ReviewLog write / DB schema change. |
 
 ## 4. Soft Rules Awaiting Hard Verification
 

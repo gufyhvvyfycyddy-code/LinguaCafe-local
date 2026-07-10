@@ -63,19 +63,19 @@
                     <v-col cols="6" md="3">
                         <v-card outlined class="pa-3 text-center">
                             <div class="text-h5 error--text">{{ report.quality.distribution.again }}</div>
-                            <div class="caption text--secondary">忘记</div>
+                            <div class="caption text--secondary">忘了</div>
                         </v-card>
                     </v-col>
                     <v-col cols="6" md="3">
                         <v-card outlined class="pa-3 text-center">
                             <div class="text-h5 warning--text">{{ report.quality.distribution.hard }}</div>
-                            <div class="caption text--secondary">困难</div>
+                            <div class="caption text--secondary">勉强记得</div>
                         </v-card>
                     </v-col>
                     <v-col cols="6" md="3">
                         <v-card outlined class="pa-3 text-center">
                             <div class="text-h5 primary--text">{{ report.quality.distribution.good }}</div>
-                            <div class="caption text--secondary">掌握</div>
+                            <div class="caption text--secondary">记得</div>
                         </v-card>
                     </v-col>
                     <v-col cols="6" md="3">
@@ -160,6 +160,37 @@
 
             <v-divider class="my-4" />
 
+            <!-- 第五块：今日最近复习记录（默认展开，migrated from TodaySummary） -->
+            <div class="mb-3">
+                <div class="text-h6 mb-2">今日最近复习</div>
+                <div v-if="report.recent_reviews.length === 0" class="body-2 text--secondary text-center pa-3">
+                    今天还没有复习记录。
+                </div>
+                <v-list v-else outlined dense class="rounded-lg">
+                    <v-list-item
+                        v-for="(item, i) in report.recent_reviews"
+                        :key="i"
+                    >
+                        <v-list-item-content>
+                            <v-list-item-title>
+                                <span class="font-weight-medium">{{ item.lemma }}</span>
+                                <span class="text--secondary ml-2">{{ item.sense_zh }}</span>
+                            </v-list-item-title>
+                            <v-list-item-subtitle>
+                                <v-chip
+                                    x-small
+                                    :color="ratingColor(item.rating)"
+                                    class="mr-2"
+                                >{{ item.rating_label }}</v-chip>
+                                <span class="text-caption text--secondary">{{ formatTime(item.reviewed_at) }}</span>
+                            </v-list-item-subtitle>
+                        </v-list-item-content>
+                    </v-list-item>
+                </v-list>
+            </div>
+
+            <v-divider class="my-4" />
+
             <div class="d-flex justify-center flex-wrap">
                 <v-btn
                     depressed
@@ -174,15 +205,18 @@
 </template>
 
 <script>
-    // SenseReviewDailyReport-1000-1
+    // SenseReviewDailyReport-1000-1 (consolidated in 1000-3 / ADR-0006)
     //
     // Presentational component for the SenseReview "今日学习日报" (daily
     // learning report). Pure render of backend data returned by the
     // GET /reviews/senses/daily-report endpoint.
     //
+    // This is the SINGLE today-report component after ADR-0006 — the former
+    // SenseReviewTodaySummary.vue was merged into this component. The
+    // recent_reviews section was migrated from that component.
+    //
     // Distinct from:
     //   - SenseReviewSessionSummary (本次复习总结, page-load scoped, frontend)
-    //   - SenseReviewTodaySummary   (今日复习总结, simpler backend aggregate)
     //
     // Contract:
     //   - Props: report (object from backend daily-report endpoint).
@@ -193,6 +227,8 @@
     //   - Does NOT handle hotkeys (parent disables them while shown).
     //   - Empty state shows "今天还没有完成词义卡复习。" with no fake charts.
     //   - average_rating null → "暂无数据".
+    //   - Five sections: overview, quality, focus_senses, progress_senses,
+    //     recent_reviews (additive, migrated from TodaySummary in ADR-0006).
     export default {
         name: 'SenseReviewDailyReport',
         props: {
@@ -248,6 +284,15 @@
                     good: 'primary',
                     easy: 'success',
                 }[rating] || 'default';
+            },
+            formatTime(iso) {
+                if (!iso) return '';
+                try {
+                    const d = new Date(iso);
+                    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                } catch (e) {
+                    return iso;
+                }
             },
         },
     }

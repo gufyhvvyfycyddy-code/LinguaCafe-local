@@ -77,7 +77,6 @@
 <script>
     import axios from 'axios';
     import { REPORT_CATALOG, getReportByKey, isReportKey } from './SenseReviewReportCatalog.js';
-    import SenseReviewTodaySummary from './SenseReviewTodaySummary.vue';
     import SenseReviewDailyReport from './SenseReviewDailyReport.vue';
     import SenseReviewSevenDayTrend from './SenseReviewSevenDayTrend.vue';
     import SenseReviewThirtyDayCalendar from './SenseReviewThirtyDayCalendar.vue';
@@ -106,7 +105,6 @@
      *  - SessionSummary is NOT managed here.
      */
     const COMPONENT_MAP = {
-        'SenseReviewTodaySummary': SenseReviewTodaySummary,
         'SenseReviewDailyReport': SenseReviewDailyReport,
         'SenseReviewSevenDayTrend': SenseReviewSevenDayTrend,
         'SenseReviewThirtyDayCalendar': SenseReviewThirtyDayCalendar,
@@ -115,7 +113,6 @@
     export default {
         name: 'SenseReviewReportCenter',
         components: {
-            SenseReviewTodaySummary,
             SenseReviewDailyReport,
             SenseReviewSevenDayTrend,
             SenseReviewThirtyDayCalendar,

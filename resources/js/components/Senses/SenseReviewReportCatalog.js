@@ -1,7 +1,7 @@
 /**
  * SenseReviewReportCatalog
  *
- * SenseReview-ReportCatalog-1000-2
+ * SenseReview-ReportCatalog-1000-2 (consolidated in 1000-3 / ADR-0006)
  *
  * Single source of truth for the SenseReview report catalog metadata.
  * Pure configuration — no API calls, no Vuex, no state writes, no Vue
@@ -9,8 +9,11 @@
  * the report home page, endpoint map, dialog width, loading text and
  * component mapping.
  *
- * Order is stable and intentional: today-summary → daily-report →
- * seven-day-trend → thirty-day-calendar (short-term → long-term).
+ * Order is stable and intentional: daily-report → seven-day-trend →
+ * thirty-day-calendar (today → short-term → long-term).
+ *
+ * The former "today-summary" entry was merged into "daily-report" in
+ * ADR-0006. The catalog now has exactly three items.
  *
  * The `component` field is a string name used by ReportCenter to look up
  * its local imported-component map. Catalog itself never imports Vue
@@ -18,21 +21,9 @@
  */
 export const REPORT_CATALOG = [
     {
-        key: 'today-summary',
-        title: '今日复习总结',
-        description: '查看今天完成的复习次数、评分分布和最近记录。',
-        icon: 'mdi-calendar-today',
-        color: 'info',
-        endpoint: '/reviews/senses/today-summary',
-        component: 'SenseReviewTodaySummary',
-        payloadProp: 'summary',
-        maxWidth: 720,
-        loadingText: '正在加载今日复习总结…',
-    },
-    {
         key: 'daily-report',
         title: '今日学习日报',
-        description: '查看今天首次复习、再次复习、遗忘率和进步词义。',
+        description: '查看今天的复习概览、学习质量、重点词义、进步记录和最近复习。',
         icon: 'mdi-file-document-outline',
         color: 'primary',
         endpoint: '/reviews/senses/daily-report',

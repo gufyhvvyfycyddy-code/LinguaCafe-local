@@ -161,9 +161,9 @@ test('no isolated 勉强 (without 记得) in SenseReview vue templates', () => {
     }
 });
 
-// 12. Catalog has exactly 4 reports in the right order.
-test('Catalog has exactly 4 reports in order today-summary/daily-report/seven-day-trend/thirty-day-calendar', () => {
-    const keys = ['today-summary', 'daily-report', 'seven-day-trend', 'thirty-day-calendar'];
+// 12. Catalog has exactly 3 reports in the right order (post ADR-0006).
+test('Catalog has exactly 3 reports in order daily-report/seven-day-trend/thirty-day-calendar', () => {
+    const keys = ['daily-report', 'seven-day-trend', 'thirty-day-calendar'];
     let prevIdx = -1;
     for (const key of keys) {
         const idx = catalogSrc.indexOf(key);
@@ -171,6 +171,8 @@ test('Catalog has exactly 4 reports in order today-summary/daily-report/seven-da
         assert.ok(idx > prevIdx, `Catalog order: ${key} must come after previous`);
         prevIdx = idx;
     }
+    // today-summary must NOT be in the catalog (consolidated into daily-report).
+    assert.ok(!catalogSrc.includes("'today-summary'"), 'Catalog must NOT have today-summary entry (ADR-0006)');
 });
 
 console.log(`\n${passed} passed`);

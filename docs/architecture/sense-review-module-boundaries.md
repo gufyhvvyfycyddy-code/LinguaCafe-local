@@ -1,6 +1,6 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (DailyReport consolidation: TodaySummaryService + today-summary endpoint removed; DailyInsightBuilder pure-computation layer added; DailyReportService is the single today-report Product Service with five-block payload. Frontend cleanup in Task A: Catalog reduces to 3 items, TodaySummary.vue deleted).
+> **Status**: Current as of 2026-07-10 (ADR-0006 complete: TodaySummaryService + today-summary endpoint + SenseReviewTodaySummary.vue all deleted; DailyInsightBuilder pure-computation layer added; DailyReportService is the single today-report Product Service with five-block payload; Catalog reduced to 3 items; ReportCenter registers 3 components).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`.
 
@@ -51,13 +51,13 @@ Controller          SenseReviewController              Request coordination only
 
 ## 0.2 SenseReviewReportCatalog.js (Frontend Report Metadata)
 
-`resources/js/components/Senses/SenseReviewReportCatalog.js` is the **single source of truth** for the four report entries on the frontend. Pure configuration — no API calls, no Vuex, no state writes.
+`resources/js/components/Senses/SenseReviewReportCatalog.js` is the **single source of truth** for the three report entries on the frontend. Pure configuration — no API calls, no Vuex, no state writes.
 
 - **Exports**: `REPORT_CATALOG` (array), `REPORT_KEYS`, `getReportByKey(key)`, `isReportKey(key)`.
 - **Each catalog entry** has: `key`, `title`, `description`, `icon`, `color`, `endpoint`, `component` (registered component name), `payloadProp` (prop name the rendered component expects), `maxWidth`, `loadingText`.
-- **Fixed order**: `daily-report`, `seven-day-trend`, `thirty-day-calendar` (Task A will remove the `today-summary` entry, reducing the catalog to 3 items).
+- **Fixed order**: `daily-report`, `seven-day-trend`, `thirty-day-calendar` (3 items post ADR-0006).
 - **Consumed by**: `SenseReviewReportCenter.vue` (drives home-page cards, endpoint selection, component lookup, payload prop binding, dialog width, loading text).
-- **Constraint**: `SenseReview.vue` does NOT know the four endpoints or report keys. `SenseReviewReportCenter.vue` does NOT maintain a parallel copy of endpoint/width/loading-text maps — all metadata comes from the Catalog.
+- **Constraint**: `SenseReview.vue` does NOT know the three endpoints or report keys. `SenseReviewReportCenter.vue` does NOT maintain a parallel copy of endpoint/width/loading-text maps — all metadata comes from the Catalog.
 - **Component mapping**: ReportCenter keeps a local `COMPONENT_MAP` from component name → imported Vue component. The catalog itself never imports Vue components (keeps it pure/testable).
 
 ## 0.3 SenseReviewRatingPresentation.js (Frontend Rating Display Contract)
@@ -140,9 +140,9 @@ The container does **not**:
 - **Owns**: form state, pre-fills on dialog open.
 - **Constraints**: calls `PATCH /review-cards/manage/{id}` on save. No direct FSRS/ReviewLog modifications.
 
-### 2.6 SenseReviewTodaySummary.vue (~210 lines) — PENDING DELETION (Task A)
+### 2.6 ~~SenseReviewTodaySummary.vue~~ (DELETED in ADR-0006)
 
-**Status**: Will be deleted in Task A. The backend endpoint (`GET /reviews/senses/today-summary`) and service (`SenseReviewTodaySummaryService`) have already been removed in Task B (ADR-0006). This component is now orphaned — the ReportCenter catalog still references it but the API call will 404. Task A will remove the component, the catalog entry, and the ReportCenter import/registration.
+**Status**: DELETED. The component, its Catalog entry, and the ReportCenter import/registration were all removed. The `recent_reviews` capability was migrated to `SenseReviewDailyReport.vue` as its fifth section. Frontend guard coverage migrated to `SenseReviewDailyReportGuard.test.mjs` and `SenseReviewReportCenterGuard.test.mjs`.
 
 - **Props**: `summary` (Object from `GET /reviews/senses/today-summary`).
 - **Emits**: `close`.
@@ -306,7 +306,7 @@ The container does **not**:
 The SenseReview page has four clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
 
 1. **本次复习总结 (Session Summary)** — `SenseReviewSessionSummary.vue` + `SenseReviewSessionTracker.js`. Frontend, page-load scoped. Resets on refresh. Tracks only ratings after page open. No backend call, no persistence.
-2. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `SenseReviewDailyInsightBuilder` + `GET /reviews/senses/daily-report`. Five-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录 / 最近复习). Former "今日复习总结" (TodaySummary) has been consolidated into this single daily report (ADR-0006). Task A will remove the `SenseReviewTodaySummary.vue` component and the `today-summary` catalog entry.
+2. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `SenseReviewDailyInsightBuilder` + `GET /reviews/senses/daily-report`. Five-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录 / 最近复习). Former "今日复习总结" (TodaySummary) has been consolidated into this single daily report (ADR-0006).
 3. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week). Short-term continuous change view.
 4. **近 30 天复习日历 (30-Day Calendar)** — `SenseReviewThirtyDayCalendar.vue` + `SenseReviewThirtyDayCalendarService` + `GET /reviews/senses/thirty-day-calendar`. Fixed rolling 30-day window (today + previous 29 natural days, NOT natural month). Historical date distribution view across 30 cells.
 
@@ -322,7 +322,6 @@ The report home page (ReportCenter catalog) shows only items 2–4. Session Summ
 | LearningFeedbackPanel | learningFeedback, fsrsStability | — |
 | RatingControls | disabled | rating(again\|hard\|good\|easy) |
 | SessionSummary | stats, needsAttention | continue-review, exit |
-| TodaySummary | summary | close, back |
 | UnderstandingAid | aid | — |
 | EditDialog | value (v-model), card | input, saved |
 | SevenDayTrend | trend | close, back |

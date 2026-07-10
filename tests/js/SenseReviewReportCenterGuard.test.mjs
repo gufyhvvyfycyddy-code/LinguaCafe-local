@@ -106,34 +106,35 @@ test('ReportCenter consumes SenseReviewReportCatalog.js', () => {
     assert.ok(existsSync(CATALOG_PATH), 'SenseReviewReportCatalog.js must exist');
     assert.ok(centerSrc.includes('SenseReviewReportCatalog'), 'ReportCenter must import Catalog');
     assert.ok(catalogSrc.includes('REPORT_CATALOG'), 'Catalog must export REPORT_CATALOG');
-    assert.ok(catalogSrc.includes('today-summary'), 'Catalog must have today-summary');
     assert.ok(catalogSrc.includes('daily-report'), 'Catalog must have daily-report');
     assert.ok(catalogSrc.includes('seven-day-trend'), 'Catalog must have seven-day-trend');
     assert.ok(catalogSrc.includes('thirty-day-calendar'), 'Catalog must have thirty-day-calendar');
+    // today-summary must NOT be in catalog (consolidated in ADR-0006).
+    assert.ok(!catalogSrc.includes("'today-summary'"), 'Catalog must NOT have today-summary (ADR-0006)');
 });
 
-// 9. ReportCenter registers all four report components.
-test('ReportCenter registers all four report components', () => {
-    assert.ok(centerSrc.includes('SenseReviewTodaySummary'), 'ReportCenter must register SenseReviewTodaySummary');
+// 9. ReportCenter registers all three report components (post ADR-0006).
+test('ReportCenter registers all three report components', () => {
     assert.ok(centerSrc.includes('SenseReviewDailyReport'), 'ReportCenter must register SenseReviewDailyReport');
     assert.ok(centerSrc.includes('SenseReviewSevenDayTrend'), 'ReportCenter must register SenseReviewSevenDayTrend');
     assert.ok(centerSrc.includes('SenseReviewThirtyDayCalendar'), 'ReportCenter must register SenseReviewThirtyDayCalendar');
+    assert.ok(!centerSrc.includes('SenseReviewTodaySummary'), 'ReportCenter must NOT register SenseReviewTodaySummary (deleted in ADR-0006)');
 });
 
 // 10. ReportCenter endpoint map is GET-only (via Catalog).
 test('Catalog endpoint map uses GET endpoints', () => {
-    assert.ok(catalogSrc.includes('/reviews/senses/today-summary'), 'today-summary endpoint present');
     assert.ok(catalogSrc.includes('/reviews/senses/daily-report'), 'daily-report endpoint present');
     assert.ok(catalogSrc.includes('/reviews/senses/seven-day-trend'), 'seven-day-trend endpoint present');
     assert.ok(catalogSrc.includes('/reviews/senses/thirty-day-calendar'), 'thirty-day-calendar endpoint present');
+    assert.ok(!catalogSrc.includes('/reviews/senses/today-summary'), 'today-summary endpoint must NOT be present (ADR-0006)');
 });
 
-// 11. Routes define all four GET endpoints.
-test('Routes define all four GET report endpoints', () => {
-    assert.ok(routesSrc.includes('/reviews/senses/today-summary'), 'today-summary route present');
+// 11. Routes define all three GET endpoints.
+test('Routes define all three GET report endpoints', () => {
     assert.ok(routesSrc.includes('/reviews/senses/daily-report'), 'daily-report route present');
     assert.ok(routesSrc.includes('/reviews/senses/seven-day-trend'), 'seven-day-trend route present');
     assert.ok(routesSrc.includes('/reviews/senses/thirty-day-calendar'), 'thirty-day-calendar route present');
+    assert.ok(!routesSrc.includes('/reviews/senses/today-summary'), 'today-summary route must NOT be present (ADR-0006)');
 });
 
 // 12. ReportCenter does not import SessionSummary.
@@ -159,10 +160,36 @@ test('SenseReview.vue has single 学习报告 entry, no old report buttons', () 
     const reportButtonCount = (containerSrc.match(/学习报告/g) || []).length;
     assert.ok(reportButtonCount >= 1, 'container must have the 学习报告 entry');
     // Old individual report entry buttons must be gone.
-    assert.ok(!containerSrc.includes('查看今日复习总结'), 'old today-summary button must be removed');
     assert.ok(!containerSrc.includes('查看今日学习日报'), 'old daily-report button must be removed');
     assert.ok(!containerSrc.includes('查看近 7 天学习趋势'), 'old seven-day-trend button must be removed');
     assert.ok(!containerSrc.includes('查看近 30 天复习日历'), 'old thirty-day-calendar button must be removed');
+});
+
+// 16. Reopen always returns to report home page (A-4 contract).
+test('ReportCenter reopens to home page (selectedReportKey resets on close)', () => {
+    // resetState must set selectedReportKey to null.
+    assert.ok(/selectedReportKey\s*=\s*null/.test(centerSrc), 'resetState must null selectedReportKey');
+    // The watch on `open` must call resetState when dialog closes.
+    assert.ok(/open\(newVal\)/.test(centerSrc), 'ReportCenter must watch open prop');
+    assert.ok(/resetState\(\)/.test(centerSrc), 'ReportCenter must call resetState on close');
+    // close() must also call resetState.
+    assert.ok(/close\(\)/.test(centerSrc), 'ReportCenter must have close method');
+    // The home page condition must check !selectedReportKey.
+    assert.ok(centerSrc.includes('!selectedReportKey'), 'ReportCenter must show home page when selectedReportKey is null');
+    // No GET request must fire on home page — fetchReport is only called from selectReport.
+    assert.ok(/selectReport\(key\)/.test(centerSrc), 'ReportCenter must have selectReport method');
+    assert.ok(/this\.fetchReport\(\)/.test(centerSrc), 'selectReport must call fetchReport');
+    // The home page template must NOT call fetchReport.
+    const homePageBlock = centerSrc.match(/v-else-if="!selectedReportKey"[\s\S]*?<\/div>/);
+    if (homePageBlock) {
+        assert.ok(!/fetchReport/.test(homePageBlock[0]), 'home page must NOT call fetchReport');
+    }
+});
+
+// 17. Catalog has exactly 3 reports (not 4 — today-summary removed in ADR-0006).
+test('Catalog has exactly 3 report entries', () => {
+    const keyCount = (catalogSrc.match(/key:\s*'/g) || []).length;
+    assert.strictEqual(keyCount, 3, 'Catalog must have exactly 3 report entries (post ADR-0006)');
 });
 
 console.log(`\n${passed} passed`);

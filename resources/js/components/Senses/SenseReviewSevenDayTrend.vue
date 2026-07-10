@@ -144,8 +144,7 @@
     //
     // Distinct from:
     //   - SenseReviewSessionSummary (本次复习总结, page-load scoped, frontend)
-    //   - SenseReviewTodaySummary   (今日复习总结, simpler backend aggregate)
-    //   - SenseReviewDailyReport    (今日学习日报, today-only four-block)
+    //   - SenseReviewDailyReport    (今日学习日报, today-only five-block, post ADR-0006)
     //
     // Contract:
     //   - Props: trend (object from backend seven-day-trend endpoint).

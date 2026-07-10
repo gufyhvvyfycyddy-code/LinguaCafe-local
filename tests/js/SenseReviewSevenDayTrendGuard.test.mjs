@@ -103,13 +103,13 @@ test('SenseReview.vue opens report center via single 学习报告 entry', () => 
     assert.ok(src.includes('reportCenterOpen'), 'container must use reportCenterOpen to open report center');
 });
 
-// 9. Catalog lists all four report titles
-test('Catalog lists all four report titles', () => {
+// 9. Catalog lists all three report titles (post ADR-0006)
+test('Catalog lists all three report titles', () => {
     const catalogSrc = readFileSync(CATALOG_PATH, 'utf8');
-    assert.ok(catalogSrc.includes('今日复习总结'), 'today summary title must be in Catalog');
     assert.ok(catalogSrc.includes('今日学习日报'), 'daily report title must be in Catalog');
     assert.ok(catalogSrc.includes('近 7 天学习趋势'), 'seven day trend title must be in Catalog');
     assert.ok(catalogSrc.includes('近 30 天复习日历'), 'thirty day calendar title must be in Catalog');
+    assert.ok(!catalogSrc.includes('今日复习总结'), 'today summary title must NOT be in Catalog (ADR-0006)');
 });
 
 // 10. Route is registered as GET /reviews/senses/seven-day-trend
