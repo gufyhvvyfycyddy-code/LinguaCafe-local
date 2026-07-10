@@ -8,30 +8,37 @@ use Illuminate\Support\Collection;
 /**
  * SenseReviewDailyReportService
  *
- * SenseReview-DailyReport-1000-1
+ * SenseReview-DailyReport-1000-1 (consolidated in 1000-3)
  *
- * Read-only "今日学习日报" (daily learning report) service. Distinct from
- * SenseReviewTodaySummaryService (simpler summary) — this service produces
- * a richer four-block report designed for daily learning reflection:
+ * Read-only "今日学习日报" (daily learning report) service. This is now the
+ * SINGLE formal today-report Product Service — the former
+ * SenseReviewTodaySummaryService was merged into this service in task
+ * GLM-SenseReview-DailyReportConsolidation-AndMergedProduct-1000-3.
  *
- *   1. overview    — totals, distinct senses, first-vs-again, average rating.
- *   2. quality     — distribution, forget rate, stability rate.
- *   3. focus_senses — max 10 senses needing attention, sorted by difficulty.
+ * Produces a five-block report designed for daily learning reflection:
+ *
+ *   1. overview        — totals, distinct senses, first-vs-again, average rating.
+ *   2. quality         — distribution, forget rate, stability rate.
+ *   3. focus_senses    — max 10 senses needing attention, sorted by difficulty.
  *   4. progress_senses — senses that improved (again→good, hard→easy) today.
+ *   5. recent_reviews  — max 10 newest reviews with rating_label (additive field
+ *                        migrated from the old TodaySummary service).
  *
  * Responsibilities:
- *  - Compute the natural-day boundary in the app timezone.
+ *  - Compute the natural-day boundary via SenseReviewReportPeriodService::
+ *    rollingDays(1, timezone) so date logic is centralized.
  *  - Delegate ReviewLog querying to SenseReviewAnalyticsQueryService so the
  *    shared sense-only / user-isolated / language-isolated / reset-excluded
  *    query rules live in one place.
- *  - Delegate rating distribution / forget rate / stability rate / per-sense
- *    aggregation to the analytics layer so the formulas are shared with
- *    TodaySummary + LearningFeedback.
+ *  - Delegate rating distribution / forget rate / stability rate / average
+ *    rating / distinct-sense count to the analytics+metrics layer so the
+ *    formulas are shared with SevenDayTrend + LearningFeedback.
+ *  - Delegate focus_senses / progress_senses / recent_reviews generation to
+ *    SenseReviewDailyInsightBuilder so insight algorithms have ONE source of
+ *    truth (previously duplicated in TodaySummary + DailyReport).
  *  - Determine first-review vs review-again senses via
  *    SenseReviewAnalyticsQueryService::sensesReviewedBefore().
- *  - Build focus_senses (max 10) with the same factual rules as TodaySummary.
- *  - Build progress_senses by scanning each sense's today rating sequence
- *    for again→good or hard→easy transitions.
+ *  - Shape the final payload.
  *
  * Invariants:
  *  - READ-ONLY: never writes ReviewLog, never touches FSRS, never creates
@@ -40,6 +47,8 @@ use Illuminate\Support\Collection;
  *  - ReviewLog sense-only filtering + reset exclusion centralized in
  *    SenseReviewAnalyticsQueryService / SenseReviewQueryService.
  *  - No new database table, no migration, no FSRS change.
+ *  - Insight algorithms (focus/progress/recent) are NOT re-implemented here —
+ *    they live in SenseReviewDailyInsightBuilder.
  */
 class SenseReviewDailyReportService
 {
@@ -47,6 +56,8 @@ class SenseReviewDailyReportService
         private SenseReviewAnalyticsQueryService $analytics,
         private SenseReviewRatingContract $contract,
         private SenseReviewReportMetricsService $metrics,
+        private SenseReviewReportPeriodService $periodService,
+        private SenseReviewDailyInsightBuilder $insightBuilder,
     ) {
     }
 
@@ -74,13 +85,15 @@ class SenseReviewDailyReportService
      *   },
      *   focus_senses: list<array>,
      *   progress_senses: list<array>,
+     *   recent_reviews: list<array>,
      * }
      */
     public function build(int $userId, string $language): array
     {
         $timezone = config('app.timezone', 'UTC');
-        $dayStart = Carbon::today($timezone);
-        $dayEnd = Carbon::tomorrow($timezone); // exclusive upper bound
+        $window = $this->periodService->rollingDays(1, $timezone);
+        $dayStart = $window['start'];
+        $dayEnd = $window['end'];
 
         // Delegate log fetching to the centralized analytics layer.
         $todayLogs = $this->analytics->reviewsForPeriod($userId, $language, $dayStart, $dayEnd);
@@ -95,6 +108,10 @@ class SenseReviewDailyReportService
         }
         $beforeTodaySet = array_flip($beforeTodaySenseIds);
 
+        // Insight lists (focus / progress / recent) from the pure builder —
+        // 0 additional DB queries, computed from the same in-memory logs.
+        $insights = $this->insightBuilder->build($todayLogs);
+
         return [
             'timezone' => $timezone,
             'day' => $dayStart->format('Y-m-d'),
@@ -102,8 +119,9 @@ class SenseReviewDailyReportService
             'day_end' => $dayEnd->toIso8601String(),
             'overview' => $this->buildOverview($todayLogs, $todaySenseIds, $beforeTodaySet),
             'quality' => $this->buildQuality($todayLogs),
-            'focus_senses' => $this->buildFocusSenses($todayLogs),
-            'progress_senses' => $this->buildProgressSenses($todayLogs),
+            'focus_senses' => $insights['focus_senses'],
+            'progress_senses' => $insights['progress_senses'],
+            'recent_reviews' => $insights['recent_reviews'],
         ];
     }
 
@@ -152,8 +170,8 @@ class SenseReviewDailyReportService
     /**
      * Build the quality block: distribution, forget_rate, stability_rate.
      *
-     * Distribution + rates delegate to the analytics layer so the formulas
-     * are shared with TodaySummary + LearningFeedback.
+     * Distribution + rates delegate to the metrics layer so the formulas
+     * are shared with SevenDayTrend + LearningFeedback.
      *
      * forget_rate = again / total (null when empty).
      * stability_rate = (good + easy) / total (null when empty).
@@ -165,123 +183,5 @@ class SenseReviewDailyReportService
             'forget_rate' => $this->metrics->forgetRate($logs),
             'stability_rate' => $this->metrics->stabilityRate($logs),
         ];
-    }
-
-    /**
-     * Build the focus-senses list (max 10, aggregated by word_sense_id).
-     *
-     * Same factual rules as TodaySummary:
-     *  - has 'again' today; OR
-     *  - has 'hard' today; OR
-     *  - rated more than once today; OR
-     *  - last rating today is again/hard.
-     *
-     * Sort: again desc, hard desc, total desc.
-     *
-     * Per-sense aggregation delegates to SenseReviewReportMetricsService::
-     * reviewsBySense(); the focus filter + sort + max-10 are product logic
-     * that stays here.
-     */
-    private function buildFocusSenses(Collection $logs): array
-    {
-        $bySense = $this->metrics->reviewsBySense($logs);
-
-        $focus = array_filter($bySense, function ($e) {
-            return $e['again'] > 0
-                || $e['hard'] > 0
-                || $e['total'] > 1
-                || in_array($e['last_rating'], ['again', 'hard'], true);
-        });
-
-        usort($focus, function ($a, $b) {
-            if ($a['again'] !== $b['again']) {
-                return $b['again'] <=> $a['again'];
-            }
-            if ($a['hard'] !== $b['hard']) {
-                return $b['hard'] <=> $a['hard'];
-            }
-            return $b['total'] <=> $a['total'];
-        });
-
-        // Shape to the DailyReport focus_senses contract (no last_reviewed_at).
-        $shaped = array_map(function ($e) {
-            return [
-                'word_sense_id' => $e['word_sense_id'],
-                'lemma' => $e['lemma'],
-                'sense_zh' => $e['sense_zh'],
-                'total' => $e['total'],
-                'again' => $e['again'],
-                'hard' => $e['hard'],
-                'last_rating' => $e['last_rating'],
-            ];
-        }, $focus);
-
-        return array_slice(array_values($shaped), 0, 10);
-    }
-
-    /**
-     * Build the progress-senses list: senses that showed improvement today.
-     *
-     * A sense qualifies when its today rating sequence contains a transition:
-     *   - again → good  (forgot then remembered)
-     *   - hard → easy   (struggled then mastered)
-     *
-     * The transition must be temporal: the 'good'/'easy' rating happens AFTER
-     * the 'again'/'hard' rating. We scan old→new and report the first
-     * qualifying transition per sense. No duplicates: one entry per sense.
-     *
-     * Per-sense grouping delegates to SenseReviewReportMetricsService::
-     * reviewsBySense() (ratings array is newest-first; we reverse to
-     * old→new for temporal scanning). The transition detection is product
-     * logic that stays here.
-     *
-     * Each item: word_sense_id, lemma, sense_zh, from_rating, to_rating.
-     */
-    private function buildProgressSenses(Collection $logs): array
-    {
-        $bySense = $this->metrics->reviewsBySense($logs);
-
-        $progress = [];
-        foreach ($bySense as $sid => $info) {
-            // ratings are newest-first; reverse to old→new for temporal scan.
-            $oldToNew = array_reverse($info['ratings']);
-            $transition = $this->findProgressTransition($oldToNew);
-            if ($transition !== null) {
-                $progress[] = [
-                    'word_sense_id' => $sid,
-                    'lemma' => $info['lemma'],
-                    'sense_zh' => $info['sense_zh'],
-                    'from_rating' => $transition['from'],
-                    'to_rating' => $transition['to'],
-                ];
-            }
-        }
-
-        return $progress;
-    }
-
-    /**
-     * Scan an old→new rating sequence for the first qualifying progress
-     * transition: again→good or hard→easy.
-     *
-     * Returns ['from' => rating, 'to' => rating] or null.
-     *
-     * @param  array  $ratings  Ratings ordered old→new.
-     */
-    private function findProgressTransition(array $ratings): ?array
-    {
-        for ($i = 0; $i < count($ratings) - 1; $i++) {
-            $from = $ratings[$i];
-            for ($j = $i + 1; $j < count($ratings); $j++) {
-                $to = $ratings[$j];
-                if ($from === 'again' && $to === 'good') {
-                    return ['from' => 'again', 'to' => 'good'];
-                }
-                if ($from === 'hard' && $to === 'easy') {
-                    return ['from' => 'hard', 'to' => 'easy'];
-                }
-            }
-        }
-        return null;
     }
 }

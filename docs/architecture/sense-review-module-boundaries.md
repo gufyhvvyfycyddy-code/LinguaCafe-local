@@ -1,12 +1,12 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (ReportCatalog + RatingPresentation centralized contracts; ReportCenter v-model=boolean open state with internal selectedReportKey; five-layer report architecture: Period + Query + Metrics + Series + Product Service).
+> **Status**: Current as of 2026-07-10 (DailyReport consolidation: TodaySummaryService + today-summary endpoint removed; DailyInsightBuilder pure-computation layer added; DailyReportService is the single today-report Product Service with five-block payload. Frontend cleanup in Task A: Catalog reduces to 3 items, TodaySummary.vue deleted).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
-> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
+> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`.
 
-## 0. Five-Layer Report Architecture
+## 0. Six-Layer Report Architecture
 
-All SenseReview analytics flows are split into five layers:
+All SenseReview analytics flows are split into six layers:
 
 ```
 Period Layer        SenseReviewReportPeriodService     Pure time-window math (zero DB)
@@ -15,11 +15,13 @@ Query Layer         SenseReviewAnalyticsQueryService   DB reads + user/language/
       ↓
 Metrics Layer       SenseReviewReportMetricsService    Pure computation, zero DB queries
       ↓
+Insight Layer       SenseReviewDailyInsightBuilder     Pure computation: focus/progress/recent (zero DB)
+      ↓
 Series Layer        SenseReviewDailySeriesBuilder      Zero-fill daily series (reuses Metrics)
       ↓
-Product Service     TodaySummary / DailyReport /       Decides product payload, focus-sense rules,
-                    SevenDayTrend / ThirtyDayCalendar / recent-count, max-10, day-boundary fill
-                    / LearningFeedback
+Product Service     DailyReport / SevenDayTrend /      Decides product payload, section orchestration,
+                    ThirtyDayCalendar /                day-boundary fill, endpoint shape
+                    LearningFeedback
       ↓
 Controller          SenseReviewController              Request coordination only
 ```
@@ -27,9 +29,10 @@ Controller          SenseReviewController              Request coordination only
 - **Period Layer** (`SenseReviewReportPeriodService`): pure time-window math. `rollingDays(int $days, string $timezone)` returns `start_day`, `end_day`, `start` (inclusive), `end` (exclusive), `day_keys` (ascending). Zero DB queries. No Auth, no config, no .env. Rejects 0/negative/>365.
 - **Query Layer** (`SenseReviewAnalyticsQueryService`): only `reviewsForPeriod()`, `sensesReviewedBefore()`, `reviewsForCards()`. No rating labels, no scores, no product copy, no sort/limit.
 - **Metrics Layer** (`SenseReviewReportMetricsService`): pure functions — `ratingDistribution`, `forgetRate`, `stabilityRate`, `averageRating`, `distinctSenseCount`, `groupByDay`, `reviewsBySense`, `periodMetrics`. Zero DB queries (locked by test). No Auth, no config, no product copy.
+- **Insight Layer** (`SenseReviewDailyInsightBuilder`): pure computation — `build(Collection $logs): array` returning `focus_senses` / `progress_senses` / `recent_reviews`. Zero DB queries (locked by `SenseReviewDailyInsightBuilderTest`). No Eloquent, no Auth, no config, no .env. Single source of truth for focus/progress/recent algorithms (consolidated from former TodaySummary + DailyReport duplication).
 - **Series Layer** (`SenseReviewDailySeriesBuilder`): `build(Collection $logs, array $dayKeys): array` — produces one entry per day key, zero-filled for empty days (null rates, NOT "0%"). Reuses Metrics. Zero DB queries. No product copy.
 - **Rating Contract** (`SenseReviewRatingContract`): single source of truth for `allowedRatings()`, `isAllowed()`, `labelFor()`, `scoreFor()`. Pure value object, no DB/Auth/config. Fail-closed for invalid rating.
-- **Product Services**: compose Period + Query + Metrics + Series + Contract, keep product rules (focus-sense max-10, recent-count, payload field names, summary block).
+- **Product Services**: compose Period + Query + Metrics + Insight + Series + Contract, keep product rules (section orchestration, payload field names, summary block).
 - **Controller**: thin — reads user + language, delegates to service, returns JSON.
 
 ## 0.1 ReportCenter UI Orchestration
@@ -38,7 +41,7 @@ Controller          SenseReviewController              Request coordination only
 
 - **v-model (open)**: `boolean` — `false` = closed (resets all internal state); `true` = open.
 - **Parent** (`SenseReview.vue`) only sets `reportCenterOpen = true|false`; ReportCenter handles dialog, loading, GET request, error state, report selection, back-to-list, and close (emits `input` false).
-- **Internal state owned by ReportCenter**: `selectedReportKey` (`null` on home page | `'today-summary'` | `'daily-report'` | `'seven-day-trend'` | `'thirty-day-calendar'`), `loading`, `error`, `payload`, `requestSequence` (monotonic counter for async-race protection).
+- **Internal state owned by ReportCenter**: `selectedReportKey` (`null` on home page | `'daily-report'` | `'seven-day-trend'` | `'thirty-day-calendar'`), `loading`, `error`, `payload`, `requestSequence` (monotonic counter for async-race protection).
 - **Home page**: when `selectedReportKey === null`, shows the report catalog selection view. NO GET request is sent on the home page. A GET is sent only after the user selects a specific report.
 - **Back to list**: resets `selectedReportKey` to `null`, clears `error`/`payload`, keeps the dialog open. The user can then choose another report.
 - **Async-race protection**: each report selection increments `requestSequence`; stale responses whose sequence no longer matches the current request are discarded (guard against user switching reports or closing the dialog while a request is in flight).
@@ -52,7 +55,7 @@ Controller          SenseReviewController              Request coordination only
 
 - **Exports**: `REPORT_CATALOG` (array), `REPORT_KEYS`, `getReportByKey(key)`, `isReportKey(key)`.
 - **Each catalog entry** has: `key`, `title`, `description`, `icon`, `color`, `endpoint`, `component` (registered component name), `payloadProp` (prop name the rendered component expects), `maxWidth`, `loadingText`.
-- **Fixed order**: `today-summary`, `daily-report`, `seven-day-trend`, `thirty-day-calendar`.
+- **Fixed order**: `daily-report`, `seven-day-trend`, `thirty-day-calendar` (Task A will remove the `today-summary` entry, reducing the catalog to 3 items).
 - **Consumed by**: `SenseReviewReportCenter.vue` (drives home-page cards, endpoint selection, component lookup, payload prop binding, dialog width, loading text).
 - **Constraint**: `SenseReview.vue` does NOT know the four endpoints or report keys. `SenseReviewReportCenter.vue` does NOT maintain a parallel copy of endpoint/width/loading-text maps — all metadata comes from the Catalog.
 - **Component mapping**: ReportCenter keeps a local `COMPONENT_MAP` from component name → imported Vue component. The catalog itself never imports Vue components (keeps it pure/testable).
@@ -137,9 +140,9 @@ The container does **not**:
 - **Owns**: form state, pre-fills on dialog open.
 - **Constraints**: calls `PATCH /review-cards/manage/{id}` on save. No direct FSRS/ReviewLog modifications.
 
-### 2.6 SenseReviewTodaySummary.vue (~210 lines)
+### 2.6 SenseReviewTodaySummary.vue (~210 lines) — PENDING DELETION (Task A)
 
-**Responsibility**: Daily cross-session summary display (今日复习总结). Distinct from `SenseReviewSessionSummary` (本次复习总结) which is page-load-scoped.
+**Status**: Will be deleted in Task A. The backend endpoint (`GET /reviews/senses/today-summary`) and service (`SenseReviewTodaySummaryService`) have already been removed in Task B (ADR-0006). This component is now orphaned — the ReportCenter catalog still references it but the API call will 404. Task A will remove the component, the catalog entry, and the ReportCenter import/registration.
 
 - **Props**: `summary` (Object from `GET /reviews/senses/today-summary`).
 - **Emits**: `close`.
@@ -203,24 +206,31 @@ The container does **not**:
 - **Owns**: example selection, occurrence evidence merge, understanding_aid normalization, FSRS field passthrough.
 - **Constraints**: does NOT directly query ReviewLog. Does NOT own rating label logic. Payload shape and semantics remain 100% backward-compatible.
 
-### 3.3 SenseReviewTodaySummaryService.php (~200 lines)
+### 3.3 ~~SenseReviewTodaySummaryService.php~~ (REMOVED in ADR-0006)
 
-**Responsibility**: Read-only cross-session daily aggregate for the "今日复习总结" feature. Distinct from `SenseReviewLearningFeedbackService` (per-card history) — this service aggregates across ALL cards for the current user/language/today.
+**Status**: DELETED. Consolidated into `SenseReviewDailyReportService` + `SenseReviewDailyInsightBuilder`. The `GET /reviews/senses/today-summary` endpoint, the Controller method, and the Service class were all removed. All test coverage migrated to `SenseReviewDailyReportTest` + `SenseReviewDailyInsightBuilderTest` (1:1 mapping, see ADR-0006).
 
-- **Public method**: `build(int $userId, string $language): array`.
-- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForPeriod()` for DB reads, `SenseReviewReportMetricsService` for distribution/forget-rate/reviewsBySense, `SenseReviewRatingContract::labelFor()` for labels (post Task B migration).
-- **Product rules**: timezone/day/day_start/day_end, total_reviews, distinct_senses, 4-rating distribution, forget_rate (null when empty), focus_senses (max 10, aggregated by sense_id), recent_reviews (max 10, newest first).
-- **Day boundary**: `Carbon::today($timezone)` (00:00:00) to `Carbon::tomorrow($timezone)` (exclusive). Timezone = `config('app.timezone', 'UTC')`. No user timezone introduced this round.
-- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table.
+### 3.3b SenseReviewDailyReportService.php (~200 lines)
 
-### 3.3b SenseReviewDailyReportService.php (~250 lines)
-
-**Responsibility**: Read-only richer four-block daily report for the "今日学习日报" feature. Distinct from TodaySummary (simpler) — DailyReport adds learning-quality, focus-senses, and progress-record sections.
+**Responsibility**: Read-only five-block daily report for the "今日学习日报" feature. The **single** today-report Product Service after ADR-0006 consolidation (formerly shared with the now-deleted TodaySummaryService).
 
 - **Public method**: `build(int $userId, string $language): array`.
-- **Uses**: `SenseReviewAnalyticsQueryService::reviewsForPeriod()` + `sensesReviewedBefore()`, `SenseReviewReportMetricsService` for distribution/forget-rate/stability-rate/reviewsBySense, `SenseReviewRatingContract::scoreFor()` for average-rating computation (post Task B migration — the `RATING_SCORES` private const has been removed).
-- **Product rules**: four sections (今日复习概览 / 今日学习质量 / 今日重点词义 / 今日进步记录), focus-sense max-10, first-review vs review-again detection via `sensesReviewedBefore()`.
-- **Constraints**: READ-ONLY. Same invariants as TodaySummary.
+- **Uses**: `SenseReviewReportPeriodService::rollingDays(1, $timezone)` (window math), `SenseReviewAnalyticsQueryService::reviewsForPeriod()` + `sensesReviewedBefore()`, `SenseReviewReportMetricsService` for distribution/forget-rate/stability-rate/reviewsBySense, `SenseReviewDailyInsightBuilder` for focus/progress/recent (single source of truth), `SenseReviewRatingContract::scoreFor()` for average-rating computation.
+- **Product rules**: five sections (今日复习概览 / 今日学习质量 / 今日重点词义 / 今日进步记录 / 今日最近复习), focus-sense max-10, first-review vs review-again detection via `sensesReviewedBefore()`.
+- **Payload**: timezone / day / day_start / day_end, overview (total_reviews / distinct_senses / first_review_senses / review_again_senses / average_rating), quality (distribution / forget_rate / stability_rate), focus_senses (max 10, unified algorithm from InsightBuilder), progress_senses (again→good / hard→easy transitions), recent_reviews (max 10, newest first, additive field migrated from former TodaySummary).
+- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table. Does NOT re-implement focus/progress/recent algorithms (delegates to InsightBuilder). Date boundary comes ONLY from PeriodService.
+
+### 3.3b-insight SenseReviewDailyInsightBuilder.php (Insight Layer)
+
+**Responsibility**: Pure computation layer — single source of truth for focus_senses, progress_senses, and recent_reviews algorithms. Consolidated from the former duplication between TodaySummaryService and DailyReportService.
+
+- **Public method**: `build(Collection $logs): array` — returns `['focus_senses' => ..., 'progress_senses' => ..., 'recent_reviews' => ...]`.
+- **Uses**: `SenseReviewReportMetricsService::reviewsBySense()` (grouping), `SenseReviewRatingContract::labelFor()` (rating labels).
+- **Forbidden dependencies**: Eloquent, DB, Auth, Request, Controller, config, .env, `SenseReviewAnalyticsQueryService`. Pure in-memory computation only.
+- **focus_senses rules**: includes senses with again>0 OR hard>0 OR same-sense reviewed multiple times today OR last rating is again/hard. Unified superset output: word_sense_id, lemma, sense_zh, total, again, hard, last_rating, last_reviewed_at. Sorted by again desc, hard desc, total desc. Max 10.
+- **progress_senses rules**: again→good or hard→easy transitions detected by real temporal order. Same sense max one entry. Invalid transitions (again→hard, good→easy, etc.) excluded.
+- **recent_reviews rules**: newest first, max 10. Each item: lemma, sense_zh, rating, rating_label (from Contract, hard→"勉强记得"), reviewed_at.
+- **Zero DB queries**: locked by `SenseReviewDailyInsightBuilderTest::test_builder_does_not_access_database`.
 
 ### 3.3c SenseReviewSevenDayTrendService.php (~190 lines)
 
@@ -279,24 +289,30 @@ The container does **not**:
 - **groupByDay**: returns ONLY days with data (associative array `Y-m-d => Collection`). Zero-fill for empty days is the Product Service's responsibility, NOT Metrics'.
 - **Constraints**: zero DB queries (locked by `SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database`). No Eloquent, no Auth, no config, no product copy, no sort/limit decisions.
 
-### 3.4 SenseReviewTodaySummary endpoint
+### 3.4 ~~SenseReviewTodaySummary endpoint~~ (REMOVED in ADR-0006)
 
-- **Route**: `GET /reviews/senses/today-summary`.
-- **Controller**: `SenseReviewController::todaySummary()` — thin: reads user + language, delegates to service, returns JSON.
+**Status**: DELETED. The `GET /reviews/senses/today-summary` route, `SenseReviewController::todaySummary()` method, and `SenseReviewTodaySummaryService` were all removed. The consolidated endpoint is `GET /reviews/senses/daily-report` (see 3.3b).
+
+### 3.4b SenseReviewDailyReport endpoint
+
+- **Route**: `GET /reviews/senses/daily-report`.
+- **Controller**: `SenseReviewController::dailyReport()` — thin: reads user + language, delegates to `SenseReviewDailyReportService`, returns JSON.
 - **Auth**: required (middleware). Strict user + language isolation (enforced by service via `SenseReviewQueryService`).
 - **No writes**: does not write ReviewLog, does not change ReviewCard/FSRS, does not create WordSense/ReviewCard.
+- **Payload**: five blocks (overview / quality / focus_senses / progress_senses / recent_reviews). See 3.3b for full shape.
 
-## 4. Five Coexisting Summary / Report Concepts
+## 4. Four Coexisting Summary / Report Concepts (post ADR-0006)
 
-The SenseReview page now has five clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
+The SenseReview page has four clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
 
 1. **本次复习总结 (Session Summary)** — `SenseReviewSessionSummary.vue` + `SenseReviewSessionTracker.js`. Frontend, page-load scoped. Resets on refresh. Tracks only ratings after page open. No backend call, no persistence.
-2. **今日复习总结 (Today Summary)** — `SenseReviewTodaySummary.vue` + `SenseReviewTodaySummaryService` + `GET /reviews/senses/today-summary`. Simpler cross-session backend aggregate for today.
-3. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `GET /reviews/senses/daily-report`. Richer four-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录).
-4. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week). Short-term continuous change view.
-5. **近 30 天复习日历 (30-Day Calendar)** — `SenseReviewThirtyDayCalendar.vue` + `SenseReviewThirtyDayCalendarService` + `GET /reviews/senses/thirty-day-calendar`. Fixed rolling 30-day window (today + previous 29 natural days, NOT natural month). Historical date distribution view across 30 cells.
+2. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `SenseReviewDailyInsightBuilder` + `GET /reviews/senses/daily-report`. Five-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录 / 最近复习). Former "今日复习总结" (TodaySummary) has been consolidated into this single daily report (ADR-0006). Task A will remove the `SenseReviewTodaySummary.vue` component and the `today-summary` catalog entry.
+3. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week). Short-term continuous change view.
+4. **近 30 天复习日历 (30-Day Calendar)** — `SenseReviewThirtyDayCalendar.vue` + `SenseReviewThirtyDayCalendarService` + `GET /reviews/senses/thirty-day-calendar`. Fixed rolling 30-day window (today + previous 29 natural days, NOT natural month). Historical date distribution view across 30 cells.
 
 The "today" row of the 7-day trend and the 30-day calendar (days[29]) MUST match the DailyReport for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (contract tests enforced). The last 7 days of the 30-day calendar MUST match the 7-day trend day-by-day (locked by `test_last_seven_days_match_seven_day_trend`).
+
+The report home page (ReportCenter catalog) shows only items 2–4. Session Summary (item 1) is page-load scoped and NOT part of the report catalog.
 
 ## 5. Props / Events Contract Summary
 
@@ -341,11 +357,16 @@ All SenseReview analytics paths are constant-query regardless of card/sense coun
 | Path | ReviewLog queries | Locked by |
 |------|-------------------|-----------|
 | `LearningFeedbackService::buildForCards` (1/5/20 cards) | 1 | `SenseReviewBatchFeedbackTest` |
+| `DailyReportService::build` empty day (1/10/50 senses) | 1 | `SenseReviewDailyReportTest::test_query_budget_constant` |
+| `DailyReportService::build` non-empty day (1/10/50 senses) | ≤2 (reviewsForPeriod + sensesReviewedBefore) | `SenseReviewDailyReportTest::test_query_budget_constant` |
+| `DailyInsightBuilder::build` (any input) | 0 | `SenseReviewDailyInsightBuilderTest::test_builder_does_not_access_database` |
 | `SevenDayTrendService::build` (1/10/50 senses, 7 days) | 1 | `SenseReviewSevenDayTrendTest` |
 | `ThirtyDayCalendarService::build` (1/10/50 senses, 30 days) | 1 | `SenseReviewThirtyDayCalendarTest` |
 | `ReportMetricsService` (any method) | 0 | `SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database` |
 | `AnalyticsQueryService::reviewsForPeriod` (1/10/50 senses) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
 | `AnalyticsQueryService::reviewsForCards` (1/10/50 cards) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
+
+The daily report issues 1 query when empty (reviewsForPeriod returns empty, sensesReviewedBefore is skipped) and at most 2 queries when non-empty (reviewsForPeriod + sensesReviewedBefore). The InsightBuilder and Metrics layers add 0 additional queries — they operate purely on the in-memory Collection passed in. The `recent_reviews` field is additive and does NOT issue its own query.
 
 The 7-day trend and 30-day calendar do NOT issue per-day queries. Each issues a single `reviewsForPeriod` for the whole [start, end) window, then `groupByDay` in memory via the Metrics layer (and `DailySeriesBuilder` for zero-fill).
 

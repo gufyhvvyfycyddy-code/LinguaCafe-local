@@ -9,7 +9,6 @@ use App\Services\SenseReviewDailyReportService;
 use App\Services\SenseReviewService;
 use App\Services\SenseReviewSevenDayTrendService;
 use App\Services\SenseReviewThirtyDayCalendarService;
-use App\Services\SenseReviewTodaySummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -20,7 +19,6 @@ class SenseReviewController extends Controller
         private ReviewCardService $reviewCardService,
         private HomeController $homeController,
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
-        private SenseReviewTodaySummaryService $senseReviewTodaySummaryService,
         private SenseReviewDailyReportService $senseReviewDailyReportService,
         private SenseReviewSevenDayTrendService $senseReviewSevenDayTrendService,
         private SenseReviewThirtyDayCalendarService $senseReviewThirtyDayCalendarService,
@@ -82,31 +80,14 @@ class SenseReviewController extends Controller
     }
 
     /**
-     * SenseReview-TodaySummary-1000-1
-     *
-     * Read-only daily sense review summary. Aggregates ALL of today's real
-     * sense-card ratings across multiple page sessions (unlike the ephemeral
-     * session summary which resets on page reload). Source of truth: ReviewLog.
-     *
-     * Controller stays thin: read current user + language, delegate to
-     * SenseReviewTodaySummaryService, return JSON. No writes, no FSRS changes.
-     */
-    public function todaySummary(Request $request)
-    {
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-
-        $summary = $this->senseReviewTodaySummaryService->build($userId, $language);
-
-        return response()->json($summary);
-    }
-
-    /**
      * SenseReview-DailyReport-1000-1
      *
-     * Read-only "今日学习日报" — richer four-block daily report (overview,
-     * quality, focus_senses, progress_senses). Distinct from the simpler
-     * today-summary. Source of truth: ReviewLog. No writes, no FSRS changes.
+     * Read-only "今日学习日报" — consolidated five-block daily report
+     * (overview, quality, focus_senses, progress_senses, recent_reviews).
+     * This is the SINGLE formal today-report endpoint — the former
+     * today-summary endpoint was merged here in task
+     * GLM-SenseReview-DailyReportConsolidation-AndMergedProduct-1000-3.
+     * Source of truth: ReviewLog. No writes, no FSRS changes.
      */
     public function dailyReport(Request $request)
     {

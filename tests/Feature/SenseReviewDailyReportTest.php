@@ -18,12 +18,13 @@ use Tests\TestCase;
 /**
  * SenseReviewDailyReportTest
  *
- * SenseReview-DailyReport-1000-1
+ * SenseReview-DailyReport-1000-1 (consolidated in 1000-3 / ADR-0006)
  *
  * Verifies the read-only "今日学习日报" (daily learning report) service.
- * Distinct from SenseReviewTodaySummaryService (simpler today summary) —
- * this service produces a richer four-block report: overview, quality,
- * focus_senses, progress_senses.
+ * This is the SINGLE formal today-report Product Service after ADR-0006
+ * consolidation — the former SenseReviewTodaySummaryService was merged
+ * into this service. Produces a five-block report: overview, quality,
+ * focus_senses, progress_senses, recent_reviews.
  *
  * Contract:
  *  - Auth required (HTTP guard).
@@ -34,8 +35,10 @@ use Tests\TestCase;
  *    ((good+easy)/total).
  *  - focus_senses: max 10, sorted by again desc, hard desc, total desc.
  *  - progress_senses: senses with again→good or hard→easy transitions today.
+ *  - recent_reviews: max 10, newest first, with rating_label (hard→勉强记得).
  *  - reset exclusion, user/language isolation, sense-only, legacy word excluded.
  *  - READ-ONLY: no ReviewLog writes, no FSRS changes.
+ *  - Query budget: empty=1 query, non-empty≤2 queries (locked by test 31).
  *  - Returns timezone / day / day_start / day_end.
  */
 class SenseReviewDailyReportTest extends TestCase
@@ -96,6 +99,7 @@ class SenseReviewDailyReportTest extends TestCase
 
         $this->assertSame([], $report['focus_senses']);
         $this->assertSame([], $report['progress_senses']);
+        $this->assertSame([], $report['recent_reviews']);
     }
 
     /**
@@ -412,6 +416,8 @@ class SenseReviewDailyReportTest extends TestCase
 
     /**
      * 17. reset exclusion: rating='reset' and source='reset' excluded.
+     *     Also covers source='reset' with a normal rating value (migrated
+     *     from TodaySummaryTest::test_reset_source_excluded).
      */
     public function test_reset_excluded(): void
     {
@@ -426,6 +432,24 @@ class SenseReviewDailyReportTest extends TestCase
 
         $this->assertSame(1, $report['overview']['total_reviews']);
         $this->assertSame(1, $report['quality']['distribution']['good']);
+    }
+
+    /**
+     * 17b. source='reset' excluded even when rating is a normal value
+     *      (migrated from TodaySummaryTest::test_reset_source_excluded).
+     */
+    public function test_reset_source_excluded_even_with_normal_rating(): void
+    {
+        $sense = $this->createConfirmedSense('bank');
+        $card = $this->createSenseCard($sense);
+        $today = Carbon::today();
+
+        $this->createReviewLog($card, 'good', $today->copy()->addHour(), 'sense_review');
+        $this->createReviewLog($card, 'good', $today->copy()->addHours(2), 'reset');
+
+        $report = $this->service->build($this->user->id, 'english');
+
+        $this->assertSame(1, $report['overview']['total_reviews']);
     }
 
     /**
@@ -609,7 +633,7 @@ class SenseReviewDailyReportTest extends TestCase
     }
 
     /**
-     * 26. HTTP: authenticated user gets the report JSON with all four blocks.
+     * 26. HTTP: authenticated user gets the report JSON with all five blocks.
      */
     public function test_authenticated_user_gets_report_json(): void
     {
@@ -630,10 +654,157 @@ class SenseReviewDailyReportTest extends TestCase
             'quality' => ['distribution', 'forget_rate', 'stability_rate'],
             'focus_senses',
             'progress_senses',
+            'recent_reviews',
         ]);
         $this->assertSame(3, $response->json('overview.total_reviews'));
         // again(1) + good(3) + easy(4) = 8 / 3 = 2.67
         $this->assertEquals(2.67, $response->json('overview.average_rating'));
+    }
+
+    /**
+     * 27. focus_senses rules: again, hard, multi-rating, last-again-or-hard.
+     *     (Migrated from TodaySummaryTest::test_focus_senses_rules.)
+     */
+    public function test_focus_senses_filter_rules(): void
+    {
+        // Sense A: has 'again' → focus.
+        $senseA = $this->createConfirmedSense('apple');
+        $cardA = $this->createSenseCard($senseA);
+        // Sense B: has 'hard' only → focus.
+        $senseB = $this->createConfirmedSense('banana');
+        $cardB = $this->createSenseCard($senseB);
+        // Sense C: rated twice, both 'good' → focus (multi-rating).
+        $senseC = $this->createConfirmedSense('cherry');
+        $cardC = $this->createSenseCard($senseC);
+        // Sense D: one 'good' only → NOT focus.
+        $senseD = $this->createConfirmedSense('date');
+        $cardD = $this->createSenseCard($senseD);
+        // Sense E: last rating 'hard' → focus.
+        $senseE = $this->createConfirmedSense('egg');
+        $cardE = $this->createSenseCard($senseE);
+
+        $today = Carbon::today();
+        $this->createReviewLog($cardA, 'again', $today->copy()->addHour());
+        $this->createReviewLog($cardB, 'hard',  $today->copy()->addHour());
+        $this->createReviewLog($cardC, 'good',  $today->copy()->addHour());
+        $this->createReviewLog($cardC, 'good',  $today->copy()->addHours(2));
+        $this->createReviewLog($cardD, 'good',  $today->copy()->addHour());
+        $this->createReviewLog($cardE, 'good',  $today->copy()->addHour());
+        $this->createReviewLog($cardE, 'hard',  $today->copy()->addHours(2));
+
+        $report = $this->service->build($this->user->id, 'english');
+
+        $focusIds = array_column($report['focus_senses'], 'word_sense_id');
+        $this->assertContains($senseA->id, $focusIds);
+        $this->assertContains($senseB->id, $focusIds);
+        $this->assertContains($senseC->id, $focusIds);
+        $this->assertContains($senseE->id, $focusIds);
+        $this->assertNotContains($senseD->id, $focusIds);
+    }
+
+    /**
+     * 28. focus_senses: includes last_reviewed_at (superset shape, migrated
+     *     from TodaySummary which always carried this field).
+     */
+    public function test_focus_senses_includes_last_reviewed_at(): void
+    {
+        $sense = $this->createConfirmedSense('bank');
+        $card = $this->createSenseCard($sense);
+        $today = Carbon::today();
+
+        $this->createReviewLog($card, 'again', $today->copy()->addHour());
+        $this->createReviewLog($card, 'good',  $today->copy()->addHours(2));
+
+        $report = $this->service->build($this->user->id, 'english');
+
+        $this->assertCount(1, $report['focus_senses']);
+        $this->assertArrayHasKey('last_reviewed_at', $report['focus_senses'][0]);
+        $this->assertNotNull($report['focus_senses'][0]['last_reviewed_at']);
+    }
+
+    /**
+     * 29. recent_reviews: newest first, max 10, with rating_label.
+     *     (Migrated from TodaySummaryTest::test_recent_reviews_newest_first.)
+     */
+    public function test_recent_reviews_newest_first_with_rating_label(): void
+    {
+        $sense = $this->createConfirmedSense('bank');
+        $card = $this->createSenseCard($sense);
+        $today = Carbon::today();
+        $this->createReviewLog($card, 'again', $today->copy()->addHour());
+        $this->createReviewLog($card, 'hard',  $today->copy()->addHours(2));
+        $this->createReviewLog($card, 'good',  $today->copy()->addHours(3));
+
+        $report = $this->service->build($this->user->id, 'english');
+
+        $this->assertCount(3, $report['recent_reviews']);
+        // newest first: good (3h), hard (2h), again (1h)
+        $this->assertSame('good',  $report['recent_reviews'][0]['rating']);
+        $this->assertSame('记得',   $report['recent_reviews'][0]['rating_label']);
+        $this->assertSame('hard',  $report['recent_reviews'][1]['rating']);
+        $this->assertSame('勉强记得', $report['recent_reviews'][1]['rating_label']);
+        $this->assertSame('again', $report['recent_reviews'][2]['rating']);
+        $this->assertSame('忘了',   $report['recent_reviews'][2]['rating_label']);
+    }
+
+    /**
+     * 30. recent_reviews: max 10 items.
+     */
+    public function test_recent_reviews_max_10(): void
+    {
+        $today = Carbon::today();
+        for ($i = 0; $i < 15; $i++) {
+            $sense = $this->createConfirmedSense('word' . $i);
+            $card = $this->createSenseCard($sense);
+            $this->createReviewLog($card, 'good', $today->copy()->addHours($i + 1));
+        }
+
+        $report = $this->service->build($this->user->id, 'english');
+
+        $this->assertCount(10, $report['recent_reviews']);
+    }
+
+    /**
+     * 31. Query budget: empty day → exactly 1 ReviewLog query.
+     *     Non-empty day → at most 2 ReviewLog queries (reviewsForPeriod +
+     *     sensesReviewedBefore). Constant regardless of sense count.
+     *
+     * Uses a single DB::listen callback with a phase flag because
+     * DB::listen returns void in Laravel (the callback cannot be cancelled),
+     * so two separate listeners would both count the second build's queries.
+     */
+    public function test_query_budget_constant(): void
+    {
+        $emptyCount = 0;
+        $nonEmptyCount = 0;
+        $phase = 'empty';
+        \DB::listen(function ($query) use (&$emptyCount, &$nonEmptyCount, &$phase) {
+            if (!str_contains($query->sql, 'review_logs')) {
+                return;
+            }
+            if ($phase === 'empty') {
+                $emptyCount++;
+            } elseif ($phase === 'nonempty') {
+                $nonEmptyCount++;
+            }
+        });
+
+        // Phase 1: empty day → exactly 1 ReviewLog query (reviewsForPeriod
+        // returns empty; sensesReviewedBefore is skipped).
+        $this->service->build($this->user->id, 'english');
+        $this->assertSame(1, $emptyCount, 'empty daily report must issue exactly 1 ReviewLog query');
+
+        // Phase 2: non-empty day with 5 senses → at most 2 ReviewLog queries.
+        $today = Carbon::today();
+        for ($i = 0; $i < 5; $i++) {
+            $sense = $this->createConfirmedSense('budget' . $i);
+            $card = $this->createSenseCard($sense);
+            $this->createReviewLog($card, 'good', $today->copy()->addHours($i + 1));
+        }
+
+        $phase = 'nonempty';
+        $this->service->build($this->user->id, 'english');
+        $this->assertLessThanOrEqual(2, $nonEmptyCount, 'non-empty daily report must issue at most 2 ReviewLog queries');
     }
 
     // ==================== Helpers ====================
