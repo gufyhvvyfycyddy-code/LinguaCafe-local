@@ -1,6 +1,6 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (report architecture consolidation: Period + DailySeries + ReportCenter).
+> **Status**: Current as of 2026-07-10 (30-day calendar added; five-layer report architecture: Period + Query + Metrics + Series + Product Service; ReportCenter UI orchestration).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
 > **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`.
 
@@ -18,7 +18,8 @@ Metrics Layer       SenseReviewReportMetricsService    Pure computation, zero DB
 Series Layer        SenseReviewDailySeriesBuilder      Zero-fill daily series (reuses Metrics)
       ↓
 Product Service     TodaySummary / DailyReport /       Decides product payload, focus-sense rules,
-                    SevenDayTrend / LearningFeedback   recent-count, max-10, day-boundary fill
+                    SevenDayTrend / ThirtyDayCalendar / recent-count, max-10, day-boundary fill
+                    / LearningFeedback
       ↓
 Controller          SenseReviewController              Request coordination only
 ```
@@ -130,6 +131,19 @@ The container does **not**:
 - **Empty state**: "近 7 天还没有完成词义卡复习。" with 7 day rows still shown, no misleading percentages.
 - **Window definition**: today + previous 6 natural days (NOT natural week, NOT configurable). Backend timezone. Real-time ReviewLog reads, no snapshot.
 
+### 2.9 SenseReviewThirtyDayCalendar.vue (~303 lines)
+
+**Responsibility**: Presentational display of the fixed rolling 30-day review calendar (近 30 天复习日历). Distinct from SevenDayTrend (short-term continuous change) — this surface shows historical date distribution across 30 cells.
+
+- **Props**: `calendar` (Object from `GET /reviews/senses/thirty-day-calendar`).
+- **Emits**: `close`.
+- **Constraints**: pure presentational. No API calls, no ReviewLog writes, no FSRS modifications, no card queue mutations, no chart library. Uses Vuetify v-card/v-row/v-col/v-chip + simple CSS grid.
+- **Content**: timezone/start_day/end_day, summary (total_reviews/active_days/distinct_senses/average_per_active_day/distribution/forget_rate/stability_rate), 30 fixed day cells (ascending, zero-filled with null rates for empty days).
+- **Empty state**: "近 30 天还没有完成词义卡复习。" with 30 cells still shown, no misleading percentages.
+- **Window definition**: today + previous 29 natural days (NOT natural month, NOT configurable). Backend timezone. Real-time ReviewLog reads, no snapshot.
+- **Calendar grid**: 10-column CSS grid (~960px+), 7-column on narrow screens (<960px). Intensity coloring by `total_reviews` relative to max-day total (empty/verylow/low/mid/high).
+- **Day detail**: clicking a day cell selects it locally (`selectedIndex`) and renders detail below the grid (no API call). Empty days show null rates (not "0%").
+
 ## 3. Backend Service Boundaries
 
 ### 3.1 SenseReviewLearningFeedbackService.php (~280 lines)
@@ -187,7 +201,20 @@ The container does **not**:
 - **Today-row consistency**: the "today" row must match `GET /reviews/senses/daily-report` for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (locked by contract test `test_today_row_matches_daily_report`).
 - **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table. No snapshot persistence.
 
-### 3.3d SenseReviewAnalyticsQueryService.php (Query Layer)
+### 3.3d SenseReviewThirtyDayCalendarService.php (~155 lines)
+
+**Responsibility**: Read-only fixed rolling 30-day calendar for the "近 30 天复习日历" feature. Distinct from SevenDayTrend (7-day short-term trend) — this surface shows 30-day historical date distribution.
+
+- **Public method**: `build(int $userId, string $language): array`.
+- **Uses**: `SenseReviewReportPeriodService::rollingDays(30, $timezone)` (window math), `SenseReviewAnalyticsQueryService::reviewsForPeriod()` (single query for the whole 30-day window), `SenseReviewDailySeriesBuilder::build()` (zero-fill daily series, reuses Metrics), `SenseReviewReportMetricsService::periodMetrics()` for summary block.
+- **Window**: today + previous 29 natural days (NOT natural month). `Carbon::today($timezone)` back 29 days. Backend timezone. Fixed 30-day array, ascending order, zero-filled for empty days (empty days have null rates, NOT "0%").
+- **Summary**: total_reviews, active_days, distinct_senses, average_per_active_day (null when 0 active days), distribution, forget_rate, stability_rate.
+- **Query budget**: exactly 1 ReviewLog query for the entire 30-day window regardless of sense count (1/10/50 senses → 1 query, locked by `SenseReviewThirtyDayCalendarTest`).
+- **Today-row consistency**: the "today" row (days[29]) must match `GET /reviews/senses/daily-report` for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (locked by contract test `test_today_row_matches_daily_report`).
+- **Last-7-days consistency**: the last 7 days of the 30-day calendar must match `GET /reviews/senses/seven-day-trend` for day/day total_reviews/distinct_senses/distribution/forget_rate/stability_rate (locked by `test_last_seven_days_match_seven_day_trend`).
+- **Constraints**: READ-ONLY. Never writes ReviewLog. Never touches FSRS. Never creates WordSense/ReviewCard. No new database table. No snapshot persistence. No date picker, no natural-week/natural-month switching.
+
+### 3.3e SenseReviewAnalyticsQueryService.php (Query Layer)
 
 **Responsibility**: Centralized read-only ReviewLog statistics query layer. Single entry point for sense-review analytics DB reads.
 
@@ -199,7 +226,7 @@ The container does **not**:
 - **Delegates**: user/language/sense-only/reset-exclusion isolation to `SenseReviewQueryService::nonResetSenseReviewLogQuery()` / `nonResetCardReviewLogQuery()`.
 - **Constraints**: READ-ONLY. No rating labels, no scores, no product copy, no sort/limit. No new database table.
 
-### 3.3e SenseReviewRatingContract.php (Rating Contract)
+### 3.3f SenseReviewRatingContract.php (Rating Contract)
 
 **Responsibility**: Single source of truth for SenseReview rating metadata. Pure value object.
 
@@ -210,7 +237,7 @@ The container does **not**:
 - **Invalid handling**: fail-closed — `labelFor`/`scoreFor` return null for invalid/null/case-mismatched ratings. Never silently treats invalid as `good`.
 - **Constraints**: no DB, no Auth, no config, no state writes, no product copy.
 
-### 3.3f SenseReviewReportMetricsService.php (Metrics Layer)
+### 3.3g SenseReviewReportMetricsService.php (Metrics Layer)
 
 **Responsibility**: Pure computation layer for report metrics. Zero DB queries.
 
@@ -226,16 +253,17 @@ The container does **not**:
 - **Auth**: required (middleware). Strict user + language isolation (enforced by service via `SenseReviewQueryService`).
 - **No writes**: does not write ReviewLog, does not change ReviewCard/FSRS, does not create WordSense/ReviewCard.
 
-## 4. Four Coexisting Summary / Report Concepts
+## 4. Five Coexisting Summary / Report Concepts
 
-The SenseReview page now has four clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
+The SenseReview page now has five clearly distinct analytics surfaces. They MUST NOT be conflated in wording or payload:
 
 1. **本次复习总结 (Session Summary)** — `SenseReviewSessionSummary.vue` + `SenseReviewSessionTracker.js`. Frontend, page-load scoped. Resets on refresh. Tracks only ratings after page open. No backend call, no persistence.
 2. **今日复习总结 (Today Summary)** — `SenseReviewTodaySummary.vue` + `SenseReviewTodaySummaryService` + `GET /reviews/senses/today-summary`. Simpler cross-session backend aggregate for today.
 3. **今日学习日报 (Daily Report)** — `SenseReviewDailyReport.vue` + `SenseReviewDailyReportService` + `GET /reviews/senses/daily-report`. Richer four-block backend aggregate for today (概览 / 学习质量 / 重点词义 / 进步记录).
-4. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week).
+4. **近 7 天学习趋势 (7-Day Trend)** — `SenseReviewSevenDayTrend.vue` + `SenseReviewSevenDayTrendService` + `GET /reviews/senses/seven-day-trend`. Fixed rolling 7-day window (today + previous 6 natural days, NOT natural week). Short-term continuous change view.
+5. **近 30 天复习日历 (30-Day Calendar)** — `SenseReviewThirtyDayCalendar.vue` + `SenseReviewThirtyDayCalendarService` + `GET /reviews/senses/thirty-day-calendar`. Fixed rolling 30-day window (today + previous 29 natural days, NOT natural month). Historical date distribution view across 30 cells.
 
-The "today" row of the 7-day trend MUST match the DailyReport for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (contract test enforced).
+The "today" row of the 7-day trend and the 30-day calendar (days[29]) MUST match the DailyReport for total_reviews / distinct_senses / distribution / forget_rate / stability_rate (contract tests enforced). The last 7 days of the 30-day calendar MUST match the 7-day trend day-by-day (locked by `test_last_seven_days_match_seven_day_trend`).
 
 ## 5. Props / Events Contract Summary
 
@@ -248,6 +276,7 @@ The "today" row of the 7-day trend MUST match the DailyReport for total_reviews 
 | UnderstandingAid | aid | — |
 | EditDialog | value (v-model), card | input, saved |
 | SevenDayTrend | trend | close |
+| ThirtyDayCalendar | calendar | close |
 | SessionTracker | (pure functions, not a component) | — |
 
 ## 6. N+1 Risk Assessment
@@ -276,18 +305,19 @@ All SenseReview analytics paths are constant-query regardless of card/sense coun
 |------|-------------------|-----------|
 | `LearningFeedbackService::buildForCards` (1/5/20 cards) | 1 | `SenseReviewBatchFeedbackTest` |
 | `SevenDayTrendService::build` (1/10/50 senses, 7 days) | 1 | `SenseReviewSevenDayTrendTest` |
+| `ThirtyDayCalendarService::build` (1/10/50 senses, 30 days) | 1 | `SenseReviewThirtyDayCalendarTest` |
 | `ReportMetricsService` (any method) | 0 | `SenseReviewReportMetricsServiceTest::test_metrics_service_does_not_access_database` |
 | `AnalyticsQueryService::reviewsForPeriod` (1/10/50 senses) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
 | `AnalyticsQueryService::reviewsForCards` (1/10/50 cards) | 1 | `SenseReviewAnalyticsQueryServiceTest` |
 
-The 7-day trend does NOT issue 7 separate queries (one per day). It issues a single `reviewsForPeriod` for the whole [start, end) window, then `groupByDay` in memory via the Metrics layer.
+The 7-day trend and 30-day calendar do NOT issue per-day queries. Each issues a single `reviewsForPeriod` for the whole [start, end) window, then `groupByDay` in memory via the Metrics layer (and `DailySeriesBuilder` for zero-fill).
 
 ## 8. Not Implemented This Round
 
 - Natural-week switching (the 7-day window is a fixed rolling window, NOT a calendar week).
+- Natural-month switching (the 30-day window is a fixed rolling window, NOT a calendar month).
 - Date picker / arbitrary-date query.
 - Monthly / yearly reports.
 - Reading-time / lookup-count / AI-usage statistics.
 - Report export / push / badges / streak / auto-generated study advice.
-- Historical daily calendar.
 - Report snapshot persistence (all reports are real-time ReviewLog reads).

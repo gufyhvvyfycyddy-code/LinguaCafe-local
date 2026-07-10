@@ -57,6 +57,13 @@
             <div class="text-center mt-1">
                 <v-btn small text color="info" @click="activeReport = 'seven-day-trend'">查看近 7 天学习趋势</v-btn>
             </div>
+            <!-- Thirty day calendar entry: fixed rolling 30-day window (today +
+                 previous 29 natural days, NOT a natural month). Distinct from
+                 the 7-day trend (short-term) — this shows historical date
+                 distribution. Read-only. -->
+            <div class="text-center mt-1">
+                <v-btn small text color="success" @click="activeReport = 'thirty-day-calendar'">查看近 30 天复习日历</v-btn>
+            </div>
         </v-card>
 
         <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>

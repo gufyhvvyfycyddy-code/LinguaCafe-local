@@ -1,6 +1,6 @@
 # LinguaCafe 当前工作台 / Codex 交接临时文档
 
-> **最后更新**：2026-07-10 (报表架构收敛: Period + DailySeries + ReportCenter 五层分离).
+> **最后更新**：2026-07-10 (近 30 天 SenseReview 复习日历 + 报表架构五层收敛: Period + DailySeries + ReportCenter).
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。Codex 新任务应以本文为准。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。

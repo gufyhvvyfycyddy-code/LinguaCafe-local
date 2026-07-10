@@ -8,6 +8,7 @@ use App\Services\SenseReviewCardSerializerService;
 use App\Services\SenseReviewDailyReportService;
 use App\Services\SenseReviewService;
 use App\Services\SenseReviewSevenDayTrendService;
+use App\Services\SenseReviewThirtyDayCalendarService;
 use App\Services\SenseReviewTodaySummaryService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -22,6 +23,7 @@ class SenseReviewController extends Controller
         private SenseReviewTodaySummaryService $senseReviewTodaySummaryService,
         private SenseReviewDailyReportService $senseReviewDailyReportService,
         private SenseReviewSevenDayTrendService $senseReviewSevenDayTrendService,
+        private SenseReviewThirtyDayCalendarService $senseReviewThirtyDayCalendarService,
     ) {
     }
 
@@ -131,5 +133,22 @@ class SenseReviewController extends Controller
         $trend = $this->senseReviewSevenDayTrendService->build($userId, $language);
 
         return response()->json($trend);
+    }
+
+    /**
+     * SenseReview-ThirtyDayCalendar-1000-1
+     *
+     * Read-only "近 30 天复习日历" — fixed rolling 30-day window (today +
+     * previous 29 natural days, NOT a natural month). Source of truth:
+     * ReviewLog. Sense-review only, reset excluded. No writes, no FSRS.
+     */
+    public function thirtyDayCalendar(Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $calendar = $this->senseReviewThirtyDayCalendarService->build($userId, $language);
+
+        return response()->json($calendar);
     }
 }
