@@ -46,6 +46,12 @@
                  This is the ONLY report entry on the page. -->
             <div class="text-center mt-2">
                 <v-btn small text color="info" @click="reportCenterOpen = true">学习报告</v-btn>
+                <!-- ADR-0009: Session-action history drawer. Shows the
+                     most recent 20 ratings in this tab session, with
+                     undo buttons for undoable actions. -->
+                <v-btn small text color="primary" @click="sessionActionDrawerOpen = true">
+                    本次操作（{{ activeSessionActionCount }}）
+                </v-btn>
             </div>
         </v-card>
 
@@ -320,6 +326,106 @@
                 <v-btn text v-bind="attrs" @click="snackbar.show = false">关闭</v-btn>
             </template>
         </v-snackbar>
+
+        <!-- ADR-0009: Undo snackbar. Shown after a successful rating with
+             the real action metadata from the backend. The "撤销" button
+             calls the unified requestUndo with source=sense_review_snackbar.
+             After the snackbar closes, undo is still available from the
+             session-actions drawer or Ctrl+Z. -->
+        <v-snackbar v-model="undoSnackbar.show" :timeout="6000" top color="info">
+            {{ undoSnackbar.text }}
+            <template #action="{ attrs }">
+                <v-btn
+                    text
+                    v-bind="attrs"
+                    :loading="undoSnackbar.action && undoLoadingReviewLogId === undoSnackbar.action.review_log_id"
+                    @click="requestUndo(undoSnackbar.action, 'sense_review_snackbar')"
+                >撤销</v-btn>
+            </template>
+        </v-snackbar>
+
+        <!-- ADR-0009: Undo conflict alert. Shown when undo fails (409/404).
+             Does NOT change currentCard. Auto-dismisses after 5 seconds. -->
+        <v-snackbar v-if="undoConflict" :value="true" :timeout="5000" top color="error">
+            {{ undoConflict }}
+            <template #action="{ attrs }">
+                <v-btn text v-bind="attrs" @click="undoConflict = ''">关闭</v-btn>
+            </template>
+        </v-snackbar>
+
+        <!-- ADR-0009: Session-action history drawer. Shows the most recent
+             20 ratings in this tab session (newest first). Each item shows
+             lemma, sense_zh, rating, reviewed_at, previous/new due, undone
+             status, and an undo button for undoable actions. Undone actions
+             are retained for audit. Only the latest active action has an
+             undo button. -->
+        <v-dialog v-model="sessionActionDrawerOpen" max-width="640" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    本次操作（{{ activeSessionActionCount }}）
+                    <v-spacer />
+                    <v-btn icon small @click="sessionActionDrawerOpen = false">
+                        <v-icon small>mdi-close</v-icon>
+                    </v-btn>
+                </v-card-title>
+                <v-divider />
+                <v-card-text class="pa-0" style="max-height: 60vh;">
+                    <v-progress-linear v-if="sessionActionsLoading" indeterminate />
+                    <v-alert v-if="sessionActionsError" type="warning" dense text class="ma-2">
+                        {{ sessionActionsError }}
+                    </v-alert>
+                    <v-list v-if="sessionActions.length" dense>
+                        <v-list-item
+                            v-for="action in sessionActions"
+                            :key="action.review_log_id"
+                            two-line
+                        >
+                            <v-list-item-content>
+                                <v-list-item-title class="d-flex align-center">
+                                    <span class="font-weight-medium">{{ action.lemma || '未知' }}</span>
+                                    <v-chip
+                                        x-small
+                                        outlined
+                                        class="ml-2"
+                                        :color="ratingColor(action.rating)"
+                                    >{{ action.rating_label || action.rating }}</v-chip>
+                                    <v-chip
+                                        v-if="action.undone"
+                                        x-small
+                                        color="grey"
+                                        class="ml-2"
+                                    >已撤销</v-chip>
+                                </v-list-item-title>
+                                <v-list-item-subtitle class="text--secondary">
+                                    {{ action.sense_zh || '暂无释义' }}
+                                    · {{ formatTime(action.reviewed_at) }}
+                                    <span v-if="action.new_due_at"> · 到期 {{ formatTime(action.new_due_at) }}</span>
+                                    <span v-if="action.undone && action.undone_at" class="ml-2">
+                                        · 撤销于 {{ formatTime(action.undone_at) }}
+                                        <span v-if="action.undo_source">（{{ undoSourceLabel(action.undo_source) }}）</span>
+                                    </span>
+                                    <span v-if="!action.undoable && !action.undone && action.blocked_reason" class="ml-2">
+                                        · {{ blockedReasonLabel(action.blocked_reason) }}
+                                    </span>
+                                </v-list-item-subtitle>
+                            </v-list-item-content>
+                            <v-list-item-action v-if="action.undoable">
+                                <v-btn
+                                    small
+                                    text
+                                    color="primary"
+                                    :loading="undoLoadingReviewLogId === action.review_log_id"
+                                    @click="requestUndo(action, 'sense_review_history')"
+                                >撤销</v-btn>
+                            </v-list-item-action>
+                        </v-list-item>
+                    </v-list>
+                    <div v-else-if="!sessionActionsLoading" class="text-center text--secondary pa-4">
+                        本次复习还没有评分记录。
+                    </div>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
     </v-container>
 </template>
 
@@ -332,6 +438,7 @@
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
+    import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
 
     /**
@@ -446,6 +553,33 @@
                 intervalPreviewLoading: false,
                 intervalPreviewError: '',
                 intervalPreviewRequestSequence: 0,
+                // ADR-0009: Review session identity + stack undo.
+                // reviewSessionId: UUID per browser tab (sessionStorage,
+                //   refresh-persistent, not shared across tabs).
+                // sessionActions: backend timeline (newest first, max 20,
+                //   includes undone for audit). Only one active action is
+                //   undoable at a time (the latest non-undone in session).
+                // sessionActionDrawerOpen: "本次操作" drawer visibility.
+                // undoLoadingReviewLogId: review_log_id being undone (prevents
+                //   double-click on the same action).
+                // undoSnackbar: dedicated snackbar shown after a successful
+                //   rating, with an "撤销" action button.
+                // undoConflict: error message shown when undo fails (409/404).
+                // sessionActionRequestSequence: race-protection counter for
+                //   the timeline GET (discards stale responses).
+                reviewSessionId: '',
+                sessionActions: [],
+                sessionActionsLoading: false,
+                sessionActionsError: '',
+                sessionActionDrawerOpen: false,
+                undoLoadingReviewLogId: null,
+                undoSnackbar: {
+                    show: false,
+                    text: '',
+                    action: null,
+                },
+                undoConflict: '',
+                sessionActionRequestSequence: 0,
             }
         },
         computed: {
@@ -504,6 +638,21 @@
             showSummaryView() {
                 return this.showSessionSummary && this.hasReviewed;
             },
+            // ADR-0009: The latest undoable action in the current session.
+            // Used by Ctrl/Cmd+Z and the undo snackbar. null when no action
+            // is undoable (empty session, all undone, or legacy logs).
+            latestUndoableAction() {
+                if (!this.sessionActions.length) {
+                    return null;
+                }
+                return this.sessionActions.find((a) => a.undoable) || null;
+            },
+            // ADR-0009: Count of non-undone session actions (for the drawer
+            // badge and summary). Undone actions are retained in the drawer
+            // for audit but excluded from the "active" count.
+            activeSessionActionCount() {
+                return this.sessionActions.filter((a) => !a.undone).length;
+            },
         },
         watch: {
             // When the answer is revealed, fetch the interval preview for
@@ -532,8 +681,16 @@
             window.removeEventListener('keyup', this.handleHotkey);
         },
         mounted() {
+            // ADR-0009: Create or restore the per-tab review session ID.
+            // Uses sessionStorage (per-tab, refresh-persistent, not shared
+            // across tabs). This ID is sent with every rating POST and used
+            // to scope the session-action timeline and stack-undo.
+            this.reviewSessionId = getOrCreateReviewSessionId();
             this.loadCards();
             this.loadFsrsStats();
+            // Load the session-action timeline so that after a page refresh
+            // the user can still see and undo their recent ratings.
+            this.loadSessionActions();
             window.addEventListener('keyup', this.handleHotkey);
         },
         methods: {
@@ -558,7 +715,7 @@
                 if (this.ignoreDailyLimits) {
                     params.ignoreDailyLimits = true;
                 }
-                axios.get('/reviews/senses', { params: params }).then((response) => {
+                return axios.get('/reviews/senses', { params: params }).then((response) => {
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;
@@ -630,6 +787,12 @@
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;
                 }
+                // ADR-0009: Attach the per-tab review session ID so the
+                // backend can link this rating into the session-action
+                // timeline and make it eligible for stack-undo.
+                if (this.reviewSessionId) {
+                    payload.review_session_id = this.reviewSessionId;
+                }
                 // Generate a unique requestId per rate() call. The tracker
                 // dedupes by this id so a double-click cannot inflate stats.
                 // Only recorded AFTER the backend confirms success.
@@ -654,6 +817,17 @@
                     this.session = SessionTracker.recordRating(this.session, entry, requestId);
                     this.loadCards();
                     this.loadFsrsStats();
+                    // ADR-0009: Refresh the session-action timeline so the
+                    // new rating appears in the drawer and becomes the
+                    // latest undoable action.
+                    this.loadSessionActions();
+                    // ADR-0009: Show the undo snackbar with the real action
+                    // metadata from the backend (review_log_id, rating_label,
+                    // undoable). Do NOT fake the review_log_id on the frontend.
+                    const action = response.data.action;
+                    if (action && action.undoable) {
+                        this.showUndoSnackbar(action, reviewedCard);
+                    }
                 }).catch((error) => {
                     this.error = error.response?.data?.message || '词义卡评分失败。';
                 }).finally(() => {
@@ -668,7 +842,167 @@
                 this.ignoreDailyLimits = false;
                 this.loadCards();
             },
+            // ==================== ADR-0009: Session actions + stack undo ====================
+            // Load the session-action timeline from the backend. Called on
+            // mount (to restore after refresh), after each rating, and after
+            // each undo. Read-only GET; never writes ReviewLog or FSRS.
+            // Race protection: each request captures the current sequence
+            // counter; stale responses are discarded.
+            loadSessionActions() {
+                if (!this.reviewSessionId) {
+                    return;
+                }
+                this.sessionActionRequestSequence++;
+                const seq = this.sessionActionRequestSequence;
+                this.sessionActionsLoading = true;
+                this.sessionActionsError = '';
+                axios.get('/reviews/senses/session-actions', {
+                    params: { review_session_id: this.reviewSessionId },
+                }).then((response) => {
+                    if (seq !== this.sessionActionRequestSequence) {
+                        return;
+                    }
+                    this.sessionActions = response.data.actions || [];
+                }).catch(() => {
+                    if (seq !== this.sessionActionRequestSequence) {
+                        return;
+                    }
+                    this.sessionActionsError = '本次操作历史加载失败。';
+                }).finally(() => {
+                    if (seq !== this.sessionActionRequestSequence) {
+                        return;
+                    }
+                    this.sessionActionsLoading = false;
+                });
+            },
+            // Show the undo snackbar after a successful rating. The snackbar
+            // carries the real action metadata (review_log_id, rating_label)
+            // from the backend — the frontend never fakes these values.
+            showUndoSnackbar(action, reviewedCard) {
+                // Extract the interval preview for the chosen rating (if
+                // available) to show "预计下次：N 天" in the snackbar.
+                let intervalText = '';
+                if (this.intervalPreviews && action.rating && this.intervalPreviews[action.rating]) {
+                    intervalText = this.intervalPreviews[action.rating].label || '';
+                }
+                const parts = ['已评分：' + (action.rating_label || action.rating)];
+                if (intervalText) {
+                    parts.push('预计下次：' + intervalText);
+                }
+                this.undoSnackbar = {
+                    show: true,
+                    text: parts.join(' · '),
+                    action: action,
+                };
+            },
+            // Unified undo entry point. Called from the snackbar, the
+            // session-actions drawer, and Ctrl/Cmd+Z. All three paths
+            // converge here so the loading guard, error handling, and
+            // post-undo refresh are identical.
+            requestUndo(action, source) {
+                if (!action || !action.undoable || !action.review_log_id) {
+                    return;
+                }
+                if (this.undoLoadingReviewLogId !== null) {
+                    return;
+                }
+                this.undoLoadingReviewLogId = action.review_log_id;
+                this.undoConflict = '';
+                const undoRequestId = 'undo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+                axios.post('/reviews/senses/review-actions/' + action.review_log_id + '/undo', {
+                    review_session_id: this.reviewSessionId,
+                    undo_request_id: undoRequestId,
+                    source: source,
+                }).then((response) => {
+                    const data = response.data;
+                    // Close the undo snackbar (it has served its purpose).
+                    this.undoSnackbar.show = false;
+                    // Reload the queue so the restored card re-enters at the
+                    // correct position. The backend restores the card's FSRS
+                    // state to the before-snapshot, so it should be due again.
+                    // After reload, move the restored card to the front.
+                    const restoredCardId = data.restored_card ? data.restored_card.review_card_id : null;
+                    this.loadCards().then(() => {
+                        if (restoredCardId) {
+                            // Move the restored card to the front of the queue
+                            // so the user can immediately re-rate it.
+                            const idx = this.cards.findIndex((c) => c.review_card_id === restoredCardId);
+                            if (idx > 0) {
+                                const [card] = this.cards.splice(idx, 1);
+                                this.cards.unshift(card);
+                            }
+                        }
+                        this.showAnswer = false;
+                        this.intervalPreviews = null;
+                        this.intervalPreviewError = '';
+                        this.intervalPreviewLoading = false;
+                        this.intervalPreviewRequestSequence++;
+                    });
+                    // Remove the undone rating from the page session tracker
+                    // so the session summary excludes it (A-7).
+                    if (restoredCardId) {
+                        this.session = SessionTracker.removeRating(this.session, restoredCardId);
+                        if (this.reviewedCount > 0) {
+                            this.reviewedCount--;
+                        }
+                    }
+                    // Refresh timeline, stats, and summary.
+                    this.loadSessionActions();
+                    this.loadFsrsStats();
+                    this.showSnackbar('已撤销上一次评分，可以重新作答。', 'info');
+                }).catch((error) => {
+                    const status = error.response?.status;
+                    const blockedReason = error.response?.data?.blocked_reason;
+                    if (status === 409) {
+                        // Conflict: card state changed, not latest, or
+                        // different undo_request_id on already-undone log.
+                        this.undoConflict = '无法撤销：卡片状态已在其他页面发生变化。';
+                    } else if (status === 404) {
+                        // Session mismatch or log not found.
+                        this.undoConflict = '无法撤销：该操作不属于当前复习会话。';
+                    } else {
+                        this.undoConflict = '撤销失败，请检查网络后重试。';
+                    }
+                    // Refresh the timeline so the UI reflects the current
+                    // undoable state (the action may no longer be undoable).
+                    this.loadSessionActions();
+                    // Do NOT change currentCard on failure. Do NOT attempt
+                    // to undo a different action automatically.
+                }).finally(() => {
+                    this.undoLoadingReviewLogId = null;
+                });
+            },
             handleHotkey(event) {
+                // ADR-0009: Ctrl+Z / Cmd+Z triggers undo. Checked BEFORE
+                // the other guards so it works even when no card is shown
+                // (e.g. summary view), but still respects input/dialog
+                // guards and undo-loading state.
+                if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z')) {
+                    // Never trigger in input/textarea/contenteditable.
+                    const tag = event.target?.tagName?.toLowerCase();
+                    if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
+                        return;
+                    }
+                    // No dialog that might be using Ctrl+Z for its own purpose.
+                    if (this.editDialog || this.archiveDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                        return;
+                    }
+                    // No study report open.
+                    if (this.showSessionSummary) {
+                        return;
+                    }
+                    // Not while rating or undoing.
+                    if (this.rating || this.undoLoadingReviewLogId !== null) {
+                        return;
+                    }
+                    // Must have an undoable action.
+                    if (!this.latestUndoableAction) {
+                        return;
+                    }
+                    event.preventDefault();
+                    this.requestUndo(this.latestUndoableAction, 'sense_review_hotkey');
+                    return;
+                }
                 // When the session summary is shown, Space and 1/2/3/4
                 // must NOT trigger show-answer or rating.
                 if (this.showSessionSummary) {
@@ -870,6 +1204,66 @@
             // ==================== Snackbar ====================
             showSnackbar(text, color) {
                 this.snackbar = { show: true, text, color };
+            },
+            // ==================== ADR-0009: Display helpers ====================
+            // Map a rating value to a Vuetify color name for the action
+            // drawer chips. Matches SenseReviewRatingPresentation colors.
+            ratingColor(rating) {
+                switch (rating) {
+                    case 'again': return 'error';
+                    case 'hard': return 'warning';
+                    case 'good': return 'primary';
+                    case 'easy': return 'success';
+                    default: return 'foreground';
+                }
+            },
+            // Format an ISO 8601 datetime for display in the action drawer.
+            // Returns a short local-time string; empty string on null/invalid.
+            formatTime(iso) {
+                if (!iso) {
+                    return '';
+                }
+                try {
+                    const d = new Date(iso);
+                    if (isNaN(d.getTime())) {
+                        return '';
+                    }
+                    return d.toLocaleString('zh-CN', {
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                    });
+                } catch (e) {
+                    return '';
+                }
+            },
+            // Human-readable label for the undo source (where the undo was
+            // triggered from). Used in the audit trail in the action drawer.
+            undoSourceLabel(source) {
+                switch (source) {
+                    case 'sense_review_snackbar': return '评分提示';
+                    case 'sense_review_history': return '操作历史';
+                    case 'sense_review_hotkey': return '快捷键';
+                    default: return source || '';
+                }
+            },
+            // Human-readable label for blocked reasons. Used in the action
+            // drawer to explain why a non-undoable action cannot be undone.
+            blockedReasonLabel(reason) {
+                switch (reason) {
+                    case 'wrong_session': return '不属于当前会话';
+                    case 'not_latest_action': return '不是最新操作';
+                    case 'already_undone': return '已撤销';
+                    case 'missing_snapshot': return '缺少快照（旧日志）';
+                    case 'card_state_changed': return '卡片状态已变化';
+                    case 'legacy_target': return '旧版卡片不支持撤销';
+                    case 'sense_not_confirmed': return '词义未确认';
+                    case 'card_archived': return '卡片已归档';
+                    case 'unsupported_rating': return '不支持的评分类型';
+                    case 'unsupported_source': return '不支持的来源';
+                    default: return reason || '';
+                }
             },
         }
     }

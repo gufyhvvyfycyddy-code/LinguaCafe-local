@@ -112,6 +112,27 @@ export function hasReviewed(session) {
 }
 
 /**
+ * Remove all entries for a given review_card_id from the session.
+ * Used by ADR-0009 stack-undo: after a successful undo, the undone
+ * rating must be excluded from the session summary (review count,
+ * rating distribution, needsAttention). Returns a new session
+ * (immutable update); the original is not mutated.
+ *
+ * @param  {object} session
+ * @param  {number} reviewCardId
+ * @return {object} New session with matching entries removed.
+ */
+export function removeRating(session, reviewCardId) {
+    if (!session || !reviewCardId) {
+        return session;
+    }
+    return {
+        entries: session.entries.filter((e) => e.review_card_id !== reviewCardId),
+        requestIds: session.requestIds,
+    };
+}
+
+/**
  * Produce a fresh empty session (alias for createSession, semantically
  * clearer when used mid-page to "start over").
  *

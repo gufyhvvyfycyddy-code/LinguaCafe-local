@@ -522,3 +522,13 @@ No existing column modified or deleted. No `review_cards` schema change. Legacy 
 ### 11.6 Constraints
 
 No FSRS algorithm/parameter/preview change. No rating key/score/label/hotkey change. No `review_cards` schema change. No second migration. No ReviewLog deletion. No redo. No cross-session undo. Legacy logs (null snapshot) remain in stats but are not undoable.
+
+### 11.7 Frontend Layer (Task A)
+
+- **`SenseReviewSessionIdentity.js`**: pure helper using `sessionStorage` (per-tab, survives refresh, not `localStorage`). Exports `getOrCreateReviewSessionId()`, `isValidReviewSessionId()`, `clearReviewSessionId()`. UUID v4 via `crypto.randomUUID()` with manual fallback. No axios, no Vue.
+- **`SenseReview.vue` state**: `reviewSessionId`, `sessionActions`, `sessionActionsLoading`, `sessionActionDrawerOpen`, `undoLoadingReviewLogId`, `undoSnackbar`, `undoConflict`, `sessionActionRequestSequence`. `mounted()` creates/reads session ID and loads timeline. `rate()` sends `review_session_id` and uses `response.data.action`.
+- **Unified `requestUndo(action, source)`**: all three entry points (snackbar, drawer, hotkey) converge. POST to `/reviews/senses/review-actions/{id}/undo` with `review_session_id` + `undo_request_id` + `source`. On success: closes snackbar, reloads cards, unshifts restored card to front, sets `showAnswer=false`, clears interval preview, calls `SessionTracker.removeRating`, decrements `reviewedCount`, refreshes timeline + stats, shows "已撤销上一次评分" info snackbar. On 409: conflict message. On 404: session mismatch. Network error: retry message. No optimistic restore, no frontend FSRS calculation, no ReviewLog deletion.
+- **Ctrl/Cmd+Z guard**: `handleHotkey` checks `ctrlKey || metaKey` + `z/Z`, then guards: input/textarea/select/contenteditable, edit/archive/reset/delete/source dialogs, `showSessionSummary`, `this.rating`, `this.undoLoadingReviewLogId !== null`, `this.latestUndoableAction` existence.
+- **Session summary**: `SessionTracker.removeRating(session, reviewCardId)` excludes undone action from summary (entries filter, requestIds preserved). Summary count/distribution/feedback reflect only active session actions.
+- **Management page audit**: `ReviewCardManage.vue` shows `已撤销` chip + `撤销时间` + `撤销来源` for undone logs. Original rating preserved (not changed to "undo"). Logs not hidden. No undo button on management page.
+- **Sources**: `sense_review_snackbar`, `sense_review_history`, `sense_review_hotkey` — validated by backend.

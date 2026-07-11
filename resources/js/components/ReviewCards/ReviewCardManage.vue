@@ -610,6 +610,17 @@
                                     <div class="text-caption text--secondary">
                                         到期: {{ formatDueAt(log.previous_due_at) }} → {{ formatDueAt(log.new_due_at) }}
                                     </div>
+                                    <!-- ADR-0009: Undo audit trail. The original
+                                         rating is preserved (not changed to undo),
+                                         the log is not hidden, and no undo button
+                                         is provided on this page. -->
+                                    <div v-if="log.undone" class="text-caption mt-1 d-flex align-center" style="gap: 4px;">
+                                        <v-chip x-small color="grey">已撤销</v-chip>
+                                        <span class="text--secondary">
+                                            撤销时间: {{ formatDateTime(log.undone_at) }}
+                                            <span v-if="log.undo_source"> · 来源: {{ log.undo_source }}</span>
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
