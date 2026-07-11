@@ -25,6 +25,13 @@ class ReviewLog extends Model
         'previous_difficulty',
         'new_difficulty',
         'source',
+        // Undo ledger fields (ADR-0009)
+        'review_session_id',
+        'before_card_snapshot',
+        'after_card_snapshot',
+        'undone_at',
+        'undo_request_id',
+        'undo_source',
     ];
 
     protected function casts(): array
@@ -37,7 +44,24 @@ class ReviewLog extends Model
             'new_stability' => 'float',
             'previous_difficulty' => 'float',
             'new_difficulty' => 'float',
+            // Undo ledger casts
+            'before_card_snapshot' => 'array',
+            'after_card_snapshot' => 'array',
+            'undone_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Scope: exclude undone review logs.
+     *
+     * Product analytics queries (daily report, 7-day trend, 30-day
+     * calendar, stats, optimization, learning feedback, session
+     * summary) MUST apply this scope. Audit queries (management
+     * page logs, session action timeline, diagnostics) MUST NOT.
+     */
+    public function scopeNotUndone($query)
+    {
+        return $query->whereNull('undone_at');
     }
 
     public function card()

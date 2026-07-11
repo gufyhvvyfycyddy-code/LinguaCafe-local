@@ -218,6 +218,11 @@ class ReviewCardManageController extends Controller
                 'new_stability' => $log->new_stability,
                 'previous_difficulty' => $log->previous_difficulty,
                 'new_difficulty' => $log->new_difficulty,
+                // ADR-0009: undo audit fields — retained for audit, not
+                // excluded from the management page log trail.
+                'undone' => $log->undone_at !== null,
+                'undone_at' => optional($log->undone_at)->toISOString(),
+                'undo_source' => $log->undo_source,
             ]);
 
         return response()->json([

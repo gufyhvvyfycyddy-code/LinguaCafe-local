@@ -11,8 +11,10 @@ use Illuminate\Support\Facades\DB;
 
 class ReviewCardService
 {
-    public function __construct(private FsrsSchedulingService $fsrsSchedulingService)
-    {
+    public function __construct(
+        private FsrsSchedulingService $fsrsSchedulingService,
+        private ReviewCardFsrsSnapshotService $snapshotService,
+    ) {
     }
 
     public function ensureWordCard(EncounteredWord $word): ?ReviewCard
@@ -158,9 +160,28 @@ class ReviewCardService
         });
     }
 
-    public function recordReview(int $userId, string $language, int $reviewCardId, string $rating, string $source = 'review'): ReviewCard
-    {
-        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source) {
+    /**
+     * Record a review rating on a card.
+     *
+     * Transactional: lockForUpdate on ReviewCard, capture before/after
+     * FSRS snapshots, call pure schedule(), apply result, save card,
+     * create ReviewLog with snapshots and session ID.
+     *
+     * @param  string  $reviewSessionId  Optional UUID from the browser tab
+     *         session. When provided, the ReviewLog is eligible for
+     *         stack-based undo within that session (ADR-0009). When
+     *         null (legacy callers), the log is created normally but
+     *         cannot be undone.
+     */
+    public function recordReview(
+        int $userId,
+        string $language,
+        int $reviewCardId,
+        string $rating,
+        string $source = 'review',
+        ?string $reviewSessionId = null,
+    ): ReviewCard {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId) {
             $card = ReviewCard::lockForUpdate()
                 ->where('user_id', $userId)
                 ->where('language_id', $language)
@@ -176,6 +197,10 @@ class ReviewCardService
                 throw new \Exception('Review card target is no longer reviewable.');
             }
 
+            // Capture complete FSRS state before the rating (ADR-0009).
+            $beforeSnapshot = $this->snapshotService->capture($card);
+
+            // Legacy 4-field before state (retained for backward compat).
             $previous = [
                 'state' => $card->fsrs_state,
                 'due_at' => $card->fsrs_due_at,
@@ -194,6 +219,9 @@ class ReviewCardService
             $card->fsrs_last_reviewed_at = $schedule['reviewed_at'];
             $card->save();
 
+            // Capture complete FSRS state after the rating (ADR-0009).
+            $afterSnapshot = $this->snapshotService->capture($card);
+
             ReviewLog::create([
                 'user_id' => $userId,
                 'language_id' => $language,
@@ -210,6 +238,10 @@ class ReviewCardService
                 'previous_difficulty' => $previous['difficulty'],
                 'new_difficulty' => $card->fsrs_difficulty,
                 'source' => $source,
+                // Undo ledger fields (ADR-0009)
+                'review_session_id' => $reviewSessionId,
+                'before_card_snapshot' => $beforeSnapshot,
+                'after_card_snapshot' => $afterSnapshot,
             ]);
 
             return $card;

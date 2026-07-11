@@ -65,21 +65,28 @@ class SenseReviewQueryService
     }
 
     /**
-     * Sense review log query that excludes reset-type entries.
+     * Sense review log query that excludes reset-type entries and
+     * undone actions.
      *
-     * Builds on confirmedSenseReviewLogQuery() and adds both
-     * source != reset and rating != reset so that daily review
-     * count and stats "reviewed today" use the same definition.
+     * Builds on confirmedSenseReviewLogQuery() and adds:
+     *   - source != reset AND rating != reset (reset exclusion)
+     *   - undone_at IS NULL (undo exclusion, ADR-0009)
+     *
+     * Product analytics (daily report, 7-day trend, 30-day calendar,
+     * stats, learning feedback, session summary) use this path so
+     * that undone ratings do not inflate counts.
      */
     public function nonResetSenseReviewLogQuery(int $userId, string $language, Carbon $since): Builder
     {
         return $this->confirmedSenseReviewLogQuery($userId, $language, $since)
             ->where('review_logs.source', '!=', 'reset')
-            ->where('review_logs.rating', '!=', 'reset');
+            ->where('review_logs.rating', '!=', 'reset')
+            ->whereNull('review_logs.undone_at');
     }
 
     /**
-     * Card-scoped ReviewLog query that excludes reset-type entries.
+     * Card-scoped ReviewLog query that excludes reset-type entries
+     * and undone actions.
      *
      * Unlike the sense-scoped helpers above, this does NOT join
      * word_senses — it is scoped purely by review_card_id. User /
@@ -88,7 +95,7 @@ class SenseReviewQueryService
      * that belong to the current user.
      *
      * Used by the card-scoped analytics path (per-card learning
-     * feedback) so that reset exclusion lives in one place.
+     * feedback) so that reset and undo exclusion lives in one place.
      *
      * @param  array<int>  $cardIds
      */
@@ -97,6 +104,7 @@ class SenseReviewQueryService
         return ReviewLog::query()
             ->whereIn('review_card_id', $cardIds)
             ->where('rating', '!=', 'reset')
-            ->where('source', '!=', 'reset');
+            ->where('source', '!=', 'reset')
+            ->whereNull('undone_at');
     }
 }

@@ -1,8 +1,8 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-10 (ADR-0007 complete: SenseReview report card deep link navigation contract added — `ReviewCardManageAccessService` is the single source of truth for sense-card access control; new read-only `GET /review-cards/manage/{reviewCard}/detail` endpoint; `ReviewCardManageDeepLink.js` pure-function helper; `SenseReviewDailyInsightBuilder` outputs `review_card_id` + `word_sense_id` on focus/progress/recent with 0 DB queries via in-memory map; ADR-0006 daily report consolidation remains intact).
+> **Status**: Current as of 2026-07-11 (ADR-0009 complete: review action transaction ledger + stack-based undo — `ReviewCardFsrsSnapshotService` captures/restores 8 FSRS fields; `recordReview()` captures before/after snapshots in transaction; `scopeNotUndone` excludes undone from product analytics; `SenseReviewUndoPolicy` pure policy; `SenseReviewSessionActionService` read-only timeline; `SenseReviewUndoService` transactional undo with idempotency; ADR-0007 deep link and ADR-0006 daily report consolidation remain intact).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
-> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`, `docs/adr/ADR-0007-sense-review-report-card-deep-link.md`.
+> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`, `docs/adr/ADR-0007-sense-review-report-card-deep-link.md`, `docs/adr/ADR-0008-sense-review-answer-interval-preview.md`, `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`.
 
 ## 0. Six-Layer Report Architecture
 
@@ -478,3 +478,47 @@ ADR-0008 adds a read-only interval-preview feature so the SenseReview page can s
 - **`SenseReviewIntervalPreviewService::preview()`**: handles access control — user + language + `target_type=sense` + confirmed WordSense + `fsrs_enabled` — then delegates to `FsrsSchedulingService::previewAllRatings()`. It is the only service the Controller calls; the Controller does not duplicate access checks.
 - **Endpoint**: `GET /reviews/senses/{reviewCard}/interval-preview` — read-only. Returns per-rating projected `due_at` / `interval` / `state` / `stability` / `difficulty` / `lapses`. GET-only; no ReviewLog write; no FSRS mutation; no DB schema change.
 - **Constraints**: no FSRS write, no ReviewLog, no WordSense/ReviewCard creation/update/delete, no new migration. The preview helps the user understand the consequence of each rating; it does not make the decision for them.
+
+## 11. Review Action Ledger and Stack Undo (ADR-0009)
+
+### 11.1 Overview
+
+ADR-0009 adds a transaction-based undo ledger for sense review actions. Each rating creates a complete FSRS before/after snapshot in the ReviewLog. Within the current browser tab session, the user can stack-undo the latest active action — restoring the card to its pre-rating state. Undone ratings are excluded from product analytics but retained in audit views.
+
+- **Stack-only undo**: only the latest active action in the session can be undone. After undoing, the previous action becomes undoable. No skipping, no redo, no cross-session undo, no arbitrary history rollback.
+- **ReviewLog is NEVER deleted**: undone logs are marked with `undone_at` and retained for audit.
+- **Product analytics exclude undone**: daily report, 7-day trend, 30-day calendar, stats, optimization all use `scopeNotUndone`.
+- **Audit views retain undone**: management page logs, session action timeline, diagnostics show undone logs with metadata.
+
+### 11.2 New Services
+
+- **`ReviewCardFsrsSnapshotService`**: pure capture/restore/matches/fingerprint/validate for 8 FSRS fields (`fsrs_state`, `fsrs_due_at`, `fsrs_stability`, `fsrs_difficulty`, `fsrs_last_reviewed_at`, `fsrs_reps`, `fsrs_lapses`, `fsrs_enabled`). No DB, no save. Datetime normalized via Carbon::toIso8601String(), floats via round($v, 6).
+- **`SenseReviewUndoPolicy`**: pure policy service — 10 blocked reasons (`wrong_session`, `not_latest_action`, `already_undone`, `missing_snapshot`, `card_state_changed`, `legacy_target`, `sense_not_confirmed`, `card_archived`, `unsupported_rating`, `unsupported_source`). No DB, no writes.
+- **`SenseReviewSessionActionService`**: read-only timeline of the 20 most recent session actions (newest first, includes undone). Evaluates undoable/blocked_reason per action via UndoPolicy. Eager-loads cards + senses to avoid N+1.
+- **`SenseReviewUndoService`**: transactional undo. Locks ReviewLog + ReviewCard, evaluates policy, restores before snapshot, marks log undone. Idempotent via `undo_request_id`.
+
+### 11.3 Migration
+
+Single additive migration adds 6 columns to `review_logs`:
+- `review_session_id` (nullable string + index)
+- `before_card_snapshot` (nullable JSON)
+- `after_card_snapshot` (nullable JSON)
+- `undone_at` (nullable timestamp + index)
+- `undo_request_id` (nullable string + unique)
+- `undo_source` (nullable string)
+
+No existing column modified or deleted. No `review_cards` schema change. Legacy logs have null fields — they still participate in stats but cannot be undone.
+
+### 11.4 Endpoints
+
+- `GET /reviews/senses/session-actions?review_session_id=UUID` — read-only session timeline.
+- `POST /reviews/senses/review-actions/{reviewLog}/undo` — transactional undo with idempotency.
+- `POST /reviews/senses/{reviewCard}/rate` — now accepts optional `review_session_id` and returns `action` metadata.
+
+### 11.5 Analytics Exclusion
+
+`ReviewLog::scopeNotUndone()` is the single exclusion point. Product analytics paths (`SenseReviewQueryService::nonResetSenseReviewLogQuery()`, `nonResetCardReviewLogQuery()`, and `SettingsService` direct queries) all apply `whereNull('undone_at')`. Audit paths (management page logs, session timeline, diagnostics) do NOT apply the scope.
+
+### 11.6 Constraints
+
+No FSRS algorithm/parameter/preview change. No rating key/score/label/hotkey change. No `review_cards` schema change. No second migration. No ReviewLog deletion. No redo. No cross-session undo. Legacy logs (null snapshot) remain in stats but are not undoable.

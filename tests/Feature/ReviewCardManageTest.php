@@ -3575,6 +3575,10 @@ class ReviewCardManageTest extends TestCase
             'new_stability',
             'previous_difficulty',
             'new_difficulty',
+            // ADR-0009: undo audit fields — retained for audit trail
+            'undone',
+            'undone_at',
+            'undo_source',
         ], array_keys($item));
         $this->assertSame($log->id, $item['id']);
         $this->assertSame('easy', $item['rating']);
