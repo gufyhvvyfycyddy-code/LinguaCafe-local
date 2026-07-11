@@ -231,9 +231,14 @@
 
                 <!-- Rating controls (extracted sub-component). Emits 'rating'
                      with 'again' | 'hard' | 'good' | 'easy'. The parent owns
-                     the actual rate() method and API call. -->
+                     the actual rate() method and API call. Interval preview
+                     props (1000-5) are passed down as pure display data;
+                     preview loading/error NEVER disables the buttons. -->
                 <SenseReviewRatingControls
                     :disabled="rating || archiveLoading || deleteLoading || resetLoading"
+                    :interval-previews="intervalPreviews"
+                    :preview-loading="intervalPreviewLoading"
+                    :preview-error="intervalPreviewError"
                     @rating="rate"
                 />
             </template>
@@ -327,6 +332,7 @@
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
+    import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
 
     /**
      * SenseReview.vue — page container (refactored).
@@ -425,6 +431,21 @@
                 // report selection, loading, error, payload and async-race
                 // protection internally.
                 reportCenterOpen: false,
+                // Interval preview (1000-5): predicted intervals for the
+                // four rating buttons, shown only after the answer is
+                // revealed. The parent (this component) is the SOLE
+                // orchestrator for the preview GET request; sub-components
+                // only receive normalized display data via props.
+                //   intervalPreviews: normalized map or null
+                //   intervalPreviewLoading: true while GET is in flight
+                //   intervalPreviewError: non-empty on failure
+                //   intervalPreviewRequestSequence: race-protection counter;
+                //     incremented on every new request and on card switch
+                //     so stale responses are discarded.
+                intervalPreviews: null,
+                intervalPreviewLoading: false,
+                intervalPreviewError: '',
+                intervalPreviewRequestSequence: 0,
             }
         },
         computed: {
@@ -484,6 +505,29 @@
                 return this.showSessionSummary && this.hasReviewed;
             },
         },
+        watch: {
+            // When the answer is revealed, fetch the interval preview for
+            // the current card. Preview is NEVER fetched before the answer
+            // is shown. Preview failure does not block rating.
+            showAnswer(val) {
+                if (val && this.currentCard) {
+                    this.loadIntervalPreview();
+                }
+            },
+            // When the current card changes (new card loaded after rating,
+            // or queue refreshed), discard any stale preview and bump the
+            // request sequence so any in-flight response is ignored.
+            currentCard(newCard, oldCard) {
+                const newId = newCard ? newCard.review_card_id : null;
+                const oldId = oldCard ? oldCard.review_card_id : null;
+                if (newId !== oldId) {
+                    this.intervalPreviews = null;
+                    this.intervalPreviewError = '';
+                    this.intervalPreviewLoading = false;
+                    this.intervalPreviewRequestSequence++;
+                }
+            },
+        },
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
         },
@@ -531,6 +575,42 @@
                     this.loading = false;
                 });
             },
+            // ==================== Interval preview (1000-5) ====================
+            // Fetch the predicted intervals for all four ratings of the
+            // current card. Called once when the answer is revealed.
+            // Read-only: never writes ReviewLog, never touches FSRS.
+            // Race protection: each request captures the current
+            // requestSequence; if the card changes or a new request
+            // starts before the response returns, the stale response is
+            // discarded. Preview failure sets a shared error hint but
+            // does NOT disable the rating buttons.
+            loadIntervalPreview() {
+                if (!this.currentCard) {
+                    return;
+                }
+                const cardId = this.currentCard.review_card_id;
+                this.intervalPreviewRequestSequence++;
+                const seq = this.intervalPreviewRequestSequence;
+                this.intervalPreviewLoading = true;
+                this.intervalPreviewError = '';
+                this.intervalPreviews = null;
+                axios.get('/reviews/senses/' + cardId + '/interval-preview').then((response) => {
+                    if (seq !== this.intervalPreviewRequestSequence) {
+                        return;
+                    }
+                    this.intervalPreviews = normalizeIntervalPreview(response.data);
+                }).catch(() => {
+                    if (seq !== this.intervalPreviewRequestSequence) {
+                        return;
+                    }
+                    this.intervalPreviewError = '预计时间暂不可用，仍可正常评分。';
+                }).finally(() => {
+                    if (seq !== this.intervalPreviewRequestSequence) {
+                        return;
+                    }
+                    this.intervalPreviewLoading = false;
+                });
+            },
             rate(rating) {
                 if (!this.currentCard) {
                     return;
@@ -538,6 +618,14 @@
 
                 this.rating = true;
                 this.error = '';
+                // Invalidate the interval preview immediately so the old
+                // card's predicted intervals cannot bleed into the next
+                // card. The requestSequence bump also discards any
+                // in-flight preview response.
+                this.intervalPreviews = null;
+                this.intervalPreviewError = '';
+                this.intervalPreviewLoading = false;
+                this.intervalPreviewRequestSequence++;
                 const payload = { rating: rating };
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;
