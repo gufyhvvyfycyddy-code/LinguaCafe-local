@@ -229,7 +229,7 @@
 | FSRS-Anki-Mgmt-9 | 学习参数 Preset：按语言 / 材料组共享 FSRS、每日上限和队列选项；禁止直接照搬 Anki deck 层级 | 📋 计划中 |
 | FSRS-Param-Browser-Smoke | FSRS 参数优化真实浏览器验收 | 📋 待验收 |
 | Anki-Review-IntervalPreview-1 | 四个评分按钮显示选择后的预计下次复习时间；预览必须复用真实调度服务且只读 | ✅ 已完成 (commit a009d2a + b927ea5, ADR-0008) |
-| Anki-Review-Undo-1 | 撤销上一次真实评分：恢复该次评分前的 FSRS 卡片状态并撤销对应 ReviewLog；必须快照化、事务化、仅允许最后一次操作 | ✅ 已完成 (commit 71d1670 + Task A commit, ADR-0009) |
+| Anki-Review-Undo-1 | 撤销上一次真实评分：恢复该次评分前的 FSRS 卡片状态并撤销对应 ReviewLog；必须快照化、事务化、仅允许最后一次操作 | ✅ 已完成 (commit 71d1670 + 977f5cb + 4e27751, ADR-0009, 26/26 Playwright验收通过) |
 | Anki-Card-State-1 | 区分“明天再看（bury）”“暂停复习（suspend）”“归档”“重置”“删除”，避免所有跳过语义都落到 fsrs_enabled | 📋 P1 待架构冻结 |
 | Anki-Leech-1 | 遗忘卡识别：按 lapses 阈值标记，默认提示用户改写释义卡；是否自动暂停由用户设置决定 | 📋 P2 计划中 |
 | Anki-Queue-Order-1 | 新卡 / 学习中 / 到期卡的队列顺序与积压优先级形成明确、可测试的策略 | 📋 P2 计划中 |
