@@ -908,7 +908,13 @@
                 }
                 this.undoLoadingReviewLogId = action.review_log_id;
                 this.undoConflict = '';
-                const undoRequestId = 'undo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+                const undoRequestId = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+                    ? crypto.randomUUID()
+                    : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                        const r = Math.random() * 16 | 0;
+                        const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                        return v.toString(16);
+                    });
                 axios.post('/reviews/senses/review-actions/' + action.review_log_id + '/undo', {
                     review_session_id: this.reviewSessionId,
                     undo_request_id: undoRequestId,
