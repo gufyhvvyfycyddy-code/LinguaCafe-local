@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Services\ReviewCardService;
 use App\Services\SenseReviewCardSerializerService;
 use App\Services\SenseReviewDailyReportService;
+use App\Services\SenseReviewIntervalPreviewService;
 use App\Services\SenseReviewService;
 use App\Services\SenseReviewSevenDayTrendService;
 use App\Services\SenseReviewThirtyDayCalendarService;
@@ -22,6 +23,7 @@ class SenseReviewController extends Controller
         private SenseReviewDailyReportService $senseReviewDailyReportService,
         private SenseReviewSevenDayTrendService $senseReviewSevenDayTrendService,
         private SenseReviewThirtyDayCalendarService $senseReviewThirtyDayCalendarService,
+        private SenseReviewIntervalPreviewService $senseReviewIntervalPreviewService,
     ) {
     }
 
@@ -131,5 +133,29 @@ class SenseReviewController extends Controller
         $calendar = $this->senseReviewThirtyDayCalendarService->build($userId, $language);
 
         return response()->json($calendar);
+    }
+
+    /**
+     * ADR-0008: Read-only interval preview for the four rating buttons.
+     *
+     * Returns the projected due_at, interval_seconds, and next_state for
+     * each of again/hard/good/easy. Does NOT write ReviewLog, does NOT
+     * modify FSRS, does NOT change the queue.
+     *
+     * Access: current user, current language, target_type=sense,
+     * fsrs_enabled=true, WordSense status=confirmed. Any failure → 404.
+     */
+    public function intervalPreview(int $reviewCardId, Request $request)
+    {
+        $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
+
+        $preview = $this->senseReviewIntervalPreviewService->preview($reviewCardId, $userId, $language);
+
+        if (!$preview) {
+            abort(404, 'Sense review card does not exist or is not previewable.');
+        }
+
+        return response()->json($preview);
     }
 }

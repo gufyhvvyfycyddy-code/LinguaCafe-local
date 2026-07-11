@@ -132,6 +132,54 @@ class FsrsSchedulingService
         ];
     }
 
+    /**
+     * ADR-0008: Batch pure projection for all four ratings.
+     *
+     * Calls schedule() once per rating and returns a structured array.
+     * This is the single method used by the interval-preview endpoint.
+     * It does NOT save, create ReviewLog, or modify the model.
+     *
+     * The rating order comes from ratings() — there is no second map.
+     *
+     * @return array<string, array{state: string, due_at: Carbon, stability: float, difficulty: float, lapses: int, reviewed_at: Carbon, interval_seconds: int}>
+     */
+    public function previewAllRatings(ReviewCard $card, ?Carbon $reviewedAt = null): array
+    {
+        $reviewedAt = $reviewedAt ?: Carbon::now();
+
+        $preview = [];
+        foreach ($this->ratings() as $rating) {
+            $schedule = $this->schedule($card, $rating, $reviewedAt);
+            $intervalSeconds = (int) max(0, $reviewedAt->diffInSeconds($schedule['due_at'], false));
+            $preview[$rating] = [
+                'state' => $schedule['state'],
+                'due_at' => $schedule['due_at'],
+                'stability' => $schedule['stability'],
+                'difficulty' => $schedule['difficulty'],
+                'lapses' => $schedule['lapses'],
+                'reviewed_at' => $schedule['reviewed_at'],
+                'interval_seconds' => $intervalSeconds,
+            ];
+        }
+
+        return $preview;
+    }
+
+    /**
+     * ADR-0008: Identify which engine was used for the last projection.
+     *
+     * Returns 'fsrs' when the extension is loaded, 'fallback' otherwise.
+     * Used by the preview service for the diagnostics-only `engine` field.
+     */
+    public function activeEngine(): string
+    {
+        if (extension_loaded('fsrs-rs-php') && class_exists('\fsrs\FSRS') && function_exists('get_default_parameters')) {
+            return 'fsrs';
+        }
+
+        return 'fallback';
+    }
+
     private function extensionItemState(ReviewCard $card, string $rating, Carbon $reviewedAt): ?array
     {
         if (!extension_loaded('fsrs-rs-php') || !class_exists('\fsrs\FSRS') || !function_exists('get_default_parameters')) {

@@ -467,3 +467,14 @@ The unique constraint on `review_cards` `(user_id, language_id, target_type, tar
 - **DeepLink Helper**: pure functions only. No API calls, no Vue imports, no DOM access.
 - **Seven-day trend window**: unchanged (today + previous 6 natural days, NOT natural week). ADR-0007 explicitly does NOT touch `SenseReviewSevenDayTrendService` / `SenseReviewReportPeriodService` / `SenseReviewSevenDayTrend.vue`.
 - **No FSRS / ReviewLog / DB schema change**: the entire deep link flow is read-only.
+
+## 10. Answer Interval Preview (ADR-0008)
+
+### 10.1 Overview
+
+ADR-0008 adds a read-only interval-preview feature so the SenseReview page can show the estimated next-review interval on each of the four rating buttons (Anki Answer Buttons UX). Preview and real rating share the same scheduling core — no second scheduler exists.
+
+- **`FsrsSchedulingService::previewAllRatings(ReviewCard $card, ?Carbon $reviewedAt = null): array`**: pure projection. Calls the existing `schedule()` once per rating (`again` / `hard` / `good` / `easy`, order from `SenseReviewRatingContract::allowedRatings()`). Does NOT save the model, does NOT create a `ReviewLog`, does NOT mutate any field. Both `ReviewCardService::recordReview()` (real rating) and the preview path call the same `schedule()` core.
+- **`SenseReviewIntervalPreviewService::preview()`**: handles access control — user + language + `target_type=sense` + confirmed WordSense + `fsrs_enabled` — then delegates to `FsrsSchedulingService::previewAllRatings()`. It is the only service the Controller calls; the Controller does not duplicate access checks.
+- **Endpoint**: `GET /reviews/senses/{reviewCard}/interval-preview` — read-only. Returns per-rating projected `due_at` / `interval` / `state` / `stability` / `difficulty` / `lapses`. GET-only; no ReviewLog write; no FSRS mutation; no DB schema change.
+- **Constraints**: no FSRS write, no ReviewLog, no WordSense/ReviewCard creation/update/delete, no new migration. The preview helps the user understand the consequence of each rating; it does not make the decision for them.

@@ -123,6 +123,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/reviews/senses/daily-report', [App\Http\Controllers\SenseReviewController::class, 'dailyReport']);
     Route::get('/reviews/senses/seven-day-trend', [App\Http\Controllers\SenseReviewController::class, 'sevenDayTrend']);
     Route::get('/reviews/senses/thirty-day-calendar', [App\Http\Controllers\SenseReviewController::class, 'thirtyDayCalendar']);
+    Route::get('/reviews/senses/{reviewCardId}/interval-preview', [App\Http\Controllers\SenseReviewController::class, 'intervalPreview']);
     Route::get('/senses/review', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);

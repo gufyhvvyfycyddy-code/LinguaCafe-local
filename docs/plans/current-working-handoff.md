@@ -114,6 +114,7 @@
   - 普通查词 UI 的旧版释义入口已完成最小隐藏，兼容字段和后端 legacy 兼容层未删除；
   - Finished reading 自动 known 分支新增测试护栏，并修复当前语言过滤缺口；
   - 本地 MySQL 未启动时 PHP Feature tests 会被数据库连接阻塞，不能用 SQLite 可靠替代（旧迁移含 MySQL collation）。
+- **ADR-0008 SenseReview 答案间隔预览已创建**：`docs/adr/ADR-0008-sense-review-answer-interval-preview.md` 已落地。`FsrsSchedulingService::previewAllRatings()` 纯投影方法（调用既有 `schedule()` 核心，不 save / 不写 ReviewLog / 不改模型）；`SenseReviewIntervalPreviewService` 负责访问控制（user + language + target_type=sense + confirmed WordSense + fsrs_enabled）后委托 previewAllRatings()；只读端点 `GET /reviews/senses/{reviewCard}/interval-preview` 已就绪。预览与真实评分共用同一 `schedule()` 核心，无 FSRS 写入 / ReviewLog / DB schema 变更。
 
 ## 4. 当前产品决策
 
