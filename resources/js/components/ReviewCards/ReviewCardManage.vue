@@ -45,9 +45,12 @@
         <v-alert v-if="statsError" type="warning" dense text class="mb-2">{{ statsError }}</v-alert>
         <div class="d-flex flex-wrap align-center mb-2" style="gap: 4px;">
             <span class="text-caption text--secondary mr-2">FSRS 总览：</span>
-            <v-chip v-for="chip in statsChips" :key="chip.label" x-small outlined class="mr-1 mb-1">
+            <v-chip v-for="(chip, idx) in statsChips" :key="idx" x-small outlined class="mr-1 mb-1">
                 {{ chip.label }} {{ chip.value }}
             </v-chip>
+            <v-btn x-small text color="info" class="ml-1 mb-1" @click="stateHelpDialog = true">
+                <v-icon x-small left>mdi-help-circle-outline</v-icon>状态说明
+            </v-btn>
         </div>
 
         <!-- Toolbar -->
@@ -69,8 +72,10 @@
                     <v-btn small value="all" @click="applyFilter('all')">全部</v-btn>
                     <v-btn small value="due" @click="applyFilter('due')">到期</v-btn>
                     <v-btn small value="future" @click="applyFilter('future')">未来到期</v-btn>
-                    <v-btn small value="enabled" @click="applyFilter('enabled')">未归档</v-btn>
-                    <v-btn small value="disabled" @click="applyFilter('disabled')">已归档</v-btn>
+                    <v-btn small value="active" @click="applyFilter('active')">学习中</v-btn>
+                    <v-btn small value="buried" @click="applyFilter('buried')">已埋藏</v-btn>
+                    <v-btn small value="suspended" @click="applyFilter('suspended')">已暂停</v-btn>
+                    <v-btn small value="archived" @click="applyFilter('archived')">已归档</v-btn>
                     <v-btn small value="missing_definition" @click="applyFilter('missing_definition')">缺释义</v-btn>
                     <v-btn small value="missing_example" @click="applyFilter('missing_example')">缺例句</v-btn>
                     <v-btn small value="missing_source" @click="applyFilter('missing_source')">缺溯源</v-btn>
@@ -247,8 +252,39 @@
                 @change="toggleSelectAll"
             />
             <span class="mr-4 body-2">已选 <strong>{{ selectedIds.length }}</strong> 项</span>
-            <v-btn small color="warning" class="mr-2" @click="bulkArchive">批量归档</v-btn>
-            <v-btn small color="success" class="mr-2" @click="bulkRestore">批量恢复</v-btn>
+            <!-- ADR-0010: Batch lifecycle operations. Uses
+                 POST /review-cards/manage/bulk-lifecycle endpoint.
+                 Bulk bury/reset/delete are NOT supported. -->
+            <v-menu offset-y>
+                <template #activator="{ on, attrs }">
+                    <v-btn small color="primary" class="mr-2" v-bind="attrs" v-on="on" :disabled="bulkLifecycleLoading">
+                        <v-icon small left>mdi-state-machine</v-icon>批量生命周期
+                        <v-icon small right>mdi-chevron-down</v-icon>
+                    </v-btn>
+                </template>
+                <v-list dense>
+                    <v-list-item :disabled="bulkLifecycleLoading" @click="confirmBulkLifecycle('suspend')">
+                        <v-list-item-icon><v-icon small>mdi-pause-circle-outline</v-icon></v-list-item-icon>
+                        <v-list-item-title>批量暂停</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item :disabled="bulkLifecycleLoading" @click="confirmBulkLifecycle('resume')">
+                        <v-list-item-icon><v-icon small>mdi-play-circle-outline</v-icon></v-list-item-icon>
+                        <v-list-item-title>批量恢复复习</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item :disabled="bulkLifecycleLoading" @click="confirmBulkLifecycle('archive')">
+                        <v-list-item-icon><v-icon small>mdi-archive</v-icon></v-list-item-icon>
+                        <v-list-item-title>批量归档</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item :disabled="bulkLifecycleLoading" @click="confirmBulkLifecycle('restore')">
+                        <v-list-item-icon><v-icon small>mdi-archive-arrow-up</v-icon></v-list-item-icon>
+                        <v-list-item-title>批量恢复归档</v-list-item-title>
+                    </v-list-item>
+                    <v-list-item :disabled="bulkLifecycleLoading" @click="confirmBulkLifecycle('unbury')">
+                        <v-list-item-icon><v-icon small>mdi-alarm-check</v-icon></v-list-item-icon>
+                        <v-list-item-title>批量解除埋藏</v-list-item-title>
+                    </v-list-item>
+                </v-list>
+            </v-menu>
             <v-btn small color="error" class="mr-2" @click="confirmBulkDelete">批量彻底删除</v-btn>
             <v-spacer />
             <v-btn small text @click="clearSelection">取消选择</v-btn>
@@ -344,8 +380,8 @@
                                 {{ item.source_display_label || item.source_chapter_title || sourceKindLabel(item.source_kind) }}
                             </td>
                             <td class="col-status">
-                                <v-chip x-small :color="item.fsrs_enabled ? 'success' : 'grey'">
-                                    {{ item.fsrs_enabled ? '未归档' : '已归档' }}
+                                <v-chip x-small :color="stateColor(item.lifecycle_state)">
+                                    {{ stateLabel(item.lifecycle_state) }}
                                 </v-chip>
                                 <span class="text-caption d-block">{{ item.fsrs_state }}</span>
                             </td>
@@ -367,9 +403,36 @@
                                 <template v-else>
                                     <v-btn x-small text @click="startEdit(item)">编辑</v-btn>
                                     <v-btn x-small text @click="openDetail(item)">详情</v-btn>
-                                    <v-btn v-if="item.fsrs_enabled" x-small text color="warning" @click="confirmArchive(item)">归档</v-btn>
-                                    <v-btn v-else x-small text color="success" @click="confirmRestore(item)">恢复</v-btn>
-                                    <v-btn v-if="item.fsrs_enabled" x-small text @click="confirmDueNow(item)">立即到期</v-btn>
+                                    <!-- ADR-0010: Lifecycle action menu. Fetches the
+                                         descriptor on open to show only available
+                                         actions. The backend validates all transitions. -->
+                                    <v-menu offset-y @input="onLifecycleMenuToggle($event, item)">
+                                        <template #activator="{ on, attrs }">
+                                            <v-btn x-small text v-bind="attrs" v-on="on" :disabled="lifecycleLoading">
+                                                生命周期
+                                            </v-btn>
+                                        </template>
+                                        <v-list dense>
+                                            <div v-if="lifecycleMenuId === item.review_card_id && !lifecycleDescriptor" class="text-caption text--secondary pa-2">
+                                                加载中...
+                                            </div>
+                                            <v-list-item
+                                                v-for="lifecycleAction in availableLifecycleActions"
+                                                :key="lifecycleAction"
+                                                :disabled="lifecycleLoading"
+                                                @click="onLifecycleMenuClick(lifecycleAction, item)"
+                                            >
+                                                <v-list-item-icon>
+                                                    <v-icon small :color="actionColor(lifecycleAction)">{{ lifecycleActionIcon(lifecycleAction) }}</v-icon>
+                                                </v-list-item-icon>
+                                                <v-list-item-title>{{ actionLabel(lifecycleAction) }}</v-list-item-title>
+                                            </v-list-item>
+                                            <div v-if="lifecycleMenuId === item.review_card_id && lifecycleDescriptor && availableLifecycleActions.length === 0" class="text-caption text--secondary pa-2">
+                                                无可用操作
+                                            </div>
+                                        </v-list>
+                                    </v-menu>
+                                    <v-btn v-if="item.lifecycle_state === 'active'" x-small text @click="confirmDueNow(item)">立即到期</v-btn>
                                     <v-menu offset-y>
                                         <template #activator="{ on, attrs }">
                                             <v-btn x-small text v-bind="attrs" v-on="on">更多</v-btn>
@@ -473,8 +536,8 @@
                             <div class="detail-row">
                                 <span class="detail-label">状态</span>
                                 <span class="detail-value">
-                                    <v-chip x-small :color="detailTarget.fsrs_enabled ? 'success' : 'grey'">
-                                        {{ detailTarget.fsrs_enabled ? '未归档' : '已归档' }}
+                                    <v-chip x-small :color="stateColor(detailTarget.lifecycle_state)">
+                                        {{ stateLabel(detailTarget.lifecycle_state) }}
                                     </v-chip>
                                 </span>
                             </div>
@@ -574,6 +637,58 @@
                             <div class="detail-row">
                                 <span class="detail-label">遗忘次数</span>
                                 <span class="detail-value">{{ displayValue(detailTarget.fsrs_lapses, 0) }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- ADR-0010: 生命周期信息 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">生命周期</div>
+                            <div class="detail-row">
+                                <span class="detail-label">当前状态</span>
+                                <span class="detail-value">
+                                    <v-chip x-small :color="stateColor(detailTarget.lifecycle_state)">
+                                        {{ stateLabel(detailTarget.lifecycle_state) }}
+                                    </v-chip>
+                                </span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">埋藏到期</span>
+                                <span class="detail-value">{{ detailTarget.buried_until ? formatDateTime(detailTarget.buried_until) : '—' }}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">状态变更时间</span>
+                                <span class="detail-value">{{ detailTarget.lifecycle_changed_at ? formatDateTime(detailTarget.lifecycle_changed_at) : '—' }}</span>
+                            </div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
+                        <!-- ADR-0010: 生命周期记录 -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">生命周期记录</div>
+                            <div v-if="detailEventsLoading" class="text-caption text--secondary py-2">加载生命周期记录中...</div>
+                            <div v-else-if="detailEventsError" class="text-caption error--text py-2">{{ detailEventsError }}</div>
+                            <div v-else-if="detailEvents.length === 0" class="text-caption text--secondary py-2">暂无生命周期记录。</div>
+                            <div v-else>
+                                <div
+                                    v-for="event in detailEvents"
+                                    :key="event.id"
+                                    class="log-entry mb-2 pa-2"
+                                >
+                                    <div class="d-flex align-center" style="gap: 6px;">
+                                        <v-chip x-small :color="actionColor(event.action)">{{ actionLabel(event.action) }}</v-chip>
+                                        <span class="text-caption">| {{ event.source }}</span>
+                                        <v-spacer />
+                                        <span class="text-caption text--secondary">{{ formatDateTime(event.created_at) }}</span>
+                                    </div>
+                                    <div class="text-caption mt-1">
+                                        <span :class="event.previous_state ? '' : 'text--secondary'">{{ stateLabel(event.previous_state) }}</span>
+                                        <span class="mx-1">→</span>
+                                        <span :class="event.new_state ? '' : 'text--secondary'">{{ stateLabel(event.new_state) }}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -694,6 +809,54 @@
             </v-card>
         </v-dialog>
 
+        <!-- ADR-0010: Lifecycle confirmation dialog (generic)
+             Used for moderate lifecycle actions (suspend/archive/restore).
+             Safe actions (bury/unbury/resume) execute immediately. -->
+        <v-dialog v-model="lifecycleDialog" max-width="480">
+            <v-card>
+                <v-card-title>{{ lifecycleDialogTitle }}</v-card-title>
+                <v-card-text>
+                    <p>{{ lifecycleDialogHint }}</p>
+                    <v-alert v-if="lifecycleConflict" type="error" dense text class="mt-2 mb-0">
+                        {{ lifecycleConflict }}
+                    </v-alert>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="lifecycleDialog = false" :disabled="lifecycleLoading">取消</v-btn>
+                    <v-btn :color="lifecycleDialogColor" :loading="lifecycleLoading" @click="performLifecycleAction">确认</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- ADR-0010: Bulk lifecycle confirmation dialog.
+             Replaces the legacy bulk-archive / bulk-restore dialogs.
+             Shows the action label, hint, and selected count. -->
+        <v-dialog v-model="bulkLifecycleDialog" max-width="520">
+            <v-card>
+                <v-card-title>{{ bulkLifecycleDialogTitle }}</v-card-title>
+                <v-card-text>
+                    <p class="review-card-manage-bulk-lifecycle-scope">
+                        只会处理你当前勾选的 {{ selectedIds.length }} 张复习卡，不会按筛选条件全量操作。
+                    </p>
+                    <p class="review-card-manage-bulk-lifecycle-hint">{{ bulkLifecycleDialogHint }}</p>
+                    <p class="review-card-manage-bulk-lifecycle-note text--secondary">
+                        跳过当前状态不允许该操作的卡片；不删除词义或复习历史。
+                    </p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="bulkLifecycleDialog = false" :disabled="bulkLifecycleLoading">取消</v-btn>
+                    <v-btn
+                        :color="bulkLifecycleDialogColor"
+                        :loading="bulkLifecycleLoading"
+                        class="review-card-manage-bulk-lifecycle-confirm"
+                        @click="doBulkLifecycle"
+                    >确认</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Due now confirmation dialog -->
         <v-dialog v-model="dueNowDialog" max-width="480">
             <v-card>
@@ -769,34 +932,35 @@
             </v-card>
         </v-dialog>
 
-        <!-- Bulk archive confirmation dialog -->
-        <v-dialog v-model="bulkArchiveDialog" max-width="500">
+        <!-- ADR-0010: State explanation dialog.
+             Shows the four lifecycle states with labels, colors, and
+             one-line hints. Reset and delete are noted as separate
+             operations (not lifecycle states). -->
+        <v-dialog v-model="stateHelpDialog" max-width="560">
             <v-card>
-                <v-card-title class="review-card-manage-bulk-archive-title">批量归档选中的复习卡？</v-card-title>
+                <v-card-title>复习卡生命周期状态说明</v-card-title>
                 <v-card-text>
-                    <p class="review-card-manage-bulk-archive-scope">只会归档你当前勾选的复习卡，不会按筛选条件全量操作。</p>
-                    <p class="review-card-manage-bulk-archive-note text--secondary">归档后，这些卡不会进入日常复习。不会删除词义或复习历史。</p>
+                    <v-list dense>
+                        <v-list-item v-for="state in lifecycleStateHelpEntries" :key="state.key">
+                            <v-list-item-icon>
+                                <v-chip x-small :color="state.color">{{ state.label }}</v-chip>
+                            </v-list-item-icon>
+                            <v-list-item-content>
+                                <v-list-item-subtitle>{{ state.hint }}</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list>
+                    <v-divider class="my-3" />
+                    <p class="text--secondary text-body-2 mb-1">
+                        <strong>重置</strong>：清空 FSRS 调度进度，不影响生命周期状态。
+                    </p>
+                    <p class="text--secondary text-body-2 mb-0">
+                        <strong>删除</strong>：永久移除复习卡，独立于生命周期状态。
+                    </p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
-                    <v-btn text @click="bulkArchiveDialog = false">取消</v-btn>
-                    <v-btn color="warning" class="review-card-manage-bulk-archive-confirm" @click="doBulkArchive">确认批量归档</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- Bulk restore confirmation dialog -->
-        <v-dialog v-model="bulkRestoreDialog" max-width="500">
-            <v-card>
-                <v-card-title class="review-card-manage-bulk-restore-title">批量恢复选中的复习卡？</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-bulk-restore-scope">只会恢复你当前勾选的复习卡，不会按筛选条件全量操作。</p>
-                    <p class="review-card-manage-bulk-restore-note text--secondary">恢复后，这些卡会重新进入日常复习。不会重置复习进度。</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="bulkRestoreDialog = false">取消</v-btn>
-                    <v-btn color="success" class="review-card-manage-bulk-restore-confirm" @click="doBulkRestore">确认批量恢复</v-btn>
+                    <v-btn text @click="stateHelpDialog = false">关闭</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -816,6 +980,16 @@ import axios from 'axios';
 import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
 import { DefaultLocalStorageManager } from '../../services/LocalStorageManagerService.js';
 import { parseReviewCardManageLocation } from '../../services/ReviewCardManageDeepLink.js';
+import {
+    actionLabel,
+    actionHint,
+    actionDangerLevel,
+    actionColor,
+    stateLabel,
+    stateColor,
+    LIFECYCLE_PRESENTATION,
+    LIFECYCLE_STATES,
+} from '../../services/ReviewCardLifecyclePresentation.js';
 
 export default {
     components: {
@@ -834,8 +1008,8 @@ export default {
             loading: false,
             error: '',
             searchQuery: '',
-            activeFilter: 'enabled',
-            currentFilter: 'enabled',
+            activeFilter: 'active',
+            currentFilter: 'active',
             perPage: 20,
             currentPage: 1,
             sortBy: 'id',
@@ -850,6 +1024,26 @@ export default {
             detailLogs: [],
             detailLogsLoading: false,
             detailLogsError: '',
+            // ADR-0010: Lifecycle state machine per-row actions
+            // lifecycleMenuId: review_card_id whose lifecycle menu is open
+            // lifecycleDescriptor: cached descriptor for the open menu
+            // lifecycleLoading: true while a lifecycle POST is in flight
+            // lifecycleDialog: generic confirmation dialog
+            // lifecycleDialogAction: action being confirmed
+            // lifecycleDialogTarget: card being acted on
+            // lifecycleConflict: 409/422 error message in the dialog
+            // detailEvents: lifecycle state events for the detail drawer
+            // detailEventsLoading / detailEventsError
+            lifecycleMenuId: null,
+            lifecycleDescriptor: null,
+            lifecycleLoading: false,
+            lifecycleDialog: false,
+            lifecycleDialogAction: null,
+            lifecycleDialogTarget: null,
+            lifecycleConflict: '',
+            detailEvents: [],
+            detailEventsLoading: false,
+            detailEventsError: '',
             archiveDialog: false,
             archiveTarget: null,
             restoreDialog: false,
@@ -861,9 +1055,13 @@ export default {
             resetLoading: false,
             deleteDialog: false,
             deleteTarget: null,
-            bulkArchiveDialog: false,
-            bulkRestoreDialog: false,
             bulkDeleteDialog: false,
+            // ADR-0010: Bulk lifecycle operations
+            bulkLifecycleLoading: false,
+            bulkLifecycleDialog: false,
+            bulkLifecycleAction: null,
+            // ADR-0010: State explanation dialog
+            stateHelpDialog: false,
             selectedIds: [],
             selectAll: false,
             snackbar: { show: false, text: '', color: 'success' },
@@ -983,6 +1181,9 @@ export default {
                 { key: 'fsrs_lapses', label: '遗忘次数' },
                 { key: 'fsrs_last_reviewed_at', label: '最近复习' },
                 { key: 'fsrs_enabled', label: '是否启用' },
+                { key: 'lifecycle_state', label: '生命周期状态' },
+                { key: 'buried_until', label: '埋藏到期' },
+                { key: 'lifecycle_changed_at', label: '状态变更时间' },
                 { key: 'missing_definition', label: '缺释义' },
                 { key: 'missing_example', label: '缺例句' },
                 { key: 'missing_source', label: '缺溯源' },
@@ -999,8 +1200,10 @@ export default {
         statsChips() {
             return [
                 { label: '总词义卡', value: this.fsrsStats.total },
-                { label: '启用中', value: this.fsrsStats.enabled },
-                { label: '已归档', value: this.fsrsStats.archived },
+                { label: '学习中', value: this.fsrsStats.active || 0 },
+                { label: '已埋藏', value: this.fsrsStats.buried || 0 },
+                { label: '已暂停', value: this.fsrsStats.suspended || 0 },
+                { label: '已归档', value: this.fsrsStats.archived || 0 },
                 { label: '当前到期', value: this.fsrsStats.due },
                 { label: '新卡', value: this.fsrsStats.by_state.new },
                 { label: '学习中', value: this.fsrsStats.by_state.learning },
@@ -1060,6 +1263,66 @@ export default {
         },
         hiddenBulkDeleteCount() {
             return Math.max(this.selectedBulkDeleteItems.length - 20, 0);
+        },
+        // ADR-0010: Available lifecycle actions for the open menu, from
+        // the backend descriptor. Empty when descriptor not loaded.
+        availableLifecycleActions() {
+            if (!this.lifecycleDescriptor) {
+                return [];
+            }
+            return this.lifecycleDescriptor.available_actions || [];
+        },
+        // Generic lifecycle dialog title.
+        lifecycleDialogTitle() {
+            if (!this.lifecycleDialogAction) {
+                return '';
+            }
+            return '确认' + actionLabel(this.lifecycleDialogAction);
+        },
+        // Generic lifecycle dialog hint text.
+        lifecycleDialogHint() {
+            if (!this.lifecycleDialogAction) {
+                return '';
+            }
+            return actionHint(this.lifecycleDialogAction);
+        },
+        // Generic lifecycle dialog button color.
+        lifecycleDialogColor() {
+            if (!this.lifecycleDialogAction) {
+                return 'primary';
+            }
+            return actionColor(this.lifecycleDialogAction);
+        },
+        // Bulk lifecycle dialog title.
+        bulkLifecycleDialogTitle() {
+            if (!this.bulkLifecycleAction) {
+                return '';
+            }
+            return '批量' + actionLabel(this.bulkLifecycleAction) + '选中的复习卡？';
+        },
+        // Bulk lifecycle dialog hint text.
+        bulkLifecycleDialogHint() {
+            if (!this.bulkLifecycleAction) {
+                return '';
+            }
+            return actionHint(this.bulkLifecycleAction);
+        },
+        // Bulk lifecycle dialog button color.
+        bulkLifecycleDialogColor() {
+            if (!this.bulkLifecycleAction) {
+                return 'primary';
+            }
+            return actionColor(this.bulkLifecycleAction);
+        },
+        // ADR-0010: State explanation entries for the help dialog.
+        // Derived from the single source of truth in LIFECYCLE_PRESENTATION.
+        lifecycleStateHelpEntries() {
+            return LIFECYCLE_STATES.map((key) => ({
+                key: key,
+                label: LIFECYCLE_PRESENTATION[key].label,
+                color: LIFECYCLE_PRESENTATION[key].color,
+                hint: LIFECYCLE_PRESENTATION[key].hint,
+            }));
         },
     },
     mounted() {
@@ -1289,6 +1552,118 @@ export default {
             });
         },
 
+        // ==================== Lifecycle (ADR-0010) ====================
+        // Per-row lifecycle actions via POST /review-cards/{id}/lifecycle-actions.
+        // The descriptor is fetched on menu open so the frontend never
+        // replicates the state machine — the backend is the sole authority.
+        // Thin wrappers exposing the pure presentation helpers to the template.
+        // Vue 2 templates can only call functions registered on the instance.
+        stateColor,
+        stateLabel,
+        actionLabel,
+        actionColor,
+        // Map a lifecycle action to an MDI icon name.
+        lifecycleActionIcon(action) {
+            const icons = {
+                bury: 'mdi-alarm-snooze',
+                unbury: 'mdi-alarm-check',
+                suspend: 'mdi-pause-circle-outline',
+                resume: 'mdi-play-circle-outline',
+                archive: 'mdi-archive',
+                restore: 'mdi-archive-arrow-up',
+            };
+            return icons[action] || 'mdi-circle-medium';
+        },
+        // Menu open/close handler — fetches descriptor on open, clears on close.
+        onLifecycleMenuToggle(isOpen, item) {
+            if (isOpen) {
+                this.lifecycleMenuId = item.review_card_id;
+                this.lifecycleDescriptor = null;
+                this.fetchLifecycleDescriptor(item.review_card_id);
+            } else {
+                // Delay clearing so the click handler can fire before the menu closes
+                setTimeout(() => {
+                    if (!this.lifecycleLoading) {
+                        this.lifecycleMenuId = null;
+                        this.lifecycleDescriptor = null;
+                    }
+                }, 200);
+            }
+        },
+        fetchLifecycleDescriptor(cardId) {
+            axios.get('/review-cards/' + cardId + '/lifecycle')
+                .then((response) => {
+                    this.lifecycleDescriptor = response.data.lifecycle || null;
+                })
+                .catch(() => {
+                    this.lifecycleDescriptor = null;
+                });
+        },
+        // Menu click handler: safe actions execute immediately,
+        // moderate actions open the confirmation dialog.
+        onLifecycleMenuClick(action, item) {
+            const dangerLevel = actionDangerLevel(action);
+            if (dangerLevel === 'safe') {
+                this.executeLifecycleAction(action, item);
+            } else {
+                this.lifecycleDialogAction = action;
+                this.lifecycleDialogTarget = item;
+                this.lifecycleConflict = '';
+                this.lifecycleDialog = true;
+            }
+        },
+        // Execute a lifecycle action via POST.
+        executeLifecycleAction(action, item) {
+            const expectedVersion = this.lifecycleDescriptor
+                ? this.lifecycleDescriptor.version
+                : null;
+            const requestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                ? window.crypto.randomUUID()
+                : ('lc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+
+            this.lifecycleLoading = true;
+            axios.post('/review-cards/' + item.review_card_id + '/lifecycle-actions', {
+                action: action,
+                request_id: requestId,
+                expected_version: expectedVersion,
+                source: 'review_card_manage',
+            }).then((response) => {
+                this.lifecycleDialog = false;
+                const label = actionLabel(action);
+                const alreadyApplied = response.data?.already_applied;
+                this.showSnackbar(
+                    alreadyApplied ? label + '：该操作已应用过。' : '已' + label + '。',
+                    'success'
+                );
+                this.loadData();
+                this.loadFsrsStats();
+            }).catch((err) => {
+                const status = err.response?.status;
+                if (status === 409) {
+                    this.lifecycleConflict = '卡片状态已在其他页面发生变化，已刷新最新状态。';
+                    this.fetchLifecycleDescriptor(item.review_card_id);
+                } else if (status === 422) {
+                    this.lifecycleConflict = err.response?.data?.message || '该操作在当前状态下不可用。';
+                    this.fetchLifecycleDescriptor(item.review_card_id);
+                } else if (!err.response) {
+                    // Network error — keep dialog open for retry.
+                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
+                } else {
+                    this.showSnackbar(err.response?.data?.message || '操作失败。', 'error');
+                    this.lifecycleDialog = false;
+                }
+            }).finally(() => {
+                this.lifecycleLoading = false;
+            });
+        },
+        // Dialog confirm handler.
+        performLifecycleAction() {
+            if (!this.lifecycleDialogAction || !this.lifecycleDialogTarget) {
+                return;
+            }
+            this.executeLifecycleAction(this.lifecycleDialogAction, this.lifecycleDialogTarget);
+        },
+
         confirmDueNow(item) {
             this.dueNowTarget = item;
             this.dueNowDialog = true;
@@ -1389,56 +1764,54 @@ export default {
                 });
         },
 
-        bulkArchive() {
+        // ADR-0010: Open the bulk lifecycle confirmation dialog.
+        // All five actions (suspend/resume/archive/restore/unbury) go
+        // through the same dialog and the same bulk-lifecycle endpoint.
+        confirmBulkLifecycle(action) {
             if (this.selectedIds.length === 0) return;
-            this.bulkArchiveDialog = true;
+            this.bulkLifecycleAction = action;
+            this.bulkLifecycleDialog = true;
         },
 
-        doBulkArchive() {
-            this.bulkArchiveDialog = false;
+        // ADR-0010: Execute the bulk lifecycle action via
+        // POST /review-cards/manage/bulk-lifecycle.
+        // The backend applies the action per-card and reports
+        // applied/skipped counts; illegal transitions are skipped,
+        // not raised as errors.
+        doBulkLifecycle() {
+            this.bulkLifecycleDialog = false;
             const ids = [...this.selectedIds];
+            const action = this.bulkLifecycleAction;
+            this.bulkLifecycleLoading = true;
 
-            axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: false })
-                .then((response) => {
-                    this.clearSelection();
-                    const data = response.data;
-                    let msg = data.message || '已批量归档。';
-                    if (data.skipped > 0) {
-                        msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
-                    }
-                    this.showSnackbar(msg, 'warning');
-                    this.loadData();
-                    this.loadFsrsStats();
-                })
-                .catch((err) => {
-                    this.error = '批量归档失败：' + (err.response?.data?.message || err.message);
-                });
-        },
-
-        bulkRestore() {
-            if (this.selectedIds.length === 0) return;
-            this.bulkRestoreDialog = true;
-        },
-
-        doBulkRestore() {
-            this.bulkRestoreDialog = false;
-            const ids = [...this.selectedIds];
-
-            axios.post('/review-cards/manage/bulk-enabled', { ids, enabled: true })
-                .then((response) => {
-                    this.clearSelection();
-                    const data = response.data;
-                    let msg = data.message || '已批量恢复。';
-                    if (data.skipped > 0) {
-                        msg += ' 其中有 ' + data.skipped + ' 张跳过处理。';
-                    }
-                    this.showSnackbar(msg, 'success');
-                    this.loadData();
-                    this.loadFsrsStats();
-                })
-                .catch((err) => {
-                    this.error = '批量恢复失败：' + (err.response?.data?.message || err.message);
-                });
+            axios.post('/review-cards/manage/bulk-lifecycle', {
+                ids: ids,
+                action: action,
+                source: 'review_card_manage_bulk',
+            }).then((response) => {
+                this.clearSelection();
+                const data = response.data || {};
+                const label = actionLabel(action);
+                let msg = `已批量${label}：应用 ${data.applied ?? ids.length} 张`;
+                if (data.skipped > 0) {
+                    msg += `，跳过 ${data.skipped} 张（当前状态不允许）`;
+                }
+                msg += '。';
+                this.showSnackbar(msg, data.skipped > 0 ? 'warning' : 'success');
+                this.loadData();
+                this.loadFsrsStats();
+            }).catch((err) => {
+                const status = err.response?.status;
+                if (status === 422) {
+                    this.showSnackbar(err.response?.data?.message || '请求参数有误。', 'error');
+                } else if (!err.response) {
+                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
+                } else {
+                    this.error = '批量操作失败：' + (err.response?.data?.message || err.message);
+                }
+            }).finally(() => {
+                this.bulkLifecycleLoading = false;
+            });
         },
 
         showSnackbar(text, color) {
@@ -1492,8 +1865,12 @@ export default {
             this.detailLogs = [];
             this.detailLogsLoading = false;
             this.detailLogsError = '';
+            this.detailEvents = [];
+            this.detailEventsLoading = false;
+            this.detailEventsError = '';
             this.detailDrawer = true;
             this.loadDetailLogs(item);
+            this.loadDetailEvents(item);
         },
 
         // --- Deep link (ADR-0007) ---
@@ -1547,6 +1924,9 @@ export default {
             this.detailLogs = [];
             this.detailLogsLoading = false;
             this.detailLogsError = '';
+            this.detailEvents = [];
+            this.detailEventsLoading = false;
+            this.detailEventsError = '';
         },
 
         loadDetailLogs(item) {
@@ -1561,6 +1941,21 @@ export default {
                 })
                 .finally(() => {
                     this.detailLogsLoading = false;
+                });
+        },
+
+        loadDetailEvents(item) {
+            this.detailEventsLoading = true;
+            this.detailEventsError = '';
+            axios.get('/review-cards/' + item.review_card_id + '/lifecycle-events')
+                .then((response) => {
+                    this.detailEvents = response.data.items || [];
+                })
+                .catch((err) => {
+                    this.detailEventsError = '加载生命周期记录失败：' + (err.response?.data?.message || err.message);
+                })
+                .finally(() => {
+                    this.detailEventsLoading = false;
                 });
         },
 

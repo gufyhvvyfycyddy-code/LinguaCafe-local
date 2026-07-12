@@ -84,8 +84,17 @@
                     </div>
                 </div>
                 <v-spacer></v-spacer>
+                <v-chip
+                    v-if="currentCardIsInactive"
+                    x-small
+                    :color="stateColor(currentCardLifecycleState)"
+                    class="mr-1"
+                >{{ stateLabel(currentCardLifecycleState) }}</v-chip>
                 <v-chip class="mr-1">{{ currentCard.fsrs_state }}</v-chip>
                 <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
+            </div>
+            <div v-if="buriedRemainingDisplay" class="caption warning--text mb-2">
+                {{ buriedRemainingDisplay }}
             </div>
 
             <!-- Question side -->
@@ -115,7 +124,7 @@
                     rounded
                     color="primary"
                     large
-                    :disabled="rating || archiveLoading || deleteLoading || resetLoading"
+                    :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
                     @click="showAnswer = true"
                 >
                     显示答案
@@ -145,18 +154,27 @@
                                 <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
                                 <v-list-item-title>编辑</v-list-item-title>
                             </v-list-item>
-                            <v-list-item @click="openArchiveDialog">
-                                <v-list-item-icon><v-icon small color="warning">mdi-archive</v-icon></v-list-item-icon>
-                                <v-list-item-title>归档</v-list-item-title>
+                            <v-divider v-if="availableLifecycleActions.length" class="my-1" />
+                            <v-list-item
+                                v-for="lifecycleAction in availableLifecycleActions"
+                                :key="lifecycleAction"
+                                :disabled="lifecycleLoading"
+                                @click="onLifecycleMenuClick(lifecycleAction)"
+                            >
+                                <v-list-item-icon>
+                                    <v-icon small :color="lifecycleActionColor(lifecycleAction)">{{ lifecycleActionIcon(lifecycleAction) }}</v-icon>
+                                </v-list-item-icon>
+                                <v-list-item-title>{{ lifecycleActionLabel(lifecycleAction) }}</v-list-item-title>
                             </v-list-item>
+                            <v-divider class="my-1" />
                             <v-list-item @click="openResetDialog">
                                 <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
-                                <v-list-item-title>重置</v-list-item-title>
+                                <v-list-item-title>重置学习进度</v-list-item-title>
                             </v-list-item>
                             <v-divider class="my-1" />
                             <v-list-item @click="openDeleteDialog">
                                 <v-list-item-icon><v-icon small color="error">mdi-delete</v-icon></v-list-item-icon>
-                                <v-list-item-title class="error--text">彻底删除</v-list-item-title>
+                                <v-list-item-title class="error--text">删除</v-list-item-title>
                             </v-list-item>
                         </v-list>
                     </v-menu>
@@ -241,7 +259,7 @@
                      props (1000-5) are passed down as pure display data;
                      preview loading/error NEVER disables the buttons. -->
                 <SenseReviewRatingControls
-                    :disabled="rating || archiveLoading || deleteLoading || resetLoading"
+                    :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
                     :interval-previews="intervalPreviews"
                     :preview-loading="intervalPreviewLoading"
                     :preview-error="intervalPreviewError"
@@ -263,17 +281,22 @@
             @saved="onCardSaved"
         />
 
-        <!-- Archive confirmation dialog -->
-        <v-dialog v-model="archiveDialog" max-width="480">
+        <!-- Lifecycle confirmation dialog (ADR-0010)
+             Generic dialog for moderate lifecycle actions (suspend/archive/restore).
+             Safe actions (bury/unbury/resume) execute immediately without this dialog. -->
+        <v-dialog v-model="lifecycleDialog" max-width="480">
             <v-card>
-                <v-card-title>确认归档</v-card-title>
+                <v-card-title>{{ lifecycleDialogTitle }}</v-card-title>
                 <v-card-text>
-                    归档后，这张词义卡不会进入日常复习，但释义、例句、复习历史都会保留。确定归档吗？
+                    <p>{{ lifecycleDialogHint }}</p>
+                    <v-alert v-if="lifecycleConflict" type="error" dense text class="mt-2 mb-0">
+                        {{ lifecycleConflict }}
+                    </v-alert>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
-                    <v-btn text @click="archiveDialog = false" :disabled="archiveLoading">取消</v-btn>
-                    <v-btn color="warning" :loading="archiveLoading" @click="archiveCard">确认归档</v-btn>
+                    <v-btn text @click="lifecycleDialog = false" :disabled="lifecycleLoading">取消</v-btn>
+                    <v-btn :color="lifecycleDialogColor" :loading="lifecycleLoading" @click="performLifecycleAction">确认</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -285,7 +308,10 @@
                 <v-card-text>
                     <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
                     <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
-                    <p>重置后，这张卡会立即重新进入复习队列。</p>
+                    <p v-if="currentCardIsInactive" class="warning--text">
+                        注意：此卡当前为「{{ stateLabel(currentCardLifecycleState) }}」状态，重置不会自动恢复到学习队列。请先恢复生命周期状态。
+                    </p>
+                    <p v-else>重置后，这张卡会立即重新进入复习队列。</p>
                     <p class="font-weight-bold">确定重置吗？</p>
                 </v-card-text>
                 <v-card-actions>
@@ -440,6 +466,17 @@
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
+    import {
+        MORE_MENU_ITEMS,
+        actionLabel,
+        actionHint,
+        actionDangerLevel,
+        actionColor,
+        stateLabel,
+        stateColor,
+        blockedReasonLabel,
+        buriedRemainingText,
+    } from '../../services/ReviewCardLifecyclePresentation.js';
 
     /**
      * SenseReview.vue — page container (refactored).
@@ -484,15 +521,24 @@
                 // Edit dialog (state reduced to visibility only; form + save
                 // logic live in SenseReviewEditDialog).
                 editDialog: false,
-                // Archive dialog
-                archiveDialog: false,
-                archiveLoading: false,
                 // Reset dialog
                 resetDialog: false,
                 resetLoading: false,
                 // Delete dialog
                 deleteDialog: false,
                 deleteLoading: false,
+                // Lifecycle state machine (ADR-0010)
+                // lifecycleDescriptor: cached descriptor from GET /review-cards/{id}/lifecycle.
+                //   Contains available_actions, effective_state, version, buried_until, etc.
+                // lifecycleLoading: true while a lifecycle POST is in flight.
+                // lifecycleDialog: generic confirmation dialog for moderate actions.
+                // lifecycleDialogAction: which action is being confirmed.
+                // lifecycleConflict: 409/422 error message shown inside the dialog.
+                lifecycleDescriptor: null,
+                lifecycleLoading: false,
+                lifecycleDialog: false,
+                lifecycleDialogAction: null,
+                lifecycleConflict: '',
                 // Source context dialog
                 sourceDialog: false,
                 sourcePayload: {},
@@ -586,6 +632,54 @@
             currentCard() {
                 return this.cards.length ? this.cards[0] : null;
             },
+            // ADR-0010: Available lifecycle actions for the current card,
+            // derived from the backend descriptor. Empty when descriptor
+            // is not loaded yet — the menu gracefully hides lifecycle items.
+            availableLifecycleActions() {
+                if (!this.lifecycleDescriptor) {
+                    return [];
+                }
+                return this.lifecycleDescriptor.available_actions || [];
+            },
+            // The effective lifecycle state of the current card.
+            currentCardLifecycleState() {
+                if (!this.lifecycleDescriptor) {
+                    return 'active';
+                }
+                return this.lifecycleDescriptor.effective_state || 'active';
+            },
+            // Whether the current card is NOT in active state (for badge).
+            currentCardIsInactive() {
+                return this.currentCardLifecycleState !== 'active';
+            },
+            // Human-readable remaining time for a buried card.
+            buriedRemainingDisplay() {
+                if (!this.lifecycleDescriptor || !this.lifecycleDescriptor.buried_until) {
+                    return '';
+                }
+                return buriedRemainingText(this.lifecycleDescriptor.buried_until);
+            },
+            // Generic lifecycle dialog title.
+            lifecycleDialogTitle() {
+                if (!this.lifecycleDialogAction) {
+                    return '';
+                }
+                return '确认' + actionLabel(this.lifecycleDialogAction);
+            },
+            // Generic lifecycle dialog hint text.
+            lifecycleDialogHint() {
+                if (!this.lifecycleDialogAction) {
+                    return '';
+                }
+                return actionHint(this.lifecycleDialogAction);
+            },
+            // Generic lifecycle dialog button color.
+            lifecycleDialogColor() {
+                if (!this.lifecycleDialogAction) {
+                    return 'primary';
+                }
+                return actionColor(this.lifecycleDialogAction);
+            },
             remainingCount() {
                 return this.cards.length;
             },
@@ -655,12 +749,13 @@
             },
         },
         watch: {
-            // When the answer is revealed, fetch the interval preview for
-            // the current card. Preview is NEVER fetched before the answer
-            // is shown. Preview failure does not block rating.
+            // When the answer is revealed, fetch the interval preview and
+            // lifecycle descriptor for the current card. Neither is fetched
+            // before the answer is shown. Failures do not block rating.
             showAnswer(val) {
                 if (val && this.currentCard) {
                     this.loadIntervalPreview();
+                    this.fetchLifecycleDescriptor();
                 }
             },
             // When the current card changes (new card loaded after rating,
@@ -674,6 +769,10 @@
                     this.intervalPreviewError = '';
                     this.intervalPreviewLoading = false;
                     this.intervalPreviewRequestSequence++;
+                    // ADR-0010: invalidate lifecycle descriptor cache on
+                    // card change so stale available_actions are never shown.
+                    this.lifecycleDescriptor = null;
+                    this.lifecycleConflict = '';
                 }
             },
         },
@@ -990,7 +1089,7 @@
                         return;
                     }
                     // No dialog that might be using Ctrl+Z for its own purpose.
-                    if (this.editDialog || this.archiveDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                    if (this.editDialog || this.lifecycleDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
                         return;
                     }
                     // No study report open.
@@ -1018,10 +1117,10 @@
                 if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
                     return;
                 }
-                if (this.editDialog || this.archiveDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                if (this.editDialog || this.lifecycleDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
                     return;
                 }
-                if (!this.currentCard || this.loading || this.rating || this.archiveLoading || this.resetLoading || this.deleteLoading) {
+                if (!this.currentCard || this.loading || this.rating || this.lifecycleLoading || this.resetLoading || this.deleteLoading) {
                     return;
                 }
                 switch (event.key) {
@@ -1107,31 +1206,130 @@
                         this.sourceDialog = true;
                     });
             },
-            // ==================== Archive ====================
-            openArchiveDialog() {
-                if (!this.currentCard) {
-                    return;
-                }
-                this.archiveDialog = true;
+            // ==================== Lifecycle (ADR-0010) ====================
+            // Lifecycle actions go through POST /review-cards/{id}/lifecycle-actions
+            // with { action, request_id, expected_version, source }.
+            // Reset and Delete keep their own dedicated endpoints.
+            // Thin wrappers exposing the pure presentation helpers to the template.
+            // Vue 2 templates can only call functions registered on the instance.
+            stateColor,
+            stateLabel,
+            // Map a lifecycle action to an MDI icon name.
+            lifecycleActionIcon(action) {
+                const icons = {
+                    bury: 'mdi-alarm-snooze',
+                    unbury: 'mdi-alarm-check',
+                    suspend: 'mdi-pause-circle-outline',
+                    resume: 'mdi-play-circle-outline',
+                    archive: 'mdi-archive',
+                    restore: 'mdi-archive-arrow-up',
+                };
+                return icons[action] || 'mdi-circle-medium';
             },
-            archiveCard() {
+            // Label for a lifecycle action (delegates to presentation helper).
+            lifecycleActionLabel(action) {
+                return actionLabel(action);
+            },
+            // Color for a lifecycle action icon (delegates to presentation helper).
+            lifecycleActionColor(action) {
+                return actionColor(action);
+            },
+            // Fetch the lifecycle descriptor for the current card.
+            // Called when the answer is revealed. Non-blocking: on failure,
+            // the menu simply hides lifecycle items.
+            fetchLifecycleDescriptor() {
                 if (!this.currentCard) {
                     return;
                 }
+                axios.get(`/review-cards/${this.currentCard.review_card_id}/lifecycle`)
+                    .then((response) => {
+                        this.lifecycleDescriptor = response.data.lifecycle || null;
+                        this.lifecycleConflict = '';
+                    })
+                    .catch(() => {
+                        this.lifecycleDescriptor = null;
+                    });
+            },
+            // Menu click handler: safe actions execute immediately,
+            // moderate actions open the confirmation dialog.
+            onLifecycleMenuClick(action) {
+                if (!this.currentCard) {
+                    return;
+                }
+                const dangerLevel = actionDangerLevel(action);
+                if (dangerLevel === 'safe') {
+                    this.executeLifecycleAction(action);
+                } else {
+                    this.openLifecycleDialog(action);
+                }
+            },
+            openLifecycleDialog(action) {
+                this.lifecycleDialogAction = action;
+                this.lifecycleConflict = '';
+                this.lifecycleDialog = true;
+            },
+            // Execute a lifecycle action via POST. Used by both the
+            // immediate path (safe actions) and the dialog confirm button.
+            executeLifecycleAction(action) {
+                if (!this.currentCard) {
+                    return;
+                }
+                const expectedVersion = this.lifecycleDescriptor
+                    ? this.lifecycleDescriptor.version
+                    : null;
+                const requestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
+                    ? window.crypto.randomUUID()
+                    : ('lc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
 
-                this.archiveLoading = true;
-                axios.patch(`/review-cards/manage/${this.currentCard.review_card_id}/enabled`, {
-                    enabled: false,
-                }).then(() => {
-                    this.archiveDialog = false;
-                    this.showSnackbar('已归档。该卡不会进入日常复习。', 'success');
+                this.lifecycleLoading = true;
+                axios.post(`/review-cards/${this.currentCard.review_card_id}/lifecycle-actions`, {
+                    action: action,
+                    request_id: requestId,
+                    expected_version: expectedVersion,
+                    source: 'sense_review',
+                }).then((response) => {
+                    this.lifecycleDialog = false;
+                    const label = actionLabel(action);
+                    const alreadyApplied = response.data?.already_applied;
+                    this.showSnackbar(
+                        alreadyApplied ? `${label}：该操作已应用过。` : `已${label}。`,
+                        'success'
+                    );
                     this.loadCards();
                     this.loadFsrsStats();
+                    // Refresh descriptor after the queue reloads so the
+                    // next card's available_actions are correct.
+                    this.$nextTick(() => {
+                        this.fetchLifecycleDescriptor();
+                    });
                 }).catch((err) => {
-                    this.showSnackbar(err.response?.data?.message || '归档失败。', 'error');
+                    const status = err.response?.status;
+                    if (status === 409) {
+                        // Version conflict: card state changed elsewhere.
+                        this.lifecycleConflict = '卡片状态已在其他页面发生变化，已刷新最新状态。';
+                        this.fetchLifecycleDescriptor();
+                    } else if (status === 422) {
+                        // Illegal transition or validation error.
+                        this.lifecycleConflict = err.response?.data?.message || '该操作在当前状态下不可用。';
+                        this.fetchLifecycleDescriptor();
+                    } else if (!err.response) {
+                        // Network error — keep dialog open for retry.
+                        this.showSnackbar('网络错误，请检查连接后重试。', 'error');
+                    } else {
+                        this.showSnackbar(err.response?.data?.message || '操作失败。', 'error');
+                        this.lifecycleDialog = false;
+                    }
                 }).finally(() => {
-                    this.archiveLoading = false;
+                    this.lifecycleLoading = false;
                 });
+            },
+            // Dialog confirm handler — calls executeLifecycleAction with
+            // the action currently selected in the dialog.
+            performLifecycleAction() {
+                if (!this.lifecycleDialogAction) {
+                    return;
+                }
+                this.executeLifecycleAction(this.lifecycleDialogAction);
             },
             // ==================== Reset ====================
             openResetDialog() {
