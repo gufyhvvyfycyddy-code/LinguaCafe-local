@@ -186,7 +186,7 @@ class ReviewCardManageTest extends TestCase
     {
         $sense = $this->createSense($this->user->id, 'english');
         $card = $this->createSenseCard($sense);
-        $card->update(['fsrs_enabled' => false]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=disabled');
         $response->assertOk();
@@ -303,7 +303,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabled1']);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false]);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=enabled');
         $items = $response->json('items');
@@ -319,7 +319,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'dis1']);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false]);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=disabled');
         $items = $response->json('items');
@@ -839,7 +839,7 @@ class ReviewCardManageTest extends TestCase
         [$card, $sense] = $this->createTestSenseCard();
         $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}", [
             'sense_zh' => 'changed',
-            'fsrs_enabled' => false,
+            'fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
         ]);
         $this->assertTrue($card->fresh()->fsrs_enabled);
     }
@@ -920,7 +920,7 @@ class ReviewCardManageTest extends TestCase
     {
         $otherSense = $this->createSense($this->otherUser->id, 'english', ['lemma' => 'other']);
         $otherCard = $this->createSenseCard($otherSense);
-        $otherCard->update(['fsrs_enabled' => false]);
+        $otherCard->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$otherCard->id}/enabled", ['enabled' => true]);
         $this->assertTrue($response->status() === 404 || $response->status() === 403);
@@ -931,7 +931,7 @@ class ReviewCardManageTest extends TestCase
     {
         $senseEs = $this->createSense($this->user->id, 'spanish', ['lemma' => 'espanol']);
         $cardEs = $this->createSenseCard($senseEs);
-        $cardEs->update(['fsrs_enabled' => false]);
+        $cardEs->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->patch("/review-cards/manage/{$cardEs->id}/enabled", ['enabled' => true]);
         $this->assertTrue($response->status() === 404 || $response->status() === 403);
@@ -981,7 +981,7 @@ class ReviewCardManageTest extends TestCase
     public function test_enabled_toggle_to_true_only_changes_fsrs_enabled(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_state' => 'review', 'fsrs_stability' => 1.0, 'fsrs_difficulty' => 0.5, 'fsrs_reps' => 3, 'fsrs_lapses' => 1]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_state' => 'review', 'fsrs_stability' => 1.0, 'fsrs_difficulty' => 0.5, 'fsrs_reps' => 3, 'fsrs_lapses' => 1]);
         $oldLogCount = ReviewLog::count();
         $oldCardCount = ReviewCard::count();
 
@@ -1023,7 +1023,7 @@ class ReviewCardManageTest extends TestCase
     public function test_enable_does_not_change_fsrs_due_at(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDay()]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->addDay()]);
         $oldDue = $card->fresh()->fsrs_due_at;
 
         $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => true]);
@@ -1043,7 +1043,7 @@ class ReviewCardManageTest extends TestCase
     public function test_due_now_preserves_fsrs_enabled(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDay()]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->addDay()]);
         $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/due-now");
         $this->assertFalse($card->fresh()->fsrs_enabled);
     }
@@ -1412,7 +1412,7 @@ class ReviewCardManageTest extends TestCase
     public function test_archived_card_excluded_from_daily_review_queue(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->subHour()]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->subHour()]);
 
         $dueCards = app(\App\Services\SenseReviewService::class)
             ->dueCards($this->user->id, 'english')
@@ -1425,7 +1425,7 @@ class ReviewCardManageTest extends TestCase
     public function test_restored_due_card_re_enters_review_queue(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->subHour()]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->subHour()]);
 
         // Verify excluded before restore
         $dueBefore = app(\App\Services\SenseReviewService::class)
@@ -1450,7 +1450,7 @@ class ReviewCardManageTest extends TestCase
     public function test_restore_does_not_change_fsrs_due_at(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDay()]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->addDay()]);
         $oldDue = $card->fresh()->fsrs_due_at;
 
         $this->actingAs($this->user)->patch("/review-cards/manage/{$card->id}/enabled", ['enabled' => true]);
@@ -1462,7 +1462,7 @@ class ReviewCardManageTest extends TestCase
     {
         [$card, $sense] = $this->createTestSenseCard();
         // Card is archived and due in the future
-        $card->update(['fsrs_enabled' => false, 'fsrs_due_at' => now()->addDays(7)]);
+        $card->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_due_at' => now()->addDays(7)]);
 
         $dueCards = app(\App\Services\SenseReviewService::class)
             ->dueCards($this->user->id, 'english')
@@ -1494,7 +1494,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabled_one']);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false]);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         // Default request without filter parameter
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
@@ -1690,9 +1690,9 @@ class ReviewCardManageTest extends TestCase
     public function test_bulk_enabled_restores_multiple_cards(): void
     {
         [$card1, $sense1] = $this->createTestSenseCard();
-        $card1->update(['fsrs_enabled' => false]);
+        $card1->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
         [$card2, $sense2] = $this->createTestSenseCard();
-        $card2->update(['fsrs_enabled' => false, 'lemma' => 'test2']);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'lemma' => 'test2']);
         $sense2->update(['lemma' => 'test2', 'surface_form' => 'test2', 'sense_key' => hash('sha256', 'english|test2|noun|测试|test')]);
 
         $response = $this->actingAs($this->user)->post('/review-cards/manage/bulk-enabled', [
@@ -2965,7 +2965,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabledNew', 'sense_key' => hash('sha256', 'english|disabledNew|noun|测试|test')]);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false, 'fsrs_state' => 'new']);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED, 'fsrs_state' => 'new']);
 
         // filter=enabled + fsrs_states=new → only enabled new card
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=enabled&fsrs_states[]=new');
@@ -3312,7 +3312,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disabledExport', 'sense_key' => hash('sha256', 'english|disabledExport|noun|测试|test')]);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false]);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=enabled');
         $response->assertOk();
@@ -3330,7 +3330,7 @@ class ReviewCardManageTest extends TestCase
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'disExp', 'sense_key' => hash('sha256', 'english|disExp|noun|测试|test')]);
         $card2 = $this->createSenseCard($sense2);
-        $card2->update(['fsrs_enabled' => false]);
+        $card2->update(['fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED]);
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/export?filter=disabled');
         $response->assertOk();
@@ -4469,19 +4469,21 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame(0, $card->fsrs_lapses);
     }
 
-    public function test_reset_sets_fsrs_enabled_true_and_clears_last_reviewed_at(): void
+    public function test_reset_clears_last_reviewed_at_but_preserves_lifecycle(): void
     {
         [$card, $sense] = $this->createTestSenseCard();
         $card->update([
             'fsrs_state' => 'review',
-            'fsrs_enabled' => false,
+            'fsrs_enabled' => false, 'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
             'fsrs_last_reviewed_at' => now()->subDay(),
         ]);
 
         $this->actingAs($this->user)->post("/review-cards/manage/{$card->id}/reset")->assertOk();
 
         $card->refresh();
-        $this->assertTrue($card->fsrs_enabled);
+        // ADR-0010: Reset does NOT change lifecycle_state or fsrs_enabled mirror.
+        $this->assertSame(ReviewCard::LIFECYCLE_ARCHIVED, $card->lifecycle_state);
+        $this->assertFalse($card->fsrs_enabled);
         $this->assertNull($card->fsrs_last_reviewed_at);
     }
 

@@ -20,6 +20,16 @@ class SenseReviewService
      * Shared between dueCards() and dueCount() so that the filtering logic
      * stays in one place and the two methods cannot drift apart.
      *
+     * Uses ReviewCard::scopeSenseReviewEligible() (ADR-0010) as the unified
+     * queue-eligibility scope, which enforces:
+     *   - user_id / language_id / target_type=sense
+     *   - lifecycle_state='active'
+     *   - buried_until IS NULL OR buried_until <= now
+     *   - fsrs_enabled=true (compatibility mirror)
+     *
+     * The due filter (fsrs_due_at <= now) is added here because the scope
+     * is "queue eligible" not "due now".
+     *
      * Callers must add their own terminal methods:
      *   - dueCards(): select, with('sense'), orderBy, get()
      *   - dueCount(): count()
@@ -28,7 +38,7 @@ class SenseReviewService
     {
         return $this->senseReviewQueryService
             ->confirmedSenseCardQuery($userId, $language)
-            ->where('review_cards.fsrs_enabled', true)
+            ->senseReviewEligible($userId, $language, Carbon::now())
             ->where('review_cards.fsrs_due_at', '<=', Carbon::now());
     }
 

@@ -75,6 +75,15 @@ class ReviewCardManageQueryService
 
     /**
      * Apply standard filter to a query already scoped to current user/language/sense.
+     *
+     * ADR-0010: The old 'enabled'/'disabled' filters are kept as deprecated
+     * aliases. New lifecycle-aware filters:
+     *   - 'active'    → lifecycle_state = active
+     *   - 'buried'    → lifecycle_state = buried
+     *   - 'suspended' → lifecycle_state = suspended
+     *   - 'archived'  → lifecycle_state = archived
+     *   - 'learning'  → active + buried + suspended (default visible set;
+     *                   excludes archived per spec 2.4 "默认管理列表隐藏")
      */
     private function applyFilters($query, string $filter, int $userId, string $language): void
     {
@@ -87,10 +96,36 @@ class ReviewCardManageQueryService
                 $query->where('review_cards.fsrs_due_at', '>', $now);
                 break;
             case 'enabled':
-                $query->where('review_cards.fsrs_enabled', true);
+                // Deprecated: active + buried (fsrs_enabled mirror = true)
+                $query->whereIn('review_cards.lifecycle_state', [
+                    ReviewCard::LIFECYCLE_ACTIVE,
+                    ReviewCard::LIFECYCLE_BURIED,
+                ]);
                 break;
             case 'disabled':
-                $query->where('review_cards.fsrs_enabled', false);
+                // Deprecated: suspended + archived (fsrs_enabled mirror = false)
+                $query->whereIn('review_cards.lifecycle_state', [
+                    ReviewCard::LIFECYCLE_SUSPENDED,
+                    ReviewCard::LIFECYCLE_ARCHIVED,
+                ]);
+                break;
+            case 'active':
+                $query->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE);
+                break;
+            case 'buried':
+                $query->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_BURIED);
+                break;
+            case 'suspended':
+                $query->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_SUSPENDED);
+                break;
+            case 'archived':
+                $query->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ARCHIVED);
+                break;
+            case 'learning':
+                // Default visible set: everything except archived
+                $query->whereNotIn('review_cards.lifecycle_state', [
+                    ReviewCard::LIFECYCLE_ARCHIVED,
+                ]);
                 break;
             case 'missing_definition':
                 $query->whereHas('sense', function ($subQuery) {

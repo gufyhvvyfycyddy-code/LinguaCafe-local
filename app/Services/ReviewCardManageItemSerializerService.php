@@ -111,6 +111,10 @@ class ReviewCardManageItemSerializerService
                 'aliases_zh' => $sense->aliases_zh ?: [],
                 'collocations' => $sense->collocations ?: [],
                 'fsrs_enabled' => $card->fsrs_enabled,
+                // ADR-0010: lifecycle fields (no audit metadata exposed)
+                'lifecycle_state' => $card->lifecycle_state,
+                'buried_until' => optional($card->buried_until)->toISOString(),
+                'lifecycle_changed_at' => optional($card->lifecycle_changed_at)->toISOString(),
                 'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
                 'missing_example' => empty($sense->example_sentence_en),
                 'missing_source' => empty($sense->source_chapter_id) && empty($occChapterId),
@@ -172,6 +176,10 @@ class ReviewCardManageItemSerializerService
             'fsrs_lapses' => $card->fsrs_lapses,
             'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
             'fsrs_enabled' => $card->fsrs_enabled,
+            // ADR-0010: lifecycle fields (no audit metadata exposed)
+            'lifecycle_state' => $card->lifecycle_state,
+            'buried_until' => optional($card->buried_until)->toISOString(),
+            'lifecycle_changed_at' => optional($card->lifecycle_changed_at)->toISOString(),
             'missing_definition' => empty($sense->sense_zh) && empty($sense->sense_en),
             'missing_example' => empty($sense->example_sentence_en),
             'missing_source' => empty($sense->source_chapter_id) && empty($occurrenceChapterId),

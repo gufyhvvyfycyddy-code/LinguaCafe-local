@@ -31,7 +31,8 @@ use App\Models\ReviewLog;
  *   card_state_changed   — current card doesn't match after_card_snapshot
  *   legacy_target        — card is not a sense card
  *   sense_not_confirmed  — WordSense status is not confirmed
- *   card_archived        — fsrs_enabled is false
+ *   card_suspended      — card lifecycle_state is suspended (ADR-0010)
+ *   card_archived       — card lifecycle_state is archived (ADR-0010)
  *   unsupported_rating   — rating is not again/hard/good/easy
  *   unsupported_source   — source is not a review source
  */
@@ -47,6 +48,7 @@ class SenseReviewUndoPolicy
     public const REASON_CARD_STATE_CHANGED = 'card_state_changed';
     public const REASON_LEGACY_TARGET = 'legacy_target';
     public const REASON_SENSE_NOT_CONFIRMED = 'sense_not_confirmed';
+    public const REASON_CARD_SUSPENDED = 'card_suspended';
     public const REASON_CARD_ARCHIVED = 'card_archived';
     public const REASON_UNSUPPORTED_RATING = 'unsupported_rating';
     public const REASON_UNSUPPORTED_SOURCE = 'unsupported_source';
@@ -104,8 +106,14 @@ class SenseReviewUndoPolicy
             return ['undoable' => false, 'blocked_reason' => self::REASON_LEGACY_TARGET];
         }
 
-        // 8. Card archived (disabled)
-        if (!$currentCard->fsrs_enabled) {
+        // 8. Card lifecycle state check (ADR-0010)
+        // Suspended and Archived cards block undo. Buried cards do NOT
+        // block undo because bury is temporary and doesn't change FSRS.
+        $lifecycleState = $currentCard->lifecycle_state ?? ReviewCard::LIFECYCLE_ACTIVE;
+        if ($lifecycleState === ReviewCard::LIFECYCLE_SUSPENDED) {
+            return ['undoable' => false, 'blocked_reason' => self::REASON_CARD_SUSPENDED];
+        }
+        if ($lifecycleState === ReviewCard::LIFECYCLE_ARCHIVED) {
             return ['undoable' => false, 'blocked_reason' => self::REASON_CARD_ARCHIVED];
         }
 

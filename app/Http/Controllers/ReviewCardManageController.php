@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
+use App\Services\LifecycleConflictException;
+use App\Services\ReviewCardLifecycleCommandService;
 use App\Services\ReviewCardManageAccessService;
 use App\Services\ReviewCardManageItemSerializerService;
 use App\Services\ReviewCardService;
@@ -15,6 +17,7 @@ use App\Services\WordSenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 
 class ReviewCardManageController extends Controller
 {
@@ -26,6 +29,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardManageItemSerializerService $itemSerializer,
         private ReviewCardManageMutationService $mutationService,
         private ReviewCardManageAccessService $accessService,
+        private ReviewCardLifecycleCommandService $lifecycleCommandService,
     )
     {
     }
@@ -247,7 +251,17 @@ class ReviewCardManageController extends Controller
 
     /**
      * PATCH /review-cards/manage/{reviewCard}/enabled
-     * Toggle fsrs_enabled only.
+     * Legacy archive/restore endpoint (ADR-0010 compatibility).
+     *
+     * Delegates to ReviewCardLifecycleCommandService:
+     *   enabled=true  → action=restore (from archived)
+     *   enabled=false → action=archive (from active/suspended)
+     *
+     * Idempotent: if the card is already in the target state, returns 200
+     * without calling the CommandService. This preserves the old behavior
+     * where setting enabled=true on an already-enabled card was a no-op.
+     *
+     * The response format is preserved for backward compatibility.
      */
     public function enabled(Request $request, int $reviewCard): JsonResponse
     {
@@ -255,7 +269,38 @@ class ReviewCardManageController extends Controller
             $reviewCard, Auth::user()->id, Auth::user()->selected_language
         );
 
-        $this->mutationService->setEnabled($card, $request->boolean('enabled'));
+        $enabled = $request->boolean('enabled');
+
+        // ADR-0010: Idempotency — if already in the target state, return 200.
+        $currentState = $card->lifecycle_state ?? ReviewCard::LIFECYCLE_ACTIVE;
+        if ($enabled && $currentState === ReviewCard::LIFECYCLE_ACTIVE) {
+            return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
+        }
+        if (!$enabled && $currentState === ReviewCard::LIFECYCLE_ARCHIVED) {
+            return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
+        }
+
+        $action = $enabled ? 'restore' : 'archive';
+        $requestId = Str::uuid()->toString();
+
+        try {
+            $this->lifecycleCommandService->act(
+                $card,
+                $action,
+                $requestId,
+                null, // legacy endpoint skips optimistic lock
+                'legacy_enabled_endpoint',
+                Auth::user()->id,
+                Auth::user()->selected_language,
+                config('app.timezone', 'UTC')
+            );
+        } catch (LifecycleConflictException $e) {
+            return response()->json([
+                'error' => $e->reason,
+                'message' => $e->getMessage(),
+                'review_card_id' => $reviewCard,
+            ], 409);
+        }
 
         return response()->json($this->itemSerializer->serializeCard($card->fresh(), $sense));
     }
@@ -323,7 +368,13 @@ class ReviewCardManageController extends Controller
 
     /**
      * POST /review-cards/manage/bulk-enabled
-     * Bulk archive or restore sense review cards.
+     * Legacy bulk archive/restore endpoint (ADR-0010 compatibility).
+     *
+     * Delegates to ReviewCardLifecycleCommandService::bulkAct:
+     *   enabled=true  → action=restore
+     *   enabled=false → action=archive
+     *
+     * The response format is preserved for backward compatibility.
      * Body: { ids: int[], enabled: bool }
      */
     public function bulkEnabled(Request $request): JsonResponse
@@ -334,21 +385,35 @@ class ReviewCardManageController extends Controller
         }
 
         $enabled = $request->boolean('enabled');
+        $action = $enabled ? 'restore' : 'archive';
 
-        $result = $this->mutationService->bulkSetEnabled(
-            $ids,
-            $enabled,
+        $bulkResult = $this->lifecycleCommandService->bulkAct(
+            array_map('intval', $ids),
+            $action,
+            'legacy_bulk_enabled_endpoint',
             Auth::user()->id,
             Auth::user()->selected_language,
+            config('app.timezone', 'UTC')
         );
 
+        $affected = 0;
+        $skipped = 0;
+        foreach ($bulkResult['results'] as $r) {
+            if (!empty($r['success']) || !empty($r['already_applied'])) {
+                $affected++;
+            } else {
+                $skipped++;
+            }
+        }
+
         return response()->json([
-            'affected' => $result['affected'],
-            'skipped' => $result['skipped'],
+            'affected' => $affected,
+            'skipped' => $skipped,
             'enabled' => $enabled,
             'message' => $enabled
-                ? "已恢复 {$result['affected']} 张复习卡。它们会重新进入日常复习。"
-                : "已归档 {$result['affected']} 张复习卡。它们不会进入日常复习。",
+                ? "已恢复 {$affected} 张复习卡。它们会重新进入日常复习。"
+                : "已归档 {$affected} 张复习卡。它们不会进入日常复习。",
+            'results' => $bulkResult['results'],
         ]);
     }
 

@@ -211,7 +211,9 @@ class FsrsReschedulePreviewService
                     || $card->language_id !== $language
                     || $card->target_type !== ReviewCard::TARGET_SENSE
                     || $card->fsrs_state !== 'review'
+                    || $card->lifecycle_state !== ReviewCard::LIFECYCLE_ACTIVE
                     || $card->fsrs_enabled !== true
+                    || ($card->buried_until !== null && $card->buried_until->gt($now))
                     || $card->fsrs_stability === null
                     || $card->fsrs_difficulty === null
                     || $card->fsrs_last_reviewed_at === null
@@ -296,15 +298,18 @@ class FsrsReschedulePreviewService
      * Conditions:
      * - target_type = sense
      * - fsrs_state = review
-     * - fsrs_enabled = true
+     * - ADR-0010: lifecycle_state = active AND not effectively buried
+     *   (buried_until IS NULL OR buried_until <= now)
+     * - fsrs_enabled = true (compatibility mirror, redundant)
      * - fsrs_stability IS NOT NULL
      * - fsrs_difficulty IS NOT NULL
      * - fsrs_last_reviewed_at IS NOT NULL
      * - WordSense is confirmed
-     * - Excludes word, phrase, new, learning, relearning
+     * - Excludes word, phrase, new, learning, relearning, suspended, archived
      */
     private function candidateCardsQuery(int $userId, string $language)
     {
+        $now = Carbon::now();
         return ReviewCard::query()
             ->join('word_senses', function ($join) {
                 $join->on('word_senses.id', '=', 'review_cards.target_id')
@@ -314,6 +319,11 @@ class FsrsReschedulePreviewService
             ->where('review_cards.language_id', $language)
             ->where('review_cards.target_type', ReviewCard::TARGET_SENSE)
             ->where('review_cards.fsrs_state', 'review')
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
             ->where('review_cards.fsrs_enabled', true)
             ->whereNotNull('review_cards.fsrs_stability')
             ->whereNotNull('review_cards.fsrs_difficulty')

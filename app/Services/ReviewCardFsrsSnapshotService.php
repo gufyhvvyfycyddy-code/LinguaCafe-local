@@ -80,9 +80,14 @@ class ReviewCardFsrsSnapshotService
     /**
      * Restore a complete FSRS snapshot onto a ReviewCard model.
      *
-     * Sets all 8 attributes on the model but does NOT call save().
+     * Sets FSRS scheduling attributes on the model but does NOT call save().
      * The caller is responsible for persisting the model within the
      * same transaction.
+     *
+     * ADR-0010: fsrs_enabled is NOT restored. It is now a mirror of
+     * lifecycle_state, which is owned exclusively by
+     * ReviewCardLifecycleCommandService. The undo service checks
+     * lifecycle state separately via SenseReviewUndoPolicy.
      *
      * @param  array  $snapshot  Must pass validate() first.
      */
@@ -105,7 +110,8 @@ class ReviewCardFsrsSnapshotService
             : null;
         $card->fsrs_reps = (int) $snapshot['fsrs_reps'];
         $card->fsrs_lapses = (int) $snapshot['fsrs_lapses'];
-        $card->fsrs_enabled = (bool) $snapshot['fsrs_enabled'];
+        // ADR-0010: fsrs_enabled is NOT restored — it is a lifecycle mirror.
+        // $card->fsrs_enabled = (bool) $snapshot['fsrs_enabled'];
     }
 
     /**

@@ -1,8 +1,8 @@
 # SenseReview Module Boundaries
 
-> **Status**: Current as of 2026-07-11 (ADR-0009 complete: review action transaction ledger + stack-based undo — `ReviewCardFsrsSnapshotService` captures/restores 8 FSRS fields; `recordReview()` captures before/after snapshots in transaction; `scopeNotUndone` excludes undone from product analytics; `SenseReviewUndoPolicy` pure policy; `SenseReviewSessionActionService` read-only timeline; `SenseReviewUndoService` transactional undo with idempotency; ADR-0007 deep link and ADR-0006 daily report consolidation remain intact).
+> **Status**: Current as of 2026-07-12 (ADR-0010 Task B complete: review card lifecycle state machine — Active/Buried/Suspended/Archived four-state model replaces overloaded `fsrs_enabled` boolean; single additive migration adds `lifecycle_state`/`buried_until`/`lifecycle_version`/`lifecycle_changed_at` to `review_cards` + new `review_card_state_events` audit table; `fsrs_enabled` retained as read-only compatibility mirror; `ReviewCardLifecyclePolicy` pure state machine; `ReviewCardBuryTimeService` user-timezone next-day 00:00; `ReviewCardLifecycleCommandService` single mutation entry point with transaction + lockForUpdate + request_id idempotency + lifecycle_version optimistic lock; `scopeSenseReviewEligible` includes expired buried via OR clause (auto-restore without scheduled job); boundaries with rating/undo/reset/delete/stats/preview/management/export all locked; 133 new backend tests + all regression suites green; ADR-0009 undo ledger and ADR-0008 interval preview remain intact).
 > **Scope**: Describes the container/sub-component/service boundaries for the SenseReview page (`/reviews/senses`).
-> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`, `docs/adr/ADR-0007-sense-review-report-card-deep-link.md`, `docs/adr/ADR-0008-sense-review-answer-interval-preview.md`, `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`.
+> **Related**: `docs/architecture/sense-http-controller-boundaries.md`, `docs/testing/sense-review-understanding-helper-playbook.md`, `docs/adr/ADR-0006-sense-review-daily-report-consolidation.md`, `docs/adr/ADR-0007-sense-review-report-card-deep-link.md`, `docs/adr/ADR-0008-sense-review-answer-interval-preview.md`, `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`.
 
 ## 0. Six-Layer Report Architecture
 
@@ -532,3 +532,132 @@ No FSRS algorithm/parameter/preview change. No rating key/score/label/hotkey cha
 - **Session summary**: `SessionTracker.removeRating(session, reviewCardId)` excludes undone action from summary (entries filter, requestIds preserved). Summary count/distribution/feedback reflect only active session actions.
 - **Management page audit**: `ReviewCardManage.vue` shows `已撤销` chip + `撤销时间` + `撤销来源` for undone logs. Original rating preserved (not changed to "undo"). Logs not hidden. No undo button on management page.
 - **Sources**: `sense_review_snackbar`, `sense_review_history`, `sense_review_hotkey` — validated by backend.
+
+## 12. Review Card Lifecycle State Machine (ADR-0010)
+
+> **Status**: ADR-0010 accepted 2026-07-12 (Task B backend complete; Task A frontend pending).
+> **Related**: `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`.
+
+### 12.1 Problem Solved
+
+ADR-0010 replaces the overloaded `review_cards.fsrs_enabled` boolean with an explicit four-state lifecycle. Previously `fsrs_enabled=false` conflated "user archived", "system disabled", and "reset side-effect"; there was no way to represent temporary bury or long-term suspend, and `resetCard()` silently un-archived cards. The undo ledger (ADR-0009) snapshot/restore path would also overwrite a concurrent lifecycle change because it snapshotted `fsrs_enabled`.
+
+### 12.2 Lifecycle States
+
+| Concept | Persistent? | Queue eligible? | FSRS modified? | ReviewLog written? |
+|---|---|---|---|---|
+| **Active** | yes | yes | normal rating | yes |
+| **Buried** | temporary | no (until user-local next-day 00:00) | no | no |
+| **Suspended** | yes (until Resume) | no | retained, no new writes | no |
+| **Archived** | yes (until Restore) | no | retained, no new writes | no |
+| **Reset** | *not a state* — scheduling operation | depends on lifecycle state | yes (rebuilds FSRS fields) | existing reset log semantics |
+| **Delete** | *not a state* — physical removal | n/a | n/a | n/a |
+
+**Buried** auto-reverts to Active at the user's timezone next natural-day 00:00. No timer or scheduled job is required — the queue query (`scopeSenseReviewEligible`) treats `buried_until <= now` as Active via an OR clause. Buried does **not** write a `ReviewLog` and does **not** touch FSRS.
+
+**Suspended** stays out of the queue until the user explicitly resumes. Resume preserves the original `fsrs_due_at` (it does **not** force the card to be due now). Suspended is visible in the management page by default.
+
+**Archived** exits the current learning system but retains all history. It is hidden from the management page's default list and visible under an "Archived" filter. Restore returns the card to Active with its prior FSRS data intact.
+
+**Reset** is a scheduling operation, not a lifecycle state. It rebuilds FSRS fields but does **not** change `lifecycle_state`, `buried_until`, `lifecycle_version`, or `lifecycle_changed_at`. A Suspended card that is reset stays Suspended; an Archived card that is reset stays Archived.
+
+**Delete** is a physical removal operation and is **not** exposed through the unified lifecycle endpoint. It continues to use its own dangerous-confirmation flow and dependency protection.
+
+### 12.3 `fsrs_enabled` Compatibility Mirror
+
+`fsrs_enabled` is retained as a read-only compatibility mirror to avoid touching every queue/stats query in a single round:
+
+- `lifecycle_state IN ('active','buried')` → `fsrs_enabled=true`
+- `lifecycle_state IN ('suspended','archived')` → `fsrs_enabled=false`
+
+The mirror is maintained inside `ReviewCardLifecycleCommandService` on every transition. `ReviewCardService::resetCard()` no longer force-sets `fsrs_enabled=true` — it leaves the mirror to whatever the current lifecycle state dictates. `ReviewCardFsrsSnapshotService::restore()` (ADR-0009 undo path) no longer restores `fsrs_enabled` — undo must not overwrite a concurrent lifecycle change.
+
+### 12.4 Backend Service Boundaries (Task B)
+
+- **`ReviewCardLifecyclePolicy`** — pure state machine. `describe(ReviewCard $card, Carbon $now, string $timezone): array`, `canTransition(string $from, string $action): bool`, `availableActions(array $descriptor): array`. No DB, no writes. Expired buried is automatically treated as Active. The Vue layer MUST NOT replicate the state machine.
+- **`ReviewCardBuryTimeService`** — `nextLocalDayBoundary(string $timezone, Carbon $now): Carbon`. Handles month-end, year-end, DST forward/back, invalid timezone (treated as UTC), and user-vs-server timezone difference. The frontend MUST NOT compute `buried_until`.
+- **`ReviewCardLifecycleSnapshotService`** — captures `lifecycle_state` / `buried_until` / `lifecycle_version` / `lifecycle_changed_at` / `fsrs_enabled` for audit.
+- **`ReviewCardLifecycleCommandService`** — single mutation entry point. Executes `bury` / `unbury` / `suspend` / `resume` / `archive` / `restore` inside a `DB::transaction` with `lockForUpdate` on `ReviewCard`: validate user/language/sense/confirmed → validate `expected_version` → `Policy::canTransition()` → capture previous state → apply transition → `lifecycle_version + 1` → sync `fsrs_enabled` mirror → save card → create `ReviewCardStateEvent` → commit. Same `request_id` retry returns `already_applied=true`. Stale version returns 409. Illegal transition returns 409. No `ReviewLog` is created. FSRS `due_at` / `stability` / `difficulty` / `reps` / `lapses` are never modified by lifecycle operations.
+- **`LifecycleConflictException`** (409) / **`LifecycleValidationException`** (422) — dedicated exceptions.
+- **`ReviewCardLifecycleController`** — `GET /review-cards/{reviewCard}/lifecycle`, `POST /review-cards/{reviewCard}/lifecycle-actions`, `GET /review-cards/{reviewCard}/lifecycle-events`. The legacy `enabled` / `archive` / `restore` endpoints are retained for backward compatibility but delegate internally to `CommandService` — no second mutation logic is maintained.
+
+### 12.5 Queue Eligibility Scope
+
+`ReviewCard::scopeSenseReviewEligible(int $userId, string $language, Carbon $now)` is the single entry point for queue eligibility:
+
+- `user_id` + `language_id` + `target_type=sense` + `fsrs_enabled=true`
+- AND ((`lifecycle_state=active` AND (`buried_until IS NULL` OR `buried_until <= now`))
+      OR (`lifecycle_state=buried` AND `buried_until <= now`))
+
+The OR clause for expired buried is the auto-restore mechanism — no scheduled job is needed. Due conditions are appended by the caller (`SenseReviewService`).
+
+All other consumers (stats, interval preview, reschedule preview, management filters, export) apply the same lifecycle awareness via their own scopes — they MUST NOT duplicate the lifecycle predicate. Stats can now split cards into Active / Buried / Suspended / Archived counts.
+
+### 12.6 Audit Trail — `review_card_state_events`
+
+New additive table records every transition:
+
+```
+id, user_id, language_id, review_card_id, action,
+previous_state (JSON), new_state (JSON),
+request_id (UUID, unique), source, metadata (nullable JSON), created_at
+```
+
+`ReviewCardStateEvent` model casts `previous_state` / `new_state` as `array`. The `request_id` unique index is the idempotency key. The management page detail drawer exposes a read-only "状态历史" view; the export includes lifecycle fields but does NOT leak internal audit metadata.
+
+### 12.7 Boundaries with Existing Systems
+
+- **Rating (`ReviewCardService::recordReview`)**: only queue-eligible cards can be rated. The query now filters `lifecycle_state=active` AND `buried_until` expiry AND `fsrs_enabled=true`. Returns `ReviewCard` (not `ReviewLog`).
+- **Undo (`SenseReviewUndoService` / `SenseReviewUndoPolicy`)**: `ReviewCardFsrsSnapshotService::restore()` no longer restores `fsrs_enabled`. `SenseReviewUndoPolicy` returns `card_suspended` or `card_archived` blocked reason — undo is blocked on Suspended/Archived cards to avoid overwriting a concurrent lifecycle change. Undo must operate while the card is still Active.
+- **Reset (`ReviewCardService::resetCard`)**: only rebuilds FSRS scheduling fields. Does NOT change `lifecycle_state` / `buried_until` / `lifecycle_version` / `lifecycle_changed_at` / `fsrs_enabled`. A Suspended card stays Suspended after reset; an Archived card stays Archived.
+- **Delete**: NOT exposed through the unified lifecycle endpoint. Continues to use its own dangerous-confirmation flow. The lifecycle state machine never transitions to a "deleted" state.
+- **Stats / Interval Preview / Reschedule Preview / Management / Export**: all lifecycle-aware. Interval preview and reschedule preview only operate on Active cards (they intentionally exclude buried cards even if expired, because they are explicit user-facing operations, not queue consumption).
+- **Daily report / 7-day trend / 30-day calendar**: unaffected — they read ReviewLog, not ReviewCard lifecycle. Lifecycle operations write no ReviewLog, so historical reports are unchanged.
+
+### 12.8 Single Additive Migration
+
+`database/migrations/2026_07_12_000001_add_review_card_lifecycle_state_machine.php`:
+
+- Adds to `review_cards`: `lifecycle_state` (string, default 'active', indexed), `buried_until` (nullable datetime, indexed), `lifecycle_version` (unsigned int, default 0), `lifecycle_changed_at` (nullable datetime).
+- Creates `review_card_state_events` table.
+- Backfill: `fsrs_enabled=false` → `lifecycle_state='archived'`; otherwise `lifecycle_state='active'`. No FSRS scheduling fields are modified. No existing column is dropped.
+- Reversible (down drops the new columns and the new table).
+- No second migration is allowed. No ReviewLog schema change. No fresh/wipe/drop/truncate.
+
+### 12.9 Backend Test Coverage (Task B-9)
+
+Seven new test files, 133 tests, 291 assertions, all green:
+
+- `tests/Unit/ReviewCardLifecyclePolicyTest.php` (39 tests)
+- `tests/Unit/ReviewCardBuryTimeServiceTest.php` (16 tests)
+- `tests/Feature/ReviewCardLifecycleMigrationTest.php` (10 tests)
+- `tests/Feature/ReviewCardLifecycleCommandTest.php` (24 tests)
+- `tests/Feature/ReviewCardLifecycleQueueTest.php` (13 tests)
+- `tests/Feature/ReviewCardLifecycleConcurrencyTest.php` (8 tests)
+- `tests/Feature/ReviewCardLifecycleCompatibilityTest.php` (23 tests)
+
+Covers: all legal/illegal transitions, bury to next-day local 00:00, DST, expired bury auto-restore, suspend/resume, archive/restore, reset preserves lifecycle, delete not in unified endpoint, request ID idempotency, version conflict, two-tab concurrency, rating concurrency, undo concurrency, other user/language, legacy word card, rejected sense, migration backfill, `fsrs_enabled` mirror, 0 ReviewLog writes, FSRS field invariance, state event correctness, queue/stats/preview/manager consistency, no N+1.
+
+Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, SenseReviewIntervalPreviewTest 25, ReviewCardManageTest 258+2 skipped, WordSense 197+1 skipped, FsrsSchedulingServiceTest 9.
+
+### 12.10 Frontend Layer (Task A — pending)
+
+- **`resources/js/services/ReviewCardLifecyclePresentation.js`** — pure presentation helper (state Chinese label, color, blocked reason, buried remaining time, available actions, danger level). No axios, no Vue, no DOM, no FSRS calculation.
+- **SenseReview "更多" menu**: adds 埋藏到明天 / 暂停复习 / 归档 / 重置学习进度 / 删除. Active can bury/suspend/archive/reset; Buried can unbury; Suspended can resume/archive/reset; Archived is not visible on the review page; Delete keeps its own dangerous confirmation.
+- **ReviewCardManage**: new filters (学习中 / 已埋藏 / 已暂停 / 已归档 / 全部), per-row state badge, lifecycle history drawer, per-row actions (bury/unbury/suspend/resume/archive/restore/reset/delete). No "启用/禁用" toggle.
+- **Batch operations**: bulk suspend/resume/archive/restore/unbury (NOT bulk bury/reset/delete). Per-item results (`success` / `already_applied` / `conflict` / `forbidden` / `not_found`); partial failure is NOT masked as full success.
+- **State explanation UI**: a "状态说明" entry on the management page that explains 埋藏 / 暂停 / 归档 / 重置 / 删除 in plain language. Does NOT expose `lifecycle_version`, `fsrs_enabled` mirror, or database column names.
+- **Concurrency / error UX**: 409 → "卡片状态已在其他页面发生变化，已刷新最新状态。"; network failure → "状态修改失败，请检查网络后重试。"; illegal transition → "当前状态不能执行此操作。". No optimistic state mutation on the frontend.
+- **Frontend guard tests**: `ReviewCardLifecyclePresentationGuard.test.mjs`, `SenseReviewLifecycleActionsGuard.test.mjs`, `ReviewCardManageLifecycleGuard.test.mjs`, `ReviewCardLifecycleBulkGuard.test.mjs`.
+
+### 12.11 Frozen Boundaries
+
+- **Policy**: pure, no DB, no writes. Vue MUST NOT replicate the state machine.
+- **CommandService**: single mutation entry point. No other service may write `lifecycle_state` / `buried_until` / `lifecycle_version` / `lifecycle_changed_at` directly.
+- **Bury time**: computed only by `ReviewCardBuryTimeService`. Frontend MUST NOT compute `buried_until`.
+- **Mirror invariant**: `lifecycle_state IN ('active','buried')` → `fsrs_enabled=true`; `lifecycle_state IN ('suspended','archived')` → `fsrs_enabled=false`. Maintained only inside `CommandService`.
+- **ReviewLog**: never written by lifecycle operations. Never deleted by lifecycle operations.
+- **FSRS**: `due_at` / `stability` / `difficulty` / `reps` / `lapses` never modified by lifecycle operations.
+- **Reset**: does NOT change lifecycle state. Does NOT force `fsrs_enabled=true`.
+- **Delete**: NOT exposed through the unified lifecycle endpoint.
+- **Migration**: exactly one additive migration. No second migration. No ReviewLog schema change.

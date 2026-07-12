@@ -24,11 +24,14 @@ use Illuminate\Support\Facades\Auth;
  *  2. user_id matches current user.
  *  3. language_id matches current user's selected language.
  *  4. target_type === 'sense'.
- *  5. fsrs_enabled === true.
- *  6. WordSense exists, belongs to current user + language, status=confirmed.
+ *  5. ADR-0010: lifecycle_state === 'active' AND not effectively buried
+ *     (buried_until IS NULL OR buried_until <= now). Suspended/Archived
+ *     cards return null (404). Expired buried cards are treated as Active.
+ *  6. fsrs_enabled === true (compatibility mirror, redundant with #5).
+ *  7. WordSense exists, belongs to current user + language, status=confirmed.
  *
- * This service does NOT require the card to be due. Access and enabled
- * state are the hard boundary; due status is not a security boundary.
+ * This service does NOT require the card to be due. Access and lifecycle
+ * eligibility are the hard boundary; due status is not a security boundary.
  */
 class SenseReviewIntervalPreviewService
 {
@@ -46,10 +49,16 @@ class SenseReviewIntervalPreviewService
      */
     public function preview(int $reviewCardId, int $userId, string $language): ?array
     {
+        $now = Carbon::now();
         $card = ReviewCard::where('id', $reviewCardId)
             ->where('user_id', $userId)
             ->where('language_id', $language)
             ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('buried_until')
+                    ->orWhere('buried_until', '<=', $now);
+            })
             ->where('fsrs_enabled', true)
             ->first();
 

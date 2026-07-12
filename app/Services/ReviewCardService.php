@@ -94,8 +94,14 @@ class ReviewCardService
      * Reset a sense review card to new-card state, erasing all FSRS memory.
      *
      * Only sense cards (target_type=sense) with a confirmed WordSense are eligible.
-     * Archived cards are force-enabled. Existing review_logs are preserved.
-     * A new ReviewLog with rating='reset' and source='reset' is created.
+     * ADR-0010: Reset does NOT change lifecycle_state, buried_until,
+     * lifecycle_version, or lifecycle_changed_at. A Suspended card stays
+     * Suspended after reset; an Archived card stays Archived. The
+     * fsrs_enabled mirror is NOT forced to true — it remains whatever the
+     * current lifecycle state dictates.
+     *
+     * Existing review_logs are preserved. A new ReviewLog with rating='reset'
+     * and source='reset' is created.
      */
     public function resetCard(int $userId, string $language, int $reviewCardId): ReviewCard
     {
@@ -128,6 +134,9 @@ class ReviewCardService
                 'difficulty' => $card->fsrs_difficulty,
             ];
 
+            // ADR-0010: Reset only FSRS scheduling fields. Do NOT touch
+            // lifecycle_state, buried_until, lifecycle_version,
+            // lifecycle_changed_at, or fsrs_enabled (mirror).
             $card->fsrs_state = 'new';
             $card->fsrs_due_at = Carbon::now();
             $card->fsrs_stability = null;
@@ -135,7 +144,6 @@ class ReviewCardService
             $card->fsrs_reps = 0;
             $card->fsrs_lapses = 0;
             $card->fsrs_last_reviewed_at = null;
-            $card->fsrs_enabled = true;
             $card->save();
 
             ReviewLog::create([
@@ -182,15 +190,24 @@ class ReviewCardService
         ?string $reviewSessionId = null,
     ): ReviewCard {
         return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId) {
+            // ADR-0010: Only queue-eligible cards can be rated.
+            // - lifecycle_state = 'active'
+            // - buried_until IS NULL OR buried_until <= now
+            // - fsrs_enabled = true (compatibility mirror)
             $card = ReviewCard::lockForUpdate()
                 ->where('user_id', $userId)
                 ->where('language_id', $language)
                 ->where('id', $reviewCardId)
                 ->where('fsrs_enabled', true)
+                ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+                ->where(function ($q) {
+                    $q->whereNull('buried_until')
+                        ->orWhere('buried_until', '<=', Carbon::now());
+                })
                 ->first();
 
             if (!$card) {
-                throw new \Exception('Review card does not exist, is disabled, or belongs to another user.');
+                throw new \Exception('Review card does not exist, is not queue-eligible, or belongs to another user.');
             }
 
             if (!$this->isReviewableTarget($card, $language)) {

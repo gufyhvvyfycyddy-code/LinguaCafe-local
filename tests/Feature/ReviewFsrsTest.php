@@ -1659,16 +1659,18 @@ class ReviewFsrsTest extends TestCase
         $this->assertContains($card->id, $afterIds, 'Card should appear in queue after reset');
     }
 
-    public function test_reset_archived_card_auto_enables(): void
+    public function test_reset_archived_card_preserves_archived_state(): void
     {
         $sense = $this->createSense($this->user->id, 'english', 'archivedreset', 'noun', '归档重置', 'archived reset');
         $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        // ADR-0010: Archive via lifecycle fields, not just fsrs_enabled.
         $card->update([
             'fsrs_state' => 'review',
             'fsrs_stability' => 7.0,
             'fsrs_difficulty' => 4.0,
             'fsrs_due_at' => now()->addDays(14),
-            'fsrs_enabled' => false, // archived
+            'fsrs_enabled' => false,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
         ]);
 
         $this->actingAs($this->user)
@@ -1676,7 +1678,9 @@ class ReviewFsrsTest extends TestCase
             ->assertOk();
 
         $card->refresh();
-        $this->assertTrue($card->fsrs_enabled, 'Archived card should be re-enabled after reset');
+        // ADR-0010: Reset does NOT change lifecycle_state or fsrs_enabled mirror.
+        $this->assertSame(ReviewCard::LIFECYCLE_ARCHIVED, $card->lifecycle_state);
+        $this->assertFalse($card->fsrs_enabled, 'Archived card stays disabled after reset');
         $this->assertSame('new', $card->fsrs_state);
     }
 

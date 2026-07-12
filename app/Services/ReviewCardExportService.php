@@ -31,6 +31,10 @@ class ReviewCardExportService
         'fsrs_lapses',
         'fsrs_last_reviewed_at',
         'fsrs_enabled',
+        // ADR-0010: lifecycle fields (no audit metadata exposed)
+        'lifecycle_state',
+        'buried_until',
+        'lifecycle_changed_at',
         'missing_definition',
         'missing_example',
         'missing_source',

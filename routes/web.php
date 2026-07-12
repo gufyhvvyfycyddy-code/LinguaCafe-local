@@ -238,6 +238,12 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::delete('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'destroy']);
     Route::post('/review-cards/manage/bulk-enabled', [App\Http\Controllers\ReviewCardManageController::class, 'bulkEnabled']);
     Route::post('/review-cards/manage/bulk-delete', [App\Http\Controllers\ReviewCardManageController::class, 'bulkDestroy']);
+    Route::post('/review-cards/manage/bulk-lifecycle', [App\Http\Controllers\ReviewCardLifecycleController::class, 'bulkAct']);
+
+    // review card lifecycle (ADR-0010)
+    Route::get('/review-cards/{reviewCard}/lifecycle', [App\Http\Controllers\ReviewCardLifecycleController::class, 'show']);
+    Route::post('/review-cards/{reviewCard}/lifecycle-actions', [App\Http\Controllers\ReviewCardLifecycleController::class, 'act']);
+    Route::get('/review-cards/{reviewCard}/lifecycle-events', [App\Http\Controllers\ReviewCardLifecycleController::class, 'events']);
 
     // anki
     Route::post('/anki/add-card', [App\Http\Controllers\AnkiController::class, 'addCardToAnki']);

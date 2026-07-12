@@ -12,7 +12,10 @@ use Illuminate\Support\Str;
 
 class WordSenseService
 {
-    public function __construct(private ReviewCardService $reviewCardService)
+    public function __construct(
+        private ReviewCardService $reviewCardService,
+        private ReviewCardLifecycleCommandService $lifecycleCommandService,
+    )
     {
     }
 
@@ -85,14 +88,24 @@ class WordSenseService
     public function archiveSense(WordSense $sense): WordSense
     {
         return DB::transaction(function () use ($sense) {
+            // Archive the review card via the unified lifecycle command service
+            // (ADR-0010) BEFORE rejecting the sense, because the command service
+            // validates that the sense is still STATUS_CONFIRMED.
+            if ($card = $sense->reviewCard) {
+                $this->lifecycleCommandService->act(
+                    $card,
+                    'archive',
+                    \Illuminate\Support\Str::uuid()->toString(),
+                    null, // legacy path skips optimistic lock
+                    'word_sense_archive',
+                    $sense->user_id,
+                    $sense->language_id,
+                    config('app.timezone', 'UTC')
+                );
+            }
+
             $sense->status = WordSense::STATUS_REJECTED;
             $sense->save();
-
-            // Disable FSRS review card without deleting history
-            if ($card = $sense->reviewCard) {
-                $card->fsrs_enabled = false;
-                $card->save();
-            }
 
             return $sense->fresh('reviewCard');
         });

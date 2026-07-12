@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ReviewCard;
 use App\Services\SenseReviewQueryService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -26,29 +27,60 @@ class ReviewStatsService
 
     /**
      * Card-level aggregate statistics scoped to confirmed sense cards only.
+     *
+     * ADR-0010: The old `fsrs_enabled` binary (enabled/archived) is split
+     * into 4 lifecycle state counts: active, buried, suspended, archived.
+     * The legacy `enabled`/`archived` keys are kept as deprecated aliases:
+     *   - enabled  = active + buried  (fsrs_enabled mirror = true)
+     *   - archived_legacy = suspended + archived (fsrs_enabled mirror = false)
+     *
+     * "Queue-eligible" = lifecycle_state=active AND not effectively buried
+     * (buried_until IS NULL OR buried_until <= now). This matches the
+     * unified scopeSenseReviewEligible in ReviewCard model.
      */
     public function cardStats(int $userId, string $language): array
     {
         $base = $this->baseCardQuery($userId, $language);
+        $now = Carbon::now();
 
-        // Total confirmed sense cards (enabled + archived)
+        // Total confirmed sense cards (all lifecycle states)
         $total = (clone $base)->count();
 
-        // Enabled cards count
-        $enabled = (clone $base)->where('review_cards.fsrs_enabled', true)->count();
-
-        // Archived cards count
-        $archived = (clone $base)->where('review_cards.fsrs_enabled', false)->count();
-
-        // Due cards (enabled and past due)
-        $due = (clone $base)
-            ->where('review_cards.fsrs_enabled', true)
-            ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
+        // ADR-0010: lifecycle state distribution
+        $activeCount = (clone $base)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->count();
+        $buriedCount = (clone $base)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_BURIED)
+            ->count();
+        $suspendedCount = (clone $base)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_SUSPENDED)
+            ->count();
+        $archivedCount = (clone $base)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ARCHIVED)
             ->count();
 
-        // State distribution (only enabled cards)
+        // Legacy aliases (deprecated, will be removed in a future release)
+        $enabled = $activeCount + $buriedCount;
+        $archivedLegacy = $suspendedCount + $archivedCount;
+
+        // Due cards: only queue-eligible (active + not effectively buried) and past due
+        $due = (clone $base)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
+            ->where('review_cards.fsrs_due_at', '<=', $now)
+            ->count();
+
+        // State distribution (only queue-eligible active cards)
         $stateCounts = (clone $base)
-            ->where('review_cards.fsrs_enabled', true)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
             ->select('review_cards.fsrs_state', DB::raw('COUNT(*) as count'))
             ->groupBy('review_cards.fsrs_state')
             ->pluck('count', 'fsrs_state')
@@ -61,29 +93,47 @@ class ReviewStatsService
             'relearning' => (int) ($stateCounts['relearning'] ?? 0),
         ];
 
-        // Average stability (enabled cards with non-null stability only)
+        // Average stability (queue-eligible active cards with non-null stability only)
         $avgStability = (clone $base)
-            ->where('review_cards.fsrs_enabled', true)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
             ->whereNotNull('review_cards.fsrs_stability')
             ->avg('review_cards.fsrs_stability');
         $averageStability = $avgStability !== null ? round((float) $avgStability, 2) : null;
 
-        // Average difficulty (enabled cards with non-null difficulty only)
+        // Average difficulty (queue-eligible active cards with non-null difficulty only)
         $avgDifficulty = (clone $base)
-            ->where('review_cards.fsrs_enabled', true)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
             ->whereNotNull('review_cards.fsrs_difficulty')
             ->avg('review_cards.fsrs_difficulty');
         $averageDifficulty = $avgDifficulty !== null ? round((float) $avgDifficulty, 2) : null;
 
-        // Total lapses across all enabled cards
+        // Total lapses across all queue-eligible active cards
         $lapsesTotal = (int) (clone $base)
-            ->where('review_cards.fsrs_enabled', true)
+            ->where('review_cards.lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($q) use ($now) {
+                $q->whereNull('review_cards.buried_until')
+                    ->orWhere('review_cards.buried_until', '<=', $now);
+            })
             ->sum('review_cards.fsrs_lapses');
 
         return [
             'total'              => $total,
+            // ADR-0010: lifecycle state distribution
+            'active'             => $activeCount,
+            'buried'             => $buriedCount,
+            'suspended'          => $suspendedCount,
+            'archived'           => $archivedCount,
+            // Legacy aliases (deprecated)
             'enabled'            => $enabled,
-            'archived'           => $archived,
+            'archived_legacy'    => $archivedLegacy,
             'due'                => $due,
             'by_state'           => $byState,
             'average_stability'  => $averageStability,
