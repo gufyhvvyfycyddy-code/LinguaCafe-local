@@ -705,7 +705,11 @@ The management page `data()` endpoint injects `leech_status` / `leech_severity` 
 
 ### 13.6 ReviewLog Exclusion
 
-Leech computation uses the same exclusion as all product analytics: `undone_at IS NULL` AND `source != 'reset'` AND `rating != 'reset'`. This is delegated to `SenseReviewLearningFeedbackService`, which uses `SenseReviewQueryService::nonResetCardReviewLogQuery()`. Reset logs and undone logs do not participate in leech classification.
+Leech computation uses the same exclusion as all product analytics: `source = 'sense_review'` (positive filter) AND `undone_at IS NULL` AND `source != 'reset'` AND `rating != 'reset'`. This is delegated to `SenseReviewLearningFeedbackService`, which uses `SenseReviewQueryService::nonResetCardReviewLogQuery()`. Reset logs, undone logs, and non-sense-review sources (e.g. `review`, `acceptance_test`) do not participate in leech classification. Audit interfaces that query ReviewLog directly are NOT affected.
+
+**Task 2000-4 fix:** The management page leech/struggling filters now use REAL Policy classification via `ReviewCardManageQueryService::getLeechFilteredCardIds()` → `SenseReviewLeechQueryService::filterCardIdsByLeechStatus()`, instead of SQL proxy rules. This ensures the filter, pagination total, and in-row badges all use the same classification source. The classification considers ALL lifecycle states (active, suspended, archived, buried) so suspended/archived leech cards remain findable.
+
+**Task 2000-4 fix:** Batch rewrite package generation (`SenseReviewLeechController::bulkRewritePackages()`) now uses `describeForCardsWithFeedbackMap()` to reuse a single batch feedback map, eliminating the N+1 ReviewLog query pattern (was 1+N queries, now 1 query regardless of card count). Single-card `rewritePackage()` uses `describeForCardWithFeedback()` to avoid duplicate queries (was 2, now 1).
 
 ### 13.7 Lifecycle Boundary
 

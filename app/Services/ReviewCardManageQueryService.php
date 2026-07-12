@@ -11,6 +11,11 @@ use Illuminate\Support\Facades\DB;
 
 class ReviewCardManageQueryService
 {
+    public function __construct(
+        private SenseReviewLeechQueryService $leechQueryService,
+    ) {
+    }
+
     /**
      * Whitelist of sortable columns.
      * Maps query-param keys to fully-qualified column expressions.
@@ -128,34 +133,17 @@ class ReviewCardManageQueryService
                 ]);
                 break;
             case 'leech':
-                // ADR-0011: Cards with again_count >= 3 AND total_reviews >= 5
-                // OR last 7 non-reset logs with (again+hard) >= 4.
-                // Use a subquery on review_logs for initial filtering.
-                $query->whereExists(function ($sub) {
-                    $sub->select(\DB::raw('COUNT(*)'))
-                        ->from('review_logs')
-                        ->whereColumn('review_logs.review_card_id', 'review_cards.id')
-                        ->whereNull('review_logs.undone_at')
-                        ->where('review_logs.source', '!=', 'reset')
-                        ->where('review_logs.rating', '!=', 'reset')
-                        ->where('review_logs.rating', '=', 'again')
-                        ->havingRaw('COUNT(*) >= 3');
-                })->whereExists(function ($sub) {
-                    $sub->select(\DB::raw('COUNT(*)'))
-                        ->from('review_logs')
-                        ->whereColumn('review_logs.review_card_id', 'review_cards.id')
-                        ->whereNull('review_logs.undone_at')
-                        ->where('review_logs.source', '!=', 'reset')
-                        ->where('review_logs.rating', '!=', 'reset')
-                        ->havingRaw('COUNT(*) >= 5');
-                });
-                break;
             case 'struggling':
-                // ADR-0011: Cards with recent difficulty but not yet leech.
-                // Use fsrs_lapses >= 2 as a proxy for initial filtering;
-                // the exact struggling classification is computed by the
-                // serializer via SenseReviewLeechPolicy.
-                $query->where('review_cards.fsrs_lapses', '>=', 2);
+                // ADR-0011: Use REAL Policy classification (not SQL proxy).
+                // Method A: Pre-compute matching card IDs via batch classification,
+                // then apply as whereIn. This ensures the filter, pagination total,
+                // and in-row badges all use the same classification source.
+                //
+                // The classification considers ALL sense cards for this user/language
+                // (regardless of lifecycle state), so suspended/archived leech cards
+                // are still findable via this filter.
+                $matchingIds = $this->getLeechFilteredCardIds($userId, $language, $filter);
+                $query->whereIn('review_cards.id', $matchingIds);
                 break;
             case 'missing_definition':
                 $query->whereHas('sense', function ($subQuery) {
@@ -187,6 +175,50 @@ class ReviewCardManageQueryService
                 });
                 break;
         }
+    }
+
+    /**
+     * Get card IDs matching the real leech/struggling Policy classification.
+     *
+     * This is the SINGLE source of truth for leech/struggling filtering on
+     * the management page. It uses SenseReviewLeechQueryService (which
+     * delegates to SenseReviewLeechPolicy) to classify ALL sense cards for
+     * the user/language, then returns only the IDs matching the requested
+     * status.
+     *
+     * Query budget: 1 ReviewLog batch query (via buildForCards) + 1 card ID
+     * query, regardless of card count. Classification is in-memory.
+     *
+     * The classification considers ALL lifecycle states (active, suspended,
+     * archived, buried) so that suspended/archived leech cards remain
+     * findable in the management filter.
+     *
+     * @param  int    $userId
+     * @param  string $language
+     * @param  string $filter  'leech' | 'struggling'
+     * @return list<int>  Card IDs matching the filter. Empty list if none.
+     */
+    private function getLeechFilteredCardIds(int $userId, string $language, string $filter): array
+    {
+        // Get ALL sense card IDs for this user/language, regardless of lifecycle.
+        // Base constraints: user/language/target_type=sense/sense confirmed.
+        $allIds = ReviewCard::query()
+            ->where('review_cards.user_id', $userId)
+            ->where('review_cards.language_id', $language)
+            ->where('review_cards.target_type', ReviewCard::TARGET_SENSE)
+            ->whereHas('sense', function ($subQuery) use ($userId, $language) {
+                $subQuery->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('status', WordSense::STATUS_CONFIRMED);
+            })
+            ->pluck('review_cards.id')
+            ->all();
+
+        if (empty($allIds)) {
+            return [];
+        }
+
+        return $this->leechQueryService->filterCardIdsByLeechStatus($allIds, $filter);
     }
 
     /**

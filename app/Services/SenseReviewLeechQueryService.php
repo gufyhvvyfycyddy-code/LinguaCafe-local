@@ -67,6 +67,81 @@ class SenseReviewLeechQueryService
     }
 
     /**
+     * Build the leech descriptor for a single card using PRE-BUILT feedback.
+     *
+     * This method does NOT query the database — it reuses a feedback
+     * descriptor that was already built by the caller (typically via
+     * SenseReviewLearningFeedbackService::buildForCard() or
+     * buildForCards()). This is the correct entry point when the caller
+     * has already loaded feedback, to avoid duplicate ReviewLog queries.
+     *
+     * @param  ReviewCard  $card
+     * @param  array       $feedback  Pre-built learning feedback descriptor.
+     * @param  Carbon|null $now
+     * @param  string      $timezone
+     * @return array  Leech descriptor {status, severity, reasons, suggestions, blocked_actions}
+     */
+    public function describeForCardWithFeedback(
+        ReviewCard $card,
+        array $feedback,
+        ?Carbon $now = null,
+        string $timezone = 'UTC'
+    ): array {
+        $now = $now ?? Carbon::now();
+        $lifecycleDescriptor = $this->lifecyclePolicy->describe($card, $now, $timezone);
+
+        return $this->leechPolicy->classify($card, $feedback, $lifecycleDescriptor, $now);
+    }
+
+    /**
+     * Build leech descriptors for many cards using a PRE-BUILT feedback map.
+     *
+     * This method does NOT query the database — it reuses a feedback map
+     * that was already built by the caller (typically via
+     * SenseReviewLearningFeedbackService::buildForCards()). This is the
+     * correct entry point for batch operations that have already loaded
+     * feedback, to avoid N+1 ReviewLog queries.
+     *
+     * Query count: 0 ReviewLog queries (feedback must be pre-built).
+     *
+     * @param  array<int>    $cardIds
+     * @param  Collection    $cards    Pre-loaded card models keyed by id.
+     * @param  array<int, array> $feedbackMap  Pre-built feedback map (card_id => feedback).
+     * @param  Carbon|null   $now
+     * @param  string        $timezone
+     * @return array<int, array>  Map of card_id => leech descriptor.
+     */
+    public function describeForCardsWithFeedbackMap(
+        array $cardIds,
+        Collection $cards,
+        array $feedbackMap,
+        ?Carbon $now = null,
+        string $timezone = 'UTC'
+    ): array {
+        $now = $now ?? Carbon::now();
+        $cardIds = array_values(array_filter(array_map('intval', $cardIds), fn($id) => $id > 0));
+
+        if (empty($cardIds)) {
+            return [];
+        }
+
+        $cards = $cards->keyBy('id');
+
+        $result = [];
+        foreach ($cardIds as $cardId) {
+            $card = $cards->get($cardId);
+            if (!$card) {
+                continue;
+            }
+            $feedback = $feedbackMap[$cardId] ?? [];
+            $lifecycleDescriptor = $this->lifecyclePolicy->describe($card, $now, $timezone);
+            $result[$cardId] = $this->leechPolicy->classify($card, $feedback, $lifecycleDescriptor, $now);
+        }
+
+        return $result;
+    }
+
+    /**
      * Build leech descriptors for many cards in a single batch.
      *
      * Uses SenseReviewLearningFeedbackService::buildForCards() which issues

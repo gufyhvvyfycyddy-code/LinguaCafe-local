@@ -65,28 +65,34 @@ class SenseReviewQueryService
     }
 
     /**
-     * Sense review log query that excludes reset-type entries and
-     * undone actions.
+     * Sense review log query that excludes reset-type entries,
+     * undone actions, and non-sense_review sources.
      *
      * Builds on confirmedSenseReviewLogQuery() and adds:
-     *   - source != reset AND rating != reset (reset exclusion)
+     *   - source = 'sense_review' (only real sense review ratings count)
+     *   - source != reset AND rating != reset (reset exclusion — redundant
+     *     with the positive source filter, but kept for clarity and safety)
      *   - undone_at IS NULL (undo exclusion, ADR-0009)
      *
      * Product analytics (daily report, 7-day trend, 30-day calendar,
      * stats, learning feedback, session summary) use this path so
-     * that undone ratings do not inflate counts.
+     * that undone ratings and non-sense_review sources do not inflate
+     * counts. Audit interfaces do NOT use this method — they query
+     * ReviewLog directly and retain all sources.
      */
     public function nonResetSenseReviewLogQuery(int $userId, string $language, Carbon $since): Builder
     {
         return $this->confirmedSenseReviewLogQuery($userId, $language, $since)
+            ->where('review_logs.source', '=', 'sense_review')
             ->where('review_logs.source', '!=', 'reset')
             ->where('review_logs.rating', '!=', 'reset')
             ->whereNull('review_logs.undone_at');
     }
 
     /**
-     * Card-scoped ReviewLog query that excludes reset-type entries
-     * and undone actions.
+     * Card-scoped ReviewLog query that only includes real sense review
+     * ratings (source = 'sense_review'), excluding reset-type entries,
+     * undone actions, and all other sources.
      *
      * Unlike the sense-scoped helpers above, this does NOT join
      * word_senses — it is scoped purely by review_card_id. User /
@@ -95,7 +101,18 @@ class SenseReviewQueryService
      * that belong to the current user.
      *
      * Used by the card-scoped analytics path (per-card learning
-     * feedback) so that reset and undo exclusion lives in one place.
+     * feedback, leech classification) so that source boundary,
+     * reset exclusion, and undo exclusion all live in one place.
+     *
+     * Boundary (ADR-0011 update):
+     *   - source = 'sense_review': INCLUDED
+     *   - source = 'reset':        EXCLUDED
+     *   - rating = 'reset':        EXCLUDED
+     *   - undone_at non-null:      EXCLUDED
+     *   - source = any other value (e.g. 'review', 'import'): EXCLUDED
+     *
+     * Audit interfaces do NOT use this method — they query ReviewLog
+     * directly and retain all sources for the management page log trail.
      *
      * @param  array<int>  $cardIds
      */
@@ -103,6 +120,7 @@ class SenseReviewQueryService
     {
         return ReviewLog::query()
             ->whereIn('review_card_id', $cardIds)
+            ->where('source', '=', 'sense_review')
             ->where('rating', '!=', 'reset')
             ->where('source', '!=', 'reset')
             ->whereNull('undone_at');

@@ -74,15 +74,16 @@ class SenseReviewLeechController extends Controller
         $timezone = $this->resolveTimezone();
         $now = Carbon::now();
 
+        // Build feedback once (1 ReviewLog query).
         $feedback = $this->feedbackService->buildForCard($card->id);
-        $lifecycleDescriptor = $this->lifecyclePolicy->describe($card, $now, $timezone);
-        $leechDescriptor = $this->leechQuery->describeForCard($card, $now, $timezone);
+        // Classify using the pre-built feedback (0 additional ReviewLog queries).
+        $leechDescriptor = $this->leechQuery->describeForCardWithFeedback($card, $feedback, $now, $timezone);
 
         $package = $this->rewriteService->buildPackage(
             $card,
             $feedback,
             $leechDescriptor,
-            $lifecycleDescriptor,
+            $this->lifecyclePolicy->describe($card, $now, $timezone),
             $now
         );
 
@@ -113,6 +114,10 @@ class SenseReviewLeechController extends Controller
      *
      * Request body: { ids: int[] }
      * Returns: { packages: [...], failed: [...], provider_called: false, ... }
+     *
+     * Query budget: exactly 1 ReviewLog query (via buildForCards) regardless
+     * of how many cards are passed. Leech classification reuses the
+     * pre-built feedback map — NO per-card ReviewLog queries.
      */
     public function bulkRewritePackages(Request $request): JsonResponse
     {
@@ -136,8 +141,17 @@ class SenseReviewLeechController extends Controller
             ->get()
             ->keyBy('id');
 
-        // Batch build feedback (1 ReviewLog query).
+        // Batch build feedback (1 ReviewLog query for ALL cards).
         $feedbackMap = $this->feedbackService->buildForCards($ids);
+
+        // Batch classify using the pre-built feedback map (0 ReviewLog queries).
+        $leechMap = $this->leechQuery->describeForCardsWithFeedbackMap(
+            $ids,
+            $cards,
+            $feedbackMap,
+            $now,
+            $timezone
+        );
 
         $cardsData = [];
         $failed = [];
@@ -149,8 +163,8 @@ class SenseReviewLeechController extends Controller
                 continue;
             }
             $feedback = $feedbackMap[$id] ?? [];
+            $leechDescriptor = $leechMap[$id] ?? [];
             $lifecycleDescriptor = $this->lifecyclePolicy->describe($card, $now, $timezone);
-            $leechDescriptor = $this->leechQuery->describeForCard($card, $now, $timezone);
             $cardsData[] = [
                 'card' => $card,
                 'feedback' => $feedback,

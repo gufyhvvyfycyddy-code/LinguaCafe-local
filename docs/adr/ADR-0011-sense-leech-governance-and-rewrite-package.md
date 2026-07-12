@@ -114,9 +114,18 @@ No new columns, no new tables.
 ### 8. ReviewLog exclusion rules
 
 Leech computation uses the same exclusion as all product analytics:
+- `review_logs.source = 'sense_review'` (POSITIVE filter — only real sense-review ratings)
 - `review_logs.undone_at IS NULL` (exclude undone)
 - `review_logs.source != 'reset'` AND `review_logs.rating != 'reset'` (exclude reset)
-- Via `SenseReviewQueryService::nonResetCardReviewLogQuery`
+- Via `SenseReviewQueryService::nonResetCardReviewLogQuery` and
+  `SenseReviewQueryService::nonResetSenseReviewLogQuery`
+
+**Task 2000-4 fix (2026-07-12):** The positive `source = 'sense_review'`
+filter was added to ensure that only real sense-review ratings participate
+in leech classification, learning feedback, and product analytics. Other
+sources (e.g. `review` for word reviews, `acceptance_test` for test data)
+are excluded. Audit interfaces that query ReviewLog directly are NOT
+affected — they continue to see all sources.
 
 ### 9. Management page integration
 
@@ -126,9 +135,12 @@ The management page list payload is extended with optional leech fields:
 - `leech_reasons[]`
 - `leech_suggestions[]`
 
-These are computed on-demand when the filter includes `leech` or `struggling`.
-The default filter does NOT compute leech (performance: leech requires ReviewLog
-batch query).
+**Task 2000-4 fix (2026-07-12):** The leech/struggling filters now use
+REAL Policy classification (via `SenseReviewLeechQueryService::filterCardIdsByLeechStatus`)
+instead of SQL proxy rules. This ensures the filter, pagination total,
+and in-row badges all use the same classification source. The classification
+considers ALL lifecycle states (active, suspended, archived, buried) so
+that suspended/archived leech cards remain findable in the management filter.
 
 New filter values: `leech`, `struggling` (additive to existing lifecycle filters).
 
@@ -214,4 +226,38 @@ tests/js/SenseReviewLeechRewritePackageGuard.test.mjs
 ```
 resources/js/components/Senses/SenseReview.vue       (integrate leech panel)
 resources/js/components/ReviewCards/ReviewCardManage.vue (filters, badges, batch)
+```
+
+### Task 2000-4 fix: source boundary, batch query, filter consistency
+
+**Date:** 2026-07-12
+
+Three issues fixed:
+
+1. **Source boundary:** Added positive `source = 'sense_review'` filter to
+   `SenseReviewQueryService::nonResetCardReviewLogQuery()` and
+   `nonResetSenseReviewLogQuery()`. Other sources (`review`, `reset`,
+   `acceptance_test`, etc.) are now excluded from leech/feedback/analytics.
+
+2. **Batch query N+1:** Added `describeForCardWithFeedback()` and
+   `describeForCardsWithFeedbackMap()` to `SenseReviewLeechQueryService`.
+   Controller's `rewritePackage()` and `bulkRewritePackages()` now build
+   feedback once and reuse it — 1 ReviewLog query regardless of card count
+   (was N+1 for batch, 2 for single).
+
+3. **Filter consistency:** Replaced SQL proxy filters in
+   `ReviewCardManageQueryService::applyFilters()` with real Policy
+   classification via `getLeechFilteredCardIds()`. The filter, pagination
+   total, and in-row badges now all use the same classification source.
+
+```
+Modified files (Task 2000-4):
+app/Services/SenseReviewQueryService.php             (source=sense_review boundary)
+app/Services/SenseReviewLeechQueryService.php        (describeWithFeedback methods)
+app/Http/Controllers/SenseReviewLeechController.php  (reuse feedback, no N+1)
+app/Services/ReviewCardManageQueryService.php        (real Policy filter)
+
+New test files (Task 2000-4):
+tests/Feature/SenseReviewLeechQueryBudgetTest.php    (5 query-budget tests)
+tests/Feature/SenseReviewLeechFilterConsistencyTest.php (12 filter-consistency tests)
 ```
