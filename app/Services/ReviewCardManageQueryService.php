@@ -127,6 +127,36 @@ class ReviewCardManageQueryService
                     ReviewCard::LIFECYCLE_ARCHIVED,
                 ]);
                 break;
+            case 'leech':
+                // ADR-0011: Cards with again_count >= 3 AND total_reviews >= 5
+                // OR last 7 non-reset logs with (again+hard) >= 4.
+                // Use a subquery on review_logs for initial filtering.
+                $query->whereExists(function ($sub) {
+                    $sub->select(\DB::raw('COUNT(*)'))
+                        ->from('review_logs')
+                        ->whereColumn('review_logs.review_card_id', 'review_cards.id')
+                        ->whereNull('review_logs.undone_at')
+                        ->where('review_logs.source', '!=', 'reset')
+                        ->where('review_logs.rating', '!=', 'reset')
+                        ->where('review_logs.rating', '=', 'again')
+                        ->havingRaw('COUNT(*) >= 3');
+                })->whereExists(function ($sub) {
+                    $sub->select(\DB::raw('COUNT(*)'))
+                        ->from('review_logs')
+                        ->whereColumn('review_logs.review_card_id', 'review_cards.id')
+                        ->whereNull('review_logs.undone_at')
+                        ->where('review_logs.source', '!=', 'reset')
+                        ->where('review_logs.rating', '!=', 'reset')
+                        ->havingRaw('COUNT(*) >= 5');
+                });
+                break;
+            case 'struggling':
+                // ADR-0011: Cards with recent difficulty but not yet leech.
+                // Use fsrs_lapses >= 2 as a proxy for initial filtering;
+                // the exact struggling classification is computed by the
+                // serializer via SenseReviewLeechPolicy.
+                $query->where('review_cards.fsrs_lapses', '>=', 2);
+                break;
             case 'missing_definition':
                 $query->whereHas('sense', function ($subQuery) {
                     $subQuery->where(function ($q) {

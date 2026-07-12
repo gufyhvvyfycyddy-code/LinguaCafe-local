@@ -240,6 +240,12 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/review-cards/manage/bulk-delete', [App\Http\Controllers\ReviewCardManageController::class, 'bulkDestroy']);
     Route::post('/review-cards/manage/bulk-lifecycle', [App\Http\Controllers\ReviewCardLifecycleController::class, 'bulkAct']);
 
+    // sense leech governance (ADR-0011)
+    Route::get('/review-cards/manage/leech-summary', [App\Http\Controllers\SenseReviewLeechController::class, 'summary']);
+    Route::post('/review-cards/manage/bulk-leech-rewrite-packages', [App\Http\Controllers\SenseReviewLeechController::class, 'bulkRewritePackages']);
+    Route::get('/reviews/senses/{reviewCard}/leech', [App\Http\Controllers\SenseReviewLeechController::class, 'show']);
+    Route::post('/reviews/senses/{reviewCard}/leech/rewrite-package', [App\Http\Controllers\SenseReviewLeechController::class, 'rewritePackage']);
+
     // review card lifecycle (ADR-0010)
     Route::get('/review-cards/{reviewCard}/lifecycle', [App\Http\Controllers\ReviewCardLifecycleController::class, 'show']);
     Route::post('/review-cards/{reviewCard}/lifecycle-actions', [App\Http\Controllers\ReviewCardLifecycleController::class, 'act']);

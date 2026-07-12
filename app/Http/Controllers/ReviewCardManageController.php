@@ -13,6 +13,7 @@ use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
 use App\Services\ReviewCardManageQueryService;
 use App\Services\ReviewCardManageMutationService;
+use App\Services\SenseReviewLeechQueryService;
 use App\Services\WordSenseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardManageMutationService $mutationService,
         private ReviewCardManageAccessService $accessService,
         private ReviewCardLifecycleCommandService $lifecycleCommandService,
+        private SenseReviewLeechQueryService $leechQueryService,
     )
     {
     }
@@ -38,6 +40,8 @@ class ReviewCardManageController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
         $perPage = min((int) $request->input('per_page', 20), 100);
+        $filter = $request->input('filter', 'enabled');
+        $includeLeech = $request->boolean('include_leech') || in_array($filter, ['leech', 'struggling'], true);
 
         $query = $this->queryService->build($request, $userId, $language);
 
@@ -46,6 +50,27 @@ class ReviewCardManageController extends Controller
         $cards = $paginator->getCollection();
 
         $items = $this->itemSerializer->buildItems($cards, $userId, $language);
+
+        // ADR-0011: Inject leech descriptors when requested or when filtering by leech/struggling.
+        if ($includeLeech && $items->count() > 0) {
+            $cardIds = $items->pluck('review_card_id')->all();
+            $leechMap = $this->leechQueryService->describeForCards($cardIds, $cards);
+            $items = $items->map(function ($item) use ($leechMap) {
+                $desc = $leechMap[$item['review_card_id']] ?? null;
+                if ($desc) {
+                    $item['leech_status'] = $desc['status'];
+                    $item['leech_severity'] = $desc['severity'];
+                    $item['leech_reasons'] = $desc['reasons'];
+                    $item['leech_suggestions'] = $desc['suggestions'];
+                } else {
+                    $item['leech_status'] = 'stable';
+                    $item['leech_severity'] = 0;
+                    $item['leech_reasons'] = [];
+                    $item['leech_suggestions'] = [];
+                }
+                return $item;
+            });
+        }
 
         return response()->json([
             'items' => $items,

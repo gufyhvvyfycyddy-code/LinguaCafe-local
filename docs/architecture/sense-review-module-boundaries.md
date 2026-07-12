@@ -661,3 +661,102 @@ Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, Sen
 - **Reset**: does NOT change lifecycle state. Does NOT force `fsrs_enabled=true`.
 - **Delete**: NOT exposed through the unified lifecycle endpoint.
 - **Migration**: exactly one additive migration. No second migration. No ReviewLog schema change.
+
+## 13. Sense Leech Governance and Rewrite Package (ADR-0011)
+
+> **Status**: ADR-0011 accepted 2026-07-12 (Task B backend complete; Task A frontend pending).
+> **Related**: `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`.
+
+### 13.1 Problem Solved
+
+ADR-0011 adds an Anki-like "leech" governance layer for sense review cards that are repeatedly forgotten. The system classifies each sense card as `stable` / `struggling` / `leech` based on its ReviewLog history, suggests governance actions (continue review, rewrite example, edit sense, suspend temporarily, view history), and can generate a "rewrite prompt package" (JSON + Markdown) for the user to copy to an external AI. The package is read-only — LinguaCafe does NOT call any AI provider, does NOT create WordSense / ReviewCard / ReviewLog, and does NOT auto-suspend cards.
+
+### 13.2 Classification States
+
+| Status | Meaning | Queue eligible? | ReviewLog written? |
+|---|---|---|---|
+| **stable** | Normal learning progress | yes (per lifecycle) | no (leech is read-only) |
+| **struggling** | Recent difficulty, not yet leech | yes (per lifecycle) | no |
+| **leech** | Repeatedly forgotten, suggests governance | yes (per lifecycle) | no |
+
+Leech is a **computed classification**, NOT a lifecycle state. It does not affect queue eligibility directly — that remains the responsibility of `ReviewCardLifecyclePolicy`. Suspended / archived cards still have a computable leech status (shown on the management page) but do not appear in the review queue.
+
+### 13.3 Thresholds
+
+- **leech**: `again_count >= 3 AND total_reviews >= 5` OR last 7 reviews `(again + hard) >= 4`
+- **struggling**: last 5 reviews `(again + hard) >= 3` OR `fsrs_lapses >= 2 AND forgetting_pattern.trend = 'declining'`
+- **stable**: all other cards
+
+### 13.4 Backend Service Boundaries (Task B)
+
+- **`SenseReviewLeechPolicy`** — pure classification function. `classify(ReviewCard $card, array $feedback, array $lifecycleDescriptor, ?Carbon $now): array`. Returns `{status, severity (0-100), reasons[], suggestions[], blocked_actions[]}`. No DB, no writes, no AI, no lifecycle mutation, no FSRS modification, no Request/Auth access. `blocked_actions` blocks `suspend_temporarily` when `effective_state != 'active'`.
+- **`SenseReviewLeechQueryService`** — batch query service. `describeForCard()` / `describeForCards()` / `summary()` / `filterCardIdsByLeechStatus()`. Reuses `SenseReviewLearningFeedbackService::buildForCards()` (1 ReviewLog query for all cards — no N+1). Excludes reset and undone ReviewLog rows via the shared `SenseReviewQueryService` exclusion. Does NOT write, does NOT call AI, does NOT mutate lifecycle.
+- **`SenseReviewLeechRewritePackageService`** — generates `sense-leech-rewrite-package-v1` JSON + Markdown. `buildPackage()` / `buildPackagesBatch()`. Returns `{schema_version, package, markdown, json, provider_called: false, card_created: false, review_log_created: false}`. Does NOT call any AI provider. Does NOT create WordSense / ReviewCard / ReviewLog. The package is a read-only output that the user copies to an external AI manually.
+- **`SenseReviewLeechController`** — 4 endpoints (see 13.5). Uses `ReviewCardManageAccessService::findManageableSenseCardOrFail` for access control. Validates `ids` array (max 50) on bulk endpoint.
+
+### 13.5 Endpoints
+
+- `GET /reviews/senses/{reviewCard}/leech` — single-card leech descriptor.
+- `POST /reviews/senses/{reviewCard}/leech/rewrite-package` — generate rewrite package (read-only).
+- `GET /review-cards/manage/leech-summary` — counts + leech/struggling card ID lists.
+- `POST /review-cards/manage/bulk-leech-rewrite-packages` — batch generate packages (`{ids: int[]}`, max 50).
+
+The management page `data()` endpoint injects `leech_status` / `leech_severity` / `leech_reasons` / `leech_suggestions` into each item when `include_leech=true` or `filter=leech|struggling`.
+
+### 13.6 ReviewLog Exclusion
+
+Leech computation uses the same exclusion as all product analytics: `undone_at IS NULL` AND `source != 'reset'` AND `rating != 'reset'`. This is delegated to `SenseReviewLearningFeedbackService`, which uses `SenseReviewQueryService::nonResetCardReviewLogQuery()`. Reset logs and undone logs do not participate in leech classification.
+
+### 13.7 Lifecycle Boundary
+
+- Leech is NOT a lifecycle state. `SenseReviewLeechPolicy` never writes `lifecycle_state` / `buried_until` / `lifecycle_version`.
+- Leech can SUGGEST `suspend_temporarily`, but the actual suspend must go through `ReviewCardLifecycleCommandService::act($card, 'suspend', ...)`.
+- Suspended / archived cards still show `leech_status` on the management page (read-only classification).
+- Suspended / archived cards do NOT appear in the review queue (enforced by `scopeSenseReviewEligible`).
+- Resume preserves leech history (the ReviewLog data is unchanged by lifecycle transitions).
+- `blocked_actions` blocks `suspend_temporarily` when `effective_state != 'active'`.
+
+### 13.8 Rewrite Package Safety
+
+The rewrite package is a read-only output. The response explicitly includes:
+- `provider_called: false` — no AI provider was contacted.
+- `card_created: false` — no WordSense / ReviewCard was created.
+- `review_log_created: false` — no ReviewLog was written.
+
+The package JSON includes `output_contract` and `safety_rules` that instruct the external AI to NOT create new senses, NOT create review cards, and to focus on improving the example sentence / Chinese definition / disambiguation clues.
+
+### 13.9 No Migration
+
+ADR-0011 does NOT add any database migration. All leech classification is computed from existing `ReviewLog` / `ReviewCard` / `WordSense` data at query time. The `SenseReviewLearningFeedbackService` already aggregates the needed metrics (`total_reviews`, `forget_count`, `hard_count`, `recent_reviews`, `forgetting_pattern`).
+
+### 13.10 Backend Test Coverage (Task B-8)
+
+Five new test files, 56 tests, all green:
+
+- `tests/Unit/SenseReviewLeechPolicyTest.php` (17 tests) — stable / struggling / leech classification, severity, suggestions, blocked actions, reasons.
+- `tests/Feature/SenseReviewLeechQueryTest.php` (9 tests) — single/batch describe, summary, filter, undone/reset exclusion, user isolation, no N+1.
+- `tests/Feature/SenseReviewLeechRewritePackageTest.php` (11 tests) — schema version, provider_called=false, no WordSense/ReviewCard/ReviewLog creation, required fields, markdown, safety rules, batch.
+- `tests/Feature/ReviewCardManageLeechTest.php` (9 tests) — leech/struggling filter, include_leech injection, summary endpoint, bulk endpoint, single card endpoints, 404 for other user.
+- `tests/Feature/SenseReviewLeechLifecycleBoundaryTest.php` (10 tests) — leech doesn't modify lifecycle, suspended/archived still shows leech, blocked actions, queue exclusion, resume preserves leech, no state events / review logs created, suspend via lifecycle endpoint.
+
+Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, ReviewCardLifecycleCommandTest 24, ReviewCardLifecycleQueueTest 13, SenseReviewIntervalPreviewTest 25, WordSense 197+1 skipped.
+
+### 13.11 Frontend Layer (Task A — pending)
+
+- **`resources/js/services/SenseReviewLeechPresentation.js`** — pure helper (status label, color, severity text, reason text, suggestion text, copy filename). No axios, no Vue, no DOM, no FSRS calculation.
+- **`SenseReviewLeechPanel.vue`** — review page panel. Stable: hidden. Struggling: light hint. Leech: governance card on answer face with buttons (生成重写提示包 / 编辑词义 / 查看历史 / 暂停复习). Does NOT block rating. Does NOT change hotkeys. Suspend goes through lifecycle endpoint.
+- **`SenseReviewLeechRewritePackageDialog.vue`** — shows JSON + Markdown, copy buttons, explicit "不调用 AI" notice. No provider-preview. No auto-creation.
+- **`ReviewCardManage.vue`** — leech filter (全部 / 正常 / 需关注 / 高遗忘), leech badge + severity + reasons, per-row actions, batch generate rewrite packages, batch suspend leech cards, detail drawer diagnostics.
+- **Frontend guard tests**: `SenseReviewLeechPresentationGuard.test.mjs`, `SenseReviewLeechPanelGuard.test.mjs`, `ReviewCardManageLeechGuard.test.mjs`, `SenseReviewLeechRewritePackageGuard.test.mjs`.
+
+### 13.12 Frozen Boundaries
+
+- **Policy**: pure, no DB, no writes, no AI, no lifecycle mutation, no FSRS modification.
+- **QueryService**: read-only, reuses `SenseReviewLearningFeedbackService`, no N+1, excludes reset/undone ReviewLog.
+- **RewritePackageService**: read-only output, `provider_called=false`, `card_created=false`, `review_log_created=false`.
+- **Leech is NOT a lifecycle state**: suspend must go through `ReviewCardLifecycleCommandService`.
+- **No migration**: all computation from existing data.
+- **No auto-AI**: the rewrite package is for the user to copy to an external AI manually.
+- **No auto-creation**: no WordSense, no ReviewCard, no ReviewLog created by leech services.
+- **No FSRS change**: leech classification does not modify any FSRS field.
+- **No rating change**: leech does not block rating or change hotkeys.
