@@ -48,6 +48,28 @@
             <v-chip v-for="(chip, idx) in statsChips" :key="idx" x-small outlined class="mr-1 mb-1">
                 {{ chip.label }} {{ chip.value }}
             </v-chip>
+            <!-- ADR-0011: Leech summary chip. Shows the leech / struggling
+                 counts from GET /review-cards/manage/leech-summary. Loaded
+                 on mount and after bulk operations. -->
+            <v-chip
+                v-if="leechSummaryLoaded"
+                x-small
+                outlined
+                color="error"
+                class="mr-1 mb-1"
+                :title="'高遗忘 ' + leechSummary.counts.leech + ' · 需关注 ' + leechSummary.counts.struggling"
+            >
+                高遗忘 {{ leechSummary.counts.leech }}
+            </v-chip>
+            <v-chip
+                v-if="leechSummaryLoaded"
+                x-small
+                outlined
+                color="warning"
+                class="mr-1 mb-1"
+            >
+                需关注 {{ leechSummary.counts.struggling }}
+            </v-chip>
             <v-btn x-small text color="info" class="ml-1 mb-1" @click="stateHelpDialog = true">
                 <v-icon x-small left>mdi-help-circle-outline</v-icon>状态说明
             </v-btn>
@@ -79,6 +101,11 @@
                     <v-btn small value="missing_definition" @click="applyFilter('missing_definition')">缺释义</v-btn>
                     <v-btn small value="missing_example" @click="applyFilter('missing_example')">缺例句</v-btn>
                     <v-btn small value="missing_source" @click="applyFilter('missing_source')">缺溯源</v-btn>
+                    <!-- ADR-0011: Leech governance filters. Backend injects
+                         leech_status per item when filter=leech|struggling
+                         and include_leech=true is set automatically. -->
+                    <v-btn small value="leech" @click="applyFilter('leech')" class="error--text">高遗忘</v-btn>
+                    <v-btn small value="struggling" @click="applyFilter('struggling')" class="warning--text">需关注</v-btn>
                 </v-btn-toggle>
             </v-col>
             <v-col cols="6" sm="3" md="2">
@@ -286,6 +313,31 @@
                 </v-list>
             </v-menu>
             <v-btn small color="error" class="mr-2" @click="confirmBulkDelete">批量彻底删除</v-btn>
+            <!-- ADR-0011: Leech batch governance.
+                 批量生成重写包 calls bulk-leech-rewrite-packages and opens
+                 a dialog showing all generated packages.
+                 批量暂停高遗忘卡 calls bulk-lifecycle with action=suspend and
+                 a dedicated source tag for audit. -->
+            <v-btn
+                small
+                color="primary"
+                class="mr-2"
+                :loading="bulkRewriteLoading"
+                :disabled="bulkRewriteLoading"
+                @click="openBulkRewritePackages"
+            >
+                <v-icon small left>mdi-package-variant-closed</v-icon>批量生成重写包
+            </v-btn>
+            <v-btn
+                small
+                color="warning"
+                class="mr-2"
+                :loading="bulkLeechSuspendLoading"
+                :disabled="bulkLeechSuspendLoading"
+                @click="confirmBulkLeechSuspend"
+            >
+                <v-icon small left>mdi-pause-circle-outline</v-icon>批量暂停高遗忘卡
+            </v-btn>
             <v-spacer />
             <v-btn small text @click="clearSelection">取消选择</v-btn>
         </div>
@@ -383,6 +435,16 @@
                                 <v-chip x-small :color="stateColor(item.lifecycle_state)">
                                     {{ stateLabel(item.lifecycle_state) }}
                                 </v-chip>
+                                <!-- ADR-0011: Leech badge. Shown when the backend
+                                     injected a non-stable leech_status (only when
+                                     include_leech=true is sent, e.g. filter=leech). -->
+                                <v-chip
+                                    v-if="item.leech_status && item.leech_status !== 'stable'"
+                                    x-small
+                                    :color="leechStatusColor(item.leech_status)"
+                                    text-color="white"
+                                    class="ml-1"
+                                >{{ leechStatusLabel(item.leech_status) }}</v-chip>
                                 <span class="text-caption d-block">{{ item.fsrs_state }}</span>
                             </td>
                             <td class="col-fsrs text-center" v-if="isColumnVisible('fsrs_stability')">{{ formatFsrsNumber(item.fsrs_stability) }}</td>
@@ -443,6 +505,18 @@
                                             </v-list-item>
                                             <v-list-item @click="confirmReset(item)">
                                                 <v-list-item-title>重置</v-list-item-title>
+                                            </v-list-item>
+                                            <!-- ADR-0011: Leech governance per-row actions.
+                                                 生成重写包 opens the rewrite-package dialog;
+                                                 暂停 calls the lifecycle suspend endpoint. -->
+                                            <v-list-item @click="openRewritePackageDialog(item)">
+                                                <v-list-item-title>生成重写包</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item
+                                                v-if="item.leech_status === 'leech'"
+                                                @click="suspendLeechCard(item)"
+                                            >
+                                                <v-list-item-title class="warning--text">暂停</v-list-item-title>
                                             </v-list-item>
                                             <v-list-item @click="confirmDelete(item)">
                                                 <v-list-item-title class="error--text">彻底删除</v-list-item-title>
@@ -742,6 +816,72 @@
 
                         <v-divider class="my-3" />
 
+                        <!-- ADR-0011: 遗忘诊断 (leech diagnostics).
+                             Fetches GET /reviews/senses/{reviewCardId}/leech
+                             when the drawer opens. Shows status badge,
+                             severity, reasons, and suggestions. For
+                             suspended/archived cards, a note explains
+                             that leech status is still computed but the
+                             card is not in the review queue. -->
+                        <div class="detail-section">
+                            <div class="detail-section-title">遗忘诊断</div>
+                            <div v-if="detailLeechLoading" class="text-caption text--secondary py-2">加载遗忘诊断中...</div>
+                            <div v-else-if="detailLeechError" class="text-caption error--text py-2">{{ detailLeechError }}</div>
+                            <template v-else-if="detailLeech">
+                                <div class="detail-row">
+                                    <span class="detail-label">遗忘状态</span>
+                                    <span class="detail-value">
+                                        <v-chip x-small :color="leechStatusColor(detailLeech.status)" text-color="white">
+                                            {{ leechStatusLabel(detailLeech.status) }}
+                                        </v-chip>
+                                        <v-chip
+                                            v-if="detailLeech.status !== 'stable'"
+                                            x-small
+                                            :color="leechSeverityColor(detailLeech.severity)"
+                                            outlined
+                                            class="ml-1"
+                                        >严重度：{{ leechSeverityText(detailLeech.severity) }}</v-chip>
+                                    </span>
+                                </div>
+                                <div v-if="detailLeech.reasons && detailLeech.reasons.length" class="detail-row">
+                                    <span class="detail-label">原因</span>
+                                    <span class="detail-value">
+                                        <v-chip
+                                            v-for="reason in detailLeech.reasons"
+                                            :key="reason"
+                                            x-small
+                                            color="error"
+                                            outlined
+                                            class="mr-1 mb-1"
+                                        >{{ leechReasonLabel(reason) }}</v-chip>
+                                    </span>
+                                </div>
+                                <div v-if="detailLeech.suggestions && detailLeech.suggestions.length" class="detail-row">
+                                    <span class="detail-label">建议</span>
+                                    <span class="detail-value">
+                                        <ul class="pl-4 mb-0">
+                                            <li v-for="suggestion in detailLeech.suggestions" :key="suggestion" class="text-body-2">
+                                                {{ leechSuggestionLabel(suggestion) }}
+                                            </li>
+                                        </ul>
+                                    </span>
+                                </div>
+                                <v-alert
+                                    v-if="detailTarget.lifecycle_state === 'suspended' || detailTarget.lifecycle_state === 'archived'"
+                                    type="info"
+                                    dense
+                                    text
+                                    class="mt-2 mb-0"
+                                    border="left"
+                                >
+                                    该卡当前为「{{ stateLabel(detailTarget.lifecycle_state) }}」状态，不在复习队列中。遗忘诊断仍会基于历史数据计算，但不会出现在日常复习中。
+                                </v-alert>
+                            </template>
+                            <div v-else class="text-caption text--secondary py-2">暂无遗忘诊断数据。</div>
+                        </div>
+
+                        <v-divider class="my-3" />
+
                         <!-- 缺失状态 -->
                         <div class="detail-section">
                             <div class="detail-section-title">缺失状态</div>
@@ -965,6 +1105,117 @@
             </v-card>
         </v-dialog>
 
+        <!-- ADR-0011: Single-card rewrite package dialog. Delegates to
+             the SenseReviewLeechRewritePackageDialog sub-component which
+             owns the POST fetch, loading state, copy buttons, and the
+             "no AI" notice. -->
+        <SenseReviewLeechRewritePackageDialog
+            v-model="rewritePackageDialog"
+            :review-card-id="rewritePackageCardId"
+            :lemma="rewritePackageLemma"
+            @copied="onRewriteCopied"
+        />
+
+        <!-- ADR-0011: Bulk rewrite packages dialog. Shows all packages
+             generated by POST /review-cards/manage/bulk-leech-rewrite-packages.
+             Each package has JSON + Markdown tabs; partial failures are
+             listed per-item. No AI is called, nothing is auto-created. -->
+        <v-dialog v-model="bulkRewriteDialog" max-width="900" scrollable>
+            <v-card>
+                <v-card-title class="d-flex align-center">
+                    <v-icon small class="mr-2">mdi-package-variant-closed</v-icon>
+                    批量重写提示包
+                    <v-spacer />
+                    <v-btn icon small @click="bulkRewriteDialog = false">
+                        <v-icon small>mdi-close</v-icon>
+                    </v-btn>
+                </v-card-title>
+                <v-alert type="warning" dense text border="left" class="mx-4 mb-0">
+                    LinguaCafe 不会调用任何 AI。请手动复制以下内容到外部 AI 改写后再回到这里编辑词义。
+                </v-alert>
+                <v-card-text>
+                    <div v-if="bulkRewriteLoading" class="d-flex align-center justify-center py-6">
+                        <v-progress-circular indeterminate size="24" class="mr-3" />
+                        <span class="text-body-2 text--secondary">正在生成 {{ bulkRewriteIds.length }} 个重写包…</span>
+                    </div>
+                    <div v-else-if="bulkRewriteError" class="text-body-2 error--text py-2">{{ bulkRewriteError }}</div>
+                    <template v-else>
+                        <div v-if="bulkRewritePackages.length" class="mb-2">
+                            <div class="text-caption text--secondary mb-2">
+                                共生成 {{ bulkRewritePackages.length }} 个提示包（不调用 AI · 不创建学习卡 · 不写复习记录）
+                            </div>
+                            <v-expansion-panels v-model="bulkRewriteOpenPanel" accordion>
+                                <v-expansion-panel
+                                    v-for="(pkg, idx) in bulkRewritePackages"
+                                    :key="idx"
+                                >
+                                    <v-expansion-panel-header class="py-1">
+                                        <div class="d-flex align-center" style="gap: 6px;">
+                                            <v-chip x-small outlined>#{{ pkg.review_card_id }}</v-chip>
+                                            <span class="text-body-2">{{ pkg.lemma || '未命名' }}</span>
+                                        </div>
+                                    </v-expansion-panel-header>
+                                    <v-expansion-panel-content>
+                                        <div class="text-caption text--secondary mt-1 mb-1">JSON</div>
+                                        <div class="d-flex justify-end mb-1">
+                                            <v-btn x-small text color="primary" @click="copyBulkPackage(pkg, 'json')">
+                                                <v-icon x-small left>mdi-content-copy</v-icon>复制 JSON
+                                            </v-btn>
+                                        </div>
+                                        <pre class="bulk-rewrite-pre">{{ formatBulkPackage(pkg, 'json') }}</pre>
+                                        <div class="text-caption text--secondary mt-3 mb-1">Markdown</div>
+                                        <div class="d-flex justify-end mb-1">
+                                            <v-btn x-small text color="primary" @click="copyBulkPackage(pkg, 'markdown')">
+                                                <v-icon x-small left>mdi-content-copy</v-icon>复制 Markdown
+                                            </v-btn>
+                                        </div>
+                                        <pre class="bulk-rewrite-pre">{{ formatBulkPackage(pkg, 'markdown') }}</pre>
+                                    </v-expansion-panel-content>
+                                </v-expansion-panel>
+                            </v-expansion-panels>
+                        </div>
+                        <div v-if="bulkRewriteFailed.length" class="mt-3">
+                            <div class="text-caption error--text mb-1">部分卡片生成失败（{{ bulkRewriteFailed.length }}）：</div>
+                            <div
+                                v-for="(fail, idx) in bulkRewriteFailed"
+                                :key="'fail-' + idx"
+                                class="text-body-2 mb-1"
+                            >
+                                <v-chip x-small outlined color="error" class="mr-1">#{{ fail.review_card_id }}</v-chip>
+                                <span class="text--secondary">{{ fail.message || '生成失败' }}</span>
+                            </div>
+                        </div>
+                    </template>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="bulkRewriteDialog = false">关闭</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
+        <!-- ADR-0011: Bulk leech suspend confirmation dialog. Calls the
+             existing bulk-lifecycle endpoint with action=suspend and a
+             dedicated source for audit. Per-item success/conflict display. -->
+        <v-dialog v-model="bulkLeechSuspendDialog" max-width="520">
+            <v-card>
+                <v-card-title>批量暂停选中的高遗忘卡？</v-card-title>
+                <v-card-text>
+                    <p class="review-card-manage-bulk-lifecycle-scope">
+                        只会处理你当前勾选的 {{ selectedIds.length }} 张复习卡。
+                    </p>
+                    <p class="text--secondary">
+                        通过生命周期接口暂停，保持学习进度。可在管理页恢复复习。
+                    </p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text :disabled="bulkLeechSuspendLoading" @click="bulkLeechSuspendDialog = false">取消</v-btn>
+                    <v-btn color="warning" :loading="bulkLeechSuspendLoading" @click="doBulkLeechSuspend">确认暂停</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- Snackbar -->
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" top>
             {{ snackbar.text }}
@@ -990,10 +1241,20 @@ import {
     LIFECYCLE_PRESENTATION,
     LIFECYCLE_STATES,
 } from '../../services/ReviewCardLifecyclePresentation.js';
+import {
+    statusLabel as leechStatusLabel,
+    statusColor as leechStatusColor,
+    reasonLabel as leechReasonLabel,
+    suggestionLabel as leechSuggestionLabel,
+    severityText as leechSeverityText,
+    severityColor as leechSeverityColor,
+} from '../../services/SenseReviewLeechPresentation.js';
+import SenseReviewLeechRewritePackageDialog from '../Senses/SenseReviewLeechRewritePackageDialog.vue';
 
 export default {
     components: {
         SenseExampleDialog,
+        SenseReviewLeechRewritePackageDialog,
     },
     props: {
         language: {
@@ -1189,6 +1450,35 @@ export default {
                 { key: 'missing_source', label: '缺溯源' },
             ],
             exportFields: [],
+            // ADR-0011: Leech summary chip (top stats area).
+            // Loaded on mount via GET /review-cards/manage/leech-summary.
+            leechSummary: {
+                counts: { stable: 0, struggling: 0, leech: 0 },
+                leech_card_ids: [],
+                struggling_card_ids: [],
+            },
+            leechSummaryLoaded: false,
+            // ADR-0011: Detail drawer leech diagnostics.
+            // Fetched via GET /reviews/senses/{reviewCardId}/leech when
+            // the drawer opens.
+            detailLeech: null,
+            detailLeechLoading: false,
+            detailLeechError: '',
+            // ADR-0011: Single-card rewrite package dialog.
+            rewritePackageDialog: false,
+            rewritePackageCardId: 0,
+            rewritePackageLemma: '',
+            // ADR-0011: Bulk rewrite packages dialog.
+            bulkRewriteDialog: false,
+            bulkRewriteLoading: false,
+            bulkRewriteError: '',
+            bulkRewriteIds: [],
+            bulkRewritePackages: [],
+            bulkRewriteFailed: [],
+            bulkRewriteOpenPanel: undefined,
+            // ADR-0011: Bulk leech suspend dialog.
+            bulkLeechSuspendDialog: false,
+            bulkLeechSuspendLoading: false,
         };
     },
     computed: {
@@ -1330,6 +1620,7 @@ export default {
         this.loadCompactMode();
         this.loadData();
         this.loadFsrsStats();
+        this.loadLeechSummary();
         this.initExportFields();
         this.handleDeepLink();
     },
@@ -1868,9 +2159,14 @@ export default {
             this.detailEvents = [];
             this.detailEventsLoading = false;
             this.detailEventsError = '';
+            // ADR-0011: Reset leech diagnostics for the new card.
+            this.detailLeech = null;
+            this.detailLeechLoading = false;
+            this.detailLeechError = '';
             this.detailDrawer = true;
             this.loadDetailLogs(item);
             this.loadDetailEvents(item);
+            this.loadDetailLeech(item);
         },
 
         // --- Deep link (ADR-0007) ---
@@ -1927,6 +2223,10 @@ export default {
             this.detailEvents = [];
             this.detailEventsLoading = false;
             this.detailEventsError = '';
+            // ADR-0011: Clear leech diagnostics on close.
+            this.detailLeech = null;
+            this.detailLeechLoading = false;
+            this.detailLeechError = '';
         },
 
         loadDetailLogs(item) {
@@ -1957,6 +2257,234 @@ export default {
                 .finally(() => {
                     this.detailEventsLoading = false;
                 });
+        },
+
+        // ==================== ADR-0011: Leech governance ====================
+        // Load the leech summary chip counts from
+        // GET /review-cards/manage/leech-summary. Called on mount and
+        // after bulk operations. Non-blocking: on failure, the chip is
+        // hidden (leechSummaryLoaded stays false).
+        loadLeechSummary() {
+            axios.get('/review-cards/manage/leech-summary')
+                .then((response) => {
+                    const data = response.data || {};
+                    this.leechSummary = {
+                        counts: data.counts || { stable: 0, struggling: 0, leech: 0 },
+                        leech_card_ids: data.leech_card_ids || [],
+                        struggling_card_ids: data.struggling_card_ids || [],
+                    };
+                    this.leechSummaryLoaded = true;
+                })
+                .catch(() => {
+                    // Non-blocking: hide the chip on failure.
+                    this.leechSummaryLoaded = false;
+                });
+        },
+
+        // Fetch the leech descriptor for the detail drawer.
+        // GET /reviews/senses/{reviewCardId}/leech. Non-blocking.
+        loadDetailLeech(item) {
+            if (!item || !item.review_card_id) {
+                return;
+            }
+            this.detailLeechLoading = true;
+            this.detailLeechError = '';
+            axios.get('/reviews/senses/' + item.review_card_id + '/leech')
+                .then((response) => {
+                    const data = response.data || {};
+                    this.detailLeech = data.leech || null;
+                })
+                .catch((err) => {
+                    this.detailLeechError = '加载遗忘诊断失败：' + (err.response?.data?.message || err.message);
+                    this.detailLeech = null;
+                })
+                .finally(() => {
+                    this.detailLeechLoading = false;
+                });
+        },
+
+        // Thin wrappers exposing the pure presentation helpers to the
+        // template. Vue 2 templates can only call functions registered
+        // on the instance via methods.
+        leechStatusLabel,
+        leechStatusColor,
+        leechReasonLabel,
+        leechSuggestionLabel,
+        leechSeverityText,
+        leechSeverityColor,
+
+        // Open the single-card rewrite package dialog.
+        openRewritePackageDialog(item) {
+            if (!item || !item.review_card_id) {
+                return;
+            }
+            this.rewritePackageCardId = item.review_card_id;
+            this.rewritePackageLemma = item.lemma || '';
+            this.rewritePackageDialog = true;
+        },
+
+        // Snackbar feedback when a copy operation completes.
+        onRewriteCopied(payload) {
+            if (!payload) {
+                return;
+            }
+            this.showSnackbar(payload.text || '已复制。', 'success');
+        },
+
+        // Per-row suspend for leech cards. Calls the lifecycle endpoint
+        // with action=suspend and a sense_review_leech source for audit.
+        // Uses crypto.randomUUID() with a try/catch fallback.
+        suspendLeechCard(item) {
+            if (!item || !item.review_card_id) {
+                return;
+            }
+            const requestId = this.generateRequestId('leech-suspend-');
+            axios.post('/review-cards/' + item.review_card_id + '/lifecycle-actions', {
+                action: 'suspend',
+                request_id: requestId,
+                expected_version: null,
+                source: 'sense_review_leech',
+            }).then((response) => {
+                const alreadyApplied = response.data?.already_applied;
+                this.showSnackbar(
+                    alreadyApplied ? '该卡已暂停过。' : '已暂停该高遗忘卡。',
+                    'success'
+                );
+                this.loadData();
+                this.loadFsrsStats();
+                this.loadLeechSummary();
+            }).catch((err) => {
+                const status = err.response?.status;
+                if (status === 409) {
+                    this.showSnackbar('卡片状态已在其他页面发生变化，已刷新。', 'warning');
+                    this.loadData();
+                } else if (status === 422) {
+                    this.showSnackbar(err.response?.data?.message || '该操作在当前状态下不可用。', 'error');
+                } else if (!err.response) {
+                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
+                } else {
+                    this.showSnackbar(err.response?.data?.message || '暂停失败。', 'error');
+                }
+            });
+        },
+
+        // Generate a request_id with crypto.randomUUID() and a
+        // Math.random fallback for older browsers.
+        generateRequestId(prefix) {
+            try {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    return window.crypto.randomUUID();
+                }
+            } catch (e) {
+                // fall through to Math.random fallback
+            }
+            return (prefix || 'req-') + Date.now() + '-' + Math.random().toString(36).slice(2);
+        },
+
+        // Open the bulk rewrite packages dialog. Calls
+        // POST /review-cards/manage/bulk-leech-rewrite-packages with the
+        // selected ids and displays all generated packages.
+        openBulkRewritePackages() {
+            if (this.selectedIds.length === 0) {
+                return;
+            }
+            this.bulkRewriteIds = [...this.selectedIds];
+            this.bulkRewritePackages = [];
+            this.bulkRewriteFailed = [];
+            this.bulkRewriteError = '';
+            this.bulkRewriteOpenPanel = 0;
+            this.bulkRewriteDialog = true;
+            this.bulkRewriteLoading = true;
+            axios.post('/review-cards/manage/bulk-leech-rewrite-packages', {
+                ids: this.bulkRewriteIds,
+            }).then((response) => {
+                const data = response.data || {};
+                this.bulkRewritePackages = Array.isArray(data.packages) ? data.packages : [];
+                this.bulkRewriteFailed = Array.isArray(data.failed) ? data.failed : [];
+            }).catch((err) => {
+                this.bulkRewriteError = (err.response && err.response.data && err.response.data.message)
+                    || '批量生成重写包失败，请稍后重试。';
+            }).finally(() => {
+                this.bulkRewriteLoading = false;
+            });
+        },
+
+        // Format a bulk package field for display.
+        formatBulkPackage(pkg, field) {
+            if (!pkg) {
+                return '';
+            }
+            if (field === 'markdown') {
+                return typeof pkg.markdown === 'string' ? pkg.markdown : '';
+            }
+            // json
+            if (typeof pkg.json === 'string') {
+                return pkg.json;
+            }
+            return JSON.stringify(pkg.package || pkg.json || {}, null, 2);
+        },
+
+        // Copy a bulk package field to the clipboard.
+        copyBulkPackage(pkg, field) {
+            const text = this.formatBulkPackage(pkg, field);
+            if (!text) {
+                return;
+            }
+            if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                navigator.clipboard.writeText(text)
+                    .then(() => {
+                        this.showSnackbar('已复制到剪贴板。', 'success');
+                    })
+                    .catch(() => {
+                        this.showSnackbar('复制失败，请手动选择文本复制。', 'error');
+                    });
+            } else {
+                this.showSnackbar('当前浏览器不支持自动复制，请手动选择文本复制。', 'warning');
+            }
+        },
+
+        // Open the bulk leech suspend confirmation dialog.
+        confirmBulkLeechSuspend() {
+            if (this.selectedIds.length === 0) {
+                return;
+            }
+            this.bulkLeechSuspendDialog = true;
+        },
+
+        // Execute the bulk leech suspend via the existing bulk-lifecycle
+        // endpoint with action=suspend and a dedicated source.
+        doBulkLeechSuspend() {
+            this.bulkLeechSuspendLoading = true;
+            const ids = [...this.selectedIds];
+            axios.post('/review-cards/manage/bulk-lifecycle', {
+                ids: ids,
+                action: 'suspend',
+                source: 'manage_bulk_leech_suspend',
+            }).then((response) => {
+                this.bulkLeechSuspendDialog = false;
+                this.clearSelection();
+                const data = response.data || {};
+                let msg = `已批量暂停：应用 ${data.applied ?? ids.length} 张`;
+                if (data.skipped > 0) {
+                    msg += `，跳过 ${data.skipped} 张（当前状态不允许）`;
+                }
+                msg += '。';
+                this.showSnackbar(msg, data.skipped > 0 ? 'warning' : 'success');
+                this.loadData();
+                this.loadFsrsStats();
+                this.loadLeechSummary();
+            }).catch((err) => {
+                const status = err.response?.status;
+                if (status === 422) {
+                    this.showSnackbar(err.response?.data?.message || '请求参数有误。', 'error');
+                } else if (!err.response) {
+                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
+                } else {
+                    this.showSnackbar(err.response?.data?.message || '批量暂停失败。', 'error');
+                }
+            }).finally(() => {
+                this.bulkLeechSuspendLoading = false;
+            });
         },
 
         initExportFields() {
@@ -2560,5 +3088,21 @@ export default {
     font-size: 0.85rem;
     color: rgba(0, 0, 0, 0.54);
     font-style: italic;
+}
+
+/* ADR-0011: Bulk rewrite packages dialog <pre> blocks. */
+.bulk-rewrite-pre {
+    background: #fafafa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    font-size: 11px;
+    line-height: 1.45;
+    max-height: 320px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin: 0;
 }
 </style>

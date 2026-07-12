@@ -664,7 +664,7 @@ Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, Sen
 
 ## 13. Sense Leech Governance and Rewrite Package (ADR-0011)
 
-> **Status**: ADR-0011 accepted 2026-07-12 (Task B backend complete; Task A frontend pending).
+> **Status**: ADR-0011 accepted 2026-07-12 (Task B backend + Task A frontend complete).
 > **Related**: `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`.
 
 ### 13.1 Problem Solved
@@ -741,13 +741,14 @@ Five new test files, 56 tests, all green:
 
 Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, ReviewCardLifecycleCommandTest 24, ReviewCardLifecycleQueueTest 13, SenseReviewIntervalPreviewTest 25, WordSense 197+1 skipped.
 
-### 13.11 Frontend Layer (Task A — pending)
+### 13.11 Frontend Layer (Task A — complete)
 
-- **`resources/js/services/SenseReviewLeechPresentation.js`** — pure helper (status label, color, severity text, reason text, suggestion text, copy filename). No axios, no Vue, no DOM, no FSRS calculation.
-- **`SenseReviewLeechPanel.vue`** — review page panel. Stable: hidden. Struggling: light hint. Leech: governance card on answer face with buttons (生成重写提示包 / 编辑词义 / 查看历史 / 暂停复习). Does NOT block rating. Does NOT change hotkeys. Suspend goes through lifecycle endpoint.
-- **`SenseReviewLeechRewritePackageDialog.vue`** — shows JSON + Markdown, copy buttons, explicit "不调用 AI" notice. No provider-preview. No auto-creation.
-- **`ReviewCardManage.vue`** — leech filter (全部 / 正常 / 需关注 / 高遗忘), leech badge + severity + reasons, per-row actions, batch generate rewrite packages, batch suspend leech cards, detail drawer diagnostics.
-- **Frontend guard tests**: `SenseReviewLeechPresentationGuard.test.mjs`, `SenseReviewLeechPanelGuard.test.mjs`, `ReviewCardManageLeechGuard.test.mjs`, `SenseReviewLeechRewritePackageGuard.test.mjs`.
+- **`resources/js/services/SenseReviewLeechPresentation.js`** — pure helper (status label, color, severity text, reason text, suggestion text, copy filename). No axios, no Vue, no DOM, no FSRS calculation. Guard: `SenseReviewLeechPresentationGuard.test.mjs` (30 tests).
+- **`SenseReviewLeechPanel.vue`** — review page panel. Stable: hidden. Struggling: light hint. Leech: governance card on answer face with buttons (生成重写提示包 / 编辑词义 / 查看历史 / 暂停复习). Does NOT block rating. Does NOT change hotkeys. Suspend goes through lifecycle endpoint. Guard: `SenseReviewLeechPanelGuard.test.mjs` (24 tests).
+- **`SenseReviewLeechRewritePackageDialog.vue`** — shows JSON + Markdown, copy buttons, explicit "不调用 AI" notice. No provider-preview. No auto-creation. Guard: `SenseReviewLeechRewritePackageGuard.test.mjs` (22 tests).
+- **`ReviewCardManage.vue`** — leech filter (全部 / 正常 / 需关注 / 高遗忘), leech badge + severity + reasons, per-row actions, batch generate rewrite packages, batch suspend leech cards, detail drawer diagnostics. Guard: `ReviewCardManageLeechGuard.test.mjs` (18 tests).
+- **`SenseReview.vue`** — integrates `SenseReviewLeechPanel` (answer face, keyed by review_card_id) and `SenseReviewLeechRewritePackageDialog` (v-model boolean). Suspend emits to existing `executeLifecycleAction('suspend')`.
+- **Total frontend guard tests**: 94 (30 + 24 + 22 + 18), all passing. `npm run development` compiles successfully.
 
 ### 13.12 Frozen Boundaries
 

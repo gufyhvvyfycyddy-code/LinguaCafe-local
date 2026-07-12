@@ -216,6 +216,23 @@
                             :learning-feedback="learningFeedback"
                             :fsrs-stability="currentCard.fsrs_stability"
                         />
+
+                        <!-- ADR-0011: Leech governance panel.
+                             Read-only classification from backend. Stable:
+                             hidden. Struggling: light hint. Leech: governance
+                             card on answer face. Does NOT block rating.
+                             Does NOT change hotkeys. Suspend goes through
+                             lifecycle endpoint. -->
+                        <SenseReviewLeechPanel
+                            v-if="currentCard"
+                            :key="'leech-' + currentCard.review_card_id"
+                            :review-card-id="currentCard.review_card_id"
+                            :show-answer="showAnswer"
+                            @rewrite="leechRewriteDialog = true"
+                            @edit="editDialog = true"
+                            @history="sessionActionDrawerOpen = true"
+                            @suspend="executeLifecycleAction('suspend')"
+                        />
                     </v-col>
                     <v-col cols="12" md="6">
                         <div class="caption text--secondary">例句</div>
@@ -279,6 +296,16 @@
             v-model="editDialog"
             :card="currentCard"
             @saved="onCardSaved"
+        />
+
+        <!-- ADR-0011: Leech rewrite package dialog.
+             Shows JSON + Markdown for the user to copy to an external AI.
+             Does NOT call any AI provider. Does NOT create WordSense /
+             ReviewCard / ReviewLog. -->
+        <SenseReviewLeechRewritePackageDialog
+            v-model="leechRewriteDialog"
+            :review-card-id="currentCard ? currentCard.review_card_id : 0"
+            :lemma="currentCard ? currentCard.lemma : ''"
         />
 
         <!-- Lifecycle confirmation dialog (ADR-0010)
@@ -463,6 +490,8 @@
     import SenseReviewUnderstandingAid from './SenseReviewUnderstandingAid.vue';
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
+    import SenseReviewLeechPanel from './SenseReviewLeechPanel.vue';
+    import SenseReviewLeechRewritePackageDialog from './SenseReviewLeechRewritePackageDialog.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
@@ -509,6 +538,8 @@
             SenseReviewUnderstandingAid,
             SenseReviewEditDialog,
             SenseReviewReportCenter,
+            SenseReviewLeechPanel,
+            SenseReviewLeechRewritePackageDialog,
         },
         data: function() {
             return {
@@ -626,6 +657,10 @@
                 },
                 undoConflict: '',
                 sessionActionRequestSequence: 0,
+                // ADR-0011: Leech governance — rewrite package dialog.
+                // leechRewriteDialog: dialog visibility (v-model).
+                // The dialog fetches its own data on open.
+                leechRewriteDialog: false,
             }
         },
         computed: {
