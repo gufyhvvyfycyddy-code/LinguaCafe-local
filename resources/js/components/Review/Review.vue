@@ -492,11 +492,16 @@
                             </template>
 
                             <!-- Answer buttons -->
+                            <!-- DEV-LOCK-2 (Task 2000-14): bind :disabled to
+                                 ratingLoading so buttons are visually greyed
+                                 out during rating request AND during recovery
+                                 reload. hotkey is still guarded inside
+                                 rateReview(). -->
                             <div class="review-button-box">
-                                <v-btn rounded class="review-rating-button" color="error" @click="rateReview('again')" v-if="revealed">忘了</v-btn>
-                                <v-btn rounded class="review-rating-button" color="warning" @click="rateReview('hard')" v-if="revealed">勉强记得</v-btn>
-                                <v-btn rounded class="review-rating-button" color="success" @click="rateReview('good')" v-if="revealed">记得</v-btn>
-                                <v-btn rounded class="review-rating-button" color="primary" @click="rateReview('easy')" v-if="revealed">很熟</v-btn>
+                                <v-btn rounded class="review-rating-button" color="error" :disabled="ratingLoading" @click="rateReview('again')" v-if="revealed">忘了</v-btn>
+                                <v-btn rounded class="review-rating-button" color="warning" :disabled="ratingLoading" @click="rateReview('hard')" v-if="revealed">勉强记得</v-btn>
+                                <v-btn rounded class="review-rating-button" color="success" :disabled="ratingLoading" @click="rateReview('good')" v-if="revealed">记得</v-btn>
+                                <v-btn rounded class="review-rating-button" color="primary" :disabled="ratingLoading" @click="rateReview('easy')" v-if="revealed">很熟</v-btn>
                             </div>
                         </div>
                     </div>

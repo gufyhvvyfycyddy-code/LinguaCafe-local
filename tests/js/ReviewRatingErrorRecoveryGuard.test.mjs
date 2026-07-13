@@ -1,7 +1,7 @@
 // ReviewRatingErrorRecoveryGuard.test.mjs
 //
-// Task 2000-13 — Source-code STRUCTURAL guard tests for the rating
-// error-recovery refactor in Review.vue and SenseReview.vue.
+// Task 2000-13 / 2000-14 — Source-code STRUCTURAL guard tests for the
+// rating error-recovery refactor in Review.vue and SenseReview.vue.
 //
 // These are STRUCTURE guards only. Executable BEHAVIOR tests live in
 // ReviewRatingRecovery.test.mjs, which imports the actual helper and
@@ -17,15 +17,22 @@
 //     6.  loadReviews() returns a Promise (return axios.post)
 //     7.  .then() clears reviewError on success
 //     8.  has persistent error alert for !finished state
+//     9.  four rating buttons bind :disabled="ratingLoading" (Task 2000-14)
+//     10. next_card logic exists in .then() success path
 //
 //   SenseReview.vue:
-//     9.  imports runAuthoritativeRatingRecovery helper
-//     10. rate catch calls runAuthoritativeRatingRecovery
-//     11. catch does NOT immediately set this.rating=false (no finally)
-//     12. .then() success path sets this.rating=false
-//     13. .then() success path clears this.error
-//     14. reviewedCount++ remains in .then() success path only
-//     15. rate() does NOT have .finally that unconditionally resets rating
+//     11. imports runAuthoritativeRatingRecovery helper
+//     12. rate catch calls runAuthoritativeRatingRecovery
+//     13. catch does NOT immediately set this.rating=false (no finally)
+//     14. .then() success path sets this.rating=false
+//     15. .then() success path clears this.error
+//     16. reviewedCount++ remains in .then() success path only
+//     17. rate() does NOT have .finally that unconditionally resets rating
+//
+//   Helper (Task 2000-14):
+//     18. concurrent calls return same in-flight Promise (not Promise.resolve())
+//     19. helper re-locks after reloadQueue() returns
+//     20. helper handles sync throw via try/catch
 
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -232,6 +239,47 @@ test('Review.vue has persistent error alert for !finished state', () => {
     );
 });
 
+// ==================== Task 2000-14: Legacy button disabled guards ====================
+
+test('Review.vue "忘了" button binds :disabled="ratingLoading"', () => {
+    assert.ok(
+        /:disabled="ratingLoading"[^>]*@click="rateReview\('again'\)"/.test(reviewSource) ||
+        /@click="rateReview\('again'\)"[^>]*:disabled="ratingLoading"/.test(reviewSource),
+        '忘了 button must bind :disabled="ratingLoading"'
+    );
+});
+
+test('Review.vue "勉强记得" button binds :disabled="ratingLoading"', () => {
+    assert.ok(
+        /:disabled="ratingLoading"[^>]*@click="rateReview\('hard'\)"/.test(reviewSource) ||
+        /@click="rateReview\('hard'\)"[^>]*:disabled="ratingLoading"/.test(reviewSource),
+        '勉强记得 button must bind :disabled="ratingLoading"'
+    );
+});
+
+test('Review.vue "记得" button binds :disabled="ratingLoading"', () => {
+    assert.ok(
+        /:disabled="ratingLoading"[^>]*@click="rateReview\('good'\)"/.test(reviewSource) ||
+        /@click="rateReview\('good'\)"[^>]*:disabled="ratingLoading"/.test(reviewSource),
+        '记得 button must bind :disabled="ratingLoading"'
+    );
+});
+
+test('Review.vue "很熟" button binds :disabled="ratingLoading"', () => {
+    assert.ok(
+        /:disabled="ratingLoading"[^>]*@click="rateReview\('easy'\)"/.test(reviewSource) ||
+        /@click="rateReview\('easy'\)"[^>]*:disabled="ratingLoading"/.test(reviewSource),
+        '很熟 button must bind :disabled="ratingLoading"'
+    );
+});
+
+test('Review.vue next_card logic exists in .then() success path', () => {
+    assert.ok(
+        reviewRateThen.includes('next_card') || reviewRateThen.includes('nextCard'),
+        '.then() success path must contain next_card logic'
+    );
+});
+
 // ==================== SenseReview.vue tests ====================
 
 const senseRateMethod = extractMethod(senseReviewSource, 'rate');
@@ -286,6 +334,45 @@ test('SenseReview.vue reviewedCount++ remains in .then() success path only', () 
     assert.ok(
         !beforeRequest.includes('this.reviewedCount++'),
         'reviewedCount++ must NOT be before axios.post'
+    );
+});
+
+// ==================== Task 2000-14: Helper concurrency + re-lock guards ====================
+
+test('Helper concurrent calls return SAME in-flight Promise (not Promise.resolve())', () => {
+    // The old code returned Promise.resolve() for the second concurrent call,
+    // which let the second caller settle before the first reload finished.
+    // The new code must return the same inFlightPromise.
+    assert.ok(
+        helperSource.includes('inFlightPromise'),
+        'helper must use inFlightPromise (not a boolean inFlight flag)'
+    );
+    assert.ok(
+        /if\s*\(inFlightPromise\)\s*\{[\s\S]*return\s+inFlightPromise/.test(helperSource),
+        'helper must return inFlightPromise for concurrent calls (not Promise.resolve())'
+    );
+    assert.ok(
+        !/if\s*\(inFlight\)\s*\{[\s\S]*return\s+Promise\.resolve\(\)/.test(helperSource),
+        'helper must NOT use old pattern: if(inFlight){ return Promise.resolve() }'
+    );
+});
+
+test('Helper re-locks after reloadQueue() returns', () => {
+    // Task 2000-14: after calling opts.reloadQueue(), the helper must call
+    // opts.lockRating() again because reloadQueue (e.g. Legacy loadReviews)
+    // may synchronously reset the lock state.
+    assert.ok(
+        /opts\.reloadQueue\(\)[\s\S]*opts\.lockRating\(\)/.test(helperSource),
+        'helper must call opts.lockRating() AFTER opts.reloadQueue() returns'
+    );
+});
+
+test('Helper handles sync throw from reloadQueue via try/catch', () => {
+    // Task 2000-14: if reloadQueue() throws synchronously, the helper must
+    // catch it and convert to a rejected Promise (not let it escape).
+    assert.ok(
+        /try\s*\{[\s\S]*opts\.reloadQueue\(\)[\s\S]*\}\s*catch/.test(helperSource),
+        'helper must wrap opts.reloadQueue() in try/catch for sync throw safety'
     );
 });
 
