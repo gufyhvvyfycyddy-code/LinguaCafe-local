@@ -38,15 +38,23 @@
 | `source_chapter` | `WordSense.source_chapter_id` matches selected chapter, OR `WordSenseOccurrence` with `status=bound` and `chapter_id` matching exists. Chapter must belong to current user + current language. Distinct `review_card_id`. No per-card query. |
 | `leech_attention` | Reuses `SenseReviewLeechQueryService` (does NOT duplicate Leech Policy). Supports `leech only` and `leech + struggling` sub-modes. Card is currently eligible. Suspended/archived NOT auto-added. |
 
-### Recommended V1 architecture — Option B (server-signed criteria token, no DB session)
+### Recommended V1 architecture — Option B (server-signed rotating session-state token, no DB session)
 Target service pipeline (NOT yet implemented):
 ```
 CustomStudyCriteria (value object, no DB)
-  → CustomStudyCriteriaValidator (pure, no DB)
+  → CustomStudyCriteriaValidator (pure, no DB, no Auth)
   → CustomStudyQueryService (builds candidate query, applies criteria, no write)
-  → CustomStudySessionTokenService (signs/verifies token, no DB)
-  → CustomStudySessionService (orchestrates: validate token → re-run query → apply order → return next card; no write)
+  → CustomStudySessionState (value object: ordered_candidate_ids, ready_queue,
+      delayed_repeat_queue, completed_count, total_count, current_card_id, step,
+      preview_delay_config)
+  → CustomStudySessionTokenService (signs/verifies/rotates token, no DB)
+  → CustomStudySessionService (orchestrates: validate token → re-validate eligibility
+      → apply CustomStudyPreviewPolicy → pick next card → rotate token; no write)
+  → CustomStudyPreviewPolicy (pure function: Again→delayed, Hard→delayed-longer,
+      Good→completed, Easy→completed; returns updated SessionState + wait_until)
+  → CustomStudySessionOrder (pure function: mode-specific order override at creation only)
   → SenseReviewCardSerializerService (serializes next card, same shape as /reviews/senses)
+  → shared card presentation component (SenseStudyCard.vue — see Frontend section)
   → Custom Study page (NOT yet implemented; NOT authorized by this plan)
 ```
 
@@ -67,12 +75,20 @@ Only shows cards currently eligible per `scopeSenseReviewEligible` (ADR-0010). S
 ### Undo inapplicability
 ADR-0009 stack-based undo does NOT apply. Preview sessions write no ReviewLog; "undo" = "exit session".
 
-### Token payload (V1: 4-hour expiry)
-- `version`, `user_id`, `language`, `mode` (preview-only), `parameters` (criteria + sub-mode + order override), `issued_at`, `expires_at`, `nonce`/`session_id` (UUID v4)
+### Token payload (V1: rotating session-state token, 4-hour expiry)
+- `version`, `user_id`, `language`, `mode` (preview-only), `parameters` (criteria + sub-mode + order override), `session_id` (UUID v4), `issued_at`, `expires_at`
+- `ordered_candidate_ids` (ordered snapshot of candidate card IDs at session creation)
+- `ready_queue` (card IDs not yet answered, in session order)
+- `delayed_repeat_queue` (card IDs that received Again/Hard, with `available_at` timestamps)
+- `completed_count`, `total_count`, `current_card_id`, `step`
+- `preview_delay_config` (again_secs=60, hard_secs=600, good_secs=0, easy_secs=0)
 - Signed via Laravel `Crypt::encryptString()` or project's existing secure token mechanism.
 - Server re-validates `user_id` + `language` on every request.
-- Candidate cards re-run through eligibility on every request.
-- Client cannot pass arbitrary `card_id` to bypass criteria query.
+- Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — ineligible cards silently skipped.
+- Client cannot pass arbitrary `card_id` — server always picks next from token's `ready_queue` or `delayed_repeat_queue`.
+- Every answer returns a **new encrypted token**; old token discarded by client. Stale responses with old token rejected by client stale-response guard.
+- Token stored in `sessionStorage` (not `localStorage`). URL carries only `session_id` or route info.
+- **No A→B→A loop**: `ready_queue` consumed in order; Again/Hard moves card to `delayed_repeat_queue` (not back to `ready_queue`); Good/Easy completes card. Session ends when both queues empty.
 
 ---
 
@@ -182,24 +198,26 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 #### Task CS-7: `CustomStudySessionTokenService`
 **Test first**: `tests/Unit/CustomStudySessionTokenServiceTest.php`
-- `issue()` returns an opaque encrypted string.
+- `issue()` returns an opaque encrypted string containing the full session state.
 - `verify()` returns the decoded payload for a valid token.
+- `rotate()` takes the current session state + answer, returns a new encrypted token with updated state.
 - `verify()` returns null for:
   - Tampered token.
   - Expired token (`expires_at` < now).
   - Token with wrong `user_id` (does not match the passed-in user).
   - Token with wrong `language` (does not match the passed-in language).
   - Token with unsupported `version`.
-- Token payload contains: `version`, `user_id`, `language`, `mode`, `parameters`, `issued_at`, `expires_at`, `nonce`.
+- Token payload contains: `version`, `user_id`, `language`, `mode`, `parameters`, `session_id`, `issued_at`, `expires_at`, `ordered_candidate_ids`, `ready_queue`, `delayed_repeat_queue`, `completed_count`, `total_count`, `current_card_id`, `step`, `preview_delay_config`.
 - `expires_at` defaults to `issued_at + 4 hours`.
-- `nonce` is UUID v4.
+- `session_id` is UUID v4.
+- Token size must have a max (candidate count capped; oversized tokens rejected at creation).
 - Uses Laravel `Crypt::encryptString()` / `Crypt::decryptString()` (or project's existing secure token mechanism — verify before implementing).
 - Does NOT persist anything.
 - Does NOT call AI.
 
 **Then implement**: `app/Services/CustomStudy/CustomStudySessionTokenService.php`
 
-**Tests count**: ~12
+**Tests count**: ~16
 
 ### Phase 4: Session orchestration (read-only, no write)
 
@@ -221,23 +239,30 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 **Tests count**: ~10
 
-#### Task CS-9: `CustomStudySessionService` — `nextCard`
-**Test first**: `tests/Feature/CustomStudyNextCardTest.php`
-- GET `/custom-study/sessions/next?token=...` → 200 + `{ next_card, summary }`.
-- Re-validates token (user, language, expiry).
-- Re-runs criteria query (does NOT trust a frozen card list).
-- Applies mode-specific order override (§7 of ADR-0016).
-- Returns the first card after order override.
-- Excludes the previously-shown card via `?exclude=card_id` (client-supplied exclude is allowed because server re-validates the card is in the candidate set).
-- Returns `{ next_card: null }` when the session is exhausted.
+#### Task CS-9: `CustomStudySessionService` — `answer` (rotating token)
+**Test first**: `tests/Feature/CustomStudyAnswerTest.php`
+- POST `/custom-study/sessions/answer` with `{ token, rating }` → 200 + `{ refreshed_token, current_card, summary, wait_until, completed }`.
+- Re-validates token (user, language, expiry, version).
+- Applies `CustomStudyPreviewPolicy`:
+  - `again` → move `current_card_id` to `delayed_repeat_queue` with `available_at = now + 60s`.
+  - `hard` → move to `delayed_repeat_queue` with `available_at = now + 600s`.
+  - `good` → remove from both queues (`completed_count++`).
+  - `easy` → remove from both queues (`completed_count++`).
+- Picks next card from `ready_queue` (front), or from `delayed_repeat_queue` if `ready_queue` empty and a card's `available_at` has passed.
+- If only delayed cards remain and none available yet → `{ current_card: null, wait_until: <next available_at> }`.
+- If both queues empty → `{ completed: true, current_card: null }`.
+- Returns new encrypted `refreshed_token` with updated session state.
+- Re-validates each card's eligibility before showing — ineligible cards silently skipped.
 - 401/404 on invalid token.
+- 422 on invalid rating.
 - Does NOT write anything.
 - Does NOT call AI.
-- Query budget: 2-4 total.
+- No A→B→A loop (ready_queue consumed; delayed cards don't re-enter ready_queue).
+- Uses injected clock in tests (no real sleep).
 
-**Then implement**: extend `CustomStudySessionService` + `CustomStudyController` (next action)
+**Then implement**: `app/Services/CustomStudy/CustomStudyPreviewPolicy.php` + extend `CustomStudySessionService` + `CustomStudyController` (answer action)
 
-**Tests count**: ~11
+**Tests count**: ~18
 
 #### Task CS-10: Session-internal ordering
 **Test first**: `tests/Unit/CustomStudySessionOrderTest.php`
@@ -269,20 +294,35 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 **Tests count**: ~8 guard tests
 
+#### Task CS-11.5: Shared card presentation component `SenseStudyCard.vue`
+**Guard test first**: `tests/js/SenseStudyCardGuard.test.mjs`
+- Component exists at `resources/js/components/Senses/SenseStudyCard.vue`.
+- Pure presentation: receives `card` prop, emits no rating events (rating buttons are owned by the parent container).
+- Does NOT call axios, does NOT own queue state, does NOT write ReviewLog, does NOT run FSRS.
+- Displays: example sentence, surface form, sense (zh/en), source context entry.
+- No `Math.random()`, no `localStorage`, no `eval`, no `v-html` with user input.
+
+**Then implement**: Extract shared presentation from `SenseReview.vue` into `SenseStudyCard.vue`. `SenseReview.vue` uses this component (refactor must preserve observable behavior — existing guard tests + MCP Chrome regression must pass).
+
+**Tests count**: ~8 guard tests
+
 #### Task CS-12: Session UI — show card + advance
 **Guard test first**: `tests/js/CustomStudySessionUiGuard.test.mjs`
-- Reuses `SenseReviewCard` display component (does NOT duplicate card rendering).
-- "Next" button calls `/custom-study/sessions/next?token=...&exclude=...`.
-- Stale-response guard: `nextCardLoading` flag + `nextCardRequestSequence` counter.
+- Reuses `SenseStudyCard` display component (does NOT duplicate card rendering).
+- Four buttons: Again / Hard / Good / Easy (calls `POST /custom-study/sessions/answer` with `{ token, rating }`).
+- Stale-response guard: `answerLoading` flag + `answerRequestSequence` counter. Slow responses with old token are dropped.
 - Double-click does NOT fire two requests.
-- `next_card === null` shows "session complete" state.
-- "Exit session" button navigates back to home (no API call needed — preview-only, nothing to clean up).
-- Token stays in URL query (refresh-safe).
+- `completed === true` shows "session complete" state.
+- `current_card === null && wait_until` shows countdown to next available card.
+- "Exit session" button navigates back (no API call — preview-only, nothing to clean up).
+- Token stored in `sessionStorage` (NOT `localStorage`). URL carries only `session_id`.
+- Refresh recovers from `sessionStorage` via `GET /custom-study/sessions/resume`.
+- Explicit text: "本次为临时预览学习，不会改变正式复习进度。"
 - No external AI call.
 
 **Then implement**: extend `CustomStudy.vue` + a child `CustomStudySession.vue` component.
 
-**Tests count**: ~10 guard tests
+**Tests count**: ~14 guard tests
 
 ### Phase 6: Routes and integration
 
@@ -346,7 +386,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `tests/Feature/CustomStudySourceChapterQueryTest.php`
 - `tests/Feature/CustomStudyLeechAttentionQueryTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
-- `tests/Feature/CustomStudyNextCardTest.php`
+- `tests/Feature/CustomStudyAnswerTest.php`
 - `tests/Feature/CustomStudyRoutesTest.php`
 - `tests/js/CustomStudyPageGuard.test.mjs`
 - `tests/js/CustomStudySessionUiGuard.test.mjs`
@@ -401,7 +441,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 | `CustomStudySourceChapterQueryTest` | Feature | ~9 | source_chapter_id match, occurrence match, distinct, no leakage, no per-card query, eligibility, no write |
 | `CustomStudyLeechAttentionQueryTest` | Feature | ~8 | leech_only, leech_plus_struggling, reuse SenseReviewLeechQueryService, no Policy duplication, eligibility, no auto-add suspended, no write |
 | `CustomStudyOpenSessionTest` | Feature | ~10 | 200 + token + first_card + summary, 422 invalid, 401 unauth, 404 chapter not owned, no ReviewLog, no lifecycle change, no FSRS change, no AI, query budget |
-| `CustomStudyNextCardTest` | Feature | ~11 | 200 + next_card, re-validate token, re-run query, order override, exclude param, null when exhausted, 401/404, no write, no AI, query budget |
+| `CustomStudyAnswerTest` | Feature | ~18 | 200 + refreshed_token, preview policy (again/hard/good/easy), rotating token, no A→B→A loop, wait_until, completed, 401/404, 422, no write, no AI, injected clock |
 | `CustomStudyRoutesTest` | Feature | ~6 | POST/GET require auth, registered in auth group, not admin-only, 405 wrong method, no new middleware |
 | **Subtotal** | | **~104** | |
 
@@ -410,8 +450,9 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 | Test file | Count | Key assertions |
 |---|---|---|
 | `CustomStudyPageGuard.test.mjs` | ~8 | page exists, Vuetify imports, no inline axios, no Math.random, no localStorage token, no eval/v-html |
-| `CustomStudySessionUiGuard.test.mjs` | ~10 | reuses SenseReviewCard, next button calls correct endpoint, stale-response guard, double-click guard, null next_card handling, exit button, token in URL, no AI |
-| **Subtotal** | **~18** | |
+| `SenseStudyCardGuard.test.mjs` | ~8 | pure presentation, no axios, no queue, no ReviewLog, no FSRS, no Math.random, no localStorage, no eval/v-html |
+| `CustomStudySessionUiGuard.test.mjs` | ~14 | reuses SenseStudyCard, four rating buttons, rotating token, stale-response guard, double-click guard, completed state, wait_until countdown, token in sessionStorage, exit button, no AI |
+| **Subtotal** | **~30** | |
 
 ---
 
@@ -492,7 +533,7 @@ Suggested commits (do NOT use `git add -A` or `git add .` — stage files explic
 - `tests/Unit/CustomStudySessionTokenServiceTest.php`
 - `tests/Unit/CustomStudySessionOrderTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
-- `tests/Feature/CustomStudyNextCardTest.php`
+- `tests/Feature/CustomStudyAnswerTest.php`
 - `tests/Feature/CustomStudyRoutesTest.php`
 
 ### Commit 3: `feat: add custom study frontend page and session ui`

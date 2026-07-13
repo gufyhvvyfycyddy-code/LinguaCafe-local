@@ -12,27 +12,46 @@ LinguaCafe's next main-line task after Queue Order is Custom Study 1A. Anki's Cu
 
 Sources reviewed (2026-07-13):
 - Anki Manual: "Filtered Decks & Cramming", "Custom Study", "Home Decks", "Creating Manually", "Order", "Steps & Returning", "Due Reviews", "Reviewing Ahead", "Rescheduling"
-- Anki repository: `qt/aqt/customstudy.py`, `qt/aqt/filtered_deck.py`, `rslib/src/search/`, `rslib/src/deckconfig/`, `rslib/src/scheduler/filtered/`
-- Anki repository commit: `e5ea3fb40af139fa1f7bcf9513dc49426047c5a1`
-- Anki release: 25.07 (current main at review time)
+- Anki repository: `proto/anki/decks.proto`, `proto/anki/scheduler.proto`, `rslib/src/scheduler/filtered/custom_study.rs`, `rslib/src/scheduler/answering/preview.rs`, `qt/aqt/customstudy.py`, `qt/aqt/filtered_deck.py`
+- Anki repository commit: `9863b2f142e9b65e90741ab450fcebfd00f3c6ba` (main branch, 2026-07-13)
+- Anki latest stable release: `26.05` (published 2026-06-16, tag `26.05`)
+- Anki release referenced in field reports: `26.05 (5d51ca02)`
 
-**Anki Custom Study presets** (from `customstudy.py` `CustomStudyRequest`):
+**Anki Custom Study presets** (from `custom_study.rs` `custom_study_inner` + `customstudy.py` `CustomStudyRequest`):
 
-| Preset | What it does | Creates filtered deck? | reschedule default |
-|---|---|---|---|
-| `new_limit_delta` | Increase today's new card limit | No — only mutates today's deck-config limit | N/A |
-| `review_limit_delta` | Increase today's review limit | No — only mutates today's deck-config limit | N/A |
-| `forgot` | Review cards forgotten in the last N days | Yes | `false` (preview mode) |
-| `ahead` | Review cards due in the next N days | Yes | `true` |
-| `preview` | Preview cards added in the last N days | Yes | `false` (preview mode) |
-| `cram` (general) | Cram arbitrary search string | Yes | `true` |
+| Preset | What it does | Creates filtered deck? | reschedule default | Order |
+|---|---|---|---|---|
+| `NewLimitDelta` | Increase today's new card limit | No — only mutates today's deck-config limit | N/A | N/A |
+| `ReviewLimitDelta` | Increase today's review limit | No — only mutates today's deck-config limit | N/A | N/A |
+| `ForgotDays` | Review cards forgotten in the last N days | Yes | `false` (preview mode) | `RANDOM` |
+| `ReviewAheadDays` | Review cards due in the next N days | Yes | `true` | `DUE` |
+| `PreviewDays` | Preview cards added in the last N days | Yes | `false` (preview mode) | `ADDED` |
+| `Cram` | Cram arbitrary search string | Yes | varies by `CramKind` | varies |
 
 Key facts:
-- Only `new_limit_delta` and `review_limit_delta` mutate today-only limits without creating a filtered deck. These are out of scope for Custom Study 1A (they belong to the later `today-only limits` main-line).
-- `forgot`, `preview`, and `cram` create filtered decks. `forgot` and `preview` hard-code `reschedule=false` (preview mode); `ahead` and `cram` default `reschedule=true`.
-- **Preview mode** in Anki: cards in `FilteredState::Preview`. Again/Hard/Good have configurable delays (0 = return card immediately); Easy always returns the card. Returned cards are restored byte-for-byte — no ReviewLog, no FSRS reschedule, no card movement.
+- Only `NewLimitDelta` and `ReviewLimitDelta` mutate today-only limits without creating a filtered deck. These are out of scope for Custom Study 1A (they belong to the later `today-only limits` main-line).
+- `ForgotDays`, `PreviewDays`, and `Cram` create filtered decks. `ForgotDays` and `PreviewDays` hard-code `reschedule=false` (preview mode); `ReviewAheadDays` defaults `reschedule=true`; `Cram` reschedule depends on `CramKind` (New/Due/Review = true, All = false).
+- **Cram card limit**: `cram_config` passes `Some(cram.card_limit)` to `custom_study_config`; other presets use `None` which defaults to `99_999` in `custom_study_config`.
+- **Preview mode delays** (from `custom_study_config` defaults): `preview_again_secs = 60`, `preview_hard_secs = 600`, `preview_good_secs = 0` (return card), `preview_delay = 10`. Easy always returns the card (from `preview.rs` test: `scheduled_secs: 0, finished: true`).
+- **Preview mode revlog behavior** (from `preview.rs` `apply_preview_state`): Anki **constructs a `RevlogEntryPartial`** on every preview answer, including Again/Hard/Good/Easy. When `reschedule=false` (preview mode), the revlog entry is created with `ease_type` reflecting the filtered state but the card is restored to its original queue/due on exit. **LinguaCafe intentionally deviates** by not writing any ReviewLog in preview-only sessions (see §1.1 below).
 - **Filtered deck exclusions** (always): suspended, buried, and already-filtered cards are excluded via `-is:suspended -is:buried -deck:filtered` appended to the user search.
-- **Filtered deck order options** (11): `random`, `introducedAsc`, `introducedDesc`, `oldestReviewedFirst`, `latestReviewedFirst`, `relativeOverduenessAsc`, `relativeOverduenessDesc`, `dueAsc`, `dueDesc`, `easeAsc`, `easeDesc`.
+- **Filtered deck order options** — official `Deck.Filtered.SearchTerm.Order` enum from `proto/anki/decks.proto` (11 values):
+
+| Enum name | Number | Description |
+|---|---|---|
+| `OLDEST_REVIEWED_FIRST` | 0 | Oldest reviewed first |
+| `RANDOM` | 1 | Random |
+| `INTERVALS_ASCENDING` | 2 | Intervals ascending |
+| `INTERVALS_DESCENDING` | 3 | Intervals descending |
+| `LAPSES` | 4 | Lapses |
+| `ADDED` | 5 | Added |
+| `DUE` | 6 | Due |
+| `REVERSE_ADDED` | 7 | Reverse added |
+| `RETRIEVABILITY_ASCENDING` | 8 | Retrievability ascending |
+| `RETRIEVABILITY_DESCENDING` | 9 | Retrievability descending |
+| `RELATIVE_OVERDUENESS` | 10 | Relative overdueness |
+
+Note: older Anki versions used different enum names (`introducedAsc`, `introducedDesc`, `oldestReviewedFirst`, `latestReviewedFirst`, `relativeOverduenessAsc`, `relativeOverduenessDesc`, `dueAsc`, `dueDesc`, `easeAsc`, `easeDesc`). These have been replaced by the current proto enum above. This ADR references the **current** enum.
 
 ### LinguaCafe current capability reconnaissance
 
@@ -68,6 +87,19 @@ Custom Study 1A is a **preview-only temporary session** — the LinguaCafe mappi
 10. Session is scoped to current user + current language + sense cards only.
 
 This is the LinguaCafe V1 interpretation of Anki's `FilteredState::Preview` — "look at these cards in this order, then put everything back".
+
+### 1.1 LinguaCafe intentional deviations from Anki
+
+The following are **deliberate product deviations** from Anki's preview mode, not claims that Anki works the same way:
+
+| Dimension | Anki behavior | LinguaCafe 1A behavior | Reason |
+|---|---|---|---|
+| **Revlog** | `apply_preview_state` constructs a `RevlogEntryPartial` on every preview answer | **No ReviewLog written at all** | LinguaCafe guarantees preview-only safety by zero DB writes; the normal queue and daily counts are provably unchanged. |
+| **Card movement** | Cards are temporarily moved into a filtered deck; `remove_from_filtered_deck_restoring_queue` restores them on exit | **No card movement** — no deck model exists in LinguaCafe | LinguaCafe has no deck/filtered-deck data model; session state is held in a rotating encrypted token, not in card rows. |
+| **`today_forgotten` ordering** | `forgot_config` uses `FilteredSearchOrder::Random` | LinguaCafe may choose "most recent Again first" as a **product choice** (see §7) | Anki's `RANDOM` order is not recency-ordered. If LinguaCafe uses recency, it is a product deviation, not an Anki default. |
+| **Session state** | Filtered deck is a DB row; card list is materialized in the deck's search results | Rotating encrypted session-state token (see §5) | No migration, no DB session table, no cleanup job for V1. |
+
+These deviations are **frozen for 1A**. A future rescheduling mode ADR may revisit them.
 
 ### 2. Future rescheduling mode
 
@@ -128,9 +160,11 @@ The frontend holds an array of `review_card_id` values in memory + sessionStorag
 
 **Rejected** for V1: security and isolation are too weak for a feature that touches the review queue.
 
-#### Option B: Server-signed criteria token, no DB session (RECOMMENDED for V1)
+#### Option B: Server-signed rotating session-state token, no DB session (RECOMMENDED for V1)
 
-The frontend receives a server-signed opaque token encoding the criteria. On every "next card" or "open session" request, the frontend sends the token; the server re-validates user + language + criteria + eligibility, re-runs the query, and returns the next card. No `custom_study_sessions` table.
+The frontend receives a server-signed opaque token encoding **the full session state** — not just the criteria. On every answer, the server rotates the token: it updates the session state (moves the current card to delayed-repeat or completed, picks the next card) and returns a **new encrypted token**. The client must use only the latest token. No `custom_study_sessions` table.
+
+This design replaces the earlier "criteria-only token" concept. A criteria-only token that re-runs the query on every "next card" request cannot prevent A→B→A loops when `exclude=last_card_id` is the only de-duplication mechanism. The rotating session-state token solves this by holding the full ordered candidate snapshot + ready queue + delayed-repeat queue inside the token.
 
 Token payload (server-signed, opaque to client):
 - `version`
@@ -138,34 +172,51 @@ Token payload (server-signed, opaque to client):
 - `language`
 - `mode` (preview-only in V1)
 - `parameters` (criteria + sub-mode + order override)
+- `session_id` (UUID v4)
 - `issued_at`
 - `expires_at` (V1: 4 hours)
-- `nonce` / `session_id` (UUID v4)
+- `ordered_candidate_ids` (ordered snapshot of candidate card IDs at session creation)
+- `ready_queue` (card IDs not yet answered, in session order)
+- `delayed_repeat_queue` (card IDs that received Again/Hard, with their `available_at` timestamps)
+- `completed_count`
+- `total_count`
+- `current_card_id`
+- `step`
+- `preview_delay_config` (again_secs, hard_secs, good_secs, easy_secs)
 
 Token rules:
-- Signed via Laravel `Crypt::encryptString()` or the project's existing secure token mechanism.
-- Token does **not** contain sensitive card content — only criteria + metadata.
-- Server re-validates `user_id` + `language` on every request (token is bound to issuer, not bearer-permissive).
-- Candidate cards are re-run through eligibility on every request — token does not "freeze" a card list.
-- Client cannot pass arbitrary `card_id` to bypass permission — the server always picks the next card from the re-run query.
-- No migration.
-- No AI call.
-- No ReviewLog.
-- No FSRS change.
+1. Signed via Laravel `Crypt::encryptString()` or the project's existing secure token mechanism.
+2. Token does **not** contain sensitive card content — only card IDs + session metadata.
+3. Server re-validates `user_id` + `language` on every request (token is bound to issuer, not bearer-permissive).
+4. Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — if a card has become ineligible mid-session, it is silently skipped.
+5. Client cannot pass arbitrary `card_id` to bypass permission — the server always picks the next card from the token's `ready_queue` or `delayed_repeat_queue`.
+6. Every answer returns a **new encrypted token**; the old token is invalidated by the client discarding it. Stale responses that carry an old token are rejected by the client's stale-response guard.
+7. Even if an old token is replayed: no DB writes, no ReviewLog, no FSRS change, no lifecycle change — the replay can only form an independent preview branch that does not affect normal learning data.
+8. No migration.
+9. No AI call.
+10. No ReviewLog.
+11. No FSRS change.
+12. Token default expiry: 4 hours.
+13. Token stored in `sessionStorage` (not `localStorage`) — refresh within the same tab recovers; multi-tab sessions are independent.
+14. URL carries only `session_id` or route info, not the full token.
+15. Token size must have a reasonable max (candidate count capped; oversized tokens rejected at creation).
+
+**Why no A→B→A loop**: The `ready_queue` is consumed in order. When a card receives Again/Hard, it moves to `delayed_repeat_queue` with an `available_at` timestamp — it does NOT go back to `ready_queue`. The server only pulls from `delayed_repeat_queue` when (a) `ready_queue` is empty, or (b) a delayed card's `available_at` has passed. Good/Easy moves the card to `completed` (removed from both queues). The session ends when both queues are empty.
 
 | Dimension | Verdict |
 |---|---|
 | Security | Strong — server re-validates every request. |
 | User isolation | Strong — `user_id` bound in token, re-checked. |
 | Language isolation | Strong — `language` bound in token, re-checked. |
-| URL/refresh recovery | OK — token can go in URL query. |
-| Card state changes | Handled — eligibility re-run each request. |
-| Concurrency | OK — tokens are stateless; multiple tabs get independent tokens. |
-| Expiry | OK — `expires_at` checked server-side. |
-| DB cost | Minimal — no session table; only criteria queries. |
-| Test difficulty | Good — server-side logic is unit-testable. |
-| Saved Search boundary | Clean — criteria are not user-free-text; they are structured enum + chapter id. |
-| Future rescheduling mode | Extensible — a future rescheduling mode can add a session table without changing the token contract. |
+| URL/refresh recovery | OK — `session_id` in URL; full token in `sessionStorage`. |
+| Card state changes | Handled — eligibility re-run each request; ineligible cards skipped. |
+| Concurrency | OK — each tab gets an independent token; no shared DB state. |
+| Expiry | OK — `expires_at` checked server-side; `sessionStorage` cleared on tab close. |
+| DB cost | Minimal — no session table; only criteria queries at creation. |
+| Test difficulty | Good — server-side logic is unit-testable with injected clock. |
+| Saved Search boundary | Clean — criteria are structured enum + chapter id, not user free-text. |
+| Future rescheduling mode | Extensible — a future rescheduling mode can add a DB session table without changing the token contract. |
+| A→B→A loop | Prevented — ready_queue is consumed; delayed cards don't re-enter ready_queue. |
 
 **Recommended V1 direction** — this is what the implementation plan should target. The decision is recorded here; implementation is not authorized by this ADR alone.
 
@@ -192,15 +243,24 @@ A new DB table stores each session: user_id, language, criteria, created_at, exp
 
 ```
 CustomStudyCriteria (value object, no DB)
-  → CustomStudyCriteriaValidator (pure, no DB)
+  → CustomStudyCriteriaValidator (pure, no DB, no Auth)
   → CustomStudyQueryService (builds the candidate query, applies criteria, no write)
-  → CustomStudySessionTokenService (signs/verifies token, no DB)
-  → CustomStudySessionService (orchestrates: validate token → re-run query → apply order → return next card; no write)
+  → CustomStudySessionState (value object: ordered_candidate_ids, ready_queue,
+      delayed_repeat_queue, completed_count, total_count, current_card_id, step,
+      preview_delay_config)
+  → CustomStudySessionTokenService (signs/verifies/rotates token, no DB)
+  → CustomStudySessionService (orchestrates: validate token → re-validate eligibility
+      → apply CustomStudyPreviewPolicy → pick next card → rotate token; no write)
+  → CustomStudyPreviewPolicy (pure function: Again→delayed, Hard→delayed-longer,
+      Good→completed, Easy→completed; returns updated SessionState + wait_until)
+  → CustomStudySessionOrder (pure function: mode-specific order override applied
+      at session creation only; does not modify global Queue Order)
   → SenseReviewCardSerializerService (serializes the next card, same shape as /reviews/senses)
+  → shared card presentation component (e.g. SenseStudyCard.vue — see impl plan)
   → Custom Study page (not yet implemented; not authorized by this ADR)
 ```
 
-This pipeline is the **recommended target**. It reuses `SenseReviewCardSerializerService` so the Custom Study card looks identical to a normal sense review card. It does not duplicate the serializer, does not duplicate Leech Policy, does not duplicate Queue Order logic.
+This pipeline is the **recommended target**. It reuses `SenseReviewCardSerializerService` so the Custom Study card looks identical to a normal sense review card. It does not duplicate the serializer, does not duplicate Leech Policy, does not duplicate Queue Order logic. The `CustomStudyPreviewPolicy` is a pure function that can be unit-tested with an injected clock (no real sleep). The `CustomStudySessionOrder` applies the mode-specific order override (§7) at session creation time only — it does not modify global Queue Order settings.
 
 ### 7. Session-internal ordering
 
@@ -208,8 +268,8 @@ The Custom Study session has a **mode-specific order override** that applies onl
 
 | Mode | Default order override | Rationale |
 |---|---|---|
-| `today_forgotten` | Most recent Again first, fallback to Queue Order | Anki `forgot` uses `rated:days:1` which is implicitly recency-ordered. |
-| `overdue` | Ascending retrievability (most forgotten first), fallback to Queue Order | Aligns with the "most at-risk first" intent. |
+| `today_forgotten` | Most recent Again first, fallback to Queue Order | **LinguaCafe product choice** — Anki's `forgot_config` uses `FilteredSearchOrder::Random`; recency ordering is a LinguaCafe deviation that surfaces the most recently forgotten cards first for immediate re-exposure. |
+| `overdue` | Ascending retrievability (most forgotten first), fallback to Queue Order | Aligns with the "most at-risk first" intent. Corresponds to Anki's `RETRIEVABILITY_ASCENDING`. |
 | `source_chapter` | Current Queue Order (no override) | No strong reason to deviate. |
 | `leech_attention` | Severity DESC (leech before struggling), then Queue Order | Surface the worst cards first. |
 
@@ -221,6 +281,27 @@ Rules:
 5. Does not merge with Saved Search.
 
 The final override table is decided in this ADR; implementation is not authorized by this ADR alone.
+
+### 7.1 Preview four-button semantics
+
+Custom Study 1A uses four in-session buttons, mirroring Anki's preview mode:
+
+| Button | Behavior | Anki default delay | LinguaCafe 1A |
+|---|---|---|---|
+| **Again** | Move current card to `delayed_repeat_queue` with short delay | `preview_again_secs = 60` (1 min) | Same; card re-appears after 60s |
+| **Hard** | Move current card to `delayed_repeat_queue` with longer delay | `preview_hard_secs = 600` (10 min) | Same; card re-appears after 600s |
+| **Good** | Complete current card (remove from both queues) | `preview_good_secs = 0` (return card) | Same; card is completed |
+| **Easy** | Complete current card (remove from both queues) | `0` (always returns card) | Same; card is completed |
+
+Rules:
+1. All four operations write **no formal ReviewLog**.
+2. All four operations run **no FSRS scheduling**.
+3. All four operations modify **no ReviewCard** row.
+4. All four operations do **not** advance daily reviewed count.
+5. Only the encrypted session-state token's internal state is updated.
+6. When only delayed-repeat cards remain and none have reached `available_at`, the page shows the next available time. The user can exit. Time-to-continue uses an injected clock in tests (no real `sleep`).
+7. Completed cards are never re-shown in the same session.
+8. The session can be reliably ended by the user or by token expiry.
 
 ### 8. Daily limits
 
