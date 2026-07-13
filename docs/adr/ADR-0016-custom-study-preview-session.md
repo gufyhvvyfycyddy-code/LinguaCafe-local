@@ -1,7 +1,7 @@
 # ADR-0016: Custom Study Preview Session
 
-**Status**: Accepted (architecture complete; development not started — this ADR only defines the architecture and V1 boundary; no Custom Study business code, API, page, or migration is authorized by this ADR alone)
-**Date**: 2026-07-13
+**Status**: Accepted (architecture complete; **Phase 1 development partially started in Task 2000-16 — `CustomStudyCriteria` + `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files completed, awaiting web-side acceptance; Phase 2-6 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects and validator)
+**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16)
 **Related**: `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0015-review-queue-order-policy.md`, `docs/plans/custom-study-1a-implementation-plan.md`
 
 ## Context
@@ -669,6 +669,48 @@ However, the actual component extraction is NOT done in 1A — it is deferred to
 4. The reading-style token color highlight (§20.5) is a LinguaCafe project adaptation. Anki supports custom HTML/CSS but does not freeze a default "target word color highlight" visual style. LinguaCafe does NOT misrepresent this as an Anki default design.
 5. The Anki "Question first, Show Answer after" flow (Anki Manual — Studying / Questions) is preserved by §20.6's `show-answer === false` contract.
 
+#### 20.7.1 AI translation card display requirement (registered for future CS-11.5, NOT implemented in Task 2000-16)
+
+> **Status**: Registered as a future product requirement for CS-11.5. **NOT implemented in Task 2000-16.** Task 2000-16 does NOT research the AI-translation data chain, does NOT implement any translation display, and does NOT call any AI provider. This section is a placeholder so the requirement is not lost; the actual data-chain Gate and implementation happen in a future CS-11.5 round.
+
+**Product requirement (registered, not implemented)**:
+
+Before "Show Answer" (`show-answer === false`):
+1. Main example sentence translation is NOT shown.
+2. Supplementary example sentence translations are NOT shown.
+3. Answer must not be leaked early.
+
+After "Show Answer" (`show-answer === true`):
+1. When the current main example sentence has a corresponding Chinese translation, the translation is displayed directly beneath the English sentence.
+2. When supplementary example sentences have corresponding translations, each translation is displayed directly beneath its own English sentence.
+3. When no translation exists, no empty block is rendered (conditional replacement semantic, same as §20.6).
+4. Do NOT show "AI 译文：" / "暂无译文" / "无" placeholders.
+5. Main example sentence translation is shown only once. Do NOT duplicate it on both question side and answer side.
+6. Both translation text and English tokens are read-only — not clickable.
+7. Do NOT open dictionary. Do NOT change familiarity. Do NOT call AI. Do NOT create learning data. Do NOT change FSRS. Do NOT write ReviewLog.
+8. Use the existing reading-page vertical-stacked translation visual style.
+9. This visual is a LinguaCafe project adaptation, NOT an Anki fixed default visual.
+
+**Pre-implementation Gate (MUST be satisfied before CS-11.5 implementation can touch this feature)**:
+1. This requirement is NOT implemented in Task 2000-16.
+2. Before entering CS-11.5, the real translation data chain MUST be investigated.
+3. Do NOT assume `example_sentence_zh` is the AI translation without verification.
+4. The currently-displayed rotating example sentence and its translation MUST be precisely correlated — no cross-occurrence mismatch.
+5. Do NOT guess translations by lemma or surface.
+6. If AI Reading Assist fallback is needed, a separate data-contract Gate MUST be done first.
+7. Do NOT temporarily call external AI to display translations.
+8. Do NOT auto-write WordSense / WordSenseOccurrence / ReviewCard to fill translations.
+9. Only a future CS-11.5 implementation prompt is allowed to handle this feature.
+
+**Current status (Task 2000-16)**:
+```
+AI 译文卡面显示：
+已登记到未来 CS-11.5；
+本轮未研究数据链；
+本轮未实现；
+不属于 Phase 1。
+```
+
 #### 20.8 Future implementation test matrix (registered, not yet executed)
 
 > These tests are registered for the future implementation round (CS-11.5). They MUST be created and passed when `SenseStudyCard.vue` is actually implemented. The current round (Task 2000-15) does NOT create any test file.
@@ -695,6 +737,17 @@ Non-regression tests:
 17. Two viewports:
     - 1920×1080
     - 900×900
+
+AI translation tests (registered by Task 2000-16 for future CS-11.5, NOT executed in Task 2000-16):
+18. `show-answer === false` → main example sentence translation hidden.
+19. `show-answer === false` → supplementary example sentence translations hidden.
+20. `show-answer === true` + main sentence has translation → translation rendered directly beneath English sentence.
+21. `show-answer === true` + supplementary sentence has translation → translation rendered beneath its own English sentence.
+22. `show-answer === true` + no translation → no empty block, no "暂无译文" / "无" placeholder.
+23. Main example sentence translation shown only once (not duplicated on question side and answer side).
+24. Translation text and English tokens are read-only — no click, no dictionary open, no familiarity change.
+25. No AI provider call, no WordSense/WordSenseOccurrence/ReviewCard write, no FSRS change, no ReviewLog write.
+26. Translation visual uses existing reading-page vertical-stacked style (LinguaCafe adaptation, not Anki default).
 
 ## Prohibited scope (this ADR)
 

@@ -1,6 +1,6 @@
 # Custom Study 1A Implementation Plan
 
-> **Status**: Architecture complete (ADR-0016 accepted). **Development NOT started** — this plan is a TDD roadmap for a future authorized round. No Custom Study business code, API, page, or migration is authorized by this plan alone.
+> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) code and tests completed in Task 2000-16, awaiting 网页端总流程设计师 acceptance.** Phase 2-6 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, or migration is authorized by this plan alone beyond Phase 1.
 
 **Goal**: Implement Custom Study 1A — a preview-only temporary session that lets the user review a curated set of sense cards outside the normal due queue, without moving cards, building a filtered deck, writing ReviewLog, or running FSRS scheduling.
 
@@ -13,6 +13,16 @@
 2. Architecture Gate review per `AGENTS.md`.
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that the `Card Marker` 1B prerequisite is NOT being snuck into 1A.
+
+**Phase status (Task 2000-16)**:
+- Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed, awaiting web-side acceptance.
+- Phase 2 (Query Services): NOT started.
+- Phase 3 (Token Service): NOT started.
+- Phase 4 (Session State / Policy): NOT started.
+- Phase 5 (Frontend / SenseStudyCard): NOT started. AI translation card display registered as future requirement (§20.7.1), NOT implemented.
+- Phase 6 (Routes): NOT started.
+- Overall feature: NOT usable. No route, no controller, no page, no API endpoint exists yet.
+- `ChapterLocatorInterface` has NO production binding in Task 2000-16 (no controller, no route). A future Phase 2 / API integration round must create the Eloquent implementation and bind it in the container.
 
 ---
 
@@ -384,7 +394,38 @@ Non-regression tests:
 16. MCP Chrome acceptance uses both a real empty-field card and a real populated-field card to verify §20.6 hiding behavior.
 17. Two viewports: 1920×1080 and 900×900.
 
-**Tests count**: ~8 base guard tests + 17 future implementation matrix tests (registered, not yet executed in Task 2000-15).
+AI translation tests (registered by Task 2000-16 for future CS-11.5, NOT executed in Task 2000-16; see ADR-0016 §20.7.1):
+18. `show-answer === false` → main example sentence translation hidden.
+19. `show-answer === false` → supplementary example sentence translations hidden.
+20. `show-answer === true` + main sentence has translation → translation rendered directly beneath English sentence.
+21. `show-answer === true` + supplementary sentence has translation → translation rendered beneath its own English sentence.
+22. `show-answer === true` + no translation → no empty block, no "暂无译文" / "无" placeholder.
+23. Main example sentence translation shown only once (not duplicated on question side and answer side).
+24. Translation text and English tokens are read-only — no click, no dictionary open, no familiarity change.
+25. No AI provider call, no WordSense/WordSenseOccurrence/ReviewCard write, no FSRS change, no ReviewLog write.
+26. Translation visual uses existing reading-page vertical-stacked style (LinguaCafe adaptation, not Anki default).
+
+**AI translation pre-implementation Gate (registered by Task 2000-16, MUST be satisfied before CS-11.5 implementation can touch this feature)**:
+1. Task 2000-16 does NOT implement AI translation display.
+2. Before entering CS-11.5, the real translation data chain MUST be investigated.
+3. Do NOT assume `example_sentence_zh` is the AI translation without verification.
+4. The currently-displayed rotating example sentence and its translation MUST be precisely correlated — no cross-occurrence mismatch.
+5. Do NOT guess translations by lemma or surface.
+6. If AI Reading Assist fallback is needed, a separate data-contract Gate MUST be done first.
+7. Do NOT temporarily call external AI to display translations.
+8. Do NOT auto-write WordSense / WordSenseOccurrence / ReviewCard to fill translations.
+9. Only a future CS-11.5 implementation prompt is allowed to handle this feature.
+
+**Current status (Task 2000-16)**:
+```
+AI 译文卡面显示：
+已登记到未来 CS-11.5；
+本轮未研究数据链；
+本轮未实现；
+不属于 Phase 1。
+```
+
+**Tests count**: ~8 base guard tests + 17 future implementation matrix tests (Task 2000-15) + 9 AI translation tests (Task 2000-16) = 26 future tests registered, not yet executed.
 
 #### Task CS-12: Session UI — show card + advance
 **Guard test first**: `tests/js/CustomStudySessionUiGuard.test.mjs`
