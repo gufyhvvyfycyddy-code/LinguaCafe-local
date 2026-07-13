@@ -597,7 +597,26 @@
             width="420"
             class="detail-drawer"
         >
-            <template v-if="detailTarget">
+            <!-- ADR-0014: Drawer-level loading / error / empty states.
+                 detailLoading without detailTarget means we are fetching
+                 via deep link (no optimistic row). detailError without
+                 detailTarget means the fetch failed entirely. The monotonic
+                 detailRequestSeq guard ensures stale responses never
+                 overwrite the current drawer state. -->
+            <div v-if="detailLoading && !detailTarget" class="d-flex align-center justify-center" style="min-height: 240px;">
+                <div class="text-center">
+                    <v-progress-circular indeterminate color="primary" size="32" />
+                    <div class="text-caption text--secondary mt-3">加载卡片详情中...</div>
+                </div>
+            </div>
+            <div v-else-if="detailError && !detailTarget" class="d-flex align-center justify-center pa-4" style="min-height: 240px;">
+                <div class="text-center">
+                    <v-icon color="error" large>mdi-alert-circle-outline</v-icon>
+                    <div class="error--text mt-2 text-body-2">{{ detailError }}</div>
+                    <v-btn text color="primary" @click="closeDetail" class="mt-2">关闭</v-btn>
+                </div>
+            </div>
+            <template v-else-if="detailTarget">
                 <v-card flat>
                     <v-card-title class="d-flex align-center">
                         <span>复习卡详情</span>
@@ -615,10 +634,39 @@
                         class="mx-4 mb-0"
                         icon="mdi-information-outline"
                     >从今日学习日报打开。</v-alert>
+                    <!-- ADR-0014: Drawer-level loading / error banners shown
+                         alongside optimistic detailTarget content. -->
+                    <v-alert
+                        v-if="detailLoading"
+                        type="info"
+                        dense
+                        text
+                        class="mx-4 mb-0"
+                        icon="mdi-loading mdi-spin"
+                    >正在加载最新详情...</v-alert>
+                    <v-alert
+                        v-if="detailError"
+                        type="error"
+                        dense
+                        text
+                        class="mx-4 mb-0"
+                        icon="mdi-alert-circle-outline"
+                    >{{ detailError }}</v-alert>
                     <v-card-subtitle class="pb-0">
                         {{ detailTarget.lemma }} / {{ detailTarget.surface_form }} / {{ detailTarget.pos }}
                     </v-card-subtitle>
                     <v-card-text class="detail-content">
+                        <!-- ADR-0014: Card Info V1 tab structure — 概览 / 历史 / 诊断.
+                             All data comes from the single canonical detail
+                             request. No additional /logs, /lifecycle-events,
+                             or /leech requests are fired when the drawer opens. -->
+                        <v-tabs v-model="detailTab" grow class="mb-2">
+                            <v-tab href="#overview">概览</v-tab>
+                            <v-tab href="#history">历史</v-tab>
+                            <v-tab href="#diagnosis">诊断</v-tab>
+                        </v-tabs>
+                        <v-tabs-items v-model="detailTab">
+                            <v-tab-item value="overview">
                         <!-- 基本信息 -->
                         <div class="detail-section">
                             <div class="detail-section-title">基本信息</div>
@@ -772,149 +820,11 @@
                             </div>
                         </div>
 
-                        <v-divider class="my-3" />
-
-                        <!-- ADR-0010: 生命周期记录 -->
-                        <div class="detail-section">
-                            <div class="detail-section-title">生命周期记录</div>
-                            <div v-if="detailEventsLoading" class="text-caption text--secondary py-2">加载生命周期记录中...</div>
-                            <div v-else-if="detailEventsError" class="text-caption error--text py-2">{{ detailEventsError }}</div>
-                            <div v-else-if="detailEvents.length === 0" class="text-caption text--secondary py-2">暂无生命周期记录。</div>
-                            <div v-else>
-                                <div
-                                    v-for="event in detailEvents"
-                                    :key="event.id"
-                                    class="log-entry mb-2 pa-2"
-                                >
-                                    <div class="d-flex align-center" style="gap: 6px;">
-                                        <v-chip x-small :color="actionColor(event.action)">{{ actionLabel(event.action) }}</v-chip>
-                                        <span class="text-caption">| {{ event.source }}</span>
-                                        <v-spacer />
-                                        <span class="text-caption text--secondary">{{ formatDateTime(event.created_at) }}</span>
-                                    </div>
-                                    <div class="text-caption mt-1">
-                                        <span :class="event.previous_state ? '' : 'text--secondary'">{{ stateLabel(event.previous_state) }}</span>
-                                        <span class="mx-1">→</span>
-                                        <span :class="event.new_state ? '' : 'text--secondary'">{{ stateLabel(event.new_state) }}</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <v-divider class="my-3" />
-
-                        <!-- 最近复习记录 -->
-                        <div class="detail-section">
-                            <div class="detail-section-title">最近复习记录</div>
-                            <div v-if="detailLogsLoading" class="text-caption text--secondary py-2">加载复习记录中...</div>
-                            <div v-else-if="detailLogsError" class="text-caption error--text py-2">{{ detailLogsError }}</div>
-                            <div v-else-if="detailLogs.length === 0" class="text-caption text--secondary py-2">暂无复习记录。</div>
-                            <div v-else>
-                                <div
-                                    v-for="log in detailLogs"
-                                    :key="log.id"
-                                    class="log-entry mb-2 pa-2"
-                                >
-                                    <div class="d-flex align-center" style="gap: 6px;">
-                                        <v-chip x-small :color="logRatingColor(log.rating)">{{ log.rating }}</v-chip>
-                                        <span class="text-caption">| {{ log.source }}</span>
-                                        <v-spacer />
-                                        <span class="text-caption text--secondary">{{ formatDateTime(log.reviewed_at) }}</span>
-                                    </div>
-                                    <div class="text-caption mt-1">
-                                        <span :class="log.previous_state ? '' : 'text--secondary'">{{ log.previous_state || '—' }}</span>
-                                        <span class="mx-1">→</span>
-                                        <span :class="log.new_state ? '' : 'text--secondary'">{{ log.new_state || '—' }}</span>
-                                    </div>
-                                    <div class="text-caption text--secondary mt-1">
-                                        S: {{ formatFsrsNumber(log.previous_stability) }} → {{ formatFsrsNumber(log.new_stability) }}
-                                        &nbsp;|&nbsp;
-                                        D: {{ formatFsrsNumber(log.previous_difficulty) }} → {{ formatFsrsNumber(log.new_difficulty) }}
-                                    </div>
-                                    <div class="text-caption text--secondary">
-                                        到期: {{ formatDueAt(log.previous_due_at) }} → {{ formatDueAt(log.new_due_at) }}
-                                    </div>
-                                    <!-- ADR-0009: Undo audit trail. The original
-                                         rating is preserved (not changed to undo),
-                                         the log is not hidden, and no undo button
-                                         is provided on this page. -->
-                                    <div v-if="log.undone" class="text-caption mt-1 d-flex align-center" style="gap: 4px;">
-                                        <v-chip x-small color="grey">已撤销</v-chip>
-                                        <span class="text--secondary">
-                                            撤销时间: {{ formatDateTime(log.undone_at) }}
-                                            <span v-if="log.undo_source"> · 来源: {{ log.undo_source }}</span>
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <v-divider class="my-3" />
-
-                        <!-- ADR-0011: 遗忘诊断 (leech diagnostics).
-                             Fetches GET /reviews/senses/{reviewCardId}/leech
-                             when the drawer opens. Shows status badge,
-                             severity, reasons, and suggestions. For
-                             suspended/archived cards, a note explains
-                             that leech status is still computed but the
-                             card is not in the review queue. -->
-                        <div class="detail-section">
-                            <div class="detail-section-title">遗忘诊断</div>
-                            <div v-if="detailLeechLoading" class="text-caption text--secondary py-2">加载遗忘诊断中...</div>
-                            <div v-else-if="detailLeechError" class="text-caption error--text py-2">{{ detailLeechError }}</div>
-                            <template v-else-if="detailLeech">
-                                <div class="detail-row">
-                                    <span class="detail-label">遗忘状态</span>
-                                    <span class="detail-value">
-                                        <v-chip x-small :color="leechStatusColor(detailLeech.status)" text-color="white">
-                                            {{ leechStatusLabel(detailLeech.status) }}
-                                        </v-chip>
-                                        <v-chip
-                                            v-if="detailLeech.status !== 'stable'"
-                                            x-small
-                                            :color="leechSeverityColor(detailLeech.severity)"
-                                            outlined
-                                            class="ml-1"
-                                        >严重度：{{ leechSeverityText(detailLeech.severity) }}</v-chip>
-                                    </span>
-                                </div>
-                                <div v-if="detailLeech.reasons && detailLeech.reasons.length" class="detail-row">
-                                    <span class="detail-label">原因</span>
-                                    <span class="detail-value">
-                                        <v-chip
-                                            v-for="reason in detailLeech.reasons"
-                                            :key="reason"
-                                            x-small
-                                            color="error"
-                                            outlined
-                                            class="mr-1 mb-1"
-                                        >{{ leechReasonLabel(reason) }}</v-chip>
-                                    </span>
-                                </div>
-                                <div v-if="detailLeech.suggestions && detailLeech.suggestions.length" class="detail-row">
-                                    <span class="detail-label">建议</span>
-                                    <span class="detail-value">
-                                        <ul class="pl-4 mb-0">
-                                            <li v-for="suggestion in detailLeech.suggestions" :key="suggestion" class="text-body-2">
-                                                {{ leechSuggestionLabel(suggestion) }}
-                                            </li>
-                                        </ul>
-                                    </span>
-                                </div>
-                                <v-alert
-                                    v-if="detailTarget.lifecycle_state === 'suspended' || detailTarget.lifecycle_state === 'archived'"
-                                    type="info"
-                                    dense
-                                    text
-                                    class="mt-2 mb-0"
-                                    border="left"
-                                >
-                                    该卡当前为「{{ stateLabel(detailTarget.lifecycle_state) }}」状态，不在复习队列中。遗忘诊断仍会基于历史数据计算，但不会出现在日常复习中。
-                                </v-alert>
-                            </template>
-                            <div v-else class="text-caption text--secondary py-2">暂无遗忘诊断数据。</div>
-                        </div>
-
+                        <!-- ADR-0014: 缺失状态 moved into the overview tab
+                             (previously positioned after the diagnosis
+                             section). The overview tab closes after this
+                             section, then the history and diagnosis tabs
+                             follow. -->
                         <v-divider class="my-3" />
 
                         <!-- 缺失状态 -->
@@ -933,6 +843,155 @@
                                 <span class="detail-value" :class="detailSourceClass(detailTarget)">{{ detailTarget.source_display_status === 'missing' ? '是（无例句无原文）' : (detailTarget.source_display_status === 'card_example_only' ? '仅保存例句（未定位原章节）' : '否（已定位原文）') }}</span>
                             </div>
                         </div>
+                            </v-tab-item>
+
+                            <!-- ADR-0014: 历史 tab — uses card_info payload
+                                 from the single canonical detail request.
+                                 No additional /logs or /lifecycle-events
+                                 requests are fired. Sections are labeled
+                                 "最近 N 条" to make the cap explicit. -->
+                            <v-tab-item value="history">
+                                <!-- ADR-0010: 生命周期记录（最近 N 条） -->
+                                <div class="detail-section">
+                                    <div class="detail-section-title">生命周期记录（最近 {{ cardInfoLifecycleEventsLimit() }} 条）</div>
+                                    <div v-if="!cardInfo" class="text-caption text--secondary py-2">暂无生命周期记录。</div>
+                                    <div v-else-if="cardInfoLifecycleEvents().length === 0" class="text-caption text--secondary py-2">暂无生命周期记录。</div>
+                                    <div v-else>
+                                        <div
+                                            v-for="event in cardInfoLifecycleEvents()"
+                                            :key="event.id"
+                                            class="log-entry mb-2 pa-2"
+                                        >
+                                            <div class="d-flex align-center" style="gap: 6px;">
+                                                <v-chip x-small :color="actionColor(event.action)">{{ actionLabel(event.action) }}</v-chip>
+                                                <span class="text-caption">| {{ event.source }}</span>
+                                                <v-spacer />
+                                                <span class="text-caption text--secondary">{{ formatDateTime(event.created_at) }}</span>
+                                            </div>
+                                            <div class="text-caption mt-1">
+                                                <span :class="event.previous_state ? '' : 'text--secondary'">{{ stateLabel(event.previous_state) }}</span>
+                                                <span class="mx-1">→</span>
+                                                <span :class="event.new_state ? '' : 'text--secondary'">{{ stateLabel(event.new_state) }}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <v-divider class="my-3" />
+
+                                <!-- ADR-0009: 最近复习记录（最近 N 条）— undone
+                                     audit trail retained. Original rating
+                                     preserved, log not hidden, no undo button. -->
+                                <div class="detail-section">
+                                    <div class="detail-section-title">最近复习记录（最近 {{ cardInfoReviewLogsLimit() }} 条）</div>
+                                    <div v-if="!cardInfo" class="text-caption text--secondary py-2">暂无复习记录。</div>
+                                    <div v-else-if="cardInfoReviewLogs().length === 0" class="text-caption text--secondary py-2">暂无复习记录。</div>
+                                    <div v-else>
+                                        <div
+                                            v-for="log in cardInfoReviewLogs()"
+                                            :key="log.id"
+                                            class="log-entry mb-2 pa-2"
+                                        >
+                                            <div class="d-flex align-center" style="gap: 6px;">
+                                                <v-chip x-small :color="logRatingColor(log.rating)">{{ log.rating }}</v-chip>
+                                                <span class="text-caption">| {{ log.source }}</span>
+                                                <v-spacer />
+                                                <span class="text-caption text--secondary">{{ formatDateTime(log.reviewed_at) }}</span>
+                                            </div>
+                                            <div class="text-caption mt-1">
+                                                <span :class="log.previous_state ? '' : 'text--secondary'">{{ log.previous_state || '—' }}</span>
+                                                <span class="mx-1">→</span>
+                                                <span :class="log.new_state ? '' : 'text--secondary'">{{ log.new_state || '—' }}</span>
+                                            </div>
+                                            <div class="text-caption text--secondary mt-1">
+                                                S: {{ formatFsrsNumber(log.previous_stability) }} → {{ formatFsrsNumber(log.new_stability) }}
+                                                &nbsp;|&nbsp;
+                                                D: {{ formatFsrsNumber(log.previous_difficulty) }} → {{ formatFsrsNumber(log.new_difficulty) }}
+                                            </div>
+                                            <div class="text-caption text--secondary">
+                                                到期: {{ formatDueAt(log.previous_due_at) }} → {{ formatDueAt(log.new_due_at) }}
+                                            </div>
+                                            <!-- ADR-0009: Undo audit trail. The original
+                                                 rating is preserved (not changed to undo),
+                                                 the log is not hidden, and no undo button
+                                                 is provided on this page. -->
+                                            <div v-if="log.undone" class="text-caption mt-1 d-flex align-center" style="gap: 4px;">
+                                                <v-chip x-small color="grey">已撤销</v-chip>
+                                                <span class="text--secondary">
+                                                    撤销时间: {{ formatDateTime(log.undone_at) }}
+                                                    <span v-if="log.undo_source"> · 来源: {{ log.undo_source }}</span>
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </v-tab-item>
+
+                            <!-- ADR-0014: 诊断 tab — uses card_info.leech
+                                 from the single canonical detail request.
+                                 No additional /leech request is fired. -->
+                            <v-tab-item value="diagnosis">
+                                <!-- ADR-0011: 遗忘诊断 (leech diagnostics).
+                                     For suspended/archived cards, a note
+                                     explains that leech status is still
+                                     computed but the card is not in the
+                                     review queue. -->
+                                <div class="detail-section">
+                                    <div class="detail-section-title">遗忘诊断</div>
+                                    <template v-if="cardInfoLeech()">
+                                        <div class="detail-row">
+                                            <span class="detail-label">遗忘状态</span>
+                                            <span class="detail-value">
+                                                <v-chip x-small :color="leechStatusColor(cardInfoLeech().status)" text-color="white">
+                                                    {{ leechStatusLabel(cardInfoLeech().status) }}
+                                                </v-chip>
+                                                <v-chip
+                                                    v-if="cardInfoLeech().status !== 'stable'"
+                                                    x-small
+                                                    :color="leechSeverityColor(cardInfoLeech().severity)"
+                                                    outlined
+                                                    class="ml-1"
+                                                >严重度：{{ leechSeverityText(cardInfoLeech().severity) }}</v-chip>
+                                            </span>
+                                        </div>
+                                        <div v-if="cardInfoLeech().reasons && cardInfoLeech().reasons.length" class="detail-row">
+                                            <span class="detail-label">原因</span>
+                                            <span class="detail-value">
+                                                <v-chip
+                                                    v-for="reason in cardInfoLeech().reasons"
+                                                    :key="reason"
+                                                    x-small
+                                                    color="error"
+                                                    outlined
+                                                    class="mr-1 mb-1"
+                                                >{{ leechReasonLabel(reason) }}</v-chip>
+                                            </span>
+                                        </div>
+                                        <div v-if="cardInfoLeech().suggestions && cardInfoLeech().suggestions.length" class="detail-row">
+                                            <span class="detail-label">建议</span>
+                                            <span class="detail-value">
+                                                <ul class="pl-4 mb-0">
+                                                    <li v-for="suggestion in cardInfoLeech().suggestions" :key="suggestion" class="text-body-2">
+                                                        {{ leechSuggestionLabel(suggestion) }}
+                                                    </li>
+                                                </ul>
+                                            </span>
+                                        </div>
+                                        <v-alert
+                                            v-if="detailTarget.lifecycle_state === 'suspended' || detailTarget.lifecycle_state === 'archived'"
+                                            type="info"
+                                            dense
+                                            text
+                                            class="mt-2 mb-0"
+                                            border="left"
+                                        >
+                                            该卡当前为「{{ stateLabel(detailTarget.lifecycle_state) }}」状态，不在复习队列中。遗忘诊断仍会基于历史数据计算，但不会出现在日常复习中。
+                                        </v-alert>
+                                    </template>
+                                    <div v-else class="text-caption text--secondary py-2">暂无遗忘诊断数据。</div>
+                                </div>
+                            </v-tab-item>
+                        </v-tabs-items>
                     </v-card-text>
                     <v-card-actions>
                         <v-btn text @click="closeDetail">关闭</v-btn>
@@ -950,6 +1009,9 @@
                     </v-card-actions>
                 </v-card>
             </template>
+            <div v-else class="d-flex align-center justify-center" style="min-height: 240px;">
+                <div class="text-caption text--secondary">请从列表中选择一张卡片查看详情。</div>
+            </div>
         </v-navigation-drawer>
 
         <!-- Archive confirmation dialog -->
@@ -1371,6 +1433,21 @@ export default {
             sourcePayload: {},
             detailDrawer: false,
             detailTarget: null,
+            // ADR-0014: Card Info read model — single canonical detail request
+            // replaces the former three parallel sub-requests (logs, lifecycle-
+            // events, leech). cardInfo holds the additive `card_info` payload
+            // (review_logs / lifecycle_events / leech). detailLoading and
+            // detailError drive the drawer-level loading/error states.
+            // detailRequestSeq is a monotonic guard against stale responses
+            // when the user rapidly switches cards.
+            cardInfo: null,
+            detailLoading: false,
+            detailError: '',
+            detailRequestSeq: 0,
+            detailTab: 'overview',
+            // Legacy fields retained for backward-compat with any code path
+            // that still reads them; the drawer no longer mutates them after
+            // ADR-0014, but tests/refs may inspect them.
             detailLogs: [],
             detailLogsLoading: false,
             detailLogsError: '',
@@ -1554,9 +1631,11 @@ export default {
                 struggling_card_ids: [],
             },
             leechSummaryLoaded: false,
-            // ADR-0011: Detail drawer leech diagnostics.
-            // Fetched via GET /reviews/senses/{reviewCardId}/leech when
-            // the drawer opens.
+            // ADR-0011 / ADR-0014: Detail drawer leech diagnostics.
+            // After ADR-0014, the leech descriptor arrives as
+            // cardInfo.leech from the single canonical detail request.
+            // These legacy fields are kept for backward-compat with any
+            // external reader but are no longer populated by the drawer.
             detailLeech: null,
             detailLeechLoading: false,
             detailLeechError: '',
@@ -2342,22 +2421,58 @@ export default {
                 });
         },
 
+        // ==================== ADR-0014: Card Info read model ====================
+        // The detail drawer now opens with a SINGLE canonical request to
+        // GET /review-cards/manage/{reviewCard}/detail, which returns the
+        // existing top-level fields PLUS an additive `card_info` object
+        // (review_logs / lifecycle_events / leech). The former three parallel
+        // sub-requests (logs / lifecycle-events / leech) are no longer fired
+        // by the drawer. Both the list-row entry and the daily-report deep-
+        // link entry share the same loadCardInfo() path.
         openDetail(item) {
-            this.detailTarget = item;
-            this.detailLogs = [];
-            this.detailLogsLoading = false;
-            this.detailLogsError = '';
-            this.detailEvents = [];
-            this.detailEventsLoading = false;
-            this.detailEventsError = '';
-            // ADR-0011: Reset leech diagnostics for the new card.
-            this.detailLeech = null;
-            this.detailLeechLoading = false;
-            this.detailLeechError = '';
+            // ADR-0014: Always fetch the canonical detail payload (do not
+            // trust the possibly-stale list-row snapshot). The response
+            // carries both the top-level card fields and card_info.
             this.detailDrawer = true;
-            this.loadDetailLogs(item);
-            this.loadDetailEvents(item);
-            this.loadDetailLeech(item);
+            this.detailTab = 'overview';
+            this.detailTarget = item; // optimistic placeholder until response arrives
+            this.cardInfo = null;
+            this.detailError = '';
+            this.detailLoading = true;
+            this.loadCardInfo(item.review_card_id);
+        },
+
+        // Single canonical detail request shared by list-row and deep-link.
+        // Uses a monotonic sequence number to guard against stale responses
+        // when the user rapidly switches cards (or closes the drawer while a
+        // request is in flight).
+        loadCardInfo(reviewCardId) {
+            const seq = ++this.detailRequestSeq;
+            axios.get('/review-cards/manage/' + reviewCardId + '/detail')
+                .then((response) => {
+                    // Stale-response guard: if a newer open/close happened,
+                    // discard this response.
+                    if (seq !== this.detailRequestSeq) {
+                        return;
+                    }
+                    const data = response.data || {};
+                    this.detailTarget = data;
+                    this.cardInfo = data.card_info || null;
+                    this.detailError = '';
+                })
+                .catch((err) => {
+                    if (seq !== this.detailRequestSeq) {
+                        return;
+                    }
+                    this.detailError = '加载卡片详情失败：' + (err.response?.data?.message || err.message);
+                    this.cardInfo = null;
+                })
+                .finally(() => {
+                    if (seq !== this.detailRequestSeq) {
+                        return;
+                    }
+                    this.detailLoading = false;
+                });
         },
 
         // --- Deep link (ADR-0007) ---
@@ -2375,15 +2490,35 @@ export default {
             this.deepLink.loading = true;
             this.deepLink.error = '';
             this.deepLink.active = false;
+            // ADR-0014: Use the same monotonic sequence guard as
+            // loadCardInfo so a rapid list-row click cannot be overwritten
+            // by a late deep-link response.
+            const seq = ++this.detailRequestSeq;
+            this.detailLoading = true;
             axios.get('/review-cards/manage/' + reviewCardId + '/detail')
                 .then((response) => {
-                    const item = response.data;
+                    if (seq !== this.detailRequestSeq) {
+                        return;
+                    }
+                    const data = response.data || {};
                     this.deepLink.active = true;
-                    this.openDetail(item);
+                    // ADR-0014: Open the drawer and populate from the single
+                    // canonical response. Do NOT re-fetch via openDetail()
+                    // because the response already contains card_info.
+                    this.detailDrawer = true;
+                    this.detailTab = 'overview';
+                    this.detailTarget = data;
+                    this.cardInfo = data.card_info || null;
+                    this.detailError = '';
+                    this.detailLoading = false;
                 })
                 .catch(() => {
+                    if (seq !== this.detailRequestSeq) {
+                        return;
+                    }
                     this.deepLink.error = '未找到可管理的词义复习卡，可能已删除、被拒绝或不属于当前语言。';
                     this.deepLink.active = false;
+                    this.detailLoading = false;
                 })
                 .finally(() => {
                     this.deepLink.loading = false;
@@ -2406,48 +2541,46 @@ export default {
         },
 
         closeDetail() {
+            // ADR-0014: Bump sequence to invalidate any in-flight request,
+            // then clear all drawer state.
+            this.detailRequestSeq++;
             this.detailDrawer = false;
             this.detailTarget = null;
+            this.cardInfo = null;
+            this.detailLoading = false;
+            this.detailError = '';
+            this.detailTab = 'overview';
+            // Legacy field cleanup (no longer populated by the drawer, but
+            // cleared for cleanliness).
             this.detailLogs = [];
             this.detailLogsLoading = false;
             this.detailLogsError = '';
             this.detailEvents = [];
             this.detailEventsLoading = false;
             this.detailEventsError = '';
-            // ADR-0011: Clear leech diagnostics on close.
             this.detailLeech = null;
             this.detailLeechLoading = false;
             this.detailLeechError = '';
         },
 
-        loadDetailLogs(item) {
-            this.detailLogsLoading = true;
-            this.detailLogsError = '';
-            axios.get('/review-cards/manage/' + item.review_card_id + '/logs')
-                .then((response) => {
-                    this.detailLogs = response.data.items || [];
-                })
-                .catch((err) => {
-                    this.detailLogsError = '加载复习记录失败：' + (err.response?.data?.message || err.message);
-                })
-                .finally(() => {
-                    this.detailLogsLoading = false;
-                });
+        // Computed-style helpers for the template. Vue 2 data() cannot
+        // expose computed properties that depend on cardInfo without
+        // declaring them in `computed`, so we use methods referenced from
+        // the template instead.
+        cardInfoReviewLogs() {
+            return this.cardInfo?.review_logs?.items || [];
         },
-
-        loadDetailEvents(item) {
-            this.detailEventsLoading = true;
-            this.detailEventsError = '';
-            axios.get('/review-cards/' + item.review_card_id + '/lifecycle-events')
-                .then((response) => {
-                    this.detailEvents = response.data.items || [];
-                })
-                .catch((err) => {
-                    this.detailEventsError = '加载生命周期记录失败：' + (err.response?.data?.message || err.message);
-                })
-                .finally(() => {
-                    this.detailEventsLoading = false;
-                });
+        cardInfoReviewLogsLimit() {
+            return this.cardInfo?.review_logs?.limit || 20;
+        },
+        cardInfoLifecycleEvents() {
+            return this.cardInfo?.lifecycle_events?.items || [];
+        },
+        cardInfoLifecycleEventsLimit() {
+            return this.cardInfo?.lifecycle_events?.limit || 20;
+        },
+        cardInfoLeech() {
+            return this.cardInfo?.leech || null;
         },
 
         // ==================== ADR-0011: Leech governance ====================
@@ -2469,28 +2602,6 @@ export default {
                 .catch(() => {
                     // Non-blocking: hide the chip on failure.
                     this.leechSummaryLoaded = false;
-                });
-        },
-
-        // Fetch the leech descriptor for the detail drawer.
-        // GET /reviews/senses/{reviewCardId}/leech. Non-blocking.
-        loadDetailLeech(item) {
-            if (!item || !item.review_card_id) {
-                return;
-            }
-            this.detailLeechLoading = true;
-            this.detailLeechError = '';
-            axios.get('/reviews/senses/' + item.review_card_id + '/leech')
-                .then((response) => {
-                    const data = response.data || {};
-                    this.detailLeech = data.leech || null;
-                })
-                .catch((err) => {
-                    this.detailLeechError = '加载遗忘诊断失败：' + (err.response?.data?.message || err.message);
-                    this.detailLeech = null;
-                })
-                .finally(() => {
-                    this.detailLeechLoading = false;
                 });
         },
 

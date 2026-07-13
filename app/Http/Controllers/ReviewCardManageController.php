@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
 use App\Services\LifecycleConflictException;
+use App\Services\ReviewCardInfoQueryService;
 use App\Services\ReviewCardLifecycleCommandService;
 use App\Services\ReviewCardManageAccessService;
 use App\Services\ReviewCardManageItemSerializerService;
@@ -33,6 +34,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardManageAccessService $accessService,
         private ReviewCardLifecycleCommandService $lifecycleCommandService,
         private SenseReviewLeechQueryService $leechQueryService,
+        private ReviewCardInfoQueryService $cardInfoQueryService,
     )
     {
     }
@@ -509,18 +511,20 @@ class ReviewCardManageController extends Controller
     /**
      * GET /review-cards/manage/{reviewCard}/detail
      * ADR-0007 — Read-only exact card detail for deep-link navigation.
+     * ADR-0014 — Converged Card Info read model (additive card_info payload).
      *
      * Returns the serialized card item (same shape as list serializer) for
-     * a specific sense ReviewCard. Used by the daily report deep link so the
-     * management page can open the exact card without depending on the
-     * target card appearing in the current pagination/filter.
+     * a specific sense ReviewCard, PLUS an additive `card_info` object that
+     * aggregates recent review logs, lifecycle events, and the leech
+     * descriptor. Used by the management page detail drawer so the frontend
+     * can render the entire drawer from a single canonical request.
      *
      * Access control: ReviewCardManageAccessService (single source of truth).
      * 404 for: not found, other user, other language, legacy word card,
      * rejected/deleted sense. Archived cards (fsrs_enabled=false) allowed.
      *
-     * Read-only: no ReviewLog write, no FSRS change, no filter/pagination
-     * modification.
+     * Read-only: no ReviewLog write, no FSRS change, no lifecycle change.
+     * Backward compat: all pre-existing top-level fields preserved unchanged.
      */
     public function detail(int $reviewCard): JsonResponse
     {
@@ -528,8 +532,18 @@ class ReviewCardManageController extends Controller
             $reviewCard, Auth::user()->id, Auth::user()->selected_language
         );
 
-        return response()->json(
-            $this->itemSerializer->serializeCard($card, $sense)
+        // ADR-0014: Top-level fields preserved unchanged (additive only).
+        $payload = $this->itemSerializer->serializeCard($card, $sense);
+
+        // ADR-0014: Additive card_info — single aggregated payload so the
+        // frontend drawer makes one request instead of four.
+        $payload['card_info'] = $this->cardInfoQueryService->build(
+            $card,
+            $sense,
+            Auth::user()->id,
+            Auth::user()->selected_language
         );
+
+        return response()->json($payload);
     }
 }
