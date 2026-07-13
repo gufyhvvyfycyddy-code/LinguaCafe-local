@@ -343,7 +343,48 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 **Then implement**: Extract shared presentation from `SenseReview.vue` into `SenseStudyCard.vue`. `SenseReview.vue` uses this component (refactor must preserve observable behavior — existing guard tests + MCP Chrome regression must pass).
 
-**Tests count**: ~8 guard tests
+**Presentation contract (frozen by Task 2000-15 — see ADR-0016 §20.5 / §20.6 / §20.7 / §20.8)**:
+
+- **Reading-style token sentence presentation** (`阅读式 token 句子展示`):
+  - Reuse existing `resources/js/components/Review/SenseSentencePreview.vue` for sentence rendering. Do NOT create a parallel token component.
+  - Data source: `card.example_sentence_tokens`, `card.example_sentence_en`, `card.surface_form`, `card.lemma`. No new API, no new migration, no tokenizer re-call.
+  - Tokens present: render each token with existing reading-page `stage` color, preserve spaces/punctuation, mark target word (prefer `token.is_target`, fall back to surface/lemma match).
+  - Tokens missing: fall back to plain-text `example_sentence_en`. No blank card face. Do NOT block rating.
+  - Read-only: no click-to-look-up, no dictionary open, no `EncounteredWord` change, no familiarity change, no `ReviewLog` write, no FSRS change.
+  - No `v-html` for sentence rendering (use `v-for` over token array).
+  - Question side and answer side MUST reuse the same sub-component.
+  - Token color is LinguaCafe project adaptation (Anki supports custom HTML/CSS but does not freeze a default "target word color highlight" style).
+
+- **Show-answer empty-field hiding** (Anki conditional replacement semantic):
+  - `show-answer === false`: only question-side info shown. No `sense_zh`, no `sense_en`, no `aliases_zh`, no `collocations`, no learning-feedback answer content.
+  - `show-answer === true`: `sense_zh` always shown. `sense_en` / `aliases_zh` / `collocations` shown **only when non-empty after trim/normalization** — hide the **entire** block (including label) when empty. Do NOT show "暂无英文释义。" / "无" placeholders.
+  - Do NOT delete any database field. Do NOT auto-generate missing content. Do NOT call AI. Do NOT make these fields required.
+  - Scope limit: supplementary example, understanding aid, learning feedback continue to follow their existing conditional display rules.
+
+**Future implementation test matrix (registered by Task 2000-15, MUST be created and passed when CS-11.5 is actually implemented)**:
+
+Functional tests:
+1. `SenseStudyCard.vue` uses `SenseSentencePreview` (or equivalent shared sub-component) for sentence rendering.
+2. Token payload present → renders tokens.
+3. Target token is marked (via `token.is_target` or surface/lemma fallback).
+4. Token `stage` color is preserved.
+5. No tokens → falls back to plain-text `example_sentence_en`.
+6. No use of `v-html` anywhere in `SenseStudyCard.vue` or its sentence sub-component.
+7. Token display is read-only — no click-to-look-up, no dictionary open, no `EncounteredWord` change.
+8. `sense_en` empty → entire block hidden (including label).
+9. `aliases_zh` empty → entire block hidden (including label).
+10. `collocations` empty → entire block hidden (including label).
+11. All three field types with content → blocks render normally with labels and chips/text.
+12. `sense_zh` is always shown after Show Answer.
+13. `show-answer === false` → all answer fields hidden.
+14. Normal Sense Review and Custom Study share the same `SenseStudyCard.vue` component.
+
+Non-regression tests:
+15. No changes to rating, undo, interval preview, FSRS, ReviewLog, or lifecycle in either Sense Review or Custom Study.
+16. MCP Chrome acceptance uses both a real empty-field card and a real populated-field card to verify §20.6 hiding behavior.
+17. Two viewports: 1920×1080 and 900×900.
+
+**Tests count**: ~8 base guard tests + 17 future implementation matrix tests (registered, not yet executed in Task 2000-15).
 
 #### Task CS-12: Session UI — show card + advance
 **Guard test first**: `tests/js/CustomStudySessionUiGuard.test.mjs`

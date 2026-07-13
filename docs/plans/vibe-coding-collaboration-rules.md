@@ -324,6 +324,53 @@ GLM 报告必须包含：
 6. **只有 Anki 没有对应设计，或与 sense-only / 阅读主线冲突时，才提出产品问题。** 不得把 Anki 已有明确答案的问题重新抛给用户。
 7. **偏离记录位置**：偏离 Anki 默认的决策必须写入对应 ADR 和 implementation plan，不得只写在最终报告中。
 
+### 8.7 Anki 参考优先规则
+
+> **问题来源**：Task 2000-15。SenseStudyCard 共享卡面展示契约冻结时，需要把"Anki 优先于普通网页产品习惯"明确写入长期协作规则，避免后续卡面 / 字段显示 / 撤销 / 学习步骤等议题被普通网页产品习惯替代 Anki 已有设计。
+
+1. **覆盖范围**。所有与 Anki 相关的功能，在产品判断前必须先核查 Anki 官方手册或官方源码。覆盖范围包括但不限于：
+   - 评分（rating buttons / answer buttons）；
+   - 队列（review queue / learning queue / day-learn queue）；
+   - 自定义学习（custom study / filtered deck）；
+   - 卡片正反面（front / back / question side / answer side）；
+   - 字段显示（field rendering）；
+   - 空字段处理（empty field behavior）；
+   - 快捷键（hotkeys）；
+   - 撤销（undo）；
+   - 学习步骤（learning steps）；
+   - 复习顺序（review order / new card order / review sort order）。
+
+2. **决策顺序固定为**：
+   1. **Anki 官方设计**（manual / 官方源码）；
+   2. **保留 Anki 核心语义的网页适配**（如 LinguaCafe 在 Web 端实现 Anki 语义）；
+   3. **Anki 没有对应设计时，才进行 LinguaCafe 独立产品判断**。
+   该顺序不允许跳级，不允许在没有查阅 Anki 的情况下直接进入第 3 步。
+
+3. **不得把"普通网页产品习惯"直接替代 Anki 已存在的设计。** 例如：Anki 卡面默认先 Question 后 Show Answer，普通网页产品"一次性展开所有内容"的习惯不得替代该语义；Anki conditional replacement 在字段非空时才渲染标签和内容，普通网页"无内容时显示'无'"的习惯不得替代该语义。
+
+4. **Anki 没有统一默认样式时，文档必须明确写**：
+   > "Anki 没有冻结该视觉样式；以下为 LinguaCafe 项目适配。"
+   该声明必须出现在对应 ADR 或 implementation plan 中，不得只写在最终报告里。
+
+5. **本次卡面契约（Task 2000-15 冻结）的 Anki 依据**：
+   - Anki 卡面支持 HTML/CSS 自定义（Anki Manual — Styling & HTML）；
+   - Anki conditional replacement 支持字段非空时才渲染标签和内容（Anki Manual — Card Generation / Conditional Replacement）；
+   - Anki 正常流程为：先显示 Question，Show Answer 后显示 Answer（Anki Manual — Studying / Questions）。
+   后续 SenseStudyCard 实现必须遵守该依据，不得偏离为"一次性展开"或"无内容显示'无'"。
+
+6. **官方来源名称**。文档中记录以下名称即可，不需要复制手册原文：
+   - Anki Manual — Card Generation / Conditional Replacement；
+   - Anki Manual — Styling & HTML；
+   - Anki Manual — Studying / Questions。
+
+7. **不得把论坛意见或第三方模板写成 Anki 官方默认设计。** 第三方 Anki 模板（如 popular shared decks、社区 CSS 模板）、Reddit / Discord 论坛讨论、博客经验帖只能作为社区经验参考，不能与官方手册 / 官方源码并列作为"Anki 默认设计"。
+
+8. **本节与 §8 / §8.6 的关系**：
+   - §8 规定涉及 Anki 相关主题时必须先查 Anki 资料，以及"不盲目照搬"原则；
+   - §8.6 规定 Anki 已有明确默认值的设置项不再向用户重复提问；
+   - §8.7（本节）规定决策顺序固定、不得用普通网页产品习惯替代 Anki、以及 Anki 没有冻结视觉样式时必须声明的项目适配条款。
+   - 三节互补，不冲突；如有冲突以更严格的边界为准。
+
 ## 9. 最终报告格式规则
 
 自本轮起，OpenCode Agent 的最终报告必须采用以下结构：
