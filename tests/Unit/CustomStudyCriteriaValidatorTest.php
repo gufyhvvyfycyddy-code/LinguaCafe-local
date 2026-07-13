@@ -28,7 +28,15 @@ use PHPUnit\Framework\TestCase;
  * - returns CustomStudyCriteria on success
  * - exception carries stable field / reason
  *
+ * Task 2000-17 hardens the error contract:
+ * - The validator must NOT parse exception messages to derive field/reason.
+ * - CustomStudyCriteria::fromArray() throws CustomStudyValidationException directly
+ *   with field/reason set at the throw site.
+ * - The validator lets the structured exception propagate unchanged.
+ * - translateCriteriaException() and str_contains($message, ...) are abolished.
+ *
  * Task CS-2 of Custom Study 1A Phase 1 (Task 2000-16).
+ * Error contract fix: Task 2000-17.
  */
 class CustomStudyCriteriaValidatorTest extends TestCase
 {
@@ -134,6 +142,36 @@ class CustomStudyCriteriaValidatorTest extends TestCase
         );
     }
 
+    public function test_rejects_unknown_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'marked', 'parameters' => []],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('unknown_mode', $e->getReason());
+        }
+    }
+
+    public function test_rejects_missing_mode_key_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['parameters' => []],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('missing_mode', $e->getReason());
+        }
+    }
+
     // ---------- 8-11: source_chapter parameter failures ----------
 
     public function test_rejects_source_chapter_missing_chapter_id(): void
@@ -146,6 +184,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
         );
     }
 
+    public function test_rejects_source_chapter_missing_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'source_chapter', 'parameters' => []],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('missing_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_rejects_source_chapter_with_chapter_id_zero(): void
     {
         $this->expectException(CustomStudyValidationException::class);
@@ -154,6 +207,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
             1,
             'english'
         );
+    }
+
+    public function test_rejects_source_chapter_with_chapter_id_zero_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'source_chapter', 'parameters' => ['chapter_id' => 0]],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
     }
 
     public function test_rejects_source_chapter_with_negative_chapter_id(): void
@@ -166,6 +234,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
         );
     }
 
+    public function test_rejects_source_chapter_with_negative_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'source_chapter', 'parameters' => ['chapter_id' => -5]],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_rejects_source_chapter_with_string_chapter_id(): void
     {
         $this->expectException(CustomStudyValidationException::class);
@@ -174,6 +257,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
             1,
             'english'
         );
+    }
+
+    public function test_rejects_source_chapter_with_string_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'source_chapter', 'parameters' => ['chapter_id' => '42']],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
     }
 
     // ---------- 12-13: leech_attention parameter failures ----------
@@ -188,6 +286,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
         );
     }
 
+    public function test_rejects_leech_attention_missing_sub_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'leech_attention', 'parameters' => []],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('sub_mode', $e->getField());
+            $this->assertSame('missing_sub_mode', $e->getReason());
+        }
+    }
+
     public function test_rejects_leech_attention_with_invalid_sub_mode(): void
     {
         $this->expectException(CustomStudyValidationException::class);
@@ -196,6 +309,21 @@ class CustomStudyCriteriaValidatorTest extends TestCase
             1,
             'english'
         );
+    }
+
+    public function test_rejects_leech_attention_with_invalid_sub_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'leech_attention', 'parameters' => ['sub_mode' => 'all']],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('sub_mode', $e->getField());
+            $this->assertSame('invalid_sub_mode', $e->getReason());
+        }
     }
 
     // ---------- 14-15: language / user_id failures ----------
@@ -369,6 +497,105 @@ class CustomStudyCriteriaValidatorTest extends TestCase
         } catch (CustomStudyValidationException $e) {
             $this->assertSame('language', $e->getField());
             $this->assertSame('invalid_language', $e->getReason());
+        }
+    }
+
+    // ---------- Task 2000-17: validator does NOT parse exception messages ----------
+
+    public function test_validator_source_does_not_contain_translate_criteria_exception(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../app/Services/CustomStudy/CustomStudyCriteriaValidator.php');
+        $this->assertStringNotContainsString(
+            'translateCriteriaException',
+            $source,
+            'Validator must NOT contain translateCriteriaException() — '
+            . 'field/reason must be set at the throw site in CustomStudyCriteria, not parsed from message.'
+        );
+    }
+
+    public function test_validator_source_does_not_contain_str_contains_message_parsing(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../app/Services/CustomStudy/CustomStudyCriteriaValidator.php');
+        $this->assertStringNotContainsString(
+            "str_contains(\$message",
+            $source,
+            'Validator must NOT use str_contains($message, ...) — '
+            . 'message text is human-only and must not drive control flow.'
+        );
+    }
+
+    public function test_validator_source_does_not_contain_get_message_control_branch(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../app/Services/CustomStudy/CustomStudyCriteriaValidator.php');
+        $this->assertStringNotContainsString(
+            'getMessage()',
+            $source,
+            'Validator must NOT call getMessage() for control flow — '
+            . 'the structured exception already carries field/reason.'
+        );
+    }
+
+    public function test_validator_source_does_not_catch_invalid_argument_exception(): void
+    {
+        $source = file_get_contents(__DIR__ . '/../../app/Services/CustomStudy/CustomStudyCriteriaValidator.php');
+        $this->assertStringNotContainsString(
+            'InvalidArgumentException',
+            $source,
+            'Validator must NOT catch InvalidArgumentException — '
+            . 'CustomStudyCriteria now throws CustomStudyValidationException directly.'
+        );
+    }
+
+    // ---------- Task 2000-17: field/reason pass-through from Criteria ----------
+
+    public function test_validator_passes_through_structured_exception_from_criteria_unchanged(): void
+    {
+        // The validator must let the CustomStudyValidationException from
+        // CustomStudyCriteria::fromArray() propagate unchanged — it must NOT
+        // re-wrap, re-translate, or re-derive field/reason.
+        try {
+            $this->validator->validate(
+                ['mode' => 'source_chapter', 'parameters' => ['chapter_id' => -1]],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            // These field/reason values are set by CustomStudyCriteria, not
+            // by the validator. If the validator were parsing messages, a
+            // change to the message text would break this test.
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
+    public function test_validator_passes_through_missing_mode_exception_unchanged(): void
+    {
+        try {
+            $this->validator->validate(
+                ['parameters' => []],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('missing_mode', $e->getReason());
+        }
+    }
+
+    public function test_validator_passes_through_invalid_parameters_exception_unchanged(): void
+    {
+        try {
+            $this->validator->validate(
+                ['mode' => 'today_forgotten', 'parameters' => 'not-array'],
+                1,
+                'english'
+            );
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('criteria', $e->getField());
+            $this->assertSame('invalid_parameters', $e->getReason());
         }
     }
 

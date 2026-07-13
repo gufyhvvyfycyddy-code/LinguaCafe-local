@@ -1,6 +1,6 @@
 # Custom Study 1A Implementation Plan
 
-> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) code and tests completed in Task 2000-16, awaiting 网页端总流程设计师 acceptance.** Phase 2-6 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, or migration is authorized by this plan alone beyond Phase 1.
+> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) code and tests completed in Task 2000-16. Task 2000-17 fixed the Phase 1 error contract: `CustomStudyCriteria::fromArray()` now throws structured `CustomStudyValidationException` directly with stable `field`/`reason` at each throw site; `CustomStudyCriteriaValidator` no longer parses exception messages. Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) code and tests completed in Task 2000-17, awaiting 网页端总流程设计师 acceptance. Phase 2B / Phase 3-6 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, or migration is authorized by this plan alone beyond Phase 1 + Phase 2A queries.
 
 **Goal**: Implement Custom Study 1A — a preview-only temporary session that lets the user review a curated set of sense cards outside the normal due queue, without moving cards, building a filtered deck, writing ReviewLog, or running FSRS scheduling.
 
@@ -14,15 +14,17 @@
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that the `Card Marker` 1B prerequisite is NOT being snuck into 1A.
 
-**Phase status (Task 2000-16)**:
-- Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed, awaiting web-side acceptance.
-- Phase 2 (Query Services): NOT started.
+**Phase status (Task 2000-17)**:
+- Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed in Task 2000-16. ✅ Error contract architecture fixed in Task 2000-17 (Criteria throws structured `CustomStudyValidationException` directly with stable `field`/`reason`; Validator no longer parses message text). Awaiting web-side final acceptance.
+- Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`): ✅ Code and tests completed in Task 2000-17, awaiting web-side acceptance.
+- Phase 2B (CS-5 `SourceChapterQuery` + CS-6 `LeechAttentionQuery`): NOT started.
 - Phase 3 (Token Service): NOT started.
 - Phase 4 (Session State / Policy): NOT started.
 - Phase 5 (Frontend / SenseStudyCard): NOT started. AI translation card display registered as future requirement (§20.7.1), NOT implemented.
 - Phase 6 (Routes): NOT started.
 - Overall feature: NOT usable. No route, no controller, no page, no API endpoint exists yet.
-- `ChapterLocatorInterface` has NO production binding in Task 2000-16 (no controller, no route). A future Phase 2 / API integration round must create the Eloquent implementation and bind it in the container.
+- `ChapterLocatorInterface` has NO production binding in Task 2000-16 / 2000-17 (no controller, no route). A future Phase 2B / API integration round must create the Eloquent implementation and bind it in the container.
+- **Error contract (frozen by Task 2000-17)**: `field`/`reason` are the machine protocol. `message` is for human reading only. Callers MUST NOT parse `message` text to derive `field`/`reason`. The old `translateCriteriaException()` / `str_contains($message, ...)` control flow has been abolished and is guarded against by source-level tests.
 
 ---
 
@@ -126,7 +128,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 #### Task CS-1: `CustomStudyCriteria` value object
 **Test first**: `tests/Unit/CustomStudyCriteriaTest.php`
 - `fromArray()` accepts valid criteria for each of the 4 modes.
-- Rejects unknown mode (throws `InvalidArgumentException`).
+- Rejects unknown mode (throws `CustomStudyValidationException` with stable `field`/`reason`).
 - Rejects missing required parameters per mode.
   - `today_forgotten`: no parameters required.
   - `overdue`: no parameters required.
@@ -137,10 +139,11 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `parameters()` accessor.
 - Unknown keys ignored (not stored).
 - Immutable — no setters.
+- **Error contract (Task 2000-17 fix)**: `fromArray()` throws `CustomStudyValidationException` directly with `field`/`reason` set at each throw site. The `message` is human-readable only and may change without affecting the contract. Stable `field`/`reason` pairs: `mode/missing_mode`, `mode/unknown_mode`, `criteria/invalid_parameters`, `chapter_id/missing_chapter_id`, `chapter_id/invalid_chapter_id`, `sub_mode/missing_sub_mode`, `sub_mode/invalid_sub_mode`.
 
 **Then implement**: `app/Services/CustomStudy/CustomStudyCriteria.php`
 
-**Tests count**: ~10
+**Tests count**: ~10 (Task 2000-16) + ~15 stability + source-guard tests (Task 2000-17 error contract fix) = ~41
 
 #### Task CS-2: `CustomStudyCriteriaValidator` (pure, no DB)
 **Test first**: `tests/Unit/CustomStudyCriteriaValidatorTest.php`
@@ -151,10 +154,11 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - Validates `sub_mode` for `leech_attention`.
 - Returns validated `CustomStudyCriteria` or throws `CustomStudyValidationException`.
 - Does NOT query ReviewLog, ReviewCard, or WordSense — only validates shape + chapter ownership.
+- **Error contract (Task 2000-17 fix)**: The validator NO LONGER catches a plain SPL exception and NO LONGER parses `message` text to derive `field`/`reason`. `CustomStudyCriteria::fromArray()` throws `CustomStudyValidationException` directly, and the validator lets it propagate unchanged. The validator's own failures (invalid `user_id`, empty `language`, chapter not owned) throw `CustomStudyValidationException` directly with stable `field`/`reason`. Source-level guard tests forbid `translateCriteriaException`, `str_contains($message`, `getMessage()` control branches, and `InvalidArgumentException` catch blocks from reappearing in the validator source.
 
 **Then implement**: `app/Services/CustomStudy/CustomStudyCriteriaValidator.php` + `app/Services/CustomStudy/ChapterLocatorInterface.php`
 
-**Tests count**: ~12
+**Tests count**: ~12 (Task 2000-16) + ~16 source-guard + pass-through + stability tests (Task 2000-17 error contract fix) = ~42
 
 ### Phase 2: Query services (read-only, no write)
 

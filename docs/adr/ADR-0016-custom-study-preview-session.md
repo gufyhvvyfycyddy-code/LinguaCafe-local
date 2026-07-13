@@ -1,7 +1,7 @@
 # ADR-0016: Custom Study Preview Session
 
-**Status**: Accepted (architecture complete; **Phase 1 development partially started in Task 2000-16 — `CustomStudyCriteria` + `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files completed, awaiting web-side acceptance; Phase 2-6 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects and validator)
-**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16)
+**Status**: Accepted (architecture complete; **Phase 1 development partially started in Task 2000-16 — `CustomStudyCriteria` + `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files completed. Task 2000-17 fixed the Phase 1 error contract architecture: `CustomStudyCriteria::fromArray()` now throws structured `CustomStudyValidationException` directly with stable `field`/`reason` at each throw site; `CustomStudyCriteriaValidator` no longer parses exception messages. Phase 2A (`TodayForgottenQuery` + `OverdueQuery`) code and tests completed in Task 2000-17. All awaiting web-side acceptance; Phase 2B / Phase 3-6 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator and Phase 2A read-only candidate queries)
+**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17)
 **Related**: `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0015-review-queue-order-policy.md`, `docs/plans/custom-study-1a-implementation-plan.md`
 
 ## Context
@@ -469,6 +469,13 @@ All three routes share the same error contract:
 - Token belonging to a different user → `404`.
 - Token belonging to a different language → `404`.
 - Invalid `criteria` / `rating` / `card_limit` → `422` with validation errors.
+
+**Internal exception contract (frozen by Task 2000-17)**:
+- `CustomStudyValidationException` is the single structured exception type used by `CustomStudyCriteria` and `CustomStudyCriteriaValidator`.
+- `field` and `reason` are the **machine protocol** — they are set at each throw site and must remain stable regardless of message text changes.
+- `message` is for **human reading only** — callers MUST NOT parse `message` text to derive `field`/`reason`.
+- The old `translateCriteriaException()` / `str_contains($message, ...)` control flow has been abolished and is guarded against by source-level tests.
+- Stable `field`/`reason` pairs: `mode/missing_mode`, `mode/unknown_mode`, `criteria/invalid_parameters`, `chapter_id/missing_chapter_id`, `chapter_id/invalid_chapter_id`, `chapter_id/chapter_not_owned`, `sub_mode/missing_sub_mode`, `sub_mode/invalid_sub_mode`, `user_id/invalid_user_id`, `language/invalid_language`.
 
 ### 17. V1 card_limit freeze
 

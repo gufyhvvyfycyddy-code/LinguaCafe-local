@@ -2,7 +2,7 @@
 
 namespace App\Services\CustomStudy;
 
-use InvalidArgumentException;
+use App\Exceptions\CustomStudyValidationException;
 
 /**
  * Value object for a Custom Study criteria selection.
@@ -16,7 +16,14 @@ use InvalidArgumentException;
  * Malicious user_id / language keys in the raw input array are silently
  * ignored (unknown keys do not become part of the value object).
  *
+ * Task 2000-17 error contract fix:
+ * fromArray() now throws structured CustomStudyValidationException directly,
+ * with stable field/reason set at EACH throw site. The human-readable message
+ * is for display only — callers must NOT parse message text to derive
+ * field/reason. The validator lets the exception propagate unchanged.
+ *
  * Task CS-1 of Custom Study 1A Phase 1 (Task 2000-16).
+ * Error contract fix: Task 2000-17.
  */
 class CustomStudyCriteria
 {
@@ -68,22 +75,36 @@ class CustomStudyCriteria
      * schema per mode is retained.
      *
      * @param array<string, mixed> $input Raw input with keys: mode, parameters (optional)
-     * @throws InvalidArgumentException If mode is unknown or required parameters are missing/invalid.
+     * @throws CustomStudyValidationException If mode is unknown or required parameters are missing/invalid.
+     *         The exception carries stable field/reason set at the throw site.
+     *         The message is human-readable and may change without affecting the contract.
      */
     public static function fromArray(array $input): self
     {
         if (!array_key_exists('mode', $input)) {
-            throw new InvalidArgumentException('Custom Study criteria missing required key: mode');
+            throw new CustomStudyValidationException(
+                'mode',
+                'missing_mode',
+                'Custom Study criteria missing required key: mode.'
+            );
         }
 
         $mode = $input['mode'];
         if (!is_string($mode) || !in_array($mode, self::ALLOWED_MODES, true)) {
-            throw new InvalidArgumentException("Unknown Custom Study criteria mode: " . get_debug_type($mode));
+            throw new CustomStudyValidationException(
+                'mode',
+                'unknown_mode',
+                'Unknown Custom Study criteria mode: ' . get_debug_type($mode)
+            );
         }
 
         $rawParameters = $input['parameters'] ?? [];
         if (!is_array($rawParameters)) {
-            throw new InvalidArgumentException('Custom Study criteria parameters must be an array');
+            throw new CustomStudyValidationException(
+                'criteria',
+                'invalid_parameters',
+                'Custom Study criteria parameters must be an array.'
+            );
         }
 
         $parameters = self::extractParametersForMode($mode, $rawParameters);
@@ -122,7 +143,8 @@ class CustomStudyCriteria
      * @param string $mode
      * @param array<string, mixed> $rawParameters
      * @return array<string, mixed>
-     * @throws InvalidArgumentException If required parameters are missing or invalid.
+     * @throws CustomStudyValidationException If required parameters are missing or invalid.
+     *         field/reason are set at each throw site — message text is NOT a protocol.
      */
     private static function extractParametersForMode(string $mode, array $rawParameters): array
     {
@@ -134,32 +156,56 @@ class CustomStudyCriteria
 
             case self::MODE_SOURCE_CHAPTER:
                 if (!array_key_exists('chapter_id', $rawParameters)) {
-                    throw new InvalidArgumentException('source_chapter criteria requires parameter: chapter_id');
+                    throw new CustomStudyValidationException(
+                        'chapter_id',
+                        'missing_chapter_id',
+                        'source_chapter criteria requires parameter: chapter_id.'
+                    );
                 }
                 $chapterId = $rawParameters['chapter_id'];
                 // Strict integer check — string "42" is rejected (project has no existing
                 // contract that allows numeric-string coercion for criteria parameters).
                 if (!is_int($chapterId)) {
-                    throw new InvalidArgumentException('chapter_id must be an integer');
+                    throw new CustomStudyValidationException(
+                        'chapter_id',
+                        'invalid_chapter_id',
+                        'chapter_id must be an integer.'
+                    );
                 }
                 if ($chapterId <= 0) {
-                    throw new InvalidArgumentException('chapter_id must be greater than 0');
+                    throw new CustomStudyValidationException(
+                        'chapter_id',
+                        'invalid_chapter_id',
+                        'chapter_id must be greater than 0.'
+                    );
                 }
                 return ['chapter_id' => $chapterId];
 
             case self::MODE_LEECH_ATTENTION:
                 if (!array_key_exists('sub_mode', $rawParameters)) {
-                    throw new InvalidArgumentException('leech_attention criteria requires parameter: sub_mode');
+                    throw new CustomStudyValidationException(
+                        'sub_mode',
+                        'missing_sub_mode',
+                        'leech_attention criteria requires parameter: sub_mode.'
+                    );
                 }
                 $subMode = $rawParameters['sub_mode'];
                 if (!is_string($subMode) || !in_array($subMode, self::ALLOWED_SUB_MODES, true)) {
-                    throw new InvalidArgumentException('Invalid leech_attention sub_mode: ' . get_debug_type($subMode));
+                    throw new CustomStudyValidationException(
+                        'sub_mode',
+                        'invalid_sub_mode',
+                        'Invalid leech_attention sub_mode: ' . get_debug_type($subMode)
+                    );
                 }
                 return ['sub_mode' => $subMode];
 
             default:
                 // Should never reach here because mode is validated above, but keep for safety.
-                throw new InvalidArgumentException("Unknown Custom Study criteria mode: {$mode}");
+                throw new CustomStudyValidationException(
+                    'mode',
+                    'unknown_mode',
+                    "Unknown Custom Study criteria mode: {$mode}"
+                );
         }
     }
 }

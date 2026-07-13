@@ -2,8 +2,8 @@
 
 namespace Tests\Unit;
 
+use App\Exceptions\CustomStudyValidationException;
 use App\Services\CustomStudy\CustomStudyCriteria;
-use InvalidArgumentException;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -14,7 +14,13 @@ use PHPUnit\Framework\TestCase;
  * Verifies the four frozen criteria modes, parameter contracts,
  * immutability, unknown-key isolation, and toArray() round-trip.
  *
+ * Task 2000-17 hardens the error contract: CustomStudyCriteria::fromArray()
+ * now throws structured CustomStudyValidationException directly, with stable
+ * field/reason set at each throw site. Message text is human-only and must
+ * NOT be parsed by callers to derive field/reason.
+ *
  * Task CS-1 of Custom Study 1A Phase 1 (Task 2000-16).
+ * Error contract fix: Task 2000-17.
  */
 class CustomStudyCriteriaTest extends TestCase
 {
@@ -95,88 +101,313 @@ class CustomStudyCriteriaTest extends TestCase
         $this->assertSame(['sub_mode' => 'leech_plus_struggling'], $criteria->parameters());
     }
 
+    // ---------- 8.4: missing mode key ----------
+
+    public function test_from_array_rejects_missing_mode_key_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('missing_mode', $e->getReason());
+        }
+    }
+
     // ---------- 8.4: unknown mode ----------
 
     public function test_from_array_rejects_unknown_mode(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'marked',
             'parameters' => [],
         ]);
     }
 
+    public function test_from_array_rejects_unknown_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'marked',
+                'parameters' => [],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('unknown_mode', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_another_unknown_mode(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'filtered_deck',
         ]);
+    }
+
+    public function test_from_array_rejects_non_string_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 123,
+                'parameters' => [],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('mode', $e->getField());
+            $this->assertSame('unknown_mode', $e->getReason());
+        }
+    }
+
+    // ---------- 8.3: invalid parameters shape ----------
+
+    public function test_from_array_rejects_non_array_parameters_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'today_forgotten',
+                'parameters' => 'not-an-array',
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('criteria', $e->getField());
+            $this->assertSame('invalid_parameters', $e->getReason());
+        }
     }
 
     // ---------- 8.3: missing / invalid parameters ----------
 
     public function test_from_array_rejects_source_chapter_missing_chapter_id(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'source_chapter',
             'parameters' => [],
         ]);
     }
 
+    public function test_from_array_rejects_source_chapter_missing_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'source_chapter',
+                'parameters' => [],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('missing_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_source_chapter_with_chapter_id_zero(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'source_chapter',
             'parameters' => ['chapter_id' => 0],
         ]);
     }
 
+    public function test_from_array_rejects_source_chapter_with_chapter_id_zero_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'source_chapter',
+                'parameters' => ['chapter_id' => 0],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_source_chapter_with_negative_chapter_id(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'source_chapter',
             'parameters' => ['chapter_id' => -5],
         ]);
     }
 
+    public function test_from_array_rejects_source_chapter_with_negative_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'source_chapter',
+                'parameters' => ['chapter_id' => -5],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_source_chapter_with_string_chapter_id(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'source_chapter',
             'parameters' => ['chapter_id' => '42'],
         ]);
     }
 
+    public function test_from_array_rejects_source_chapter_with_string_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'source_chapter',
+                'parameters' => ['chapter_id' => '42'],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_source_chapter_with_null_chapter_id(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'source_chapter',
             'parameters' => ['chapter_id' => null],
         ]);
     }
 
+    public function test_from_array_rejects_source_chapter_with_null_chapter_id_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'source_chapter',
+                'parameters' => ['chapter_id' => null],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('chapter_id', $e->getField());
+            $this->assertSame('invalid_chapter_id', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_leech_attention_missing_sub_mode(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'leech_attention',
             'parameters' => [],
         ]);
     }
 
+    public function test_from_array_rejects_leech_attention_missing_sub_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'leech_attention',
+                'parameters' => [],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('sub_mode', $e->getField());
+            $this->assertSame('missing_sub_mode', $e->getReason());
+        }
+    }
+
     public function test_from_array_rejects_leech_attention_with_invalid_sub_mode(): void
     {
-        $this->expectException(InvalidArgumentException::class);
+        $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
             'mode' => 'leech_attention',
             'parameters' => ['sub_mode' => 'all'],
         ]);
+    }
+
+    public function test_from_array_rejects_leech_attention_with_invalid_sub_mode_with_stable_field_and_reason(): void
+    {
+        try {
+            CustomStudyCriteria::fromArray([
+                'mode' => 'leech_attention',
+                'parameters' => ['sub_mode' => 'all'],
+            ]);
+            $this->fail('Expected CustomStudyValidationException was not thrown');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertSame('sub_mode', $e->getField());
+            $this->assertSame('invalid_sub_mode', $e->getReason());
+        }
+    }
+
+    // ---------- Task 2000-17: field/reason is the machine protocol, message is human-only ----------
+
+    public function test_field_and_reason_are_stable_regardless_of_message_text_for_unknown_mode(): void
+    {
+        // The same logical error (unknown mode) must always produce the same
+        // field/reason pair, no matter what the human-readable message says.
+        // Two different invalid modes produce different messages but identical
+        // field/reason — proving field/reason is NOT derived from message text.
+        $reasons = [];
+        foreach (['marked', 'filtered_deck', 'nonexistent', 'RANDOM'] as $badMode) {
+            try {
+                CustomStudyCriteria::fromArray(['mode' => $badMode, 'parameters' => []]);
+                $this->fail("Expected exception for mode={$badMode}");
+            } catch (CustomStudyValidationException $e) {
+                $reasons[] = $e->getField() . '/' . $e->getReason();
+            }
+        }
+        $this->assertSame(
+            ['mode/unknown_mode', 'mode/unknown_mode', 'mode/unknown_mode', 'mode/unknown_mode'],
+            $reasons
+        );
+    }
+
+    public function test_field_and_reason_are_stable_regardless_of_message_text_for_invalid_chapter_id(): void
+    {
+        // Different invalid chapter_id values (0, -5, '42', null) all produce
+        // different messages but identical field/reason — proving field/reason
+        // is set at the throw site, not parsed from message.
+        $reasons = [];
+        foreach ([0, -5, '42', null, 3.14, false] as $badChapterId) {
+            try {
+                CustomStudyCriteria::fromArray([
+                    'mode' => 'source_chapter',
+                    'parameters' => ['chapter_id' => $badChapterId],
+                ]);
+                $this->fail("Expected exception for chapter_id=" . var_export($badChapterId, true));
+            } catch (CustomStudyValidationException $e) {
+                $reasons[] = $e->getField() . '/' . $e->getReason();
+            }
+        }
+        $this->assertSame(
+            [
+                'chapter_id/invalid_chapter_id',
+                'chapter_id/invalid_chapter_id',
+                'chapter_id/invalid_chapter_id',
+                'chapter_id/invalid_chapter_id',
+                'chapter_id/invalid_chapter_id',
+                'chapter_id/invalid_chapter_id',
+            ],
+            $reasons
+        );
+    }
+
+    public function test_exception_is_not_invalid_argument_exception_subclass(): void
+    {
+        // CustomStudyValidationException extends Exception directly, NOT
+        // InvalidArgumentException. This proves the error contract is
+        // structural (field/reason), not string-message-based.
+        try {
+            CustomStudyCriteria::fromArray(['mode' => 'bad']);
+            $this->fail('Expected CustomStudyValidationException');
+        } catch (CustomStudyValidationException $e) {
+            $this->assertFalse(
+                $e instanceof \InvalidArgumentException,
+                'CustomStudyValidationException must NOT extend InvalidArgumentException — '
+                . 'the error contract is structural, not message-based.'
+            );
+        }
     }
 
     // ---------- 8.4: toArray round-trip ----------
