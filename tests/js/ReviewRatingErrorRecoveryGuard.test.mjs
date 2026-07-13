@@ -1,50 +1,31 @@
 // ReviewRatingErrorRecoveryGuard.test.mjs
 //
-// Task 2000-12 Track C (DEV-QO-4) — Source-code guard tests for the rating
-// error-recovery fix in Review.vue and SenseReview.vue.
+// Task 2000-13 — Source-code STRUCTURAL guard tests for the rating
+// error-recovery refactor in Review.vue and SenseReview.vue.
 //
-// When a rating POST fails, the client cannot know whether the server
-// succeeded (response lost) or truly failed. The old code had three bugs:
-//   1. Review.vue catch set `this.finished = true`, sending the user to
-//      the "review complete" page even though cards might still exist.
-//   2. Review.vue incremented `correctReviews` and called `countReadWords()`
-//      BEFORE the server confirmed, so a failed request left permanently
-//      inflated statistics.
-//   3. SenseReview.vue catch set `this.error` but immediately reset
-//      `this.rating = false` in finally, allowing the user to re-rate the
-//      possibly-already-rated card — risking a duplicate ReviewLog.
+// These are STRUCTURE guards only. Executable BEHAVIOR tests live in
+// ReviewRatingRecovery.test.mjs, which imports the actual helper and
+// exercises it with deferred Promises. Do not conflate the two.
 //
-// The fix:
-//   - Review.vue: move stat increments into .then(); catch resets
-//     animation, shows a recovery message, reloads the authoritative
-//     queue via loadReviews(), and keeps ratingLoading=true until the
-//     reload settles.
-//   - SenseReview.vue: catch calls loadCards() to reload the authoritative
-//     queue, keeps this.rating=true until reload settles, and sets a
-//     recovery message.
-//
-// Tests:
+// Guards:
 //   Review.vue:
-//     1.  catch does NOT set finished=true.
-//     2.  catch does NOT set finished=true even indirectly.
-//     3.  correctReviews++ is inside .then(), not before the request.
-//     4.  countReadWords() is inside .then(), not before the request.
-//     5.  catch calls loadReviews() to reload the authoritative queue.
-//     6.  catch resets intoTheCorrectDeckAnimation to false.
-//     7.  catch resets backToDeckAnimation to false.
-//     8.  catch resets newCardAnimation to false.
-//     9.  catch sets a recovery error message.
-//     10. loadReviews .then resets ratingLoading to false.
-//     11. loadReviews .catch resets ratingLoading to false.
-//     12. v-alert for reviewError && !finished exists (persistent error).
-//     13. success path clears reviewError.
+//     1.  imports runAuthoritativeRatingRecovery helper
+//     2.  rateReview catch calls runAuthoritativeRatingRecovery
+//     3.  catch does NOT set finished=true
+//     4.  correctReviews++ is inside .then(), not before the request
+//     5.  countReadWords() is inside .then(), not before the request
+//     6.  loadReviews() returns a Promise (return axios.post)
+//     7.  .then() clears reviewError on success
+//     8.  has persistent error alert for !finished state
 //
 //   SenseReview.vue:
-//     14. catch calls loadCards() to reload the authoritative queue.
-//     15. catch does NOT immediately set this.rating=false (no finally).
-//     16. catch sets a recovery error message after loadCards settles.
-//     17. success path sets this.rating=false and clears this.error.
-//     18. no .finally that unconditionally resets this.rating=false.
+//     9.  imports runAuthoritativeRatingRecovery helper
+//     10. rate catch calls runAuthoritativeRatingRecovery
+//     11. catch does NOT immediately set this.rating=false (no finally)
+//     12. .then() success path sets this.rating=false
+//     13. .then() success path clears this.error
+//     14. reviewedCount++ remains in .then() success path only
+//     15. rate() does NOT have .finally that unconditionally resets rating
 
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -61,6 +42,10 @@ const REVIEW_PATH = join(
 const SENSE_REVIEW_PATH = join(
     __dirname, '..', '..',
     'resources', 'js', 'components', 'Senses', 'SenseReview.vue'
+);
+const HELPER_PATH = join(
+    __dirname, '..', '..',
+    'resources', 'js', 'components', 'Review', 'ReviewRatingRecovery.js'
 );
 
 let passed = 0;
@@ -82,6 +67,9 @@ const reviewSource = existsSync(REVIEW_PATH)
 const senseReviewSource = existsSync(SENSE_REVIEW_PATH)
     ? readFileSync(SENSE_REVIEW_PATH, 'utf-8')
     : '';
+const helperSource = existsSync(HELPER_PATH)
+    ? readFileSync(HELPER_PATH, 'utf-8')
+    : '';
 
 // Helper: extract the body of a named method from Vue source.
 function extractMethod(source, name) {
@@ -100,19 +88,13 @@ function extractMethod(source, name) {
 }
 
 // Helper: extract the MAIN .catch block body from an axios chain.
-// The main catch is the one that takes an `error` parameter, e.g.
-// `.catch((error) => { ... })`. Inner catches like `.catch(() => {})`
-// are skipped.
 function extractMainCatchBody(methodBody) {
-    // Find all .catch( occurrences and pick the one with (error) parameter.
     let searchFrom = 0;
     while (true) {
         const catchIdx = methodBody.indexOf('.catch(', searchFrom);
         if (catchIdx === -1) return '';
-        // Check if this catch has an (error) parameter
         const afterCatch = methodBody.slice(catchIdx, catchIdx + 30);
         if (afterCatch.includes('(error)') || afterCatch.includes('(err)')) {
-            // Found the main catch. Extract its body.
             const arrowStart = methodBody.indexOf('=>', catchIdx);
             if (arrowStart === -1) return '';
             let i = arrowStart;
@@ -152,6 +134,26 @@ function extractFirstThenBody(methodBody) {
     return methodBody.slice(start, i - 1);
 }
 
+// ==================== Helper module exists ====================
+
+test('ReviewRatingRecovery.js helper module exists and exports runAuthoritativeRatingRecovery', () => {
+    assert.ok(helperSource.length > 0, 'ReviewRatingRecovery.js must exist');
+    assert.ok(
+        helperSource.includes('export function runAuthoritativeRatingRecovery'),
+        'helper must export runAuthoritativeRatingRecovery'
+    );
+});
+
+test('ReviewRatingRecovery.js does NOT import axios', () => {
+    // Check for actual import/require statements, not comments mentioning axios.
+    const hasAxiosImport = /^\s*import\s+.*axios/m.test(helperSource) ||
+        /require\(['"][^'"]*axios['"]\)/.test(helperSource);
+    assert.ok(
+        !hasAxiosImport,
+        'helper must NOT import axios (caller supplies reloadQueue)'
+    );
+});
+
 // ==================== Review.vue tests ====================
 
 const reviewRateMethod = extractMethod(reviewSource, 'rateReview');
@@ -159,8 +161,18 @@ const reviewRateCatch = extractMainCatchBody(reviewRateMethod);
 const reviewRateThen = extractFirstThenBody(reviewRateMethod);
 const reviewLoadMethod = extractMethod(reviewSource, 'loadReviews');
 
-test('Review.vue rateReview method exists', () => {
-    assert.ok(reviewRateMethod.length > 0, 'rateReview method not found');
+test('Review.vue imports runAuthoritativeRatingRecovery helper', () => {
+    assert.ok(
+        reviewSource.includes('import { runAuthoritativeRatingRecovery }'),
+        'Review.vue must import runAuthoritativeRatingRecovery'
+    );
+});
+
+test('Review.vue rateReview catch calls runAuthoritativeRatingRecovery', () => {
+    assert.ok(
+        reviewRateCatch.includes('runAuthoritativeRatingRecovery'),
+        'rateReview catch must call runAuthoritativeRatingRecovery'
+    );
 });
 
 test('Review.vue catch does NOT set finished=true', () => {
@@ -170,56 +182,7 @@ test('Review.vue catch does NOT set finished=true', () => {
     );
 });
 
-test('Review.vue catch calls loadReviews() to reload authoritative queue', () => {
-    assert.ok(
-        reviewRateCatch.includes('this.loadReviews()'),
-        'catch must call loadReviews() to reload the authoritative queue'
-    );
-});
-
-test('Review.vue catch keeps ratingLoading=true during reload', () => {
-    // The catch should set ratingLoading=true after calling loadReviews
-    // so buttons stay disabled until the reload settles.
-    assert.ok(
-        reviewRateCatch.includes('this.ratingLoading = true'),
-        'catch must set ratingLoading=true to keep buttons disabled during reload'
-    );
-});
-
-test('Review.vue catch resets intoTheCorrectDeckAnimation', () => {
-    assert.ok(
-        reviewRateCatch.includes('this.intoTheCorrectDeckAnimation = false'),
-        'catch must reset intoTheCorrectDeckAnimation to false'
-    );
-});
-
-test('Review.vue catch resets backToDeckAnimation', () => {
-    assert.ok(
-        reviewRateCatch.includes('this.backToDeckAnimation = false'),
-        'catch must reset backToDeckAnimation to false'
-    );
-});
-
-test('Review.vue catch resets newCardAnimation', () => {
-    assert.ok(
-        reviewRateCatch.includes('this.newCardAnimation = false'),
-        'catch must reset newCardAnimation to false'
-    );
-});
-
-test('Review.vue catch sets recovery error message', () => {
-    assert.ok(
-        reviewRateCatch.includes('评分结果状态不确定'),
-        'catch must set a recovery error message mentioning 评分结果状态不确定'
-    );
-    assert.ok(
-        reviewRateCatch.includes('重新加载'),
-        'catch must mention 重新加载 in the error message'
-    );
-});
-
 test('Review.vue correctReviews++ is inside .then() success path', () => {
-    // The increment must be in .then(), not before the request.
     const beforeRequest = reviewRateMethod.split('axios.post')[0];
     assert.ok(
         !beforeRequest.includes('this.correctReviews ++') &&
@@ -245,17 +208,20 @@ test('Review.vue countReadWords() is inside .then() success path', () => {
     );
 });
 
+test('Review.vue loadReviews() returns a Promise (return axios.post)', () => {
+    // DEV-RECOVERY-2 (Task 2000-13): loadReviews must return the axios
+    // Promise so the recovery helper can reliably await success/failure.
+    assert.ok(
+        reviewLoadMethod.includes('return axios.post') ||
+        reviewLoadMethod.includes('return axios.get'),
+        'loadReviews must return the axios Promise (return axios.post/get)'
+    );
+});
+
 test('Review.vue .then() clears reviewError on success', () => {
     assert.ok(
         reviewRateThen.includes("this.reviewError = ''"),
         '.then() must clear reviewError on successful rating'
-    );
-});
-
-test('Review.vue loadReviews .then resets ratingLoading to false', () => {
-    assert.ok(
-        reviewLoadMethod.includes('this.ratingLoading = false'),
-        'loadReviews must reset ratingLoading to false after reload completes'
     );
 });
 
@@ -272,50 +238,28 @@ const senseRateMethod = extractMethod(senseReviewSource, 'rate');
 const senseRateCatch = extractMainCatchBody(senseRateMethod);
 const senseRateThen = extractFirstThenBody(senseRateMethod);
 
-test('SenseReview.vue rate method exists', () => {
-    assert.ok(senseRateMethod.length > 0, 'rate method not found');
-});
-
-test('SenseReview.vue catch calls loadCards() to reload authoritative queue', () => {
+test('SenseReview.vue imports runAuthoritativeRatingRecovery helper', () => {
     assert.ok(
-        senseRateCatch.includes('this.loadCards()'),
-        'catch must call loadCards() to reload the authoritative queue'
+        senseReviewSource.includes('import { runAuthoritativeRatingRecovery }'),
+        'SenseReview.vue must import runAuthoritativeRatingRecovery'
     );
 });
 
-test('SenseReview.vue catch does NOT immediately set this.rating=false', () => {
-    // The catch should NOT have a direct (top-level) this.rating = false
-    // statement that executes before loadCards settles. Instead,
-    // this.rating = false must be inside a loadCards().finally() callback.
-    //
-    // Verify: this.rating = false must appear AFTER this.loadCards() in
-    // the catch body (i.e., inside the loadCards callback). If it appears
-    // before loadCards(), it's a direct statement that unlocks buttons
-    // immediately — which is the bug we're fixing.
-    const loadCardsIdx = senseRateCatch.indexOf('this.loadCards()');
-    const ratingFalseIdx = senseRateCatch.indexOf('this.rating = false');
-    assert.ok(loadCardsIdx !== -1, 'catch must call this.loadCards()');
-    assert.ok(ratingFalseIdx !== -1, 'catch must eventually set this.rating = false');
+test('SenseReview.vue rate catch calls runAuthoritativeRatingRecovery', () => {
     assert.ok(
-        ratingFalseIdx > loadCardsIdx,
-        'this.rating = false must appear AFTER this.loadCards() (inside the callback), not before it'
-    );
-    // Additionally verify .finally( wraps the this.rating = false.
-    const finallyIdx = senseRateCatch.indexOf('.finally(');
-    assert.ok(
-        finallyIdx !== -1 && finallyIdx < ratingFalseIdx,
-        'this.rating = false must be inside a .finally() callback'
+        senseRateCatch.includes('runAuthoritativeRatingRecovery'),
+        'rate catch must call runAuthoritativeRatingRecovery'
     );
 });
 
-test('SenseReview.vue catch sets recovery error message after loadCards', () => {
+test('SenseReview.vue catch does NOT have .finally that unconditionally resets rating', () => {
+    // The old code had `.finally(() => { this.rating = false; })` which
+    // unlocked buttons even on error. The new code delegates to the helper
+    // which handles unlock via unlockRating callback.
     assert.ok(
-        senseRateCatch.includes('评分结果状态不确定'),
-        'catch must set a recovery error message mentioning 评分结果状态不确定'
-    );
-    assert.ok(
-        senseRateCatch.includes('重新加载'),
-        'catch must mention 重新加载 in the error message'
+        !senseRateMethod.includes('.finally(') ||
+        !senseRateMethod.match(/\.finally\([^}]*this\.rating\s*=\s*false/s),
+        'rate() must NOT have a .finally that unconditionally resets this.rating=false'
     );
 });
 
@@ -330,16 +274,6 @@ test('SenseReview.vue .then() success path clears this.error', () => {
     assert.ok(
         senseRateThen.includes("this.error = ''"),
         '.then() success path must clear this.error on successful rating'
-    );
-});
-
-test('SenseReview.vue rate() does NOT have .finally that unconditionally resets rating', () => {
-    // The old code had `.finally(() => { this.rating = false; })` which
-    // unlocked buttons even on error. The new code must NOT have this.
-    assert.ok(
-        !senseRateMethod.includes('.finally(') ||
-        !senseRateMethod.match(/\.finally\([^}]*this\.rating\s*=\s*false/s),
-        'rate() must NOT have a .finally that unconditionally resets this.rating=false'
     );
 });
 

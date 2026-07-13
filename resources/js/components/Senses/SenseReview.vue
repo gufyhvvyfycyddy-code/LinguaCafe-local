@@ -495,6 +495,7 @@
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
+    import { runAuthoritativeRatingRecovery } from '../Review/ReviewRatingRecovery.js';
     import {
         MORE_MENU_ITEMS,
         actionLabel,
@@ -1000,28 +1001,20 @@
                     this.error = '';
                     this.rating = false;
                 }).catch((error) => {
-                    // DEV-QO-3 (Task 2000-12): Rating request failed. The
-                    // server may have succeeded but the response was lost,
-                    // OR the server truly failed. We MUST NOT allow
-                    // re-rating the possibly-already-rated card (avoids
-                    // duplicate ReviewLog). Reload the authoritative queue
-                    // from the server. Keep this.rating=true (buttons
-                    // disabled) until the reload settles.
-                    //
-                    // loadCards() clears this.error at start and may set
-                    // its own load-error on failure. After the reload
-                    // settles, if no load-error occurred, set the rating-
-                    // recovery message so it stays visible until the next
-                    // successful rating.
-                    this.loadCards().finally(() => {
-                        if (!this.error) {
+                    // DEV-RECOVERY-1 (Task 2000-13): delegate the recovery
+                    // orchestration to the pure JS helper. The helper keeps
+                    // this.rating=true (buttons disabled), calls loadCards()
+                    // which returns a Promise, waits for it to settle, then
+                    // unlocks. The helper does NOT touch statistics,
+                    // ReviewLog, FSRS, or lifecycle.
+                    runAuthoritativeRatingRecovery({
+                        reloadQueue: () => this.loadCards(),
+                        lockRating: () => { this.rating = true; },
+                        unlockRating: () => { this.rating = false; },
+                        setRecoveryMessage: () => {
                             this.error = '评分结果状态不确定，正在重新加载词义复习队列，请不要重复评分。';
-                        }
-                        // Reload settled — unlock buttons. If the server
-                        // had succeeded, the reloaded queue won't contain
-                        // the rated card. If the server truly failed, the
-                        // reloaded queue will still contain it.
-                        this.rating = false;
+                        },
+                        preserveLoadError: () => !!this.error,
                     });
                 });
             },

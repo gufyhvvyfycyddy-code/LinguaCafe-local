@@ -512,6 +512,7 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
+    import { runAuthoritativeRatingRecovery } from './ReviewRatingRecovery.js';
     import SenseSentencePreview from './SenseSentencePreview.vue';
     import SenseExampleDialog from './SenseExampleDialog.vue';
 
@@ -648,7 +649,11 @@
                     data.ignoreDailyLimits = true;
                 }
 
-                axios.post('/reviews', data).then((response) => {
+                // DEV-RECOVERY-2 (Task 2000-13): return the full axios
+                // Promise so the rating-recovery helper can reliably await
+                // success or failure. Callers that ignore the return value
+                // (mounted / ignoreDailyLimits) are unaffected.
+                return axios.post('/reviews', data).then((response) => {
                     var data = response.data;
                     this.reviews = data.reviews;
                     this.totalReviews = data.reviews.length;
@@ -912,33 +917,27 @@
                         if (seq !== this.ratingRequestSequence) {
                             return;
                         }
-                        // DEV-QO-2 (Task 2000-12): Rating request failed.
-                        // The server may have succeeded but the response was
-                        // lost, OR the server truly failed. We MUST NOT:
-                        //   - enter the "finished" state (cards may still exist)
-                        //   - keep pre-incremented statistics (already moved
-                        //     to .then() above, so nothing to undo here)
-                        //   - allow re-rating the possibly-already-rated card
-                        // Instead: reset animation, show a clear error, and
-                        // reload the authoritative queue from the server.
-                        // ratingLoading stays true (buttons disabled) until
-                        // the reload settles.
-                        this.reviewError = '评分结果状态不确定，正在重新加载正式复习队列，请不要重复评分。';
+                        // DEV-RECOVERY-1 (Task 2000-13): delegate the
+                        // recovery orchestration to the pure JS helper.
+                        // The helper keeps ratingLoading=true (buttons
+                        // disabled), calls loadReviews() which returns a
+                        // Promise, waits for it to settle, then unlocks.
+                        // The helper does NOT touch statistics, ReviewLog,
+                        // FSRS, or lifecycle.
                         // Reset animation and background so the page looks
                         // operable during reload.
                         this.intoTheCorrectDeckAnimation = false;
                         this.backToDeckAnimation = false;
                         this.newCardAnimation = false;
                         this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
-                        // Reload the authoritative queue. loadReviews()
-                        // increments ratingRequestSequence (invalidating
-                        // this seq) and sets ratingLoading=false at start;
-                        // we immediately restore ratingLoading=true so the
-                        // buttons stay disabled until the reload's .then or
-                        // .catch fires.
-                        this.$nextTick(() => {
-                            this.loadReviews();
-                            this.ratingLoading = true;
+                        runAuthoritativeRatingRecovery({
+                            reloadQueue: () => this.loadReviews(),
+                            lockRating: () => { this.ratingLoading = true; },
+                            unlockRating: () => { this.ratingLoading = false; },
+                            setRecoveryMessage: () => {
+                                this.reviewError = '评分结果状态不确定，正在重新加载正式复习队列，请不要重复评分。';
+                            },
+                            preserveLoadError: () => !!this.reviewError,
                         });
                     }).finally(() => {
                         // DEV-QO-6: restore operable state only if this is
