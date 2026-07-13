@@ -1,6 +1,6 @@
 # Custom Study 1A Implementation Plan
 
-> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) code and tests completed in Task 2000-16. Task 2000-17 fixed the Phase 1 error contract: `CustomStudyCriteria::fromArray()` now throws structured `CustomStudyValidationException` directly with stable `field`/`reason` at each throw site; `CustomStudyCriteriaValidator` no longer parses exception messages. Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) code and tests completed in Task 2000-17, awaiting 网页端总流程设计师 acceptance. Phase 2B / Phase 3-6 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, or migration is authorized by this plan alone beyond Phase 1 + Phase 2A queries.
+> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) code and tests completed in Task 2000-16. Task 2000-17 fixed the Phase 1 error contract: `CustomStudyCriteria::fromArray()` now throws structured `CustomStudyValidationException` directly with stable `field`/`reason` at each throw site; `CustomStudyCriteriaValidator` no longer parses exception messages. Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) code and tests completed in Task 2000-17, awaiting 网页端总流程设计师 acceptance. Phase 2A 文档旧契约 (CS-3/CS-4 "返回空集合"描述) 在 Task 2000-18 修正为 "返回可组合 Builder". Task 2000-18 实现 Phase 2B (`EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`) 代码与测试完成，等待网页端验收。Phase 3-6 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, or migration is authorized by this plan alone beyond Phase 1 + Phase 2A/2B queries + Phase 2B 候选 ID 编排.
 
 **Goal**: Implement Custom Study 1A — a preview-only temporary session that lets the user review a curated set of sense cards outside the normal due queue, without moving cards, building a filtered deck, writing ReviewLog, or running FSRS scheduling.
 
@@ -14,17 +14,18 @@
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that the `Card Marker` 1B prerequisite is NOT being snuck into 1A.
 
-**Phase status (Task 2000-17)**:
-- Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed in Task 2000-16. ✅ Error contract architecture fixed in Task 2000-17 (Criteria throws structured `CustomStudyValidationException` directly with stable `field`/`reason`; Validator no longer parses message text). Awaiting web-side final acceptance.
-- Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`): ✅ Code and tests completed in Task 2000-17, awaiting web-side acceptance.
-- Phase 2B (CS-5 `SourceChapterQuery` + CS-6 `LeechAttentionQuery`): NOT started.
+**Phase status (Task 2000-18)**:
+- Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed in Task 2000-16. ✅ Error contract architecture fixed in Task 2000-17 (Criteria throws structured `CustomStudyValidationException` directly with stable `field`/`reason`; Validator no longer parses message text). ✅ Accepted by web-side.
+- Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`): ✅ Code and tests completed in Task 2000-17. ✅ Accepted by web-side. ✅ Phase 2A 文档旧契约 (CS-3/CS-4 "返回空集合"描述) 在 Task 2000-18 修正为 "返回可组合 Builder".
+- Phase 2B (CS-5 `SourceChapterQuery` + CS-6 `LeechAttentionQuery` + `EloquentChapterLocator` + `CustomStudyQueryService`): ✅ Code and tests completed in Task 2000-18, awaiting web-side acceptance. Two-layer boundary frozen: SQL-native Queries return Builder (today_forgotten/overdue/source_chapter); `LeechAttentionQuery` is Policy-derived returning `list<int>` (复用 `SenseReviewLeechQueryService` + `SenseReviewLeechPolicy`, no Policy duplication). `CustomStudyQueryService` is the unified `candidateIds()` boundary for the four modes — no `QueryInterface`, no DTO, no Repository, no Adapter.
 - Phase 3 (Token Service): NOT started.
 - Phase 4 (Session State / Policy): NOT started.
 - Phase 5 (Frontend / SenseStudyCard): NOT started. AI translation card display registered as future requirement (§20.7.1), NOT implemented.
 - Phase 6 (Routes): NOT started.
 - Overall feature: NOT usable. No route, no controller, no page, no API endpoint exists yet.
-- `ChapterLocatorInterface` has NO production binding in Task 2000-16 / 2000-17 (no controller, no route). A future Phase 2B / API integration round must create the Eloquent implementation and bind it in the container.
+- `ChapterLocatorInterface` has production binding in Task 2000-18 (`EloquentChapterLocator` in `AppServiceProvider`). `app(ChapterLocatorInterface::class)` and `app(CustomStudyCriteriaValidator::class)` are resolvable.
 - **Error contract (frozen by Task 2000-17)**: `field`/`reason` are the machine protocol. `message` is for human reading only. Callers MUST NOT parse `message` text to derive `field`/`reason`. The old `translateCriteriaException()` / `str_contains($message, ...)` control flow has been abolished and is guarded against by source-level tests.
+- **Phase 2 architecture boundary (frozen by Task 2000-18)**: SQL-native Queries return composable Builder; `LeechAttentionQuery` returns `list<int>` derived from real `SenseReviewLeechPolicy`. `CustomStudyQueryService::candidateIds()` is the unified output boundary. No new `QueryInterface`, DTO, Repository, or Adapter. No sorting, no `card_limit`, no serializer, no session, no token at the Query layer.
 
 ---
 
@@ -164,33 +165,36 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 #### Task CS-3: `CustomStudyQueryService` — `today_forgotten`
 **Test first**: `tests/Feature/CustomStudyTodayForgottenQueryTest.php`
-- Returns distinct `review_card_id` for `source=sense_review`, `rating=again`, `undone_at IS NULL`, `reviewed_at` within learning-timezone today.
+- Returns a composable Eloquent `Builder<ReviewCard>` (does NOT load models, does NOT apply `card_limit`, does NOT implement `SessionOrder`).
+- Filters via `whereExists` subquery on `review_logs` for `source=sense_review`, `rating=again`, `undone_at IS NULL`, `reviewed_at` within the current learning-timezone natural day (`dayStart <= reviewed_at < nextDayStart`).
 - Excludes cards whose `undone_at` is non-null (undone Again does NOT count).
 - Excludes cards not belonging to current user + language.
 - Excludes cards that are not confirmed sense cards (`target_type=sense`, WordSense confirmed).
 - Excludes suspended/archived/buried-not-expired cards (reuse `scopeSenseReviewEligible`).
-- Uses `ReviewStudyTimezoneService` for the day boundary (NOT `Carbon::today()`).
-- Returns empty collection when no matches.
+- Uses `ReviewStudyTimezoneService::dayStart()` for the boundary (NOT `Carbon::today()`).
+- Terminates as a **single candidate-card SQL** when `pluck('review_cards.id')` is called — the `whereExists` subquery is correlated, NOT a separate query.
+- Empty result is observed only after the Builder is terminated (e.g. `pluck`/`get`/`count`); the Query object itself never holds a "result set".
 - Does NOT write anything.
-- Query count: 1 ReviewLog query + 1 ReviewCard query (batch by `review_card_id`).
+- No N+1: one composable SQL when terminated.
 
 **Then implement**: `app/Services/CustomStudy/Queries/TodayForgottenQuery.php`
 
-**Tests count**: ~9
+**Tests count**: ~9 base + Task 2000-17 expanded to ~29 (timezones, DST, lifecycle, fsrs_enabled, no-write, no-N+1)
 
 #### Task CS-4: `CustomStudyQueryService` — `overdue`
 **Test first**: `tests/Feature/CustomStudyOverdueQueryTest.php`
-- Returns cards with `fsrs_due_at < start_of_local_natural_day` (strict — cards due later today excluded).
-- Uses `ReviewStudyTimezoneService::dayStart()` for the boundary.
-- Excludes ineligible cards (suspended/archived/buried-not-expired).
-- Confirmed sense only.
-- Empty collection when nothing overdue.
+- Returns a composable Eloquent `Builder<ReviewCard>` (does NOT load models, does NOT apply `card_limit`, does NOT implement `SessionOrder`).
+- Strict `review_cards.fsrs_due_at < dayStart` (cards due exactly at `dayStart`, later today, or tomorrow are NOT included; `NULL` `fsrs_due_at` is NOT included).
+- Uses `ReviewStudyTimezoneService::dayStart()` for the boundary (NOT `Carbon::today()`).
+- Excludes ineligible cards (suspended/archived/buried-not-expired) via `scopeSenseReviewEligible`.
+- Confirmed sense only via `confirmedSenseCardQuery`.
+- Empty result is observed only after the Builder is terminated.
 - Does NOT write anything.
-- Query count: 1.
+- Query count: 1 when terminated. No N+1.
 
 **Then implement**: `app/Services/CustomStudy/Queries/OverdueQuery.php`
 
-**Tests count**: ~7
+**Tests count**: ~7 base + Task 2000-17 expanded to ~24 (strict `<`, DST, lifecycle, fsrs_enabled, no-write, no-N+1)
 
 #### Task CS-5: `CustomStudyQueryService` — `source_chapter`
 **Test first**: `tests/Feature/CustomStudySourceChapterQueryTest.php`

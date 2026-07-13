@@ -7,6 +7,8 @@ use App\Services\AiStudyCardV6OpenAiCompatibleHttpTransport;
 use App\Services\AiStudyCardV6OpenAiCompatibleProviderAdapter;
 use App\Services\AiStudyCardV6ProviderInterface;
 use App\Services\AiStudyCardV6ProviderTransportInterface;
+use App\Services\CustomStudy\ChapterLocatorInterface;
+use App\Services\CustomStudy\EloquentChapterLocator;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -30,6 +32,11 @@ class AppServiceProvider extends ServiceProvider
 
             return $app->make(AiStudyCardV6DisabledProviderAdapter::class);
         });
+
+        // Custom Study Phase 2B (Task 2000-18): production binding for
+        // ChapterLocatorInterface. EloquentChapterLocator queries only the
+        // chapters table (user_id + language) via exists().
+        $this->app->bind(ChapterLocatorInterface::class, EloquentChapterLocator::class);
     }
 
     /**
