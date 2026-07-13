@@ -13,6 +13,7 @@ use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
 use App\Services\ReviewCardManageQueryService;
 use App\Services\ReviewCardManageMutationService;
+use App\Services\InvalidBrowserSearchException;
 use App\Services\SenseReviewLeechQueryService;
 use App\Services\WordSenseService;
 use Illuminate\Http\JsonResponse;
@@ -42,6 +43,15 @@ class ReviewCardManageController extends Controller
         $perPage = min((int) $request->input('per_page', 20), 100);
         $filter = $request->input('filter', 'enabled');
         $includeLeech = $request->boolean('include_leech') || in_array($filter, ['leech', 'struggling'], true);
+
+        // ADR-0012: Parse criteria up-front so we can:
+        //   (1) return a structured 422 on invalid grammar BEFORE querying,
+        //   (2) include search_meta in the success response.
+        try {
+            $criteria = $this->queryService->parseCriteria($request);
+        } catch (InvalidBrowserSearchException $e) {
+            return response()->json($e->toResponseArray(), 422);
+        }
 
         $query = $this->queryService->build($request, $userId, $language);
 
@@ -80,6 +90,11 @@ class ReviewCardManageController extends Controller
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
             ],
+            // ADR-0012: search_meta lets the frontend render token chips without
+            // re-parsing. The raw_query preserves the user's input, text_query is
+            // the plain-text portion, tokens are normalized advanced tokens, and
+            // advanced is true when at least one advanced token was recognized.
+            'search_meta' => $criteria->toSearchMeta(),
         ]);
     }
     /**
@@ -92,6 +107,13 @@ class ReviewCardManageController extends Controller
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
+
+        // ADR-0012: Validate search grammar before running the export query.
+        try {
+            $this->queryService->parseCriteria($request);
+        } catch (InvalidBrowserSearchException $e) {
+            return response()->json($e->toResponseArray(), 422);
+        }
 
         $query = $this->queryService->build($request, $userId, $language);
         $total = $query->count();
@@ -149,6 +171,13 @@ class ReviewCardManageController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
+        // ADR-0012: Validate search grammar before running the export query.
+        try {
+            $this->queryService->parseCriteria($request);
+        } catch (InvalidBrowserSearchException $e) {
+            return response()->json($e->toResponseArray(), 422);
+        }
+
         $query = $this->queryService->build($request, $userId, $language);
 
         $total = $query->count();
@@ -182,6 +211,13 @@ class ReviewCardManageController extends Controller
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
+
+        // ADR-0012: Validate search grammar before running the export query.
+        try {
+            $this->queryService->parseCriteria($request);
+        } catch (InvalidBrowserSearchException $e) {
+            return response()->json($e->toResponseArray(), 422);
+        }
 
         $query = $this->queryService->build($request, $userId, $language);
         $total = $query->count();

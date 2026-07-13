@@ -80,7 +80,7 @@
             <v-col cols="12" sm="5" md="4">
                 <v-text-field
                     v-model="searchQuery"
-                    label="搜索 Lemma / 释义 / 例句"
+                    label="搜索词义，或输入高级语法"
                     prepend-inner-icon="mdi-magnify"
                     clearable
                     dense
@@ -88,6 +88,37 @@
                     @keyup.enter="search"
                     @click:clear="search"
                 />
+                <div class="d-flex align-center mt-1" style="gap: 4px;">
+                    <v-btn x-small text color="info" @click="searchHelpDialog = true">
+                        <v-icon x-small left>mdi-help-circle-outline</v-icon>高级搜索语法
+                    </v-btn>
+                </div>
+                <!-- ADR-0012: Token chips from server-side search_meta -->
+                <div v-if="searchMeta && searchMeta.tokens && searchMeta.tokens.length > 0" class="d-flex flex-wrap align-center mt-1" style="gap: 4px;">
+                    <v-chip
+                        v-for="token in searchMeta.tokens"
+                        :key="token"
+                        x-small
+                        close
+                        color="primary"
+                        text-color="white"
+                        @click:close="removeToken(token)"
+                    >{{ token }}</v-chip>
+                </div>
+                <!-- ADR-0012: Specific grammar error display (422) -->
+                <v-alert
+                    v-if="searchErrors.length > 0"
+                    type="error"
+                    dense
+                    text
+                    class="mt-2 mb-0"
+                >
+                    <div class="text-caption">高级搜索语法有误：</div>
+                    <div v-for="(err, idx) in searchErrors" :key="idx" class="text-caption">
+                        <strong>{{ err.token }}</strong> — {{ err.reason }}
+                        <span v-if="err.example" class="text--secondary">（示例：{{ err.example }}）</span>
+                    </div>
+                </v-alert>
             </v-col>
             <v-col cols="12" sm="7" md="5">
                 <v-btn-toggle v-model="activeFilter" mandatory dense class="flex-wrap">
@@ -527,7 +558,11 @@
                             </td>
                         </tr>
                         <tr v-if="!loading && items.length === 0">
-                            <td :colspan="visibleColumnCount" class="text-center py-4 text--secondary">暂无词义复习卡。</td>
+                            <td :colspan="visibleColumnCount" class="text-center py-4 text--secondary">
+                                <span v-if="searchErrors.length > 0">搜索语法有误，请修正后重试。</span>
+                                <span v-else-if="searchQuery || (searchMeta && searchMeta.advanced)">当前搜索没有匹配结果。</span>
+                                <span v-else>暂无词义复习卡。</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
@@ -1105,6 +1140,60 @@
             </v-card>
         </v-dialog>
 
+        <!-- ADR-0012: Advanced search syntax help dialog -->
+        <v-dialog v-model="searchHelpDialog" max-width="560">
+            <v-card>
+                <v-card-title>高级搜索语法</v-card-title>
+                <v-card-text>
+                    <p class="text-body-2 mb-3">
+                        在搜索框中输入以下 token 可以精确筛选复习卡。所有条件使用 AND 语义组合。普通文本仍会搜索 Lemma / 释义 / 例句。
+                    </p>
+                    <v-list dense class="mb-2">
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>is:leech</code></v-list-item-title>
+                                <v-list-item-subtitle>只显示高遗忘（Leech）的卡片</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>is:struggling</code></v-list-item-title>
+                                <v-list-item-subtitle>只显示需关注的卡片</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>is:active</code> / <code>is:buried</code> / <code>is:suspended</code> / <code>is:archived</code></v-list-item-title>
+                                <v-list-item-subtitle>按生命周期状态筛选（最多一个）</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>rated:again</code> / <code>rated:hard</code></v-list-item-title>
+                                <v-list-item-subtitle>只显示有对应评分记录的卡片</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>prop:lapses&gt;=2</code></v-list-item-title>
+                                <v-list-item-subtitle>按遗忘次数筛选，支持 =, &gt;, &gt;=, &lt;, &lt;=</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                    </v-list>
+                    <v-divider class="my-2" />
+                    <p class="text-body-2 mb-1"><strong>组合示例：</strong></p>
+                    <p class="text-body-2 mb-1"><code>charge is:leech</code> — 搜索 charge 且是 Leech</p>
+                    <p class="text-body-2 mb-1"><code>is:leech is:suspended</code> — Leech 且已暂停</p>
+                    <p class="text-body-2 mb-1"><code>rated:again prop:lapses&gt;=2</code> — 有 Again 记录且遗忘 ≥ 2</p>
+                    <p class="text-body-2 mb-0"><code>charge rated:again prop:lapses&gt;=2</code> — 全部组合</p>
+                </v-card-text>
+                <v-card-actions>
+                    <v-spacer />
+                    <v-btn text @click="searchHelpDialog = false">关闭</v-btn>
+                </v-card-actions>
+            </v-card>
+        </v-dialog>
+
         <!-- ADR-0011: Single-card rewrite package dialog. Delegates to
              the SenseReviewLeechRewritePackageDialog sub-component which
              owns the POST fetch, loading state, copy buttons, and the
@@ -1323,6 +1412,13 @@ export default {
             bulkLifecycleAction: null,
             // ADR-0010: State explanation dialog
             stateHelpDialog: false,
+            // ADR-0012: Advanced browser search state
+            // searchHelpDialog: help dialog for advanced syntax
+            // searchMeta: {raw_query, text_query, tokens, advanced} from server
+            // searchErrors: per-token error list from 422 responses
+            searchHelpDialog: false,
+            searchMeta: null,
+            searchErrors: [],
             selectedIds: [],
             selectAll: false,
             snackbar: { show: false, text: '', color: 'success' },
@@ -1642,6 +1738,19 @@ export default {
         loadData(allowPageFallback = true) {
             this.loading = true;
             this.error = '';
+            // ADR-0012: Clear previous search errors on new request.
+            this.searchErrors = [];
+
+            // ADR-0012 §6: When the search query contains advanced tokens,
+            // auto-switch the filter button to "全部" (filter=all) so that
+            // lifecycle tokens like is:suspended are not pre-filtered out.
+            // This must happen BEFORE the request is sent.
+            if (this.detectAdvancedTokens(this.searchQuery)) {
+                if (this.currentFilter !== 'all') {
+                    this.currentFilter = 'all';
+                    this.activeFilter = 'all';
+                }
+            }
 
             axios.get('/review-cards/manage/data', {
                 params: {
@@ -1662,6 +1771,9 @@ export default {
                 this.pagination = response.data.pagination;
                 this.currentPage = response.data.pagination.current_page;
 
+                // ADR-0012: Store search_meta for chip display.
+                this.searchMeta = response.data.search_meta || null;
+
                 // Clean up selectedIds — remove ids not in current page
                 const currentIds = this.items.map(i => i.review_card_id);
                 this.selectedIds = this.selectedIds.filter(id => currentIds.includes(id));
@@ -1675,7 +1787,16 @@ export default {
                 }
             })
             .catch((err) => {
-                this.error = '加载数据失败：' + (err.response?.data?.message || err.message);
+                // ADR-0012: Handle 422 grammar errors with specific per-token
+                // detail. Do NOT replace with a generic "load failed" message.
+                // Preserve the user's input in the search box.
+                if (err.response && err.response.status === 422 && err.response.data && err.response.data.code === 'invalid_browser_search') {
+                    this.searchErrors = err.response.data.errors || [];
+                    // Do NOT set this.error — the specific errors are shown
+                    // in the searchErrors alert. Keep existing items intact.
+                } else {
+                    this.error = '加载数据失败：' + (err.response?.data?.message || err.message);
+                }
             })
             .finally(() => {
                 this.loading = false;
@@ -1732,9 +1853,79 @@ export default {
             this.loadData();
         },
 
+        // ADR-0012: Frontend helper functions for token display and removal.
+        // These are SIMPLE string helpers — they do NOT replicate the backend
+        // parser. Validation is server-side only. The frontend only needs to:
+        //   (1) detect if advanced tokens are present (to auto-switch filter),
+        //   (2) strip is: tokens when a filter button is clicked,
+        //   (3) remove a specific token when a chip's close button is clicked.
+        detectAdvancedTokens(query) {
+            if (!query) return false;
+            // A segment "looks like an advanced token" if it contains a colon
+            // AND the prefix (before the first colon) is is/rated/prop (case-
+            // insensitive). This mirrors the backend's token detection rule.
+            const segments = query.trim().split(/\s+/);
+            return segments.some(seg => {
+                const colonPos = seg.indexOf(':');
+                if (colonPos <= 0) return false;
+                const prefix = seg.substring(0, colonPos).toLowerCase();
+                return prefix === 'is' || prefix === 'rated' || prefix === 'prop';
+            });
+        },
+
+        stripIsTokens(query) {
+            if (!query) return '';
+            const segments = query.trim().split(/\s+/);
+            const kept = segments.filter(seg => {
+                const colonPos = seg.indexOf(':');
+                if (colonPos <= 0) return true; // plain text — keep
+                const prefix = seg.substring(0, colonPos).toLowerCase();
+                return prefix !== 'is'; // remove only is: tokens
+            });
+            return kept.join(' ').trim();
+        },
+
+        removeToken(token) {
+            if (!this.searchQuery || !token) return;
+            const segments = this.searchQuery.trim().split(/\s+/);
+            // Remove the first segment that matches the token (case-insensitive).
+            const tokenLower = token.toLowerCase();
+            let removed = false;
+            const kept = segments.filter(seg => {
+                if (removed) return true;
+                if (seg.toLowerCase() === tokenLower) {
+                    removed = true;
+                    return false;
+                }
+                return true;
+            });
+            this.searchQuery = kept.join(' ').trim();
+            this.currentPage = 1;
+            this.clearSelection();
+            this.loadData();
+        },
+
+        // ADR-0012: Returns the effective filter for API requests.
+        // When advanced tokens are present, returns 'all' to avoid the
+        // default filter pre-filtering out lifecycle tokens. Used by
+        // loadData() and all three export methods.
+        effectiveFilter() {
+            if (this.detectAdvancedTokens(this.searchQuery)) {
+                return 'all';
+            }
+            return this.currentFilter;
+        },
+
         applyFilter(filter) {
             this.activeFilter = filter;
             this.currentFilter = filter;
+            // ADR-0012 §6: When the user clicks a filter button, clear is:
+            // tokens from the search box but preserve plain text, rated:,
+            // and prop: tokens. This makes filter buttons and is: tokens
+            // mutually exclusive (as specified).
+            if (this.searchQuery) {
+                this.searchQuery = this.stripIsTokens(this.searchQuery);
+            }
             this.currentPage = 1;
             this.clearSelection();
             this.loadData();
@@ -2508,7 +2699,7 @@ export default {
             axios.get('/review-cards/manage/export', {
                 params: {
                     q: this.searchQuery,
-                    filter: this.currentFilter,
+                    filter: this.effectiveFilter(),
                     sort_by: this.sortBy,
                     sort_dir: this.sortDir,
                     fsrs_states: this.advancedFilters.fsrsStates,
@@ -2557,7 +2748,7 @@ export default {
             axios.get('/review-cards/manage/export-anki-tsv', {
                 params: {
                     q: this.searchQuery,
-                    filter: this.currentFilter,
+                    filter: this.effectiveFilter(),
                     sort_by: this.sortBy,
                     sort_dir: this.sortDir,
                     fsrs_states: this.advancedFilters.fsrsStates,
@@ -2604,7 +2795,7 @@ export default {
             axios.get('/review-cards/manage/export-csv', {
                 params: {
                     q: this.searchQuery,
-                    filter: this.currentFilter,
+                    filter: this.effectiveFilter(),
                     sort_by: this.sortBy,
                     sort_dir: this.sortDir,
                     fsrs_states: this.advancedFilters.fsrsStates,

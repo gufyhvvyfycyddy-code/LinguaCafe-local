@@ -13,6 +13,8 @@ class ReviewCardManageQueryService
 {
     public function __construct(
         private SenseReviewLeechQueryService $leechQueryService,
+        private ReviewCardBrowserSearchParser $searchParser,
+        private ReviewCardBrowserSearchQueryApplier $searchApplier,
     ) {
     }
 
@@ -35,11 +37,22 @@ class ReviewCardManageQueryService
     /**
      * Build the shared base query with all security constraints, search, filters,
      * advanced filters, and sort applied. Used by both data() and export().
+     *
+     * ADR-0012: The q parameter is now parsed by ReviewCardBrowserSearchParser
+     * into a ReviewCardBrowserSearchCriteria. If parsing fails (invalid token,
+     * conflict, etc.), InvalidBrowserSearchException is thrown — the caller
+     * (controller) catches it and returns a 422 JSON.
+     *
+     * @throws InvalidBrowserSearchException When the search grammar is invalid.
      */
     public function build(Request $request, int $userId, string $language): \Illuminate\Database\Eloquent\Builder
     {
         $filter = $request->input('filter', 'enabled');
         $q = trim($request->input('q', ''));
+
+        // ADR-0012: Parse the search query into structured criteria.
+        // This may throw InvalidBrowserSearchException — let it propagate.
+        $criteria = $this->searchParser->parse($q);
 
         // Base query — all security constraints baked in via whereHas
         $query = ReviewCard::query()
@@ -53,21 +66,32 @@ class ReviewCardManageQueryService
             })
             ->with('sense');
 
-        // Search — scoped inside whereHas to prevent escaping security constraints
-        if (!empty($q)) {
-            $query->whereHas('sense', function ($subQuery) use ($q) {
-                $subQuery->where(function ($inner) use ($q) {
-                    $inner->where('lemma', 'like', "%{$q}%")
-                        ->orWhere('surface_form', 'like', "%{$q}%")
-                        ->orWhere('sense_zh', 'like', "%{$q}%")
-                        ->orWhere('sense_en', 'like', "%{$q}%")
-                        ->orWhere('example_sentence_en', 'like', "%{$q}%");
-                });
-            });
-        }
+        // ADR-0012: Pre-compute governance matching IDs if needed.
+        // If filter=leech|struggling AND is:leech|is:struggling token both
+        // request the SAME status, compute once and reuse. If they request
+        // DIFFERENT statuses (e.g. filter=leech is:struggling), both must
+        // be satisfied (AND) — compute both. If only one source requests
+        // governance, compute only that one.
+        $governanceMatchingIds = $this->resolveGovernanceMatchingIds(
+            $filter, $criteria, $userId, $language
+        );
 
-        // Apply standard filters
-        $this->applyFilters($query, $filter, $userId, $language);
+        // ADR-0012: Apply browser search criteria (text, lifecycle, governance,
+        // rated, prop) via the applier. Plain text is applied here instead of
+        // the old inline whereHas — same 5 fields, same LIKE %text% behavior.
+        $this->searchApplier->apply(
+            $query,
+            $criteria,
+            $userId,
+            $language,
+            $governanceMatchingIds['criteria_ids'] ?? null,
+            null, // resolver not needed — ids pre-computed above
+        );
+
+        // Apply standard filters (filter buttons).
+        // NOTE: leech/struggling filter case uses the pre-computed IDs to
+        // avoid duplicate classification.
+        $this->applyFilters($query, $filter, $userId, $language, $governanceMatchingIds['filter_ids'] ?? null);
 
         // Advanced filters — all within security scope (user_id/language_id/sense confirmed)
         $this->applyAdvancedFilters($query, $request);
@@ -76,6 +100,63 @@ class ReviewCardManageQueryService
         $this->applySort($query, $request);
 
         return $query;
+    }
+
+    /**
+     * Get the parsed criteria for a request, for the controller to expose
+     * as search_meta in the response.
+     *
+     * @throws InvalidBrowserSearchException
+     */
+    public function parseCriteria(Request $request): ReviewCardBrowserSearchCriteria
+    {
+        return $this->searchParser->parse(trim($request->input('q', '')));
+    }
+
+    /**
+     * Pre-compute governance (leech/struggling) matching card IDs.
+     *
+     * ADR-0012: Avoids duplicate Policy classification when both the filter
+     * button and the is: token request governance. Returns IDs keyed by
+     * use-case so applyFilters and the applier can reuse them.
+     *
+     * @return array{filter_ids: array<int>|null, criteria_ids: array<int>|null}
+     */
+    private function resolveGovernanceMatchingIds(
+        string $filter,
+        ReviewCardBrowserSearchCriteria $criteria,
+        int $userId,
+        string $language,
+    ): array {
+        $filterNeedsGovernance = in_array($filter, ['leech', 'struggling'], true);
+        $criteriaNeedsGovernance = $criteria->hasGovernanceStatus();
+
+        if (!$filterNeedsGovernance && !$criteriaNeedsGovernance) {
+            return ['filter_ids' => null, 'criteria_ids' => null];
+        }
+
+        $result = ['filter_ids' => null, 'criteria_ids' => null];
+
+        // If filter requests governance, compute once.
+        if ($filterNeedsGovernance) {
+            $filterIds = $this->getLeechFilteredCardIds($userId, $language, $filter);
+            $result['filter_ids'] = $filterIds;
+
+            // If criteria requests the SAME status, reuse.
+            if ($criteriaNeedsGovernance && $criteria->governanceStatus === $filter) {
+                $result['criteria_ids'] = $filterIds;
+            }
+        }
+
+        // If criteria requests a DIFFERENT status (or filter didn't request
+        // governance), compute separately.
+        if ($criteriaNeedsGovernance && $result['criteria_ids'] === null) {
+            $result['criteria_ids'] = $this->getLeechFilteredCardIds(
+                $userId, $language, $criteria->governanceStatus
+            );
+        }
+
+        return $result;
     }
 
     /**
@@ -90,7 +171,7 @@ class ReviewCardManageQueryService
      *   - 'learning'  → active + buried + suspended (default visible set;
      *                   excludes archived per spec 2.4 "默认管理列表隐藏")
      */
-    private function applyFilters($query, string $filter, int $userId, string $language): void
+    private function applyFilters($query, string $filter, int $userId, string $language, ?array $precomputedGovernanceIds = null): void
     {
         $now = Carbon::now();
         switch ($filter) {
@@ -142,7 +223,11 @@ class ReviewCardManageQueryService
                 // The classification considers ALL sense cards for this user/language
                 // (regardless of lifecycle state), so suspended/archived leech cards
                 // are still findable via this filter.
-                $matchingIds = $this->getLeechFilteredCardIds($userId, $language, $filter);
+                //
+                // ADR-0012: If the caller pre-computed IDs via resolveGovernanceMatchingIds()
+                // (e.g. when is:leech token also requested governance), reuse them to
+                // avoid running Policy classification a second time.
+                $matchingIds = $precomputedGovernanceIds ?? $this->getLeechFilteredCardIds($userId, $language, $filter);
                 $query->whereIn('review_cards.id', $matchingIds);
                 break;
             case 'missing_definition':
