@@ -156,10 +156,15 @@ class ReviewQueueOrderService
      * Compute retrievability using FSRS-5 official formula.
      *
      * R = (1 + FACTOR * elapsed / stability) ^ DECAY
+     *   where FACTOR = 19/81, DECAY = -0.5, elapsed in days.
      *
-     * Fallback:
-     *   - stability <= 0 or null: use due_at timestamp (earlier due = lower R proxy)
-     *   - last_reviewed_at null: elapsed = 0, R = 1.0 (highest, lowest priority)
+     * Fallback (DEV-QO-4: comment must match implementation):
+     *   - stability null, 0, or negative: return 0.0 (conservative — treat
+     *     as fully forgotten, highest priority). This is NOT a timestamp
+     *     proxy; it is a constant 0.0.
+     *   - last_reviewed_at null: elapsed = 0, R = 1.0 (highest retrievability,
+     *     lowest priority).
+     *   - inner <= 0 (should not happen with valid inputs): return 0.0.
      *
      * @return float Retrievability in [0, 1]. Lower = more forgotten = higher priority.
      */
@@ -168,9 +173,9 @@ class ReviewQueueOrderService
         $stability = $card->fsrs_stability;
 
         if ($stability === null || $stability <= 0) {
-            // Fallback: use due_at as proxy (earlier due = lower retrievability)
-            // Return negative timestamp so earlier cards sort first
-            return 0.0; // Conservative: treat as fully forgotten
+            // DEV-QO-4: Conservative fallback — treat as fully forgotten.
+            // Returns constant 0.0 (NOT a timestamp proxy).
+            return 0.0;
         }
 
         $elapsedDays = 0.0;
@@ -227,10 +232,15 @@ class ReviewQueueOrderService
 
             case ReviewQueueOrderOptions::REVIEW_SORT_DUE_RANDOM:
             default:
-                // Primary: due_at date (earlier date first)
-                // Secondary: daily hash within same date
+                // DEV-QO-3: Primary key is the due_at LOCAL date (in the
+                // learning timezone), NOT the UTC date. Two cards with
+                // different UTC dates but the same local date must be
+                // treated as the same due-day group. The learning timezone
+                // is extracted from $nowInTz, which the caller constructed
+                // via ReviewStudyTimezoneService.
+                $tzName = $nowInTz->getTimezone()->getName();
                 $dueDate = $card->fsrs_due_at
-                    ? $card->fsrs_due_at->format('Y-m-d')
+                    ? $card->fsrs_due_at->copy()->tz($tzName)->format('Y-m-d')
                     : '1970-01-01';
                 $dateScore = strtotime($dueDate);
                 $hash = $this->dailyHash($userId, $language, $localDate, $card->id);

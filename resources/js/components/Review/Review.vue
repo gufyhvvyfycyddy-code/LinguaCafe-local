@@ -554,6 +554,14 @@
                 today: new moment().format('YYYY-MM-DD'), // CHANGE TO SERVER SIDE
                 ignoreDailyLimits: false,
                 dailyLimitSummary: null,
+                // DEV-QO-6: rating request race protection.
+                // ratingLoading disables re-rating while a request is in
+                // flight. ratingRequestSequence is monotonically incremented
+                // per request; only the response carrying the latest sequence
+                // is allowed to mutate reviews / currentReviewIndex /
+                // dailyLimitSummary / finished. Slow responses are dropped.
+                ratingLoading: false,
+                ratingRequestSequence: 0,
             }
         },
         props: {
@@ -570,6 +578,9 @@
         },
         beforeDestroy: function () {
             window.removeEventListener('keyup', this.hotkey);
+            // DEV-QO-6: invalidate in-flight rating requests on destroy.
+            this.ratingRequestSequence++;
+            this.ratingLoading = false;
         },
         methods: {
             enableIgnoreDailyLimits() {
@@ -583,11 +594,21 @@
                 this.correctReviews = 0;
                 this.reviewError = '';
                 this.dailyLimitSummary = null;
+                // DEV-QO-6: invalidate any in-flight rating request so its
+                // response cannot overwrite the freshly reloaded queue.
+                this.ratingRequestSequence++;
+                this.ratingLoading = false;
                 this.$nextTick(() => {
                     this.loadReviews();
                 });
             },
             loadReviews() {
+                // DEV-QO-6: invalidate any in-flight rating request when the
+                // queue is (re)loaded so stale responses cannot mutate the
+                // new queue state.
+                this.ratingRequestSequence++;
+                this.ratingLoading = false;
+
                 var data = {
                     bookId: -1,
                     chapterId: -1,
@@ -761,6 +782,14 @@
                     return;
                 }
 
+                // DEV-QO-6: race protection — disable re-rating while a
+                // request is in flight. This prevents duplicate ReviewLog
+                // entries and prevents slow responses from overwriting newer
+                // page state.
+                if (this.ratingLoading) {
+                    return;
+                }
+
                 this.revealed = false;
                 this.intoTheCorrectDeckAnimation = true;
                 this.backToDeckAnimation = false;
@@ -773,23 +802,90 @@
                 this.countReadWords();
 
                 if (!this.practiceMode) {
-                    axios.post('/reviews/rate', {
+                    // DEV-QO-6: increment sequence and capture for this
+                    // request. Only the response with the latest sequence
+                    // may mutate queue state.
+                    this.ratingLoading = true;
+                    const seq = ++this.ratingRequestSequence;
+
+                    // DEV-QO-5: pass ignoreDailyLimits so /reviews/rate uses
+                    // the same daily-limit boundary as /reviews.
+                    const payload = {
                         reviewCardId: this.reviews[this.currentReviewIndex].review_card_id,
                         rating: rating,
-                    }).then(() => {
+                    };
+                    if (this.ignoreDailyLimits) {
+                        payload.ignoreDailyLimits = true;
+                    }
+
+                    axios.post('/reviews/rate', payload).then((response) => {
+                        // DEV-QO-6: drop stale responses. If a newer request
+                        // has been issued (or the queue was reloaded), this
+                        // response must not mutate state.
+                        if (seq !== this.ratingRequestSequence) {
+                            return;
+                        }
+
                         axios.post('/goals/achievement/review/update').catch(() => {});
 
-                        if (this.reviews.length == 1) {
-                            this.finish();
-                        } else {
-                            this.reviews.splice(this.currentReviewIndex, 1)[0];
+                        // DEV-QO-5: update daily limit summary from server.
+                        if (response.data && response.data.summary) {
+                            this.dailyLimitSummary = response.data.summary;
+                        }
+
+                        // Remove the just-rated card from the local queue.
+                        this.reviews.splice(this.currentReviewIndex, 1)[0];
+
+                        // DEV-QO-5: consume server-authoritative next_card.
+                        const nextCard = response.data && response.data.next_card
+                            ? response.data.next_card
+                            : null;
+
+                        if (nextCard) {
+                            // If next_card already exists in the remaining
+                            // queue (e.g. relearning card re-entering), move
+                            // it to index 0. Otherwise insert it at index 0.
+                            const existingIdx = this.reviews.findIndex(
+                                c => c.review_card_id === nextCard.review_card_id
+                            );
+                            if (existingIdx !== -1) {
+                                // Move existing card to front.
+                                const [existing] = this.reviews.splice(existingIdx, 1);
+                                this.reviews.unshift(existing);
+                            } else {
+                                // Insert server-provided next card at front.
+                                this.reviews.unshift(nextCard);
+                            }
                             setTimeout(this.next, this.transitionDuration);
+                        } else {
+                            // No next card from server. If the local queue
+                            // is empty, finish; otherwise continue with the
+                            // remaining local queue (old-response compat).
+                            if (this.reviews.length === 0) {
+                                this.finish();
+                            } else {
+                                setTimeout(this.next, this.transitionDuration);
+                            }
                         }
                     }).catch((error) => {
+                        // DEV-QO-6: only handle error if this is still the
+                        // latest request. Otherwise the error belongs to a
+                        // stale response.
+                        if (seq !== this.ratingRequestSequence) {
+                            return;
+                        }
                         this.reviewError = requestErrorMessage(error, '评分提交失败。');
                         this.finished = true;
+                    }).finally(() => {
+                        // DEV-QO-6: restore operable state only if this is
+                        // still the latest request.
+                        if (seq === this.ratingRequestSequence) {
+                            this.ratingLoading = false;
+                        }
                     });
                 } else {
+                    // practiceMode: no ReviewLog, no backend call. Keep old
+                    // behavior — just splice and advance locally.
                     if (this.reviews.length == 1) {
                         this.finish();
                     } else {

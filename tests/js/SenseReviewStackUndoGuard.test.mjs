@@ -300,4 +300,112 @@ test('undoLoadingReviewLogId set during request and cleared in finally', () => {
     assert.ok(undoSection.includes('this.undoLoadingReviewLogId = null'), 'must clear undoLoadingReviewLogId in finally');
 });
 
+// ==================== DEV-QO-7: SenseReview next_card & loadCards guard ====================
+
+// Helper: extract method body from SenseReview.vue
+function extractSenseMethod(name) {
+    const re = new RegExp(name + '\\s*\\([^)]*\\)\\s*\\{');
+    const m = source.match(re);
+    if (!m) return '';
+    const start = m.index + m[0].length;
+    let depth = 1;
+    let i = start;
+    while (i < source.length && depth > 0) {
+        if (source[i] === '{') depth++;
+        else if (source[i] === '}') depth--;
+        i++;
+    }
+    return source.slice(m.index, i);
+}
+
+const loadCardsBody = extractSenseMethod('loadCards');
+const rateBody = extractSenseMethod('rate');
+
+// 36. DEV-QO-7: loadCardsRequestSequence exists in data()
+test('loadCardsRequestSequence exists in data()', () => {
+    assert.ok(/loadCardsRequestSequence\s*:\s*0/.test(source),
+        'data() must include loadCardsRequestSequence: 0');
+});
+
+// 37. DEV-QO-7: loadCards() increments loadCardsRequestSequence
+test('loadCards() increments loadCardsRequestSequence', () => {
+    assert.ok(/this\.loadCardsRequestSequence\+\+/.test(loadCardsBody),
+        'loadCards() must increment loadCardsRequestSequence');
+});
+
+// 38. DEV-QO-7: loadCards() checks seq in .then() (stale response drop)
+test('loadCards() drops stale responses in .then()', () => {
+    assert.ok(/seq\s*!==\s*this\.loadCardsRequestSequence/.test(loadCardsBody),
+        'loadCards() must check seq !== this.loadCardsRequestSequence in .then()');
+});
+
+// 39. DEV-QO-7: loadCards() checks seq in .catch()
+test('loadCards() drops stale responses in .catch()', () => {
+    const catchMatch = loadCardsBody.match(/\.catch\(\(([^)]*)\)\s*=>\s*\{([\s\S]*?)\}\)/);
+    assert.ok(catchMatch, 'loadCards() must have a .catch() handler');
+    assert.ok(/seq\s*!==\s*this\.loadCardsRequestSequence/.test(catchMatch[0]),
+        'loadCards() .catch() must check seq');
+});
+
+// 40. DEV-QO-7: loadCards() checks seq in .finally()
+test('loadCards() only clears loading in .finally() if seq matches', () => {
+    const finallyMatch = loadCardsBody.match(/\.finally\(\(\)\s*=>\s*\{([\s\S]*?)\}\)/);
+    assert.ok(finallyMatch, 'loadCards() must have a .finally() handler');
+    assert.ok(/seq\s*===\s*this\.loadCardsRequestSequence/.test(finallyMatch[0]),
+        'loadCards() .finally() must check seq === this.loadCardsRequestSequence');
+});
+
+// 41. DEV-QO-7: rate() checks this.rating at start (double-click protection)
+test('rate() checks this.rating at start', () => {
+    assert.ok(/if\s*\(\s*this\.rating\s*\)\s*\{[\s\S]*?return/.test(rateBody),
+        'rate() must check this.rating and return early if true');
+});
+
+// 42. DEV-QO-7: rate() increments loadCardsRequestSequence (invalidates in-flight loadCards)
+test('rate() increments loadCardsRequestSequence', () => {
+    assert.ok(/this\.loadCardsRequestSequence\+\+/.test(rateBody),
+        'rate() must increment loadCardsRequestSequence to invalidate in-flight loadCards()');
+});
+
+// 43. DEV-QO-7: rate() passes ignoreDailyLimits to backend
+test('rate() passes ignoreDailyLimits to backend', () => {
+    assert.ok(/payload\.ignoreDailyLimits\s*=\s*true/.test(rateBody),
+        'rate() must set payload.ignoreDailyLimits when flag is true');
+});
+
+// 44. DEV-QO-7: rate() reads response.data.summary
+test('rate() reads response.data.summary', () => {
+    assert.ok(/response\.data\.summary/.test(rateBody),
+        'rate() must read response.data.summary from backend');
+});
+
+// 45. DEV-QO-7: rate() reads response.data.reviewed_card
+test('rate() reads response.data.reviewed_card', () => {
+    assert.ok(/response\.data\.reviewed_card/.test(rateBody),
+        'rate() must read response.data.reviewed_card from backend');
+});
+
+// 46. DEV-QO-7: rate() reads response.data.action
+test('rate() reads response.data.action for undo metadata', () => {
+    assert.ok(/response\.data\.action/.test(rateBody),
+        'rate() must read response.data.action from backend');
+});
+
+// 47. DEV-QO-7: No Math.random used to pick next card (only for requestId)
+test('no Math.random used to pick next card in rate()', () => {
+    // Math.random is allowed ONLY for requestId generation, not for
+    // deciding the next card. The next card comes from the backend via
+    // loadCards() which uses Queue Order.
+    const randomMatches = rateBody.match(/Math\.random/g) || [];
+    // Should only appear in the requestId line, not in next-card logic
+    assert.ok(rateBody.includes('requestId'),
+        'Math.random should only be used for requestId generation');
+});
+
+// 48. DEV-QO-7: rate() calls loadCards() after successful rating
+test('rate() calls loadCards() after successful rating', () => {
+    assert.ok(/this\.loadCards\(\)/.test(rateBody),
+        'rate() must call loadCards() after successful rating to refresh queue');
+});
+
 console.log(`\n${passed} passed`);

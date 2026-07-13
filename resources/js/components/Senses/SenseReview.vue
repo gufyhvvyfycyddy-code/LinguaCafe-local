@@ -630,6 +630,12 @@
                 intervalPreviewLoading: false,
                 intervalPreviewError: '',
                 intervalPreviewRequestSequence: 0,
+                // DEV-QO-7: loadCards stale-response protection.
+                // Incremented on every loadCards() call and on every rate()
+                // start. A stale loadCards() response (seq mismatch) is
+                // discarded so it cannot overwrite a newer rating result or
+                // a newer queue state.
+                loadCardsRequestSequence: 0,
                 // ADR-0009: Review session identity + stack undo.
                 // reviewSessionId: UUID per browser tab (sessionStorage,
                 //   refresh-persistent, not shared across tabs).
@@ -845,11 +851,20 @@
             loadCards() {
                 this.loading = true;
                 this.error = '';
+                // DEV-QO-7: capture sequence so stale loadCards() responses
+                // (e.g. from a previous rating cycle) are discarded.
+                this.loadCardsRequestSequence++;
+                const seq = this.loadCardsRequestSequence;
                 const params = {};
                 if (this.ignoreDailyLimits) {
                     params.ignoreDailyLimits = true;
                 }
                 return axios.get('/reviews/senses', { params: params }).then((response) => {
+                    // DEV-QO-7: drop stale responses so a slow loadCards()
+                    // cannot overwrite a newer rating result or queue state.
+                    if (seq !== this.loadCardsRequestSequence) {
+                        return;
+                    }
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
                     this.fsrsDetailOpen = false;
@@ -861,9 +876,14 @@
                         this.showSessionSummary = true;
                     }
                 }).catch((error) => {
+                    if (seq !== this.loadCardsRequestSequence) {
+                        return;
+                    }
                     this.error = error.response?.data?.message || '词义复习队列加载失败。';
                 }).finally(() => {
-                    this.loading = false;
+                    if (seq === this.loadCardsRequestSequence) {
+                        this.loading = false;
+                    }
                 });
             },
             // ==================== Interval preview (1000-5) ====================
@@ -907,6 +927,14 @@
                     return;
                 }
 
+                // DEV-QO-7: prevent double-rating from hotkeys or
+                // programmatic calls. The rating buttons are already
+                // disabled via :disabled="rating || ...", but this guard
+                // ensures programmatic calls are also blocked.
+                if (this.rating) {
+                    return;
+                }
+
                 this.rating = true;
                 this.error = '';
                 // Invalidate the interval preview immediately so the old
@@ -917,6 +945,10 @@
                 this.intervalPreviewError = '';
                 this.intervalPreviewLoading = false;
                 this.intervalPreviewRequestSequence++;
+                // DEV-QO-7: invalidate any in-flight loadCards() so its
+                // stale response cannot overwrite the state after this
+                // rating completes and triggers a fresh loadCards().
+                this.loadCardsRequestSequence++;
                 const payload = { rating: rating };
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;

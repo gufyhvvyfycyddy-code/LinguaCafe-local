@@ -1,6 +1,6 @@
 # ADR-0015: Review Queue Order Policy
 
-**Status**: Implemented (code + tests + npm build + db:doctor pass; MCP Chrome acceptance pending)
+**Status**: Implemented, awaiting production acceptance (code + tests + npm build + db:doctor pass; 2000-10A production closure gaps fixed; MCP Chrome acceptance pending)
 **Date**: 2026-07-13
 **Related**: `docs/adr/ADR-0008-sense-review-answer-interval-preview.md`, `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0014-review-card-info-read-model.md`
 
@@ -289,6 +289,45 @@ The following Anki options are **not implemented** in LinguaCafe V1 because Ling
 ### 18. Rollback
 
 Revert the implementation commit. The old `shuffle()` behavior is restored by reverting `ReviewService.php`. The `ReviewQueueOrderOptions`, `ReviewQueueOrderPolicy`, `ReviewQueueOrderService` are new files — removing them is safe. The `next_card` field in `/reviews/rate` is additive. The settings endpoints and admin UI are additive. No migration, no schema change, no FSRS / lifecycle / ReviewLog change — rollback is a pure code revert.
+
+### 19. Task 2000-10A production closure (in progress)
+
+The 2000-9B round left eight production gaps that 2000-10A closes:
+
+1. **Unified learning timezone boundary** — New `app/Services/ReviewStudyTimezoneService.php` replaces scattered `config('app.timezone')` reads. V1 returns `config('app.timezone', 'UTC')` explicitly; does NOT read non-existent user timezone field; leaves a single replacement point for future user-level timezone; validates timezone string. Queue Order, `reviewedTodayCount()`, and post-rating `next_card` all source the learning timezone from this service. 11 unit tests.
+
+2. **`due_random` local date fix** — `ReviewQueueOrderService::computeReviewSortKey()` converts `fsrs_due_at` to the learning timezone before extracting `Y-m-d`. Cards with different UTC dates but the same local date are treated as the same day; cards with the same UTC date but straddling local midnight are treated as different days. Daily hash uses the same timezone source. New tests: `America/Los_Angeles`, `UTC`, cross-midnight, DST boundary.
+
+3. **Retrievability evidence chain** — Fixed-fixture cross-validation (e.g. `stability=10`, `elapsed=10d` → R≈0.9). NaN/Infinity protection. `null` / `0` / negative `stability` fallback to constant `0.0` (documented in docblock). Formula source: FSRS-5 `R = (1 + FACTOR * elapsed / stability) ^ DECAY`, `FACTOR = 19/81`, `DECAY = -0.5`. ADR docblock aligned with code.
+
+4. **`Review.vue` consumes `next_card`** — `rateReview()` reads `response.data.next_card` and `response.data.summary`. Uses `findIndex` to check if the card is already in the remaining array; if found, `splice` + `unshift` moves it to index 0; if not found, `unshift` inserts at index 0 (covers relearning cards re-entering the queue). If `next_card` is `null` and the remaining array is empty → `finish()`; if `next_card` is `null` but cards remain → `next()`. Updates `dailyLimitSummary` from `response.data.summary`. Passes `ignoreDailyLimits` to `/reviews/rate`. Preserves `practiceMode` (no ReviewLog) and old-response compatibility.
+
+5. **Rating request race protection** — `ratingLoading` flag disables re-rating. `ratingRequestSequence` increments on every rating request; only the latest valid response may mutate `reviews` / `currentReviewIndex` / `dailyLimitSummary` / `finished`. Stale responses (`seq !== this.ratingRequestSequence`) are dropped in `.then` / `.catch` / `.finally`. `loadReviews()`, `enableIgnoreDailyLimits()`, and `beforeDestroy()` all bump the sequence to invalidate in-flight requests. Errors restore operable state. No duplicate ReviewLog. No hotkey change.
+
+6. **`SenseReview.vue` stale-response guard** — `loadCardsRequestSequence` incremented on every `loadCards()` call and every `rate()` start; stale `.then` / `.catch` / `.finally` responses dropped via seq mismatch. `rate()` adds `if (this.rating) return` double-click guard.
+
+7. **`reviewedTodayCount()` unified timezone** — Now sources the learning timezone from `ReviewStudyTimezoneService`, constructs the local natural-day start, and aligns the ReviewLog query boundary with the Queue Order local date. Cross-midnight tests added.
+
+8. **Documentation status fix** — Master plan, handoff, ADR-0015, and DOCUMENTATION_INDEX now mark Queue Order as `🟡 Incomplete / 待生产验收` instead of `✅ 已完成`. Status may return to `✅ 已完成` only after all ten conditions are met: code gaps fixed, automated tests pass, npm build passes, db:doctor healthy, MCP Chrome settings page passes, MCP Chrome SenseReview passes, MCP Chrome legacy Review passes, two viewports pass, Console has no new errors, Network has no external AI requests.
+
+**New files in 2000-10A**:
+- `app/Services/ReviewStudyTimezoneService.php`
+- `tests/Unit/ReviewStudyTimezoneServiceTest.php` (11 tests)
+- `tests/Feature/ReviewQueueOrderNextCardTest.php` (9 tests)
+- `tests/js/ReviewQueueOrderNextCardGuard.test.mjs` (12 tests)
+
+**Extended files in 2000-10A**:
+- `tests/Unit/ReviewQueueOrderServiceTest.php` (+10 due_random local date + retrievability fixture tests)
+- `tests/js/ReviewQueueOrderFrontendGuard.test.mjs` (8 → 21 tests: next_card consumption + stale guard + ignoreDailyLimits)
+- `tests/js/SenseReviewStackUndoGuard.test.mjs` (35 → 48 tests: loadCardsRequestSequence + rate double-click guard)
+
+**Modified files in 2000-10A**:
+- `app/Services/ReviewQueueOrderService.php` — `due_random` local date fix + retrievability docblock fix
+- `app/Services/SenseReviewService.php` — `reviewedTodayCount()` uses `ReviewStudyTimezoneService`
+- `resources/js/components/Review/Review.vue` — consumes `next_card`, passes `ignoreDailyLimits`, adds `ratingLoading` + `ratingRequestSequence` stale guard
+- `resources/js/components/Senses/SenseReview.vue` — adds `loadCardsRequestSequence` stale guard + `rate()` double-click guard
+
+**Pending**: MCP Chrome real acceptance (settings page / SenseReview / legacy Review, two viewports, Console/Network checks).
 
 ## Prohibited scope
 

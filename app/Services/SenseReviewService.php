@@ -13,6 +13,7 @@ class SenseReviewService
         private ReviewLimitSummaryService $reviewLimitSummaryService,
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
         private ReviewQueueOrderService $reviewQueueOrderService,
+        private ReviewStudyTimezoneService $studyTimezoneService,
     ) {
     }
     /**
@@ -63,7 +64,7 @@ class SenseReviewService
         // Apply Queue Order to get the proper first card
         $options = $this->settingsService->getFsrsQueueOrder();
         $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($options);
-        $timezone = config('app.timezone', 'UTC');
+        $timezone = $this->studyTimezoneService->getStudyTimezone();
         $ordered = $this->reviewQueueOrderService->order(
             $cards,
             $userId,
@@ -97,10 +98,15 @@ class SenseReviewService
 
     /**
      * Count how many sense review cards the user has reviewed today.
+     *
+     * DEV-QO-8: Uses the unified study timezone boundary service so that
+     * the "today" boundary matches the Queue Order local date. This avoids
+     * a scenario where daily hash rolls over at midnight UTC but
+     * reviewedTodayCount rolls over at a different local midnight.
      */
     public function reviewedTodayCount(int $userId, string $language): int
     {
-        $today = Carbon::today();
+        $today = $this->studyTimezoneService->dayStart(Carbon::now());
 
         return $this->senseReviewQueryService
             ->nonResetSenseReviewLogQuery($userId, $language, $today)
@@ -139,7 +145,7 @@ class SenseReviewService
         // Apply Queue Order (ADR-0015 V1) — single canonical ordering entry point
         $queueOptionsArray = $this->settingsService->getFsrsQueueOrder();
         $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($queueOptionsArray);
-        $timezone = config('app.timezone', 'UTC');
+        $timezone = $this->studyTimezoneService->getStudyTimezone();
         $now = Carbon::now();
         $orderedCards = $this->reviewQueueOrderService->order(
             $allCards,

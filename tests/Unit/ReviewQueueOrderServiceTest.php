@@ -357,4 +357,158 @@ class ReviewQueueOrderServiceTest extends TestCase
 
         $this->assertSame($key1, $key2);
     }
+
+    // === DEV-QO-3: due_random must use local date, not UTC date ===
+
+    public function test_due_random_groups_by_local_date_not_utc_date(): void
+    {
+        // Two cards: 2026-07-13 23:00 UTC and 2026-07-14 01:00 UTC.
+        // In America/Los_Angeles (UTC-7 in July), both are 2026-07-13 local.
+        // They must be treated as the SAME due date group.
+        $opts = ReviewQueueOrderOptions::fromArray(['review_sort_order' => 'due_random']);
+        $nowInLa = Carbon::create(2026, 7, 13, 20, 0, 0, 'America/Los_Angeles');
+
+        $card1 = $this->makeCard(['id' => 1, 'fsrs_due_at' => Carbon::parse('2026-07-13 23:00:00', 'UTC')]);
+        $card2 = $this->makeCard(['id' => 2, 'fsrs_due_at' => Carbon::parse('2026-07-14 01:00:00', 'UTC')]);
+
+        $localDate = '2026-07-13';
+        $key1 = $this->service->computeSortKey($card1, 'review', $opts, 1, 'english', $localDate, $nowInLa);
+        $key2 = $this->service->computeSortKey($card2, 'review', $opts, 1, 'english', $localDate, $nowInLa);
+
+        // Extract the integer (date) part — both must have the same date score
+        $date1 = (int) $key1;
+        $date2 = (int) $key2;
+        $this->assertSame($date1, $date2, 'Cards in same local date must share date score');
+    }
+
+    public function test_due_random_separates_cards_across_local_midnight(): void
+    {
+        // 2026-07-13 06:59 UTC = 2026-07-12 23:59 PDT (previous local day)
+        // 2026-07-13 07:01 UTC = 2026-07-13 00:01 PDT (next local day)
+        $opts = ReviewQueueOrderOptions::fromArray(['review_sort_order' => 'due_random']);
+        $nowInLa = Carbon::create(2026, 7, 13, 12, 0, 0, 'America/Los_Angeles');
+
+        $card1 = $this->makeCard(['id' => 1, 'fsrs_due_at' => Carbon::parse('2026-07-13 06:59:00', 'UTC')]);
+        $card2 = $this->makeCard(['id' => 2, 'fsrs_due_at' => Carbon::parse('2026-07-13 07:01:00', 'UTC')]);
+
+        $localDate = '2026-07-13';
+        $key1 = $this->service->computeSortKey($card1, 'review', $opts, 1, 'english', $localDate, $nowInLa);
+        $key2 = $this->service->computeSortKey($card2, 'review', $opts, 1, 'english', $localDate, $nowInLa);
+
+        // card1 local date = 2026-07-12, card2 local date = 2026-07-13
+        // card1 date score < card2 date score (earlier date first)
+        $this->assertLessThan($key2, $key1, 'Card before local midnight must sort before card after midnight');
+    }
+
+    public function test_due_random_utc_timezone_uses_utc_date(): void
+    {
+        $opts = ReviewQueueOrderOptions::fromArray(['review_sort_order' => 'due_random']);
+        $nowUtc = Carbon::create(2026, 7, 13, 12, 0, 0, 'UTC');
+
+        $card1 = $this->makeCard(['id' => 1, 'fsrs_due_at' => Carbon::parse('2026-07-13 23:00:00', 'UTC')]);
+        $card2 = $this->makeCard(['id' => 2, 'fsrs_due_at' => Carbon::parse('2026-07-14 01:00:00', 'UTC')]);
+
+        $localDate = '2026-07-13';
+        $key1 = $this->service->computeSortKey($card1, 'review', $opts, 1, 'english', $localDate, $nowUtc);
+        $key2 = $this->service->computeSortKey($card2, 'review', $opts, 1, 'english', $localDate, $nowUtc);
+
+        // In UTC, these are different dates → card1 < card2
+        $this->assertLessThan($key2, $key1);
+    }
+
+    // === DEV-QO-4: retrievability fallback consistency ===
+
+    public function test_retrievability_fallback_for_null_stability_returns_zero(): void
+    {
+        // The code returns 0.0 for null/invalid stability. The comment must
+        // match this — no "negative timestamp" claim.
+        $card = $this->makeCard([
+            'fsrs_stability' => null,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
+        ]);
+        $now = Carbon::now('UTC');
+        $r = $this->service->computeRetrievability($card, $now);
+        $this->assertSame(0.0, $r);
+    }
+
+    public function test_retrievability_fallback_for_zero_stability_returns_zero(): void
+    {
+        $card = $this->makeCard([
+            'fsrs_stability' => 0,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
+        ]);
+        $now = Carbon::now('UTC');
+        $r = $this->service->computeRetrievability($card, $now);
+        $this->assertSame(0.0, $r);
+    }
+
+    public function test_retrievability_fallback_for_negative_stability_returns_zero(): void
+    {
+        $card = $this->makeCard([
+            'fsrs_stability' => -1.0,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
+        ]);
+        $now = Carbon::now('UTC');
+        $r = $this->service->computeRetrievability($card, $now);
+        $this->assertSame(0.0, $r);
+    }
+
+    public function test_retrievability_no_last_reviewed_returns_one(): void
+    {
+        // elapsed = 0 → R = (1 + 0)^DECAY = 1.0
+        $card = $this->makeCard([
+            'fsrs_stability' => 10.0,
+            'fsrs_last_reviewed_at' => null,
+        ]);
+        $now = Carbon::now('UTC');
+        $r = $this->service->computeRetrievability($card, $now);
+        $this->assertEqualsWithDelta(1.0, $r, 0.0001);
+    }
+
+    public function test_retrievability_known_value_cross_check(): void
+    {
+        // FSRS-5 formula: R = (1 + (19/81) * elapsed / stability)^(-0.5)
+        // stability = 10, elapsed = 10 days → R = (1 + (19/81) * 1)^(-0.5)
+        //   = (1 + 0.234568...)^(-0.5) = (1.234568...)^(-0.5)
+        //   = 1 / sqrt(1.234568...) = 1 / 1.11111 = 0.9
+        $card = $this->makeCard([
+            'fsrs_stability' => 10.0,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(10),
+        ]);
+        $now = Carbon::now('UTC');
+        $r = $this->service->computeRetrievability($card, $now);
+        $this->assertEqualsWithDelta(0.9, $r, 0.01, 'R for stability=10, elapsed=10d must be ~0.9');
+    }
+
+    public function test_retrievability_smaller_stability_lower_r(): void
+    {
+        $now = Carbon::now('UTC');
+        $card1 = $this->makeCard([
+            'fsrs_stability' => 5.0,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(10),
+        ]);
+        $card2 = $this->makeCard([
+            'fsrs_stability' => 20.0,
+            'fsrs_last_reviewed_at' => Carbon::now()->subDays(10),
+        ]);
+        $r1 = $this->service->computeRetrievability($card1, $now);
+        $r2 = $this->service->computeRetrievability($card2, $now);
+        $this->assertLessThan($r2, $r1, 'Lower stability → lower R → higher priority');
+    }
+
+    public function test_retrievability_never_returns_nan_or_infinity(): void
+    {
+        $now = Carbon::now('UTC');
+        $stabilities = [null, 0, -1.0, 0.001, 1.0, 100.0, 99999.0];
+        foreach ($stabilities as $s) {
+            $card = $this->makeCard([
+                'fsrs_stability' => $s,
+                'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
+            ]);
+            $r = $this->service->computeRetrievability($card, $now);
+            $this->assertTrue(is_finite($r), "R for stability={$s} must be finite, got {$r}");
+            $this->assertGreaterThanOrEqual(0.0, $r, "R for stability={$s} must be >= 0");
+            $this->assertLessThanOrEqual(1.0, $r, "R for stability={$s} must be <= 1");
+        }
+    }
 }
