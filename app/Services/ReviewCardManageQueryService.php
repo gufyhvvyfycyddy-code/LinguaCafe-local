@@ -38,21 +38,46 @@ class ReviewCardManageQueryService
      * Build the shared base query with all security constraints, search, filters,
      * advanced filters, and sort applied. Used by both data() and export().
      *
-     * ADR-0012: The q parameter is now parsed by ReviewCardBrowserSearchParser
-     * into a ReviewCardBrowserSearchCriteria. If parsing fails (invalid token,
-     * conflict, etc.), InvalidBrowserSearchException is thrown — the caller
-     * (controller) catches it and returns a 422 JSON.
+     * ADR-0013: This is now a THIN WRAPPER for backward compatibility. The
+     * Controller's main path is buildFromCriteria() which receives an
+     * already-parsed ReviewCardBrowserSearchCriteria (parsed exactly once per
+     * request). This wrapper re-parses q from the Request — it exists only for
+     * callers that have not migrated to the single-parse contract.
      *
      * @throws InvalidBrowserSearchException When the search grammar is invalid.
      */
     public function build(Request $request, int $userId, string $language): \Illuminate\Database\Eloquent\Builder
     {
-        $filter = $request->input('filter', 'enabled');
         $q = trim($request->input('q', ''));
-
-        // ADR-0012: Parse the search query into structured criteria.
-        // This may throw InvalidBrowserSearchException — let it propagate.
         $criteria = $this->searchParser->parse($q);
+        return $this->buildFromCriteria($request, $criteria, $userId, $language);
+    }
+
+    /**
+     * Build the shared base query from an ALREADY-PARSED criteria.
+     *
+     * ADR-0013: This is the single execution entry point for the browser
+     * search pipeline. The Controller parses q once, catches
+     * InvalidBrowserSearchException for the 422 guard, and passes the
+     * resulting criteria here. This method does NOT re-read q and does NOT
+     * call the parser.
+     *
+     * Responsibilities:
+     *  - Create the security-scoped base query (user/language/sense-confirmed).
+     *  - Pre-compute governance matching IDs (single batch, no N+1).
+     *  - Delegate to ReviewCardBrowserSearchQueryApplier (text/lifecycle/
+     *    governance/rated/prop).
+     *  - Apply standard filter buttons (reusing pre-computed governance IDs).
+     *  - Apply advanced filter panel.
+     *  - Apply sort.
+     */
+    public function buildFromCriteria(
+        Request $request,
+        ReviewCardBrowserSearchCriteria $criteria,
+        int $userId,
+        string $language,
+    ): \Illuminate\Database\Eloquent\Builder {
+        $filter = $request->input('filter', 'enabled');
 
         // Base query — all security constraints baked in via whereHas
         $query = ReviewCard::query()
@@ -105,6 +130,10 @@ class ReviewCardManageQueryService
     /**
      * Get the parsed criteria for a request, for the controller to expose
      * as search_meta in the response.
+     *
+     * ADR-0013: The Controller calls this once per request for the 422 guard
+     * and search_meta, then passes the returned criteria to buildFromCriteria().
+     * buildFromCriteria() does NOT re-parse.
      *
      * @throws InvalidBrowserSearchException
      */

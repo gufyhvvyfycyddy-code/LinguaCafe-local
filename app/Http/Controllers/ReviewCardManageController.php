@@ -44,16 +44,16 @@ class ReviewCardManageController extends Controller
         $filter = $request->input('filter', 'enabled');
         $includeLeech = $request->boolean('include_leech') || in_array($filter, ['leech', 'struggling'], true);
 
-        // ADR-0012: Parse criteria up-front so we can:
-        //   (1) return a structured 422 on invalid grammar BEFORE querying,
-        //   (2) include search_meta in the success response.
+        // ADR-0013: Parse criteria exactly ONCE per request. The same criteria
+        // is reused for the 422 guard, search_meta, and buildFromCriteria().
+        // buildFromCriteria() does NOT re-parse.
         try {
             $criteria = $this->queryService->parseCriteria($request);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->build($request, $userId, $language);
+        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
 
         // Paginate
         $paginator = $query->paginate($perPage);
@@ -108,14 +108,14 @@ class ReviewCardManageController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
-        // ADR-0012: Validate search grammar before running the export query.
+        // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $this->queryService->parseCriteria($request);
+            $criteria = $this->queryService->parseCriteria($request);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->build($request, $userId, $language);
+        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
         $total = $query->count();
 
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {
@@ -171,14 +171,14 @@ class ReviewCardManageController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
-        // ADR-0012: Validate search grammar before running the export query.
+        // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $this->queryService->parseCriteria($request);
+            $criteria = $this->queryService->parseCriteria($request);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->build($request, $userId, $language);
+        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
 
         $total = $query->count();
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {
@@ -212,14 +212,14 @@ class ReviewCardManageController extends Controller
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
 
-        // ADR-0012: Validate search grammar before running the export query.
+        // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $this->queryService->parseCriteria($request);
+            $criteria = $this->queryService->parseCriteria($request);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->build($request, $userId, $language);
+        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
         $total = $query->count();
 
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {

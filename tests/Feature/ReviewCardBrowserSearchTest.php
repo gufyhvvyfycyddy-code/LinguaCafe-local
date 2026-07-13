@@ -784,6 +784,532 @@ class ReviewCardBrowserSearchTest extends TestCase
         $this->assertSame([], $response->json('search_meta.tokens'));
     }
 
+    // ═══════════════════════════════════════════════════════════════════════
+    // ADR-0013: Pipeline Convergence Tests (Task 2000-7)
+    //
+    // These 16 tests verify the converged execution pipeline:
+    //   - Parser is called exactly once per HTTP request (tests 1-4)
+    //   - Legal search results are stable after convergence (test 5)
+    //   - 422 contract is consistent across all 4 endpoints (test 6)
+    //   - Duplicate tokens are deduplicated (test 7)
+    //   - Conflicting tokens still return 422 (test 8)
+    //   - User / language / sense-only isolation (tests 9-11)
+    //   - rated: only counts real sense_review logs (test 12)
+    //   - Governance query budget is O(1), not O(N) (test 13)
+    //   - No ReviewLog writes, no FSRS mutation, no lifecycle mutation (tests 14-16)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    // ─── 2000-7 §1. data endpoint parses exactly once ───
+
+    public function test_adr_0013_data_endpoint_parses_search_string_exactly_once(): void
+    {
+        $this->makeCardWithLeechHistory();
+
+        $callCount = 0;
+        $this->spyParserCallCount($callCount);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2') . '&include_leech=1');
+
+        $response->assertStatus(200);
+        $this->assertSame(1, $callCount, 'ADR-0013: data endpoint must parse the search string exactly once per request.');
+    }
+
+    // ─── 2000-7 §2. JSON export parses exactly once ───
+
+    public function test_adr_0013_json_export_parses_search_string_exactly_once(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 3]);
+
+        $callCount = 0;
+        $this->spyParserCallCount($callCount);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?q=' . urlencode('prop:lapses>=2'));
+
+        $response->assertStatus(200);
+        $this->assertSame(1, $callCount, 'ADR-0013: JSON export must parse the search string exactly once per request.');
+    }
+
+    // ─── 2000-7 §3. CSV export parses exactly once ───
+
+    public function test_adr_0013_csv_export_parses_search_string_exactly_once(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 3]);
+
+        $callCount = 0;
+        $this->spyParserCallCount($callCount);
+
+        $response = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?q=' . urlencode('prop:lapses>=2'));
+
+        $response->assertStatus(200);
+        $this->assertSame(1, $callCount, 'ADR-0013: CSV export must parse the search string exactly once per request.');
+    }
+
+    // ─── 2000-7 §4. TSV export parses exactly once ───
+
+    public function test_adr_0013_tsv_export_parses_search_string_exactly_once(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 3]);
+
+        $callCount = 0;
+        $this->spyParserCallCount($callCount);
+
+        $response = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?q=' . urlencode('prop:lapses>=2'));
+
+        $response->assertStatus(200);
+        $this->assertSame(1, $callCount, 'ADR-0013: TSV export must parse the search string exactly once per request.');
+    }
+
+    // ─── 2000-7 §5. Legal search results unchanged after convergence ───
+
+    public function test_adr_0013_legal_search_results_match_expected_set(): void
+    {
+        // Build a scenario with multiple token categories and verify the
+        // exact expected card set is returned. This is the regression guard
+        // proving the pipeline convergence did not change V1 semantics.
+        $match = $this->makeCardWithLeechHistory([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_SUSPENDED,
+            'fsrs_lapses' => 3,
+        ]);
+        $match->sense->update(['lemma' => 'converge']);
+
+        $wrongLifecycle = $this->makeCardWithLeechHistory([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_lapses' => 3,
+        ]);
+        $wrongLifecycle->sense->update(['lemma' => 'converge']);
+
+        $wrongLapses = $this->makeCardWithLeechHistory([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_SUSPENDED,
+            'fsrs_lapses' => 1,
+        ]);
+        $wrongLapses->sense->update(['lemma' => 'converge']);
+
+        $wrongText = $this->makeCardWithLeechHistory([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_SUSPENDED,
+            'fsrs_lapses' => 3,
+        ]);
+        $wrongText->sense->update(['lemma' => 'other']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('converge is:leech is:suspended prop:lapses>=2 rated:again') . '&include_leech=1&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($match->id, $cardIds);
+        $this->assertNotContains($wrongLifecycle->id, $cardIds);
+        $this->assertNotContains($wrongLapses->id, $cardIds);
+        $this->assertNotContains($wrongText->id, $cardIds);
+    }
+
+    // ─── 2000-7 §6. All 4 endpoints return the same 422 structure ───
+
+    public function test_adr_0013_all_four_endpoints_return_identical_422_structure(): void
+    {
+        $invalidQuery = 'is:leech is:struggling';
+        $expectedStructure = [
+            'message',
+            'code',
+            'errors' => [['token', 'reason', 'example']],
+        ];
+
+        // data
+        $dataResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode($invalidQuery));
+        $dataResponse->assertStatus(422);
+        $dataResponse->assertJsonStructure($expectedStructure);
+        $dataResponse->assertJsonPath('code', 'invalid_browser_search');
+
+        // JSON export
+        $jsonResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?q=' . urlencode($invalidQuery));
+        $jsonResponse->assertStatus(422);
+        $jsonResponse->assertJsonStructure($expectedStructure);
+        $jsonResponse->assertJsonPath('code', 'invalid_browser_search');
+
+        // CSV export
+        $csvResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-csv?q=' . urlencode($invalidQuery));
+        $csvResponse->assertStatus(422);
+        $csvResponse->assertJsonStructure($expectedStructure);
+        $csvResponse->assertJsonPath('code', 'invalid_browser_search');
+
+        // TSV export
+        $tsvResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-anki-tsv?q=' . urlencode($invalidQuery));
+        $tsvResponse->assertStatus(422);
+        $tsvResponse->assertJsonStructure($expectedStructure);
+        $tsvResponse->assertJsonPath('code', 'invalid_browser_search');
+
+        // All four must return byte-identical error payload (message + code + errors).
+        $this->assertSame($dataResponse->json(), $jsonResponse->json());
+        $this->assertSame($dataResponse->json(), $csvResponse->json());
+        $this->assertSame($dataResponse->json(), $tsvResponse->json());
+    }
+
+    // ─── 2000-7 §7. Duplicate tokens produce a single chip ───
+
+    public function test_adr_0013_duplicate_tokens_produce_single_search_meta_token(): void
+    {
+        $this->makeCardWithLeechHistory(['fsrs_lapses' => 3]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech is:leech rated:again rated:again prop:lapses>=2 prop:lapses>=2') . '&include_leech=1');
+
+        $response->assertStatus(200);
+        $tokens = $response->json('search_meta.tokens');
+        $this->assertSame(['is:leech', 'rated:again', 'prop:lapses>=2'], $tokens, 'Duplicate tokens must collapse to a single chip entry.');
+        $this->assertCount(3, $tokens);
+    }
+
+    // ─── 2000-7 §8. Conflicting tokens still return 422 ───
+
+    public function test_adr_0013_conflicting_tokens_still_return_422_after_convergence(): void
+    {
+        // Same-category conflict (two different governance statuses) must
+        // still be rejected with 422 after the pipeline convergence.
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('is:leech is:struggling'));
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('code', 'invalid_browser_search');
+        $errors = $response->json('errors');
+        $this->assertNotEmpty($errors);
+        $this->assertNotEmpty($errors[0]['reason']);
+    }
+
+    public function test_adr_0013_conflicting_lifecycle_tokens_still_return_422(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('is:active is:suspended'));
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('code', 'invalid_browser_search');
+    }
+
+    // ─── 2000-7 §9. User isolation ───
+
+    public function test_adr_0013_search_isolates_by_user_id(): void
+    {
+        $otherUser = User::forceCreate([
+            'name' => 'Isolation Other',
+            'email' => 'iso-' . Str::uuid() . '@example.com',
+            'password' => \Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+
+        // Other user's card with leech history — must NOT appear for $this->user.
+        $otherCard = $this->makeCardWithLeechHistoryForUser($otherUser);
+        $otherCard->sense->update(['lemma' => 'isolated']);
+
+        // Same-lemma card owned by $this->user — should appear.
+        $ownCard = $this->makeCardWithLeechHistory();
+        $ownCard->sense->update(['lemma' => 'isolated']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('isolated is:leech') . '&include_leech=1&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($ownCard->id, $cardIds);
+        $this->assertNotContains($otherCard->id, $cardIds);
+    }
+
+    // ─── 2000-7 §10. Language isolation ───
+
+    public function test_adr_0013_search_isolates_by_language(): void
+    {
+        // Same user, different language — must NOT appear.
+        $jpSense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+            'lemma' => 'leech-word',
+            'surface_form' => 'leech-word',
+            'pos' => 'noun',
+            'sense_zh' => '水蛭',
+            'sense_en' => 'leech',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'A leech attaches.',
+            'example_sentence_zh' => '水蛭会附着。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', strtolower('japanese|leech-word|noun|水蛭|leech')),
+        ]);
+        $jpCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'japanese',
+            'language' => 'japanese',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $jpSense->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'fsrs_reps' => 0,
+            'fsrs_lapses' => 3,
+            'lifecycle_state' => 'active',
+        ]);
+
+        $enCard = $this->makeCardWithLeechHistory();
+        $enCard->sense->update(['lemma' => 'leech-word']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('leech-word is:leech') . '&include_leech=1&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($enCard->id, $cardIds);
+        $this->assertNotContains($jpCard->id, $cardIds);
+    }
+
+    // ─── 2000-7 §11. Sense-only (non-sense targets excluded) ───
+
+    public function test_adr_0013_search_excludes_non_sense_target_cards(): void
+    {
+        // Create a word-target card (not sense) with matching lemma.
+        $wordSense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'english',
+            'language_id' => 'english',
+            'lemma' => 'sense-only-guard',
+            'surface_form' => 'sense-only-guard',
+            'pos' => 'noun',
+            'sense_zh' => 'sense-only 守卫',
+            'sense_en' => 'sense-only guard',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'A guard stands.',
+            'example_sentence_zh' => '守卫站着。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', strtolower('english|sense-only-guard|noun|sense-only 守卫|sense-only guard')),
+        ]);
+        $senseCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $wordSense->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'fsrs_reps' => 0,
+            'fsrs_lapses' => 0,
+            'lifecycle_state' => 'active',
+        ]);
+
+        // A word-target card pointing at a non-sense target. We use a dummy
+        // target_id (0) since the search filter only checks target_type.
+        $wordCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => 999999,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'fsrs_reps' => 0,
+            'fsrs_lapses' => 0,
+            'lifecycle_state' => 'active',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('sense-only-guard') . '&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($senseCard->id, $cardIds);
+        $this->assertNotContains($wordCard->id, $cardIds, 'ADR-0013: non-sense target cards must be excluded from browser search.');
+    }
+
+    // ─── 2000-7 §12. rated: only counts real sense_review logs ───
+
+    public function test_adr_0013_rated_excludes_reset_undone_and_non_sense_review_logs(): void
+    {
+        // Three cards, each with an 'again' log that MUST NOT count:
+        //   (a) source='review' (non-sense_review)
+        //   (b) source='reset' (reset log)
+        //   (c) source='sense_review' but undone_at set
+        // Plus one card with a real sense_review again log that SHOULD count.
+        $cardNonSense = $this->makeCard();
+        ReviewLog::create([
+            'user_id' => $cardNonSense->user_id, 'language_id' => $cardNonSense->language_id, 'language' => $cardNonSense->language,
+            'review_card_id' => $cardNonSense->id, 'rating' => 'again',
+            'reviewed_at' => now()->subDay(),
+            'previous_state' => 'review', 'new_state' => 'review',
+            'previous_due_at' => now()->subDays(2), 'new_due_at' => now(),
+            'previous_stability' => 1.0, 'new_stability' => 1.5,
+            'previous_difficulty' => 5.0, 'new_difficulty' => 5.0,
+            'source' => 'review',
+        ]);
+
+        $cardReset = $this->makeCard();
+        ReviewLog::create([
+            'user_id' => $cardReset->user_id, 'language_id' => $cardReset->language_id, 'language' => $cardReset->language,
+            'review_card_id' => $cardReset->id, 'rating' => 'again',
+            'reviewed_at' => now()->subDay(),
+            'previous_state' => 'review', 'new_state' => 'new',
+            'previous_due_at' => now()->subDays(2), 'new_due_at' => now(),
+            'previous_stability' => 1.0, 'new_stability' => null,
+            'previous_difficulty' => 5.0, 'new_difficulty' => null,
+            'source' => 'reset',
+        ]);
+
+        $cardUndone = $this->makeCard();
+        ReviewLog::create([
+            'user_id' => $cardUndone->user_id, 'language_id' => $cardUndone->language_id, 'language' => $cardUndone->language,
+            'review_card_id' => $cardUndone->id, 'rating' => 'again',
+            'reviewed_at' => now()->subDay(),
+            'previous_state' => 'review', 'new_state' => 'review',
+            'previous_due_at' => now()->subDays(2), 'new_due_at' => now(),
+            'previous_stability' => 1.0, 'new_stability' => 1.5,
+            'previous_difficulty' => 5.0, 'new_difficulty' => 5.0,
+            'source' => 'sense_review',
+            'undone_at' => now(),
+        ]);
+
+        $cardReal = $this->makeCard();
+        $this->makeLog($cardReal, 'again', 1);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('rated:again') . '&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($cardReal->id, $cardIds);
+        $this->assertNotContains($cardNonSense->id, $cardIds, 'Non-sense_review source logs must not count for rated:');
+        $this->assertNotContains($cardReset->id, $cardIds, 'Reset logs must not count for rated:');
+        $this->assertNotContains($cardUndone->id, $cardIds, 'Undone logs must not count for rated:');
+    }
+
+    // ─── 2000-7 §13. Governance query budget is O(1) ───
+
+    public function test_adr_0013_governance_query_count_does_not_grow_with_card_count(): void
+    {
+        // Create a larger set of leech cards and verify the review_logs query
+        // count stays constant (does not scale linearly with card count).
+        for ($i = 0; $i < 15; $i++) {
+            $this->makeCardWithLeechHistory();
+        }
+
+        DB::enableQueryLog();
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech') . '&include_leech=1&per_page=50');
+        $response->assertStatus(200);
+        $queries = DB::getQueryLog();
+        DB::disableQueryLog();
+
+        $reviewLogQueries = array_filter($queries, function ($q) {
+            return strpos($q['query'], 'review_logs') !== false;
+        });
+
+        // With O(1) governance classification, review_logs queries should be
+        // a small constant (1 batch load for classification + descriptor
+        // injection). Must NOT scale with the 15 cards.
+        $this->assertLessThan(6, count($reviewLogQueries), 'Governance classification must be O(1) — review_logs query count must not grow with card count.');
+    }
+
+    // ─── 2000-7 §14. No ReviewLog writes from any endpoint ───
+
+    public function test_adr_0013_no_endpoint_writes_review_log(): void
+    {
+        $this->makeCardWithLeechHistory(['fsrs_lapses' => 3]);
+
+        $logBefore = ReviewLog::where('user_id', $this->user->id)->count();
+
+        // Hit all 4 endpoints with a multi-token query.
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2') . '&include_leech=1');
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $logAfter = ReviewLog::where('user_id', $this->user->id)->count();
+        $this->assertSame($logBefore, $logAfter, 'ADR-0013: No endpoint may create ReviewLog entries.');
+    }
+
+    // ─── 2000-7 §15. No FSRS mutation from any endpoint ───
+
+    public function test_adr_0013_no_endpoint_mutates_fsrs_fields(): void
+    {
+        $card = $this->makeCardWithLeechHistory([
+            'fsrs_stability' => 7.5,
+            'fsrs_difficulty' => 0.2,
+            'fsrs_reps' => 8,
+            'fsrs_lapses' => 3,
+            'fsrs_state' => 'review',
+        ]);
+
+        $snapshot = function () use ($card) {
+            $c = ReviewCard::find($card->id);
+            return [
+                'fsrs_stability' => $c->fsrs_stability,
+                'fsrs_difficulty' => $c->fsrs_difficulty,
+                'fsrs_reps' => $c->fsrs_reps,
+                'fsrs_lapses' => $c->fsrs_lapses,
+                'fsrs_state' => $c->fsrs_state,
+                'fsrs_due_at' => optional($c->fsrs_due_at)->toISOString(),
+                'fsrs_enabled' => $c->fsrs_enabled,
+            ];
+        };
+
+        $before = $snapshot();
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2') . '&include_leech=1');
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?filter=all&q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $after = $snapshot();
+        $this->assertSame($before, $after, 'ADR-0013: No endpoint may mutate FSRS fields.');
+    }
+
+    // ─── 2000-7 §16. No lifecycle mutation from any endpoint ───
+
+    public function test_adr_0013_no_endpoint_mutates_lifecycle_state(): void
+    {
+        $card = $this->makeCardWithLeechHistory([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_SUSPENDED,
+        ]);
+
+        $snapshot = function () use ($card) {
+            $c = ReviewCard::find($card->id);
+            return [
+                'lifecycle_state' => $c->lifecycle_state,
+                'lifecycle_version' => $c->lifecycle_version,
+                'fsrs_enabled' => $c->fsrs_enabled,
+            ];
+        };
+
+        $before = $snapshot();
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('is:leech is:suspended rated:again prop:lapses>=2') . '&include_leech=1');
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?filter=all&q=' . urlencode('is:leech is:suspended rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?filter=all&q=' . urlencode('is:leech is:suspended rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?filter=all&q=' . urlencode('is:leech is:suspended rated:again prop:lapses>=2'));
+
+        $after = $snapshot();
+        $this->assertSame($before, $after, 'ADR-0013: No endpoint may mutate lifecycle state or version.');
+    }
+
     // ─── Helpers ───
 
     private function makeCard(array $overrides = []): ReviewCard
@@ -839,6 +1365,37 @@ class ReviewCardBrowserSearchTest extends TestCase
             ['rating' => 'easy', 'daysAgo' => 2],
         ]);
         return $card;
+    }
+
+    private function makeCardWithLeechHistoryForUser(User $user, array $overrides = []): ReviewCard
+    {
+        $card = $this->makeCardForUser($user, array_merge(['fsrs_lapses' => 3], $overrides));
+        $this->makeLogs($card, [
+            ['rating' => 'again', 'daysAgo' => 10],
+            ['rating' => 'again', 'daysAgo' => 8],
+            ['rating' => 'again', 'daysAgo' => 6],
+            ['rating' => 'good', 'daysAgo' => 4],
+            ['rating' => 'easy', 'daysAgo' => 2],
+        ]);
+        return $card;
+    }
+
+    /**
+     * ADR-0013: Install a Mockery spy on ReviewCardBrowserSearchParser that
+     * counts parse() calls and delegates to the real parser. The $callCount
+     * parameter is passed by reference so the caller can assert the count
+     * after the request completes.
+     */
+    private function spyParserCallCount(int &$callCount): void
+    {
+        $realParser = new \App\Services\ReviewCardBrowserSearchParser();
+        $mock = \Mockery::mock(\App\Services\ReviewCardBrowserSearchParser::class);
+        $mock->shouldReceive('parse')
+            ->andReturnUsing(function (string $q) use ($realParser, &$callCount) {
+                $callCount++;
+                return $realParser->parse($q);
+            });
+        $this->app->instance(\App\Services\ReviewCardBrowserSearchParser::class, $mock);
     }
 
     private function makeCardWithStrugglingHistory(array $overrides = []): ReviewCard

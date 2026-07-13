@@ -100,7 +100,17 @@ class ReviewCardBrowserSearchParser
             }
 
             $tokenData = $parseResult['data'];
-            $normalizedTokens[] = $tokenData['normalized'];
+            $normalizedToken = $tokenData['normalized'];
+
+            // ADR-0013: Deduplicate by first-occurrence order. Same token
+            // appearing twice (e.g. `is:leech is:leech`) is normalized to a
+            // single entry in normalizedTokens and a single condition. This
+            // prevents duplicate chips on the frontend and duplicate SQL WHERE
+            // clauses in the applier.
+            if (in_array($normalizedToken, $normalizedTokens, true)) {
+                continue;
+            }
+            $normalizedTokens[] = $normalizedToken;
 
             // Apply to criteria fields (with conflict detection).
             switch ($tokenData['kind']) {
@@ -132,11 +142,26 @@ class ReviewCardBrowserSearchParser
                     }
                     break;
                 case 'property':
-                    $propertyConditions[] = [
-                        'field' => $tokenData['field'],
-                        'operator' => $tokenData['operator'],
-                        'value' => $tokenData['value'],
-                    ];
+                    // ADR-0013: Deduplicate identical property conditions
+                    // (same field + operator + value). Different operators on
+                    // the same field are kept (e.g. prop:lapses>=2 prop:lapses<5).
+                    $dup = false;
+                    foreach ($propertyConditions as $existing) {
+                        if ($existing['field'] === $tokenData['field']
+                            && $existing['operator'] === $tokenData['operator']
+                            && $existing['value'] === $tokenData['value']
+                        ) {
+                            $dup = true;
+                            break;
+                        }
+                    }
+                    if (!$dup) {
+                        $propertyConditions[] = [
+                            'field' => $tokenData['field'],
+                            'operator' => $tokenData['operator'],
+                            'value' => $tokenData['value'],
+                        ];
+                    }
                     break;
             }
         }

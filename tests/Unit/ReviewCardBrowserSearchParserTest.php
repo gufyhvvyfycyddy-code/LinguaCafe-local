@@ -232,16 +232,18 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         $this->assertSame('lapses', $criteria->propertyConditions[0]['field']);
     }
 
-    // ─── 9. Duplicate token deduplication ───
+    // ─── 9. Duplicate token deduplication (ADR-0013) ───
 
     public function test_duplicate_governance_token_is_deduplicated(): void
     {
+        // ADR-0013: Same token appearing twice must be normalized to a single
+        // entry in normalizedTokens (and a single condition). This prevents
+        // duplicate chips on the frontend and duplicate SQL WHERE clauses.
         $criteria = $this->parser->parse('is:leech is:leech');
 
         $this->assertSame('leech', $criteria->governanceStatus);
-        // Both occurrences normalized — dedup is at the criteria field level,
-        // not the normalizedTokens list (we keep both for display fidelity).
-        // However, the governanceStatus is a single value, not two.
+        $this->assertSame(['is:leech'], $criteria->normalizedTokens);
+        $this->assertCount(1, $criteria->normalizedTokens);
     }
 
     public function test_duplicate_rated_token_is_deduplicated(): void
@@ -250,6 +252,56 @@ class ReviewCardBrowserSearchParserTest extends TestCase
 
         $this->assertSame(['again'], $criteria->ratings);
         $this->assertCount(1, $criteria->ratings);
+        $this->assertSame(['rated:again'], $criteria->normalizedTokens);
+        $this->assertCount(1, $criteria->normalizedTokens);
+    }
+
+    public function test_duplicate_lifecycle_token_is_deduplicated(): void
+    {
+        // ADR-0013: Same lifecycle token repeated → single normalized entry.
+        $criteria = $this->parser->parse('is:suspended is:suspended');
+
+        $this->assertSame('suspended', $criteria->lifecycleStatus);
+        $this->assertSame(['is:suspended'], $criteria->normalizedTokens);
+        $this->assertCount(1, $criteria->normalizedTokens);
+    }
+
+    public function test_duplicate_property_condition_is_deduplicated(): void
+    {
+        // ADR-0013: Identical property condition (same field + operator + value)
+        // appearing twice must collapse to a single condition and a single
+        // normalized token, preventing duplicate SQL WHERE clauses.
+        $criteria = $this->parser->parse('prop:lapses>=2 prop:lapses>=2');
+
+        $this->assertCount(1, $criteria->propertyConditions);
+        $this->assertSame('lapses', $criteria->propertyConditions[0]['field']);
+        $this->assertSame('>=', $criteria->propertyConditions[0]['operator']);
+        $this->assertSame(2, $criteria->propertyConditions[0]['value']);
+        $this->assertSame(['prop:lapses>=2'], $criteria->normalizedTokens);
+        $this->assertCount(1, $criteria->normalizedTokens);
+    }
+
+    public function test_different_operators_on_same_property_field_are_kept(): void
+    {
+        // ADR-0013: Different operators on the same field are NOT duplicates —
+        // both conditions are kept (AND semantics). Only identical triplets
+        // (field + operator + value) are deduplicated.
+        $criteria = $this->parser->parse('prop:lapses>=2 prop:lapses<5');
+
+        $this->assertCount(2, $criteria->propertyConditions);
+        $this->assertContains('prop:lapses>=2', $criteria->normalizedTokens);
+        $this->assertContains('prop:lapses<5', $criteria->normalizedTokens);
+    }
+
+    public function test_duplicate_token_mixed_with_other_tokens_dedups_correctly(): void
+    {
+        // ADR-0013: Dedup happens by first-occurrence order; other distinct
+        // tokens are preserved in their original positions.
+        $criteria = $this->parser->parse('is:leech rated:again rated:again prop:lapses>=2 is:leech');
+
+        $this->assertSame(['is:leech', 'rated:again', 'prop:lapses>=2'], $criteria->normalizedTokens);
+        $this->assertSame(['again'], $criteria->ratings);
+        $this->assertCount(1, $criteria->propertyConditions);
     }
 
     // ─── 10. Conflict lifecycle ───
