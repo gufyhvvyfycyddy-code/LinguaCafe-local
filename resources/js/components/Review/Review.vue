@@ -225,6 +225,22 @@
                 <v-btn title="查看快捷键" icon class="my-2" @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
             </div>
 
+            <!-- DEV-QO-2 (Task 2000-12): Persistent rating error alert.
+                 Shown when a rating request failed and the queue is being
+                 reloaded. Stays visible after reload until the user
+                 dismisses it or completes the next successful rating. -->
+            <v-alert
+                v-if="reviewError && !finished"
+                type="error"
+                dense
+                outlined
+                dismissible
+                @input="reviewError = ''"
+                class="mt-2 mb-0"
+            >
+                {{ reviewError }}
+            </v-alert>
+
             <!-- Card -->
             <div id="review-card"
                 :class="{
@@ -653,10 +669,17 @@
 
                     this.textToSpeechService = new TextToSpeechService(this.language, this.updateTextToSpeechState);
                     window.addEventListener('keyup', this.hotkey);
+                    // DEV-QO-2 (Task 2000-12): reload complete — unlock
+                    // rating buttons. This is essential when loadReviews is
+                    // called from the rating-error recovery path.
+                    this.ratingLoading = false;
                 }).catch((error) => {
                     this.reviewError = requestErrorMessage(error, '复习队列加载失败。');
                     this.totalReviews = 0;
                     this.finished = true;
+                    // DEV-QO-2 (Task 2000-12): reload failed — no cards to
+                    // rate, unlock buttons (finished view is shown anyway).
+                    this.ratingLoading = false;
                 });
             },
             textToSpeech() {
@@ -798,8 +821,11 @@
                     ? this.$vuetify.theme.currentTheme.error
                     : this.$vuetify.theme.currentTheme.success;
 
-                this.correctReviews ++;
-                this.countReadWords();
+                // DEV-QO-2 (Task 2000-12): Do NOT increment correctReviews
+                // or countReadWords() before the server confirms the rating.
+                // If the request fails, these statistics must not have been
+                // permanently increased. They are now incremented inside the
+                // .then() success path only.
 
                 if (!this.practiceMode) {
                     // DEV-QO-6: increment sequence and capture for this
@@ -825,6 +851,18 @@
                         if (seq !== this.ratingRequestSequence) {
                             return;
                         }
+
+                        // DEV-QO-2 (Task 2000-12): Server has confirmed the
+                        // rating. NOW it is safe to increment success counters
+                        // and count read words for the just-rated card. These
+                        // MUST NOT happen before server confirmation — if the
+                        // request failed, they must not have been increased.
+                        this.correctReviews ++;
+                        this.countReadWords();
+                        // Clear any persistent rating error from a previous
+                        // failed attempt — the user has now completed a
+                        // successful rating.
+                        this.reviewError = '';
 
                         axios.post('/goals/achievement/review/update').catch(() => {});
 
@@ -874,11 +912,40 @@
                         if (seq !== this.ratingRequestSequence) {
                             return;
                         }
-                        this.reviewError = requestErrorMessage(error, '评分提交失败。');
-                        this.finished = true;
+                        // DEV-QO-2 (Task 2000-12): Rating request failed.
+                        // The server may have succeeded but the response was
+                        // lost, OR the server truly failed. We MUST NOT:
+                        //   - enter the "finished" state (cards may still exist)
+                        //   - keep pre-incremented statistics (already moved
+                        //     to .then() above, so nothing to undo here)
+                        //   - allow re-rating the possibly-already-rated card
+                        // Instead: reset animation, show a clear error, and
+                        // reload the authoritative queue from the server.
+                        // ratingLoading stays true (buttons disabled) until
+                        // the reload settles.
+                        this.reviewError = '评分结果状态不确定，正在重新加载正式复习队列，请不要重复评分。';
+                        // Reset animation and background so the page looks
+                        // operable during reload.
+                        this.intoTheCorrectDeckAnimation = false;
+                        this.backToDeckAnimation = false;
+                        this.newCardAnimation = false;
+                        this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
+                        // Reload the authoritative queue. loadReviews()
+                        // increments ratingRequestSequence (invalidating
+                        // this seq) and sets ratingLoading=false at start;
+                        // we immediately restore ratingLoading=true so the
+                        // buttons stay disabled until the reload's .then or
+                        // .catch fires.
+                        this.$nextTick(() => {
+                            this.loadReviews();
+                            this.ratingLoading = true;
+                        });
                     }).finally(() => {
                         // DEV-QO-6: restore operable state only if this is
-                        // still the latest request.
+                        // still the latest request. When the catch handler
+                        // triggers loadReviews(), the sequence is incremented,
+                        // so this finally will NOT reset ratingLoading — the
+                        // reload's own .then/.catch is responsible for that.
                         if (seq === this.ratingRequestSequence) {
                             this.ratingLoading = false;
                         }

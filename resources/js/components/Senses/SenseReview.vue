@@ -994,10 +994,35 @@
                     if (action && action.undoable) {
                         this.showUndoSnackbar(action, reviewedCard);
                     }
-                }).catch((error) => {
-                    this.error = error.response?.data?.message || '词义卡评分失败。';
-                }).finally(() => {
+                    // DEV-QO-3 (Task 2000-12): Server confirmed the rating.
+                    // Clear any persistent rating-recovery error from a
+                    // previous failed attempt, then unlock the buttons.
+                    this.error = '';
                     this.rating = false;
+                }).catch((error) => {
+                    // DEV-QO-3 (Task 2000-12): Rating request failed. The
+                    // server may have succeeded but the response was lost,
+                    // OR the server truly failed. We MUST NOT allow
+                    // re-rating the possibly-already-rated card (avoids
+                    // duplicate ReviewLog). Reload the authoritative queue
+                    // from the server. Keep this.rating=true (buttons
+                    // disabled) until the reload settles.
+                    //
+                    // loadCards() clears this.error at start and may set
+                    // its own load-error on failure. After the reload
+                    // settles, if no load-error occurred, set the rating-
+                    // recovery message so it stays visible until the next
+                    // successful rating.
+                    this.loadCards().finally(() => {
+                        if (!this.error) {
+                            this.error = '评分结果状态不确定，正在重新加载词义复习队列，请不要重复评分。';
+                        }
+                        // Reload settled — unlock buttons. If the server
+                        // had succeeded, the reloaded queue won't contain
+                        // the rated card. If the server truly failed, the
+                        // reloaded queue will still contain it.
+                        this.rating = false;
+                    });
                 });
             },
             continueOverLimit() {
