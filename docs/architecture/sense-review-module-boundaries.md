@@ -765,3 +765,148 @@ Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, Rev
 - **No auto-creation**: no WordSense, no ReviewCard, no ReviewLog created by leech services.
 - **No FSRS change**: leech classification does not modify any FSRS field.
 - **No rating change**: leech does not block rating or change hotkeys.
+
+## 14. Review Card Browser Advanced Search (ADR-0012 — `Anki-Browser-Search-1`)
+
+> **Status**: Current as of 2026-07-13 (ADR-0012 Task 2000-5 complete).
+> **Related**: `docs/adr/ADR-0012-review-card-browser-search.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`.
+
+The `/review-cards/manage` search box supports composable V1 advanced search syntax while preserving existing plain-text fuzzy search. All four consumers — page `data()`, JSON export, CSV export, Anki TSV export — share the same parser and `ReviewCardManageQueryService::build()` so query semantics are identical across page and exports.
+
+### 14.1 V1 Grammar
+
+| Token family | Examples | Semantics |
+|---|---|---|
+| `is:` governance | `is:leech` / `is:struggling` | ADR-0011 leech Policy classification (stable/struggling/leech). Max one governance token. |
+| `is:` lifecycle | `is:active` / `is:buried` / `is:suspended` / `is:archived` | ADR-0010 lifecycle state. Max one lifecycle token. |
+| `rated:` | `rated:again` / `rated:hard` | Correlated `whereExists` on `review_logs` requiring `source='sense_review'` + `rating=again|hard` + `undone_at IS NULL`. Reset / other-source / undone logs excluded. |
+| `prop:lapses` | `prop:lapses=0` / `prop:lapses>=2` / `prop:lapses<5` | Direct column WHERE on `review_cards.fsrs_lapses` with operator `=`,`>`,`>=`,`<`,`<=` and non-negative integer value. |
+| Plain text | `charge` | After removing all valid tokens, remaining text continues to fall back to LIKE on lemma / surface_form / sense_zh / sense_en / example_sentence_en. |
+
+Rules:
+- All conditions AND-combined.
+- Token matching is case-insensitive (e.g. `IS:LEECH` ≡ `is:leech`); normalized output is lowercase.
+- Same-category tokens with conflicting values → 422 (e.g. `is:suspended is:archived`, `is:leech is:struggling`).
+- Same-category duplicate tokens are deduplicated (e.g. `is:leech is:leech` ≡ `is:leech`).
+- Cross-category combination is legal (e.g. `is:leech is:suspended`).
+- Leech is governance (ADR-0011), NOT a lifecycle state — `is:leech` never mutates lifecycle; suspend must still go through `ReviewCardLifecycleCommandService`.
+- `rated:` is read-only — never writes `ReviewLog`, never modifies FSRS.
+- Not supported in V1: `OR`, `NOT`, parentheses, date search, saved searches, more `prop:` fields, `rated:good`, `rated:easy`, new migration.
+
+A segment "looks like an advanced token" iff it contains a colon AND the part before the first colon matches `is`/`rated`/`prop` (case-insensitive). Other colon-containing segments (e.g. URLs) are treated as plain text.
+
+### 14.2 Architecture — Three New Services
+
+```
+Request q string
+      ↓
+ReviewCardBrowserSearchParser         Pure function (no DB / Request / Auth / state)
+      ↓
+ReviewCardBrowserSearchCriteria       Read-only value object
+  (rawQuery / textQuery / governanceStatus / lifecycleStatus /
+   ratings / propertyConditions / normalizedTokens / errors)
+      ↓
+ReviewCardManageQueryService::build() Owns base query + user/language/sense-confirmed isolation
+      ↓                                 + invokes Parser + invokes Applier + advanced filters + sort
+ReviewCardBrowserSearchQueryApplier   Applies criteria to already-scoped query builder only
+      ↓                                 (does NOT create base query / handle pagination / serialize / export)
+QueryBuilder → paginated / exported by ReviewCardManageController + ReviewCardExportService
+```
+
+**`app/Services/ReviewCardBrowserSearchParser.php`** — Pure function. Receives raw string, identifies supported tokens, extracts remaining plain text, validates values and operators, identifies same-category conflicts, returns standardized `ReviewCardBrowserSearchCriteria`. No DB queries, no Request reads, no Auth, no state mutation. Constants: `GOVERNANCE_STATUSES`, `LIFECYCLE_STATUSES`, `RATINGS`, `PROP_FIELDS`, `PROP_OPERATORS`.
+
+**`app/Services/ReviewCardBrowserSearchCriteria.php`** — Read-only value object. All fields `readonly`. At least: `rawQuery`, `textQuery`, `governanceStatus`, `lifecycleStatus`, `ratings`, `propertyConditions`, `normalizedTokens`, `errors`. `toSearchMeta()` returns `{raw_query, text_query, tokens, advanced}` for the `data()` response.
+
+**`app/Services/ReviewCardBrowserSearchQueryApplier.php`** — Only receives an already-security-scoped query builder (user/language/sense-confirmed isolation done by `ReviewCardManageQueryService`). Applies: (1) plain text LIKE on 5 fields, (2) lifecycle WHERE on `lifecycle_state`, (3) governance `whereIn` on Policy-classified IDs (cached), (4) `rated:` correlated `whereExists` on `review_logs`, (5) `prop:lapses` direct WHERE on `fsrs_lapses`. Does NOT handle pagination, serialization, export, or any DB write.
+
+**`app/Services/InvalidBrowserSearchException.php`** — Carries per-token error details. `toResponseArray()` returns:
+```json
+{
+  "message": "高级搜索语法有误。",
+  "code": "invalid_browser_search",
+  "errors": [
+    {"token": "prop:lapses>>2", "reason": "不支持的属性比较格式", "example": "prop:lapses>=2"}
+  ]
+}
+```
+
+### 14.3 Governance Classification Boundary (no N+1, no triple-classification)
+
+`is:leech` and `is:struggling` MUST reuse `SenseReviewLeechQueryService` + `SenseReviewLeechPolicy` (ADR-0011). Leech thresholds MUST NOT be copied. Per management-page request:
+
+- Governance classification runs **at most once** — IDs computed once and reused by filter, pagination total, and in-row badge.
+- No per-card `ReviewLog` query.
+- Query count MUST NOT grow linearly with card count.
+- When the legacy `filter=leech|struggling` button AND the `is:leech|is:struggling` token request the same status, classification runs once and the ID set is reused. When they request different statuses, both are computed (AND semantics).
+
+This is locked by `tests/Feature/ReviewCardBrowserSearchTest.php` query-budget tests (1 card vs N cards → same query count) and filter-consistency tests (filter button + token combo does not invoke classification twice).
+
+### 14.4 `rated:` ReviewLog Boundary
+
+`rated:again` / `rated:hard` translate to a correlated `whereExists` subquery on `review_logs` with these hard boundaries:
+
+- `review_logs.review_card_id = review_cards.id`
+- `review_logs.user_id = <current user>` (injected by `ReviewCardManageQueryService` base query scoping)
+- `review_logs.language_id = <current language>`
+- `review_logs.source = 'sense_review'` (excludes `review` / `reset` / `acceptance_test` / other)
+- `review_logs.rating = 'again'` (or `'hard'`)
+- `review_logs.undone_at IS NULL` (excludes undone logs from ADR-0009 undo ledger)
+
+MUST continue to exclude: `source=reset`, `rating=reset`, other sources, undone logs. `rated:` is read-only — never writes `ReviewLog`, never modifies FSRS.
+
+### 14.5 `search_meta` Response Contract
+
+`GET /review-cards/manage/data` keeps existing `items` + `pagination` and adds:
+
+```json
+{
+  "items": [...],
+  "pagination": {...},
+  "search_meta": {
+    "raw_query": "charge is:leech prop:lapses>=2",
+    "text_query": "charge",
+    "tokens": ["is:leech", "prop:lapses>=2"],
+    "advanced": true
+  }
+}
+```
+
+MUST NOT leak internal SQL, table names, or user info. JSON / CSV / Anki TSV exports use the same Parser + `ReviewCardManageQueryService::build()` so query results match the page exactly.
+
+### 14.6 Frontend Behavior — `ReviewCardManage.vue`
+
+- Search box label: `搜索词义，或输入高级语法`.
+- Help entry `高级搜索语法` opens a dialog showing at least: `is:leech`, `is:suspended`, `rated:again`, `prop:lapses>=2`, `charge is:leech`.
+- Successful search displays recognized-token chips (one per advanced token). Each chip has a close button for single-token removal and re-search.
+- When the search box contains one or more advanced tokens, the frontend auto-switches the top status button to `全部` so lifecycle tokens like `is:suspended` are not pre-filtered out by the default filter.
+- Clicking a top status button: preserves plain search text, clears `is:` tokens from the search box, keeps `rated:` and `prop:` tokens, re-requests data.
+- Syntax error: keeps user input, displays the specific per-token error under the search box (NOT a generic "加载失败"), does not clear existing data, distinguishes empty states (no cards / no match / syntax error).
+- Frontend MAY use simple string helpers for token display and removal, but MUST NOT replicate the full backend parser or re-validate grammar client-side. The parser is server-side only.
+- Forbidden frontend changes: table editing, lifecycle operations, batch operations, Leech rewrite packages, export fields, column settings, rating page, reading page.
+
+### 14.7 Query Consistency — Page + Three Exports
+
+All four consumers (`data()`, `export()` JSON, `exportAnkiTsv()`, `exportCsv()`) call `ReviewCardManageQueryService::build()` which uses the same Parser → Criteria → Applier pipeline. `effectiveFilter()` helper returns `'all'` when advanced tokens are present, ensuring exports use the same filter logic as `loadData()`. Export row counts MUST match the page filter.
+
+### 14.8 Test Coverage
+
+- `tests/Unit/ReviewCardBrowserSearchParserTest.php` — 41 tests covering: empty string, plain text, single `is:` token, governance+lifecycle combo, `rated:` token, 5 `prop:` operators, plain text + multi-token, case normalization, duplicate dedup, lifecycle conflict (422), governance conflict (422), unknown `is`/`rated`/`prop`, missing prop value, negative number, non-numeric, unsupported operator, extra whitespace, parser does not query DB.
+- `tests/Feature/ReviewCardBrowserSearchTest.php` — 28 tests covering: `is:leech`, `is:struggling`, `is:suspended`, `is:archived`, `is:leech is:suspended`, `rated:again`, `rated:hard`, non-sense_review again excluded, reset excluded, undone again excluded, `prop:lapses>=2`, plain text + rated, plain text + is + prop, user isolation, language isolation, pagination total, JSON export consistency, CSV export consistency, Anki TSV export consistency, 422 error structure, query budget not linear with card count, filter + q do not double-classify.
+- `tests/Feature/ReviewCardBrowserSearchUiGuardTest.php` — 31 frontend guard tests covering: search help entry, syntax examples, token chips, chip removal, specific error display, advanced-token → switch to 全部, top filter click clears `is:` tokens, frontend does NOT replicate full parser, no change to lifecycle / batch operations.
+
+### 14.9 Frozen Boundaries
+
+- **Parser**: pure function — no DB, no Request, no Auth, no state mutation, no lifecycle mutation, no FSRS modification, no AI calls, no WordSense/ReviewCard creation.
+- **Criteria**: read-only value object — immutable after construction.
+- **QueryApplier**: applies criteria to already-scoped query only — does NOT create base query, handle pagination, serialize, or export.
+- **`ReviewCardManageQueryService`**: continues to own base query (user/language/sense-confirmed isolation), parser invocation, applier, advanced filters, sort, and provides identical query results to all four consumers.
+- **Governance reuse**: `is:leech` / `is:struggling` MUST reuse `SenseReviewLeechPolicy` / `SenseReviewLeechQueryService` — thresholds MUST NOT be copied.
+- **`rated:` read-only**: never writes `ReviewLog`, never modifies FSRS, excludes `source != 'sense_review'` and `undone_at != null`.
+- **No lifecycle mutation**: `is:leech` is governance, not a lifecycle state; suspend still goes through `ReviewCardLifecycleCommandService`.
+- **No FSRS modification**: search does not modify any FSRS field on any card.
+- **No ReviewLog creation**: search does not create or modify any `ReviewLog`.
+- **No new migration**: all V1 grammar operates on existing columns (`lifecycle_state`, `fsrs_lapses`, `review_logs` columns).
+- **Frontend does NOT replicate parser**: only simple string helpers for chip display/removal; validation is server-side only.
+- **No OR / NOT / parentheses / dates / saved-searches / more prop fields / `rated:good` / `rated:easy` in V1**.
+- **Export consistency**: page `data()`, JSON, CSV, Anki TSV all use the same parser + QueryService → identical query semantics.
+- **No internal SQL / table names / user info leaked** in `search_meta` or error response.

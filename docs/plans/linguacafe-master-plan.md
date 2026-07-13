@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-10 (近 30 天 SenseReview 复习日历 + 报表架构五层收敛: Period + DailySeries + ReportCenter).
+> **最后更新**：2026-07-13 (ADR-0012 Task 2000-5 完成: review card browser advanced search grammar — `Anki-Browser-Search-1` — `/review-cards/manage` 搜索框可组合 V1 高级语法 is:/rated:/prop:lapses + 普通文本模糊搜索; 纯函数 parser + 只读 criteria + query applier + `search_meta` 响应 + 前端 chips + 41+28+31 测试 + MCP Chrome 28/28 PASS; 不新增 migration, 不改 FSRS/lifecycle/ReviewLog/ADR-0010/ADR-0011).
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -235,7 +235,7 @@
 | Anki-Queue-Order-1 | 新卡 / 学习中 / 到期卡的队列顺序与积压优先级形成明确、可测试的策略 | 📋 P2 计划中 |
 | Anki-CustomStudy-1 | 自定义学习会话：今日忘记、逾期、指定来源章节、已标记、遗忘卡；默认不改变正常队列，重排模式需单独确认 | 📋 P2 计划中 |
 | Anki-Stats-1 | 统计补齐：未来到期、复习耗时、间隔分布、稳定度、难度、可检索率、评分分布、真实保持率 | 📋 P2 计划中 |
-| Anki-Browser-Search-1 | 高级浏览器搜索语法：is:leech、is:suspended、rated:again、prop:lapses | 📋 P2 计划中 |
+| Anki-Browser-Search-1 | 高级浏览器搜索语法：is:leech、is:suspended、rated:again、prop:lapses | ✅ 已完成 (commit 待 push, ADR-0012, 纯函数 parser `ReviewCardBrowserSearchParser` + 只读 `ReviewCardBrowserSearchCriteria` + `ReviewCardBrowserSearchQueryApplier` 仅作用于已隔离 query + `InvalidBrowserSearchException` 结构化 422 + `search_meta` 响应字段; V1: is:leech/is:struggling/is:active/is:buried/is:suspended/is:archived (governance/lifecycle 分离, 同类冲突 422, 跨类合法) + rated:again/rated:hard (whereExists 强制 source=sense_review + undone_at IS NULL) + prop:lapses{=,>,>=,<,<=}<非负整数> (直接 WHERE fsrs_lapses); AND 组合, 不支持 OR/NOT/括号/日期/保存搜索/更多 prop/rated:good/rated:easy/新 migration; 普通文本继续 LIKE lemma/surface_form/sense_zh/sense_en/example_sentence_en; 页面 data + JSON/CSV/Anki TSV 导出共用同一 parser + QueryService; governance 分类每请求最多一次复用缓存 ID 无 N+1; 前端 chips + 帮助 + 具体错误 + 高级 token 自动切全部 + 不复制完整 parser; 41 parser 单元 + 28 feature + 31 前端 guard 测试全绿 + 回归套件全绿; MCP Chrome 28/28 PASS; 不改 FSRS/lifecycle/ReviewLog/ADR-0010/ADR-0011) |
 
 ### 4.5 释义卡 / 多例句 / 复习体验
 
