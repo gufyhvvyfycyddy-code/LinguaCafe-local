@@ -15,7 +15,6 @@ Sources reviewed (2026-07-13):
 - Anki repository: `proto/anki/decks.proto`, `proto/anki/scheduler.proto`, `rslib/src/scheduler/filtered/custom_study.rs`, `rslib/src/scheduler/answering/preview.rs`, `qt/aqt/customstudy.py`, `qt/aqt/filtered_deck.py`
 - Anki repository commit: `9863b2f142e9b65e90741ab450fcebfd00f3c6ba` (main branch, 2026-07-13)
 - Anki latest stable release: `26.05` (published 2026-06-16, tag `26.05`)
-- Anki release referenced in field reports: `26.05 (5d51ca02)`
 
 **Anki Custom Study presets** (from `custom_study.rs` `custom_study_inner` + `customstudy.py` `CustomStudyRequest`):
 
@@ -190,8 +189,8 @@ Token rules:
 3. Server re-validates `user_id` + `language` on every request (token is bound to issuer, not bearer-permissive).
 4. Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — if a card has become ineligible mid-session, it is silently skipped.
 5. Client cannot pass arbitrary `card_id` to bypass permission — the server always picks the next card from the token's `ready_queue` or `delayed_repeat_queue`.
-6. Every answer returns a **new encrypted token**; the old token is invalidated by the client discarding it. Stale responses that carry an old token are rejected by the client's stale-response guard.
-7. Even if an old token is replayed: no DB writes, no ReviewLog, no FSRS change, no lifecycle change — the replay can only form an independent preview branch that does not affect normal learning data.
+6. Every answer returns a **new encrypted token**; the previous token becomes **client-obsolete** — the client discards it and uses only the new token. The server does **not** maintain a session table and therefore **cannot** actively invalidate (revoke) old tokens. Old tokens are called **client-obsolete**, not server-invalidated. Stale responses that carry an old token are rejected by the client's stale-response guard.
+7. Even if a client-obsolete token is replayed: no DB writes, no ReviewLog, no FSRS change, no lifecycle change — the replay can only form an independent preview branch that does not affect normal learning data. Tampered or expired tokens are still rejected server-side (signature validation + `expires_at` check).
 8. No migration.
 9. No AI call.
 10. No ReviewLog.
@@ -349,16 +348,25 @@ If a future rescheduling mode writes ReviewLog, undo must be revisited in that m
 
 ### 12. Query budget
 
+The query budget is based on the **full candidate ID snapshot** model: the criteria query runs **once** at session creation to produce an ordered list of up to `card_limit` (max 500) candidate card IDs. This snapshot is stored inside the encrypted session-state token. Answer and resume do **not** re-run the full criteria query.
+
 | Operation | Queries | Notes |
 |---|---|---|
-| Create session (issue token) | 1-2 | criteria validation + candidate count (does not fetch full cards). |
-| Get next card | 2-4 | re-run criteria + eligibility + order + serialize. No N+1. |
-| `today_forgotten` | 1 ReviewLog query + 1 card query | batch by `review_card_id`. |
-| `overdue` | 1 card query | `fsrs_due_at` WHERE + eligibility scope. |
-| `source_chapter` | 1 WordSense/WordSenseOccurrence query + 1 card query | batch by `word_sense_id`. |
-| `leech_attention` | reuses `SenseReviewLeechQueryService` batch path | no Policy duplication, no N+1. |
+| Create session (issue token) | 1 criteria query + 1 card ID hydration | Executes the criteria query ONCE, fetches up to `card_limit` (max 500) ordered card IDs. Does NOT load full serializer payloads — only IDs + ordering. Only the first card (current_card) is fully serialized. |
+| Answer current card | 1 eligibility re-validation (batch window) | Re-validates the next candidate card's eligibility (user, language, target_type=sense, WordSense confirmed, lifecycle, fsrs_enabled). Does NOT re-run the full criteria query. Consecutive ineligible cards use a batch window to avoid N+1. |
+| Resume session | 1 eligibility re-validation (batch window) | Same as answer — re-validates the next candidate only. |
+| `today_forgotten` | 1 ReviewLog query + 1 card ID hydration | Batch by `review_card_id`. Runs at session creation only. |
+| `overdue` | 1 card query | `fsrs_due_at` WHERE + eligibility scope. Runs at session creation only. |
+| `source_chapter` | 1 WordSense/WordSenseOccurrence query + 1 card ID hydration | Batch by `word_sense_id`. Runs at session creation only. |
+| `leech_attention` | reuses `SenseReviewLeechQueryService` batch path | no Policy duplication, no N+1. Runs at session creation only. |
 
-The server never fetches the full candidate list on every "next card" — it fetches only enough to determine the next card (page size 1-2, ordered by the mode-specific override).
+Rules:
+1. The full criteria query runs **once** at session creation, fetching up to 500 ordered card IDs.
+2. The server does **not** load 500 full serializer payloads — only card IDs + ordering metadata go into the token.
+3. Only `current_card` is fully serialized (via `SenseReviewCardSerializerService`).
+4. Answer and resume do **not** re-run the full criteria query.
+5. Answer and resume re-validate the next candidate card's eligibility (user, language, target_type=sense, WordSense confirmed, lifecycle, fsrs_enabled) using a batch window to avoid N+1.
+6. The implementation plan must include a query-count test to verify the budget.
 
 ### 13. Rollback
 
@@ -396,6 +404,199 @@ The "marked" criterion from the original task spec is **preserved** as `Custom S
 - Does not use leech status as a marker proxy.
 - Records that no `flag`/`marker`/`tag` column or table exists today.
 - A future Card Marker ADR will define the schema and semantics.
+
+### 16. Frozen API contract — three routes
+
+Custom Study 1A exposes exactly **three** POST routes. All three require auth middleware (not admin-only). The full token is passed in the request body, never in the URL or query string.
+
+#### 16.1 Create session
+
+`POST /custom-study/sessions`
+
+Request body:
+- `mode` (preview-only in V1)
+- `parameters` (criteria + sub-mode + order override)
+- `card_limit` (default 100, min 1, max 500 — see §17)
+
+Response:
+- `token` (encrypted session-state token)
+- `session_id` (UUID v4, also inside the token)
+- `current_card` (fully serialized card, same shape as `/reviews/senses`)
+- `summary` (session summary: total_count, completed_count, etc.)
+- `expires_at` (ISO 8601, V1: 4 hours from creation)
+
+#### 16.2 Answer current card
+
+`POST /custom-study/sessions/answer`
+
+Request body:
+- `token` (the current encrypted session-state token)
+- `rating` (again / hard / good / easy)
+
+Response:
+- `refreshed_token` (new encrypted token with updated session state)
+- `current_card` (the next card, or null if session is complete)
+- `summary`
+- `wait_until` (ISO 8601, if delayed-repeat cards are pending and no card is ready)
+- `completed` (boolean — true when both ready_queue and delayed_repeat_queue are empty)
+
+#### 16.3 Resume / advance session
+
+`POST /custom-study/sessions/resume`
+
+Request body:
+- `token` (the current encrypted session-state token)
+
+Response:
+- `refreshed_token`
+- `current_card` (or null)
+- `summary`
+- `wait_until`
+- `completed`
+
+#### 16.4 Prohibited route patterns
+
+The following are **prohibited** and must NOT appear in the implementation:
+- `GET /custom-study/sessions/next` — no GET-based card advancement.
+- `exclude=card_id` as a query parameter — de-duplication is handled inside the token's session state, not via URL parameters.
+- Full token in the URL path or query string — the token is too large and sensitive for URL transport; it goes in the request body only.
+
+#### 16.5 Error responses
+
+All three routes share the same error contract:
+- Unauthenticated → `401`.
+- Tampered / expired token → `404` (not 403 — do not leak existence).
+- Token belonging to a different user → `404`.
+- Token belonging to a different language → `404`.
+- Invalid `criteria` / `rating` / `card_limit` → `422` with validation errors.
+
+### 17. V1 card_limit freeze
+
+The `card_limit` parameter controls how many candidate cards are fetched at session creation and stored in the encrypted token.
+
+| Constraint | Value | Reason |
+|---|---|---|
+| Default | 100 | Reasonable preview session size; keeps token size manageable. |
+| Minimum | 1 | A session must have at least one card. |
+| Maximum | 500 | Token size cap; 500 card IDs + session metadata is the practical limit for an encrypted token transported in a request body. |
+
+**Anki's default of 99,999 is NOT used.** Anki's 99,999 relies on a database-backed filtered deck that materializes cards on demand. LinguaCafe's V1 uses a stateless encrypted token containing the full ordered candidate ID snapshot, so 99,999 would produce an unusably large token.
+
+The `card_limit` validation:
+- `card_limit < 1` → 422.
+- `card_limit > 500` → 422.
+- `card_limit` not an integer → 422.
+- `card_limit` omitted → uses default 100.
+
+### 18. Session State invariants
+
+The session state inside the token MUST satisfy the following invariants. These are testable properties and the implementation plan must include unit tests for each.
+
+1. `current_card_id` must NOT simultaneously exist in `ready_queue` or `delayed_repeat_queue`.
+2. When creating a session, the first card is popped from `ready_queue` and becomes `current_card_id`.
+3. Each candidate card belongs to exactly one of: `current`, `ready`, `delayed`, `completed`, `skipped_ineligible`. No card is in two states at once.
+4. No card is lost and no card is duplicated across the five states.
+5. `completed_count` equals the number of cards in the `completed` state.
+6. After Good or Easy, `current_card_id` moves to `completed`.
+7. After Again or Hard, `current_card_id` moves to `delayed` (with an `available_at` timestamp).
+8. A card in `delayed` NEVER re-enters `ready_queue`.
+9. `wait_until` is the earliest `available_at` in `delayed_repeat_queue`, or null if `delayed_repeat_queue` is empty.
+10. On resume:
+    - If `current_card_id` is set: return the same current card.
+    - If `current_card_id` is null and `ready_queue` is non-empty: pop the first card from `ready_queue` as the new current card.
+    - If `ready_queue` is empty and a delayed card has reached `available_at`: pop the earliest-available delayed card as the new current card.
+    - If only un-delayed cards remain in `delayed_repeat_queue`: return `wait_until`, no current card.
+    - If all states are empty: `completed = true`.
+11. A card whose eligibility has failed (suspended, archived, un-confirmed, fsrs_disabled, wrong user/language) moves to `skipped_ineligible` and NEVER re-appears in the session.
+12. The session MUST be able to reliably end (reach `completed = true` or token expiry).
+
+### 19. File list (frozen for implementation plan)
+
+The implementation plan must include the following files. This list is authoritative — the implementation must not silently add or remove files without updating this ADR and the implementation plan.
+
+#### 19.1 Backend (create)
+
+- `app/CustomStudy/CustomStudySessionState.php` — value object holding the full session state (ordered_candidate_ids, ready_queue, delayed_repeat_queue, completed_count, total_count, current_card_id, step, preview_delay_config).
+- `app/CustomStudy/CustomStudyPreviewPolicy.php` — pure function: maps (current_state, rating) → (updated_state, wait_until). Again→delayed(60s), Hard→delayed(600s), Good→completed, Easy→completed.
+- `app/CustomStudy/CustomStudySessionTokenService.php` — signs, verifies, and rotates the encrypted session-state token. No DB.
+- `app/CustomStudy/CustomStudySessionService.php` — orchestrates: validate token → re-validate eligibility → apply PreviewPolicy → pick next card → rotate token. No write.
+- `app/CustomStudy/CustomStudySessionOrder.php` — pure function: mode-specific order override applied at session creation only.
+
+#### 19.2 Frontend (create)
+
+- `resources/js/components/CustomStudy/CustomStudy.vue` — top-level page component.
+- `resources/js/components/CustomStudy/CustomStudySession.vue` — session orchestration component (token management, answer/resume calls).
+- `resources/js/components/Senses/SenseStudyCard.vue` — shared card presentation component (see §20 for boundary).
+
+#### 19.3 Tests (create)
+
+Backend:
+- `tests/Unit/CustomStudy/CustomStudySessionStateTest.php`
+- `tests/Unit/CustomStudy/CustomStudyPreviewPolicyTest.php`
+- `tests/Unit/CustomStudy/CustomStudySessionTokenServiceTest.php`
+- `tests/Feature/CustomStudy/CustomStudyOpenSessionTest.php`
+- `tests/Feature/CustomStudy/CustomStudyAnswerTest.php`
+- `tests/Feature/CustomStudy/CustomStudyResumeTest.php`
+- `tests/Feature/CustomStudy/CustomStudyRoutesTest.php`
+
+Frontend (Node guard tests):
+- `tests/js/SenseStudyCardGuard.test.mjs`
+- `tests/js/CustomStudyPageGuard.test.mjs`
+- `tests/js/CustomStudySessionUiGuard.test.mjs`
+
+#### 19.4 Files NOT created (prohibited in 1A)
+
+- No migration file.
+- No `custom_study_sessions` DB table.
+- No `CustomStudyController` route file beyond the three routes in §16.
+- No `SenseStudyCard.vue` rating buttons (shared component is presentation-only — see §20).
+
+### 20. Shared card component boundary — SenseStudyCard.vue
+
+`SenseStudyCard.vue` is the shared presentation component used by both the normal sense review (`SenseReview.vue`) and Custom Study (`CustomStudySession.vue`). It renders the card face (question + answer) and is **presentation-only**.
+
+#### 20.1 Allowed responsibilities
+
+- Render `lemma` / `surface` / `pos`.
+- Render the question-side example sentence.
+- Render the Chinese and English sense definitions.
+- Render `aliases` / `collocations`.
+- Render supplementary example.
+- Render understanding aid.
+- Render learning feedback.
+- Emit `source-context` entry events (parent decides what to do).
+
+#### 20.2 Prohibited responsibilities
+
+- NO formal rating buttons (those belong to `SenseReviewRatingControls` in normal review, and to `CustomStudySession.vue` in Custom Study).
+- NO Custom Study four-button (Again/Hard/Good/Easy) — the parent container renders those.
+- NO lifecycle operations (suspend / archive / bury / restore).
+- NO axios requests.
+- NO ReviewLog writes.
+- NO FSRS interactions.
+- NO route navigation.
+- NO queue state management.
+
+#### 20.3 Props and events contract
+
+Props (input, read-only):
+- `card` — the serialized card object (same shape as `/reviews/senses` card).
+- `show-answer` — boolean, whether the answer side is visible.
+- `font-size` — number.
+
+Events (output, parent handles):
+- `reveal` — request to show the answer.
+- `view-source` — request to open the source-context dialog.
+
+The parent container (`SenseReview.vue` or `CustomStudySession.vue`) owns the rating buttons, lifecycle menu, undo, interval preview, and all backend communication.
+
+#### 20.4 Future extraction note
+
+The implementation plan must allow future modification of:
+- `resources/js/components/Senses/SenseReview.vue` — to extract the shared card face into `SenseStudyCard.vue`.
+- Existing related guard tests — to reflect the extraction.
+
+However, the actual component extraction is NOT done in 1A — it is deferred to the implementation round. This ADR only freezes the boundary.
 
 ## Prohibited scope (this ADR)
 
@@ -439,5 +640,10 @@ This ADR is "architecture complete" when:
 13. It documents rollback (§13).
 14. It documents the V1 boundary (§14).
 15. It documents the marker follow-up (§15).
+16. It freezes the three API routes and error contract (§16).
+17. It freezes the V1 card_limit (default 100, min 1, max 500) (§17).
+18. It defines the 12 Session State invariants (§18).
+19. It freezes the file list for the implementation plan (§19).
+20. It defines the shared component boundary for SenseStudyCard.vue (§20).
 
-All 15 are satisfied. The accompanying implementation plan `docs/plans/custom-study-1a-implementation-plan.md` defines the TDD breakdown for a future authorized implementation round.
+All 20 are satisfied. The accompanying implementation plan `docs/plans/custom-study-1a-implementation-plan.md` defines the TDD breakdown for a future authorized implementation round.

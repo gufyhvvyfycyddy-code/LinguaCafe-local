@@ -77,7 +77,7 @@ ADR-0009 stack-based undo does NOT apply. Preview sessions write no ReviewLog; "
 
 ### Token payload (V1: rotating session-state token, 4-hour expiry)
 - `version`, `user_id`, `language`, `mode` (preview-only), `parameters` (criteria + sub-mode + order override), `session_id` (UUID v4), `issued_at`, `expires_at`
-- `ordered_candidate_ids` (ordered snapshot of candidate card IDs at session creation)
+- `ordered_candidate_ids` (ordered snapshot of candidate card IDs at session creation — up to `card_limit` max 500)
 - `ready_queue` (card IDs not yet answered, in session order)
 - `delayed_repeat_queue` (card IDs that received Again/Hard, with `available_at` timestamps)
 - `completed_count`, `total_count`, `current_card_id`, `step`
@@ -86,9 +86,24 @@ ADR-0009 stack-based undo does NOT apply. Preview sessions write no ReviewLog; "
 - Server re-validates `user_id` + `language` on every request.
 - Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — ineligible cards silently skipped.
 - Client cannot pass arbitrary `card_id` — server always picks next from token's `ready_queue` or `delayed_repeat_queue`.
-- Every answer returns a **new encrypted token**; old token discarded by client. Stale responses with old token rejected by client stale-response guard.
-- Token stored in `sessionStorage` (not `localStorage`). URL carries only `session_id` or route info.
+- Every answer returns a **new encrypted token**; the previous token becomes **client-obsolete** — the client discards it and uses only the new token. The server does NOT maintain a session table and cannot actively invalidate old tokens. Stale responses with old token rejected by client stale-response guard.
+- Token stored in `sessionStorage` (not `localStorage`). URL carries only `session_id` or route info. Full token goes in request body only — never in URL or query string.
 - **No A→B→A loop**: `ready_queue` consumed in order; Again/Hard moves card to `delayed_repeat_queue` (not back to `ready_queue`); Good/Easy completes card. Session ends when both queues empty.
+
+### V1 card_limit freeze
+- Default: 100.
+- Minimum: 1.
+- Maximum: 500.
+- Anki's 99,999 default is NOT used (relies on DB filtered deck; LinguaCafe uses stateless encrypted token).
+- `card_limit < 1` → 422. `card_limit > 500` → 422. Non-integer → 422. Omitted → default 100.
+
+### Three frozen API routes (see ADR-0016 §16)
+1. `POST /custom-study/sessions` — create session. Request: `{ mode, parameters, card_limit }`. Response: `{ token, session_id, current_card, summary, expires_at }`.
+2. `POST /custom-study/sessions/answer` — answer current card. Request: `{ token, rating }`. Response: `{ refreshed_token, current_card, summary, wait_until, completed }`.
+3. `POST /custom-study/sessions/resume` — resume/advance session. Request: `{ token }`. Response: `{ refreshed_token, current_card, summary, wait_until, completed }`.
+
+Prohibited: `GET /custom-study/sessions/next`, `exclude=card_id`, full token in URL/query string.
+All three routes: auth middleware, not admin-only. 401 unauthenticated. 404 tampered/expired/wrong user/wrong language. 422 invalid criteria/rating/card_limit.
 
 ---
 
@@ -223,19 +238,20 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 #### Task CS-8: `CustomStudySessionService` — `openSession`
 **Test first**: `tests/Feature/CustomStudyOpenSessionTest.php`
-- POST `/custom-study/sessions` with valid criteria → 200 + `{ token, first_card, summary }`.
-- Calls `CustomStudyCriteriaValidator` → `CustomStudyQueryService` (per mode) → `CustomStudySessionTokenService::issue()`.
-- `first_card` is serialized via `SenseReviewCardSerializerService` (same shape as `/reviews/senses`).
-- `summary` includes `{ total_candidates, mode, expires_at }`.
+- POST `/custom-study/sessions` with valid criteria → 200 + `{ token, session_id, current_card, summary, expires_at }`.
+- Calls `CustomStudyCriteriaValidator` → `CustomStudyQueryService` (per mode) → `CustomStudySessionState` (populates ordered_candidate_ids + ready_queue from criteria query) → `CustomStudySessionTokenService::issue()`.
+- `current_card` is serialized via `SenseReviewCardSerializerService` (same shape as `/reviews/senses`).
+- `summary` includes `{ total_candidates, mode, completed_count, total_count }`.
 - 422 on invalid criteria (structured errors, no partial save).
 - 401 if not authenticated.
 - 404 if chapter does not belong to user + language (do NOT leak existence).
 - Does NOT write ReviewLog.
 - Does NOT modify ReviewCard / lifecycle / FSRS.
 - Does NOT call AI.
-- Query budget: 1-2 (validate) + 1-2 (query candidates, page size 1-2) ≤ 4 total.
+- Query budget (per ADR-0016 §12): criteria query runs ONCE at session creation, fetching up to `card_limit` (max 500) ordered card IDs in a single batched query. Does NOT load 500 full serializer payloads — only the current card is serialized. answer / resume do NOT re-run the full criteria query; they only re-validate the next candidate's eligibility via a batched window (no per-card N+1).
+- `card_limit` validation: default 100, min 1, max 500. `card_limit < 1` → 422. `card_limit > 500` → 422. Non-integer → 422. Omitted → default 100.
 
-**Then implement**: `app/Services/CustomStudy/CustomStudySessionService.php` + `app/Http/Controllers/CustomStudyController.php` (open action only)
+**Then implement**: `app/Services/CustomStudy/CustomStudySessionState.php` + `app/Services/CustomStudy/CustomStudySessionService.php` + `app/Http/Controllers/CustomStudyController.php` (open action only)
 
 **Tests count**: ~10
 
@@ -263,6 +279,29 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 **Then implement**: `app/Services/CustomStudy/CustomStudyPreviewPolicy.php` + extend `CustomStudySessionService` + `CustomStudyController` (answer action)
 
 **Tests count**: ~18
+
+#### Task CS-9.5: `CustomStudySessionService` — `resume` (rotating token)
+**Test first**: `tests/Feature/CustomStudyResumeTest.php`
+- POST `/custom-study/sessions/resume` with `{ token }` → 200 + `{ refreshed_token, current_card, summary, wait_until, completed }`.
+- Re-validates token (user, language, expiry, version).
+- Resume semantics (per ADR-0016 §18 invariant 10):
+  - If session has `current_card_id` → returns the same current card.
+  - If no current card and `ready_queue` non-empty → pops front of `ready_queue` as new current card.
+  - If `ready_queue` empty and a delayed card's `available_at` has passed → pops earliest-available delayed card as new current card.
+  - If only un-ready delayed cards remain → `{ current_card: null, wait_until: <earliest available_at>, completed: false }`.
+  - If all queues empty and no current card → `{ completed: true, current_card: null }`.
+- Re-validates the next candidate's eligibility (confirmed sense, lifecycle, fsrs_enabled) via batched window before showing — ineligible cards move to `skipped_ineligible`, do NOT reappear.
+- Returns new encrypted `refreshed_token` with updated session state.
+- 401/404 on invalid token (tampered / expired / wrong user / wrong language).
+- 422 only if token payload is structurally malformed (not for normal resume).
+- Does NOT write anything.
+- Does NOT call AI.
+- Does NOT re-run the full criteria query (uses the ordered_candidate_ids snapshot from the token).
+- Uses injected clock in tests (no real sleep).
+
+**Then implement**: extend `CustomStudySessionService` (resume action) + `CustomStudyController` (resume action)
+
+**Tests count**: ~12
 
 #### Task CS-10: Session-internal ordering
 **Test first**: `tests/Unit/CustomStudySessionOrderTest.php`
@@ -316,7 +355,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `current_card === null && wait_until` shows countdown to next available card.
 - "Exit session" button navigates back (no API call — preview-only, nothing to clean up).
 - Token stored in `sessionStorage` (NOT `localStorage`). URL carries only `session_id`.
-- Refresh recovers from `sessionStorage` via `GET /custom-study/sessions/resume`.
+- Refresh recovers from `sessionStorage` via `POST /custom-study/sessions/resume` with `{ token }` in request body.
 - Explicit text: "本次为临时预览学习，不会改变正式复习进度。"
 - No external AI call.
 
@@ -329,15 +368,20 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 #### Task CS-13: Routes + middleware
 **Test first**: `tests/Feature/CustomStudyRoutesTest.php`
 - `POST /custom-study/sessions` requires auth.
-- `GET /custom-study/sessions/next` requires auth.
+- `POST /custom-study/sessions/answer` requires auth.
+- `POST /custom-study/sessions/resume` requires auth.
 - Routes registered in `routes/web.php` inside `auth` middleware group.
 - No admin-only restriction (any authenticated user can use Custom Study).
-- 405 on wrong method.
+- 405 on wrong method (e.g., GET on any of the three routes).
+- 401 unauthenticated.
+- 404 tampered / expired / wrong user / wrong language token.
+- 422 invalid criteria / rating / card_limit.
 - No new middleware added.
+- Prohibited routes do NOT exist: `GET /custom-study/sessions/next`, `exclude=card_id` query param.
 
-**Then implement**: add 2 routes to `routes/web.php`.
+**Then implement**: add 3 routes to `routes/web.php`.
 
-**Tests count**: ~6
+**Tests count**: ~8
 
 ### Phase 7: Regression and full suite
 
@@ -363,6 +407,8 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `app/Services/CustomStudy/Queries/OverdueQuery.php`
 - `app/Services/CustomStudy/Queries/SourceChapterQuery.php`
 - `app/Services/CustomStudy/Queries/LeechAttentionQuery.php`
+- `app/Services/CustomStudy/CustomStudySessionState.php`
+- `app/Services/CustomStudy/CustomStudyPreviewPolicy.php`
 - `app/Services/CustomStudy/CustomStudySessionTokenService.php`
 - `app/Services/CustomStudy/CustomStudySessionService.php`
 - `app/Services/CustomStudy/CustomStudySessionOrder.php`
@@ -370,15 +416,21 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `app/Exceptions/CustomStudyValidationException.php`
 
 ### Backend — modify (extend only)
-- `routes/web.php` — add 2 routes inside `auth` group.
+- `routes/web.php` — add 3 routes inside `auth` group (`POST /custom-study/sessions`, `POST /custom-study/sessions/answer`, `POST /custom-study/sessions/resume`).
 
 ### Frontend — create
 - `resources/js/components/CustomStudy/CustomStudy.vue`
 - `resources/js/components/CustomStudy/CustomStudySession.vue`
+- `resources/js/components/Senses/SenseStudyCard.vue` (shared presentation component — see ADR-0016 §20)
+
+### Frontend — modify (SenseStudyCard extraction only)
+- `resources/js/components/Senses/SenseReview.vue` — refactor to use `SenseStudyCard.vue` for shared card presentation. Must preserve observable behavior (existing guard tests + MCP Chrome regression must pass). No changes to normal sense review rating logic, undo, interval preview, or lifecycle operations.
 
 ### Tests — create
 - `tests/Unit/CustomStudyCriteriaTest.php`
 - `tests/Unit/CustomStudyCriteriaValidatorTest.php`
+- `tests/Unit/CustomStudySessionStateTest.php`
+- `tests/Unit/CustomStudyPreviewPolicyTest.php`
 - `tests/Unit/CustomStudySessionTokenServiceTest.php`
 - `tests/Unit/CustomStudySessionOrderTest.php`
 - `tests/Feature/CustomStudyTodayForgottenQueryTest.php`
@@ -387,8 +439,10 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `tests/Feature/CustomStudyLeechAttentionQueryTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
 - `tests/Feature/CustomStudyAnswerTest.php`
+- `tests/Feature/CustomStudyResumeTest.php`
 - `tests/Feature/CustomStudyRoutesTest.php`
 - `tests/js/CustomStudyPageGuard.test.mjs`
+- `tests/js/SenseStudyCardGuard.test.mjs`
 - `tests/js/CustomStudySessionUiGuard.test.mjs`
 
 ### Docs — create/modify
@@ -416,7 +470,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - `app/Models/WordSense.php` (no schema change).
 - `app/Models/WordSenseOccurrence.php` (no schema change).
 - Any FSRS-related file (`app/Services/Fsrs*`).
-- `resources/js/components/Senses/SenseReview.vue` (no changes to normal sense review).
+- `resources/js/components/Senses/SenseReview.vue` — **exception**: only the SenseStudyCard extraction refactor is allowed (see "Frontend — modify" above). No changes to normal sense review rating logic, undo, interval preview, lifecycle operations, or error recovery. All existing SenseReview guard tests + MCP Chrome regression must pass.
 - `resources/js/components/Review/Review.vue` (no changes to legacy review).
 - `app/Http/Controllers/ReviewController.php` (no changes).
 - `app/Http/Controllers/SenseReviewController.php` (no changes).
@@ -434,16 +488,19 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 |---|---|---|---|
 | `CustomStudyCriteriaTest` | Unit | ~10 | fromArray, toArray, invalid mode, missing params, unknown keys ignored, immutable |
 | `CustomStudyCriteriaValidatorTest` | Unit | ~12 | user/language/mode validation, chapter ownership, sub_mode, returns criteria or throws |
-| `CustomStudySessionTokenServiceTest` | Unit | ~12 | issue, verify valid, tampered, expired, wrong user, wrong language, wrong version, payload shape, 4h expiry, UUID nonce |
+| `CustomStudySessionStateTest` | Unit | ~14 | current_card_id exclusivity (invariant 1), state transitions (invariants 6-8), no loss/duplication (invariant 4), completed_count consistency (invariant 5), skipped_ineligible (invariant 11), reliable ending (invariant 12) |
+| `CustomStudyPreviewPolicyTest` | Unit | ~10 | again→delayed(60s), hard→delayed(600s), good→completed, easy→completed, wait_until computation, no re-enter ready, pure function |
+| `CustomStudySessionTokenServiceTest` | Unit | ~12 | issue, verify valid, tampered, expired, wrong user, wrong language, wrong version, payload shape, 4h expiry, UUID nonce, token size cap |
 | `CustomStudySessionOrderTest` | Unit | ~10 | per-mode order, fallback to Queue Order, deterministic, no global setting change |
 | `CustomStudyTodayForgottenQueryTest` | Feature | ~9 | source/rating/undone_at filter, day boundary via ReviewStudyTimezoneService, eligibility, confirmed sense, no write, query count |
 | `CustomStudyOverdueQueryTest` | Feature | ~7 | strict < dayStart, eligibility, confirmed sense, empty, no write, query count |
 | `CustomStudySourceChapterQueryTest` | Feature | ~9 | source_chapter_id match, occurrence match, distinct, no leakage, no per-card query, eligibility, no write |
 | `CustomStudyLeechAttentionQueryTest` | Feature | ~8 | leech_only, leech_plus_struggling, reuse SenseReviewLeechQueryService, no Policy duplication, eligibility, no auto-add suspended, no write |
-| `CustomStudyOpenSessionTest` | Feature | ~10 | 200 + token + first_card + summary, 422 invalid, 401 unauth, 404 chapter not owned, no ReviewLog, no lifecycle change, no FSRS change, no AI, query budget |
+| `CustomStudyOpenSessionTest` | Feature | ~10 | 200 + token + session_id + current_card + summary + expires_at, card_limit validation (422 for <1, >500, non-integer), 422 invalid criteria, 401 unauth, 404 chapter not owned, no ReviewLog, no lifecycle change, no FSRS change, no AI, query budget (criteria query ONCE) |
 | `CustomStudyAnswerTest` | Feature | ~18 | 200 + refreshed_token, preview policy (again/hard/good/easy), rotating token, no A→B→A loop, wait_until, completed, 401/404, 422, no write, no AI, injected clock |
-| `CustomStudyRoutesTest` | Feature | ~6 | POST/GET require auth, registered in auth group, not admin-only, 405 wrong method, no new middleware |
-| **Subtotal** | | **~104** | |
+| `CustomStudyResumeTest` | Feature | ~12 | resume semantics (invariant 10: current card / ready pop / delayed pop / wait_until / completed), batched eligibility re-validation, no criteria re-query, 401/404, no write, no AI |
+| `CustomStudyRoutesTest` | Feature | ~8 | 3 POST routes require auth, registered in auth group, not admin-only, 405 wrong method, 401 unauth, 404 bad token, 422 invalid input, no GET /next route exists, no exclude param |
+| **Subtotal** | | **~139** | |
 
 ## Frontend guard test matrix
 
@@ -474,15 +531,16 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 ### Page 2: Session in progress
 1. First card matches the criteria.
-2. "Next" advances to the next card in mode-specific order.
-3. Card display identical to normal sense review (same serializer).
-4. Refresh preserves session (token in URL).
+2. Four rating buttons (Again / Hard / Good / Easy) call `POST /custom-study/sessions/answer` with `{ token, rating }` in request body — advances to the next card in mode-specific order.
+3. Card display identical to normal sense review (same serializer, shared SenseStudyCard component).
+4. Refresh preserves session: token read from `sessionStorage`, recovery via `POST /custom-study/sessions/resume` with `{ token }` in request body (NOT in URL/query string).
 5. "Exit session" returns to home.
 6. No ReviewLog written (verify via DB before/after).
 7. No lifecycle change (verify via DB).
 8. No FSRS change (verify via DB).
 9. Console: no errors.
 10. Network: no external AI request.
+11. Network: no `GET /custom-study/sessions/next` request, no `exclude=` query param, no token in URL.
 
 ### Page 3: After session exit
 1. Normal `/reviews/senses` queue is unchanged.
@@ -523,22 +581,29 @@ Suggested commits (do NOT use `git add -A` or `git add .` — stage files explic
 - `tests/Feature/CustomStudySourceChapterQueryTest.php`
 - `tests/Feature/CustomStudyLeechAttentionQueryTest.php`
 
-### Commit 2: `feat: add custom study session token and orchestration`
+### Commit 2: `feat: add custom study session state, policy, token and orchestration`
+- `app/Services/CustomStudy/CustomStudySessionState.php`
+- `app/Services/CustomStudy/CustomStudyPreviewPolicy.php`
 - `app/Services/CustomStudy/CustomStudySessionTokenService.php`
 - `app/Services/CustomStudy/CustomStudySessionService.php`
 - `app/Services/CustomStudy/CustomStudySessionOrder.php`
 - `app/Http/Controllers/CustomStudyController.php`
-- `routes/web.php` (2 routes added)
-- `app/Exceptions/CustomStudyValidationException.php` (if not in commit 1)
+- `routes/web.php` (3 routes added: `POST /custom-study/sessions`, `POST /custom-study/sessions/answer`, `POST /custom-study/sessions/resume`)
+- `tests/Unit/CustomStudySessionStateTest.php`
+- `tests/Unit/CustomStudyPreviewPolicyTest.php`
 - `tests/Unit/CustomStudySessionTokenServiceTest.php`
 - `tests/Unit/CustomStudySessionOrderTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
 - `tests/Feature/CustomStudyAnswerTest.php`
+- `tests/Feature/CustomStudyResumeTest.php`
 - `tests/Feature/CustomStudyRoutesTest.php`
 
-### Commit 3: `feat: add custom study frontend page and session ui`
+### Commit 3: `feat: add custom study frontend page, session ui and shared card component`
+- `resources/js/components/Senses/SenseStudyCard.vue` (shared presentation component)
 - `resources/js/components/CustomStudy/CustomStudy.vue`
 - `resources/js/components/CustomStudy/CustomStudySession.vue`
+- `resources/js/components/Senses/SenseReview.vue` (refactor to use SenseStudyCard — behavior-preserving)
+- `tests/js/SenseStudyCardGuard.test.mjs`
 - `tests/js/CustomStudyPageGuard.test.mjs`
 - `tests/js/CustomStudySessionUiGuard.test.mjs`
 
