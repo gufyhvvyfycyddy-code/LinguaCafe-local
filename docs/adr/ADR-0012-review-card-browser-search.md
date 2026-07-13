@@ -169,6 +169,13 @@ All four consumers — `data()`, `export()` (JSON), `exportAnkiTsv()`,
 
 This guarantees identical query semantics across page and all exports.
 
+> **Task 2000-6 fix**: `exportAnkiTsv()` and `exportCsv()` declare return type
+> `\Symfony\Component\HttpFoundation\Response` (the common parent of
+> `Illuminate\Http\Response` and `JsonResponse`) so that structured 422 JSON
+> responses for invalid grammar and export-limit-exceeded are returned without
+> PHP TypeError. CSV and TSV file responses continue to return 200 with
+> `Content-Type` and `X-Export-Count` headers.
+
 ### 13. Performance and query budget
 
 | Condition | Query cost |
