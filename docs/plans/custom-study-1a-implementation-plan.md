@@ -326,7 +326,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 - Imports `VSelect`, `VCard`, `VBtn` from Vuetify (no global Vue UI framework import).
 - No `axios.get('/custom-study/sessions')` outside of methods (must be in a named method, not inline).
 - No `Math.random()` for card selection.
-- No `localStorage` for token storage (token goes in URL query or Vuex, NOT localStorage — security rule).
+- No `localStorage` for token storage (token is stored in sessionStorage for the current tab. The full token never appears in the URL, route params, or query string. The URL may contain only session_id or ordinary route information. Do NOT use localStorage or Vuex for the full token.)
 - No `eval`, no `v-html` with user input.
 
 **Then implement**: `resources/js/components/CustomStudy/CustomStudy.vue` — criteria selector (4 modes) + sub-mode selector for `leech_attention` + chapter picker for `source_chapter` + "Start session" button.
@@ -490,7 +490,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 | `CustomStudyCriteriaValidatorTest` | Unit | ~12 | user/language/mode validation, chapter ownership, sub_mode, returns criteria or throws |
 | `CustomStudySessionStateTest` | Unit | ~14 | current_card_id exclusivity (invariant 1), state transitions (invariants 6-8), no loss/duplication (invariant 4), completed_count consistency (invariant 5), skipped_ineligible (invariant 11), reliable ending (invariant 12) |
 | `CustomStudyPreviewPolicyTest` | Unit | ~10 | again→delayed(60s), hard→delayed(600s), good→completed, easy→completed, wait_until computation, no re-enter ready, pure function |
-| `CustomStudySessionTokenServiceTest` | Unit | ~12 | issue, verify valid, tampered, expired, wrong user, wrong language, wrong version, payload shape, 4h expiry, UUID nonce, token size cap |
+| `CustomStudySessionTokenServiceTest` | Unit | ~12 | issue, verify valid, tampered, expired, wrong user, wrong language, wrong version, payload shape, 4h expiry, UUID v4 session_id, token size cap |
 | `CustomStudySessionOrderTest` | Unit | ~10 | per-mode order, fallback to Queue Order, deterministic, no global setting change |
 | `CustomStudyTodayForgottenQueryTest` | Feature | ~9 | source/rating/undone_at filter, day boundary via ReviewStudyTimezoneService, eligibility, confirmed sense, no write, query count |
 | `CustomStudyOverdueQueryTest` | Feature | ~7 | strict < dayStart, eligibility, confirmed sense, empty, no write, query count |
