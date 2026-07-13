@@ -69,6 +69,7 @@ class ReviewController extends Controller {
         $language = Auth::user()->selected_language;
         $reviewCardId = $request->post('reviewCardId');
         $rating = $request->post('rating');
+        $ignoreDailyLimits = $request->post('ignoreDailyLimits', $request->post('ignore_daily_limits', false));
 
         try {
             $card = $this->reviewCardService->recordReview($userId, $language, $reviewCardId, $rating);
@@ -76,6 +77,25 @@ class ReviewController extends Controller {
             abort(500, $e->getMessage());
         }
 
-        return response()->json($card, 200);
+        // ADR-0015 V1: return next_card and summary using the same Queue Order
+        // path as /reviews/senses so the legacy endpoint no longer needs any
+        // frontend random selection.
+        $result = $this->reviewService->getReviewItems(
+            $userId,
+            $language,
+            -1,
+            -1,
+            false,
+            config('linguacafe.languages.languages_without_spaces'),
+            $ignoreDailyLimits
+        );
+
+        $nextCard = !empty($result['reviews']) ? $result['reviews'][0] : null;
+
+        return response()->json([
+            'reviewed_card' => $card,
+            'next_card' => $nextCard,
+            'summary' => $result['summary'],
+        ], 200);
     }
 }

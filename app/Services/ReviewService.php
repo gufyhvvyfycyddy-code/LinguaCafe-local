@@ -37,8 +37,9 @@ class ReviewService {
             $reviews[] = (object) $serialized;
         }
 
-        // 随机顺序
-        shuffle($reviews);
+        // ADR-0015 V1: Queue Order is applied by SenseReviewService via
+        // ReviewQueueOrderService. No shuffle here — the order is deterministic
+        // and matches /reviews/senses.
 
         return [
             'reviews' => $reviews,

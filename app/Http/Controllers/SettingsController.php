@@ -203,6 +203,35 @@ class SettingsController extends Controller
     }
 
     /**
+     * Get Queue Order configuration (ADR-0015 V1).
+     */
+    public function getFsrsQueueOrder() {
+        return response()->json(
+            $this->settingsService->getFsrsQueueOrder(),
+            200
+        );
+    }
+
+    /**
+     * Update Queue Order configuration (ADR-0015 V1).
+     */
+    public function updateFsrsQueueOrder(Request $request) {
+        $input = $request->post();
+
+        try {
+            $result = $this->settingsService->updateFsrsQueueOrder($input);
+            $result['success'] = true;
+            return response()->json($result, 200);
+        } catch (\App\Exceptions\QueueOrderValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'errors' => $e->getErrors(),
+            ], 422);
+        }
+    }
+
+    /**
      * Retention workload simulator.
      *
      * Simulates today and next-7-days due counts for 85%/90%/93%/95%

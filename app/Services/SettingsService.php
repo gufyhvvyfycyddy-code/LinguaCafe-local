@@ -848,6 +848,118 @@ class SettingsService {
         return $this->getFsrsDailyLimits();
     }
 
+    /**
+     * Get Queue Order configuration (ADR-0015 V1).
+     *
+     * Returns defaults when no settings are saved yet.
+     * Reads 4 global settings (user_id = -1):
+     *   - fsrs_queue_interday_learning_review_order
+     *   - fsrs_queue_new_review_order
+     *   - fsrs_queue_review_sort_order
+     *   - fsrs_queue_new_sort_order
+     *
+     * @return array{
+     *     interday_learning_review_order: string,
+     *     new_review_order: string,
+     *     review_sort_order: string,
+     *     new_sort_order: string,
+     *     scope: string,
+     *     preset_supported: bool
+     * }
+     */
+    public function getFsrsQueueOrder(): array
+    {
+        $options = $this->loadQueueOrderOptions();
+        return $options->toArray();
+    }
+
+    /**
+     * Save Queue Order configuration (ADR-0015 V1).
+     *
+     * Validates input via ReviewQueueOrderOptions::fromArray(). Invalid enums
+     * throw QueueOrderValidationException — no partial save.
+     * Unknown keys are silently ignored.
+     *
+     * @param array $input  associative array with any of the 4 Queue Order keys
+     * @return array  the full Queue Order config after save
+     * @throws \App\Exceptions\QueueOrderValidationException
+     */
+    public function updateFsrsQueueOrder(array $input): array
+    {
+        // Map API key names → setting column names
+        $keyMap = [
+            'interday_learning_review_order' => 'fsrs_queue_interday_learning_review_order',
+            'new_review_order' => 'fsrs_queue_new_review_order',
+            'review_sort_order' => 'fsrs_queue_review_sort_order',
+            'new_sort_order' => 'fsrs_queue_new_sort_order',
+        ];
+
+        // Validate each provided key against the allowed enums.
+        $errors = [];
+        $apiToAllowed = [
+            'interday_learning_review_order' => ReviewQueueOrderOptions::ALLOWED_INTERDAY,
+            'new_review_order' => ReviewQueueOrderOptions::ALLOWED_NEW_REVIEW,
+            'review_sort_order' => ReviewQueueOrderOptions::ALLOWED_REVIEW_SORT,
+            'new_sort_order' => ReviewQueueOrderOptions::ALLOWED_NEW_SORT,
+        ];
+
+        foreach ($apiToAllowed as $apiName => $allowed) {
+            if (array_key_exists($apiName, $input) && !in_array($input[$apiName], $allowed, true)) {
+                $errors[$apiName] = '此值不在允许的选项中。';
+            }
+        }
+
+        if (!empty($errors)) {
+            throw new \App\Exceptions\QueueOrderValidationException($errors);
+        }
+
+        // Validation passed — write only the keys that were provided in input.
+        // Keys not in input keep their current saved value (or default if never saved).
+        foreach ($keyMap as $apiName => $columnName) {
+            if (array_key_exists($apiName, $input)) {
+                $this->upsertGlobalSetting($columnName, $input[$apiName]);
+            }
+        }
+
+        return $this->getFsrsQueueOrder();
+    }
+
+    /**
+     * Load current Queue Order options, falling back to defaults.
+     */
+    private function loadQueueOrderOptions(): ReviewQueueOrderOptions
+    {
+        $keys = [
+            'interday_learning_review_order' => 'fsrs_queue_interday_learning_review_order',
+            'new_review_order' => 'fsrs_queue_new_review_order',
+            'review_sort_order' => 'fsrs_queue_review_sort_order',
+            'new_sort_order' => 'fsrs_queue_new_sort_order',
+        ];
+
+        $rows = Setting::where('user_id', -1)
+            ->whereIn('name', array_values($keys))
+            ->get()
+            ->keyBy('name');
+
+        $data = [];
+        foreach ($keys as $apiName => $columnName) {
+            $row = $rows->get($columnName);
+            if ($row) {
+                $decoded = json_decode($row->value, true);
+                $data[$apiName] = is_string($decoded) ? $decoded : $row->value;
+            }
+        }
+
+        // fromArray applies defaults for missing keys and validates present ones.
+        // Stored values were validated before saving, so they should always be valid.
+        try {
+            return ReviewQueueOrderOptions::fromArray($data);
+        } catch (\InvalidArgumentException $e) {
+            // Defensive: a stale/invalid row slipped through. Fall back to defaults.
+            return ReviewQueueOrderOptions::defaults();
+        }
+    }
+
     public function restoreFsrsDefaultParameters(): array
     {
         $keys = [

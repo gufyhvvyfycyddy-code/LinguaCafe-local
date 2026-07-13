@@ -819,7 +819,12 @@
                 }, this.transitionDuration);
 
                 this.finishedReviews ++;
-                this.currentReviewIndex = Math.floor(Math.random() * this.reviews.length);
+                // ADR-0015 V1: 后端已按 Queue Order 排序返回 reviews，
+                // 前端不再自己随机选择下一张。始终使用队列第一张（index 0）。
+                // 评分后 rateReview 会 splice 掉刚评过的卡，因此 index 0 自然
+                // 变成队列中的下一张。这保证 /reviews 与 /reviews/senses 两个
+                // 入口返回相同的卡顺序。
+                this.currentReviewIndex = 0;
 
                 this.exampleSentence = null;
                 this.sourceFallbackDialog = false;

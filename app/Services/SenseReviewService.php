@@ -12,6 +12,7 @@ class SenseReviewService
         private SenseReviewQueryService $senseReviewQueryService,
         private ReviewLimitSummaryService $reviewLimitSummaryService,
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
+        private ReviewQueueOrderService $reviewQueueOrderService,
     ) {
     }
     /**
@@ -54,8 +55,25 @@ class SenseReviewService
 
     public function nextDueCard(int $userId, string $language): ?array
     {
-        $card = $this->dueCards($userId, $language)->first();
+        $cards = $this->dueCards($userId, $language);
+        if ($cards->isEmpty()) {
+            return null;
+        }
 
+        // Apply Queue Order to get the proper first card
+        $options = $this->settingsService->getFsrsQueueOrder();
+        $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($options);
+        $timezone = config('app.timezone', 'UTC');
+        $ordered = $this->reviewQueueOrderService->order(
+            $cards,
+            $userId,
+            $language,
+            $timezone,
+            Carbon::now(),
+            $queueOptions
+        );
+
+        $card = $ordered->first();
         return $card ? $this->senseReviewCardSerializerService->serialize($card) : null;
     }
 
@@ -90,7 +108,12 @@ class SenseReviewService
     }
 
     /**
-     * Get due sense review cards with daily limits applied.
+     * Get due sense review cards with daily limits and Queue Order applied.
+     *
+     * ADR-0015 V1: The Queue Order is applied via ReviewQueueOrderService,
+     * which is the single canonical entry point for queue ordering.
+     * Both /reviews/senses and /reviews share this code path, ensuring
+     * identical card id order for the same user/language/time/settings.
      *
      * @return array{cards: \Illuminate\Support\Collection, summary: array}
      */
@@ -112,20 +135,28 @@ class SenseReviewService
         // Count today's reviewed sense cards
         $reviewedTodayCount = $this->reviewedTodayCount($userId, $language);
         $remainingReviewSlots = max(0, $reviewLimit - $reviewedTodayCount);
-        $limitReached = false;
-        $hiddenDueCount = 0;
-        $hiddenByReviewLimit = 0;
-        $hiddenByNewLimit = 0;
 
-        // If ignoreDailyLimits, return all cards
+        // Apply Queue Order (ADR-0015 V1) — single canonical ordering entry point
+        $queueOptionsArray = $this->settingsService->getFsrsQueueOrder();
+        $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($queueOptionsArray);
+        $timezone = config('app.timezone', 'UTC');
+        $now = Carbon::now();
+        $orderedCards = $this->reviewQueueOrderService->order(
+            $allCards,
+            $userId,
+            $language,
+            $timezone,
+            $now,
+            $queueOptions
+        );
+
+        // If ignoreDailyLimits, return all cards in queue order
         if ($ignoreDailyLimits) {
-            $visibleCards = $allCards;
-
             return [
-                'cards' => $visibleCards,
+                'cards' => $orderedCards,
                 'summary' => $this->reviewLimitSummaryService->build(
                     totalDueCount: $totalDueCount,
-                    visibleCount: $visibleCards->count(),
+                    visibleCount: $orderedCards->count(),
                     reviewedTodayCount: $reviewedTodayCount,
                     remainingReviewSlots: $remainingReviewSlots,
                     reviewLimit: $reviewLimit,
@@ -143,59 +174,105 @@ class SenseReviewService
             ];
         }
 
-        // Split into new cards and known cards (review/learning/relearning)
-        $newCards = $allCards->filter(fn ($card) => $card->fsrs_state === 'new');
-        $knownCards = $allCards->filter(fn ($card) => $card->fsrs_state !== 'new');
+        // ADR-0015 V1 / 任务规格第 333-339 行执行层次：
+        //   1. intraday 单独最前
+        //   2. interday + review 组合
+        //   3. 应用 review daily limit（对 interday+review）
+        //   4. 排序并裁剪 new cards（受 new limit，且当
+        //      new_cards_ignore_review_limit=false 时受剩余 review limit）
+        //   5. 按 new_review_order 把 new 与非 intraday 组合
+        //   6. 拼接 intraday
+        //
+        // 因此 daily limits 必须按两阶段裁剪：先 non-new（intraday+interday+
+        // review）按 queue order 应用 review limit，再 new 按 queue order
+        // 应用 new limit + 剩余 review limit。最后按 queue order 过滤可见卡，
+        // 保证返回顺序仍是 Queue Order 的统一顺序。
+        //
+        // 关键语义：review limit 的 slot 优先留给 review/learning 卡，
+        // new 卡只在剩余 slot 内可见。这避免 mix 顺序下 new 卡先消耗
+        // review slot 从而把 review 卡挤出去的问题。
+        $nowInTz = $now->copy()->tz($timezone);
 
-        $knownCount = $knownCards->count();
-        $newCount = $newCards->count();
-
-        // Apply review limit
-        $allowedReviewCards = $knownCards;
-        if ($reviewLimitEnabled && $remainingReviewSlots < $knownCount) {
-            $allowedReviewCards = $knownCards->slice(0, $remainingReviewSlots);
-            $hiddenByReviewLimit = $knownCount - $allowedReviewCards->count();
-        }
-
-        // Calculate how many review slots remain after filling known cards
-        $reviewSlotsUsed = $allowedReviewCards->count();
-        $remainingAfterKnown = max(0, $remainingReviewSlots - $reviewSlotsUsed);
-
-        // Apply new cards under the review limit
-        $allowedNewCards = collect();
-        if ($newLimitEnabled && $newCount > 0) {
-            if ($newIgnoreReviewLimit) {
-                // New cards ignore review limit — show up to newLimit
-                $allowedNewCards = $newCards->slice(0, $newLimit);
-                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
-            } elseif ($remainingAfterKnown > 0) {
-                // New cards compete for remaining review slots
-                $maxNew = min($newLimit, $remainingAfterKnown);
-                $allowedNewCards = $newCards->slice(0, $maxNew);
-                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
+        // 按类别分组（保留 queue order）
+        $intradayCards = [];
+        $nonNewCards = []; // interday + review
+        $newCards = [];
+        foreach ($orderedCards as $card) {
+            $category = $this->reviewQueueOrderService->classify($card, $timezone, $nowInTz);
+            if ($category === 'new') {
+                $newCards[] = $card;
+            } elseif ($category === 'intraday') {
+                $intradayCards[] = $card;
             } else {
-                // No review slots remaining, hide all new cards
-                $hiddenByNewLimit = $newCount;
-            }
-        } elseif (!$newLimitEnabled) {
-            // No separate new-card limit — new cards are still subject to the
-            // daily review limit unless new_cards_ignore_review_limit is enabled.
-            if ($newIgnoreReviewLimit) {
-                $allowedNewCards = $newCards;
-            } elseif ($remainingAfterKnown > 0) {
-                $allowedNewCards = $newCards->slice(0, $remainingAfterKnown);
-                $hiddenByNewLimit = $newCount - $allowedNewCards->count();
-            } else {
-                $hiddenByNewLimit = $newCount;
+                $nonNewCards[] = $card;
             }
         }
 
-        // Merge known + new, preserving order (known first, ordered by due_at)
-        $visibleCards = $allowedReviewCards->concat($allowedNewCards);
+        // 阶段一：对 non-new 卡应用 review daily limit。
+        // intraday 按“优先显示”语义同样计入 review limit（保守策略，
+        // 与重构前 split known/new 行为一致，避免放宽限制）。
+        $reviewCount = 0;
+        $hiddenByReviewLimit = 0;
+        $hiddenDueCount = 0;
+        $visibleNonNew = [];
+        foreach ($intradayCards as $card) {
+            if ($reviewLimitEnabled && $reviewCount >= $remainingReviewSlots) {
+                $hiddenByReviewLimit++;
+                $hiddenDueCount++;
+                continue;
+            }
+            $visibleNonNew[] = $card;
+            $reviewCount++;
+        }
+        foreach ($nonNewCards as $card) {
+            if ($reviewLimitEnabled && $reviewCount >= $remainingReviewSlots) {
+                $hiddenByReviewLimit++;
+                $hiddenDueCount++;
+                continue;
+            }
+            $visibleNonNew[] = $card;
+            $reviewCount++;
+        }
+
+        // 阶段二：对 new 卡应用 new limit + 剩余 review limit。
+        $newCount = 0;
+        $hiddenByNewLimit = 0;
+        $visibleNew = [];
+        foreach ($newCards as $card) {
+            if ($newLimitEnabled && $newCount >= $newLimit) {
+                $hiddenByNewLimit++;
+                $hiddenDueCount++;
+                continue;
+            }
+            if (!$newIgnoreReviewLimit && $reviewLimitEnabled && $reviewCount >= $remainingReviewSlots) {
+                $hiddenByNewLimit++;
+                $hiddenDueCount++;
+                continue;
+            }
+            $visibleNew[] = $card;
+            $newCount++;
+            if (!$newIgnoreReviewLimit) {
+                $reviewCount++;
+            }
+        }
+
+        // 阶段三：按 queue order 过滤可见卡，保持统一顺序。
+        $visibleIds = [];
+        foreach ($visibleNonNew as $card) {
+            $visibleIds[$card->id] = true;
+        }
+        foreach ($visibleNew as $card) {
+            $visibleIds[$card->id] = true;
+        }
+        $visibleCards = collect();
+        foreach ($orderedCards as $card) {
+            if (isset($visibleIds[$card->id])) {
+                $visibleCards->push($card);
+            }
+        }
+
         $visibleCount = $visibleCards->count();
-        $hiddenDueCount = $totalDueCount - $visibleCount;
         $limitReached = $hiddenDueCount > 0;
-
         $canContinueOverLimit = $totalDueCount > 0 && $reviewLimitEnabled && $limitReached;
 
         return [

@@ -72,6 +72,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/settings/fsrs/restore-default', [App\Http\Controllers\SettingsController::class, 'restoreFsrsDefaultParameters']);
         Route::get('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'getFsrsDailyLimits']);
         Route::post('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'updateFsrsDailyLimits']);
+        Route::get('/settings/fsrs/queue-order', [App\Http\Controllers\SettingsController::class, 'getFsrsQueueOrder']);
+        Route::post('/settings/fsrs/queue-order', [App\Http\Controllers\SettingsController::class, 'updateFsrsQueueOrder']);
         Route::post('/settings/fsrs/retention-workload-simulation', [App\Http\Controllers\SettingsController::class, 'retentionWorkloadSimulation']);
         Route::post('/settings/global/update', [App\Http\Controllers\SettingsController::class, 'updateGlobalSettings']);
         Route::post('/settings/global/get', [App\Http\Controllers\SettingsController::class, 'getGlobalSettingsByName']);

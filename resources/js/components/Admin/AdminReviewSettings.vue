@@ -228,6 +228,119 @@
             </v-card-text>
         </v-card>
 
+        <!-- Zone 1.5: 复习显示顺序 (Queue Order, ADR-0015 V1) -->
+        <v-card outlined class="rounded-lg mt-4" :loading="queueOrderLoading">
+            <v-card-title>复习显示顺序</v-card-title>
+            <v-card-subtitle>控制复习队列中各类卡片的显示顺序。两个复习入口（/reviews 与 /reviews/senses）共享同一组设置。</v-card-subtitle>
+            <v-card-text>
+                <v-alert
+                    v-if="queueOrderSaveStatus"
+                    dense outlined type="success" class="mb-3"
+                >{{ queueOrderSaveStatus }}</v-alert>
+                <v-alert
+                    v-if="queueOrderSaveError"
+                    dense outlined type="error" class="mb-3"
+                >{{ queueOrderSaveError }}</v-alert>
+
+                <v-simple-table dense class="no-hover">
+                    <tbody>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle; min-width: 220px;">
+                                跨日学习与复习顺序
+                            </td>
+                            <td class="py-2">
+                                <v-select
+                                    v-model="queueOrder.interday_learning_review_order"
+                                    :items="interdayLearningReviewOrderOptions"
+                                    item-text="text"
+                                    item-value="value"
+                                    outlined dense hide-details
+                                    style="max-width: 320px;"
+                                />
+                                <div class="mt-1 caption grey--text text--darken-1">
+                                    当跨日学习卡和复习卡同时到期时，如何排列两者的相对顺序。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">
+                                新卡与复习顺序
+                            </td>
+                            <td class="py-2">
+                                <v-select
+                                    v-model="queueOrder.new_review_order"
+                                    :items="newReviewOrderOptions"
+                                    item-text="text"
+                                    item-value="value"
+                                    outlined dense hide-details
+                                    style="max-width: 320px;"
+                                />
+                                <div class="mt-1 caption grey--text text--darken-1">
+                                    新卡和复习卡之间的相对顺序。混合为 Anki 默认行为。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">
+                                复习卡排序
+                            </td>
+                            <td class="py-2">
+                                <v-select
+                                    v-model="queueOrder.review_sort_order"
+                                    :items="reviewSortOrderOptions"
+                                    item-text="text"
+                                    item-value="value"
+                                    outlined dense hide-details
+                                    style="max-width: 320px;"
+                                />
+                                <div class="mt-1 caption grey--text text--darken-1">
+                                    复习卡内部的排序规则。按到期日+每日随机为 Anki 默认。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2" style="vertical-align: middle;">
+                                新卡排序
+                            </td>
+                            <td class="py-2">
+                                <v-select
+                                    v-model="queueOrder.new_sort_order"
+                                    :items="newSortOrderOptions"
+                                    item-text="text"
+                                    item-value="value"
+                                    outlined dense hide-details
+                                    style="max-width: 320px;"
+                                />
+                                <div class="mt-1 caption grey--text text--darken-1">
+                                    新卡内部的排序规则。按创建时间升序为 Anki 默认。
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="font-weight-bold pr-4 py-2">说明</td>
+                            <td class="py-2 grey--text text--darken-1">
+                                当日学习卡（intraday learning/relearning）始终最先显示。
+                                顺序为确定性：同一用户、语言、日期、卡片集合和设置下，两个入口返回完全相同的卡顺序。
+                                评分后的下一张卡也使用这组设置。
+                            </td>
+                        </tr>
+                    </tbody>
+                </v-simple-table>
+
+                <v-card-actions class="px-0">
+                    <v-spacer />
+                    <v-btn
+                        rounded depressed color="primary"
+                        :disabled="queueOrderSaving"
+                        :loading="queueOrderSaving"
+                        @click="saveFsrsQueueOrder"
+                    >
+                        保存显示顺序设置
+                    </v-btn>
+                </v-card-actions>
+            </v-card-text>
+        </v-card>
+
         <!-- Zone 2: 当前 FSRS 状态 -->
         <v-card outlined class="rounded-lg mt-4" :loading="statsLoading">
             <v-card-title>当前 FSRS 状态</v-card-title>
@@ -1266,6 +1379,39 @@
                 fsrsRescheduleUndoDialog: false,
                 fsrsRescheduleUndoCountdown: 0,
                 fsrsRescheduleUndoCountdownTimer: null,
+
+                // ADR-0015 V1: Queue Order settings
+                queueOrderLoading: false,
+                queueOrderSaving: false,
+                queueOrderSaveStatus: '',
+                queueOrderSaveError: '',
+                queueOrder: {
+                    interday_learning_review_order: 'mix',
+                    new_review_order: 'mix',
+                    review_sort_order: 'due_random',
+                    new_sort_order: 'created_asc',
+                },
+                interdayLearningReviewOrderOptions: [
+                    { text: '混合显示（Anki 默认）', value: 'mix' },
+                    { text: '跨日学习在前', value: 'before' },
+                    { text: '复习在前', value: 'after' },
+                ],
+                newReviewOrderOptions: [
+                    { text: '混合显示（Anki 默认）', value: 'mix' },
+                    { text: '新卡在前', value: 'before' },
+                    { text: '复习在前', value: 'after' },
+                ],
+                reviewSortOrderOptions: [
+                    { text: '按到期日 + 每日稳定随机（Anki 默认）', value: 'due_random' },
+                    { text: '按到期日稳定排序', value: 'due_stable' },
+                    { text: '按记忆强度升序（最易忘先复习）', value: 'ascending_retrievability' },
+                    { text: '每日稳定随机', value: 'random' },
+                ],
+                newSortOrderOptions: [
+                    { text: '按创建时间升序（Anki 默认）', value: 'created_asc' },
+                    { text: '按创建时间降序', value: 'created_desc' },
+                    { text: '每日稳定随机', value: 'random' },
+                ],
             }
         },
         props: {
@@ -1276,6 +1422,7 @@
             this.loadFsrsStats();
             this.loadFsrsOptimizationStatus();
             this.loadFsrsDailyLimits();
+            this.loadFsrsQueueOrder();
         },
         computed: {
             fsrsDesiredRetentionText() {
@@ -1530,6 +1677,69 @@
                     })
                     .finally(() => {
                         this.dailyLimitsSaving = false;
+                    });
+            },
+            // ADR-0015 V1: Queue Order load/save
+            loadFsrsQueueOrder() {
+                this.queueOrderLoading = true;
+                axios.get('/settings/fsrs/queue-order')
+                    .then((response) => {
+                        const data = response.data;
+                        // Only copy known keys; ignore scope/preset_supported metadata.
+                        this.queueOrder.interday_learning_review_order =
+                            data.interday_learning_review_order ?? 'mix';
+                        this.queueOrder.new_review_order =
+                            data.new_review_order ?? 'mix';
+                        this.queueOrder.review_sort_order =
+                            data.review_sort_order ?? 'due_random';
+                        this.queueOrder.new_sort_order =
+                            data.new_sort_order ?? 'created_asc';
+                    })
+                    .catch(() => {
+                        // Silently fail — defaults remain in place.
+                    })
+                    .finally(() => {
+                        this.queueOrderLoading = false;
+                    });
+            },
+            saveFsrsQueueOrder() {
+                this.queueOrderSaving = true;
+                this.queueOrderSaveStatus = '';
+                this.queueOrderSaveError = '';
+
+                const payload = {
+                    interday_learning_review_order: this.queueOrder.interday_learning_review_order,
+                    new_review_order: this.queueOrder.new_review_order,
+                    review_sort_order: this.queueOrder.review_sort_order,
+                    new_sort_order: this.queueOrder.new_sort_order,
+                };
+
+                axios.post('/settings/fsrs/queue-order', payload)
+                    .then((response) => {
+                        const data = response.data;
+                        this.queueOrderSaveStatus = '复习显示顺序设置已保存。复习页将按新设置排序。';
+                        // Refresh from server response.
+                        this.queueOrder.interday_learning_review_order =
+                            data.interday_learning_review_order ?? this.queueOrder.interday_learning_review_order;
+                        this.queueOrder.new_review_order =
+                            data.new_review_order ?? this.queueOrder.new_review_order;
+                        this.queueOrder.review_sort_order =
+                            data.review_sort_order ?? this.queueOrder.review_sort_order;
+                        this.queueOrder.new_sort_order =
+                            data.new_sort_order ?? this.queueOrder.new_sort_order;
+                        setTimeout(() => { this.queueOrderSaveStatus = ''; }, 5000);
+                    })
+                    .catch((error) => {
+                        const msg = error.response?.data?.message || '保存失败，请稍后再试。';
+                        this.queueOrderSaveError = msg;
+                        const errors = error.response?.data?.errors;
+                        if (errors) {
+                            const detail = Object.values(errors).join(' ');
+                            this.queueOrderSaveError = msg + ' ' + detail;
+                        }
+                    })
+                    .finally(() => {
+                        this.queueOrderSaving = false;
                     });
             },
             runFsrsOptimizationPreflight() {
