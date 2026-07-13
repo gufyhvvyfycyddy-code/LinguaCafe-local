@@ -1,7 +1,7 @@
 # ADR-0015: Review Queue Order Policy
 
-**Status**: Implemented, awaiting production acceptance (code + tests + npm build + db:doctor pass; 2000-10A production closure gaps fixed; MCP Chrome acceptance pending)
-**Date**: 2026-07-13
+**Status**: ✅ Accepted / 生产验收通过（Task 2000-14，网页端最终验收，2026-07-14）. Code + tests + npm build + db:doctor pass; 2000-10A production closure gaps fixed; Task 2000-13 Accept withdrawn after web-side review found Legacy reload lock gap; Task 2000-14 closed the gap and web-side final Accept recorded 2026-07-14.
+**Date**: 2026-07-13 (accepted 2026-07-14)
 **Related**: `docs/adr/ADR-0008-sense-review-answer-interval-preview.md`, `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0014-review-card-info-read-model.md`
 
 ## Correction Notice
@@ -290,7 +290,7 @@ The following Anki options are **not implemented** in LinguaCafe V1 because Ling
 
 Revert the implementation commit. The old `shuffle()` behavior is restored by reverting `ReviewService.php`. The `ReviewQueueOrderOptions`, `ReviewQueueOrderPolicy`, `ReviewQueueOrderService` are new files — removing them is safe. The `next_card` field in `/reviews/rate` is additive. The settings endpoints and admin UI are additive. No migration, no schema change, no FSRS / lifecycle / ReviewLog change — rollback is a pure code revert.
 
-### 19. Task 2000-10A production closure (in progress)
+### 19. Task 2000-10A production closure (historical; superseded by §20 final closure)
 
 The 2000-9B round left eight production gaps that 2000-10A closes:
 
@@ -327,7 +327,37 @@ The 2000-9B round left eight production gaps that 2000-10A closes:
 - `resources/js/components/Review/Review.vue` — consumes `next_card`, passes `ignoreDailyLimits`, adds `ratingLoading` + `ratingRequestSequence` stale guard
 - `resources/js/components/Senses/SenseReview.vue` — adds `loadCardsRequestSequence` stale guard + `rate()` double-click guard
 
-**Pending**: MCP Chrome real acceptance (settings page / SenseReview / legacy Review, two viewports, Console/Network checks).
+**Pending (historical, closed by Task 2000-14 / 2026-07-14)**: MCP Chrome real acceptance (settings page / SenseReview / legacy Review, two viewports, Console/Network checks) — completed in Task 2000-13 and re-verified in Task 2000-14 after the Legacy reload lock fix. See §20 for the final closure facts.
+
+## 20. Task 2000-14 final closure (production acceptance passed)
+
+Task 2000-13 delivered the rating-failure recovery helper (`ReviewRatingRecovery.js`) and the executable async behavior tests, and performed the narrow MCP Chrome re-verification for both rating recovery and normal rating execution. Web-side review then found a Legacy reload lock gap and **withdrew the Task 2000-13 Accept**. Task 2000-14 closed the gap. The web-side total-flow designer issued the formal **Accept** on 2026-07-14, closing Queue Order for production.
+
+The historical facts (Task 2000-13 Accept withdrawn, Task 2000-14 fix) are retained — they are not deleted. This ADR no longer carries any current "Pending MCP Chrome", "Queue Order 待生产验收", or "only after conditions are met may it be re-completed" wording; those phrases are historical only.
+
+Final closure facts confirmed by the web-side total-flow designer against the latest master (`42532cbe8ce32e48fe5821425230ca1322f565ec`):
+
+1. **Recovery re-lock** — `ReviewRatingRecovery.runAuthoritativeRatingRecovery()` re-confirms the lock after `reloadQueue()` returns, so the Legacy `loadReviews()` synchronous `ratingLoading=false` reset cannot leave the queue unlocked during the real reload.
+2. **Sync throw safe release** — `reloadQueue()` synchronous throw is wrapped in try/catch; the in-flight guard and the rating lock are always released, so a sync throw can no longer permanently lock `inFlight`. Recovery can be triggered again afterwards.
+3. **Concurrent same Promise** — concurrent recovery calls return the **same** `inFlightPromise` (not `Promise.resolve()`), so the second concurrent call does not silently no-op while the first is still in flight.
+4. **Single reload under concurrency** — concurrent recovery still triggers `reloadQueue()` exactly once.
+5. **resolve / reject / sync throw all unlock** — `resolve`, `reject`, and sync throw paths all release the lock and the in-flight guard.
+6. **Recovery still possible after sync throw** — verified by executable tests (`ReviewRatingRecovery.test.mjs`, 20 test cases / 34 assertions).
+7. **Legacy rating guard** — Legacy Review's four rating buttons (忘了 / 勉强记得 / 记得 / 很熟) are bound to `:disabled="ratingLoading"`, so a user cannot double-rate while a request or recovery is in flight.
+8. **Normal rating transition hides buttons** — once a normal rating enters the transition state, the four gray buttons may be hidden; the buttons are not forced to stay visible. Normal rating path does **not** show "正在同步复习进度……".
+9. **Recovery path message** — only the recovery path may show "正在确认评分结果，请勿重复评分……".
+10. **MCP Chrome normal rating evidence** — Legacy `/review` 2 ratings (1 button + 1 hotkey `3`), each with exactly 1 `POST /reviews/rate` (200), `next_card` correctly consumed, no duplicate requests; Sense Review `/reviews/senses` 3 ratings (2 at 1920×1080 including 1 undo, 1 at 900×900), each with exactly 1 `POST /reviews/senses/{id}/rate` (200), undo correctly restored the queue, interval preview normal. Both viewports rendered correctly. No regression found in Sense Review normal rating, undo, or interval preview.
+11. **Failure-branch evidence** — MCP Chrome `emulate` only supports global network conditions (Offline / Slow 3G), not selective per-endpoint blocking, so the failure branch is covered by the executable `ReviewRatingRecovery.test.mjs` (20 test cases / 34 assertions) as the behavioral evidence; this is explicitly documented as "MCP not applicable / tool does not support selective endpoint blocking".
+12. **Web-side final Accept** — the web-side total-flow designer issued the formal Accept on 2026-07-14 (Task 2000-14), closing Queue Order for production.
+
+**Test results at closure**:
+- Node guard tests: `ReviewRatingRecovery.test.mjs` 20/34, `ReviewRatingErrorRecoveryGuard.test.mjs` 16, `ReviewQueueOrderNextCardGuard.test.mjs` 12, `ReviewQueueOrderFrontendGuard.test.mjs` 21, `SenseReviewStackUndoGuard.test.mjs` 48, `GlmSingleAgentWorkflowDocsGuard.test.mjs` 9 — all green.
+- PHP tests: `ReviewQueueOrderNextCardTest` 9/39, `ReviewQueueOrderTest` 13/56, `ReviewFsrsTest` 63/375, `SenseReviewStackUndoTest` 15/62, `SenseReviewDailyLimitsTest` 17/81 — 117 tests / 613 assertions all green.
+- `npm run development` build success.
+- `php artisan db:doctor` healthy.
+- `git diff --check` clean.
+
+**No changes to**: FSRS algorithm or parameters; ReviewLog schema; ReviewLog deletion; rating undo ledger; lifecycle state machine semantics; rating key / score / label / hotkey; AI provider calls; daily-report deep link and 7-day window; legacy word card creation; reader tokenizer main flow; new migration; `.env` / `.playwright-cli/` / `AGENTS.md` / `.omo/` / notification script / DCP / force push.
 
 ## Prohibited scope
 
