@@ -166,7 +166,7 @@ class ReviewCardManageController extends Controller
      * Reuses ReviewCardManageQueryService via queryService->build() — no mode, no card_ids, no all/selected.
      * Fixed 13 columns, Front/Back are HTML-rendered question/answer faces.
      */
-    public function exportAnkiTsv(Request $request): \Illuminate\Http\Response
+    public function exportAnkiTsv(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
@@ -207,7 +207,7 @@ class ReviewCardManageController extends Controller
      * Reuses ReviewCardManageQueryService, buildItems, and ReviewCardExportService export field/limit rules.
      * No mode, no card_ids, no all/selected. Uses fputcsv + BOM.
      */
-    public function exportCsv(Request $request): \Illuminate\Http\Response
+    public function exportCsv(Request $request): \Symfony\Component\HttpFoundation\Response
     {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;

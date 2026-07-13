@@ -565,6 +565,137 @@ class ReviewCardBrowserSearchTest extends TestCase
         $response->assertJsonPath('code', 'invalid_browser_search');
     }
 
+    // ─── 20a. CSV export 422 on invalid grammar (Task 2000-6 fix) ───
+
+    public function test_csv_export_returns_422_on_invalid_grammar(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-csv?q=' . urlencode('is:unknown'));
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('code', 'invalid_browser_search');
+        $response->assertJsonStructure([
+            'message',
+            'code',
+            'errors' => [['token', 'reason', 'example']],
+        ]);
+    }
+
+    // ─── 20b. Anki TSV export 422 on invalid grammar (Task 2000-6 fix) ───
+
+    public function test_anki_tsv_export_returns_422_on_invalid_grammar(): void
+    {
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-anki-tsv?q=' . urlencode('is:unknown'));
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('code', 'invalid_browser_search');
+        $response->assertJsonStructure([
+            'message',
+            'code',
+            'errors' => [['token', 'reason', 'example']],
+        ]);
+    }
+
+    // ─── 20c. CSV/TSV export limit-exceeded path also returns 422 JSON (Task 2000-6 fix) ───
+    // Note: The limit-exceeded path uses the same `response()->json(...)` pattern as the
+    // invalid-grammar path above. Since the return type is now Symfony Response (the common
+    // parent of Illuminate\Http\Response and JsonResponse), both 422 paths are covered by
+    // the same type fix. Creating 5001 cards (EXPORT_LIMIT=5000) to trigger the limit path
+    // would make the test suite impractically slow; the invalid-grammar tests above prove
+    // the JsonResponse return works without TypeError for both export endpoints.
+
+    // ─── 20e. Legal CSV export still returns 200 with X-Export-Count (Task 2000-6 regression) ───
+
+    public function test_legal_csv_export_returns_200_with_count(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 3]);
+        $this->makeCard(['fsrs_lapses' => 0]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?q=' . urlencode('prop:lapses>=2'));
+
+        $response->assertStatus(200);
+        $this->assertSame('1', $response->headers->get('X-Export-Count'));
+        $this->assertStringContainsString('text/csv', $response->headers->get('Content-Type'));
+    }
+
+    // ─── 20f. Legal Anki TSV export still returns 200 with X-Export-Count (Task 2000-6 regression) ───
+
+    public function test_legal_anki_tsv_export_returns_200_with_count(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 3]);
+        $this->makeCard(['fsrs_lapses' => 0]);
+
+        $response = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?q=' . urlencode('prop:lapses>=2'));
+
+        $response->assertStatus(200);
+        $this->assertSame('1', $response->headers->get('X-Export-Count'));
+        $this->assertStringContainsString('text/tab-separated-values', $response->headers->get('Content-Type'));
+    }
+
+    // ─── 20g. Search does not write ReviewLog (Task 2000-6 safety) ───
+
+    public function test_search_does_not_write_review_log(): void
+    {
+        $this->makeCard(['fsrs_lapses' => 2]);
+
+        $logBefore = ReviewLog::where('user_id', $this->user->id)->count();
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-csv?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-anki-tsv?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $logAfter = ReviewLog::where('user_id', $this->user->id)->count();
+        $this->assertSame($logBefore, $logAfter, 'Search and export must not create ReviewLog entries.');
+    }
+
+    // ─── 20h. Search does not modify FSRS or lifecycle (Task 2000-6 safety) ───
+
+    public function test_search_does_not_modify_fsrs_or_lifecycle(): void
+    {
+        $card = $this->makeCard([
+            'fsrs_lapses' => 2,
+            'fsrs_stability' => 5.0,
+            'fsrs_difficulty' => 0.3,
+            'fsrs_reps' => 3,
+            'lifecycle_state' => 'active',
+        ]);
+
+        $snapshot = function () use ($card) {
+            $c = ReviewCard::find($card->id);
+            return [
+                'fsrs_lapses' => $c->fsrs_lapses,
+                'fsrs_stability' => $c->fsrs_stability,
+                'fsrs_difficulty' => $c->fsrs_difficulty,
+                'fsrs_reps' => $c->fsrs_reps,
+                'fsrs_state' => $c->fsrs_state,
+                'fsrs_due_at' => optional($c->fsrs_due_at)->toISOString(),
+                'lifecycle_state' => $c->lifecycle_state,
+                'lifecycle_version' => $c->lifecycle_version,
+            ];
+        };
+
+        $before = $snapshot();
+
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-csv?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+        $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export-anki-tsv?q=' . urlencode('is:leech rated:again prop:lapses>=2'));
+
+        $after = $snapshot();
+
+        $this->assertSame($before, $after, 'Search and export must not modify FSRS or lifecycle fields.');
+    }
+
     // ─── 21. query budget doesn't grow linearly ───
 
     public function test_query_budget_does_not_grow_linearly_with_card_count(): void
