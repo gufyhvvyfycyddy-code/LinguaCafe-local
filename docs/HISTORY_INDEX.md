@@ -1,7 +1,7 @@
 # LinguaCafe History Index
 
 > **Status**: Historical document index.
-> **Last updated**: 2026-07-02.
+> **Last updated**: 2026-07-13 (Task 2000-12 — added CodeBuddy/WorkBuddy workflow archive reference).
 
 This file keeps old documents discoverable while lowering their context priority. Do not delete these files, and do not start a new task from them.
 
@@ -55,3 +55,13 @@ Current FSRS / sense-only direction lives in:
 When a historical document says "next", "current", "final", or "must do", treat that wording as scoped to the old date and phase. Re-check the current entry documents before acting.
 
 Historical documents may explain why a decision was made. They do not authorize code changes, database changes, browser actions, or new tasks.
+
+## 5. Discontinued Workflow Archives
+
+The following archive files preserve discontinued workflow rules for historical reference. They are **not** current instructions and must not be executed:
+
+| Archive | Discontinued | What it preserves | Current replacement |
+|---|---|---|---|
+| `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md` | 2026-07-13 | Full text of the cancelled CodeBuddy / WorkBuddy / three-employee workflow rules (original §4.x, §14, §18, §20, §23 of `vibe-coding-collaboration-rules.md`). | `vibe-coding-collaboration-rules.md` §1.5 GLM 单 Agent 闭环规则 (current). |
+
+Rules from the old §14 that remain valid (MCP Chrome testing, To-do list, dual-track parallelism, task packaging) have been migrated into the current GLM chapters of `vibe-coding-collaboration-rules.md`; the archive does not repeat their current text.

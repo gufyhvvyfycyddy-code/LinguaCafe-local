@@ -1,6 +1,6 @@
 # LinguaCafe 总控大计划
 
-> **最后更新**：2026-07-13 (Task 2000-11 `GLM-Single-Agent-Workflow-Migration-QueueOrder-Acceptance-And-CustomStudy-1A-2000-11` — **Status: Incomplete**. WORKFLOW: CodeBuddy/WorkBuddy 工作流取消, 迁移到 GLM 单 Agent 闭环 (`vibe-coding-collaboration-rules.md` §1.5)。ARCH-CS: ADR-0016 修正 — Anki 官方事实重新核查 (commit `9863b2f142e9b65e90741ab450fcebfd00f3c6ba`, release `26.05`; Order enum 11 值; preview mode 构造 RevlogEntryPartial; `forgot_config` 用 Random; custom_study 默认 preview_again_secs=60/hard=600/good=0/delay=10, card_limit=99_999); rotating session-state token 替代 criteria-only token; A→B→A 循环预防; `SenseStudyCard.vue` 共享展示组件; Preview 四按钮语义 (Again 60s/Hard 600s/Good/Easy completed, 不写 ReviewLog/FSRS/ReviewCard/daily count)。QO-UX: Incomplete — MCP Chrome 工具不在 GLM 工具集中, 无法真实浏览器验收; 按 §一(7)/§七(7.4) 标记 Incomplete, 不伪造。DEV-CS: NOT started — 被 QO-UX Gate 阻塞。Queue Order 状态仍为 🟡 Incomplete / 待生产验收。无 FSRS/ReviewLog/lifecycle/rating/AI/migration 变更。当前工作流: GLM 单 Agent 闭环, 详见 `vibe-coding-collaboration-rules.md` §1.5; CodeBuddy/WorkBuddy 已停用)。
+> **最后更新**：2026-07-13 (Task 2000-12 `GLM-Workflow-Governance-CustomStudy-Contract-And-QueueOrder-Production-Closure-2000-12` — **Status: In progress**. GOV: CodeBuddy/WorkBuddy 工作流彻底退出 — 旧规则迁入 `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md`，当前规则文件 `vibe-coding-collaboration-rules.md` 只保留 GLM 单 Agent 闭环规则，guard test `GlmSingleAgentWorkflowDocsGuard.test.mjs` 防止回退。ARCH-CS: Custom Study 1A 契约收口 — ADR-0016 新增 §16 三条 API 冻结 (POST /sessions, /sessions/answer, /sessions/resume)、§17 V1 card_limit 冻结 (default 100/min 1/max 500)、§18 Session State 12 不变量、§19 文件清单、§20 SenseStudyCard.vue 共享组件边界；§6 token 语义修正 (client-obsolete 非 server-invalidated)；§12 query budget 重写 (full candidate ID snapshot)。Implementation plan 同步修正 (CS-8/CS-9/CS-9.5 resume/CS-12/CS-13/allowed files/test matrix/commit plan/MCP Chrome matrix)。DEV-QO: Queue Order 评分失败恢复 — Review.vue catch 不再设 finished=true, 统计移到 .then(), 权威队列重载; SenseReview.vue 移除 .finally 无条件解锁, catch 重载后再解锁; guard test `ReviewRatingErrorRecoveryGuard.test.mjs` (21 tests)。UX-QO: MCP Chrome 生产验收 pending。Queue Order 状态仍为 🟡 Incomplete / 待生产验收。Custom Study 状态: 架构契约待网页端验收, 开发未开始。当前工作流: GLM 单 Agent 闭环, 详见 `vibe-coding-collaboration-rules.md` §1.5; CodeBuddy/WorkBuddy 已停用, 旧规则见 `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md`)。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -655,7 +655,7 @@
 - 无新增 migration（仅 SELECT 现有表）。
 - 无新增 WordSenseOccurrence（endpoint 只 SELECT 现有 occurrence）。
 
-### WorkBuddy P2 处理
+### ~~WorkBuddy P2 处理~~（历史记录，WorkBuddy 已停用 2026-07-13）
 
 - More 菜单危险操作已做视觉分隔（divider + 红色保留），改动 <20 行。
 - 测试数据干扰只记录不清理（`codex_sense_smoke_*` 等 lemma 仍存在）。
