@@ -23,8 +23,8 @@ class ReviewTodayLimitsController extends Controller
     public function update(Request $request)
     {
         $validated = $request->validate([
-            'new_limit_delta' => ['required', 'integer', 'between:-99,99'],
-            'review_limit_delta' => ['required', 'integer', 'between:-999,999'],
+            'new_limit_delta' => ['required', 'integer', 'between:0,999'],
+            'review_limit_delta' => ['required', 'integer', 'between:0,9999'],
             'pause_new_cards' => ['required', 'boolean'],
         ]);
         $user = $request->user();

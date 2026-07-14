@@ -15,10 +15,10 @@
                 <template v-else-if="limits">
                     <v-row>
                         <v-col cols="12" sm="6">
-                            <v-text-field v-model.number="form.new_limit_delta" type="number" min="-99" max="99" outlined dense label="今天多学的新卡" hint="可输入 -99 至 99" persistent-hint />
+                            <v-text-field v-model.number="form.new_limit_delta" type="number" min="0" max="999" outlined dense label="今天额外增加的新卡" hint="可输入 0 至 999（仅可增加，不能减少）" :error-messages="errors.new_limit_delta" persistent-hint />
                         </v-col>
                         <v-col cols="12" sm="6">
-                            <v-text-field v-model.number="form.review_limit_delta" type="number" min="-999" max="999" outlined dense label="今天增加的复习" hint="可输入 -999 至 999" persistent-hint />
+                            <v-text-field v-model.number="form.review_limit_delta" type="number" min="0" max="9999" outlined dense label="今天额外增加的复习" hint="可输入 0 至 9999（仅可增加，不能减少）" :error-messages="errors.review_limit_delta" persistent-hint />
                         </v-col>
                     </v-row>
                     <v-switch v-model="form.pause_new_cards" inset color="warning" label="暂停今天的新卡" class="mt-0" />
@@ -43,7 +43,7 @@
                 <v-btn text :disabled="saving || loading || !limits" @click="resetToday">重置临时设置</v-btn>
                 <v-spacer />
                 <v-btn text :disabled="saving" @click="open = false">取消</v-btn>
-                <v-btn color="primary" :loading="saving" :disabled="loading || !limits" @click="save">保存今天</v-btn>
+                <v-btn color="primary" :loading="saving" :disabled="loading || !limits || !canSave" @click="save">保存今天</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -55,6 +55,26 @@ export default {
     data: () => ({ loading: false, saving: false, limits: null, error: '', form: { new_limit_delta: 0, review_limit_delta: 0, pause_new_cards: false }, requestSequence: 0 }),
     computed: {
         open: { get() { return this.value; }, set(value) { this.$emit('input', value); } },
+        newDeltaError() {
+            const v = this.form.new_limit_delta;
+            if (v === '' || v === null || v === undefined || Number.isNaN(v)) return '请输入整数。';
+            if (!Number.isInteger(v)) return '必须为整数。';
+            if (v < 0) return '不能小于 0。';
+            if (v > 999) return '不能大于 999。';
+            return '';
+        },
+        reviewDeltaError() {
+            const v = this.form.review_limit_delta;
+            if (v === '' || v === null || v === undefined || Number.isNaN(v)) return '请输入整数。';
+            if (!Number.isInteger(v)) return '必须为整数。';
+            if (v < 0) return '不能小于 0。';
+            if (v > 9999) return '不能大于 9999。';
+            return '';
+        },
+        errors() {
+            return { new_limit_delta: this.newDeltaError, review_limit_delta: this.reviewDeltaError };
+        },
+        canSave() { return !this.newDeltaError && !this.reviewDeltaError; },
         previewEffectiveNew() { return this.form.pause_new_cards ? 0 : Math.max(0, this.limits.permanent_new_limit + Number(this.form.new_limit_delta || 0)); },
         previewEffectiveReview() { return Math.max(0, this.limits.permanent_review_limit + Number(this.form.review_limit_delta || 0)); },
         previewRemainingNew() { return Math.max(0, this.previewEffectiveNew - this.limits.introduced_today_count); },
@@ -77,6 +97,7 @@ export default {
                 .finally(() => { if (seq === this.requestSequence) this.loading = false; });
         },
         save() {
+            if (!this.canSave) return;
             this.saving = true;
             this.error = '';
             axios.put('/reviews/senses/today-limits', this.form)

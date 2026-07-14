@@ -23,11 +23,13 @@ class EffectiveReviewLimitsService
 
         $permanentNew = (int) ($permanent['daily_new_limit'] ?? 20);
         $permanentReview = (int) ($permanent['daily_review_limit'] ?? 200);
-        $newDelta = (int) ($override?->new_limit_delta ?? 0);
-        $reviewDelta = (int) ($override?->review_limit_delta ?? 0);
+        // ponytail: legacy rows may hold negative deltas (pre-contract schema); normalize on read,
+        // never write back. Clients receive canonical non-negative values; next save overwrites.
+        $newDelta = max(0, (int) ($override?->new_limit_delta ?? 0));
+        $reviewDelta = max(0, (int) ($override?->review_limit_delta ?? 0));
         $paused = (bool) ($override?->pause_new_cards ?? false);
-        $effectiveNew = $paused ? 0 : max(0, $permanentNew + $newDelta);
-        $effectiveReview = max(0, $permanentReview + $reviewDelta);
+        $effectiveNew = $paused ? 0 : $permanentNew + $newDelta;
+        $effectiveReview = $permanentReview + $reviewDelta;
 
         return [
             'study_date' => $this->studyTimezoneService->localDate($now),
