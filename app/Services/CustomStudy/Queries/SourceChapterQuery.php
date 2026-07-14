@@ -7,6 +7,7 @@ use App\Services\SenseReviewQueryService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Custom Study Phase 2B — CS-5: source_chapter candidate query.
@@ -53,29 +54,40 @@ class SourceChapterQuery
      */
     public function build(int $userId, string $language, int $chapterId, Carbon $now): Builder
     {
-        return $this->senseReviewQueryService
-            ->confirmedSenseCardQuery($userId, $language)
-            ->senseReviewEligible($userId, $language, $now)
-            ->where(function (Builder $outer) use ($userId, $language, $chapterId): void {
-                // Path 1: WordSense.source_chapter_id direct match.
-                $outer->whereExists(function (QueryBuilder $q) use ($chapterId): void {
-                    $q->select(\Illuminate\Support\Facades\DB::raw(1))
-                        ->from('word_senses as ws_direct')
-                        ->whereColumn('ws_direct.id', 'review_cards.target_id')
-                        ->where('ws_direct.source_chapter_id', $chapterId);
-                });
+        $reviewCardIds = $this->eligibleChapterMatches($userId, $language, $now)
+            ->where('chapter_id', $chapterId)
+            ->select('review_card_id');
 
-                // Path 2: bound WordSenseOccurrence with matching chapter.
-                $outer->orWhereExists(function (QueryBuilder $q) use ($userId, $language, $chapterId): void {
-                    $q->select(\Illuminate\Support\Facades\DB::raw(1))
-                        ->from('word_sense_occurrences as wso')
-                        ->join('word_senses as ws_occ', 'ws_occ.id', '=', 'wso.word_sense_id')
-                        ->whereColumn('ws_occ.id', 'review_cards.target_id')
-                        ->where('wso.chapter_id', $chapterId)
-                        ->where('wso.status', 'bound')
-                        ->where('wso.user_id', $userId)
-                        ->where('wso.language_id', $language);
-                });
-            });
+        return ReviewCard::query()->whereIn('review_cards.id', $reviewCardIds);
+    }
+
+    /**
+     * Build the shared pre-limit mapping of eligible review cards to chapters.
+     * UNION and the outer distinct count keep direct/occurrence duplicates from
+     * changing either the session candidates or chapter option counts.
+     */
+    public function eligibleChapterMatches(int $userId, string $language, Carbon $now): QueryBuilder
+    {
+        $base = $this->senseReviewQueryService
+            ->confirmedSenseCardQuery($userId, $language)
+            ->senseReviewEligible($userId, $language, $now);
+
+        $direct = (clone $base)
+            ->select('review_cards.id as review_card_id', 'word_senses.source_chapter_id as chapter_id')
+            ->whereNotNull('word_senses.source_chapter_id');
+
+        $boundOccurrence = (clone $base)
+            ->join('word_sense_occurrences as occurrences', function ($join) use ($userId, $language) {
+                $join->on('occurrences.word_sense_id', '=', 'review_cards.target_id')
+                    ->where('occurrences.user_id', $userId)
+                    ->where('occurrences.language_id', $language)
+                    ->where('occurrences.status', 'bound');
+            })
+            ->select('review_cards.id as review_card_id', 'occurrences.chapter_id as chapter_id')
+            ->whereNotNull('occurrences.chapter_id');
+
+        return DB::query()
+            ->fromSub($direct->union($boundOccurrence), 'eligible_chapter_matches')
+            ->select('review_card_id', 'chapter_id');
     }
 }

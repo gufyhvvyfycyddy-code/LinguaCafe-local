@@ -2,14 +2,14 @@
 
 namespace App\Services\CustomStudy;
 
-use App\Services\SenseReviewQueryService;
+use App\Services\CustomStudy\Queries\SourceChapterQuery;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
 class CustomStudyChapterOptionsService
 {
     public function __construct(
-        private readonly SenseReviewQueryService $senseReviewQueryService,
+        private readonly SourceChapterQuery $sourceChapterQuery,
     ) {
     }
 
@@ -20,26 +20,8 @@ class CustomStudyChapterOptionsService
      */
     public function forUser(int $userId, string $language, Carbon $now): array
     {
-        $base = $this->senseReviewQueryService
-            ->confirmedSenseCardQuery($userId, $language)
-            ->senseReviewEligible($userId, $language, $now);
-
-        $direct = (clone $base)
-            ->select('review_cards.id as review_card_id', 'word_senses.source_chapter_id as chapter_id')
-            ->whereNotNull('word_senses.source_chapter_id');
-
-        $boundOccurrence = (clone $base)
-            ->join('word_sense_occurrences as occurrences', function ($join) use ($userId, $language) {
-                $join->on('occurrences.word_sense_id', '=', 'review_cards.target_id')
-                    ->where('occurrences.user_id', $userId)
-                    ->where('occurrences.language_id', $language)
-                    ->where('occurrences.status', 'bound');
-            })
-            ->select('review_cards.id as review_card_id', 'occurrences.chapter_id as chapter_id')
-            ->whereNotNull('occurrences.chapter_id');
-
         return DB::query()
-            ->fromSub($direct->union($boundOccurrence), 'chapter_matches')
+            ->fromSub($this->sourceChapterQuery->eligibleChapterMatches($userId, $language, $now), 'chapter_matches')
             ->join('chapters', 'chapters.id', '=', 'chapter_matches.chapter_id')
             ->leftJoin('books', function ($join) use ($userId, $language) {
                 $join->on('books.id', '=', 'chapters.book_id')
