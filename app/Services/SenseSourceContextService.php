@@ -22,7 +22,7 @@ class SenseSourceContextService
     ) {
     }
 
-    public function sourceContext(int $userId, string $language, int $senseId): array
+    public function sourceContext(int $userId, string $language, int $senseId, bool $allowRecoveryWriteBack = true): array
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
         $sourceOccurrence = $this->resolver->resolveSourceOccurrence($sense);
@@ -52,7 +52,12 @@ class SenseSourceContextService
         }
 
         // 2. Try recovered source (exact match example sentence in chapters)
-        $recovered = $this->recoverSourceContextFromExampleSentence($sense, $targetOccurrence, $exampleSentence);
+        $recovered = $this->recoverSourceContextFromExampleSentence(
+            $sense,
+            $targetOccurrence,
+            $exampleSentence,
+            $allowRecoveryWriteBack,
+        );
         if ($recovered) {
             $this->resolver->logSourceContextResult($sense, $recovered, [
                 'has_example' => (bool) $exampleSentence,
@@ -62,7 +67,12 @@ class SenseSourceContextService
         }
 
         // 3. Try fuzzy match
-        $fuzzy = $this->recoverSourceContextByFuzzyMatch($sense, $targetOccurrence, $exampleSentence);
+        $fuzzy = $this->recoverSourceContextByFuzzyMatch(
+            $sense,
+            $targetOccurrence,
+            $exampleSentence,
+            $allowRecoveryWriteBack,
+        );
         if ($fuzzy) {
             $this->resolver->logSourceContextResult($sense, $fuzzy, [
                 'has_example' => (bool) $exampleSentence,
@@ -118,7 +128,13 @@ class SenseSourceContextService
      *     'unavailable' is returned when no preferred occurrence id was
      *     supplied (preserves the old contract for callers that don't care).
      */
-    public function sourceContextList(int $userId, string $language, int $senseId, ?int $preferredOccurrenceId = null): array
+    public function sourceContextList(
+        int $userId,
+        string $language,
+        int $senseId,
+        ?int $preferredOccurrenceId = null,
+        bool $allowRecoveryWriteBack = true,
+    ): array
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
 
@@ -259,7 +275,7 @@ class SenseSourceContextService
             // (card_example / unavailable) is appropriate. If we reach here,
             // $preferredStatus is one of invalid / fallback / unavailable
             // (matched would have populated $sources above).
-            $primary = $this->sourceContext($userId, $language, $senseId);
+            $primary = $this->sourceContext($userId, $language, $senseId, $allowRecoveryWriteBack);
             return [
                 'sense_id' => $sense->id,
                 'sources' => [$primary],
@@ -345,7 +361,8 @@ class SenseSourceContextService
     private function recoverSourceContextFromExampleSentence(
         WordSense $sense,
         ?WordSenseOccurrence $occurrence,
-        ?string $exampleSentence
+        ?string $exampleSentence,
+        bool $allowRecoveryWriteBack = true,
     ): ?array {
         if (!$exampleSentence) {
             return null;
@@ -361,7 +378,9 @@ class SenseSourceContextService
 
         // Chapter title exact match
         if ($kind === 'chapter_title') {
-            $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, null);
+            if ($allowRecoveryWriteBack) {
+                $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, null);
+            }
 
             $tokens = $this->senseTokenPayloadService->syntheticSentenceTokens($exampleSentence, $sense, $occurrence);
             $targetIndexes = $this->resolver->collectTargetIndexes($tokens);
@@ -401,7 +420,9 @@ class SenseSourceContextService
             return null;
         }
 
-        $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, $targetKey);
+        if ($allowRecoveryWriteBack) {
+            $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, $targetKey);
+        }
 
         return [
             'sense_id' => $sense->id,
@@ -420,7 +441,8 @@ class SenseSourceContextService
     private function recoverSourceContextByFuzzyMatch(
         WordSense $sense,
         ?WordSenseOccurrence $occurrence,
-        ?string $exampleSentence
+        ?string $exampleSentence,
+        bool $allowRecoveryWriteBack = true,
     ): ?array {
         if (!$exampleSentence) {
             return null;
@@ -437,7 +459,9 @@ class SenseSourceContextService
 
         // Chapter title fuzzy match
         if ($kind === 'chapter_title') {
-            $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, null);
+            if ($allowRecoveryWriteBack) {
+                $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, null);
+            }
 
             $tokens = $this->senseTokenPayloadService->syntheticSentenceTokens($exampleSentence, $sense, $occurrence);
             $targetIndexes = $this->resolver->collectTargetIndexes($tokens);
@@ -486,7 +510,9 @@ class SenseSourceContextService
             return null;
         }
 
-        $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, $best['target_key']);
+        if ($allowRecoveryWriteBack) {
+            $this->resolver->writeBackRecoveredSource($sense, $occurrence, $chapter->id, $best['target_key']);
+        }
 
         $result = [
             'sense_id' => $sense->id,

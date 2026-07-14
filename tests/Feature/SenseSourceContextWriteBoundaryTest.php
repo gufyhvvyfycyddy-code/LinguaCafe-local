@@ -117,6 +117,25 @@ class SenseSourceContextWriteBoundaryTest extends TestCase
         $this->assertSame('0', (string) $occurrence->sentence_id);
     }
 
+    public function test_read_only_source_context_list_recovers_context_without_writing_location(): void
+    {
+        $sense = $this->createConfirmedSense();
+        $chapter = $this->createChapterForSentence('The bureau opened at noon.');
+
+        $response = $this->actingAs($this->user)
+            ->get('/senses/' . $sense->id . '/source-context-list?read_only=1');
+
+        $response->assertOk();
+        $this->assertSame('chapter_recovered', $response->json('sources.0.source_kind'));
+        $this->assertSame($chapter->id, $response->json('sources.0.chapter_id'));
+        $sense->refresh();
+        $this->assertNull($sense->source_chapter_id);
+        $this->assertNull($sense->sentence_id);
+        $this->assertSame(0, WordSenseOccurrence::count());
+        $this->assertSame(0, ReviewLog::count());
+        $this->assertSame(0, ReviewCard::count());
+    }
+
     private function createConfirmedSense(): WordSense
     {
         $sense = $this->wordSenseService->createSense([

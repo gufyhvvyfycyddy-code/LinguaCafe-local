@@ -23,6 +23,7 @@ assert.match(session, /\/custom-study\/sessions\/answer/);
 assert.match(session, /\/custom-study\/sessions\/resume/);
 assert.match(session, /sessionStorage/);
 assert.match(session, /preferred_occurrence_id/);
+assert.match(session, /read_only:\s*1/);
 assert.match(sessionBoundary, /wait_until/);
 assert.match(session, /Boolean\(this\.waitUntil\) && !this\.currentCard/);
 assert.match(session, /total_candidates/);

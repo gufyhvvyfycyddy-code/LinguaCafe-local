@@ -273,7 +273,7 @@
                     example_sentence_en: this.currentCard.example_sentence_en,
                     example_sentence_zh: this.currentCard.example_sentence_zh,
                 };
-                const params = {};
+                const params = { read_only: 1 };
                 if (this.currentCard.displayed_occurrence_id) {
                     params.preferred_occurrence_id = this.currentCard.displayed_occurrence_id;
                 }

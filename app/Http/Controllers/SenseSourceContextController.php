@@ -48,6 +48,7 @@ class SenseSourceContextController extends Controller
             Auth::user()->selected_language,
             $id,
             $preferredId,
+            !request()->boolean('read_only'),
         ));
     }
 }
