@@ -375,9 +375,6 @@ export default {
                     translationText: this.translationText
                 });
 
-                if (inputName == 'translation' && this.stage >= 0 && this.$props.autoHighlightWords && this.translationText !== '') {
-                    this.setStage(-7);
-                }
             },
             unselectAllWords() {
                 this.$emit('unselectAllWords');

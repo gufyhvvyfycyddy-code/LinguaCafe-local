@@ -405,9 +405,6 @@ export default {
                 translationText: this.translationText
             });
 
-            if (inputName == 'translation' && this.$store.state.vocabularyBox.stage >= 0 && this.$props.autoHighlightWords && this.translationText !== '') {
-                this.setStage(-7);
-            }
         },
         loadAiSuggestions() {
             // AI suggestion panel manages its own expanded state via :key="word" reset

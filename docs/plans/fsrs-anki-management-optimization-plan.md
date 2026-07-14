@@ -48,8 +48,8 @@
 | Reader-UI-1-a | 查词侧栏第一轮瘦身：隐藏旧 SRS 1-7 按钮 + "选择释义" + 词典默认收起 | ✅ 已完成 | 前端改动，不删 setStage 逻辑，不删数据 |
 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 + 确认弹窗如实告知行为 | ✅ 已完成 | 全前端改动，后端行为未改（当前 hardDeleteWord 物理删除数据） |
 | Reader-UI-6-b | 回归为新词时删除释义复习卡与复习记录 | ✅ 已完成 | 后端删除 sense ReviewLog + legacy word ReviewLog，删除 sense+legacy ReviewCard，WordSense rejected，EncounteredWord 删除 |
-| Mgmt-7-c（待定） | 自动提升词汇等级改为 FSRS 复习记录 | 📋 审计完成 | 当前仍是旧 SRS `EncounteredWord.setStage()`，需要单独任务迁移 |
-| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 |
+| Mgmt-7-c（待定） | 自动提升词汇等级改为 FSRS 复习记录 | 🟡 第一安全切片已完成 | translation edit 不再隐式调用 `setStage(-7)`；完整职责迁移及首次评分前阅读颜色仍为 Product Gate（ADR-0020） |
+| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | ✅ 已完成（2026-07-14，ADR-0018） |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
 
 > **注意**：每日上限接入前，需注意阅读页新词创建与 lemma/study_base 归并质量；`Lemma-Origin-1` 将单独跟踪英文原型识别回归问题。
@@ -58,7 +58,7 @@
 
 ## 5. 当前下一步
 
-进入 **FSRS-Anki-Mgmt-7：复习队列每日上限接入 + 超额复习入口**（中高风险，已接入 `/reviews` 队列）
+当前下一步不再是已经完成的 Mgmt-7 / Mgmt-8。Mgmt-7-c 仅完成第一安全切片，完整职责迁移继续等待 Product Gate；FSRS-Anki-Mgmt-9 Preset / 分组参数仍未开始。
 
 本阶段已完成：
 - 后端 `dueCardsWithLimits()` — 对 `/reviews` 队列应用每日复习上限 + 新学上限
@@ -68,7 +68,7 @@
 - 设置页文案更新
 - 编程协作规则文档新增
 - `Lemma-Origin-1` 仍为独立后续任务
-- Mgmt-8（今日临时上限）仍为后续
+- Mgmt-8（今日临时上限）已完成（ADR-0018）
 
 本轮目标：只做侦察和计划，不实现功能。
 
@@ -84,9 +84,9 @@
 后续阶段：
 | 阶段 | 内容 | 状态 | 风险 |
 |------|------|------|------|
-| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（全局上限） | 📋 计划中 | 低 |
-| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | 📋 计划中 | 高 |
-| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 中 |
+| FSRS-Anki-Mgmt-6 | 每日上限设置页第一版（全局上限） | ✅ 已完成 | 低 |
+| FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 | ✅ 已完成 | 高 |
+| FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | ✅ 已完成（ADR-0018） | 中 |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 低 |
 
 后端：

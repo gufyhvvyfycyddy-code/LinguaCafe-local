@@ -11,8 +11,7 @@
 > | State | Work |
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A |
-> | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time |
-> | Corrective closure completed; awaiting web-side re-acceptance | Study Overview canonical eligibility |
+> | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
 > | Product Gates | Mgmt-7-c; FSRS-Anki-Mgmt-9 Preset; Custom Study 1B / Card Marker |
 > | Environment Gates | External AI/provider-dependent work remains separately gated |
 
@@ -245,7 +244,7 @@
 | 编号 | 内容 | 状态 |
 |------|------|------|
 | Mgmt-7-b | 每日新学累计计数精确化（按学习日统计首次新卡引入，正式 sense/legacy 入口共用） | ✅ 已完成（2026-07-14，ADR-0018） |
-| Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录；启动前必须审计 EncounteredWord 自动 stage 写入、阅读颜色、熟悉度总览、legacy 兼容与 FSRS 的职责关系 | 🚧 产品与架构 Gate 待网页端决定；未进入实现 |
+| Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录；第一安全切片已关闭 translation edit 隐式 `setStage(-7)`，完整迁移仍需审计阅读颜色、熟悉度总览、legacy 兼容与 FSRS 职责 | 🟡 第一安全切片已完成（ADR-0020）；完整职责迁移仍为 Product Gate，未全部完成 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡；区分永久设置与 today-only 临时覆盖 | ✅ 已完成（2026-07-14，ADR-0018） |
 | FSRS-Anki-Mgmt-9 | 学习参数 Preset：需先决定按语言、材料组或其他学习集合绑定 FSRS、每日上限和队列选项；禁止直接照搬 Anki deck/subdeck 层级 | 📋 未开始；Custom Study 1A 已关闭，不再是阻塞项 |
 | FSRS-Param-Browser-Smoke | FSRS 参数优化真实浏览器验收：高级工具、恢复默认确认并取消、重排预览不执行、设置指纹保持、1920×1080 / 900×900 | ✅ 已完成（2026-07-15，本轮纠正性验收证据） |
@@ -255,7 +254,7 @@
 | Anki-Leech-1 | 遗忘卡识别：按 lapses 阈值标记，默认提示用户改写释义卡；是否自动暂停由用户设置决定 | ✅ 已完成 (commit 9a03740 + Task A + 2000-4 fix, ADR-0011, stable/struggling/leech classification from ReviewLog + pure policy + batch query no N+1 + rewrite package provider_called=false + 4 endpoints + 56+17 backend tests + 94 frontend guard tests + leech NOT lifecycle state + no migration; 2000-4 fix: source=sense_review positive filter + describeWithFeedback pure functions eliminating N+1 + real Policy classification for management filters + 5 query-budget tests + 12 filter-consistency tests + MCP Chrome 36 PASS acceptance incl. batch 2+ rewrite packages) |
 | Anki-Queue-Order-1 | 新卡 / 学习中 / 到期卡的队列顺序与积压优先级形成明确、可测试的策略 | ✅ Accepted / 生产验收通过（Task 2000-14，网页端最终验收，2026-07-14） (Task 2000-9A docs + Task 2000-9B docs+feat + Task 2000-10A production closure + Task 2000-13 + Task 2000-14 lock fix, ADR-0015 corrected, 四设置四分类三层架构: `ReviewQueueOrderOptions` 值对象 + `ReviewQueueOrderPolicy` 纯函数 + `ReviewQueueOrderService` 单一排序入口; 4 Anki-aligned settings `interday_learning_review_order`/`new_review_order`/`review_sort_order`/`new_sort_order` 全局 user_id=-1; 4 categories intraday/interday/review/new; Mix 确定性均匀交错非随机; stable daily hash `md5(userId\|language\|localDate\|cardId)` 替代 shuffle; FSRS-5 retrievability `R=(1+FACTOR*elapsed/stability)^DECAY`; 两入口 `/reviews`+`/reviews/senses` 统一; `ReviewService::shuffle()` 删除; `Review.vue` `Math.random()` 删除; `/reviews/rate`+`/reviews/senses/{id}/rate` 返回 `next_card`; 三阶段 daily limits; `/settings/fsrs/queue-order` GET/POST admin middleware; `QueueOrderValidationException` 结构化 422; `AdminReviewSettings.vue` 4 下拉框; 59 Unit + 30 Feature + 22 Node guard 测试全绿; 回归 669 passed; npm build 成功; db:doctor healthy. **Task 2000-10A production closure**: 新增 `ReviewStudyTimezoneService` 统一学习时区边界替代分散的 `config('app.timezone')` 读取; `due_random` 本地日期修复 (`fsrs_due_at` 显式转学习时区再取 Y-m-d, 同一本地日期卡视为同天, 跨本地午夜视为不同天, 新增 America/Los_Angeles + UTC + 跨午夜 + DST 测试); retrievability 证据链修复 (固定 fixture 交叉验证 + NaN/Infinity 保护 + null/0/负数 stability fallback); `Review.vue` 真正消费 `/reviews/rate` 返回的 `next_card` (findIndex+unshift 移动/插入队首, 传 `ignoreDailyLimits`, 更新 `dailyLimitSummary`); 评分请求竞态保护 (`ratingLoading` + `ratingRequestSequence` stale-response guard, 慢响应不覆盖新状态, 快速双击不写双 ReviewLog); `SenseReview.vue` `loadCardsRequestSequence` stale guard + `rate()` 双击保护; `reviewedTodayCount()` 改用统一学习时区; 新增 `ReviewQueueOrderNextCardTest` (9 backend) + `ReviewQueueOrderNextCardGuard.test.mjs` (12 frontend) + `ReviewStudyTimezoneServiceTest` (11 unit) + 扩展 `ReviewQueueOrderServiceTest` (+10 due_random/retrievability 测试) + 扩展 `ReviewQueueOrderFrontendGuard` (8→21) + 扩展 `SenseReviewStackUndoGuard` (35→48). **Task 2000-13**: MCP Chrome 正常评分验收通过 (Legacy + Sense, 2 viewport); 失败分支用可执行 ReviewRatingRecovery.test.mjs 作为行为证据; 新增纯 JS recovery helper ReviewRatingRecovery.js 被 Legacy+Sense Review 真实调用; loadReviews() 返回 Promise; Custom Study 两处旧契约修正. **Task 2000-13 Accept 被撤回 (历史)**: 网页端复核发现 Legacy reload 锁状态缺口. **Task 2000-14 lock fix (最终关闭)**: helper 在 reloadQueue 返回后重新确认锁定 (re-lock after sync reset); 并发调用返回同一 `inFlightPromise` (非 `Promise.resolve()`); reloadQueue sync throw 经 try/catch 安全释放 inFlight + 解锁; Legacy 四个评分按钮绑定 `:disabled="ratingLoading"`; 可执行测试 20 cases/34 assertions; guard test 24 tests. **网页端总流程设计师 2026-07-14 正式 Accept，Queue Order 生产关闭。** 不改 FSRS/ReviewLog/lifecycle/rating/AI/migration) |
 | Anki-CustomStudy-1 | Custom Study 1A：今日忘记、逾期、指定来源章节、遗忘卡关注；preview-only，不改变正常队列。已标记条件属于 1B 的 Card Marker Gate | ✅ Accepted / Production Closed；1B 未开始 |
-| Anki-Stats-1 | Study Overview V1：未来到期、复习耗时、间隔分布、稳定度、难度、可检索率、评分分布、真实保持率；workload 已改为复用 canonical Sense Review eligibility | 🟡 纠正性收口完成，等待网页端重新验收（2026-07-15，ADR-0019） |
+| Anki-Stats-1 | Study Overview V1：未来到期、复习耗时、间隔分布、稳定度、难度、可检索率、评分分布、真实保持率；workload 已改为复用 canonical Sense Review eligibility | ✅ Accepted（2026-07-15，ADR-0019；网页端总流程设计师确认无需再次独立网页验收） |
 | Anki-Browser-Search-1 | 高级浏览器搜索语法：is:leech、is:suspended、rated:again、prop:lapses | ✅ 已完成 (commit `0f6ef29` docs + `858a3f2` feat, ADR-0012, 纯函数 parser `ReviewCardBrowserSearchParser` + 只读 `ReviewCardBrowserSearchCriteria` + `ReviewCardBrowserSearchQueryApplier` 仅作用于已隔离 query + `InvalidBrowserSearchException` 结构化 422 + `search_meta` 响应字段; V1: is:leech/is:struggling/is:active/is:buried/is:suspended/is:archived (governance/lifecycle 分离, 同类冲突 422, 跨类合法) + rated:again/rated:hard (whereExists 强制 source=sense_review + undone_at IS NULL) + prop:lapses{=,>,>=,<,<=}<非负整数> (直接 WHERE fsrs_lapses); AND 组合, 不支持 OR/NOT/括号/日期/保存搜索/更多 prop/rated:good/rated:easy/新 migration; 普通文本继续 LIKE lemma/surface_form/sense_zh/sense_en/example_sentence_en; 页面 data + JSON/CSV/Anki TSV 导出共用同一 parser + QueryService; governance 分类每请求最多一次复用缓存 ID 无 N+1; 前端 chips + 帮助 + 具体错误 + 高级 token 自动切全部 + 不复制完整 parser; 41 parser 单元 + 28 feature + 31 前端 guard 测试全绿 + 回归套件全绿; MCP Chrome 28/28 PASS; 不改 FSRS/lifecycle/ReviewLog/ADR-0010/ADR-0011。**Task 2000-6 fix**: `exportAnkiTsv()`/`exportCsv()` return type 改为 `\Symfony\Component\HttpFoundation\Response` 公共父类型, 修复非法语法和导出超限时 JsonResponse 返回导致 PHP TypeError; 6 新增测试 CSV/TSV 422 + 合法导出 200 + 不写 ReviewLog + 不改 FSRS/lifecycle; MCP Chrome 13/13 PASS。**Task 2000-7 refactor (ADR-0013)**: 执行管道收敛 — 每请求只 parse 一次, Controller 调 `parseCriteria()` 后将 Criteria 传入新增 `buildFromCriteria()` 单一执行入口, 旧 `build()` 降级为薄包装; 四入口 (data / export JSON / exportAnkiTsv / exportCsv) 共用同一 Criteria + 同一执行入口; Parser 按 first-occurrence 顺序对 `normalizedTokens` / `ratings` / `propertyConditions` 去重, 同类冲突仍 422; governance 仍由 `resolveGovernanceMatchingIds()` 单次批量 O(1), 不复制 Leech Policy, 不逐卡查 ReviewLog; 不改 V1 结果, 不新增语法; 6 parser 去重 + 16 ADR-0013 pipeline feature 测试 (4 入口 Mockery spy 各 parse 一次 / 合法结果回归 / 422 一致结构 / 重复 token 单 chip / 冲突 token 仍 422 / user 隔离 / language 隔离 / sense-only / rated 排除 reset+undone+非 sense_review / governance O(1) / 不写 ReviewLog / 不改 FSRS / 不改 lifecycle); 回归 649 passed / 0 failed; npm build 成功; db:doctor HEALTHY; MCP Chrome 18/18 PASS) |
 
 ### 4.5 释义卡 / 多例句 / 复习体验
@@ -424,7 +423,7 @@
 
 | Gate | 当前事实 | 启动前必须决定 |
 |---|---|---|
-| Mgmt-7-c | 未进入实现 | EncounteredWord 自动 stage 写入、阅读颜色、熟悉度总览、legacy 兼容与 FSRS 职责如何收敛 |
+| Mgmt-7-c | 第一安全切片已完成；完整迁移未完成 | translation edit 已不再隐式进入旧 SRS；仍需决定 confirmed sense 首次正式 FSRS 评分前显示最低学习颜色还是新词颜色，并收敛 EncounteredWord、阅读颜色、legacy 与 FSRS 职责 |
 | FSRS-Anki-Mgmt-9 Preset | 未开始；Custom Study 1A 已关闭，不再构成阻塞 | 按语言、材料组还是其他学习集合绑定；不得复制 Anki deck/subdeck |
 | Custom Study 1B / Card Marker | 1A 已生产关闭；1B 未开始；Card Marker 已在 ADR-0016 和实施计划登记为前置 Gate | marker 的对象、语义、筛选和持久化；当前不新增 migration，不用 lifecycle/leech 代替 marker |
 | AI Reading Assist | 手工包、解析、保存与阅读辅助主线已有完成能力；真实 provider 与自动本章分析仍分别受环境/产品 Gate 约束 | 是否启用 provider、调用成本、数据边界和人工确认步骤 |
@@ -447,7 +446,7 @@
 | 11 | FSRS-Anki-Mgmt-9 | 学习参数 Preset 与分组策略 | 历史建议；当前 Custom Study 1A 已关闭，Preset 仍需单独确定绑定范围 |
 | 12 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | LinguaCafe 阅读主线能力，不因 Anki 对齐而取消 |
 | 13 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
-| 14 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 历史建议；当前仍需先完成 EncounteredWord / 阅读颜色 / legacy 兼容架构 Gate |
+| 14 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 第一安全切片已完成（ADR-0020）；完整职责迁移及首次评分前阅读颜色仍为 Product Gate |
 
 ## Recent Update: Codex-FinalArchitectureClosureTargetMode-1
 
