@@ -34,7 +34,7 @@ class VocabularyHardDeleteTest extends TestCase
         $this->assertDatabaseMissing('encountered_words', [
             'id' => $word->id,
         ]);
-        $this->assertFalse((bool) $card->fresh()->fsrs_enabled);
+        $this->assertNull($card->fresh(), 'Hard delete removes its legacy word review card.');
     }
 
     public function test_batch_hard_delete_selected_ids_removes_words_only_for_current_user_and_language(): void
@@ -158,8 +158,8 @@ class VocabularyHardDeleteTest extends TestCase
         // Occurrence preserved
         $this->assertDatabaseHas('word_sense_occurrences', ['id' => $occurrence->id]);
 
-        // Word-type review card disabled (legacy behavior)
-        $this->assertFalse((bool) $card->fresh()->fsrs_enabled);
+        // Word-type review card and its logs are removed with the deleted word.
+        $this->assertNull($card->fresh());
 
         // Sense-type review card deleted
         $this->assertNull(ReviewCard::find($senseCard->id));

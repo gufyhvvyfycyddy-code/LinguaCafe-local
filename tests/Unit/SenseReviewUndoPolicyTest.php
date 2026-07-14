@@ -57,6 +57,7 @@ class SenseReviewUndoPolicyTest extends TestCase
         $card = new ReviewCard();
         $card->target_type = $overrides['target_type'] ?? ReviewCard::TARGET_SENSE;
         $card->fsrs_enabled = $overrides['fsrs_enabled'] ?? true;
+        $card->lifecycle_state = $overrides['lifecycle_state'] ?? ReviewCard::LIFECYCLE_ACTIVE;
         $card->fsrs_state = $overrides['fsrs_state'] ?? 'review';
         $card->fsrs_due_at = null;
         $card->fsrs_stability = null;
@@ -282,7 +283,8 @@ class SenseReviewUndoPolicyTest extends TestCase
     public function test_card_archived_blocks_undo(): void
     {
         $card = $this->makeCard([
-            'fsrs_enabled' => false, // archived
+            'fsrs_enabled' => false,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
         ]);
         $afterSnapshot = $this->snapshotMatchingCard($card);
         $targetLog = $this->makeLog([

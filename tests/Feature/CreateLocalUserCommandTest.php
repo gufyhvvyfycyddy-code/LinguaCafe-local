@@ -15,6 +15,8 @@ class CreateLocalUserCommandTest extends TestCase
 
     public function test_user_create_command_creates_loginable_local_user(): void
     {
+        User::query()->delete();
+
         $this->artisan('user:create --email=test@example.com --password=12345678')
             ->expectsOutput('Local user created successfully.')
             ->expectsOutput('Email: test@example.com')
@@ -51,6 +53,8 @@ class CreateLocalUserCommandTest extends TestCase
 
     public function test_first_user_can_be_created_from_web_setup_endpoint(): void
     {
+        User::query()->delete();
+
         $this->get('/setup')
             ->assertOk()
             ->assertSee(':_setup-mode="true"', false);

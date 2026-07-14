@@ -231,7 +231,11 @@ class ReviewStatsTest extends TestCase
         $this->createSenseCard($senseActive, ['fsrs_enabled' => true, 'fsrs_state' => 'review']);
 
         $senseArchived = $this->createSense($this->user->id, 'english', ['lemma' => 'archived']);
-        $this->createSenseCard($senseArchived, ['fsrs_enabled' => false, 'fsrs_state' => 'new']);
+        $this->createSenseCard($senseArchived, [
+            'fsrs_enabled' => false,
+            'fsrs_state' => 'new',
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
+        ]);
 
         $response = $this->actingAs($this->user)->getJson('/review-cards/stats');
         $response->assertOk();
@@ -262,6 +266,7 @@ class ReviewStatsTest extends TestCase
         $this->createSenseCard($senseDisabledDue, [
             'fsrs_enabled' => false,
             'fsrs_due_at' => Carbon::now()->subDay(),
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
         ]);
 
         $response = $this->actingAs($this->user)->getJson('/review-cards/stats');
@@ -322,7 +327,11 @@ class ReviewStatsTest extends TestCase
 
         // Archived card — lapses should NOT count (only enabled)
         $senseArchived = $this->createSense($this->user->id, 'english', ['lemma' => 'archived']);
-        $this->createSenseCard($senseArchived, ['fsrs_lapses' => 100, 'fsrs_enabled' => false]);
+        $this->createSenseCard($senseArchived, [
+            'fsrs_lapses' => 100,
+            'fsrs_enabled' => false,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ARCHIVED,
+        ]);
 
         $response = $this->actingAs($this->user)->getJson('/review-cards/stats');
         $response->assertOk();
