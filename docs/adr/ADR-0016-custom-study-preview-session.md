@@ -1001,3 +1001,13 @@ token. The session screen reuses `SenseStudyCard.vue` and the existing source
 context dialog, calls only the frozen answer/resume session routes, handles
 expired tokens by clearing the temporary token, and labels its four actions as
 preview-only. It does not render formal review controls or write review data.
+
+## Completion update — 2026-07-14
+
+Custom Study 1A is implemented and acceptance-tested. The authenticated
+chapter-options read endpoint, sentence/token/translation alignment,
+presentation-only shared card, setup/session UI, and normal Sense Review
+compatibility are complete. MCP Chrome validated the actual local flow,
+including preview reveal/rating/reload/exit, no console errors, and no formal
+review-data changes. This ADR is now **Implemented**; the work awaits only
+the web designer's final product acceptance.

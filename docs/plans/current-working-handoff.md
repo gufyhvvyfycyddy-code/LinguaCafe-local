@@ -322,14 +322,19 @@ frozen three POST session routes. `SenseReviewCardSerializerService` now keeps
 the chosen example's sentence, token payload, and translation together;
 translation is explicit occurrence/card-fallback text first, then one exact
 persisted reading-assist match, otherwise absent. `serializeMany()` batches the
-assist lookup. Remaining work: shared `SenseStudyCard.vue`, Custom Study setup
-and session UI, route/navigation integration, browser acceptance, and final
-documentation closure.
+assist lookup. The shared card, setup/session UI, route/navigation integration,
+browser acceptance, and documentation closure are now complete.
 
 Phase 5B shared presentation extraction is also complete: `SenseStudyCard.vue`
 owns only the card face and reuses `SenseSentencePreview.vue`; `SenseReview.vue`
-keeps all formal review operations through slots. The next slice is the Custom
-Study setup page and temporary-session UI.
+keeps all formal review operations through slots.
+
+Final status: **code and MCP Chrome acceptance complete; awaiting web designer
+final product acceptance.** MCP Chrome checked the live local preview flow,
+refresh recovery, exit, normal Sense Review compatibility, both required
+viewports, and console output. A before/after database fingerprint was
+unchanged after a preview rating. Do not begin Custom Study 1B, Saved Search,
+preset, migration, or FSRS work from this handoff.
 
 ## Recent Update: GLM-AIRecommendationConfirmationLoop-V4-1
 

@@ -5,6 +5,11 @@
 
 > **Implementation addendum (2026-07-14)**: Custom Study 1A frontend is now implemented at `/custom-study`: setup, authenticated chapter picker, temporary preview session UI, navigation, and shared card presentation. The token remains session-only and the normal review queue, FSRS, ReviewLog, and lifecycle remain unchanged.
 
+> **Custom Study 1A completion addendum (2026-07-14)**: backend, aligned
+> example payload, shared card, frontend, and MCP Chrome acceptance are
+> complete. Preview rating was verified not to change formal-review data. The
+> work is awaiting only web designer final product acceptance.
+
 This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
 
 ## 1. Current Entry Order

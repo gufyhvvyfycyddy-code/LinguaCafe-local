@@ -784,4 +784,28 @@ This plan is a **TDD roadmap only**. It is not authorization to start coding. St
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that no Card Marker code is being snuck into 1A.
 
-Until all four are satisfied, Custom Study 1A remains **architecture complete, development not started**.
+At the time this roadmap was written, until all four were satisfied, Custom
+Study 1A remained **architecture complete, development not started**.
+
+---
+
+## Final implementation and acceptance update — 2026-07-14
+
+Custom Study 1A is now code-complete and acceptance-tested.
+
+- Backend session routes and authenticated chapter options are implemented.
+- Source-chapter options expose the frozen full pre-limit `candidate_count`.
+- The displayed sentence, token payload, and translation share one selected
+  example occurrence; `SenseStudyCard.vue` is presentation-only and is reused
+  by Custom Study and normal Sense Review.
+- `/custom-study` implements setup, preview session recovery, wait/completion
+  states, exit, and session-only token persistence without formal review
+  writes.
+- MCP Chrome exercised the live local UI, including reveal, a single rating,
+  refresh recovery, exit, normal Sense Review, 900×900 and 1920×1080 layouts,
+  and console inspection. A before/after database fingerprint was identical
+  after preview rating.
+
+The implementation and acceptance work is complete. It awaits the web
+designer's final product acceptance; no Custom Study 1B, Saved Search, preset,
+or scheduling work is authorized by this status update.
