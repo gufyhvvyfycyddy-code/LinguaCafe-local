@@ -78,6 +78,7 @@
                     class="custom-study-card-limit"
                     :error-messages="cardLimitError"
                     @input="cardLimitError = ''"
+                    @blur="validateCardLimit"
                 ></v-text-field>
 
                 <v-btn color="primary" :loading="starting" :disabled="!canStart || starting" type="submit">
@@ -174,16 +175,20 @@
                 const count = Number.isInteger(item.candidate_count) ? ` · ${item.candidate_count} 张可用卡片` : '';
                 return `${bookTitle} · ${chapterTitle}${count}`;
             },
+            validateCardLimit() {
+                this.cardLimitError = this.validCardLimit
+                    ? ''
+                    : '请输入 1 到 500 之间的整数。';
+                return Boolean(this.validCardLimit);
+            },
             startSession() {
                 this.error = '';
                 this.chapterError = '';
-                this.cardLimitError = '';
 
-                const cardLimit = this.validCardLimit;
-                if (!cardLimit) {
-                    this.cardLimitError = '请输入 1 到 500 之间的整数。';
+                if (!this.validateCardLimit()) {
                     return;
                 }
+                const cardLimit = this.validCardLimit;
 
                 const parameters = {};
                 if (this.mode === 'source_chapter') {
