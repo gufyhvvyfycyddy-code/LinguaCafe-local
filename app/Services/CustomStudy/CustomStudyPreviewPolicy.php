@@ -205,4 +205,91 @@ class CustomStudyPreviewPolicy
 
         return [$newCurrent, $readyQueue, $newDelayed];
     }
+
+    /**
+     * Resolves eligibility by moving ineligible cards from current/ready/delayed
+     * to skipped_ineligible, WITHOUT incrementing step.
+     *
+     * This is a pure method — it does NOT query the DB. The caller
+     * (CustomStudySessionEligibilityService) is responsible for determining
+     * which card IDs are ineligible; this method only applies the state
+     * transition.
+     *
+     * Behavior:
+     * 1. Ineligible cards in ready_queue → moved to skipped_ineligible_ids.
+     * 2. Ineligible cards in delayed_repeat_queue → moved to skipped_ineligible_ids.
+     * 3. If current_card_id is ineligible → moved to skipped_ineligible_ids,
+     *    and the next eligible card is popped from the (already-filtered)
+     *    ready_queue. If ready is empty, current becomes null.
+     * 4. Cards already in completed_ids or skipped_ineligible_ids are NOT
+     *    affected (they are already resolved).
+     * 5. step is NOT incremented (invariant 18 — same-step eligibility
+     *    resolution boundary).
+     *
+     * Task 2000-22 — Phase 4B.
+     *
+     * @param list<int> $ineligibleCardIds Card IDs that are no longer eligible
+     *     (determined by the EligibilityService via DB query).
+     */
+    public function resolveEligibility(
+        CustomStudySessionState $state,
+        array $ineligibleCardIds
+    ): CustomStudySessionState {
+        // Fast path: no ineligible cards — return an equivalent state through
+        // withEligibilityResolution() to maintain the same-step boundary contract.
+        if (empty($ineligibleCardIds)) {
+            return $state->withEligibilityResolution(
+                $state->currentCardId(),
+                $state->readyQueue(),
+                $state->delayedRepeatQueue(),
+                $state->completedIds(),
+                $state->skippedIneligibleIds()
+            );
+        }
+
+        // Build a set for O(1) lookup.
+        $ineligibleSet = array_flip($ineligibleCardIds);
+
+        // 1. Partition ready_queue: ineligible → skipped, eligible → stays.
+        $newReady = [];
+        $newSkipped = $state->skippedIneligibleIds();
+        foreach ($state->readyQueue() as $cardId) {
+            if (isset($ineligibleSet[$cardId])) {
+                $newSkipped[] = $cardId;
+            } else {
+                $newReady[] = $cardId;
+            }
+        }
+
+        // 2. Partition delayed_repeat_queue: ineligible → skipped, eligible → stays.
+        $newDelayed = [];
+        foreach ($state->delayedRepeatQueue() as $entry) {
+            if (isset($ineligibleSet[$entry['card_id']])) {
+                $newSkipped[] = $entry['card_id'];
+            } else {
+                $newDelayed[] = $entry;
+            }
+        }
+
+        // 3. Handle current_card_id: if ineligible, move to skipped and pick
+        //    the next eligible card from the (already-filtered) ready_queue.
+        $newCurrent = $state->currentCardId();
+        if ($newCurrent !== null && isset($ineligibleSet[$newCurrent])) {
+            $newSkipped[] = $newCurrent;
+            if (!empty($newReady)) {
+                $newCurrent = array_shift($newReady);
+                $newReady = array_values($newReady);
+            } else {
+                $newCurrent = null;
+            }
+        }
+
+        return $state->withEligibilityResolution(
+            $newCurrent,
+            $newReady,
+            $newDelayed,
+            $state->completedIds(),
+            $newSkipped
+        );
+    }
 }

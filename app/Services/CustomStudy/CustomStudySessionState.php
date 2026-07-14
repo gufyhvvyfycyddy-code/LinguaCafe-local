@@ -14,14 +14,18 @@ use App\Exceptions\CustomStudyValidationException;
  * Holds the complete V1 session payload: version, user_id, language, mode,
  * parameters, session_id, issued_at, expires_at, ordered_candidate_ids,
  * ready_queue, delayed_repeat_queue, completed_ids, skipped_ineligible_ids,
- * completed_count, total_count, current_card_id, step, preview_delay_config.
+ * completed_count, total_count, current_card_id, step, preview_delay_config,
+ * available_candidate_count.
  *
  * The five-state union + mutual exclusion invariants (current / ready / delayed /
  * completed / skipped_ineligible) are fully verifiable from the state alone.
  * `completed_count` is redundant by construction (=== count(completed_ids)).
  * `total_count` is redundant by construction (=== count(ordered_candidate_ids)).
+ * `available_candidate_count` records the pre-card_limit-truncation total
+ * (invariant 16: >= 0; invariant 17: >= total_count; immutable after creation).
  *
  * Task 2000-19 — Custom Study 1A Phase 3A.
+ * Task 2000-22 — Phase 4B (available_candidate_count + withEligibilityResolution).
  */
 class CustomStudySessionState
 {
@@ -58,6 +62,14 @@ class CustomStudySessionState
     private readonly int $step;
     /** @var array{again_secs: int, hard_secs: int, good_secs: int, easy_secs: int} */
     private readonly array $previewDelayConfig;
+    /**
+     * Total number of eligible candidate cards BEFORE card_limit truncation.
+     * Invariant 16: >= 0, immutable after creation.
+     * Invariant 17: >= total_count (= count(ordered_candidate_ids)).
+     *
+     * Task 2000-22 — Phase 4B.
+     */
+    private readonly int $availableCandidateCount;
 
     /**
      * Private constructor — use createInitial() or fromArray().
@@ -88,7 +100,8 @@ class CustomStudySessionState
         int $totalCount,
         ?int $currentCardId,
         int $step,
-        array $previewDelayConfig
+        array $previewDelayConfig,
+        int $availableCandidateCount
     ) {
         $this->version = $version;
         $this->userId = $userId;
@@ -108,6 +121,7 @@ class CustomStudySessionState
         $this->currentCardId = $currentCardId;
         $this->step = $step;
         $this->previewDelayConfig = $previewDelayConfig;
+        $this->availableCandidateCount = $availableCandidateCount;
     }
 
     /**
@@ -130,7 +144,8 @@ class CustomStudySessionState
         int $issuedAt,
         int $expiresAt,
         array $orderedCandidateIds,
-        array $previewDelayConfig
+        array $previewDelayConfig,
+        ?int $availableCandidateCount = null
     ): self {
         // Validate scalar fields
         self::validateVersion($version);
@@ -142,6 +157,14 @@ class CustomStudySessionState
 
         // Validate candidate IDs
         $orderedCandidateIds = self::validateCandidateIds($orderedCandidateIds);
+
+        // Default available_candidate_count to total_count when not provided
+        // (no card_limit truncation occurred).
+        $totalCount = count($orderedCandidateIds);
+        if ($availableCandidateCount === null) {
+            $availableCandidateCount = $totalCount;
+        }
+        self::validateAvailableCandidateCount($availableCandidateCount, $totalCount);
 
         // Build initial state
         $mode = $criteria->mode();
@@ -170,10 +193,11 @@ class CustomStudySessionState
             [],
             [],
             0,
-            count($orderedCandidateIds),
+            $totalCount,
             $currentCardId,
             0,
-            $previewDelayConfig
+            $previewDelayConfig,
+            $availableCandidateCount
         );
     }
 
@@ -273,6 +297,20 @@ class CustomStudySessionState
         $previewDelayConfig = self::requireArrayKey($payload, 'preview_delay_config');
         self::validatePreviewDelayConfig($previewDelayConfig);
 
+        // Validate available_candidate_count (optional key — defaults to total_count
+        // for backward compat with tokens issued before the field was added).
+        $availableCandidateCount = $totalCount;
+        if (array_key_exists('available_candidate_count', $payload)) {
+            $availableCandidateCount = $payload['available_candidate_count'];
+            if (!is_int($availableCandidateCount)) {
+                throw new CustomStudySessionStateException(
+                    'invalid_available_candidate_count',
+                    'available_candidate_count must be an integer.'
+                );
+            }
+        }
+        self::validateAvailableCandidateCount($availableCandidateCount, $totalCount);
+
         // Cross-field invariants
         self::validateFiveStateInvariants(
             $orderedCandidateIds,
@@ -317,7 +355,8 @@ class CustomStudySessionState
             $totalCount,
             $currentCardId,
             $step,
-            $previewDelayConfig
+            $previewDelayConfig,
+            $availableCandidateCount
         );
     }
 
@@ -355,6 +394,7 @@ class CustomStudySessionState
                 'good_secs' => $this->previewDelayConfig['good_secs'],
                 'easy_secs' => $this->previewDelayConfig['easy_secs'],
             ],
+            'available_candidate_count' => $this->availableCandidateCount,
         ];
     }
 
@@ -473,16 +513,29 @@ class CustomStudySessionState
         ];
     }
 
+    /**
+     * Returns the total number of eligible candidates BEFORE card_limit truncation.
+     *
+     * Invariant 16: >= 0, immutable after creation.
+     * Invariant 17: >= total_count.
+     *
+     * Task 2000-22 — Phase 4B.
+     */
+    public function availableCandidateCount(): int
+    {
+        return $this->availableCandidateCount;
+    }
+
     // ---------- Phase 3B: immutable progress boundary ----------
 
     /**
      * Returns a new immutable state with updated progress fields.
      *
      * Identity fields (version, user_id, language, mode, parameters, session_id,
-     * issued_at, expires_at, ordered_candidate_ids, preview_delay_config) are
-     * preserved from the current state. Only the five progress fields are taken
-     * from the caller. completed_count, total_count, and step are auto-computed
-     * — the caller cannot set them.
+     * issued_at, expires_at, ordered_candidate_ids, preview_delay_config,
+     * available_candidate_count) are preserved from the current state. Only the
+     * five progress fields are taken from the caller. completed_count,
+     * total_count, and step are auto-computed — the caller cannot set them.
      *
      * The original state is NOT mutated (immutable value object semantics).
      *
@@ -507,9 +560,80 @@ class CustomStudySessionState
         array $completedIds,
         array $skippedIneligibleIds
     ): self {
-        // Guard against integer overflow on step — caller cannot pass step,
-        // so the only way to hit PHP_INT_MAX is via cumulative increments.
-        if ($this->step === PHP_INT_MAX) {
+        return $this->copyWithProgress(
+            $currentCardId,
+            $readyQueue,
+            $delayedRepeatQueue,
+            $completedIds,
+            $skippedIneligibleIds,
+            true
+        );
+    }
+
+    /**
+     * Returns a new immutable state with updated five-state fields but WITHOUT
+     * incrementing step.
+     *
+     * This is the same-step eligibility resolution boundary: the eligibility
+     * service may move a card from ready/delayed to skipped_ineligible without
+     * counting it as a user-visible step. All identity fields (including
+     * available_candidate_count and step) are preserved from the current state.
+     *
+     * Invariant 18: withEligibilityResolution() is a same-step immutable copy.
+     * It reuses the same private helper as withProgress() (with incrementStep=false)
+     * so there is exactly one validation path for the five-state invariants.
+     *
+     * Task 2000-22 — Phase 4B.
+     *
+     * @param list<int> $readyQueue
+     * @param list<array{card_id: int, available_at: int}> $delayedRepeatQueue
+     * @param list<int> $completedIds
+     * @param list<int> $skippedIneligibleIds
+     * @throws CustomStudySessionStateException If any five-state invariant is
+     *     violated.
+     */
+    public function withEligibilityResolution(
+        ?int $currentCardId,
+        array $readyQueue,
+        array $delayedRepeatQueue,
+        array $completedIds,
+        array $skippedIneligibleIds
+    ): self {
+        return $this->copyWithProgress(
+            $currentCardId,
+            $readyQueue,
+            $delayedRepeatQueue,
+            $completedIds,
+            $skippedIneligibleIds,
+            false
+        );
+    }
+
+    /**
+     * Shared private helper for withProgress() and withEligibilityResolution().
+     *
+     * Both methods perform the same five-state validation and identity
+     * preservation; the only difference is whether step is incremented.
+     * Having a single helper ensures there is exactly one validation path
+     * (invariant 18: "复用 private helper 禁止两套验证").
+     *
+     * @param list<int> $readyQueue
+     * @param list<array{card_id: int, available_at: int}> $delayedRepeatQueue
+     * @param list<int> $completedIds
+     * @param list<int> $skippedIneligibleIds
+     * @param bool $incrementStep True for withProgress(), false for
+     *     withEligibilityResolution().
+     */
+    private function copyWithProgress(
+        ?int $currentCardId,
+        array $readyQueue,
+        array $delayedRepeatQueue,
+        array $completedIds,
+        array $skippedIneligibleIds,
+        bool $incrementStep
+    ): self {
+        // Guard against integer overflow on step — only relevant when incrementing.
+        if ($incrementStep && $this->step === PHP_INT_MAX) {
             throw new CustomStudySessionStateException(
                 'step_overflow',
                 'step would overflow PHP_INT_MAX; cannot increment further.'
@@ -545,7 +669,7 @@ class CustomStudySessionState
         // Auto-compute the derived fields — caller cannot supply these.
         $newCompletedCount = count($completedIds);
         $newTotalCount = count($this->orderedCandidateIds);
-        $newStep = $this->step + 1;
+        $newStep = $incrementStep ? $this->step + 1 : $this->step;
 
         return new self(
             $this->version,
@@ -565,7 +689,8 @@ class CustomStudySessionState
             $newTotalCount,
             $currentCardId,
             $newStep,
-            $this->previewDelayConfig
+            $this->previewDelayConfig,
+            $this->availableCandidateCount
         );
     }
 
@@ -850,6 +975,30 @@ class CustomStudySessionState
                     'preview_delay_config.' . $key . ' must be non-negative.'
                 );
             }
+        }
+    }
+
+    /**
+     * Validates available_candidate_count against invariants 16 and 17.
+     *
+     * Invariant 16: available_candidate_count >= 0.
+     * Invariant 17: available_candidate_count >= total_count.
+     *
+     * Task 2000-22 — Phase 4B.
+     */
+    private static function validateAvailableCandidateCount(int $availableCandidateCount, int $totalCount): void
+    {
+        if ($availableCandidateCount < 0) {
+            throw new CustomStudySessionStateException(
+                'invalid_available_candidate_count',
+                'available_candidate_count must be a non-negative integer.'
+            );
+        }
+        if ($availableCandidateCount < $totalCount) {
+            throw new CustomStudySessionStateException(
+                'invalid_available_candidate_count',
+                'available_candidate_count must be >= total_count (' . $totalCount . ').'
+            );
         }
     }
 
