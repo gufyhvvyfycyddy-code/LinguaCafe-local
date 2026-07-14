@@ -324,6 +324,11 @@ assist lookup. Remaining work: shared `SenseStudyCard.vue`, Custom Study setup
 and session UI, route/navigation integration, browser acceptance, and final
 documentation closure.
 
+Phase 5B shared presentation extraction is also complete: `SenseStudyCard.vue`
+owns only the card face and reuses `SenseSentencePreview.vue`; `SenseReview.vue`
+keeps all formal review operations through slots. The next slice is the Custom
+Study setup page and temporary-session UI.
+
 ## Recent Update: GLM-AIRecommendationConfirmationLoop-V4-1
 
 - AI study card v4 AI recommendation confirmation loop is implemented: paste AI recommendation JSON, dedupe, default unchecked, user confirmation, final candidates package.

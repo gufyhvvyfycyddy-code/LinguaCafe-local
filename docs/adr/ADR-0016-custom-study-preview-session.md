@@ -985,3 +985,8 @@ The first Phase 5 data-contract slice is implemented and remains read-only.
 - `CustomStudyChapterOptionsService` reuses `SenseReviewQueryService` eligibility and obtains direct `source_chapter_id` plus bound occurrence matches in one grouped query. A card matched by both paths is counted once.
 - A serialized card now aligns its displayed sentence, token payload, and translation to the selected example. Translation priority is explicit occurrence/card-fallback text, then one exact persisted `ChapterAiReadingAssist` sentence match; it never borrows a sense-level translation for another occurrence.
 - `serializeMany()` batches the persisted reading-assist lookup. This slice adds no migration, no AI call, no ReviewLog write, no FSRS/lifecycle change, and no change to the existing session POST contract.
+
+Phase 5B now provides `SenseStudyCard.vue`: a presentation-only component
+using `SenseSentencePreview.vue` on both faces. It owns no request, rating,
+queue, lifecycle, or scheduling behavior; containers supply the normal-review
+menu, panels, FSRS details, and formal rating controls through slots.

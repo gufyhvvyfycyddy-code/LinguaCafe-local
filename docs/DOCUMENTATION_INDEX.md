@@ -115,4 +115,6 @@ If a historical document conflicts with current entry documents, follow this pri
 Phase 5A has added the read-only chapter-options data contract and selected
 example sentence/token/translation alignment. See ADR-0016 and
 `docs/plans/custom-study-1a-implementation-plan.md`; the Custom Study page and
-session UI are still pending.
+session UI are still pending. The normal review card now shares its read-only
+presentation with `SenseStudyCard.vue`; formal review controls remain in its
+existing container.

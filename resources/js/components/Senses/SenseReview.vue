@@ -74,71 +74,39 @@
         <SenseReviewReportCenter v-model="reportCenterOpen" />
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
-            <!-- Lemma / surface form / pos -->
-            <div class="d-flex align-center mb-3">
-                <div>
-                    <div class="text-h5 default-font">{{ currentCard.lemma }}</div>
-                    <div class="text--secondary">
-                        {{ currentCard.surface_form || currentCard.lemma }}
-                        <span v-if="currentCard.pos"> / {{ currentCard.pos }}</span>
-                    </div>
-                </div>
-                <v-spacer></v-spacer>
-                <v-chip
-                    v-if="currentCardIsInactive"
-                    x-small
-                    :color="stateColor(currentCardLifecycleState)"
-                    class="mr-1"
-                >{{ stateLabel(currentCardLifecycleState) }}</v-chip>
-                <v-chip class="mr-1">{{ currentCard.fsrs_state }}</v-chip>
-                <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
-            </div>
-            <div v-if="buriedRemainingDisplay" class="caption warning--text mb-2">
-                {{ buriedRemainingDisplay }}
-            </div>
-
-            <!-- Question side -->
-            <div class="mb-4">
-                <div class="caption text--secondary d-flex align-center">
-                    <span>例句</span>
+            <SenseStudyCard
+                :card="currentCard"
+                :show-answer="showAnswer"
+                :font-size="20"
+                @reveal="showAnswer = true"
+                @view-source="viewSource"
+            >
+                <template #header-meta>
                     <v-chip
-                        v-if="currentCard.occurrence_count > 1"
+                        v-if="currentCardIsInactive"
                         x-small
-                        outlined
-                        color="info"
-                        class="ml-2"
-                    >本词义已有 {{ currentCard.occurrence_count }} 条来源例句</v-chip>
-                </div>
-                <v-sheet outlined rounded class="pa-3 mb-3">
-                    <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
-                </v-sheet>
-                <div class="body-1 primary--text font-weight-medium">
-                    这个句子里的 “{{ currentCard.lemma }}” 是什么意思？
-                </div>
-            </div>
+                        :color="stateColor(currentCardLifecycleState)"
+                        class="mr-1"
+                    >{{ stateLabel(currentCardLifecycleState) }}</v-chip>
+                    <v-chip class="mr-1">{{ currentCard.fsrs_state }}</v-chip>
+                    <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
+                    <div v-if="buriedRemainingDisplay" class="caption warning--text ml-2">
+                        {{ buriedRemainingDisplay }}
+                    </div>
+                </template>
 
-            <!-- Show answer button -->
-            <div v-if="!showAnswer" class="d-flex justify-center mb-4">
-                <v-btn
-                    depressed
-                    rounded
-                    color="primary"
-                    large
-                    :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
-                    @click="showAnswer = true"
-                >
-                    显示答案
-                </v-btn>
-            </div>
+                <template #reveal>
+                    <v-btn
+                        depressed
+                        rounded
+                        color="primary"
+                        large
+                        :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
+                        @click="showAnswer = true"
+                    >显示答案</v-btn>
+                </template>
 
-            <div class="text-center caption grey--text mt-2" v-if="!showAnswer">
-                快捷键：Space 显示答案
-            </div>
-
-            <!-- Answer side -->
-            <template v-if="showAnswer">
-                <!-- More menu -->
-                <div class="d-flex justify-end mb-3" style="gap: 8px;">
+                <template #answer-toolbar>
                     <v-menu offset-y left>
                         <template v-slot:activator="{ on, attrs }">
                             <v-btn small text v-bind="attrs" v-on="on">
@@ -146,10 +114,6 @@
                             </v-btn>
                         </template>
                         <v-list dense>
-                            <v-list-item @click="viewSource">
-                                <v-list-item-icon><v-icon small>mdi-book-open-page-variant</v-icon></v-list-item-icon>
-                                <v-list-item-title>查看原文</v-list-item-title>
-                            </v-list-item>
                             <v-list-item @click="startEdit">
                                 <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
                                 <v-list-item-title>编辑</v-list-item-title>
@@ -178,111 +142,55 @@
                             </v-list-item>
                         </v-list>
                     </v-menu>
-                </div>
+                </template>
 
-                <v-row dense>
-                    <v-col cols="12" md="6">
-                        <div class="caption text--secondary">中文释义</div>
-                        <div class="sense-main mb-4">{{ currentCard.sense_zh }}</div>
+                <template #answer-left-extra>
+                    <SenseReviewUnderstandingAid :aid="understandingAid" />
+                    <SenseReviewLearningFeedbackPanel
+                        v-if="hasLearningFeedback"
+                        :key="'feedback-' + currentCard.review_card_id"
+                        :learning-feedback="learningFeedback"
+                        :fsrs-stability="currentCard.fsrs_stability"
+                    />
+                    <SenseReviewLeechPanel
+                        :key="'leech-' + currentCard.review_card_id"
+                        :review-card-id="currentCard.review_card_id"
+                        :show-answer="showAnswer"
+                        @rewrite="leechRewriteDialog = true"
+                        @edit="editDialog = true"
+                        @history="sessionActionDrawerOpen = true"
+                        @suspend="executeLifecycleAction('suspend')"
+                    />
+                </template>
 
-                        <div class="caption text--secondary">英文释义</div>
-                        <div class="mb-4">{{ currentCard.sense_en || '暂无英文释义。' }}</div>
-
-                        <div class="caption text--secondary">近义译法</div>
-                        <div class="mb-4">
-                            <v-chip small class="mr-1 mb-1" v-for="alias in currentCard.aliases_zh" :key="alias">{{ alias }}</v-chip>
-                            <span v-if="!currentCard.aliases_zh.length" class="text--secondary">无</span>
+                <template #answer-right-extra>
+                    <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
+                        FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
+                        <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
+                    </div>
+                    <v-expand-transition>
+                        <div v-if="fsrsDetailOpen">
+                            <v-simple-table dense class="no-hover border rounded-lg mt-2">
+                                <tbody>
+                                    <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
+                                    <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
+                                    <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
+                                </tbody>
+                            </v-simple-table>
                         </div>
+                    </v-expand-transition>
+                </template>
 
-                        <div class="caption text--secondary">搭配</div>
-                        <div>
-                            <v-chip small class="mr-1 mb-1" v-for="collocation in currentCard.collocations" :key="collocation">{{ collocation }}</v-chip>
-                            <span v-if="!currentCard.collocations.length" class="text--secondary">无</span>
-                        </div>
-
-                        <!-- Understanding aid (extracted sub-component).
-                             Pure presentational: renders the collapsible
-                             "理解这个词义" block from the normalized aid
-                             payload. Owns its own collapse state. -->
-                        <SenseReviewUnderstandingAid :aid="understandingAid" />
-
-                        <!-- Learning feedback panel (extracted sub-component).
-                             Read-only: no backend calls, no ReviewLog writes,
-                             no FSRS changes. :key on review_card_id resets the
-                             collapse state on card change. -->
-                        <SenseReviewLearningFeedbackPanel
-                            v-if="hasLearningFeedback"
-                            :key="'feedback-' + currentCard.review_card_id"
-                            :learning-feedback="learningFeedback"
-                            :fsrs-stability="currentCard.fsrs_stability"
-                        />
-
-                        <!-- ADR-0011: Leech governance panel.
-                             Read-only classification from backend. Stable:
-                             hidden. Struggling: light hint. Leech: governance
-                             card on answer face. Does NOT block rating.
-                             Does NOT change hotkeys. Suspend goes through
-                             lifecycle endpoint. -->
-                        <SenseReviewLeechPanel
-                            v-if="currentCard"
-                            :key="'leech-' + currentCard.review_card_id"
-                            :review-card-id="currentCard.review_card_id"
-                            :show-answer="showAnswer"
-                            @rewrite="leechRewriteDialog = true"
-                            @edit="editDialog = true"
-                            @history="sessionActionDrawerOpen = true"
-                            @suspend="executeLifecycleAction('suspend')"
-                        />
-                    </v-col>
-                    <v-col cols="12" md="6">
-                        <div class="caption text--secondary">例句</div>
-                        <v-sheet outlined rounded class="pa-3 mb-4">
-                            <div class="default-font">{{ currentCard.example_sentence_en || '暂无例句。' }}</div>
-                            <div class="text--secondary mt-2">{{ currentCard.example_sentence_zh }}</div>
-                        </v-sheet>
-
-                        <template v-if="supplementaryExample">
-                            <div class="caption text--secondary">补充例句</div>
-                            <v-sheet outlined rounded class="pa-3 mb-4 supplementary-example">
-                                <div class="default-font">{{ supplementaryExample.sentence_en }}</div>
-                                <div class="text--secondary mt-2">{{ supplementaryExample.sentence_zh || '' }}</div>
-                                <div v-if="supplementaryExample.chapter_title" class="text-caption text--secondary mt-2">
-                                    来源：{{ supplementaryExample.chapter_title }}
-                                </div>
-                            </v-sheet>
-                        </template>
-
-                        <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
-                            FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
-                            <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                        </div>
-                        <v-expand-transition>
-                            <div v-if="fsrsDetailOpen">
-                                <v-simple-table dense class="no-hover border rounded-lg mt-2">
-                                    <tbody>
-                                        <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
-                                        <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
-                                        <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
-                                    </tbody>
-                                </v-simple-table>
-                            </div>
-                        </v-expand-transition>
-                    </v-col>
-                </v-row>
-
-                <!-- Rating controls (extracted sub-component). Emits 'rating'
-                     with 'again' | 'hard' | 'good' | 'easy'. The parent owns
-                     the actual rate() method and API call. Interval preview
-                     props (1000-5) are passed down as pure display data;
-                     preview loading/error NEVER disables the buttons. -->
-                <SenseReviewRatingControls
-                    :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
-                    :interval-previews="intervalPreviews"
-                    :preview-loading="intervalPreviewLoading"
-                    :preview-error="intervalPreviewError"
-                    @rating="rate"
-                />
-            </template>
+                <template #after-answer>
+                    <SenseReviewRatingControls
+                        :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
+                        :interval-previews="intervalPreviews"
+                        :preview-loading="intervalPreviewLoading"
+                        :preview-error="intervalPreviewError"
+                        @rating="rate"
+                    />
+                </template>
+            </SenseStudyCard>
         </v-card>
 
         <v-alert v-else-if="!loading && !showSummaryView" type="info" dense outlined>
@@ -492,6 +400,7 @@
     import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
     import SenseReviewLeechPanel from './SenseReviewLeechPanel.vue';
     import SenseReviewLeechRewritePackageDialog from './SenseReviewLeechRewritePackageDialog.vue';
+    import SenseStudyCard from './SenseStudyCard.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
@@ -541,6 +450,7 @@
             SenseReviewReportCenter,
             SenseReviewLeechPanel,
             SenseReviewLeechRewritePackageDialog,
+            SenseStudyCard,
         },
         data: function() {
             return {
@@ -724,21 +634,6 @@
             },
             remainingCount() {
                 return this.cards.length;
-            },
-            supplementaryExample() {
-                if (!this.currentCard) {
-                    return null;
-                }
-                const supp = this.currentCard.supplementary_example;
-                if (!supp || !supp.sentence_en) {
-                    return null;
-                }
-                // Never show a supplementary example that duplicates the
-                // question example (backend guarantees this, but guard here).
-                if (supp.sentence_en === this.currentCard.example_sentence_en) {
-                    return null;
-                }
-                return supp;
             },
             // Understanding aid (sense-level + occurrence-level merged).
             // Backend always returns a normalized structure. Passed as-is to
@@ -1557,10 +1452,3 @@
         }
     }
 </script>
-
-<style scoped>
-    .sense-main {
-        font-size: 24px;
-        font-weight: 600;
-    }
-</style>

@@ -364,6 +364,12 @@ tokens, and translation; `serializeMany()` batches reading-assist lookup.
 No page, navigation, session UI, migration, or scheduling behavior is part of
 this subphase.
 
+**Phase 5B completed (2026-07-14):** `SenseStudyCard.vue` is the shared
+presentation layer. It uses `SenseSentencePreview.vue`, hides optional answer
+fields when empty, and emits only reveal/view-source intents. `SenseReview.vue`
+retains its existing menu, lifecycle actions, FSRS detail, interval preview,
+and rating controls as explicit slots.
+
 #### Task CS-11: `CustomStudy.vue` page skeleton
 **Guard test first**: `tests/js/CustomStudyPageGuard.test.mjs`
 - Page exists at `resources/js/components/CustomStudy/CustomStudy.vue`.
