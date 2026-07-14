@@ -2528,7 +2528,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame($card1->id, $items[1]['review_card_id']);
     }
 
-    public function test_sort_invalid_sort_by_falls_back_to_default_column(): void
+    public function test_sort_invalid_sort_by_returns_422(): void
     {
         $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
         $card1 = $this->createSenseCard($sense1);
@@ -2537,17 +2537,10 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid sort_by with invalid sort_dir — both fall back to defaults (id desc)
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=malicious;DROP TABLE users;&sort_dir=hacked');
-        $response->assertOk();
-        $items = $response->json('items');
-        $this->assertGreaterThanOrEqual(2, count($items));
-        // Should be sorted by id desc (default), not by malicious injection
-        $ids = array_column($items, 'review_card_id');
-        $sorted = $ids;
-        rsort($sorted);
-        $this->assertSame($sorted, $ids, 'Invalid sort_by with invalid sort_dir should fall back to default id desc');
+        $response->assertStatus(422)->assertJsonValidationErrors(['sort_by', 'sort_dir']);
     }
 
-    public function test_sort_invalid_sort_dir_falls_back_to_default(): void
+    public function test_sort_invalid_sort_dir_returns_422(): void
     {
         $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'alpha']);
         $card1 = $this->createSenseCard($sense1);
@@ -2556,14 +2549,7 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid sort_dir should fall back to desc
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?sort_by=id&sort_dir=invalid');
-        $response->assertOk();
-        $items = $response->json('items');
-        $this->assertGreaterThanOrEqual(2, count($items));
-        // Should be sorted by id desc (default dir)
-        $ids = array_column($items, 'review_card_id');
-        $sorted = $ids;
-        rsort($sorted);
-        $this->assertSame($sorted, $ids);
+        $response->assertStatus(422)->assertJsonValidationErrors('sort_dir');
     }
 
     public function test_sort_does_not_leak_other_user_data(): void
@@ -2753,7 +2739,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertNotContains('learning', $states);
     }
 
-    public function test_advanced_filter_fsrs_states_invalid_ignored(): void
+    public function test_advanced_filter_fsrs_states_invalid_returns_422(): void
     {
         $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'newCard']);
         $card = $this->createSenseCard($sense);
@@ -2761,11 +2747,8 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid fsrs_states value should be ignored, so no filter applied
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&fsrs_states[]=invalid_state');
-        $response->assertOk();
-        $items = $response->json('items');
+        $response->assertStatus(422)->assertJsonValidationErrors('fsrs_states.0');
         // Invalid value ignored → no state filter → sees all cards
-        $this->assertCount(1, $items);
-        $this->assertSame('newCard', $items[0]['lemma']);
     }
 
     public function test_advanced_filter_fsrs_states_empty_no_filter(): void
@@ -2866,7 +2849,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame('noDue', $items[0]['lemma']);
     }
 
-    public function test_advanced_filter_due_range_invalid_treats_as_all(): void
+    public function test_advanced_filter_due_range_invalid_returns_422(): void
     {
         $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
         $card = $this->createSenseCard($sense);
@@ -2874,9 +2857,7 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid due_range should fall back to 'all' → no filter
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&due_range=invalid_range');
-        $response->assertOk();
-        $items = $response->json('items');
-        $this->assertCount(1, $items);
+        $response->assertStatus(422)->assertJsonValidationErrors('due_range');
     }
 
     public function test_advanced_filter_reps_min(): void
@@ -2913,7 +2894,7 @@ class ReviewCardManageTest extends TestCase
         $this->assertSame('hasLapses', $items[0]['lemma']);
     }
 
-    public function test_advanced_filter_reps_min_invalid_ignored(): void
+    public function test_advanced_filter_reps_min_invalid_returns_422(): void
     {
         $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
         $card = $this->createSenseCard($sense);
@@ -2921,12 +2902,10 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid reps_min — non-numeric, should be ignored
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&reps_min=hello');
-        $response->assertOk();
-        $items = $response->json('items');
-        $this->assertCount(1, $items);
+        $response->assertStatus(422)->assertJsonValidationErrors('reps_min');
     }
 
-    public function test_advanced_filter_lapses_min_invalid_ignored(): void
+    public function test_advanced_filter_lapses_min_invalid_returns_422(): void
     {
         $sense = $this->createSense($this->user->id, 'english', ['lemma' => 'card']);
         $card = $this->createSenseCard($sense);
@@ -2934,9 +2913,7 @@ class ReviewCardManageTest extends TestCase
 
         // Invalid lapses_min — non-numeric, should be ignored
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data?filter=all&lapses_min=abc');
-        $response->assertOk();
-        $items = $response->json('items');
-        $this->assertCount(1, $items);
+        $response->assertStatus(422)->assertJsonValidationErrors('lapses_min');
     }
 
     public function test_advanced_filter_combined_with_search(): void

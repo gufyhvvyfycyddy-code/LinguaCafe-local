@@ -48,9 +48,9 @@ class ReviewCardManageQueryService
      */
     public function build(Request $request, int $userId, string $language): \Illuminate\Database\Eloquent\Builder
     {
-        $q = trim($request->input('q', ''));
-        $criteria = $this->searchParser->parse($q);
-        return $this->buildFromCriteria($request, $criteria, $userId, $language);
+        $state = ReviewCardManageFilterState::fromRequest($request);
+        $criteria = $this->parseCriteriaForState($state);
+        return $this->buildFromFilterState($state, $criteria, $userId, $language);
     }
 
     /**
@@ -77,7 +77,21 @@ class ReviewCardManageQueryService
         int $userId,
         string $language,
     ): \Illuminate\Database\Eloquent\Builder {
-        $filter = $request->input('filter', 'enabled');
+        return $this->buildFromFilterState(
+            ReviewCardManageFilterState::fromRequest($request),
+            $criteria,
+            $userId,
+            $language,
+        );
+    }
+
+    public function buildFromFilterState(
+        ReviewCardManageFilterState $state,
+        ReviewCardBrowserSearchCriteria $criteria,
+        int $userId,
+        string $language,
+    ): \Illuminate\Database\Eloquent\Builder {
+        $filter = $state->get('filter');
 
         // Base query — all security constraints baked in via whereHas
         $query = ReviewCard::query()
@@ -119,10 +133,10 @@ class ReviewCardManageQueryService
         $this->applyFilters($query, $filter, $userId, $language, $governanceMatchingIds['filter_ids'] ?? null);
 
         // Advanced filters — all within security scope (user_id/language_id/sense confirmed)
-        $this->applyAdvancedFilters($query, $request);
+        $this->applyAdvancedFilters($query, $state);
 
         // Sort — whitelist only, no raw user input in orderBy
-        $this->applySort($query, $request);
+        $this->applySort($query, $state);
 
         return $query;
     }
@@ -139,7 +153,12 @@ class ReviewCardManageQueryService
      */
     public function parseCriteria(Request $request): ReviewCardBrowserSearchCriteria
     {
-        return $this->searchParser->parse(trim($request->input('q', '')));
+        return $this->parseCriteriaForState(ReviewCardManageFilterState::fromRequest($request));
+    }
+
+    public function parseCriteriaForState(ReviewCardManageFilterState $state): ReviewCardBrowserSearchCriteria
+    {
+        return $this->searchParser->parse($state->get('q'));
     }
 
     /**
@@ -339,24 +358,16 @@ class ReviewCardManageQueryService
      * Apply advanced filter query parameters within the already-scoped query.
      * All filters use whitelist/enum/int-safe parsing — no raw user input in SQL.
      */
-    private function applyAdvancedFilters($query, Request $request): void
+    private function applyAdvancedFilters($query, ReviewCardManageFilterState $state): void
     {
         // fsrs_states[] — whitelist each value
-        $allowedStates = ['new', 'learning', 'review', 'relearning'];
-        $fsrsStates = $request->input('fsrs_states', []);
-        if (is_array($fsrsStates) && !empty($fsrsStates)) {
-            $validStates = array_values(array_intersect($fsrsStates, $allowedStates));
-            if (!empty($validStates)) {
-                $query->whereIn('review_cards.fsrs_state', $validStates);
-            }
+        $fsrsStates = $state->get('fsrs_states');
+        if (!empty($fsrsStates)) {
+            $query->whereIn('review_cards.fsrs_state', $fsrsStates);
         }
 
         // due_range — whitelist via switch
-        $dueRange = $request->input('due_range', 'all');
-        $allowedRanges = ['all', 'overdue', 'today', 'next7', 'future', 'none'];
-        if (!in_array($dueRange, $allowedRanges, true)) {
-            $dueRange = 'all';
-        }
+        $dueRange = $state->get('due_range');
         switch ($dueRange) {
             case 'overdue':
                 $query->where('review_cards.fsrs_due_at', '<', Carbon::today());
@@ -379,16 +390,14 @@ class ReviewCardManageQueryService
         }
 
         // reps_min — non-negative int, ctype_digit guard
-        $repsMin = $request->input('reps_min');
-        if ($repsMin !== null && $repsMin !== '' && ctype_digit((string) $repsMin)) {
-            $repsMin = (int) $repsMin;
+        $repsMin = $state->get('reps_min');
+        if ($repsMin !== null) {
             $query->where('review_cards.fsrs_reps', '>=', $repsMin);
         }
 
         // lapses_min — non-negative int, ctype_digit guard
-        $lapsesMin = $request->input('lapses_min');
-        if ($lapsesMin !== null && $lapsesMin !== '' && ctype_digit((string) $lapsesMin)) {
-            $lapsesMin = (int) $lapsesMin;
+        $lapsesMin = $state->get('lapses_min');
+        if ($lapsesMin !== null) {
             $query->where('review_cards.fsrs_lapses', '>=', $lapsesMin);
         }
     }
@@ -396,18 +405,10 @@ class ReviewCardManageQueryService
     /**
      * Apply sort to a query — whitelist only, no raw user input in orderBy.
      */
-    private function applySort($query, Request $request): void
+    private function applySort($query, ReviewCardManageFilterState $state): void
     {
-        $sortBy = $request->input('sort_by', 'id');
-        $sortDir = strtolower($request->input('sort_dir', 'desc'));
-
-        if (!array_key_exists($sortBy, self::SORTABLE_COLUMNS)) {
-            $sortBy = 'id';
-        }
-
-        if (!in_array($sortDir, ['asc', 'desc'], true)) {
-            $sortDir = 'desc';
-        }
+        $sortBy = $state->get('sort_by');
+        $sortDir = $state->get('sort_dir');
 
         $sortColumn = self::SORTABLE_COLUMNS[$sortBy];
         $query->orderBy($sortColumn, $sortDir);

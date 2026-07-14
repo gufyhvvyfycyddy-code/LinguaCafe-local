@@ -13,6 +13,7 @@ use App\Services\ReviewCardManageItemSerializerService;
 use App\Services\ReviewCardService;
 use App\Services\ReviewCardExportService;
 use App\Services\ReviewCardManageQueryService;
+use App\Services\ReviewCardManageFilterState;
 use App\Services\ReviewCardManageMutationService;
 use App\Services\InvalidBrowserSearchException;
 use App\Services\SenseReviewLeechQueryService;
@@ -21,6 +22,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class ReviewCardManageController extends Controller
 {
@@ -50,12 +52,15 @@ class ReviewCardManageController extends Controller
         // is reused for the 422 guard, search_meta, and buildFromCriteria().
         // buildFromCriteria() does NOT re-parse.
         try {
-            $criteria = $this->queryService->parseCriteria($request);
+            $filterState = ReviewCardManageFilterState::fromRequest($request);
+            $criteria = $this->queryService->parseCriteriaForState($filterState);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Invalid review card filters.', 'errors' => $e->errors()], 422);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
+        $query = $this->queryService->buildFromFilterState($filterState, $criteria, $userId, $language);
 
         // Paginate
         $paginator = $query->paginate($perPage);
@@ -112,12 +117,15 @@ class ReviewCardManageController extends Controller
 
         // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $criteria = $this->queryService->parseCriteria($request);
+            $filterState = ReviewCardManageFilterState::fromRequest($request);
+            $criteria = $this->queryService->parseCriteriaForState($filterState);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Invalid review card filters.', 'errors' => $e->errors()], 422);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
+        $query = $this->queryService->buildFromFilterState($filterState, $criteria, $userId, $language);
         $total = $query->count();
 
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {
@@ -143,16 +151,7 @@ class ReviewCardManageController extends Controller
 
         $selectedFields = $fieldResult['selectedFields'];
 
-        $filters = [
-            'q' => trim($request->input('q', '')),
-            'filter' => $request->input('filter', 'enabled'),
-            'fsrs_states' => $request->input('fsrs_states', []),
-            'due_range' => $request->input('due_range', 'all'),
-            'reps_min' => $request->input('reps_min'),
-            'lapses_min' => $request->input('lapses_min'),
-            'sort_by' => $request->input('sort_by', 'id'),
-            'sort_dir' => $request->input('sort_dir', 'desc'),
-        ];
+        $filters = $filterState->toArray();
 
         $data = $this->exportService->buildJsonExportData($items, $selectedFields, $filters, $language);
         $filename = 'review-cards-export-' . now()->format('Ymd-His') . '.json';
@@ -175,12 +174,15 @@ class ReviewCardManageController extends Controller
 
         // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $criteria = $this->queryService->parseCriteria($request);
+            $filterState = ReviewCardManageFilterState::fromRequest($request);
+            $criteria = $this->queryService->parseCriteriaForState($filterState);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Invalid review card filters.', 'errors' => $e->errors()], 422);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
+        $query = $this->queryService->buildFromFilterState($filterState, $criteria, $userId, $language);
 
         $total = $query->count();
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {
@@ -216,12 +218,15 @@ class ReviewCardManageController extends Controller
 
         // ADR-0013: Parse criteria exactly ONCE. Reuse for buildFromCriteria().
         try {
-            $criteria = $this->queryService->parseCriteria($request);
+            $filterState = ReviewCardManageFilterState::fromRequest($request);
+            $criteria = $this->queryService->parseCriteriaForState($filterState);
+        } catch (ValidationException $e) {
+            return response()->json(['message' => 'Invalid review card filters.', 'errors' => $e->errors()], 422);
         } catch (InvalidBrowserSearchException $e) {
             return response()->json($e->toResponseArray(), 422);
         }
 
-        $query = $this->queryService->buildFromCriteria($request, $criteria, $userId, $language);
+        $query = $this->queryService->buildFromFilterState($filterState, $criteria, $userId, $language);
         $total = $query->count();
 
         if ($total > ReviewCardExportService::EXPORT_LIMIT) {

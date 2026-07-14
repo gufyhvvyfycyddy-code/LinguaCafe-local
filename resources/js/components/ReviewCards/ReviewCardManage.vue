@@ -75,6 +75,12 @@
             </v-btn>
         </div>
 
+        <review-card-saved-search-panel
+            :filter-state="currentFilterState"
+            :language="language"
+            @apply="applySavedSearch"
+        />
+
         <!-- Toolbar -->
         <v-row class="mb-3" dense align="center">
             <v-col cols="12" sm="5" md="4">
@@ -1401,11 +1407,17 @@ import {
     severityColor as leechSeverityColor,
 } from '../../services/SenseReviewLeechPresentation.js';
 import SenseReviewLeechRewritePackageDialog from '../Senses/SenseReviewLeechRewritePackageDialog.vue';
+import ReviewCardSavedSearchPanel from './ReviewCardSavedSearchPanel.vue';
+import {
+    applyReviewCardManageFilterState,
+    buildReviewCardManageFilterState,
+} from '../../services/ReviewCardManageFilterState.js';
 
 export default {
     components: {
         SenseExampleDialog,
         SenseReviewLeechRewritePackageDialog,
+        ReviewCardSavedSearchPanel,
     },
     props: {
         language: {
@@ -1657,6 +1669,9 @@ export default {
         };
     },
     computed: {
+        currentFilterState() {
+            return buildReviewCardManageFilterState(this);
+        },
         selectIndeterminate() {
             if (this.selectedIds.length === 0) return false;
             if (this.items.length === 0) return false;
@@ -1800,6 +1815,12 @@ export default {
         this.handleDeepLink();
     },
     methods: {
+        applySavedSearch(savedSearch) {
+            applyReviewCardManageFilterState(this, savedSearch.filter_state);
+            this.currentPage = 1;
+            this.clearSelection();
+            this.loadData();
+        },
         loadFsrsStats() {
             this.statsLoading = true;
             this.statsError = '';
@@ -1833,16 +1854,9 @@ export default {
 
             axios.get('/review-cards/manage/data', {
                 params: {
-                    q: this.searchQuery,
-                    filter: this.currentFilter,
+                    ...this.currentFilterState,
                     page: this.currentPage,
                     per_page: this.perPage,
-                    sort_by: this.sortBy,
-                    sort_dir: this.sortDir,
-                    fsrs_states: this.advancedFilters.fsrsStates,
-                    due_range: this.advancedFilters.dueRange,
-                    reps_min: this.advancedFilters.repsMin,
-                    lapses_min: this.advancedFilters.lapsesMin,
                 },
             })
             .then((response) => {
@@ -2809,14 +2823,8 @@ export default {
             this.exportLoading = true;
             axios.get('/review-cards/manage/export', {
                 params: {
-                    q: this.searchQuery,
+                    ...this.currentFilterState,
                     filter: this.effectiveFilter(),
-                    sort_by: this.sortBy,
-                    sort_dir: this.sortDir,
-                    fsrs_states: this.advancedFilters.fsrsStates,
-                    due_range: this.advancedFilters.dueRange,
-                    reps_min: this.advancedFilters.repsMin,
-                    lapses_min: this.advancedFilters.lapsesMin,
                     fields: this.exportFields,
                 },
                 responseType: 'blob',
@@ -2858,14 +2866,8 @@ export default {
             this.ankiExportLoading = true;
             axios.get('/review-cards/manage/export-anki-tsv', {
                 params: {
-                    q: this.searchQuery,
+                    ...this.currentFilterState,
                     filter: this.effectiveFilter(),
-                    sort_by: this.sortBy,
-                    sort_dir: this.sortDir,
-                    fsrs_states: this.advancedFilters.fsrsStates,
-                    due_range: this.advancedFilters.dueRange,
-                    reps_min: this.advancedFilters.repsMin,
-                    lapses_min: this.advancedFilters.lapsesMin,
                 },
                 responseType: 'blob',
             })
@@ -2905,14 +2907,8 @@ export default {
             this.csvExportLoading = true;
             axios.get('/review-cards/manage/export-csv', {
                 params: {
-                    q: this.searchQuery,
+                    ...this.currentFilterState,
                     filter: this.effectiveFilter(),
-                    sort_by: this.sortBy,
-                    sort_dir: this.sortDir,
-                    fsrs_states: this.advancedFilters.fsrsStates,
-                    due_range: this.advancedFilters.dueRange,
-                    reps_min: this.advancedFilters.repsMin,
-                    lapses_min: this.advancedFilters.lapsesMin,
                     fields: this.exportFields,
                 },
                 responseType: 'blob',

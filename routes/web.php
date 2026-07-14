@@ -241,6 +241,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/review-cards/manage/export', [App\Http\Controllers\ReviewCardManageController::class, 'export']);
     Route::get('/review-cards/manage/export-anki-tsv', [App\Http\Controllers\ReviewCardManageController::class, 'exportAnkiTsv']);
     Route::get('/review-cards/manage/export-csv', [App\Http\Controllers\ReviewCardManageController::class, 'exportCsv']);
+    Route::get('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'index']);
+    Route::post('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'store']);
+    Route::patch('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'update']);
+    Route::delete('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'destroy']);
     Route::get('/review-cards/manage/{reviewCard}/logs', [App\Http\Controllers\ReviewCardManageController::class, 'logs']);
     Route::get('/review-cards/manage/{reviewCard}/detail', [App\Http\Controllers\ReviewCardManageController::class, 'detail']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
