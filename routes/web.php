@@ -122,6 +122,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/chapters/edit/{bookId}/{chapterId}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/review/{practiceMode?}/{bookId?}/{chapterId?}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/custom-study', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/study-overview', [App\Http\Controllers\StudyOverviewController::class, 'index']);
+    Route::get('/study-overview/data', [App\Http\Controllers\StudyOverviewController::class, 'data']);
     Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);
     Route::get('/reviews/senses/today-limits', [App\Http\Controllers\ReviewTodayLimitsController::class, 'show']);
     Route::put('/reviews/senses/today-limits', [App\Http\Controllers\ReviewTodayLimitsController::class, 'update']);

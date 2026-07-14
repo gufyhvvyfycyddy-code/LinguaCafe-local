@@ -16,6 +16,7 @@ class RateReviewCardRequest extends FormRequest
         return [
             'reviewCardId' => 'required|integer|min:1',
             'rating' => 'required|string|in:again,hard,good,easy',
+            'review_duration_ms' => 'nullable|integer|min:0|max:600000',
         ];
     }
 }

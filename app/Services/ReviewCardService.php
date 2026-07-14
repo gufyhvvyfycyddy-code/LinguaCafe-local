@@ -188,8 +188,9 @@ class ReviewCardService
         string $rating,
         string $source = 'review',
         ?string $reviewSessionId = null,
+        ?int $reviewDurationMs = null,
     ): ReviewCard {
-        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId) {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs) {
             // ADR-0010: Only queue-eligible cards can be rated.
             // - lifecycle_state = 'active'
             // - buried_until IS NULL OR buried_until <= now
@@ -246,6 +247,7 @@ class ReviewCardService
                 'review_card_id' => $card->id,
                 'rating' => $rating,
                 'reviewed_at' => $schedule['reviewed_at'],
+                'review_duration_ms' => $reviewDurationMs,
                 'previous_state' => $previous['state'],
                 'new_state' => $card->fsrs_state,
                 'previous_due_at' => $previous['due_at'],

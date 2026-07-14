@@ -74,6 +74,7 @@ export default {
     props: {
         filterState: { type: Object, required: true },
         language: { type: String, default: 'english' },
+        initialSavedSearchId: { type: Number, default: null },
     },
     data() {
         return {
@@ -86,6 +87,7 @@ export default {
             error: '',
             deleteDialog: false,
             requestGeneration: 0,
+            initialApplied: false,
         };
     },
     computed: {
@@ -119,6 +121,12 @@ export default {
                 if (this.selectedId && !this.selectedSearch) {
                     this.selectedId = null;
                     this.appliedId = null;
+                }
+                if (!this.initialApplied && this.initialSavedSearchId) {
+                    this.selectedId = this.initialSavedSearchId;
+                    this.initialApplied = true;
+                    this.syncSelectedName();
+                    this.applySelected();
                 }
             } catch (error) {
                 if (generation === this.requestGeneration) this.error = this.messageFor(error, '保存的搜索加载失败。');

@@ -410,6 +410,7 @@
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
     import { runAuthoritativeRatingRecovery } from '../Review/ReviewRatingRecovery.js';
+    import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from '../Review/ReviewDurationTracker.js';
     import {
         MORE_MENU_ITEMS,
         actionLabel,
@@ -554,6 +555,7 @@
                 // discarded so it cannot overwrite a newer rating result or
                 // a newer queue state.
                 loadCardsRequestSequence: 0,
+                reviewDurationTracker: createTracker(Date.now(), document.visibilityState !== 'hidden'),
                 // ADR-0009: Review session identity + stack undo.
                 // reviewSessionId: UUID per browser tab (sessionStorage,
                 //   refresh-persistent, not shared across tabs).
@@ -709,6 +711,7 @@
                 const newId = newCard ? newCard.review_card_id : null;
                 const oldId = oldCard ? oldCard.review_card_id : null;
                 if (newId !== oldId) {
+                    this.reviewDurationTracker = createTracker(Date.now(), document.visibilityState !== 'hidden');
                     this.intervalPreviews = null;
                     this.intervalPreviewError = '';
                     this.intervalPreviewLoading = false;
@@ -722,6 +725,7 @@
         },
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
+            document.removeEventListener('visibilitychange', this.handleReviewVisibility);
         },
         mounted() {
             // ADR-0009: Create or restore the per-tab review session ID.
@@ -735,8 +739,13 @@
             // the user can still see and undo their recent ratings.
             this.loadSessionActions();
             window.addEventListener('keyup', this.handleHotkey);
+            document.addEventListener('visibilitychange', this.handleReviewVisibility);
         },
         methods: {
+            handleReviewVisibility() {
+                if (document.visibilityState === 'hidden') pauseDuration(this.reviewDurationTracker);
+                else resumeDuration(this.reviewDurationTracker);
+            },
             onTodayLimitsChanged(limits) {
                 this.summary = Object.assign({}, this.summary, limits);
                 this.ignoreDailyLimits = false;
@@ -858,6 +867,7 @@
                 // rating completes and triggers a fresh loadCards().
                 this.loadCardsRequestSequence++;
                 const payload = { rating: rating };
+                payload.review_duration_ms = durationMs(this.reviewDurationTracker);
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;
                 }

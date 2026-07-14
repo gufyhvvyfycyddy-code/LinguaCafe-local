@@ -1053,3 +1053,13 @@ Accept（待真实浏览器验收后最终确认）。
 不自动进入下一任务。
 
 - Did NOT enter the next task automatically.
+# Authoritative Anki study-management closure update (2026-07-14)
+
+Saved Search V1, today-only limits with precise cumulative new introductions (Mgmt-7-b), Review Time, and Study Overview V1 are production-ready.
+
+- Phase A: commit `334a12d` (`feat: add saved review card searches`), pushed to `master`; ADR-0017 and migration `2026_07_14_000001`.
+- Phase B: commit `04af001` (`feat: add today-only review limits`), pushed to `master`; ADR-0018 and migration `2026_07_14_000002`.
+- Phase C: ADR-0019 and migration `2026_07_14_000003`; formal sense and legacy ratings capture visible active time, undone logs retain audit duration, and product metrics exclude undone/reset/non-sense-review rows.
+- Study Overview supports 30/90/365 days and private Saved Search current-membership scope, separates overdue from 30 future study days, reports explicit coverage/unavailable counts, and keeps query counts constant for 1/100/500-card fixtures.
+- Chrome acceptance passed for Saved Search CRUD/deep-link restore, effective today-only limit changes/reset, two real timed ratings plus undo audit semantics, and responsive Study Overview at exact 1920×1080 and 900×900 without horizontal overflow.
+- Exactly three additive reversible migrations were used. No FSRS math, lifecycle semantics, Custom Study, Preset, phrase review, `.env`, or notification behavior changed.

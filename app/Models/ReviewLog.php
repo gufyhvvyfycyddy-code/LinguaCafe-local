@@ -16,6 +16,7 @@ class ReviewLog extends Model
         'review_card_id',
         'rating',
         'reviewed_at',
+        'review_duration_ms',
         'previous_state',
         'new_state',
         'previous_due_at',
@@ -38,6 +39,7 @@ class ReviewLog extends Model
     {
         return [
             'reviewed_at' => 'datetime',
+            'review_duration_ms' => 'integer',
             'previous_due_at' => 'datetime',
             'new_due_at' => 'datetime',
             'previous_stability' => 'float',

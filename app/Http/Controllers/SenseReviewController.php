@@ -60,12 +60,14 @@ class SenseReviewController extends Controller
         $request->validate([
             'rating' => ['required', 'in:again,hard,good,easy'],
             'review_session_id' => ['nullable', 'string', 'uuid'],
+            'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
         ]);
 
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
         $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
         $reviewSessionId = $request->post('review_session_id');
+        $reviewDurationMs = $request->post('review_duration_ms');
 
         $card = ReviewCard::where('id', $reviewCardId)
             ->where('user_id', $userId)
@@ -85,6 +87,7 @@ class SenseReviewController extends Controller
             $rating,
             'sense_review',
             $reviewSessionId,
+            $reviewDurationMs,
         );
 
         // Build action metadata for the undo ledger (ADR-0009).

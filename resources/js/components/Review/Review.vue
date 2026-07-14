@@ -518,6 +518,7 @@
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
     import { runAuthoritativeRatingRecovery } from './ReviewRatingRecovery.js';
+    import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from './ReviewDurationTracker.js';
     import SenseSentencePreview from './SenseSentencePreview.vue';
     import SenseExampleDialog from './SenseExampleDialog.vue';
 
@@ -584,6 +585,7 @@
                 // dailyLimitSummary / finished. Slow responses are dropped.
                 ratingLoading: false,
                 ratingRequestSequence: 0,
+                reviewDurationTracker: createTracker(Date.now(), document.visibilityState !== 'hidden'),
             }
         },
         props: {
@@ -597,14 +599,20 @@
             }
 
             this.loadReviews();
+            document.addEventListener('visibilitychange', this.handleReviewVisibility);
         },
         beforeDestroy: function () {
             window.removeEventListener('keyup', this.hotkey);
+            document.removeEventListener('visibilitychange', this.handleReviewVisibility);
             // DEV-QO-6: invalidate in-flight rating requests on destroy.
             this.ratingRequestSequence++;
             this.ratingLoading = false;
         },
         methods: {
+            handleReviewVisibility() {
+                if (document.visibilityState === 'hidden') pauseDuration(this.reviewDurationTracker);
+                else resumeDuration(this.reviewDurationTracker);
+            },
             enableIgnoreDailyLimits() {
                 var lsKey = 'linguacafe_sense_review_ignore_daily_limits_' + this.today;
                 localStorage.setItem(lsKey, 'true');
@@ -849,6 +857,7 @@
                     const payload = {
                         reviewCardId: this.reviews[this.currentReviewIndex].review_card_id,
                         rating: rating,
+                        review_duration_ms: durationMs(this.reviewDurationTracker),
                     };
                     if (this.ignoreDailyLimits) {
                         payload.ignoreDailyLimits = true;
@@ -992,6 +1001,7 @@
                 // 变成队列中的下一张。这保证 /reviews 与 /reviews/senses 两个
                 // 入口返回相同的卡顺序。
                 this.currentReviewIndex = 0;
+                this.reviewDurationTracker = createTracker(Date.now(), document.visibilityState !== 'hidden');
 
                 this.exampleSentence = null;
                 this.sourceFallbackDialog = false;

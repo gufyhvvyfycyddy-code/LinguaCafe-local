@@ -159,6 +159,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: '学习总览',
+                        url: '/study-overview',
+                        icon: 'mdi-view-dashboard-outline',
+                        bottomNav: false,
+                    },
+                    {
                         name: '设置',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',

@@ -78,6 +78,7 @@
         <review-card-saved-search-panel
             :filter-state="currentFilterState"
             :language="language"
+            :initial-saved-search-id="deepLinkedSavedSearchId"
             @apply="applySavedSearch"
         />
 
@@ -1669,6 +1670,10 @@ export default {
         };
     },
     computed: {
+        deepLinkedSavedSearchId() {
+            const value = Number(this.$route?.query?.saved_search_id);
+            return Number.isInteger(value) && value > 0 ? value : null;
+        },
         currentFilterState() {
             return buildReviewCardManageFilterState(this);
         },
