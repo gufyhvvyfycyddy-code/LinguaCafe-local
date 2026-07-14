@@ -1,7 +1,7 @@
 # ADR-0016: Custom Study Preview Session
 
-**Status**: Accepted (architecture complete; **Phase 1 Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A Accepted (Task 2000-17, Builder contract docs fixed in Task 2000-18). Phase 2B Accepted (Task 2000-18: `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`). Phase 3A Accepted (Task 2000-19 + Task 2000-20 docs closure): `CustomStudySessionState` (immutable value object with `completed_ids` + `skipped_ineligible_ids` fields, five-state union + mutual exclusion invariants, no DB/Auth/Request/Crypt) + `CustomStudySessionTokenService` (only encrypts/decrypts/verifies, no rotate/answer/rating/SessionService/PreviewPolicy, injects `Illuminate\Contracts\Encryption\Encrypter`, `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`). Phase 3B code and tests completed in Task 2000-20, awaiting web-side acceptance: `CustomStudyPreviewPolicy` (pure state transition function — `applyRating(state, rating, now)` + `resume(state, now)`; only accepts four lowercase ratings `again`/`hard`/`good`/`easy`; Again/Hard → `delayed_repeat_queue`, Good/Easy → `completed_ids`; picks next `current_card_id` from `ready_queue` first, else earliest mature `delayed_repeat_queue` entry; does NOT touch DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI; does NOT call `toArray()`/`fromArray()`, only `withProgress()`) + `CustomStudySessionState::withProgress()` (immutable copy boundary — preserves identity fields, accepts the new five-state, auto-recomputes `completed_count`/`total_count`, auto-increments `step`, rejects `step === PHP_INT_MAX` overflow) + `CustomStudySessionState::waitUntil()` + `CustomStudySessionState::isCompleted()` + `CustomStudyPreviewPolicyException` + Token constants (`VERSION`, `MAX_CANDIDATE_COUNT`) referencing `CustomStudySessionState` (single source of truth). Phase 4-7 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator, Phase 2A read-only candidate queries, Phase 2B chapter locator + source_chapter/leech_attention queries + unified candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, and Phase 3B pure state transition policy)
-**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17; Phase 2A docs fix + Phase 2B added 2026-07-14 by Task 2000-18; Phase 2B Accepted + Phase 3A SessionState/TokenService + state contract fix + chapter picker future registration added 2026-07-14 by Task 2000-19; Phase 3A Accepted + Phase 3B PreviewPolicy + withProgress + transition contract closure added 2026-07-14 by Task 2000-20)
+**Status**: Accepted (architecture complete; **Phase 1 Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A Accepted (Task 2000-17, Builder contract docs fixed in Task 2000-18). Phase 2B Accepted (Task 2000-18: `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`). Phase 3A Accepted (Task 2000-19 + Task 2000-20 docs closure): `CustomStudySessionState` (immutable value object with `completed_ids` + `skipped_ineligible_ids` fields, five-state union + mutual exclusion invariants, no DB/Auth/Request/Crypt) + `CustomStudySessionTokenService` (only encrypts/decrypts/verifies, no rotate/answer/rating/SessionService/PreviewPolicy, injects `Illuminate\Contracts\Encryption\Encrypter`, `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`). Phase 3B code and tests completed in Task 2000-20, docs/harness status drift closed in Task 2000-21, awaiting web-side final closure: `CustomStudyPreviewPolicy` (pure state transition function — `applyRating(state, rating, now)` + `resume(state, now)`; only accepts four lowercase ratings `again`/`hard`/`good`/`easy`; Again/Hard → `delayed_repeat_queue`, Good/Easy → `completed_ids`; picks next `current_card_id` from `ready_queue` first, else earliest mature `delayed_repeat_queue` entry; does NOT touch DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI; does NOT call `toArray()`/`fromArray()`, only `withProgress()`) + `CustomStudySessionState::withProgress()` (immutable copy boundary — preserves identity fields, accepts the new five-state, auto-recomputes `completed_count`/`total_count`, auto-increments `step`, rejects `step === PHP_INT_MAX` overflow) + `CustomStudySessionState::waitUntil()` + `CustomStudySessionState::isCompleted()` + `CustomStudyPreviewPolicyException` + Token constants (`VERSION`, `MAX_CANDIDATE_COUNT`) referencing `CustomStudySessionState` (single source of truth). Phase 4A code and tests completed in Task 2000-21, awaiting web-side acceptance: `CustomStudySessionOrder` (pure session-internal ordering service — batch-loads ReviewCard once filtering user+language+target_type=sense; computes one canonical fallback rank via `ReviewQueueOrderService::order()`; per-mode primary sort: source_chapter = canonical, overdue = retrievability ASC, today_forgotten = latest today-again DESC, leech_attention = severity DESC; tie-break on canonical fallback; does NOT apply card_limit, does NOT create SessionState/token, does NOT write any table, does NOT modify Queue Order settings, does NOT re-run Criteria queries). Phase 4B-7 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator, Phase 2A read-only candidate queries, Phase 2B chapter locator + source_chapter/leech_attention queries + unified candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, Phase 3B pure state transition policy, and Phase 4A session-internal ordering)
+**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17; Phase 2A docs fix + Phase 2B added 2026-07-14 by Task 2000-18; Phase 2B Accepted + Phase 3A SessionState/TokenService + state contract fix + chapter picker future registration added 2026-07-14 by Task 2000-19; Phase 3A Accepted + Phase 3B PreviewPolicy + withProgress + transition contract closure added 2026-07-14 by Task 2000-20; Phase 3B docs/harness status drift closed + Phase 4A `CustomStudySessionOrder` + `candidate_count` future contract registered added 2026-07-14 by Task 2000-21)
 **Related**: `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0015-review-queue-order-policy.md`, `docs/plans/custom-study-1a-implementation-plan.md`
 
 ## Context
@@ -553,50 +553,65 @@ The implementation plan must include the following files. This list is authorita
 - `app/Services/CustomStudy/Queries/LeechAttentionQuery.php` — Policy-derived query (reuses `SenseReviewLeechPolicy`, no Policy duplication). Returns candidate IDs.
 - `app/Services/CustomStudy/CustomStudyQueryService.php` — unified candidate-ID dispatcher for all four modes. Returns ordered candidate IDs only; no card payload hydration.
 
-#### 19.4 Backend — Phase 3A (existing, awaiting web-side acceptance, Task 2000-19)
+#### 19.4 Backend — Phase 3A (existing, Accepted, Task 2000-19; Phase 3B code/tests complete pending final web closure, Task 2000-20 / Task 2000-21)
 
 - `app/Exceptions/CustomStudySessionStateException.php` — structured exception with stable internal `reason` + `message`; no HTTP Response, no Request, no Auth, no DB.
 - `app/Services/CustomStudy/CustomStudySessionState.php` — immutable value object holding the full session state: `version`, `user_id`, `language`, `mode`, `parameters`, `session_id`, `issued_at`, `expires_at`, `ordered_candidate_ids`, `ready_queue`, `delayed_repeat_queue`, `completed_ids`, `skipped_ineligible_ids`, `completed_count`, `total_count`, `current_card_id`, `step`, `preview_delay_config`. Pure — no DB, no Auth, no Request, no Crypt, no ReviewLog, no FSRS, no AI. Exposes `createInitial()` + `fromArray()` + `toArray()` + read-only getters; NO setter; NO answer/rate/resume/nextCard/transition/rotate.
 - `app/Services/CustomStudy/CustomStudySessionTokenService.php` — encrypts, decrypts, and verifies the session-state token. Injects `Illuminate\Contracts\Encryption\Encrypter`. Exposes `issue()` + `verify()` only; NO `rotate(answer)`; NO rating/answer branching; NO SessionService/PreviewPolicy/Controller/routes/Vue. `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`, `MAX_CANDIDATE_COUNT=500`.
 
-#### 19.5 Backend — Phase 4 (NOT created; authorized only by future task)
+#### 19.5 Backend — Phase 3B (existing, code/tests complete pending final web closure, Task 2000-20 / Task 2000-21)
 
-- `app/Services/CustomStudy/CustomStudyPreviewPolicy.php` — pure function: maps (current_state, rating) → (updated_state, wait_until). Again→delayed(60s), Hard→delayed(600s), Good→completed, Easy→completed.
-- `app/Services/CustomStudy/CustomStudySessionService.php` — orchestrates: validate token → re-validate eligibility → apply PreviewPolicy → pick next card → rotate token. No write.
-- `app/Services/CustomStudy/CustomStudySessionOrder.php` — pure function: mode-specific order override applied at session creation only.
+- `app/Exceptions/CustomStudyPreviewPolicyException.php` — structured exception with stable internal `reason` + `message`; reasons are `invalid_rating` / `no_current_card`. No HTTP Response, no Request, no Auth, no DB.
+- `app/Services/CustomStudy/CustomStudyPreviewPolicy.php` — pure state-transition function: `applyRating(state, rating, now)` + `resume(state, now)`. Again → delayed (again_secs), Hard → delayed (hard_secs), Good → completed, Easy → completed. Picks next card via `withProgress()` only — never calls `toArray()` / `fromArray()`. No DB, no Auth, no Request, no Crypt, no ReviewLog, no FSRS, no AI, no token issue/verify.
 
-#### 19.6 Frontend (NOT created; authorized only by future Phase 6/7 task)
+#### 19.6 Backend — Phase 4A (existing, code/tests complete pending web acceptance, Task 2000-21)
+
+- `app/Services/CustomStudy/CustomStudySessionOrder.php` — pure session-internal ordering service. Takes unordered candidate IDs from `CustomStudyQueryService` + a `CustomStudyCriteria` + trusted `userId` / `language` + `Carbon $now` + `ReviewQueueOrderOptions`, and returns the ordered `list<int>` of sense-card IDs for `CustomStudySessionState::createInitial()`. Batch-loads ReviewCard once (filters user + language + target_type=sense), computes one canonical fallback rank via `ReviewQueueOrderService::order()`, applies per-mode primary sort key (source_chapter = canonical; overdue = retrievability ASC; today_forgotten = latest today-again DESC; leech_attention = severity DESC), tie-breaks on canonical fallback. Does NOT apply card_limit, does NOT create SessionState, does NOT create token, does NOT write any table, does NOT modify Queue Order settings, does NOT re-run Criteria queries.
+
+#### 19.7 Backend — Phase 4B (NOT created; authorized only by future task)
+
+- `app/Services/CustomStudy/CustomStudySessionService.php` — orchestrates: validate token → re-validate eligibility → apply PreviewPolicy → pick next card → issue refreshed token. No write.
+
+#### 19.8 Frontend (NOT created; authorized only by future Phase 6/7 task)
 
 - `resources/js/components/CustomStudy/CustomStudy.vue` — top-level page component.
 - `resources/js/components/CustomStudy/CustomStudySession.vue` — session orchestration component (token management, answer/resume calls).
 - `resources/js/components/Senses/SenseStudyCard.vue` — shared card presentation component (see §20 for boundary).
 
-#### 19.7 Tests — Phase 1 (existing, accepted)
+#### 19.9 Tests — Phase 1 (existing, accepted)
 
 - `tests/Unit/CustomStudyCriteriaTest.php`
 - `tests/Unit/CustomStudyCriteriaValidatorTest.php`
 
-#### 19.8 Tests — Phase 2A (existing, accepted)
+#### 19.10 Tests — Phase 2A (existing, accepted)
 
 - `tests/Feature/CustomStudyTodayForgottenQueryTest.php`
 - `tests/Feature/CustomStudyOverdueQueryTest.php`
 
-#### 19.9 Tests — Phase 2B (existing, accepted, Task 2000-18)
+#### 19.11 Tests — Phase 2B (existing, accepted, Task 2000-18)
 
 - `tests/Feature/CustomStudyChapterLocatorTest.php`
 - `tests/Feature/CustomStudySourceChapterQueryTest.php`
 - `tests/Feature/CustomStudyLeechAttentionQueryTest.php`
 - `tests/Feature/CustomStudyQueryServiceTest.php`
 
-#### 19.10 Tests — Phase 3A (existing, awaiting web-side acceptance, Task 2000-19)
+#### 19.12 Tests — Phase 3A (existing, Accepted, Task 2000-19)
 
 - `tests/Unit/CustomStudySessionStateTest.php` — 37+ behavior tests covering immutability, five-state union + mutual exclusion invariants, validation matrix, and pure/no-DB/no-Auth/no-Request/no-Crypt guards.
 - `tests/Unit/CustomStudySessionTokenServiceTest.php` — 32+ behavior tests covering issue+verify round-trip, opacity, tamper rejection, expiry, user/language binding, MAX_TOKEN_BYTES, MAX_CANDIDATE_COUNT, no DB, no Auth, no Request, no ReviewLog, no FSRS, no AI, no rotate(answer).
 
-#### 19.11 Tests — Phase 4+ (NOT created; authorized only by future task)
+#### 19.13 Tests — Phase 3B (existing, code/tests complete pending final web closure, Task 2000-20 / Task 2000-21)
+
+- `tests/Unit/CustomStudySessionStateProgressTest.php` — 39 behavior tests covering `withProgress()` immutability, identity-field preservation, automatic `completed_count` / `total_count` recompute, automatic `step + 1`, `step_overflow` rejection, five-state invariant re-validation, `waitUntil()`, `isCompleted()`.
+- `tests/Unit/CustomStudyPreviewPolicyTest.php` — 51 behavior tests covering Rating (again/hard → delayed with correct secs; good/easy → completed; ready priority; mature-delayed selection; tie stability; step +1; original-state immutability; invalid/uppercase/numeric rating rejection; null-current rejection), Resume (keep current; pop ready; pop mature delayed; immature-only keeps null; waitUntil; isCompleted), and Architecture (no toArray/fromArray; only withProgress; no DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI/Token/QueryService; injected Carbon).
+
+#### 19.14 Tests — Phase 4A (existing, code/tests complete pending web acceptance, Task 2000-21)
+
+- `tests/Feature/CustomStudySessionOrderTest.php` — 55+ behavior tests covering: empty input; dedup; positive-int filter; cross-user/language/legacy-word filter; single batch ReviewCard load; single canonical fallback computation; per-mode ordering (source_chapter = canonical; overdue = retrievability ASC; today_forgotten = latest today-again DESC; leech_attention = severity DESC); tie-break on canonical fallback; stable determinism; no card_limit; no Criteria query re-run; no SessionState/token creation; no DB writes; no settings mutation; no QueryService call; single `describeForCards()` call; preloaded cards; no `describeForCard()` / `summary()`; no N+1.
+
+#### 19.15 Tests — Phase 4B+ (NOT created; authorized only by future task)
 
 Backend:
-- `tests/Unit/CustomStudyPreviewPolicyTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
 - `tests/Feature/CustomStudyAnswerTest.php`
 - `tests/Feature/CustomStudyResumeTest.php`
@@ -607,7 +622,7 @@ Frontend (Node guard tests):
 - `tests/js/CustomStudyPageGuard.test.mjs`
 - `tests/js/CustomStudySessionUiGuard.test.mjs`
 
-#### 19.12 Files NOT created (prohibited in 1A)
+#### 19.16 Files NOT created (prohibited in 1A)
 
 - No migration file.
 - No `custom_study_sessions` DB table.
@@ -812,13 +827,32 @@ AI translation tests (registered by Task 2000-16 for future CS-11.5, NOT execute
 25. No AI provider call, no WordSense/WordSenseOccurrence/ReviewCard write, no FSRS change, no ReviewLog write.
 26. Translation visual uses existing reading-page vertical-stacked style (LinguaCafe adaptation, not Anki default).
 
-### 21. Chapter picker future contract (registered by Task 2000-19; NOT implemented in Task 2000-19)
+### 21. Chapter picker future contract (registered by Task 2000-19; candidate_count display requirement registered by Task 2000-21; NOT implemented in Task 2000-19 or Task 2000-21)
 
-> **Status**: Registered as a future product requirement for Phase 5 / CS-11 (chapter picker product contract) and Phase 6 (chapter options data delivery Gate). **Task 2000-19 does NOT implement the chapter list, page, or endpoint.** This section is a placeholder so the requirement is not lost; the actual implementation happens in a future Phase 5/6 round after an Architecture Gate.
+> **Status**: Registered as a future product requirement for Phase 5 / CS-11 (chapter picker product contract) and Phase 6 (chapter options data delivery Gate). **Task 2000-19 does NOT implement the chapter list, page, or endpoint. Task 2000-21 only registers the `candidate_count` display contract and the open product Gate; it does NOT implement any chapter-picker code, endpoint, migration, or Vue component.** This section is a placeholder so the requirement is not lost; the actual implementation happens in a future Phase 5/6 round after an Architecture Gate.
 
 **Product requirement (registered, not implemented)**:
 
 The `source_chapter` mode chapter picker MUST only show chapters (for the current user + current language) that currently have at least one candidate card satisfying `SourceChapterQuery` eligibility. Chapters that would produce an empty session (`candidate_count = 0`) MUST NOT be shown.
+
+**`candidate_count` display contract (registered by Task 2000-21; Phase 5/6 implementation deferred)**:
+
+1. Each chapter option returned by the future chapter picker MUST include a `candidate_count` field.
+2. `candidate_count` MUST be a non-negative integer.
+3. `candidate_count = 0` chapters MUST NOT be returned and MUST NOT be displayed.
+4. The display position of `candidate_count` MUST be in the same option area as the chapter title, so the user can see the count without entering the chapter.
+5. Task 2000-21 does NOT implement the candidate_count query, endpoint, or Vue rendering.
+6. Task 2000-21 does NOT decide the final visual style (chip, badge, parenthetical count, etc.) — that is a Phase 5/6 Architecture Gate decision.
+
+**OPEN PRODUCT GATE (registered by Task 2000-21; awaiting user decision before Phase 5/6 implementation)**:
+
+```
+candidate_count 语义未决：
+A. 显示"当前全部可用候选数"（不受 card_limit 截断）
+B. 显示"应用本次 card_limit 后的数量"（受 card_limit 截断）
+```
+
+Task 2000-21 does NOT choose A or B. The user must decide before Phase 5/6 implementation can proceed. The chosen semantics will be written into this section as part of the Phase 5/6 Architecture Gate.
 
 Eligibility reuses `SourceChapterQuery`'s exact criteria — no separate filter:
 1. Confirmed `WordSense` only.
@@ -830,26 +864,31 @@ Eligibility reuses `SourceChapterQuery`'s exact criteria — no separate filter:
 **Performance contract**:
 1. The chapter picker data source MUST be a single **batched / grouped read query** — NOT N+1 calls to `SourceChapterQuery` per chapter.
 2. The query MUST reuse the same eligibility predicates as `SourceChapterQuery` (no duplicate policy logic, no divergent filter).
-3. The page MAY display `candidate_count` per chapter, but Task 2000-19 does NOT freeze the visual layout.
-4. Task 2000-19 does NOT add the chapter picker endpoint, does NOT modify `Chapter`, does NOT implement any frontend picker.
+3. The page MUST display `candidate_count` per chapter (Task 2000-21 registered contract; Task 2000-19's earlier "MAY display" wording is superseded).
+4. Task 2000-19 does NOT add the chapter picker endpoint, does NOT modify `Chapter`, does NOT implement any frontend picker. Task 2000-21 does NOT add them either.
 
-**Bootstrap-vs-dedicated-endpoint decision**: deferred to the Phase 5/6 Architecture Gate. Task 2000-19 does NOT decide whether the picker data is delivered via page bootstrap JSON or via an authenticated dedicated GET endpoint.
+**Bootstrap-vs-dedicated-endpoint decision**: deferred to the Phase 5/6 Architecture Gate. Task 2000-19 does NOT decide whether the picker data is delivered via page bootstrap JSON or via an authenticated dedicated GET endpoint. Task 2000-21 also does NOT decide.
 
-**Current status (Task 2000-19)**:
+**Current status (Task 2000-19 + Task 2000-21)**:
 ```
 章节选择器只显示存在候选卡的章节：
 已登记到未来 Phase 5/6；
+Task 2000-21 已登记 candidate_count MUST display 契约；
+Task 2000-21 已登记 candidate_count = 0 章节禁止显示；
+Task 2000-21 已登记 candidate_count 语义 OPEN PRODUCT GATE（A 全部 vs B card_limit 截断）；
 本轮不实现章节列表；
 本轮不实现章节选项 endpoint；
 本轮不修改 Chapter；
-本轮不实现前端选择器。
+本轮不实现前端选择器；
+本轮不实现 candidate_count 查询或渲染。
 ```
 
 **Pre-implementation Gate (MUST be satisfied before Phase 5/6 implementation can touch this feature)**:
 1. The batched query MUST be reviewed for N+1 safety before implementation.
 2. The query MUST NOT duplicate `SourceChapterQuery` eligibility logic — it must share the predicate source.
 3. Page bootstrap vs. authenticated GET endpoint MUST be decided in a Phase 5/6 Architecture Gate.
-4. This section does NOT authorize any chapter-picker code, endpoint, migration, or Vue component in Task 2000-19.
+4. The OPEN PRODUCT GATE on `candidate_count` semantics (A vs B) MUST be resolved by the user before implementation.
+5. This section does NOT authorize any chapter-picker code, endpoint, migration, or Vue component in Task 2000-19 or Task 2000-21.
 
 ## Prohibited scope (this ADR)
 

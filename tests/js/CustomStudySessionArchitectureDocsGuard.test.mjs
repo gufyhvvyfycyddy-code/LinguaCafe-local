@@ -460,6 +460,210 @@ test('guard has executed checks against both ADR and implementation plan', () =>
 });
 
 // ---------------------------------------------------------------------------
+// 14. Task 2000-21 — Full-document zero-residual status checks
+//
+// The Task 2000-20 guard only verified "at least one correct status phrase
+// exists". That let stale body text (e.g. "Phase 3A awaiting acceptance"
+// in §19.4 / §19.10, "Phase 3B 未定义" in master-plan L1878) survive
+// alongside the corrected summary. This block enforces zero-residual:
+// the forbidden stale phrases MUST NOT appear ANYWHERE in the active
+// documents, while the correct status MUST appear at least once.
+// ---------------------------------------------------------------------------
+
+// 14.1 master plan — full-text forbidden phrases (current-status drift)
+test('master plan full-text does NOT contain "Phase 3A ... 等待网页端验收"', () => {
+    assert.ok(
+        !masterPlanSource.includes('Phase 3A 等待网页端验收'),
+        'master plan still says "Phase 3A 等待网页端验收" — Phase 3A is Accepted.'
+    );
+});
+test('master plan full-text does NOT contain "Phase 3A ... 等待网页端总流程设计师验收"', () => {
+    assert.ok(
+        !masterPlanSource.includes('Phase 3A 代码与测试完成'),
+        'master plan still says "Phase 3A 代码与测试完成" — Phase 3A is Accepted.'
+    );
+});
+test('master plan full-text does NOT contain "Phase 3A（... 等待网页端验收）"', () => {
+    assert.ok(
+        !masterPlanSource.includes('等待网页端总流程设计师验收'),
+        'master plan still references "等待网页端总流程设计师验收" for Phase 3A — Phase 3A is Accepted.'
+    );
+});
+test('master plan full-text does NOT say "Phase 3B / Phase 4-7 未开始"', () => {
+    // This phrasing implies Phase 3B has not started, which is false
+    // after Task 2000-20.
+    assert.ok(
+        !masterPlanSource.includes('Phase 3B / Phase 4-7 未开始'),
+        'master plan still says "Phase 3B / Phase 4-7 未开始" — Phase 3B is complete pending web acceptance.'
+    );
+});
+test('master plan full-text does NOT say "Phase 3B（未定义）"', () => {
+    assert.ok(
+        !masterPlanSource.includes('Phase 3B（未定义）'),
+        'master plan still says "Phase 3B（未定义）" — Phase 3B is defined and code-complete.'
+    );
+});
+test('master plan full-text does NOT say "Phase 3B 未定义"', () => {
+    assert.ok(
+        !masterPlanSource.includes('Phase 3B 未定义'),
+        'master plan still says "Phase 3B 未定义" — Phase 3B is defined and code-complete.'
+    );
+});
+test('master plan full-text does NOT say "Phase 3B 未开始"', () => {
+    assert.ok(
+        !masterPlanSource.includes('Phase 3B 未开始'),
+        'master plan still says "Phase 3B 未开始" — Phase 3B is complete pending web acceptance.'
+    );
+});
+test('master plan full-text does NOT say "Phase 3A（... 代码与测试完成（Task 2000-19）" (existing-but-awaiting pattern)', () => {
+    // The long master-plan bullet still described Phase 3A as
+    // "代码与测试完成（Task 2000-19），等待网页端总流程设计师验收".
+    // After Task 2000-20 Phase 3A is Accepted — this entire phrasing
+    // must be gone.
+    assert.ok(
+        !/Phase 3A（[^）]*代码与测试完成/.test(masterPlanSource),
+        'master plan still describes Phase 3A as "代码与测试完成" inside a parenthetical — Phase 3A is Accepted.'
+    );
+});
+
+// 14.2 ADR-0016 — full-text forbidden phrases (status drift in §19.4 / §19.10)
+test('ADR-0016 full-text does NOT contain "Phase 3A (existing, awaiting web-side acceptance"', () => {
+    // §19.4 and §19.10 had this exact parenthetical.
+    assert.ok(
+        !adrSource.includes('Phase 3A (existing, awaiting web-side acceptance'),
+        'ADR-0016 still labels Phase 3A as "awaiting web-side acceptance" — Phase 3A is Accepted.'
+    );
+});
+test('ADR-0016 full-text does NOT contain "Phase 3A tests ... awaiting web-side acceptance"', () => {
+    // The §19.10 header had this exact parenthetical.
+    assert.ok(
+        !adrSource.includes('Tests — Phase 3A (existing, awaiting'),
+        'ADR-0016 still labels Phase 3A tests as "awaiting web-side acceptance" — Phase 3A is Accepted.'
+    );
+});
+
+// 14.3 implementation plan — full-text forbidden phrases
+test('implementation plan full-text does NOT say "Phase 3B: NOT defined"', () => {
+    assert.ok(
+        !planSource.includes('Phase 3B: NOT defined'),
+        'implementation plan still says "Phase 3B: NOT defined" — Phase 3B is defined.'
+    );
+});
+test('implementation plan full-text does NOT say "Phase 3B 未开始"', () => {
+    assert.ok(
+        !planSource.includes('Phase 3B 未开始'),
+        'implementation plan still says "Phase 3B 未开始" — Phase 3B is complete pending web acceptance.'
+    );
+});
+test('implementation plan full-text does NOT say "Phase 3B 未定义"', () => {
+    assert.ok(
+        !planSource.includes('Phase 3B 未定义'),
+        'implementation plan still says "Phase 3B 未定义" — Phase 3B is defined.'
+    );
+});
+test('implementation plan full-text does NOT say "PreviewPolicy 属于 Phase 4"', () => {
+    assert.ok(
+        !planSource.includes('PreviewPolicy 属于 Phase 4'),
+        'implementation plan still says "PreviewPolicy 属于 Phase 4" — PreviewPolicy is Phase 3B.'
+    );
+});
+
+// 14.4 Token Service source — comment phase number correctness
+const TOKEN_SERVICE_PATH = join(
+    __dirname, '..', '..',
+    'app', 'Services', 'CustomStudy', 'CustomStudySessionTokenService.php'
+);
+const tokenServiceSource = readSafe(TOKEN_SERVICE_PATH);
+
+test('Token Service source file is readable by the guard', () => {
+    assert.ok(tokenServiceSource.length > 0, 'CustomStudySessionTokenService.php is missing or empty.');
+});
+
+test('Token Service source does NOT label PreviewPolicy as Phase 4', () => {
+    // The Task 2000-19 docblock said "apply ratings or answers (Phase 4 PreviewPolicy)"
+    // and "rotate tokens (Phase 4 SessionService ...)". After Task 2000-20,
+    // PreviewPolicy = Phase 3B and SessionService = Phase 4. The source
+    // comment must reflect the new phase numbers.
+    assert.ok(
+        !tokenServiceSource.includes('Phase 4 PreviewPolicy'),
+        'TokenService docblock still labels PreviewPolicy as Phase 4 — it is Phase 3B.'
+    );
+});
+
+test('Token Service source does NOT label SessionService as Phase 4 in the "apply ratings" line', () => {
+    // The old "apply ratings or answers (Phase 4 PreviewPolicy)" line is
+    // gone. The remaining "rotate tokens (Phase 4 SessionService ...)"
+    // line is correct (SessionService IS Phase 4). We only forbid the
+    // mislabeling of PreviewPolicy as Phase 4.
+    assert.ok(
+        !/Phase 4 PreviewPolicy/.test(tokenServiceSource),
+        'TokenService docblock still mislabels PreviewPolicy as Phase 4.'
+    );
+});
+
+test('Token Service source explicitly marks PreviewPolicy as Phase 3B', () => {
+    // After the fix, the docblock should reference "Phase 3B PreviewPolicy"
+    // to make the phase number unambiguous.
+    assert.ok(
+        tokenServiceSource.includes('Phase 3B PreviewPolicy'),
+        'TokenService docblock must label PreviewPolicy as Phase 3B.'
+    );
+});
+
+test('Token Service source explicitly marks SessionService as Phase 4', () => {
+    assert.ok(
+        tokenServiceSource.includes('Phase 4 SessionService'),
+        'TokenService docblock must label SessionService as Phase 4.'
+    );
+});
+
+// 14.5 Active documents must declare Phase 4A SessionOrder status
+test('implementation plan references Phase 4A', () => {
+    assert.ok(
+        planSource.toLowerCase().includes('phase 4a'),
+        'implementation plan must reference Phase 4A (SessionOrder).'
+    );
+});
+test('master plan references Phase 4A', () => {
+    assert.ok(
+        masterPlanSource.toLowerCase().includes('phase 4a'),
+        'master plan must reference Phase 4A (SessionOrder).'
+    );
+});
+test('handoff references Phase 4A', () => {
+    assert.ok(
+        handoffSource.toLowerCase().includes('phase 4a'),
+        'handoff must reference Phase 4A (SessionOrder).'
+    );
+});
+test('DOCUMENTATION_INDEX references Phase 4A', () => {
+    assert.ok(
+        docIndexSource.toLowerCase().includes('phase 4a'),
+        'DOCUMENTATION_INDEX must reference Phase 4A (SessionOrder).'
+    );
+});
+
+// 14.6 Chapter picker candidate_count future contract (Task 2000-21 §8.3)
+test('ADR-0016 §21 mentions candidate_count', () => {
+    assert.ok(
+        adrSource.includes('candidate_count'),
+        'ADR-0016 §21 must register the candidate_count future contract.'
+    );
+});
+test('implementation plan mentions candidate_count', () => {
+    assert.ok(
+        planSource.includes('candidate_count'),
+        'implementation plan must register the candidate_count future contract.'
+    );
+});
+test('ADR-0016 §21 forbids candidate_count = 0 chapters', () => {
+    assert.ok(
+        adrSource.includes('candidate_count = 0'),
+        'ADR-0016 §21 must forbid chapters with candidate_count = 0.'
+    );
+});
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 

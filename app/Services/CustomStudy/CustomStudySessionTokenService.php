@@ -18,13 +18,15 @@ use JsonException;
  *    version / user / language / expiry.
  *
  * The Token Service does NOT:
- * - apply ratings or answers (Phase 4 PreviewPolicy).
+ * - apply ratings or answers (Phase 3B PreviewPolicy).
  * - rotate tokens (Phase 4 SessionService calls issue() with a new State).
  * - query the database, use Auth, read the Request, write review logs,
  *   run spaced-repetition scheduling, or call AI services.
  * - know about card content, sense text, or user email.
  *
  * Task 2000-19 — Custom Study 1A Phase 3A.
+ * Task 2000-21 — docblock phase label corrected (PreviewPolicy = Phase 3B,
+ *               SessionService = Phase 4).
  */
 class CustomStudySessionTokenService
 {
