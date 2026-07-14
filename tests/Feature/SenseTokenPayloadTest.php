@@ -280,6 +280,32 @@ class SenseTokenPayloadTest extends TestCase
         $this->assertSame('sentence_text_match', $result['source'], 'source must be "sentence_text_match".');
     }
 
+    public function test_preloaded_chapter_supports_text_match_without_sentence_identity(): void
+    {
+        $sense = $this->createSense('preloaded', 'preloaded');
+        $chapter = $this->createChapter($this->user->id, [
+            $this->pt('A', 2),
+            $this->pt('preloaded', 0),
+            $this->pt('example', 2),
+            $this->pt('.', 2),
+        ]);
+
+        $result = $this->service->exampleSentenceTokenPayload(
+            $sense,
+            [
+                'chapter_id' => $chapter->id,
+                'sentence_id' => null,
+                'sentence_hash' => null,
+                'sentence_en' => 'A preloaded example.',
+                'occurrence_id' => 123,
+            ],
+            [$chapter->id => $chapter],
+        );
+
+        $this->assertSame('sentence_text_match', $result['source']);
+        $this->assertSame(['A', 'preloaded', 'example', '.'], array_column($result['tokens'], 'word'));
+    }
+
     public function test_example_payload_layer3_synthetic_when_no_chapter(): void
     {
         $sense = $this->createSense('synth', 'synth');

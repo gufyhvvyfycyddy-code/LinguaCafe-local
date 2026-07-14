@@ -49,19 +49,23 @@ class SenseTokenPayloadService
         $selectedOccurrence = $selectedExample !== null
             && ($selectedExample['occurrence_id'] ?? null) !== null;
 
+        $chapter = $preloadedChapters !== null && $chapterId !== null
+            ? ($preloadedChapters[$chapterId] ?? null)
+            : null;
+        if ($chapter
+            && ((int) $chapter->user_id !== (int) $sense->user_id
+                || (string) $chapter->language !== (string) $sense->language_id)) {
+            $chapter = null;
+        }
+
         // === Layer 1: Real source tokens ===
         if ($chapterId !== null && ($sentenceId !== null || $sentenceHash !== null)) {
-            $chapter = $preloadedChapters === null
-                ? Chapter::query()
+            if ($preloadedChapters === null) {
+                $chapter = Chapter::query()
                     ->where('id', $chapterId)
                     ->where('user_id', $sense->user_id)
                     ->where('language', $sense->language_id)
-                    ->first()
-                : ($preloadedChapters[$chapterId] ?? null);
-            if ($chapter
-                && ((int) $chapter->user_id !== (int) $sense->user_id
-                    || (string) $chapter->language !== (string) $sense->language_id)) {
-                $chapter = null;
+                    ->first();
             }
 
             if ($chapter) {
@@ -77,7 +81,7 @@ class SenseTokenPayloadService
 
         // === Layer 2: Text match — reverse-lookup sentence in processed_text by example_sentence_en ===
         if ($sentenceText && $chapterId !== null) {
-            if (!isset($chapter) && $preloadedChapters === null) {
+            if ($chapter === null && $preloadedChapters === null) {
                 $chapter = Chapter::query()
                     ->where('id', $chapterId)
                     ->where('user_id', $sense->user_id)
