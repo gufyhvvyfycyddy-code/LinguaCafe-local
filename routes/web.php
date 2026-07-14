@@ -198,6 +198,14 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/reviews/update', [App\Http\Controllers\ReviewController::class, 'updateReadWordsGoal']);
     Route::post('/reviews/senses/{reviewCardId}/rate', [App\Http\Controllers\SenseReviewController::class, 'rate']);
 
+    // Custom Study preview sessions (Task 2000-22 — Phase 4B).
+    // Three POST routes only — no fourth, no token URL, no exclude query param.
+    // Token is always in the request body; user/language come from Auth::user().
+    // Controller is the single HTTP boundary; SessionService is stateless.
+    Route::post('/custom-study/sessions', [App\Http\Controllers\CustomStudyController::class, 'openSession']);
+    Route::post('/custom-study/sessions/answer', [App\Http\Controllers\CustomStudyController::class, 'answer']);
+    Route::post('/custom-study/sessions/resume', [App\Http\Controllers\CustomStudyController::class, 'resume']);
+
     // sense mapping review
     Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);
     Route::get('/senses/candidates', [App\Http\Controllers\SenseOccurrenceController::class, 'candidates']);
