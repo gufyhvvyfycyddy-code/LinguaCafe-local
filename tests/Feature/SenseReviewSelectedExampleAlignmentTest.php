@@ -13,6 +13,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class SenseReviewSelectedExampleAlignmentTest extends TestCase
@@ -154,6 +155,72 @@ class SenseReviewSelectedExampleAlignmentTest extends TestCase
         $this->assertSame('occurrence', $payload['example_sentence_token_source']);
         $this->assertSame(['Second', 'aligned', 'example.'], array_column($payload['example_sentence_tokens'], 'word'));
         $this->assertSame($first->id, $first->fresh()->id);
+    }
+
+    #[DataProvider('batchCardCounts')]
+    public function test_batch_serialization_query_budget_is_constant(int $cardCount): void
+    {
+        [$user, $prototypeSense, $first, $second, $prototypeCard] = $this->twoOccurrenceCard([
+            'sentence_zh' => null,
+        ]);
+        $cards = collect([$prototypeCard->fresh()->load('sense')]);
+        $chapter = Chapter::query()->findOrFail($first->chapter_id);
+
+        for ($index = 1; $index < $cardCount; $index++) {
+            $sense = WordSense::forceCreate([
+                'user_id' => $user->id,
+                'language' => 'english',
+                'language_id' => 'english',
+                'lemma' => "batch-{$index}",
+                'surface_form' => "batch-{$index}",
+                'pos' => 'noun',
+                'sense_zh' => "batch-{$index}",
+                'sense_en' => "batch-{$index}",
+                'aliases_zh' => [],
+                'collocations' => [],
+                'example_sentence_en' => 'First unrelated example.',
+                'status' => WordSense::STATUS_CONFIRMED,
+                'sense_key' => hash('sha256', "batch-{$index}"),
+            ]);
+            $this->occurrence($sense, $chapter, 0, 'First unrelated example.', null);
+            $card = ReviewCard::forceCreate([
+                'user_id' => $user->id,
+                'language' => 'english',
+                'language_id' => 'english',
+                'target_type' => ReviewCard::TARGET_SENSE,
+                'target_id' => $sense->id,
+                'fsrs_enabled' => true,
+                'fsrs_state' => 'review',
+                'fsrs_due_at' => now()->subDay(),
+                'fsrs_stability' => 1,
+                'fsrs_difficulty' => 5,
+                'fsrs_reps' => 0,
+                'fsrs_lapses' => 0,
+            ]);
+            $cards->push($card->load('sense'));
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        app(SenseReviewCardSerializerService::class)->serializeMany($cards);
+        $queries = collect(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        foreach (['word_sense_occurrences', 'chapters', 'chapter_ai_reading_assists', 'review_logs'] as $table) {
+            $this->assertLessThanOrEqual(
+                1,
+                $queries->filter(fn (array $query) => str_contains(strtolower($query['query'] ?? ''), $table))->count(),
+                "{$table} query count must stay constant for {$cardCount} cards.",
+            );
+        }
+        $this->assertLessThanOrEqual(4, $queries->count());
+        $this->assertSame($second->id, $second->fresh()->id);
+        $this->assertSame($prototypeSense->id, $prototypeSense->fresh()->id);
+    }
+
+    public static function batchCardCounts(): array
+    {
+        return [[1], [10], [100]];
     }
 
     private function twoOccurrenceCard(array $secondOverrides = []): array

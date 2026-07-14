@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Chapter;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use Illuminate\Support\Collection;
 
 /**
  * Builds the real-source example pool for a WordSense.
@@ -43,29 +44,69 @@ class WordSenseExamplePoolService
      */
     public function exampleCandidates(WordSense $sense): array
     {
+        $batch = $this->exampleCandidateBatch(collect([$sense]));
+
+        return $batch['candidates'][$sense->id] ?? [];
+    }
+
+    /**
+     * Batch-load candidate occurrences and chapters for serializeMany().
+     * The returned chapter/evidence maps are also reused by token and
+     * understanding-aid resolution so those layers do not re-query per card.
+     */
+    public function exampleCandidateBatch(Collection $senses): array
+    {
+        if ($senses->isEmpty()) {
+            return ['candidates' => [], 'chapters' => [], 'occurrence_evidence' => []];
+        }
+
+        $sensesById = $senses->keyBy('id');
         $occurrences = WordSenseOccurrence::query()
-            ->where('user_id', $sense->user_id)
-            ->where('language_id', $sense->language_id)
-            ->where('word_sense_id', $sense->id)
+            ->whereIn('word_sense_id', $sensesById->keys()->all())
             ->where('status', WordSenseOccurrence::STATUS_BOUND)
             ->whereNotNull('sentence_en')
             ->where('sentence_en', '<>', '')
             ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
             ->orderByDesc('id')
-            ->limit(10)
-            ->get();
+            ->get()
+            ->filter(function (WordSenseOccurrence $occurrence) use ($sensesById): bool {
+                $sense = $sensesById->get($occurrence->word_sense_id);
 
-        // Batch-load all referenced chapters in one query to avoid N+1.
+                return $sense !== null
+                    && (int) $occurrence->user_id === (int) $sense->user_id
+                    && (string) $occurrence->language_id === (string) $sense->language_id;
+            });
+
         $chapterIds = $occurrences->pluck('chapter_id')->filter()->unique()->values()->all();
         $chaptersById = [];
         if (!empty($chapterIds)) {
             $chaptersById = Chapter::query()
                 ->whereIn('id', $chapterIds)
-                ->where('user_id', $sense->user_id)
-                ->where('language', $sense->language_id)
-                ->pluck('name', 'id')
+                ->get()
+                ->keyBy('id')
                 ->all();
         }
+
+        $candidateMap = [];
+        foreach ($senses as $sense) {
+            $senseOccurrences = $occurrences
+                ->where('word_sense_id', $sense->id)
+                ->take(10)
+                ->values();
+            $candidateMap[$sense->id] = $this->buildCandidates($sense, $senseOccurrences, $chaptersById);
+        }
+
+        return [
+            'candidates' => $candidateMap,
+            'chapters' => $chaptersById,
+            'occurrence_evidence' => $occurrences->mapWithKeys(
+                fn (WordSenseOccurrence $occurrence) => [$occurrence->id => $occurrence->evidence],
+            )->all(),
+        ];
+    }
+
+    private function buildCandidates(WordSense $sense, Collection $occurrences, array $chaptersById): array
+    {
 
         $candidates = [];
         $seenKeys = [];
@@ -84,11 +125,16 @@ class WordSenseExamplePoolService
             // points to another user's (or another language's) chapter.
             // Such an occurrence is untrusted: skip it entirely so its
             // sentence_en does not leak into the candidate pool.
-            if ($occurrence->chapter_id !== null && !isset($chaptersById[$occurrence->chapter_id])) {
-                continue;
+            $chapter = $occurrence->chapter_id === null ? null : ($chaptersById[$occurrence->chapter_id] ?? null);
+            if ($occurrence->chapter_id !== null) {
+                if ($chapter === null
+                    || (int) $chapter->user_id !== (int) $sense->user_id
+                    || (string) $chapter->language !== (string) $sense->language_id) {
+                    continue;
+                }
             }
 
-            $chapterName = $occurrence->chapter_id ? ($chaptersById[$occurrence->chapter_id] ?? null) : null;
+            $chapterName = $chapter?->name;
 
             $dedupeKey = $this->dedupeKey($occurrence->chapter_id, $sentenceEn);
             if (isset($seenKeys[$dedupeKey])) {

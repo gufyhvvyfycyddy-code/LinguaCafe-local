@@ -18,7 +18,11 @@ class SenseTokenPayloadService
      * 2. Reverse-match by example_sentence_en text
      * 3. Generate synthetic tokens from example_sentence_en
      */
-    public function exampleSentenceTokenPayload(WordSense $sense, ?array $selectedExample = null): array
+    public function exampleSentenceTokenPayload(
+        WordSense $sense,
+        ?array $selectedExample = null,
+        ?array $preloadedChapters = null,
+    ): array
     {
         $occurrence = null;
         if ($selectedExample === null) {
@@ -47,11 +51,18 @@ class SenseTokenPayloadService
 
         // === Layer 1: Real source tokens ===
         if ($chapterId !== null && ($sentenceId !== null || $sentenceHash !== null)) {
-            $chapter = Chapter::query()
-                ->where('id', $chapterId)
-                ->where('user_id', $sense->user_id)
-                ->where('language', $sense->language_id)
-                ->first();
+            $chapter = $preloadedChapters === null
+                ? Chapter::query()
+                    ->where('id', $chapterId)
+                    ->where('user_id', $sense->user_id)
+                    ->where('language', $sense->language_id)
+                    ->first()
+                : ($preloadedChapters[$chapterId] ?? null);
+            if ($chapter
+                && ((int) $chapter->user_id !== (int) $sense->user_id
+                    || (string) $chapter->language !== (string) $sense->language_id)) {
+                $chapter = null;
+            }
 
             if ($chapter) {
                 $tokens = $this->extractSentenceTokensFromChapter($chapter, $sentenceId, $sentenceHash);
@@ -66,11 +77,13 @@ class SenseTokenPayloadService
 
         // === Layer 2: Text match — reverse-lookup sentence in processed_text by example_sentence_en ===
         if ($sentenceText && $chapterId !== null) {
-            $chapter = $chapter ?? Chapter::query()
-                ->where('id', $chapterId)
-                ->where('user_id', $sense->user_id)
-                ->where('language', $sense->language_id)
-                ->first();
+            if (!isset($chapter) && $preloadedChapters === null) {
+                $chapter = Chapter::query()
+                    ->where('id', $chapterId)
+                    ->where('user_id', $sense->user_id)
+                    ->where('language', $sense->language_id)
+                    ->first();
+            }
 
             if ($chapter) {
                 $tokens = $this->matchSentenceTokensByText($chapter, $sentenceText);

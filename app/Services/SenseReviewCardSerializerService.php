@@ -123,7 +123,11 @@ class SenseReviewCardSerializerService
         if ($tokenExample !== null && $questionIdentity !== null) {
             $tokenExample['resolved_sentence_index'] = $questionIdentity['sentence_index'];
         }
-        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense, $tokenExample);
+        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload(
+            $sense,
+            $tokenExample,
+            $options['token_chapters'] ?? null,
+        );
 
         // The selected example is the only translation source. Sense-level
         // text is never borrowed for a different occurrence.
@@ -162,7 +166,12 @@ class SenseReviewCardSerializerService
         // sense-level values for the same keys; sense-level values remain as
         // fallback for keys the occurrence doesn't provide.
         $understandingAid = $this->normalizeUnderstandingAid($sense->understanding_aid);
-        $understandingAid = $this->mergeOccurrenceEvidence($understandingAid, $displayedOccurrenceId, $sense);
+        $understandingAid = $this->mergeOccurrenceEvidence(
+            $understandingAid,
+            $displayedOccurrenceId,
+            $sense,
+            $options['occurrence_evidence'] ?? null,
+        );
 
         return [
             'review_card_id' => $card->id,
@@ -251,12 +260,16 @@ class SenseReviewCardSerializerService
 
         $cardIds = $cards->map(fn (ReviewCard $card) => $card->id)->all();
         $feedbackMap = $this->feedbackService->buildForCards($cardIds);
+        $exampleBatch = $this->examplePoolService->exampleCandidateBatch(
+            $cards->map(fn (ReviewCard $card) => $card->sense),
+        );
+        $candidateBySense = $exampleBatch['candidates'];
         $candidateMap = [];
         $chapterIds = [];
         $userIds = [];
         $languages = [];
         foreach ($cards as $card) {
-            $candidates = $this->examplePoolService->exampleCandidates($card->sense);
+            $candidates = $candidateBySense[$card->sense->id] ?? [];
             $candidateMap[$card->id] = $candidates;
             $userIds[] = $card->sense->user_id;
             $languages[] = $card->sense->language_id;
@@ -268,11 +281,13 @@ class SenseReviewCardSerializerService
         }
         $translationAssists = $this->translationAssistMap($chapterIds, $userIds, $languages);
 
-        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $options) {
+        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $exampleBatch, $options) {
             $perCardOptions = $options;
             $perCardOptions['learning_feedback'] = $feedbackMap[$card->id] ?? null;
             $perCardOptions['example_candidates'] = $candidateMap[$card->id];
             $perCardOptions['translation_assists'] = $translationAssists;
+            $perCardOptions['token_chapters'] = $exampleBatch['chapters'];
+            $perCardOptions['occurrence_evidence'] = $exampleBatch['occurrence_evidence'];
 
             return $this->serialize($card, $perCardOptions);
         })->values()->all();
@@ -374,23 +389,30 @@ class SenseReviewCardSerializerService
      * @param  WordSense  $sense  The sense (for scoping the occurrence query).
      * @return array  Merged aid with occurrence-level overrides applied.
      */
-    private function mergeOccurrenceEvidence(array $senseAid, ?int $occurrenceId, $sense): array
+    private function mergeOccurrenceEvidence(
+        array $senseAid,
+        ?int $occurrenceId,
+        $sense,
+        ?array $preloadedEvidence = null,
+    ): array
     {
         if ($occurrenceId === null) {
             return $senseAid;
         }
 
-        // Load the occurrence scoped to the sense to prevent cross-sense leak.
-        $occurrence = \App\Models\WordSenseOccurrence::query()
-            ->where('id', $occurrenceId)
-            ->where('word_sense_id', $sense->id)
-            ->first();
-
-        if (!$occurrence || !is_array($occurrence->evidence)) {
-            return $senseAid;
+        if ($preloadedEvidence !== null) {
+            $evidence = $preloadedEvidence[$occurrenceId] ?? null;
+        } else {
+            $occurrence = \App\Models\WordSenseOccurrence::query()
+                ->where('id', $occurrenceId)
+                ->where('word_sense_id', $sense->id)
+                ->first();
+            $evidence = $occurrence?->evidence;
         }
 
-        $evidence = $occurrence->evidence;
+        if (!is_array($evidence)) {
+            return $senseAid;
+        }
 
         // Occurrence-level overrides (only when the key exists and is non-null).
         if (isset($evidence['context_hint']) && $evidence['context_hint'] !== null) {
