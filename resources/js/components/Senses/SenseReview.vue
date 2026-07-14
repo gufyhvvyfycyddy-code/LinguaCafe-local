@@ -8,6 +8,9 @@
                 <v-chip class="mx-1" color="foreground">已复习 {{ reviewedCount }}</v-chip>
                 <v-chip class="mx-1" color="foreground">剩余 {{ remainingCount }}</v-chip>
                 <v-chip class="mx-1 my-1" small outlined>今日已复习 {{ fsrsStats.reviewed_today }}</v-chip>
+                <v-btn small outlined color="primary" class="ml-2" @click="todayLimitsOpen = true">
+                    <v-icon small left>mdi-calendar-edit</v-icon>今日学习设置
+                </v-btn>
                 <v-btn icon small @click="statsDetailOpen = !statsDetailOpen">
                     <v-icon>{{ statsDetailOpen ? 'mdi-chevron-up' : 'mdi-chart-box-outline' }}</v-icon>
                 </v-btn>
@@ -72,6 +75,7 @@
              boolean open state; ReportCenter owns report selection,
              loading, error, payload and async-race protection internally. -->
         <SenseReviewReportCenter v-model="reportCenterOpen" />
+        <SenseReviewTodayLimitsDialog v-model="todayLimitsOpen" @changed="onTodayLimitsChanged" />
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
             <SenseStudyCard
@@ -398,6 +402,7 @@
     import SenseReviewUnderstandingAid from './SenseReviewUnderstandingAid.vue';
     import SenseReviewEditDialog from './SenseReviewEditDialog.vue';
     import SenseReviewReportCenter from './SenseReviewReportCenter.vue';
+    import SenseReviewTodayLimitsDialog from './SenseReviewTodayLimitsDialog.vue';
     import SenseReviewLeechPanel from './SenseReviewLeechPanel.vue';
     import SenseReviewLeechRewritePackageDialog from './SenseReviewLeechRewritePackageDialog.vue';
     import SenseStudyCard from './SenseStudyCard.vue';
@@ -448,6 +453,7 @@
             SenseReviewUnderstandingAid,
             SenseReviewEditDialog,
             SenseReviewReportCenter,
+            SenseReviewTodayLimitsDialog,
             SenseReviewLeechPanel,
             SenseReviewLeechRewritePackageDialog,
             SenseStudyCard,
@@ -526,6 +532,7 @@
                 // report selection, loading, error, payload and async-race
                 // protection internally.
                 reportCenterOpen: false,
+                todayLimitsOpen: false,
                 // Interval preview (1000-5): predicted intervals for the
                 // four rating buttons, shown only after the answer is
                 // revealed. The parent (this component) is the SOLE
@@ -730,6 +737,11 @@
             window.addEventListener('keyup', this.handleHotkey);
         },
         methods: {
+            onTodayLimitsChanged(limits) {
+                this.summary = Object.assign({}, this.summary, limits);
+                this.ignoreDailyLimits = false;
+                this.loadCards();
+            },
             loadFsrsStats() {
                 this.statsLoading = true;
                 this.statsError = '';

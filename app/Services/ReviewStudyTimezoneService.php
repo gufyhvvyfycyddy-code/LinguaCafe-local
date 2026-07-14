@@ -80,4 +80,17 @@ class ReviewStudyTimezoneService
             $tz
         );
     }
+
+    /** @return array{timezone:string, study_date:string, day_start:Carbon, next_day_start:Carbon} */
+    public function dayBounds(Carbon $now): array
+    {
+        $dayStart = $this->dayStart($now);
+
+        return [
+            'timezone' => $this->getStudyTimezone(),
+            'study_date' => $dayStart->format('Y-m-d'),
+            'day_start' => $dayStart,
+            'next_day_start' => $dayStart->copy()->addDay()->startOfDay(),
+        ];
+    }
 }

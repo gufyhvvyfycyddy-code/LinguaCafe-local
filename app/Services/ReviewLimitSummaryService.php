@@ -26,7 +26,8 @@ class ReviewLimitSummaryService
         int $hiddenByReviewLimit = 0,
         int $hiddenByNewLimit = 0,
         bool $isQueueEnforced = true,
-        bool $canContinueOverLimit = false
+        bool $canContinueOverLimit = false,
+        array $effectiveLimits = []
     ): array {
         $limitMessage = null;
 
@@ -36,7 +37,7 @@ class ReviewLimitSummaryService
             }
         }
 
-        return [
+        return array_merge([
             'due_count' => $visibleCount,
             'visible_count' => $visibleCount,
             'total_due_count' => $totalDueCount,
@@ -55,7 +56,7 @@ class ReviewLimitSummaryService
             'limit_reached' => $limitReached,
             'can_continue_over_limit' => $canContinueOverLimit,
             'limit_message' => $limitMessage,
-        ];
+        ], $effectiveLimits);
     }
 
     /**

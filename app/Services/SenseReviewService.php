@@ -14,6 +14,7 @@ class SenseReviewService
         private SenseReviewCardSerializerService $senseReviewCardSerializerService,
         private ReviewQueueOrderService $reviewQueueOrderService,
         private ReviewStudyTimezoneService $studyTimezoneService,
+        private EffectiveReviewLimitsService $effectiveReviewLimitsService,
     ) {
     }
     /**
@@ -106,11 +107,8 @@ class SenseReviewService
      */
     public function reviewedTodayCount(int $userId, string $language): int
     {
-        $today = $this->studyTimezoneService->dayStart(Carbon::now());
-
-        return $this->senseReviewQueryService
-            ->nonResetSenseReviewLogQuery($userId, $language, $today)
-            ->count('review_logs.id');
+        return $this->effectiveReviewLimitsService
+            ->resolve($userId, $language)['reviewed_today_count'];
     }
 
     /**
@@ -125,12 +123,13 @@ class SenseReviewService
      */
     public function dueCardsWithLimits(int $userId, string $language, bool $ignoreDailyLimits = false): array
     {
-        $limits = $this->settingsService->getFsrsDailyLimits();
+        $limits = $this->effectiveReviewLimitsService->resolve($userId, $language);
 
-        $reviewLimitEnabled = $limits['daily_review_limit_enabled'] ?? true;
-        $reviewLimit = $limits['daily_review_limit'] ?? 200;
-        $newLimitEnabled = $limits['daily_new_limit_enabled'] ?? true;
-        $newLimit = $limits['daily_new_limit'] ?? 20;
+        $reviewLimitEnabled = $limits['effective_review_limit_enabled'];
+        $reviewLimit = $limits['effective_review_limit'];
+        $newLimitEnabled = $limits['effective_new_limit_enabled'];
+        $newLimit = $limits['effective_new_limit'];
+        $remainingNewSlots = $limits['remaining_new'];
         $newIgnoreReviewLimit = $limits['new_cards_ignore_review_limit'] ?? false;
 
         // Base due cards query
@@ -139,8 +138,8 @@ class SenseReviewService
         $totalDueCount = $allCards->count();
 
         // Count today's reviewed sense cards
-        $reviewedTodayCount = $this->reviewedTodayCount($userId, $language);
-        $remainingReviewSlots = max(0, $reviewLimit - $reviewedTodayCount);
+        $reviewedTodayCount = $limits['reviewed_today_count'];
+        $remainingReviewSlots = $limits['remaining_review'];
 
         // Apply Queue Order (ADR-0015 V1) — single canonical ordering entry point
         $queueOptionsArray = $this->settingsService->getFsrsQueueOrder();
@@ -176,6 +175,7 @@ class SenseReviewService
                     hiddenByReviewLimit: 0,
                     hiddenByNewLimit: 0,
                     isQueueEnforced: true,
+                    effectiveLimits: $limits,
                 ),
             ];
         }
@@ -245,7 +245,7 @@ class SenseReviewService
         $hiddenByNewLimit = 0;
         $visibleNew = [];
         foreach ($newCards as $card) {
-            if ($newLimitEnabled && $newCount >= $newLimit) {
+            if ($newLimitEnabled && $newCount >= $remainingNewSlots) {
                 $hiddenByNewLimit++;
                 $hiddenDueCount++;
                 continue;
@@ -300,6 +300,7 @@ class SenseReviewService
                 hiddenByNewLimit: $hiddenByNewLimit,
                 isQueueEnforced: true,
                 canContinueOverLimit: $canContinueOverLimit,
+                effectiveLimits: $limits,
             ),
         ];
     }

@@ -133,4 +133,17 @@ class ReviewStudyTimezoneServiceTest extends TestCase
         $tz = $service->getStudyTimezone();
         $this->assertNotEmpty($tz);
     }
+
+    public function test_day_bounds_follow_dst_local_midnights(): void
+    {
+        config(['app.timezone' => 'America/New_York']);
+        $bounds = (new ReviewStudyTimezoneService())->dayBounds(
+            Carbon::create(2026, 3, 8, 12, 0, 0, 'UTC')
+        );
+
+        $this->assertSame('2026-03-08', $bounds['study_date']);
+        $this->assertSame('2026-03-08T00:00:00-05:00', $bounds['day_start']->toIso8601String());
+        $this->assertSame('2026-03-09T00:00:00-04:00', $bounds['next_day_start']->toIso8601String());
+        $this->assertSame(23.0, $bounds['day_start']->diffInHours($bounds['next_day_start']));
+    }
 }

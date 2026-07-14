@@ -72,7 +72,7 @@ class ReviewController extends Controller {
         $ignoreDailyLimits = $request->post('ignoreDailyLimits', $request->post('ignore_daily_limits', false));
 
         try {
-            $card = $this->reviewCardService->recordReview($userId, $language, $reviewCardId, $rating);
+            $card = $this->reviewCardService->recordReview($userId, $language, $reviewCardId, $rating, 'sense_review');
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
