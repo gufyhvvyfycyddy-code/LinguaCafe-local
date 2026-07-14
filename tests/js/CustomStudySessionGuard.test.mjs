@@ -5,25 +5,38 @@ const session = readFileSync(
     new URL('../../resources/js/components/CustomStudy/CustomStudySession.vue', import.meta.url),
     'utf8',
 );
+const coordinator = readFileSync(
+    new URL('../../resources/js/components/CustomStudy/CustomStudySessionCoordinator.js', import.meta.url),
+    'utf8',
+);
+const sessionBoundary = `${session}\n${coordinator}`;
 
 assert.match(session, /SenseStudyCard/);
 assert.match(session, /SenseExampleDialog/);
+assert.match(session, /CustomStudySessionCoordinator/);
+assert.match(session, /customStudyKeyboardAction/);
+assert.match(session, /coordinator\.answer/);
+assert.match(session, /coordinator\.resume/);
+assert.match(session, /addEventListener\('keydown'/);
+assert.match(session, /removeEventListener\('keydown'/);
 assert.match(session, /\/custom-study\/sessions\/answer/);
 assert.match(session, /\/custom-study\/sessions\/resume/);
 assert.match(session, /sessionStorage/);
 assert.match(session, /preferred_occurrence_id/);
-assert.match(session, /wait_until/);
+assert.match(sessionBoundary, /wait_until/);
 assert.match(session, /Boolean\(this\.waitUntil\) && !this\.currentCard/);
 assert.match(session, /total_candidates/);
-assert.match(session, /clearStoredToken/);
+assert.match(coordinator, /clearToken/);
 assert.match(session, /\/reviews\/senses/);
 assert.match(session, /again/);
 assert.match(session, /hard/);
 assert.match(session, /good/);
 assert.match(session, /easy/);
 assert.doesNotMatch(session, /SenseReviewRatingControls/);
-assert.doesNotMatch(session, /localStorage/);
+assert.doesNotMatch(sessionBoundary, /localStorage/);
 assert.doesNotMatch(session, /\$store/);
 assert.doesNotMatch(session, /\/reviews\/senses\/.*\/rate/);
+assert.doesNotMatch(session, /answerRequestSequence/);
+assert.doesNotMatch(session, /resumeRequestSequence/);
 
 console.log('CustomStudy session guard passed.');

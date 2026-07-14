@@ -32,7 +32,7 @@
         <v-card v-else-if="isWaiting" outlined class="rounded-lg pa-6 text-center custom-study-waiting">
             <div class="text-h6">这张卡稍后再练习</div>
             <div class="text--secondary mt-2">{{ waitingMessage }}</div>
-            <v-btn class="mt-4" color="primary" :loading="resumeLoading" :disabled="resumeLoading" @click="resumeSession">
+            <v-btn class="mt-4" color="primary" :loading="resumeLoading" :disabled="answerLoading || resumeLoading || completed || expired" @click="resumeSession">
                 继续预览学习
             </v-btn>
         </v-card>
@@ -53,19 +53,20 @@
                 @view-source="viewSource"
             >
                 <template #reveal>
-                    <v-btn depressed rounded color="primary" large :disabled="answerLoading" @click="showAnswer = true">
+                    <v-btn depressed rounded color="primary" large :disabled="sessionInputBlocked" @click="showAnswer = true">
                         显示答案
                     </v-btn>
                 </template>
 
                 <template #after-answer>
                     <div class="custom-study-rating-actions mt-5">
-                        <v-btn color="error" :loading="answerLoading && pendingRating === 'again'" :disabled="answerLoading" @click="answer('again')">再来一次</v-btn>
-                        <v-btn color="warning" :loading="answerLoading && pendingRating === 'hard'" :disabled="answerLoading" @click="answer('hard')">困难</v-btn>
-                        <v-btn color="primary" :loading="answerLoading && pendingRating === 'good'" :disabled="answerLoading" @click="answer('good')">良好</v-btn>
-                        <v-btn color="success" :loading="answerLoading && pendingRating === 'easy'" :disabled="answerLoading" @click="answer('easy')">简单</v-btn>
+                        <v-btn color="error" :loading="answerLoading && pendingRating === 'again'" :disabled="sessionInputBlocked" @click="answer('again')">再来一次</v-btn>
+                        <v-btn color="warning" :loading="answerLoading && pendingRating === 'hard'" :disabled="sessionInputBlocked" @click="answer('hard')">困难</v-btn>
+                        <v-btn color="primary" :loading="answerLoading && pendingRating === 'good'" :disabled="sessionInputBlocked" @click="answer('good')">良好</v-btn>
+                        <v-btn color="success" :loading="answerLoading && pendingRating === 'easy'" :disabled="sessionInputBlocked" @click="answer('easy')">简单</v-btn>
                     </div>
                     <div class="caption text--secondary text-center mt-2">这些按钮只推进本次预览会话，不会写入正式复习记录。</div>
+                    <div class="caption text--secondary text-center mt-1">快捷键：Space 显示答案；答案面按 1 / 2 / 3 / 4 选择 Again / Hard / Good / Easy。</div>
                 </template>
             </SenseStudyCard>
         </v-card>
@@ -86,8 +87,12 @@
 <script>
     import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
     import SenseStudyCard from '../Senses/SenseStudyCard.vue';
-
-    const SESSION_TOKEN_KEY = 'linguacafe.custom-study.preview-token';
+    import {
+        CustomStudySessionCoordinator,
+        customStudyKeyboardAction,
+        customStudySessionStorageKey,
+        isCustomStudySessionMutationLocked,
+    } from './CustomStudySessionCoordinator.js';
 
     export default {
         components: {
@@ -117,11 +122,11 @@
                 resumeLoading: false,
                 pendingRating: '',
                 error: '',
-                answerRequestSequence: 0,
-                resumeRequestSequence: 0,
+                expired: false,
+                expiredNotified: false,
+                coordinator: null,
                 waitTimer: null,
                 waitingSeconds: 0,
-                waitAutoResumeStarted: false,
                 sourceDialog: false,
                 sourcePayload: {},
             };
@@ -130,6 +135,15 @@
             isWaiting() {
                 return Boolean(this.waitUntil) && !this.currentCard;
             },
+            sessionInputBlocked() {
+                return isCustomStudySessionMutationLocked({
+                    mutationLocked: this.answerLoading || this.resumeLoading,
+                    waitUntil: this.waitUntil,
+                    completed: this.completed,
+                    expired: this.expired,
+                    currentCard: this.currentCard,
+                });
+            },
             waitingMessage() {
                 return this.waitingSeconds > 0
                     ? `将在 ${this.waitingSeconds} 秒后可继续，或现在手动继续。`
@@ -137,95 +151,70 @@
             },
         },
         mounted() {
+            this.coordinator = new CustomStudySessionCoordinator({
+                transport: {
+                    answer: (token, rating) => axios
+                        .post('/custom-study/sessions/answer', { token: token, rating: rating })
+                        .then(response => response.data || {}),
+                    resume: token => axios
+                        .post('/custom-study/sessions/resume', { token: token })
+                        .then(response => response.data || {}),
+                },
+                storage: window.sessionStorage,
+                storageKey: customStudySessionStorageKey(),
+                onState: this.applyCoordinatorState,
+            });
+            window.addEventListener('keydown', this.handleKeydown);
             if (this.initialPayload) {
-                this.applySessionPayload(this.initialPayload, true);
+                this.coordinator.open(this.initialToken, this.initialPayload);
                 return;
             }
-            this.resumeSession(true);
+            this.coordinator.restore();
         },
         beforeDestroy() {
             this.clearWaitTimer();
+            window.removeEventListener('keydown', this.handleKeydown);
+            if (this.coordinator) {
+                this.coordinator.dispose();
+            }
         },
         methods: {
             answer(rating) {
-                if (this.answerLoading || this.resumeLoading || !this.token || !this.currentCard) {
-                    return;
-                }
-                const requestSequence = ++this.answerRequestSequence;
-                this.answerLoading = true;
-                this.pendingRating = rating;
-                this.error = '';
-
-                axios.post('/custom-study/sessions/answer', { token: this.token, rating: rating })
-                    .then((response) => {
-                        if (requestSequence !== this.answerRequestSequence) {
-                            return;
-                        }
-                        this.applySessionPayload(response.data || {}, false);
-                    })
-                    .catch((requestError) => {
-                        if (requestSequence === this.answerRequestSequence) {
-                            this.handleSessionError(requestError);
-                        }
-                    })
-                    .finally(() => {
-                        if (requestSequence === this.answerRequestSequence) {
-                            this.answerLoading = false;
-                            this.pendingRating = '';
-                        }
-                    });
+                return this.coordinator ? this.coordinator.answer(rating) : Promise.resolve(false);
             },
-            resumeSession(isInitialRestore = false) {
-                if (this.resumeLoading || this.answerLoading || !this.token) {
-                    return;
-                }
-                const requestSequence = ++this.resumeRequestSequence;
-                this.resumeLoading = true;
-                this.loading = isInitialRestore;
-                this.error = '';
-
-                axios.post('/custom-study/sessions/resume', { token: this.token })
-                    .then((response) => {
-                        if (requestSequence !== this.resumeRequestSequence) {
-                            return;
-                        }
-                        this.applySessionPayload(response.data || {}, false);
-                    })
-                    .catch((requestError) => {
-                        if (requestSequence === this.resumeRequestSequence) {
-                            this.handleSessionError(requestError);
-                        }
-                    })
-                    .finally(() => {
-                        if (requestSequence === this.resumeRequestSequence) {
-                            this.resumeLoading = false;
-                            this.loading = false;
-                        }
-                    });
+            resumeSession() {
+                return this.coordinator ? this.coordinator.resume() : Promise.resolve(false);
             },
-            applySessionPayload(payload, isOpenPayload) {
-                const refreshedToken = payload.refreshed_token || payload.token;
-                if (refreshedToken) {
-                    this.token = refreshedToken;
-                    window.sessionStorage.setItem(SESSION_TOKEN_KEY, refreshedToken);
-                    this.$emit('token-updated', refreshedToken);
-                }
-                this.summary = payload.summary || {};
-                this.currentCard = payload.current_card || null;
-                this.completed = Boolean(payload.completed);
-                this.showAnswer = false;
-                this.waitUntil = payload.wait_until || null;
-                this.waitAutoResumeStarted = false;
-                this.refreshWaitingClock();
+            applyCoordinatorState(state) {
+                const previousCardId = this.currentCard ? this.currentCard.review_card_id : null;
+                const previousWaitUntil = this.waitUntil;
+                const previousToken = this.token;
+                this.token = state.token;
+                this.currentCard = state.currentCard;
+                this.summary = state.summary;
+                this.completed = state.completed;
+                this.expired = state.expired;
+                this.waitUntil = state.waitUntil;
+                this.loading = state.loading;
+                this.answerLoading = state.mutationLocked && state.mutationType === 'answer';
+                this.resumeLoading = state.mutationLocked && state.mutationType === 'resume';
+                this.pendingRating = state.pendingRating;
+                this.error = state.error;
 
-                if (isOpenPayload && !this.currentCard && !this.waitUntil) {
-                    this.completed = true;
+                const currentCardId = this.currentCard ? this.currentCard.review_card_id : null;
+                if (currentCardId !== previousCardId) {
+                    this.showAnswer = false;
                 }
-
-                if (this.completed) {
-                    this.waitUntil = null;
+                if (this.waitUntil !== previousWaitUntil) {
+                    this.refreshWaitingClock();
+                }
+                if (this.token && this.token !== previousToken) {
+                    this.$emit('token-updated', this.token);
+                }
+                if (this.expired && !this.expiredNotified) {
+                    this.expiredNotified = true;
                     this.clearWaitTimer();
-                    this.clearStoredToken();
+                    this.$emit('expired', this.error);
                 }
             },
             refreshWaitingClock() {
@@ -240,9 +229,8 @@
                     this.waitingSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
                     if (this.waitingSeconds === 0) {
                         this.clearWaitTimer();
-                        if (!this.waitAutoResumeStarted) {
-                            this.waitAutoResumeStarted = true;
-                            this.resumeSession();
+                        if (this.coordinator) {
+                            this.coordinator.autoResume();
                         }
                     }
                 };
@@ -257,8 +245,21 @@
                     this.waitTimer = null;
                 }
             },
-            clearStoredToken() {
-                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+            handleKeydown(event) {
+                const action = customStudyKeyboardAction(event, {
+                    showAnswer: this.showAnswer,
+                    blocked: this.sessionInputBlocked,
+                    sourceDialogOpen: this.sourceDialog,
+                });
+                if (!action) {
+                    return;
+                }
+                event.preventDefault();
+                if (action === 'reveal') {
+                    this.showAnswer = true;
+                    return;
+                }
+                this.answer(action);
             },
             viewSource() {
                 if (!this.currentCard) {
@@ -295,19 +296,11 @@
                         this.sourceDialog = true;
                     });
             },
-            handleSessionError(requestError) {
-                const response = requestError.response;
-                const payload = response && response.data ? response.data : {};
-                if (response && response.status === 404) {
-                    window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
-                    this.$emit('expired', payload.message || '预览会话已过期或不存在。');
-                    return;
-                }
-                this.error = payload.message || '请求失败，请稍后重试。';
-            },
             exitSession() {
                 this.clearWaitTimer();
-                this.clearStoredToken();
+                if (this.coordinator) {
+                    this.coordinator.exit();
+                }
                 this.$emit('exit');
             },
         },
