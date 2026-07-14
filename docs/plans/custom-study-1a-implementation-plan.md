@@ -1,10 +1,10 @@
 # Custom Study 1A Implementation Plan
 
-> **Authoritative Custom Study status (2026-07-14)**
+> **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
-> Custom Study 1A: awaiting web-side process designer final Accept
+> Custom Study 1A: Accepted / Production Closed
 > Custom Study 1B: not started
-> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production closure are complete. The detailed phase roadmap below is retained as historical/superseded implementation context; it does not authorize 1B or another product task.
+> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production acceptance are complete. The detailed phase roadmap below is historical implementation context; the concise chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`, and this plan does not authorize 1B or another product task.
 
 
 > **Status**: Architecture and production implementation are complete through the 1A browser-verified preview workflow. The phase ledger below records how that result was built; current acceptance status is defined only by the authoritative block above.
@@ -813,6 +813,6 @@ Custom Study 1A is now code-complete and acceptance-tested.
   and console inspection. A before/after database fingerprint was identical
   after preview rating.
 
-The implementation and acceptance work is complete. It awaits the web
-designer's final product acceptance; no Custom Study 1B, Saved Search, preset,
-or scheduling work is authorized by this status update.
+The implementation and acceptance work is complete, and the web-side process
+designer has issued final product acceptance. No Custom Study 1B, preset, or
+scheduling work is authorized by this status update.

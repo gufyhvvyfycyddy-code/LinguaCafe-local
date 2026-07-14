@@ -44,6 +44,15 @@ const DOC_INDEX_PATH = join(
     __dirname, '..', '..',
     'docs', 'DOCUMENTATION_INDEX.md'
 );
+const CUSTOM_STUDY_PAGE_PATH = join(
+    __dirname, '..', '..',
+    'resources', 'js', 'components', 'CustomStudy', 'CustomStudy.vue'
+);
+const SENSE_STUDY_CARD_PATH = join(
+    __dirname, '..', '..',
+    'resources', 'js', 'components', 'Senses', 'SenseStudyCard.vue'
+);
+const ROUTES_PATH = join(__dirname, '..', '..', 'routes', 'web.php');
 
 let passed = 0;
 let failed = 0;
@@ -69,6 +78,9 @@ const planSource = readSafe(PLAN_PATH);
 const masterPlanSource = readSafe(MASTER_PLAN_PATH);
 const handoffSource = readSafe(HANDOFF_PATH);
 const docIndexSource = readSafe(DOC_INDEX_PATH);
+const customStudyPageSource = readSafe(CUSTOM_STUDY_PAGE_PATH);
+const senseStudyCardSource = readSafe(SENSE_STUDY_CARD_PATH);
+const routesSource = readSafe(ROUTES_PATH);
 const authoritativeSources = [
     ['master plan', masterPlanSource],
     ['handoff', handoffSource],
@@ -77,8 +89,22 @@ const authoritativeSources = [
     ['documentation index', docIndexSource],
 ];
 const PRODUCTION_STATUS = 'Production closure: complete';
-const ACCEPTANCE_STATUS = 'Custom Study 1A: awaiting web-side process designer final Accept';
+const ACCEPTANCE_STATUS = 'Custom Study 1A: Accepted / Production Closed';
 const ONE_B_STATUS = 'Custom Study 1B: not started';
+const OBSOLETE_CURRENT_STATUS_PATTERNS = [
+    /custom study 1a:\s*awaiting web-side process designer final accept/i,
+    /custom study 1a[^\n]{0,240}awaiting final accept/i,
+    /overall feature not usable/i,
+    /overall feature incomplete/i,
+    /custom study[^\n]{0,240}feature incomplete/i,
+    /custom study[^\n]{0,240}no frontend/i,
+    /custom study[^\n]{0,240}无前端/i,
+    /整体功能不可使用(?:[^\n]{0,160}无前端)?/i,
+    /phase 5-7 not started/i,
+    /phase 4-7 未开始/i,
+    /backend api exists but no page consumes it/i,
+    /custom study 1a 未完成/i,
+];
 
 // ---------------------------------------------------------------------------
 // 0. Files exist
@@ -376,7 +402,7 @@ test('implementation plan marks production closure complete', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 10. Overall feature is production-ready pending final product Accept
+// 10. Overall feature is accepted and production-closed
 // ---------------------------------------------------------------------------
 
 test('implementation plan has the authoritative acceptance status', () => {
@@ -395,13 +421,23 @@ test('all five authoritative documents share the production status trio', () => 
     }
 });
 
-test('active status blocks do not claim frontend missing or overall feature unusable', () => {
+test('all five authoritative documents contain no obsolete current Custom Study status', () => {
     for (const [name, source] of authoritativeSources) {
-        const currentBlock = source.slice(0, 2500).toLowerCase();
-        assert.ok(!currentBlock.includes('overall feature not usable'), `${name} keeps obsolete unusable status at the top`);
-        assert.ok(!currentBlock.includes('no frontend'), `${name} keeps obsolete no-frontend status at the top`);
-        assert.ok(!currentBlock.includes('phase 5-7 not started'), `${name} keeps obsolete phase status at the top`);
+        for (const pattern of OBSOLETE_CURRENT_STATUS_PATTERNS) {
+            assert.ok(!pattern.test(source), `${name} contains obsolete current status matching ${pattern}`);
+        }
     }
+});
+
+test('production implementation facts exist in code and routes', () => {
+    assert.ok(customStudyPageSource.length > 0, 'CustomStudy.vue must exist');
+    assert.ok(senseStudyCardSource.length > 0, 'SenseStudyCard.vue must exist');
+    assert.match(senseStudyCardSource, /SenseSentencePreview/, 'SenseStudyCard must reuse SenseSentencePreview');
+    assert.match(routesSource, /Route::get\(\s*['"]\/custom-study['"]/, '/custom-study page route must exist');
+    assert.match(routesSource, /custom-study\/chapter-options/, 'chapter-options route must exist');
+    assert.match(routesSource, /custom-study\/sessions['"]/, 'open-session route must exist');
+    assert.match(routesSource, /custom-study\/sessions\/answer/, 'answer route must exist');
+    assert.match(routesSource, /custom-study\/sessions\/resume/, 'resume route must exist');
 });
 
 // ---------------------------------------------------------------------------
@@ -440,11 +476,10 @@ test('master plan references Phase 3A as Accepted', () => {
     );
 });
 
-test('master plan references Phase 3B completion awaiting web-side acceptance', () => {
-    // After Task 2000-20, Phase 3B code/tests are complete pending web验收.
+test('master plan references Phase 3B completion as historical architecture', () => {
     assert.ok(
         masterPlanSource.toLowerCase().includes('phase 3b'),
-        'master plan must reference Phase 3B.'
+        'master plan must preserve Phase 3B architecture history.'
     );
 });
 
