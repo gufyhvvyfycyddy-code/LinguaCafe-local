@@ -176,6 +176,24 @@ export function parseAiRecommendations(jsonText, pendingItems, selectedIds) {
 }
 
 /**
+ * Convert a V6 provider-preview package into the same state shape used by the
+ * manually pasted recommendation flow. Recommendations remain unselected.
+ */
+export function importV6Recommendations(recommendationPackage, pendingItems, selectedIds) {
+    const jsonInput = JSON.stringify(recommendationPackage || {}, null, 2);
+    const result = parseAiRecommendations(jsonInput, pendingItems, selectedIds);
+
+    return {
+        ...result,
+        jsonInput,
+        selectedIndices: [],
+        importNotice: result.recommendations.length > 0
+            ? '已从 V6 AI 推荐预览导入 ' + result.recommendations.length + ' 条推荐词，默认未勾选。请手动勾选需要的词，再继续生成；最终生成学习卡前仍必须填写中文释义。'
+            : 'V6 AI 推荐预览没有可导入的新推荐词。重复项已被丢弃，请更换待解释词后重试。',
+    };
+}
+
+/**
  * Re-dedupe existing recommendations after the user changes which pending
  * items are selected. Removes recommendations whose lemma matches a newly
  * selected pending item. Preserves the selection state of the kept items

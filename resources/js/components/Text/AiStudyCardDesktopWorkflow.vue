@@ -32,7 +32,6 @@
             :type="aiStudyCardPendingError ? 'error' : 'success'"
         >{{ aiStudyCardPendingMessage }}</v-alert>
 
-        <!-- V3: 待 AI 解释列表面板（含已取消视图 + 恢复按钮） -->
         <AiStudyCardPendingListDialog
             v-model="aiPendingListDialog"
             :pending-items="aiPendingItems"
@@ -49,7 +48,6 @@
             @open-preview="openAiStudyCardPreview"
         />
 
-        <!-- V3-V5: 生成预览弹窗（含 V4 AI 推荐词粘贴 + V5 生成学习卡结果） -->
         <AiStudyCardPreviewDialog
             v-model="aiStudyCardPreviewDialog"
             :pending-items="aiPendingItems"
@@ -91,7 +89,6 @@
             @dismiss-result="aiGenerateCardsResult = null"
         />
 
-        <!-- V5: 确认生成学习卡对话框（共享组件） -->
         <AiStudyCardGenerateCardsDialog
             v-model="aiGenerateCardsDialog"
             :items="aiGenerateCardsItems"
@@ -110,6 +107,7 @@ import AiStudyCardPendingListDialog from './AiStudyCardPendingListDialog.vue';
 import AiStudyCardPreviewDialog from './AiStudyCardPreviewDialog.vue';
 import {
     parseAiRecommendations as parseRecommendations,
+    importV6Recommendations,
     rededupeRecommendations,
 } from '../../services/AiStudyCardRecommendationParserService.js';
 import {
@@ -119,6 +117,7 @@ import {
     restorePendingItem,
     buildPreviewPackage,
     buildFinalCandidatesPackage,
+    createFinalCandidatesPayload,
 } from '../../services/AiStudyCardPendingWorkflowService.js';
 import {
     buildGenerateCardItems,
@@ -173,7 +172,6 @@ export default {
         };
     },
     methods: {
-        // State reset helpers (DRY for repeated patterns)
         _resetPreviewPackageState() {
             this.aiPreviewPackage = null; this.aiPreviewCopyMessage = ''; this.aiPreviewCopied = false;
         },
@@ -186,7 +184,6 @@ export default {
             this.rededupeAiRecommendationsAfterUserSelectionChange();
             this.aiFinalCandidatesPackage = null; this.aiFinalCopyMessage = ''; this.aiFinalCopied = false;
         },
-        // V1: mark current word as pending AI explanation
         markAiStudyCardPending() {
             if (this.type !== 'word') return;
             const chapterId = this._chapterId;
@@ -214,7 +211,6 @@ export default {
                 this.aiStudyCardPendingLoading = false;
             });
         },
-        // V3: open pending list dialog and load pending + dismissed
         openAiPendingListDialog() {
             this.aiPendingListDialog = true;
             this.aiPendingListMessage = '';
@@ -268,19 +264,13 @@ export default {
                 .catch((error) => { this.aiPendingListError = error.message || '恢复失败。'; })
                 .finally(() => { this.aiPendingRestoreLoadingId = null; });
         },
-        // V3: open preview dialog, initialize selection state
         openAiStudyCardPreview() {
             this.aiStudyCardPreviewDialog = true;
             this.aiPreviewSelectedItemIds = this.aiPendingItems.map(i => i.id);
             this._resetPreviewPackageState();
             this.aiPreviewPackageError = '';
-            // V4: clear AI recommendation state
-            this.aiRecommendationJsonInput = '';
-            this.aiRecommendations = [];
-            this.aiSelectedRecommendationIndices = [];
-            this.aiRecommendationParseError = '';
-            this.aiRecommendationSummary = null;
-            this.aiRecommendationImportNotice = '';
+            this.aiRecommendationJsonInput = ''; this.aiRecommendations = []; this.aiSelectedRecommendationIndices = [];
+            this.aiRecommendationParseError = ''; this.aiRecommendationSummary = null; this.aiRecommendationImportNotice = '';
             this._resetFinalCandidatesState();
         },
         togglePreviewItemSelection(itemId) {
@@ -297,8 +287,6 @@ export default {
             this.aiPreviewSelectedItemIds = [];
             this._resetAfterSelectionChange();
         },
-        // V4: parse AI recommendation JSON (delegates to pure service)
-        // AI recommendations default to UNSELECTED
         parseAiRecommendations() {
             this.aiRecommendationParseError = '';
             this.aiRecommendationSummary = null;
@@ -325,17 +313,13 @@ export default {
             this._resetFinalCandidatesState();
         },
         applyV6Recommendations(recommendationPackage) {
-            if (!recommendationPackage || !Array.isArray(recommendationPackage.recommended_items)) {
-                this.aiRecommendationParseError = 'V6 AI 推荐预览格式无效，无法导入推荐词列表。';
-                return;
-            }
-            this.aiRecommendationJsonInput = JSON.stringify(recommendationPackage, null, 2);
-            this.parseAiRecommendations();
-            this.aiSelectedRecommendationIndices = [];
-            const validCount = this.aiRecommendations.length;
-            this.aiRecommendationImportNotice = validCount > 0
-                ? '已从 V6 AI 推荐预览导入 ' + validCount + ' 条推荐词，默认未勾选。请手动勾选需要的词，再点击「准备生成」和「生成最终候选包」；最终生成学习卡前仍必须填写中文释义。'
-                : 'V6 AI 推荐预览没有可导入的新推荐词。重复项已被丢弃，你可以换一组待解释词再试。';
+            const result = importV6Recommendations(recommendationPackage, this.aiPendingItems, this.aiPreviewSelectedItemIds);
+            this.aiRecommendationJsonInput = result.jsonInput;
+            this.aiRecommendations = result.recommendations;
+            this.aiSelectedRecommendationIndices = result.selectedIndices;
+            this.aiRecommendationSummary = result.summary;
+            this.aiRecommendationParseError = result.error;
+            this.aiRecommendationImportNotice = result.importNotice;
             this._resetFinalCandidatesState();
         },
         rededupeAiRecommendationsAfterUserSelectionChange() {
@@ -357,23 +341,16 @@ export default {
             const i = this.aiSelectedRecommendationIndices.indexOf(idx);
             if (i >= 0) this.aiSelectedRecommendationIndices.splice(i, 1);
             else this.aiSelectedRecommendationIndices.push(idx);
-            this.aiFinalCandidatesPackage = null;
-            this.aiFinalCopyMessage = '';
-            this.aiFinalCopied = false;
+            this.aiFinalCandidatesPackage = null; this.aiFinalCopyMessage = ''; this.aiFinalCopied = false;
         },
         selectAllAiRecommendations() {
             this.aiSelectedRecommendationIndices = this.aiRecommendations.map((_, idx) => idx);
-            this.aiFinalCandidatesPackage = null;
-            this.aiFinalCopyMessage = '';
-            this.aiFinalCopied = false;
+            this.aiFinalCandidatesPackage = null; this.aiFinalCopyMessage = ''; this.aiFinalCopied = false;
         },
         deselectAllAiRecommendations() {
             this.aiSelectedRecommendationIndices = [];
-            this.aiFinalCandidatesPackage = null;
-            this.aiFinalCopyMessage = '';
-            this.aiFinalCopied = false;
+            this.aiFinalCandidatesPackage = null; this.aiFinalCopyMessage = ''; this.aiFinalCopied = false;
         },
-        // V3: build safe preview package
         generatePreviewPackage() {
             if (this.aiPreviewSelectedItemIds.length === 0) return;
             this.aiPreviewPackageLoading = true;
@@ -388,7 +365,6 @@ export default {
             if (!this.aiPreviewPackage) return;
             this.copyJsonToClipboard(this.aiPreviewPackage, 'aiPreviewCopied', 'aiPreviewCopyMessage');
         },
-        // V4: build final candidates package
         generateFinalCandidatesPackage() {
             if (this.aiPreviewSelectedItemIds.length === 0 && this.aiSelectedRecommendationIndices.length === 0) return;
             if (!this.aiPreviewPackage) {
@@ -398,21 +374,13 @@ export default {
             this.aiFinalCandidatesLoading = true;
             this.aiFinalCandidatesError = '';
             this._resetFinalCandidatesState();
-            const selectedAi = this.aiSelectedRecommendationIndices.map(idx => this.aiRecommendations[idx]).filter(Boolean);
-            const unselectedAi = this.aiRecommendations
-                .map((rec, idx) => ({ rec, idx }))
-                .filter(({ idx }) => !this.aiSelectedRecommendationIndices.includes(idx))
-                .map(({ rec }) => rec);
-            const payload = {
-                selected_item_ids: this.aiPreviewSelectedItemIds,
-                selected_ai_recommendations: selectedAi,
-                unselected_ai_recommendations: unselectedAi,
-                dedupe_summary: this.aiRecommendationSummary || {
-                    original_ai_count: 0, valid_ai_count: 0, dropped_missing_word: 0,
-                    dropped_duplicate_with_user: 0, dropped_ai_internal_duplicate: 0,
-                },
-                source_preview_package: this.aiPreviewPackage,
-            };
+            const payload = createFinalCandidatesPayload({
+                selectedItemIds: this.aiPreviewSelectedItemIds,
+                recommendations: this.aiRecommendations,
+                selectedRecommendationIndices: this.aiSelectedRecommendationIndices,
+                recommendationSummary: this.aiRecommendationSummary,
+                previewPackage: this.aiPreviewPackage,
+            });
             buildFinalCandidatesPackage(axios, payload)
                 .then(({ package: pkg }) => { this.aiFinalCandidatesPackage = pkg; })
                 .catch((error) => { this.aiFinalCandidatesError = error.message || '生成候选包失败，请重试。'; })

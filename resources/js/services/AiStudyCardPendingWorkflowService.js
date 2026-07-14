@@ -186,6 +186,23 @@ export function buildFinalCandidatesPackage(axios, payload) {
         });
 }
 
+/** Build the V4 request payload without coupling the Vue container to it. */
+export function createFinalCandidatesPayload({ selectedItemIds, recommendations, selectedRecommendationIndices, recommendationSummary, previewPackage }) {
+    const selectedAi = selectedRecommendationIndices.map(index => recommendations[index]).filter(Boolean);
+    const unselectedAi = recommendations.filter((recommendation, index) => !selectedRecommendationIndices.includes(index));
+
+    return {
+        selected_item_ids: selectedItemIds,
+        selected_ai_recommendations: selectedAi,
+        unselected_ai_recommendations: unselectedAi,
+        dedupe_summary: recommendationSummary || {
+            original_ai_count: 0, valid_ai_count: 0, dropped_missing_word: 0,
+            dropped_duplicate_with_user: 0, dropped_ai_internal_duplicate: 0,
+        },
+        source_preview_package: previewPackage,
+    };
+}
+
 /**
  * Build the V6 provider-disabled request package.
  *

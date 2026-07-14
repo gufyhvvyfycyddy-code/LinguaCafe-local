@@ -3,47 +3,45 @@
 namespace Tests\Feature\Auth;
 
 use App\Models\User;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Route;
 use Tests\TestCase;
 
 class PasswordResetTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_reset_password_link_can_be_requested(): void
+    public function test_password_reset_routes_are_not_exposed(): void
     {
         Notification::fake();
 
         $user = User::factory()->create();
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $this->assertFalse(Route::has('password.email'));
+        $this->assertFalse(Route::has('password.store'));
 
-        Notification::assertSentTo($user, ResetPassword::class);
+        $this->post('/forgot-password', ['email' => $user->email])
+            ->assertNotFound();
+
+        Notification::assertNothingSent();
     }
 
-    public function test_password_can_be_reset_with_valid_token(): void
+    public function test_direct_password_reset_request_is_rejected(): void
     {
         Notification::fake();
 
         $user = User::factory()->create();
+        $originalPassword = $user->password;
 
-        $this->post('/forgot-password', ['email' => $user->email]);
+        $this->post('/reset-password', [
+            'token' => 'disabled-route-token',
+            'email' => $user->email,
+            'password' => 'new-password',
+            'password_confirmation' => 'new-password',
+        ])->assertNotFound();
 
-        Notification::assertSentTo($user, ResetPassword::class, function (object $notification) use ($user) {
-            $response = $this->post('/reset-password', [
-                'token' => $notification->token,
-                'email' => $user->email,
-                'password' => 'password',
-                'password_confirmation' => 'password',
-            ]);
-
-            $response
-                ->assertSessionHasNoErrors()
-                ->assertStatus(200);
-
-            return true;
-        });
+        $this->assertSame($originalPassword, $user->fresh()->password);
+        Notification::assertNothingSent();
     }
 }

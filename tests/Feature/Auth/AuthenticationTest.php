@@ -20,7 +20,9 @@ class AuthenticationTest extends TestCase
         ]);
 
         $this->assertAuthenticated();
-        $response->assertNoContent();
+        $response
+            ->assertOk()
+            ->assertContent('"User has been logged in successfully."');
     }
 
     public function test_users_can_not_authenticate_with_invalid_password(): void
