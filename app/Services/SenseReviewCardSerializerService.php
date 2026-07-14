@@ -40,6 +40,7 @@ class SenseReviewCardSerializerService
         private SenseTokenPayloadService $senseTokenPayloadService,
         private WordSenseExamplePoolService $examplePoolService,
         private SenseReviewLearningFeedbackService $feedbackService,
+        private SenseExampleIdentityResolver $exampleIdentityResolver,
     ) {
     }
 
@@ -115,7 +116,14 @@ class SenseReviewCardSerializerService
         );
         $supplementaryExample = $supplementaryIndex !== null ? $candidates[$supplementaryIndex] ?? null : null;
 
-        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense, $questionExample);
+        $questionIdentity = $questionExample === null
+            ? null
+            : $this->exampleIdentityResolver->resolve($questionExample, (int) $sense->user_id, (string) $sense->language_id);
+        $tokenExample = $questionExample;
+        if ($tokenExample !== null && $questionIdentity !== null) {
+            $tokenExample['resolved_sentence_index'] = $questionIdentity['sentence_index'];
+        }
+        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense, $tokenExample);
 
         // The selected example is the only translation source. Sense-level
         // text is never borrowed for a different occurrence.
@@ -272,43 +280,31 @@ class SenseReviewCardSerializerService
 
     private function translationForExample($sense, ?array $example, ?array $assists): array
     {
-        $explicit = trim((string) ($example['sentence_zh'] ?? ''));
-        if ($explicit !== '') {
-            return [$explicit, ($example['is_card_fallback'] ?? false) ? 'card_fallback' : 'occurrence'];
-        }
-
-        $chapterId = $example['chapter_id'] ?? null;
-        $sentenceId = $example['sentence_id'] ?? null;
-        $sentenceEn = $example['sentence_en'] ?? null;
-        if ($chapterId === null || $sentenceId === null || !is_string($sentenceEn) || trim($sentenceEn) === '') {
+        if ($example === null) {
             return [null, null];
         }
 
-        $key = $this->translationAssistKey($sense->user_id, $sense->language_id, $chapterId);
+        $identity = $this->exampleIdentityResolver->resolve(
+            $example,
+            (int) $sense->user_id,
+            (string) $sense->language_id,
+        );
+        $chapterId = $identity['chapter_id'] ?? null;
+
+        $key = $chapterId === null ? null : $this->translationAssistKey($sense->user_id, $sense->language_id, $chapterId);
         $assist = $assists === null ? null : ($assists[$key] ?? null);
-        if ($assists === null) {
+        if ($assists === null && $chapterId !== null) {
             $assist = ChapterAiReadingAssist::query()
                 ->where('user_id', $sense->user_id)
                 ->where('language', $sense->language_id)
                 ->where('chapter_id', $chapterId)
                 ->first();
         }
-        if ($assist === null) {
-            return [null, null];
-        }
-
-        $matches = collect($assist->sentence_translations ?? [])
-            ->filter(fn ($item) => is_array($item)
-                && array_key_exists('sentence_index', $item)
-                && (string) $item['sentence_index'] === (string) $sentenceId
-                && isset($item['source_text'])
-                && $this->normalizeSentenceText((string) $item['source_text']) === $this->normalizeSentenceText($sentenceEn)
-                && trim((string) ($item['translation_zh'] ?? '')) !== '')
-            ->values();
-
-        return $matches->count() === 1
-            ? [trim((string) $matches->first()['translation_zh']), 'chapter_ai_reading_assist']
-            : [null, null];
+        return $this->exampleIdentityResolver->translationFor(
+            $example,
+            $identity,
+            $assist?->sentence_translations ?? [],
+        );
     }
 
     private function translationAssistMap(array $chapterIds, array $userIds, array $languages): array
@@ -332,11 +328,6 @@ class SenseReviewCardSerializerService
     private function translationAssistKey(int $userId, string $language, int $chapterId): string
     {
         return $userId . '|' . $language . '|' . $chapterId;
-    }
-
-    private function normalizeSentenceText(string $text): string
-    {
-        return trim(preg_replace('/\s+/u', ' ', mb_strtolower($text)) ?? '');
     }
 
     /**

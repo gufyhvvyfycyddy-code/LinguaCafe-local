@@ -37,7 +37,9 @@ class SenseTokenPayloadService
         // A selected example is authoritative: never borrow chapter, sentence,
         // or text identity from a different occurrence.
         $chapterId = $selectedExample['chapter_id'] ?? ($occurrence?->chapter_id ?? $sense->source_chapter_id);
-        $sentenceId = $selectedExample['sentence_id'] ?? ($occurrence?->sentence_id ?? $sense->sentence_id);
+        $sentenceId = $selectedExample['resolved_sentence_index']
+            ?? $selectedExample['sentence_id']
+            ?? ($occurrence?->sentence_id ?? $sense->sentence_id);
         $sentenceHash = $selectedExample['sentence_hash'] ?? ($occurrence?->sentence_hash ?? $sense->sentence_hash);
         $sentenceText = $selectedExample['sentence_en'] ?? $sense->example_sentence_en;
         $selectedOccurrence = $selectedExample !== null

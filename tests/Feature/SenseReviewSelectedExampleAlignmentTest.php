@@ -120,6 +120,42 @@ class SenseReviewSelectedExampleAlignmentTest extends TestCase
         $this->assertSame($second->id, $second->fresh()->id);
     }
 
+    public function test_ai_study_card_sentence_identity_aligns_translation_and_chapter_tokens(): void
+    {
+        [$user, $sense, $first, $second, $card] = $this->twoOccurrenceCard([
+            'sentence_zh' => null,
+        ]);
+        $second->forceFill([
+            'sentence_id' => "ai-study-card:{$second->chapter_id}:0:1:aligned",
+        ])->save();
+
+        ChapterAiReadingAssist::forceCreate([
+            'user_id' => $user->id,
+            'language' => 'english',
+            'chapter_id' => $second->chapter_id,
+            'schema_version' => 'linguacafe_ai_reading_assist_v1',
+            'sentence_translations' => [
+                ['sentence_index' => 1, 'source_text' => 'Second aligned example.', 'translation_zh' => 'Synthetic aligned translation.'],
+            ],
+            'vocabulary_items' => [],
+            'phrase_items' => [],
+            'warnings' => [],
+            'summary' => [],
+        ]);
+
+        $payload = app(SenseReviewCardSerializerService::class)->serialize($card->load('sense'), [
+            'preferred_occurrence_id' => $second->id,
+        ]);
+
+        $this->assertSame($second->id, $payload['displayed_occurrence_id']);
+        $this->assertSame('Second aligned example.', $payload['example_sentence_en']);
+        $this->assertSame('Synthetic aligned translation.', $payload['example_sentence_zh']);
+        $this->assertSame('chapter_ai_reading_assist', $payload['example_sentence_translation_source']);
+        $this->assertSame('occurrence', $payload['example_sentence_token_source']);
+        $this->assertSame(['Second', 'aligned', 'example.'], array_column($payload['example_sentence_tokens'], 'word'));
+        $this->assertSame($first->id, $first->fresh()->id);
+    }
+
     private function twoOccurrenceCard(array $secondOverrides = []): array
     {
         $user = User::forceCreate([
