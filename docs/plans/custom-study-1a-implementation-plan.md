@@ -1,6 +1,13 @@
 # Custom Study 1A Implementation Plan
 
-> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) ✅ Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) ✅ Accepted (Task 2000-17 + Task 2000-18 docs fix). Phase 2B (`EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`) ✅ Accepted (Task 2000-18). Phase 3A (`CustomStudySessionState` immutable value object + `CustomStudySessionTokenService` encrypt/decrypt/verify only + `CustomStudySessionStateException` + 2 unit test files) ✅ Accepted / Closed (Task 2000-19 + Task 2000-20 docs closure + Task 2000-22 final closure). Phase 3B (`CustomStudyPreviewPolicy` pure state transition function + `CustomStudyPreviewPolicyException` + `CustomStudySessionState::withProgress()` + `waitUntil()` + `isCompleted()` + Token constant single-source reference + 2 unit test files) ✅ Accepted / Closed (Task 2000-20 + Task 2000-21 docs closure + Task 2000-22 final closure). Phase 4A (`CustomStudySessionOrder` session-internal ordering service + 1 feature test file) ✅ Accepted / Closed (Task 2000-21 + Task 2000-22 final closure). Phase 4B (Backend session vertical slice: `CustomStudySessionState::available_candidate_count` + `withEligibilityResolution()` + `CustomStudyPreviewPolicy::resolveEligibility()` + `CustomStudySessionEligibilityService` + `CustomStudySessionException` + `CustomStudySessionService` open/answer/resume + `CustomStudyController` + three POST routes + 6 feature test files + 2 Node guard files) code and tests completed in Task 2000-22, awaiting web-side acceptance. `candidate_count` product Gate closed as Option A (full available candidate count, NOT card_limit-truncated). Phase 5-7 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study page or migration is authorized by this plan alone beyond Phase 1 value objects/validator, Phase 2A/2B queries + candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, Phase 3B pure state transition policy, Phase 4A session-internal ordering, and Phase 4B backend session orchestration vertical slice.**
+> **Authoritative Custom Study status (2026-07-14)**
+> Production closure: complete
+> Custom Study 1A: awaiting web-side process designer final Accept
+> Custom Study 1B: not started
+> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production closure are complete. The detailed phase roadmap below is retained as historical/superseded implementation context; it does not authorize 1B or another product task.
+
+
+> **Status**: Architecture and production implementation are complete through the 1A browser-verified preview workflow. The phase ledger below records how that result was built; current acceptance status is defined only by the authoritative block above.
 
 **Goal**: Implement Custom Study 1A — a preview-only temporary session that lets the user review a curated set of sense cards outside the normal due queue, without moving cards, building a filtered deck, writing ReviewLog, or running FSRS scheduling.
 
@@ -8,7 +15,7 @@
 
 **Related ADR**: `docs/adr/ADR-0016-custom-study-preview-session.md`
 
-**Authorization required before any task below can start**:
+**Historical authorization checklist used before the completed implementation phases**:
 1. A separate task authorization from the 网页端总流程设计师.
 2. Architecture Gate review per `AGENTS.md`.
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
@@ -25,7 +32,7 @@
 - Phase 5 (Frontend / SenseStudyCard / Chapter picker): NOT started. AI translation card display registered as future requirement (ADR-0016 §20.7.1), NOT implemented. Chapter picker future contract registered (ADR-0016 §21, Task 2000-19 + Task 2000-21 `candidate_count` display contract), NOT implemented. `candidate_count` semantics frozen as Option A by Task 2000-22 (full available candidate count, NOT card_limit-truncated) — the earlier OPEN PRODUCT GATE is closed.
 - Phase 6 (Routes integration): NOT started. (Phase 4B already registers the three backend POST routes; Phase 6 is the frontend route integration.)
 - Phase 7 (End-to-end MCP Chrome acceptance): NOT started.
-- Overall feature: NOT usable (no frontend, no chapter picker UI). Backend API exists but no page consumes it yet.
+- Historical pre-frontend state (superseded): the backend once existed without a page. The current `/custom-study` frontend, chapter picker, and preview session now consume it.
 - `ChapterLocatorInterface` has production binding in Task 2000-18 (`EloquentChapterLocator` in `AppServiceProvider`). `app(ChapterLocatorInterface::class)` and `app(CustomStudyCriteriaValidator::class)` are resolvable. `app(CustomStudySessionTokenService::class)` is resolvable via auto-concrete-resolution + `Illuminate\Contracts\Encryption\Encrypter` (Laravel default registered).
 - **Error contract (frozen by Task 2000-17)**: `field`/`reason` are the machine protocol. `message` is for human reading only. Callers MUST NOT parse `message` text to derive `field`/`reason`. The old `translateCriteriaException()` / `str_contains($message, ...)` control flow has been abolished and is guarded against by source-level tests.
 - **Phase 2 architecture boundary (frozen by Task 2000-18)**: SQL-native Queries return composable Builder; `LeechAttentionQuery` returns `list<int>` derived from real `SenseReviewLeechPolicy`. `CustomStudyQueryService::candidateIds()` is the unified output boundary. No new `QueryInterface`, DTO, Repository, or Adapter. No sorting, no `card_limit`, no serializer, no session, no token at the Query layer.
@@ -134,7 +141,7 @@ All three routes: auth middleware, not admin-only. 401 unauthenticated. 404 tamp
 
 ---
 
-## TDD Breakdown
+## Historical TDD Breakdown (completed; superseded as current status)
 
 This plan follows strict TDD (red → green → refactor). Each task lists the test file first, then the implementation file. No implementation file may be written before its test file fails.
 

@@ -1,5 +1,12 @@
 # LinguaCafe Documentation Index
 
+> **Authoritative Custom Study status (2026-07-14)**
+> Production closure: complete
+> Custom Study 1A: awaiting web-side process designer final Accept
+> Custom Study 1B: not started
+> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production closure are complete. No final web-side Accept is claimed; older phase ledgers are historical/superseded context.
+
+
 > **Status**: Current entry index.
 > **Last updated**: 2026-07-14 (Task 2000-21 `GLM-CustomStudy-Phase4A-SessionInternalOrdering-And-Phase3B-Closure-2000-21` — **Custom Study 1A Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务**。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Custom Study 1A 当前状态**：Phase 1 ✅ Accepted；Phase 2A ✅ Accepted；Phase 2B ✅ Accepted（Task 2000-18）；Phase 3A ✅ Accepted（Task 2000-19 + Task 2000-20 docs closure）；Phase 3B（`CustomStudyPreviewPolicy` + `CustomStudyPreviewPolicyException` + `withProgress()` + `waitUntil()` + `isCompleted()` + Token 常量单一来源 + 2 unit tests + 文档 guard）代码与测试完成，文档/harness 状态漂移已收口（Task 2000-21），等待网页端最终关闭；Phase 4A（`CustomStudySessionOrder` 会话内部排序服务 + 1 feature test）代码与测试完成（Task 2000-21），等待网页端验收；Phase 4B-7 未开始；**整体功能不可使用**。**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。)
 
@@ -80,6 +87,8 @@ New rules and process notes are documented in:
 Do not treat frozen plans as implementation authorization. They only freeze the route; the next implementation round must still pass Architecture Gate and ADR review.
 
 ## 3. Current ADRs
+
+The detailed ADR table retains historical phase-by-phase registration text. For Custom Study, the authoritative status block at the top of this index supersedes any future-tense phase wording inside the long ADR-0016 ledger row.
 
 | ADR | Status | Scope |
 |---|---|---|

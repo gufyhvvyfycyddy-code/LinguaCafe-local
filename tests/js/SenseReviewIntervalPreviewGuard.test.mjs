@@ -304,7 +304,9 @@ test('normalizeIntervalPreview handles null payload', () => {
 test('SenseReview.vue invalidates preview at start of rate()', () => {
     const rateIdx = reviewSrc.indexOf('rate(rating)');
     assert.ok(rateIdx >= 0, 'must have rate method');
-    const chunk = reviewSrc.slice(rateIdx, rateIdx + 900);
+    const nextMethodIdx = reviewSrc.indexOf('continueOverLimit()', rateIdx);
+    assert.ok(nextMethodIdx > rateIdx, 'must find the method boundary after rate()');
+    const chunk = reviewSrc.slice(rateIdx, nextMethodIdx);
     assert.ok(chunk.includes('intervalPreviews = null'), 'rate() must clear intervalPreviews');
     assert.ok(chunk.includes('intervalPreviewRequestSequence++'), 'rate() must bump requestSequence');
 });

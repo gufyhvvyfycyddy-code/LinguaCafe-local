@@ -69,6 +69,16 @@ const planSource = readSafe(PLAN_PATH);
 const masterPlanSource = readSafe(MASTER_PLAN_PATH);
 const handoffSource = readSafe(HANDOFF_PATH);
 const docIndexSource = readSafe(DOC_INDEX_PATH);
+const authoritativeSources = [
+    ['master plan', masterPlanSource],
+    ['handoff', handoffSource],
+    ['ADR-0016', adrSource],
+    ['implementation plan', planSource],
+    ['documentation index', docIndexSource],
+];
+const PRODUCTION_STATUS = 'Production closure: complete';
+const ACCEPTANCE_STATUS = 'Custom Study 1A: awaiting web-side process designer final Accept';
+const ONE_B_STATUS = 'Custom Study 1B: not started';
 
 // ---------------------------------------------------------------------------
 // 0. Files exist
@@ -358,37 +368,40 @@ test('ADR-0016 marks Phase 3A as Accepted', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 9. Phase 4-7 NOT started
+// 9. Production phases are complete
 // ---------------------------------------------------------------------------
 
-test('implementation plan marks Phase 4 as NOT started', () => {
-    const lines = planSource.split('\n');
-    const phase4Line = lines.find(line =>
-        line.includes('Phase 4') && (line.includes('NOT started') || line.includes('started'))
-    );
-    assert.ok(phase4Line, 'Phase 4 status line must exist');
-    assert.ok(
-        phase4Line.includes('NOT started'),
-        'Phase 4 must remain NOT started.'
-    );
+test('implementation plan marks production closure complete', () => {
+    assert.ok(planSource.includes(PRODUCTION_STATUS));
 });
 
 // ---------------------------------------------------------------------------
-// 10. Overall feature NOT usable
+// 10. Overall feature is production-ready pending final product Accept
 // ---------------------------------------------------------------------------
 
-test('implementation plan says overall feature NOT usable', () => {
-    assert.ok(
-        planSource.toLowerCase().includes('not usable'),
-        'implementation plan must state the overall feature is NOT usable.'
-    );
+test('implementation plan has the authoritative acceptance status', () => {
+    assert.ok(planSource.includes(ACCEPTANCE_STATUS));
 });
 
-test('ADR-0016 says overall feature incomplete / NOT usable', () => {
-    assert.ok(
-        adrSource.toLowerCase().includes('incomplete') || adrSource.toLowerCase().includes('not usable'),
-        'ADR-0016 must state the overall feature is incomplete / NOT usable.'
-    );
+test('ADR-0016 has the authoritative acceptance status', () => {
+    assert.ok(adrSource.includes(ACCEPTANCE_STATUS));
+});
+
+test('all five authoritative documents share the production status trio', () => {
+    for (const [name, source] of authoritativeSources) {
+        assert.ok(source.includes(PRODUCTION_STATUS), `${name} is missing production closure status`);
+        assert.ok(source.includes(ACCEPTANCE_STATUS), `${name} is missing final Accept status`);
+        assert.ok(source.includes(ONE_B_STATUS), `${name} is missing 1B not-started status`);
+    }
+});
+
+test('active status blocks do not claim frontend missing or overall feature unusable', () => {
+    for (const [name, source] of authoritativeSources) {
+        const currentBlock = source.slice(0, 2500).toLowerCase();
+        assert.ok(!currentBlock.includes('overall feature not usable'), `${name} keeps obsolete unusable status at the top`);
+        assert.ok(!currentBlock.includes('no frontend'), `${name} keeps obsolete no-frontend status at the top`);
+        assert.ok(!currentBlock.includes('phase 5-7 not started'), `${name} keeps obsolete phase status at the top`);
+    }
 });
 
 // ---------------------------------------------------------------------------

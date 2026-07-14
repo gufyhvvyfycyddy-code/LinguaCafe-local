@@ -1,5 +1,14 @@
 # ADR-0016: Custom Study Preview Session
 
+> **Authoritative Custom Study status (2026-07-14)**
+> Production closure: complete
+> Custom Study 1A: awaiting web-side process designer final Accept
+> Custom Study 1B: not started
+> The backend, read-only chapter options, aligned example identity, shared Sense card, setup/session frontend, executable state tests, query budgets, and MCP Chrome production closure now implement this accepted architecture. No final web-side Accept is claimed. Earlier future-tense phase notes are retained only as historical/superseded design context.
+
+**Historical phase ledger (superseded as current status by the block above):**
+
+
 **Status**: Accepted (architecture complete; **Phase 1 Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A Accepted (Task 2000-17, Builder contract docs fixed in Task 2000-18). Phase 2B Accepted (Task 2000-18: `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`). Phase 3A Accepted (Task 2000-19 + Task 2000-20 docs closure): `CustomStudySessionState` (immutable value object with `completed_ids` + `skipped_ineligible_ids` fields, five-state union + mutual exclusion invariants, no DB/Auth/Request/Crypt) + `CustomStudySessionTokenService` (only encrypts/decrypts/verifies, no rotate/answer/rating/SessionService/PreviewPolicy, injects `Illuminate\Contracts\Encryption\Encrypter`, `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`). Phase 3B Accepted / Closed (Task 2000-22 final closure, code/tests completed in Task 2000-20, docs/harness status drift closed in Task 2000-21): `CustomStudyPreviewPolicy` (pure state transition function — `applyRating(state, rating, now)` + `resume(state, now)`; only accepts four lowercase ratings `again`/`hard`/`good`/`easy`; Again/Hard → `delayed_repeat_queue`, Good/Easy → `completed_ids`; picks next `current_card_id` from `ready_queue` first, else earliest mature `delayed_repeat_queue` entry; does NOT touch DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI; does NOT call `toArray()`/`fromArray()`, only `withProgress()`) + `CustomStudySessionState::withProgress()` (immutable copy boundary — preserves identity fields, accepts the new five-state, auto-recomputes `completed_count`/`total_count`, auto-increments `step`, rejects `step === PHP_INT_MAX` overflow) + `CustomStudySessionState::waitUntil()` + `CustomStudySessionState::isCompleted()` + `CustomStudyPreviewPolicyException` + Token constants (`VERSION`, `MAX_CANDIDATE_COUNT`) referencing `CustomStudySessionState` (single source of truth). Phase 4A Accepted / Closed (Task 2000-22 final closure, code/tests completed in Task 2000-21): `CustomStudySessionOrder` (pure session-internal ordering service — batch-loads ReviewCard once filtering user+language+target_type=sense; computes one canonical fallback rank via `ReviewQueueOrderService::order()`; per-mode primary sort: source_chapter = canonical, overdue = retrievability ASC, today_forgotten = latest today-again DESC, leech_attention = severity DESC; tie-break on canonical fallback; does NOT apply card_limit, does NOT create SessionState/token, does NOT write any table, does NOT modify Queue Order settings, does NOT re-run Criteria queries). Phase 4B Backend session vertical slice code/tests complete pending web-side acceptance (Task 2000-22): `CustomStudySessionState::available_candidate_count` + `withEligibilityResolution()` same-step immutable boundary, `CustomStudyPreviewPolicy::resolveEligibility()` pure method, `CustomStudySessionEligibilityService` batch eligibility resolver, `CustomStudySessionException` for token-not-found, `CustomStudySessionService` open/answer/resume orchestrator (no Auth/Request/Session/Settings facade access), `CustomStudyController` HTTP boundary, three POST routes `/custom-study/sessions` + `/custom-study/sessions/answer` + `/custom-study/sessions/resume`, `candidate_count` product Gate closed as Option A (full available candidate count, not card_limit-truncated). Phase 5-7 NOT started; overall feature incomplete (no frontend, no chapter picker UI)**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator, Phase 2A read-only candidate queries, Phase 2B chapter locator + source_chapter/leech_attention queries + unified candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, Phase 3B pure state transition policy, Phase 4A session-internal ordering, and Phase 4B backend session orchestration vertical slice)
 **Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17; Phase 2A docs fix + Phase 2B added 2026-07-14 by Task 2000-18; Phase 2B Accepted + Phase 3A SessionState/TokenService + state contract fix + chapter picker future registration added 2026-07-14 by Task 2000-19; Phase 3A Accepted + Phase 3B PreviewPolicy + withProgress + transition contract closure added 2026-07-14 by Task 2000-20; Phase 3B docs/harness status drift closed + Phase 4A `CustomStudySessionOrder` + `candidate_count` future contract registered added 2026-07-14 by Task 2000-21; Phase 3B/4A Accepted/Closed + Phase 4B backend session vertical slice + `available_candidate_count` + `withEligibilityResolution` + `resolveEligibility` + `CustomStudySessionEligibilityService` + `CustomStudySessionService` open/answer/resume + `CustomStudyController` + three POST routes + `candidate_count` Gate closed as Option A + V1 query budget truthfully recorded added 2026-07-14 by Task 2000-22)
 **Related**: `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0015-review-queue-order-policy.md`, `docs/plans/custom-study-1a-implementation-plan.md`
@@ -761,9 +770,9 @@ However, the actual component extraction is NOT done in 1A — it is deferred to
 4. The reading-style token color highlight (§20.5) is a LinguaCafe project adaptation. Anki supports custom HTML/CSS but does not freeze a default "target word color highlight" visual style. LinguaCafe does NOT misrepresent this as an Anki default design.
 5. The Anki "Question first, Show Answer after" flow (Anki Manual — Studying / Questions) is preserved by §20.6's `show-answer === false` contract.
 
-#### 20.7.1 AI translation card display requirement (registered for future CS-11.5, NOT implemented in Task 2000-16)
+#### 20.7.1 Translation card display contract (implemented; historical registration text retained below)
 
-> **Status**: Registered as a future product requirement for CS-11.5. **NOT implemented in Task 2000-16.** Task 2000-16 does NOT research the AI-translation data chain, does NOT implement any translation display, and does NOT call any AI provider. This section is a placeholder so the requirement is not lost; the actual data-chain Gate and implementation happen in a future CS-11.5 round.
+> **Current status (2026-07-14)**: implemented through the persisted occurrence/card translation plus exact reading-assist match contract, with fail-closed identity resolution and no external AI call. The original Task 2000-16 registration and pre-implementation checklist below are historical/superseded context.
 
 **Product requirement (registered, not implemented)**:
 
@@ -803,9 +812,9 @@ AI 译文卡面显示：
 不属于 Phase 1。
 ```
 
-#### 20.8 Future implementation test matrix (registered, not yet executed)
+#### 20.8 Historical implementation test matrix (now covered by executable tests and browser acceptance)
 
-> These tests are registered for the future implementation round (CS-11.5). They MUST be created and passed when `SenseStudyCard.vue` is actually implemented. The current round (Task 2000-15) does NOT create any test file.
+> Historical note: this was the pre-implementation matrix. The current implementation is covered by PHP feature/unit tests, Node guards, and the two-viewport MCP Chrome production closure.
 
 Functional tests:
 1. `SenseStudyCard.vue` uses `SenseSentencePreview` (or equivalent shared sub-component) for sentence rendering.
@@ -841,9 +850,9 @@ AI translation tests (registered by Task 2000-16 for future CS-11.5, NOT execute
 25. No AI provider call, no WordSense/WordSenseOccurrence/ReviewCard write, no FSRS change, no ReviewLog write.
 26. Translation visual uses existing reading-page vertical-stacked style (LinguaCafe adaptation, not Anki default).
 
-### 21. Chapter picker future contract (registered by Task 2000-19; candidate_count display requirement + Option A decision frozen by Task 2000-21 / Task 2000-22; NOT implemented in Task 2000-19, Task 2000-21, or Task 2000-22)
+### 21. Chapter picker contract (implemented; historical registration text retained below)
 
-> **Status**: Registered as a future product requirement for Phase 5 / CS-11 (chapter picker product contract) and Phase 6 (chapter options data delivery Gate). **Task 2000-19 does NOT implement the chapter list, page, or endpoint. Task 2000-21 registered the `candidate_count` display contract and the open product Gate. Task 2000-22 closes the product Gate by freezing Option A (full available candidate count, NOT card_limit-truncated). Task 2000-22 does NOT implement any chapter-picker code, endpoint, migration, or Vue component.** This section is a placeholder so the requirement is not lost; the actual implementation happens in a future Phase 5/6 round after an Architecture Gate.
+> **Current status (2026-07-14)**: implemented. `GET /custom-study/chapter-options` returns eligible owned chapters with full distinct `candidate_count`; zero-candidate chapters are excluded and the Vue setup page consumes this read-only endpoint. The task-specific registration narrative below is historical/superseded context.
 
 **Product requirement (registered, not implemented)**:
 
