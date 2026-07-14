@@ -664,6 +664,167 @@ test('ADR-0016 §21 forbids candidate_count = 0 chapters', () => {
 });
 
 // ---------------------------------------------------------------------------
+// 14.7 Phase 4B documentation status (Task 2000-22 final closure)
+// ---------------------------------------------------------------------------
+
+test('implementation plan references Phase 4B', () => {
+    assert.ok(
+        planSource.toLowerCase().includes('phase 4b'),
+        'implementation plan must reference Phase 4B (backend session vertical slice).'
+    );
+});
+test('master plan references Phase 4B', () => {
+    assert.ok(
+        masterPlanSource.toLowerCase().includes('phase 4b'),
+        'master plan must reference Phase 4B (backend session vertical slice).'
+    );
+});
+test('handoff references Phase 4B', () => {
+    assert.ok(
+        handoffSource.toLowerCase().includes('phase 4b'),
+        'handoff must reference Phase 4B (backend session vertical slice).'
+    );
+});
+test('DOCUMENTATION_INDEX references Phase 4B', () => {
+    assert.ok(
+        docIndexSource.toLowerCase().includes('phase 4b'),
+        'DOCUMENTATION_INDEX must reference Phase 4B (backend session vertical slice).'
+    );
+});
+test('ADR-0016 references Phase 4B', () => {
+    assert.ok(
+        adrSource.toLowerCase().includes('phase 4b'),
+        'ADR-0016 must reference Phase 4B (backend session vertical slice).'
+    );
+});
+
+// 14.8 Phase 3B/4A must be marked Accepted / Closed (no longer "awaiting")
+test('ADR-0016 marks Phase 3B as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 3B Accepted \/ Closed/.test(adrSource),
+        'ADR-0016 must mark Phase 3B as "Accepted / Closed".'
+    );
+});
+test('ADR-0016 marks Phase 4A as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 4A Accepted \/ Closed/.test(adrSource),
+        'ADR-0016 must mark Phase 4A as "Accepted / Closed".'
+    );
+});
+test('implementation plan marks Phase 3B as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 3B .* Accepted \/ Closed/.test(planSource) ||
+        /Accepted \/ Closed.*Phase 3B/.test(planSource),
+        'implementation plan must mark Phase 3B as "Accepted / Closed".'
+    );
+});
+test('implementation plan marks Phase 4A as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 4A .* Accepted \/ Closed/.test(planSource) ||
+        /Accepted \/ Closed.*Phase 4A/.test(planSource),
+        'implementation plan must mark Phase 4A as "Accepted / Closed".'
+    );
+});
+
+// 14.9 candidate_count product Gate closed as Option A (no longer OPEN PRODUCT GATE)
+test('ADR-0016 §21 closes OPEN PRODUCT GATE for candidate_count', () => {
+    // After closure, the §21 section should NOT describe candidate_count semantics as unresolved.
+    // The closing language must mention Option A or "not card_limit-truncated".
+    assert.ok(
+        adrSource.includes('Option A') ||
+        adrSource.includes('not card_limit-truncated') ||
+        adrSource.includes('NOT card_limit-truncated'),
+        'ADR-0016 must close candidate_count product Gate as Option A (full available count, not card_limit-truncated).'
+    );
+});
+test('ADR-0016 §21 must NOT keep candidate_count as an unresolved OPEN PRODUCT GATE', () => {
+    // The phrase "OPEN PRODUCT GATE" may appear only as historical mention or in closure context,
+    // not as the current status. Check that the closure language exists.
+    assert.ok(
+        /OPEN PRODUCT GATE.*closed/i.test(adrSource) ||
+        /closed.*OPEN PRODUCT GATE/i.test(adrSource) ||
+        !adrSource.includes('OPEN PRODUCT GATE'),
+        'ADR-0016 must close the OPEN PRODUCT GATE — closure language required if the phrase still appears.'
+    );
+});
+
+// 14.10 Session State invariants expanded to 18 (Task 2000-22 added invariants 16/17/18)
+test('ADR-0016 §18 references 18 invariants', () => {
+    assert.ok(
+        adrSource.includes('18 invariants') ||
+        adrSource.includes('18 Session State invariants') ||
+        /invariants? expanded to 18/i.test(adrSource),
+        'ADR-0016 §18 must reference 18 invariants (Task 2000-22 expanded 15 to 18).'
+    );
+});
+test('ADR-0016 §18 mentions available_candidate_count invariant', () => {
+    assert.ok(
+        adrSource.includes('available_candidate_count'),
+        'ADR-0016 §18 must mention available_candidate_count (invariants 16/17).'
+    );
+});
+test('ADR-0016 §18 mentions withEligibilityResolution same-step boundary', () => {
+    assert.ok(
+        adrSource.includes('withEligibilityResolution'),
+        'ADR-0016 §18 must mention withEligibilityResolution same-step boundary (invariant 18).'
+    );
+});
+
+// 14.11 V1 token payload includes available_candidate_count
+test('ADR-0016 §5 token payload includes available_candidate_count', () => {
+    assert.ok(
+        adrSource.includes('available_candidate_count'),
+        'ADR-0016 §5 token payload must include available_candidate_count field.'
+    );
+});
+
+// 14.12 V1 query budget truthfully records full-candidate hydration
+test('ADR-0016 §12 query budget truthfully records full candidate hydration', () => {
+    // The query budget must NOT hide the full-candidate hydration step.
+    assert.ok(
+        /full candidate/i.test(adrSource) || /full-candidate/i.test(adrSource),
+        'ADR-0016 §12 query budget must truthfully record full-candidate ID snapshot + full-candidate ordering.'
+    );
+});
+test('ADR-0016 §12 query budget must NOT truncate candidate IDs before ordering', () => {
+    assert.ok(
+        /MUST NOT truncate candidate IDs? before/i.test(adrSource) ||
+        /must not truncate candidate IDs? before/i.test(adrSource),
+        'ADR-0016 §12 must forbid truncating candidate IDs before CustomStudySessionOrder.'
+    );
+});
+
+// 14.13 Master plan and handoff Phase 3B/4A closure (Task 2000-22)
+test('master plan marks Phase 3B as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 3B.*Accepted \/ Closed/.test(masterPlanSource) ||
+        /Phase 3B.*✅.*Closed/.test(masterPlanSource),
+        'master plan must mark Phase 3B as Accepted / Closed.'
+    );
+});
+test('master plan marks Phase 4A as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 4A.*Accepted \/ Closed/.test(masterPlanSource) ||
+        /Phase 4A.*✅.*Closed/.test(masterPlanSource),
+        'master plan must mark Phase 4A as Accepted / Closed.'
+    );
+});
+test('handoff marks Phase 3B as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 3B.*Accepted \/ Closed/.test(handoffSource) ||
+        /Phase 3B.*✅.*Closed/.test(handoffSource),
+        'handoff must mark Phase 3B as Accepted / Closed.'
+    );
+});
+test('handoff marks Phase 4A as Accepted / Closed', () => {
+    assert.ok(
+        /Phase 4A.*Accepted \/ Closed/.test(handoffSource) ||
+        /Phase 4A.*✅.*Closed/.test(handoffSource),
+        'handoff must mark Phase 4A as Accepted / Closed.'
+    );
+});
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
