@@ -109,3 +109,10 @@ If a historical document conflicts with current entry documents, follow this pri
 4. `vibe-coding-collaboration-rules.md`.
 5. Module contract / ADR files.
 6. Historical documents only as background.
+
+## Current Custom Study 1A update (2026-07-14)
+
+Phase 5A has added the read-only chapter-options data contract and selected
+example sentence/token/translation alignment. See ADR-0016 and
+`docs/plans/custom-study-1a-implementation-plan.md`; the Custom Study page and
+session UI are still pending.

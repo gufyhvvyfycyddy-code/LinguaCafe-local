@@ -34,7 +34,8 @@ use Tests\TestCase;
  *   ANY  /custom-study/sessions/{token}
  *   ANY  /custom-study/sessions?exclude=card_id
  *   DELETE /custom-study/sessions/*
- *   GET  /custom-study/chapter-options
+ * The read-only chapter-options endpoint is intentionally outside the
+ * three-route session contract.
  */
 class CustomStudyRoutesTest extends TestCase
 {
@@ -217,17 +218,11 @@ class CustomStudyRoutesTest extends TestCase
         );
     }
 
-    public function test_no_chapter_options_route(): void
+    public function test_chapter_options_route_exists_without_expanding_session_routes(): void
     {
-        $chapterOptions = collect(Route::getRoutes()->getRoutes())
-            ->contains(function (\Illuminate\Routing\Route $r) {
-                return str_contains($r->uri(), 'custom-study')
-                    && str_contains($r->uri(), 'chapter-options');
-            });
-
-        $this->assertFalse(
-            $chapterOptions,
-            'No custom-study chapter-options route allowed in this phase.'
+        $this->assertTrue(
+            $this->routeExists('GET', '/custom-study/chapter-options'),
+            'GET /custom-study/chapter-options must remain a read-only setup endpoint.'
         );
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\ChapterAiReadingAssist;
 use App\Models\ReviewCard;
 use Illuminate\Support\Collection;
 
@@ -92,8 +93,7 @@ class SenseReviewCardSerializerService
     public function serialize(ReviewCard $card, array $options = []): array
     {
         $sense = $card->sense;
-        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense);
-        $candidates = $this->examplePoolService->exampleCandidates($sense);
+        $candidates = $options['example_candidates'] ?? $this->examplePoolService->exampleCandidates($sense);
 
         $preferredOccurrenceId = $options['preferred_occurrence_id'] ?? null;
 
@@ -115,10 +115,23 @@ class SenseReviewCardSerializerService
         );
         $supplementaryExample = $supplementaryIndex !== null ? $candidates[$supplementaryIndex] ?? null : null;
 
-        // Use the rotated question example's sentence for the question side.
-        // Fall back to the legacy single sentence if no candidates were found.
+        $tokenPayload = $this->senseTokenPayloadService->exampleSentenceTokenPayload($sense, $questionExample);
+
+        // The selected example is the only translation source. Sense-level
+        // text is never borrowed for a different occurrence.
         $exampleSentenceEn = $questionExample['sentence_en'] ?? $sense->example_sentence_en;
-        $exampleSentenceZh = $questionExample['sentence_zh'] ?? $sense->example_sentence_zh;
+        [$exampleSentenceZh, $translationSource] = $this->translationForExample(
+            $sense,
+            $questionExample,
+            $options['translation_assists'] ?? null,
+        );
+        if ($supplementaryExample !== null) {
+            [$supplementaryExample['sentence_zh'], $supplementaryExample['translation_source']] = $this->translationForExample(
+                $sense,
+                $supplementaryExample,
+                $options['translation_assists'] ?? null,
+            );
+        }
 
         // SenseMultiExampleBindingAndReviewRotation-1000-6: surface which
         // occurrence the current display comes from, how many distinct source
@@ -161,6 +174,7 @@ class SenseReviewCardSerializerService
             'understanding_aid' => $understandingAid,
             'example_sentence_en' => $exampleSentenceEn,
             'example_sentence_zh' => $exampleSentenceZh,
+            'example_sentence_translation_source' => $translationSource,
             'example_sentence_tokens' => $tokenPayload['tokens'],
             'example_sentence_token_source' => $tokenPayload['source'],
             'example_candidates' => $candidates,
@@ -229,13 +243,100 @@ class SenseReviewCardSerializerService
 
         $cardIds = $cards->map(fn (ReviewCard $card) => $card->id)->all();
         $feedbackMap = $this->feedbackService->buildForCards($cardIds);
+        $candidateMap = [];
+        $chapterIds = [];
+        $userIds = [];
+        $languages = [];
+        foreach ($cards as $card) {
+            $candidates = $this->examplePoolService->exampleCandidates($card->sense);
+            $candidateMap[$card->id] = $candidates;
+            $userIds[] = $card->sense->user_id;
+            $languages[] = $card->sense->language_id;
+            foreach ($candidates as $candidate) {
+                if (($candidate['chapter_id'] ?? null) !== null) {
+                    $chapterIds[] = $candidate['chapter_id'];
+                }
+            }
+        }
+        $translationAssists = $this->translationAssistMap($chapterIds, $userIds, $languages);
 
-        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $options) {
+        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $options) {
             $perCardOptions = $options;
             $perCardOptions['learning_feedback'] = $feedbackMap[$card->id] ?? null;
+            $perCardOptions['example_candidates'] = $candidateMap[$card->id];
+            $perCardOptions['translation_assists'] = $translationAssists;
 
             return $this->serialize($card, $perCardOptions);
         })->values()->all();
+    }
+
+    private function translationForExample($sense, ?array $example, ?array $assists): array
+    {
+        $explicit = trim((string) ($example['sentence_zh'] ?? ''));
+        if ($explicit !== '') {
+            return [$explicit, ($example['is_card_fallback'] ?? false) ? 'card_fallback' : 'occurrence'];
+        }
+
+        $chapterId = $example['chapter_id'] ?? null;
+        $sentenceId = $example['sentence_id'] ?? null;
+        $sentenceEn = $example['sentence_en'] ?? null;
+        if ($chapterId === null || $sentenceId === null || !is_string($sentenceEn) || trim($sentenceEn) === '') {
+            return [null, null];
+        }
+
+        $key = $this->translationAssistKey($sense->user_id, $sense->language_id, $chapterId);
+        $assist = $assists === null ? null : ($assists[$key] ?? null);
+        if ($assists === null) {
+            $assist = ChapterAiReadingAssist::query()
+                ->where('user_id', $sense->user_id)
+                ->where('language', $sense->language_id)
+                ->where('chapter_id', $chapterId)
+                ->first();
+        }
+        if ($assist === null) {
+            return [null, null];
+        }
+
+        $matches = collect($assist->sentence_translations ?? [])
+            ->filter(fn ($item) => is_array($item)
+                && array_key_exists('sentence_index', $item)
+                && (string) $item['sentence_index'] === (string) $sentenceId
+                && isset($item['source_text'])
+                && $this->normalizeSentenceText((string) $item['source_text']) === $this->normalizeSentenceText($sentenceEn)
+                && trim((string) ($item['translation_zh'] ?? '')) !== '')
+            ->values();
+
+        return $matches->count() === 1
+            ? [trim((string) $matches->first()['translation_zh']), 'chapter_ai_reading_assist']
+            : [null, null];
+    }
+
+    private function translationAssistMap(array $chapterIds, array $userIds, array $languages): array
+    {
+        $chapterIds = array_values(array_unique(array_filter($chapterIds)));
+        if ($chapterIds === []) {
+            return [];
+        }
+
+        return ChapterAiReadingAssist::query()
+            ->whereIn('chapter_id', $chapterIds)
+            ->whereIn('user_id', array_values(array_unique($userIds)))
+            ->whereIn('language', array_values(array_unique($languages)))
+            ->get()
+            ->mapWithKeys(fn (ChapterAiReadingAssist $assist) => [
+                $this->translationAssistKey($assist->user_id, $assist->language, $assist->chapter_id) => $assist,
+            ])
+            ->all();
+    }
+
+    private function translationAssistKey(int $userId, string $language, int $chapterId): string
+    {
+        return $userId . '|' . $language . '|' . $chapterId;
+    }
+
+    private function normalizeSentenceText(string $text): string
+    {
+        return trim(preg_replace('/\s+/u', ' ', mb_strtolower($text)) ?? '');
     }
 
     /**

@@ -18,23 +18,30 @@ class SenseTokenPayloadService
      * 2. Reverse-match by example_sentence_en text
      * 3. Generate synthetic tokens from example_sentence_en
      */
-    public function exampleSentenceTokenPayload(WordSense $sense): array
+    public function exampleSentenceTokenPayload(WordSense $sense, ?array $selectedExample = null): array
     {
-        // 1. Look up WordSenseOccurrence (prefer manual_sense_add source)
-        $occurrence = WordSenseOccurrence::query()
-            ->where('user_id', $sense->user_id)
-            ->where('language_id', $sense->language_id)
-            ->where('word_sense_id', $sense->id)
-            ->where('status', WordSenseOccurrence::STATUS_BOUND)
-            ->whereNotNull('chapter_id')
-            ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
-            ->orderByDesc('id')
-            ->first();
+        $occurrence = null;
+        if ($selectedExample === null) {
+            // Legacy entry point: choose the historical preferred occurrence.
+            $occurrence = WordSenseOccurrence::query()
+                ->where('user_id', $sense->user_id)
+                ->where('language_id', $sense->language_id)
+                ->where('word_sense_id', $sense->id)
+                ->where('status', WordSenseOccurrence::STATUS_BOUND)
+                ->whereNotNull('chapter_id')
+                ->orderByRaw('CASE WHEN source = ? THEN 0 ELSE 1 END', [WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD])
+                ->orderByDesc('id')
+                ->first();
+        }
 
-        // 2. Determine positioning info (use ?? not ?: because "0" is falsy in PHP)
-        $chapterId = $occurrence?->chapter_id ?? $sense->source_chapter_id;
-        $sentenceId = $occurrence?->sentence_id ?? $sense->sentence_id;
-        $sentenceHash = $occurrence?->sentence_hash ?? $sense->sentence_hash;
+        // A selected example is authoritative: never borrow chapter, sentence,
+        // or text identity from a different occurrence.
+        $chapterId = $selectedExample['chapter_id'] ?? ($occurrence?->chapter_id ?? $sense->source_chapter_id);
+        $sentenceId = $selectedExample['sentence_id'] ?? ($occurrence?->sentence_id ?? $sense->sentence_id);
+        $sentenceHash = $selectedExample['sentence_hash'] ?? ($occurrence?->sentence_hash ?? $sense->sentence_hash);
+        $sentenceText = $selectedExample['sentence_en'] ?? $sense->example_sentence_en;
+        $selectedOccurrence = $selectedExample !== null
+            && ($selectedExample['occurrence_id'] ?? null) !== null;
 
         // === Layer 1: Real source tokens ===
         if ($chapterId !== null && ($sentenceId !== null || $sentenceHash !== null)) {
@@ -49,14 +56,14 @@ class SenseTokenPayloadService
                 if ($tokens !== null) {
                     return [
                         'tokens' => $tokens,
-                        'source' => $occurrence ? 'occurrence' : 'word_sense',
+                        'source' => ($selectedOccurrence || $occurrence !== null) ? 'occurrence' : 'word_sense',
                     ];
                 }
             }
         }
 
         // === Layer 2: Text match — reverse-lookup sentence in processed_text by example_sentence_en ===
-        if ($sense->example_sentence_en && $chapterId !== null) {
+        if ($sentenceText && $chapterId !== null) {
             $chapter = $chapter ?? Chapter::query()
                 ->where('id', $chapterId)
                 ->where('user_id', $sense->user_id)
@@ -64,7 +71,7 @@ class SenseTokenPayloadService
                 ->first();
 
             if ($chapter) {
-                $tokens = $this->matchSentenceTokensByText($chapter, $sense->example_sentence_en);
+                $tokens = $this->matchSentenceTokensByText($chapter, $sentenceText);
                 if ($tokens !== null) {
                     return [
                         'tokens' => $tokens,
@@ -75,8 +82,8 @@ class SenseTokenPayloadService
         }
 
         // === Layer 3: Synthetic tokens ===
-        if ($sense->example_sentence_en) {
-            $tokens = $this->syntheticSentenceTokens($sense->example_sentence_en, $sense, $occurrence);
+        if ($sentenceText) {
+            $tokens = $this->syntheticSentenceTokens($sentenceText, $sense, $occurrence);
             return [
                 'tokens' => $tokens,
                 'source' => 'synthetic',

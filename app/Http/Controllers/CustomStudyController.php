@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Exceptions\CustomStudyPreviewPolicyException;
 use App\Exceptions\CustomStudySessionException;
 use App\Exceptions\CustomStudyValidationException;
+use App\Services\CustomStudy\CustomStudyChapterOptionsService;
 use App\Services\CustomStudy\CustomStudySessionService;
 use App\Services\ReviewQueueOrderOptions;
 use App\Services\SettingsService;
@@ -71,8 +72,22 @@ class CustomStudyController extends Controller
 {
     public function __construct(
         private readonly CustomStudySessionService $sessionService,
+        private readonly CustomStudyChapterOptionsService $chapterOptionsService,
         private readonly SettingsService $settingsService,
     ) {
+    }
+
+    public function chapterOptions(): JsonResponse
+    {
+        $user = Auth::user();
+
+        return response()->json([
+            'items' => $this->chapterOptionsService->forUser(
+                $user->id,
+                $user->selected_language,
+                Carbon::now(),
+            ),
+        ]);
     }
 
     /**

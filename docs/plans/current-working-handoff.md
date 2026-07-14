@@ -310,6 +310,20 @@
 - No AI calls, no API key saved, no WordSense/ReviewCard/ReviewLog created, no FSRS changes, no delete/archive/restore changes, no SenseReview/SenseMappingReview/legacy word card removal.
 - Did NOT enter the next task automatically.
 
+## Custom Study 1A — current implementation handoff (2026-07-14)
+
+Phase 5A backend data contracts are ready for the frontend slice: a read-only
+authenticated `GET /custom-study/chapter-options` endpoint returns only
+eligible owned English chapters, with stable book/chapter ordering and full
+distinct candidate counts before the session card limit. It does not expand the
+frozen three POST session routes. `SenseReviewCardSerializerService` now keeps
+the chosen example's sentence, token payload, and translation together;
+translation is explicit occurrence/card-fallback text first, then one exact
+persisted reading-assist match, otherwise absent. `serializeMany()` batches the
+assist lookup. Remaining work: shared `SenseStudyCard.vue`, Custom Study setup
+and session UI, route/navigation integration, browser acceptance, and final
+documentation closure.
+
 ## Recent Update: GLM-AIRecommendationConfirmationLoop-V4-1
 
 - AI study card v4 AI recommendation confirmation loop is implemented: paste AI recommendation JSON, dedupe, default unchecked, user confirmation, final candidates package.

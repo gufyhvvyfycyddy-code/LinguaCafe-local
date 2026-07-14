@@ -976,3 +976,12 @@ This ADR is "architecture complete" when:
 21. It registers the chapter picker future contract (§21, registered by Task 2000-19; implementation deferred to Phase 5/6).
 
 All 21 are satisfied. The accompanying implementation plan `docs/plans/custom-study-1a-implementation-plan.md` defines the TDD breakdown for a future authorized implementation round.
+
+## Implementation update — 2026-07-14, Custom Study 1A Phase 5A
+
+The first Phase 5 data-contract slice is implemented and remains read-only.
+
+- `GET /custom-study/chapter-options` is an authenticated setup endpoint, separate from the frozen three POST session routes. It returns only current-user/current-language chapters with at least one eligible source-chapter card, with stable book/chapter ordering and full pre-limit `candidate_count` values.
+- `CustomStudyChapterOptionsService` reuses `SenseReviewQueryService` eligibility and obtains direct `source_chapter_id` plus bound occurrence matches in one grouped query. A card matched by both paths is counted once.
+- A serialized card now aligns its displayed sentence, token payload, and translation to the selected example. Translation priority is explicit occurrence/card-fallback text, then one exact persisted `ChapterAiReadingAssist` sentence match; it never borrows a sense-level translation for another occurrence.
+- `serializeMany()` batches the persisted reading-assist lookup. This slice adds no migration, no AI call, no ReviewLog write, no FSRS/lifecycle change, and no change to the existing session POST contract.

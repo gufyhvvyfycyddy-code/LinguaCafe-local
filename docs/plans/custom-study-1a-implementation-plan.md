@@ -354,6 +354,16 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 ### Phase 5: Frontend (Vue 2 + Vuetify)
 
+**Phase 5A completed (2026-07-14):** the read-only chapter-options and
+selected-example data contracts are ready for the page work. The dedicated
+authenticated `GET /custom-study/chapter-options` endpoint is deliberately
+outside the frozen three POST session routes. It returns only eligible owned
+chapters, stable book/chapter ordering, and Option-A full candidate counts.
+The serializer now makes the selected example authoritative for sentence,
+tokens, and translation; `serializeMany()` batches reading-assist lookup.
+No page, navigation, session UI, migration, or scheduling behavior is part of
+this subphase.
+
 #### Task CS-11: `CustomStudy.vue` page skeleton
 **Guard test first**: `tests/js/CustomStudyPageGuard.test.mjs`
 - Page exists at `resources/js/components/CustomStudy/CustomStudy.vue`.

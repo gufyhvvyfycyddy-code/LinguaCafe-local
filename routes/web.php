@@ -202,6 +202,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // Three POST routes only — no fourth, no token URL, no exclude query param.
     // Token is always in the request body; user/language come from Auth::user().
     // Controller is the single HTTP boundary; SessionService is stateless.
+    Route::get('/custom-study/chapter-options', [App\Http\Controllers\CustomStudyController::class, 'chapterOptions']);
     Route::post('/custom-study/sessions', [App\Http\Controllers\CustomStudyController::class, 'openSession']);
     Route::post('/custom-study/sessions/answer', [App\Http\Controllers\CustomStudyController::class, 'answer']);
     Route::post('/custom-study/sessions/resume', [App\Http\Controllers\CustomStudyController::class, 'resume']);
