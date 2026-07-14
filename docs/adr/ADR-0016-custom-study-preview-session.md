@@ -990,3 +990,14 @@ Phase 5B now provides `SenseStudyCard.vue`: a presentation-only component
 using `SenseSentencePreview.vue` on both faces. It owns no request, rating,
 queue, lifecycle, or scheduling behavior; containers supply the normal-review
 menu, panels, FSRS details, and formal rating controls through slots.
+
+## Implementation update — 2026-07-14, Custom Study frontend
+
+The preview workflow is now available at `/custom-study`. The setup screen
+uses the four frozen criteria and reads `GET /custom-study/chapter-options`
+only for the source-chapter picker. It stores only the opaque rotating token
+in `sessionStorage`; neither a URL nor persistent browser storage carries a
+token. The session screen reuses `SenseStudyCard.vue` and the existing source
+context dialog, calls only the frozen answer/resume session routes, handles
+expired tokens by clearing the temporary token, and labels its four actions as
+preview-only. It does not render formal review controls or write review data.

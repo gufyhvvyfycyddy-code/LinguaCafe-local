@@ -147,6 +147,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: '自定义学习',
+                        url: '/custom-study',
+                        icon: 'mdi-tune-variant',
+                        bottomNav: false,
+                    },
+                    {
                         name: '高级复习卡管理',
                         url: '/review-cards/manage',
                         icon: 'mdi-card-account-details',

@@ -737,6 +737,16 @@ Suggested commits (do NOT use `git add -A` or `git add .` — stage files explic
 
 ---
 
+## Implementation update — 2026-07-14
+
+The authorized frontend slice is implemented: `CustomStudy.vue` provides the
+criteria setup UI and `CustomStudySession.vue` provides the stateless preview
+session UI. The SPA route and authenticated web route are `/custom-study` and
+the navigation exposes it beside sense review. The frontend preserves the
+three frozen session POST routes, uses `sessionStorage` for the opaque token
+only, and reuses `SenseStudyCard.vue` plus `SenseExampleDialog.vue` without
+calling the formal rating endpoint or changing FSRS, ReviewLog, or lifecycle.
+
 ## Explicit exclusions (re-stated per task spec)
 
 This plan does NOT authorize and does NOT cover:
