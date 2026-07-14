@@ -1,7 +1,7 @@
 # ADR-0016: Custom Study Preview Session
 
-**Status**: Accepted (architecture complete; **Phase 1 Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A Accepted (Task 2000-17, Builder contract docs fixed in Task 2000-18). Phase 2B Accepted (Task 2000-18: `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`). Phase 3A code and tests completed in Task 2000-19: `CustomStudySessionState` (immutable value object with `completed_ids` + `skipped_ineligible_ids` fields, five-state union + mutual exclusion invariants, no DB/Auth/Request/Crypt) + `CustomStudySessionTokenService` (only encrypts/decrypts/verifies, no rotate/answer/rating/SessionService/PreviewPolicy, injects `Illuminate\Contracts\Encryption\Encrypter`, `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`), awaiting web-side acceptance. Phase 3B / Phase 4-7 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator, Phase 2A read-only candidate queries, Phase 2B chapter locator + source_chapter/leech_attention queries + unified candidate ID dispatcher, and Phase 3A immutable session state + encrypted token service)
-**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17; Phase 2A docs fix + Phase 2B added 2026-07-14 by Task 2000-18; Phase 2B Accepted + Phase 3A SessionState/TokenService + state contract fix + chapter picker future registration added 2026-07-14 by Task 2000-19)
+**Status**: Accepted (architecture complete; **Phase 1 Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A Accepted (Task 2000-17, Builder contract docs fixed in Task 2000-18). Phase 2B Accepted (Task 2000-18: `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`). Phase 3A Accepted (Task 2000-19 + Task 2000-20 docs closure): `CustomStudySessionState` (immutable value object with `completed_ids` + `skipped_ineligible_ids` fields, five-state union + mutual exclusion invariants, no DB/Auth/Request/Crypt) + `CustomStudySessionTokenService` (only encrypts/decrypts/verifies, no rotate/answer/rating/SessionService/PreviewPolicy, injects `Illuminate\Contracts\Encryption\Encrypter`, `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`). Phase 3B code and tests completed in Task 2000-20, awaiting web-side acceptance: `CustomStudyPreviewPolicy` (pure state transition function — `applyRating(state, rating, now)` + `resume(state, now)`; only accepts four lowercase ratings `again`/`hard`/`good`/`easy`; Again/Hard → `delayed_repeat_queue`, Good/Easy → `completed_ids`; picks next `current_card_id` from `ready_queue` first, else earliest mature `delayed_repeat_queue` entry; does NOT touch DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI; does NOT call `toArray()`/`fromArray()`, only `withProgress()`) + `CustomStudySessionState::withProgress()` (immutable copy boundary — preserves identity fields, accepts the new five-state, auto-recomputes `completed_count`/`total_count`, auto-increments `step`, rejects `step === PHP_INT_MAX` overflow) + `CustomStudySessionState::waitUntil()` + `CustomStudySessionState::isCompleted()` + `CustomStudyPreviewPolicyException` + Token constants (`VERSION`, `MAX_CANDIDATE_COUNT`) referencing `CustomStudySessionState` (single source of truth). Phase 4-7 NOT started; overall feature incomplete**; this ADR only defines the architecture and V1 boundary; no Custom Study API, page, or migration is authorized by this ADR alone beyond Phase 1 value objects/validator, Phase 2A read-only candidate queries, Phase 2B chapter locator + source_chapter/leech_attention queries + unified candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, and Phase 3B pure state transition policy)
+**Date**: 2026-07-13 (Phase 1 added 2026-07-14 by Task 2000-16; error contract fixed + Phase 2A added 2026-07-14 by Task 2000-17; Phase 2A docs fix + Phase 2B added 2026-07-14 by Task 2000-18; Phase 2B Accepted + Phase 3A SessionState/TokenService + state contract fix + chapter picker future registration added 2026-07-14 by Task 2000-19; Phase 3A Accepted + Phase 3B PreviewPolicy + withProgress + transition contract closure added 2026-07-14 by Task 2000-20)
 **Related**: `docs/adr/ADR-0009-review-action-ledger-and-stack-undo.md`, `docs/adr/ADR-0010-review-card-lifecycle-state-machine.md`, `docs/adr/ADR-0011-sense-leech-governance-and-rewrite-package.md`, `docs/adr/ADR-0015-review-queue-order-policy.md`, `docs/plans/custom-study-1a-implementation-plan.md`
 
 ## Context
@@ -186,7 +186,7 @@ Token payload (server-signed, opaque to client):
 - `preview_delay_config` (`again_secs`, `hard_secs`, `good_secs`, `easy_secs`; V1 defaults: 60/600/0/0; all must be non-negative ints)
 
 Token rules:
-1. Signed via Laravel `Crypt::encryptString()` or the project's existing secure token mechanism.
+1. Encrypted via the injected `Illuminate\Contracts\Encryption\Encrypter` contract (Laravel default binding). The implementation MUST NOT call the static `Crypt::encryptString()` / `Crypt::decryptString()` facade directly — the Encrypter is injected in the `CustomStudySessionTokenService` constructor so the key/cipher can be substituted in tests.
 2. Token does **not** contain sensitive card content — only card IDs + session metadata.
 3. Server re-validates `user_id` + `language` on every request (token is bound to issuer, not bearer-permissive).
 4. Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — if a card has become ineligible mid-session, it is silently skipped.
@@ -247,13 +247,21 @@ CustomStudyCriteria (value object, no DB)
   → CustomStudyCriteriaValidator (pure, no DB, no Auth)
   → CustomStudyQueryService (builds the candidate query, applies criteria, no write)
   → CustomStudySessionState (value object: ordered_candidate_ids, ready_queue,
-      delayed_repeat_queue, completed_count, total_count, current_card_id, step,
-      preview_delay_config)
-  → CustomStudySessionTokenService (signs/verifies/rotates token, no DB)
-  → CustomStudySessionService (orchestrates: validate token → re-validate eligibility
-      → apply CustomStudyPreviewPolicy → pick next card → rotate token; no write)
-  → CustomStudyPreviewPolicy (pure function: Again→delayed, Hard→delayed-longer,
-      Good→completed, Easy→completed; returns updated SessionState + wait_until)
+      delayed_repeat_queue, completed_ids, skipped_ineligible_ids, completed_count,
+      total_count, current_card_id, step, preview_delay_config)
+  → CustomStudySessionTokenService (issue/verify only, no DB; signs and verifies the
+      encrypted token via injected Illuminate\Contracts\Encryption\Encrypter — does NOT
+      implement rotate(answer), rating, or any state transition)
+  → CustomStudyPreviewPolicy (pure state transition function: applies a rating or resume
+      to the current state and returns a new immutable CustomStudySessionState via
+      withProgress(); Again/Hard → delayed_repeat_queue, Good/Easy → completed_ids;
+      picks the next current_card_id from ready_queue first, else the earliest
+      available delayed_repeat_queue entry whose available_at <= now; returns
+      waitUntil() + isCompleted() via the new state — NOT a token signer)
+  → CustomStudySessionService (future orchestrator: validate token → re-validate
+      eligibility → call CustomStudyPreviewPolicy → call
+      CustomStudySessionTokenService::issue(newState) → return refreshed_token;
+      no write to ReviewLog / FSRS / lifecycle / DB)
   → CustomStudySessionOrder (pure function: mode-specific order override applied
       at session creation only; does not modify global Queue Order)
   → SenseReviewCardSerializerService (serializes the next card, same shape as /reviews/senses)

@@ -1,6 +1,6 @@
 # Custom Study 1A Implementation Plan
 
-> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) ✅ Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) ✅ Accepted (Task 2000-17 + Task 2000-18 docs fix). Phase 2B (`EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`) ✅ Accepted (Task 2000-18). Phase 3A (`CustomStudySessionState` immutable value object + `CustomStudySessionTokenService` encrypt/decrypt/verify only + `CustomStudySessionStateException` + 2 unit test files) code and tests completed in Task 2000-19, awaiting 网页端总流程设计师 acceptance. Phase 3B / Phase 4-7 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, route, controller, or migration is authorized by this plan alone beyond Phase 1 value objects/validator, Phase 2A/2B queries + candidate ID dispatcher, and Phase 3A immutable session state + encrypted token service.**
+> **Status**: Architecture complete (ADR-0016 accepted). **Phase 1 (Task CS-1 + CS-2) ✅ Accepted (Task 2000-16 + Task 2000-17 error contract fix). Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`) ✅ Accepted (Task 2000-17 + Task 2000-18 docs fix). Phase 2B (`EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService`) ✅ Accepted (Task 2000-18). Phase 3A (`CustomStudySessionState` immutable value object + `CustomStudySessionTokenService` encrypt/decrypt/verify only + `CustomStudySessionStateException` + 2 unit test files) ✅ Accepted (Task 2000-19 + Task 2000-20 docs closure). Phase 3B (`CustomStudyPreviewPolicy` pure state transition function + `CustomStudyPreviewPolicyException` + `CustomStudySessionState::withProgress()` + `waitUntil()` + `isCompleted()` + Token constant single-source reference + 2 unit test files) code and tests completed in Task 2000-20, awaiting 网页端总流程设计师 acceptance. Phase 4-7 NOT started. Overall feature NOT usable. This plan is a TDD roadmap; no Custom Study API, page, route, controller, or migration is authorized by this plan alone beyond Phase 1 value objects/validator, Phase 2A/2B queries + candidate ID dispatcher, Phase 3A immutable session state + encrypted token service, and Phase 3B pure state transition policy.**
 
 **Goal**: Implement Custom Study 1A — a preview-only temporary session that lets the user review a curated set of sense cards outside the normal due queue, without moving cards, building a filtered deck, writing ReviewLog, or running FSRS scheduling.
 
@@ -14,13 +14,13 @@
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that the `Card Marker` 1B prerequisite is NOT being snuck into 1A.
 
-**Phase status (Task 2000-19)**:
+**Phase status (Task 2000-20)**:
 - Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed in Task 2000-16. ✅ Error contract architecture fixed in Task 2000-17 (Criteria throws structured `CustomStudyValidationException` directly with stable `field`/`reason`; Validator no longer parses message text). ✅ Accepted by web-side.
 - Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`): ✅ Code and tests completed in Task 2000-17. ✅ Accepted by web-side. ✅ Phase 2A 文档旧契约 (CS-3/CS-4 "返回空集合"描述) 在 Task 2000-18 修正为 "返回可组合 Builder".
 - Phase 2B (CS-5 `SourceChapterQuery` + CS-6 `LeechAttentionQuery` + `EloquentChapterLocator` + `CustomStudyQueryService`): ✅ Code and tests completed in Task 2000-18. ✅ Accepted by web-side (Task 2000-19 docs closure). Two-layer boundary frozen: SQL-native Queries return Builder (today_forgotten/overdue/source_chapter); `LeechAttentionQuery` is Policy-derived returning `list<int>` (复用 `SenseReviewLeechQueryService` + `SenseReviewLeechPolicy`, no Policy duplication). `CustomStudyQueryService` is the unified `candidateIds()` boundary for the four modes — no `QueryInterface`, no DTO, no Repository, no Adapter.
-- Phase 3A (`CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit test files): ✅ Code and tests completed in Task 2000-19, awaiting web-side acceptance. State is an immutable value object with `completed_ids` + `skipped_ineligible_ids` (five-state union + mutual exclusion invariants verifiable from state alone). TokenService only encrypts/decrypts/verifies (no `rotate(answer)`, no rating/answer branching, no SessionService/PreviewPolicy/Controller/routes/Vue). Injects `Illuminate\Contracts\Encryption\Encrypter`. `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`, `MAX_CANDIDATE_COUNT=500`.
-- Phase 3B: NOT defined / NOT started.
-- Phase 4 (Session State rotation / PreviewPolicy / SessionService): NOT started.
+- Phase 3A (`CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit test files): ✅ Code and tests completed in Task 2000-19. ✅ Accepted by web-side (Task 2000-20). State is an immutable value object with `completed_ids` + `skipped_ineligible_ids` (five-state union + mutual exclusion invariants verifiable from state alone). TokenService only encrypts/decrypts/verifies (no `rotate(answer)`, no rating/answer branching, no SessionService/PreviewPolicy/Controller/routes/Vue). Injects `Illuminate\Contracts\Encryption\Encrypter`. `MAX_TOKEN_BYTES=65536`, `DEFAULT_TTL_SECONDS=14400`, `MAX_CANDIDATE_COUNT=500`.
+- Phase 3B (`CustomStudyPreviewPolicy` + `CustomStudyPreviewPolicyException` + `CustomStudySessionState::withProgress()` + `waitUntil()` + `isCompleted()` + Token constant single-source reference + 2 unit test files): ✅ Code and tests completed in Task 2000-20, awaiting web-side acceptance. Phase 3B is the **pure state transition layer** — `CustomStudyPreviewPolicy::applyRating(state, rating, now)` and `CustomStudyPreviewPolicy::resume(state, now)` are pure functions that consume an immutable `CustomStudySessionState` and return a new `CustomStudySessionState` via `withProgress()`. They do NOT touch DB / Auth / Request / Crypt / ReviewLog / FSRS / lifecycle / AI / SessionService / Controller / routes / Vue. The Policy only accepts four frozen lowercase ratings (`again` / `hard` / `good` / `easy`); Again/Hard move the current card to `delayed_repeat_queue`, Good/Easy move it to `completed_ids`. The Policy does NOT call `toArray()` / `fromArray()` — it goes through `withProgress()`. Token constants (`VERSION`, `MAX_CANDIDATE_COUNT`) now reference `CustomStudySessionState` (single source of truth). Phase 3B does NOT implement SessionService, Controller, routes, or any HTTP surface.
+- Phase 4 (Session orchestration / `CustomStudySessionService`): NOT started.
 - Phase 5 (Frontend / SenseStudyCard / Chapter picker): NOT started. AI translation card display registered as future requirement (ADR-0016 §20.7.1), NOT implemented. Chapter picker future contract registered (ADR-0016 §21, Task 2000-19), NOT implemented.
 - Phase 6 (Routes): NOT started.
 - Overall feature: NOT usable. No route, no controller, no page, no API endpoint exists yet.
@@ -58,15 +58,23 @@ Target service pipeline (NOT yet implemented):
 ```
 CustomStudyCriteria (value object, no DB)
   → CustomStudyCriteriaValidator (pure, no DB, no Auth)
-  → CustomStudyQueryService (builds candidate query, applies criteria, no write)
+  → CustomStudyQueryService (builds the candidate query, applies criteria, no write)
   → CustomStudySessionState (value object: ordered_candidate_ids, ready_queue,
-      delayed_repeat_queue, completed_count, total_count, current_card_id, step,
-      preview_delay_config)
-  → CustomStudySessionTokenService (signs/verifies/rotates token, no DB)
-  → CustomStudySessionService (orchestrates: validate token → re-validate eligibility
-      → apply CustomStudyPreviewPolicy → pick next card → rotate token; no write)
-  → CustomStudyPreviewPolicy (pure function: Again→delayed, Hard→delayed-longer,
-      Good→completed, Easy→completed; returns updated SessionState + wait_until)
+      delayed_repeat_queue, completed_ids, skipped_ineligible_ids, completed_count,
+      total_count, current_card_id, step, preview_delay_config)
+  → CustomStudySessionTokenService (issue/verify only, no DB; signs and verifies the
+      encrypted token via injected Illuminate\Contracts\Encryption\Encrypter — does NOT
+      implement rotate(answer), rating, or any state transition)
+  → CustomStudyPreviewPolicy (pure state transition function: applies a rating or resume
+      to the current state and returns a new immutable CustomStudySessionState via
+      withProgress(); Again/Hard → delayed_repeat_queue, Good/Easy → completed_ids;
+      picks the next current_card_id from ready_queue first, else the earliest
+      available delayed_repeat_queue entry whose available_at <= now; returns
+      waitUntil() + isCompleted() via the new state — NOT a token signer)
+  → CustomStudySessionService (future orchestrator: validate token → re-validate
+      eligibility → call CustomStudyPreviewPolicy → call
+      CustomStudySessionTokenService::issue(newState) → return refreshed_token;
+      no write to ReviewLog / FSRS / lifecycle / DB)
   → CustomStudySessionOrder (pure function: mode-specific order override at creation only)
   → SenseReviewCardSerializerService (serializes next card, same shape as /reviews/senses)
   → shared card presentation component (SenseStudyCard.vue — see Frontend section)
@@ -90,14 +98,16 @@ Only shows cards currently eligible per `scopeSenseReviewEligible` (ADR-0010). S
 ### Undo inapplicability
 ADR-0009 stack-based undo does NOT apply. Preview sessions write no ReviewLog; "undo" = "exit session".
 
-### Token payload (V1: rotating session-state token, 4-hour expiry)
-- `version`, `user_id`, `language`, `mode` (preview-only), `parameters` (criteria + sub-mode + order override), `session_id` (UUID v4), `issued_at`, `expires_at`
+### Token payload (V1: server-signed encrypted session-state token, 4-hour expiry)
+- `version`, `user_id`, `language`, `mode` (one of the four Criteria modes: `today_forgotten` / `overdue` / `source_chapter` / `leech_attention` — NOT the literal string "preview-only"; "preview-only" describes the whole Custom Study 1A feature, not a value of `mode`), `parameters` (criteria + sub-mode + order override), `session_id` (UUID v4), `issued_at`, `expires_at`
 - `ordered_candidate_ids` (ordered snapshot of candidate card IDs at session creation — up to `card_limit` max 500)
 - `ready_queue` (card IDs not yet answered, in session order)
 - `delayed_repeat_queue` (card IDs that received Again/Hard, with `available_at` timestamps)
+- `completed_ids` (card IDs that received Good/Easy — explicit ID list, not just a count)
+- `skipped_ineligible_ids` (card IDs that failed eligibility re-validation mid-session — explicit ID list)
 - `completed_count`, `total_count`, `current_card_id`, `step`
 - `preview_delay_config` (again_secs=60, hard_secs=600, good_secs=0, easy_secs=0)
-- Signed via Laravel `Crypt::encryptString()` or project's existing secure token mechanism.
+- Encrypted via the injected `Illuminate\Contracts\Encryption\Encrypter` contract (Laravel default binding). The implementation MUST NOT call the static `Crypt::encryptString()` / `Crypt::decryptString()` facade directly — the Encrypter is injected in the `CustomStudySessionTokenService` constructor so the key/cipher can be substituted in tests.
 - Server re-validates `user_id` + `language` on every request.
 - Server re-validates each card's eligibility (confirmed sense, lifecycle, fsrs_enabled) before showing it — ineligible cards silently skipped.
 - Client cannot pass arbitrary `card_id` — server always picks next from token's `ready_queue` or `delayed_repeat_queue`.
@@ -229,26 +239,28 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 
 **Tests count**: ~8
 
-### Phase 3: Token service (no DB, no write)
+### Phase 3: Token service (no DB, no write) — frozen as issue()/verify() only
+
+> **Task 2000-19 + Task 2000-20 contract freeze**: `CustomStudySessionTokenService` exposes ONLY `issue(CustomStudySessionState): string` and `verify(string, int, string, Carbon): ?CustomStudySessionState`. There is **NO `rotate(answer)` method** and **NO rating/answer/resume/transition/pickNext logic** in TokenService. The future `CustomStudySessionService` (Phase 4) will orchestrate: it calls `CustomStudyPreviewPolicy::applyRating(state, rating, now)` (or `resume`) to obtain a new `CustomStudySessionState`, then calls `TokenService::issue(newState)` to produce the refreshed token. The Policy is the **only** state transition layer; TokenService is the **only** signer/verifier. This contract is enforced by `tests/Unit/CustomStudySessionTokenServiceTest.php` (no `rotate()` method) and `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs`.
 
 #### Task CS-7: `CustomStudySessionTokenService`
 **Test first**: `tests/Unit/CustomStudySessionTokenServiceTest.php`
 - `issue()` returns an opaque encrypted string containing the full session state.
 - `verify()` returns the decoded payload for a valid token.
-- `rotate()` takes the current session state + answer, returns a new encrypted token with updated state.
 - `verify()` returns null for:
   - Tampered token.
   - Expired token (`expires_at` < now).
   - Token with wrong `user_id` (does not match the passed-in user).
   - Token with wrong `language` (does not match the passed-in language).
   - Token with unsupported `version`.
-- Token payload contains: `version`, `user_id`, `language`, `mode`, `parameters`, `session_id`, `issued_at`, `expires_at`, `ordered_candidate_ids`, `ready_queue`, `delayed_repeat_queue`, `completed_count`, `total_count`, `current_card_id`, `step`, `preview_delay_config`.
+- Token payload contains: `version`, `user_id`, `language`, `mode`, `parameters`, `session_id`, `issued_at`, `expires_at`, `ordered_candidate_ids`, `ready_queue`, `delayed_repeat_queue`, `completed_ids`, `skipped_ineligible_ids`, `completed_count`, `total_count`, `current_card_id`, `step`, `preview_delay_config`.
 - `expires_at` defaults to `issued_at + 4 hours`.
 - `session_id` is UUID v4.
 - Token size must have a max (candidate count capped; oversized tokens rejected at creation).
-- Uses Laravel `Crypt::encryptString()` / `Crypt::decryptString()` (or project's existing secure token mechanism — verify before implementing).
+- Uses the injected `Illuminate\Contracts\Encryption\Encrypter` contract (Laravel default binding). The implementation MUST NOT call the static `Crypt::encryptString()` / `Crypt::decryptString()` facade directly — the Encrypter is injected in the constructor so the key/cipher can be substituted in tests.
 - Does NOT persist anything.
 - Does NOT call AI.
+- Does NOT implement `rotate(answer)` / `applyRating()` / `resume()` / `nextCard()` / `transition()` — those belong to `CustomStudyPreviewPolicy` (Phase 3B) and `CustomStudySessionService` (Phase 4).
 
 **Then implement**: `app/Services/CustomStudy/CustomStudySessionTokenService.php`
 
