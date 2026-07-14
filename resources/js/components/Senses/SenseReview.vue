@@ -555,7 +555,7 @@
                 // discarded so it cannot overwrite a newer rating result or
                 // a newer queue state.
                 loadCardsRequestSequence: 0,
-                reviewDurationTracker: createTracker(Date.now(), document.visibilityState !== 'hidden'),
+                reviewDurationTracker: createTracker(undefined, document.visibilityState !== 'hidden'),
                 // ADR-0009: Review session identity + stack undo.
                 // reviewSessionId: UUID per browser tab (sessionStorage,
                 //   refresh-persistent, not shared across tabs).
@@ -711,7 +711,7 @@
                 const newId = newCard ? newCard.review_card_id : null;
                 const oldId = oldCard ? oldCard.review_card_id : null;
                 if (newId !== oldId) {
-                    this.reviewDurationTracker = createTracker(Date.now(), document.visibilityState !== 'hidden');
+                    this.reviewDurationTracker = createTracker(undefined, document.visibilityState !== 'hidden');
                     this.intervalPreviews = null;
                     this.intervalPreviewError = '';
                     this.intervalPreviewLoading = false;

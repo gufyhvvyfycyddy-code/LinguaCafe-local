@@ -585,7 +585,7 @@
                 // dailyLimitSummary / finished. Slow responses are dropped.
                 ratingLoading: false,
                 ratingRequestSequence: 0,
-                reviewDurationTracker: createTracker(Date.now(), document.visibilityState !== 'hidden'),
+                reviewDurationTracker: createTracker(undefined, document.visibilityState !== 'hidden'),
             }
         },
         props: {
@@ -1001,7 +1001,7 @@
                 // 变成队列中的下一张。这保证 /reviews 与 /reviews/senses 两个
                 // 入口返回相同的卡顺序。
                 this.currentReviewIndex = 0;
-                this.reviewDurationTracker = createTracker(Date.now(), document.visibilityState !== 'hidden');
+                this.reviewDurationTracker = createTracker(undefined, document.visibilityState !== 'hidden');
 
                 this.exampleSentence = null;
                 this.sourceFallbackDialog = false;

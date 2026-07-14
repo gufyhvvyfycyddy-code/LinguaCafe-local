@@ -9,6 +9,9 @@ for (const [name, source] of [['SenseReview', senseReview], ['Review', legacyRev
     assert.match(source, /ReviewDurationTracker/ , `${name} must use the shared duration tracker`);
     assert.match(source, /review_duration_ms\s*[:=]/, `${name} must submit review_duration_ms with the rating`);
     assert.match(source, /visibilitychange/, `${name} must pause timing while the page is hidden`);
+    // ADR-0019: callers must NOT pass Date.now() to the tracker — the tracker's
+    // default monotonic clock (performance.now with safe fallback) must be used.
+    assert.doesNotMatch(source, /createTracker\(Date\.now/, `${name} must not pass Date.now() to createTracker`);
 }
 
 assert.doesNotMatch(customStudy, /ReviewDurationTracker|review_duration_ms/, 'Custom Study must remain outside formal Review Time');
