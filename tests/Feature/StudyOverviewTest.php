@@ -152,6 +152,37 @@ class StudyOverviewTest extends TestCase
             ->assertJsonPath('today.overdue_backlog', 1);
     }
 
+    public function test_canonical_workload_requires_enabled_confirmed_sense_for_current_user_and_language(): void
+    {
+        $eligible = $this->card('eligible-current', 'review', now()->subDay(), now()->subDays(4));
+
+        $disabled = $this->card('disabled-current', 'review', now()->subDay(), now()->subDays(4));
+        $disabled->forceFill(['fsrs_enabled' => false])->save();
+
+        $rejected = $this->card('rejected-current', 'review', now()->subDay(), now()->subDays(4));
+        $rejected->sense->forceFill(['status' => WordSense::STATUS_REJECTED])->save();
+
+        $other = User::forceCreate([
+            'name' => 'Other Overview User', 'email' => 'overview-scope-other@example.test', 'password' => Hash::make('password'),
+            'selected_language' => 'english', 'password_changed' => true, 'is_admin' => true, 'uuid' => (string) Str::uuid(),
+        ]);
+        $this->cardFor($other, 'english', 'other-user', 'review', now()->subDay(), now()->subDays(4));
+        $this->cardFor($this->user, 'german', 'other-language', 'review', now()->subDay(), now()->subDays(4));
+        $this->cardFor($this->user, 'english', 'legacy-word', 'review', now()->subDay(), now()->subDays(4), WordSense::STATUS_CONFIRMED, ReviewCard::TARGET_WORD);
+
+        $this->actingAs($this->user)->getJson('/study-overview/data')
+            ->assertOk()
+            // Inventory keeps the disabled confirmed sense card, but excludes
+            // rejected, foreign-user, foreign-language, and legacy word cards.
+            ->assertJsonPath('meta.scope_card_count', 2)
+            ->assertJsonPath('cards.state_distribution.review', 2)
+            // Workload is the inventory intersected with canonical eligibility.
+            ->assertJsonPath('today.due_count', 1)
+            ->assertJsonPath('today.overdue_backlog', 1);
+
+        $this->assertTrue($eligible->fsrs_enabled);
+    }
+
     public function test_archived_only_saved_search_has_zero_workload_but_correct_inventory(): void
     {
         $archived = $this->card('archived-only', 'review', now()->subDay(), now()->subDays(4));
@@ -207,15 +238,30 @@ class StudyOverviewTest extends TestCase
 
     private function card(string $lemma, string $state, Carbon $due, ?Carbon $lastReviewed): ReviewCard
     {
+        return $this->cardFor($this->user, 'english', $lemma, $state, $due, $lastReviewed);
+    }
+
+    private function cardFor(
+        User $user,
+        string $language,
+        string $lemma,
+        string $state,
+        Carbon $due,
+        ?Carbon $lastReviewed,
+        string $senseStatus = WordSense::STATUS_CONFIRMED,
+        string $targetType = ReviewCard::TARGET_SENSE,
+    ): ReviewCard {
         $sense = WordSense::forceCreate([
-            'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english', 'lemma' => $lemma,
+            'user_id' => $user->id, 'language' => $language, 'language_id' => $language, 'lemma' => $lemma,
             'surface_form' => $lemma, 'pos' => 'noun', 'sense_zh' => $lemma, 'sense_en' => $lemma,
             'aliases_zh' => [], 'collocations' => [], 'example_sentence_en' => 'Example.', 'example_sentence_zh' => 'Example.',
-            'status' => WordSense::STATUS_CONFIRMED, 'is_context_specific' => true, 'sense_key' => hash('sha256', $lemma),
+            'status' => $senseStatus, 'is_context_specific' => true,
+            'sense_key' => hash('sha256', $user->id . '|' . $language . '|' . $lemma),
         ]);
+
         return ReviewCard::forceCreate([
-            'user_id' => $this->user->id, 'language' => 'english', 'language_id' => 'english',
-            'target_type' => ReviewCard::TARGET_SENSE, 'target_id' => $sense->id, 'fsrs_state' => $state,
+            'user_id' => $user->id, 'language' => $language, 'language_id' => $language,
+            'target_type' => $targetType, 'target_id' => $sense->id, 'fsrs_state' => $state,
             'fsrs_due_at' => $due, 'fsrs_enabled' => true, 'fsrs_stability' => $state === 'new' ? null : 10,
             'fsrs_difficulty' => $state === 'new' ? null : 5, 'fsrs_last_reviewed_at' => $lastReviewed,
         ]);

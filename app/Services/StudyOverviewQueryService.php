@@ -16,6 +16,7 @@ class StudyOverviewQueryService
         private ReviewCardManageQueryService $manageQueryService,
         private ReviewStudyTimezoneService $timezoneService,
         private EffectiveReviewLimitsService $effectiveLimitsService,
+        private SenseReviewQueryService $senseReviewQueryService,
         private ReviewQueueOrderService $queueOrderService,
         private FsrsSchedulingService $fsrsSchedulingService,
     ) {
@@ -56,10 +57,19 @@ class StudyOverviewQueryService
         $periodLogs = $logs->filter(fn ($log) => $log->reviewed_at >= $periodStart);
         $effective = $this->effectiveLimitsService->resolve($userId, $language, $now);
 
-        // ponytail: workload (due/backlog/future) uses Saved Search ∩ canonical queue eligibility
-        // (scopeSenseReviewEligible semantics), filtered in-memory from the already-fetched inventory.
-        // No new SQL; query budget unchanged. Inventory metrics still use the full $cards collection.
-        $eligibleCards = $this->eligibleCards($cards, $now);
+        // Workload metrics are the Saved Search inventory intersected with the
+        // canonical formal Sense Review eligibility scope. Inventory metrics
+        // still use the full $cards collection. This adds one constant-size
+        // query and prevents lifecycle eligibility from drifting here.
+        $eligibleCardIds = $cardIds
+            ? $this->senseReviewQueryService
+                ->confirmedSenseCardQuery($userId, $language)
+                ->senseReviewEligible($userId, $language, $now)
+                ->whereIn('review_cards.id', $cardIds)
+                ->pluck('review_cards.id')
+                ->all()
+            : [];
+        $eligibleCards = $cards->whereIn('id', $eligibleCardIds);
 
         return [
             'meta' => [
@@ -81,19 +91,6 @@ class StudyOverviewQueryService
             'true_retention' => $this->retentionMetrics($logs, $periodStart, $bounds['timezone']),
             'deep_link' => '/review-cards/manage' . ($savedSearch ? '?saved_search_id=' . $savedSearch->id : ''),
         ];
-    }
-
-    private function eligibleCards($cards, Carbon $now)
-    {
-        return $cards->filter(function ($card) use ($now) {
-            if (!$card->fsrs_enabled) return false;
-            $life = $card->lifecycle_state ?: 'active';
-            $buriedUntil = $card->buried_until;
-            $buryExpired = $buriedUntil !== null && $buriedUntil->lte($now);
-            if ($life === 'active') return $buriedUntil === null || $buryExpired;
-            if ($life === 'buried') return $buryExpired;
-            return false; // suspended / archived never enter workload
-        });
     }
 
     private function futureDue($cards, Carbon $now, string $timezone): array
