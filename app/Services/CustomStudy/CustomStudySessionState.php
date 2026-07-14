@@ -473,6 +473,140 @@ class CustomStudySessionState
         ];
     }
 
+    // ---------- Phase 3B: immutable progress boundary ----------
+
+    /**
+     * Returns a new immutable state with updated progress fields.
+     *
+     * Identity fields (version, user_id, language, mode, parameters, session_id,
+     * issued_at, expires_at, ordered_candidate_ids, preview_delay_config) are
+     * preserved from the current state. Only the five progress fields are taken
+     * from the caller. completed_count, total_count, and step are auto-computed
+     * — the caller cannot set them.
+     *
+     * The original state is NOT mutated (immutable value object semantics).
+     *
+     * This is the only sanctioned way for the future CustomStudyPreviewPolicy
+     * to produce a new state. Policy MUST NOT call toArray() / fromArray() to
+     * mutate the payload string-keyed representation.
+     *
+     * Task 2000-20 — Custom Study 1A Phase 3B.
+     *
+     * @param list<int> $readyQueue
+     * @param list<array{card_id: int, available_at: int}> $delayedRepeatQueue
+     * @param list<int> $completedIds
+     * @param list<int> $skippedIneligibleIds
+     * @throws CustomStudySessionStateException If step would overflow, or any
+     *     five-state invariant (mutual exclusion / union completeness / no
+     *     unknown IDs / no lost ordered IDs) is violated.
+     */
+    public function withProgress(
+        ?int $currentCardId,
+        array $readyQueue,
+        array $delayedRepeatQueue,
+        array $completedIds,
+        array $skippedIneligibleIds
+    ): self {
+        // Guard against integer overflow on step — caller cannot pass step,
+        // so the only way to hit PHP_INT_MAX is via cumulative increments.
+        if ($this->step === PHP_INT_MAX) {
+            throw new CustomStudySessionStateException(
+                'step_overflow',
+                'step would overflow PHP_INT_MAX; cannot increment further.'
+            );
+        }
+
+        // Normalize + validate the five progress fields using the same
+        // validators that fromArray() uses.
+        $readyQueue = self::validateIdList($readyQueue, 'ready_queue');
+        $delayedRepeatQueue = self::validateDelayedRepeatQueue($delayedRepeatQueue);
+        $completedIds = self::validateIdList($completedIds, 'completed_ids');
+        $skippedIneligibleIds = self::validateIdList($skippedIneligibleIds, 'skipped_ineligible_ids');
+
+        // Validate current_card_id type if non-null.
+        if ($currentCardId !== null && !is_int($currentCardId)) {
+            throw new CustomStudySessionStateException(
+                'invalid_current_card_id',
+                'current_card_id must be an integer or null.'
+            );
+        }
+
+        // Run the full five-state invariants check (mutual exclusion + union
+        // completeness + no unknown IDs + no lost ordered IDs).
+        self::validateFiveStateInvariants(
+            $this->orderedCandidateIds,
+            $currentCardId,
+            $readyQueue,
+            $delayedRepeatQueue,
+            $completedIds,
+            $skippedIneligibleIds
+        );
+
+        // Auto-compute the derived fields — caller cannot supply these.
+        $newCompletedCount = count($completedIds);
+        $newTotalCount = count($this->orderedCandidateIds);
+        $newStep = $this->step + 1;
+
+        return new self(
+            $this->version,
+            $this->userId,
+            $this->language,
+            $this->mode,
+            $this->parameters,
+            $this->sessionId,
+            $this->issuedAt,
+            $this->expiresAt,
+            $this->orderedCandidateIds,
+            $readyQueue,
+            $delayedRepeatQueue,
+            $completedIds,
+            $skippedIneligibleIds,
+            $newCompletedCount,
+            $newTotalCount,
+            $currentCardId,
+            $newStep,
+            $this->previewDelayConfig
+        );
+    }
+
+    /**
+     * Returns the earliest available_at timestamp in the delayed_repeat_queue,
+     * or null if the delayed queue is empty.
+     *
+     * Pure derived query — does NOT mutate the delayed queue.
+     *
+     * Task 2000-20 — Custom Study 1A Phase 3B.
+     */
+    public function waitUntil(): ?int
+    {
+        if (empty($this->delayedRepeatQueue)) {
+            return null;
+        }
+        $earliest = PHP_INT_MAX;
+        foreach ($this->delayedRepeatQueue as $entry) {
+            if ($entry['available_at'] < $earliest) {
+                $earliest = $entry['available_at'];
+            }
+        }
+        return $earliest;
+    }
+
+    /**
+     * Returns true when the session has no more active cards to show.
+     *
+     * True iff: current_card_id === null AND ready_queue empty AND
+     * delayed_repeat_queue empty. completed_ids and skipped_ineligible_ids may
+     * be non-empty (they represent cards already resolved).
+     *
+     * Task 2000-20 — Custom Study 1A Phase 3B.
+     */
+    public function isCompleted(): bool
+    {
+        return $this->currentCardId === null
+            && empty($this->readyQueue)
+            && empty($this->delayedRepeatQueue);
+    }
+
     // ---------- Validation helpers ----------
 
     private static function validateVersion(int $version): void

@@ -28,8 +28,20 @@ use JsonException;
  */
 class CustomStudySessionTokenService
 {
-    public const VERSION = 1;
-    public const MAX_CANDIDATE_COUNT = 500;
+    /**
+     * Schema constants — single source of truth lives in CustomStudySessionState.
+     * The Token Service references the State's constants so that future schema
+     * changes only need to be made in one place.
+     *
+     * Task 2000-20 — Phase 3B constant single-source canonicalization.
+     */
+    public const VERSION = CustomStudySessionState::VERSION;
+    public const MAX_CANDIDATE_COUNT = CustomStudySessionState::MAX_CANDIDATE_COUNT;
+
+    /**
+     * Token-transport constants — local to the Token Service (not part of the
+     * session-state schema).
+     */
     public const MAX_TOKEN_BYTES = 65536;
     public const DEFAULT_TTL_SECONDS = 14400;
 
