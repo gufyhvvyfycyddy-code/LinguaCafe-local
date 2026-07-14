@@ -46,6 +46,19 @@
                     @change="chapterError = ''"
                 ></v-select>
 
+                <v-alert
+                    v-if="mode === 'source_chapter' && !chapterOptionsLoading && !chapterOptions.length"
+                    type="info"
+                    dense
+                    outlined
+                >
+                    当前没有包含可用预览卡片的篇章。
+                </v-alert>
+
+                <v-alert v-if="selectedChapterOption" type="info" dense outlined>
+                    当前可用 {{ selectedChapterOption.candidateCount }} 张，本次最多学习 {{ validCardLimit || 100 }} 张。
+                </v-alert>
+
                 <v-radio-group v-if="mode === 'leech_attention'" v-model="leechSubMode" label="困难词义范围">
                     <v-radio value="leech_only" label="仅顽固遗忘词义"></v-radio>
                     <v-radio value="leech_plus_struggling" label="顽固遗忘词义与近期困难词义"></v-radio>
@@ -67,7 +80,7 @@
                     @input="cardLimitError = ''"
                 ></v-text-field>
 
-                <v-btn color="primary" :loading="starting" :disabled="starting" type="submit">
+                <v-btn color="primary" :loading="starting" :disabled="!canStart || starting" type="submit">
                     开始预览学习
                 </v-btn>
             </v-form>
@@ -109,6 +122,26 @@
                 }
             },
         },
+        computed: {
+            validCardLimit() {
+                const cardLimit = Number(this.cardLimit);
+                return Number.isInteger(cardLimit) && cardLimit >= 1 && cardLimit <= 500
+                    ? cardLimit
+                    : null;
+            },
+            selectedChapterOption() {
+                if (!Number.isInteger(this.chapterId)) {
+                    return null;
+                }
+                return this.chapterOptions.find((item) => item.id === this.chapterId) || null;
+            },
+            canStart() {
+                if (!this.validCardLimit) {
+                    return false;
+                }
+                return this.mode !== 'source_chapter' || Boolean(this.selectedChapterOption);
+            },
+        },
         mounted() {
             this.activeToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
         },
@@ -123,7 +156,8 @@
                     .then((response) => {
                         const items = response.data && Array.isArray(response.data.items) ? response.data.items : [];
                         this.chapterOptions = items.map((item) => ({
-                            id: item.id,
+                            id: item.chapter_id,
+                            candidateCount: item.candidate_count,
                             label: this.chapterLabel(item),
                         }));
                     })
@@ -135,8 +169,8 @@
                     });
             },
             chapterLabel(item) {
-                const bookTitle = item.book_title || '未命名材料';
-                const chapterTitle = item.chapter_title || `篇章 ${item.id}`;
+                const bookTitle = item.book_name || '未命名材料';
+                const chapterTitle = item.chapter_name || `篇章 ${item.chapter_id}`;
                 const count = Number.isInteger(item.candidate_count) ? ` · ${item.candidate_count} 张可用卡片` : '';
                 return `${bookTitle} · ${chapterTitle}${count}`;
             },
@@ -145,8 +179,8 @@
                 this.chapterError = '';
                 this.cardLimitError = '';
 
-                const cardLimit = Number(this.cardLimit);
-                if (!Number.isInteger(cardLimit) || cardLimit < 1 || cardLimit > 500) {
+                const cardLimit = this.validCardLimit;
+                if (!cardLimit) {
                     this.cardLimitError = '请输入 1 到 500 之间的整数。';
                     return;
                 }

@@ -19,12 +19,14 @@
         <v-card v-else-if="completed" outlined class="rounded-lg pa-5 custom-study-summary">
             <div class="text-h6 mb-3">本次预览学习已完成</div>
             <v-row dense>
-                <v-col cols="6" sm="3"><div class="caption text--secondary">计划卡片</div><div>{{ summary.total_count || 0 }}</div></v-col>
-                <v-col cols="6" sm="3"><div class="caption text--secondary">已完成</div><div>{{ summary.completed_count || 0 }}</div></v-col>
-                <v-col cols="6" sm="3"><div class="caption text--secondary">剩余</div><div>{{ summary.remaining_count || 0 }}</div></v-col>
-                <v-col cols="6" sm="3"><div class="caption text--secondary">跳过</div><div>{{ summary.skipped_ineligible_count || 0 }}</div></v-col>
+                <v-col cols="6" sm="4"><div class="caption text--secondary">全部候选</div><div>{{ summary.total_candidates || 0 }}</div></v-col>
+                <v-col cols="6" sm="4"><div class="caption text--secondary">计划卡片</div><div>{{ summary.total_count || 0 }}</div></v-col>
+                <v-col cols="6" sm="4"><div class="caption text--secondary">已完成</div><div>{{ summary.completed_count || 0 }}</div></v-col>
+                <v-col cols="6" sm="4"><div class="caption text--secondary">剩余</div><div>{{ summary.remaining_count || 0 }}</div></v-col>
+                <v-col cols="6" sm="4"><div class="caption text--secondary">跳过</div><div>{{ summary.skipped_ineligible_count || 0 }}</div></v-col>
             </v-row>
             <v-btn class="mt-4" color="primary" @click="exitSession">返回自定义学习</v-btn>
+            <v-btn class="mt-4 ml-2" text href="/reviews/senses">前往普通复习</v-btn>
         </v-card>
 
         <v-card v-else-if="isWaiting" outlined class="rounded-lg pa-6 text-center custom-study-waiting">
@@ -210,7 +212,7 @@
                 }
                 this.summary = payload.summary || {};
                 this.currentCard = payload.current_card || null;
-                this.completed = Boolean(payload.completed) || (!this.currentCard && Boolean(payload.completed));
+                this.completed = Boolean(payload.completed);
                 this.showAnswer = false;
                 this.waitUntil = payload.wait_until || null;
                 this.waitAutoResumeStarted = false;
@@ -218,6 +220,12 @@
 
                 if (isOpenPayload && !this.currentCard && !this.waitUntil) {
                     this.completed = true;
+                }
+
+                if (this.completed) {
+                    this.waitUntil = null;
+                    this.clearWaitTimer();
+                    this.clearStoredToken();
                 }
             },
             refreshWaitingClock() {
@@ -248,6 +256,9 @@
                     window.clearInterval(this.waitTimer);
                     this.waitTimer = null;
                 }
+            },
+            clearStoredToken() {
+                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
             },
             viewSource() {
                 if (!this.currentCard) {
@@ -296,7 +307,7 @@
             },
             exitSession() {
                 this.clearWaitTimer();
-                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+                this.clearStoredToken();
                 this.$emit('exit');
             },
         },
