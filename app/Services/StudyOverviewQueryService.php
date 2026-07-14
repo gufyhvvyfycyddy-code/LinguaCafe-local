@@ -56,6 +56,11 @@ class StudyOverviewQueryService
         $periodLogs = $logs->filter(fn ($log) => $log->reviewed_at >= $periodStart);
         $effective = $this->effectiveLimitsService->resolve($userId, $language, $now);
 
+        // ponytail: workload (due/backlog/future) uses Saved Search ∩ canonical queue eligibility
+        // (scopeSenseReviewEligible semantics), filtered in-memory from the already-fetched inventory.
+        // No new SQL; query budget unchanged. Inventory metrics still use the full $cards collection.
+        $eligibleCards = $this->eligibleCards($cards, $now);
+
         return [
             'meta' => [
                 'language' => $language, 'period' => $period, 'timezone' => $bounds['timezone'],
@@ -64,10 +69,11 @@ class StudyOverviewQueryService
                 'limits' => ['max_cards' => self::MAX_CARDS, 'max_logs' => self::MAX_LOGS],
             ],
             'today' => array_merge([
-                'due_count' => $cards->where('fsrs_due_at', '<=', $now)->count(),
-                'overdue_backlog' => $cards->filter(fn ($card) => $card->fsrs_due_at && $card->fsrs_due_at < $bounds['day_start'])->count(),
+                'due_count' => $eligibleCards->where('fsrs_due_at', '<=', $now)->count(),
+                'overdue_backlog' => $eligibleCards->filter(fn ($card) => $card->fsrs_due_at && $card->fsrs_due_at < $bounds['day_start'])->count(),
+                'daily_limit_scope' => 'user_language_global',
             ], $effective),
-            'future_due' => $this->futureDue($cards, $now, $bounds['timezone']),
+            'future_due' => $this->futureDue($eligibleCards, $now, $bounds['timezone']),
             'cards' => $this->cardMetrics($cards, $now),
             'memory' => $this->memoryMetrics($cards, $now),
             'ratings' => $this->ratingMetrics($periodLogs),
@@ -75,6 +81,19 @@ class StudyOverviewQueryService
             'true_retention' => $this->retentionMetrics($logs, $periodStart, $bounds['timezone']),
             'deep_link' => '/review-cards/manage' . ($savedSearch ? '?saved_search_id=' . $savedSearch->id : ''),
         ];
+    }
+
+    private function eligibleCards($cards, Carbon $now)
+    {
+        return $cards->filter(function ($card) use ($now) {
+            if (!$card->fsrs_enabled) return false;
+            $life = $card->lifecycle_state ?: 'active';
+            $buriedUntil = $card->buried_until;
+            $buryExpired = $buriedUntil !== null && $buriedUntil->lte($now);
+            if ($life === 'active') return $buriedUntil === null || $buryExpired;
+            if ($life === 'buried') return $buryExpired;
+            return false; // suspended / archived never enter workload
+        });
     }
 
     private function futureDue($cards, Carbon $now, string $timezone): array

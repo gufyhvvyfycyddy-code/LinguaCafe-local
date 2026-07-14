@@ -107,6 +107,70 @@ class StudyOverviewTest extends TestCase
             ->assertJsonPath('cards.lifecycle_distribution.buried', 1);
     }
 
+    public function test_workload_excludes_suspended_archived_and_active_buried_but_inventory_includes_them(): void
+    {
+        // Due cards that should NOT count as workload (inventory +1 each, workload +0).
+        $suspended = $this->card('suspended-due', 'review', now()->subDay(), now()->subDays(4));
+        $suspended->forceFill(['lifecycle_state' => 'suspended'])->save();
+
+        $archived = $this->card('archived-due', 'review', now()->subDay(), now()->subDays(4));
+        $archived->forceFill(['lifecycle_state' => 'archived', 'fsrs_enabled' => false])->save();
+
+        $futureBuried = $this->card('future-buried-due', 'review', now()->subDay(), now()->subDays(4));
+        $futureBuried->forceFill(['lifecycle_state' => 'active', 'buried_until' => now()->addDay()])->save();
+
+        // Due card that SHOULD count as workload (active, no bury, fsrs_enabled).
+        $active = $this->card('active-due', 'review', now()->subDay(), now()->subDays(4));
+
+        $response = $this->actingAs($this->user)->getJson('/study-overview/data')
+            ->assertOk()
+            // Inventory: all 4 cards (future-buried reclassified as buried in distribution)
+            ->assertJsonPath('meta.scope_card_count', 4)
+            ->assertJsonPath('cards.lifecycle_distribution.suspended', 1)
+            ->assertJsonPath('cards.lifecycle_distribution.archived', 1)
+            ->assertJsonPath('cards.lifecycle_distribution.active', 1)
+            ->assertJsonPath('cards.lifecycle_distribution.buried', 1)
+            // Workload: only the 1 active eligible card is due
+            ->assertJsonPath('today.due_count', 1)
+            ->assertJsonPath('today.overdue_backlog', 1)
+            ->assertJsonPath('today.daily_limit_scope', 'user_language_global');
+        // All due cards are in the past (overdue), so future_due sum is 0.
+        $this->assertSame(0, collect($response->json('future_due'))->sum('count'));
+    }
+
+    public function test_expired_buried_card_enters_workload(): void
+    {
+        $card = $this->card('expired-buried-due', 'review', now()->subDay(), now()->subDays(4));
+        $card->forceFill(['lifecycle_state' => 'buried', 'buried_until' => now()->subMinute()])->save();
+
+        $this->actingAs($this->user)->getJson('/study-overview/data')
+            ->assertOk()
+            ->assertJsonPath('meta.scope_card_count', 1)
+            ->assertJsonPath('cards.lifecycle_distribution.buried', 1)
+            // Expired bury is eligible → counts as workload
+            ->assertJsonPath('today.due_count', 1)
+            ->assertJsonPath('today.overdue_backlog', 1);
+    }
+
+    public function test_archived_only_saved_search_has_zero_workload_but_correct_inventory(): void
+    {
+        $archived = $this->card('archived-only', 'review', now()->subDay(), now()->subDays(4));
+        $archived->forceFill(['lifecycle_state' => 'archived', 'fsrs_enabled' => false])->save();
+
+        $saved = ReviewCardSavedSearch::forceCreate([
+            'user_id' => $this->user->id, 'language_id' => 'english', 'name' => 'Archived', 'normalized_name' => 'archived',
+            'filter_state_version' => 1, 'filter_state' => ['q' => '', 'filter' => 'archived', 'sort_by' => 'id', 'sort_dir' => 'desc', 'fsrs_states' => [], 'due_range' => 'all', 'reps_min' => null, 'lapses_min' => null],
+        ]);
+
+        $response = $this->actingAs($this->user)->getJson('/study-overview/data?saved_search_id=' . $saved->id)
+            ->assertOk()
+            ->assertJsonPath('meta.scope_card_count', 1)
+            ->assertJsonPath('cards.lifecycle_distribution.archived', 1)
+            ->assertJsonPath('today.due_count', 0)
+            ->assertJsonPath('today.overdue_backlog', 0);
+        $this->assertSame(0, collect($response->json('future_due'))->sum('count'));
+    }
+
     public function test_query_budget_is_constant_for_1_100_and_500_cards(): void
     {
         $queries = [];

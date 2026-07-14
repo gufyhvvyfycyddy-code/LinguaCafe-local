@@ -12,7 +12,7 @@
         <v-alert v-if="error" type="error" outlined>{{ error }}</v-alert>
         <v-skeleton-loader v-if="loading && !data" type="card@3" />
         <template v-if="data">
-            <section-title title="今日负担" hint="到期与临时限额均按学习时区计算" />
+            <section-title title="今日负担" hint="到期与未来负担按当前筛选范围计算；今日限制和已完成数量按当前语言的完整正式队列计算" />
             <v-row class="mb-3"><v-col v-for="item in todayCards" :key="item.label" cols="6" sm="4" lg="2"><metric-card :label="item.label" :value="item.value" :tone="item.tone" /></v-col></v-row>
             <v-alert dense text type="info" class="mb-6">永久上限：新卡 {{ data.today.permanent_new_limit }} / 复习 {{ data.today.permanent_review_limit }}；今日增量：新卡 {{ delta('new_limit_delta') }} / 复习 {{ delta('review_limit_delta') }}；有效上限：新卡 {{ data.today.effective_new_limit }} / 复习 {{ data.today.effective_review_limit }}。</v-alert>
             <v-row>
