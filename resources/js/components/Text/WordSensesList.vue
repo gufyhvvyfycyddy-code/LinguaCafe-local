@@ -129,51 +129,15 @@
                             </v-btn>
                         </div>
 
-                        <template v-if="editingSenseId === sense.sense_id">
-                            <div class="edit-form rounded pa-2 mt-2">
-                                <v-select
-                                    dense
-                                    filled
-                                    rounded
-                                    hide-details
-                                    class="mb-2"
-                                    label="词性"
-                                    :items="posOptions"
-                                    item-text="label"
-                                    item-value="value"
-                                    v-model="editForm.pos"
-                                />
-                                <v-textarea
-                                    dense
-                                    filled
-                                    rounded
-                                    hide-details
-                                    no-resize
-                                    class="mb-2"
-                                    height="70"
-                                    label="中文释义"
-                                    v-model="editForm.sense_zh"
-                                />
-                                <v-textarea
-                                    dense
-                                    filled
-                                    rounded
-                                    hide-details
-                                    no-resize
-                                    class="mb-2"
-                                    height="70"
-                                    label="英文解释（可选）"
-                                    v-model="editForm.sense_en"
-                                />
-                                <v-text-field dense filled rounded hide-details class="mb-2" label="近义译法，用逗号分隔" v-model="editForm.aliases_zh" />
-                                <v-text-field dense filled rounded hide-details class="mb-2" label="搭配，用逗号分隔" v-model="editForm.collocations" />
-                                <div class="d-flex">
-                                    <v-spacer />
-                                    <v-btn x-small text class="mr-2" @click="cancelEdit">取消</v-btn>
-                                    <v-btn x-small color="success" :loading="saving" @click="saveEdit(sense)">保存释义</v-btn>
-                                </div>
-                            </div>
-                        </template>
+                        <manual-sense-form
+                            v-if="editingSenseId === sense.sense_id"
+                            :value="editForm"
+                            mode="edit"
+                            :pos-options="posOptions"
+                            :saving="saving"
+                            @submit="onEditFormSubmit($event, sense)"
+                            @cancel="cancelEdit"
+                        />
 
                         <template v-else>
                             <div v-if="sense.sense_zh" class="sense-zh mb-1">
@@ -226,9 +190,10 @@
             </v-expansion-panel>
         </v-expansion-panels>
 
-        <add-sense-form
+        <manual-sense-form
             v-if="showAddForm"
             :value="newForm"
+            mode="create"
             :pos-options="posOptions"
             :saving="saving"
             :prefill-source="prefillSource"
@@ -240,7 +205,7 @@
 
 <script>
 import { mapState } from 'vuex';
-import AddSenseForm from './AddSenseForm.vue';
+import ManualSenseForm from './ManualSenseForm.vue';
 import InlineSensePreviewPanel from './InlineSensePreviewPanel.vue';
 import {
     buildWordSenseCandidateLookupContext,
@@ -265,7 +230,7 @@ const POS_OPTIONS = [
 
 export default {
     components: {
-        AddSenseForm,
+        ManualSenseForm,
         InlineSensePreviewPanel,
     },
     props: {
@@ -590,6 +555,13 @@ export default {
                 keep_new: formData.keep_new === true,
             };
             this.createSense();
+        },
+        onEditFormSubmit(formData, sense) {
+            this.editForm = {
+                ...this.editForm,
+                ...formData,
+            };
+            this.saveEdit(sense);
         },
         closeAddForm() {
             this.showAddForm = false;
