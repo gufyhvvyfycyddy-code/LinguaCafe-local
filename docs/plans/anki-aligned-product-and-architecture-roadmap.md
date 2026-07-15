@@ -149,7 +149,7 @@ LinguaCafe 采用相同方向：
 
 ### Phase 0：当前事实收口
 
-状态：本轮执行。
+状态：Completed / Production Closed（2026-07-15）。
 
 目标：
 
@@ -167,7 +167,9 @@ LinguaCafe 采用相同方向：
 
 ### Phase 1：Settings 架构收敛
 
-优先级：P0，下一阶段。
+状态：Completed / Production Closed（2026-07-15，ADR-0023）。
+
+优先级：P0，已完成。
 
 目标：为 Preset 提供干净入口，先拆 `AdminReviewSettings.vue` 和 `SettingsService.php`。
 
@@ -181,14 +183,17 @@ LinguaCafe 采用相同方向：
 
 量化目标：
 
-- `AdminReviewSettings.vue` 从 2,165 行降到 900 行以内。
-- 页面直接 axios 引用从 18 降到 4 以内。
-- `SettingsService.php` 从 1,007 行降到 600 行以内，现有 public 方法保持兼容。
-- 所有设置回归、构建和 MCP Chrome 双 viewport 通过。
+- `AdminReviewSettings.vue` 从 2,164 行降到 60 行，成为纯组合容器。
+- 15 个设置 HTTP 调用全部集中到 `AdminReviewSettingsApi.js`，容器和面板不直接调用 axios。
+- `SettingsService.php` 从 1,006 行降到 105 行，仅保留兼容门面；四个设置领域服务承接实现。
+- 设置、重排、队列消费者回归、全量测试、构建、DB doctor 和 Chrome 双 viewport 均通过。
+- 浏览器验收只执行安全保存和只读预览，没有执行正式重排、恢复默认或撤销。
 
 ### Phase 2：Preset V1
 
-优先级：P1。
+状态：Planned / Current Next Task。
+
+优先级：P1，当前下一阶段。
 
 产品决定：**Preset V1 绑定用户 + 语言。**
 

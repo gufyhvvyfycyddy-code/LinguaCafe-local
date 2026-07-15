@@ -6,7 +6,7 @@
 > 2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry and long-term ledger.
 > 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative product priority and architecture-debt route.
 >
-> Manual Sense shared form is Accepted / Production Closed. Current next task is Settings architecture convergence, followed by Preset V1 and Browser/ReviewCardManage convergence. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
+> Manual Sense shared form and Settings architecture convergence are Accepted / Production Closed. Current next task is Preset V1, followed by Browser/ReviewCardManage convergence. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -126,6 +126,7 @@ The detailed ADR table retains historical phase-by-phase registration text. For 
 | `docs/adr/ADR-0020-encountered-word-stage-authority-and-fsrs-transition.md` | Accepted first safe slice (2026-07-15); current authority continues in ADR-0021 | Historical decision that removed implicit translation-edit `setStage(-7)` before the full responsibility convergence. ADR-0021 closes the later enrollment and legacy-write boundaries. |
 | `docs/adr/ADR-0021-encountered-word-learning-enrollment-and-legacy-write-boundary.md` | Accepted (2026-07-15); Mgmt-7-c complete | Separates content-only edits, explicit legacy stage transitions, and confirmed-sense enrollment. Default enrollment uses reader stage -1 with a real new sense card; `keep_new` remains stage 2; content edits cannot create legacy word cards or bridge senses. |
 | `docs/adr/ADR-0022-word-sense-pos-canonicalization-boundary.md` | Accepted (2026-07-15) | Canonicalizes evidenced manual-sense POS aliases at frontend prefill and backend trust boundaries, preserves structured 422 for unknown values, and keeps ADR-0021 enrollment semantics unchanged. |
+| `docs/adr/ADR-0023-settings-architecture-convergence.md` | Accepted / Production Closed (2026-07-15) | Replaces the 2,164-line review settings page and 1,006-line settings service with a thin Vue container, five product panels, one API client, and four focused backend settings modules while preserving every existing route and payload. |
 
 ## 4. Soft Rules Awaiting Hard Verification
 

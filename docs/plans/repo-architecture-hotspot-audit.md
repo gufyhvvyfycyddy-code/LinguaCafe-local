@@ -4,7 +4,7 @@
 >
 > Current priority and measurable targets are governed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`. The old “overall architecture closure 100%” statement is a historical phase label and is not a current code-quality conclusion.
 >
-> Fresh baseline at `a0916784951be69b411066446a03be940373589f`: 29 production files exceed 500 lines, 12 exceed 1,000 lines, and 3 exceed 1,500 lines. Current assessment is **6.5/10, localized high burden**. Priority is corrected to: Settings architecture convergence → Preset V1 → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
+> Fresh baseline after Settings convergence (ADR-0023): 27 production files exceed 500 lines, 10 exceed 1,000 lines, and 2 exceed 1,500 lines. `AdminReviewSettings.vue` fell from 2,164 to 60 lines and `SettingsService.php` from 1,006 to 105 lines. Current assessment remains **6.5/10, localized high burden** because the largest hotspots are now `ReviewCardManage.vue` (3,411), `TextBlockGroup.vue` (2,516), and `SenseReview.vue` (1,476). Priority is: Preset V1 → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
 >
 > The previous recommendation to continue isolated low-risk scouts is superseded. New architecture work must reduce a measured hotspot or establish a required product seam; zero-progress reconnaissance cannot be dispatched as a standalone main task.
 >

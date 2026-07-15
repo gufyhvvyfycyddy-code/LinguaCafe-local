@@ -6,15 +6,15 @@
 >
 > | State | Work |
 > |---|---|
-> | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared create/edit form + inline validation |
+> | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared form; Settings architecture convergence |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
-> | Current Next Task | Settings architecture convergence |
-> | Authorized Sequence | Preset V1 → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
+> | Current Next Task | Preset V1 |
+> | Authorized Sequence | Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
 > Custom Study 1A is Accepted / Production Closed. Custom Study 1B is not started. `/custom-study`, four frozen criteria, chapter options, stateless open/answer/resume, shared `SenseStudyCard.vue`, `SenseSentencePreview.vue` reuse, sessionStorage token handling, and MCP Chrome production acceptance are complete. Historical phase narratives are archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
-> **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Domain boundaries are identified, while measurable structural debt remains. Current assessment is **6.5/10, localized high burden**; the highest frontend hotspots are `ReviewCardManage.vue`, `TextBlockGroup.vue`, and `AdminReviewSettings.vue`.
+> **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Settings convergence removed two former 1,000-line hotspots. The fresh baseline is 27 production files over 500 lines, 10 over 1,000, and 2 over 1,500; current assessment remains **6.5/10, localized high burden** because `ReviewCardManage.vue`, `TextBlockGroup.vue`, and `SenseReview.vue` remain large.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -26,7 +26,7 @@
 
 > **Historical Phase 5A update (superseded 2026-07-14)**: this earlier slice added the authenticated read-only `GET /custom-study/chapter-options` endpoint and aligned sentence/token/translation identity before the frontend existed. The production frontend and browser closure described in the authoritative status above now supersede that interim state.
 
-> **最后更新**：2026-07-15（Manual Sense 生产关闭 + Anki 对齐产品与架构路线 + Open Work Registry 事实校准）。历史最近任务记录：2026-07-14 (Task 2000-20 `GLM-CustomStudy-Phase3B-Pure-Transition-Policy-And-Contract-Harness-2000-20` — **Custom Study 1A Phase 3B 复合型主线任务**。本轮完成：(A) Phase 3A 架构契约和文档冲突收口 — ADR-0016 + implementation plan 不再写 `TokenService (signs/verifies/rotates token)` / `rotate(answer)` / 静态 `Crypt::encryptString()`；payload 补齐 `completed_ids` + `skipped_ineligible_ids`；`mode` 明确为四种 Criteria mode（`today_forgotten` / `overdue` / `source_chapter` / `leech_attention`），`preview-only` 是功能级性质不是 payload `mode` 值；新增可执行文档 guard `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs`（40 项，先 RED 9 项失败后 GREEN 全绿）；Phase 3A 标记为 Accepted。(B) State 显式不可变复制边界 — `CustomStudySessionState::withProgress(currentCardId, readyQueue, delayedRepeatQueue, completedIds, skippedIneligibleIds): self` 保留 identity 字段、自动重算 `completed_count`/`total_count`、自动 `step + 1`、拒绝 `step === PHP_INT_MAX` 溢出；新增 `waitUntil(): ?int` + `isCompleted(): bool` 派生查询；Token 常量 `VERSION` / `MAX_CANDIDATE_COUNT` 改为引用 `CustomStudySessionState`（单一来源）。(C) 纯函数 `CustomStudyPreviewPolicy` — `applyRating(state, rating, now): self` + `resume(state, now): self`，只接受四个冻结小写 rating（`again`/`hard`/`good`/`easy`）；Again/Hard → `delayed_repeat_queue`，Good/Easy → `completed_ids`；ready 优先于 delayed，delayed tie 稳定；不调用 `toArray()`/`fromArray()`，只通过 `withProgress()` 创建新 State；不访问 DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI。(D) 可执行架构 guard — `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs` 同时覆盖 ADR 和 implementation plan。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 3 commits。**Previous task (2000-19)**: Phase 3A `CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit tests；V1 payload 新增 `completed_ids` + `skipped_ineligible_ids`；五状态 union + 互斥不变量；章节选择器未来契约登记。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1、2A、2B、3A、3B 的架构与测试均已完成；后续 API、前端、共享卡面、章节选择器和浏览器收口也已完成。当前权威状态见文件顶部。**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。当前工作流: GLM 单 Agent 闭环, 详见 `vibe-coding-collaboration-rules.md` §1.5; CodeBuddy/WorkBuddy 已停用, 旧规则见 `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md`)。
+> **最后更新**：2026-07-15（Settings 架构收敛生产关闭；Preset V1 成为当前下一任务）。历史最近任务记录：2026-07-14 (Task 2000-20 `GLM-CustomStudy-Phase3B-Pure-Transition-Policy-And-Contract-Harness-2000-20` — **Custom Study 1A Phase 3B 复合型主线任务**。本轮完成：(A) Phase 3A 架构契约和文档冲突收口 — ADR-0016 + implementation plan 不再写 `TokenService (signs/verifies/rotates token)` / `rotate(answer)` / 静态 `Crypt::encryptString()`；payload 补齐 `completed_ids` + `skipped_ineligible_ids`；`mode` 明确为四种 Criteria mode（`today_forgotten` / `overdue` / `source_chapter` / `leech_attention`），`preview-only` 是功能级性质不是 payload `mode` 值；新增可执行文档 guard `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs`（40 项，先 RED 9 项失败后 GREEN 全绿）；Phase 3A 标记为 Accepted。(B) State 显式不可变复制边界 — `CustomStudySessionState::withProgress(currentCardId, readyQueue, delayedRepeatQueue, completedIds, skippedIneligibleIds): self` 保留 identity 字段、自动重算 `completed_count`/`total_count`、自动 `step + 1`、拒绝 `step === PHP_INT_MAX` 溢出；新增 `waitUntil(): ?int` + `isCompleted(): bool` 派生查询；Token 常量 `VERSION` / `MAX_CANDIDATE_COUNT` 改为引用 `CustomStudySessionState`（单一来源）。(C) 纯函数 `CustomStudyPreviewPolicy` — `applyRating(state, rating, now): self` + `resume(state, now): self`，只接受四个冻结小写 rating（`again`/`hard`/`good`/`easy`）；Again/Hard → `delayed_repeat_queue`，Good/Easy → `completed_ids`；ready 优先于 delayed，delayed tie 稳定；不调用 `toArray()`/`fromArray()`，只通过 `withProgress()` 创建新 State；不访问 DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI。(D) 可执行架构 guard — `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs` 同时覆盖 ADR 和 implementation plan。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 3 commits。**Previous task (2000-19)**: Phase 3A `CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit tests；V1 payload 新增 `completed_ids` + `skipped_ineligible_ids`；五状态 union + 互斥不变量；章节选择器未来契约登记。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1、2A、2B、3A、3B 的架构与测试均已完成；后续 API、前端、共享卡面、章节选择器和浏览器收口也已完成。当前权威状态见文件顶部。**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。当前工作流: GLM 单 Agent 闭环, 详见 `vibe-coding-collaboration-rules.md` §1.5; CodeBuddy/WorkBuddy 已停用, 旧规则见 `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md`)。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -213,8 +213,8 @@
 | 顺序 | 任务 | 状态 | 用户能获得什么 | 当前缺口 / 阻塞 | 证据位置 | 开发授权 |
 |---:|---|---|---|---|---|---|
 | 0 | Manual Sense POS + shared form + inline validation | Completed / Production Closed | 创建和编辑共用表单，错误就地显示，失败保留草稿 | 无 | ADR-0022；2026-07-15 DevSpace5 + Chrome 验收 | 已完成 |
-| 1 | Settings architecture convergence | Planned / Current Next Task | 设置页更清晰，后续 Preset 不再继续堆进超大页面和单一 Service | `AdminReviewSettings.vue` 2165 行、18 个 axios 引用；`SettingsService.php` 1007 行 | `anki-aligned-product-and-architecture-roadmap.md` Phase 1 | 已授权为下一任务 |
-| 2 | FSRS-Anki-Mgmt-9 Preset V1 | Planned | 按语言共享、复制、切换 FSRS、每日上限、队列顺序和 Leech 设置 | 必须先完成 Settings 边界；V1 绑定用户 + 语言，不建 deck 树 | 同路线 Phase 2 | Settings 收敛后授权 |
+| 1 | Settings architecture convergence | Completed / Production Closed | 设置页按目标、队列、状态、高级工具和旧 SRS 分区；后续 Preset 不再堆进超大页面 | `AdminReviewSettings.vue` 60 行；15 个请求集中到 API client；`SettingsService.php` 105 行兼容门面 | ADR-0023；Chrome 双 viewport；设置/重排回归 | 已完成 |
+| 2 | FSRS-Anki-Mgmt-9 Preset V1 | Planned / Current Next Task | 按语言共享、复制、切换 FSRS、每日上限、队列顺序和 Leech 设置 | V1 绑定用户 + 语言，不建 deck 树；需冻结 preset identity、继承、删除和切换语义 | 同路线 Phase 2 | 已授权为下一任务 |
 | 3 | Browser / ReviewCardManage architecture convergence | Planned | Anki Browser 式搜索、表格、详情/编辑分区，批量治理更可控 | `ReviewCardManage.vue` 3412 行、26 个 axios 引用、12 个 dialog | 同路线 Phase 3；ADR-0012–0014 | Preset 后授权 |
 | 4 | Card Marker + Custom Study 1B | Planned | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 必须落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | 同路线 Phase 4；ADR-0016 | Browser 收敛后授权 |
 | 5 | Reviewer architecture convergence | Planned | Sense Review 与 legacy Review 共用请求恢复、会话和评分编排边界 | `SenseReview.vue` 1477 行；`Review.vue` 1071 行 | 同路线 Phase 5；ADR-0008–0010 | Card Marker 后授权 |
@@ -359,8 +359,8 @@
 
 | 顺序 | 阶段 | 当前决定 | 为什么排在这里 |
 |---:|---|---|---|
-| 1 | Settings architecture convergence | 当前下一任务 | Preset 会继续增加设置语义，必须先收敛 `AdminReviewSettings.vue` 与 `SettingsService.php` |
-| 2 | Preset V1 | 绑定用户 + 语言 | 对齐 Anki Deck Options Preset 的共享、复制和切换语义；当前没有稳定 deck 树 |
+| 1 | Settings architecture convergence | Completed / Production Closed | ADR-0023 已将页面收敛为薄容器 + 五个设置区，并将后端收敛为兼容门面 + 四个领域服务 |
+| 2 | Preset V1 | Current Next Task；绑定用户 + 语言 | 对齐 Anki Deck Options Preset 的共享、复制和切换语义；当前没有稳定 deck 树 |
 | 3 | Browser / ReviewCardManage convergence | 搜索、表格、详情/编辑三区域 | `ReviewCardManage.vue` 是当前最大前端热点，也是 Marker 和批量治理入口 |
 | 4 | Card Marker + Custom Study 1B | Marker 放在 ReviewCard | 对齐 Anki Card Flag；与 lifecycle、leech、WordSense status 分离 |
 | 5 | Reviewer convergence | Sense Review 为正式主入口 | 统一评分恢复、会话、预计间隔和错误处理；legacy 只保留兼容 |

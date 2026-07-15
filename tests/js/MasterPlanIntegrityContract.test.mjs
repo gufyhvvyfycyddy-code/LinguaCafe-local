@@ -14,7 +14,8 @@ const section = (source, startHeading, nextHeading) => {
 
 const master = read('docs/plans/linguacafe-master-plan.md');
 const handoff = read('docs/plans/current-working-handoff.md');
-const adr = read('docs/adr/ADR-0022-word-sense-pos-canonicalization-boundary.md');
+const manualSenseAdr = read('docs/adr/ADR-0022-word-sense-pos-canonicalization-boundary.md');
+const settingsAdr = read('docs/adr/ADR-0023-settings-architecture-convergence.md');
 const roadmap = read('docs/plans/anki-aligned-product-and-architecture-roadmap.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
@@ -25,14 +26,15 @@ const executionOrder = section(master, '## 8. Anki 对齐产品与架构执行�
 const handoffAuthority = section(handoff, '> **Current authority — 2026-07-15**', '> **Authoritative Custom Study status');
 const manualClosure = section(handoff, '## Manual Sense shared form corrective follow-up (2026-07-15)', null);
 
-assert.match(masterAuthority, /Manual Sense POS \+ shared create\/edit form \+ inline validation/);
-assert.match(masterAuthority, /Current Next Task \| Settings architecture convergence/);
+assert.match(masterAuthority, /Settings architecture convergence/);
+assert.match(masterAuthority, /Current Next Task \| Preset V1/);
+assert.match(masterAuthority, /27 production files over 500 lines, 10 over 1,000, and 2 over 1,500/);
 assert.match(masterAuthority, /6\.5\/10, localized high burden/);
 assert.doesNotMatch(masterAuthority, /web acceptance pending/i);
 assert.match(masterAuthority, /old “overall architecture closure 100%” statement is historical/);
 
-assert.match(openWork, /Settings architecture convergence \| Planned \/ Current Next Task/);
-assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1 \| Planned/);
+assert.match(openWork, /Settings architecture convergence \| Completed \/ Production Closed/);
+assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1 \| Planned \/ Current Next Task/);
 assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Planned/);
 assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
 assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
@@ -58,6 +60,8 @@ for (const term of orderedRoadmapTerms) {
 }
 assert.match(roadmap, /Preset V1 绑定用户 \+ 语言/);
 assert.match(roadmap, /Card Marker 参考 Anki Card Flag，落在 ReviewCard/);
+assert.match(roadmap, /Phase 1：Settings 架构收敛[\s\S]*Completed \/ Production Closed/);
+assert.match(roadmap, /Phase 2：Preset V1[\s\S]*Planned \/ Current Next Task/);
 assert.match(roadmap, /6\.5 \/ 10，局部高负担/);
 assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增加职责/);
 
@@ -67,17 +71,24 @@ assert.match(executionOrder, /Browser \/ ReviewCardManage convergence/);
 assert.match(executionOrder, /Card Marker \+ Custom Study 1B/);
 assert.doesNotMatch(executionOrder, /当前没有自动授权的下一产品任务|仍须由用户.*指定/);
 
-assert.match(adr, /Accepted \/ Production Closed/);
-assert.match(adr, /DevSpace5\/Chrome web acceptance are complete/);
-assert.doesNotMatch(adr, /web acceptance remains pending|Production closure is not claimed/);
+assert.match(manualSenseAdr, /Accepted \/ Production Closed/);
+assert.match(manualSenseAdr, /DevSpace5\/Chrome web acceptance are complete/);
+assert.doesNotMatch(manualSenseAdr, /web acceptance remains pending|Production closure is not claimed/);
+assert.match(settingsAdr, /Accepted \/ Production Closed/);
+assert.match(settingsAdr, /AdminReviewSettings\.vue.*2,164 lines/);
+assert.match(settingsAdr, /SettingsService.*1,006 lines/);
+assert.match(settingsAdr, /No Preset is implemented/);
 
-assert.match(handoffAuthority, /Current next task: \*\*Settings architecture convergence\*\*/);
+assert.match(handoffAuthority, /Settings architecture convergence: \*\*Accepted \/ Production Closed\*\*/);
+assert.match(handoffAuthority, /Current next task: \*\*Preset V1\*\*/);
 assert.match(handoffAuthority, /6\.5\/10, localized high burden/);
 assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
 assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
+assert.match(index, /Settings architecture convergence are Accepted \/ Production Closed/);
+assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
 assert.match(index, /old “overall architecture closure 100%” statement is historical/);
 assert.match(index, /§27\.8 — DevSpace PHP \/ PHPUnit 502 截断规则/);
 
