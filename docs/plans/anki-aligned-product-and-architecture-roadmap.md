@@ -2,14 +2,14 @@
 
 > **状态**：Current / Authoritative
 > **日期**：2026-07-15
-> **基线 commit**：`36bf8257c720ca7b4f65e737acb907e0de724567`
+> **基线 commit**：`ef30eb20cf389a51817afb794d57d3a68d83a442`
 > **适用范围**：产品优先级、架构优化顺序、下一阶段任务授权判断
 
 ## 1. 一句话结论
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛已经生产关闭。Preset V1A 的 Default Preset、用户/语言绑定和透明兼容读取已达到 **Code Complete / Web Acceptance Pending**；在网页验收与交接完成前不进入 Preset 管理动作。随后顺序仍为 V1B–V1D、ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
+Settings 架构收敛和 Preset V1A 已生产关闭。当前进入 **Preset V1B — Management Operations and UI**，随后完成 V1C 消费者收敛和 V1D Settings UX/生产关闭，再进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
 
 ## 2. 本轮依据
 
@@ -189,9 +189,9 @@ LinguaCafe 采用相同方向：
 
 ### Phase 2：Preset V1
 
-状态：V1A Code Complete / Web Acceptance Pending；V1B–V1D Planned。
+状态：V1A Completed / Production Closed；V1B Planned / Current Next Task；V1C–V1D Planned。
 
-优先级：P1，当前下一阶段。
+优先级：P1，当前执行 V1B。
 
 权威实施计划：`docs/plans/review-settings-preset-v1-plan.md`。
 
@@ -229,10 +229,10 @@ Preset V1 不包含：
 
 分阶段：
 
-1. **V1A — Code Complete / Web Acceptance Pending**：additive persistence、Default Preset、用户/语言唯一绑定、legacy global snapshot、单一 `ReviewSettingsResolver`、现有 endpoint/payload 兼容、现有设置与调度透明读取当前 Preset；页面只显示只读“当前 Preset：Default”。实现决策见 ADR-0024；未进入 V1B。
-2. **V1B**：新增、复制、重命名、删除、切换 API 与 UI；Default 不可删除；删除普通 Preset 时在事务内把受影响语言重新绑定到 Default。
-3. **V1C**：多语言共享和所有 FSRS / daily limits / queue / simulation 消费者收敛，清理业务层直接全局 Setting 读取。
-4. **V1D**：双用户、多语言、双 viewport、Network、Console、数据库 delta 和无自动重排的生产关闭。
+1. **V1A — Completed / Production Closed**：additive persistence、Default Preset、用户/语言唯一绑定、legacy global snapshot、单一 `ReviewSettingsResolver`、现有 endpoint/payload 兼容、现有设置与调度透明读取当前 Preset；双 viewport、真实 English/French binding、保存和全量回归已由网页端复核。实现决策见 ADR-0024。
+2. **V1B — Current Next Task**：新增、复制、重命名、删除、切换 API 与 UI；Default 不可删除或重命名；删除普通 Preset 时在事务内把受影响语言重新绑定到 Default。
+3. **V1C**：多语言共享和所有 FSRS / daily limits / queue / simulation 消费者收敛，清理业务层直接全局 Setting 读取；`fsrs_parameters_previous` 当前仍是全局、无读取方的孤儿状态，必须删除、迁移为 Preset 级操作历史或明确废弃。
+4. **V1D**：Settings UX-1 + 双用户、多语言、双 viewport、Network、Console、数据库 delta 和无自动重排的生产关闭。Settings UX-1 专门收口高级工具的无/少数据状态、动作安全与信息层级。
 
 Anki 对齐行为：
 

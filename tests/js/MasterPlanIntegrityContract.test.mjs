@@ -29,15 +29,20 @@ const handoffAuthority = section(handoff, '> **Current authority — 2026-07-15*
 const manualClosure = section(handoff, '## Manual Sense shared form corrective follow-up (2026-07-15)', null);
 
 assert.match(masterAuthority, /Settings architecture convergence/);
-assert.match(masterAuthority, /Code Complete \/ Web Acceptance Pending \| Preset V1A — Default Preset Foundation and Transparent Binding/);
+assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A/);
+assert.match(masterAuthority, /Current Next Task \| Preset V1B — Management Operations and UI/);
 assert.match(masterAuthority, /27 production files over 500 lines, 10 over 1,000, and 2 over 1,500/);
 assert.match(masterAuthority, /6\.5\/10, localized high burden/);
-assert.match(masterAuthority, /Web Acceptance Pending/);
+assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
 assert.match(masterAuthority, /old “overall architecture closure 100%” statement is historical/);
 
 assert.match(openWork, /Settings architecture convergence \| Completed \/ Production Closed/);
-assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1A \| Code Complete \/ Web Acceptance Pending/);
-assert.match(openWork, /Preset V1B–V1D \| Planned/);
+assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1A \| Completed \/ Production Closed/);
+assert.match(openWork, /Preset V1B — Management Operations and UI \| Planned \/ Current Next Task/);
+assert.match(openWork, /Preset V1C — Consumer Convergence \| Planned/);
+assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Planned/);
+assert.match(openWork, /fsrs_parameters_previous/);
+assert.match(openWork, /Settings UX-1/);
 assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Planned/);
 assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
 assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
@@ -66,7 +71,9 @@ assert.match(roadmap, /Preset V1\.1 Leech Configuration Product Gate/);
 assert.match(roadmap, /review-settings-preset-v1-plan\.md/);
 assert.match(roadmap, /Card Marker 参考 Anki Card Flag，落在 ReviewCard/);
 assert.match(roadmap, /Phase 1：Settings 架构收敛[\s\S]*Completed \/ Production Closed/);
-assert.match(roadmap, /Phase 2：Preset V1[\s\S]*V1A Code Complete \/ Web Acceptance Pending/);
+assert.match(roadmap, /Phase 2：Preset V1[\s\S]*V1A Completed \/ Production Closed/);
+assert.match(roadmap, /V1B Planned \/ Current Next Task/);
+assert.match(roadmap, /Settings UX-1/);
 assert.match(roadmap, /6\.5 \/ 10，局部高负担/);
 assert.match(roadmap, /27 个生产文件超过 500 行/);
 assert.match(roadmap, /10 个生产文件超过 1,000 行/);
@@ -87,19 +94,21 @@ assert.match(settingsAdr, /Accepted \/ Production Closed/);
 assert.match(settingsAdr, /AdminReviewSettings\.vue.*2,164 lines/);
 assert.match(settingsAdr, /SettingsService.*1,006 lines/);
 assert.match(settingsAdr, /No Preset is implemented/);
-assert.match(presetAdr, /Code Complete \/ Web Acceptance Pending/);
+assert.match(presetAdr, /Accepted \/ Production Closed/);
 assert.match(presetAdr, /ReviewSettingsResolver/);
 assert.match(presetAdr, /no create, clone, rename, delete, or switch action/i);
 
 assert.match(handoffAuthority, /Settings architecture convergence: \*\*Accepted \/ Production Closed\*\*/);
-assert.match(handoffAuthority, /Preset V1A — Default Preset Foundation and Transparent Binding: \*\*Code Complete \/ Web Acceptance Pending\*\*/);
+assert.match(handoffAuthority, /Preset V1A — Default Preset Foundation and Transparent Binding: \*\*Accepted \/ Production Closed\*\*/);
+assert.match(handoffAuthority, /Current next task: \*\*Preset V1B — Management Operations and UI\*\*/);
 assert.match(handoffAuthority, /6\.5\/10, localized high burden/);
 assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
 assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
-assert.match(index, /Settings architecture convergence are Accepted \/ Production Closed/);
+assert.match(index, /Preset V1A are Accepted \/ Production Closed/);
+assert.match(index, /Current next task is Preset V1B — Management Operations and UI/);
 assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
 assert.match(index, /ADR-0024-review-settings-preset-v1a-foundation\.md/);
 assert.match(index, /review-settings-preset-v1-plan\.md/);
@@ -122,6 +131,9 @@ assert.match(presetPlan, /Default Preset 可以修改和复制，不能重命名
 assert.match(presetPlan, /Preset V1\.1 Leech Configuration Product Gate/);
 assert.match(presetPlan, /ReviewSettingsResolver/);
 assert.match(presetPlan, /不自动修改任何 `fsrs_due_at`/);
-assert.match(presetPlan, /停止，不进入新增\/复制\/重命名\/删除\/切换/);
+assert.match(presetPlan, /Preset V1B — Management Operations and UI/);
+assert.match(presetPlan, /Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety/);
+assert.match(presetPlan, /fsrs_parameters_previous/);
+assert.match(presetPlan, /状态更新为 \*\*Accepted \/ Production Closed\*\*/);
 
 console.log('Master plan integrity contract passed.');

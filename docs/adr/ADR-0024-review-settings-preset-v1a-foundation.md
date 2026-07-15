@@ -2,7 +2,7 @@
 
 ## Status
 
-Code Complete / Web Acceptance Pending — 2026-07-15
+Accepted / Production Closed — 2026-07-15
 
 ## Context
 
@@ -61,7 +61,7 @@ The existing settings page adds a small read-only identity surface showing `当�
 
 Executable contracts cover config normalization, idempotent initialization, user/language isolation, ownership rejection, legacy equivalence, no re-snapshot on a new language, invalid-config fail-closed behavior, mixed endpoint compatibility, disjoint update merging, learning-data safety, UI scope, and absence of direct runtime legacy reads. Existing scheduling, optimization, daily-limit, queue-order, workload, reschedule, Study Overview, WordSense, and Custom Study regressions remain required.
 
-Production status remains **Code Complete / Web Acceptance Pending** until the required two-viewport Chrome acceptance and web-side handoff are recorded. V1B is not authorized by this ADR.
+Web-side acceptance is complete. DevSpace5 verified the latest master, migrations, constraints, resolver consumers and automatic regression; Chrome DevTools verified Default identity, real settings saves, 1920×1080 and 900×900 layouts, English/French binding creation, no horizontal overflow and no new Console error/warning. Preset V1A is **Accepted / Production Closed**. V1B is authorized only through the separate current plan.
 
 ## Consequences
 

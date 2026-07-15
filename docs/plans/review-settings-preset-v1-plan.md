@@ -1,9 +1,9 @@
 # LinguaCafe Review Settings Preset V1 计划
 
-> **状态**：V1A Code Complete / Web Acceptance Pending; V1B–V1D Planned
+> **状态**：V1A Completed / Production Closed; V1B Planned / Current Next Task; V1C–V1D Planned
 > **日期**：2026-07-15
 > **实现基线**：`8a42566fcd8a64aae18b72d30480a9f9124558d1`
-> **当前授权阶段**：Preset V1A — Code Complete / Web Acceptance Pending
+> **当前授权阶段**：Preset V1B — Management Operations and UI
 > **后续阶段**：V1B 管理动作与 UI → V1C 多语言共享验收 → V1D 生产关闭
 
 ## 1. 一句话结论
@@ -215,12 +215,19 @@ V1A 生效后：
 
 ### Preset V1B — Management Operations and UI
 
+**当前下一任务。**
+
 交付：
 
 - 列表、创建、复制、重命名、删除和切换 API；
 - 管理弹窗或独立设置区；
 - Default 保护、名称冲突、删除重绑定和多语言共享；
-- 设置页现有五个区域继续作为当前 Preset 的编辑器。
+- Default 不可删除或重命名；普通 Preset 名称在当前用户内唯一；
+- Add 从系统默认配置创建，Clone 复制当前 Preset；
+- 切换只改变当前用户 + 当前语言 binding，不自动复制配置、不重排卡片；
+- 删除普通 Preset 时在事务中把全部绑定语言重绑到该用户 Default，再删除；
+- 设置页现有五个区域继续作为当前 Preset 的编辑器；
+- 管理动作必须显示“影响哪些语言”，共享 Preset 修改必须明确提醒所有绑定语言会同步变化。
 
 ### Preset V1C — Multi-language Sharing and Consumer Convergence
 
@@ -229,17 +236,41 @@ V1A 生效后：
 - 多语言绑定真实流程；
 - 所有 FSRS、每日上限、队列和工作量模拟消费者复核；
 - 删除残留的业务层直接全局 Setting 读取；
+- 处理 `fsrs_parameters_previous`：当前它仍写在全局 Setting 中且没有真实读取方，必须选择删除、迁移为 Preset 级操作历史或明确废弃，禁止继续把它描述为多用户回滚权威；
 - 旧全局记录只保留明确兼容期，不再是运行时主来源。
 
-### Preset V1D — Production Closure
+### Preset V1D — Settings UX and Production Closure
 
 交付：
 
+- **Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety**；
 - 全量自动回归；
 - 两个用户、至少两种语言的 Chrome 真实验收；
 - 新增、复制、修改共享、切换、删除重绑定、刷新持久化；
 - Network、Console、数据库 delta 和无重排证据；
 - 网页端总流程设计师最终 Accept。
+
+#### Settings UX-1 修复目标
+
+截图反馈表明，高级工具在无数据或数据不足时会形成“错误警告 + 大量 0 指标 + 仍然突出的无效操作”的噪声。该项放在 V1D，而不插入 V1B/V1C：管理 UI 和消费者数据流先稳定，再一次完成最终信息层级，避免同一设置页连续返工。
+
+目标：
+
+1. 无可用诊断时只显示一个清楚的空状态，不同时出现“没有诊断”与一整块全 0 诊断表。
+2. 数据不足时优先显示一条进度信息：`有效记录 N / 300`、还差多少条、当前可训练卡数量；其余细项进入“查看诊断详情”折叠区。
+3. “预览优化结果”在 `can_optimize=false` 时禁用或隐藏，并解释怎样才能启用；不得让用户点击一个注定失败的动作。
+4. 当前已经使用默认参数时，“恢复默认参数”禁用或显示“当前已是默认参数”，避免制造危险动作错觉。
+5. 全诊断网格只在存在有意义数据，或用户主动展开详情时显示；0 值必须有明确语义，不能只是占位。
+6. 一个状态只保留一个主色和一个主结论；warning、error、info 不得互相冲突。
+7. 900×900 无横向溢出，键盘焦点和 live-region 状态可读。
+8. 只改展示和动作可用性，不改变优化阈值、FSRS 参数、ReviewLog、lifecycle、重排和 Preset 数据契约。
+
+成功标准：
+
+- 0 条记录、1–299 条有效记录、300+ 条有效记录、默认参数、优化参数、诊断加载失败六种状态各有独立页面测试和 Chrome 验收。
+- 空状态不出现超过 3 个零值统计卡。
+- 不可执行按钮无法发出写请求。
+- 页面仍通过双 viewport、Console、Network 和无数据库副作用验收。
 
 ## 9. V1A 验收矩阵
 
@@ -297,7 +328,7 @@ V1A 生效后：
 
 ## 12. V1A 实现交接（2026-07-15）
 
-状态固定为 **Code Complete / Web Acceptance Pending**。
+状态更新为 **Accepted / Production Closed**。
 
 - 两张 additive-only 表和复合所有权外键已经实现；旧 `settings` 表及其行未删除。
 - `ReviewSettingsPresetConfig`、Default/Binding 服务、legacy snapshot 和 `ReviewSettingsResolver` 已成为 V1A 边界。
@@ -305,4 +336,4 @@ V1A 生效后：
 - desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
 - 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
 - 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
-- ADR-0024 是实现决策记录；在网页验收交接前不得开始 V1B。
+- ADR-0024 是实现决策记录；网页端已于 2026-07-15 使用 DevSpace5 与 Chrome DevTools 完成独立验收，V1B 现已成为当前下一任务。
