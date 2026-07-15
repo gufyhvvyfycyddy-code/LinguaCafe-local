@@ -143,8 +143,6 @@ assert.match(collaborationRules, /Feature 永远分组复核，不再运行 Feat
 assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
 assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
 assert.match(collaborationRules, /完整输出重定向到仓库忽略目录中的临时日志/);
-assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
-assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
 assert.match(collaborationRules, /记录每组文件数、退出码、passed\/skipped\/assertions 摘要/);
 assert.match(collaborationRules, /Incomplete \/ DevSpace PHP verification unavailable/);
 assert.match(collaborationRules, /交给下一轮相关 Codex 复杂主任务执行，不再回退尝试原始 DevSpace 流式方案/);
