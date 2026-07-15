@@ -16,12 +16,17 @@ class ReviewSettingsResolver
 
     public function resolve(int $userId, string $language): ReviewSettingsPresetConfig
     {
-        return ReviewSettingsPresetConfig::fromArray($this->resolvePreset($userId, $language)->config);
+        return ReviewSettingsPresetConfig::fromArray($this->currentPreset($userId, $language)->config);
+    }
+
+    public function currentPreset(int $userId, string $language): ReviewSettingPreset
+    {
+        return $this->resolvePreset($userId, $language);
     }
 
     public function mutate(int $userId, string $language, array $patch): ReviewSettingsPresetConfig
     {
-        $presetId = $this->resolvePreset($userId, $language)->id;
+        $presetId = $this->currentPreset($userId, $language)->id;
 
         return DB::transaction(function () use ($userId, $presetId, $patch): ReviewSettingsPresetConfig {
             $preset = ReviewSettingPreset::whereKey($presetId)->lockForUpdate()->firstOrFail();
@@ -37,7 +42,7 @@ class ReviewSettingsResolver
 
     public function metadata(int $userId, string $language): array
     {
-        $preset = $this->resolvePreset($userId, $language);
+        $preset = $this->currentPreset($userId, $language);
         return [
             'name' => $preset->name,
             'is_default' => (bool) $preset->is_default,

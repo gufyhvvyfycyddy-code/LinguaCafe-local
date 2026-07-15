@@ -2,14 +2,23 @@
     <div id="admin-review-settings">
         <div class="subheader mt-4">间隔重复系统</div>
 
-        <current-review-settings-preset :language="language" />
-        <fsrs-goal-settings-panel :fsrs-stats="fsrsStats" />
-        <fsrs-queue-order-settings-panel />
+        <current-review-settings-preset
+            :language="language"
+            @preset-changed="handlePresetChanged"
+        />
+        <fsrs-goal-settings-panel
+            :key="`goal-${settingsRefreshKey}`"
+            :fsrs-stats="fsrsStats"
+        />
+        <fsrs-queue-order-settings-panel :key="`queue-${settingsRefreshKey}`" />
         <fsrs-status-panel
             :refresh-key="statsRefreshKey"
             @stats-loaded="handleStatsLoaded"
         />
-        <fsrs-advanced-tools-panel @stats-changed="refreshStats" />
+        <fsrs-advanced-tools-panel
+            :key="`advanced-${settingsRefreshKey}`"
+            @stats-changed="refreshStats"
+        />
         <legacy-srs-settings-panel />
     </div>
 </template>
@@ -37,6 +46,7 @@ export default {
     data() {
         return {
             statsRefreshKey: 0,
+            settingsRefreshKey: 0,
             fsrsStats: {
                 total: 0,
                 enabled: 0,
@@ -56,6 +66,10 @@ export default {
             this.fsrsStats = stats;
         },
         refreshStats() {
+            this.statsRefreshKey += 1;
+        },
+        handlePresetChanged() {
+            this.settingsRefreshKey += 1;
             this.statsRefreshKey += 1;
         },
     },

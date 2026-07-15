@@ -10,6 +10,7 @@ const lineCount = source => source.split(/\r?\n/).length;
 const containerPath = 'resources/js/components/Admin/AdminReviewSettings.vue';
 const apiPath = 'resources/js/services/AdminReviewSettingsApi.js';
 const panelPaths = [
+    'resources/js/components/Admin/ReviewSettings/CurrentReviewSettingsPreset.vue',
     'resources/js/components/Admin/ReviewSettings/FsrsGoalSettingsPanel.vue',
     'resources/js/components/Admin/ReviewSettings/FsrsQueueOrderSettingsPanel.vue',
     'resources/js/components/Admin/ReviewSettings/FsrsStatusPanel.vue',
@@ -44,6 +45,12 @@ assert.match(container, /@stats-changed="refreshStats"/);
 const expectedApiMethods = [
     'getGlobalSettings',
     'updateGlobalSettings',
+    'listReviewSettingsPresets',
+    'createReviewSettingsPreset',
+    'cloneReviewSettingsPreset',
+    'renameReviewSettingsPreset',
+    'deleteReviewSettingsPreset',
+    'switchReviewSettingsPreset',
     'getReviewCardStats',
     'getOptimizationStatus',
     'simulateRetentionWorkload',
@@ -61,7 +68,7 @@ const expectedApiMethods = [
 for (const method of expectedApiMethods) {
     assert.match(api, new RegExp(`export function ${method}\\b`), `API client must export ${method}`);
 }
-assert.equal((api.match(/axios\./g) || []).length, 15, 'all 15 settings HTTP calls must live in the API client');
+assert.equal((api.match(/axios\./g) || []).length, 21, 'all 21 settings HTTP calls must live in the API client');
 
 for (const panelPath of panelPaths) {
     const panel = read(panelPath);

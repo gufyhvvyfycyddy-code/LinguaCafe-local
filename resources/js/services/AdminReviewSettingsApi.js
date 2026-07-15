@@ -10,6 +10,30 @@ export function getPresetMetadata() {
     return getGlobalSettings(['reviewSettingsPresetMetadata']);
 }
 
+export function listReviewSettingsPresets() {
+    return axios.get('/settings/review-presets');
+}
+
+export function createReviewSettingsPreset(name) {
+    return axios.post('/settings/review-presets', { name });
+}
+
+export function cloneReviewSettingsPreset(presetId, name) {
+    return axios.post(`/settings/review-presets/${presetId}/clone`, { name });
+}
+
+export function renameReviewSettingsPreset(presetId, name) {
+    return axios.patch(`/settings/review-presets/${presetId}`, { name });
+}
+
+export function deleteReviewSettingsPreset(presetId) {
+    return axios.delete(`/settings/review-presets/${presetId}`);
+}
+
+export function switchReviewSettingsPreset(presetId) {
+    return axios.put('/settings/review-presets/current-language', { preset_id: presetId });
+}
+
 export function getReviewCardStats() {
     return axios.get('/review-cards/stats');
 }
