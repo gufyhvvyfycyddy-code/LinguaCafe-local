@@ -247,6 +247,10 @@ import {
     buildWordSenseCandidateLookupKey,
     fetchWordSenseCandidates,
 } from '../../services/WordSenseCandidateService';
+import {
+    manualSenseErrorMessage,
+    normalizeWordSensePos,
+} from '../../services/ManualWordSenseFormService';
 
 const POS_OPTIONS = [
     { value: 'noun', label: '名词 noun', shortLabel: '名词' },
@@ -527,7 +531,7 @@ export default {
             this.message = '';
             this.prefillSource = '';
             this.newForm = this.emptyForm();
-            this.newForm.pos = pos || 'verb';
+            this.newForm.pos = normalizeWordSensePos(pos) || pos || 'verb';
 
             // Snapshot current Vuex state in case store is reset (e.g. v-select click-outside)
             this.snapshot = {
@@ -539,7 +543,7 @@ export default {
 
             if (prefill) {
                 this.prefillSource = prefill.dictionary || '词典';
-                this.newForm.pos = prefill.pos || this.newForm.pos;
+                this.newForm.pos = normalizeWordSensePos(prefill.pos) || prefill.pos || this.newForm.pos;
                 if (prefill.sense_zh) {
                     this.newForm.sense_zh = prefill.sense_zh;
                 } else if (prefill.definition) {
@@ -577,7 +581,7 @@ export default {
         onFormSubmit(formData) {
             // Replace newForm with the submitted form data, then call the existing save logic
             this.newForm = {
-                pos: formData.pos || 'verb',
+                pos: normalizeWordSensePos(formData.pos) || formData.pos || 'verb',
                 sense_zh: formData.sense_zh || '',
                 sense_en: formData.sense_en || '',
                 aliases_zh: formData.aliases_zh || '',
@@ -602,7 +606,7 @@ export default {
             return {
                 lemma: this.effectiveLemma,
                 surface_form: this.surfaceWord,
-                pos: form.pos,
+                pos: normalizeWordSensePos(form.pos) || form.pos,
                 sense_zh: form.sense_zh,
                 sense_en: form.sense_en,
                 aliases_zh: this.splitList(form.aliases_zh),
@@ -648,8 +652,8 @@ export default {
                         this.openPanels.push(index);
                     }
                 })
-                .catch(() => {
-                    this.saveError = '保存词义失败，请稍后重试。';
+                .catch((error) => {
+                    this.saveError = manualSenseErrorMessage(error, '保存词义失败，请稍后重试。');
                 })
                 .finally(() => {
                     this.saving = false;
@@ -658,7 +662,7 @@ export default {
         startEdit(sense) {
             this.editingSenseId = sense.sense_id;
             this.editForm = {
-                pos: sense.pos || 'other',
+                pos: normalizeWordSensePos(sense.pos) || sense.pos || 'other',
                 sense_zh: sense.sense_zh || '',
                 sense_en: sense.sense_en || '',
                 aliases_zh: this.listValue(sense.aliases_zh),
@@ -683,7 +687,7 @@ export default {
             this.message = '';
 
             axios.put(`/senses/${sense.sense_id}/manual`, {
-                pos: this.editForm.pos,
+                pos: normalizeWordSensePos(this.editForm.pos) || this.editForm.pos,
                 sense_zh: this.editForm.sense_zh,
                 sense_en: this.editForm.sense_en,
                 aliases_zh: this.splitList(this.editForm.aliases_zh),
@@ -694,8 +698,8 @@ export default {
                     this.cancelEdit();
                     this.fetchSenses();
                 })
-                .catch(() => {
-                    this.saveError = '更新词义失败，请稍后重试。';
+                .catch((error) => {
+                    this.saveError = manualSenseErrorMessage(error, '更新词义失败，请稍后重试。');
                 })
                 .finally(() => {
                     this.saving = false;

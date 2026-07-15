@@ -12,6 +12,14 @@ use Illuminate\Validation\Rule;
 class ManualWordSenseController extends Controller
 {
     private const POS_OPTIONS = ['noun', 'verb', 'adjective', 'adverb', 'preposition', 'conjunction', 'phrase', 'other'];
+    private const POS_ALIASES = [
+        'n' => 'noun',
+        'v' => 'verb',
+        'adj' => 'adjective',
+        'adv' => 'adverb',
+        'prep' => 'preposition',
+        'conj' => 'conjunction',
+    ];
 
     public function __construct(
         private WordSenseService $wordSenseService,
@@ -22,6 +30,8 @@ class ManualWordSenseController extends Controller
 
     public function storeManualSense(Request $request)
     {
+        $request->merge(['pos' => $this->normalizePos($request->input('pos'))]);
+
         $data = $request->validate([
             'lemma' => ['required', 'string'],
             'surface_form' => ['nullable', 'string'],
@@ -55,6 +65,8 @@ class ManualWordSenseController extends Controller
 
     public function updateManualSense(int $id, Request $request)
     {
+        $request->merge(['pos' => $this->normalizePos($request->input('pos'))]);
+
         $data = $request->validate([
             'pos' => ['required', Rule::in(self::POS_OPTIONS)],
             'sense_zh' => ['required', 'string'],
@@ -86,5 +98,16 @@ class ManualWordSenseController extends Controller
         $sense = $this->wordSenseService->archiveSense($sense);
 
         return response()->json($this->payloadSerializer->serializeSense($sense->load('reviewCard')));
+    }
+
+    private function normalizePos(mixed $pos): mixed
+    {
+        if (!is_string($pos)) {
+            return $pos;
+        }
+
+        $normalized = strtolower(trim($pos));
+
+        return self::POS_ALIASES[$normalized] ?? $normalized;
     }
 }

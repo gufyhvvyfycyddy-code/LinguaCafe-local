@@ -6,6 +6,18 @@ import { pathToFileURL } from 'node:url';
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '../..');
 const helperPath = path.join(root, 'resources/js/services/ManualWordSenseFormService.js');
 
+function methodBody(source, signature) {
+    const start = source.indexOf(signature);
+    assert.notEqual(start, -1, `${signature} must exist`);
+    let depth = 0;
+    for (let index = source.indexOf('{', start); index < source.length; index += 1) {
+        if (source[index] === '{') depth += 1;
+        if (source[index] === '}') depth -= 1;
+        if (depth === 0) return source.slice(start, index + 1);
+    }
+    assert.fail(`${signature} body must be readable`);
+}
+
 assert.ok(fs.existsSync(helperPath), 'manual sense form contract helper must exist');
 
 const helperSource = fs.readFileSync(helperPath, 'utf8');
@@ -18,6 +30,8 @@ for (const [input, expected] of Object.entries({
     adv: 'adverb',
     prep: 'preposition',
     conj: 'conjunction',
+    ADJ: 'adjective',
+    NOUN: 'noun',
     adjective: 'adjective',
     other: 'other',
 })) {
@@ -32,14 +46,17 @@ const other422 = { response: { status: 422, data: { errors: { lemma: ['The lemma
 assert.equal(helper.manualSenseErrorMessage(pos422, 'fallback'), '词性格式无效，请重新选择词性。');
 assert.equal(helper.manualSenseErrorMessage(sense422, 'fallback'), '请先填写中文释义。');
 assert.equal(helper.manualSenseErrorMessage(other422, 'fallback'), 'The lemma field is required.');
+assert.equal(helper.manualSenseErrorMessage({ response: { status: 422, data: { errors: { lemma: ['<html>secret</html>'] } } } }, 'fallback'), 'fallback');
 assert.equal(helper.manualSenseErrorMessage({ response: { status: 500, data: '<html>secret</html>' } }, 'fallback'), 'fallback');
 
 const component = fs.readFileSync(path.join(root, 'resources/js/components/Text/WordSensesList.vue'), 'utf8');
 assert.match(component, /normalizeWordSensePos/, 'AI, dictionary, create, and edit paths must use the shared POS normalizer');
 assert.match(component, /manualSenseErrorMessage/, 'create and edit catches must use structured validation errors');
+assert.match(component, /normalizeWordSensePos\(prefill\.pos\)\s*\|\|\s*prefill\.pos/, 'unknown prefill POS must stay invalid instead of pretending to be canonical');
 assert.match(component, /response\.data\.updated_word/, 'successful create must keep consuming updated_word');
 assert.match(component, /\$emit\(['"]word-learning-updated['"]/, 'successful create must keep the reader event chain');
 assert.doesNotMatch(component, /catch[\s\S]{0,240}closeAddForm\s*\(/, 'failed saves must keep the add form open');
-assert.doesNotMatch(component, /setStage|ReviewLog|fsrs/i, 'frontend contract must not copy stage, ReviewLog, or FSRS logic');
+const saveMethods = methodBody(component, '        createSense() {') + methodBody(component, '        saveEdit(sense) {');
+assert.doesNotMatch(saveMethods, /ReviewLog|fsrs|stage\s*[:=]\s*-\d/i, 'save methods must not copy ReviewLog, FSRS, or stage-transition logic');
 
 console.log('Manual WordSense POS and error UX contract passed.');
