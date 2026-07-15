@@ -43,15 +43,30 @@ const pos422 = { response: { status: 422, data: { errors: { pos: ['The selected 
 const sense422 = { response: { status: 422, data: { errors: { sense_zh: ['The sense zh field is required.'] } } } };
 const other422 = { response: { status: 422, data: { errors: { lemma: ['The lemma field is required.'] } } } };
 
-assert.equal(helper.manualSenseErrorMessage(pos422, 'fallback'), '词性格式无效，请重新选择词性。');
-assert.equal(helper.manualSenseErrorMessage(sense422, 'fallback'), '请先填写中文释义。');
-assert.equal(helper.manualSenseErrorMessage(other422, 'fallback'), 'The lemma field is required.');
-assert.equal(helper.manualSenseErrorMessage({ response: { status: 422, data: { errors: { lemma: ['<html>secret</html>'] } } } }, 'fallback'), 'fallback');
-assert.equal(helper.manualSenseErrorMessage({ response: { status: 500, data: '<html>secret</html>' } }, 'fallback'), 'fallback');
+assert.deepEqual(helper.manualSenseValidationState(pos422, 'fallback'), {
+    fieldErrors: { pos: '词性格式无效，请重新选择词性。', sense_zh: '' },
+    generalError: '',
+});
+assert.deepEqual(helper.manualSenseValidationState(sense422, 'fallback'), {
+    fieldErrors: { pos: '', sense_zh: '请先填写中文释义。' },
+    generalError: '',
+});
+assert.deepEqual(helper.manualSenseValidationState(other422, 'fallback'), {
+    fieldErrors: { pos: '', sense_zh: '' },
+    generalError: 'The lemma field is required.',
+});
+assert.equal(
+    helper.manualSenseValidationState({ response: { status: 422, data: { errors: { lemma: ['<html>secret</html>'] } } } }, 'fallback').generalError,
+    'fallback',
+);
+assert.equal(
+    helper.manualSenseValidationState({ response: { status: 500, data: '<html>secret</html>' } }, 'fallback').generalError,
+    'fallback',
+);
 
 const component = fs.readFileSync(path.join(root, 'resources/js/components/Text/WordSensesList.vue'), 'utf8');
 assert.match(component, /normalizeWordSensePos/, 'AI, dictionary, create, and edit paths must use the shared POS normalizer');
-assert.match(component, /manualSenseErrorMessage/, 'create and edit catches must use structured validation errors');
+assert.match(component, /manualSenseValidationState/, 'create and edit catches must use structured validation errors');
 assert.match(component, /normalizeWordSensePos\(prefill\.pos\)\s*\|\|\s*prefill\.pos/, 'unknown prefill POS must stay invalid instead of pretending to be canonical');
 assert.match(component, /response\.data\.updated_word/, 'successful create must keep consuming updated_word');
 assert.match(component, /\$emit\(['"]word-learning-updated['"]/, 'successful create must keep the reader event chain');
