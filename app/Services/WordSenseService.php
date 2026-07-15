@@ -15,6 +15,7 @@ class WordSenseService
     public function __construct(
         private ReviewCardService $reviewCardService,
         private ReviewCardLifecycleCommandService $lifecycleCommandService,
+        private EncounteredWordLearningEnrollmentService $learningEnrollmentService,
     )
     {
     }
@@ -236,6 +237,7 @@ class WordSenseService
                 $encounteredWord = \App\Models\EncounteredWord::where('id', (int) $encounteredWordId)
                     ->where('user_id', $userId)
                     ->where('language', $language)
+                    ->lockForUpdate()
                     ->first();
             }
 
@@ -263,49 +265,12 @@ class WordSenseService
             $card = $this->createReviewCardForSense($sense);
             $this->createManualOccurrence($sense, $card, $data);
 
-            // 2. Auto-mark as Learning 7 (word card no longer created)
-            $keepNew = (bool) Arr::get($data, 'keep_new', false);
-            $updatedWord = null;
-            if ($encounteredWord) {
-                if ($encounteredWord->stage === 2) {
-                    if ($keepNew) {
-                        // Keep as New — don't upgrade to Learning 7
-                        $updatedWord = [
-                            'id' => $encounteredWord->id,
-                            'stage' => $encounteredWord->stage,
-                            'word' => $encounteredWord->word,
-                            'base_word' => $encounteredWord->base_word,
-                            'study_base' => $encounteredWord->study_base,
-                            'stage_changed' => false,
-                        ];
-                    } else {
-                        // New (stage=2) → Learning 7
-                        // 只改 stage，不创建 word review_card
-                        $encounteredWord->setStage(-7);
-                        $encounteredWord->save();
-
-                        $updatedWord = [
-                            'id' => $encounteredWord->id,
-                            'stage' => $encounteredWord->stage,
-                            'word' => $encounteredWord->word,
-                            'base_word' => $encounteredWord->base_word,
-                            'study_base' => $encounteredWord->study_base,
-                            'stage_changed' => true,
-                        ];
-                    }
-                } elseif ($encounteredWord->stage < 0) {
-                    // Already in Learning: don't change stage, don't create word card
-                    $updatedWord = [
-                        'id' => $encounteredWord->id,
-                        'stage' => $encounteredWord->stage,
-                        'word' => $encounteredWord->word,
-                        'base_word' => $encounteredWord->base_word,
-                        'study_base' => $encounteredWord->study_base,
-                        'stage_changed' => false,
-                    ];
-                }
-                // stage 0 (Known) / stage 1 (Ignored): skip stage update and word card
-            }
+            $updatedWord = $encounteredWord
+                ? $this->learningEnrollmentService->enrollFromConfirmedSense(
+                    $encounteredWord,
+                    (bool) Arr::get($data, 'keep_new', false),
+                )
+                : null;
 
             return [
                 'sense' => $sense->fresh('reviewCard'),

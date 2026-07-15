@@ -59,17 +59,20 @@ class VocabularyService {
         }
 
         $word->update($wordData);
-        $word->save();
 
-        if ($word->stage < 0) {
-            $this->reviewCardService->ensureWordCard($word);
-        } else {
-            $this->reviewCardService->disableWordCard($word);
-        }
+        if ($wordStage !== null) {
+            $word->save();
 
-        // 桥接：Learning 词自动创建 word_sense 草稿
-        if ($word->stage < 0 && !empty($word->translation)) {
-            $this->bridgeWordToSense($word, $bridgeContext);
+            if ($word->stage < 0) {
+                $this->reviewCardService->ensureWordCard($word);
+            } else {
+                $this->reviewCardService->disableWordCard($word);
+            }
+
+            // 桥接仅属于显式 legacy stage transition。
+            if ($word->stage < 0 && !empty($word->translation)) {
+                $this->bridgeWordToSense($word, $bridgeContext);
+            }
         }
 
         return true;
