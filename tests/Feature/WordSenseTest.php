@@ -665,9 +665,9 @@ class WordSenseTest extends TestCase
 
         $response->assertOk();
 
-        // stage 从 2 变 -7
+        // stage 从 2 变为最低 reader enrollment（-1）
         $word->refresh();
-        $this->assertSame(-7, $word->stage, 'Stage should change from 2 to -7');
+        $this->assertSame(-1, $word->stage, 'Stage should change from 2 to -1');
 
         // 创建了 sense review_card
         $senseCard = ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->first();
@@ -767,7 +767,7 @@ class WordSenseTest extends TestCase
         $this->assertSame(2, $word->stage);
     }
 
-    public function test_keep_new_defaults_to_false_changes_stage_to_learning_7(): void
+    public function test_keep_new_defaults_to_false_changes_stage_to_reader_enrolled(): void
     {
         $word = $this->createWord('surge');
         $word->update(['stage' => 2]);
@@ -784,8 +784,8 @@ class WordSenseTest extends TestCase
         $response->assertOk();
 
         $word->refresh();
-        $this->assertSame(-7, $word->stage, 'Stage should change to -7 when keep_new is not provided');
-        $this->assertSame(-7, $response->json('updated_word.stage'));
+        $this->assertSame(-1, $word->stage, 'Stage should change to -1 when keep_new is not provided');
+        $this->assertSame(-1, $response->json('updated_word.stage'));
         $this->assertTrue($response->json('updated_word.stage_changed'));
 
         // 传 keep_new=false 应与不传行为一致
@@ -803,7 +803,7 @@ class WordSenseTest extends TestCase
 
         $response2->assertOk();
         $word2->refresh();
-        $this->assertSame(-7, $word2->stage, 'Stage should change to -7 when keep_new=false');
+        $this->assertSame(-1, $word2->stage, 'Stage should change to -1 when keep_new=false');
     }
 
     public function test_keep_new_does_not_downgrade_learning_word(): void
@@ -2912,10 +2912,10 @@ class WordSenseTest extends TestCase
     }
 
     // ===================================================================
-    // Auto-mark Learning 7 when adding manual sense
+    // Reader enrollment when adding manual sense
     // ===================================================================
 
-    public function test_manual_sense_auto_sets_new_word_to_learning_7(): void
+    public function test_manual_sense_auto_sets_new_word_to_reader_enrolled(): void
     {
         $word = $this->createWord('surge');
         $word->update(['stage' => 2]); // New
@@ -2931,8 +2931,8 @@ class WordSenseTest extends TestCase
         $response->assertOk();
         $word->refresh();
 
-        // Stage should change from 2 (New) to -7 (Learning 7)
-        $this->assertSame(-7, $word->stage);
+        // Stage should change from 2 (New) to -1 (lowest reader enrollment)
+        $this->assertSame(-1, $word->stage);
 
         // Word review card should NOT be created (sense-only policy)
         $this->assertDatabaseMissing('review_cards', [
@@ -2947,9 +2947,9 @@ class WordSenseTest extends TestCase
         $this->assertNotNull($sense);
         $this->assertSame($word->id, $sense->encountered_word_id);
 
-        // Response should include updated_word with stage=-7 and stage_changed=true
+        // Response should include updated_word with stage=-1 and stage_changed=true
         $response->assertJsonPath('updated_word.id', $word->id);
-        $response->assertJsonPath('updated_word.stage', -7);
+        $response->assertJsonPath('updated_word.stage', -1);
         $response->assertJsonPath('updated_word.stage_changed', true);
 
         // The manual sense occurrence should NOT be pending in /senses/review

@@ -138,6 +138,50 @@ class ReaderFsrsHighlightTest extends TestCase
 
     // ── Tests ────────────────────────────────────
 
+    public function test_new_confirmed_sense_card_keeps_reader_at_lowest_enrolled_green_after_reload(): void
+    {
+        $word = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
+        $sense = $this->createWordSense($word);
+        $this->createReviewCard($sense, 0.0, Carbon::now(), 'new')->update([
+            'fsrs_reps' => 0,
+            'fsrs_stability' => null,
+            'fsrs_difficulty' => null,
+        ]);
+
+        foreach ([$this->loadReader(), $this->loadReader()] as $response) {
+            $response->assertOk();
+            $token = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+            $unique = collect($response->json('uniqueWords'))->firstWhere('id', $word->id);
+
+            $this->assertSame(-1, $token['stage']);
+            $this->assertSame(1, $token['fsrs_familiarity_level_10']);
+            $this->assertSame(10, $token['fsrs_familiarity_percent']);
+            $this->assertTrue($unique['fsrs_familiarity_has_data']);
+            $this->assertSame(1, $unique['fsrs_familiarity_level_10']);
+            $this->assertSame(10, $unique['fsrs_familiarity_percent']);
+        }
+    }
+
+    public function test_keep_new_stage_is_not_overridden_by_new_sense_card(): void
+    {
+        $word = $this->createEncounteredWord('phenomenology', 'phenomenology', 2);
+        $sense = $this->createWordSense($word);
+        $this->createReviewCard($sense, 0.0, Carbon::now(), 'new')->update([
+            'fsrs_reps' => 0,
+            'fsrs_stability' => null,
+            'fsrs_difficulty' => null,
+        ]);
+
+        $response = $this->loadReader();
+        $response->assertOk();
+        $token = collect($response->json('words'))->firstWhere('word', 'Phenomenology');
+        $unique = collect($response->json('uniqueWords'))->firstWhere('id', $word->id);
+
+        $this->assertSame(2, $token['stage']);
+        $this->assertArrayNotHasKey('fsrs_familiarity_level_10', $token);
+        $this->assertFalse($unique['fsrs_familiarity_has_data']);
+    }
+
     public function test_reader_returns_fsrs_familiarity_for_learning_word(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', 'phenomenology', -1);
