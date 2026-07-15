@@ -1,6 +1,6 @@
 # ADR-0021: EncounteredWord Learning Enrollment and Legacy Write Boundary
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-07-15
 
 ## Context
@@ -58,7 +58,7 @@ No migration, schema change, or backfill is required. Existing columns and the r
 - Focused Feature tests cover default enrollment, `keep_new`, already-enrolled, Known, Ignored, repeat enrollment, content-only edits at positive and negative stages, existing-card immutability, and explicit legacy stage compatibility.
 - Reader tests cover a new sense card at stage -1 and 10%, `keep_new` stage 2, refresh-equivalent reads, and real post-rating familiarity.
 - The architecture guard locks the three frontend content editors, service delegation, absence of direct `setStage(-7)` in manual-sense creation, content-only side-effect isolation, retained explicit-stage calls, and the existing `updated_word` event chain.
-- Real Chrome acceptance exercises translation-only edits at 1920×1080 and 900×900, default and `keep_new` manual sense creation, a post-enrollment content edit, and one explicit legacy-stage smoke.
+- Real Chrome acceptance exercises translation-only edits at 1920×1080 and 900×900, default and `keep_new` manual sense creation, a post-enrollment content edit, and one explicit legacy-stage smoke. Captured requests confirm one POST per action, content-only payloads without `stage`, explicit legacy payloads with `stage`, and HTTP 200 responses.
 
 ## Rollback impact
 

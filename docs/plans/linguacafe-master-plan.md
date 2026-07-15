@@ -12,7 +12,7 @@
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
-> | Product Gates | Mgmt-7-c; FSRS-Anki-Mgmt-9 Preset; Custom Study 1B / Card Marker |
+> | Product Gates | FSRS-Anki-Mgmt-9 Preset; Custom Study 1B / Card Marker |
 > | Environment Gates | External AI/provider-dependent work remains separately gated |
 
 
@@ -244,7 +244,7 @@
 | 编号 | 内容 | 状态 |
 |------|------|------|
 | Mgmt-7-b | 每日新学累计计数精确化（按学习日统计首次新卡引入，正式 sense/legacy 入口共用） | ✅ 已完成（2026-07-14，ADR-0018） |
-| Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录；第一安全切片已关闭 translation edit 隐式 `setStage(-7)`，完整迁移仍需审计阅读颜色、熟悉度总览、legacy 兼容与 FSRS 职责 | 🟡 第一安全切片已完成（ADR-0020）；完整职责迁移仍为 Product Gate，未全部完成 |
+| Mgmt-7-c | 收敛 EncounteredWord 阅读分类、confirmed sense enrollment 与 explicit legacy stage transition 三条写入路径 | ✅ 完整职责迁移已完成（2026-07-15，ADR-0021） |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡；区分永久设置与 today-only 临时覆盖 | ✅ 已完成（2026-07-14，ADR-0018） |
 | FSRS-Anki-Mgmt-9 | 学习参数 Preset：需先决定按语言、材料组或其他学习集合绑定 FSRS、每日上限和队列选项；禁止直接照搬 Anki deck/subdeck 层级 | 📋 未开始；Custom Study 1A 已关闭，不再是阻塞项 |
 | FSRS-Param-Browser-Smoke | FSRS 参数优化真实浏览器验收：高级工具、恢复默认确认并取消、重排预览不执行、设置指纹保持、1920×1080 / 900×900 | ✅ 已完成（2026-07-15，本轮纠正性验收证据） |
@@ -423,7 +423,6 @@
 
 | Gate | 当前事实 | 启动前必须决定 |
 |---|---|---|
-| Mgmt-7-c | 第一安全切片已完成；完整迁移未完成 | translation edit 已不再隐式进入旧 SRS；仍需决定 confirmed sense 首次正式 FSRS 评分前显示最低学习颜色还是新词颜色，并收敛 EncounteredWord、阅读颜色、legacy 与 FSRS 职责 |
 | FSRS-Anki-Mgmt-9 Preset | 未开始；Custom Study 1A 已关闭，不再构成阻塞 | 按语言、材料组还是其他学习集合绑定；不得复制 Anki deck/subdeck |
 | Custom Study 1B / Card Marker | 1A 已生产关闭；1B 未开始；Card Marker 已在 ADR-0016 和实施计划登记为前置 Gate | marker 的对象、语义、筛选和持久化；当前不新增 migration，不用 lifecycle/leech 代替 marker |
 | AI Reading Assist | 手工包、解析、保存与阅读辅助主线已有完成能力；真实 provider 与自动本章分析仍分别受环境/产品 Gate 约束 | 是否启用 provider、调用成本、数据边界和人工确认步骤 |
@@ -446,7 +445,7 @@
 | 11 | FSRS-Anki-Mgmt-9 | 学习参数 Preset 与分组策略 | 历史建议；当前 Custom Study 1A 已关闭，Preset 仍需单独确定绑定范围 |
 | 12 | AI-Reading-Assist-4 | AI 译文按句显示/隐藏 | LinguaCafe 阅读主线能力，不因 Anki 对齐而取消 |
 | 13 | Lemma-Origin-1 | 原型识别回归修复 | 影响字典查询和释义准确性 |
-| 14 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | 第一安全切片已完成（ADR-0020）；完整职责迁移及首次评分前阅读颜色仍为 Product Gate |
+| 14 | Mgmt-7-c | 自动提升词汇等级改为 FSRS | ✅ 已完成（ADR-0021）：默认 confirmed sense 为最低学习绿色；`keep_new` 保持黄色；content edit 与 explicit legacy stage 已分流 |
 
 ## Recent Update: Codex-FinalArchitectureClosureTargetMode-1
 

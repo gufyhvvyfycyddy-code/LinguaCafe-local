@@ -1059,7 +1059,7 @@ Accept（待真实浏览器验收后最终确认）。
 
 Saved Search V1, today-only limits with precise cumulative new introductions (Mgmt-7-b), Review Time, and Study Overview V1 are production-ready.
 
-Mgmt-7-c is only partially implemented. Its first safe slice removes the implicit translation-edit → legacy `setStage(-7)` side effect from all three vocabulary editors while preserving translation updates, explicit stage actions, phrase/Anki behavior, and the manual confirmed-sense `updated_word` path. ADR-0020 freezes `EncounteredWord.stage` as the temporary reader/legacy authority and sense ReviewCard/ReviewLog/FSRS as formal review authority. Full responsibility migration remains a Product Gate. The unresolved product choice is the reader color after confirmed-sense creation but before the first formal FSRS rating: minimum learning color or new-word color.
+Mgmt-7-c is complete under ADR-0021. Content-only vocabulary updates cannot invoke legacy stage/card/bridge side effects; explicit requests containing `stage` retain the legacy compatibility path; confirmed manual senses use the dedicated enrollment boundary. Default New enrollment becomes reader stage -1 and immediately shows the lowest learning green, while a real `fsrs_state=new` sense card supplies 10% familiarity after reload and still records zero formal reviews. `keep_new=true` remains stage 2 and yellow. Sense ReviewCard, ReviewLog, and FSRS remain the only authority for formal study progress; no migration or backfill was required.
 
 - Phase A: commit `334a12d` (`feat: add saved review card searches`), pushed to `master`; ADR-0017 and migration `2026_07_14_000001`.
 - Phase B: commit `04af001` (`feat: add today-only review limits`), pushed to `master`; ADR-0018 and migration `2026_07_14_000002`.

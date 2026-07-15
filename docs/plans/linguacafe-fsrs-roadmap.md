@@ -625,7 +625,7 @@
 | 中 | AI-Reading-Assist-2-search | 详情页增加英文搜索框 | ✅ 已完成 | 大小写不敏感，覆盖 4 类详情字段 + trigger_words 数组 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
 | 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化（第一轮 Reader-UI-1-a 已完成） | 📋 暂缓，后续轮次 | 见 ai-reading-assist-plan.md 第 7 节 |
-| 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | 🔄 第一安全切片已完成（2026-07-15，ADR-0020） | translation edit 不再隐式 setStage(-7)；完整职责迁移仍为 Product Gate；首次正式 FSRS 评分前的阅读颜色方案未决定，等待网页端 GPT 决定下一阶段 |
+| 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | ✅ 已完成（2026-07-15，ADR-0021） | content edit、explicit legacy stage、confirmed sense enrollment 已分流；默认最低学习绿色，`keep_new` 黄色，正式进度仍由 sense ReviewCard / ReviewLog / FSRS 权威负责 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
 

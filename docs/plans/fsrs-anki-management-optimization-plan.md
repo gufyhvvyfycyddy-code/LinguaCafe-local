@@ -48,7 +48,7 @@
 | Reader-UI-1-a | 查词侧栏第一轮瘦身：隐藏旧 SRS 1-7 按钮 + "选择释义" + 词典默认收起 | ✅ 已完成 | 前端改动，不删 setStage 逻辑，不删数据 |
 | Reader-UI-6-a | "删除词条"→"回归为新词"语义收口 + 确认弹窗如实告知行为 | ✅ 已完成 | 全前端改动，后端行为未改（当前 hardDeleteWord 物理删除数据） |
 | Reader-UI-6-b | 回归为新词时删除释义复习卡与复习记录 | ✅ 已完成 | 后端删除 sense ReviewLog + legacy word ReviewLog，删除 sense+legacy ReviewCard，WordSense rejected，EncounteredWord 删除 |
-| Mgmt-7-c（待定） | 自动提升词汇等级改为 FSRS 复习记录 | 🟡 第一安全切片已完成 | translation edit 不再隐式调用 `setStage(-7)`；完整职责迁移及首次评分前阅读颜色仍为 Product Gate（ADR-0020） |
+| Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | ✅ 已完成（2026-07-15，ADR-0021） | content edit 无 legacy card/bridge 副作用；默认 confirmed sense 为 stage=-1 最低学习绿色；`keep_new` 保持 stage=2；explicit legacy stage 兼容保留 |
 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | ✅ 已完成（2026-07-14，ADR-0018） |
 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 |
 
@@ -58,7 +58,7 @@
 
 ## 5. 当前下一步
 
-当前下一步不再是已经完成的 Mgmt-7 / Mgmt-8。Mgmt-7-c 仅完成第一安全切片，完整职责迁移继续等待 Product Gate；FSRS-Anki-Mgmt-9 Preset / 分组参数仍未开始。
+当前下一步不再是已经完成的 Mgmt-7 / Mgmt-8 / Mgmt-7-c。FSRS-Anki-Mgmt-9 Preset / 分组参数仍未开始，继续作为独立 Product Gate，本轮不自动进入。
 
 本阶段已完成：
 - 后端 `dueCardsWithLimits()` — 对 `/reviews` 队列应用每日复习上限 + 新学上限
