@@ -25,11 +25,17 @@ The manual-sense boundary accepts only these evidenced, case-insensitive aliases
 | `prep` | `preposition` |
 | `conj` | `conjunction` |
 
-The frontend normalizes AI, dictionary, ordinary-create, and edit prefill before `AddSenseForm` receives the value, so the select and outgoing payload use a canonical value. The controller independently normalizes both create and update input before the existing allow-list validation because it is the server trust boundary. Known aliases are stored canonically. Unknown values are preserved for validation and return structured HTTP 422; they are never coerced to `other`.
+The frontend normalizes AI, dictionary, ordinary-create, and edit prefill before `ManualSenseForm` receives the value, so the select and outgoing payload use a canonical value. The controller independently normalizes both create and update input before the existing allow-list validation because it is the server trust boundary. Known aliases are stored canonically. Unknown values are preserved for validation and return structured HTTP 422; they are never coerced to `other`.
 
 Dictionary aliases such as `vi`, `vt`, and `a` remain owned by the existing dictionary mapper, which already emits canonical values. They are not duplicated into the manual API alias contract without evidence that a manual client sends them. Tokenizer Universal POS values remain a separate token annotation contract.
 
 For 422 responses, the UI shows a specific Chinese POS or required-meaning error, or the first safe structured field message. HTML and unknown/network failures use the generic fallback. A failed save leaves the form and user input intact and has zero learning side effects: no WordSense, ReviewCard, ReviewLog, stage change, or learning target is created.
+
+## Shared Form and field validation follow-up
+
+Manual create and edit now render the same `ManualSenseForm` field template. The shared component owns its local draft, create/edit field visibility, inline Vuetify errors, advanced-section state, and first-error focus. `WordSensesList` continues to own the distinct POST/PUT requests, create context snapshot, enrollment response handling, and success lifecycle. The existing `ManualWordSenseFormService` supplies the pure local validator and safe structured 422 mapper; it does not access Vuex, DOM, stage, FSRS, ReviewLog, or Enrollment.
+
+This follow-up does not alter the accepted POS set, aliases, HTTP payload shape, controller trust boundary, or ADR-0021 enrollment semantics. Code is implemented and automated tests pass; final DevSpace5/Chrome web acceptance remains pending with the web-side total-flow designer. Production closure is not claimed by this follow-up.
 
 ## Boundaries and consequences
 

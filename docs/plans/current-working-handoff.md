@@ -1073,3 +1073,56 @@ Mgmt-7-c is complete under ADR-0021. Content-only vocabulary updates cannot invo
 ADR-0022 independently closes the manual WordSense POS contract without reopening Mgmt-7-c. AI/dictionary/create/edit prefill and both manual create/update trust boundaries now converge on the eight canonical POS values; the six evidenced short aliases are normalized, while unknown values retain structured 422 behavior. Validation failures preserve the open form and have zero WordSense, ReviewCard, ReviewLog, stage, or learning-target side effects. ADR-0021 enrollment remains unchanged: default confirmed senses enroll at stage -1, `keep_new` remains stage 2, and no legacy word card is created.
 
 The current Gate recommendation is to let the user select one concrete Reader UI backlog problem and its acceptance result. Preset, Custom Study 1B / Card Marker, and real AI provider work still require unresolved product or environment decisions. No next Gate was started.
+
+## Manual Sense shared form corrective follow-up (2026-07-15)
+
+Status: **code implemented; automated tests passed; web acceptance pending**. This is not a production-closure claim.
+
+Create and edit now use one `ManualSenseForm`. The shared form owns the common fields, create/edit visibility, local required validation, inline field errors, first-error focus, and advanced-section state. `WordSensesList` retains the distinct POST/PUT orchestration, create snapshot, `updated_word` stage synchronization, `word-learning-updated` event, and edit refresh lifecycle. Structured 422 errors map to `pos`, `sense_zh`, or a safe in-form general fallback; HTML, HTTP 500, and network failures are never rendered verbatim. The canonical eight POS values and six aliases remain unchanged. ADR-0021 enrollment, ReviewCard identity, ReviewLog, and FSRS semantics remain unchanged.
+
+### Web Acceptance Manifest
+
+Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome DevTools. Every scenario below is **待网页端执行**; no PASS/Accepted result is asserted here.
+
+#### Scenario A — AI `adj` success path — 待网页端执行
+
+- Viewport: `1920×1080`.
+- Open a real reader page, select a new word with an AI `adj` suggestion, and choose that sense.
+- Expect POS to display `adjective`; preserve/enter Chinese meaning and save successfully.
+- Expect reader stage `2 → -1`, still `-1` after reload, familiarity `10%`, and no legacy word card.
+- Confirm the existing `POST /senses/manual → response.updated_word → vocabularyBox/setStage → word-learning-updated → TextBlockGroup token update` chain.
+
+#### Scenario B — Create local required error — 待网页端执行
+
+- Viewport: `1920×1080`.
+- Open create, leave Chinese meaning empty, and click “保存新释义”.
+- Expect no `POST /senses/manual` request.
+- Expect “请先填写中文释义。” directly below the field, the form still open, and focus on Chinese meaning.
+- Expect POS, example, `keep_new`, advanced fields, and manual advanced open/closed state to remain unchanged.
+
+#### Scenario C — Narrow-screen error visibility — 待网页端执行
+
+- Viewport: `900×900`.
+- Open a word with multiple sense groups, scroll to create, and trigger empty Chinese meaning.
+- Expect the error beside the current field, no jump to the list top, no sidebar close, and no horizontal overflow.
+
+#### Scenario D — Edit local required error — 待网页端执行
+
+- Open an existing sense editor, clear Chinese meaning, and click “保存释义”.
+- Expect no PUT request, inline “请先填写中文释义。”, and the edit form to remain open.
+- Expect original POS, English explanation, aliases, and collocations to remain; no example-edit capability appears.
+
+#### Scenario E — Server/network failure handoff — 待网页端执行
+
+- Create route: `POST /senses/manual`.
+- Edit route: `PUT /senses/{sense_id}/manual`.
+- Expected validation response shape: HTTP 422 JSON such as `{ "message": "...", "errors": { "pos": ["..."], "sense_zh": ["..."] } }`.
+- `errors.pos` must display “词性格式无效，请重新选择词性。” at POS; `errors.sense_zh` must display “请先填写中文释义。” at Chinese meaning.
+- Other safe plain-text field messages may appear as an in-form general error. HTML, response objects, stack traces, SQL, and server pages must not appear.
+- Generic create network/500 text: “保存词义失败，请稍后重试。” Generic edit text: “更新词义失败，请稍后重试。”
+- Console expectation: zero newly introduced application errors. Record actual Network/Console evidence only during the web-side run.
+- Expected failure delta: WordSense `0`, ReviewCard `0`, ReviewLog `0`, EncounteredWord stage `0`, GoalAchievement `0`; form/draft/advanced state remain present.
+- Expected successful create delta: WordSense `+1`, sense ReviewCard `+1`, ReviewLog `0`, default stage `2 → -1` or `keep_new=true` stage remains `2`, legacy word ReviewCard `0`.
+- Expected successful edit delta: existing WordSense updated in place, ReviewCard identity unchanged, new ReviewCard `0`, ReviewLog `0`, stage delta `0`.
+
+No MCP Chrome, Playwright, fetch, Axios, curl, screenshot, or source inference was used as final browser acceptance in this Codex task. Do not begin another product task from this handoff automatically.

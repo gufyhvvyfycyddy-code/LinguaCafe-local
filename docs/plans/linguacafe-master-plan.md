@@ -430,6 +430,8 @@
 
 ### 8.1 Manual Sense POS 收口后的 Gate readiness（2026-07-15）
 
+Reader UI corrective follow-up `Codex-ManualSense-SharedForm-FieldValidation-And-WebAcceptanceHandoff-TargetMode-5` 已完成代码与自动化测试：manual sense create/edit 收敛为同一个 `ManualSenseForm`，空中文释义与非法 POS 在字段附近显示并聚焦，结构化 422 保持在当前表单内，失败不关闭也不清空输入。最终 DevSpace5 + Chrome 验收仍为 **web acceptance pending**，由网页端总流程设计师执行；在该验收完成前不标记 production closed。Preset、Custom Study 1B / Card Marker、AI provider 状态均未改变。
+
 当前最适合下一轮选择的是 **Reader UI backlog 中的一项具体真实问题**：它不依赖外部 provider，也不预设新数据模型，但仍须由用户从 Reader-UI-1 后续轮次或 4/7/8 中指定一个问题及验收结果，Codex 不能自行替用户决定交互优先级。
 
 - Preset 尚需定义绑定维度（语言、材料组或其他学习集合）、继承规则和集合身份；这些是产品语义，不能由 Codex 猜定。
