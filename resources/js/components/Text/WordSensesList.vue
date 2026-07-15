@@ -135,7 +135,10 @@
                             mode="edit"
                             :pos-options="posOptions"
                             :saving="saving"
+                            :field-errors="editValidation.fieldErrors"
+                            :general-error="editValidation.generalError"
                             @submit="onEditFormSubmit($event, sense)"
+                            @clear-error="clearValidationField('editValidation', $event)"
                             @cancel="cancelEdit"
                         />
 
@@ -192,12 +195,16 @@
 
         <manual-sense-form
             v-if="showAddForm"
+            :key="`create-${createFormSession}`"
             :value="newForm"
             mode="create"
             :pos-options="posOptions"
             :saving="saving"
             :prefill-source="prefillSource"
+            :field-errors="createValidation.fieldErrors"
+            :general-error="createValidation.generalError"
             @submit="onFormSubmit"
+            @clear-error="clearValidationField('createValidation', $event)"
             @cancel="closeAddForm"
         />
     </div>
@@ -213,8 +220,9 @@ import {
     fetchWordSenseCandidates,
 } from '../../services/WordSenseCandidateService';
 import {
-    manualSenseErrorMessage,
+    manualSenseValidationState,
     normalizeWordSensePos,
+    validateManualSenseForm,
 } from '../../services/ManualWordSenseFormService';
 
 const POS_OPTIONS = [
@@ -321,6 +329,7 @@ export default {
             error: false,
             saving: false,
             showAddForm: false,
+            createFormSession: 0,
             editingSenseId: null,
             message: '',
             saveError: '',
@@ -330,6 +339,8 @@ export default {
             posOptions: POS_OPTIONS,
             newForm: this.emptyForm(),
             editForm: this.emptyForm(),
+            createValidation: this.emptyValidationState(),
+            editValidation: this.emptyValidationState(),
             // Snapshot of selected word context, captured when form opens
             // Prevents data loss if the store is accidentally reset (e.g. v-select click-outside)
             snapshot: {
@@ -395,6 +406,28 @@ export default {
                 collocations: '',
                 example_sentence_en: '',
                 keep_new: false,
+            };
+        },
+        emptyValidationState() {
+            return {
+                fieldErrors: {
+                    pos: '',
+                    sense_zh: '',
+                },
+                generalError: '',
+            };
+        },
+        hasValidationErrors(validation) {
+            return Boolean(validation.fieldErrors.pos || validation.fieldErrors.sense_zh);
+        },
+        clearValidationField(target, field) {
+            this[target] = {
+                ...this[target],
+                generalError: '',
+                fieldErrors: {
+                    ...this[target].fieldErrors,
+                    [field]: '',
+                },
             };
         },
         fetchSenses() {
@@ -492,9 +525,11 @@ export default {
         },
         openAddForm(pos = 'verb', prefill = null) {
             this.showAddForm = true;
+            this.createFormSession += 1;
             this.saveError = '';
             this.message = '';
             this.prefillSource = '';
+            this.createValidation = this.emptyValidationState();
             this.newForm = this.emptyForm();
             this.newForm.pos = normalizeWordSensePos(pos) || pos || 'verb';
 
@@ -567,6 +602,7 @@ export default {
             this.showAddForm = false;
             this.prefillSource = '';
             this.newForm = this.emptyForm();
+            this.createValidation = this.emptyValidationState();
         },
         createPayload(form) {
             // Use snapshot as fallback in case Vuex state was reset (e.g. v-select click-outside)
@@ -591,8 +627,8 @@ export default {
             };
         },
         createSense() {
-            if (!this.newForm.sense_zh.trim()) {
-                this.saveError = '请先填写中文释义。';
+            this.createValidation = validateManualSenseForm(this.newForm);
+            if (this.hasValidationErrors(this.createValidation)) {
                 return;
             }
 
@@ -625,7 +661,7 @@ export default {
                     }
                 })
                 .catch((error) => {
-                    this.saveError = manualSenseErrorMessage(error, '保存词义失败，请稍后重试。');
+                    this.createValidation = manualSenseValidationState(error, '保存词义失败，请稍后重试。');
                 })
                 .finally(() => {
                     this.saving = false;
@@ -643,14 +679,16 @@ export default {
             };
             this.saveError = '';
             this.message = '';
+            this.editValidation = this.emptyValidationState();
         },
         cancelEdit() {
             this.editingSenseId = null;
             this.editForm = this.emptyForm();
+            this.editValidation = this.emptyValidationState();
         },
         saveEdit(sense) {
-            if (!this.editForm.sense_zh.trim()) {
-                this.saveError = '请先填写中文释义。';
+            this.editValidation = validateManualSenseForm(this.editForm);
+            if (this.hasValidationErrors(this.editValidation)) {
                 return;
             }
 
@@ -671,7 +709,7 @@ export default {
                     this.fetchSenses();
                 })
                 .catch((error) => {
-                    this.saveError = manualSenseErrorMessage(error, '更新词义失败，请稍后重试。');
+                    this.editValidation = manualSenseValidationState(error, '更新词义失败，请稍后重试。');
                 })
                 .finally(() => {
                     this.saving = false;

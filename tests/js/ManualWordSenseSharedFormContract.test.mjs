@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '../..');
 const formPath = path.join(root, 'resources/js/components/Text/ManualSenseForm.vue');
@@ -14,7 +13,7 @@ assert.ok(!fs.existsSync(path.join(root, 'resources/js/components/Text/AddSenseF
 const form = fs.readFileSync(formPath, 'utf8');
 const list = fs.readFileSync(listPath, 'utf8');
 const helperSource = fs.readFileSync(helperPath, 'utf8');
-const helper = await import(pathToFileURL(helperPath));
+const helper = await import(`data:text/javascript;base64,${Buffer.from(helperSource).toString('base64')}`);
 
 assert.match(form, /mode[\s\S]*create[\s\S]*edit/, 'shared form must explicitly support create and edit modes');
 for (const field of ['pos', 'sense_zh', 'sense_en', 'aliases_zh', 'collocations']) {
@@ -35,6 +34,8 @@ assert.doesNotMatch(list, /<add-sense-form\b|import AddSenseForm/, 'parent must 
 assert.doesNotMatch(list, /editingSenseId === sense\.id[\s\S]{0,1800}<v-select/, 'parent must not retain a second inline edit field template');
 assert.match(list, /createValidation/, 'create must own structured validation state');
 assert.match(list, /editValidation/, 'edit must own structured validation state');
+assert.match(list, /:key="`create-\$\{createFormSession\}`"/, 'a new AI or dictionary prefill must start a fresh create-form session');
+assert.match(list, /clearValidationField[\s\S]{0,300}generalError:\s*''[\s\S]{0,300}\[field\]:\s*''/, 'field input must clear its own field error and any stale general error');
 assert.match(list, /manualSenseValidationState/, 'server failures must map to field and general errors');
 assert.doesNotMatch(list, /catch[\s\S]{0,280}(closeAddForm|cancelEdit|reset)\s*\(/, 'failed saves must leave form state open and intact');
 assert.match(list, /response\.data\.updated_word/, 'create success must consume updated_word');
