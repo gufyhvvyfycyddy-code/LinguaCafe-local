@@ -1,5 +1,16 @@
 # LinguaCafe 当前工作台 / GLM 交接临时文档
 
+> **Current authority — 2026-07-15**
+>
+> - Manual Sense POS + shared create/edit form + inline validation: **Accepted / Production Closed** on master `a0916784951be69b411066446a03be940373589f`.
+> - Current product and architecture route: `docs/plans/anki-aligned-product-and-architecture-roadmap.md`.
+> - Current next task: **Settings architecture convergence**. Preset V1 follows after that boundary is clean.
+> - Then: Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
+> - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
+> - Current code-debt assessment: **6.5/10, localized high burden**. The largest production hotspots are `ReviewCardManage.vue`, `TextBlockGroup.vue`, and `AdminReviewSettings.vue`.
+> - DevSpace PHP / PHPUnit follows `vibe-coding-collaboration-rules.md §27.8`: default to log redirection, saved exit code and split suites; do not try the original high-output streamed command first. If the replacement path cannot produce trustworthy evidence, hand the full PHP regression to the next related Codex complex task.
+> - §27.8 workaround verified on 2026-07-15: redirected Unit suite passed 649 tests / 1507 assertions, redirected Feature suite passed 2575 tests / 11537 assertions with 14 skipped, all Node guards passed, frontend build succeeded, DB doctor was healthy, and `git diff --check` passed.
+>
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
@@ -22,7 +33,7 @@
 
 ## 1. 当前阶段一句话
 
-架构收口阶段已结束（总体架构收口 100%）。AI 示意卡 V1-V4 已实现。近期已新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗、词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）、真实 tokenizer/importer 端到端覆盖、8 类形态真实页面点击、词性歧义真实点击验证、阅读页 inline sense preview 面板、阅读中词义确认持久化（ADR-0003 + additive-only 表 + match/not_match upsert）、阅读中确认结果使用层（match_count/not_match_count/last_choice/recent_examples 聚合 + 预览面板使用层显示块）。本轮新增阅读中确认记录管理入口：`ReadingInlineSenseConfirmationService::listConfirmationsForManagement()`/`revokeConfirmation()` 只读列表 + 单条撤销（DELETE 操作，仅删除当前用户/当前语言单条 confirmation 记录），新增 `GET /senses/inline-confirmations` 列表端点（choice/lemma/surface/word_sense_id/chapter_id/date_from/date_to 筛选 + 分页 + WordSense/chapter/sentence 摘要 + 严格 user/language 隔离）+ `DELETE /senses/inline-confirmations/{id}` 撤销端点（返回 `revoked:true` + 6 条 safety_flags：no_review_log_created/no_fsrs_changed/no_review_card_changed/no_word_sense_deleted/no_review_card_deleted/not_a_review_rating），新增 `ReadingInlineConfirmationManage.vue` 管理页（`/senses/inline-confirmations/manage`：筛选 全部/是这个意思/不是这个意思/lemma/文章 + 列表 surface/lemma/choice/WordSense 摘要/来源句子/文章/最近更新时间 + 「查看来源」/「撤销这条记录」操作 + 「这不是复习评分」/「不会写入复习记录」/「不会改变复习进度（FSRS）」/「不是忘记，不是复习失败，也不是删除词义」安全文案 + 撤销确认弹窗 + 空状态文案），`InlineSensePreviewPanel.vue` 新增「查看全部阅读确认记录」入口链接到管理页。49 个后端护栏测试（list 端点 user/language 隔离 + choice/lemma 筛选 + WordSense 摘要 + revoke 仅删当前 user/language 单条 + 不写 ReviewLog/FSRS/ReviewCard/WordSense 删除 + 未知 id 安全失败）+ 19 个 UI guard 测试（文件存在 + 标题/不是复习评分/不会写入复习记录/不会改变复习进度/是这个意思/不是这个意思/撤销这条记录 文案 + 撤销弹窗 + 不是忘记/不是复习失败/不是删除词义 文案 + 无 FSRS rating 按钮 + 无 rating/review/fsrs 路由 + 无 AI 路由 + 仅调用安全端点 + 无禁止撤销含义文案 + 无批量撤销 UI + preview panel 链接到管理页 + 回到阅读页链接 + 空状态文案）。R4 morphology 轮 13 个真实 Playwright 点击（windows/horses/sheep/mice/deer/broke/drove/spoken/threw/grown/taller/walked/finished，11/13 正确，2 P2 residual 在 V-ed 歧义形式与 R2 一致，0% 重复率 vs R3，8/8 类别覆盖，tokenizer 经不规则形式 mice→mouse/broke→break/drove→drive/spoken→speak/threw→throw/grown→grow 确认可用），MCP Chrome 全流程验收（POST inline-confirmation → GET manage list → filter choice=match → DELETE revoke → list 更新 → re-click token 不再显示 persisted_choice），网络仅 inline-confirmation POST + inline-confirmations GET + DELETE revoke，无 ReviewLog/FSRS/AI。未写 ReviewLog、未改 FSRS、未真实调用 AI、未实现阅读中刷卡评分、未自动创建 WordSense/ReviewCard、未新增 migration、未删除 WordSense/ReviewCard/ReviewLog、未批量撤销、未实现评分按钮。1000% 是 10 个子阶段合计提升，不是固定五条主线虚假上涨。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
+领域边界识别阶段已经完成；“总体架构收口 100%”仅保留为历史阶段说法。当前进入可量化的结构债务治理，下一任务为 Settings 架构收敛，随后按 Anki 对齐路线推进 Preset、Browser、Card Marker / Custom Study 1B、Reviewer、Reader 和 AI provider。AI 示意卡 V1-V4 已实现。近期已新增多例句池、复习页题面例句轮换、答案后补充例句不重复、多来源溯源 carousel、Finished reading 确认弹窗、词形原型绑定（surface 保留 + lemma 优先搜索 + 用户修正后生效）、已学词义候选面板、熟词僻义前置结构（不调 AI）、例句池性能优化（消除 N+1 + 批量预加载）、真实 tokenizer/importer 端到端覆盖、8 类形态真实页面点击、词性歧义真实点击验证、阅读页 inline sense preview 面板、阅读中词义确认持久化（ADR-0003 + additive-only 表 + match/not_match upsert）、阅读中确认结果使用层（match_count/not_match_count/last_choice/recent_examples 聚合 + 预览面板使用层显示块）。本轮新增阅读中确认记录管理入口：`ReadingInlineSenseConfirmationService::listConfirmationsForManagement()`/`revokeConfirmation()` 只读列表 + 单条撤销（DELETE 操作，仅删除当前用户/当前语言单条 confirmation 记录），新增 `GET /senses/inline-confirmations` 列表端点（choice/lemma/surface/word_sense_id/chapter_id/date_from/date_to 筛选 + 分页 + WordSense/chapter/sentence 摘要 + 严格 user/language 隔离）+ `DELETE /senses/inline-confirmations/{id}` 撤销端点（返回 `revoked:true` + 6 条 safety_flags：no_review_log_created/no_fsrs_changed/no_review_card_changed/no_word_sense_deleted/no_review_card_deleted/not_a_review_rating），新增 `ReadingInlineConfirmationManage.vue` 管理页（`/senses/inline-confirmations/manage`：筛选 全部/是这个意思/不是这个意思/lemma/文章 + 列表 surface/lemma/choice/WordSense 摘要/来源句子/文章/最近更新时间 + 「查看来源」/「撤销这条记录」操作 + 「这不是复习评分」/「不会写入复习记录」/「不会改变复习进度（FSRS）」/「不是忘记，不是复习失败，也不是删除词义」安全文案 + 撤销确认弹窗 + 空状态文案），`InlineSensePreviewPanel.vue` 新增「查看全部阅读确认记录」入口链接到管理页。49 个后端护栏测试（list 端点 user/language 隔离 + choice/lemma 筛选 + WordSense 摘要 + revoke 仅删当前 user/language 单条 + 不写 ReviewLog/FSRS/ReviewCard/WordSense 删除 + 未知 id 安全失败）+ 19 个 UI guard 测试（文件存在 + 标题/不是复习评分/不会写入复习记录/不会改变复习进度/是这个意思/不是这个意思/撤销这条记录 文案 + 撤销弹窗 + 不是忘记/不是复习失败/不是删除词义 文案 + 无 FSRS rating 按钮 + 无 rating/review/fsrs 路由 + 无 AI 路由 + 仅调用安全端点 + 无禁止撤销含义文案 + 无批量撤销 UI + preview panel 链接到管理页 + 回到阅读页链接 + 空状态文案）。R4 morphology 轮 13 个真实 Playwright 点击（windows/horses/sheep/mice/deer/broke/drove/spoken/threw/grown/taller/walked/finished，11/13 正确，2 P2 residual 在 V-ed 歧义形式与 R2 一致，0% 重复率 vs R3，8/8 类别覆盖，tokenizer 经不规则形式 mice→mouse/broke→break/drove→drive/spoken→speak/threw→throw/grown→grow 确认可用），MCP Chrome 全流程验收（POST inline-confirmation → GET manage list → filter choice=match → DELETE revoke → list 更新 → re-click token 不再显示 persisted_choice），网络仅 inline-confirmation POST + inline-confirmations GET + DELETE revoke，无 ReviewLog/FSRS/AI。未写 ReviewLog、未改 FSRS、未真实调用 AI、未实现阅读中刷卡评分、未自动创建 WordSense/ReviewCard、未新增 migration、未删除 WordSense/ReviewCard/ReviewLog、未批量撤销、未实现评分按钮。1000% 是 10 个子阶段合计提升，不是固定五条主线虚假上涨。下一步仍应由网页端总设计师选择，不自动进入 AI 真实推荐、AI 释义生成或完整闭环，也不自动进入阅读中刷卡。
 
 **GLM-QueueOrder-Executable-Error-Recovery-Tests-And-CustomStudy-Contract-Cleanup-2000-13（Queue Order 最终验收收口）**：为评分失败恢复建立可执行异步行为测试，修正 Custom Study 实施计划两处旧契约，完成窄范围 MCP Chrome 复验。**轨道 A — 可执行评分恢复状态机**：新增 `resources/js/components/Review/ReviewRatingRecovery.js` 纯 JS helper（`runAuthoritativeRatingRecovery({ reloadQueue, lockRating, unlockRating, setRecoveryMessage, preserveLoadError })`）；不 import axios、不知道 ReviewLog/FSRS/lifecycle、不修改统计；inFlight 守卫防止并发 recovery 触发第二次 reload；reload Promise settle 前保持锁定，settle 后始终解锁；成功且无加载错误时显示恢复提示，加载错误优先保留；永不产生 unhandled rejection。Legacy Review `loadReviews()` 现在 `return axios.post(...)` 显式返回 Promise，catch 块调用 helper 委托恢复编排。Sense Review `loadCards()` 已返回 Promise，catch 块同样委托 helper。新增 `tests/js/ReviewRatingRecovery.test.mjs` 可执行行为测试（15 test cases / 21 assertions，使用 deferred Promise）：立即锁定、reload 只调一次、settle 前不解锁、成功后解锁、失败后解锁、成功时显示恢复提示、加载错误不被覆盖、并发 recovery 被拒绝、Legacy 配置、Sense 配置、不修改统计、不调 rating API、不写 ReviewLog、不修改 FSRS、无 unhandled rejection。重写 `tests/js/ReviewRatingErrorRecoveryGuard.test.mjs` 源码结构护栏（16 tests）：检查 helper 模块存在与导出、不 import axios、两个 Vue 组件真实 import helper、两个 catch 真实调用 helper、`loadReviews()` 返回 Promise、统计只在成功路径、catch 不设 finished=true、正常成功路径不变。**轨道 B — Custom Study 契约清理**：`docs/plans/custom-study-1a-implementation-plan.md` 修正两处旧契约：(1) "token goes in URL query or Vuex" → sessionStorage 契约（token 存于 sessionStorage，完整 token 不出现在 URL/route params/query string，URL 仅含 session_id 或普通路由信息，不使用 localStorage 或 Vuex 存完整 token）；(2) "UUID nonce" → "UUID v4 session_id"。Custom Study 状态保持：架构契约已冻结、开发未开始、未创建 API、未创建页面、未创建 SenseStudyCard、未新增 migration。**轨道 C — MCP Chrome 窄范围复验**：Legacy Review (`/review`) 2 次评分（1 次按钮 + 1 次快捷键 3），每次仅 1 个 POST `/reviews/rate` (200)，next_card 正确消费，无重复请求。Sense Review (`/reviews/senses`) 3 次评分（1920×1080 2 次含 1 次 undo + 900×900 1 次），每次仅 1 个 POST `/reviews/senses/{id}/rate` (200)，undo 正确恢复队列，interval preview 正常。两 viewport 均正常渲染。失败分支：MCP Chrome `emulate` 工具仅支持全局网络条件（Offline/Slow 3G 等），无法选择性阻断单个 API endpoint，明确写"失败分支 MCP 不适用/工具不支持"，使用可执行 `ReviewRatingRecovery.test.mjs` (15 tests / 21 assertions) 作为失败分支行为证据。**测试**：Node 6 files 全绿（ReviewRatingRecovery 15/21、ReviewRatingErrorRecoveryGuard 16、ReviewQueueOrderNextCardGuard 12、ReviewQueueOrderFrontendGuard 21、SenseReviewStackUndoGuard 48、GlmSingleAgentWorkflowDocsGuard 9）；PHP 5 filters 117 tests / 613 assertions 全绿（ReviewQueueOrderNextCardTest 9/39、ReviewQueueOrderTest 13/56、ReviewFsrsTest 63/375、SenseReviewStackUndoTest 15/62、SenseReviewDailyLimitsTest 17/81）；`npm run development` 编译成功；`php artisan db:doctor` healthy；`git diff --check` 通过。**Commit**：4b4a15e (fix: recovery helper + tests + Vue)、e26c2af (docs: custom study contract)、本 commit (docs: accept queue order production closure)。**不改 FSRS 算法或参数；不修改 ReviewLog schema；不删除 ReviewLog；不修改评分撤销账本；不修改 lifecycle 状态机语义；不修改 rating key/score/label/hotkey；不自动调用 AI；不自动创建 WordSense/ReviewCard；不修改日报 deep link 和近 7 天窗口；不创建 legacy word card；不修改阅读页 tokenizer 主流程；不新增 migration；不自动进入下一任务；不 fresh/wipe/drop/truncate；不 .env / .playwright-cli/ / AGENTS.md / .omo/ / notification script / DCP / force push。**
 
@@ -123,11 +134,11 @@
 | GLM-SenseReviewTodaySummary-1 | SenseReview 今日复习总结（Task A）。新增跨页面会话的今日复习总结，区别于本次复习总结（page-load scoped）。后端新增 `SenseReviewTodaySummaryService.php` + `GET /reviews/senses/today-summary` 只读端点：复用 `SenseReviewQueryService::nonResetSenseReviewLogQuery()` 共享 reset 排除/sense-only/用户隔离规则；今日边界用 app timezone（`Carbon::today()` 至 `Carbon::tomorrow()` 排除上界）；返回 timezone/day/day_start/day_end + total_reviews + distinct_senses + 4-rating 分布 + forget_rate（空时 null 非 0%）+ focus_senses（max 10，按 sense 聚合）+ recent_reviews（max 10，倒序）。前端新增 `SenseReviewTodaySummary.vue` 展示组件（纯渲染，emit close，无 API/ReviewLog/FSRS）+ 入口按钮（stats 区域 + session summary 页）。18 项后端测试 + 10 项 Node guard + MCP Chrome 两页面会话验收（会话一 again + 会话二 good+hard，今日累计 34→37，本次复习仅 2，跨会话合并正确）。**不写 ReviewLog（除用户评分）；不改 FSRS；不创建 legacy word card；不新增 migration；不修改 .env；不引入用户时区设置。** |
 | GLM-SenseReviewBatchFeedback-1 | SenseReview 学习反馈批量聚合 N+1 消除（Task B）。新增 `SenseReviewLearningFeedbackService::buildForCards(array $reviewCardIds): array` 批量接口，一次查询加载所有目标卡片的非 reset ReviewLog，内存按 review_card_id 聚合，每卡返回与 `buildForCard()` 完全相同的 payload。`buildForCard()` 委托 `buildForCards([$id])` 保持单一算法事实来源。Controller `index()` 使用批量路径预计算 feedback map 传入 serializer，消除队列序列化 N+1。查询数量测试锁定 1/5/20 张卡 ReviewLog 查询为常数级。**payload 100% 兼容；Controller 保持薄；Service 无写操作；无新增表；无 FSRS 改动；无评分流程改动。** |
 
-## 3. 当前未最终关闭的事项
+## 3. 历史未关闭事项记录（已由顶部 Current authority 取代）
 
-本节只放真实未完成事项。已完成任务详情进入 `docs/plans/linguacafe-master-plan.md`，历史材料进入 `docs/HISTORY_INDEX.md`。
+本节保留旧阶段上下文，不能用于选择当前任务。当前状态只看顶部 Current authority、master plan 的 Open Work Registry 和 Anki 对齐路线。
 
-- **架构收口阶段已结束**（Codex-FinalArchitectureClosureTargetMode-1）：总体架构收口 100% 不代表全项目完成，只代表旧系统地基已检查、sense-only 复习主线边界清楚、AI 示意卡第一版可进入开发设计。详见 `docs/plans/final-architecture-closure-report.md`。
+- **领域边界识别阶段已结束，结构债务治理仍在进行**：旧系统地基、sense-only 主线和高风险边界已经识别；“总体架构收口 100%”是历史阶段标签。当前按 `anki-aligned-product-and-architecture-roadmap.md` 使用文件体量、请求数量、职责、测试和 Chrome 验收衡量架构进展。
 - **AI 示意卡 V3 安全生成包已实现**：详见 `docs/plans/ai-study-card-v3-safe-preview-package-plan.md`。已取消项恢复按钮、真实预览内容、安全生成包已落地。
 - **AI 示意卡 V4 AI 推荐词确认闭环已实现**：详见 `docs/plans/ai-recommendation-confirmation-loop-plan.md`。AI 推荐词粘贴导入、去重、默认不选、用户确认、最终候选包已落地。
 - **AI 示意卡 V5 用户确认生成学习卡闭环已实现**：详见 `docs/plans/current-working-handoff.md` §2 任务表。V5 已实现从 final_candidates_package 到 confirmed WordSense + target_type=sense ReviewCard + 来源例句（含 synthetic sentence_id）的最小生成闭环。V5 hardening 已收口反向校验 + sense_zh 必填 + sense_en 可空 + AI reason 不自动填 sense_zh + synthetic occurrence + payload 增强。**V5 桌面端架构收敛已完成（GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1）**：`VocabularySideBox.vue` 与 `VocabularyBox.vue` 已共用 `AiStudyCardGenerateCardsService.js` + `AiStudyCardGenerateCardsDialog.vue` + `AiStudyCardGenerateCardsResult.vue`，由 `AiStudyCardV5DesktopArchitectureGuardTest`（17 项）+ `VocabularyBoxV5UiGuardTest`（16 项）锁定收敛边界。**桌面端 V1-V5 工作流 feature island 收敛已完成（GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2）**：新增 `AiStudyCardDesktopWorkflow.vue`（约 1019 行 feature island 组件，包含 V1-V5 全部模板/data/methods）+ `AiStudyCardRecommendationParserService.js`（3 个纯函数）+ `AiStudyCardPendingWorkflowService.js`（6 个 API 函数 + re-export 3 个）；两个父组件 `VocabularySideBox.vue` 与 `VocabularyBox.vue` 只负责挂载该组件，不再各自维护完整 AIStudyCard 流程；由 `AiStudyCardDesktopWorkflowArchitectureGuardTest`（22 项 / 293 assertions）锁定 feature island 边界。AI 真实推荐（自动调 AI）、AI 自动释义、真实 AI provider、API key、自动刷卡评分仍未实现（V6 范围）。
@@ -171,9 +182,9 @@
 | Finished reading | 保留章节完成能力；自动 known 只处理当前用户/当前语言黄色新词，不写 WordSense/ReviewCard/ReviewLog/FSRS，不等同复习完成 |
 | 阅读中刷卡 / 多例句轮换 | 路线已冻结为 WordSense-only 与真实来源例句池；当前未实现 |
 
-## 5. 下一候选方向
+## 5. 历史候选方向（已由 Anki 对齐路线取代）
 
-> 架构收口已结束。下一阶段应进入明确的最小实现任务，不再继续无限侦查。每个候选前必须先过 Architecture Gate 与 ADR（如涉及接口、DB、FSRS、删除/归档/恢复）。
+> 本节用于追溯旧任务来源。当前执行顺序只看 `docs/plans/anki-aligned-product-and-architecture-roadmap.md`，不得从本节恢复旧 NEXT_TASK。
 
 ### A. AI 示意卡后续：V5 hardening / source binding / desktop architecture convergence / V6 前置设计
 
@@ -234,34 +245,22 @@
 9. 如果 Codex 改代码，必须说明：改了哪些文件、跑了哪些测试、哪些验收无法完成。
 10. Codex 应先读 current-working-handoff，再读 master plan，再读相关模块文档，不从头扫描所有旧文档。
 
-## 7. 当前主线进度
+## 7. 当前可量化状态
 
-以下百分比是总设计师用于沟通的产品进度估算，不是精确测试覆盖率。后续会根据 GitHub 最新代码、测试和真实页面验收调整。不得把估算进度当成最终完成承诺。
+百分比进度已停用。当前只记录可核查事实，避免把规划、代码完成和生产验收混为一项。
 
-> 文档与协作规则治理属于阶段性支撑任务，不作为固定五条主线之一；如某轮任务专门处理文档规则，可在本轮说明中临时提及。
+| 维度 | 当前事实 | 下一衡量点 |
+|---|---|---|
+| 正式复习主线 | `/reviews/senses` 为主入口；FSRS、ReviewLog、撤销、生命周期、队列顺序、每日上限和 Card Info 已有测试与真实验收 | Reviewer convergence 后减少重复请求与状态编排 |
+| Manual Sense | Accepted / Production Closed；create/edit 共享表单，字段验证和失败保留已通过双 viewport Chrome 验收 | 无开放缺口 |
+| Custom Study | 1A Accepted / Production Closed；1B 未开始 | Card Marker 完成后接入已标记卡条件 |
+| Browser / 管理页 | Search、Saved Search、Card Info、生命周期和批量治理已实现 | `ReviewCardManage.vue` 3412 行、26 axios、12 dialog；目标降到容器 1000 行以内 |
+| Settings | 功能已丰富，页面和 Service 仍持续膨胀 | `AdminReviewSettings.vue` 2165 行、18 axios；`SettingsService.php` 1007 行；当前下一任务 |
+| Reader | 原文、lemma、多例句、颜色和 AI 示意卡已形成特色主线 | `TextBlockGroup.vue` 2517 行、`TextBlockService.php` 1382 行；在后续阶段逐职责治理 |
+| AI Study Card | 手工确认的 V1–V5 闭环已存在；真实 provider 受环境门槛约束 | 先拆 1065 行 PendingItem Service，再考虑 provider |
+| 文档 | 已建立 Current authority、Open Work Registry 和 Anki 对齐路线 | 历史长叙述逐步归档，不再作为当前状态入口 |
 
-| 主线 | 进度 | 说明 |
-|------|------|------|
-| 总体架构收口 | ≈ 100% | 架构收口阶段已结束（Codex-FinalArchitectureClosureTargetMode-1）。100% 不代表全项目完成，只代表旧系统地基已检查、sense-only 复习主线边界清楚、AI 示意卡第一版可进入开发设计、高风险区清楚、文档入口清楚、下一轮不应继续无限侦查。详见 `docs/plans/final-architecture-closure-report.md`。 |
-| 复习主线稳定 | ≈ 96% | WordSense/ReviewCard/FSRS 核心链路已锁定；V3 新增 dismissed 列表/restore/preview-package 反向 contract tests，进一步确认不写 WordSense/ReviewCard/ReviewLog/EncounteredWord；入口统一后日常复习主线指向 `/reviews/senses`。 |
-| 页面真实验收 | ≈ 100% | V3 MCP Chrome 真实页面验收 28 项全通过：阅读页点词 → 标记 → 列表 → 取消 → 已取消视图 → 恢复 → 真预览弹窗 → 勾选/取消勾选 → 全不选禁用 → 准备生成 → 安全包 JSON → 复制 → 无 AI 调用 → 无学习数据写入 → 主入口/旧入口正常 → console/network 检查。 |
-| AI 示意卡规划 | ≈ 100% | V1 pending marker + V2 列表/取消/预览雏形 + V3 已取消视图/恢复/真实预览/安全生成包已落地，路线完全清晰。未完成：AI 推荐词、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用。 |
-| 前端入口整理 | ≈ 100% | 第一轮入口统一已完成：主入口文案为「复习」并指向 `/reviews/senses`，首页「开始复习」进入 sense-only 主线，旧路由保留。V3 列表/已取消视图/预览/安全包入口与复习入口完全协调。后续仅剩更细的 alias/高级分组收口（不影响日常使用）。 |
-
-### 7.1 子阶段进度
-
-| 子阶段 | 进度 | 说明 |
-|--------|------|------|
-| AI 示意卡生成闭环 | ≈ 95% | V3 已取消视图/恢复按钮/真实预览/安全生成包已完成（95%）。**这个 95% 是「AI 示意卡生成闭环」子阶段的进度，不是固定五条主线的虚假上调。** AI 真实推荐、AI 释义生成、WordSense/ReviewCard 生成闭环、真实 AI 调用仍未实现。 |
-| AI 生成安全契约 | ≈ 85% | V3 安全生成包（schema_version=ai-study-card-preview-package-v1）+ V4 最终候选包（schema_version=ai-study-card-final-candidates-v1）已完成。V4 safety_flags 6 条：no_ai_called_by_linguacafe / ai_response_pasted_by_user / no_review_card_created / no_word_sense_created / no_fsrs_changed / user_confirmation_required_before_card_generation；generation_rules 5 条。V3 + V4 共 32 个反向 contract tests 覆盖用户/语言/状态隔离 + 去重 + 默认不选 + 空结果 + 数量上限。**85% 是子阶段进度，不是固定五条主线的虚假上调。** API key 安全存储、真实 AI 调用边界、用户确认后生成 WordSense/ReviewCard 仍未实现。 |
-| AI 推荐词确认闭环 | ≈ 80% | V4 新增子阶段。粘贴导入、去重、默认不选、用户确认、最终候选包已落地。**80% 是子阶段进度，不是固定五条主线的虚假上调。** AI 真实推荐（自动调用 AI 获取推荐词）仍未实现。 |
-| 旧版入口清理执行 | ≈ 80% | 普通查词界面的旧入口文案已隐藏，并加源码 guard；后端兼容层和 legacy route/service/tests 保留。**80% 是子阶段进度，不是固定五条主线的虚假上调。** 更深层删除必须另做依赖审计。 |
-| Finished reading 安全护栏 | ≈ 70% | Feature test 覆盖 yellow→known、green/WordSense/ReviewCard/ReviewLog/FSRS/用户/语言隔离，并修复语言过滤缺口。本轮新增「完成阅读」确认弹窗（说明影响 + 取消/确认），不污染真实数据。**70% 是子阶段进度，不是固定五条主线的虚假上调。** |
-| 阅读中复习 / 多例句轮换路线 | ≈ 65% | 路线冻结文档明确 WordSense-only、真实来源例句、熟词僻义分区、surface/lemma 绑定原则。已实现多例句池、题面例句轮换、补充例句不重复、多来源溯源、词形原型绑定前置、known-sense 候选、例句池/来源查询性能优化。本轮新增 inline confirmation management surface（read-only list + 单条 revoke + 管理页 + preview panel 入口链接），阅读中刷卡前置匹配 70%→75%。这些是子阶段进度，不是固定五条主线虚假上涨。**阅读中刷卡评分仍未实现。AI 不生成例句。熟词僻义仅前置结构，AI 判断仍未实现。inline confirmation 不等于评分，不写 ReviewLog，不改 FSRS。撤销不等于忘记，不删除 WordSense/ReviewCard/ReviewLog。** |
-
-> 如果任务失败或 Incomplete，对应进度不得上调。
-> 如果一个任务完成后不会推动任何固定主线进度，就不得作为 OpenCode / Codex / Trae 的单独任务派发；应合并到能推动主线进度的复合任务中。纯小修正只能作为复合任务的附带项。
-> "总体架构收口 100%"是进入新功能开发前的架构收口 100%，不是全项目完成。不要把它写成全项目完成。
+当前顺序：Settings convergence → Preset V1 → Browser convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/architecture → AI provider。
 
 ## 8. 临时文档使用规则
 
@@ -1072,19 +1071,19 @@ Mgmt-7-c is complete under ADR-0021. Content-only vocabulary updates cannot invo
 
 ADR-0022 independently closes the manual WordSense POS contract without reopening Mgmt-7-c. AI/dictionary/create/edit prefill and both manual create/update trust boundaries now converge on the eight canonical POS values; the six evidenced short aliases are normalized, while unknown values retain structured 422 behavior. Validation failures preserve the open form and have zero WordSense, ReviewCard, ReviewLog, stage, or learning-target side effects. ADR-0021 enrollment remains unchanged: default confirmed senses enroll at stage -1, `keep_new` remains stage 2, and no legacy word card is created.
 
-The current Gate recommendation is to let the user select one concrete Reader UI backlog problem and its acceptance result. Preset, Custom Study 1B / Card Marker, and real AI provider work still require unresolved product or environment decisions. No next Gate was started.
+The current route is now fixed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`: Settings architecture convergence first, then Preset V1, Browser/ReviewCardManage convergence, Card Marker + Custom Study 1B, Reviewer convergence, Reader UI/reader architecture, and finally real AI provider work. No product implementation beyond the documentation and planning changes in this closure was started.
 
 ## Manual Sense shared form corrective follow-up (2026-07-15)
 
-Status: **code implemented; automated tests passed; web acceptance pending**. This is not a production-closure claim.
+Status: **Accepted / Production Closed**. Code, automated tests, and final DevSpace5 + Chrome DevTools acceptance are complete on master `a0916784951be69b411066446a03be940373589f`.
 
 Create and edit now use one `ManualSenseForm`. The shared form owns the common fields, create/edit visibility, local required validation, inline field errors, first-error focus, and advanced-section state. `WordSensesList` retains the distinct POST/PUT orchestration, create snapshot, `updated_word` stage synchronization, `word-learning-updated` event, and edit refresh lifecycle. Structured 422 errors map to `pos`, `sense_zh`, or a safe in-form general fallback; HTML, HTTP 500, and network failures are never rendered verbatim. The canonical eight POS values and six aliases remain unchanged. ADR-0021 enrollment, ReviewCard identity, ReviewLog, and FSRS semantics remain unchanged.
 
 ### Web Acceptance Manifest
 
-Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome DevTools. Every scenario below is **待网页端执行**; no PASS/Accepted result is asserted here.
+Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome DevTools. All scenarios below were executed on 2026-07-15 and passed.
 
-#### Scenario A — AI `adj` success path — 待网页端执行
+#### Scenario A — canonical POS success path — PASS
 
 - Viewport: `1920×1080`.
 - Open a real reader page, select a new word with an AI `adj` suggestion, and choose that sense.
@@ -1092,7 +1091,7 @@ Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome D
 - Expect reader stage `2 → -1`, still `-1` after reload, familiarity `10%`, and no legacy word card.
 - Confirm the existing `POST /senses/manual → response.updated_word → vocabularyBox/setStage → word-learning-updated → TextBlockGroup token update` chain.
 
-#### Scenario B — Create local required error — 待网页端执行
+#### Scenario B — Create local required error — PASS
 
 - Viewport: `1920×1080`.
 - Open create, leave Chinese meaning empty, and click “保存新释义”.
@@ -1100,19 +1099,19 @@ Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome D
 - Expect “请先填写中文释义。” directly below the field, the form still open, and focus on Chinese meaning.
 - Expect POS, example, `keep_new`, advanced fields, and manual advanced open/closed state to remain unchanged.
 
-#### Scenario C — Narrow-screen error visibility — 待网页端执行
+#### Scenario C — Narrow-screen error visibility — PASS
 
 - Viewport: `900×900`.
 - Open a word with multiple sense groups, scroll to create, and trigger empty Chinese meaning.
 - Expect the error beside the current field, no jump to the list top, no sidebar close, and no horizontal overflow.
 
-#### Scenario D — Edit local required error — 待网页端执行
+#### Scenario D — Edit local required error — PASS
 
 - Open an existing sense editor, clear Chinese meaning, and click “保存释义”.
 - Expect no PUT request, inline “请先填写中文释义。”, and the edit form to remain open.
 - Expect original POS, English explanation, aliases, and collocations to remain; no example-edit capability appears.
 
-#### Scenario E — Server/network failure handoff — 待网页端执行
+#### Scenario E — Network failure and side-effect safety — PASS
 
 - Create route: `POST /senses/manual`.
 - Edit route: `PUT /senses/{sense_id}/manual`.
@@ -1125,4 +1124,4 @@ Owner: `WEB_SIDE_TOTAL_FLOW_DESIGNER`. Environment: DevSpace5 with real Chrome D
 - Expected successful create delta: WordSense `+1`, sense ReviewCard `+1`, ReviewLog `0`, default stage `2 → -1` or `keep_new=true` stage remains `2`, legacy word ReviewCard `0`.
 - Expected successful edit delta: existing WordSense updated in place, ReviewCard identity unchanged, new ReviewCard `0`, ReviewLog `0`, stage delta `0`.
 
-No MCP Chrome, Playwright, fetch, Axios, curl, screenshot, or source inference was used as final browser acceptance in this Codex task. Do not begin another product task from this handoff automatically.
+Final acceptance used real DevSpace5 + Chrome DevTools interaction. The successful create request submitted canonical `adjective`; EncounteredWord stage changed `2 → -1`; one confirmed WordSense and one sense ReviewCard were created; ReviewLog and legacy word-card deltas were zero; reload showed 10% familiarity. Empty create/edit submissions sent no POST/PUT and preserved the form. Offline create/edit failures displayed safe generic messages and produced zero learning-data delta. The 900×900 viewport had no horizontal overflow, and the clean reload had zero new application console errors or warnings. The next implementation task is governed by the Anki-aligned roadmap and is not automatically started by this documentation closure.

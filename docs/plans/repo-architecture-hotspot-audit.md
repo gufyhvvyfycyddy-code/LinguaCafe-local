@@ -1,8 +1,16 @@
 # LinguaCafe 全仓库架构热点审计
 
-> **审计日期**：2026-07-01（最近任务刷新 2026-07-07 GM52-SenseSourceContextFollowDisplayedOccurrence-1000-7）
-> **基准 commit**：`7f3d4b6`
-> **审计方式**：只读侦查，不改代码，不进入功能开发。
+> **Current authority correction — 2026-07-15**
+>
+> Current priority and measurable targets are governed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`. The old “overall architecture closure 100%” statement is a historical phase label and is not a current code-quality conclusion.
+>
+> Fresh baseline at `a0916784951be69b411066446a03be940373589f`: 29 production files exceed 500 lines, 12 exceed 1,000 lines, and 3 exceed 1,500 lines. Current assessment is **6.5/10, localized high burden**. Priority is corrected to: Settings architecture convergence → Preset V1 → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
+>
+> The previous recommendation to continue isolated low-risk scouts is superseded. New architecture work must reduce a measured hotspot or establish a required product seam; zero-progress reconnaissance cannot be dispatched as a standalone main task.
+>
+> **历史审计日期**：2026-07-01（最近历史任务刷新 2026-07-07 GM52-SenseSourceContextFollowDisplayedOccurrence-1000-7）
+> **历史基准 commit**：`7f3d4b6`
+> **历史审计方式**：只读侦查，不改代码，不进入功能开发。
 
 > **2026-07-03 GLM-ArchitectureFirst1000-SafeStability-1 新增热点（安全稳定优先第一轮）**：
 > - **第一硬原则写入**：`vibe-coding-collaboration-rules.md` §27.0 + 本文 §8.5.0 同步写入「代码安全性和稳定性优先于功能速度」。GLM 1000% 第一轮只做低风险维护性工作（tests / MCP 新样本 / sample tracker / 只读 service / 只读查询抽取 / source/example/known-sense 回归护栏 / 安全 DI 优化 / 文档规则同步）；禁止 FSRS / ReviewLog / migration / 真实 AI 写入 / per-occurrence lemma 落库 / 阅读中刷卡评分 / legacy 删除 / 大规模 UI 重写 / 批量数据变更。

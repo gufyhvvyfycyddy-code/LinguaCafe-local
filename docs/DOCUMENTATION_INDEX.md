@@ -1,5 +1,13 @@
 # LinguaCafe Documentation Index
 
+> **Current authority — 2026-07-15**
+>
+> 1. `docs/plans/current-working-handoff.md` — current workbench.
+> 2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry and long-term ledger.
+> 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative product priority and architecture-debt route.
+>
+> Manual Sense shared form is Accepted / Production Closed. Current next task is Settings architecture convergence, followed by Preset V1 and Browser/ReviewCardManage convergence. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
+>
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
@@ -8,7 +16,7 @@
 
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-14 (Task 2000-21 `GLM-CustomStudy-Phase4A-SessionInternalOrdering-And-Phase3B-Closure-2000-21` — **Custom Study 1A Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务**。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1 through Phase 4A and the backend vertical slice were completed in Tasks 2000-16 through 2000-22; the frontend, shared card, chapter picker, and browser closure were completed afterward. Current authority is the status block above.**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。)
+> **Last updated**: 2026-07-15 (Manual Sense production closure, Open Work Registry reconciliation, and Anki-aligned product/architecture roadmap). Historical previous update: 2026-07-14 (Task 2000-21 `GLM-CustomStudy-Phase4A-SessionInternalOrdering-And-Phase3B-Closure-2000-21` — **Custom Study 1A Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务**。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1 through Phase 4A and the backend vertical slice were completed in Tasks 2000-16 through 2000-22; the frontend, shared card, chapter picker, and browser closure were completed afterward. Current authority is the status block above.**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。)
 
 > **Implementation addendum (2026-07-14)**: Custom Study 1A frontend is now implemented at `/custom-study`: setup, authenticated chapter picker, temporary preview session UI, navigation, and shared card presentation. The token remains session-only and the normal review queue, FSRS, ReviewLog, and lifecycle remain unchanged.
 
@@ -23,13 +31,14 @@ This file is the lightweight entry map for humans and agents. It exists to preve
 
 Read these in order for a new GLM Agent task (current workflow: GLM 单 Agent 闭环, see `vibe-coding-collaboration-rules.md` §1.5):
 
-1. `docs/plans/current-working-handoff.md` — current short-term workbench, current decisions, and next candidates.
-2. `docs/plans/linguacafe-master-plan.md` — long-term ledger of product lines, completed work, and preserved future directions.
-3. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
-4. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, six-layer report architecture (Period/Query/Metrics/Insight/Series/Product/Controller), rating contract, four coexisting summary concepts (session/daily/7-day/30-day), ReportCenter UI orchestration, props/events contract, query budget, N+1 risk, review card lifecycle state machine (ADR-0010: Active/Buried/Suspended/Archived four-state model, `fsrs_enabled` compatibility mirror, `scopeSenseReviewEligible` with expired-buried auto-restore, boundaries with rating/undo/reset/delete).
-5. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
-6. `docs/plans/repo-architecture-hotspot-audit.md` — architecture risk map and candidate backlog.
-7. `docs/plans/final-architecture-closure-report.md` — architecture-closure phase conclusion (read when judging whether to start AI study card v1 or new feature work).
+1. `docs/plans/current-working-handoff.md` — current short-term workbench and current next task.
+2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry plus long-term ledger.
+3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative order for Settings, Preset, Browser, Marker/Custom Study, Reviewer, Reader, and AI provider work.
+4. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
+5. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, report architecture, rating contract, lifecycle interaction, query budget, and N+1 rules.
+6. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
+7. `docs/plans/repo-architecture-hotspot-audit.md` — historical and detailed architecture evidence; use the Anki-aligned roadmap for current priority.
+8. `docs/plans/final-architecture-closure-report.md` — historical phase conclusion. Its “100% architecture closure” wording is superseded by the current measurable debt assessment.
 
 Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_STATUS.md`, or `docs/FSRS_PHASE*.md`. Those are historical references.
 
@@ -40,8 +49,9 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Entry / current state | Decide what is current and what to read next | `current-working-handoff.md`, this file |
 | Long-term ledger | Preserve product directions and completed task history | `linguacafe-master-plan.md` |
 | Collaboration rules | Role boundaries, safety red lines, test/smoke/report rules | `vibe-coding-collaboration-rules.md` |
-| Architecture risks | Module responsibilities, hotspots, candidate routes | `repo-architecture-hotspot-audit.md` |
-| Architecture closure | Final closure conclusion and next-stage roadmap | `final-architecture-closure-report.md` |
+| Product and architecture priority | Current Anki-aligned sequence, measurable debt targets, and implementation gates | `anki-aligned-product-and-architecture-roadmap.md` |
+| Architecture risks | Detailed module responsibilities and hotspot evidence | `repo-architecture-hotspot-audit.md` |
+| Historical architecture phase closure | Preserved old phase conclusion; no longer the current priority source | `final-architecture-closure-report.md` |
 | Frozen plans | Route-frozen plans for upcoming minimum implementation | `ai-study-card-v1-frozen-plan.md`, `frontend-review-entry-unification-plan.md` |
 | ADR / stable decisions | Accepted decisions that should not be re-litigated each task | `docs/adr/*.md` |
 | Module contracts | Stable module boundaries and output contracts | `docs/architecture/sense-http-controller-boundaries.md`, `docs/architecture/sense-review-module-boundaries.md` (now includes ReportCatalog + RatingPresentation centralized contracts, ReportCenter v-model=boolean open-state contract, and Section 12 ADR-0010 review card lifecycle state machine), `docs/plans/*contract*.md`, `docs/plans/*boundaries*.md` |
@@ -65,6 +75,7 @@ New rules and process notes are documented in:
 - `mcp-chrome-local-smoke-playbook.md` §8 — Lemma / Morphology click sample rotation（词元测试样本轮换操作指南）。
 - `morphology-test-sample-tracker.md` — MCP 词元测试样本追踪文档（每轮 marker / 文章 / 测试词 / 重复比例 / 8 类覆盖 / 真实点击标记 / API 替代标记 / Incomplete 标记）。
 - `vibe-coding-collaboration-rules.md` §27.7 — Testing DB 健康检查规则（每轮大型任务必须先跑 DB health check）。
+- `vibe-coding-collaboration-rules.md` §27.8 — DevSpace PHP / PHPUnit 502 截断规则：先用日志重定向、拆分套件和聚焦测试替代；仍无法取得可信全量结果时标记 Incomplete，并把完整 PHP 回归附加到下一轮相关 Codex 复杂任务。
 - `testing-db-health-playbook.md` — Testing DB 健康检查操作指南（health check / 进程锁 / 禁止命令 / 故障报告）。
 - `current-working-handoff.md` §7 — 当前主线进度估算。
 - `docs/testing/ai-study-card-full-loop-regression-playbook.md` — AI Study Card 主链路（V6 → V4 → V5 → `/reviews/senses` → FSRS rating）回归 harness：测试命令矩阵（9 条命令 + 期望计数）/ MCP Chrome 真实验收 playbook（轻量 7 步 + 完整 20 步）/ 数据库验收矩阵（每阶段表 delta）/ 网络验收（禁止 provider 域名）/ Refuse 条件（12 条安全契约 + 额外触发器）/ Accept/Refuse/Incomplete 判断 / 允许修改文件边界 / 停止条件 / 文件→测试映射。任何 agent 改 AI 学习卡前必须先读本文档并跑 §3 测试命令矩阵。

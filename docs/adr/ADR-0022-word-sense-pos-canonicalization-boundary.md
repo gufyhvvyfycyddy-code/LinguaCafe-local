@@ -35,7 +35,9 @@ For 422 responses, the UI shows a specific Chinese POS or required-meaning error
 
 Manual create and edit now render the same `ManualSenseForm` field template. The shared component owns its local draft, create/edit field visibility, inline Vuetify errors, advanced-section state, and first-error focus. `WordSensesList` continues to own the distinct POST/PUT requests, create context snapshot, enrollment response handling, and success lifecycle. The existing `ManualWordSenseFormService` supplies the pure local validator and safe structured 422 mapper; it does not access Vuex, DOM, stage, FSRS, ReviewLog, or Enrollment.
 
-This follow-up does not alter the accepted POS set, aliases, HTTP payload shape, controller trust boundary, or ADR-0021 enrollment semantics. Code is implemented and automated tests pass; final DevSpace5/Chrome web acceptance remains pending with the web-side total-flow designer. Production closure is not claimed by this follow-up.
+This follow-up does not alter the accepted POS set, aliases, HTTP payload shape, controller trust boundary, or ADR-0021 enrollment semantics. Code, automated tests, and final DevSpace5/Chrome web acceptance are complete. The shared-form follow-up is **Accepted / Production Closed** as of 2026-07-15 on master `a0916784951be69b411066446a03be940373589f`.
+
+Final browser acceptance covered the real reader at `1920×1080` and `900×900`: successful create normalized the submitted POS to `adjective`, moved the selected EncounteredWord from stage `2` to `-1`, created one confirmed WordSense and one sense ReviewCard, created no legacy word card and no ReviewLog, and showed 10% familiarity after reload. Empty Chinese meaning in create and edit sent no POST/PUT, displayed and focused the inline field error, and kept the draft and advanced-section state. Create and edit network failures displayed safe generic text, preserved the draft, and produced zero learning-data delta. The narrow viewport had no horizontal overflow, and a clean reload introduced zero application console errors or warnings.
 
 ## Boundaries and consequences
 
