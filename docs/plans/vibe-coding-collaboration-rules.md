@@ -1049,7 +1049,7 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
 ### 27.8 DevSpace 执行 PHP 测试时的 502 截断规则
 
 1. DevSpace 在运行耗时较长或输出较多的 PHP / PHPUnit 命令时，可能返回 `502` 或截断结果。该现象属于**工具传输失败**，不能直接认定为代码测试失败，也不能认定为测试通过。
-2. **PHP / PHPUnit 在 DevSpace 中默认只使用替代检测，禁止先运行原始高输出流式方案。**执行顺序固定为：
+2. **PHP / PHPUnit 在 DevSpace 中默认只使用替代检测，禁止先运行原始高输出流式方案。用户于 2026-07-15 明确冻结：Feature 永远分组复核，不再运行 Feature 全量命令。**执行顺序固定为：
    - 将完整输出重定向到仓库忽略目录中的临时日志，只让 DevSpace 返回退出码和末尾摘要；
    - Unit 可以作为独立套件运行；**Feature 永远按文件批次或业务模块分组运行，禁止执行 `php artisan test --testsuite=Feature`、禁止先尝试 Feature 整套命令再回退分组**；
    - Feature 分组必须覆盖全部 Feature test files，记录每组文件数、退出码、passed/skipped/assertions 摘要，最后汇总；

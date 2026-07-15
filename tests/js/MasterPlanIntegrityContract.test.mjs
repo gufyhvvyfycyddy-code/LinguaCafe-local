@@ -139,6 +139,9 @@ assert.match(collaborationRules, /### 27\.8 DevSpace 执行 PHP 测试时的 502
 assert.match(collaborationRules, /工具传输失败/);
 assert.match(collaborationRules, /不能直接认定为代码测试失败，也不能认定为测试通过/);
 assert.match(collaborationRules, /默认只使用替代检测，禁止先运行原始高输出流式方案/);
+assert.match(collaborationRules, /Feature 永远分组复核，不再运行 Feature 全量命令/);
+assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
+assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
 assert.match(collaborationRules, /完整输出重定向到仓库忽略目录中的临时日志/);
 assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
 assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
