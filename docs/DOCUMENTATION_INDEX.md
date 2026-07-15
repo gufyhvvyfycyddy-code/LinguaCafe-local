@@ -129,6 +129,7 @@ The detailed ADR table retains historical phase-by-phase registration text. For 
 | `docs/adr/ADR-0021-encountered-word-learning-enrollment-and-legacy-write-boundary.md` | Accepted (2026-07-15); Mgmt-7-c complete | Separates content-only edits, explicit legacy stage transitions, and confirmed-sense enrollment. Default enrollment uses reader stage -1 with a real new sense card; `keep_new` remains stage 2; content edits cannot create legacy word cards or bridge senses. |
 | `docs/adr/ADR-0022-word-sense-pos-canonicalization-boundary.md` | Accepted (2026-07-15) | Canonicalizes evidenced manual-sense POS aliases at frontend prefill and backend trust boundaries, preserves structured 422 for unknown values, and keeps ADR-0021 enrollment semantics unchanged. |
 | `docs/adr/ADR-0023-settings-architecture-convergence.md` | Accepted / Production Closed (2026-07-15) | Replaces the 2,164-line review settings page and 1,006-line settings service with a thin Vue container, five product panels, one API client, and four focused backend settings modules while preserving every existing route and payload. |
+| `docs/adr/ADR-0024-review-settings-preset-v1a-foundation.md` | Code Complete / Web Acceptance Pending (2026-07-15) | Preset V1A: lazy per-user Default, unique user/language binding, legacy first snapshot, schema-v1 config, locked mutation, explicit resolver consumers, read-only identity UI, no automatic reschedule, and no V1B actions. |
 
 ## 4. Soft Rules Awaiting Hard Verification
 

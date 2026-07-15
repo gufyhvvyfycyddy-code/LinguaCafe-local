@@ -1,9 +1,9 @@
 # LinguaCafe Review Settings Preset V1 计划
 
-> **状态**：Current / Authoritative Design
+> **状态**：V1A Code Complete / Web Acceptance Pending; V1B–V1D Planned
 > **日期**：2026-07-15
-> **代码基线**：`36bf8257c720ca7b4f65e737acb907e0de724567`
-> **当前授权阶段**：Preset V1A — Default Preset Foundation and Transparent Binding
+> **实现基线**：`8a42566fcd8a64aae18b72d30480a9f9124558d1`
+> **当前授权阶段**：Preset V1A — Code Complete / Web Acceptance Pending
 > **后续阶段**：V1B 管理动作与 UI → V1C 多语言共享验收 → V1D 生产关闭
 
 ## 1. 一句话结论
@@ -294,3 +294,15 @@ V1A 生效后：
 - 不读取或修改 `.env`、`AGENTS.md`、`.omo/`、`.playwright-cli/`、`nul`。
 - 不清库，不执行 `migrate:fresh`、`db:wipe`、DROP、TRUNCATE 或 `--force`。
 - 不运行 notification script，不 DCP，不自动进入 V1B。
+
+## 12. V1A 实现交接（2026-07-15）
+
+状态固定为 **Code Complete / Web Acceptance Pending**。
+
+- 两张 additive-only 表和复合所有权外键已经实现；旧 `settings` 表及其行未删除。
+- `ReviewSettingsPresetConfig`、Default/Binding 服务、legacy snapshot 和 `ReviewSettingsResolver` 已成为 V1A 边界。
+- Preset JSON 的所有更新通过事务、`lockForUpdate()`、局部合并和全 schema 归一化完成。
+- desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
+- 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
+- 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
+- ADR-0024 是实现决策记录；在网页验收交接前不得开始 V1B。

@@ -8,7 +8,7 @@
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared form; Settings architecture convergence |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
-> | Current Next Task | Preset V1A — Default Preset Foundation and Transparent Binding |
+> | Code Complete / Web Acceptance Pending | Preset V1A — Default Preset Foundation and Transparent Binding |
 > | Authorized Sequence | Preset V1B–V1D → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
@@ -214,7 +214,7 @@
 |---:|---|---|---|---|---|---|
 | 0 | Manual Sense POS + shared form + inline validation | Completed / Production Closed | 创建和编辑共用表单，错误就地显示，失败保留草稿 | 无 | ADR-0022；2026-07-15 DevSpace5 + Chrome 验收 | 已完成 |
 | 1 | Settings architecture convergence | Completed / Production Closed | 设置页按目标、队列、状态、高级工具和旧 SRS 分区；后续 Preset 不再堆进超大页面 | `AdminReviewSettings.vue` 60 行；15 个请求集中到 API client；`SettingsService.php` 105 行兼容门面 | ADR-0023；Chrome 双 viewport；设置/重排回归 | 已完成 |
-| 2A | FSRS-Anki-Mgmt-9 Preset V1A | Planned / Current Next Task | 当前用户的每种学习语言都能稳定读取一个 Default Preset；现有设置页和调度透明使用用户 + 语言配置 | 旧设置仍主要是 `settings.user_id=-1` 全局记录；需 additive persistence、唯一绑定、legacy snapshot、单一 resolver 和兼容 endpoint | `review-settings-preset-v1-plan.md`；同路线 Phase 2 | 已授权为下一任务 |
+| 2A | FSRS-Anki-Mgmt-9 Preset V1A | Code Complete / Web Acceptance Pending | 当前用户的每种学习语言都能稳定读取一个 Default Preset；现有设置页和调度透明使用用户 + 语言配置 | 代码、迁移、自动回归与双 viewport 本机 Chrome 验收待形成网页端交接结论；不得自动进入 V1B | ADR-0024；`review-settings-preset-v1-plan.md` | 仅允许 V1A 验收与修复 |
 | 2B | Preset V1B–V1D | Planned | 新增、复制、重命名、删除、切换；多语言共享；最终生产关闭 | V1A 完成后才能开发；Default 不可删除；删除普通 Preset 必须事务重绑定；Leech 配置另设 V1.1 Product Gate | `review-settings-preset-v1-plan.md` | V1A 关闭后授权 |
 | 3 | Browser / ReviewCardManage architecture convergence | Planned | Anki Browser 式搜索、表格、详情/编辑分区，批量治理更可控 | `ReviewCardManage.vue` 3412 行、26 个 axios 引用、12 个 dialog | 同路线 Phase 3；ADR-0012–0014 | Preset V1D 后授权 |
 | 4 | Card Marker + Custom Study 1B | Planned | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 必须落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | 同路线 Phase 4；ADR-0016 | Browser 收敛后授权 |

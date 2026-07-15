@@ -5,7 +5,7 @@
 > - Manual Sense POS + shared create/edit form + inline validation: **Accepted / Production Closed** on master `a0916784951be69b411066446a03be940373589f`.
 > - Current product and architecture route: `docs/plans/anki-aligned-product-and-architecture-roadmap.md`.
 > - Settings architecture convergence: **Accepted / Production Closed** (ADR-0023).
-> - Current next task: **Preset V1A — Default Preset Foundation and Transparent Binding**. Authoritative plan: `docs/plans/review-settings-preset-v1-plan.md`.
+> - Preset V1A — Default Preset Foundation and Transparent Binding: **Code Complete / Web Acceptance Pending** (ADR-0024). Authoritative plan: `docs/plans/review-settings-preset-v1-plan.md`. Do not enter V1B before acceptance handoff.
 > - Then: Preset V1B–V1D → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
 > - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
 > - Current code-debt assessment: **6.5/10, localized high burden**. Settings convergence reduced the baseline to 27 production files over 500 lines, 10 over 1,000, and 2 over 1,500. The largest hotspots are now `ReviewCardManage.vue`, `TextBlockGroup.vue`, and `SenseReview.vue`.
