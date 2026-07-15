@@ -243,11 +243,11 @@ V1A 生效后：
 
 ### Preset V1D — Settings UX and Production Closure
 
-**Planned / Current Next Task。按用户要求，本轮只冻结目标和验收合同，不执行页面修改。**
+**In Progress。Settings UX-1 已 Accepted（ADR-0027）；Preset V1D 的跨用户/跨语言最终生产关闭矩阵仍开放。**
 
 交付：
 
-- **Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety**；
+- **Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety：Completed / Accepted**；
 - 全量自动回归；
 - 两个用户、至少两种语言的 Chrome 真实验收；
 - 新增、复制、修改共享、切换、删除重绑定、刷新持久化；
@@ -271,7 +271,7 @@ V1A 生效后：
 
 成功标准：
 
-- 0 条记录、1–299 条有效记录、300+ 条有效记录、默认参数、优化参数、诊断加载失败六种状态各有独立页面测试和 Chrome 验收。
+- 0 条记录、1–299 条有效记录、300+ 条有效记录、默认参数、优化参数、诊断加载失败六种状态都有确定性纯状态测试；当前真实 insufficient/default 状态完成双 viewport Chrome 验收。禁止为了截图制造 300 条正式 ReviewLog。
 - 空状态不出现超过 3 个零值统计卡。
 - 不可执行按钮无法发出写请求。
 - 页面仍通过双 viewport、Console、Network 和无数据库副作用验收。
@@ -340,4 +340,4 @@ V1A 生效后：
 - desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
 - 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
 - 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
-- ADR-0024 记录 V1A，ADR-0025 记录 V1B，ADR-0026 记录 V1C。三个阶段均已由网页端使用 DevSpace5 与 Chrome DevTools / 自动回归完成独立验收；V1D 现为当前下一任务，但本轮按用户要求未执行。
+- ADR-0024 记录 V1A，ADR-0025 记录 V1B，ADR-0026 记录 V1C，ADR-0027 记录 V1D 的 Settings UX-1。V1A–V1C 已生产关闭；Settings UX-1 已由网页端使用 DevSpace5、自动回归和 Chrome DevTools 双 viewport 验收；V1D 仍需完成跨用户/跨语言最终生产关闭矩阵。

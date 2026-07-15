@@ -19,6 +19,7 @@ const settingsAdr = read('docs/adr/ADR-0023-settings-architecture-convergence.md
 const presetAdr = read('docs/adr/ADR-0024-review-settings-preset-v1a-foundation.md');
 const presetManagementAdr = read('docs/adr/ADR-0025-review-settings-preset-v1b-management.md');
 const presetConvergenceAdr = read('docs/adr/ADR-0026-review-settings-preset-v1c-consumer-convergence.md');
+const settingsUxAdr = read('docs/adr/ADR-0027-settings-advanced-tools-ux-state-model.md');
 const roadmap = read('docs/plans/anki-aligned-product-and-architecture-roadmap.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
@@ -32,7 +33,7 @@ const manualClosure = section(handoff, '## Manual Sense shared form corrective f
 
 assert.match(masterAuthority, /Settings architecture convergence/);
 assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A[^\n]*Preset V1B[^\n]*Preset V1C/);
-assert.match(masterAuthority, /Current Next Task \| Preset V1D — Settings UX and Production Closure/);
+assert.match(masterAuthority, /Current Phase \| Preset V1D — Settings UX and Production Closure; Settings UX-1 Accepted/);
 assert.match(masterAuthority, /27 production files over 500 lines, 10 over 1,000, and 2 over 1,500/);
 assert.match(masterAuthority, /6\.5\/10, localized high burden/);
 assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
@@ -42,7 +43,7 @@ assert.match(openWork, /Settings architecture convergence \| Completed \/ Produc
 assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1A \| Completed \/ Production Closed/);
 assert.match(openWork, /Preset V1B — Management Operations and UI \| Completed \/ Production Closed/);
 assert.match(openWork, /Preset V1C — Consumer Convergence \| Completed \/ Production Closed/);
-assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Planned \/ Current Next Task/);
+assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Partial \/ Settings UX-1 Accepted/);
 assert.match(openWork, /fsrs_parameters_previous/);
 assert.match(openWork, /Settings UX-1/);
 assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Planned/);
@@ -75,7 +76,7 @@ assert.match(roadmap, /Card Marker 参考 Anki Card Flag，落在 ReviewCard/);
 assert.match(roadmap, /Phase 1：Settings 架构收敛[\s\S]*Completed \/ Production Closed/);
 assert.match(roadmap, /Phase 2：Preset V1[\s\S]*V1A–V1C Completed \/ Production Closed/);
 assert.match(roadmap, /V1A–V1C Completed \/ Production Closed/);
-assert.match(roadmap, /V1D Planned \/ Current Next Task/);
+assert.match(roadmap, /Settings UX-1 已 Accepted/);
 assert.match(roadmap, /Settings UX-1/);
 assert.match(roadmap, /6\.5 \/ 10，局部高负担/);
 assert.match(roadmap, /27 个生产文件超过 500 行/);
@@ -86,6 +87,7 @@ assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增�
 
 assert.match(executionOrder, /Settings architecture convergence/);
 assert.match(executionOrder, /Preset V1/);
+assert.match(executionOrder, /Current Phase \/ Settings UX-1 Accepted/);
 assert.match(executionOrder, /Browser \/ ReviewCardManage convergence/);
 assert.match(executionOrder, /Card Marker \+ Custom Study 1B/);
 assert.doesNotMatch(executionOrder, /当前没有自动授权的下一产品任务|仍须由用户.*指定/);
@@ -104,12 +106,17 @@ assert.match(presetManagementAdr, /Accepted \/ Production Closed/);
 assert.match(presetManagementAdr, /transactionally rebinds all of its languages/);
 assert.match(presetConvergenceAdr, /Accepted \/ Production Closed/);
 assert.match(presetConvergenceAdr, /Stop writing `fsrs_parameters_previous`/);
+assert.match(settingsUxAdr, /Accepted — Settings UX-1/);
+assert.match(settingsUxAdr, /Pure presentation state module/);
+assert.match(settingsUxAdr, /does not mutate its input/);
+assert.match(settingsUxAdr, /Preset V1D final production closure remains open/);
 
 assert.match(handoffAuthority, /Settings architecture convergence: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /Preset V1A — Default Preset Foundation and Transparent Binding: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /Preset V1B — Management Operations and UI: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /Preset V1C — Consumer Convergence: \*\*Accepted \/ Production Closed\*\*/);
-assert.match(handoffAuthority, /Current next task: \*\*Preset V1D — Settings UX and Production Closure\*\*/);
+assert.match(handoffAuthority, /Current phase: \*\*Preset V1D — Settings UX and Production Closure\*\*/);
+assert.match(handoffAuthority, /Settings UX-1 is \*\*Accepted\*\*/);
 assert.match(handoffAuthority, /6\.5\/10, localized high burden/);
 assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
@@ -117,9 +124,11 @@ assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
 assert.match(index, /Preset V1A–V1C are Accepted \/ Production Closed/);
-assert.match(index, /Current next task is Preset V1D — Settings UX and Production Closure/);
+assert.match(index, /Settings UX-1 is Accepted under ADR-0027/);
+assert.match(index, /broader cross-user\/cross-language V1D production-closure matrix remains open/);
 assert.match(index, /ADR-0025-review-settings-preset-v1b-management\.md/);
 assert.match(index, /ADR-0026-review-settings-preset-v1c-consumer-convergence\.md/);
+assert.match(index, /ADR-0027-settings-advanced-tools-ux-state-model\.md/);
 assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
 assert.match(index, /ADR-0024-review-settings-preset-v1a-foundation\.md/);
 assert.match(index, /review-settings-preset-v1-plan\.md/);
@@ -131,7 +140,9 @@ assert.match(collaborationRules, /工具传输失败/);
 assert.match(collaborationRules, /不能直接认定为代码测试失败，也不能认定为测试通过/);
 assert.match(collaborationRules, /默认只使用替代检测，禁止先运行原始高输出流式方案/);
 assert.match(collaborationRules, /完整输出重定向到仓库忽略目录中的临时日志/);
-assert.match(collaborationRules, /将完整套件拆成 Unit、Feature 或按模块分组/);
+assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
+assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
+assert.match(collaborationRules, /记录每组文件数、退出码、passed\/skipped\/assertions 摘要/);
 assert.match(collaborationRules, /Incomplete \/ DevSpace PHP verification unavailable/);
 assert.match(collaborationRules, /交给下一轮相关 Codex 复杂主任务执行，不再回退尝试原始 DevSpace 流式方案/);
 assert.match(collaborationRules, /禁止为了绕开 502 使用 SQLite/);
@@ -146,8 +157,8 @@ assert.match(presetPlan, /Preset V1B — Management Operations and UI/);
 assert.match(presetPlan, /V1A–V1C Completed \/ Production Closed/);
 assert.match(presetPlan, /Preset V1C — Multi-language Sharing and Consumer Convergence/);
 assert.match(presetPlan, /Preset V1D — Settings UX and Production Closure/);
-assert.match(presetPlan, /本轮只冻结目标和验收合同，不执行页面修改/);
-assert.match(presetPlan, /Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety/);
+assert.match(presetPlan, /In Progress。Settings UX-1 已 Accepted/);
+assert.match(presetPlan, /Settings UX-1 — Advanced Tools Diagnostic Empty-State and Action Safety：Completed \/ Accepted/);
 assert.match(presetPlan, /fsrs_parameters_previous/);
 assert.match(presetPlan, /状态更新为 \*\*Accepted \/ Production Closed\*\*/);
 

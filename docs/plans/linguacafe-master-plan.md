@@ -8,7 +8,7 @@
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A; Preset V1B; Preset V1C |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
-> | Current Next Task | Preset V1D — Settings UX and Production Closure |
+> | Current Phase | Preset V1D — Settings UX and Production Closure; Settings UX-1 Accepted, broader closure matrix open |
 > | Authorized Sequence | Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
@@ -217,7 +217,7 @@
 | 2A | FSRS-Anki-Mgmt-9 Preset V1A | Completed / Production Closed | 当前用户的每种学习语言都能稳定读取一个 Default Preset；现有设置页和调度透明使用用户 + 语言配置 | 无阻断；网页端已复核代码、数据库、双 viewport、真实语言切换与全量回归 | ADR-0024；`review-settings-preset-v1-plan.md`；2026-07-15 web acceptance | 已完成 |
 | 2B | Preset V1B — Management Operations and UI | Completed / Production Closed | 新增、复制、重命名、删除、切换 Preset；设置页成为当前 Preset 编辑器 | 无阻断；Default 保护、用户隔离、共享语言提示和删除重绑定均已通过真实页面验收 | ADR-0025；`review-settings-preset-v1b-execution-plan.md` | 已完成 |
 | 2C | Preset V1C — Consumer Convergence | Completed / Production Closed | 所有设置消费者只读取当前 binding；不再生成没有用户/语言归属的全局回滚状态 | `fsrs_parameters_previous` 新写入/删除已停止，旧行保持不动并被明确标记为无效历史残留 | ADR-0026；V1C static guard；全量回归 | 已完成 |
-| 2D | Preset V1D — Settings UX and Production Closure | Planned / Current Next Task | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | 高级工具在无/少数据状态信息重复、零值卡片过多、无效动作仍突出；需完成 Settings UX-1 后再最终关闭 | `review-settings-preset-v1-plan.md`；截图反馈 2026-07-15 | 已登记，按用户要求本轮不执行 |
+| 2D | Preset V1D — Settings UX and Production Closure | Partial / Settings UX-1 Accepted | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | Settings UX-1 已完成；仍需完成跨用户、跨语言、完整 Preset 管理与持久化的最终生产关闭矩阵 | ADR-0027；`review-settings-preset-v1-plan.md`；2026-07-15 Chrome 双 viewport | 保持当前阶段；Browser 尚未授权 |
 | 3 | Browser / ReviewCardManage architecture convergence | Planned | Anki Browser 式搜索、表格、详情/编辑分区，批量治理更可控 | `ReviewCardManage.vue` 3412 行、26 个 axios 引用、12 个 dialog | 同路线 Phase 3；ADR-0012–0014 | Preset V1D 后授权 |
 | 4 | Card Marker + Custom Study 1B | Planned | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 必须落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | 同路线 Phase 4；ADR-0016 | Browser 收敛后授权 |
 | 5 | Reviewer architecture convergence | Planned | Sense Review 与 legacy Review 共用请求恢复、会话和评分编排边界 | `SenseReview.vue` 1477 行；`Review.vue` 1071 行 | 同路线 Phase 5；ADR-0008–0010 | Card Marker 后授权 |
@@ -354,6 +354,14 @@
 7. **不得把论坛意见或第三方模板写成 Anki 官方默认设计。** 社区模板 / 论坛讨论 / 博客经验帖只能作为社区经验参考。
 8. **与 §7 / §7.1-7.4 的关系**：§7 规定必须先查 Anki 以及"不盲目照搬"；§7.1-7.4 规定对象映射、必须借鉴原则、不照搬能力、对齐审计结论；§7.5（本节）规定决策顺序固定、不得用普通网页产品习惯替代 Anki、以及 Anki 没有冻结视觉样式时必须声明的项目适配条款。
 
+### 7.6 2026-07-15 Anki Settings 与字幕架构复核
+
+1. Anki Deck Options 把 Preset 作为共享配置；修改同一 Preset 会影响使用它的对象，且多数设置不追溯修改旧卡结果。LinguaCafe 继续保留“共享影响提示”和“新评分使用新参数，旧卡不自动重排”的边界。
+2. Anki FSRS 优化需要几百条复习历史；参数优化和 `Reschedule Cards on Change` 是独立选择，默认不重排。LinguaCafe 的参数优化状态、恢复默认和旧卡重排必须继续分区，禁止把高风险重排藏进普通保存动作。
+3. Anki 桌面层只负责承载 deck-options Web 页面；Rust `deckconfig` 按 schema/service/update/undo 拆分，并在保存前验证参数。LinguaCafe 对应保持 Vue 渲染、API transport、后端领域事实、纯展示状态四层分工，不在模板中复制 FSRS 或状态判断。
+4. 九份项目字幕共同强调：MVP 后先冻结模块边界和旧功能保护，再逐步拆分；文档必须通过测试、smoke 或 guard 变成可执行 harness；不要一次把所有文档塞进上下文。本轮 Settings UX-1 采用纯状态模块 + Node guard + Chrome 验收，作为后续前端收敛的默认方式。
+5. 该复核不授权 deck/subdeck、Browser、Reviewer 或 Reader 开发。当前仍只允许完成 Preset V1D 的剩余验收矩阵。
+
 ---
 
 ## 8. Anki 对齐产品与架构执行顺序
@@ -366,7 +374,7 @@
 | 2A | Preset V1A | Completed / Production Closed | Default Preset、用户/语言 binding、透明兼容读取和双 viewport / 多语言网页验收已完成 |
 | 2B | Preset V1B | Completed / Production Closed | 新增/复制/重命名/删除/切换、共享影响提示和删除重绑定已完成 |
 | 2C | Preset V1C | Completed / Production Closed | 全消费者收敛；停止 `fsrs_parameters_previous` 全局孤儿状态的新写入/删除 |
-| 2D | Preset V1D | Current Next Task | Settings UX-1 空状态/动作安全收口与最终生产验收；本轮按用户要求仅登记计划 |
+| 2D | Preset V1D | Current Phase / Settings UX-1 Accepted | 空状态、诊断折叠、失败状态和无效动作安全已收口；继续完成跨用户/跨语言最终生产关闭矩阵 |
 | 3 | Browser / ReviewCardManage convergence | 搜索、表格、详情/编辑三区域 | `ReviewCardManage.vue` 是当前最大前端热点，也是 Marker 和批量治理入口 |
 | 4 | Card Marker + Custom Study 1B | Marker 放在 ReviewCard | 对齐 Anki Card Flag；与 lifecycle、leech、WordSense status 分离 |
 | 5 | Reviewer convergence | Sense Review 为正式主入口 | 统一评分恢复、会话、预计间隔和错误处理；legacy 只保留兼容 |

@@ -1051,7 +1051,8 @@ OpenCode 不能把 MCP 验证失败当作自动扩大任务范围的授权。验
 1. DevSpace 在运行耗时较长或输出较多的 PHP / PHPUnit 命令时，可能返回 `502` 或截断结果。该现象属于**工具传输失败**，不能直接认定为代码测试失败，也不能认定为测试通过。
 2. **PHP / PHPUnit 在 DevSpace 中默认只使用替代检测，禁止先运行原始高输出流式方案。**执行顺序固定为：
    - 将完整输出重定向到仓库忽略目录中的临时日志，只让 DevSpace 返回退出码和末尾摘要；
-   - 需要全量回归时，将完整套件拆成 Unit、Feature 或按模块分组的较短命令；
+   - Unit 可以作为独立套件运行；**Feature 永远按文件批次或业务模块分组运行，禁止执行 `php artisan test --testsuite=Feature`、禁止先尝试 Feature 整套命令再回退分组**；
+   - Feature 分组必须覆盖全部 Feature test files，记录每组文件数、退出码、passed/skipped/assertions 摘要，最后汇总；
    - 同时运行与本轮改动直接相关的聚焦测试、Node guard、DB health check、`git diff --check` 和构建；
    - 读取日志末尾和单独保存的退出码，不依赖容易被截断的流式输出。
 3. 禁止为了绕开 502 使用 SQLite 代替项目 testing MySQL。禁止降低断言、跳过 DB health check、删除失败测试或把 API / 源码推测写成测试结果。

@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛和 Preset V1A–V1C 已生产关闭。当前下一任务是 **Preset V1D — Settings UX and Production Closure**；本轮按用户要求只登记截图问题的修复方案，不执行 V1D。V1D 完成后进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
+Settings 架构收敛和 Preset V1A–V1C 已生产关闭。当前阶段是 **Preset V1D — Settings UX and Production Closure**。Settings UX-1 已通过纯状态模块、Node harness 和 Chrome 双 viewport 验收；V1D 的跨用户/跨语言最终生产关闭矩阵仍开放。完成 V1D 后才能进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
 
 ## 2. 本轮依据
 
@@ -357,13 +357,15 @@ Custom Study 1B：
 8. “架构完成”必须附带可量化指标。禁止用百分比代替文件、接口、测试和验收事实。
 9. 历史任务叙述进入 history。master plan 当前区只保留状态、缺口、证据和授权。
 10. Harness 聚焦高风险不变量，不追求机械覆盖全部代码。
+11. 对外部响应形成的 UI 状态，优先用纯展示状态模块统一归一化，再由页面消费；禁止在模板和多个 method 中重复拼接同一状态规则。
+12. 文档只登记决策和入口。能够影响安全、状态或旧功能的规则必须落入测试、guard 或 Chrome smoke，避免只靠 Agent 读取长文档。
 
 ## 9. 当前优先级
 
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1C | Default、绑定、管理动作、共享提示、删除重绑定和消费者收敛已完成 |
-| 2 | Preset V1D | Settings UX-1 与 Preset 最终生产关闭；当前已登记、未执行 |
+| 2 | Preset V1D | Settings UX-1 已 Accepted；当前剩余跨用户/跨语言 Preset 最终生产关闭矩阵 |
 | 3 | Browser / ReviewCardManage 架构收敛 | 当前最大前端热点，也是后续 Marker 和治理入口 |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
