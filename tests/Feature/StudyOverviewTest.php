@@ -204,6 +204,8 @@ class StudyOverviewTest extends TestCase
 
     public function test_query_budget_is_constant_for_1_100_and_500_cards(): void
     {
+        app(\App\Services\Settings\Presets\ReviewSettingsResolver::class)
+            ->resolve($this->user->id, 'english');
         $queries = [];
         DB::listen(function ($query) use (&$queries) { $queries[] = strtolower($query->sql); });
         $service = app(StudyOverviewQueryService::class);

@@ -3,7 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
-use App\Models\Setting;
+use App\Services\Settings\Presets\ReviewSettingsResolver;
 use Carbon\Carbon;
 
 class FsrsSchedulingService
@@ -13,40 +13,24 @@ class FsrsSchedulingService
     public const RATING_GOOD = 'good';
     public const RATING_EASY = 'easy';
 
-    /**
-     * Read the user-configured FSRS desired retention from the global settings table.
-     *
-     * Defaults to 0.90 when the setting is missing or invalid.
-     * Clamped to [0.70, 0.97] regardless of stored value.
-     *
-     * @return float
-     */
-    public function desiredRetention(): float
+    /** Resolve the active user/language Preset's desired retention. */
+    private ReviewSettingsResolver $reviewSettings;
+
+    public function __construct(?ReviewSettingsResolver $reviewSettings = null)
     {
-        $setting = \App\Models\Setting::where('name', 'fsrsDesiredRetention')
-            ->where('user_id', -1)
-            ->first();
+        $this->reviewSettings = $reviewSettings ?? app(ReviewSettingsResolver::class);
+    }
 
-        if (!$setting) {
-            return 0.90;
-        }
-
-        $value = json_decode($setting->value, true);
-
-        if (!is_numeric($value)) {
-            return 0.90;
-        }
-
-        $value = (float) $value;
-
-        return max(0.70, min(0.97, $value));
+    public function desiredRetention(int $userId, string $language): float
+    {
+        return $this->reviewSettings->resolve($userId, $language)->fsrsDesiredRetention();
     }
 
     /**
      * Returns the currently active FSRS parameters for scheduling.
      *
-     * Reads the fsrs_parameters global setting (user_id=-1).
-     * If the setting is missing, empty, invalid JSON, wrong count,
+     * Reads the active user/language Preset through ReviewSettingsResolver.
+     * If the config is missing, empty, invalid, wrong count,
      * contains non-numeric or out-of-range values, or any error occurs,
      * falls back to get_default_parameters().
      *
@@ -56,24 +40,10 @@ class FsrsSchedulingService
      *
      * @return float[]
      */
-    public function getActiveFsrsParameters(): array
+    public function getActiveFsrsParameters(int $userId, string $language): array
     {
         try {
-            $setting = Setting::where('name', 'fsrs_parameters')
-                ->where('user_id', -1)
-                ->first();
-
-            if (!$setting || empty($setting->value)) {
-                return get_default_parameters();
-            }
-
-            $params = json_decode($setting->value, true);
-
-            if (!is_array($params)) {
-                return get_default_parameters();
-            }
-
-            $params = array_values($params);
+            $params = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
             $count = count($params);
 
             if ($count < 19 || $count > 21) {
@@ -196,8 +166,18 @@ class FsrsSchedulingService
             $elapsedDays = (int) max(0, $card->fsrs_last_reviewed_at->diffInDays($reviewedAt));
         }
 
-        $fsrs = new \fsrs\FSRS($this->getActiveFsrsParameters());
-        $states = $fsrs->next_states($memory, $this->desiredRetention(), $elapsedDays);
+        $userId = (int) $card->user_id;
+        $language = (string) $card->language_id;
+        if ($userId > 0 && $language !== '') {
+            $config = $this->reviewSettings->resolve($userId, $language);
+            $parameters = $config->fsrsParameters();
+            $retention = $config->fsrsDesiredRetention();
+        } else {
+            $parameters = get_default_parameters();
+            $retention = 0.90;
+        }
+        $fsrs = new \fsrs\FSRS($parameters);
+        $states = $fsrs->next_states($memory, $retention, $elapsedDays);
 
         $state = match ($rating) {
             self::RATING_AGAIN => $states->get_again(),

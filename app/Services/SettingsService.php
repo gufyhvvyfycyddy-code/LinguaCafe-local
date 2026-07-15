@@ -38,14 +38,14 @@ class SettingsService
         return $this->settingValues->getAnkiSettings();
     }
 
-    public function getGlobalSettingsByName($settingNames)
+    public function getGlobalSettingsByName($settingNames, ?int $userId = null, ?string $language = null)
     {
-        return $this->settingValues->getGlobalSettingsByName($settingNames);
+        return $this->settingValues->getGlobalSettingsByName($settingNames, $userId, $language);
     }
 
-    public function updateGlobalSettings($settings): bool
+    public function updateGlobalSettings($settings, ?int $userId = null, ?string $language = null): bool
     {
-        return $this->settingValues->updateGlobalSettings($settings);
+        return $this->settingValues->updateGlobalSettings($settings, $userId, $language);
     }
 
     public function getUserSettingsByName($userId, $settingNames)
@@ -78,28 +78,28 @@ class SettingsService
         return $this->fsrsOptimization->apply($userId, $language);
     }
 
-    public function getFsrsDailyLimits(): array
+    public function getFsrsDailyLimits(int $userId, string $language): array
     {
-        return $this->fsrsDailyLimits->get();
+        return $this->fsrsDailyLimits->get($userId, $language);
     }
 
-    public function updateFsrsDailyLimits(array $input): array
+    public function updateFsrsDailyLimits(int $userId, string $language, array $input): array
     {
-        return $this->fsrsDailyLimits->update($input);
+        return $this->fsrsDailyLimits->update($userId, $language, $input);
     }
 
-    public function getFsrsQueueOrder(): array
+    public function getFsrsQueueOrder(int $userId, string $language): array
     {
-        return $this->fsrsQueueOrder->get();
+        return $this->fsrsQueueOrder->get($userId, $language);
     }
 
-    public function updateFsrsQueueOrder(array $input): array
+    public function updateFsrsQueueOrder(int $userId, string $language, array $input): array
     {
-        return $this->fsrsQueueOrder->update($input);
+        return $this->fsrsQueueOrder->update($userId, $language, $input);
     }
 
-    public function restoreFsrsDefaultParameters(): array
+    public function restoreFsrsDefaultParameters(int $userId, string $language): array
     {
-        return $this->fsrsOptimization->restoreDefaults();
+        return $this->fsrsOptimization->restoreDefaults($userId, $language);
     }
 }

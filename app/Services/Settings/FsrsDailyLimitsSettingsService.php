@@ -3,7 +3,7 @@
 namespace App\Services\Settings;
 
 use App\Exceptions\DailyLimitsValidationException;
-use App\Models\Setting;
+use App\Services\Settings\Presets\ReviewSettingsResolver;
 
 class FsrsDailyLimitsSettingsService
 {
@@ -21,18 +21,13 @@ class FsrsDailyLimitsSettingsService
         'new_cards_ignore_review_limit',
     ];
 
-    public function get(): array
+    public function __construct(private ReviewSettingsResolver $reviewSettings)
     {
-        $rows = Setting::where('user_id', -1)
-            ->whereIn('name', array_keys(self::DEFAULTS))
-            ->get()
-            ->keyBy('name');
+    }
 
-        $limits = [];
-        foreach (self::DEFAULTS as $key => $defaultValue) {
-            $row = $rows->get($key);
-            $limits[$key] = $row ? json_decode($row->value) : $defaultValue;
-        }
+    public function get(int $userId, string $language): array
+    {
+        $limits = $this->reviewSettings->resolve($userId, $language)->dailyLimitsForApi();
 
         $limits['is_queue_enforced'] = true;
         $limits['message'] = '每日上限设置已保存；复习队列按以上限制显示卡。';
@@ -40,7 +35,7 @@ class FsrsDailyLimitsSettingsService
         return $limits;
     }
 
-    public function update(array $input): array
+    public function update(int $userId, string $language, array $input): array
     {
         $errors = [];
 
@@ -75,31 +70,24 @@ class FsrsDailyLimitsSettingsService
             throw new DailyLimitsValidationException($errors);
         }
 
+        $map = [
+            'daily_new_limit_enabled' => 'new_cards_enabled',
+            'daily_new_limit' => 'new_cards_per_day',
+            'daily_review_limit_enabled' => 'reviews_enabled',
+            'daily_review_limit' => 'maximum_reviews_per_day',
+            'new_cards_ignore_review_limit' => 'new_cards_ignore_review_limit',
+        ];
+        $patch = [];
         foreach ($input as $key => $value) {
-            if (!array_key_exists($key, self::DEFAULTS)) {
-                continue;
-            }
-
-            if (in_array($key, self::BOOLEAN_KEYS, true)) {
-                $value = filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-            } elseif ($key === 'daily_new_limit' || $key === 'daily_review_limit') {
-                $value = (int) $value;
-            }
-
-            $setting = Setting::where('name', $key)
-                ->where('user_id', -1)
-                ->first();
-
-            if (!$setting) {
-                $setting = new Setting();
-                $setting->name = $key;
-                $setting->user_id = -1;
-            }
-
-            $setting->value = json_encode($value);
-            $setting->save();
+            if (!isset($map[$key])) continue;
+            $patch[$map[$key]] = in_array($key, self::BOOLEAN_KEYS, true)
+                ? filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE)
+                : (int) $value;
+        }
+        if ($patch !== []) {
+            $this->reviewSettings->mutate($userId, $language, ['daily_limits' => $patch]);
         }
 
-        return $this->get();
+        return $this->get($userId, $language);
     }
 }

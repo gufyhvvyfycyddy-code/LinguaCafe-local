@@ -491,6 +491,9 @@ class SenseReviewIntervalPreviewTest extends TestCase
 
     public function test_preview_query_count_is_constant(): void
     {
+        app(\App\Services\Settings\Presets\ReviewSettingsResolver::class)
+            ->resolve($this->user->id, 'english');
+
         // Use a fresh counter that only counts queries during the HTTP request,
         // not during data setup. We run the same request twice and verify the
         // query count does not grow.

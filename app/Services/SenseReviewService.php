@@ -63,7 +63,7 @@ class SenseReviewService
         }
 
         // Apply Queue Order to get the proper first card
-        $options = $this->settingsService->getFsrsQueueOrder();
+        $options = $this->settingsService->getFsrsQueueOrder($userId, $language);
         $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($options);
         $timezone = $this->studyTimezoneService->getStudyTimezone();
         $ordered = $this->reviewQueueOrderService->order(
@@ -142,7 +142,7 @@ class SenseReviewService
         $remainingReviewSlots = $limits['remaining_review'];
 
         // Apply Queue Order (ADR-0015 V1) — single canonical ordering entry point
-        $queueOptionsArray = $this->settingsService->getFsrsQueueOrder();
+        $queueOptionsArray = $this->settingsService->getFsrsQueueOrder($userId, $language);
         $queueOptions = \App\Services\ReviewQueueOrderOptions::fromArray($queueOptionsArray);
         $timezone = $this->studyTimezoneService->getStudyTimezone();
         $now = Carbon::now();

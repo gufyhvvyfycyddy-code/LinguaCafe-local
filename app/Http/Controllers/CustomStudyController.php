@@ -105,7 +105,7 @@ class CustomStudyController extends Controller
         try {
             // Queue Order is loaded read-only — fromArray() does NOT persist.
             $queueOptions = ReviewQueueOrderOptions::fromArray(
-                $this->settingsService->getFsrsQueueOrder()
+                $this->settingsService->getFsrsQueueOrder($user->id, $user->selected_language)
             );
 
             $result = $this->sessionService->openSession(

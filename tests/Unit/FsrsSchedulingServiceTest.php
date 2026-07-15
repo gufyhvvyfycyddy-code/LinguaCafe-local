@@ -4,6 +4,7 @@ namespace Tests\Unit;
 
 use App\Models\ReviewCard;
 use App\Models\Setting;
+use App\Models\User;
 use App\Services\FsrsSchedulingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -14,7 +15,7 @@ class FsrsSchedulingServiceTest extends TestCase
     use RefreshDatabase;
     public function test_good_rating_schedules_a_new_card_for_review(): void
     {
-        $card = new ReviewCard([
+        $card = $this->contextCard([
             'fsrs_state' => 'new',
             'fsrs_reps' => 0,
             'fsrs_lapses' => 0,
@@ -33,7 +34,7 @@ class FsrsSchedulingServiceTest extends TestCase
 
     public function test_again_rating_records_a_lapse(): void
     {
-        $card = new ReviewCard([
+        $card = $this->contextCard([
             'fsrs_state' => 'review',
             'fsrs_stability' => 4.0,
             'fsrs_difficulty' => 5.0,
@@ -87,7 +88,7 @@ class FsrsSchedulingServiceTest extends TestCase
         $s->value = json_encode(array_fill(0, 19, 1.0));
         $s->save();
 
-        $card = new ReviewCard([
+        $card = $this->contextCard([
             'fsrs_state' => 'review',
             'fsrs_stability' => 4.0,
             'fsrs_difficulty' => 5.0,
@@ -106,7 +107,7 @@ class FsrsSchedulingServiceTest extends TestCase
 
         // Verify the helper returns the saved params via reflection
         $ref = new \ReflectionMethod(FsrsSchedulingService::class, 'getActiveFsrsParameters');
-        $params = $ref->invoke(new FsrsSchedulingService());
+        $params = $ref->invoke(new FsrsSchedulingService(), $card->user_id, $card->language_id);
         $this->assertCount(19, $params);
         foreach ($params as $p) {
             $this->assertSame(1.0, $p);
@@ -121,8 +122,9 @@ class FsrsSchedulingServiceTest extends TestCase
         $s->value = 'not-json{{';
         $s->save();
 
+        $context = $this->contextCard([]);
         $ref = new \ReflectionMethod(FsrsSchedulingService::class, 'getActiveFsrsParameters');
-        $params = $ref->invoke(new FsrsSchedulingService());
+        $params = $ref->invoke(new FsrsSchedulingService(), $context->user_id, $context->language_id);
 
         // Fallback: should return default 19 params, not throw
         $this->assertCount(19, $params);
@@ -148,8 +150,9 @@ class FsrsSchedulingServiceTest extends TestCase
         $s->value = json_encode([1.0, 2.0, 3.0]);
         $s->save();
 
+        $context = $this->contextCard([]);
         $ref = new \ReflectionMethod(FsrsSchedulingService::class, 'getActiveFsrsParameters');
-        $params = $ref->invoke(new FsrsSchedulingService());
+        $params = $ref->invoke(new FsrsSchedulingService(), $context->user_id, $context->language_id);
 
         // Fallback: should return default 19 params, not 3
         $this->assertCount(19, $params);
@@ -176,8 +179,9 @@ class FsrsSchedulingServiceTest extends TestCase
         $s->value = json_encode($params);
         $s->save();
 
+        $context = $this->contextCard([]);
         $ref = new \ReflectionMethod(FsrsSchedulingService::class, 'getActiveFsrsParameters');
-        $result = $ref->invoke(new FsrsSchedulingService());
+        $result = $ref->invoke(new FsrsSchedulingService(), $context->user_id, $context->language_id);
 
         // Fallback: should return default 19 params
         $this->assertCount(19, $result);
@@ -204,8 +208,9 @@ class FsrsSchedulingServiceTest extends TestCase
         $s->value = json_encode($params);
         $s->save();
 
+        $context = $this->contextCard([]);
         $ref = new \ReflectionMethod(FsrsSchedulingService::class, 'getActiveFsrsParameters');
-        $result = $ref->invoke(new FsrsSchedulingService());
+        $result = $ref->invoke(new FsrsSchedulingService(), $context->user_id, $context->language_id);
 
         // Fallback: should return default 19 params
         $this->assertCount(19, $result);
@@ -219,5 +224,14 @@ class FsrsSchedulingServiceTest extends TestCase
 
         $schedule = (new FsrsSchedulingService())->schedule($card, FsrsSchedulingService::RATING_GOOD, Carbon::now());
         $this->assertGreaterThan(0, $schedule['stability']);
+    }
+
+    private function contextCard(array $attributes): ReviewCard
+    {
+        $user = User::factory()->create();
+        return new ReviewCard(array_merge([
+            'user_id' => $user->id,
+            'language_id' => 'english',
+        ], $attributes));
     }
 }

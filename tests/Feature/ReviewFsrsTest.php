@@ -1409,7 +1409,7 @@ class ReviewFsrsTest extends TestCase
         $service = app(FsrsSchedulingService::class);
 
         // No fsrsDesiredRetention setting exists; should default to 0.90
-        $this->assertSame(0.90, $service->desiredRetention());
+        $this->assertSame(0.90, $service->desiredRetention($this->user->id, 'english'));
     }
 
     public function test_desired_retention_reads_from_settings_table(): void
@@ -1422,7 +1422,7 @@ class ReviewFsrsTest extends TestCase
 
         $service = app(FsrsSchedulingService::class);
 
-        $this->assertSame(0.95, $service->desiredRetention());
+        $this->assertSame(0.95, $service->desiredRetention($this->user->id, 'english'));
     }
 
     public function test_desired_retention_clamps_low_value_to_0_70(): void
@@ -1435,7 +1435,7 @@ class ReviewFsrsTest extends TestCase
 
         $service = app(FsrsSchedulingService::class);
 
-        $this->assertSame(0.70, $service->desiredRetention());
+        $this->assertSame(0.70, $service->desiredRetention($this->user->id, 'english'));
     }
 
     public function test_desired_retention_clamps_high_value_to_0_97(): void
@@ -1448,7 +1448,7 @@ class ReviewFsrsTest extends TestCase
 
         $service = app(FsrsSchedulingService::class);
 
-        $this->assertSame(0.97, $service->desiredRetention());
+        $this->assertSame(0.97, $service->desiredRetention($this->user->id, 'english'));
     }
 
     public function test_desired_retention_defaults_to_0_90_for_non_numeric(): void
@@ -1461,7 +1461,7 @@ class ReviewFsrsTest extends TestCase
 
         $service = app(FsrsSchedulingService::class);
 
-        $this->assertSame(0.90, $service->desiredRetention());
+        $this->assertSame(0.90, $service->desiredRetention($this->user->id, 'english'));
     }
 
     // ==================== Reset card ====================

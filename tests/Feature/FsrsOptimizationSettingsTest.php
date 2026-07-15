@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\EncounteredWord;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
+use App\Models\ReviewSettingPreset;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WordSense;
@@ -374,18 +375,9 @@ class FsrsOptimizationSettingsTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('applied', true);
 
-        $this->assertDatabaseHas('settings', [
-            'user_id' => -1,
-            'name' => 'fsrs_parameters',
-        ]);
-        $this->assertDatabaseHas('settings', [
-            'user_id' => -1,
-            'name' => 'fsrs_parameters_source',
-        ]);
-        $this->assertDatabaseHas('settings', [
-            'user_id' => -1,
-            'name' => 'fsrs_parameters_optimized_at',
-        ]);
+        $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
+        $this->assertSame('optimized', $preset->config['fsrs']['parameters_source']);
+        $this->assertNotEmpty($preset->config['fsrs']['parameters_optimized_at']);
         $this->assertDatabaseHas('settings', [
             'user_id' => -1,
             'name' => 'fsrs_parameters_previous',
@@ -403,19 +395,9 @@ class FsrsOptimizationSettingsTest extends TestCase
 
         $response->assertOk();
 
-        // Verify source is set correctly
-        $sourceSetting = \DB::table('settings')
-            ->where('name', 'fsrs_parameters_source')
-            ->first();
-        $this->assertNotNull($sourceSetting);
-        $this->assertEquals('optimized', json_decode($sourceSetting->value));
-
-        // Verify optimized_at is a valid datetime (ISO 8601)
-        $optimizedAtSetting = \DB::table('settings')
-            ->where('name', 'fsrs_parameters_optimized_at')
-            ->first();
-        $this->assertNotNull($optimizedAtSetting);
-        $this->assertNotEmpty(json_decode($optimizedAtSetting->value));
+        $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
+        $this->assertSame('optimized', $preset->config['fsrs']['parameters_source']);
+        $this->assertNotEmpty($preset->config['fsrs']['parameters_optimized_at']);
     }
 
     public function test_confirm_does_not_reschedule_cards(): void
@@ -471,9 +453,8 @@ class FsrsOptimizationSettingsTest extends TestCase
         ]);
     }
 
-    public function test_confirm_isolation_only_saves_global_settings(): void
+    public function test_confirm_isolation_saves_only_current_users_preset(): void
     {
-        // confirm=true saves to user_id=-1 (global), not to the acting user
         $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
         $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
 
@@ -483,15 +464,9 @@ class FsrsOptimizationSettingsTest extends TestCase
 
         $response->assertOk();
 
-        // Verify saved as global (user_id=-1), not per-user
-        $this->assertDatabaseHas('settings', [
-            'user_id' => -1,
-            'name' => 'fsrs_parameters',
-        ]);
-        $this->assertDatabaseMissing('settings', [
-            'user_id' => $this->user->id,
-            'name' => 'fsrs_parameters',
-        ]);
+        $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
+        $this->assertSame('optimized', $preset->config['fsrs']['parameters_source']);
+        $this->assertDatabaseMissing('review_setting_presets', ['user_id' => $this->otherUser->id]);
     }
 
     // ─── FSRS-Anki-Mgmt-1: Restore default parameters tests ────────────────
@@ -508,12 +483,14 @@ class FsrsOptimizationSettingsTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('success', true);
-        $response->assertJsonPath('deleted_count', 4);
+        $response->assertJsonPath('deleted_count', 1);
 
-        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters', 'user_id' => -1]);
-        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_source', 'user_id' => -1]);
-        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1]);
+        $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters', 'user_id' => -1]);
+        $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters_source', 'user_id' => -1]);
+        $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1]);
         $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_previous', 'user_id' => -1]);
+        $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
+        $this->assertSame('default', $preset->config['fsrs']['parameters_source']);
     }
 
     public function test_restore_default_returns_default_optimization_status(): void
@@ -544,7 +521,7 @@ class FsrsOptimizationSettingsTest extends TestCase
         $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
 
         $schedulingService = app(\App\Services\FsrsSchedulingService::class);
-        $params = $schedulingService->getActiveFsrsParameters();
+        $params = $schedulingService->getActiveFsrsParameters($this->user->id, 'english');
         $this->assertIsArray($params);
         $this->assertCount(19, $params);
     }
@@ -820,7 +797,7 @@ class FsrsOptimizationSettingsTest extends TestCase
         $response->assertJsonPath('parameters_count', 21);
     }
 
-    public function test_optimization_status_handles_malformed_parameters(): void
+    public function test_optimization_status_falls_back_when_legacy_parameters_are_malformed(): void
     {
         Setting::forceCreate([
             'name' => 'fsrs_parameters',
@@ -831,11 +808,10 @@ class FsrsOptimizationSettingsTest extends TestCase
         $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
 
         $response->assertOk();
-        $response->assertJsonPath('parameters_source', 'unknown');
-        $response->assertJsonPath('parameters_source_label', '参数来源异常，请重新优化或检查设置');
+        $response->assertJsonPath('parameters_source', 'default');
+        $response->assertJsonPath('parameters_source_label', '当前使用默认参数');
         $response->assertJsonPath('has_optimized_parameters', false);
-        $response->assertJsonPath('parameters_count', 0);
-        $response->assertJsonPath('parameters_warning', '已保存的 fsrs_parameters 无法解析为有效参数数组。');
+        $response->assertJsonPath('parameters_count', 19);
     }
 
     public function test_optimization_status_handles_custom_source(): void
@@ -848,13 +824,13 @@ class FsrsOptimizationSettingsTest extends TestCase
         Setting::forceCreate([
             'name' => 'fsrs_parameters_source',
             'user_id' => -1,
-            'value' => json_encode('custom_source_value'),
+            'value' => json_encode('custom'),
         ]);
 
         $response = $this->actingAs($this->user)->getJson('/settings/fsrs/optimization-status');
 
         $response->assertOk();
-        $response->assertJsonPath('parameters_source', 'custom_source_value');
+        $response->assertJsonPath('parameters_source', 'custom');
         $response->assertJsonPath('parameters_source_label', '当前使用自定义参数');
         $response->assertJsonPath('has_optimized_parameters', false);
         $response->assertJsonPath('parameters_count', 19);

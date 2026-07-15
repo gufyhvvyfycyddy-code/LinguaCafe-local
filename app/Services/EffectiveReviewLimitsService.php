@@ -17,7 +17,7 @@ class EffectiveReviewLimitsService
     public function resolve(int $userId, string $language, ?Carbon $now = null): array
     {
         $now ??= Carbon::now();
-        $permanent = $this->settingsService->getFsrsDailyLimits();
+        $permanent = $this->settingsService->getFsrsDailyLimits($userId, $language);
         $override = $this->overrideService->current($userId, $language, $now);
         $progress = $this->progressQueryService->counts($userId, $language, $now);
 

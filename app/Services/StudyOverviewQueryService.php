@@ -85,7 +85,7 @@ class StudyOverviewQueryService
             ], $effective),
             'future_due' => $this->futureDue($eligibleCards, $now, $bounds['timezone']),
             'cards' => $this->cardMetrics($cards, $now),
-            'memory' => $this->memoryMetrics($cards, $now),
+            'memory' => $this->memoryMetrics($cards, $now, $userId, $language),
             'ratings' => $this->ratingMetrics($periodLogs),
             'review_time' => $this->durationMetrics($periodLogs, $bounds['timezone']),
             'true_retention' => $this->retentionMetrics($logs, $periodStart, $bounds['timezone']),
@@ -124,13 +124,13 @@ class StudyOverviewQueryService
         return ['state_distribution' => $states, 'lifecycle_distribution' => $lifecycle, 'interval_distribution' => $intervals];
     }
 
-    private function memoryMetrics($cards, Carbon $now): array
+    private function memoryMetrics($cards, Carbon $now, int $userId, string $language): array
     {
         $stability = $cards->pluck('fsrs_stability')->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v)->values()->all();
         $difficulty = $cards->pluck('fsrs_difficulty')->filter(fn ($v) => $v !== null)->map(fn ($v) => (float) $v)->values()->all();
         $retrievability = [];
         foreach ($cards as $card) if ($card->fsrs_stability !== null) $retrievability[] = $this->queueOrderService->computeRetrievability($card, $now);
-        $desired = $this->fsrsSchedulingService->desiredRetention();
+        $desired = $this->fsrsSchedulingService->desiredRetention($userId, $language);
         return [
             'stability' => $this->numberSummary($stability, [1, 7, 30, 90]),
             'difficulty' => $this->numberSummary($difficulty, [3, 5, 7, 9]),

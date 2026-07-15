@@ -46,10 +46,13 @@ class SettingsController extends Controller
 
     // returns an array of global settings
     public function getGlobalSettingsByName(GetGlobalSettingsByNameRequest $request) {
+        $user = Auth::user();
         $settingNames = $request->post('settingNames');
 
         try {
-            $settings = $this->settingsService->getGlobalSettingsByName($settingNames);
+            $settings = $this->settingsService->getGlobalSettingsByName(
+                $settingNames, $user->id, $user->selected_language
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -59,10 +62,13 @@ class SettingsController extends Controller
 
     // saves an array of global settings
     public function updateGlobalSettings(UpdateGlobalSettingsRequest $request) {
+        $user = Auth::user();
         $settings = $request->post('settings');
 
         try {
-            $settings = $this->settingsService->updateGlobalSettings($settings);
+            $settings = $this->settingsService->updateGlobalSettings(
+                $settings, $user->id, $user->selected_language
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -177,8 +183,9 @@ class SettingsController extends Controller
      * Get current daily study limits configuration.
      */
     public function getFsrsDailyLimits() {
+        $user = Auth::user();
         return response()->json(
-            $this->settingsService->getFsrsDailyLimits(),
+            $this->settingsService->getFsrsDailyLimits($user->id, $user->selected_language),
             200
         );
     }
@@ -187,10 +194,13 @@ class SettingsController extends Controller
      * Update daily study limits configuration.
      */
     public function updateFsrsDailyLimits(Request $request) {
+        $user = Auth::user();
         $input = $request->post();
 
         try {
-            $result = $this->settingsService->updateFsrsDailyLimits($input);
+            $result = $this->settingsService->updateFsrsDailyLimits(
+                $user->id, $user->selected_language, $input
+            );
             $result['success'] = true;
             return response()->json($result, 200);
         } catch (\App\Exceptions\DailyLimitsValidationException $e) {
@@ -206,8 +216,9 @@ class SettingsController extends Controller
      * Get Queue Order configuration (ADR-0015 V1).
      */
     public function getFsrsQueueOrder() {
+        $user = Auth::user();
         return response()->json(
-            $this->settingsService->getFsrsQueueOrder(),
+            $this->settingsService->getFsrsQueueOrder($user->id, $user->selected_language),
             200
         );
     }
@@ -216,10 +227,13 @@ class SettingsController extends Controller
      * Update Queue Order configuration (ADR-0015 V1).
      */
     public function updateFsrsQueueOrder(Request $request) {
+        $user = Auth::user();
         $input = $request->post();
 
         try {
-            $result = $this->settingsService->updateFsrsQueueOrder($input);
+            $result = $this->settingsService->updateFsrsQueueOrder(
+                $user->id, $user->selected_language, $input
+            );
             $result['success'] = true;
             return response()->json($result, 200);
         } catch (\App\Exceptions\QueueOrderValidationException $e) {
@@ -247,16 +261,17 @@ class SettingsController extends Controller
     /**
      * Restore FSRS default parameters.
      *
-     * Deletes fsrs_parameters, fsrs_parameters_source,
-     * fsrs_parameters_optimized_at, and fsrs_parameters_previous
-     * from global settings. Does NOT delete any review data.
+     * Restores the current user/language Preset's FSRS fields and clears the
+     * operation-only legacy previous-parameters snapshot. Does NOT delete review data.
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function restoreFsrsDefaultParameters() {
         $user = Auth::user();
 
-        $result = $this->settingsService->restoreFsrsDefaultParameters();
+        $result = $this->settingsService->restoreFsrsDefaultParameters(
+            $user->id, $user->selected_language
+        );
 
         // Append refreshed optimization status
         $result['status'] = $this->settingsService->getFsrsOptimizationStatus(

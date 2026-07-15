@@ -4,8 +4,9 @@ namespace App\Services\Settings;
 
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
-use App\Models\Setting;
 use App\Models\WordSense;
+use App\Services\Settings\Presets\ReviewSettingsPresetConfig;
+use App\Services\Settings\Presets\ReviewSettingsResolver;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +17,10 @@ class FsrsOptimizationSettingsService
     public const INSUFFICIENT_MESSAGE = '复习记录还不够，先继续复习一段时间再来优化。';
     public const PENDING_MESSAGE = '已经有足够记录，但自动优化还需要下一步接入参数计算。';
 
-    public function __construct(private SettingValueService $settingValues)
-    {
+    public function __construct(
+        private SettingValueService $settingValues,
+        private ReviewSettingsResolver $reviewSettings,
+    ) {
     }
 
     public function getStatus(int $userId, string $language): array
@@ -30,7 +33,7 @@ class FsrsOptimizationSettingsService
             'min_required' => self::MIN_REQUIRED,
             'can_optimize' => $canOptimize,
             'message' => $canOptimize ? self::PENDING_MESSAGE : self::INSUFFICIENT_MESSAGE,
-        ], $this->parameterSource(), [
+        ], $this->parameterSource($userId, $language), [
             'diagnostics' => $this->diagnostics($userId, $language),
         ]);
     }
@@ -66,7 +69,7 @@ class FsrsOptimizationSettingsService
             $optimized = $fsrs->compute_parameters($trainSet);
             $parameters = $this->extractComputedParameters($optimized);
             $parameters = $this->validateParameters($parameters);
-            $current = get_default_parameters();
+            $current = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
 
             return [
                 'optimized' => false,
@@ -129,23 +132,19 @@ class FsrsOptimizationSettingsService
             ];
         }
 
-        $previous = get_default_parameters();
-        $existing = Setting::where('name', 'fsrs_parameters')->where('user_id', -1)->first();
-        if ($existing) {
-            $decoded = json_decode($existing->value, true);
-            if (is_array($decoded)) {
-                $previous = $decoded;
-            }
-        }
+        $previous = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
+        $optimizedAt = Carbon::now()->toIso8601String();
 
-        DB::transaction(function () use ($parameters, $previous): void {
-            $this->settingValues->upsertGlobal('fsrs_parameters', array_values($parameters));
-            $this->settingValues->upsertGlobal('fsrs_parameters_source', 'optimized');
-            $this->settingValues->upsertGlobal('fsrs_parameters_optimized_at', Carbon::now()->toIso8601String());
+        DB::transaction(function () use ($userId, $language, $parameters, $previous, $optimizedAt): void {
+            $this->reviewSettings->mutate($userId, $language, ['fsrs' => [
+                'parameters' => array_values($parameters),
+                'parameters_source' => 'optimized',
+                'parameters_optimized_at' => $optimizedAt,
+            ]]);
             $this->settingValues->upsertGlobal('fsrs_parameters_previous', array_values($previous));
         });
 
-        $current = get_default_parameters();
+        $current = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
         return [
             'optimized' => true,
             'applied' => true,
@@ -167,7 +166,7 @@ class FsrsOptimizationSettingsService
         ];
     }
 
-    public function restoreDefaults(): array
+    public function restoreDefaults(int $userId, string $language): array
     {
         $keys = [
             'fsrs_parameters',
@@ -175,11 +174,15 @@ class FsrsOptimizationSettingsService
             'fsrs_parameters_optimized_at',
             'fsrs_parameters_previous',
         ];
-        $deletedCount = Setting::where('user_id', -1)->whereIn('name', $keys)->delete();
+        $defaults = ReviewSettingsPresetConfig::defaults()->toArray()['fsrs'];
+        $before = $this->reviewSettings->resolve($userId, $language)->toArray()['fsrs'];
+        $this->reviewSettings->mutate($userId, $language, ['fsrs' => $defaults]);
+        $deletedCount = $this->settingValues->deleteGlobal('fsrs_parameters_previous');
+        $changed = $before !== $defaults;
 
         return [
             'success' => true,
-            'message' => $deletedCount > 0
+            'message' => $changed || $deletedCount > 0
                 ? '已恢复 FSRS 默认参数。之后新的复习评分将使用默认参数。'
                 : '当前已是默认参数，无需恢复。',
             'deleted_count' => $deletedCount,
@@ -264,27 +267,13 @@ class FsrsOptimizationSettingsService
         ];
     }
 
-    private function parameterSource(): array
+    private function parameterSource(int $userId, string $language): array
     {
-        $setting = Setting::where('name', 'fsrs_parameters')->where('user_id', -1)->first();
-        if (!$setting) {
-            return $this->defaultParameterSource();
-        }
-
-        $parameters = json_decode($setting->value, true);
-        if (!is_array($parameters) || $parameters === []) {
-            return [
-                'parameters_source' => 'unknown',
-                'parameters_source_label' => '参数来源异常，请重新优化或检查设置',
-                'last_optimized_at' => null,
-                'parameters_count' => 0,
-                'has_optimized_parameters' => false,
-                'parameters_warning' => '已保存的 fsrs_parameters 无法解析为有效参数数组。',
-            ];
-        }
-
-        $source = $this->settingValues->decodeGlobal('fsrs_parameters_source', 'default');
-        $lastOptimizedAt = $this->settingValues->decodeGlobal('fsrs_parameters_optimized_at');
+        $config = $this->reviewSettings->resolve($userId, $language);
+        $parameters = $config->fsrsParameters();
+        $metadata = $config->fsrsMetadata();
+        $source = $metadata['parameters_source'];
+        $lastOptimizedAt = $metadata['parameters_optimized_at'];
         if ($source === 'optimized') {
             return [
                 'parameters_source' => 'optimized',

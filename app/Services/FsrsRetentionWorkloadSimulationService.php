@@ -40,7 +40,7 @@ class FsrsRetentionWorkloadSimulationService
             return [
                 'success' => true,
                 'simulation_available' => false,
-                'current_retention' => $this->fsrsSchedulingService->desiredRetention(),
+                'current_retention' => $this->fsrsSchedulingService->desiredRetention($userId, $language),
                 'target_type' => 'sense',
                 'language' => $language,
                 'total_candidates' => 0,
@@ -56,7 +56,7 @@ class FsrsRetentionWorkloadSimulationService
             return [
                 'success' => true,
                 'simulation_available' => true,
-                'current_retention' => $this->fsrsSchedulingService->desiredRetention(),
+                'current_retention' => $this->fsrsSchedulingService->desiredRetention($userId, $language),
                 'target_type' => 'sense',
                 'language' => $language,
                 'total_candidates' => 0,
@@ -65,8 +65,8 @@ class FsrsRetentionWorkloadSimulationService
             ];
         }
 
-        $currentRetention = $this->fsrsSchedulingService->desiredRetention();
-        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters();
+        $currentRetention = $this->fsrsSchedulingService->desiredRetention($userId, $language);
+        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters($userId, $language);
         $now = Carbon::now();
         $sevenDaysFromNow = (new Carbon())->addDays(7);
 

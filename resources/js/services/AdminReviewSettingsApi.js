@@ -6,6 +6,10 @@ export function updateGlobalSettings(settings) {
     return axios.post('/settings/global/update', { settings });
 }
 
+export function getPresetMetadata() {
+    return getGlobalSettings(['reviewSettingsPresetMetadata']);
+}
+
 export function getReviewCardStats() {
     return axios.get('/review-cards/stats');
 }

@@ -3,8 +3,8 @@
 namespace App\Services\Settings;
 
 use App\Exceptions\QueueOrderValidationException;
-use App\Models\Setting;
 use App\Services\ReviewQueueOrderOptions;
+use App\Services\Settings\Presets\ReviewSettingsResolver;
 
 class FsrsQueueOrderSettingsService
 {
@@ -15,16 +15,16 @@ class FsrsQueueOrderSettingsService
         'new_sort_order' => 'fsrs_queue_new_sort_order',
     ];
 
-    public function __construct(private SettingValueService $settingValues)
+    public function __construct(private ReviewSettingsResolver $reviewSettings)
     {
     }
 
-    public function get(): array
+    public function get(int $userId, string $language): array
     {
-        return $this->loadOptions()->toArray();
+        return $this->loadOptions($userId, $language)->toArray();
     }
 
-    public function update(array $input): array
+    public function update(int $userId, string $language, array $input): array
     {
         $allowedValues = [
             'interday_learning_review_order' => ReviewQueueOrderOptions::ALLOWED_INTERDAY,
@@ -44,35 +44,25 @@ class FsrsQueueOrderSettingsService
             throw new QueueOrderValidationException($errors);
         }
 
-        foreach (self::KEY_MAP as $apiName => $settingName) {
+        $patch = [];
+        foreach (array_keys(self::KEY_MAP) as $apiName) {
             if (array_key_exists($apiName, $input)) {
-                $this->settingValues->upsertGlobal($settingName, $input[$apiName]);
+                $patch[$apiName] = $input[$apiName];
             }
         }
+        if ($patch !== []) {
+            $this->reviewSettings->mutate($userId, $language, ['queue_order' => $patch]);
+        }
 
-        return $this->get();
+        return $this->get($userId, $language);
     }
 
-    private function loadOptions(): ReviewQueueOrderOptions
+    private function loadOptions(int $userId, string $language): ReviewQueueOrderOptions
     {
-        $rows = Setting::where('user_id', -1)
-            ->whereIn('name', array_values(self::KEY_MAP))
-            ->get()
-            ->keyBy('name');
-
-        $data = [];
-        foreach (self::KEY_MAP as $apiName => $settingName) {
-            $row = $rows->get($settingName);
-            if (!$row) {
-                continue;
-            }
-
-            $decoded = json_decode($row->value, true);
-            $data[$apiName] = is_string($decoded) ? $decoded : $row->value;
-        }
-
         try {
-            return ReviewQueueOrderOptions::fromArray($data);
+            return ReviewQueueOrderOptions::fromArray(
+                $this->reviewSettings->resolve($userId, $language)->queueOrderForApi()
+            );
         } catch (\InvalidArgumentException) {
             return ReviewQueueOrderOptions::defaults();
         }

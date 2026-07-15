@@ -2,6 +2,7 @@
     <div id="admin-review-settings">
         <div class="subheader mt-4">间隔重复系统</div>
 
+        <current-review-settings-preset :language="language" />
         <fsrs-goal-settings-panel :fsrs-stats="fsrsStats" />
         <fsrs-queue-order-settings-panel />
         <fsrs-status-panel
@@ -15,6 +16,7 @@
 
 <script>
 import FsrsGoalSettingsPanel from './ReviewSettings/FsrsGoalSettingsPanel.vue';
+import CurrentReviewSettingsPreset from './ReviewSettings/CurrentReviewSettingsPreset.vue';
 import FsrsQueueOrderSettingsPanel from './ReviewSettings/FsrsQueueOrderSettingsPanel.vue';
 import FsrsStatusPanel from './ReviewSettings/FsrsStatusPanel.vue';
 import FsrsAdvancedToolsPanel from './ReviewSettings/FsrsAdvancedToolsPanel.vue';
@@ -22,6 +24,7 @@ import LegacySrsSettingsPanel from './ReviewSettings/LegacySrsSettingsPanel.vue'
 
 export default {
     components: {
+        CurrentReviewSettingsPreset,
         FsrsGoalSettingsPanel,
         FsrsQueueOrderSettingsPanel,
         FsrsStatusPanel,

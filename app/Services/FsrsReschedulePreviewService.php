@@ -469,9 +469,9 @@ class FsrsReschedulePreviewService
             return null;
         }
 
-        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters();
+        $activeParams = $this->fsrsSchedulingService->getActiveFsrsParameters($userId, $language);
         $cards = $this->candidateCardsQuery($userId, $language)->get();
-        $desiredRetention = $this->fsrsSchedulingService->desiredRetention();
+        $desiredRetention = $this->fsrsSchedulingService->desiredRetention($userId, $language);
         $now = Carbon::now();
 
         $skippedCount = 0;

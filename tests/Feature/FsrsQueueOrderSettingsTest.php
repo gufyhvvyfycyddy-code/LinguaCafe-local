@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\User;
 use App\Models\Setting;
+use App\Models\ReviewSettingPreset;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -277,21 +278,20 @@ class FsrsQueueOrderSettingsTest extends TestCase
         $limits->assertJsonPath('daily_review_limit', 234);
     }
 
-    public function test_queue_order_uses_global_scope_settings(): void
+    public function test_queue_order_uses_current_users_default_preset(): void
     {
         // Save queue order
         $this->actingAs($this->admin)->postJson('/settings/fsrs/queue-order', [
             'interday_learning_review_order' => 'before',
         ])->assertOk();
 
-        // Verify stored in settings table with user_id = -1
-        $this->assertDatabaseHas('settings', [
+        $preset = ReviewSettingPreset::where('user_id', $this->admin->id)
+            ->where('is_default', true)
+            ->firstOrFail();
+        $this->assertSame('before', $preset->config['queue_order']['interday_learning_review_order']);
+        $this->assertDatabaseMissing('settings', [
             'name' => 'fsrs_queue_interday_learning_review_order',
             'user_id' => -1,
         ]);
-        $row = Setting::where('name', 'fsrs_queue_interday_learning_review_order')
-            ->where('user_id', -1)
-            ->first();
-        $this->assertSame('before', json_decode($row->value));
     }
 }
