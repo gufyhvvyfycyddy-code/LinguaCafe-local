@@ -1,14 +1,14 @@
 # LinguaCafe Review Settings Preset V1 计划
 
-> **状态**：V1A–V1B Completed / Production Closed; V1C Planned / Current Next Task; V1D Planned
+> **状态**：V1A–V1C Completed / Production Closed; V1D Planned / Current Next Task
 > **日期**：2026-07-15
-> **实现基线**：`dc1f37c1`（V1A closure；V1B 见 ADR-0025）
-> **当前授权阶段**：Preset V1C — Multi-language Sharing and Consumer Convergence
-> **后续阶段**：V1C 消费者收敛 → V1D Settings UX and Production Closure
+> **实现基线**：`58103281`（V1B production closure；V1C 见 ADR-0026）
+> **当前授权阶段**：Preset V1D — Settings UX and Production Closure（本轮仅登记，未执行）
+> **后续阶段**：V1D 完成后进入 Browser / ReviewCardManage architecture convergence
 
 ## 1. 一句话结论
 
-Preset 是用户拥有的命名复习配置，一个用户的一种学习语言在任一时刻只绑定一个 Preset。V1A 先把现有稳定设置迁入 Default Preset，并让现有页面和调度透明读取当前用户 + 当前语言的有效配置；V1B 再增加新增、复制、重命名、删除和切换。
+Preset 是用户拥有的命名复习配置，一个用户的一种学习语言在任一时刻只绑定一个 Preset。V1A 建立 Default 与绑定，V1B 完成管理动作，V1C 收敛所有消费者并停止错误的全局回滚状态写入。当前仅剩 V1D 的 Settings UX-1 与最终生产关闭。
 
 ## 2. 为什么现在做
 
@@ -231,17 +231,19 @@ V1A 生效后：
 
 ### Preset V1C — Multi-language Sharing and Consumer Convergence
 
-**当前下一任务。**
+**Completed / Production Closed。实现与验收见 ADR-0026。**
 
 交付：
 
 - 多语言绑定真实流程；
 - 所有 FSRS、每日上限、队列和工作量模拟消费者复核；
 - 删除残留的业务层直接全局 Setting 读取；
-- 处理 `fsrs_parameters_previous`：当前它仍写在全局 Setting 中且没有真实读取方；本阶段停止新写入和新删除，不再把它列为成功响应中的保存/删除 key，旧数据库行只视为无效历史残留；
+- `fsrs_parameters_previous` 不再写入、不再删除，也不再出现在成功响应的保存/删除 key 中；旧数据库行保持原样，仅视为无效历史残留；
 - 旧全局记录只保留明确兼容期，不再是运行时主来源。
 
 ### Preset V1D — Settings UX and Production Closure
+
+**Planned / Current Next Task。按用户要求，本轮只冻结目标和验收合同，不执行页面修改。**
 
 交付：
 
@@ -338,4 +340,4 @@ V1A 生效后：
 - desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
 - 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
 - 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
-- ADR-0024 记录 V1A；ADR-0025 记录 V1B。两阶段均已由网页端使用 DevSpace5 与 Chrome DevTools 完成独立验收，V1C 现为当前下一任务。
+- ADR-0024 记录 V1A，ADR-0025 记录 V1B，ADR-0026 记录 V1C。三个阶段均已由网页端使用 DevSpace5 与 Chrome DevTools / 自动回归完成独立验收；V1D 现为当前下一任务，但本轮按用户要求未执行。

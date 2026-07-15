@@ -2,14 +2,14 @@
 
 > **状态**：Current / Authoritative
 > **日期**：2026-07-15
-> **基线 commit**：`dc1f37c1`（Preset V1A production closure；V1B 实现将形成后续提交）
+> **基线 commit**：`58103281`（Preset V1B production closure；V1C 见 ADR-0026）
 > **适用范围**：产品优先级、架构优化顺序、下一阶段任务授权判断
 
 ## 1. 一句话结论
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A 和 Preset V1B 已生产关闭。当前进入 **Preset V1C — Consumer Convergence**，随后完成 V1D Settings UX/生产关闭，再进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
+Settings 架构收敛和 Preset V1A–V1C 已生产关闭。当前下一任务是 **Preset V1D — Settings UX and Production Closure**；本轮按用户要求只登记截图问题的修复方案，不执行 V1D。V1D 完成后进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
 
 ## 2. 本轮依据
 
@@ -189,9 +189,9 @@ LinguaCafe 采用相同方向：
 
 ### Phase 2：Preset V1
 
-状态：V1A–V1B Completed / Production Closed；V1C Planned / Current Next Task；V1D Planned。
+状态：V1A–V1C Completed / Production Closed；V1D Planned / Current Next Task。
 
-优先级：P1，当前执行 V1C。
+优先级：P1，当前等待执行 V1D；本轮不实施 Settings UX-1。
 
 权威实施计划：`docs/plans/review-settings-preset-v1-plan.md`。
 
@@ -231,8 +231,8 @@ Preset V1 不包含：
 
 1. **V1A — Completed / Production Closed**：additive persistence、Default Preset、用户/语言唯一绑定、legacy global snapshot、单一 `ReviewSettingsResolver`、现有 endpoint/payload 兼容、现有设置与调度透明读取当前 Preset；双 viewport、真实 English/French binding、保存和全量回归已由网页端复核。实现决策见 ADR-0024。
 2. **V1B — Completed / Production Closed**：新增、复制、重命名、删除、切换 API 与 UI；Default 保护、所有权、共享语言提示与删除重绑定均已通过真实页面验收。实现决策见 ADR-0025。
-3. **V1C — Current Next Task**：多语言共享和所有 FSRS / daily limits / queue / simulation 消费者收敛，清理业务层直接全局 Setting 读取；`fsrs_parameters_previous` 当前仍是全局、无读取方的孤儿状态，本阶段停止新写入并冻结旧行仅作历史残留。
-4. **V1D**：Settings UX-1 + 双用户、多语言、双 viewport、Network、Console、数据库 delta 和无自动重排的生产关闭。Settings UX-1 专门收口高级工具的无/少数据状态、动作安全与信息层级。
+3. **V1C — Completed / Production Closed**：所有 FSRS / daily limits / queue / simulation 消费者继续以当前 binding + Resolver 为权威；停止 `fsrs_parameters_previous` 新写入/删除，删除无调用方的全局写入辅助方法，旧行仅作为忽略的历史残留。实现决策见 ADR-0026。
+4. **V1D — Current Next Task / Planned**：Settings UX-1 + 双用户、多语言、双 viewport、Network、Console、数据库 delta 和无自动重排的最终生产关闭。Settings UX-1 专门收口高级工具的无/少数据状态、动作安全与信息层级；按用户要求本轮只写入计划，不实现。
 
 Anki 对齐行为：
 
@@ -362,8 +362,8 @@ Custom Study 1B：
 
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
-| 1 | Preset V1A–V1B | Default、用户/语言绑定、管理动作、共享提示和删除重绑定已完成 |
-| 2 | Preset V1C–V1D | 消费者收敛、Settings UX-1 和 Preset 生产关闭 |
+| 1 | Preset V1A–V1C | Default、绑定、管理动作、共享提示、删除重绑定和消费者收敛已完成 |
+| 2 | Preset V1D | Settings UX-1 与 Preset 最终生产关闭；当前已登记、未执行 |
 | 3 | Browser / ReviewCardManage 架构收敛 | 当前最大前端热点，也是后续 Marker 和治理入口 |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |

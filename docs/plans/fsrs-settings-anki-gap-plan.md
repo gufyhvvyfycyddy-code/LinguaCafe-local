@@ -1,5 +1,7 @@
 # FSRS 设置页 Anki 对标与拆解计划
 
+> **Current authority notice — 2026-07-15**：本文的“全局设置页”和旧 Setting 写入描述属于历史基线。当前复习设置已经采用用户拥有的 Preset + 用户/学习语言 binding，运行时统一经过 `ReviewSettingsResolver`（ADR-0024–0026）；管理动作已完成。当前剩余差距是 Preset V1D / Settings UX-1：高级工具的诊断空状态、信息层级和不可执行动作安全，不改变 FSRS 算法或数据契约。
+>
 > **创建日期**：2026-06-25
 > **关联里程碑**：[linguacafe-fsrs-roadmap.md](./linguacafe-fsrs-roadmap.md) → D 系列
 

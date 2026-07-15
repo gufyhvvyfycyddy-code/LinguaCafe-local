@@ -7,8 +7,9 @@
 > - Settings architecture convergence: **Accepted / Production Closed** (ADR-0023).
 > - Preset V1A — Default Preset Foundation and Transparent Binding: **Accepted / Production Closed** (ADR-0024; web-side DevSpace5 + Chrome verification on 2026-07-15).
 > - Preset V1B — Management Operations and UI: **Accepted / Production Closed** (ADR-0025; direct DevSpace5 + Chrome execution on 2026-07-15).
-> - Current next task: **Preset V1C — Consumer Convergence**. Authoritative plan: `docs/plans/review-settings-preset-v1-plan.md`.
-> - Then: Preset V1D Settings UX/production closure → Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
+> - Preset V1C — Consumer Convergence: **Accepted / Production Closed** (ADR-0026; global previous-state writes removed; old rows preserved as ignored history).
+> - Current next task: **Preset V1D — Settings UX and Production Closure**. Authoritative plan: `docs/plans/review-settings-preset-v1-plan.md`. Per user instruction, V1D was planned but not executed in this round.
+> - Then: Browser/ReviewCardManage convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture → real AI provider.
 > - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
 > - Current code-debt assessment: **6.5/10, localized high burden**. Settings convergence reduced the baseline to 27 production files over 500 lines, 10 over 1,000, and 2 over 1,500. The largest hotspots are now `ReviewCardManage.vue`, `TextBlockGroup.vue`, and `SenseReview.vue`.
 > - DevSpace PHP / PHPUnit follows `vibe-coding-collaboration-rules.md §27.8`: default to log redirection, saved exit code and split suites; do not try the original high-output streamed command first. If the replacement path cannot produce trustworthy evidence, hand the full PHP regression to the next related Codex complex task.
@@ -263,7 +264,7 @@
 | AI Study Card | 手工确认的 V1–V5 闭环已存在；真实 provider 受环境门槛约束 | 先拆 1065 行 PendingItem Service，再考虑 provider |
 | 文档 | 已建立 Current authority、Open Work Registry 和 Anki 对齐路线 | 历史长叙述逐步归档，不再作为当前状态入口 |
 
-当前顺序：Preset V1C → Preset V1D（含 Settings UX-1）→ Browser convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/architecture → AI provider。
+当前顺序：Preset V1D（含 Settings UX-1，已登记、未执行）→ Browser convergence → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/architecture → AI provider。
 
 ## 8. 临时文档使用规则
 

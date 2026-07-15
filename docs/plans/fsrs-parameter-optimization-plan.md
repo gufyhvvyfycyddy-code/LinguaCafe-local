@@ -1,5 +1,7 @@
 # FSRS 参数优化实施计划
 
+> **Current authority notice — 2026-07-15**：本文保留 D.3/D.4 历史实施记录。当前运行时配置权威已经迁移到用户 + 学习语言绑定的 Review Settings Preset（ADR-0024/0025/0026）。`fsrs_parameters_previous` 不再写入、不再删除，也不是参数恢复或多用户回滚权威；旧数据库行仅作为忽略的历史残留。当前设置页后续任务是 Preset V1D / Settings UX-1。
+>
 > **创建日期**：2026-06-25
 > **关联里程碑**：[linguacafe-fsrs-roadmap.md](./linguacafe-fsrs-roadmap.md) → D.3
 > **前置侦察**：FSRS-D3-scout（本文件即侦察输出）
