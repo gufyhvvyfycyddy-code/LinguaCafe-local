@@ -17,10 +17,8 @@ class FsrsOptimizationSettingsService
     public const INSUFFICIENT_MESSAGE = '复习记录还不够，先继续复习一段时间再来优化。';
     public const PENDING_MESSAGE = '已经有足够记录，但自动优化还需要下一步接入参数计算。';
 
-    public function __construct(
-        private SettingValueService $settingValues,
-        private ReviewSettingsResolver $reviewSettings,
-    ) {
+    public function __construct(private ReviewSettingsResolver $reviewSettings)
+    {
     }
 
     public function getStatus(int $userId, string $language): array
@@ -132,17 +130,13 @@ class FsrsOptimizationSettingsService
             ];
         }
 
-        $previous = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
         $optimizedAt = Carbon::now()->toIso8601String();
 
-        DB::transaction(function () use ($userId, $language, $parameters, $previous, $optimizedAt): void {
-            $this->reviewSettings->mutate($userId, $language, ['fsrs' => [
-                'parameters' => array_values($parameters),
-                'parameters_source' => 'optimized',
-                'parameters_optimized_at' => $optimizedAt,
-            ]]);
-            $this->settingValues->upsertGlobal('fsrs_parameters_previous', array_values($previous));
-        });
+        $this->reviewSettings->mutate($userId, $language, ['fsrs' => [
+            'parameters' => array_values($parameters),
+            'parameters_source' => 'optimized',
+            'parameters_optimized_at' => $optimizedAt,
+        ]]);
 
         $current = $this->reviewSettings->resolve($userId, $language)->fsrsParameters();
         return [
@@ -161,7 +155,6 @@ class FsrsOptimizationSettingsService
                 'fsrs_parameters',
                 'fsrs_parameters_source',
                 'fsrs_parameters_optimized_at',
-                'fsrs_parameters_previous',
             ],
         ];
     }
@@ -172,20 +165,18 @@ class FsrsOptimizationSettingsService
             'fsrs_parameters',
             'fsrs_parameters_source',
             'fsrs_parameters_optimized_at',
-            'fsrs_parameters_previous',
         ];
         $defaults = ReviewSettingsPresetConfig::defaults()->toArray()['fsrs'];
         $before = $this->reviewSettings->resolve($userId, $language)->toArray()['fsrs'];
         $this->reviewSettings->mutate($userId, $language, ['fsrs' => $defaults]);
-        $deletedCount = $this->settingValues->deleteGlobal('fsrs_parameters_previous');
         $changed = $before !== $defaults;
 
         return [
             'success' => true,
-            'message' => $changed || $deletedCount > 0
+            'message' => $changed
                 ? '已恢复 FSRS 默认参数。之后新的复习评分将使用默认参数。'
                 : '当前已是默认参数，无需恢复。',
-            'deleted_count' => $deletedCount,
+            'deleted_count' => 0,
             'deleted_keys' => $keys,
         ];
     }

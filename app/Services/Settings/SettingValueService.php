@@ -219,24 +219,4 @@ class SettingValueService
         return json_last_error() === JSON_ERROR_NONE ? $decoded : $setting->value;
     }
 
-    public function upsertGlobal(string $name, mixed $value): void
-    {
-        $setting = Setting::where('name', $name)
-            ->where('user_id', -1)
-            ->first();
-
-        if (!$setting) {
-            $setting = new Setting();
-            $setting->user_id = -1;
-            $setting->name = $name;
-        }
-
-        $setting->value = json_encode($value);
-        $setting->save();
-    }
-
-    public function deleteGlobal(string $name): int
-    {
-        return Setting::where('user_id', -1)->where('name', $name)->delete();
-    }
 }

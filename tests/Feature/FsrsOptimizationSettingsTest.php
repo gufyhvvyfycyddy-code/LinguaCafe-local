@@ -363,8 +363,14 @@ class FsrsOptimizationSettingsTest extends TestCase
         $response->assertJsonPath('applied', false);
     }
 
-    public function test_confirm_saves_parameters_when_sufficient(): void
+    public function test_confirm_saves_parameters_when_sufficient_without_writing_legacy_previous_state(): void
     {
+        $legacyPrevious = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3];
+        Setting::forceCreate([
+            'name' => 'fsrs_parameters_previous',
+            'user_id' => -1,
+            'value' => json_encode($legacyPrevious),
+        ]);
         $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));
         $this->createReviewLogs($card, SettingsService::FSRS_OPTIMIZATION_MIN_REQUIRED, [], 1);
 
@@ -374,14 +380,15 @@ class FsrsOptimizationSettingsTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('applied', true);
+        $this->assertNotContains('fsrs_parameters_previous', $response->json('saved_keys'));
 
         $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
         $this->assertSame('optimized', $preset->config['fsrs']['parameters_source']);
         $this->assertNotEmpty($preset->config['fsrs']['parameters_optimized_at']);
-        $this->assertDatabaseHas('settings', [
-            'user_id' => -1,
-            'name' => 'fsrs_parameters_previous',
-        ]);
+        $this->assertEquals(
+            $legacyPrevious,
+            json_decode(Setting::where('user_id', -1)->where('name', 'fsrs_parameters_previous')->value('value'), true)
+        );
     }
 
     public function test_confirm_persists_optimization_metadata(): void
@@ -471,24 +478,28 @@ class FsrsOptimizationSettingsTest extends TestCase
 
     // ─── FSRS-Anki-Mgmt-1: Restore default parameters tests ────────────────
 
-    public function test_restore_default_deletes_saved_parameters(): void
+    public function test_restore_default_leaves_legacy_previous_state_untouched_and_unclaimed(): void
     {
-        // Save 4 FSRS parameter settings
         Setting::forceCreate(['name' => 'fsrs_parameters', 'user_id' => -1, 'value' => json_encode([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9])]);
         Setting::forceCreate(['name' => 'fsrs_parameters_source', 'user_id' => -1, 'value' => json_encode('optimized')]);
         Setting::forceCreate(['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1, 'value' => json_encode('2026-06-26T10:30:00+00:00')]);
-        Setting::forceCreate(['name' => 'fsrs_parameters_previous', 'user_id' => -1, 'value' => json_encode([0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3])]);
+        $legacyPrevious = [0.5, 0.6, 0.7, 0.8, 0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2.0, 2.1, 2.2, 2.3];
+        Setting::forceCreate(['name' => 'fsrs_parameters_previous', 'user_id' => -1, 'value' => json_encode($legacyPrevious)]);
 
         $response = $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default');
 
         $response->assertOk();
         $response->assertJsonPath('success', true);
-        $response->assertJsonPath('deleted_count', 1);
+        $response->assertJsonPath('deleted_count', 0);
+        $this->assertNotContains('fsrs_parameters_previous', $response->json('deleted_keys'));
 
         $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters', 'user_id' => -1]);
         $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters_source', 'user_id' => -1]);
         $this->assertDatabaseHas('settings', ['name' => 'fsrs_parameters_optimized_at', 'user_id' => -1]);
-        $this->assertDatabaseMissing('settings', ['name' => 'fsrs_parameters_previous', 'user_id' => -1]);
+        $this->assertEquals(
+            $legacyPrevious,
+            json_decode(Setting::where('user_id', -1)->where('name', 'fsrs_parameters_previous')->value('value'), true)
+        );
         $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
         $this->assertSame('default', $preset->config['fsrs']['parameters_source']);
     }
