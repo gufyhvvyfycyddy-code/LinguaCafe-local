@@ -2,9 +2,9 @@
 
 ## Status
 
-Accepted — Settings UX-1 / 2026-07-15
+Accepted — Settings UX-1 / Preset V1D Production Closed / 2026-07-15
 
-Preset V1D final production closure remains open for the broader cross-user and cross-language Preset acceptance matrix. Browser / ReviewCardManage work is not authorized by this ADR.
+The broader cross-user and cross-language Preset acceptance matrix was completed on 2026-07-15. Browser / ReviewCardManage is the authorized next stage, but this ADR does not authorize or implement that work.
 
 ## Context
 
@@ -112,4 +112,4 @@ Rejected because it would contaminate learning history. Ready, optimized, zero, 
 
 ## Consequences
 
-Settings UX-1 is accepted. Preset V1D remains the current phase until its broader production-closure matrix is completed. No Browser, ReviewCardManage, Card Marker, Reviewer, Reader, provider, FSRS algorithm, ReviewLog, lifecycle, or database work is authorized by this decision.
+Settings UX-1 is accepted and Preset V1D is Production Closed. The final acceptance matrix covered two local users, English/French sharing, create/clone/rename/switch/shared edit/delete-rebind/refresh persistence, unchanged ReviewLog and ReviewCard counts, and an unchanged ReviewCard due checksum. Browser / ReviewCardManage is only the authorized next stage; no Browser, Card Marker, Reviewer, Reader, provider, FSRS algorithm, ReviewLog, lifecycle, or database implementation is authorized by this decision.

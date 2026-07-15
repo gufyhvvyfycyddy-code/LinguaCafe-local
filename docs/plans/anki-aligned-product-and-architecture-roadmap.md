@@ -2,14 +2,14 @@
 
 > **状态**：Current / Authoritative
 > **日期**：2026-07-15
-> **基线 commit**：`58103281`（Preset V1B production closure；V1C 见 ADR-0026）
+> **基线 commit**：`d9ae9d4f`（Preset V1D 执行前 master；最终关闭 commit 见 Git 历史）
 > **适用范围**：产品优先级、架构优化顺序、下一阶段任务授权判断
 
 ## 1. 一句话结论
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛和 Preset V1A–V1C 已生产关闭。当前阶段是 **Preset V1D — Settings UX and Production Closure**。Settings UX-1 已通过纯状态模块、Node harness 和 Chrome 双 viewport 验收；V1D 的跨用户/跨语言最终生产关闭矩阵仍开放。完成 V1D 后才能进入 ReviewCardManage、Card Marker / Custom Study 1B、Reviewer 和 Reader。真实 AI provider 继续延后。
+Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。下一授权阶段是 Browser / ReviewCardManage 架构收敛，但本轮没有自动进入。Card Marker / Custom Study 1B、Reviewer、Reader 与真实 AI provider 继续按顺序延后。
 
 ## 2. 本轮依据
 
@@ -90,10 +90,13 @@ Settings 架构收敛和 Preset V1A–V1C 已生产关闭。当前阶段是 **Pr
 6. 每轮只完成一个可独立验收的结构变化。拆分后必须保持用户行为不变。
 7. 大文件拆分以职责和数据流为依据，不按行数机械切块。
 8. 全局状态和隐式副作用优先治理。纯函数、Policy、Value Object 保持无数据库和无页面依赖。
+9. 自然语言结论必须下沉为测试、smoke、状态机或可观测数据库事实；Agent 报告只提供线索，不构成最终验收。
+10. 可以并行的只读侦查、文档核查和独立测试应并行；共享代码修改、数据库写入和最终合并必须串行收口，防止互相覆盖。
+11. MVP 阶段只冻结已经稳定的产品边界；进入长期迭代后，再把高频变化点收敛为模块和接口，避免过早写满 spec，也避免成熟后继续无边界扩张。
 
 ## 4. Anki 官方架构参考
 
-Anki 官方仓库把核心能力按领域拆分。Rust 核心包含 `card`、`collection`、`deckconfig`、`decks`、`notes`、`revlog`、`scheduler`、`search`、`stats`、`storage`、`undo` 等模块。`proto` 定义前后端通信和部分存储契约，并生成 Rust、Python、TypeScript 绑定。Python 层包装 Rust 核心，Qt 层主要负责桌面界面和用户操作。
+Anki 官方仓库把核心能力按领域拆分。Rust 核心包含 `card`、`collection`、`deckconfig`、`decks`、`notes`、`revlog`、`scheduler`、`search`、`stats`、`storage`、`undo` 等模块。`deckconfig` 内进一步区分 `service.rs`、`update.rs`、`undo.rs`，说明读取、更新和撤销不应堆进同一个页面或控制器。`proto` 定义前后端通信和部分存储契约，并生成 Rust、Python、TypeScript 绑定。Python 层包装 Rust 核心，Qt `DeckOptionsDialog` 主要承载独立 Web 页面，桌面壳不复制设置领域规则。Browser 目录也把 `sidebar`、`table`、`card_info` 与页面编排分开。
 
 LinguaCafe 采用相同方向：
 
@@ -189,9 +192,9 @@ LinguaCafe 采用相同方向：
 
 ### Phase 2：Preset V1
 
-状态：V1A–V1C Completed / Production Closed；V1D Planned / Current Next Task。
+状态：V1A–V1D Completed / Accepted / Production Closed（2026-07-15）。
 
-优先级：P1，当前等待执行 V1D；本轮不实施 Settings UX-1。
+优先级：P1，已完成；不得继续追加未经过产品 Gate 的 Preset V1.1 能力。
 
 权威实施计划：`docs/plans/review-settings-preset-v1-plan.md`。
 
@@ -232,7 +235,7 @@ Preset V1 不包含：
 1. **V1A — Completed / Production Closed**：additive persistence、Default Preset、用户/语言唯一绑定、legacy global snapshot、单一 `ReviewSettingsResolver`、现有 endpoint/payload 兼容、现有设置与调度透明读取当前 Preset；双 viewport、真实 English/French binding、保存和全量回归已由网页端复核。实现决策见 ADR-0024。
 2. **V1B — Completed / Production Closed**：新增、复制、重命名、删除、切换 API 与 UI；Default 保护、所有权、共享语言提示与删除重绑定均已通过真实页面验收。实现决策见 ADR-0025。
 3. **V1C — Completed / Production Closed**：所有 FSRS / daily limits / queue / simulation 消费者继续以当前 binding + Resolver 为权威；停止 `fsrs_parameters_previous` 新写入/删除，删除无调用方的全局写入辅助方法，旧行仅作为忽略的历史残留。实现决策见 ADR-0026。
-4. **V1D — Current Next Task / Planned**：Settings UX-1 + 双用户、多语言、双 viewport、Network、Console、数据库 delta 和无自动重排的最终生产关闭。Settings UX-1 专门收口高级工具的无/少数据状态、动作安全与信息层级；按用户要求本轮只写入计划，不实现。
+4. **V1D — Completed / Production Closed**：Settings UX-1 通过纯状态模块与动作安全护栏；主账号 English/French 完成共享 Preset 的创建、切换、修改、复制、重命名、刷新持久化、删除重绑定；第二本地管理员账号完成页面级隔离；验收前后 ReviewLog、ReviewCard 和到期 checksum 不变，证明未自动重排。
 
 Anki 对齐行为：
 
@@ -243,9 +246,11 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
+状态：Authorized Next / Not Started。本文件只冻结方向，本轮未进入实现。
+
 优先级：P1。
 
-目标：把 3,412 行管理页拆成 Anki Browser 风格的三个区域：
+目标：参考 Anki Browser 的 `sidebar`、`table`、`card_info` 分层，把 3,412 行管理页拆成三个区域：
 
 1. 搜索与侧栏。
 2. 卡片表格。
@@ -364,9 +369,8 @@ Custom Study 1B：
 
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
-| 1 | Preset V1A–V1C | Default、绑定、管理动作、共享提示、删除重绑定和消费者收敛已完成 |
-| 2 | Preset V1D | Settings UX-1 已 Accepted；当前剩余跨用户/跨语言 Preset 最终生产关闭矩阵 |
-| 3 | Browser / ReviewCardManage 架构收敛 | 当前最大前端热点，也是后续 Marker 和治理入口 |
+| 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
+| 2 | Browser / ReviewCardManage 架构收敛 | Authorized Next / Not Started；当前最大前端热点，也是后续 Marker 和治理入口 |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |

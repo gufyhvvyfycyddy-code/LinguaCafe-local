@@ -1,14 +1,14 @@
 # LinguaCafe Review Settings Preset V1 计划
 
-> **状态**：V1A–V1C Completed / Production Closed; V1D Planned / Current Next Task
+> **状态**：Preset V1A–V1D Completed / Production Closed
 > **日期**：2026-07-15
-> **实现基线**：`58103281`（V1B production closure；V1C 见 ADR-0026）
-> **当前授权阶段**：Preset V1D — Settings UX and Production Closure（本轮仅登记，未执行）
-> **后续阶段**：V1D 完成后进入 Browser / ReviewCardManage architecture convergence
+> **实现基线**：`d9ae9d4f`（V1D 执行前 master；最终关闭 commit 见 Git 历史）
+> **当前授权阶段**：Preset V1D 已完成；本轮不自动进入后续阶段
+> **后续阶段**：Browser / ReviewCardManage architecture convergence（仅登记，尚未执行）
 
 ## 1. 一句话结论
 
-Preset 是用户拥有的命名复习配置，一个用户的一种学习语言在任一时刻只绑定一个 Preset。V1A 建立 Default 与绑定，V1B 完成管理动作，V1C 收敛所有消费者并停止错误的全局回滚状态写入。当前仅剩 V1D 的 Settings UX-1 与最终生产关闭。
+Preset 是用户拥有的命名复习配置，一个用户的一种学习语言在任一时刻只绑定一个 Preset。V1A 建立 Default 与绑定，V1B 完成管理动作，V1C 收敛所有消费者并停止错误的全局回滚状态写入，V1D 完成高级工具 UX 与跨用户、跨语言生产验收。Preset V1 已完整生产关闭。
 
 ## 2. 为什么现在做
 
@@ -243,7 +243,7 @@ V1A 生效后：
 
 ### Preset V1D — Settings UX and Production Closure
 
-**In Progress。Settings UX-1 已 Accepted（ADR-0027）；Preset V1D 的跨用户/跨语言最终生产关闭矩阵仍开放。**
+**Completed / Accepted / Production Closed。Settings UX-1 见 ADR-0027；跨用户/跨语言最终生产关闭矩阵已于 2026-07-15 完成。**
 
 交付：
 
@@ -253,6 +253,17 @@ V1A 生效后：
 - 新增、复制、修改共享、切换、删除重绑定、刷新持久化；
 - Network、Console、数据库 delta 和无重排证据；
 - 网页端总流程设计师最终 Accept。
+
+生产关闭事实：
+
+- 主账号 English 与 French 均完成 Default → shared preset → clone/rename → delete/rebind → Default 的真实页面流程。
+- 共享 Preset 在 French 读取到 English 已保存的每日新卡上限 `21`，证明同一配置对象被多语言共享；删除普通 Preset 后所有受影响语言安全重绑到 Default。
+- 创建第二个本地管理员测试账号，通过真实退出、登录和设置页访问确认只能看到自己的 Default Preset，不能看到主账号的临时 Preset。
+- 新增、复制、重命名、切换、共享修改、刷新持久化和删除重绑定全部由 Chrome DevTools 在真实页面执行。
+- 验收前后主账号 `ReviewLog=166`、`ReviewCard=95`，卡片到期字段 checksum 均为 `8efba9502402eab665070925ee0c6359bbb26f7164c3962e0262fb1defef76fb`；Preset 管理未写 ReviewLog、未改卡片数量、未自动重排。
+- 临时普通 Preset 已全部删除，主账号最终只保留 Default；English/French 均绑定 Default。
+- 设置相关分组 Feature 回归 101 tests / 513 assertions、Unit 652 tests / 1518 assertions、Node guards、前端构建和双 viewport 页面验收通过。
+- 本阶段结束后停止，未进入 Browser / ReviewCardManage。
 
 #### Settings UX-1 修复目标
 
@@ -340,4 +351,4 @@ V1A 生效后：
 - desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
 - 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
 - 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
-- ADR-0024 记录 V1A，ADR-0025 记录 V1B，ADR-0026 记录 V1C，ADR-0027 记录 V1D 的 Settings UX-1。V1A–V1C 已生产关闭；Settings UX-1 已由网页端使用 DevSpace5、自动回归和 Chrome DevTools 双 viewport 验收；V1D 仍需完成跨用户/跨语言最终生产关闭矩阵。
+- ADR-0024 记录 V1A，ADR-0025 记录 V1B，ADR-0026 记录 V1C，ADR-0027 记录 V1D 的 Settings UX-1。V1A–V1D 均已生产关闭；V1D 的双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定和无自动重排矩阵已由网页端使用 DevSpace5 与 Chrome DevTools 完成。

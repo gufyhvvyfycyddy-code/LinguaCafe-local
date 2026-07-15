@@ -19,14 +19,27 @@
  * @returns {number} Sidebar width in px
  */
 export function getReaderSidebarWidthForWorkspace(width) {
-    if (width >= 1500) return 600;
-    if (width >= 1280) return 560;
-    if (width >= 1080) return 520;
+    if (width >= 1500) return 540;
+    if (width >= 1280) return 500;
+    if (width >= 1080) return 460;
     return 400;
 }
 
 /**
- * Return the sidebar width as a CSS string (e.g. '600px', '560px').
+ * Return the full horizontal track reserved for the sidebar.
+ *
+ * The 24px difference keeps the sidebar's rounded outer edge visible instead
+ * of letting the panel touch the reader card boundary.
+ *
+ * @param {number} width - Workspace width in px
+ * @returns {number} Reserved sidebar track width in px
+ */
+export function getReaderSidebarReservationWidthForWorkspace(width) {
+    return getReaderSidebarWidthForWorkspace(width) + 24;
+}
+
+/**
+ * Return the sidebar panel width as a CSS string (e.g. '540px', '500px').
  *
  * @param {number} width - Workspace width in px
  * @returns {string} Sidebar width CSS value
@@ -55,7 +68,7 @@ export function getMinimumReaderWidthForWorkspace(width) {
  * @returns {boolean} True if sidebar fits
  */
 export function doesReaderSidebarFitWorkspace(width, spacing = 72) {
-    const sidebarWidth = getReaderSidebarWidthForWorkspace(width);
+    const sidebarReservationWidth = getReaderSidebarReservationWidthForWorkspace(width);
     const minimumReaderWidth = getMinimumReaderWidthForWorkspace(width);
-    return width >= minimumReaderWidth + sidebarWidth + spacing;
+    return width >= minimumReaderWidth + sidebarReservationWidth + spacing;
 }

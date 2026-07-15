@@ -1,5 +1,7 @@
 # ReaderWorkspaceSizing-Convergence-1: 阅读页宽度计算重复规则收敛
 
+> **2026-07-15 follow-up authority**：本文件第 1–8 节记录首次“行为不变”的历史收敛。用户真实截图随后证明 600px 宽屏侧栏几乎贴住阅读容器边界，因此 `ReaderSidebar-Boundary-Fix-1` 已调整宽度并补齐 `panel width` / `reservation width` 两层契约。当前权威值见第 9 节。
+
 ## 1. 当前问题
 
 ### 哪些文件重复了宽度断点规则
@@ -154,3 +156,37 @@ export function doesReaderSidebarFitWorkspace(width, spacing = 72);
 4. text reader smoke guard（如果 auth 可用）— 保证 P0 用例通过
 5. 代码审查：确认 helper 是纯函数、不访问 DOM/Vue/Vuex/window
 6. 人工检查 diff：确认没有多余修改
+
+## 9. ReaderSidebar-Boundary-Fix-1（2026-07-15）
+
+### 9.1 用户问题与根因
+
+真实宽屏页面中，`#fullscreen-box` 工作区约 1524px。旧规则同时把查词侧栏宽度和阅读区右侧预留宽度设为 600px，侧栏右缘与阅读容器右缘仅剩约 0.67px，视觉上像被窗口裁断，句子和面板也显得过度拥挤。
+
+根因不是候选预览数据缺失，而是布局把“面板本身宽度”和“为面板保留的横向轨道”视为同一个值，无法表达外侧留白；同时 `TextBlockGroup.vue` 仍保留第三份旧断点，存在后续漂移风险。
+
+### 9.2 当前权威宽度契约
+
+| Workspace width | Panel width | Reserved track | Visible boundary |
+|---:|---:|---:|---:|
+| `>= 1500` | 540px | 564px | 24px |
+| `>= 1280` | 500px | 524px | 24px |
+| `>= 1080` | 460px | 484px | 24px |
+| `< 1080` | 400px | 424px | 24px（仅适用于 fit 判断；窄屏继续使用浮动面板） |
+
+`ReaderWorkspaceSizingService.js` 现在同时提供：
+
+- `getReaderSidebarWidthForWorkspace()`：实际面板宽度；
+- `getReaderSidebarCssWidthForWorkspace()`：面板 CSS 宽度；
+- `getReaderSidebarReservationWidthForWorkspace()`：面板宽度 + 24px 边界；
+- `doesReaderSidebarFitWorkspace()`：按完整 reserved track 判断是否使用宽屏侧栏。
+
+`TextReader.vue` 用 reservation width 设置右侧 padding；`VocabularySideBox.vue` 用 panel width 渲染面板；`TextBlockGroup.vue` 复用共享 panel helper，不再自带断点表。
+
+### 9.3 验收事实
+
+- 1920×1080：侧栏 540px、阅读区右侧预留 564px、实际可见边界约 24.67px；候选句子完整换行；文档无横向溢出。
+- 1780×861：侧栏 540px、实际可见边界约 24.67px、窗口右侧保留约 48.67px；候选预览完整显示；面板无横向溢出。
+- 900×900：宽屏侧栏不渲染，原 400px 浮动查词面板继续使用；候选预览完整显示；句子 `clientWidth === scrollWidth`；文档无横向溢出。
+- 自动测试锁定全部断点、24px reservation 差值以及 `TextBlockGroup.vue` 不得恢复旧 600px 重复规则。
+- 本轮不修改 API、Vuex、后端、WordSense、ReviewCard、ReviewLog、FSRS 或数据库。

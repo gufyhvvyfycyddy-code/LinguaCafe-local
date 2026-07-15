@@ -201,6 +201,7 @@
 
 <script>
     import TextToSpeechService from './../../services/TextToSpeechService';
+    import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
         resolveWordElementFromEventTarget,
         resolveWordElementFromPoint,
@@ -2431,10 +2432,7 @@
                 return readerWorkspace ? readerWorkspace.clientWidth : window.innerWidth;
             },
             readerSidebarWidthForContentWidth(width) {
-                if (width >= 1500) return 600;
-                if (width >= 1280) return 560;
-                if (width >= 1080) return 520;
-                return 400;
+                return getReaderSidebarWidthForWorkspace(width);
             },
             scrollToVocabBox() {
                 setTimeout(() => {

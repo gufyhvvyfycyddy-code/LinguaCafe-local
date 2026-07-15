@@ -274,7 +274,11 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager, defaultSettings } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
-    import { getReaderSidebarWidthForWorkspace, doesReaderSidebarFitWorkspace } from './../../services/ReaderWorkspaceSizingService';
+    import {
+        getReaderSidebarReservationWidthForWorkspace,
+        getReaderSidebarWidthForWorkspace,
+        doesReaderSidebarFitWorkspace,
+    } from './../../services/ReaderWorkspaceSizingService';
 
     export default {
         data: function() {
@@ -462,7 +466,7 @@
                 return this.readerSidebarWidthForContentWidth(this.readerWorkspaceWidth());
             },
             sidebarPaddingWidth() {
-                return this.sidebarWidthValue + 'px !important';
+                return getReaderSidebarReservationWidthForWorkspace(this.readerWorkspaceWidth()) + 'px !important';
             },
         },
         methods: {
