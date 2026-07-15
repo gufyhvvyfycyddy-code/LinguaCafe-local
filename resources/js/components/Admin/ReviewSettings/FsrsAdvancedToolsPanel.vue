@@ -7,25 +7,43 @@
                     <div class="caption grey--text mb-4">参数优化、旧卡重排和恢复默认参数属于低频操作，需要时再打开。</div>
 
                     <v-card outlined class="rounded-lg mb-4">
-                        <v-card-title class="subtitle-1">自动优化参数</v-card-title>
-                        <v-card-text>
-                            <div class="body-2">根据正式词义复习记录计算更适合你的 FSRS 参数。</div>
-                            <div class="caption grey--text mt-1">预览不会保存参数，也不会重排已有卡片。</div>
-                            <v-btn class="mt-3" small outlined color="primary" :loading="optimizationLoading" :disabled="optimizationLoading" @click="runOptimizationPreview">
-                                根据我的复习记录优化
-                            </v-btn>
-
-                            <v-alert v-if="optimizationMessage && !optimizationPreview" dense outlined :type="optimizationCanOptimize ? 'info' : 'warning'" class="mt-3 mb-0">
-                                {{ optimizationMessage }}
+                        <v-card-title class="subtitle-1">参数优化</v-card-title>
+                        <v-card-text aria-live="polite">
+                            <v-progress-linear v-if="advancedToolsView.dataState === 'loading'" indeterminate color="primary" class="mb-3" />
+                            <v-alert dense outlined :type="stateAlertType" class="mb-3">
+                                {{ advancedToolsView.primaryMessage }}
                             </v-alert>
 
-                            <div v-if="optimizationPreview && optimizationPreview.preview_available" class="mt-4">
+                            <v-progress-linear
+                                v-if="['insufficient', 'ready'].includes(advancedToolsView.dataState)"
+                                :value="advancedToolsView.progressPercent"
+                                height="8"
+                                rounded
+                                color="primary"
+                                class="mb-3"
+                                aria-hidden="true"
+                            />
+
+                            <v-btn
+                                v-if="!['loading', 'error'].includes(advancedToolsView.dataState)"
+                                small
+                                outlined
+                                color="primary"
+                                :loading="optimizationLoading"
+                                :disabled="optimizationLoading || !advancedToolsView.canPreviewOptimization"
+                                @click="runOptimizationPreview"
+                            >
+                                {{ advancedToolsView.previewButtonLabel }}
+                            </v-btn>
+                            <v-btn v-else-if="advancedToolsView.dataState === 'error'" small outlined color="primary" @click="loadOptimizationStatus">重新加载诊断</v-btn>
+
+                            <div v-if="!advancedToolsView.canPreviewOptimization && ['empty', 'insufficient'].includes(advancedToolsView.dataState)" class="caption grey--text mt-2">
+                                有效记录达到 300 条后，预览按钮才会启用。
+                            </div>
+                            <v-alert v-if="optimizationMessage" dense outlined type="error" class="mt-3 mb-0">{{ optimizationMessage }}</v-alert>
+
+                            <div v-if="advancedToolsView.dataState !== 'error' && optimizationPreview && optimizationPreview.preview_available" class="mt-4">
                                 <v-alert dense outlined type="success">{{ optimizationPreview.message }}</v-alert>
-                                <v-row dense>
-                                    <v-col cols="4"><v-sheet outlined rounded class="pa-3 text-center"><strong>{{ optimizationPreview.review_count }}</strong><div class="caption">复习记录</div></v-sheet></v-col>
-                                    <v-col cols="4"><v-sheet outlined rounded class="pa-3 text-center"><strong>{{ optimizationPreview.card_count }}</strong><div class="caption">词义卡</div></v-sheet></v-col>
-                                    <v-col cols="4"><v-sheet outlined rounded class="pa-3 text-center"><strong>{{ optimizationPreview.parameter_count }}</strong><div class="caption">参数</div></v-sheet></v-col>
-                                </v-row>
                                 <v-expansion-panels flat class="mt-3">
                                     <v-expansion-panel>
                                         <v-expansion-panel-header class="body-2">查看参数明细</v-expansion-panel-header>
@@ -50,31 +68,42 @@
                                 </v-btn>
                             </div>
                             <v-alert v-if="optimizationSuccess" dense outlined type="success" class="mt-3 mb-0">{{ optimizationSuccess }}</v-alert>
-                        </v-card-text>
-                    </v-card>
 
-                    <v-card outlined class="rounded-lg mb-4">
-                        <v-card-title class="subtitle-1">参数来源与诊断</v-card-title>
-                        <v-card-text>
-                            <div class="mb-2"><strong>当前参数：</strong>{{ parameterSourceLabel }}</div>
-                            <div class="caption grey--text">参数数量：{{ parameterCount }} 个</div>
-                            <div v-if="parameterLastOptimizedAt" class="caption grey--text">最近优化：{{ formatDate(parameterLastOptimizedAt) }}</div>
-                            <v-alert v-if="parameterWarning" dense outlined type="warning" class="mt-3">{{ parameterWarning }}</v-alert>
-
-                            <div v-if="diagnostics" class="mt-4">
-                                <v-divider class="mb-3" />
-                                <div><strong>有效复习记录：</strong>{{ diagnostics.eligible_review_logs }} / {{ diagnostics.min_required }}</div>
-                                <div><strong>可训练卡片：</strong>{{ diagnostics.trainable_cards }} 张</div>
-                                <v-chip small outlined :color="diagnosisColor" class="mt-2">{{ diagnostics.diagnosis_message }}</v-chip>
-                                <div v-if="diagnostics.excluded_review_logs > 0" class="caption grey--text mt-2">
-                                    不参与计算的旧记录：{{ diagnostics.excluded_review_logs }} 条；其中 reset：{{ diagnostics.reset_review_logs }} 条。
+                            <template v-if="!['loading', 'error'].includes(advancedToolsView.dataState)">
+                                <v-divider class="my-4" />
+                                <div class="d-flex flex-wrap align-center">
+                                    <v-chip small outlined :color="parameterStateColor" class="mr-2 mb-2">{{ advancedToolsView.parameterLabel }}</v-chip>
+                                    <span class="body-2 mb-2">{{ advancedToolsView.parameterDescription }}</span>
                                 </div>
-                            </div>
+                                <div class="caption grey--text">参数数量：{{ advancedToolsView.parameterCount }} 个</div>
+                                <div v-if="advancedToolsView.lastOptimizedAt" class="caption grey--text">最近优化：{{ formatDate(advancedToolsView.lastOptimizedAt) }}</div>
 
-                            <v-btn class="mt-4" small outlined color="secondary" :loading="restoreLoading" :disabled="restoreLoading" @click="restoreDefaultParameters">
-                                恢复默认参数
-                            </v-btn>
-                            <v-alert v-if="restoreStatus" dense outlined type="success" class="mt-3 mb-0">{{ restoreStatus }}</v-alert>
+                                <v-btn
+                                    class="mt-3"
+                                    small
+                                    outlined
+                                    color="secondary"
+                                    :loading="restoreLoading"
+                                    :disabled="restoreLoading || !advancedToolsView.canRestoreDefaults"
+                                    @click="restoreDefaultParameters"
+                                >
+                                    {{ advancedToolsView.restoreButtonLabel }}
+                                </v-btn>
+                                <v-alert v-if="restoreStatus" dense outlined type="success" class="mt-3 mb-0">{{ restoreStatus }}</v-alert>
+
+                                <v-expansion-panels v-if="advancedToolsView.showDiagnosticDetails" v-model="diagnosticPanels" flat class="mt-4">
+                                    <v-expansion-panel>
+                                        <v-expansion-panel-header class="body-2">查看诊断详情</v-expansion-panel-header>
+                                        <v-expansion-panel-content>
+                                            <div class="caption">符合条件的卡片：{{ advancedToolsView.diagnosticDetails.eligibleCards }} 张</div>
+                                            <div class="caption">不参与计算的记录：{{ advancedToolsView.diagnosticDetails.excludedReviewLogs }} 条</div>
+                                            <div class="caption">其中 reset 记录：{{ advancedToolsView.diagnosticDetails.resetReviewLogs }} 条</div>
+                                            <div class="caption">已确认词义卡：{{ advancedToolsView.diagnosticDetails.confirmedSenseCards }} 张</div>
+                                            <div class="caption">已拒绝词义：{{ advancedToolsView.diagnosticDetails.rejectedWordSenses }} 条</div>
+                                        </v-expansion-panel-content>
+                                    </v-expansion-panel>
+                                </v-expansion-panels>
+                            </template>
                         </v-card-text>
                     </v-card>
 
@@ -170,22 +199,20 @@
 
 <script>
 import * as AdminReviewSettingsApi from '../../../services/AdminReviewSettingsApi';
+import { buildFsrsAdvancedToolsPresentation } from '../../../services/FsrsAdvancedToolsPresentation';
 
 export default {
     data() {
         return {
+            optimizationStatus: null,
+            optimizationStatusLoading: true,
+            optimizationStatusError: false,
             optimizationLoading: false,
             optimizationApplyLoading: false,
-            optimizationCanOptimize: false,
             optimizationMessage: '',
             optimizationPreview: null,
             optimizationSuccess: '',
-            parameterSource: 'default',
-            parameterSourceLabel: '当前使用默认参数',
-            parameterLastOptimizedAt: null,
-            parameterCount: 19,
-            parameterWarning: '',
-            diagnostics: null,
+            diagnosticPanels: [],
             restoreLoading: false,
             restoreStatus: '',
             reschedulePreviewLoading: false,
@@ -208,10 +235,21 @@ export default {
         };
     },
     computed: {
-        diagnosisColor() {
-            if (!this.diagnostics) return 'grey';
-            if (this.diagnostics.diagnosis_level === 'ready') return 'success';
-            if (['insufficient', 'needs_more_card_history'].includes(this.diagnostics.diagnosis_level)) return 'warning';
+        advancedToolsView() {
+            return buildFsrsAdvancedToolsPresentation(this.optimizationStatus, {
+                loading: this.optimizationStatusLoading,
+                error: this.optimizationStatusError,
+            });
+        },
+        stateAlertType() {
+            if (this.advancedToolsView.dataState === 'error') return 'error';
+            if (this.advancedToolsView.dataState === 'ready') return 'success';
+            if (this.advancedToolsView.dataState === 'insufficient') return 'warning';
+            return 'info';
+        },
+        parameterStateColor() {
+            if (this.advancedToolsView.parameterState === 'optimized') return 'success';
+            if (this.advancedToolsView.parameterState === 'unknown') return 'warning';
             return 'grey';
         },
         parameterRows() {
@@ -246,29 +284,30 @@ export default {
     },
     methods: {
         loadOptimizationStatus() {
+            this.optimizationStatusLoading = true;
+            this.optimizationStatusError = false;
+            this.optimizationMessage = '';
+            this.optimizationPreview = null;
+            this.optimizationSuccess = '';
             AdminReviewSettingsApi.getOptimizationStatus().then(response => {
-                const data = response.data;
-                this.optimizationCanOptimize = data.can_optimize;
-                this.optimizationMessage = data.message;
-                this.parameterSource = data.parameters_source || 'default';
-                this.parameterSourceLabel = data.parameters_source_label || '当前使用默认参数';
-                this.parameterLastOptimizedAt = data.last_optimized_at || null;
-                this.parameterCount = data.parameters_count ?? 19;
-                this.parameterWarning = data.parameters_warning || '';
-                this.diagnostics = data.diagnostics || null;
+                this.optimizationStatus = response.data;
+                this.diagnosticPanels = [];
             }).catch(() => {
-                this.optimizationCanOptimize = false;
-                this.optimizationMessage = '自动优化状态加载失败，请稍后再试。';
+                this.optimizationStatus = null;
+                this.optimizationStatusError = true;
+            }).finally(() => {
+                this.optimizationStatusLoading = false;
             });
         },
         runOptimizationPreview() {
+            if (!this.advancedToolsView.canPreviewOptimization) return;
             this.optimizationLoading = true;
+            this.optimizationMessage = '';
             this.optimizationPreview = null;
             this.optimizationSuccess = '';
             AdminReviewSettingsApi.previewOptimization().then(response => {
-                this.optimizationCanOptimize = response.data.can_optimize;
                 if (response.data.preview_available) this.optimizationPreview = response.data;
-                else this.optimizationMessage = response.data.message || '复习记录还不够，先继续复习一段时间再来优化。';
+                else this.optimizationMessage = response.data.message || '暂时无法生成优化预览，请重新加载诊断。';
             }).catch(() => { this.optimizationMessage = '检查失败了，请稍后再试。'; })
                 .finally(() => { this.optimizationLoading = false; });
         },
@@ -284,6 +323,7 @@ export default {
             }).finally(() => { this.optimizationApplyLoading = false; });
         },
         restoreDefaultParameters() {
+            if (!this.advancedToolsView.canRestoreDefaults) return;
             if (!window.confirm('这只会恢复 FSRS 默认参数，不会删除学习数据，也不会自动重排已有卡片。')) return;
             this.restoreLoading = true;
             this.restoreStatus = '';
