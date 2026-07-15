@@ -1067,3 +1067,9 @@ Mgmt-7-c is complete under ADR-0021. Content-only vocabulary updates cannot invo
 - Study Overview supports 30/90/365 days and private Saved Search current-membership scope, separates overdue from 30 future study days, reports explicit coverage/unavailable counts, and keeps query counts constant for 1/100/500-card fixtures.
 - Chrome acceptance passed for Saved Search CRUD/deep-link restore, effective today-only limit changes/reset, two real timed ratings plus undo audit semantics, and responsive Study Overview at exact 1920×1080 and 900×900 without horizontal overflow.
 - Exactly three additive reversible migrations were used. No FSRS math, lifecycle semantics, Custom Study, Preset, phrase review, `.env`, or notification behavior changed.
+
+## Manual Sense POS contract closure (2026-07-15)
+
+ADR-0022 independently closes the manual WordSense POS contract without reopening Mgmt-7-c. AI/dictionary/create/edit prefill and both manual create/update trust boundaries now converge on the eight canonical POS values; the six evidenced short aliases are normalized, while unknown values retain structured 422 behavior. Validation failures preserve the open form and have zero WordSense, ReviewCard, ReviewLog, stage, or learning-target side effects. ADR-0021 enrollment remains unchanged: default confirmed senses enroll at stage -1, `keep_new` remains stage 2, and no legacy word card is created.
+
+The current Gate recommendation is to let the user select one concrete Reader UI backlog problem and its acceptance result. Preset, Custom Study 1B / Card Marker, and real AI provider work still require unresolved product or environment decisions. No next Gate was started.

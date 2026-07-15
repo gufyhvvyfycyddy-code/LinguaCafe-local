@@ -11,7 +11,7 @@
 > | State | Work |
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A |
-> | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility |
+> | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Manual Sense POS canonicalization (ADR-0022) |
 > | Product Gates | FSRS-Anki-Mgmt-9 Preset; Custom Study 1B / Card Marker |
 > | Environment Gates | External AI/provider-dependent work remains separately gated |
 
@@ -427,6 +427,15 @@
 | Custom Study 1B / Card Marker | 1A 已生产关闭；1B 未开始；Card Marker 已在 ADR-0016 和实施计划登记为前置 Gate | marker 的对象、语义、筛选和持久化；当前不新增 migration，不用 lifecycle/leech 代替 marker |
 | AI Reading Assist | 手工包、解析、保存与阅读辅助主线已有完成能力；真实 provider 与自动本章分析仍分别受环境/产品 Gate 约束 | 是否启用 provider、调用成本、数据边界和人工确认步骤 |
 | Reader UI | Reader-UI-2/3/5/6-a/6-b/9 已完成；Reader-UI-1 后续轮次及 4/7/8 仍是产品 backlog | 每项按真实用户问题单独授权，不用百分比概括代码状态 |
+
+### 8.1 Manual Sense POS 收口后的 Gate readiness（2026-07-15）
+
+当前最适合下一轮选择的是 **Reader UI backlog 中的一项具体真实问题**：它不依赖外部 provider，也不预设新数据模型，但仍须由用户从 Reader-UI-1 后续轮次或 4/7/8 中指定一个问题及验收结果，Codex 不能自行替用户决定交互优先级。
+
+- Preset 尚需定义绑定维度（语言、材料组或其他学习集合）、继承规则和集合身份；这些是产品语义，不能由 Codex 猜定。
+- Custom Study 1B / Card Marker 尚需定义 marker 的对象、语义、筛选与持久化；在定义前不能推导 schema 或复用 lifecycle/leech 代替。
+- AI provider / 自动本章分析尚需用户授权 provider、成本上限、数据边界与人工确认步骤，并准备可用外部环境。
+- Reader UI 启动前只需用户给出一个具体痛点、目标交互和成功标准；本轮不进入任何 Gate 实现。
 
 下表仅保留为 **2026-07-10 历史建议顺序**，不再是当前执行入口：
 
