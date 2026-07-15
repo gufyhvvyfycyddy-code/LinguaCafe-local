@@ -1,10 +1,10 @@
 # LinguaCafe Review Settings Preset V1 计划
 
-> **状态**：V1A Completed / Production Closed; V1B Planned / Current Next Task; V1C–V1D Planned
+> **状态**：V1A–V1B Completed / Production Closed; V1C Planned / Current Next Task; V1D Planned
 > **日期**：2026-07-15
-> **实现基线**：`8a42566fcd8a64aae18b72d30480a9f9124558d1`
-> **当前授权阶段**：Preset V1B — Management Operations and UI
-> **后续阶段**：V1B 管理动作与 UI → V1C 多语言共享验收 → V1D 生产关闭
+> **实现基线**：`dc1f37c1`（V1A closure；V1B 见 ADR-0025）
+> **当前授权阶段**：Preset V1C — Multi-language Sharing and Consumer Convergence
+> **后续阶段**：V1C 消费者收敛 → V1D Settings UX and Production Closure
 
 ## 1. 一句话结论
 
@@ -195,7 +195,7 @@ V1A 生效后：
 
 ### Preset V1A — Default Preset Foundation and Transparent Binding
 
-**当前下一任务。**
+**Completed / Production Closed。实现与验收见 ADR-0024。**
 
 交付：
 
@@ -215,7 +215,7 @@ V1A 生效后：
 
 ### Preset V1B — Management Operations and UI
 
-**当前下一任务。**
+**Completed / Production Closed。实现与验收见 ADR-0025 和 `review-settings-preset-v1b-execution-plan.md`。**
 
 交付：
 
@@ -231,12 +231,14 @@ V1A 生效后：
 
 ### Preset V1C — Multi-language Sharing and Consumer Convergence
 
+**当前下一任务。**
+
 交付：
 
 - 多语言绑定真实流程；
 - 所有 FSRS、每日上限、队列和工作量模拟消费者复核；
 - 删除残留的业务层直接全局 Setting 读取；
-- 处理 `fsrs_parameters_previous`：当前它仍写在全局 Setting 中且没有真实读取方，必须选择删除、迁移为 Preset 级操作历史或明确废弃，禁止继续把它描述为多用户回滚权威；
+- 处理 `fsrs_parameters_previous`：当前它仍写在全局 Setting 中且没有真实读取方；本阶段停止新写入和新删除，不再把它列为成功响应中的保存/删除 key，旧数据库行只视为无效历史残留；
 - 旧全局记录只保留明确兼容期，不再是运行时主来源。
 
 ### Preset V1D — Settings UX and Production Closure
@@ -336,4 +338,4 @@ V1A 生效后：
 - desired retention、FSRS 参数、每日上限、队列顺序、工作量模拟、重排预览/确认和 Study Overview 均使用显式用户 + 语言上下文。
 - 现有 endpoint path、请求字段和响应字段保持兼容；generic global endpoint 允许 preset-owned 与真正 global key 混合请求。
 - 设置页只增加“当前 Preset：Default / 当前语言”只读识别，没有 V1B 管理动作。
-- ADR-0024 是实现决策记录；网页端已于 2026-07-15 使用 DevSpace5 与 Chrome DevTools 完成独立验收，V1B 现已成为当前下一任务。
+- ADR-0024 记录 V1A；ADR-0025 记录 V1B。两阶段均已由网页端使用 DevSpace5 与 Chrome DevTools 完成独立验收，V1C 现为当前下一任务。
