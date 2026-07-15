@@ -3046,7 +3046,7 @@ class WordSenseTest extends TestCase
         $response->assertJsonPath('updated_word.stage_changed', false);
     }
 
-    public function test_manual_sense_ensures_word_card_for_learning_word_without_card(): void
+    public function test_manual_sense_does_not_create_word_card_for_learning_word_without_card(): void
     {
         $word = $this->createWord('nocards');
         $word->update(['stage' => -5]); // Learning 5, no word card
