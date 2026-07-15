@@ -19,6 +19,7 @@ const settingsAdr = read('docs/adr/ADR-0023-settings-architecture-convergence.md
 const roadmap = read('docs/plans/anki-aligned-product-and-architecture-roadmap.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
+const presetPlan = read('docs/plans/review-settings-preset-v1-plan.md');
 
 const masterAuthority = section(master, '> **Current authority — 2026-07-15**', '> **Custom Study 1A shared card update');
 const openWork = section(master, '## 4. Open Work Registry（当前唯一开放工作账本）', '## 5. 颜色语义规则');
@@ -27,14 +28,15 @@ const handoffAuthority = section(handoff, '> **Current authority — 2026-07-15*
 const manualClosure = section(handoff, '## Manual Sense shared form corrective follow-up (2026-07-15)', null);
 
 assert.match(masterAuthority, /Settings architecture convergence/);
-assert.match(masterAuthority, /Current Next Task \| Preset V1/);
+assert.match(masterAuthority, /Current Next Task \| Preset V1A — Default Preset Foundation and Transparent Binding/);
 assert.match(masterAuthority, /27 production files over 500 lines, 10 over 1,000, and 2 over 1,500/);
 assert.match(masterAuthority, /6\.5\/10, localized high burden/);
 assert.doesNotMatch(masterAuthority, /web acceptance pending/i);
 assert.match(masterAuthority, /old “overall architecture closure 100%” statement is historical/);
 
 assert.match(openWork, /Settings architecture convergence \| Completed \/ Production Closed/);
-assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1 \| Planned \/ Current Next Task/);
+assert.match(openWork, /FSRS-Anki-Mgmt-9 Preset V1A \| Planned \/ Current Next Task/);
+assert.match(openWork, /Preset V1B–V1D \| Planned/);
 assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Planned/);
 assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
 assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
@@ -58,11 +60,17 @@ for (const term of orderedRoadmapTerms) {
     assert.ok(current > previous, `roadmap term must exist in order: ${term}`);
     previous = current;
 }
-assert.match(roadmap, /Preset V1 绑定用户 \+ 语言/);
+assert.match(roadmap, /Preset 归属于用户；每个用户 \+ 学习语言只绑定一个 Preset/);
+assert.match(roadmap, /Preset V1\.1 Leech Configuration Product Gate/);
+assert.match(roadmap, /review-settings-preset-v1-plan\.md/);
 assert.match(roadmap, /Card Marker 参考 Anki Card Flag，落在 ReviewCard/);
 assert.match(roadmap, /Phase 1：Settings 架构收敛[\s\S]*Completed \/ Production Closed/);
 assert.match(roadmap, /Phase 2：Preset V1[\s\S]*Planned \/ Current Next Task/);
 assert.match(roadmap, /6\.5 \/ 10，局部高负担/);
+assert.match(roadmap, /27 个生产文件超过 500 行/);
+assert.match(roadmap, /10 个生产文件超过 1,000 行/);
+assert.match(roadmap, /2 个生产文件超过 1,500 行/);
+assert.doesNotMatch(roadmap, /\| 1 \| Settings 架构收敛 \| Preset 的前置地基/);
 assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增加职责/);
 
 assert.match(executionOrder, /Settings architecture convergence/);
@@ -80,7 +88,7 @@ assert.match(settingsAdr, /SettingsService.*1,006 lines/);
 assert.match(settingsAdr, /No Preset is implemented/);
 
 assert.match(handoffAuthority, /Settings architecture convergence: \*\*Accepted \/ Production Closed\*\*/);
-assert.match(handoffAuthority, /Current next task: \*\*Preset V1\*\*/);
+assert.match(handoffAuthority, /Current next task: \*\*Preset V1A — Default Preset Foundation and Transparent Binding\*\*/);
 assert.match(handoffAuthority, /6\.5\/10, localized high burden/);
 assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
@@ -89,6 +97,7 @@ assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
 assert.match(index, /Settings architecture convergence are Accepted \/ Production Closed/);
 assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
+assert.match(index, /review-settings-preset-v1-plan\.md/);
 assert.match(index, /old “overall architecture closure 100%” statement is historical/);
 assert.match(index, /§27\.8 — DevSpace PHP \/ PHPUnit 502 截断规则/);
 
@@ -101,5 +110,13 @@ assert.match(collaborationRules, /将完整套件拆成 Unit、Feature 或按模
 assert.match(collaborationRules, /Incomplete \/ DevSpace PHP verification unavailable/);
 assert.match(collaborationRules, /交给下一轮相关 Codex 复杂主任务执行，不再回退尝试原始 DevSpace 流式方案/);
 assert.match(collaborationRules, /禁止为了绕开 502 使用 SQLite/);
+
+assert.match(presetPlan, /Preset V1A — Default Preset Foundation and Transparent Binding/);
+assert.match(presetPlan, /每个 `user_id \+ language_id` 只能绑定一个 Preset/);
+assert.match(presetPlan, /Default Preset 可以修改和复制，不能重命名为其他名称，不能删除/);
+assert.match(presetPlan, /Preset V1\.1 Leech Configuration Product Gate/);
+assert.match(presetPlan, /ReviewSettingsResolver/);
+assert.match(presetPlan, /不自动修改任何 `fsrs_due_at`/);
+assert.match(presetPlan, /停止，不进入新增\/复制\/重命名\/删除\/切换/);
 
 console.log('Master plan integrity contract passed.');

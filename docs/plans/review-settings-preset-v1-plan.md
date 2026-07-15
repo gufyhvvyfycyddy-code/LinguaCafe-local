@@ -1,0 +1,296 @@
+# LinguaCafe Review Settings Preset V1 计划
+
+> **状态**：Current / Authoritative Design
+> **日期**：2026-07-15
+> **代码基线**：`36bf8257c720ca7b4f65e737acb907e0de724567`
+> **当前授权阶段**：Preset V1A — Default Preset Foundation and Transparent Binding
+> **后续阶段**：V1B 管理动作与 UI → V1C 多语言共享验收 → V1D 生产关闭
+
+## 1. 一句话结论
+
+Preset 是用户拥有的命名复习配置，一个用户的一种学习语言在任一时刻只绑定一个 Preset。V1A 先把现有稳定设置迁入 Default Preset，并让现有页面和调度透明读取当前用户 + 当前语言的有效配置；V1B 再增加新增、复制、重命名、删除和切换。
+
+## 2. 为什么现在做
+
+Settings 架构已经收敛为薄页面容器、独立设置区、单一 API client 和后端领域服务。当前遗留设置仍主要保存在 `settings.user_id = -1` 的全局记录中，无法表达：
+
+- 不同用户使用不同复习目标；
+- 同一用户的英语和日语使用不同配置；
+- 多种语言共享一套配置；
+- 一次修改影响所有绑定对象；
+- 配置的复制、重命名和安全删除。
+
+因此 Preset 是 Settings 收敛后的下一项正式产品能力。
+
+## 3. Anki 官方事实
+
+### 3.1 产品语义
+
+Anki Deck Options Preset 的稳定语义：
+
+- 多个 deck 可以共享一个 Preset；
+- 修改 Preset 会影响所有使用它的 deck；
+- Add Preset 从默认值创建；
+- Clone 复制当前 Preset；
+- 支持 Rename 和 Delete；
+- 新建 deck 默认使用 Default；
+- 配置变化默认不追溯修改已排程卡片，重排必须显式执行。
+
+LinguaCafe 没有稳定 deck 树，因此把共享对象映射为“用户 + 学习语言”。
+
+### 3.2 架构语义
+
+Anki 官方实现把 `deckconfig` 作为核心领域模块；Qt `DeckOptionsDialog` 主要打开独立 Web 页面，配置读取、更新和删除进入核心服务。LinguaCafe 采用同一方向：
+
+- Preset 规则和持久化进入后端领域服务；
+- HTTP payload 形成稳定契约；
+- Vue 页面只展示、选择和提交，不复制配置合并与隔离规则；
+- 调度消费者只读取一个“当前有效配置”入口。
+
+### 3.3 官方来源
+
+- Anki Manual — Deck Options / Presets
+- Anki repository — `rslib/src/deckconfig`
+- Anki repository — `qt/aqt/deckoptions.py`
+- Anki repository — legacy `qt/aqt/deckconf.py`（新增、复制、重命名、删除行为参考）
+
+## 4. 字幕工程原则
+
+本计划结合项目库九份 AI 编程 / spec / harness 字幕，采用以下门禁：
+
+1. 先冻结对象身份、归属、绑定和删除语义，再开发 UI。
+2. 每条业务规则只有一个后端入口，页面和调度不得各写一份。
+3. Spec 只记录已经稳定的决定；仍在探索的 Leech 配置不进入 V1 核心 schema。
+4. 权限、用户隔离、语言隔离、迁移兼容和不自动重排必须进入可执行 harness。
+5. 每阶段形成可独立验收的竖切，不一次开发完整 Preset 产品。
+6. 拆分按职责和数据流，不按文件行数机械切块。
+7. 真实页面和数据库事实负责最终验收，Agent 自述不能代替证据。
+
+## 5. Preset V1 产品契约
+
+### 5.1 身份与归属
+
+- Preset 归属于一个用户。
+- Preset 名称在同一用户内必须唯一；保存前 trim，空名称拒绝。
+- 每个用户必须有且只有一个 Default Preset。
+- Default Preset 可以修改和复制，不能重命名为其他名称，不能删除。
+- 不同用户可以使用相同 Preset 名称，数据绝不共享。
+
+### 5.2 用户 + 语言绑定
+
+- 每个 `user_id + language_id` 只能绑定一个 Preset。
+- 一个 Preset可以同时被同一用户的多种语言绑定。
+- 修改 Preset 后，所有绑定语言下次读取时立即使用新配置。
+- 新语言首次进入复习设置时绑定用户自己的 Default Preset。
+- 不创建 deck/subdeck 树，不把书籍、章节或 Saved Search 绑定为 Preset。
+
+### 5.3 新增、复制、重命名、删除、切换
+
+这些动作在 V1B 实现，V1A 先冻结语义：
+
+- **新增**：从系统默认值创建新 Preset。
+- **复制**：完整复制当前 Preset 的 V1 配置，生成新的独立 Preset。
+- **重命名**：只改变名称，不改变绑定和配置。
+- **切换**：只改变当前用户 + 当前语言的绑定，不修改卡片和 ReviewLog。
+- **删除**：Default 禁止删除；删除普通 Preset 时，把该用户所有受影响语言在同一事务内重新绑定到 Default，再删除 Preset，禁止留下孤儿绑定。
+
+### 5.4 生效与重排
+
+- 保存 Preset 后只影响后续设置读取和后续评分。
+- 不自动重排已存在的 `fsrs_due_at`。
+- 需要改变既有卡片到期日时，仍必须进入现有“预览 → 风险确认 → 正式重排”流程。
+- 切换、复制、重命名、删除均不写 ReviewLog，不改变 lifecycle，不创建或删除 WordSense / ReviewCard。
+
+## 6. Preset V1 配置范围
+
+### 6.1 V1 核心字段
+
+只收纳已经存在并有稳定测试契约的设置：
+
+1. `fsrs.desired_retention`
+2. `fsrs.parameters`
+3. `fsrs.parameters_source`
+4. `fsrs.parameters_optimized_at`
+5. `daily_limits.new_cards_enabled`
+6. `daily_limits.new_cards_per_day`
+7. `daily_limits.reviews_enabled`
+8. `daily_limits.maximum_reviews_per_day`
+9. `daily_limits.new_cards_ignore_review_limit`
+10. `queue_order.interday_learning_review_order`
+11. `queue_order.new_review_order`
+12. `queue_order.review_sort_order`
+13. `queue_order.new_sort_order`
+
+配置必须带 `schema_version = 1`，通过单一 Value Object / validator 归一化。
+
+### 6.2 暂不进入 V1 的字段
+
+- today-only 临时覆盖；
+- Custom Study 条件和 card limit；
+- lifecycle / bury / suspend / archive；
+- Card Marker；
+- Saved Search；
+- 任意 deck/subdeck 结构；
+- 自动重排开关；
+- UI 主题、字体、词典、API、Jellyfin、Anki 导出设置；
+- `fsrs_parameters_previous` 等一次性操作快照。
+
+### 6.3 Leech 配置修正
+
+Anki 的 Leech threshold/action 属于 Deck Options，但 LinguaCafe 当前 `SenseReviewLeechPolicy` 使用更丰富的 stable / struggling / leech 分类，并将暂停动作与 lifecycle 明确分离。当前代码没有稳定的 Leech 设置接口。
+
+因此：
+
+- Leech 阈值和处理方式不进入 Preset V1A/V1B 核心 schema；
+- 保持现有 Policy 行为不变；
+- 以后以 `Preset V1.1 Leech Configuration Product Gate` 单独设计；
+- 禁止为了“对齐 Anki”直接把常量搬进 JSON 或在前端复制分类规则。
+
+## 7. 目标架构
+
+### 7.1 持久化对象
+
+建议使用两个 additive-only 表，最终字段名由实现时按现有 Laravel 规范确定：
+
+1. `review_setting_presets`
+   - `id`
+   - `user_id`
+   - `name`
+   - `config_schema_version`
+   - `config` JSON/TEXT
+   - `is_default`
+   - timestamps
+   - 同一用户名称唯一
+   - 同一用户只能一个 Default
+
+2. `review_setting_preset_bindings`
+   - `id`
+   - `user_id`
+   - `language_id`
+   - `preset_id`
+   - timestamps
+   - `user_id + language_id` 唯一
+   - binding 的 user 必须和 Preset owner 一致
+
+不得在旧 `settings` 表中继续拼接语言前缀名称，也不得把完整 Preset 塞进 `users` 表。
+
+### 7.2 领域边界
+
+- `ReviewSettingsPresetConfig`：V1 schema、默认值、验证和归一化；无 DB、Auth、Request。
+- `ReviewSettingsPresetService`：新增、复制、重命名、删除、读取；V1A 只实现 Default 建立和读取所需部分。
+- `ReviewSettingsPresetBindingService`：用户 + 语言绑定和所有权校验。
+- `ReviewSettingsResolver`：返回当前用户 + 当前语言唯一有效配置；调度和设置领域的单一读取入口。
+- `LegacyReviewSettingsSnapshotService`：只负责从旧全局设置生成首次 Default 配置；不得长期成为双写层。
+- `SettingsService`：继续保持兼容门面，不重新膨胀。
+
+### 7.3 单一数据流
+
+V1A 生效后：
+
+`authenticated user + selected language → binding → preset → ReviewSettingsResolver → existing settings services / FSRS consumers`
+
+旧全局设置只用于首次兼容快照和安全 fallback。Default Preset 建立后，禁止在新 Preset 和旧全局记录之间长期双写。
+
+## 8. 分阶段实施
+
+### Preset V1A — Default Preset Foundation and Transparent Binding
+
+**当前下一任务。**
+
+交付：
+
+- additive migration、模型和约束；
+- V1 config Value Object / validator；
+- Default Preset 幂等建立；
+- 当前用户 + 当前语言唯一绑定；
+- 从旧全局设置生成首次兼容快照；
+- `ReviewSettingsResolver` 单一有效配置入口；
+- 现有目标保持率、FSRS 参数、每日上限和队列顺序读取接入 resolver；
+- 现有 endpoint 和 payload 保持兼容；
+- 设置页只增加只读的“当前 Preset：Default”识别，不增加管理菜单；
+- 用户隔离、语言隔离、并发幂等、legacy fallback、无自动重排、无 ReviewLog 写入测试；
+- 双 viewport MCP Chrome 验收。
+
+停止条件：完成 V1A 后停止，不进入新增/复制/重命名/删除/切换。
+
+### Preset V1B — Management Operations and UI
+
+交付：
+
+- 列表、创建、复制、重命名、删除和切换 API；
+- 管理弹窗或独立设置区；
+- Default 保护、名称冲突、删除重绑定和多语言共享；
+- 设置页现有五个区域继续作为当前 Preset 的编辑器。
+
+### Preset V1C — Multi-language Sharing and Consumer Convergence
+
+交付：
+
+- 多语言绑定真实流程；
+- 所有 FSRS、每日上限、队列和工作量模拟消费者复核；
+- 删除残留的业务层直接全局 Setting 读取；
+- 旧全局记录只保留明确兼容期，不再是运行时主来源。
+
+### Preset V1D — Production Closure
+
+交付：
+
+- 全量自动回归；
+- 两个用户、至少两种语言的 Chrome 真实验收；
+- 新增、复制、修改共享、切换、删除重绑定、刷新持久化；
+- Network、Console、数据库 delta 和无重排证据；
+- 网页端总流程设计师最终 Accept。
+
+## 9. V1A 验收矩阵
+
+### 数据与权限
+
+- 用户 A 无法读取或绑定用户 B 的 Preset。
+- English 和 Japanese 可绑定不同 Preset，读取互不污染。
+- 相同用户 + 语言重复初始化只产生一个 binding 和一个 Default。
+- 并发初始化不产生重复 Default 或重复 binding。
+- Preset owner 与 binding user 不一致时拒绝。
+
+### 兼容
+
+- 未建立 Preset 时，从当前旧全局设置生成等价 Default。
+- 已建立 Preset 后，修改当前配置不再依赖旧全局记录。
+- 现有设置 GET/POST endpoint 和 payload 不变。
+- 旧调用方仍可通过 `SettingsService` 兼容门面工作。
+
+### 学习安全
+
+- 初始化、读取和保存 Preset 不创建/删除 WordSense、ReviewCard、ReviewLog。
+- 不改变 ReviewCard lifecycle。
+- 不自动修改任何 `fsrs_due_at`。
+- 不运行正式重排、恢复默认参数或撤销。
+- 不改变评分 key、score、label、hotkey。
+
+### 页面
+
+- 1920×1080 与 900×900 显示“当前 Preset：Default”。
+- 原五个设置区正常加载和保存。
+- 刷新后设置保持。
+- 无横向溢出，无新增 Console error/warning。
+- Network 只访问 LinguaCafe 本地 endpoint。
+
+## 10. 失败与回滚
+
+- migration 或初始化失败必须事务回滚，不留下半个 Preset 或孤儿 binding。
+- resolver 无法读取合法 Preset 时 fail closed，并返回可诊断错误；不得静默使用其他用户或其他语言配置。
+- 只有“该用户 + 语言尚未建立 Preset”时允许使用 legacy snapshot。
+- V1A 回滚时，旧全局设置仍可支持原版本；禁止在迁移中删除旧 Setting 记录。
+
+## 11. 明确禁止
+
+- 不实现 deck/subdeck。
+- 不实现 Preset 管理动作和管理 UI（属于 V1B）。
+- 不配置 Leech 阈值。
+- 不接触 today-only、Custom Study、Card Marker、Browser 重构、Reviewer 重构或 Reader 重构。
+- 不改 FSRS 算法。
+- 不自动重排旧卡。
+- 不删除旧 `settings` 记录。
+- 不做长期双写。
+- 不读取或修改 `.env`、`AGENTS.md`、`.omo/`、`.playwright-cli/`、`nul`。
+- 不清库，不执行 `migrate:fresh`、`db:wipe`、DROP、TRUNCATE 或 `--force`。
+- 不运行 notification script，不 DCP，不自动进入 V1B。
