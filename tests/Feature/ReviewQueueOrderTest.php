@@ -155,29 +155,37 @@ class ReviewQueueOrderTest extends TestCase
 
     public function test_intraday_cards_come_first(): void
     {
-        $s1 = $this->createSense('intraday');
-        $s2 = $this->createSense('review');
+        // Freeze to UTC noon so subHours(2) stays within the same learning date
+        // (project timezone is UTC; real run near midnight broke intraday classification).
+        Carbon::setTestNow(Carbon::today()->addHours(12));
 
-        // intraday: learning state, last_reviewed_at and due_at on same day
-        $intraday = $this->createCard($s1, [
-            'fsrs_state' => 'learning',
-            'fsrs_last_reviewed_at' => Carbon::now()->subHours(2),
-            'fsrs_due_at' => Carbon::now()->subMinutes(5),
-            'fsrs_stability' => 1.0,
-        ]);
+        try {
+            $s1 = $this->createSense('intraday');
+            $s2 = $this->createSense('review');
 
-        // review card due earlier
-        $review = $this->createCard($s2, [
-            'fsrs_state' => 'review',
-            'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
-            'fsrs_due_at' => Carbon::now()->subHours(1),
-        ]);
+            // intraday: learning state, last_reviewed_at and due_at on same day
+            $intraday = $this->createCard($s1, [
+                'fsrs_state' => 'learning',
+                'fsrs_last_reviewed_at' => Carbon::now()->subHours(2),
+                'fsrs_due_at' => Carbon::now()->subMinutes(5),
+                'fsrs_stability' => 1.0,
+            ]);
 
-        $this->saveQueueOrder(['review_sort_order' => 'due_stable']);
+            // review card due earlier
+            $review = $this->createCard($s2, [
+                'fsrs_state' => 'review',
+                'fsrs_last_reviewed_at' => Carbon::now()->subDays(5),
+                'fsrs_due_at' => Carbon::now()->subHours(1),
+            ]);
 
-        $ids = $this->senseCardIds();
-        $this->assertSame($intraday->id, $ids[0], 'Intraday card must come first');
-        $this->assertSame($review->id, $ids[1], 'Review card must come after intraday');
+            $this->saveQueueOrder(['review_sort_order' => 'due_stable']);
+
+            $ids = $this->senseCardIds();
+            $this->assertSame($intraday->id, $ids[0], 'Intraday card must come first');
+            $this->assertSame($review->id, $ids[1], 'Review card must come after intraday');
+        } finally {
+            Carbon::setTestNow();
+        }
     }
 
     public function test_review_sort_due_stable_orders_by_due_at_asc(): void
