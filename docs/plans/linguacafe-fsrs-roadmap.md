@@ -594,7 +594,7 @@
 | 中 | FSRS-Anki-Mgmt-6 | 每日上限设置页第一版 | ✅ 已完成 | 全局复习上限 + 新学上限设置页，暂不接入队列；fix：默认复习上限改为开启 200 + 校验收口 |
 | 中 | FSRS-Anki-Mgmt-7 | 复习队列每日上限接入 + 超额复习入口 | ✅ 已完成 | `/reviews` + `/reviews/senses` 队列限制 + 超额复习入口 |
 | 中 | FSRS-Anki-Mgmt-7-follow-up | 修复 `/reviews/senses` 绕过每日上限问题 | ✅ 已完成 | SenseReviewController 改用 dueCardsWithLimits，SettingsService is_queue_enforced 改为 true |
-| 中 | FSRS-Anki-Mgmt-7-b | 每日新学累计计数精确化 | 📋 计划中 | 当前只限制队列显示数量，未严格统计今日已学新卡累计 |
+| 中 | FSRS-Anki-Mgmt-7-b | 每日新学累计计数精确化 | ✅ 已完成（2026-07-14，ADR-0018） | 按学习日累计首次新卡引入统计，正式 sense/legacy 入口共用 |
 | 中 | Reader-FSRS-Highlight-1 | 阅读页绿色高亮改为 FSRS 熟悉度驱动 | ✅ 已完成 | 后端 TextBlockService 根据 ReviewCard stability/due_at/state 计算熟悉度 level 1-7 |
 | 中 | Reader-Visual-Semantics-1 | 绿色十档 + 紫色搜索命中 + 计划保全规则 | ✅ 已完成 | FSRS 10 档 (10%-100%) + AI 预览紫色高亮 + 文档明确保留所有未完成计划 |
 | 高 | Plan-Integrity-1 | 新增总控大计划 + 未完成任务总表入库 | ✅ 已完成 | 新增 `linguacafe-master-plan.md` 汇总所有任务线，详见总控计划 |
@@ -613,7 +613,7 @@
 | 高 | Reader-Layout-1-b | 修复全屏查词栏误变弹窗 + 加载性能审计 | ✅ 已完成 | 修复 vocabularySidebarFits 改用响应式 breakpoint + 实际空间判断；updateVocabBoxPosition 同步动态宽度；padding-right 改用 Vuetify computed |
 | 中 | Reader-Toolbar-UI-1 | 恢复阅读工具栏 + 精简添加释义表单 + 压缩词典结果 | ✅ 已完成 | 工具栏 z-index+背景修复；添加释义高级选项默认折叠；词典结果紧凑化+加号按钮 |
 | 低 | Reader-Toolbar-UI-1-b | 工具栏避让查词栏 + AI 建议可见带 chip + 词典二次紧凑化（左词右义+行内加号） | ✅ 已完成 | 工具栏移至左侧 float:left，reader card ml-2 移除，vocab-side-box 可视区域扩大；_sentenceIndex watcher 补充 |
-| 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | 📋 计划中 | 后续可选 |
+| 中 | FSRS-Anki-Mgmt-8 | 今日临时上限 / 暂停新卡 | ✅ 已完成（2026-07-14，ADR-0018） | today-only limit、暂停/恢复/重置已完成 |
 | 中 | FSRS-Anki-Mgmt-9 | Preset / 分组参数长期评估 | 📋 计划中 | 原 Mgmt-5 顺延 |
 
 ### 后续候选任务
@@ -625,7 +625,7 @@
 | 中 | AI-Reading-Assist-2-search | 详情页增加英文搜索框 | ✅ 已完成 | 大小写不敏感，覆盖 4 类详情字段 + trigger_words 数组 |
 | 中 | Lemma-Origin-1 | 英文原型识别回归侦察与修复 | 📋 计划中 | 独立于 FSRS 管理系列 |
 | 中 | Reader-UI-1 | 阅读页查词侧栏 UI 简化（第一轮 Reader-UI-1-a 已完成） | 📋 暂缓，后续轮次 | 见 ai-reading-assist-plan.md 第 7 节 |
-| 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | 📋 待审计 | 审计确认自动提升仍使用旧 SRS（EncounteredWord.setStage），建议后续单独任务 |
+| 中 | Mgmt-7-c | 自动提升词汇等级改为 FSRS 复习记录 | 🔄 第一安全切片已完成（2026-07-15，ADR-0020） | translation edit 不再隐式 setStage(-7)；完整职责迁移仍为 Product Gate；首次正式 FSRS 评分前的阅读颜色方案未决定，等待网页端 GPT 决定下一阶段 |
 
 **建议下一步**：等待网页端 GPT 根据 GitHub 最新代码和产品方向决定下一阶段。
 
