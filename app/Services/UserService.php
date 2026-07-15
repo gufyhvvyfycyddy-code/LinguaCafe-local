@@ -62,7 +62,7 @@ class UserService {
         $user->save();
 
         (new GoalService())->createGoalsForLanguage($user->id, $studyLanguage);
-        (new SettingsService())->updateUserSettings($user->id, [
+        app(SettingsService::class)->updateUserSettings($user->id, [
             'uiLanguage' => 'zh-CN',
         ]);
 
