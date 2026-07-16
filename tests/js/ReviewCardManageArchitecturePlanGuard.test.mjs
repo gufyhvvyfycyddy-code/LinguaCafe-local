@@ -10,6 +10,7 @@ const roadmapPath = join(root, 'docs', 'plans', 'anki-aligned-product-and-archit
 const masterPath = join(root, 'docs', 'plans', 'linguacafe-master-plan.md');
 const handoffPath = join(root, 'docs', 'plans', 'current-working-handoff.md');
 const indexPath = join(root, 'docs', 'DOCUMENTATION_INDEX.md');
+const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 
 assert.ok(existsSync(planPath), 'ReviewCardManage architecture convergence plan must exist');
 
@@ -18,8 +19,12 @@ const roadmap = readFileSync(roadmapPath, 'utf8');
 const master = readFileSync(masterPath, 'utf8');
 const handoff = readFileSync(handoffPath, 'utf8');
 const index = readFileSync(indexPath, 'utf8');
+const parent = readFileSync(parentPath, 'utf8');
+const parentLineCount = (parent.match(/\n/g) || []).length;
 
-assert.match(plan, /Implemented \/ Automated Verified \/ Browser Functional Checks Complete \/ Network Trace Pending \/ Awaiting web-side final acceptance/);
+assert.equal(parentLineCount, 2792, 'ReviewCardManage.vue current line count must remain explicit and reviewable');
+assert.match(plan, /Implemented \/ Automated Verified \/ Authenticated Network Acceptance Blocked \/ Incomplete/);
+assert.match(plan, /2,792 lines/);
 assert.match(plan, /3,411 lines/);
 assert.match(plan, /24 direct `axios\.` references/);
 assert.match(plan, /12 `v-dialog` blocks/);
@@ -44,7 +49,8 @@ assert.match(plan, /Feature tests must be grouped/);
 
 for (const doc of [roadmap, master, handoff, index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /Network Trace Pending|Network trace and web-side final acceptance still pending/);
+    assert.match(doc, /Authenticated Network Acceptance Blocked|authenticated Network acceptance is blocked/);
+    assert.match(doc, /2,792/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }
 
