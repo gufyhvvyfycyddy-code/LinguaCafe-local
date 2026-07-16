@@ -47,6 +47,7 @@ const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
+const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
@@ -61,6 +62,8 @@ function test(name, fn) {
 }
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const searchSurfaceSource = existsSync(SEARCH_SURFACE_PATH) ? readFileSync(SEARCH_SURFACE_PATH, 'utf-8') : '';
+const browserSource = `${source}\n${searchSurfaceSource}`;
 const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 
 // 1. File exists
@@ -75,22 +78,22 @@ test('Imports from ReviewCardLifecyclePresentation', () => {
 
 // 3. Has 'active' filter button
 test("Has 'active' filter button", () => {
-    assert.ok(source.includes("value=\"active\""), "Must have 'active' filter button");
+    assert.ok(browserSource.includes("value=\"active\""), "Must have 'active' filter button");
 });
 
 // 4. Has 'buried' filter button
 test("Has 'buried' filter button", () => {
-    assert.ok(source.includes("value=\"buried\""), "Must have 'buried' filter button");
+    assert.ok(browserSource.includes("value=\"buried\""), "Must have 'buried' filter button");
 });
 
 // 5. Has 'suspended' filter button
 test("Has 'suspended' filter button", () => {
-    assert.ok(source.includes("value=\"suspended\""), "Must have 'suspended' filter button");
+    assert.ok(browserSource.includes("value=\"suspended\""), "Must have 'suspended' filter button");
 });
 
 // 6. Has 'archived' filter button
 test("Has 'archived' filter button", () => {
-    assert.ok(source.includes("value=\"archived\""), "Must have 'archived' filter button");
+    assert.ok(browserSource.includes("value=\"archived\""), "Must have 'archived' filter button");
 });
 
 // 7. Has lifecycleDescriptor data field

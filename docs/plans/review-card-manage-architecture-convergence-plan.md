@@ -1,289 +1,253 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3A Accepted / Production Closed
+> **Status**: Phase 3B-1 Accepted / Production Closed
 >
-> **Current next slice**: Phase 3B-1 — Search / Filter / Saved Search Surface — Authorized Next / Not Started
+> **Current next slice**: Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Authorized Next / Not Started
 >
-> **Baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
+> **Architecture baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
 >
-> **Scope**: sense-only ReviewCard management; preserve all current endpoint, payload, access, lifecycle, delete, reset, ReviewLog and FSRS semantics.
+> **Phase 3B-1 implementation baseline**: master `83605d5885bcd9b8b583e9ab5647d2b12fb572e4`
+>
+> **Scope**: sense-only ReviewCard management; preserve current endpoint, payload, access, lifecycle, delete, reset, ReviewLog and FSRS semantics.
 
-## 1. Why this phase is next
+## 1. Why this architecture line exists
 
-Preset V1A–V1D are Production Closed. The next authorized item in the Anki-aligned sequence is Browser/ReviewCardManage convergence. This is not permission to add Card Marker, Custom Study 1B, Reviewer work, Reader work, deck/subdeck, or a new search language.
+The management page already has useful Browser-style capabilities. Its original container mixed search, Saved Search, table, selection, exports, Card Info, lifecycle, leech governance, editing and dangerous mutations in one Options API component.
 
-The current `resources/js/components/ReviewCards/ReviewCardManage.vue` is a working but concentrated page:
+Original measured baseline:
 
-- 3,411 lines;
+- `ReviewCardManage.vue`: 3,411 lines;
 - 24 direct `axios.` references;
 - 12 `v-dialog` blocks;
-- one large detail drawer;
-- search, Saved Search, table, selection, exports, Card Info, lifecycle, leech governance, editing and dangerous mutations are coordinated in one Options API component.
+- Card Info, search and table concerns all lived in the parent.
 
-The page already has substantial, accepted product capability. The objective is to reduce change blast radius without changing user behavior.
+The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
-## 2. Anki official reference and the parts we actually borrow
+## 2. Anki official reference and the parts LinguaCafe borrows
 
-Reviewed official sources:
+Reviewed official sources and code boundaries:
 
-- **Anki Manual — Browsing**: the Browser is presented as three visible sections — sidebar, card/note table and editing area. It distinguishes multi-row selection actions from current-item actions, supports Saved Searches in the sidebar, configurable/sortable columns and separate Card Info.
-- **Anki Manual — Searching**: Browse and Filtered Decks share one search method; the grammar supports a broader set of operators than LinguaCafe V1.
-- `ankitects/anki/qt/aqt/browser/browser.py`: the top-level Browser composes `SidebarTreeView`, `Table`, `BrowserCardInfo` and `BrowserLayout` rather than rendering every responsibility inline.
-- `ankitects/anki/qt/aqt/browser/card_info.py` and `layout.py`: Card Info and layout are dedicated modules.
-- `ankitects/anki/qt/aqt/browser/table/table.py`, `qt/aqt/browser/table/model.py`, `qt/aqt/browser/table/state.py`: table behavior, data model and table state are separate responsibilities.
-- `ankitects/anki/rslib/src/search/parser.rs`, `rslib/src/search/sqlwriter.rs`, `rslib/src/search/service/`: search parsing and execution are separate backend boundaries.
+- **Anki Manual — Browsing** describes the Browser as sidebar, card/note table and editing area. Saved Searches belong to the sidebar/search region. The manual distinguishes multi-row selection from the current card used by Card Info.
+- **Anki Manual — Searching** states that Browser and Filtered Deck use one common search method. LinguaCafe therefore keeps one server-authoritative search contract instead of adding a second frontend grammar.
+- `ankitects/anki/qt/aqt/browser/` contains dedicated `sidebar/`, `table/`, `browser.py`, `card_info.py`, `layout.py` and `previewer.py` boundaries.
+- `qt/aqt/browser/browser.py` normalizes the query through `build_search_string` and delegates result loading to `table.search`; the top-level Browser coordinates instead of parsing search syntax itself.
+- `ankitects/anki/rslib/src/search/` separates search service code from `builder.rs`, `parser.rs`, `sqlwriter.rs` and `writer.rs`.
+- Exact paths used as references include `qt/aqt/browser/sidebar`, `qt/aqt/browser/table`, `qt/aqt/browser/card_info.py`, `rslib/src/search/parser.rs` and `rslib/src/search/sqlwriter.rs`.
 
 Borrowed principles:
 
-1. The page container coordinates modules; it does not own every rendering and state rule.
-2. Card Info is a current-card concern and can be separated before the table is reworked.
-3. Multi-selection state and current-card state are different concepts.
-4. Search parsing remains server-authoritative and separate from table rendering.
-5. Saved Search belongs with the browsing/search surface, not with mutation dialogs.
-6. Table state should eventually have a clear owner instead of being spread through template, data and methods.
+1. The page container coordinates regions.
+2. Search parsing and result presentation have separate owners.
+3. Saved Search belongs with the search/filter surface.
+4. Current-card state and selected-row state stay distinct.
+5. Card Info has a dedicated read-only owner.
+6. Table ownership is handled after search ownership, in a separate phase.
 
 Deliberate LinguaCafe deviations:
 
 - 不复制 Anki 的 Cards/Notes 双模式；LinguaCafe remains sense ReviewCard-only.
 - 不实现 deck/subdeck 树、Note Type、Card Template or tag-tree editing.
-- Do not copy Anki's global note deletion semantics; LinguaCafe preserves its existing WordSense/ReviewCard delete contracts and ReviewLog-retention rules.
-- Do not expand Browser Search V1 into OR / NOT / parentheses / dates / regular expressions in this convergence phase.
-- Do not create Filtered Deck semantics. Custom Study remains the separate temporary-study product boundary.
-- Card flags are only a future Card Marker reference. Phase 3 does not add them.
+- Do not copy Anki note-deletion semantics; existing WordSense/ReviewCard and ReviewLog-retention contracts remain authoritative.
+- Do not expand Browser Search V1 into OR, NOT, parentheses, dates or regular expressions during architecture convergence.
+- Do not create Filtered Deck semantics. Custom Study remains the temporary-study boundary.
+- Card flags remain a future Card Marker reference.
 
-## 3. Subtitle architecture review
+## 3. Subtitle-derived long-project rules
 
-The following project subtitle files were selected because they directly address a mature page refactor; all unrelated subtitles were intentionally not loaded.
+The following project subtitle files were used because they directly address architecture work on a mature codebase:
 
 - `AI可以帮你写代码，但帮不了你成为架构师.srt`
-  - Adopted principle: hard-to-test code usually signals unclear inputs, side effects or dependency boundaries. Stable modules and interfaces improve AI implementation quality.
 - `AI编程项目为什么总是烂尾？长期项目迭代先给 AI 画边界.srt`
-  - Adopted principle: long-running projects need modularity, feature/architecture decoupling and real-machine acceptance after refactoring.
 - `10万代码量真实项目，我是如何防止AI把旧功能改坏的？.srt`
-  - Adopted principle: natural-language decisions describe why and boundaries; harnesses protect old behavior. Both are required.
 - `你写了一堆文档AI还是不听话？问题不在文档本身.srt`
-  - Adopted principle: documents are not a database. Critical boundaries must become executable tests, guards and browser checks.
 - `AI编程越写越乱？我用水桶装水，把边界讲透，快速认识spec与harness.srt`
-  - Adopted principle: load only task-relevant context; separate the drawing from the enforcement mechanism.
+- `AI 编程的 spec 到底该什么时候写？和先写文档完全相反.srt`
 - `答应我，别再和AI一起拉屎了；Vibe Coding如何避免屎山.srt`
-  - Adopted principle: split by coherent responsibility, but do not create interface overhead merely to increase file count.
 
-Application to this page:
+Rules frozen into this plan:
 
-- no one-shot rewrite;
-- one responsibility slice at a time;
-- characterize current behavior before moving it;
-- each slice must reduce a measurable responsibility from the parent;
-- page-level Chrome acceptance remains mandatory;
-- critical safety boundaries must be executable, not only documented.
+- 只把稳定决定写进长期文档；探索过程留在任务报告。
+- 文档负责说明边界，可执行 guard、测试和 Chrome smoke 负责阻止越界。
+- 每轮只移动一个真实职责，并保留旧功能回归证据。
+- 按数据流和副作用分模块，不按行数机械拆文件。
+- 优先复用既有组件和状态工具，不新增没有独立职责的抽象层。
+- 当前权威入口优先于历史长叙述，旧状态不得重新进入有效文档。
 
-## 4. Frozen architecture direction
-
-The final Browser/ReviewCardManage shape is:
+## 4. Frozen target shape
 
 ```text
 ReviewCardManage.vue
-  ├─ browsing/search surface
-  │    ├─ Saved Search
-  │    ├─ query/filter state
-  │    ├─ table/model state
-  │    ├─ pagination/columns/selection
-  │    └─ exports
+  ├─ ReviewCardSearchSurface.vue
+  │    ├─ ReviewCardSavedSearchPanel.vue
+  │    ├─ search input / token chips / server errors
+  │    ├─ preset filters / advanced filters
+  │    └─ normalized filter-state emission
+  ├─ future table surface (Phase 3B-2)
+  │    ├─ columns / sorting / pagination / compact mode
+  │    ├─ current card / selected cards
+  │    └─ read-only exports
   ├─ ReviewCardInfoDrawer.vue
   │    ├─ one canonical detail request
-  │    ├─ overview/history/diagnosis presentation
+  │    ├─ overview / history / diagnosis
   │    └─ stale-response and close cleanup
-  └─ mutation/dialog families
+  └─ future mutation/dialog families (Phase 3C)
        ├─ lifecycle/archive/restore/bury/suspend
        ├─ due-now/reset
        ├─ delete/bulk delete
        └─ leech governance/rewrite packages
 ```
 
-The container may coordinate cross-region refresh and snackbar state. It must not re-implement access, lifecycle, leech, delete or FSRS rules.
+The parent may coordinate list requests, cross-region refresh and snackbar state. It must not re-implement access, lifecycle, leech, delete, search grammar or FSRS rules.
 
-## 5. Phase sequence
+## 5. Phase sequence and evidence
 
 ### Phase 3A — Card Info Drawer Extraction
 
 Status: **Accepted / Production Closed**.
 
-Create `resources/js/components/ReviewCards/ReviewCardInfoDrawer.vue` and move the existing accepted Card Info responsibility out of the parent.
+Implemented boundary:
 
-The child owns:
+- `ReviewCardInfoDrawer.vue` owns the canonical detail request, loading/error/detail state, stale-response sequence guard, tabs, formatting and close cleanup.
+- `ReviewCardManage.vue` retains deep-link parsing, source-dialog orchestration, report return, list refresh and mutation workflows.
+- The parent decreased from 3,411 to 2,792 lines and from 24 to 22 direct `axios.` references; 12 `v-dialog` blocks remained.
+- Exactly one canonical detail request owner remains.
+- Authenticated Chrome acceptance covered 1920×1080, 900×900, Slow 3G switching, report deep link/return, source context, clean Console and unchanged ReviewLog/FSRS data.
 
-- drawer open/loading/error/empty states;
-- `overview / history / diagnosis` tabs;
-- exactly one canonical detail request to `GET /review-cards/manage/{reviewCard}/detail` per opened target;
-- the existing monotonic stale-response guard;
-- detail cleanup on close;
-- Card Info-only formatting and presentation helpers;
-- current read-only Card Info data.
+### Phase 3B-1 — Search / Filter / Saved Search Surface — Accepted / Production Closed
 
-The parent owns:
+Implemented boundary:
 
-- choosing the current review card;
-- deep-link parsing through the existing `ReviewCardManageDeepLink.js` contract;
-- source dialog orchestration after the drawer emits a source action;
-- list refresh after an external mutation;
-- all mutation dialogs and mutation requests.
+- Created `resources/js/components/ReviewCards/ReviewCardSearchSurface.vue`.
+- The child owns search input, token chips, server error presentation, preset filters, advanced filters, search help and canonical filter-state emission.
+- Existing `ReviewCardSavedSearchPanel.vue` remains the Saved Search GET/POST/PATCH/DELETE owner; no duplicate CRUD implementation was created.
+- Existing `ReviewCardManageFilterState.js` remains the canonical normalization/apply helper.
+- `ReviewCardManage.vue` owns list/data requests, sorting, pagination, table, selection, exports, mutation dialogs and Card Info orchestration.
+- Search remains server-authoritative. The child performs only simple token detection/removal needed for UI behavior and contains no request client or full parser.
 
-Frozen interface direction:
+Measured result:
 
-- declarative `value`/open state plus positive `reviewCardId` and existing deep-link source metadata;
-- emits close/input and semantic actions such as source navigation or report return;
-- no generic event bus, no Vuex expansion, no new global state;
-- no second Card Info request path in the parent.
+- parent decreased from 2,792 lines to 2,462 lines;
+- parent direct `axios.` references remain 22 because request ownership intentionally stayed in the parent until later phases;
+- parent now has 11 `v-dialog` blocks, decreased from 12 because search help moved with the search surface;
+- `ReviewCardSearchSurface.vue` contains no `axios.` call;
+- table, export, selection, lifecycle, reset, delete and Card Info behavior were not moved.
 
-Phase 3A measurable closure:
+TDD and browser evidence on 2026-07-16:
 
-- parent loses the complete Card Info drawer template, Card Info request state and Card Info-only helpers;
-- `ReviewCardManage.vue` falls below 2,900 lines or the report explains, with exact diff evidence, why an equally large responsibility reduction does not reach that number;
-- direct parent `axios.` references decrease by at least one and detail loading has one owner;
-- opening Card Info still sends exactly one detail request;
-- deep link, overview/history/diagnosis, undone audit rows, source navigation and close/reopen behavior pass tests and Chrome;
-- no mutation button is added inside Card Info.
+- `ReviewCardSearchSurfaceGuard.test.mjs` first failed because the component did not exist, then passed after the smallest extraction.
+- A second RED caught the 900×900 advanced-filter action overflow; adding a wrapping action row turned the guard GREEN and removed page-level horizontal overflow.
+- focused search and Saved Search tests passed; the development build compiled successfully.
+- authenticated Chrome confirmed one data request per explicit search/filter action.
+- `bigger` returned its matching card; `zzznomatch` displayed the no-match state.
+- invalid `is:unknown` displayed the server 422 grammar error and preserved existing table data.
+- clicking a preset filter removed conflicting `is:` state and issued the expected filter request.
+- advanced filter `reps_min=1` produced zero results; clearing it restored the two-card list.
+- temporary Saved Search creation, automatic selection, delete confirmation and cleanup completed through the page; no test row remained.
+- at 900×900, document `scrollWidth === clientWidth`; table overflow remains inside its intended scroll container.
+- Console contained no error or warning.
 
-Implementation evidence (2026-07-16):
+### Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Authorized Next / Not Started
 
-- `ReviewCardInfoDrawer.vue` now owns the canonical detail request, loading/error/detail state, stale-response sequence guard, tabs, formatting, close cleanup and read-only presentation.
-- `ReviewCardManage.vue` retains deep-link parsing, source-dialog ownership, report return, table/list refresh and every mutation workflow. It no longer owns a parallel Card Info request or detail state.
-- The parent decreased from 3,411 to 2,792 lines and from 24 to 22 direct `axios.` references; its 12 existing `v-dialog` blocks are unchanged. Canonical detail-request owners decreased from two parent call sites to one child call site.
-- All 53 Node guard files, grouped related Feature suites, the Unit suite and the development build passed. Database health passed, and the browser checks left ReviewLog/ReviewCard counts and the due checksum unchanged.
-- Authenticated Chrome acceptance completed on 2026-07-16 at 1920×1080 and 900×900. Opening Card Info issued exactly one canonical `GET /review-cards/manage/{id}/detail`; switching overview/history/diagnosis issued no additional request. No legacy single-card `/logs`, `/lifecycle-events` or `/leech` request appeared. The page-level `GET /review-cards/manage/leech-summary` remains a separate list summary and is not duplicate Card Info loading.
-- Slow 3G close/reopen and card 156 → card 157 switching completed with the drawer stabilized on card 157; the stale card 156 response did not overwrite the active card. The 900×900 page and 420px drawer both had `scrollWidth === clientWidth`, so no horizontal overflow occurred.
-- The report deep link displayed its source hint, loaded the same canonical detail request, returned to `/reviews/senses` when entered from the report, and opened source context only after the user clicked “查看原文”. Console contained no error or warning. Read-only opening, tab switching, source viewing and closing did not write ReviewLog or change FSRS data.
-- Phase 3A is therefore Accepted / Production Closed. This closure authorizes only the next planning position; this task does not enter or implement Phase 3B-1.
-
-### Phase 3B-1 — Search / Filter / Saved Search Surface — Authorized Next / Not Started
-
-Own the browsing query surface after Phase 3A closure:
-
-- search input and server error presentation;
-- Saved Search selection, save, update and delete surface;
-- current filter state and advanced filters;
-- server-authoritative search contract reuse;
-- no new search grammar.
-
-Forbidden in Phase 3B-1:
-
-- table redesign, column ownership or pagination extraction;
-- selection mutation or dangerous actions;
-- lifecycle/delete/reset semantics;
-- Card Info changes;
-- backend search-language expansion.
-
-### Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Planned / Not Started
-
-Own the read-only table surface only after Phase 3B-1 is separately accepted:
+Next owned surface:
 
 - table columns, sorting, pagination and compact mode;
 - current-card and selected-card state kept distinct;
 - selection state without dangerous-action ownership;
-- read-only JSON/CSV/TSV export presentation.
+- read-only JSON/CSV/TSV export presentation;
+- reuse current endpoints, serializers and `ReviewCardManageFilterState.js`.
 
-Phase 3B-1 and Phase 3B-2 may introduce a dedicated read-only browser client or state module only when it owns a real, testable responsibility. They must reuse `ReviewCardManageFilterState.js`, ADR-0012, ADR-0013 and ADR-0017 instead of creating parallel query rules.
+Forbidden in Phase 3B-2:
 
-### Phase 3C — Mutation and Dialog Families
+- backend route, payload or search grammar changes;
+- lifecycle, reset, delete, archive, restore or leech mutation changes;
+- Card Info or Search Surface redesign;
+- new global state, event bus or speculative browser framework;
+- entering Phase 3C, Card Marker or Custom Study 1B.
 
-Group dangerous actions by domain while keeping their existing backend authorities:
+### Phase 3C — Mutation and Dialog Families — Planned / Not Started
 
-- lifecycle actions continue through Lifecycle services;
-- update/due/reset/delete/bulk actions continue through existing Mutation/Access services;
-- leech classification remains read-only and suspension remains a lifecycle command;
-- dialogs may be extracted only with their full state/action/error boundary, not as empty visual wrappers.
+Group dangerous actions by real domain boundaries while retaining current backend authorities. No mutation semantics change is authorized by this plan.
 
-No delete, reset, archive, restore, ReviewLog-retention or FSRS behavior changes are allowed without a separate product/ADR decision.
+### Phase 3D — Container Closure — Planned / Not Started
 
-### Phase 3D — Container Closure
-
-Final targets, evaluated after the earlier slices:
-
-- `ReviewCardManage.vue` is a coordinator, preferably at or below 1,200 lines; 1,000 remains the stretch target, not a reason to create meaningless pass-through components;
-- parent direct `axios.` references at or below 5;
-- no duplicate Card Info, search, selection, lifecycle or dialog state owners;
-- every region has executable guards and real Chrome acceptance;
-- endpoint and payload compatibility remain intact.
+Evaluate the final coordinator only after earlier slices are separately accepted. The stretch target is about 1,000 lines; 1,200 is acceptable when further extraction would create meaningless pass-through components.
 
 ## 6. Formal target pairing required by the hard rules
 
-The Codex target must execute both tracks in the same task:
+Completed Phase 3B-1 target pair:
 
-- `ARCH-ReviewCardManage-3A`: verify the current Card Info data flow, freeze the child/parent ownership boundary, reject duplicate state owners and meaningless pass-through abstractions, and preserve ADR-0014 plus the existing deep-link contract.
-- `DEV-ReviewCardManage-3A`: implement the verified boundary by creating `ReviewCardInfoDrawer.vue`, moving the complete Card Info responsibility, adding executable guards, running grouped regression and performing real dual-viewport Chrome acceptance.
+- `ARCH-ReviewCardManage-3B-1`: verify search/Saved Search data flow, keep the server as parser authority, freeze parent/child ownership, reuse `ReviewCardManageFilterState.js`, and reject duplicate request owners or speculative state frameworks.
+- `DEV-ReviewCardManage-3B-1`: create `ReviewCardSearchSurface.vue`, move the complete search/filter/help presentation, retain `ReviewCardSavedSearchPanel.vue`, add executable guards, run grouped regression and perform authenticated dual-viewport Chrome acceptance.
 
-ARCH is not a separate planning-only round. DEV may start only after the target has recorded the verified boundary and the failing characterization guard, then both tracks close together in one commit/push/report cycle.
+ARCH and DEV closed in the same task. The architecture record preceded implementation, the new guard demonstrated RED, and implementation proceeded only inside the frozen boundary.
 
-## 7. Phase 3A allowed scope
+## 7. Phase 3B-1 changed files
 
-Allowed production files:
+Production:
 
 - `resources/js/components/ReviewCards/ReviewCardManage.vue`
-- create `resources/js/components/ReviewCards/ReviewCardInfoDrawer.vue`
-- `resources/js/services/ReviewCardManageDeepLink.js` only if a proven compatibility seam is required
+- `resources/js/components/ReviewCards/ReviewCardSearchSurface.vue`
 
-Allowed tests:
+Tests:
 
-- `tests/js/ReviewCardInfoGuard.test.mjs`
-- `tests/js/ReviewCardManageDeepLinkGuard.test.mjs`
-- create focused Card Info drawer tests/guards as needed
-- related existing backend Feature files for regression only; backend behavior changes are out of scope
+- `tests/js/ReviewCardSearchSurfaceGuard.test.mjs`
+- `tests/Feature/ReviewCardBrowserSearchUiGuardTest.php`
+- existing architecture/master-plan guards
 
-Allowed docs:
+Docs:
 
 - this plan;
-- current roadmap, master plan, handoff, Documentation Index;
-- ADR-0014 only for additive factual implementation notes after code exists.
+- Anki-aligned roadmap;
+- master plan;
+- current handoff;
+- Documentation Index.
 
-## 8. Phase 3A forbidden scope
+## 8. Permanent safety boundaries
 
-- backend Controller/Service/route/payload changes;
-- database schema or migrations;
-- FSRS algorithm, parameters, due fields, rating or ReviewLog writes;
-- lifecycle, archive, restore, reset or delete semantics;
-- Search V1 grammar or Saved Search behavior;
-- 不进入 Card Marker 或 Custom Study 1B；也不进入 table redesign、Reviewer or Reader work;
-- deck/subdeck, Note mode, tag tree or Filtered Deck;
-- new dependency, Vuex module or event bus;
-- `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/`, `nul`;
-- notification scripts, DCP, force, destructive DB commands.
+- no backend Controller/Service/route/payload changes during a frontend ownership extraction;
+- no database schema or migration change;
+- no FSRS, due, rating or ReviewLog write change;
+- no lifecycle, archive, restore, reset or delete semantic change;
+- no frontend reimplementation of Browser Search grammar;
+- 不进入 Phase 3B-2、Card Marker 或 Custom Study 1B without a separate task;
+- no deck/subdeck, Note mode, tag tree or Filtered Deck;
+- no new dependency, Vuex module or event bus without proven need;
+- no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
+- no notification script, DCP, force or destructive DB command.
 
-## 9. Required verification for the Codex target
-
-TDD and executable evidence are mandatory:
+## 9. Required verification for future Browser phases
 
 1. Write or update a guard first and show the expected RED result.
-2. Implement the smallest extraction that turns it GREEN.
-3. Run focused Node guards for Card Info, deep links and management UI.
-4. Run DB health checks before Feature tests.
-5. Feature tests must be grouped. Never run `php artisan test --testsuite=Feature`; group all related files by module and record each exit code and summary.
-6. Run Unit suite as allowed by the current hard rule, all Node guards, frontend build, `php artisan db:doctor`, and `git diff --check`.
-7. MCP Chrome real acceptance at 1920×1080 and 900×900 using the task-provided local account if needed.
-8. Verify Network: one detail GET on open, no extra `/logs`, `/lifecycle-events` or `/leech` request, no external domains.
-9. Verify Console has no new errors.
-10. Verify no learning-data or scheduling change from read-only opening/closing.
+2. Implement the smallest responsibility-complete change that turns it GREEN.
+3. Run focused Node guards and related PHP tests.
+4. Run database health before Feature tests.
+5. Feature tests must be grouped. Never run the ungrouped full Feature suite.
+6. Run Unit suite, all Node guards, frontend build, `php artisan db:doctor` and `git diff --check`.
+7. Use authenticated MCP Chrome at 1920×1080 and 900×900.
+8. Verify request ownership, no external domains and no duplicate requests.
+9. Verify Console has no new error or warning.
+10. Verify protected learning/scheduling data is unchanged when the task is read-only.
 
 ## 10. Accept / Refuse conditions
 
-Accept only when:
+Accept a phase only when:
 
-- the child owns the whole Card Info responsibility;
-- the parent no longer keeps a parallel Card Info request/state implementation;
-- deep links and one-request Card Info behavior are preserved;
-- existing management actions remain accessible and unchanged;
-- tests, build and two-viewport Chrome acceptance pass;
+- the moved region has one complete owner;
+- the parent no longer keeps a parallel implementation;
+- existing requests and user behavior remain compatible;
+- tests, build and dual-viewport Chrome pass;
 - the diff stays inside the allowed boundary.
 
 Refuse when:
 
-- extraction is only a template wrapper while state and requests remain duplicated;
-- new generic DTO/service/event layers have no independent responsibility;
-- the task changes backend behavior to simplify the frontend;
-- detail opening sends duplicate requests;
-- any destructive, rating, lifecycle or FSRS behavior changes;
-- the report uses API/fetch in place of real browser acceptance;
-- Feature coverage is claimed from an ungrouped full-suite command.
+- extraction is only a template wrapper while state or requests remain duplicated;
+- generic DTO/service/event layers lack an independent responsibility;
+- backend behavior is changed to make frontend extraction easier;
+- request count increases without an approved product reason;
+- destructive, rating, lifecycle or FSRS behavior changes;
+- API/fetch evidence is used instead of real browser acceptance;
+- ungrouped Feature execution is presented as valid evidence.
 
 ## 11. Stop rule
 
-Phase 3A is closed after this repository-status commit, normal push and final report. Phase 3B-1 is only the Authorized Next / Not Started planning position. Do not enter Phase 3B-1, Phase 3B-2, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3B-1 closes after its commit, normal push and final report. Phase 3B-2 is only **Authorized Next / Not Started**. Do not enter Phase 3B-2, Phase 3C, Card Marker, Custom Study 1B or any later phase automatically.

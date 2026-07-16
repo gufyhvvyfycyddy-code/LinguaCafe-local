@@ -246,7 +246,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A Accepted / Production Closed**。Card Info 抽屉已完成单一子组件职责抽取、authenticated Chrome 与 Network 验收。**Phase 3B-1 — Search / Filter / Saved Search Surface：Authorized Next / Not Started**；**Phase 3B-2 — Table / Columns / Pagination / Selection / Export：Planned / Not Started**。本轮不进入 3B 开发。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
+状态：**Phase 3A 与 Phase 3B-1 Accepted / Production Closed**。Card Info 与 Search / Filter / Saved Search Surface 已分别形成单一职责所有者并完成 authenticated Chrome 与 Network 验收。`ReviewCardManage.vue` 当前为 2,462 行、22 个 direct `axios.` references、11 个 `v-dialog`。**Phase 3B-2 — Table / Columns / Pagination / Selection / Export：Authorized Next / Not Started**。本轮停止，不进入 3B-2 开发。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
 
 优先级：P1。
 
@@ -259,8 +259,8 @@ Anki 对齐行为：
 拆分方向：
 
 - **Phase 3A — Card Info Drawer Extraction**：Accepted / Production Closed。ADR-0014 锁定的只读详情抽屉、单一 detail 请求、tabs、异步竞态保护和清理边界已迁入 `ReviewCardInfoDrawer.vue`，真实页面验收已完成。
-- **Phase 3B-1 — Search / Filter / Saved Search Surface**：Authorized Next / Not Started。只负责搜索输入、服务端错误、Saved Search、当前筛选状态和高级筛选，不改搜索语法。
-- **Phase 3B-2 — Table / Columns / Pagination / Selection / Export**：Planned / Not Started。只负责表格、列、排序、分页、compact mode、current/selected 分离和只读导出。
+- **Phase 3B-1 — Search / Filter / Saved Search Surface**：Accepted / Production Closed。`ReviewCardSearchSurface.vue` 负责搜索输入、服务端错误、Saved Search、当前筛选状态和高级筛选；继续复用 `ReviewCardSavedSearchPanel.vue` 与 `ReviewCardManageFilterState.js`，不改服务端搜索语法。
+- **Phase 3B-2 — Table / Columns / Pagination / Selection / Export**：Authorized Next / Not Started。只负责表格、列、排序、分页、compact mode、current/selected 分离和只读导出。
 - **Phase 3C — Mutation and Dialog Families**：最后按 lifecycle / due-reset / delete / leech 领域归并危险操作与弹窗。
 - **Phase 3D — Container Closure**：消除重复状态所有者，让页面容器只协调区域。
 - 所有写操作继续走现有 Mutation / Lifecycle / Access 服务。
@@ -271,7 +271,7 @@ Anki 对齐行为：
 
 - `ReviewCardManage.vue` 最终优先降到 1,200 行以内；1,000 行是 stretch target，不得为了数字制造无职责的空壳组件。
 - 页面直接 `axios.` 引用从 24 降到 5 以内。
-- 12 个 dialog 按功能归入独立组件。
+- 当前 11 个 dialog 继续按功能归入独立组件。
 - 搜索、导出、详情、批量操作、危险操作全部有自动测试和 MCP Chrome 验收。
 
 ### Phase 4：Card Marker + Custom Study 1B
@@ -374,7 +374,7 @@ Custom Study 1B：
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A Accepted / Production Closed；authenticated Chrome、单请求 Network、Slow 3G、双 viewport、深链、来源入口、Console 和只读数据不变均通过；Phase 3B-1 Authorized Next / Not Started，Phase 3B-2 Planned / Not Started；见 `review-card-manage-architecture-convergence-plan.md` |
+| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A 与 Phase 3B-1 Accepted / Production Closed；Card Info、搜索、筛选、Saved Search、错误状态、CRUD 清理、双 viewport 与 Console 均通过；父组件 2,462 行；Phase 3B-2 Authorized Next / Not Started；见 `review-card-manage-architecture-convergence-plan.md` |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |

@@ -45,6 +45,7 @@ const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
+const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 
 const name = 'ReviewCardManageLeechGuard';
 let passed = 0;
@@ -60,6 +61,8 @@ function test(name, fn) {
 }
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const searchSurfaceSource = existsSync(SEARCH_SURFACE_PATH) ? readFileSync(SEARCH_SURFACE_PATH, 'utf-8') : '';
+const browserSource = `${source}\n${searchSurfaceSource}`;
 const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 
 // 1. File exists
@@ -69,12 +72,12 @@ test('File exists', () => {
 
 // 2. Source includes 'leech' filter
 test("Source includes 'leech' filter", () => {
-    assert.ok(source.includes('value="leech"'), "Must have a 'leech' filter button");
+    assert.ok(browserSource.includes('value="leech"'), "Must have a 'leech' filter button");
 });
 
 // 3. Source includes 'struggling' filter
 test("Source includes 'struggling' filter", () => {
-    assert.ok(source.includes('value="struggling"'), "Must have a 'struggling' filter button");
+    assert.ok(browserSource.includes('value="struggling"'), "Must have a 'struggling' filter button");
 });
 
 // 4. Source includes /review-cards/manage/leech-summary endpoint
