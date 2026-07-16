@@ -46,6 +46,7 @@ const __dirname = dirname(__filename);
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
+const TABLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
 
 const name = 'ReviewCardManageLeechGuard';
 let passed = 0;
@@ -62,7 +63,8 @@ function test(name, fn) {
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
 const searchSurfaceSource = existsSync(SEARCH_SURFACE_PATH) ? readFileSync(SEARCH_SURFACE_PATH, 'utf-8') : '';
-const browserSource = `${source}\n${searchSurfaceSource}`;
+const tableSurfaceSource = existsSync(TABLE_SURFACE_PATH) ? readFileSync(TABLE_SURFACE_PATH, 'utf-8') : '';
+const browserSource = `${source}\n${searchSurfaceSource}\n${tableSurfaceSource}`;
 const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 
 // 1. File exists
@@ -97,17 +99,17 @@ test('Source includes /lifecycle-actions endpoint', () => {
 
 // 7. Source includes '生成重写包' per-row action
 test("Source includes '生成重写包' per-row action", () => {
-    assert.ok(source.includes('生成重写包'), "Must include '生成重写包' per-row action");
+    assert.ok(browserSource.includes('生成重写包'), "Must include '生成重写包' per-row action");
 });
 
 // 8. Source includes '批量生成重写包' batch action
 test("Source includes '批量生成重写包' batch action", () => {
-    assert.ok(source.includes('批量生成重写包'), "Must include '批量生成重写包' batch action");
+    assert.ok(browserSource.includes('批量生成重写包'), "Must include '批量生成重写包' batch action");
 });
 
 // 9. Source includes '批量暂停高遗忘卡' batch action
 test("Source includes '批量暂停高遗忘卡' batch action", () => {
-    assert.ok(source.includes('批量暂停高遗忘卡'), "Must include '批量暂停高遗忘卡' batch action");
+    assert.ok(browserSource.includes('批量暂停高遗忘卡'), "Must include '批量暂停高遗忘卡' batch action");
 });
 
 // 10. Source imports SenseReviewLeechRewritePackageDialog
@@ -123,7 +125,7 @@ test('Source imports SenseReviewLeechPresentation functions', () => {
 // 12. Source has leech status badge in table
 test('Source has leech status badge in table', () => {
     assert.ok(
-        source.includes('leech_status') || source.includes('leechStatusLabel'),
+        tableSurfaceSource.includes('leech_status') || tableSurfaceSource.includes('leechStatusLabel'),
         'Table must show a leech status badge (leech_status / leechStatusLabel)'
     );
 });

@@ -15,25 +15,30 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
 {
     private string $managePath;
     private string $searchSurfacePath;
+    private string $tableSurfacePath;
 
     protected function setUp(): void
     {
         parent::setUp();
         $this->managePath = resource_path('js/components/ReviewCards/ReviewCardManage.vue');
         $this->searchSurfacePath = resource_path('js/components/ReviewCards/ReviewCardSearchSurface.vue');
+        $this->tableSurfacePath = resource_path('js/components/ReviewCards/ReviewCardTableSurface.vue');
     }
 
     private function browserContents(): string
     {
         return file_get_contents($this->managePath)
             . "\n"
-            . file_get_contents($this->searchSurfacePath);
+            . file_get_contents($this->searchSurfacePath)
+            . "\n"
+            . file_get_contents($this->tableSurfacePath);
     }
 
     public function test_browser_source_files_exist(): void
     {
         $this->assertFileExists($this->managePath);
         $this->assertFileExists($this->searchSurfacePath);
+        $this->assertFileExists($this->tableSurfacePath);
     }
 
     public function test_search_help_and_examples_exist(): void
@@ -92,20 +97,22 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
 
     public function test_existing_page_operations_are_preserved(): void
     {
-        $contents = file_get_contents($this->managePath);
-        $this->assertStringContainsString('lifecycleDialog', $contents);
-        $this->assertStringContainsString('archiveDialog', $contents);
-        $this->assertStringContainsString('restoreDialog', $contents);
-        $this->assertStringContainsString('resetDialog', $contents);
-        $this->assertStringContainsString('bulkLifecycle', $contents);
-        $this->assertStringContainsString('bulkDelete', $contents);
-        $this->assertStringContainsString('bulkRewritePackages', $contents);
+        $contents = $this->browserContents();
+        $manageContents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('lifecycleDialog', $manageContents);
+        $this->assertStringContainsString('archiveDialog', $manageContents);
+        $this->assertStringContainsString('restoreDialog', $manageContents);
+        $this->assertStringContainsString('resetDialog', $manageContents);
+        $this->assertStringContainsString('bulkLifecycle', $manageContents);
+        $this->assertStringContainsString('bulkDelete', $manageContents);
+        $this->assertStringContainsString('bulkRewritePackages', $manageContents);
         $this->assertStringContainsString('exportCurrentFilter', $contents);
         $this->assertStringContainsString('exportAnkiTsv', $contents);
         $this->assertStringContainsString('exportCsv', $contents);
         $this->assertStringContainsString('editingId', $contents);
-        $this->assertStringContainsString('startEdit', $contents);
-        $this->assertStringContainsString('saveEdit', $contents);
+        $this->assertStringContainsString('startEdit', $manageContents);
+        $this->assertStringContainsString('saveEdit', $manageContents);
+        $this->assertStringNotContainsString("axios.post('/review-cards/manage/bulk", file_get_contents($this->tableSurfacePath));
     }
 
     public function test_invalid_search_preserves_existing_table_data(): void

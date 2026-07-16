@@ -49,6 +49,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const TABLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
@@ -63,10 +64,12 @@ function test(name, fn) {
 }
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const tableSource = existsSync(TABLE_SURFACE_PATH) ? readFileSync(TABLE_SURFACE_PATH, 'utf-8') : '';
 
 // 1. File exists
 test('File exists', () => {
     assert.ok(existsSync(MANAGE_PATH), 'ReviewCardManage.vue must exist');
+    assert.ok(existsSync(TABLE_SURFACE_PATH), 'ReviewCardTableSurface.vue must exist');
 });
 
 // 2. Has confirmBulkLifecycle method
@@ -101,7 +104,7 @@ test('Uses POST /review-cards/manage/bulk-lifecycle endpoint', () => {
 
 // 8. Sends ids array in payload
 test('Sends ids array in payload', () => {
-    assert.ok(source.includes('ids:') && source.includes('selectedIds'), 'Must send ids array from selectedIds');
+    assert.ok(source.includes('ids: ids') && source.includes('bulkSelectionIds'), 'Parent must send ids from the child-owned selection snapshot');
 });
 
 // 9. Sends action in payload
@@ -115,58 +118,59 @@ test('Sends source in payload', () => {
 });
 
 // Extract the bulk menu section (between confirmBulkLifecycle calls)
-const bulkMenuSection = source.match(/批量生命周期[\s\S]*?<\/v-menu>/)?.[0] || '';
+const bulkMenuSection = tableSource.match(/bulkLifecycleActions\(\)[\s\S]*?return \[[\s\S]*?\];/)?.[0] || '';
 
 // 11. Bulk menu has 'suspend' option
 test("Bulk menu has 'suspend' option", () => {
-    assert.ok(bulkMenuSection.includes("confirmBulkLifecycle('suspend')"), "Bulk menu must have suspend option");
+    assert.ok(bulkMenuSection.includes("key: 'suspend'"), "Bulk menu must have suspend option");
 });
 
 // 12. Bulk menu has 'resume' option
 test("Bulk menu has 'resume' option", () => {
-    assert.ok(bulkMenuSection.includes("confirmBulkLifecycle('resume')"), "Bulk menu must have resume option");
+    assert.ok(bulkMenuSection.includes("key: 'resume'"), "Bulk menu must have resume option");
 });
 
 // 13. Bulk menu has 'archive' option
 test("Bulk menu has 'archive' option", () => {
-    assert.ok(bulkMenuSection.includes("confirmBulkLifecycle('archive')"), "Bulk menu must have archive option");
+    assert.ok(bulkMenuSection.includes("key: 'archive'"), "Bulk menu must have archive option");
 });
 
 // 14. Bulk menu has 'restore' option
 test("Bulk menu has 'restore' option", () => {
-    assert.ok(bulkMenuSection.includes("confirmBulkLifecycle('restore')"), "Bulk menu must have restore option");
+    assert.ok(bulkMenuSection.includes("key: 'restore'"), "Bulk menu must have restore option");
 });
 
 // 15. Bulk menu has 'unbury' option
 test("Bulk menu has 'unbury' option", () => {
-    assert.ok(bulkMenuSection.includes("confirmBulkLifecycle('unbury')"), "Bulk menu must have unbury option");
+    assert.ok(bulkMenuSection.includes("key: 'unbury'"), "Bulk menu must have unbury option");
 });
 
 // 16. Bulk menu does NOT have 'bury' option
 test("Bulk menu does NOT have 'bury' option", () => {
-    assert.ok(!bulkMenuSection.includes("confirmBulkLifecycle('bury')"), "Bulk menu must NOT have bury option (bulk bury not supported)");
+    assert.ok(!bulkMenuSection.includes("key: 'bury'"), "Bulk menu must NOT have bury option (bulk bury not supported)");
 });
 
 // 17. Bulk menu does NOT have 'reset' option
 test("Bulk menu does NOT have 'reset' option", () => {
-    assert.ok(!bulkMenuSection.includes("confirmBulkLifecycle('reset')"), "Bulk menu must NOT have reset option (reset is not a lifecycle action)");
+    assert.ok(!bulkMenuSection.includes("key: 'reset'"), "Bulk menu must NOT have reset option (reset is not a lifecycle action)");
 });
 
 // 18. Bulk menu does NOT have 'delete' option
 test("Bulk menu does NOT have 'delete' option", () => {
-    assert.ok(!bulkMenuSection.includes("confirmBulkLifecycle('delete')"), "Bulk menu must NOT have delete option (delete is not a lifecycle action)");
+    assert.ok(!bulkMenuSection.includes("key: 'delete'"), "Bulk menu must NOT have delete option (delete is not a lifecycle action)");
 });
 
-// 19. confirmBulkLifecycle checks selectedIds.length
-test('confirmBulkLifecycle checks selectedIds.length', () => {
+// 19. confirmBulkLifecycle validates the child-owned selection payload
+test('confirmBulkLifecycle validates selection payload', () => {
     const methodSection = source.match(/confirmBulkLifecycle\([^)]*\)\s*\{[\s\S]*?\}/)?.[0] || '';
-    assert.ok(methodSection.includes('selectedIds.length'), 'confirmBulkLifecycle must check selectedIds.length');
+    assert.ok(methodSection.includes('selection.ids.length'), 'confirmBulkLifecycle must validate selection.ids.length');
+    assert.ok(methodSection.includes('bulkSelectionIds'), 'confirmBulkLifecycle must snapshot selected ids in the parent');
 });
 
-// 20. doBulkLifecycle clears selection on success
+// 20. doBulkLifecycle clears child selection on success
 test('doBulkLifecycle clears selection on success', () => {
     const methodSection = source.match(/doBulkLifecycle\(\)\s*\{[\s\S]*?\}\s*,/)?.[0] || '';
-    assert.ok(methodSection.includes('clearSelection'), 'doBulkLifecycle must call clearSelection on success');
+    assert.ok(methodSection.includes('clearTableSelection'), 'doBulkLifecycle must clear the child-owned selection on success');
 });
 
 // 21. doBulkLifecycle handles skipped count

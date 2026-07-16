@@ -1,12 +1,14 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3B-1 Accepted / Production Closed
+> **Status**: Phase 3B-2 Accepted / Production Closed
 >
-> **Current next slice**: Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Authorized Next / Not Started
+> **Current next slice**: Phase 3C — Mutation and Dialog Families — Authorized Next / Not Started
 >
 > **Architecture baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
 >
-> **Phase 3B-1 implementation baseline**: master `83605d5885bcd9b8b583e9ab5647d2b12fb572e4`
+> **Phase 3B-1 implementation baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
+>
+> **Phase 3B-2 execution baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
 >
 > **Scope**: sense-only ReviewCard management; preserve current endpoint, payload, access, lifecycle, delete, reset, ReviewLog and FSRS semantics.
 
@@ -82,7 +84,7 @@ ReviewCardManage.vue
   │    ├─ search input / token chips / server errors
   │    ├─ preset filters / advanced filters
   │    └─ normalized filter-state emission
-  ├─ future table surface (Phase 3B-2)
+  ├─ ReviewCardTableSurface.vue
   │    ├─ columns / sorting / pagination / compact mode
   │    ├─ current card / selected cards
   │    └─ read-only exports
@@ -146,25 +148,40 @@ TDD and browser evidence on 2026-07-16:
 - at 900×900, document `scrollWidth === clientWidth`; table overflow remains inside its intended scroll container.
 - Console contained no error or warning.
 
-### Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Authorized Next / Not Started
+### Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Accepted / Production Closed
 
-Next owned surface:
+Implemented boundary:
 
-- table columns, sorting, pagination and compact mode;
-- current-card and selected-card state kept distinct;
-- selection state without dangerous-action ownership;
-- read-only JSON/CSV/TSV export presentation;
-- reuse current endpoints, serializers and `ReviewCardManageFilterState.js`.
+- Created `resources/js/components/ReviewCards/ReviewCardTableSurface.vue` as the complete owner of table rendering, column visibility, compact mode, sorting controls, pagination controls, current-card state, selected-card state and read-only JSON/CSV/TSV exports.
+- `currentCardId` and `selectedIds` are separate child-owned states. Opening Card Info marks the current row without changing the checkbox selection.
+- The child emits row and bulk mutation intents with an explicit selection snapshot. It contains no mutation request and does not own lifecycle, reset, delete, archive, restore or leech semantics.
+- `ReviewCardManage.vue` remains the canonical `/review-cards/manage/data` request owner and continues to own every mutation request, dangerous confirmation dialog, Card Info orchestration, cross-region refresh and snackbar state.
+- Existing endpoints, payloads, serializers, server search grammar and `ReviewCardManageFilterState.js` remain unchanged.
+- No Vuex module, event bus, backend route, migration or speculative abstraction was introduced.
 
-Forbidden in Phase 3B-2:
+Measured result:
 
-- backend route, payload or search grammar changes;
-- lifecycle, reset, delete, archive, restore or leech mutation changes;
-- Card Info or Search Surface redesign;
-- new global state, event bus or speculative browser framework;
-- entering Phase 3C, Card Marker or Custom Study 1B.
+- parent decreased from 2,462 lines to 1,532 lines;
+- new `ReviewCardTableSurface.vue` is 866 lines and owns one responsibility-complete table region;
+- parent direct `axios.` references decreased from 22 to 19 because the three existing read-only export GET requests moved with their presentation;
+- the child contains exactly three `axios.` references, all read-only export GET requests, and no POST/PATCH/DELETE request;
+- parent keeps 11 `v-dialog` blocks because mutation/dialog extraction belongs to Phase 3C;
+- `ReviewCardSearchSurface.vue` remains 325 lines and unchanged in responsibility.
 
-### Phase 3C — Mutation and Dialog Families — Planned / Not Started
+TDD, regression and browser evidence on 2026-07-16:
+
+- `ReviewCardTableSurfaceGuard.test.mjs` first failed because the component did not exist, then passed after the frozen owner boundary was implemented.
+- Testing database health passed: 12 tests, 97 assertions.
+- Browser/Search/Saved Search/Manage/Card Info/Deep Link regression passed: 380 tests, 1,298 assertions, with two existing slow tests skipped.
+- Lifecycle/Danger/Leech regression passed: 147 tests, 402 assertions.
+- Unit suite passed: 652 tests, 1,518 assertions.
+- all Node guards passed after historical parent-owned selection and line-count assumptions were updated to the new executable contract.
+- `npm run development`, `php artisan db:doctor` and `git diff --check` passed.
+- authenticated Chrome at 1920×1080 confirmed one list request for sort and per-page changes, one detail request when opening Card Info, separate current/selected state, working column and compact preferences without list reload, three read-only export requests and a bulk confirmation dialog without mutation.
+- authenticated Chrome at 900×900 confirmed no page-level horizontal overflow; wide table overflow remains inside `.table-wrapper`.
+- Console contained no error or warning and no external request was observed.
+
+### Phase 3C — Mutation and Dialog Families — Authorized Next / Not Started
 
 Group dangerous actions by real domain boundaries while retaining current backend authorities. No mutation semantics change is authorized by this plan.
 
@@ -174,23 +191,28 @@ Evaluate the final coordinator only after earlier slices are separately accepted
 
 ## 6. Formal target pairing required by the hard rules
 
-Completed Phase 3B-1 target pair:
+Completed Phase 3B target pairs:
 
 - `ARCH-ReviewCardManage-3B-1`: verify search/Saved Search data flow, keep the server as parser authority, freeze parent/child ownership, reuse `ReviewCardManageFilterState.js`, and reject duplicate request owners or speculative state frameworks.
 - `DEV-ReviewCardManage-3B-1`: create `ReviewCardSearchSurface.vue`, move the complete search/filter/help presentation, retain `ReviewCardSavedSearchPanel.vue`, add executable guards, run grouped regression and perform authenticated dual-viewport Chrome acceptance.
+- `ARCH-ReviewCardManage-3B-2`: freeze the table-region owner, keep list and mutation requests in the parent, separate current-card from selected-card state and move only the three existing read-only export requests.
+- `DEV-ReviewCardManage-3B-2`: create `ReviewCardTableSurface.vue`, migrate the complete table/columns/pagination/selection/export region, update executable guards, run grouped regression and complete authenticated dual-viewport Chrome acceptance.
 
-ARCH and DEV closed in the same task. The architecture record preceded implementation, the new guard demonstrated RED, and implementation proceeded only inside the frozen boundary.
+Each ARCH and DEV pair closed in one task. The architecture record preceded implementation, the new guard demonstrated RED, and implementation proceeded only inside the frozen boundary.
 
-## 7. Phase 3B-1 changed files
+## 7. Phase 3B changed files
 
 Production:
 
 - `resources/js/components/ReviewCards/ReviewCardManage.vue`
 - `resources/js/components/ReviewCards/ReviewCardSearchSurface.vue`
+- `resources/js/components/ReviewCards/ReviewCardTableSurface.vue`
 
 Tests:
 
 - `tests/js/ReviewCardSearchSurfaceGuard.test.mjs`
+- `tests/js/ReviewCardTableSurfaceGuard.test.mjs`
+- `tests/js/ReviewCardLifecycleBulkGuard.test.mjs`
 - `tests/Feature/ReviewCardBrowserSearchUiGuardTest.php`
 - existing architecture/master-plan guards
 
@@ -209,7 +231,7 @@ Docs:
 - no FSRS, due, rating or ReviewLog write change;
 - no lifecycle, archive, restore, reset or delete semantic change;
 - no frontend reimplementation of Browser Search grammar;
-- 不进入 Phase 3B-2、Card Marker 或 Custom Study 1B without a separate task;
+- 不进入 Phase 3C、Card Marker 或 Custom Study 1B without a separate task;
 - no deck/subdeck, Note mode, tag tree or Filtered Deck;
 - no new dependency, Vuex module or event bus without proven need;
 - no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
@@ -250,4 +272,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3B-1 closes after its commit, normal push and final report. Phase 3B-2 is only **Authorized Next / Not Started**. Do not enter Phase 3B-2, Phase 3C, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3B-2 closes after its commit, normal push and final report. Phase 3C is only **Authorized Next / Not Started**. Do not enter Phase 3C, Card Marker, Custom Study 1B or any later phase automatically.
