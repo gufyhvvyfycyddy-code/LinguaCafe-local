@@ -1,8 +1,8 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Implemented / Automated Verified / Authenticated Network Acceptance Blocked / Incomplete
+> **Status**: Phase 3A Accepted / Production Closed
 >
-> **Current first slice**: Phase 3A — Card Info Drawer Extraction
+> **Current next slice**: Phase 3B-1 — Search / Filter / Saved Search Surface — Authorized Next / Not Started
 >
 > **Baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
 >
@@ -106,7 +106,7 @@ The container may coordinate cross-region refresh and snackbar state. It must no
 
 ### Phase 3A — Card Info Drawer Extraction
 
-Status: **Implemented / Automated Verified / Authenticated Network Acceptance Blocked / Incomplete**.
+Status: **Accepted / Production Closed**.
 
 Create `resources/js/components/ReviewCards/ReviewCardInfoDrawer.vue` and move the existing accepted Card Info responsibility out of the parent.
 
@@ -150,21 +150,39 @@ Implementation evidence (2026-07-16):
 - `ReviewCardManage.vue` retains deep-link parsing, source-dialog ownership, report return, table/list refresh and every mutation workflow. It no longer owns a parallel Card Info request or detail state.
 - The parent decreased from 3,411 to 2,792 lines and from 24 to 22 direct `axios.` references; its 12 existing `v-dialog` blocks are unchanged. Canonical detail-request owners decreased from two parent call sites to one child call site.
 - All 53 Node guard files, grouped related Feature suites, the Unit suite and the development build passed. Database health passed, and the browser checks left ReviewLog/ReviewCard counts and the due checksum unchanged.
-- The implementation report records wide/narrow functional browser checks, but web-side re-verification on 2026-07-16 could not complete authenticated Network acceptance: `Chrome_DevTools_1.list_pages` repeatedly returned 502, and the remaining local Chrome page session was unauthenticated. Direct CDP confirmed the browser/debug endpoint was alive, but it cannot replace an authenticated real-page trace. Therefore one-request Network proof and final page acceptance remain blocked; executable ownership guards prove only the static single-owner boundary.
-- Phase 3B remains out of scope and is not authorized until authenticated Network acceptance is completed and the web-side designer issues final Accept.
+- Authenticated Chrome acceptance completed on 2026-07-16 at 1920×1080 and 900×900. Opening Card Info issued exactly one canonical `GET /review-cards/manage/{id}/detail`; switching overview/history/diagnosis issued no additional request. No legacy single-card `/logs`, `/lifecycle-events` or `/leech` request appeared. The page-level `GET /review-cards/manage/leech-summary` remains a separate list summary and is not duplicate Card Info loading.
+- Slow 3G close/reopen and card 156 → card 157 switching completed with the drawer stabilized on card 157; the stale card 156 response did not overwrite the active card. The 900×900 page and 420px drawer both had `scrollWidth === clientWidth`, so no horizontal overflow occurred.
+- The report deep link displayed its source hint, loaded the same canonical detail request, returned to `/reviews/senses` when entered from the report, and opened source context only after the user clicked “查看原文”. Console contained no error or warning. Read-only opening, tab switching, source viewing and closing did not write ReviewLog or change FSRS data.
+- Phase 3A is therefore Accepted / Production Closed. This closure authorizes only the next planning position; this task does not enter or implement Phase 3B-1.
 
-### Phase 3B — Search and Table Surface
+### Phase 3B-1 — Search / Filter / Saved Search Surface — Authorized Next / Not Started
 
-Extract the browsing/search/table surface after Phase 3A is accepted:
+Own the browsing query surface after Phase 3A closure:
 
-- Saved Search UI;
-- search query and server error presentation;
-- advanced filters;
+- search input and server error presentation;
+- Saved Search selection, save, update and delete surface;
+- current filter state and advanced filters;
+- server-authoritative search contract reuse;
+- no new search grammar.
+
+Forbidden in Phase 3B-1:
+
+- table redesign, column ownership or pagination extraction;
+- selection mutation or dangerous actions;
+- lifecycle/delete/reset semantics;
+- Card Info changes;
+- backend search-language expansion.
+
+### Phase 3B-2 — Table / Columns / Pagination / Selection / Export — Planned / Not Started
+
+Own the read-only table surface only after Phase 3B-1 is separately accepted:
+
 - table columns, sorting, pagination and compact mode;
-- selection state and read-only exports;
-- clear distinction between current card and selected cards.
+- current-card and selected-card state kept distinct;
+- selection state without dangerous-action ownership;
+- read-only JSON/CSV/TSV export presentation.
 
-This phase may introduce a dedicated read-only browser client or state module only when it owns a real, testable responsibility. It must reuse `ReviewCardManageFilterState.js`, ADR-0012, ADR-0013 and ADR-0017 instead of creating parallel query rules.
+Phase 3B-1 and Phase 3B-2 may introduce a dedicated read-only browser client or state module only when it owns a real, testable responsibility. They must reuse `ReviewCardManageFilterState.js`, ADR-0012, ADR-0013 and ADR-0017 instead of creating parallel query rules.
 
 ### Phase 3C — Mutation and Dialog Families
 
@@ -268,4 +286,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3A ends after commit, normal push and final report. Do not enter Phase 3B, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3A is closed after this repository-status commit, normal push and final report. Phase 3B-1 is only the Authorized Next / Not Started planning position. Do not enter Phase 3B-1, Phase 3B-2, Card Marker, Custom Study 1B or any later phase automatically.

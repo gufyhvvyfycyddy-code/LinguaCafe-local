@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。Browser / ReviewCardManage Phase 3A — Card Info Drawer Extraction 已实现并通过自动化核验；网页端复验时 `Chrome_DevTools_1` 持续返回 502，现有浏览器会话又已失去登录状态，因此 authenticated Network acceptance 当前受阻，结论为 Incomplete，不进入 Phase 3B。详细边界见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。Card Marker / Custom Study 1B、Reviewer、Reader 与真实 AI provider 继续按顺序延后。
+Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。Browser / ReviewCardManage Phase 3A — Card Info Drawer Extraction 已完成 authenticated Chrome、Network、双 viewport、Slow 3G 竞态、深链、来源入口、Console 和只读数据不变验收，状态为 Accepted / Production Closed。Phase 3B 已拆为 3B-1 与 3B-2；3B-1 仅为 Authorized Next / Not Started，本轮不进入开发。详细边界见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。Card Marker / Custom Study 1B、Reviewer、Reader 与真实 AI provider 继续按顺序延后。
 
 ## 2. 本轮依据
 
@@ -246,7 +246,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A Implemented / Automated Verified / Authenticated Network Acceptance Blocked / Incomplete**。Card Info 抽屉已完成单一子组件职责抽取；Phase 3B 未授权。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
+状态：**Phase 3A Accepted / Production Closed**。Card Info 抽屉已完成单一子组件职责抽取、authenticated Chrome 与 Network 验收。**Phase 3B-1 — Search / Filter / Saved Search Surface：Authorized Next / Not Started**；**Phase 3B-2 — Table / Columns / Pagination / Selection / Export：Planned / Not Started**。本轮不进入 3B 开发。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
 
 优先级：P1。
 
@@ -258,8 +258,9 @@ Anki 对齐行为：
 
 拆分方向：
 
-- **Phase 3A — Card Info Drawer Extraction**：先把已由 ADR-0014 锁定的只读详情抽屉、单一 detail 请求、tabs、异步竞态保护和清理边界迁入 `ReviewCardInfoDrawer.vue`；这是当前已准备的 Codex 目标。
-- **Phase 3B — Search and Table Surface**：再拆 Query state、Saved Search、table columns、bulk selection、pagination 和 exports。
+- **Phase 3A — Card Info Drawer Extraction**：Accepted / Production Closed。ADR-0014 锁定的只读详情抽屉、单一 detail 请求、tabs、异步竞态保护和清理边界已迁入 `ReviewCardInfoDrawer.vue`，真实页面验收已完成。
+- **Phase 3B-1 — Search / Filter / Saved Search Surface**：Authorized Next / Not Started。只负责搜索输入、服务端错误、Saved Search、当前筛选状态和高级筛选，不改搜索语法。
+- **Phase 3B-2 — Table / Columns / Pagination / Selection / Export**：Planned / Not Started。只负责表格、列、排序、分页、compact mode、current/selected 分离和只读导出。
 - **Phase 3C — Mutation and Dialog Families**：最后按 lifecycle / due-reset / delete / leech 领域归并危险操作与弹窗。
 - **Phase 3D — Container Closure**：消除重复状态所有者，让页面容器只协调区域。
 - 所有写操作继续走现有 Mutation / Lifecycle / Access 服务。
@@ -373,7 +374,7 @@ Custom Study 1B：
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A 已实现并通过自动化核验；authenticated Network acceptance 因 Chrome DevTools 1 连接 502 与本地会话未登录而受阻，状态 Incomplete，Phase 3B 未授权；见 `review-card-manage-architecture-convergence-plan.md` |
+| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A Accepted / Production Closed；authenticated Chrome、单请求 Network、Slow 3G、双 viewport、深链、来源入口、Console 和只读数据不变均通过；Phase 3B-1 Authorized Next / Not Started，Phase 3B-2 Planned / Not Started；见 `review-card-manage-architecture-convergence-plan.md` |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |
