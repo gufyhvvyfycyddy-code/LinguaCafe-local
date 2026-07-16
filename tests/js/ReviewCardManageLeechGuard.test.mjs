@@ -47,6 +47,7 @@ const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components',
 const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 const TABLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
+const LIFECYCLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
 
 const name = 'ReviewCardManageLeechGuard';
 let passed = 0;
@@ -66,6 +67,7 @@ const searchSurfaceSource = existsSync(SEARCH_SURFACE_PATH) ? readFileSync(SEARC
 const tableSurfaceSource = existsSync(TABLE_SURFACE_PATH) ? readFileSync(TABLE_SURFACE_PATH, 'utf-8') : '';
 const browserSource = `${source}\n${searchSurfaceSource}\n${tableSurfaceSource}`;
 const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
+const lifecycleSurfaceSource = existsSync(LIFECYCLE_SURFACE_PATH) ? readFileSync(LIFECYCLE_SURFACE_PATH, 'utf-8') : '';
 
 // 1. File exists
 test('File exists', () => {
@@ -92,9 +94,12 @@ test('Source includes /review-cards/manage/bulk-leech-rewrite-packages endpoint'
     assert.ok(source.includes('/review-cards/manage/bulk-leech-rewrite-packages'), 'Must use the bulk-leech-rewrite-packages endpoint');
 });
 
-// 6. Source includes /lifecycle-actions endpoint
-test('Source includes /lifecycle-actions endpoint', () => {
-    assert.ok(source.includes('/lifecycle-actions'), 'Must use the lifecycle-actions endpoint');
+// 6. Leech UI delegates to the lifecycle request owner
+test('Leech UI delegates to lifecycle request owner', () => {
+    assert.ok(source.includes('surface.runLifecycleAction'), 'Single leech suspend must delegate to lifecycle owner');
+    assert.ok(source.includes('surface.runBulkLifecycle'), 'Bulk leech suspend must delegate to lifecycle owner');
+    assert.ok(!source.includes('/lifecycle-actions'), 'Parent must not duplicate lifecycle-actions endpoint');
+    assert.ok(lifecycleSurfaceSource.includes('/lifecycle-actions'), 'Lifecycle owner must use lifecycle-actions endpoint');
 });
 
 // 7. Source includes '生成重写包' per-row action
@@ -153,10 +158,10 @@ test('Source does NOT contain FSRS scheduling', () => {
     assert.ok(!source.includes('fsrs_schedule'), 'Source must not call fsrs_schedule');
 });
 
-// 17. Source uses crypto.randomUUID for request_id
-test('Source uses crypto.randomUUID for request_id', () => {
-    assert.ok(source.includes('randomUUID'), 'Must use crypto.randomUUID for request_id');
-    assert.ok(source.includes('request_id') || source.includes('requestId'), 'Must send a request_id');
+// 17. Lifecycle request owner uses crypto.randomUUID for request_id
+test('Lifecycle owner uses crypto.randomUUID for request_id', () => {
+    assert.ok(lifecycleSurfaceSource.includes('randomUUID'), 'Lifecycle owner must use crypto.randomUUID for request_id');
+    assert.ok(lifecycleSurfaceSource.includes('request_id'), 'Lifecycle owner must send a request_id');
 });
 
 // 18. Source handles partial failure in batch

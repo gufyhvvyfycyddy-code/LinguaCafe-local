@@ -1,209 +1,102 @@
-// ReviewCardLifecycleBulkGuard.test.mjs
-//
-// ADR-0010: Review card lifecycle state machine.
-//
-// Node built-in assert tests for the bulk lifecycle operations contract:
-//   - Bulk endpoint is /review-cards/manage/bulk-lifecycle.
-//   - Supports suspend/resume/archive/restore/unbury.
-//   - Does NOT support bury/reset/delete (by design).
-//   - Sends source parameter.
-//   - Clears selection on success.
-//   - Handles skipped count.
-//   - 422 error handling.
-//   - Network error handling.
-//
-// Tests:
-//   1.  File exists.
-//   2.  Has confirmBulkLifecycle method.
-//   3.  Has doBulkLifecycle method.
-//   4.  Has bulkLifecycleDialog data field.
-//   5.  Has bulkLifecycleLoading data field.
-//   6.  Has bulkLifecycleAction data field.
-//   7.  Uses POST /review-cards/manage/bulk-lifecycle endpoint.
-//   8.  Sends ids array in payload.
-//   9.  Sends action in payload.
-//  10.  Sends source in payload.
-//  11.  Bulk menu has 'suspend' option.
-//  12.  Bulk menu has 'resume' option.
-//  13.  Bulk menu has 'archive' option.
-//  14.  Bulk menu has 'restore' option.
-//  15.  Bulk menu has 'unbury' option.
-//  16.  Bulk menu does NOT have 'bury' option.
-//  17.  Bulk menu does NOT have 'reset' option.
-//  18.  Bulk menu does NOT have 'delete' option.
-//  19.  confirmBulkLifecycle checks selectedIds.length.
-//  20.  doBulkLifecycle clears selection on success.
-//  21.  doBulkLifecycle handles skipped count.
-//  22.  doBulkLifecycle handles 422 error.
-//  23.  doBulkLifecycle handles network error.
-//  24.  Has bulkLifecycleDialogTitle computed.
-//  25.  Has bulkLifecycleDialogHint computed.
-//  26.  Has bulkLifecycleDialogColor computed.
-
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
-const TABLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..', '..');
+const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const tablePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
+const surfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
     try {
         fn();
         passed++;
-    } catch (e) {
+    } catch (error) {
         console.error('FAIL: ' + name);
-        console.error(e.message);
+        console.error(error.message);
         process.exitCode = 1;
     }
 }
 
-const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
-const tableSource = existsSync(TABLE_SURFACE_PATH) ? readFileSync(TABLE_SURFACE_PATH, 'utf-8') : '';
+for (const path of [parentPath, tablePath, surfacePath]) {
+    test(`File exists: ${path.split(/[\\/]/).pop()}`, () => assert.ok(existsSync(path)));
+}
 
-// 1. File exists
-test('File exists', () => {
-    assert.ok(existsSync(MANAGE_PATH), 'ReviewCardManage.vue must exist');
-    assert.ok(existsSync(TABLE_SURFACE_PATH), 'ReviewCardTableSurface.vue must exist');
+const parent = readFileSync(parentPath, 'utf8');
+const table = readFileSync(tablePath, 'utf8');
+const surface = readFileSync(surfacePath, 'utf8');
+
+for (const method of ['confirmBulk', 'requestBulkLifecycle', 'runBulkLifecycle', 'performBulkLifecycleAction']) {
+    test(`Surface has ${method}`, () => assert.ok(surface.includes(`${method}(`)));
+}
+
+for (const field of ['bulkLifecycleDialog', 'bulkLifecycleLoading', 'bulkLifecycleAction', 'bulkSelectionIds']) {
+    test(`Surface owns ${field}`, () => assert.ok(surface.includes(field)));
+}
+
+test('Surface owns bulk-lifecycle endpoint', () => {
+    assert.match(surface, /axios\.post\('\/review-cards\/manage\/bulk-lifecycle'/);
+    assert.ok(!parent.includes('/review-cards/manage/bulk-lifecycle'));
 });
 
-// 2. Has confirmBulkLifecycle method
-test('Has confirmBulkLifecycle method', () => {
-    assert.ok(source.includes('confirmBulkLifecycle'), 'Must have confirmBulkLifecycle method');
+test('Bulk payload contains ids action and source', () => {
+    assert.match(surface, /requestBulkLifecycle\(\{ ids, action, source/);
+    assert.match(surface, /axios\.post\('\/review-cards\/manage\/bulk-lifecycle',[\s\S]*?ids: normalizedIds,[\s\S]*?action,[\s\S]*?source/);
 });
 
-// 3. Has doBulkLifecycle method
-test('Has doBulkLifecycle method', () => {
-    assert.ok(source.includes('doBulkLifecycle'), 'Must have doBulkLifecycle method');
+const actionsSection = table.match(/bulkLifecycleActions\(\)[\s\S]*?return \[[\s\S]*?\];/)?.[0] || '';
+for (const action of ['suspend', 'resume', 'archive', 'restore', 'unbury']) {
+    test(`Bulk menu has ${action}`, () => assert.ok(actionsSection.includes(`key: '${action}'`)));
+}
+for (const action of ['bury', 'reset', 'delete']) {
+    test(`Bulk menu excludes ${action}`, () => assert.ok(!actionsSection.includes(`key: '${action}'`)));
+}
+
+test('Table emits immutable bulk lifecycle selection snapshot', () => {
+    assert.match(table, /emitBulkLifecycle\(action\)[\s\S]*?ids:\s*\[\.\.\.this\.selectedIds\]/);
+    assert.match(table, /items:\s*\[\.\.\.this\.selectedItems\]/);
 });
 
-// 4. Has bulkLifecycleDialog data field
-test('Has bulkLifecycleDialog data field', () => {
-    assert.ok(source.includes('bulkLifecycleDialog'), 'Must have bulkLifecycleDialog data field');
+test('Parent forwards bulk lifecycle intent to child', () => {
+    assert.match(parent, /confirmBulkLifecycle\(selection\)[\s\S]*?lifecycleMutationSurface\?\.confirmBulk\(selection\)/);
 });
 
-// 5. Has bulkLifecycleLoading data field
-test('Has bulkLifecycleLoading data field', () => {
-    assert.ok(source.includes('bulkLifecycleLoading'), 'Must have bulkLifecycleLoading data field');
+test('Bulk success clears selection through semantic event', () => {
+    assert.ok(surface.includes("this.$emit('clear-selection')"));
+    assert.ok(parent.includes('@clear-selection="clearTableSelection"'));
 });
 
-// 6. Has bulkLifecycleAction data field
-test('Has bulkLifecycleAction data field', () => {
-    assert.ok(source.includes('bulkLifecycleAction'), 'Must have bulkLifecycleAction data field');
+test('Bulk success reports applied and skipped counts', () => {
+    assert.ok(surface.includes('data.applied'));
+    assert.ok(surface.includes('data.skipped'));
 });
 
-// 7. Uses POST /review-cards/manage/bulk-lifecycle endpoint
-test('Uses POST /review-cards/manage/bulk-lifecycle endpoint', () => {
-    assert.ok(source.includes('/review-cards/manage/bulk-lifecycle'), 'Must use bulk-lifecycle endpoint');
+test('Bulk request is locked', () => {
+    assert.match(surface, /if \(this\.bulkLifecycleLoading\)/);
+    assert.match(surface, /this\.bulkLifecycleLoading = true/);
+    assert.match(surface, /finally\(\(\) => \{[\s\S]*?this\.bulkLifecycleLoading = false/);
 });
 
-// 8. Sends ids array in payload
-test('Sends ids array in payload', () => {
-    assert.ok(source.includes('ids: ids') && source.includes('bulkSelectionIds'), 'Parent must send ids from the child-owned selection snapshot');
+test('Bulk handles 422 error', () => assert.ok(surface.includes('status === 422')));
+test('Bulk handles network error', () => assert.ok(surface.includes('!err.response')));
+test('Bulk has title hint and color computed values', () => {
+    assert.ok(surface.includes('bulkLifecycleDialogTitle'));
+    assert.ok(surface.includes('bulkLifecycleDialogHint'));
+    assert.ok(surface.includes('bulkLifecycleDialogColor'));
 });
 
-// 9. Sends action in payload
-test('Sends action in payload', () => {
-    assert.ok(source.includes('action:'), 'Must send action in payload');
+test('Leech bulk suspend delegates to shared request owner', () => {
+    assert.ok(parent.includes('surface.runBulkLifecycle'));
+    assert.ok(parent.includes("source: 'manage_bulk_leech_suspend'"));
 });
 
-// 10. Sends source in payload
-test('Sends source in payload', () => {
-    assert.ok(source.includes('source:'), 'Must send source in payload');
-});
-
-// Extract the bulk menu section (between confirmBulkLifecycle calls)
-const bulkMenuSection = tableSource.match(/bulkLifecycleActions\(\)[\s\S]*?return \[[\s\S]*?\];/)?.[0] || '';
-
-// 11. Bulk menu has 'suspend' option
-test("Bulk menu has 'suspend' option", () => {
-    assert.ok(bulkMenuSection.includes("key: 'suspend'"), "Bulk menu must have suspend option");
-});
-
-// 12. Bulk menu has 'resume' option
-test("Bulk menu has 'resume' option", () => {
-    assert.ok(bulkMenuSection.includes("key: 'resume'"), "Bulk menu must have resume option");
-});
-
-// 13. Bulk menu has 'archive' option
-test("Bulk menu has 'archive' option", () => {
-    assert.ok(bulkMenuSection.includes("key: 'archive'"), "Bulk menu must have archive option");
-});
-
-// 14. Bulk menu has 'restore' option
-test("Bulk menu has 'restore' option", () => {
-    assert.ok(bulkMenuSection.includes("key: 'restore'"), "Bulk menu must have restore option");
-});
-
-// 15. Bulk menu has 'unbury' option
-test("Bulk menu has 'unbury' option", () => {
-    assert.ok(bulkMenuSection.includes("key: 'unbury'"), "Bulk menu must have unbury option");
-});
-
-// 16. Bulk menu does NOT have 'bury' option
-test("Bulk menu does NOT have 'bury' option", () => {
-    assert.ok(!bulkMenuSection.includes("key: 'bury'"), "Bulk menu must NOT have bury option (bulk bury not supported)");
-});
-
-// 17. Bulk menu does NOT have 'reset' option
-test("Bulk menu does NOT have 'reset' option", () => {
-    assert.ok(!bulkMenuSection.includes("key: 'reset'"), "Bulk menu must NOT have reset option (reset is not a lifecycle action)");
-});
-
-// 18. Bulk menu does NOT have 'delete' option
-test("Bulk menu does NOT have 'delete' option", () => {
-    assert.ok(!bulkMenuSection.includes("key: 'delete'"), "Bulk menu must NOT have delete option (delete is not a lifecycle action)");
-});
-
-// 19. confirmBulkLifecycle validates the child-owned selection payload
-test('confirmBulkLifecycle validates selection payload', () => {
-    const methodSection = source.match(/confirmBulkLifecycle\([^)]*\)\s*\{[\s\S]*?\}/)?.[0] || '';
-    assert.ok(methodSection.includes('selection.ids.length'), 'confirmBulkLifecycle must validate selection.ids.length');
-    assert.ok(methodSection.includes('bulkSelectionIds'), 'confirmBulkLifecycle must snapshot selected ids in the parent');
-});
-
-// 20. doBulkLifecycle clears child selection on success
-test('doBulkLifecycle clears selection on success', () => {
-    const methodSection = source.match(/doBulkLifecycle\(\)\s*\{[\s\S]*?\}\s*,/)?.[0] || '';
-    assert.ok(methodSection.includes('clearTableSelection'), 'doBulkLifecycle must clear the child-owned selection on success');
-});
-
-// 21. doBulkLifecycle handles skipped count
-test('doBulkLifecycle handles skipped count', () => {
-    const methodSection = source.match(/doBulkLifecycle\(\)\s*\{[\s\S]*?\}\s*,/)?.[0] || '';
-    assert.ok(methodSection.includes('skipped'), 'doBulkLifecycle must handle skipped count in response');
-});
-
-// 22. doBulkLifecycle handles 422 error
-test('doBulkLifecycle handles 422 error', () => {
-    const methodSection = source.match(/doBulkLifecycle\(\)\s*\{[\s\S]*?\}\s*,/)?.[0] || '';
-    assert.ok(methodSection.includes('422'), 'doBulkLifecycle must handle 422 error');
-});
-
-// 23. doBulkLifecycle handles network error
-test('doBulkLifecycle handles network error', () => {
-    const methodSection = source.match(/doBulkLifecycle\(\)\s*\{[\s\S]*?\}\s*,/)?.[0] || '';
-    assert.ok(methodSection.includes('!err.response') || methodSection.includes('网络错误'), 'doBulkLifecycle must handle network error');
-});
-
-// 24. Has bulkLifecycleDialogTitle computed
-test('Has bulkLifecycleDialogTitle computed', () => {
-    assert.ok(source.includes('bulkLifecycleDialogTitle'), 'Must have bulkLifecycleDialogTitle computed');
-});
-
-// 25. Has bulkLifecycleDialogHint computed
-test('Has bulkLifecycleDialogHint computed', () => {
-    assert.ok(source.includes('bulkLifecycleDialogHint'), 'Must have bulkLifecycleDialogHint computed');
-});
-
-// 26. Has bulkLifecycleDialogColor computed
-test('Has bulkLifecycleDialogColor computed', () => {
-    assert.ok(source.includes('bulkLifecycleDialogColor'), 'Must have bulkLifecycleDialogColor computed');
+test('Surface excludes delete reset and rewrite endpoints', () => {
+    assert.ok(!surface.includes('/bulk-delete'));
+    assert.ok(!surface.includes('/reset'));
+    assert.ok(!surface.includes('rewrite-package'));
 });
 
 console.log(`\n${passed} tests passed.`);

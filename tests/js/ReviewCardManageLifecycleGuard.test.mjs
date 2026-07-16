@@ -1,196 +1,131 @@
-// ReviewCardManageLifecycleGuard.test.mjs
-//
-// ADR-0010: Review card lifecycle state machine.
-//
-// Node built-in assert tests for ReviewCardManage.vue lifecycle contract:
-//   - Lifecycle state filters (active/buried/suspended/archived).
-//   - Per-row lifecycle menu with descriptor fetch.
-//   - Detail drawer shows lifecycle events.
-//   - State help dialog.
-//   - 409/422/network error handling.
-//   - No legacy bulk-enabled endpoint.
-//
-// Tests:
-//   1.  File exists.
-//   2.  Imports from ReviewCardLifecyclePresentation.
-//   3.  Has 'active' filter button.
-//   4.  Has 'buried' filter button.
-//   5.  Has 'suspended' filter button.
-//   6.  Has 'archived' filter button.
-//   7.  Has lifecycleDescriptor data field.
-//   8.  Has lifecycleLoading data field.
-//   9.  Has lifecycleDialog data field.
-//  10.  Has fetchLifecycleDescriptor method.
-//  11.  Has executeLifecycleAction method.
-//  12.  Uses POST /review-cards/{id}/lifecycle-actions.
-//  13.  Uses GET /review-cards/{id}/lifecycle for descriptor.
-//  14.  Uses GET /review-cards/{id}/lifecycle-events for events.
-//  15.  Detail drawer shows lifecycle state.
-//  16.  409 error handling.
-//  17.  422 error handling.
-//  18.  Network error handling.
-//  19.  Has stateHelpDialog data field.
-//  20.  Has lifecycleStateHelpEntries computed.
-//  21.  No legacy bulkArchive method (replaced by doBulkLifecycle).
-//  22.  No legacy bulkRestore method.
-//  23.  No legacy bulkArchiveDialog.
-//  24.  No legacy bulkRestoreDialog.
-//  25.  No legacy /bulk-enabled endpoint usage.
-
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
-const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
-const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const root = join(__dirname, '..', '..');
+const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const surfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
+const drawerPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
+const searchPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
     try {
         fn();
         passed++;
-    } catch (e) {
+    } catch (error) {
         console.error('FAIL: ' + name);
-        console.error(e.message);
+        console.error(error.message);
         process.exitCode = 1;
     }
 }
 
-const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
-const searchSurfaceSource = existsSync(SEARCH_SURFACE_PATH) ? readFileSync(SEARCH_SURFACE_PATH, 'utf-8') : '';
-const browserSource = `${source}\n${searchSurfaceSource}`;
-const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
+for (const path of [parentPath, surfacePath, drawerPath, searchPath]) {
+    test(`File exists: ${path.split(/[\\/]/).pop()}`, () => assert.ok(existsSync(path)));
+}
 
-// 1. File exists
-test('File exists', () => {
-    assert.ok(existsSync(MANAGE_PATH), 'ReviewCardManage.vue must exist');
+const parent = readFileSync(parentPath, 'utf8');
+const surface = readFileSync(surfacePath, 'utf8');
+const drawer = readFileSync(drawerPath, 'utf8');
+const browser = `${parent}\n${readFileSync(searchPath, 'utf8')}`;
+
+for (const state of ['active', 'buried', 'suspended', 'archived']) {
+    test(`Has ${state} filter`, () => assert.ok(browser.includes(`value="${state}"`)));
+}
+
+test('Parent registers lifecycle mutation surface', () => {
+    assert.ok(parent.includes('ReviewCardLifecycleMutationSurface'));
+    assert.ok(parent.includes('<review-card-lifecycle-mutation-surface'));
 });
 
-// 2. Imports from ReviewCardLifecyclePresentation
-test('Imports from ReviewCardLifecyclePresentation', () => {
-    assert.ok(source.includes('ReviewCardLifecyclePresentation'), 'Must import lifecycle presentation helpers');
+test('Surface imports lifecycle presentation helpers', () => {
+    assert.ok(surface.includes('ReviewCardLifecyclePresentation'));
+    assert.ok(surface.includes('LIFECYCLE_PRESENTATION'));
+    assert.ok(surface.includes('actionDangerLevel'));
 });
 
-// 3. Has 'active' filter button
-test("Has 'active' filter button", () => {
-    assert.ok(browserSource.includes("value=\"active\""), "Must have 'active' filter button");
+test('Surface owns descriptor and request state', () => {
+    for (const field of ['lifecycleMenuId', 'lifecycleDescriptor', 'lifecycleLoading', 'descriptorRequestSeq']) {
+        assert.ok(surface.includes(field), `missing ${field}`);
+    }
 });
 
-// 4. Has 'buried' filter button
-test("Has 'buried' filter button", () => {
-    assert.ok(browserSource.includes("value=\"buried\""), "Must have 'buried' filter button");
+test('Surface owns confirmation and conflict state', () => {
+    for (const field of ['lifecycleDialog', 'lifecycleDialogContext', 'lifecycleConflict']) {
+        assert.ok(surface.includes(field), `missing ${field}`);
+    }
 });
 
-// 5. Has 'suspended' filter button
-test("Has 'suspended' filter button", () => {
-    assert.ok(browserSource.includes("value=\"suspended\""), "Must have 'suspended' filter button");
+test('Surface owns descriptor GET', () => {
+    assert.match(surface, /axios\.get\('\/review-cards\/' \+ normalizedId \+ '\/lifecycle'\)/);
 });
 
-// 6. Has 'archived' filter button
-test("Has 'archived' filter button", () => {
-    assert.ok(browserSource.includes("value=\"archived\""), "Must have 'archived' filter button");
+test('Surface owns lifecycle action POST', () => {
+    assert.match(surface, /axios\.post\('\/review-cards\/' \+ reviewCardId \+ '\/lifecycle-actions'/);
 });
 
-// 7. Has lifecycleDescriptor data field
-test('Has lifecycleDescriptor data field', () => {
-    assert.ok(source.includes('lifecycleDescriptor'), 'Must have lifecycleDescriptor data field');
+test('Confirmation freezes expected version before menu cleanup', () => {
+    assert.match(surface, /lifecycleDialogContext\s*=\s*\{[\s\S]*?expectedVersion/);
+    assert.match(surface, /performLifecycleAction\(\)[\s\S]*?expectedVersion/);
 });
 
-// 8. Has lifecycleLoading data field
-test('Has lifecycleLoading data field', () => {
-    assert.ok(source.includes('lifecycleLoading'), 'Must have lifecycleLoading data field');
+test('Descriptor request has stale-response sequence protection', () => {
+    assert.match(surface, /const seq = \+\+this\.descriptorRequestSeq/);
+    assert.match(surface, /seq !== this\.descriptorRequestSeq/);
+    assert.match(surface, /beforeDestroy\(\)[\s\S]*?descriptorRequestSeq\+\+/);
 });
 
-// 9. Has lifecycleDialog data field
-test('Has lifecycleDialog data field', () => {
-    assert.ok(source.includes('lifecycleDialog'), 'Must have lifecycleDialog data field');
+test('Surface handles 409 conflict', () => assert.ok(surface.includes('status === 409')));
+test('Surface handles 422 contract error', () => assert.ok(surface.includes('status === 422')));
+test('Surface handles network error', () => assert.ok(surface.includes('!err.response')));
+
+test('State help belongs to lifecycle surface', () => {
+    assert.ok(surface.includes('stateHelpDialog'));
+    assert.ok(surface.includes('lifecycleStateHelpEntries'));
+    assert.ok(surface.includes('复习卡生命周期状态说明'));
 });
 
-// 10. Has fetchLifecycleDescriptor method
-test('Has fetchLifecycleDescriptor method', () => {
-    assert.ok(source.includes('fetchLifecycleDescriptor'), 'Must have fetchLifecycleDescriptor method');
+test('Parent exposes only lifecycle coordinator methods', () => {
+    assert.ok(parent.includes('onLifecycleStateChange'));
+    assert.ok(parent.includes('lifecycleMutationSurface?.handleMenuToggle'));
+    assert.ok(parent.includes('lifecycleMutationSurface?.handleAction'));
+    assert.ok(parent.includes('lifecycleMutationSurface?.openStateHelp'));
 });
 
-// 11. Has executeLifecycleAction method
-test('Has executeLifecycleAction method', () => {
-    assert.ok(source.includes('executeLifecycleAction'), 'Must have executeLifecycleAction method');
+test('Parent has no lifecycle endpoint', () => {
+    assert.ok(!parent.includes('/lifecycle-actions'));
+    assert.ok(!parent.includes("'/lifecycle'"));
+    assert.ok(!parent.includes('/bulk-lifecycle'));
 });
 
-// 12. Uses POST /review-cards/{id}/lifecycle-actions
-test('Uses POST /review-cards/{id}/lifecycle-actions', () => {
-    assert.ok(source.includes('/lifecycle-actions'), 'Must use lifecycle-actions endpoint');
+test('Parent has no lifecycle dialog ownership', () => {
+    assert.ok(!parent.includes('v-model="lifecycleDialog"'));
+    assert.ok(!parent.includes('v-model="bulkLifecycleDialog"'));
+    assert.ok(!parent.includes('v-model="stateHelpDialog"'));
 });
 
-// 13. Uses GET /review-cards/{id}/lifecycle for descriptor
-test('Uses GET /review-cards/{id}/lifecycle for descriptor', () => {
-    assert.ok(source.includes('/lifecycle') && source.includes('axios.get'), 'Must fetch lifecycle descriptor');
+test('Leech governance delegates lifecycle requests', () => {
+    assert.ok(parent.includes('surface.runLifecycleAction'));
+    assert.ok(parent.includes('surface.runBulkLifecycle'));
 });
 
-// 14. Lifecycle events come from the canonical aggregate detail request.
-test('Uses aggregate card_info lifecycle events without a granular request', () => {
-    assert.ok(drawerSource.includes('lifecycle_events'), 'Drawer must render card_info lifecycle events');
-    assert.ok(!drawerSource.includes('/lifecycle-events'), 'Drawer must not fire a granular lifecycle-events request');
+test('Detail drawer renders aggregate lifecycle events', () => {
+    assert.ok(drawer.includes('lifecycle_events'));
+    assert.ok(!drawer.includes('/lifecycle-events'));
 });
 
-// 15. Detail drawer shows lifecycle state
-test('Detail drawer shows lifecycle state', () => {
-    assert.ok(drawerSource.includes('lifecycle_state') || drawerSource.includes('lifecycleState'), 'Detail drawer must show lifecycle state');
+test('No legacy bulk-enabled endpoint', () => assert.ok(!parent.includes('/bulk-enabled')));
+test('No legacy bulk archive/restore dialogs', () => {
+    assert.ok(!parent.includes('bulkArchiveDialog'));
+    assert.ok(!parent.includes('bulkRestoreDialog'));
 });
 
-// 16. 409 error handling
-test('409 error handling', () => {
-    assert.ok(source.includes('409'), 'Must handle 409 status');
-});
-
-// 17. 422 error handling
-test('422 error handling', () => {
-    assert.ok(source.includes('422'), 'Must handle 422 status');
-});
-
-// 18. Network error handling
-test('Network error handling', () => {
-    assert.ok(source.includes('!err.response') || source.includes('网络错误'), 'Must handle network error');
-});
-
-// 19. Has stateHelpDialog data field
-test('Has stateHelpDialog data field', () => {
-    assert.ok(source.includes('stateHelpDialog'), 'Must have stateHelpDialog for state explanation UI');
-});
-
-// 20. Has lifecycleStateHelpEntries computed
-test('Has lifecycleStateHelpEntries computed', () => {
-    assert.ok(source.includes('lifecycleStateHelpEntries'), 'Must have lifecycleStateHelpEntries computed');
-});
-
-// 21. No legacy bulkArchive method
-test('No legacy bulkArchive method (replaced by doBulkLifecycle)', () => {
-    // The old bulkArchive() method that opened bulkArchiveDialog should be gone
-    assert.ok(!/\bbulkArchive\(\)/.test(source), 'Must not have legacy bulkArchive() method');
-});
-
-// 22. No legacy bulkRestore method
-test('No legacy bulkRestore method', () => {
-    assert.ok(!/\bbulkRestore\(\)/.test(source), 'Must not have legacy bulkRestore() method');
-});
-
-// 23. No legacy bulkArchiveDialog
-test('No legacy bulkArchiveDialog', () => {
-    assert.ok(!source.includes('bulkArchiveDialog'), 'Must not have legacy bulkArchiveDialog');
-});
-
-// 24. No legacy bulkRestoreDialog
-test('No legacy bulkRestoreDialog', () => {
-    assert.ok(!source.includes('bulkRestoreDialog'), 'Must not have legacy bulkRestoreDialog');
-});
-
-// 25. No legacy /bulk-enabled endpoint usage
-test('No legacy /bulk-enabled endpoint usage', () => {
-    assert.ok(!source.includes('/bulk-enabled'), 'Must not use legacy /bulk-enabled endpoint');
+test('Surface does not replicate lifecycle state machine', () => {
+    assert.ok(!surface.includes('ReviewCardLifecyclePolicy'));
+    assert.ok(!surface.includes('buried_until ='));
+    assert.ok(!surface.includes('fsrs_enabled ='));
 });
 
 console.log(`\n${passed} tests passed.`);

@@ -59,7 +59,7 @@
             >
                 需关注 {{ leechSummary.counts.struggling }}
             </v-chip>
-            <v-btn x-small text color="info" class="ml-1 mb-1" @click="stateHelpDialog = true">
+            <v-btn x-small text color="info" class="ml-1 mb-1" @click="openLifecycleStateHelp">
                 <v-icon x-small left>mdi-help-circle-outline</v-icon>状态说明
             </v-btn>
         </div>
@@ -89,11 +89,11 @@
             :editing-id="editingId"
             :saving-id="savingId"
             :edit-form="editForm"
-            :lifecycle-loading="lifecycleLoading"
-            :lifecycle-menu-id="lifecycleMenuId"
-            :lifecycle-descriptor="lifecycleDescriptor"
-            :available-lifecycle-actions="availableLifecycleActions"
-            :bulk-lifecycle-loading="bulkLifecycleLoading"
+            :lifecycle-loading="lifecycleSurfaceState.loading"
+            :lifecycle-menu-id="lifecycleSurfaceState.menuId"
+            :lifecycle-descriptor="lifecycleSurfaceState.descriptor"
+            :available-lifecycle-actions="lifecycleSurfaceState.availableActions"
+            :bulk-lifecycle-loading="lifecycleSurfaceState.bulkLoading"
             :bulk-rewrite-loading="bulkRewriteLoading"
             :bulk-leech-suspend-loading="bulkLeechSuspendLoading"
             @page-change="changePage"
@@ -147,6 +147,16 @@
             @error="onSchedulingError"
         />
 
+        <review-card-lifecycle-mutation-surface
+            ref="lifecycleMutationSurface"
+            @state-change="onLifecycleStateChange"
+            @clear-selection="clearTableSelection"
+            @refresh-list="loadData"
+            @refresh-stats="loadFsrsStats"
+            @notify="showSnackbar"
+            @error="onLifecycleError"
+        />
+
         <!-- Archive confirmation dialog -->
         <v-dialog v-model="archiveDialog" max-width="480">
             <v-card>
@@ -175,54 +185,6 @@
                     <v-spacer />
                     <v-btn text @click="restoreDialog = false">取消</v-btn>
                     <v-btn color="success" class="review-card-manage-restore-confirm" @click="doRestore">确认恢复</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- ADR-0010: Lifecycle confirmation dialog (generic)
-             Used for moderate lifecycle actions (suspend/archive/restore).
-             Safe actions (bury/unbury/resume) execute immediately. -->
-        <v-dialog v-model="lifecycleDialog" max-width="480">
-            <v-card>
-                <v-card-title>{{ lifecycleDialogTitle }}</v-card-title>
-                <v-card-text>
-                    <p>{{ lifecycleDialogHint }}</p>
-                    <v-alert v-if="lifecycleConflict" type="error" dense text class="mt-2 mb-0">
-                        {{ lifecycleConflict }}
-                    </v-alert>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="lifecycleDialog = false" :disabled="lifecycleLoading">取消</v-btn>
-                    <v-btn :color="lifecycleDialogColor" :loading="lifecycleLoading" @click="performLifecycleAction">确认</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- ADR-0010: Bulk lifecycle confirmation dialog.
-             Replaces the legacy bulk-archive / bulk-restore dialogs.
-             Shows the action label, hint, and selected count. -->
-        <v-dialog v-model="bulkLifecycleDialog" max-width="520">
-            <v-card>
-                <v-card-title>{{ bulkLifecycleDialogTitle }}</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-bulk-lifecycle-scope">
-                        只会处理你当前勾选的 {{ bulkSelectionIds.length }} 张复习卡，不会按筛选条件全量操作。
-                    </p>
-                    <p class="review-card-manage-bulk-lifecycle-hint">{{ bulkLifecycleDialogHint }}</p>
-                    <p class="review-card-manage-bulk-lifecycle-note text--secondary">
-                        跳过当前状态不允许该操作的卡片；不删除词义或复习历史。
-                    </p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="bulkLifecycleDialog = false" :disabled="bulkLifecycleLoading">取消</v-btn>
-                    <v-btn
-                        :color="bulkLifecycleDialogColor"
-                        :loading="bulkLifecycleLoading"
-                        class="review-card-manage-bulk-lifecycle-confirm"
-                        @click="doBulkLifecycle"
-                    >确认</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -266,39 +228,6 @@
                     <v-spacer />
                     <v-btn text @click="bulkDeleteDialog = false">取消</v-btn>
                     <v-btn color="error" class="review-card-manage-bulk-delete-confirm" @click="doBulkDelete">确认批量彻底删除</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- ADR-0010: State explanation dialog.
-             Shows the four lifecycle states with labels, colors, and
-             one-line hints. Reset and delete are noted as separate
-             operations (not lifecycle states). -->
-        <v-dialog v-model="stateHelpDialog" max-width="560">
-            <v-card>
-                <v-card-title>复习卡生命周期状态说明</v-card-title>
-                <v-card-text>
-                    <v-list dense>
-                        <v-list-item v-for="state in lifecycleStateHelpEntries" :key="state.key">
-                            <v-list-item-icon>
-                                <v-chip x-small :color="state.color">{{ state.label }}</v-chip>
-                            </v-list-item-icon>
-                            <v-list-item-content>
-                                <v-list-item-subtitle>{{ state.hint }}</v-list-item-subtitle>
-                            </v-list-item-content>
-                        </v-list-item>
-                    </v-list>
-                    <v-divider class="my-3" />
-                    <p class="text--secondary text-body-2 mb-1">
-                        <strong>重置</strong>：清空 FSRS 调度进度，不影响生命周期状态。
-                    </p>
-                    <p class="text--secondary text-body-2 mb-0">
-                        <strong>删除</strong>：永久移除复习卡，独立于生命周期状态。
-                    </p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="stateHelpDialog = false">关闭</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -429,14 +358,6 @@ import axios from 'axios';
 import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
 import { parseReviewCardManageLocation, stripReviewCardManageDeepLinkQuery } from '../../services/ReviewCardManageDeepLink.js';
 import {
-    actionLabel,
-    actionHint,
-    actionDangerLevel,
-    actionColor,
-    LIFECYCLE_PRESENTATION,
-    LIFECYCLE_STATES,
-} from '../../services/ReviewCardLifecyclePresentation.js';
-import {
     reasonLabel as leechReasonLabel,
     suggestionLabel as leechSuggestionLabel,
     severityText as leechSeverityText,
@@ -447,6 +368,7 @@ import ReviewCardSearchSurface from './ReviewCardSearchSurface.vue';
 import ReviewCardInfoDrawer from './ReviewCardInfoDrawer.vue';
 import ReviewCardTableSurface from './ReviewCardTableSurface.vue';
 import ReviewCardSchedulingMutationSurface from './ReviewCardSchedulingMutationSurface.vue';
+import ReviewCardLifecycleMutationSurface from './ReviewCardLifecycleMutationSurface.vue';
 
 export default {
     components: {
@@ -456,6 +378,7 @@ export default {
         ReviewCardInfoDrawer,
         ReviewCardTableSurface,
         ReviewCardSchedulingMutationSurface,
+        ReviewCardLifecycleMutationSurface,
     },
     props: {
         language: {
@@ -490,21 +413,15 @@ export default {
             sourcePayload: {},
             detailDrawer: false,
             detailReviewCardId: null,
-            // ADR-0010: Lifecycle state machine per-row actions
-            // lifecycleMenuId: review_card_id whose lifecycle menu is open
-            // lifecycleDescriptor: cached descriptor for the open menu
-            // lifecycleLoading: true while a lifecycle POST is in flight
-            // lifecycleDialog: generic confirmation dialog
-            // lifecycleDialogAction: action being confirmed
-            // lifecycleDialogTarget: card being acted on
-            // lifecycleConflict: 409/422 error message in the dialog
-            lifecycleMenuId: null,
-            lifecycleDescriptor: null,
-            lifecycleLoading: false,
-            lifecycleDialog: false,
-            lifecycleDialogAction: null,
-            lifecycleDialogTarget: null,
-            lifecycleConflict: '',
+            // Read-only projection published by ReviewCardLifecycleMutationSurface.
+            // The child remains the sole request, target, lock and dialog owner.
+            lifecycleSurfaceState: {
+                menuId: null,
+                descriptor: null,
+                availableActions: [],
+                loading: false,
+                bulkLoading: false,
+            },
             archiveDialog: false,
             archiveTarget: null,
             restoreDialog: false,
@@ -512,12 +429,6 @@ export default {
             deleteDialog: false,
             deleteTarget: null,
             bulkDeleteDialog: false,
-            // ADR-0010: Bulk lifecycle operations
-            bulkLifecycleLoading: false,
-            bulkLifecycleDialog: false,
-            bulkLifecycleAction: null,
-            // ADR-0010: State explanation dialog
-            stateHelpDialog: false,
             // ADR-0012: Server-authoritative search response state. The
             // dedicated search surface owns input/filter UI and presents it.
             searchMeta: null,
@@ -613,66 +524,6 @@ export default {
         },
         hiddenBulkDeleteCount() {
             return Math.max(this.bulkSelectionItems.length - 20, 0);
-        },
-        // ADR-0010: Available lifecycle actions for the open menu, from
-        // the backend descriptor. Empty when descriptor not loaded.
-        availableLifecycleActions() {
-            if (!this.lifecycleDescriptor) {
-                return [];
-            }
-            return this.lifecycleDescriptor.available_actions || [];
-        },
-        // Generic lifecycle dialog title.
-        lifecycleDialogTitle() {
-            if (!this.lifecycleDialogAction) {
-                return '';
-            }
-            return '确认' + actionLabel(this.lifecycleDialogAction);
-        },
-        // Generic lifecycle dialog hint text.
-        lifecycleDialogHint() {
-            if (!this.lifecycleDialogAction) {
-                return '';
-            }
-            return actionHint(this.lifecycleDialogAction);
-        },
-        // Generic lifecycle dialog button color.
-        lifecycleDialogColor() {
-            if (!this.lifecycleDialogAction) {
-                return 'primary';
-            }
-            return actionColor(this.lifecycleDialogAction);
-        },
-        // Bulk lifecycle dialog title.
-        bulkLifecycleDialogTitle() {
-            if (!this.bulkLifecycleAction) {
-                return '';
-            }
-            return '批量' + actionLabel(this.bulkLifecycleAction) + '选中的复习卡？';
-        },
-        // Bulk lifecycle dialog hint text.
-        bulkLifecycleDialogHint() {
-            if (!this.bulkLifecycleAction) {
-                return '';
-            }
-            return actionHint(this.bulkLifecycleAction);
-        },
-        // Bulk lifecycle dialog button color.
-        bulkLifecycleDialogColor() {
-            if (!this.bulkLifecycleAction) {
-                return 'primary';
-            }
-            return actionColor(this.bulkLifecycleAction);
-        },
-        // ADR-0010: State explanation entries for the help dialog.
-        // Derived from the single source of truth in LIFECYCLE_PRESENTATION.
-        lifecycleStateHelpEntries() {
-            return LIFECYCLE_STATES.map((key) => ({
-                key: key,
-                label: LIFECYCLE_PRESENTATION[key].label,
-                color: LIFECYCLE_PRESENTATION[key].color,
-                hint: LIFECYCLE_PRESENTATION[key].hint,
-            }));
         },
     },
     mounted() {
@@ -875,102 +726,33 @@ export default {
             });
         },
 
-        // ==================== Lifecycle (ADR-0010) ====================
-        // Per-row lifecycle actions via POST /review-cards/{id}/lifecycle-actions.
-        // The descriptor is fetched on menu open so the frontend never
-        // replicates the state machine — the backend is the sole authority.
-        // Thin wrappers exposing the pure presentation helpers to the template.
-        // Vue 2 templates can only call functions registered on the instance.
-        actionLabel,
-        actionColor,
-        // Menu open/close handler — fetches descriptor on open, clears on close.
+        // ==================== Lifecycle (ADR-0010 / Phase 3C-2) ====================
+        // The child owns descriptor reads, mutation requests, request locks,
+        // confirmation state and lifecycle help. The parent only coordinates
+        // table intents and cross-region refresh/notification effects.
+        onLifecycleStateChange(state) {
+            this.lifecycleSurfaceState = {
+                menuId: state?.menuId ?? null,
+                descriptor: state?.descriptor || null,
+                availableActions: [...(state?.availableActions || [])],
+                loading: Boolean(state?.loading),
+                bulkLoading: Boolean(state?.bulkLoading),
+            };
+        },
         onLifecycleMenuToggle(isOpen, item) {
-            if (isOpen) {
-                this.lifecycleMenuId = item.review_card_id;
-                this.lifecycleDescriptor = null;
-                this.fetchLifecycleDescriptor(item.review_card_id);
-            } else {
-                // Delay clearing so the click handler can fire before the menu closes
-                setTimeout(() => {
-                    if (!this.lifecycleLoading) {
-                        this.lifecycleMenuId = null;
-                        this.lifecycleDescriptor = null;
-                    }
-                }, 200);
-            }
+            this.$refs.lifecycleMutationSurface?.handleMenuToggle(isOpen, item);
         },
-        fetchLifecycleDescriptor(cardId) {
-            axios.get('/review-cards/' + cardId + '/lifecycle')
-                .then((response) => {
-                    this.lifecycleDescriptor = response.data.lifecycle || null;
-                })
-                .catch(() => {
-                    this.lifecycleDescriptor = null;
-                });
-        },
-        // Menu click handler: safe actions execute immediately,
-        // moderate actions open the confirmation dialog.
         onLifecycleMenuClick(action, item) {
-            const dangerLevel = actionDangerLevel(action);
-            if (dangerLevel === 'safe') {
-                this.executeLifecycleAction(action, item);
-            } else {
-                this.lifecycleDialogAction = action;
-                this.lifecycleDialogTarget = item;
-                this.lifecycleConflict = '';
-                this.lifecycleDialog = true;
-            }
+            this.$refs.lifecycleMutationSurface?.handleAction(action, item);
         },
-        // Execute a lifecycle action via POST.
-        executeLifecycleAction(action, item) {
-            const expectedVersion = this.lifecycleDescriptor
-                ? this.lifecycleDescriptor.version
-                : null;
-            const requestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
-                ? window.crypto.randomUUID()
-                : ('lc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
-
-            this.lifecycleLoading = true;
-            axios.post('/review-cards/' + item.review_card_id + '/lifecycle-actions', {
-                action: action,
-                request_id: requestId,
-                expected_version: expectedVersion,
-                source: 'review_card_manage',
-            }).then((response) => {
-                this.lifecycleDialog = false;
-                const label = actionLabel(action);
-                const alreadyApplied = response.data?.already_applied;
-                this.showSnackbar(
-                    alreadyApplied ? label + '：该操作已应用过。' : '已' + label + '。',
-                    'success'
-                );
-                this.loadData();
-                this.loadFsrsStats();
-            }).catch((err) => {
-                const status = err.response?.status;
-                if (status === 409) {
-                    this.lifecycleConflict = '卡片状态已在其他页面发生变化，已刷新最新状态。';
-                    this.fetchLifecycleDescriptor(item.review_card_id);
-                } else if (status === 422) {
-                    this.lifecycleConflict = err.response?.data?.message || '该操作在当前状态下不可用。';
-                    this.fetchLifecycleDescriptor(item.review_card_id);
-                } else if (!err.response) {
-                    // Network error — keep dialog open for retry.
-                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
-                } else {
-                    this.showSnackbar(err.response?.data?.message || '操作失败。', 'error');
-                    this.lifecycleDialog = false;
-                }
-            }).finally(() => {
-                this.lifecycleLoading = false;
-            });
+        confirmBulkLifecycle(selection) {
+            this.$refs.lifecycleMutationSurface?.confirmBulk(selection);
         },
-        // Dialog confirm handler.
-        performLifecycleAction() {
-            if (!this.lifecycleDialogAction || !this.lifecycleDialogTarget) {
-                return;
-            }
-            this.executeLifecycleAction(this.lifecycleDialogAction, this.lifecycleDialogTarget);
+        openLifecycleStateHelp() {
+            this.$refs.lifecycleMutationSurface?.openStateHelp();
+        },
+        onLifecycleError(message) {
+            this.error = message;
         },
 
         confirmDueNow(item) {
@@ -1048,60 +830,6 @@ export default {
                 .catch((err) => {
                     this.error = '批量删除失败：' + (err.response?.data?.message || err.message);
                 });
-        },
-
-        // ADR-0010: Open the bulk lifecycle confirmation dialog.
-        // All five actions (suspend/resume/archive/restore/unbury) go
-        // through the same dialog and the same bulk-lifecycle endpoint.
-        confirmBulkLifecycle(selection) {
-            if (!selection || selection.ids.length === 0) return;
-            this.bulkSelectionIds = [...selection.ids];
-            this.bulkSelectionItems = [...selection.items];
-            this.bulkLifecycleAction = selection.action;
-            this.bulkLifecycleDialog = true;
-        },
-
-        // ADR-0010: Execute the bulk lifecycle action via
-        // POST /review-cards/manage/bulk-lifecycle.
-        // The backend applies the action per-card and reports
-        // applied/skipped counts; illegal transitions are skipped,
-        // not raised as errors.
-        doBulkLifecycle() {
-            this.bulkLifecycleDialog = false;
-            const ids = [...this.bulkSelectionIds];
-            const action = this.bulkLifecycleAction;
-            this.bulkLifecycleLoading = true;
-
-            axios.post('/review-cards/manage/bulk-lifecycle', {
-                ids: ids,
-                action: action,
-                source: 'review_card_manage_bulk',
-            }).then((response) => {
-                this.clearTableSelection();
-                this.bulkSelectionIds = [];
-                this.bulkSelectionItems = [];
-                const data = response.data || {};
-                const label = actionLabel(action);
-                let msg = `已批量${label}：应用 ${data.applied ?? ids.length} 张`;
-                if (data.skipped > 0) {
-                    msg += `，跳过 ${data.skipped} 张（当前状态不允许）`;
-                }
-                msg += '。';
-                this.showSnackbar(msg, data.skipped > 0 ? 'warning' : 'success');
-                this.loadData();
-                this.loadFsrsStats();
-            }).catch((err) => {
-                const status = err.response?.status;
-                if (status === 422) {
-                    this.showSnackbar(err.response?.data?.message || '请求参数有误。', 'error');
-                } else if (!err.response) {
-                    this.showSnackbar('网络错误，请检查连接后重试。', 'error');
-                } else {
-                    this.error = '批量操作失败：' + (err.response?.data?.message || err.message);
-                }
-            }).finally(() => {
-                this.bulkLifecycleLoading = false;
-            });
         },
 
         showSnackbar(text, color) {
@@ -1270,18 +998,17 @@ export default {
             this.showSnackbar(payload.text || '已复制。', 'success');
         },
 
-        // Per-row suspend for leech cards. Calls the lifecycle endpoint
-        // with action=suspend and a sense_review_leech source for audit.
-        // Uses crypto.randomUUID() with a try/catch fallback.
+        // Per-row leech governance remains in the parent, while the
+        // lifecycle child is the sole owner of the underlying POST request.
         suspendLeechCard(item) {
-            if (!item || !item.review_card_id) {
-                return;
-            }
-            const requestId = this.generateRequestId('leech-suspend-');
-            axios.post('/review-cards/' + item.review_card_id + '/lifecycle-actions', {
+            if (!item || !item.review_card_id) return;
+            const surface = this.$refs.lifecycleMutationSurface;
+            if (!surface || typeof surface.runLifecycleAction !== 'function') return;
+
+            surface.runLifecycleAction({
                 action: 'suspend',
-                request_id: requestId,
-                expected_version: null,
+                item,
+                expectedVersion: null,
                 source: 'sense_review_leech',
             }).then((response) => {
                 const alreadyApplied = response.data?.already_applied;
@@ -1299,25 +1026,14 @@ export default {
                     this.loadData();
                 } else if (status === 422) {
                     this.showSnackbar(err.response?.data?.message || '该操作在当前状态下不可用。', 'error');
+                } else if (err.message === 'lifecycle_request_in_flight') {
+                    return;
                 } else if (!err.response) {
                     this.showSnackbar('网络错误，请检查连接后重试。', 'error');
                 } else {
                     this.showSnackbar(err.response?.data?.message || '暂停失败。', 'error');
                 }
             });
-        },
-
-        // Generate a request_id with crypto.randomUUID() and a
-        // Math.random fallback for older browsers.
-        generateRequestId(prefix) {
-            try {
-                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-                    return window.crypto.randomUUID();
-                }
-            } catch (e) {
-                // fall through to Math.random fallback
-            }
-            return (prefix || 'req-') + Date.now() + '-' + Math.random().toString(36).slice(2);
         },
 
         // Open the bulk rewrite packages dialog. Calls
@@ -1394,13 +1110,16 @@ export default {
             this.bulkLeechSuspendDialog = true;
         },
 
-        // Execute the bulk leech suspend via the existing bulk-lifecycle
-        // endpoint with action=suspend and a dedicated source.
+        // Bulk leech governance keeps its own dialog, while the lifecycle
+        // child owns the shared bulk-lifecycle request and lock.
         doBulkLeechSuspend() {
+            const surface = this.$refs.lifecycleMutationSurface;
+            if (!surface || typeof surface.runBulkLifecycle !== 'function') return;
             this.bulkLeechSuspendLoading = true;
             const ids = [...this.bulkSelectionIds];
-            axios.post('/review-cards/manage/bulk-lifecycle', {
-                ids: ids,
+
+            surface.runBulkLifecycle({
+                ids,
                 action: 'suspend',
                 source: 'manage_bulk_leech_suspend',
             }).then((response) => {
@@ -1422,6 +1141,8 @@ export default {
                 const status = err.response?.status;
                 if (status === 422) {
                     this.showSnackbar(err.response?.data?.message || '请求参数有误。', 'error');
+                } else if (err.message === 'bulk_lifecycle_request_in_flight') {
+                    return;
                 } else if (!err.response) {
                     this.showSnackbar('网络错误，请检查连接后重试。', 'error');
                 } else {
