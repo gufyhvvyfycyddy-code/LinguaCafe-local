@@ -1,8 +1,8 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3B-2 Accepted / Production Closed
+> **Status**: Phase 3C-1 — Due-now / Reset Scheduling Mutation Family — Accepted / Production Closed
 >
-> **Current next slice**: Phase 3C — Mutation and Dialog Families — Authorized Next / Not Started
+> **Current next slice**: Phase 3C-2 — Lifecycle Mutation Family — Authorized Next / Not Started
 >
 > **Architecture baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
 >
@@ -191,9 +191,44 @@ Corrective follow-up on 2026-07-16:
 - At 900×900, card 156 remained current while card 157 remained selected; the page had no horizontal overflow and only `.table-wrapper` scrolled horizontally. Console remained clean and all observed requests stayed on `127.0.0.1:8000`.
 - The current measured sizes are 1,540 lines for `ReviewCardManage.vue` and 872 lines for `ReviewCardTableSurface.vue`; request and dialog counts remain 19 parent `axios.` references, three child read-only export GET requests and 11 parent `v-dialog` blocks.
 
-### Phase 3C — Mutation and Dialog Families — Authorized Next / Not Started
+### Phase 3C — Mutation and Dialog Families — In Progress
 
-Group dangerous actions by real domain boundaries while retaining current backend authorities. No mutation semantics change is authorized by this plan.
+Group write operations by real domain boundaries while retaining current backend authorities. No mutation semantics change is authorized by this plan.
+
+Frozen subphase order:
+
+1. **Phase 3C-1 — Due-now / Reset Scheduling Mutation Family — Accepted / Production Closed**. `ReviewCardSchedulingMutationSurface.vue` is the sole owner of the two scheduling POST requests, their targets, request locks and confirmation dialogs. The parent only forwards table intents and consumes semantic card-update/refresh/notify/error events.
+2. **Phase 3C-2 — Lifecycle Mutation Family — Authorized Next / Not Started**. Consolidate lifecycle descriptor loading, single/bulk transitions and lifecycle dialogs without changing the backend state machine.
+3. **Phase 3C-3 — Delete Mutation Family — Planned / Not Started**. Consolidate single/bulk delete confirmation and request ownership while preserving ReviewLog, occurrence and last-confirmed-sense semantics.
+4. **Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Started**. Consolidate rewrite-package and leech-suspend orchestration while preserving the no-provider/no-auto-create boundary.
+
+Anki alignment for 3C-1:
+
+- the Browser coordinates the selected/current card and delegates scheduling operations such as Set Due Date and Reset to operation-specific code;
+- LinguaCafe borrows the coordinator-versus-operation boundary only;
+- LinguaCafe does not copy deck movement, note deletion, filtered deck behavior, Anki's full reset option matrix or its Cards/Notes dual mode;
+- existing LinguaCafe due-now and reset endpoints, ReviewLog behavior and FSRS semantics remain authoritative.
+
+Phase 3C-1 measured result:
+
+- created `resources/js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue` at 117 lines;
+- the scheduling child owns exactly two `axios.post` requests and two `v-dialog` blocks;
+- `ReviewCardManage.vue` decreased from 1,540 to 1,489 lines;
+- parent direct `axios.` references decreased from 19 to 16 because the two live scheduling requests moved and one unused duplicate `setDueNow()` request path was removed;
+- parent `v-dialog` blocks decreased from 11 to 9;
+- the parent contains no due-now/reset endpoint, target, loading or dialog state;
+- lifecycle, delete, leech, search, Card Info, backend routes and payloads remain unchanged.
+
+Phase 3C-1 TDD and browser evidence on 2026-07-16:
+
+- `ReviewCardSchedulingMutationSurfaceGuard.test.mjs` first failed because the component did not exist, then passed after the responsibility-complete extraction;
+- `ReviewCardManageUiGuardTest.php` was updated to read the management safety surface across the parent and the new scheduling owner; the safety copy remains locked;
+- authenticated Chrome at 1920×1080 confirmed that opening the due-now confirmation creates no write request; one deliberate confirmation for review card 157 produced exactly one `POST /review-cards/manage/157/due-now`, one stats refresh and the semantic row-update event;
+- a separate deliberate reset confirmation for review card 156 produced exactly one `POST /review-cards/manage/156/reset`; the dialog closed, target/loading state cleared, list and stats refresh events fired, and the success notice was shown. The resulting `ReviewLog` row was preserved as required;
+- Chrome accessibility snapshot IDs drifted during acceptance, so later actions used real DOM events and the loaded Vue component's existing event method inside the authenticated page rather than direct API/fetch calls;
+- the same acceptance pass closed a stale deep-link context bug: closing a report-opened Card Info drawer now removes only `review_card_id` and `from` from the route, preserves unrelated query keys such as `saved_search_id`, and prevents a subsequently opened normal card from showing report-only copy;
+- deep-link parsing now rejects mixed numeric garbage such as `123abc` and decimal strings such as `1.5` instead of truncating them with `parseInt`;
+- at 900×900 the page had no document-level horizontal overflow, table overflow remained inside `.table-wrapper`, the scheduling dialog remained contained, Console was clean and no external resource was observed.
 
 ### Phase 3D — Container Closure — Planned / Not Started
 
@@ -209,6 +244,11 @@ Completed Phase 3B target pairs:
 - `DEV-ReviewCardManage-3B-2`: create `ReviewCardTableSurface.vue`, migrate the complete table/columns/pagination/selection/export region, update executable guards, run grouped regression and complete authenticated dual-viewport Chrome acceptance.
 
 Each ARCH and DEV pair closed in one task. The architecture record preceded implementation, the new guard demonstrated RED, and implementation proceeded only inside the frozen boundary.
+
+Current Phase 3C-1 target pair:
+
+- `ARCH-ReviewCardManage-3C-1`: freeze due-now/reset as one scheduling mutation family, make request and dialog ownership singular, remove duplicate due-now implementation, and preserve backend scheduling authorities.
+- `DEV-ReviewCardManage-3C-1`: create `ReviewCardSchedulingMutationSurface.vue`, migrate the complete due-now/reset request and confirmation workflow, add executable guards, run grouped regressions and complete authenticated dual-viewport Chrome acceptance.
 
 ## 7. Phase 3B changed files
 
@@ -241,7 +281,7 @@ Docs:
 - no FSRS, due, rating or ReviewLog write change;
 - no lifecycle, archive, restore, reset or delete semantic change;
 - no frontend reimplementation of Browser Search grammar;
-- 不进入 Phase 3C、Card Marker 或 Custom Study 1B without a separate task;
+- do not enter the next Phase 3C subphase, Card Marker or Custom Study 1B without a separate task;
 - no deck/subdeck, Note mode, tag tree or Filtered Deck;
 - no new dependency, Vuex module or event bus without proven need;
 - no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
@@ -282,4 +322,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3B-2 closes after its commit, normal push and final report. Phase 3C is only **Authorized Next / Not Started**. Do not enter Phase 3C, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3C-1 closes after its commit, normal push and final report. Phase 3C-2 is **Authorized Next / Not Started**. Do not enter Phase 3C-2, Card Marker, Custom Study 1B or any later phase automatically.

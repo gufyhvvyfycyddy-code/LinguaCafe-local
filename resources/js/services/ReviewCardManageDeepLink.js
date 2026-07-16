@@ -70,8 +70,12 @@ export function parseReviewCardManageLocation(query) {
     const rawId = query.review_card_id;
     if (rawId === undefined || rawId === null) return null;
 
-    const cardId = parseInt(Array.isArray(rawId) ? rawId[0] : rawId, 10);
-    if (!Number.isInteger(cardId) || cardId <= 0) return null;
+    const candidateId = Array.isArray(rawId) ? rawId[0] : rawId;
+    if (typeof candidateId !== 'string' && typeof candidateId !== 'number') return null;
+    const normalizedId = String(candidateId);
+    if (!/^\d+$/.test(normalizedId)) return null;
+    const cardId = Number(normalizedId);
+    if (!Number.isSafeInteger(cardId) || cardId <= 0) return null;
 
     const rawFrom = query.from;
     const from = Array.isArray(rawFrom) ? rawFrom[0] : rawFrom;
@@ -81,6 +85,21 @@ export function parseReviewCardManageLocation(query) {
         review_card_id: cardId,
         from: from,
     };
+}
+
+/**
+ * Remove only this feature's route keys while preserving unrelated query
+ * state such as Saved Search identifiers.
+ *
+ * @param {object} query
+ * @returns {object}
+ */
+export function stripReviewCardManageDeepLinkQuery(query) {
+    if (!query || typeof query !== 'object') return {};
+    const nextQuery = { ...query };
+    delete nextQuery.review_card_id;
+    delete nextQuery.from;
+    return nextQuery;
 }
 
 /**

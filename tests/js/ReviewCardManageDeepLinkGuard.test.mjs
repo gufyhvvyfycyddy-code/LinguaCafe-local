@@ -28,6 +28,7 @@ const HELPER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'services', '
 const {
     buildReviewCardManageLocation,
     parseReviewCardManageLocation,
+    stripReviewCardManageDeepLinkQuery,
     DEEP_LINK_SOURCES,
 } = await import('file://' + HELPER_PATH.replace(/\\/g, '/'));
 
@@ -120,6 +121,14 @@ test('parse: review_card_id = "abc" → null', () => {
     assert.strictEqual(parseReviewCardManageLocation({ review_card_id: 'abc', from: 'daily-report' }), null);
 });
 
+test('parse: mixed numeric garbage is rejected instead of truncated', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '123abc', from: 'daily-report' }), null);
+});
+
+test('parse: decimal strings are rejected instead of truncated', () => {
+    assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '1.5', from: 'daily-report' }), null);
+});
+
 test('parse: review_card_id missing → null', () => {
     assert.strictEqual(parseReviewCardManageLocation({ from: 'daily-report' }), null);
 });
@@ -155,6 +164,25 @@ test('DEEP_LINK_SOURCES contains exactly 3 sources', () => {
     assert.ok(DEEP_LINK_SOURCES.includes('daily-report'));
     assert.ok(DEEP_LINK_SOURCES.includes('seven-day-trend'));
     assert.ok(DEEP_LINK_SOURCES.includes('thirty-day-calendar'));
+});
+
+test('strip query removes only deep-link keys and preserves unrelated state', () => {
+    const query = {
+        review_card_id: '156',
+        from: 'daily-report',
+        saved_search_id: '9',
+        filter: 'archived',
+    };
+    assert.deepEqual(stripReviewCardManageDeepLinkQuery(query), {
+        saved_search_id: '9',
+        filter: 'archived',
+    });
+    assert.equal(query.review_card_id, '156', 'strip helper must not mutate the original query');
+});
+
+test('strip query safely handles missing query objects', () => {
+    assert.deepEqual(stripReviewCardManageDeepLinkQuery(null), {});
+    assert.deepEqual(stripReviewCardManageDeepLinkQuery(undefined), {});
 });
 
 // --- 5. word_sense_id is NOT required ---
@@ -228,7 +256,7 @@ test('ReviewCardManage.vue does not auto-open first card on invalid ID', () => {
     assert.ok(drawer.includes('加载卡片详情失败'), 'drawer must show a safe detail error');
     assert.ok(src.includes('@detail-load-error="onDetailLoadError"'), 'parent must receive canonical request failures');
     assert.ok(src.includes('未找到可管理的词义复习卡'), 'parent must preserve the safe deep-link error message');
-    assert.match(src, /onDetailLoadError\(reviewCardId\)[\s\S]*?deepLink\.active\s*=\s*false[\s\S]*?detailDrawer\s*=\s*false/, 'failure must keep deep link inactive and close the failed drawer');
+    assert.match(src, /onDetailLoadError\(reviewCardId\)[\s\S]*?clearDeepLinkContext\([^)]*未找到可管理的词义复习卡[\s\S]*?detailDrawer\s*=\s*false/, 'failure must end deep-link mode, preserve the safe error and close the failed drawer');
 });
 
 test('deep link loading and active state follow the canonical child request', () => {
@@ -239,7 +267,7 @@ test('deep link loading and active state follow the canonical child request', ()
     assert.match(src, /onDetailLoaded\(reviewCardId\)[\s\S]*?deepLink\.loading\s*=\s*false[\s\S]*?deepLink\.active\s*=\s*true/, 'success must activate the deep link after loading');
     assert.ok(drawer.includes("this.$emit('detail-loaded', reviewCardId)"), 'child must emit success for the requested ID');
     assert.ok(drawer.includes("this.$emit('detail-load-error', reviewCardId)"), 'child must emit failure for the requested ID');
-    assert.match(src, /onDetailClosed\(\)[\s\S]*?deepLink\.loading\s*=\s*false[\s\S]*?detailDrawer\s*=\s*false/, 'closing a pending deep link must clear the page-level loading state');
+    assert.match(src, /onDetailClosed\(\)[\s\S]*?clearDeepLinkContext\(\)[\s\S]*?detailDrawer\s*=\s*false/, 'closing a deep link must end report context before the drawer closes');
 });
 
 test('ReviewCardManage.vue has back-to-report button', () => {
@@ -272,6 +300,15 @@ test('ReviewCardManage.vue preserves review_card_id in URL for refresh', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
     // handleDeepLink reads from this.$route.query, which survives refresh
     assert.ok(/\$route\.query/.test(src) || /\$route.*query/.test(src), 'ReviewCardManage must read route query for deep link');
+});
+
+test('closing or replacing a report target clears stale report context and URL keys', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    assert.ok(src.includes('stripReviewCardManageDeepLinkQuery'), 'parent must reuse the pure query-strip helper');
+    assert.match(src, /clearDeepLinkContext\(error = ['"]['"], replaceRoute = true\)/, 'parent must expose one canonical deep-link exit method');
+    assert.match(src, /clearDeepLinkContext[\s\S]*?deepLink\.active\s*=\s*false[\s\S]*?deepLink\.source\s*=\s*null[\s\S]*?deepLink\.reviewCardId\s*=\s*null/, 'exit must clear active source and target state');
+    assert.match(src, /\$router\.replace\([\s\S]*?stripReviewCardManageDeepLinkQuery/, 'exit must replace the current URL without deep-link keys');
+    assert.match(src, /openDetail\(item\)[\s\S]*?clearDeepLinkContext\(\)/, 'manual Card Info must end any prior report context before opening');
 });
 
 console.log(`\n${passed} passed`);

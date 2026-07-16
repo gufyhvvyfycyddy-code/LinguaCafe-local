@@ -138,6 +138,15 @@
             @close="onDetailClosed"
         />
 
+        <review-card-scheduling-mutation-surface
+            ref="schedulingMutationSurface"
+            @card-updated="onSchedulingCardUpdated"
+            @refresh-list="loadData"
+            @refresh-stats="loadFsrsStats"
+            @notify="onSchedulingNotify"
+            @error="onSchedulingError"
+        />
+
         <!-- Archive confirmation dialog -->
         <v-dialog v-model="archiveDialog" max-width="480">
             <v-card>
@@ -214,38 +223,6 @@
                         class="review-card-manage-bulk-lifecycle-confirm"
                         @click="doBulkLifecycle"
                     >确认</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- Due now confirmation dialog -->
-        <v-dialog v-model="dueNowDialog" max-width="480">
-            <v-card>
-                <v-card-title class="review-card-manage-due-now-title">让这张卡立即到期？</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-due-now-body">确认后，这张卡会尽快出现在复习队列中。</p>
-                    <p class="review-card-manage-due-now-note text--secondary">这不是一次复习评分，不会写入复习历史，也不会改变 FSRS 记忆。</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="dueNowDialog = false">取消</v-btn>
-                    <v-btn color="primary" class="review-card-manage-due-now-confirm" @click="doDueNow">确认立即到期</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- Reset confirmation dialog -->
-        <v-dialog v-model="resetDialog" max-width="500">
-            <v-card>
-                <v-card-title class="review-card-manage-reset-title">重置这张复习卡的进度？</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-reset-body">这会把这张词义卡恢复为新卡状态，并清空当前 FSRS 记忆。</p>
-                    <p class="review-card-manage-reset-note text--secondary">旧复习历史会保留，并会新增一条 "reset" 记录。不会删除词义，也不会删除阅读来源。</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
-                    <v-btn color="primary" :loading="resetLoading" class="review-card-manage-reset-confirm" @click="doReset">确认重置</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -450,7 +427,7 @@
 <script>
 import axios from 'axios';
 import SenseExampleDialog from '../Review/SenseExampleDialog.vue';
-import { parseReviewCardManageLocation } from '../../services/ReviewCardManageDeepLink.js';
+import { parseReviewCardManageLocation, stripReviewCardManageDeepLinkQuery } from '../../services/ReviewCardManageDeepLink.js';
 import {
     actionLabel,
     actionHint,
@@ -469,6 +446,7 @@ import SenseReviewLeechRewritePackageDialog from '../Senses/SenseReviewLeechRewr
 import ReviewCardSearchSurface from './ReviewCardSearchSurface.vue';
 import ReviewCardInfoDrawer from './ReviewCardInfoDrawer.vue';
 import ReviewCardTableSurface from './ReviewCardTableSurface.vue';
+import ReviewCardSchedulingMutationSurface from './ReviewCardSchedulingMutationSurface.vue';
 
 export default {
     components: {
@@ -477,6 +455,7 @@ export default {
         ReviewCardSearchSurface,
         ReviewCardInfoDrawer,
         ReviewCardTableSurface,
+        ReviewCardSchedulingMutationSurface,
     },
     props: {
         language: {
@@ -530,11 +509,6 @@ export default {
             archiveTarget: null,
             restoreDialog: false,
             restoreTarget: null,
-            dueNowDialog: false,
-            dueNowTarget: null,
-            resetDialog: false,
-            resetTarget: null,
-            resetLoading: false,
             deleteDialog: false,
             deleteTarget: null,
             bulkDeleteDialog: false,
@@ -1000,54 +974,27 @@ export default {
         },
 
         confirmDueNow(item) {
-            this.dueNowTarget = item;
-            this.dueNowDialog = true;
-        },
-
-        doDueNow() {
-            if (!this.dueNowTarget) return;
-            const item = this.dueNowTarget;
-            this.dueNowDialog = false;
-            this.dueNowTarget = null;
-
-            axios.post('/review-cards/manage/' + item.review_card_id + '/due-now')
-                .then((response) => {
-                    const idx = this.items.findIndex(i => i.review_card_id === item.review_card_id);
-                    if (idx >= 0) {
-                        this.$set(this.items, idx, response.data);
-                    }
-                    this.showSnackbar('已设为立即到期。该卡会进入复习队列。', 'success');
-                    this.loadFsrsStats();
-                })
-                .catch((err) => {
-                    this.error = '操作失败：' + (err.response?.data?.message || err.message);
-                });
+            this.$refs.schedulingMutationSurface.confirmDueNow(item);
         },
 
         confirmReset(item) {
-            this.resetTarget = item;
-            this.resetDialog = true;
+            this.$refs.schedulingMutationSurface.confirmReset(item);
         },
 
-        doReset() {
-            if (!this.resetTarget) return;
-            const item = this.resetTarget;
-            this.resetLoading = true;
+        onSchedulingCardUpdated(card) {
+            const reviewCardId = Number(card?.review_card_id);
+            const idx = this.items.findIndex(item => item.review_card_id === reviewCardId);
+            if (idx >= 0) {
+                this.$set(this.items, idx, card);
+            }
+        },
 
-            axios.post('/review-cards/manage/' + item.review_card_id + '/reset')
-                .then((response) => {
-                    this.resetDialog = false;
-                    this.resetTarget = null;
-                    this.showSnackbar(response.data.message || '已重置复习进度。该卡会重新进入复习队列。', 'success');
-                    this.loadData();
-                    this.loadFsrsStats();
-                })
-                .catch((err) => {
-                    this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
-                })
-                .finally(() => {
-                    this.resetLoading = false;
-                });
+        onSchedulingNotify(text, color) {
+            this.showSnackbar(text, color);
+        },
+
+        onSchedulingError(message) {
+            this.error = message;
         },
 
         confirmDelete(item) {
@@ -1161,21 +1108,6 @@ export default {
             this.snackbar = { show: true, text, color };
         },
 
-        setDueNow(item) {
-            axios.post('/review-cards/manage/' + item.review_card_id + '/due-now')
-                .then((response) => {
-                    const idx = this.items.findIndex(i => i.review_card_id === item.review_card_id);
-                    if (idx >= 0) {
-                        this.$set(this.items, idx, response.data);
-                    }
-                    this.showSnackbar('已设为立即到期。该卡会进入复习队列。', 'success');
-                    this.loadFsrsStats();
-                })
-                .catch((err) => {
-                    this.error = '操作失败：' + (err.response?.data?.message || err.message);
-                });
-        },
-
         viewSource(item) {
             const card = {
                 lemma: item.lemma,
@@ -1210,6 +1142,7 @@ export default {
         openDetail(item) {
             const reviewCardId = Number(item?.review_card_id);
             if (!Number.isInteger(reviewCardId) || reviewCardId <= 0) return;
+            this.clearDeepLinkContext();
             this.detailReviewCardId = reviewCardId;
             this.detailDrawer = true;
         },
@@ -1231,6 +1164,24 @@ export default {
             this.detailDrawer = true;
         },
 
+        clearDeepLinkContext(error = '', replaceRoute = true) {
+            const routeQuery = this.$route && this.$route.query ? this.$route.query : {};
+            const hasDeepLinkQuery = Object.prototype.hasOwnProperty.call(routeQuery, 'review_card_id')
+                || Object.prototype.hasOwnProperty.call(routeQuery, 'from');
+            this.deepLink.active = false;
+            this.deepLink.loading = false;
+            this.deepLink.error = error;
+            this.deepLink.source = null;
+            this.deepLink.reviewCardId = null;
+            if (replaceRoute && hasDeepLinkQuery && this.$router && this.$route) {
+                this.$router.replace({
+                    path: this.$route.path,
+                    query: stripReviewCardManageDeepLinkQuery(routeQuery),
+                    hash: this.$route.hash,
+                }, () => {}, () => {});
+            }
+        },
+
         syncTableCurrentCard(reviewCardId) {
             const tableSurface = this.$refs.tableSurface;
             if (tableSurface && typeof tableSurface.markCurrentCardById === 'function') {
@@ -1248,9 +1199,7 @@ export default {
 
         onDetailLoadError(reviewCardId) {
             if (reviewCardId !== this.deepLink.reviewCardId) return;
-            this.deepLink.loading = false;
-            this.deepLink.error = '未找到可管理的词义复习卡，可能已删除、被拒绝或不属于当前语言。';
-            this.deepLink.active = false;
+            this.clearDeepLinkContext('未找到可管理的词义复习卡，可能已删除、被拒绝或不属于当前语言。');
             this.detailDrawer = false;
             this.detailReviewCardId = null;
         },
@@ -1268,7 +1217,7 @@ export default {
         },
 
         onDetailClosed() {
-            this.deepLink.loading = false;
+            this.clearDeepLinkContext();
             this.detailDrawer = false;
             this.detailReviewCardId = null;
         },

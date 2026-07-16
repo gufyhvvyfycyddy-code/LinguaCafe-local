@@ -14,8 +14,9 @@ const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'R
 const drawerPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 const searchSurfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 const tableSurfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
+const schedulingSurfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSchedulingMutationSurface.vue');
 
-for (const path of [planPath, drawerPath, searchSurfacePath, tableSurfacePath]) {
+for (const path of [planPath, drawerPath, searchSurfacePath, tableSurfacePath, schedulingSurfacePath]) {
     assert.ok(existsSync(path), `required architecture file missing: ${path}`);
 }
 
@@ -28,22 +29,30 @@ const parent = readFileSync(parentPath, 'utf8');
 const drawer = readFileSync(drawerPath, 'utf8');
 const searchSurface = readFileSync(searchSurfacePath, 'utf8');
 const tableSurface = readFileSync(tableSurfacePath, 'utf8');
+const schedulingSurface = readFileSync(schedulingSurfacePath, 'utf8');
 const parentLineCount = (parent.match(/\n/g) || []).length;
 const parentAxiosCount = (parent.match(/axios\./g) || []).length;
 const parentDialogCount = (parent.match(/<v-dialog/g) || []).length;
 const tableLineCount = (tableSurface.match(/\n/g) || []).length;
 const tableAxiosCount = (tableSurface.match(/axios\./g) || []).length;
+const schedulingLineCount = (schedulingSurface.match(/\n/g) || []).length;
+const schedulingAxiosCount = (schedulingSurface.match(/axios\./g) || []).length;
+const schedulingDialogCount = (schedulingSurface.match(/<v-dialog/g) || []).length;
 const detailRequestPattern = /axios\.get\(['"]\/review-cards\/manage\/[\s\S]{0,120}?\/detail['"]/;
 const canonicalOwnerCount = [parent, drawer].filter(source => detailRequestPattern.test(source)).length;
 
-assert.equal(parentLineCount, 1540, 'ReviewCardManage.vue current line count must remain explicit and reviewable');
-assert.equal(parentAxiosCount, 19, 'ReviewCardManage.vue direct axios count must remain explicit and reviewable');
+assert.equal(parentLineCount, 1489, 'ReviewCardManage.vue current line count must remain explicit and reviewable');
+assert.equal(parentAxiosCount, 16, 'ReviewCardManage.vue direct axios count must remain explicit and reviewable');
 assert.equal(tableLineCount, 872, 'ReviewCardTableSurface.vue current line count must remain explicit and reviewable');
 assert.equal(tableAxiosCount, 3, 'ReviewCardTableSurface.vue must own exactly the three read-only export requests');
-assert.equal(parentDialogCount, 11, 'ReviewCardManage.vue dialog count must remain explicit and reviewable');
+assert.equal(parentDialogCount, 9, 'ReviewCardManage.vue dialog count must remain explicit and reviewable');
+assert.equal(schedulingLineCount, 117, 'ReviewCardSchedulingMutationSurface.vue current line count must remain explicit and reviewable');
+assert.equal(schedulingAxiosCount, 2, 'scheduling surface must own exactly the due-now and reset requests');
+assert.equal(schedulingDialogCount, 2, 'scheduling surface must own exactly two confirmation dialogs');
 assert.equal(canonicalOwnerCount, 1, 'Card Info canonical detail request must have exactly one frontend owner');
 assert.match(parent, /<review-card-search-surface/);
 assert.match(parent, /<review-card-table-surface/);
+assert.match(parent, /<review-card-scheduling-mutation-surface/);
 assert.match(parent, /@apply="applySearchFilterState"/);
 assert.doesNotMatch(parent, /<review-card-saved-search-panel/);
 assert.doesNotMatch(parent, /v-model="searchQuery"/);
@@ -55,18 +64,26 @@ assert.match(tableSurface, /axios\.get\(['"]\/review-cards\/manage\/export-anki-
 assert.match(tableSurface, /axios\.get\(['"]\/review-cards\/manage\/export-csv['"]/);
 assert.doesNotMatch(tableSurface, /axios\.(post|put|patch|delete)\s*\(/i);
 assert.doesNotMatch(tableSurface, /Vuex|mapState|mapActions|eventBus|EventBus/);
+assert.match(schedulingSurface, /\/due-now/);
+assert.match(schedulingSurface, /\/reset/);
+assert.doesNotMatch(parent, /\/due-now|\/reset/);
+assert.doesNotMatch(schedulingSurface, /lifecycle-actions|bulk-lifecycle|bulk-delete|bulk-leech|rewrite-package/);
 assert.match(drawer, /Number\.isInteger\(reviewCardId\) && reviewCardId > 0/);
 assert.match(drawer, /const seq = \+\+this\.detailRequestSeq/);
 assert.match(drawer, /clearDetailState\(\)[\s\S]*?this\.detailRequestSeq\+\+/);
 assert.doesNotMatch(drawer, /axios\.(post|put|patch|delete)\s*\(/i);
 assert.doesNotMatch(drawer, />\s*(删除|归档|恢复|重置|立即到期|忘了|困难|良好|简单)\s*</);
 
-assert.match(plan, /Phase 3B-2 Accepted \/ Production Closed/);
+assert.match(plan, /Phase 3C-1[^\n]*Accepted \/ Production Closed/);
 assert.doesNotMatch(plan, /^> \*\*Status\*\*:.*Incomplete/m);
 assert.match(plan, /2,792 lines/);
 assert.match(plan, /2,462 lines/);
-assert.match(plan, /1,540 lines/);
+assert.match(plan, /1,489 lines/);
+assert.match(plan, /117 lines/);
 assert.match(plan, /872 lines/);
+assert.match(plan, /from 19 to 16/);
+assert.match(plan, /from 11 to 9/);
+assert.match(plan, /setDueNow\(\)/);
 assert.match(plan, /deep-link current-row synchronization/i);
 assert.match(plan, /currentCardId[^\n]*null/);
 assert.match(plan, /review card 156/);
@@ -86,12 +103,18 @@ assert.match(plan, /Phase 3B-1 — Search \/ Filter \/ Saved Search Surface/);
 assert.match(plan, /Phase 3B-1[^\n]*Accepted \/ Production Closed/);
 assert.match(plan, /Phase 3B-2 — Table \/ Columns \/ Pagination \/ Selection \/ Export/);
 assert.match(plan, /Phase 3B-2[^\n]*Accepted \/ Production Closed/);
-assert.match(plan, /Phase 3C — Mutation and Dialog Families[^\n]*Authorized Next \/ Not Started/);
+assert.match(plan, /Phase 3C — Mutation and Dialog Families[^\n]*In Progress/);
+assert.match(plan, /Phase 3C-1 — Due-now \/ Reset Scheduling Mutation Family[^\n]*Accepted \/ Production Closed/);
+assert.match(plan, /Phase 3C-2 — Lifecycle Mutation Family[^\n]*Authorized Next \/ Not Started/);
+assert.match(plan, /Phase 3C-3 — Delete Mutation Family[^\n]*Planned \/ Not Started/);
+assert.match(plan, /Phase 3C-4 — Leech Governance Mutation Family[^\n]*Planned \/ Not Started/);
 assert.match(plan, /Phase 3D — Container Closure/);
 assert.match(plan, /ARCH-ReviewCardManage-3B-1/);
 assert.match(plan, /DEV-ReviewCardManage-3B-1/);
 assert.match(plan, /ARCH-ReviewCardManage-3B-2/);
 assert.match(plan, /DEV-ReviewCardManage-3B-2/);
+assert.match(plan, /ARCH-ReviewCardManage-3C-1/);
+assert.match(plan, /DEV-ReviewCardManage-3C-1/);
 assert.match(plan, /Anki Manual — Browsing/);
 assert.match(plan, /qt\/aqt\/browser\/sidebar/);
 assert.match(plan, /qt\/aqt\/browser\/table/);
@@ -107,19 +130,19 @@ assert.match(plan, /可执行 guard/);
 assert.match(plan, /一个真实职责/);
 assert.match(plan, /不复制 Anki 的 Cards\/Notes 双模式/);
 assert.match(plan, /不实现 deck\/subdeck 树/);
-assert.match(plan, /不进入 Phase 3C/);
+assert.match(plan, /do not enter the next Phase 3C subphase/);
 assert.match(plan, /Feature tests must be grouped/);
 
 for (const doc of [roadmap, master, handoff, index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /Phase 3B-2[^\n]*Accepted \/ Production Closed/);
-    assert.match(doc, /1,540/);
-    assert.match(doc, /Phase 3C[^\n]*Authorized Next \/ Not Started/);
+    assert.match(doc, /Phase 3C-1[^\n]*Accepted \/ Production Closed/);
+    assert.match(doc, /1,489/);
+    assert.match(doc, /Phase 3C-2[^\n]*Authorized Next \/ Not Started/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }
 
-assert.match(master, /Current Phase \| Browser\/ReviewCardManage Phase 3B-2[^\n]*Accepted \/ Production Closed/);
-assert.match(handoff, /Phase 3B-2 — Table \/ Columns \/ Pagination \/ Selection \/ Export/);
-assert.match(index, /Table \/ Columns \/ Pagination \/ Selection \/ Export/);
+assert.match(master, /Current Phase \| Browser\/ReviewCardManage Phase 3C-1[^\n]*Accepted \/ Production Closed/);
+assert.match(handoff, /Phase 3C-1 — Due-now \/ Reset Scheduling Mutation Family/);
+assert.match(index, /Due-now \/ Reset Scheduling Mutation Surface/);
 
 console.log('ReviewCardManage architecture plan guard passed.');

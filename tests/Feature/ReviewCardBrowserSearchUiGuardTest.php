@@ -16,6 +16,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
     private string $managePath;
     private string $searchSurfacePath;
     private string $tableSurfacePath;
+    private string $schedulingSurfacePath;
 
     protected function setUp(): void
     {
@@ -23,6 +24,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->managePath = resource_path('js/components/ReviewCards/ReviewCardManage.vue');
         $this->searchSurfacePath = resource_path('js/components/ReviewCards/ReviewCardSearchSurface.vue');
         $this->tableSurfacePath = resource_path('js/components/ReviewCards/ReviewCardTableSurface.vue');
+        $this->schedulingSurfacePath = resource_path('js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue');
     }
 
     private function browserContents(): string
@@ -31,7 +33,9 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
             . "\n"
             . file_get_contents($this->searchSurfacePath)
             . "\n"
-            . file_get_contents($this->tableSurfacePath);
+            . file_get_contents($this->tableSurfacePath)
+            . "\n"
+            . file_get_contents($this->schedulingSurfacePath);
     }
 
     public function test_browser_source_files_exist(): void
@@ -39,6 +43,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertFileExists($this->managePath);
         $this->assertFileExists($this->searchSurfacePath);
         $this->assertFileExists($this->tableSurfacePath);
+        $this->assertFileExists($this->schedulingSurfacePath);
     }
 
     public function test_search_help_and_examples_exist(): void
@@ -102,7 +107,8 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString('lifecycleDialog', $manageContents);
         $this->assertStringContainsString('archiveDialog', $manageContents);
         $this->assertStringContainsString('restoreDialog', $manageContents);
-        $this->assertStringContainsString('resetDialog', $manageContents);
+        $this->assertStringContainsString('resetDialog', file_get_contents($this->schedulingSurfacePath));
+        $this->assertStringNotContainsString('resetDialog:', $manageContents);
         $this->assertStringContainsString('bulkLifecycle', $manageContents);
         $this->assertStringContainsString('bulkDelete', $manageContents);
         $this->assertStringContainsString('bulkRewritePackages', $manageContents);
