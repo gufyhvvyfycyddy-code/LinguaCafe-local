@@ -19,7 +19,7 @@ const master = readFileSync(masterPath, 'utf8');
 const handoff = readFileSync(handoffPath, 'utf8');
 const index = readFileSync(indexPath, 'utf8');
 
-assert.match(plan, /Authorized Next \/ Target Prepared \/ Not Started/);
+assert.match(plan, /Implemented \/ Automated Verified \/ Browser Functional Checks Complete \/ Network Trace Pending \/ Awaiting web-side final acceptance/);
 assert.match(plan, /3,411 lines/);
 assert.match(plan, /24 direct `axios\.` references/);
 assert.match(plan, /12 `v-dialog` blocks/);
@@ -44,7 +44,7 @@ assert.match(plan, /Feature tests must be grouped/);
 
 for (const doc of [roadmap, master, handoff, index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /Target Prepared/);
+    assert.match(doc, /Network Trace Pending|Network trace and web-side final acceptance still pending/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }
 

@@ -29,6 +29,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 const CONTROLLER_PATH = join(__dirname, '..', '..', 'app', 'Http', 'Controllers', 'ReviewCardManageController.php');
 
 let passed = 0;
@@ -43,7 +44,7 @@ function test(name, fn) {
     }
 }
 
-const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const source = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 const controllerSource = existsSync(CONTROLLER_PATH) ? readFileSync(CONTROLLER_PATH, 'utf-8') : '';
 
 // 1. Shows "已撤销" chip for undone logs

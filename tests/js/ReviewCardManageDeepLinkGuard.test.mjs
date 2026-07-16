@@ -189,6 +189,7 @@ test('helper file does not reference document/window', () => {
 // --- 7. ADR-0007 / Task A-3: ReviewCardManage.vue recognizes route query ---
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 
 test('ReviewCardManage.vue imports parseReviewCardManageLocation', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
@@ -202,13 +203,15 @@ test('ReviewCardManage.vue calls handleDeepLink on mount', () => {
     assert.ok(/this\.handleDeepLink\(\)/.test(src), 'ReviewCardManage must call handleDeepLink in mounted');
 });
 
-test('ReviewCardManage.vue calls exact detail endpoint (not list search)', () => {
+test('deep link hands the exact ID to the canonical drawer request', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
-    assert.ok(/\/review-cards\/manage\/.*\/detail/.test(src), 'ReviewCardManage must call /review-cards/manage/{id}/detail endpoint');
-    // Must NOT fall back to lemma search for deep link
+    const drawer = readFileSync(DRAWER_PATH, 'utf-8');
+    assert.ok(/detailReviewCardId\s*=\s*reviewCardId/.test(src), 'parent must hand exact reviewCardId to drawer');
+    assert.ok(/\/review-cards\/manage\/.*\/detail/.test(drawer), 'drawer must call /review-cards/manage/{id}/detail endpoint');
     const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
     if (methodMatch) {
         assert.ok(!/searchQuery\s*=/.test(methodMatch[1]), 'loadDeepLinkDetail must not set searchQuery (no lemma fallback)');
+        assert.ok(!/axios\./.test(methodMatch[1]), 'parent must not duplicate the drawer request');
     }
 });
 
@@ -218,13 +221,25 @@ test('ReviewCardManage.vue does not auto-open first card on invalid ID', () => {
     const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
     assert.ok(methodMatch, 'loadDeepLinkDetail method must exist');
     const methodBody = methodMatch[1];
-    // The catch block within this method must set deepLink.error
-    assert.ok(/deepLink\.error\s*=/.test(methodBody), 'catch block must set deepLink.error');
     // Must NOT fall back to opening the first card in the list
     assert.ok(!/this\.items\[0\]/.test(methodBody), 'catch block must NOT open first card in list');
     assert.ok(!/openDetail\(this\.items/.test(methodBody), 'catch block must NOT call openDetail with list item');
-    // Error message must be present in the component
-    assert.ok(src.includes('未找到可管理的词义复习卡'), 'ReviewCardManage must show safe error message for invalid ID');
+    const drawer = readFileSync(DRAWER_PATH, 'utf-8');
+    assert.ok(drawer.includes('加载卡片详情失败'), 'drawer must show a safe detail error');
+    assert.ok(src.includes('@detail-load-error="onDetailLoadError"'), 'parent must receive canonical request failures');
+    assert.ok(src.includes('未找到可管理的词义复习卡'), 'parent must preserve the safe deep-link error message');
+    assert.match(src, /onDetailLoadError\(reviewCardId\)[\s\S]*?deepLink\.active\s*=\s*false[\s\S]*?detailDrawer\s*=\s*false/, 'failure must keep deep link inactive and close the failed drawer');
+});
+
+test('deep link loading and active state follow the canonical child request', () => {
+    const src = readFileSync(MANAGE_PATH, 'utf-8');
+    const drawer = readFileSync(DRAWER_PATH, 'utf-8');
+    assert.match(src, /loadDeepLinkDetail\(reviewCardId\)[\s\S]*?deepLink\.loading\s*=\s*true[\s\S]*?deepLink\.active\s*=\s*false/, 'deep link must remain loading and inactive before success');
+    assert.ok(src.includes('@detail-loaded="onDetailLoaded"'), 'parent must receive canonical request success');
+    assert.match(src, /onDetailLoaded\(reviewCardId\)[\s\S]*?deepLink\.loading\s*=\s*false[\s\S]*?deepLink\.active\s*=\s*true/, 'success must activate the deep link after loading');
+    assert.ok(drawer.includes("this.$emit('detail-loaded', reviewCardId)"), 'child must emit success for the requested ID');
+    assert.ok(drawer.includes("this.$emit('detail-load-error', reviewCardId)"), 'child must emit failure for the requested ID');
+    assert.match(src, /onDetailClosed\(\)[\s\S]*?deepLink\.loading\s*=\s*false[\s\S]*?detailDrawer\s*=\s*false/, 'closing a pending deep link must clear the page-level loading state');
 });
 
 test('ReviewCardManage.vue has back-to-report button', () => {
@@ -236,18 +251,21 @@ test('ReviewCardManage.vue has back-to-report button', () => {
 
 test('ReviewCardManage.vue shows deep link hint when opened from report', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
-    assert.ok(/从今日学习日报打开/.test(src) || /从学习报告打开/.test(src), 'ReviewCardManage must show hint when opened from report');
+    const drawer = readFileSync(DRAWER_PATH, 'utf-8');
+    assert.ok(/从学习报告打开/.test(drawer), 'drawer must show hint when opened from report');
     assert.ok(/deepLink\.active/.test(src), 'ReviewCardManage must track deepLink.active state');
 });
 
 test('ReviewCardManage.vue does not write ReviewLog or modify FSRS during deep link', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
+    const drawer = readFileSync(DRAWER_PATH, 'utf-8');
     // Extract the loadDeepLinkDetail method block
     const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
     assert.ok(methodMatch, 'loadDeepLinkDetail method must exist');
     const methodBody = methodMatch[1];
-    assert.ok(/axios\.get/.test(methodBody), 'loadDeepLinkDetail must use axios.get');
-    assert.ok(!/axios\.(post|put|delete|patch)/.test(methodBody), 'loadDeepLinkDetail must NOT use write APIs');
+    assert.ok(!/axios\./.test(methodBody), 'parent deep-link handoff must not make an HTTP request');
+    assert.ok(/axios\.get/.test(drawer), 'drawer must use the canonical read request');
+    assert.ok(!/axios\.(post|put|delete|patch)/.test(drawer), 'drawer must NOT use write APIs');
 });
 
 test('ReviewCardManage.vue preserves review_card_id in URL for refresh', () => {

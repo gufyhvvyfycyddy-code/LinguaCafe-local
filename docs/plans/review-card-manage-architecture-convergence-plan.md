@@ -1,10 +1,10 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Authorized Next / Target Prepared / Not Started
+> **Status**: Implemented / Automated Verified / Browser Functional Checks Complete / Network Trace Pending / Awaiting web-side final acceptance
 >
 > **Current first slice**: Phase 3A — Card Info Drawer Extraction
 >
-> **Baseline**: master `4968d00830ee928f2495dd4046d01c2a5337ffa3`
+> **Baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
 >
 > **Scope**: sense-only ReviewCard management; preserve all current endpoint, payload, access, lifecycle, delete, reset, ReviewLog and FSRS semantics.
 
@@ -106,7 +106,7 @@ The container may coordinate cross-region refresh and snackbar state. It must no
 
 ### Phase 3A — Card Info Drawer Extraction
 
-Status: **Authorized Next / Target Prepared / Not Started**.
+Status: **Implemented / Automated Verified / Browser Functional Checks Complete / Network Trace Pending / Awaiting web-side final acceptance**.
 
 Create `resources/js/components/ReviewCards/ReviewCardInfoDrawer.vue` and move the existing accepted Card Info responsibility out of the parent.
 
@@ -143,6 +143,15 @@ Phase 3A measurable closure:
 - opening Card Info still sends exactly one detail request;
 - deep link, overview/history/diagnosis, undone audit rows, source navigation and close/reopen behavior pass tests and Chrome;
 - no mutation button is added inside Card Info.
+
+Implementation evidence (2026-07-16):
+
+- `ReviewCardInfoDrawer.vue` now owns the canonical detail request, loading/error/detail state, stale-response sequence guard, tabs, formatting, close cleanup and read-only presentation.
+- `ReviewCardManage.vue` retains deep-link parsing, source-dialog ownership, report return, table/list refresh and every mutation workflow. It no longer owns a parallel Card Info request or detail state.
+- The parent decreased from 3,411 to 2,773 lines and from 24 to 22 direct `axios.` references; its 12 existing `v-dialog` blocks are unchanged. Canonical detail-request owners decreased from two parent call sites to one child call site.
+- All 53 Node guard files, grouped related Feature suites, the Unit suite and the development build passed. Database health passed, and the browser checks left ReviewLog/ReviewCard counts and the due checksum unchanged.
+- MCP Chrome exercised wide and narrow layouts, overview/history/diagnosis, source navigation, close/reopen, deep-link report return and undone audit visibility with no application console errors. The available browser interface did not expose an inspectable XHR/Network log, so one-request Network trace proof remains a web-side acceptance item; executable ownership guards prove the static single-owner boundary.
+- Phase 3B remains out of scope and is not authorized by this implementation.
 
 ### Phase 3B — Search and Table Surface
 

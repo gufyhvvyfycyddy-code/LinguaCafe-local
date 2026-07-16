@@ -44,6 +44,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 
 const name = 'ReviewCardManageLeechGuard';
 let passed = 0;
@@ -59,6 +60,7 @@ function test(name, fn) {
 }
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 
 // 1. File exists
 test('File exists', () => {
@@ -125,7 +127,7 @@ test('Source has leech status badge in table', () => {
 
 // 13. Source has detail '遗忘诊断' diagnostics section
 test("Source has detail '遗忘诊断' diagnostics section", () => {
-    assert.ok(source.includes('遗忘诊断'), "Detail drawer must include a '遗忘诊断' diagnostics section");
+    assert.ok(drawerSource.includes('遗忘诊断'), "Detail drawer must include a '遗忘诊断' diagnostics section");
 });
 
 // 14. Source does NOT call provider-preview

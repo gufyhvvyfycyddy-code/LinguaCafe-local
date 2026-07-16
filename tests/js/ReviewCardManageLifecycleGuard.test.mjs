@@ -46,6 +46,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const MANAGE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
+const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 
 let passed = 0;
 function test(name, fn) {
@@ -60,6 +61,7 @@ function test(name, fn) {
 }
 
 const source = existsSync(MANAGE_PATH) ? readFileSync(MANAGE_PATH, 'utf-8') : '';
+const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 
 // 1. File exists
 test('File exists', () => {
@@ -126,14 +128,15 @@ test('Uses GET /review-cards/{id}/lifecycle for descriptor', () => {
     assert.ok(source.includes('/lifecycle') && source.includes('axios.get'), 'Must fetch lifecycle descriptor');
 });
 
-// 14. Uses GET /review-cards/{id}/lifecycle-events for events
-test('Uses GET /review-cards/{id}/lifecycle-events for events', () => {
-    assert.ok(source.includes('/lifecycle-events'), 'Must fetch lifecycle events for detail drawer');
+// 14. Lifecycle events come from the canonical aggregate detail request.
+test('Uses aggregate card_info lifecycle events without a granular request', () => {
+    assert.ok(drawerSource.includes('lifecycle_events'), 'Drawer must render card_info lifecycle events');
+    assert.ok(!drawerSource.includes('/lifecycle-events'), 'Drawer must not fire a granular lifecycle-events request');
 });
 
 // 15. Detail drawer shows lifecycle state
 test('Detail drawer shows lifecycle state', () => {
-    assert.ok(source.includes('lifecycle_state') || source.includes('lifecycleState'), 'Detail drawer must show lifecycle state');
+    assert.ok(drawerSource.includes('lifecycle_state') || drawerSource.includes('lifecycleState'), 'Detail drawer must show lifecycle state');
 });
 
 // 16. 409 error handling

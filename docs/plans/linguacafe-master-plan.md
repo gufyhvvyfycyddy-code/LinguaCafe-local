@@ -8,7 +8,7 @@
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A; Preset V1B; Preset V1C; Preset V1D |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Browser/ReviewCardManage Phase 3A — Card Info Drawer Extraction is Authorized Next / Target Prepared / Not Started |
+> | Current Phase | Browser/ReviewCardManage Phase 3A — Card Info Drawer Extraction is Implemented / Automated Verified / Browser Functional Checks Complete / Network Trace Pending / Awaiting web-side final acceptance; Phase 3B is not authorized |
 > | Authorized Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
@@ -219,7 +219,7 @@
 | 2B | Preset V1B — Management Operations and UI | Completed / Production Closed | 新增、复制、重命名、删除、切换 Preset；设置页成为当前 Preset 编辑器 | 无阻断；Default 保护、用户隔离、共享语言提示和删除重绑定均已通过真实页面验收 | ADR-0025；`review-settings-preset-v1b-execution-plan.md` | 已完成 |
 | 2C | Preset V1C — Consumer Convergence | Completed / Production Closed | 所有设置消费者只读取当前 binding；不再生成没有用户/语言归属的全局回滚状态 | `fsrs_parameters_previous` 新写入/删除已停止，旧行保持不动并被明确标记为无效历史残留 | ADR-0026；V1C static guard；全量回归 | 已完成 |
 | 2D | Preset V1D — Settings UX and Production Closure | Completed / Production Closed | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | 无；Settings UX-1、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定和无自动重排矩阵已完成 | ADR-0027；`review-settings-preset-v1-plan.md`；2026-07-15 Chrome 双 viewport + 数据库 delta | 已完成；停止在本阶段 |
-| 3 | Browser / ReviewCardManage architecture convergence | Authorized Next / Target Prepared / Not Started | Anki Browser 式搜索、表格、Card Info 与危险操作分区；Phase 3A 先抽取只读 Card Info Drawer | `ReviewCardManage.vue` 3,411 行、24 个 direct `axios.` references、12 个 `v-dialog`；现有功能已可用但改动爆炸半径过大 | `docs/plans/review-card-manage-architecture-convergence-plan.md`；ADR-0012–0014、0017 | 立即执行 Phase 3A；不得进入 Phase 3B 或 Card Marker |
+| 3 | Browser / ReviewCardManage architecture convergence | Phase 3A Implemented / Network Trace Pending / Awaiting web-side final acceptance | Anki Browser 式搜索、表格、Card Info 与危险操作分区；Phase 3A 已抽取只读 Card Info Drawer | `ReviewCardManage.vue` 2,773 行、22 个 direct `axios.` references、12 个 `v-dialog`；Card Info canonical detail request 仅由子组件负责 | `docs/plans/review-card-manage-architecture-convergence-plan.md`；ADR-0012–0014、0017 | 完成网页端 Network trace 与最终验收；不得进入 Phase 3B 或 Card Marker |
 | 4 | Card Marker + Custom Study 1B | Planned | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 必须落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | 同路线 Phase 4；ADR-0016 | Browser 收敛后授权 |
 | 5 | Reviewer architecture convergence | Planned | Sense Review 与 legacy Review 共用请求恢复、会话和评分编排边界 | `SenseReview.vue` 1477 行；`Review.vue` 1071 行 | 同路线 Phase 5；ADR-0008–0010 | Card Marker 后授权 |
 | 6 | Reader UI-7 / Reader UI-8 小步优化 | Planned | hover 自动查词开关，降低常驻面板干扰 | 必须逐项真实验收，不和阅读主链路大拆分混做 | 同路线 Phase 6 | Reviewer 收敛后授权 |
@@ -376,7 +376,7 @@
 | 2B | Preset V1B | Completed / Production Closed | 新增/复制/重命名/删除/切换、共享影响提示和删除重绑定已完成 |
 | 2C | Preset V1C | Completed / Production Closed | 全消费者收敛；停止 `fsrs_parameters_previous` 全局孤儿状态的新写入/删除 |
 | 2D | Preset V1D | Completed / Production Closed | 双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和无自动重排矩阵已完成 |
-| 3 | Browser / ReviewCardManage convergence | Authorized Next / Target Prepared / Not Started | `ReviewCardManage.vue` 是当前最大前端热点；Phase 3A — Card Info Drawer Extraction 已冻结，代码尚未开始；见 `review-card-manage-architecture-convergence-plan.md` |
+| 3 | Browser / ReviewCardManage convergence | Phase 3A Implemented / Network Trace Pending / Awaiting web-side final acceptance | `ReviewCardManage.vue` 已完成 Card Info Drawer Extraction；自动化与浏览器功能检查通过，Phase 3B 未授权；见 `review-card-manage-architecture-convergence-plan.md` |
 | 4 | Card Marker + Custom Study 1B | Marker 放在 ReviewCard | 对齐 Anki Card Flag；与 lifecycle、leech、WordSense status 分离 |
 | 5 | Reviewer convergence | Sense Review 为正式主入口 | 统一评分恢复、会话、预计间隔和错误处理；legacy 只保留兼容 |
 | 6 | Reader UI + reader architecture | 先小步 UI，后逐职责拆分 | 阅读、原文、多例句、lemma 和 AI 示意卡是 LinguaCafe 特色，必须在强 harness 下治理 |

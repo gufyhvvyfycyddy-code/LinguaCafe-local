@@ -6,7 +6,7 @@
 > 2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry and long-term ledger.
 > 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative product priority and architecture-debt route.
 >
-> Manual Sense shared form, Settings architecture convergence, and Preset V1A–V1D are Accepted / Production Closed. Settings UX-1 and the broader two-user, English/French V1D matrix are complete under ADR-0027 and the Preset V1 plan. Browser/ReviewCardManage Phase 3A — Card Info Drawer Extraction is Authorized Next / Target Prepared / Not Started; its implementation boundary is `docs/plans/review-card-manage-architecture-convergence-plan.md`. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
+> Manual Sense shared form, Settings architecture convergence, and Preset V1A–V1D are Accepted / Production Closed. Settings UX-1 and the broader two-user, English/French V1D matrix are complete under ADR-0027 and the Preset V1 plan. Browser/ReviewCardManage Phase 3A — Card Info Drawer Extraction is implemented and automated/browser-function verified, with Network trace and web-side final acceptance still pending; Phase 3B is not authorized. Its implementation boundary is `docs/plans/review-card-manage-architecture-convergence-plan.md`. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -34,7 +34,7 @@ Read these in order for a new GLM Agent task (current workflow: GLM 单 Agent �
 1. `docs/plans/current-working-handoff.md` — current short-term workbench and current next task.
 2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry plus long-term ledger.
 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative order for Preset, Browser, Marker/Custom Study, Reviewer, Reader, and AI provider work.
-4. `docs/plans/review-card-manage-architecture-convergence-plan.md` — current Browser/ReviewCardManage Phase 3A–3D architecture route; Phase 3A Card Info Drawer Extraction is the prepared Codex target.
+4. `docs/plans/review-card-manage-architecture-convergence-plan.md` — current Browser/ReviewCardManage Phase 3A–3D architecture route; Phase 3A is implemented but awaits Network trace and web-side final acceptance, and Phase 3B is not authorized.
 5. `docs/plans/review-settings-preset-v1-plan.md` — authoritative Preset identity, binding, config scope, staged implementation and acceptance contract.
 6. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
 7. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, report architecture, rating contract, lifecycle interaction, query budget, and N+1 rules.

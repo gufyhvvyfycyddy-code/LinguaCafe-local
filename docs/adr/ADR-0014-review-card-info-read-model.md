@@ -231,3 +231,11 @@ Revert the refactor commit. The old `/logs`, `/lifecycle-events`, `/leech` endpo
 - No ReviewLog write.
 - No legacy word card creation.
 - No edit / suspend / resume / archive / reset / delete action inside the Card Info drawer.
+
+## Phase 3A frontend extraction evidence (2026-07-16)
+
+The accepted read model is now consumed through one dedicated presentation boundary: `ReviewCardInfoDrawer.vue`. The child owns the canonical detail GET, request lifecycle, monotonic sequence guard, close/switch cleanup, overview/history/diagnosis tabs and Card Info-only formatting. Its public contract is limited to `value`, `reviewCardId` and `deepLinkSource` props plus `input`, `close`, `open-source` and `return-to-report` events.
+
+`ReviewCardManage.vue` remains the coordinator for deep-link parsing, source-dialog navigation, report return, list refresh and every write workflow. It has no parallel detail GET or Card Info response state. The parent changed from 3,411 to 2,773 lines, direct `axios.` references changed from 24 to 22, and its 12 existing `v-dialog` blocks remain unchanged. The canonical Card Info detail request now has one frontend owner.
+
+No endpoint, payload, access rule, database schema, ReviewLog behavior, lifecycle/FSRS behavior or write semantics changed. Automated guards, grouped related Feature tests, the Unit suite and the frontend build passed. MCP Chrome verified both viewports, all three tabs, source navigation, close/reopen, deep-link report return and undone audit presentation without application console errors. The available browser interface did not provide XHR/Network trace export, so final web-side acceptance must still confirm the one-request trace before Phase 3A is marked Accepted; Phase 3B is not authorized by this evidence.
