@@ -4,7 +4,7 @@
 >
 > **Current next slice**: Phase 3C-2 authenticated Chrome acceptance — Pending; Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized
 >
-> **Architecture baseline**: master `291a5a8676f5ade2625a51c4305fb1ce2714a3fd`
+> **Architecture baseline**: master `18c8208073029cfadf89f86634b8f4cad68f4854`
 >
 > **Phase 3B-1 implementation baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
 >
@@ -25,11 +25,20 @@ Original measured baseline:
 
 The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
+Current measured snapshot on master `18c8208073029cfadf89f86634b8f4cad68f4854`:
+
+- 28 production files exceed 500 lines;
+- 10 production files exceed 1,000 lines;
+- only 1 production file now exceeds 1,500 lines (`TextBlockGroup.vue`, 2,514 lines);
+- `ReviewCardManage.vue` is 1,210 lines with 11 direct `axios.` references and 6 dialogs;
+- current debt assessment is **6.0/10, localized medium-high burden**: the management module has materially converged, while Reader/Reviewer hotspots and residual compatibility code still require staged governance.
+
 ## 2. Anki official reference and the parts LinguaCafe borrows
 
 Reviewed official sources and code boundaries:
 
-- **Anki Manual — Browsing** describes the Browser as sidebar, card/note table and editing area. Saved Searches belong to the sidebar/search region. The manual distinguishes multi-row selection from the current card used by Card Info.
+- **Anki Manual — Browsing** describes the Browser as sidebar, card/note table and editing area. Saved Searches belong to the sidebar/search region. The manual distinguishes multi-row selection from the current card used by Card Info, and lists Set Due, Reset, Toggle Suspend and Info as separate card actions.
+- **Anki Manual — Studying** keeps Bury, Suspend, Reset and Set Due semantically separate: Bury hides until the next day, Suspend lasts until manual unsuspend, Reset returns a card to the new queue while preserving review history, and Set Due changes scheduling without pretending a review occurred.
 - **Anki Manual — Searching** states that Browser and Filtered Deck use one common search method. LinguaCafe therefore keeps one server-authoritative search contract instead of adding a second frontend grammar.
 - `ankitects/anki/qt/aqt/browser/` contains dedicated `sidebar/`, `table/`, `browser.py`, `card_info.py`, `layout.py` and `previewer.py` boundaries.
 - `qt/aqt/browser/browser.py` normalizes the query through `build_search_string` and delegates result loading to `table.search`; the top-level Browser coordinates instead of parsing search syntax itself.
@@ -45,6 +54,7 @@ Borrowed principles:
 4. Current-card state and selected-row state stay distinct.
 5. Card Info has a dedicated read-only owner.
 6. Table ownership is handled after search ownership, in a separate phase.
+7. Bury, Suspend, Reset, Set Due and Delete remain different product commands with different confirmations and side effects; a generic mutation abstraction must not erase those distinctions.
 
 Deliberate LinguaCafe deviations:
 
@@ -57,7 +67,7 @@ Deliberate LinguaCafe deviations:
 
 ## 3. Subtitle-derived long-project rules
 
-The checkout does not contain `.srt`, `.vtt` or `.ass` files. This phase therefore does not claim a fresh read of subtitle originals. It inherits the following subtitle-derived rules already frozen in `vibe-coding-collaboration-rules.md §28.4`, because they directly address architecture work on a mature codebase:
+The repository checkout itself does not track subtitle files, but this task had direct access to and searched all **9 个原始字幕文件** supplied with the project context (11,156 subtitle lines total), with focused close reading of the four most relevant architecture/spec/harness videos. This plan therefore records a fresh evidence-based synthesis instead of merely inheriting an earlier summary:
 
 - `AI可以帮你写代码，但帮不了你成为架构师.srt`
 - `AI编程项目为什么总是烂尾？长期项目迭代先给 AI 画边界.srt`
@@ -65,15 +75,19 @@ The checkout does not contain `.srt`, `.vtt` or `.ass` files. This phase therefo
 - `你写了一堆文档AI还是不听话？问题不在文档本身.srt`
 - `AI编程越写越乱？我用水桶装水，把边界讲透，快速认识spec与harness.srt`
 - `AI 编程的 spec 到底该什么时候写？和先写文档完全相反.srt`
+- `AI编程别一开始就写太多spec，MVP阶段放开抡.srt`
+- `Vibe Coding 第二讲：像架构师一样用 AI 做复杂产品.srt`
 - `答应我，别再和AI一起拉屎了；Vibe Coding如何避免屎山.srt`
 
 Rules frozen into this plan:
 
-- 只把稳定决定写进长期文档；探索过程留在任务报告。
-- 文档负责说明边界，可执行 guard、测试和 Chrome smoke 负责阻止越界。
+- 只把已经稳定、下一轮不应重新争论的决定写进长期 spec；探索中的判断保留在任务证据里。
+- MVP 只冻结产品身份、反向边界和不可破坏项；进入长期迭代后，再把反复验证过的决定逐步固化。
+- 文档负责解释边界，可执行 guard、测试和 Chrome smoke 才负责阻止越界；Agent 自报完成不等于验收。
 - 每轮只移动一个真实职责，并保留旧功能回归证据。
-- 按数据流和副作用分模块，不按行数机械拆文件。
-- 优先复用既有组件和状态工具，不新增没有独立职责的抽象层。
+- 按数据流、副作用和权威所有者分模块，不按行数机械拆文件。
+- 接口本身也有复杂度成本；只有形成独立职责时才抽取，禁止空壳包装和重复 DTO。
+- 优先复用既有组件、纯函数和状态工具，避免全局状态与隐式跨模块副作用。
 - 当前权威入口优先于历史长叙述，旧状态不得重新进入有效文档。
 
 ## 4. Frozen target shape
@@ -246,14 +260,15 @@ Implemented boundary:
 - the parent contains no `/lifecycle-actions`, `/review-cards/manage/bulk-lifecycle`, lifecycle target, request lock, conflict or lifecycle dialog state;
 - the parent stores only a read-only lifecycle view snapshot for `ReviewCardTableSurface.vue` and forwards table intents through the child ref;
 - table current/selected state remains owned by `ReviewCardTableSurface.vue`; the table still contains no mutation request;
-- Leech-specific single and bulk suspend UI remains in the parent for Phase 3C-4, but its lifecycle POSTs now delegate to the lifecycle child, leaving one frontend lifecycle request owner;
-- legacy `/enabled` archive/restore compatibility controls remain unchanged and are not treated as a second lifecycle state-machine implementation.
+- Leech-specific single and bulk suspend UI remains in the parent for Phase 3C-4, but its lifecycle POSTs now delegate to the lifecycle child, making it the **ReviewCardManage 域内唯一生命周期请求所有者**;
+- `SenseReview.vue` 是独立产品入口，仍拥有自己的 lifecycle client；这不影响管理页收敛，但不得把该子组件夸大为全前端唯一 lifecycle client；
+- 遗留 `/enabled` archive/restore 兼容方法和对话框无可达表格入口，属于 dormant compatibility debt，而不是第二套活跃状态机；删除代码或退休端点属于后续兼容/Phase 3D 任务，不属于本次验收。
 
 Architecture risks closed:
 
 - the old moderate-action flow could clear the live descriptor 200 ms after the row menu closed, so the later confirmation could silently lose `expected_version`; the child now freezes `expectedVersion` in `lifecycleDialogContext` before menu cleanup;
 - descriptor requests now use `descriptorRequestSeq`, card identity checks and destroy invalidation, so a slower response from an earlier row cannot overwrite the active menu;
-- shared single/bulk request methods enforce one in-flight request and are reused by Leech suspend delegation, avoiding a hidden second lifecycle client;
+- shared single/bulk request methods enforce one in-flight request and are reused by Leech suspend delegation, avoiding a hidden second lifecycle client inside ReviewCardManage;
 - successful single actions explicitly clear the menu descriptor snapshot, including the fast-confirm path where the delayed menu-close cleanup was skipped by the request lock;
 - 409/422 refresh the authoritative descriptor; network and general errors never report false success.
 

@@ -34,8 +34,8 @@ const manualClosure = section(handoff, '## Manual Sense shared form corrective f
 assert.match(masterAuthority, /Settings architecture convergence/);
 assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A[^\n]*Preset V1B[^\n]*Preset V1C[^\n]*Preset V1D/);
 assert.match(masterAuthority, /Current Phase \| Browser\/ReviewCardManage Phase 3C-2 — Lifecycle Mutation Family is Code Complete \/ Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
-assert.match(masterAuthority, /28 production files over 500 lines, 10 over 1,000, and 2 over 1,500/);
-assert.match(masterAuthority, /6\.5\/10, localized high burden/);
+assert.match(masterAuthority, /28 production files over 500 lines, 10 over 1,000, and 1 over 1,500/);
+assert.match(masterAuthority, /6\.0\/10, localized medium-high burden/);
 assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
 assert.match(masterAuthority, /old “overall architecture closure 100%” statement is historical/);
 
@@ -79,10 +79,10 @@ assert.match(roadmap, /Phase 2：Preset V1[\s\S]*V1A–V1D Completed \/ Accepted
 assert.match(roadmap, /V1A–V1D 已生产关闭/);
 assert.match(roadmap, /V1D — Completed \/ Production Closed/);
 assert.match(roadmap, /Settings UX-1/);
-assert.match(roadmap, /6\.5 \/ 10，局部高负担/);
+assert.match(roadmap, /6\.0 \/ 10，局部中高负担/);
 assert.match(roadmap, /28 个生产文件超过 500 行/);
 assert.match(roadmap, /10 个生产文件超过 1,000 行/);
-assert.match(roadmap, /2 个生产文件超过 1,500 行/);
+assert.match(roadmap, /1 个生产文件超过 1,500 行/);
 assert.doesNotMatch(roadmap, /\| 1 \| Settings 架构收敛 \| Preset 的前置地基/);
 assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增加职责/);
 
@@ -121,7 +121,7 @@ assert.match(handoffAuthority, /Preset V1B — Management Operations and UI: \*\
 assert.match(handoffAuthority, /Preset V1C — Consumer Convergence: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /Preset V1D — Settings UX and Production Closure: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /ReaderSidebar-Boundary-Fix-1: \*\*Accepted\*\*/);
-assert.match(handoffAuthority, /6\.5\/10, localized high burden/);
+assert.match(handoffAuthority, /6\.0\/10, localized medium-high burden/);
 assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
 assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);

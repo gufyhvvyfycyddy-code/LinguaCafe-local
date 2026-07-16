@@ -84,8 +84,12 @@ assert.match(source.plan, /ARCH-ReviewCardManage-3C-2/);
 assert.match(source.plan, /DEV-ReviewCardManage-3C-2/);
 assert.match(source.plan, /Anki Manual — Browsing/);
 assert.match(source.plan, /qt\/aqt\/operations\/scheduling\.py/);
+assert.match(source.plan, /9 个原始字幕文件/);
 assert.match(source.plan, /你写了一堆文档AI还是不听话？问题不在文档本身\.srt/);
 assert.match(source.plan, /一个真实职责/);
+assert.match(source.plan, /ReviewCardManage 域内唯一生命周期请求所有者/);
+assert.match(source.plan, /SenseReview\.vue[^\n]*独立产品入口/);
+assert.match(source.plan, /遗留 `\/enabled`[^\n]*无可达表格入口/);
 assert.match(source.plan, /do not enter the next Phase 3C subphase/);
 
 for (const doc of [source.roadmap, source.master, source.handoff, source.index]) {
