@@ -20,11 +20,14 @@ assert.match(parent, /@per-page-change="changePerPage"/);
 assert.match(parent, /@sort-change="changeSort"/);
 assert.match(parent, /@bulk-delete="confirmBulkDelete"/);
 assert.match(parent, /@notify="showSnackbar"/);
+assert.match(parent, /syncTableCurrentCard\(reviewCardId\)/, 'parent must synchronize parent-opened Card Info targets into the table current-card state');
+assert.match(parent, /onDetailLoaded\(reviewCardId\)[\s\S]*?this\.syncTableCurrentCard\(reviewCardId\)/, 'detail load must synchronize the visible current row before deep-link-only handling');
 assert.match(parent, /axios\.get\(['"]\/review-cards\/manage\/data['"]/, 'parent remains the canonical list request owner');
 
 assert.match(surface, /selectedIds:\s*\[\]/);
 assert.match(surface, /currentCardId:\s*null/);
 assert.match(surface, /markCurrentCard\(item\)/);
+assert.match(surface, /markCurrentCardById\(reviewCardId\)/, 'table surface must expose a narrow current-card synchronization method');
 assert.match(surface, /clearSelection\(\)/);
 assert.match(surface, /v-model="compactMode"/);
 assert.match(surface, /reviewCardManageColumnSettings/);

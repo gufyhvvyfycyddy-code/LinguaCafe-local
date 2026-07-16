@@ -161,8 +161,8 @@ Implemented boundary:
 
 Measured result:
 
-- parent decreased from 2,462 lines to 1,532 lines;
-- new `ReviewCardTableSurface.vue` is 866 lines and owns one responsibility-complete table region;
+- the initial extraction decreased the parent from 2,462 lines to 1,532 lines; the corrective deep-link synchronization leaves the current parent at 1,540 lines;
+- the initial `ReviewCardTableSurface.vue` was 866 lines; the current component is 872 lines and owns one responsibility-complete table region;
 - parent direct `axios.` references decreased from 22 to 19 because the three existing read-only export GET requests moved with their presentation;
 - the child contains exactly three `axios.` references, all read-only export GET requests, and no POST/PATCH/DELETE request;
 - parent keeps 11 `v-dialog` blocks because mutation/dialog extraction belongs to Phase 3C;
@@ -180,6 +180,16 @@ TDD, regression and browser evidence on 2026-07-16:
 - authenticated Chrome at 1920×1080 confirmed one list request for sort and per-page changes, one detail request when opening Card Info, separate current/selected state, working column and compact preferences without list reload, three read-only export requests and a bulk confirmation dialog without mutation.
 - authenticated Chrome at 900×900 confirmed no page-level horizontal overflow; wide table overflow remains inside `.table-wrapper`.
 - Console contained no error or warning and no external request was observed.
+
+Corrective follow-up on 2026-07-16:
+
+- A second independent acceptance pass found one missed cross-region case: a valid learning-report deep link opened Card Info for review card 156 while the table child still held `currentCardId` as `null`, so no current row was marked.
+- The guard was extended first and failed on the missing parent-to-table synchronization contract.
+- `ReviewCardTableSurface.vue` now exposes the narrow `markCurrentCardById()` method while remaining the sole current-card state owner. `ReviewCardManage.vue` coordinates only after the canonical drawer emits `detail-loaded`.
+- This deep-link current-row synchronization does not change checkbox selection, list requests, Card Info request ownership, mutation behavior, endpoints or payloads.
+- After rebuilding, authenticated Chrome at 1920×1080 opened the valid `daily-report` deep link for review card 156 with exactly one detail request, `currentCardId=156`, no checkbox selection and the matching row marked. Selecting card 157 then left card 156 as the current row, proving current and selected states remain independent.
+- At 900×900, card 156 remained current while card 157 remained selected; the page had no horizontal overflow and only `.table-wrapper` scrolled horizontally. Console remained clean and all observed requests stayed on `127.0.0.1:8000`.
+- The current measured sizes are 1,540 lines for `ReviewCardManage.vue` and 872 lines for `ReviewCardTableSurface.vue`; request and dialog counts remain 19 parent `axios.` references, three child read-only export GET requests and 11 parent `v-dialog` blocks.
 
 ### Phase 3C — Mutation and Dialog Families — Authorized Next / Not Started
 

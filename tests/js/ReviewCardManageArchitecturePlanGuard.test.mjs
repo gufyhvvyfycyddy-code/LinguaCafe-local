@@ -36,9 +36,9 @@ const tableAxiosCount = (tableSurface.match(/axios\./g) || []).length;
 const detailRequestPattern = /axios\.get\(['"]\/review-cards\/manage\/[\s\S]{0,120}?\/detail['"]/;
 const canonicalOwnerCount = [parent, drawer].filter(source => detailRequestPattern.test(source)).length;
 
-assert.equal(parentLineCount, 1532, 'ReviewCardManage.vue current line count must remain explicit and reviewable');
+assert.equal(parentLineCount, 1540, 'ReviewCardManage.vue current line count must remain explicit and reviewable');
 assert.equal(parentAxiosCount, 19, 'ReviewCardManage.vue direct axios count must remain explicit and reviewable');
-assert.equal(tableLineCount, 866, 'ReviewCardTableSurface.vue current line count must remain explicit and reviewable');
+assert.equal(tableLineCount, 872, 'ReviewCardTableSurface.vue current line count must remain explicit and reviewable');
 assert.equal(tableAxiosCount, 3, 'ReviewCardTableSurface.vue must own exactly the three read-only export requests');
 assert.equal(parentDialogCount, 11, 'ReviewCardManage.vue dialog count must remain explicit and reviewable');
 assert.equal(canonicalOwnerCount, 1, 'Card Info canonical detail request must have exactly one frontend owner');
@@ -65,8 +65,11 @@ assert.match(plan, /Phase 3B-2 Accepted \/ Production Closed/);
 assert.doesNotMatch(plan, /^> \*\*Status\*\*:.*Incomplete/m);
 assert.match(plan, /2,792 lines/);
 assert.match(plan, /2,462 lines/);
-assert.match(plan, /1,532 lines/);
-assert.match(plan, /866 lines/);
+assert.match(plan, /1,540 lines/);
+assert.match(plan, /872 lines/);
+assert.match(plan, /deep-link current-row synchronization/i);
+assert.match(plan, /currentCardId[^\n]*null/);
+assert.match(plan, /review card 156/);
 assert.match(plan, /3,411 lines/);
 assert.match(plan, /22 direct `axios\.` references/);
 assert.match(plan, /from 22 to 19/);
@@ -110,7 +113,7 @@ assert.match(plan, /Feature tests must be grouped/);
 for (const doc of [roadmap, master, handoff, index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
     assert.match(doc, /Phase 3B-2[^\n]*Accepted \/ Production Closed/);
-    assert.match(doc, /1,532/);
+    assert.match(doc, /1,540/);
     assert.match(doc, /Phase 3C[^\n]*Authorized Next \/ Not Started/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }

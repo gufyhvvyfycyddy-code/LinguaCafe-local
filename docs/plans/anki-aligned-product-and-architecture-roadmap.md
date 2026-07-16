@@ -246,7 +246,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A、Phase 3B-1 与 Phase 3B-2 Accepted / Production Closed**。Card Info、Search / Filter / Saved Search 与 Table / Columns / Pagination / Selection / Export Surface 已分别形成单一职责所有者并完成 authenticated Chrome 与 Network 验收。`ReviewCardManage.vue` 当前为 1,532 行、19 个 direct `axios.` references、11 个 `v-dialog`；`ReviewCardTableSurface.vue` 为 866 行并仅持有三个只读导出 GET。**Phase 3C — Mutation and Dialog Families：Authorized Next / Not Started**。本轮停止，不进入 3C 开发。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
+状态：**Phase 3A、Phase 3B-1 与 Phase 3B-2 Accepted / Production Closed**。Card Info、Search / Filter / Saved Search 与 Table / Columns / Pagination / Selection / Export Surface 已分别形成单一职责所有者并完成 authenticated Chrome 与 Network 验收。纠正验收已补齐学习报告深链打开 Card Info 后的当前行同步。`ReviewCardManage.vue` 当前为 1,540 行、19 个 direct `axios.` references、11 个 `v-dialog`；`ReviewCardTableSurface.vue` 为 872 行并仅持有三个只读导出 GET。**Phase 3C — Mutation and Dialog Families：Authorized Next / Not Started**。本轮停止，不进入 3C 开发。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
 
 优先级：P1。
 
@@ -374,7 +374,7 @@ Custom Study 1B：
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A、Phase 3B-1 与 Phase 3B-2 Accepted / Production Closed；Card Info、搜索、筛选、Saved Search、表格、列设置、排序、分页、current/selected、只读导出、双 viewport 与 Console 均通过；父组件 1,532 行；Phase 3C Authorized Next / Not Started；见 `review-card-manage-architecture-convergence-plan.md` |
+| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A、Phase 3B-1 与 Phase 3B-2 Accepted / Production Closed；Card Info、搜索、筛选、Saved Search、表格、列设置、排序、分页、current/selected、只读导出、双 viewport 与 Console 均通过；父组件 1,540 行；学习报告深链与当前行同步通过；Phase 3C Authorized Next / Not Started；见 `review-card-manage-architecture-convergence-plan.md` |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |

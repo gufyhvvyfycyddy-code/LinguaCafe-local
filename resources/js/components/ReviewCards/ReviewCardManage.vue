@@ -1231,7 +1231,15 @@ export default {
             this.detailDrawer = true;
         },
 
+        syncTableCurrentCard(reviewCardId) {
+            const tableSurface = this.$refs.tableSurface;
+            if (tableSurface && typeof tableSurface.markCurrentCardById === 'function') {
+                tableSurface.markCurrentCardById(reviewCardId);
+            }
+        },
+
         onDetailLoaded(reviewCardId) {
+            this.syncTableCurrentCard(reviewCardId);
             if (reviewCardId !== this.deepLink.reviewCardId) return;
             this.deepLink.loading = false;
             this.deepLink.error = '';

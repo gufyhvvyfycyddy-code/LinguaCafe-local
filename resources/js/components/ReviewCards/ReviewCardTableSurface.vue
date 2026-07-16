@@ -516,7 +516,13 @@ export default {
         leechStatusLabel,
         leechStatusColor,
         markCurrentCard(item) {
-            this.currentCardId = item && item.review_card_id ? item.review_card_id : null;
+            this.markCurrentCardById(item && item.review_card_id);
+        },
+        markCurrentCardById(reviewCardId) {
+            const normalizedId = Number(reviewCardId);
+            this.currentCardId = Number.isInteger(normalizedId) && normalizedId > 0
+                ? normalizedId
+                : null;
         },
         emitRow(eventName, item) {
             this.markCurrentCard(item);
