@@ -196,6 +196,6 @@ Verification completed:
 - the search action issued one local GET to `/review-cards/manage/data`, no write request, and Console contained no error or warning;
 - ReviewLog, ReviewCard, WordSense, and ReviewCardStateEvent counts were unchanged before and after the browser action.
 
-No quoted phrase, negation, OR, parentheses, general AST, route, migration, index, dependency, export field, Saved Search schema, Custom Study mode, Reviewer behavior, FSRS change, or ReviewLog write was added.
+Phase 8I itself added no quoted phrase, negation, OR, parentheses, general AST, route, migration, index, dependency, export field, Saved Search schema, Custom Study mode, Reviewer behavior, FSRS change, or ReviewLog write.
 
-The only next entry is **Phase 8J — Browser Search quoted phrase and negation read-only reconnaissance and semantic freeze**. Runtime implementation requires separate authorization.
+Phase 8J later completed the separately authorized quoted-phrase and text-negation semantic freeze in `review-card-browser-quoted-phrase-negation-semantic-freeze.md`. The current next entry is **Phase 8K — Browser Search quoted phrase and text-negation minimal runtime implementation**; runtime remains separately authorized.

@@ -2,23 +2,22 @@
 
 Status: current
 
-## 0. Phase 8I current authority（2026-07-17）
+## 0. Phase 8J current authority（2026-07-17）
 
-Current phase: **Phase 3–7 authorized scope closed**；Phase 8A–8I 已按顺序完成当前小步。以下 Phase 8H 与更早章节保留历史证据，凡与本节冲突，以本节为准。
+Current phase: **Phase 3–7 authorized scope closed**；Phase 8A–8J 已按顺序完成当前小步。以下 Phase 8I 与更早章节保留历史证据，凡与本节冲突，以本节为准。
 
-- 当前分支：`codex/anki-maximal-alignment-plan`；本轮开始时本地 HEAD、上游和 GitHub 分支 tip 均为 `ac40ba193638384b533ce73da9eed1110e85ca94`。
-- Phase 8I 只实现 Phase 8H 已冻结的 `rated:<days>` 与 `rated:<days>:<rating-code>`；`days` 只接受 1..365，rating code 只接受 1..4，映射为 1=Again、2=Hard、3=Good、4=Easy。
-- Parser 保持纯函数；Criteria 新增有序只读 `recentReviewConditions`；Query Applier 复用 `SenseReviewReportPeriodService::rollingDays()`，为每个 recent 条件添加独立的 correlated `whereExists`。
-- 既有 `rated:again|hard|good|easy` 仍表示不限时间的正式评分存在条件；数字 token、符号 token 及其他 Browser 条件继续按全局 AND 独立组合。
-- 时间窗口为应用时区中的自然日滚动窗口：今天加之前 `n-1` 天，左闭右开 `[start_of_first_day, start_of_tomorrow)`；只统计同用户、同语言、`source=sense_review`、有效正式评分且 `undone_at IS NULL` 的 ReviewLog。
-- reset、非正式来源、撤销评分、legacy word card、跨用户/语言和未确认 sense 均被排除；列表、JSON、CSV 与 Anki TSV 继续共用同一 Parser/Criteria/Query Applier 管线。
-- 前端只增加 numeric `rated:` 帮助和组合示例，没有复制完整 parser；没有新增 route、migration、index、dependency、export field、Saved Search schema、Custom Study、Reviewer、FSRS 或 ReviewLog 写路径。
-- 聚焦测试：20 passed / 133 assertions；Browser Search 兼容回归与自然日边界：184 passed / 785 assertions；`npm run development` 编译成功，仅有既有 Sass deprecation warnings。
-- 真实 localhost 页面输入 `RATED:007:01` 后只发出一个本地 GET `/review-cards/manage/data`，页面显示规范化 chip `rated:7:1`；帮助弹窗显示 `rated:7`、`rated:7:1` 与 1–4 评分映射。控制台核验无 error/warn。
-- 浏览器动作前后数据库计数一致：ReviewLog 0、ReviewCard 4、WordSense 4、ReviewCardStateEvent 0。
+- 当前分支：`codex/anki-maximal-alignment-plan`；本轮预检时本地 HEAD、上游和 GitHub 分支 tip 均为 `8bc3cde50c55f6abe98a9ffd491a927d809d51ca`。
+- Phase 8J 只完成 Browser Search quoted phrase 与 text negation 的只读侦察和语义冻结；新增 `docs/plans/review-card-browser-quoted-phrase-negation-semantic-freeze.md`，没有修改运行时代码、测试、前端、路由、导出、数据库或搜索行为。
+- 冻结的未来首个实现语法仅为 `"<phrase>"`、`-<plain-term>` 与 `-"<phrase>"`；既有未加引号正向 plain text 继续保留当前单一 `textQuery` 行为。
+- 正向 phrase 与负向 text/phrase 都只匹配既有五个 WordSense 搜索字段；新谓词必须按 literal substring 处理 `%`、`_` 和 SQL escape character，不能意外扩大为 SQL wildcard。
+- 多个 phrase、negative text、现有 textQuery 和所有现有高级 token 继续按全局 AND 独立组合；不同正向条件可以由同一 WordSense 的不同搜索字段满足。
+- 第一实现切片明确不支持高级 token 否定。`-is:suspended`、`-rated:again`、`-due:today`、`-source:chapter:46` 等必须返回既有结构化 `invalid_browser_search` 422，不能静默当作普通文本。
+- 未来实现需要一个小型纯 lexer，只区分现有 advanced token、现有 unquoted text remainder、positive phrase、negative plain term 和 negative phrase；不建立 OR/parentheses AST。
+- quote/minus malformed grammar 包括未闭合引号、空 phrase、单独 `-`、双重 `--`、词中开始引号和高级 token 否定；都必须在 DB 查询前返回结构化 422。
+- Phase 8J 为 docs/rules-only closure：真实浏览器验收不适用；验收只需文档内容、链接/守卫、范围证明和 `git diff --check`。
 - 用户明确要求本地与线上 GitHub 同步，因此本轮完成最终核验后精确暂存、提交并推送；受保护的 `.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md` 不进入提交。
 
-当前唯一下一小步：**Phase 8J — Browser Search quoted phrase 与 negation 只读侦察和语义冻结**。该步骤尚未授权执行；不得在本轮进入 quoted phrase/negation runtime、OR/parentheses 或其他后续阶段。
+当前唯一下一小步：**Phase 8K — Browser Search quoted phrase 与 text-negation 最小运行时实现**。该步骤尚未授权执行；不得在本轮进入 runtime、advanced-token negation、OR/parentheses 或其他后续阶段。
 
 ## 0A. Phase 8G historical authority（2026-07-17）
 
