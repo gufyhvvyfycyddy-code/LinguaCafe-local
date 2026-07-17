@@ -1,22 +1,32 @@
 # LinguaCafe Documentation Index
 
-> **Current authority — 2026-07-16**
+> **Rule authority — 2026-07-17**
 >
-> 1. `docs/plans/current-working-handoff.md` — current workbench.
-> 2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry and long-term ledger.
-> 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative product priority and architecture-debt route.
+> 1. `AGENTS.md` — short root navigation and universal safety boundary.
+> 2. `docs/architecture/ai-development-rule-system.md` — authoritative rule priority, task-loading gates, architecture preflight, compatibility, hard-rule admission, guard economics, and evidence rules.
+> 3. Stable module contracts and accepted ADRs — authoritative for their recorded product/module behavior.
+> 4. `CONTEXT.md` — conditional canonical domain terminology and data ownership source.
+> 5. `docs/architecture/subtitle-guided-development-summary.md` — conditional method source for rules/spec/architecture/harness work, not universal task context.
 >
-> Manual Sense shared form and Settings architecture convergence are Accepted / Production Closed. Preset V1A–V1D are Accepted / Production Closed; the two-user, English/French V1D matrix are complete under ADR-0027. Browser/ReviewCardManage Phase 3A, Phase 3B-1, Phase 3B-2 and Phase 3C-1 are Accepted / Production Closed. Phase 3C-2 Lifecycle Mutation Family is Code Complete / Browser Acceptance Pending. Card Info, Search, Table, Due-now / Reset Scheduling Mutation Surface and Lifecycle Mutation Surface now have separate owners. Current parent size is 1,210 lines with 11 direct `axios.` references and 6 `v-dialog` blocks; `ReviewCardLifecycleMutationSurface.vue` is 414 lines with one descriptor GET, two lifecycle POST requests and three dialogs. It freezes `expected_version`, rejects stale descriptor responses, clears successful stale snapshots and is the ReviewCardManage-domain shared request owner for Leech suspend delegation. `SenseReview.vue` remains a separate formal-review lifecycle client; dormant legacy `/enabled` controls remain later compatibility debt. Chrome DevTools 1 returned 502 and authenticated write acceptance remains pending. Phase 3C-3 Delete Mutation Family is Planned / Not Authorized. Its boundary is `docs/plans/review-card-manage-architecture-convergence-plan.md`. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
+> **Current product/state authority — 2026-07-16**
+>
+> Load this layer only for phase authorization, current acceptance status, roadmap, or product sequencing. It is not the default for a bounded module fix.
+>
+> 1. `docs/plans/current-working-handoff.md` — current status/workbench; read the relevant top block or section first.
+> 2. `docs/plans/linguacafe-master-plan.md` — long-term Open Work Registry/ledger; load only when the ledger is part of the decision.
+> 3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — product priority and architecture-debt sequence; load only when sequencing is part of the decision.
+>
+> Manual Sense shared form, Settings architecture convergence, Browser authorized scope, Card Marker + Custom Study 1B, Reviewer convergence, and Reader UI/architecture governance are Accepted / Production Closed. `ReviewCardManage.vue` is 905 lines after Marker wiring, with 9 direct requests and 4 dialogs. Reader lookup space is now reserved only for an active sidebar, and `ReaderDataService` is the single reader-projection owner behind the compatibility facade. AI Study Card lifecycle, package/candidate, generation, source-binding, and disabled-provider preflight convergence is Accepted under ADR-0032; the user explicitly chose to keep the real provider disabled. Phase 3C-3 Delete Mutation Family is Planned / Not Authorized and was not executed. The old “overall architecture closure 100%” statement is historical and no longer governs task selection.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
+> Custom Study 1B: Accepted / Production Closed (Card Marker, `flag:`, marked preview queue, Browser/Card Info/Sense Review convergence; evidence: `docs/testing/review-card-marker-custom-study-browser-acceptance-2026-07-17.md`)
 > `/custom-study`, chapter options, four frozen criteria, stateless session APIs, shared card presentation, sessionStorage token handling, and MCP Chrome production acceptance are complete. Phase history is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 
 
 > **Status**: Current entry index.
-> **Last updated**: 2026-07-16 (Preset V1D Production Closed; reader sidebar boundary correction accepted; Browser/ReviewCardManage Phase 3A, Phase 3B-1, Phase 3B-2 and Phase 3C-1 Accepted / Production Closed; Phase 3C-2 Code Complete / Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family Planned / Not Authorized). Historical previous update: 2026-07-14 (Task 2000-21 `GLM-CustomStudy-Phase4A-SessionInternalOrdering-And-Phase3B-Closure-2000-21` — **Custom Study 1A Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务**。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1 through Phase 4A and the backend vertical slice were completed in Tasks 2000-16 through 2000-22; the frontend, shared card, chapter picker, and browser closure were completed afterward. Current authority is the status block above.**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。)
+> **Last updated**: 2026-07-17 (AI development rule system rebuilt; root rules shortened; canonical domain glossary and subtitle methodology summary added; detailed Vibe Coding rules downgraded to an explicitly loaded appendix). Historical previous update: 2026-07-16 (Preset V1D Production Closed; reader sidebar boundary correction accepted; Browser/ReviewCardManage Phase 3A, Phase 3B-1, Phase 3B-2 and Phase 3C-1 Accepted / Production Closed; Phase 3C-2 Code Complete / Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family Planned / Not Authorized). Historical previous update: 2026-07-14 (Task 2000-21 `GLM-CustomStudy-Phase4A-SessionInternalOrdering-And-Phase3B-Closure-2000-21` — **Custom Study 1A Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务**。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1 through Phase 4A and the backend vertical slice were completed in Tasks 2000-16 through 2000-22; the frontend, shared card, chapter picker, and browser closure were completed afterward. Current authority is the status block above.**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。)
 
 > **Implementation addendum (2026-07-14)**: Custom Study 1A frontend is now implemented at `/custom-study`: setup, authenticated chapter picker, temporary preview session UI, navigation, and shared card presentation. The token remains session-only and the normal review queue, FSRS, ReviewLog, and lifecycle remain unchanged.
 
@@ -25,22 +35,28 @@
 > complete. Preview rating was verified not to change formal-review data, and
 > web-side final product acceptance has been issued.
 
-This file is the lightweight entry map for humans and agents. It exists to prevent context flooding: read the current layer first, then load module or history documents only when the task actually needs them.
+This file is a routing index plus a current-status ledger. It is not universal default context. Use it when ownership/status is unclear or when the task concerns phase authorization, product priority, documentation routing, or history classification.
 
 ## 1. Current Entry Order
 
-Read these in order for a new GLM Agent task (current workflow: GLM 单 Agent 闭环, see `vibe-coding-collaboration-rules.md` §1.5):
+Use one canonical route for a file-changing or acceptance task:
 
-1. `docs/plans/current-working-handoff.md` — current short-term workbench and current next task.
-2. `docs/plans/linguacafe-master-plan.md` — current Open Work Registry plus long-term ledger.
-3. `docs/plans/anki-aligned-product-and-architecture-roadmap.md` — authoritative order for Preset, Browser, Marker/Custom Study, Reviewer, Reader, and AI provider work.
-4. `docs/plans/review-card-manage-architecture-convergence-plan.md` — current Browser/ReviewCardManage Phase 3A–3D architecture route; Phase 3A, Phase 3B-1, Phase 3B-2 and Phase 3C-1 are Accepted / Production Closed. Phase 3C-2 is Code Complete / Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family is Planned / Not Authorized. The current parent is 1,210 lines and the Lifecycle Mutation Surface is the unique lifecycle request owner inside ReviewCardManage.
-5. `docs/plans/review-settings-preset-v1-plan.md` — authoritative Preset identity, binding, config scope, staged implementation and acceptance contract.
-6. `docs/architecture/sense-http-controller-boundaries.md` — current HTTP/controller placement rules for sense, review-assist, pending-sense, manual-sense, and inline-confirmation features.
-7. `docs/architecture/sense-review-module-boundaries.md` — SenseReview container/sub-component/service boundaries, report architecture, rating contract, lifecycle interaction, query budget, and N+1 rules.
-8. `docs/plans/vibe-coding-collaboration-rules.md` — collaboration rules, safety boundaries, and verification rules.
-9. `docs/plans/repo-architecture-hotspot-audit.md` — historical and detailed architecture evidence; use the Anki-aligned roadmap for current priority.
-10. `docs/plans/final-architecture-closure-report.md` — historical phase conclusion. Its “100% architecture closure” wording is superseded by the current measurable debt assessment.
+1. `AGENTS.md` — root navigation and universal red lines.
+2. The task-relevant local Skill instructions.
+3. `docs/architecture/ai-development-rule-system.md` — task loading, rule priority, document status, architecture preflight, compatibility, hard-rule admission, guard economics, and evidence.
+4. Git branch, latest commit, worktree status, and user-owned changes.
+5. Select the smallest additional route:
+   - domain/state/data ownership → `CONTEXT.md`;
+   - rules/spec/architecture/harness → `docs/architecture/subtitle-guided-development-summary.md`;
+   - phase/status/priority → this index, then `current-working-handoff.md`; load master plan/roadmap only if ledger or sequencing is needed;
+   - bounded module work → owning contract, accepted ADRs, relevant code/tests/harness; use this index only when ownership or status is unclear.
+6. Inspect the exact files to change and an established local pattern.
+
+`current-working-handoff.md`, `linguacafe-master-plan.md`, the roadmap, raw subtitles, all ADRs, and history are never a universal bundle. `docs/plans/vibe-coding-collaboration-rules.md` is read only when a current task or contract explicitly cites one section.
+
+For the current Browser/ReviewCardManage phase, the task-specific route is `docs/plans/review-card-manage-architecture-convergence-plan.md`. Preset work uses `docs/plans/review-settings-preset-v1-plan.md`. Sense HTTP and formal-review work use the corresponding documents under `docs/architecture/`.
+
+Do not start from `docs/plans/repo-architecture-hotspot-audit.md` or `docs/plans/final-architecture-closure-report.md`; they contain useful evidence but are not current priority sources.
 
 Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_STATUS.md`, or `docs/FSRS_PHASE*.md`. Those are historical references.
 
@@ -48,9 +64,13 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 
 | Layer | Purpose | Primary files |
 |---|---|---|
-| Entry / current state | Decide what is current and what to read next | `current-working-handoff.md`, this file |
-| Long-term ledger | Preserve product directions and completed task history | `linguacafe-master-plan.md` |
-| Collaboration rules | Role boundaries, safety red lines, test/smoke/report rules | `vibe-coding-collaboration-rules.md` |
+| Root entry | Short navigation, universal red lines, and rule priority pointer | `AGENTS.md`, `CLAUDE.md` |
+| Domain glossary | Canonical terms, data ownership, and state distinctions | `CONTEXT.md` |
+| Authoritative rule system | Document taxonomy, progressive loading, Skill routing, architecture preflight, compatibility, evidence, and promotion rules | `docs/architecture/ai-development-rule-system.md` |
+| Subtitle methodology summary | MVP versus long-lived project rules, plan/spec/harness distinctions, anti-mud principles | `docs/architecture/subtitle-guided-development-summary.md` |
+| Routing / current state | Resolve uncertain ownership, phase authorization, acceptance status, or what state source to read | this file; `current-working-handoff.md` only when status matters |
+| Long-term ledger | Preserve product directions and completed task history; not default context | `linguacafe-master-plan.md` |
+| Detailed operational appendix | Older role/process clauses and task-specific procedures; read only by explicit current reference | `vibe-coding-collaboration-rules.md` |
 | Product and architecture priority | Current Anki-aligned sequence, measurable debt targets, and implementation gates | `anki-aligned-product-and-architecture-roadmap.md` |
 | Architecture risks | Detailed module responsibilities and hotspot evidence | `repo-architecture-hotspot-audit.md` |
 | Historical architecture phase closure | Preserved old phase conclusion; no longer the current priority source | `final-architecture-closure-report.md` |
@@ -62,24 +82,22 @@ Do not start from `docs/CODEX_HANDOFF.md`, `docs/NEXT_TASK.md`, `docs/CURRENT_ST
 | Product principles | Long-term product direction, function constraints, and legacy cleanup plan | `docs/plans/product-principles-and-legacy-cleanup-plan.md` |
 | History | Old handoffs, old status files, old phase notes | `docs/HISTORY_INDEX.md` |
 
-## 2.5 Key Rule References
+## 2.5 Current Rule And Verification References
 
-New rules and process notes are documented in:
-- `vibe-coding-collaboration-rules.md` §1.5 — **GLM 单 Agent 闭环规则（当前生效，2026-07-13 起）**。CodeBuddy/WorkBuddy 工作流已停用。
-- `vibe-coding-collaboration-rules.md` §22 — 总设计师提示词前进度说明规则（每次给提示词前必须先说明当前进度）。
-- `vibe-coding-collaboration-rules.md` §23 — ~~三方架构侦查规则（网页端总设计师/CodeBuddy/OpenCode 三方分工）~~（已停用 2026-07-13，历史参考）。
-- `vibe-coding-collaboration-rules.md` §24 — 进度条显示规则（100% 项隐藏、涨幅标注、样式）。
-- `vibe-coding-collaboration-rules.md` §25 — 计划审查规则（入任务前审查全部未满项）。
-- `vibe-coding-collaboration-rules.md` §26 — ~~模式选择规则（OpenCode 微任务 / Codex 目标模式）~~（已停用 2026-07-13，历史参考）。
-- `vibe-coding-collaboration-rules.md` §27 — 高内聚低耦合架构规则与 GLM 1000% 分层规则、MCP 词元测试样本治理规则、视频字幕架构经验规则。§27.0 第一硬原则：代码安全性和稳定性优先于功能速度。
+Current rules and reusable verification procedures are documented in:
+- `AGENTS.md` — short root entry, universal safety boundary, and current rule priority.
+- `docs/architecture/ai-development-rule-system.md` — general hard-rule authority, progressive document loading, Skill routing, architecture preflight, compatibility, evidence, and documentation promotion.
+- `CONTEXT.md` — canonical `EncounteredWord` / `WordSense` / `WordSenseOccurrence` / `ReviewCard` / `ReviewLog` terminology and ownership.
+- `docs/architecture/subtitle-guided-development-summary.md` — source-verified methodology summary; raw subtitles are not default task context.
+- `docs/adr/ADR-0028-ai-development-rule-loading-and-document-status.md` — accepted decision for short roots, conditional context loading, document status, legacy-appendix downgrade, and executable governance.
+- `docs/plans/vibe-coding-collaboration-rules.md` — detailed legacy operational appendix. Its old workflow, progress, complexity, role, and task-packaging sections are historical unless a current task or contract cites one exact section; a broad file reference does not activate the appendix.
 - `docs/architecture/sense-http-controller-boundaries.md` — sense / review-assist / pending-sense / manual-sense HTTP Controller 落位规则。新功能若无清晰归属，必须先建架构再实现。
 - `repo-architecture-hotspot-audit.md` §8.5 — 下一轮架构优化必须遵守的边界。
 - `mcp-chrome-local-smoke-playbook.md` §8 — Lemma / Morphology click sample rotation（词元测试样本轮换操作指南）。
 - `morphology-test-sample-tracker.md` — MCP 词元测试样本追踪文档（每轮 marker / 文章 / 测试词 / 重复比例 / 8 类覆盖 / 真实点击标记 / API 替代标记 / Incomplete 标记）。
-- `vibe-coding-collaboration-rules.md` §27.7 — Testing DB 健康检查规则（每轮大型任务必须先跑 DB health check）。
-- `vibe-coding-collaboration-rules.md` §27.8 — DevSpace PHP / PHPUnit 502 截断规则：先用日志重定向、拆分套件和聚焦测试替代；仍无法取得可信全量结果时标记 Incomplete，并把完整 PHP 回归附加到下一轮相关 Codex 复杂任务。
-- `testing-db-health-playbook.md` — Testing DB 健康检查操作指南（health check / 进程锁 / 禁止命令 / 故障报告）。
-- `current-working-handoff.md` §7 — 当前主线进度估算。
+- `docs/plans/testing-db-health-playbook.md` — current Testing DB health-check procedure, process-lock rules, prohibited commands, and failure reporting. Load only for tasks that use the testing database or whose acceptance contract requires it.
+- `docs/plans/devspace-php-verification-playbook.md` — current recovery procedure for large/truncated/502 PHP and PHPUnit output; requires real exit/result evidence and `Incomplete` when completion cannot be verified.
+- `current-working-handoff.md` — current phase and acceptance-status source only when those facts are material; its progress estimates are not general hard rules.
 - `docs/testing/ai-study-card-full-loop-regression-playbook.md` — AI Study Card 主链路（V6 → V4 → V5 → `/reviews/senses` → FSRS rating）回归 harness：测试命令矩阵（9 条命令 + 期望计数）/ MCP Chrome 真实验收 playbook（轻量 7 步 + 完整 20 步）/ 数据库验收矩阵（每阶段表 delta）/ 网络验收（禁止 provider 域名）/ Refuse 条件（12 条安全契约 + 额外触发器）/ Accept/Refuse/Incomplete 判断 / 允许修改文件边界 / 停止条件 / 文件→测试映射。任何 agent 改 AI 学习卡前必须先读本文档并跑 §3 测试命令矩阵。
 - `docs/testing/sense-review-understanding-helper-playbook.md` — SenseReview 理解辅助（Task 3 sense-level + Task 4 occurrence-level merge）playbook：两层 `understanding_aid`（`word_senses.understanding_aid` + `word_sense_occurrences.evidence` 复用，无新 migration）/ `SenseReviewCardSerializerService::normalizeUnderstandingAid` + `mergeOccurrenceEvidence` / `WordSenseExamplePoolService::pickQuestionIndexWithContext` 智能例句选择（`preferred_occurrence_id` 优先 + 线性轮换 fallback）/ 前端「理解这个词义」折叠块 + `related_collocations` 「类似使用」chips / FSRS 安全矩阵（展开/折叠/切例句/查看原文均不写 ReviewLog）/ 测试矩阵（`SenseReviewUnderstandingAidTest` 6/21 + `SenseReviewContextualUnderstandingTest` 8/23 + SenseReview 全量 244/1001）/ MCP Chrome 验收 / 13 条 Refuse 条件 / 允许文件边界 / 回滚步骤。任何 agent 改理解辅助或例句选择前必须先读本文档并跑 §7 测试命令矩阵。
 
@@ -134,6 +152,11 @@ The detailed ADR table retains historical phase-by-phase registration text. For 
 | `docs/adr/ADR-0025-review-settings-preset-v1b-management.md` | Accepted / Production Closed (2026-07-15) | Preset V1B: list/add/clone/rename/delete/switch, Default protection, user ownership, shared-language warning, transactional delete-to-Default rebinding, dedicated route/controller/domain boundary, and completed real Chrome management acceptance. |
 | `docs/adr/ADR-0026-review-settings-preset-v1c-consumer-convergence.md` | Accepted / Production Closed (2026-07-15) | Preset V1C: Resolver remains runtime authority; `fsrs_parameters_previous` is no longer written, deleted, or claimed in responses; old rows remain untouched historical residue. |
 | `docs/adr/ADR-0027-settings-advanced-tools-ux-state-model.md` | Accepted / Preset V1D Production Closed (2026-07-15) | Pure Advanced Tools presentation state model, progressive disclosure, disabled-action guards, diagnostic failure handling, Anki-aligned separation of optimization from rescheduling, dual-viewport Chrome acceptance, and completed final Preset matrix. |
+| `docs/adr/ADR-0028-ai-development-rule-loading-and-document-status.md` | Accepted (2026-07-17) | Short root entry, canonical detailed rule system, domain glossary, subtitle summary, progressive task loading, explicit document statuses, legacy operational appendix downgrade, and executable governance guards. |
+| `docs/adr/ADR-0029-review-card-marker-and-custom-study-1b.md` | Accepted / Production Closed (2026-07-17) | ReviewCard marker `0..7`, `flag:` search, shared picker/API, and marked Custom Study preview without FSRS/ReviewLog/lifecycle writes. |
+| `docs/adr/ADR-0030-reviewer-request-coordination-and-shortcuts.md` | Accepted / Production Closed (2026-07-17) | Shared minimal rating request coordinator, authoritative recovery, exact Card Info reuse, and Anki-aligned Sense Review shortcuts without merging Reviewer products. |
+| `docs/adr/ADR-0031-reader-attention-and-facade-convergence.md` | Accepted / Production Closed (2026-07-17) | Active-only lookup sidebar/padding, dependent hover settings, and single ReaderDataService projection ownership behind TextBlockService. |
+| `docs/adr/ADR-0032-ai-pending-lifecycle-and-provider-gate.md` | Accepted service convergence / live provider deliberately disabled (2026-07-17) | Focused lifecycle, package/candidate, and generation/source-binding owners behind a 195-line compatibility facade; explicit blocked preflight; local-only fail-closed browser evidence; and the recorded decision to defer a real provider. |
 
 ## 4. Soft Rules Awaiting Hard Verification
 
@@ -143,20 +166,17 @@ Use `docs/plans/spec-to-harness-candidates.md` when a task asks what should beco
 
 Use `docs/HISTORY_INDEX.md` to understand old documents. Historical documents are retained because they contain useful context, but they are not current task entry points.
 
-If a historical document conflicts with current entry documents, follow this priority:
+If a historical document conflicts with current authority, follow this priority:
 
 1. Current task prompt and explicit user decision.
-2. `current-working-handoff.md`.
-3. `linguacafe-master-plan.md`.
-4. `vibe-coding-collaboration-rules.md`.
-5. Module contract / ADR files.
-6. Historical documents only as background.
+2. `AGENTS.md` safety/protection rules.
+3. `docs/architecture/ai-development-rule-system.md`.
+4. Accepted module contracts and ADRs.
+5. Git/code/tests plus the task-selected current-state source (`current-working-handoff.md`, master plan, or roadmap) for implementation/status facts.
+6. The explicitly authorized current task plan and acceptance evidence.
+7. A specifically cited legacy appendix section.
+8. Historical documents only as background.
 
-## Current Custom Study 1A update (2026-07-14)
+## Historical Custom Study 1A interim update (superseded 2026-07-14)
 
-Phase 5A has added the read-only chapter-options data contract and selected
-example sentence/token/translation alignment. See ADR-0016 and
-`docs/plans/custom-study-1a-implementation-plan.md`; the Custom Study page and
-session UI are still pending. The normal review card now shares its read-only
-presentation with `SenseStudyCard.vue`; formal review controls remain in its
-existing container.
+The former Phase 5A note said the page/session UI was pending. That statement is historical and is superseded by the authoritative production-closed status block at the top of this index and ADR-0016.

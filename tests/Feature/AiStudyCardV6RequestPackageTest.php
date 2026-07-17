@@ -48,6 +48,17 @@ class AiStudyCardV6RequestPackageTest extends TestCase
         $response->assertJsonPath('success', true);
         $response->assertJsonPath('package.schema_version', 'ai-study-card-v6-request-package-v1');
         $response->assertJsonPath('package.provider_request_state', 'provider_disabled');
+        $response->assertJsonPath('package.provider_preflight.ready', false);
+        $response->assertJsonPath('package.provider_preflight.provider', 'disabled');
+        $response->assertJsonPath('package.provider_preflight.model', 'deepseek-chat');
+        $response->assertJsonPath('package.provider_preflight.item_count', 1);
+        $response->assertJsonPath('package.provider_preflight.timeout_seconds', 0);
+        $response->assertJsonPath('package.provider_preflight.max_cost_usd', null);
+        $response->assertJsonPath('package.provider_preflight.estimated_cost_usd', null);
+        $response->assertJsonPath('package.provider_preflight.secret_source', 'env');
+        $response->assertJsonPath('package.provider_preflight.failure_policy', 'fail_closed');
+        $response->assertJsonPath('package.provider_preflight.external_data_fields.0', 'word');
+        $response->assertJsonFragment(['cost_ceiling_not_configured']);
         $response->assertJsonPath('package.language', 'english');
         $response->assertJsonPath('package.context_policy.mode', 'selected_items_with_sentence');
         $response->assertJsonPath('package.context_policy.include_full_chapter_text', false);
@@ -71,6 +82,8 @@ class AiStudyCardV6RequestPackageTest extends TestCase
         $response->assertJsonPath('package.safety_flags.no_review_card_created', true);
         $response->assertJsonPath('package.safety_flags.no_legacy_word_card_created', true);
         $response->assertJsonPath('package.safety_flags.user_confirmation_required', true);
+        $this->assertStringNotContainsString('secret_reference', $response->getContent());
+        $this->assertStringNotContainsString('AI_STUDY_CARD_V6_API_KEY', $response->getContent());
     }
 
     public function test_request_package_does_not_write_cards_senses_logs_or_pending_state(): void

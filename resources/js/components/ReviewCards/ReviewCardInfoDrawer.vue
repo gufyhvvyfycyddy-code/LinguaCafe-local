@@ -56,6 +56,7 @@
                                 <div class="detail-section-title">基本信息</div>
                                 <detail-row label="ReviewCard ID" :value="detailTarget.review_card_id" />
                                 <detail-row label="WordSense ID" :value="detailTarget.word_sense_id" />
+                                <detail-row label="标记" :value="markerLabel(detailTarget.marker)" />
                                 <detail-row label="Lemma" :value="detailTarget.lemma" />
                                 <detail-row label="Surface" :value="displayValue(detailTarget.surface_form)" />
                                 <detail-row label="POS" :value="displayValue(detailTarget.pos)" />
@@ -197,6 +198,7 @@
 <script>
 import axios from 'axios';
 import { actionColor, actionLabel, stateColor, stateLabel } from '../../services/ReviewCardLifecyclePresentation.js';
+import { markerChoice } from '../../services/ReviewCardMarkerPresentation.js';
 import {
     reasonLabel as leechReasonLabel,
     severityColor as leechSeverityColor,
@@ -280,6 +282,7 @@ export default {
         leechStatusColor,
         leechStatusLabel,
         leechSuggestionLabel,
+        markerLabel(value) { return markerChoice(value).label; },
         loadCardInfo(reviewCardId) {
             const seq = ++this.detailRequestSeq;
             this.detailLoading = true;

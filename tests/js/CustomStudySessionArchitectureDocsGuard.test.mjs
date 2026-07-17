@@ -90,7 +90,7 @@ const authoritativeSources = [
 ];
 const PRODUCTION_STATUS = 'Production closure: complete';
 const ACCEPTANCE_STATUS = 'Custom Study 1A: Accepted / Production Closed';
-const ONE_B_STATUS = 'Custom Study 1B: not started';
+const ONE_B_STATUS = 'Custom Study 1B: Accepted / Production Closed';
 const OBSOLETE_CURRENT_STATUS_PATTERNS = [
     /custom study 1a:\s*awaiting web-side process designer final accept/i,
     /custom study 1a[^\n]{0,240}awaiting final accept/i,
@@ -417,7 +417,7 @@ test('all five authoritative documents share the production status trio', () => 
     for (const [name, source] of authoritativeSources) {
         assert.ok(source.includes(PRODUCTION_STATUS), `${name} is missing production closure status`);
         assert.ok(source.includes(ACCEPTANCE_STATUS), `${name} is missing final Accept status`);
-        assert.ok(source.includes(ONE_B_STATUS), `${name} is missing 1B not-started status`);
+        assert.ok(source.includes(ONE_B_STATUS), `${name} is missing final 1B status`);
     }
 });
 

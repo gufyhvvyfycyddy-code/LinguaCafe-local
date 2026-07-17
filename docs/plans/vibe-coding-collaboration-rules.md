@@ -1,15 +1,19 @@
 # LinguaCafe Vibe Coding 协作原则
 
-> LinguaCafe 长期本地改造中，网页端 GPT / 总流程设计师（产品决策方）与本地 GLM Agent（执行方）的协作规范。
-> **当前工作流（2026-07-13 起）：GLM 单 Agent 闭环。** CodeBuddy / WorkBuddy / 三员工工作流已停用（见 §1.5）。
-> 本文是协作规则和红线，不是业务总计划；业务现状先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`。
+> **Status — 2026-07-17**: Detailed legacy operational appendix. This file is no longer a default task entry or the general hard-rule authority.
+> **Current authority**: `AGENTS.md` → `docs/architecture/ai-development-rule-system.md` → accepted module contracts / ADRs → task-selected current-state sources.
+> Read a section here only when a current task, module contract, or current playbook cites that exact section. A broad reference to this file, a legacy task name, or imperative wording inside the appendix does not activate the whole document. If this appendix conflicts with current authority, current authority wins. Discontinued CodeBuddy / WorkBuddy material remains historical.
+>
+> LinguaCafe 长期本地改造中，网页端 GPT / 总流程设计师（产品决策方）与本地 GLM Agent（执行方）的旧版详细协作规范。
+> **旧版当前工作流记录（2026-07-13 起）：GLM 单 Agent 闭环。** CodeBuddy / WorkBuddy / 三员工工作流已停用（见 §1.5）。
+> 本文保留大量阶段性操作细节用于追溯，不是业务总计划；当前业务事实先读 `docs/DOCUMENTATION_INDEX.md`。
 
 ---
 
 ## 0. 如何阅读本文
 
-1. 新任务不要把本文全文当作唯一上下文。先读 `docs/DOCUMENTATION_INDEX.md`，按任务只加载相关章节。
-2. 本文只记录长期协作规则、安全红线、验收规则和角色边界；业务计划放在 master plan，当前入口放在 current-working-handoff，历史材料放在 `docs/HISTORY_INDEX.md`。
+1. 新任务不要把本文全文当作上下文入口。先按 `AGENTS.md` 和 `docs/architecture/ai-development-rule-system.md` 选择最小任务路线；只有被当前任务或契约精确引用的章节才可作为补充程序。
+2. 本文保留旧版长期协作、安全、验收与角色程序用于追溯；当前规则、模块契约、阶段状态和历史分类分别由当前规则系统、模块文档、按需状态源与 `docs/HISTORY_INDEX.md` 管理。
 3. 如果本文与当前任务提示词冲突，先遵守更严格的安全边界；如果是产品方向冲突，交给网页端总设计师判断。
 4. 文档规则是软约束；高风险规则应逐步转为 tests / smoke / harness，候选见 `docs/plans/spec-to-harness-candidates.md`。
 

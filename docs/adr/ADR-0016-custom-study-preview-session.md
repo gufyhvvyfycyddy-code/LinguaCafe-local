@@ -3,7 +3,7 @@
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
+> Custom Study 1B: Accepted / Production Closed
 > The backend, chapter options, aligned example identity, shared Sense card, setup/session frontend, executable state tests, query budgets, and MCP Chrome production acceptance implement this architecture. Superseded phase chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 
 **Historical phase ledger (superseded as current status by the block above):**

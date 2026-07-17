@@ -26,6 +26,7 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         $this->assertFalse(config('ai_study_card_v6.request_policy.token_click_requests_allowed'));
         $this->assertSame(50, config('ai_study_card_v6.request_policy.max_items_per_request'));
         $this->assertSame(0, config('ai_study_card_v6.request_policy.timeout_seconds'));
+        $this->assertSame(0.0, config('ai_study_card_v6.request_policy.max_cost_usd'));
         $this->assertSame(0, config('ai_study_card_v6.request_policy.max_retries'));
         $this->assertSame('fail_closed', config('ai_study_card_v6.request_policy.quota_failure_policy'));
         $this->assertSame('fail_closed', config('ai_study_card_v6.request_policy.malformed_output_policy'));
@@ -85,6 +86,7 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         $this->assertContains('api_key_not_configured', $preconditions['errors']);
         $this->assertContains('base_url_not_configured', $preconditions['errors']);
         $this->assertContains('timeout_not_configured', $preconditions['errors']);
+        $this->assertContains('cost_ceiling_not_configured', $preconditions['errors']);
     }
 
     public function test_security_policy_service_exposes_safe_flags_snapshot(): void

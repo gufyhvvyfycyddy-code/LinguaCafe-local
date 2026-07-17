@@ -1,7 +1,7 @@
 # LinguaCafe History Index
 
 > **Status**: Historical document index.
-> **Last updated**: 2026-07-13 (Task 2000-12 — added CodeBuddy/WorkBuddy workflow archive reference).
+> **Last updated**: 2026-07-17 (AI development rule-system rebuild; legacy operational appendix downgraded from default task context).
 
 This file keeps old documents discoverable while lowering their context priority. Do not delete these files, and do not start a new task from them.
 
@@ -13,8 +13,8 @@ These files have names that sound current but are no longer current entry points
 
 | File | Historical stage | Can still be referenced? | Why not current | Current replacement |
 |---|---|---|---|---|
-| `docs/NEXT_TASK.md` | Early FSRS / local modification phase | Only for historical audit | Name suggests current next task, but its task order is stale | `docs/plans/current-working-handoff.md` |
-| `docs/CURRENT_STATUS.md` | 2026-06-17 era local status | Only for historical audit | Name suggests current state, but project has moved through many later phases | `docs/plans/current-working-handoff.md` |
+| `docs/NEXT_TASK.md` | Early FSRS / local modification phase | Only for historical audit | Name suggests current next task, but its task order is stale | For phase selection only: `docs/DOCUMENTATION_INDEX.md` → relevant section of `docs/plans/current-working-handoff.md` |
+| `docs/CURRENT_STATUS.md` | 2026-06-17 era local status | Only for historical audit | Name suggests current state, but project has moved through many later phases | For current status only: `docs/DOCUMENTATION_INDEX.md` → relevant section of `docs/plans/current-working-handoff.md` |
 | `docs/FSRS_FINAL_STATUS.md` | Old FSRS phase summary | Only for old FSRS phase context | "Final" means final for that old phase, not final architecture | `docs/plans/linguacafe-master-plan.md` |
 | `docs/CODEX_HANDOFF.md` | 2026-06-23 Codex handoff | Partial background only | Old handoff can mislead Codex into starting from obsolete tasks | `docs/plans/current-working-handoff.md` |
 
@@ -50,18 +50,28 @@ Current FSRS / sense-only direction lives in:
 | `docs/convergence/reader-workspace-sizing-convergence-1.md` | Historical completed convergence plan | Useful to understand ReaderWorkspaceSizingService rationale |
 | `docs/plans/linguacafe-fsrs-roadmap.md` | Historical FSRS roadmap | Many items were completed or superseded; master plan is authoritative |
 
-## 4. Rule For Agents
+## 4. Downgraded Operational Appendices
+
+These files are retained because current playbooks or old plans still cite specific clauses, but they are not default task context and do not outrank the current rule system:
+
+| File | Current status | Read when | Current replacement |
+|---|---|---|---|
+| `docs/plans/vibe-coding-collaboration-rules.md` | Detailed legacy operational appendix | A current task, module contract, or playbook explicitly cites a section | `AGENTS.md` + `docs/architecture/ai-development-rule-system.md` |
+
+A cited appendix section may supply a detailed procedure, but it cannot override current user decisions, root safety rules, the authoritative rule system, current code facts, or accepted module contracts.
+
+## 5. Rule For Agents
 
 When a historical document says "next", "current", "final", or "must do", treat that wording as scoped to the old date and phase. Re-check the current entry documents before acting.
 
 Historical documents may explain why a decision was made. They do not authorize code changes, database changes, browser actions, or new tasks.
 
-## 5. Discontinued Workflow Archives
+## 6. Discontinued Workflow Archives
 
 The following archive files preserve discontinued workflow rules for historical reference. They are **not** current instructions and must not be executed:
 
 | Archive | Discontinued | What it preserves | Current replacement |
 |---|---|---|---|
-| `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md` | 2026-07-13 | Full text of the cancelled CodeBuddy / WorkBuddy / three-employee workflow rules (original §4.x, §14, §18, §20, §23 of `vibe-coding-collaboration-rules.md`). | `vibe-coding-collaboration-rules.md` §1.5 GLM 单 Agent 闭环规则 (current). |
+| `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md` | 2026-07-13 | Full text of the cancelled CodeBuddy / WorkBuddy / three-employee workflow rules (original §4.x, §14, §18, §20, §23 of `vibe-coding-collaboration-rules.md`). | Current execution and acceptance rules: `AGENTS.md` + `docs/architecture/ai-development-rule-system.md`; task-specific current playbooks as explicitly selected. |
 
-Rules from the old §14 that remain valid (MCP Chrome testing, To-do list, dual-track parallelism, task packaging) have been migrated into the current GLM chapters of `vibe-coding-collaboration-rules.md`; the archive does not repeat their current text.
+Any still-valid safety, browser, task-boundary, or verification procedure must live in `AGENTS.md`, the current rule system, a current module contract, or a current playbook. Similar wording in this archive or the legacy appendix does not make that old workflow active.

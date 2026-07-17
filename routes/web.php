@@ -250,6 +250,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'store']);
     Route::patch('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'update']);
     Route::delete('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'destroy']);
+    Route::patch('/review-cards/manage/markers', [App\Http\Controllers\ReviewCardMarkerController::class, 'bulkUpdate']);
     Route::get('/review-cards/manage/{reviewCard}/logs', [App\Http\Controllers\ReviewCardManageController::class, 'logs']);
     Route::get('/review-cards/manage/{reviewCard}/detail', [App\Http\Controllers\ReviewCardManageController::class, 'detail']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
@@ -260,6 +261,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/review-cards/manage/bulk-enabled', [App\Http\Controllers\ReviewCardManageController::class, 'bulkEnabled']);
     Route::post('/review-cards/manage/bulk-delete', [App\Http\Controllers\ReviewCardManageController::class, 'bulkDestroy']);
     Route::post('/review-cards/manage/bulk-lifecycle', [App\Http\Controllers\ReviewCardLifecycleController::class, 'bulkAct']);
+    Route::patch('/review-cards/{reviewCard}/marker', [App\Http\Controllers\ReviewCardMarkerController::class, 'update']);
 
     // sense leech governance (ADR-0011)
     Route::get('/review-cards/manage/leech-summary', [App\Http\Controllers\SenseReviewLeechController::class, 'summary']);

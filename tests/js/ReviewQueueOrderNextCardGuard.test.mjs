@@ -116,22 +116,22 @@ test('practiceMode bypasses axios and ReviewLog', () => {
 // 6. Stale response drop (seq mismatch)
 test('stale response is dropped when seq mismatches', () => {
     // In .then()
-    assert.ok(/seq\s*!==\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .then() must check seq !== this.ratingRequestSequence');
+    assert.ok(/this\.ratingRequestCoordinator\.isCurrent\(seq\)/.test(rateReviewBody),
+        'rateReview .then() must use the coordinator stale check');
     // In .catch()
-    assert.ok(/catch[\s\S]*?seq\s*!==\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .catch() must also check seq !== this.ratingRequestSequence');
+    assert.ok(/catch[\s\S]*?this\.ratingRequestCoordinator\.isCurrent\(seq\)/.test(rateReviewBody),
+        'rateReview .catch() must also use the coordinator stale check');
     // In .finally()
-    assert.ok(/finally[\s\S]*?seq\s*===\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .finally() must check seq === this.ratingRequestSequence before resetting ratingLoading');
+    assert.ok(/finally[\s\S]*?this\.ratingRequestCoordinator\.succeed\(seq\)/.test(rateReviewBody),
+        'rateReview .finally() must complete through the coordinator');
 });
 
 // 7. ratingLoading double-click protection
 test('ratingLoading prevents double-click duplicate ReviewLog', () => {
     assert.ok(/if\s*\(\s*this\.ratingLoading\s*\)\s*\{[\s\S]*?return/.test(rateReviewBody),
         'rateReview must return early if ratingLoading is true');
-    assert.ok(/this\.ratingLoading\s*=\s*true/.test(rateReviewBody),
-        'rateReview must set ratingLoading = true before axios call');
+    assert.ok(/this\.ratingRequestCoordinator\.begin\(\)/.test(rateReviewBody),
+        'rateReview must acquire the shared coordinator lock before axios');
 });
 
 // 8. dailyLimitSummary updated from server response

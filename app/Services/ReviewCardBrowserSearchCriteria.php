@@ -33,6 +33,7 @@ class ReviewCardBrowserSearchCriteria
      * @param string $textQuery
      * @param string|null $governanceStatus
      * @param string|null $lifecycleStatus
+     * @param int|null $marker
      * @param list<'again'|'hard'> $ratings
      * @param list<array{field: string, operator: string, value: int}> $propertyConditions
      * @param list<string> $normalizedTokens
@@ -43,6 +44,7 @@ class ReviewCardBrowserSearchCriteria
         public readonly string $textQuery,
         public readonly ?string $governanceStatus,
         public readonly ?string $lifecycleStatus,
+        public readonly ?int $marker,
         public readonly array $ratings,
         public readonly array $propertyConditions,
         public readonly array $normalizedTokens,
@@ -80,6 +82,11 @@ class ReviewCardBrowserSearchCriteria
     public function hasLifecycleStatus(): bool
     {
         return $this->lifecycleStatus !== null;
+    }
+
+    public function hasMarker(): bool
+    {
+        return $this->marker !== null;
     }
 
     /**

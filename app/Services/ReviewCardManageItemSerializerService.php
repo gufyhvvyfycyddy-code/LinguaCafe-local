@@ -111,6 +111,7 @@ class ReviewCardManageItemSerializerService
                 'aliases_zh' => $sense->aliases_zh ?: [],
                 'collocations' => $sense->collocations ?: [],
                 'fsrs_enabled' => $card->fsrs_enabled,
+                'marker' => (int) ($card->marker ?? 0),
                 // ADR-0010: lifecycle fields (no audit metadata exposed)
                 'lifecycle_state' => $card->lifecycle_state,
                 'buried_until' => optional($card->buried_until)->toISOString(),
@@ -176,6 +177,7 @@ class ReviewCardManageItemSerializerService
             'fsrs_lapses' => $card->fsrs_lapses,
             'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
             'fsrs_enabled' => $card->fsrs_enabled,
+            'marker' => (int) ($card->marker ?? 0),
             // ADR-0010: lifecycle fields (no audit metadata exposed)
             'lifecycle_state' => $card->lifecycle_state,
             'buried_until' => optional($card->buried_until)->toISOString(),

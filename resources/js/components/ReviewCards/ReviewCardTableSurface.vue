@@ -102,6 +102,7 @@
         </v-row>
 
         <div v-if="selectedIds.length > 0" class="bulk-action-bar d-flex flex-wrap align-center pa-3 mb-3 rounded-lg">
+            <review-card-marker-picker class="mr-2" :value="0" @change="emitBulkMarker" />
             <v-checkbox
                 :input-value="selectAll"
                 :indeterminate="selectIndeterminate"
@@ -183,6 +184,7 @@
                             <th v-if="isColumnVisible('example_sentence_zh')" class="col-example">例句(中)</th>
                             <th v-if="isColumnVisible('source')" class="col-source">溯源</th>
                             <th class="col-status sortable" @click="toggleSort('fsrs_state')">状态 <span class="sort-icon">{{ sortIcon('fsrs_state') }}</span></th>
+                            <th class="col-marker">标记</th>
                             <th v-if="isColumnVisible('fsrs_stability')" class="col-fsrs sortable" @click="toggleSort('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
                             <th v-if="isColumnVisible('fsrs_difficulty')" class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
                             <th v-if="isColumnVisible('fsrs_reps')" class="col-fsrs sortable" @click="toggleSort('fsrs_reps')">复习 <span class="sort-icon">{{ sortIcon('fsrs_reps') }}</span></th>
@@ -257,6 +259,9 @@
                                     class="ml-1"
                                 >{{ leechStatusLabel(item.leech_status) }}</v-chip>
                                 <span class="text-caption d-block">{{ item.fsrs_state }}</span>
+                            </td>
+                            <td class="col-marker">
+                                <review-card-marker-picker :value="Number(item.marker || 0)" @change="$emit('marker-change', { item, marker: $event })" />
                             </td>
                             <td v-if="isColumnVisible('fsrs_stability')" class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_stability) }}</td>
                             <td v-if="isColumnVisible('fsrs_difficulty')" class="col-fsrs text-center">{{ formatFsrsNumber(item.fsrs_difficulty) }}</td>
@@ -343,8 +348,10 @@ import {
     statusLabel as leechStatusLabel,
     statusColor as leechStatusColor,
 } from '../../services/SenseReviewLeechPresentation.js';
+import ReviewCardMarkerPicker from './ReviewCardMarkerPicker.vue';
 
 export default {
+    components: { ReviewCardMarkerPicker },
     props: {
         items: { type: Array, default: () => [] },
         pagination: { type: Object, default: () => ({ current_page: 1, last_page: 1, total: 0 }) },
@@ -389,7 +396,7 @@ export default {
                 fsrs_last_reviewed_at: true,
                 fsrs_due_at: true,
             },
-            pinnedColumnKeys: ['checkbox', 'lemma', 'sense_zh', 'fsrs_state', 'actions'],
+            pinnedColumnKeys: ['checkbox', 'lemma', 'sense_zh', 'fsrs_state', 'marker', 'actions'],
             configurableColumnDefs: [
                 { key: 'id', label: 'ID' },
                 { key: 'surface_form', label: 'Surface' },
@@ -546,6 +553,10 @@ export default {
         emitBulkLifecycle(action) {
             if (this.selectedIds.length === 0) return;
             this.$emit('bulk-lifecycle', { action, ids: [...this.selectedIds], items: [...this.selectedItems] });
+        },
+        emitBulkMarker(marker) {
+            if (this.selectedIds.length === 0) return;
+            this.$emit('bulk-marker', { ids: [...this.selectedIds], items: [...this.selectedItems], marker });
         },
         updateSelectAllState() {
             if (this.items.length === 0) {

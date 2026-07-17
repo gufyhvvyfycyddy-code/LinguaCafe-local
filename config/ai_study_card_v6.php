@@ -30,6 +30,7 @@ return [
         'token_click_requests_allowed' => false,
         'max_items_per_request' => 50,
         'timeout_seconds' => (int) env('AI_STUDY_CARD_V6_TIMEOUT_SECONDS', 0),
+        'max_cost_usd' => (float) env('AI_STUDY_CARD_V6_MAX_COST_USD', 0),
         'max_retries' => 0,
         'quota_failure_policy' => 'fail_closed',
         'malformed_output_policy' => 'fail_closed',

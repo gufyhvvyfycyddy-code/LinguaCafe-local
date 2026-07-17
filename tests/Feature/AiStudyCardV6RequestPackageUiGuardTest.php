@@ -44,6 +44,9 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $requiredTexts = [
             'V6 请求包（不调用 AI）',
             'provider disabled',
+            'External request preflight',
+            'Cost ceiling',
+            'Data fields',
             '调用 V6 AI 推荐（后端预览）',
             '浏览器只调用本地后端',
             '推荐结果默认不勾选',
@@ -76,6 +79,7 @@ class AiStudyCardV6RequestPackageUiGuardTest extends TestCase
         $this->assertStringContainsString('recommendedItemCount()', $panel);
         $this->assertStringContainsString('droppedItemCount()', $panel);
         $this->assertStringContainsString('allRecommendationsDropped()', $panel);
+        $this->assertStringContainsString('providerPreflight()', $panel);
         $this->assertStringContainsString('copyTextToClipboard', $panel);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/request-package'", $service);
         $this->assertStringContainsString("axios.post('/ai-study-card/v6/recommendations/provider-preview'", $service);

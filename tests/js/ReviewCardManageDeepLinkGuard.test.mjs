@@ -87,6 +87,17 @@ test('parse: round-trip build → parse', () => {
     assert.deepEqual(parsed, { review_card_id: 99, from: 'thirty-day-calendar' });
 });
 
+test('build: Sense Review card info uses the exact-card deep link', () => {
+    const loc = buildReviewCardManageLocation(
+        { review_card_id: 64 },
+        'sense-review'
+    );
+    assert.deepEqual(loc, {
+        path: '/review-cards/manage',
+        query: { review_card_id: 64, from: 'sense-review' },
+    });
+});
+
 // --- 3. Invalid / zero / negative / string-garbage review_card_id ---
 
 test('build: review_card_id = 0 → null', () => {
@@ -159,11 +170,12 @@ test('parse: missing from → null', () => {
     assert.strictEqual(parseReviewCardManageLocation({ review_card_id: '1' }), null);
 });
 
-test('DEEP_LINK_SOURCES contains exactly 3 sources', () => {
-    assert.strictEqual(DEEP_LINK_SOURCES.length, 3);
+test('DEEP_LINK_SOURCES contains exactly 4 sources', () => {
+    assert.strictEqual(DEEP_LINK_SOURCES.length, 4);
     assert.ok(DEEP_LINK_SOURCES.includes('daily-report'));
     assert.ok(DEEP_LINK_SOURCES.includes('seven-day-trend'));
     assert.ok(DEEP_LINK_SOURCES.includes('thirty-day-calendar'));
+    assert.ok(DEEP_LINK_SOURCES.includes('sense-review'));
 });
 
 test('strip query removes only deep-link keys and preserves unrelated state', () => {

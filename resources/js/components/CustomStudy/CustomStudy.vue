@@ -26,6 +26,7 @@
             <v-form @submit.prevent="startSession">
                 <v-radio-group v-model="mode" label="学习范围" class="mt-0">
                     <v-radio value="today_forgotten" label="今天遗忘过的词义"></v-radio>
+                    <v-radio value="marked" label="已标记的词义卡"></v-radio>
                     <v-radio value="overdue" label="已逾期的词义"></v-radio>
                     <v-radio value="source_chapter" label="按原文篇章"></v-radio>
                     <v-radio value="leech_attention" label="需要特别关注的困难词义"></v-radio>
@@ -144,6 +145,7 @@
             },
         },
         mounted() {
+            if (this.$route?.query?.mode === 'marked') this.mode = 'marked';
             this.activeToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
         },
         methods: {

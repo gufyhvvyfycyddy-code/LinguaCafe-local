@@ -148,6 +148,7 @@ class AiStudyCardV6LiveTransportConfigTest extends TestCase
             'ai_study_card_v6.provider.model' => 'deepseek-chat',
             'ai_study_card_v6.provider.api_key' => 'test-key-not-real',
             'ai_study_card_v6.request_policy.timeout_seconds' => 60,
+            'ai_study_card_v6.request_policy.max_cost_usd' => 0.05,
         ]);
 
         $this->app->forgetInstance(AiStudyCardV6ProviderInterface::class);

@@ -72,3 +72,15 @@ export function doesReaderSidebarFitWorkspace(width, spacing = 72) {
     const minimumReaderWidth = getMinimumReaderWidthForWorkspace(width);
     return width >= minimumReaderWidth + sidebarReservationWidth + spacing;
 }
+
+export function isReaderSidebarVisible({ enabled, fits, active, hidden }) {
+    return Boolean(enabled && fits && active && !hidden);
+}
+
+export function getReaderContentRightPadding({ enabled, fits, active, hidden, workspaceWidth }) {
+    if (!isReaderSidebarVisible({ enabled, fits, active, hidden })) {
+        return '0px';
+    }
+
+    return getReaderSidebarReservationWidthForWorkspace(workspaceWidth) + 'px';
+}

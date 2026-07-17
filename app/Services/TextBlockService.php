@@ -6,7 +6,6 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Carbon\Carbon;
 use App\Models\Phrase;
 use App\Services\VocabularyTokenFilter;
 
@@ -34,12 +33,8 @@ class TextBlockService
     public $language = '';
     public $userId = -1;
 
-    /**
-     * Optional ReaderDataService instance for reader data preparation.
-     * When set, collectUniqueWords / prepareTextForReader / indexPhrases
-     * delegate to it. TextBlockService remains the external facade.
-     */
-    public ?ReaderDataService $readerDataService = null;
+    /** ReaderDataService owns reader projection and enrichment. */
+    public ReaderDataService $readerDataService;
 
     /*
         This variable contains raw untokenized text. 
@@ -385,21 +380,7 @@ class TextBlockService
     }
 
     public function collectUniqueWords() {
-        if ($this->readerDataService) {
-            $this->uniqueWords = $this->readerDataService->collectUniqueWords($this->processedWords);
-            return;
-        }
-        $this->uniqueWords = [];
-        for ($wordIndex = 0; $wordIndex < count($this->processedWords); $wordIndex ++) {
-            $word = $this->processedWords[$wordIndex]->word;
-            if (VocabularyTokenFilter::shouldSkip($word, $this->language)) {
-                continue;
-            }
-
-            if (!in_array(mb_strtolower($word, 'UTF-8'), $this->uniqueWords, true)) {
-                $this->uniqueWords[] = mb_strtolower($word, 'UTF-8');
-            }
-        }
+        $this->uniqueWords = $this->readerDataService->collectUniqueWords($this->processedWords);
     }
 
     function updateAllPhraseIds() {
@@ -503,44 +484,8 @@ class TextBlockService
         for TextBlock vue object for better search speeds.
     */
     public function indexPhrases() {
-        if ($this->readerDataService) {
-            $this->phrases = $this->readerDataService->loadPhrases($this->words);
-            $this->readerDataService->indexPhraseIndexes($this->words, $this->phrases);
-            return;
-        }
-
-        // get unique phrase ids
-        $phraseIds = [];
-        for ($wordIndex = 0; $wordIndex < count($this->words); $wordIndex ++) {
-            for ($phraseCounter = 0; $phraseCounter < count($this->words[$wordIndex]->phrase_ids); $phraseCounter ++) {
-                if (!in_array($this->words[$wordIndex]->phrase_ids[$phraseCounter], $phraseIds)) {
-                    array_push($phraseIds, $this->words[$wordIndex]->phrase_ids[$phraseCounter]);
-                }
-            }
-        }
-        
-        sort($phraseIds);
-
-        $this->phrases = Phrase
-            ::where('user_id', $this->userId)
-            ->where('language', $this->language)
-            ->whereIn('id', $phraseIds)
-            ->orderBy('id')
-            ->get();
-
-        for ($phraseIndex = 0; $phraseIndex < count($this->phrases); $phraseIndex++) {
-            $this->phrases[$phraseIndex]->words = json_decode($this->phrases[$phraseIndex]->words);
-            $this->phrases[$phraseIndex]->definitions_checked = false;
-        }
-
-        for ($wordIndex = 0; $wordIndex < count($this->words); $wordIndex ++) {
-            foreach($this->words[$wordIndex]->phrase_ids as $phraseId) {
-                $index = array_search($phraseId, $phraseIds);
-                $tempArray = $this->words[$wordIndex]->phraseIndexes;
-                array_push($tempArray, $index);
-                $this->words[$wordIndex]->phraseIndexes = $tempArray;
-            }
-        }
+        $this->phrases = $this->readerDataService->loadPhrases($this->words);
+        $this->readerDataService->indexPhraseIndexes($this->words, $this->phrases);
     }
 
     /*
@@ -549,179 +494,20 @@ class TextBlockService
         to work.
     */
     public function prepareTextForReader() {
-        if ($this->readerDataService) {
-            $encounteredWords = DB::table('encountered_words')
-                ->where('user_id', $this->userId)
-                ->where('language', $this->language)
-                ->whereIn('word', $this->uniqueWords)
-                ->get();
-
-            $fwLookup = $this->readerDataService->loadFsrsFamiliarityLookup();
-            $this->words = $this->readerDataService->prepareTextForReader(
-                $this->processedWords,
-                $encounteredWords,
-                $this->uniqueWords,
-                $fwLookup,
-            );
-            $this->uniqueWords = $this->readerDataService->enrichUniqueWords($encounteredWords, $fwLookup);
-            return;
-        }
-
-        $tokensWithNoSpaceBefore = config('linguacafe.tokens_with_no_space_before');
-        $tokensWithNoSpaceAfter = config('linguacafe.tokens_with_no_space_after');
-        $languagesWithoutSpaces = config('linguacafe.languages.languages_without_spaces');
-
-        $this->words = [];
         $encounteredWords = DB::table('encountered_words')
             ->where('user_id', $this->userId)
             ->where('language', $this->language)
             ->whereIn('word', $this->uniqueWords)
             ->get();
 
-        // Build FSRS familiarity lookup for words with confirmed WordSenses + ReviewCards
-        $fwLookup = $this->loadFsrsFamiliarityLookup();
-
-        $wordCount = count($this->processedWords);
-        for ($wordIndex = 0; $wordIndex < $wordCount; $wordIndex ++) {
-            // make the word into an object
-            $word = $this->processedWords[$wordIndex];
-            $word->selected = false;
-            $word->hover = false;
-            $word->phraseStage = 'learning';
-            $word->phraseStart = false;
-            $word->phraseEnd = false;
-            $word->phraseIndexes = [];
-            $word->subtitleIndex = -1;
-            
-            
-            // Add space for word if the language has spaces in it.
-            if ($this->language == 'thai') {
-                $word->spaceAfter = (
-                    isset($this->processedWords[$wordIndex]->sentence_index) &&
-                    $wordIndex < $wordCount - 1 && 
-                    $this->processedWords[$wordIndex + 1]->sentence_index !== $this->processedWords[$wordIndex]->sentence_index
-                );
-            } else {
-                $word->spaceAfter = !in_array($this->language, $languagesWithoutSpaces, true);
-            }
-            
-            if ($wordIndex < count($this->processedWords) - 1 && in_array($this->processedWords[$wordIndex + 1]->word, $tokensWithNoSpaceBefore, true)) {
-                    $word->spaceAfter = false;
-            }
-
-            if (in_array($this->processedWords[$wordIndex]->word, $tokensWithNoSpaceAfter, true)) {
-                $word->spaceAfter = false;
-            }
-            
-
-            $wordId = $encounteredWords->search(function ($item, $key) use($word) {
-                return $item->word == mb_strtolower($word->word);
-            });
-
-            if ($wordId === false) {
-                $word->id = null;
-                $word->stage = 1;
-                $word->lookup_count = 0;
-                $word->furigana = '';
-            } else {
-                $word->id = $encounteredWords[$wordId]->id;
-                $word->stage = $encounteredWords[$wordId]->stage;
-                $word->lookup_count = $encounteredWords[$wordId]->lookup_count;
-                $word->furigana = $encounteredWords[$wordId]->reading;
-            }
-
-            // Override stage with FSRS familiarity for learning-system words
-            if ($word->stage < 0 && isset($encounteredWords[$wordId]->id) && array_key_exists($encounteredWords[$wordId]->id, $fwLookup)) {
-                $fw = $fwLookup[$encounteredWords[$wordId]->id];
-                // Keep stage < 0 so furigana and "highlighted" logic still works;
-                // only the numerical level (used for green depth) is adjusted
-                $word->stage = max(-10, min(-1, -$fw['level_10']));
-                $word->fsrs_familiarity_score = $fw['score'];
-                $word->fsrs_familiarity_level_10 = $fw['level_10'];
-                $word->fsrs_familiarity_percent = $fw['level_10'] * 10;
-            }
-            // If no FSRS data: keep old SRS stage unchanged
-
-            $this->words[] = $word;
-        }
-
-        $this->uniqueWords = $encounteredWords;
-
-        foreach ($this->uniqueWords as $uniqueWord) {
-            $uniqueWord->definitions_checked = false;
-            // Add FSRS familiarity fields for the vocabulary sidebar
-            if (isset($fwLookup[$uniqueWord->id])) {
-                $fw = $fwLookup[$uniqueWord->id];
-                $uniqueWord->fsrs_familiarity_score = $fw['score'];
-                $uniqueWord->fsrs_familiarity_level_10 = $fw['level_10'];
-                $uniqueWord->fsrs_familiarity_percent = $fw['level_10'] * 10;
-                $uniqueWord->fsrs_familiarity_has_data = true;
-            } else {
-                $uniqueWord->fsrs_familiarity_has_data = false;
-            }
-        }
-    }
-
-    /**
-     * Load FSRS familiarity data for encountered words that have confirmed WordSenses.
-     *
-     * Returns array keyed by encountered_word_id:
-     *   ['level' => 1..7, 'score' => 0.0..1.0]
-     */
-    private function loadFsrsFamiliarityLookup(): array
-    {
-        $lookup = [];
-
-        // Direct join: confirmed WordSense + EncounteredWord (stage < 0) + ReviewCard (sense)
-        $rows = \Illuminate\Support\Facades\DB::table('word_senses')
-            ->join('encountered_words', 'word_senses.encountered_word_id', '=', 'encountered_words.id')
-            ->join('review_cards', function ($join) {
-                $join->on('word_senses.id', '=', 'review_cards.target_id')
-                     ->where('review_cards.target_type', '=', \App\Models\ReviewCard::TARGET_SENSE);
-            })
-            ->where('word_senses.user_id', $this->userId)
-            ->where('word_senses.language', $this->language)
-            ->where('word_senses.status', \App\Models\WordSense::STATUS_CONFIRMED)
-            ->where('encountered_words.stage', '<', 0)
-            ->select([
-                'word_senses.encountered_word_id',
-                'review_cards.fsrs_stability',
-                'review_cards.fsrs_due_at',
-                'review_cards.fsrs_state',
-            ])
-            ->get()
-            ->toArray();
-
-        foreach ($rows as $row) {
-            $stability = (float) ($row->fsrs_stability ?? 0);
-            $isOverdue = $row->fsrs_due_at && \Carbon\Carbon::parse($row->fsrs_due_at)->isPast();
-            $state = $row->fsrs_state ?? 'new';
-
-            // Compute 10-tier familiarity level (1-10)
-            // Normalise stability to 0-1 range (30+ days → 1.0)
-            $score = $stability > 0 ? min(1.0, $stability / 30.0) : 0.0;
-            $level10 = (int) ceil(max(0.01, $score) * 10);
-            $level10 = max(1, min(10, $level10));
-
-            if ($state === 'new') $level10 = 1;
-            if ($isOverdue && $level10 > 1) $level10--;
-
-            // For backward compatibility with stage -1..-7 mapping:
-            // level_7 = ceil(level10 * 7 / 10)
-            $level7 = max(1, min(7, (int) ceil($level10 * 7 / 10)));
-
-            // Conservative: take lowest level for duplicate encountered_word_id
-            $existing = $lookup[$row->encountered_word_id] ?? null;
-            if (!$existing || $level10 < $existing['level_10']) {
-                $lookup[$row->encountered_word_id] = [
-                    'level_10' => $level10,
-                    'level' => $level7,
-                    'score' => round($score, 2),
-                ];
-            }
-        }
-
-        return $lookup;
+        $fwLookup = $this->readerDataService->loadFsrsFamiliarityLookup();
+        $this->words = $this->readerDataService->prepareTextForReader(
+            $this->processedWords,
+            $encounteredWords,
+            $this->uniqueWords,
+            $fwLookup,
+        );
+        $this->uniqueWords = $this->readerDataService->enrichUniqueWords($encounteredWords, $fwLookup);
     }
 
     private function postTokenizer(string $path, array $payload)

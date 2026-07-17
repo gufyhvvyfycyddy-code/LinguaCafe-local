@@ -163,9 +163,9 @@ test('ratingLoading flag exists in data()', () => {
 });
 
 // 14. DEV-QO-6: ratingRequestSequence flag exists in data()
-test('ratingRequestSequence flag exists in data()', () => {
-    assert.ok(/ratingRequestSequence\s*:\s*0/.test(source),
-        'data() must include ratingRequestSequence: 0');
+test('shared ratingRequestCoordinator exists in data()', () => {
+    assert.ok(/ratingRequestCoordinator\s*:\s*null/.test(source),
+        'data() must include the shared rating request coordinator');
 });
 
 // 15. DEV-QO-6: rateReview checks ratingLoading before proceeding
@@ -176,24 +176,24 @@ test('rateReview checks ratingLoading before proceeding', () => {
 });
 
 // 16. DEV-QO-6: rateReview increments ratingRequestSequence
-test('rateReview increments ratingRequestSequence', () => {
+test('rateReview begins a coordinated rating request', () => {
     const body = extractMethod('rateReview');
-    assert.ok(/\+\+this\.ratingRequestSequence/.test(body),
-        'rateReview must increment ratingRequestSequence');
+    assert.ok(/this\.ratingRequestCoordinator\.begin\(\)/.test(body),
+        'rateReview must begin through the shared coordinator');
 });
 
 // 17. DEV-QO-6: stale response check (seq !== this.ratingRequestSequence)
 test('rateReview has stale response check', () => {
     const body = extractMethod('rateReview');
-    assert.ok(/seq\s*!==\s*this\.ratingRequestSequence/.test(body),
-        'rateReview must check seq !== this.ratingRequestSequence to drop stale responses');
+    assert.ok(/this\.ratingRequestCoordinator\.isCurrent\(seq\)/.test(body),
+        'rateReview must use the shared coordinator to drop stale responses');
 });
 
 // 18. DEV-QO-6: loadReviews increments ratingRequestSequence
-test('loadReviews increments ratingRequestSequence', () => {
+test('loadReviews invalidates the shared coordinator', () => {
     const body = extractMethod('loadReviews');
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(body),
-        'loadReviews must increment ratingRequestSequence to invalidate in-flight requests');
+    assert.ok(/this\.ratingRequestCoordinator\.invalidate\(\)/.test(body),
+        'loadReviews must invalidate in-flight rating requests');
 });
 
 // 19. DEV-QO-6: beforeDestroy increments ratingRequestSequence
@@ -202,17 +202,16 @@ test('beforeDestroy increments ratingRequestSequence', () => {
     // search the whole source for the pattern near beforeDestroy.
     const idx = source.indexOf('beforeDestroy');
     assert.ok(idx !== -1, 'beforeDestroy must exist');
-    // Search within 300 chars after beforeDestroy for the increment.
-    const region = source.slice(idx, idx + 300);
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(region),
-        'beforeDestroy must increment ratingRequestSequence to invalidate in-flight requests');
+    const region = source.slice(idx, idx + 500);
+    assert.ok(/this\.ratingRequestCoordinator\.invalidate\(\)/.test(region),
+        'beforeDestroy must invalidate in-flight requests');
 });
 
 // 20. DEV-QO-6: enableIgnoreDailyLimits increments ratingRequestSequence
 test('enableIgnoreDailyLimits increments ratingRequestSequence', () => {
     const body = extractMethod('enableIgnoreDailyLimits');
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(body),
-        'enableIgnoreDailyLimits must increment ratingRequestSequence to invalidate in-flight requests');
+    assert.ok(/this\.ratingRequestCoordinator\.invalidate\(\)/.test(body),
+        'enableIgnoreDailyLimits must invalidate in-flight requests');
 });
 
 // 21. DEV-QO-6: ratingLoading restored to false in finally
@@ -220,8 +219,8 @@ test('ratingLoading restored to false in finally', () => {
     const body = extractMethod('rateReview');
     assert.ok(/finally/.test(body),
         'rateReview must use finally to restore ratingLoading');
-    assert.ok(/this\.ratingLoading\s*=\s*false/.test(body),
-        'rateReview must set ratingLoading = false in finally');
+    assert.ok(/this\.ratingRequestCoordinator\.succeed\(seq\)/.test(body),
+        'rateReview must let the coordinator restore the rating lock in finally');
 });
 
 console.log(`\n${passed} tests passed.`);

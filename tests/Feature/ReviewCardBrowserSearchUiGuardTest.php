@@ -18,6 +18,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
     private string $tableSurfacePath;
     private string $schedulingSurfacePath;
     private string $lifecycleSurfacePath;
+    private string $leechSurfacePath;
 
     protected function setUp(): void
     {
@@ -27,6 +28,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->tableSurfacePath = resource_path('js/components/ReviewCards/ReviewCardTableSurface.vue');
         $this->schedulingSurfacePath = resource_path('js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue');
         $this->lifecycleSurfacePath = resource_path('js/components/ReviewCards/ReviewCardLifecycleMutationSurface.vue');
+        $this->leechSurfacePath = resource_path('js/components/ReviewCards/ReviewCardLeechMutationSurface.vue');
     }
 
     private function browserContents(): string
@@ -119,7 +121,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString('bulkLifecycle', $lifecycleContents);
         $this->assertStringContainsString('confirmBulkLifecycle', $manageContents);
         $this->assertStringContainsString('bulkDelete', $manageContents);
-        $this->assertStringContainsString('bulkRewritePackages', $manageContents);
+        $this->assertStringContainsString('bulkRewritePackages', file_get_contents($this->leechSurfacePath));
         $this->assertStringContainsString('exportCurrentFilter', $contents);
         $this->assertStringContainsString('exportAnkiTsv', $contents);
         $this->assertStringContainsString('exportCsv', $contents);

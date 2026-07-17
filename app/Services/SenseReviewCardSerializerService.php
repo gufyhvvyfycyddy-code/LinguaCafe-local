@@ -211,6 +211,7 @@ class SenseReviewCardSerializerService
             'fsrs_difficulty' => $card->fsrs_difficulty,
             'fsrs_reps' => $card->fsrs_reps,
             'fsrs_lapses' => $card->fsrs_lapses,
+            'marker' => (int) ($card->marker ?? 0),
             // SenseReview-LearningFeedback-1000-1: read-only aggregate of
             // this card's ReviewLog history. Delegated to the dedicated
             // SenseReviewLearningFeedbackService (single source of truth for

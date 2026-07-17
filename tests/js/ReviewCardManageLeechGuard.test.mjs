@@ -48,6 +48,7 @@ const DRAWER_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components',
 const SEARCH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 const TABLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
 const LIFECYCLE_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
+const LEECH_SURFACE_PATH = join(__dirname, '..', '..', 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLeechMutationSurface.vue');
 
 const name = 'ReviewCardManageLeechGuard';
 let passed = 0;
@@ -68,6 +69,7 @@ const tableSurfaceSource = existsSync(TABLE_SURFACE_PATH) ? readFileSync(TABLE_S
 const browserSource = `${source}\n${searchSurfaceSource}\n${tableSurfaceSource}`;
 const drawerSource = existsSync(DRAWER_PATH) ? readFileSync(DRAWER_PATH, 'utf-8') : '';
 const lifecycleSurfaceSource = existsSync(LIFECYCLE_SURFACE_PATH) ? readFileSync(LIFECYCLE_SURFACE_PATH, 'utf-8') : '';
+const leechSurfaceSource = existsSync(LEECH_SURFACE_PATH) ? readFileSync(LEECH_SURFACE_PATH, 'utf-8') : '';
 
 // 1. File exists
 test('File exists', () => {
@@ -86,19 +88,22 @@ test("Source includes 'struggling' filter", () => {
 
 // 4. Source includes /review-cards/manage/leech-summary endpoint
 test('Source includes /review-cards/manage/leech-summary endpoint', () => {
-    assert.ok(source.includes('/review-cards/manage/leech-summary'), 'Must use the leech-summary endpoint');
+    assert.ok(leechSurfaceSource.includes('/review-cards/manage/leech-summary'), 'Leech owner must use the leech-summary endpoint');
+    assert.ok(!source.includes('/review-cards/manage/leech-summary'), 'Parent must not duplicate the leech-summary endpoint');
 });
 
 // 5. Source includes /review-cards/manage/bulk-leech-rewrite-packages endpoint
 test('Source includes /review-cards/manage/bulk-leech-rewrite-packages endpoint', () => {
-    assert.ok(source.includes('/review-cards/manage/bulk-leech-rewrite-packages'), 'Must use the bulk-leech-rewrite-packages endpoint');
+    assert.ok(leechSurfaceSource.includes('/review-cards/manage/bulk-leech-rewrite-packages'), 'Leech owner must use the bulk rewrite endpoint');
+    assert.ok(!source.includes('/review-cards/manage/bulk-leech-rewrite-packages'), 'Parent must not duplicate the bulk rewrite endpoint');
 });
 
 // 6. Leech UI delegates to the lifecycle request owner
 test('Leech UI delegates to lifecycle request owner', () => {
-    assert.ok(source.includes('surface.runLifecycleAction'), 'Single leech suspend must delegate to lifecycle owner');
-    assert.ok(source.includes('surface.runBulkLifecycle'), 'Bulk leech suspend must delegate to lifecycle owner');
+    assert.ok(leechSurfaceSource.includes('runLifecycleAction'), 'Single leech suspend must delegate to lifecycle owner');
+    assert.ok(leechSurfaceSource.includes('runBulkLifecycle'), 'Bulk leech suspend must delegate to lifecycle owner');
     assert.ok(!source.includes('/lifecycle-actions'), 'Parent must not duplicate lifecycle-actions endpoint');
+    assert.ok(!leechSurfaceSource.includes('/lifecycle-actions'), 'Leech owner must not duplicate lifecycle-actions endpoint');
     assert.ok(lifecycleSurfaceSource.includes('/lifecycle-actions'), 'Lifecycle owner must use lifecycle-actions endpoint');
 });
 
@@ -119,12 +124,13 @@ test("Source includes '批量暂停高遗忘卡' batch action", () => {
 
 // 10. Source imports SenseReviewLeechRewritePackageDialog
 test('Source imports SenseReviewLeechRewritePackageDialog', () => {
-    assert.ok(source.includes('SenseReviewLeechRewritePackageDialog'), 'Must import SenseReviewLeechRewritePackageDialog');
+    assert.ok(leechSurfaceSource.includes('SenseReviewLeechRewritePackageDialog'), 'Leech owner must import SenseReviewLeechRewritePackageDialog');
+    assert.ok(!source.includes('SenseReviewLeechRewritePackageDialog'), 'Parent must not own the rewrite-package dialog');
 });
 
 // 11. Source imports SenseReviewLeechPresentation functions
 test('Source imports SenseReviewLeechPresentation functions', () => {
-    assert.ok(source.includes('SenseReviewLeechPresentation'), 'Must import SenseReviewLeechPresentation functions');
+    assert.ok(!source.includes('SenseReviewLeechPresentation'), 'Parent must not retain Leech presentation helpers');
 });
 
 // 12. Source has leech status badge in table
@@ -142,7 +148,7 @@ test("Source has detail '遗忘诊断' diagnostics section", () => {
 
 // 14. Source does NOT call provider-preview
 test('Source does NOT call provider-preview', () => {
-    assert.ok(!source.includes('provider-preview'), 'Source must not call provider-preview');
+    assert.ok(!leechSurfaceSource.includes('provider-preview'), 'Leech owner must not call provider-preview');
 });
 
 // 15. Source does NOT create ReviewLog / WordSense / ReviewCard
@@ -167,9 +173,16 @@ test('Lifecycle owner uses crypto.randomUUID for request_id', () => {
 // 18. Source handles partial failure in batch
 test('Source handles partial failure in batch', () => {
     assert.ok(
-        source.includes('failed') || source.includes('bulkRewriteFailed'),
+        leechSurfaceSource.includes('failed') || leechSurfaceSource.includes('bulkRewriteFailed'),
         'Batch rewrite must handle partial failure (failed array per item)'
     );
+});
+
+test('Leech owner is responsibility-complete', () => {
+    assert.ok(existsSync(LEECH_SURFACE_PATH), 'ReviewCardLeechMutationSurface.vue must exist');
+    assert.ok(source.includes('ReviewCardLeechMutationSurface'), 'Parent must render the Leech owner');
+    assert.ok(!source.includes('bulkRewriteDialog'), 'Parent must not retain bulk rewrite dialog state');
+    assert.ok(!source.includes('bulkLeechSuspendDialog'), 'Parent must not retain bulk Leech suspend dialog state');
 });
 
 console.log(`\n${name}: ${passed} passed`);

@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
  *
  * Pure unit tests — no Laravel container, no DB, no Auth, no Request.
  *
- * Verifies the four frozen criteria modes, parameter contracts,
+ * Verifies the supported criteria modes, parameter contracts,
  * immutability, unknown-key isolation, and toArray() round-trip.
  *
  * Task 2000-17 hardens the error contract: CustomStudyCriteria::fromArray()
@@ -68,6 +68,14 @@ class CustomStudyCriteriaTest extends TestCase
         $this->assertSame([], $criteria->parameters());
     }
 
+    public function test_from_array_accepts_marked_without_parameters(): void
+    {
+        $criteria = CustomStudyCriteria::fromArray(['mode' => 'marked']);
+
+        $this->assertSame('marked', $criteria->mode());
+        $this->assertSame([], $criteria->parameters());
+    }
+
     public function test_from_array_accepts_source_chapter_with_valid_chapter_id(): void
     {
         $criteria = CustomStudyCriteria::fromArray([
@@ -120,7 +128,7 @@ class CustomStudyCriteriaTest extends TestCase
     {
         $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
-            'mode' => 'marked',
+            'mode' => 'unknown_marker_mode',
             'parameters' => [],
         ]);
     }
@@ -129,7 +137,7 @@ class CustomStudyCriteriaTest extends TestCase
     {
         try {
             CustomStudyCriteria::fromArray([
-                'mode' => 'marked',
+                'mode' => 'unknown_marker_mode',
                 'parameters' => [],
             ]);
             $this->fail('Expected CustomStudyValidationException was not thrown');
@@ -349,7 +357,7 @@ class CustomStudyCriteriaTest extends TestCase
         // Two different invalid modes produce different messages but identical
         // field/reason — proving field/reason is NOT derived from message text.
         $reasons = [];
-        foreach (['marked', 'filtered_deck', 'nonexistent', 'RANDOM'] as $badMode) {
+        foreach (['unknown_marker_mode', 'filtered_deck', 'nonexistent', 'RANDOM'] as $badMode) {
             try {
                 CustomStudyCriteria::fromArray(['mode' => $badMode, 'parameters' => []]);
                 $this->fail("Expected exception for mode={$badMode}");

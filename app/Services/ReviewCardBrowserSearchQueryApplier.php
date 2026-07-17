@@ -74,6 +74,10 @@ class ReviewCardBrowserSearchQueryApplier
             $query->where('review_cards.lifecycle_state', $criteria->lifecycleStatus);
         }
 
+        if ($criteria->hasMarker()) {
+            $query->where('review_cards.marker', $criteria->marker);
+        }
+
         // 3. Governance condition (is:leech/is:struggling)
         if ($criteria->hasGovernanceStatus()) {
             $matchingIds = $governanceMatchingIds;

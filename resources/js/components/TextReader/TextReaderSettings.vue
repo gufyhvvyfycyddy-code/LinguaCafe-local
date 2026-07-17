@@ -391,8 +391,8 @@
                         </v-row>
 
                         <!-- Hover vocabulary box dictionary search -->
-                        <v-row>
-                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">悬浮词汇框词典搜索：</v-col>
+                        <v-row v-if="settings.vocabularyHoverBox">
+                            <v-col cols="8" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">悬停自动查词：</v-col>
                             <v-col cols="4" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-switch
                                     v-model="settings.vocabularyHoverBoxSearch"
@@ -403,7 +403,7 @@
                         </v-row>
 
                         <!-- Hover vocabulary delay -->
-                        <v-row>
+                        <v-row v-if="settings.vocabularyHoverBox">
                             <v-col cols="12" sm="3" class="d-flex align-center mt-0 mt-md-0 mb-md-5 pb-0 pb-sm-0 pb-md-3">悬浮延迟：</v-col>
                             <v-col class="slider-container d-flex pt-xs-0 pt-sm-0 pt-md-3 align-center">
                                 <v-slider
@@ -423,7 +423,7 @@
                         </v-row>
 
                         <!-- Hover vocabulary preferred position -->
-                        <v-row>
+                        <v-row v-if="settings.vocabularyHoverBox">
                             <v-col cols="12" md="4" class="switch-container d-flex align-center mt-0 mb-md-5">优先显示位置：</v-col>
                             <v-col cols="12" md="8" class="switch-container d-flex align-center mt-0 pt-3 justify-end">
                                 <v-select

@@ -170,6 +170,12 @@
                                 <v-list-item-subtitle>按遗忘次数筛选，支持 =, &gt;, &gt;=, &lt;, &lt;=</v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>flag:1</code> … <code>flag:7</code></v-list-item-title>
+                                <v-list-item-subtitle>按卡片标记筛选；<code>flag:0</code> 表示未标记</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
                     </v-list>
                     <v-divider class="my-2" />
                     <p class="text-body-2 mb-1"><strong>组合示例：</strong></p>

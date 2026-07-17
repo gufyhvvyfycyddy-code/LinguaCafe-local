@@ -136,7 +136,7 @@ class CustomStudyCriteriaValidatorTest extends TestCase
     {
         $this->expectException(CustomStudyValidationException::class);
         $this->validator->validate(
-            ['mode' => 'marked', 'parameters' => []],
+            ['mode' => 'unknown_marker_mode', 'parameters' => []],
             1,
             'english'
         );
@@ -146,7 +146,7 @@ class CustomStudyCriteriaValidatorTest extends TestCase
     {
         try {
             $this->validator->validate(
-                ['mode' => 'marked', 'parameters' => []],
+                ['mode' => 'unknown_marker_mode', 'parameters' => []],
                 1,
                 'english'
             );
@@ -443,7 +443,7 @@ class CustomStudyCriteriaValidatorTest extends TestCase
     {
         try {
             $this->validator->validate(
-                ['mode' => 'marked', 'parameters' => []],
+                ['mode' => 'unknown_marker_mode', 'parameters' => []],
                 1,
                 'english'
             );

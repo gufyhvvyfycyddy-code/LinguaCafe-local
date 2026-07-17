@@ -168,17 +168,17 @@ const reviewRateCatch = extractMainCatchBody(reviewRateMethod);
 const reviewRateThen = extractFirstThenBody(reviewRateMethod);
 const reviewLoadMethod = extractMethod(reviewSource, 'loadReviews');
 
-test('Review.vue imports runAuthoritativeRatingRecovery helper', () => {
+test('Review.vue imports shared rating request coordinator', () => {
     assert.ok(
-        reviewSource.includes('import { runAuthoritativeRatingRecovery }'),
-        'Review.vue must import runAuthoritativeRatingRecovery'
+        reviewSource.includes('createRatingRequestCoordinator'),
+        'Review.vue must import createRatingRequestCoordinator'
     );
 });
 
-test('Review.vue rateReview catch calls runAuthoritativeRatingRecovery', () => {
+test('Review.vue rateReview catch delegates recovery to coordinator', () => {
     assert.ok(
-        reviewRateCatch.includes('runAuthoritativeRatingRecovery'),
-        'rateReview catch must call runAuthoritativeRatingRecovery'
+        reviewRateCatch.includes('ratingRequestCoordinator.recover'),
+        'rateReview catch must delegate to ratingRequestCoordinator.recover'
     );
 });
 
@@ -286,17 +286,17 @@ const senseRateMethod = extractMethod(senseReviewSource, 'rate');
 const senseRateCatch = extractMainCatchBody(senseRateMethod);
 const senseRateThen = extractFirstThenBody(senseRateMethod);
 
-test('SenseReview.vue imports runAuthoritativeRatingRecovery helper', () => {
+test('SenseReview.vue imports shared rating request coordinator', () => {
     assert.ok(
-        senseReviewSource.includes('import { runAuthoritativeRatingRecovery }'),
-        'SenseReview.vue must import runAuthoritativeRatingRecovery'
+        senseReviewSource.includes('createRatingRequestCoordinator'),
+        'SenseReview.vue must import createRatingRequestCoordinator'
     );
 });
 
-test('SenseReview.vue rate catch calls runAuthoritativeRatingRecovery', () => {
+test('SenseReview.vue rate catch delegates recovery to coordinator', () => {
     assert.ok(
-        senseRateCatch.includes('runAuthoritativeRatingRecovery'),
-        'rate catch must call runAuthoritativeRatingRecovery'
+        senseRateCatch.includes('ratingRequestCoordinator.recover'),
+        'rate catch must delegate to ratingRequestCoordinator.recover'
     );
 });
 
@@ -311,10 +311,10 @@ test('SenseReview.vue catch does NOT have .finally that unconditionally resets r
     );
 });
 
-test('SenseReview.vue .then() success path sets this.rating=false', () => {
+test('SenseReview.vue .then() success path completes coordinator', () => {
     assert.ok(
-        senseRateThen.includes('this.rating = false'),
-        '.then() success path must set this.rating=false to unlock buttons after confirmed rating'
+        senseRateThen.includes('ratingRequestCoordinator.succeed'),
+        '.then() success path must complete the coordinator after confirmed rating'
     );
 });
 

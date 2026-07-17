@@ -180,7 +180,7 @@
         <!--Vocabulary sidebar-->
         <vocabulary-side-box
             ref="vocabularySideBox"
-            v-if="$props.vocabularySidebar && $props.vocabularySidebarFits && !$store.state.vocabularyBox.sidebarHidden"
+            v-if="$props.vocabularySidebar && $props.vocabularySidebarFits && $store.state.vocabularyBox.active && !$store.state.vocabularyBox.sidebarHidden"
             :language="$props.language"
             :auto-highlight-words="$props.autoHighlightWords"
             :any-api-dictionary-enabled="anyApiDictionaryEnabled"
@@ -2386,10 +2386,10 @@
 
 
                 // update sidebar
-                if (this.$props.vocabularySidebarFits && this.$props.vocabularySidebar) {
+                if (this.$props.vocabularySidebarFits && this.$props.vocabularySidebar && this.$store.state.vocabularyBox.active) {
                     this.$store.commit('vocabularyBox/setSidebarHidden', false);
                     this.$store.commit('vocabularyBox/setHeight', vocabBoxAreaElement.offsetHeight);
-                    this.$store.commit('vocabularyBox/setPositionLeft', vocabBoxArea.right);
+                    this.$store.commit('vocabularyBox/setPositionLeft', vocabBoxArea.right - sidebarW);
                     this.$store.commit('vocabularyBox/setPositionTop', vocabBoxArea.top);
                     return;
                 }

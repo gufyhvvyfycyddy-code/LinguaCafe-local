@@ -20,9 +20,16 @@ const presetAdr = read('docs/adr/ADR-0024-review-settings-preset-v1a-foundation.
 const presetManagementAdr = read('docs/adr/ADR-0025-review-settings-preset-v1b-management.md');
 const presetConvergenceAdr = read('docs/adr/ADR-0026-review-settings-preset-v1c-consumer-convergence.md');
 const settingsUxAdr = read('docs/adr/ADR-0027-settings-advanced-tools-ux-state-model.md');
+const ruleLoadingAdr = read('docs/adr/ADR-0028-ai-development-rule-loading-and-document-status.md');
 const roadmap = read('docs/plans/anki-aligned-product-and-architecture-roadmap.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
+const phpVerificationPlaybook = read('docs/plans/devspace-php-verification-playbook.md');
+const rootAgents = read('AGENTS.md');
+const domainContext = read('CONTEXT.md');
+const aiRuleSystem = read('docs/architecture/ai-development-rule-system.md');
+const subtitleSummary = read('docs/architecture/subtitle-guided-development-summary.md');
+const historyIndex = read('docs/HISTORY_INDEX.md');
 const presetPlan = read('docs/plans/review-settings-preset-v1-plan.md');
 
 const masterAuthority = section(master, '> **Current authority — 2026-07-16**', '> **Custom Study 1A shared card update');
@@ -31,9 +38,30 @@ const executionOrder = section(master, '## 8. Anki 对齐产品与架构执行�
 const handoffAuthority = section(handoff, '> **Current authority — 2026-07-16**', '> **Authoritative Custom Study status');
 const manualClosure = section(handoff, '## Manual Sense shared form corrective follow-up (2026-07-15)', null);
 
+assert.match(rootAgents, /docs\/architecture\/ai-development-rule-system\.md/);
+assert.match(rootAgents, /docs\/architecture\/subtitle-guided-development-summary\.md/);
+assert.match(rootAgents, /Do not load all plans, ADRs, reports, handoffs, or history by default/);
+assert.match(domainContext, /EncounteredWord/);
+assert.match(domainContext, /WordSenseOccurrence/);
+assert.match(domainContext, /ReviewCard/);
+assert.match(domainContext, /ReviewLog/);
+assert.match(aiRuleSystem, /Current \/ Authoritative hard-rule system/);
+assert.match(aiRuleSystem, /Document Status Model/);
+assert.match(aiRuleSystem, /Progressive Task Loading/);
+assert.match(aiRuleSystem, /Local Architecture Preflight/);
+assert.match(aiRuleSystem, /Interfaces, Compatibility, And Migrations/);
+assert.match(aiRuleSystem, /Hard-Rule Admission And Guard Economics/);
+assert.match(subtitleSummary, /raw subtitle count: 9 files/);
+assert.match(subtitleSummary, /LinguaCafe is now a long-lived project/);
+assert.match(historyIndex, /Downgraded Operational Appendices/);
+assert.match(collaborationRules, /Detailed legacy operational appendix/);
+assert.match(collaborationRules, /cites that exact section/);
+assert.match(master, /Loading gate — 2026-07-17/);
+assert.match(handoff, /Loading gate — 2026-07-17/);
+
 assert.match(masterAuthority, /Settings architecture convergence/);
 assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A[^\n]*Preset V1B[^\n]*Preset V1C[^\n]*Preset V1D/);
-assert.match(masterAuthority, /Current Phase \| Browser\/ReviewCardManage Phase 3C-2 — Lifecycle Mutation Family is Code Complete \/ Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
+assert.match(masterAuthority, /Current Phase \| Phase 3–7 authorized scope closed; AI Study Card lifecycle\/package\/generation\/source-binding and disabled-provider preflight Accepted under ADR-0032; real provider deliberately disabled; Browser\/ReviewCardManage Phase 3C-3 Delete Mutation Family remains Planned \/ Not Authorized/);
 assert.match(masterAuthority, /28 production files over 500 lines, 10 over 1,000, and 1 over 1,500/);
 assert.match(masterAuthority, /6\.0\/10, localized medium-high burden/);
 assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
@@ -46,10 +74,10 @@ assert.match(openWork, /Preset V1C — Consumer Convergence \| Completed \/ Prod
 assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Completed \/ Production Closed/);
 assert.match(openWork, /fsrs_parameters_previous/);
 assert.match(openWork, /Settings UX-1/);
-assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Phase 3C-2 Code Complete \/ Acceptance Pending/);
-assert.match(openWork, /ReviewCardLifecycleMutationSurface\.vue[^\n]*414 行[^\n]*1 个 descriptor GET[^\n]*2 个 lifecycle POST[^\n]*3 个对话框/);
-assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
-assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
+assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Completed \/ Production Closed for authorized scope/);
+assert.match(openWork, /Phase 3A Card Info[^\n]*Phase 3D Container Closure 均已接受/);
+assert.match(openWork, /Card Marker \+ Custom Study 1B \| Accepted \/ Production Closed/);
+assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Deferred by user decision/);
 assert.match(openWork, /Reader-UI-4[^\n]*高级字段默认折叠/);
 assert.match(openWork, /SenseReview-Smoke-1[^\n]*SenseReview-Smoke-5[^\n]*已完成真实页面验收/);
 assert.match(openWork, /ReviewCardManage-MutationService-Extract-1B[^\n]*已抽入 Mutation Service/);
@@ -62,7 +90,7 @@ const orderedRoadmapTerms = [
     'Phase 4：Card Marker + Custom Study 1B',
     'Phase 5：Reviewer 架构收敛',
     'Phase 6：Reader UI 与阅读架构治理',
-    'Phase 7：AI Study Card service 收敛与真实 provider',
+    'Phase 7：AI Study Card service 收敛与禁用 provider 预检',
 ];
 let previous = -1;
 for (const term of orderedRoadmapTerms) {
@@ -76,7 +104,7 @@ assert.match(roadmap, /review-settings-preset-v1-plan\.md/);
 assert.match(roadmap, /Card Marker 参考 Anki Card Flag，落在 ReviewCard/);
 assert.match(roadmap, /Phase 1：Settings 架构收敛[\s\S]*Completed \/ Production Closed/);
 assert.match(roadmap, /Phase 2：Preset V1[\s\S]*V1A–V1D Completed \/ Accepted \/ Production Closed/);
-assert.match(roadmap, /V1A–V1D 已生产关闭/);
+assert.match(roadmap, /Preset V1A–V1D[^\n]*已生产关闭/);
 assert.match(roadmap, /V1D — Completed \/ Production Closed/);
 assert.match(roadmap, /Settings UX-1/);
 assert.match(roadmap, /6\.0 \/ 10，局部中高负担/);
@@ -89,7 +117,7 @@ assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增�
 assert.match(executionOrder, /Settings architecture convergence/);
 assert.match(executionOrder, /Preset V1/);
 assert.match(executionOrder, /Completed \/ Production Closed[\s\S]*双用户、English\/French/);
-assert.match(executionOrder, /Phase 3C-2 Code Complete \/ Browser Acceptance Pending/);
+assert.match(executionOrder, /Completed \/ Production Closed for authorized scope/);
 assert.match(executionOrder, /Phase 3C-3[^\n]*Planned \/ Not Authorized/);
 assert.match(executionOrder, /Browser \/ ReviewCardManage convergence/);
 assert.match(executionOrder, /Card Marker \+ Custom Study 1B/);
@@ -114,6 +142,10 @@ assert.match(settingsUxAdr, /Pure presentation state module/);
 assert.match(settingsUxAdr, /does not mutate its input/);
 assert.match(settingsUxAdr, /broader cross-user and cross-language Preset acceptance matrix was completed/);
 assert.doesNotMatch(settingsUxAdr, /production closure remains open|remains the current phase/);
+assert.match(ruleLoadingAdr, /Accepted — 2026-07-17/);
+assert.match(ruleLoadingAdr, /Short root entry/);
+assert.match(ruleLoadingAdr, /progressive task loading/i);
+assert.match(ruleLoadingAdr, /Detailed legacy operational appendix/);
 
 assert.match(handoffAuthority, /Settings architecture convergence: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(handoffAuthority, /Preset V1A — Default Preset Foundation and Transparent Binding: \*\*Accepted \/ Production Closed\*\*/);
@@ -126,34 +158,36 @@ assert.match(manualClosure, /Status: \*\*Accepted \/ Production Closed\*\*/);
 assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and passed/);
 assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 
+assert.match(index, /AGENTS\.md/);
+assert.match(index, /CONTEXT\.md/);
+assert.match(index, /ai-development-rule-system\.md/);
+assert.match(index, /subtitle-guided-development-summary\.md/);
+assert.match(index, /detailed legacy operational appendix/i);
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
-assert.match(index, /Preset V1A–V1D are Accepted \/ Production Closed/);
-assert.match(index, /two-user, English\/French V1D matrix are complete under ADR-0027/);
-assert.match(index, /Phase 3C-2[^\n]*Code Complete \/ Browser Acceptance Pending[\s\S]*Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
-assert.match(index, /1,210 lines[^\n]*11 direct `axios\.` references[^\n]*6 `v-dialog` blocks/);
+assert.match(index, /Preset V1A[–-]V1D/);
+assert.match(index, /ReaderDataService.*single reader-projection owner/);
+assert.match(index, /Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
+assert.match(index, /AI Study Card lifecycle, package\/candidate, generation, source-binding, and disabled-provider preflight convergence is Accepted under ADR-0032; the user explicitly chose to keep the real provider disabled/);
 assert.match(index, /review-card-manage-architecture-convergence-plan\.md/);
 assert.doesNotMatch(index, /V1D production-closure matrix remains open|V1D broader production closure remains open/);
 assert.match(index, /ADR-0025-review-settings-preset-v1b-management\.md/);
 assert.match(index, /ADR-0026-review-settings-preset-v1c-consumer-convergence\.md/);
 assert.match(index, /ADR-0027-settings-advanced-tools-ux-state-model\.md/);
+assert.match(index, /ADR-0028-ai-development-rule-loading-and-document-status\.md/);
 assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
 assert.match(index, /ADR-0024-review-settings-preset-v1a-foundation\.md/);
 assert.match(index, /review-settings-preset-v1-plan\.md/);
 assert.match(index, /old “overall architecture closure 100%” statement is historical/);
-assert.match(index, /§27\.8 — DevSpace PHP \/ PHPUnit 502 截断规则/);
+assert.match(index, /devspace-php-verification-playbook\.md/);
 
-assert.match(collaborationRules, /### 27\.8 DevSpace 执行 PHP 测试时的 502 截断规则/);
-assert.match(collaborationRules, /工具传输失败/);
-assert.match(collaborationRules, /不能直接认定为代码测试失败，也不能认定为测试通过/);
-assert.match(collaborationRules, /默认只使用替代检测，禁止先运行原始高输出流式方案/);
-assert.match(collaborationRules, /Feature 永远分组复核，不再运行 Feature 全量命令/);
-assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
-assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
-assert.match(collaborationRules, /完整输出重定向到仓库忽略目录中的临时日志/);
-assert.match(collaborationRules, /记录每组文件数、退出码、passed\/skipped\/assertions 摘要/);
-assert.match(collaborationRules, /Incomplete \/ DevSpace PHP verification unavailable/);
-assert.match(collaborationRules, /交给下一轮相关 Codex 复杂主任务执行，不再回退尝试原始 DevSpace 流式方案/);
-assert.match(collaborationRules, /禁止为了绕开 502 使用 SQLite/);
+assert.match(phpVerificationPlaybook, /Current verification playbook/);
+assert.match(phpVerificationPlaybook, /Do not use a transport failure as evidence that tests passed or failed/);
+assert.match(phpVerificationPlaybook, /preserving the real process exit code/);
+assert.match(phpVerificationPlaybook, /Do not convert missing evidence into pass/);
+assert.match(phpVerificationPlaybook, /split by relevant suite or test group without changing test behavior/);
+assert.match(phpVerificationPlaybook, /Do not claim a full-suite pass from focused tests/);
+assert.match(phpVerificationPlaybook, /Missing or untrustworthy completion evidence is `Incomplete`/);
+assert.match(phpVerificationPlaybook, /Only the current user\/task contract may reduce the required verification scope/);
 
 assert.match(presetPlan, /Preset V1A — Default Preset Foundation and Transparent Binding/);
 assert.match(presetPlan, /每个 `user_id \+ language_id` 只能绑定一个 Preset/);

@@ -35,6 +35,12 @@ class AiStudyCardV6ProviderSecurityPolicyService
         return (int) config('ai_study_card_v6.request_policy.max_retries', 0);
     }
 
+    public function maxCostUsd(): ?float
+    {
+        $value = (float) config('ai_study_card_v6.request_policy.max_cost_usd', 0);
+        return $value > 0 ? $value : null;
+    }
+
     public function maxItemsPerRequest(): int
     {
         return (int) config('ai_study_card_v6.request_policy.max_items_per_request', 50);
@@ -112,6 +118,10 @@ class AiStudyCardV6ProviderSecurityPolicyService
 
         if ($this->timeoutSeconds() <= 0) {
             $errors[] = 'timeout_not_configured';
+        }
+
+        if ($this->maxCostUsd() === null) {
+            $errors[] = 'cost_ceiling_not_configured';
         }
 
         if (!$this->browserNetworkSmokeRequiredBeforeRealProvider()) {

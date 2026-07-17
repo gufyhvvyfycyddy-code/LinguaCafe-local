@@ -3,6 +3,7 @@
 namespace App\Services\CustomStudy;
 
 use App\Services\CustomStudy\Queries\LeechAttentionQuery;
+use App\Services\CustomStudy\Queries\MarkedQuery;
 use App\Services\CustomStudy\Queries\OverdueQuery;
 use App\Services\CustomStudy\Queries\SourceChapterQuery;
 use App\Services\CustomStudy\Queries\TodayForgottenQuery;
@@ -43,7 +44,8 @@ class CustomStudyQueryService
         private readonly TodayForgottenQuery $todayForgottenQuery,
         private readonly OverdueQuery $overdueQuery,
         private readonly SourceChapterQuery $sourceChapterQuery,
-        private readonly LeechAttentionQuery $leechAttentionQuery
+        private readonly LeechAttentionQuery $leechAttentionQuery,
+        private readonly MarkedQuery $markedQuery,
     ) {
     }
 
@@ -92,6 +94,13 @@ class CustomStudyQueryService
                 $subMode = (string) ($criteria->parameters()['sub_mode'] ?? '');
                 $ids = $this->leechAttentionQuery
                     ->candidateIds($userId, $language, $subMode, $now);
+                break;
+
+            case CustomStudyCriteria::MODE_MARKED:
+                $ids = $this->markedQuery
+                    ->build($userId, $language, $now)
+                    ->pluck('review_cards.id')
+                    ->all();
                 break;
 
             default:

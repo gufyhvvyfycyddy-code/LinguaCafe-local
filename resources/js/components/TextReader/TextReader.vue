@@ -86,7 +86,7 @@
                 }"
                 :style="{
                     'height': $vuetify.breakpoint.mdAndUp ? 'calc(100% - 24px - 24px)' : 'calc(100% - 24px - 24px - 64px)',
-                    'padding-right': settings.vocabularySidebar && vocabularySidebarFits ? (sidebarPaddingWidth) : '0px'
+                    'padding-right': readerContentRightPadding
                 }"
             >
                 <v-card-text id="reader-content" :class="{
@@ -275,9 +275,9 @@
     import { DefaultLocalStorageManager, defaultSettings } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
     import {
-        getReaderSidebarReservationWidthForWorkspace,
         getReaderSidebarWidthForWorkspace,
         doesReaderSidebarFitWorkspace,
+        getReaderContentRightPadding,
     } from './../../services/ReaderWorkspaceSizingService';
 
     export default {
@@ -465,8 +465,14 @@
             sidebarWidthValue() {
                 return this.readerSidebarWidthForContentWidth(this.readerWorkspaceWidth());
             },
-            sidebarPaddingWidth() {
-                return getReaderSidebarReservationWidthForWorkspace(this.readerWorkspaceWidth()) + 'px !important';
+            readerContentRightPadding() {
+                return getReaderContentRightPadding({
+                    enabled: this.settings.vocabularySidebar,
+                    fits: this.vocabularySidebarFits,
+                    active: this.$store.state.vocabularyBox.active,
+                    hidden: this.$store.state.vocabularyBox.sidebarHidden,
+                    workspaceWidth: this.readerWorkspaceWidth(),
+                });
             },
         },
         methods: {

@@ -72,6 +72,7 @@ class ReviewCardInfoQueryService
                 'limit' => self::EVENT_LIMIT,
             ],
             'leech' => $this->resolveLeechDescriptor($card),
+            'marker' => (int) ($card->marker ?? 0),
         ];
     }
 

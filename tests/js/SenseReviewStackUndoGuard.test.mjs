@@ -355,10 +355,10 @@ test('loadCards() only clears loading in .finally() if seq matches', () => {
         'loadCards() .finally() must check seq === this.loadCardsRequestSequence');
 });
 
-// 41. DEV-QO-7: rate() checks this.rating at start (double-click protection)
-test('rate() checks this.rating at start', () => {
-    assert.ok(/if\s*\(\s*this\.rating\s*\)\s*\{[\s\S]*?return/.test(rateBody),
-        'rate() must check this.rating and return early if true');
+// 41. Reviewer convergence: shared coordinator owns double-click protection.
+test('rate() acquires the shared rating coordinator at start', () => {
+    assert.ok(/this\.ratingRequestCoordinator\.begin\(\)/.test(rateBody),
+        'rate() must acquire the shared rating coordinator');
 });
 
 // 42. DEV-QO-7: rate() increments loadCardsRequestSequence (invalidates in-flight loadCards)

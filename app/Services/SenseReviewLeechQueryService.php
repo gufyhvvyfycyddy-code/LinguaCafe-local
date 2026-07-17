@@ -206,7 +206,7 @@ class SenseReviewLeechQueryService
 
         // Get all sense cards for this user/language (regardless of lifecycle).
         $cardIds = ReviewCard::where('user_id', $userId)
-            ->where('language', $language)
+            ->where('language_id', $language)
             ->where('target_type', 'sense')
             ->pluck('id')
             ->all();

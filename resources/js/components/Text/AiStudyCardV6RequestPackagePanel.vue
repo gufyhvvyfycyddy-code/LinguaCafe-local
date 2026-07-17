@@ -25,6 +25,19 @@
         <v-alert v-if="error" dense text type="error" class="mt-3">{{ error }}</v-alert>
 
         <div v-if="requestPackage" class="mt-3">
+            <v-alert dense text :type="providerPreflight.ready ? 'success' : 'warning'" class="mb-3">
+                <strong>External request preflight:</strong>
+                {{ providerPreflight.ready ? 'ready' : 'blocked' }}<br>
+                Provider/model: {{ providerPreflight.provider || 'not configured' }} /
+                {{ providerPreflight.model || 'not configured' }};
+                items: {{ providerPreflight.item_count }};
+                timeout: {{ providerPreflight.timeout_seconds || 'not configured' }}s;
+                Cost ceiling: {{ providerPreflight.max_cost_usd == null ? 'not configured' : `$${providerPreflight.max_cost_usd}` }}.<br>
+                Data fields: {{ providerPreflight.external_data_fields.join(', ') }}.
+                <span v-if="providerPreflight.blocking_reasons.length">
+                    Blocking: {{ providerPreflight.blocking_reasons.join(', ') }}.
+                </span>
+            </v-alert>
             <v-btn
                 small
                 color="warning"
@@ -126,6 +139,9 @@ export default {
         };
     },
     computed: {
+        providerPreflight() {
+            return this.requestPackage.provider_preflight;
+        },
         recommendedItemCount() {
             if (!this.recommendationPackage || !Array.isArray(this.recommendationPackage.recommended_items)) {
                 return 0;

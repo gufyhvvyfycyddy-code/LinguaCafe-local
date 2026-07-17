@@ -17,9 +17,13 @@ const {
     getReaderSidebarCssWidthForWorkspace,
     getReaderSidebarReservationWidthForWorkspace,
     doesReaderSidebarFitWorkspace,
+    isReaderSidebarVisible,
+    getReaderContentRightPadding,
 } = sizing;
 
 assert.equal(typeof getReaderSidebarReservationWidthForWorkspace, 'function', 'reservation-width helper must exist');
+assert.equal(typeof isReaderSidebarVisible, 'function', 'sidebar visibility helper must exist');
+assert.equal(typeof getReaderContentRightPadding, 'function', 'content-padding helper must exist');
 
 const widthCases = [
     [1920, 540],
@@ -58,6 +62,44 @@ assert.equal(
 
 assert.equal(doesReaderSidebarFitWorkspace(1500), true, 'wide workspace should still fit the narrowed sidebar');
 assert.equal(doesReaderSidebarFitWorkspace(900), false, 'narrow workspace should keep the existing non-sidebar fallback');
+
+assert.equal(
+    isReaderSidebarVisible({ enabled: true, fits: true, active: true, hidden: false }),
+    true,
+    'an active, enabled, fitting sidebar should be visible',
+);
+assert.equal(
+    isReaderSidebarVisible({ enabled: true, fits: true, active: false, hidden: false }),
+    false,
+    'an inactive vocabulary box must not leave an empty sidebar visible',
+);
+assert.equal(
+    isReaderSidebarVisible({ enabled: true, fits: true, active: true, hidden: true }),
+    false,
+    'an explicitly hidden sidebar must stay hidden',
+);
+assert.equal(
+    getReaderContentRightPadding({
+        enabled: true,
+        fits: true,
+        active: true,
+        hidden: false,
+        workspaceWidth: 1524,
+    }),
+    '564px',
+    'visible sidebar should reserve the shared panel and gutter width',
+);
+assert.equal(
+    getReaderContentRightPadding({
+        enabled: true,
+        fits: true,
+        active: false,
+        hidden: false,
+        workspaceWidth: 1524,
+    }),
+    '0px',
+    'inactive vocabulary UI must not permanently narrow the reader',
+);
 
 const textBlockSource = readFileSync(textBlockPath, 'utf8');
 assert.match(

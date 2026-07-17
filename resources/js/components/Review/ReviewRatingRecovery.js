@@ -24,6 +24,64 @@
 
 let inFlightPromise = null;
 
+export function classifyRatingRequestError(error) {
+    const status = Number(error?.response?.status || 0);
+    if (!status) return 'network';
+    if (status === 401 || status === 403) return 'authentication';
+    if (status === 409) return 'conflict';
+    if (status === 422) return 'validation';
+    return 'server';
+}
+
+export function ratingRecoveryMessage(kind, queueLabel) {
+    const queue = queueLabel || '正式复习';
+    if (kind === 'authentication') return `登录状态已失效，正在重新加载${queue}队列。`;
+    if (kind === 'validation' || kind === 'conflict') return `评分请求未被确认，正在重新加载${queue}队列，请不要重复评分。`;
+    return `评分结果状态不确定，正在重新加载${queue}队列，请不要重复评分。`;
+}
+
+export function createRatingRequestCoordinator(opts) {
+    let sequence = 0;
+    let locked = false;
+
+    const setLocked = (value) => {
+        locked = value;
+        opts.setLocked(value);
+    };
+
+    return {
+        begin() {
+            if (locked) return null;
+            sequence++;
+            setLocked(true);
+            return sequence;
+        },
+        current() { return sequence; },
+        isCurrent(token) { return locked && token === sequence; },
+        invalidate() {
+            sequence++;
+            setLocked(false);
+            return sequence;
+        },
+        succeed(token) {
+            if (!locked || token !== sequence) return false;
+            setLocked(false);
+            return true;
+        },
+        recover(token, error) {
+            if (!locked || token !== sequence) return Promise.resolve('stale');
+            const kind = classifyRatingRequestError(error);
+            return runAuthoritativeRatingRecovery({
+                reloadQueue: opts.reloadQueue,
+                lockRating: () => setLocked(true),
+                unlockRating: () => setLocked(false),
+                setRecoveryMessage: () => opts.setRecoveryMessage(kind),
+                preserveLoadError: opts.hasLoadError,
+            }).then(() => kind);
+        },
+    };
+}
+
 /**
  * Run the authoritative rating recovery flow.
  *

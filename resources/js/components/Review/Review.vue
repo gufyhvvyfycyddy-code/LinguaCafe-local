@@ -517,7 +517,7 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
-    import { runAuthoritativeRatingRecovery } from './ReviewRatingRecovery.js';
+    import { createRatingRequestCoordinator, ratingRecoveryMessage } from './ReviewRatingRecovery.js';
     import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from './ReviewDurationTracker.js';
     import SenseSentencePreview from './SenseSentencePreview.vue';
     import SenseExampleDialog from './SenseExampleDialog.vue';
@@ -577,18 +577,22 @@
                 today: new moment().format('YYYY-MM-DD'), // CHANGE TO SERVER SIDE
                 ignoreDailyLimits: false,
                 dailyLimitSummary: null,
-                // DEV-QO-6: rating request race protection.
-                // ratingLoading disables re-rating while a request is in
-                // flight. ratingRequestSequence is monotonically incremented
-                // per request; only the response carrying the latest sequence
-                // is allowed to mutate reviews / currentReviewIndex /
-                // dailyLimitSummary / finished. Slow responses are dropped.
                 ratingLoading: false,
-                ratingRequestSequence: 0,
+                ratingRequestCoordinator: null,
                 reviewDurationTracker: createTracker(undefined, document.visibilityState !== 'hidden'),
             }
         },
         props: {
+        },
+        created: function() {
+            this.ratingRequestCoordinator = createRatingRequestCoordinator({
+                setLocked: value => { this.ratingLoading = value; },
+                reloadQueue: () => this.loadReviews(),
+                hasLoadError: () => Boolean(this.reviewError),
+                setRecoveryMessage: kind => {
+                    this.reviewError = ratingRecoveryMessage(kind, '正式复习');
+                },
+            });
         },
         mounted: function() {
             // Check localStorage for today's ignore_daily_limits status
@@ -605,8 +609,7 @@
             window.removeEventListener('keyup', this.hotkey);
             document.removeEventListener('visibilitychange', this.handleReviewVisibility);
             // DEV-QO-6: invalidate in-flight rating requests on destroy.
-            this.ratingRequestSequence++;
-            this.ratingLoading = false;
+            this.ratingRequestCoordinator.invalidate();
         },
         methods: {
             handleReviewVisibility() {
@@ -626,8 +629,7 @@
                 this.dailyLimitSummary = null;
                 // DEV-QO-6: invalidate any in-flight rating request so its
                 // response cannot overwrite the freshly reloaded queue.
-                this.ratingRequestSequence++;
-                this.ratingLoading = false;
+                this.ratingRequestCoordinator.invalidate();
                 this.$nextTick(() => {
                     this.loadReviews();
                 });
@@ -636,8 +638,7 @@
                 // DEV-QO-6: invalidate any in-flight rating request when the
                 // queue is (re)loaded so stale responses cannot mutate the
                 // new queue state.
-                this.ratingRequestSequence++;
-                this.ratingLoading = false;
+                this.ratingRequestCoordinator.invalidate();
 
                 var data = {
                     bookId: -1,
@@ -849,8 +850,8 @@
                     // DEV-QO-6: increment sequence and capture for this
                     // request. Only the response with the latest sequence
                     // may mutate queue state.
-                    this.ratingLoading = true;
-                    const seq = ++this.ratingRequestSequence;
+                    const seq = this.ratingRequestCoordinator.begin();
+                    if (seq === null) return;
 
                     // DEV-QO-5: pass ignoreDailyLimits so /reviews/rate uses
                     // the same daily-limit boundary as /reviews.
@@ -867,7 +868,7 @@
                         // DEV-QO-6: drop stale responses. If a newer request
                         // has been issued (or the queue was reloaded), this
                         // response must not mutate state.
-                        if (seq !== this.ratingRequestSequence) {
+                        if (!this.ratingRequestCoordinator.isCurrent(seq)) {
                             return;
                         }
 
@@ -928,7 +929,7 @@
                         // DEV-QO-6: only handle error if this is still the
                         // latest request. Otherwise the error belongs to a
                         // stale response.
-                        if (seq !== this.ratingRequestSequence) {
+                        if (!this.ratingRequestCoordinator.isCurrent(seq)) {
                             return;
                         }
                         // DEV-RECOVERY-1 (Task 2000-13): delegate the
@@ -944,24 +945,14 @@
                         this.backToDeckAnimation = false;
                         this.newCardAnimation = false;
                         this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
-                        runAuthoritativeRatingRecovery({
-                            reloadQueue: () => this.loadReviews(),
-                            lockRating: () => { this.ratingLoading = true; },
-                            unlockRating: () => { this.ratingLoading = false; },
-                            setRecoveryMessage: () => {
-                                this.reviewError = '评分结果状态不确定，正在重新加载正式复习队列，请不要重复评分。';
-                            },
-                            preserveLoadError: () => !!this.reviewError,
-                        });
+                        this.ratingRequestCoordinator.recover(seq, error);
                     }).finally(() => {
                         // DEV-QO-6: restore operable state only if this is
                         // still the latest request. When the catch handler
                         // triggers loadReviews(), the sequence is incremented,
                         // so this finally will NOT reset ratingLoading — the
                         // reload's own .then/.catch is responsible for that.
-                        if (seq === this.ratingRequestSequence) {
-                            this.ratingLoading = false;
-                        }
+                        this.ratingRequestCoordinator.succeed(seq);
                     });
                 } else {
                     // practiceMode: no ReviewLog, no backend call. Keep old

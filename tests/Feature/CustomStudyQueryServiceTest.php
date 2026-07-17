@@ -21,7 +21,7 @@ use Tests\TestCase;
  * CustomStudyQueryServiceTest — Task 2000-18 / Phase 2B (Dispatcher)
  *
  * Verifies the unified candidate ID orchestration boundary:
- *  - Each of the four modes dispatches to the correct Query.
+ *  - Each supported mode dispatches to the correct Query.
  *  - Output is list<int> of unique positive IDs.
  *  - Empty candidate set returns empty array.
  *  - Dispatcher does NOT sort, does NOT apply card_limit, does NOT load
@@ -477,8 +477,8 @@ class CustomStudyQueryServiceTest extends TestCase
         $codeOnly = preg_replace('/^\s*\/\/.*$/m', '', $codeOnly);
         $buildCalls = substr_count($codeOnly, '->build(');
         $candidateIdsCalls = substr_count($codeOnly, '->candidateIds(');
-        // 1 ->build for today_forgotten + 1 for overdue + 1 for source_chapter = 3.
-        $this->assertSame(3, $buildCalls, 'Dispatcher must call build() exactly once per SQL-native mode (3 total).');
+        // One ->build call for each SQL-native mode: today_forgotten, overdue, source_chapter, marked.
+        $this->assertSame(4, $buildCalls, 'Dispatcher must call build() exactly once per SQL-native mode (4 total).');
         // 1 ->candidateIds for leech_attention.
         $this->assertSame(1, $candidateIdsCalls, 'Dispatcher must call candidateIds() exactly once for leech_attention.');
     }

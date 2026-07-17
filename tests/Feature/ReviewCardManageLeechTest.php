@@ -104,7 +104,8 @@ class ReviewCardManageLeechTest extends TestCase
 
     public function test_leech_summary_endpoint(): void
     {
-        $this->makeCardWithLeechHistory();
+        $leechCard = $this->makeCardWithLeechHistory();
+        $leechCard->forceFill(['language' => ''])->save();
         $this->makeCard();
 
         $response = $this->actingAs($this->user)
@@ -116,6 +117,8 @@ class ReviewCardManageLeechTest extends TestCase
             'leech_card_ids',
             'struggling_card_ids',
         ]);
+        $response->assertJsonPath('counts.leech', 1);
+        $this->assertContains($leechCard->id, $response->json('leech_card_ids'));
     }
 
     public function test_bulk_rewrite_packages_endpoint(): void

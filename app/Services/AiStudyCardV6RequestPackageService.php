@@ -9,6 +9,10 @@ class AiStudyCardV6RequestPackageService
 {
     private const MAX_ITEMS_PER_PACKAGE = 50;
 
+    public function __construct(private AiStudyCardV6ProviderSecurityPolicyService $securityPolicy)
+    {
+    }
+
     /**
      * Build the V6 provider-disabled request package.
      *
@@ -91,6 +95,7 @@ class AiStudyCardV6RequestPackageService
             'created_at' => now()->toIso8601String(),
             'language' => $language,
             'provider_request_state' => 'provider_disabled',
+            'provider_preflight' => $this->providerPreflight(count($selectedItems)),
             'context_policy' => [
                 'mode' => $normalizedContextPolicy,
                 'include_sentence_text' => true,
@@ -144,5 +149,34 @@ class AiStudyCardV6RequestPackageService
             'selected_items_with_sentence' => 'selected_items_with_sentence',
             default => 'selected_items_only',
         };
+    }
+
+    private function providerPreflight(int $itemCount): array
+    {
+        $preconditions = $this->securityPolicy->assertRealProviderPreconditions();
+
+        return [
+            'ready' => $preconditions['ok'],
+            'provider' => $this->securityPolicy->providerName(),
+            'model' => $this->securityPolicy->providerModel(),
+            'item_count' => $itemCount,
+            'external_data_fields' => [
+                'word',
+                'lemma',
+                'surface',
+                'sentence_text',
+                'chapter_id',
+                'sentence_id',
+                'text_block_index',
+                'sentence_index',
+            ],
+            'timeout_seconds' => $this->securityPolicy->timeoutSeconds(),
+            'max_cost_usd' => $this->securityPolicy->maxCostUsd(),
+            'estimated_cost_usd' => null,
+            'cost_estimate_state' => 'unavailable_until_provider_pricing_is_configured',
+            'secret_source' => (string) config('ai_study_card_v6.provider.secret_source', 'not_configured'),
+            'failure_policy' => 'fail_closed',
+            'blocking_reasons' => $preconditions['errors'],
+        ];
     }
 }

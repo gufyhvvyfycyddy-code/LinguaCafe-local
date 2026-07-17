@@ -20,6 +20,10 @@ class ReviewCard extends Model
     public const LIFECYCLE_SUSPENDED = 'suspended';
     public const LIFECYCLE_ARCHIVED = 'archived';
 
+    public const MARKER_UNMARKED = 0;
+    public const MARKER_MIN = 0;
+    public const MARKER_MAX = 7;
+
     protected $fillable = [
         'user_id',
         'language_id',
@@ -38,6 +42,7 @@ class ReviewCard extends Model
         'buried_until',
         'lifecycle_version',
         'lifecycle_changed_at',
+        'marker',
     ];
 
     protected function casts(): array
@@ -51,6 +56,7 @@ class ReviewCard extends Model
             'buried_until' => 'datetime',
             'lifecycle_changed_at' => 'datetime',
             'lifecycle_version' => 'integer',
+            'marker' => 'integer',
         ];
     }
 

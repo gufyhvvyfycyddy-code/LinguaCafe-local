@@ -8,7 +8,7 @@ use App\Exceptions\CustomStudyValidationException;
  * Value object for a Custom Study criteria selection.
  *
  * Pure data object — no DB, no Auth, no Request, no Session, no side effects.
- * Expresses ONE of the four frozen Custom Study criteria modes defined in ADR-0016.
+ * Expresses one supported Custom Study criteria mode.
  *
  * This object ONLY carries the user's criteria choice (mode + parameters).
  * It does NOT carry user_id or language — those belong to the service call
@@ -32,6 +32,7 @@ class CustomStudyCriteria
     public const MODE_OVERDUE = 'overdue';
     public const MODE_SOURCE_CHAPTER = 'source_chapter';
     public const MODE_LEECH_ATTENTION = 'leech_attention';
+    public const MODE_MARKED = 'marked';
 
     /** @var list<string> */
     public const ALLOWED_MODES = [
@@ -39,6 +40,7 @@ class CustomStudyCriteria
         self::MODE_OVERDUE,
         self::MODE_SOURCE_CHAPTER,
         self::MODE_LEECH_ATTENTION,
+        self::MODE_MARKED,
     ];
 
     // leech_attention sub_mode enums
@@ -151,6 +153,7 @@ class CustomStudyCriteria
         switch ($mode) {
             case self::MODE_TODAY_FORGOTTEN:
             case self::MODE_OVERDUE:
+            case self::MODE_MARKED:
                 // No parameters required. Unknown keys ignored.
                 return [];
 

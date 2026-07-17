@@ -1,5 +1,160 @@
-# LinguaCafe 当前工作台 / GLM 交接临时文档
+# Current Development Handoff
 
+Status: current
+
+## 1. 更新时间
+
+2026-07-17 12:57:09 +08:00（Asia/Shanghai）。
+
+## 2. 仓库与 Git 状态
+
+- 本地仓库：`D:\Document\lingl\LinguaCafe-main`
+- 远端：`git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git`
+- 当前分支：`codex/anki-maximal-alignment-plan`
+- 写入本区块前的 HEAD：`31eed2643eaa72fefdd2796fb9252c02a7157ade`
+- 上游：`origin/codex/anki-maximal-alignment-plan`
+- 写入本区块前本地 HEAD 与上游一致；本次检查点提交后，以远端分支 tip 和最终回复中的 SHA 为恢复入口。
+- 工作区在提交前不干净：包含本次 Phase 3–7 已验证实现、文档和测试；受保护的 `.playwright-cli/`、`nul`，生成的 `public/js/app.js.LICENSE.txt`，以及与本检查点无关的 `docs/architecture/improve-codebase-architecture-install-report.md` 不纳入提交。
+
+## 3. 项目目标
+
+LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 Anki deck/note-template 数据模型的前提下，复刻通用卡片管理、Custom Study、Reviewer、统计和恢复体验。`WordSense` 是学习内容，`ReviewCard(target_type=sense)` 是正式调度对象，`ReviewLog` 是正式复习历史，`EncounteredWord` 只负责阅读熟悉度与展示状态。
+
+## 4. 当前已经验证的状态
+
+- Phase 3 已授权 Browser/ReviewCardManage 范围关闭：Card Info、Search、Table、Scheduling、Lifecycle、Leech 和 Marker 各有职责所有者；父协调器当前 905 行、9 个直接请求、4 个对话框。Phase 3C-3 Delete Mutation Family 仍是 Planned / Not Authorized。
+- Phase 4 Card Marker + Custom Study 1B 已关闭：ReviewCard marker 为 `0..7`；`flag:0..7`、Browser/Card Info/Sense Review 和 marked preview queue 共用同一字段；Custom Study 不写 ReviewLog、不改 FSRS、不改正常队列。
+- Phase 5 Reviewer convergence 已关闭：Sense Review 和 legacy Review 共用请求协调、失败恢复与快捷键契约；Sense Review 仍是正式入口。
+- Phase 6 Reader UI/architecture 已关闭：查词侧栏只在实际选词时占位；Reader projection 责任已收敛，未重写阅读主链路。
+- Phase 7 授权范围已关闭：Pending lifecycle、package/candidate、confirmed-card generation/source binding 各有服务所有者，旧 Service 是 195 行兼容 facade；真实 provider 按用户决定保持禁用，预检 fail-closed。
+- 最大 Anki 对齐差距审计与后续 Phase 8–12 计划已在 `docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md`，但没有自动进入 Phase 8。
+- 兼容边界未改变：不创建 legacy word card；不改变 FSRS、ReviewLog 生命周期、公开评分值或现有 V1–V6 payload；AI 推荐仍默认不选并经过 V5 人工确认。
+
+## 5. 本窗口完成的唯一小步骤
+
+目标：把已完成并验证的 Phase 3–7 工作整理成一个可从 GitHub 恢复的检查点，不开发新功能。
+
+实际范围：
+
+- Browser/Custom Study：Marker 字段与 migration、marker controller/service/UI、`flag:` 搜索、marked query、Lifecycle/Leech/Container 收敛及测试。
+- Reviewer：共享评分失败恢复、请求协调、快捷键和两个 Review 页面接线及测试。
+- Reader：active-only sidebar、workspace sizing、Reader projection/facade 收敛及测试。
+- AI Study Card：Pending lifecycle/package/generation 服务拆分、disabled-provider preflight、配置/UI/测试。
+- 规则与文档：根规则、领域词汇、规则系统、ADR-0028 至 ADR-0032、路线图、master plan、验收报告和本交接入口。
+
+关键决定：复用现有服务与 Vue 边界；不新增依赖；不实现 Delete Mutation Family；不启用真实 provider；不把 Phase 8 放入本检查点。Marker migration 是本次唯一数据库 schema 变更，为可逆的单列 additive migration；没有破坏公开接口或 persisted payload。
+
+未采用：一次性重写 ReviewCardManage/Reader、通用 deck/note 模型、provider 密钥/计费基础设施、自动 AI 建卡。原因分别是高风险、违背产品边界或未获授权。
+
+## 6. 验证证据
+
+- 最初完整运行发现 `CustomStudySessionStateTest::rejects_unknown_mode_in_from_array` 仍把已合法的 `marked` 当未知模式；只把测试样例改为 `unknown_marker_mode`。聚焦复测：1 test / 1 assertion，通过。
+- 完整 PHP：`php -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --colors=never` → 3,247 tests / 13,205 assertions / 14 skipped / 0 failures / 64 existing deprecations，退出码 0。
+- 全部 JS 守卫：67/67 文件通过，0 failures，退出码 0。
+- 前端构建：`npm run development` → Laravel Mix compiled successfully in 5,923ms（命令总计 6.66s），退出码 0；仅有 335 条既存 Sass deprecation warnings 被折叠。
+- 浏览器证据：
+  - `docs/testing/review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md`
+  - `docs/testing/review-card-leech-mutation-browser-acceptance-2026-07-17.md`
+  - `docs/testing/review-card-marker-custom-study-browser-acceptance-2026-07-17.md`
+  - `docs/testing/reviewer-convergence-browser-acceptance-2026-07-17.md`
+  - `docs/testing/reader-attention-and-facade-browser-acceptance-2026-07-17.md`
+  - `docs/testing/ai-study-card-service-convergence-browser-acceptance-2026-07-17.md`
+- AI disabled-provider follow-up：请求包本地 200；显式 provider preview 按预期 503 fail-closed；浏览器无 provider-domain 请求；preflight 前后 WordSense 180、ReviewCard 103、ReviewLog 168、pending 8 均不变。
+- `git diff --check`、暂存清单检查和 push 三方 SHA postflight 必须在提交前后完成。
+
+## 7. 未提交或未完成内容
+
+- 功能未完成项：Phase 3C-3 Delete Mutation Family（未授权）；真实 provider（用户决定暂缓）；Phase 8–12（均需分别授权）。
+- 当前故意 RED：无。已发现的 stale `marked` 测试夹具已最小修正并通过。
+- 临时/受保护内容：`.playwright-cli/` 与 `nul` 不处理、不提交；`public/js/app.js.LICENSE.txt` 为构建生成差异，不提交；`docs/architecture/improve-codebase-architecture-install-report.md` 与本检查点无关，不提交。
+- 技术债：旧 handoff 历史正文很长且含历史状态；只有本文件顶部的 `Status: current` 区块和当前索引有授权意义。PHPUnit 有 64 条 doc-comment metadata 弃用提示，未在本收尾任务中扩修。
+- 文档冲突已修正：Card Marker 接线后 `ReviewCardManage.vue` 的当前事实是 905 行，不是 Phase 3D 刚关闭时的 872 行；Custom Study 1B 当前是 Accepted / Production Closed，不是 not started。
+
+## 8. 风险和保护边界
+
+- 不修改或提交 `.env*`、密钥、认证材料、`.omo/`、`.playwright-cli/`、`nul`、数据库 dump、日志和构建产物。
+- 不运行 destructive migration/reset；新 migration 只能按正常 additive 路径应用。
+- 不改变 `ReviewCard.target_type=sense` 主线、FSRS 字段语义、ReviewLog 生命周期、rating API 值、用户/语言隔离和 V5 人工确认边界。
+- 不删除 legacy compatibility code；Phase 3C-3 未授权。
+- 真实 provider 继续 disabled；代码存在不等于生产授权。
+- `php artisan test --compact` 在默认 128MB 下可能因 PHPUnit 结果缓存 OOM；完整回归使用上面的 512MB、`--do-not-cache-result` 原生命令，不能把 OOM 误报为业务失败或通过。
+
+## 9. 当前唯一下一小步
+
+名称：Phase 8A — Browser Search `rated:good` / `rated:easy` 最小切片。
+
+目标：让现有线性 Browser 查询语法支持另外两个正式评分值，并保持列表、JSON/CSV/Anki TSV export 使用同一 Query Applier。
+
+先读：`AGENTS.md`、本文件、`docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md`、`app/Services/ReviewCardBrowserSearchCriteria.php`、`ReviewCardBrowserSearchParser.php`、`ReviewCardBrowserSearchQueryApplier.php`、`tests/Unit/ReviewCardBrowserSearchParserTest.php`、`tests/Feature/ReviewCardBrowserSearchTest.php`、`resources/js/components/ReviewCards/ReviewCardSearchSurface.vue`。
+
+先写 RED：
+
+1. Parser 测试证明 `rated:good` 和 `rated:easy` 被规范化、去重并可与现有 token 组合。
+2. Feature 测试证明只匹配当前用户/语言的真实 `sense_review` Good/Easy 日志，排除 reset、undone 和非正式来源，并锁定列表与三个 export 消费者一致。
+
+最小 GREEN：只扩展现有 parser rating 白名单/映射、现有 Query Applier rating 映射和帮助文本；不新增 service、route、dependency 或 AST。
+
+排除：不做 quoted phrase、negation、OR/parentheses、due/state/FSRS/source/missing/recent filters；不改 Saved Search schema、Custom Study、Reviewer、FSRS、ReviewLog 写入或数据库 schema；不进入 Phase 8B。
+
+验收：聚焦 Parser + Browser Search + UI guard；全部 JS guards；前端 build；完整 PHP 回归；真实登录 Browser 页面分别查询 `rated:good` / `rated:easy`，确认本地 Network、Console 无新增错误和数据库零写入；`git diff --check`。
+
+停止条件：上述单一切片验证、交接、commit 和普通 push 完成后立即停止；任一隔离/消费者一致性失败则记录 Incomplete，不继续其他 Phase 8 语法。
+
+## 10. 下一窗口直接使用的提示词
+
+```text
+你现在接管一个尚未完成的编程任务。
+
+本地仓库：D:\Document\lingl\LinguaCafe-main
+远端仓库：git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git
+当前分支：codex/anki-maximal-alignment-plan
+已验证功能检查点 SHA：FUNCTIONAL_CHECKPOINT_SHA（先 git fetch origin，再以 origin/codex/anki-maximal-alignment-plan 的 branch tip 为最终交接元数据；核对该 tip 包含此功能检查点）
+
+先读取项目规则、当前计划和 docs/plans/current-working-handoff.md，并核对 Git 状态。必须执行 git status、git branch --show-current、git log -1 --oneline、git rev-parse HEAD、git rev-parse @{u}、git ls-remote origin refs/heads/codex/anki-maximal-alignment-plan，确认本地、上游和远端事实；不得丢弃任何已有未提交文件。
+
+你本窗口只能执行交接文档中定义的唯一下一小步：Phase 8A — Browser Search `rated:good` / `rated:easy` 最小切片。目标是让现有线性查询语法支持另外两个正式评分，并让列表、JSON export、CSV export、Anki TSV export 继续共用一个 Query Applier。
+
+先读取：
+- AGENTS.md
+- docs/plans/current-working-handoff.md
+- docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md
+- app/Services/ReviewCardBrowserSearchCriteria.php
+- app/Services/ReviewCardBrowserSearchParser.php
+- app/Services/ReviewCardBrowserSearchQueryApplier.php
+- tests/Unit/ReviewCardBrowserSearchParserTest.php
+- tests/Feature/ReviewCardBrowserSearchTest.php
+- tests/Feature/ReviewCardBrowserSearchUiGuardTest.php
+- resources/js/components/ReviewCards/ReviewCardSearchSurface.vue
+
+先建立 RED：Parser 测试覆盖 `rated:good` / `rated:easy` 的规范化、去重和组合；Feature 测试覆盖当前用户/语言的真实 sense_review Good/Easy 日志，排除 reset、undone、非正式来源，并覆盖列表与三个 export 消费者一致。确认 RED 原因是尚未支持这两个评分后，才做最小 GREEN。
+
+最小实现范围：只修改现有 parser rating 白名单/映射、Query Applier rating 映射、必要的 Criteria/帮助文本和对应测试。不得新增 service、route、dependency、AST 或 migration。
+
+明确排除：quoted phrase、negation、OR/parentheses、due/state/FSRS/source/missing/recent filters、Saved Search schema 改动、Custom Study、Reviewer、FSRS、ReviewLog 写入、Delete Mutation Family、真实 AI provider，以及任何无关重构。保护 sense-only、用户/语言隔离、正式 ReviewLog 来源过滤、现有 endpoint/payload/export 兼容和 `.env*`/`.playwright-cli`/`nul`。
+
+必须运行：
+1. php artisan test tests/Unit/ReviewCardBrowserSearchParserTest.php tests/Feature/ReviewCardBrowserSearchTest.php tests/Feature/ReviewCardBrowserSearchUiGuardTest.php --stop-on-failure
+2. 全部 tests/js/*.test.mjs 守卫
+3. npm run development
+4. php -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --colors=never
+5. git diff --check
+6. 真实本地 Browser 页面验收：依照 AGENTS.md Section 8 使用 localhost fixture，查询 rated:good / rated:easy，检查本地 Network、Console 和数据库零写入；不得用 API 成功替代页面验收。
+
+不要继续后续步骤，即使当前上下文仍然充足。使用测试先行或项目既定流程完成这个小步骤，运行全部规定验证，更新 docs/plans/current-working-handoff.md，精确暂存，提交并正常推送到当前功能分支。禁止 force push、git add .、git add -A、自动合并和清理用户工作区。
+
+完成后必须核对本地 HEAD、上游和 git ls-remote 远端分支三者同一 SHA；最后给出下一个新窗口可以直接使用的完整递归提示词，然后立即停止。每个窗口只执行一个小步骤。
+```
+
+---
+
+# Historical retained workbench
+
+以下内容仅保留历史证据，不是当前授权入口。
+
+> **Loading gate — 2026-07-17**
+>
+> Read this large temporary workbench only when the task concerns current phase authorization, acceptance status, product sequencing, or a section explicitly cited by the current task. For a bounded module fix, use the owning contract, accepted ADRs, code, tests, and harness instead. Historical timelines and old authority claims embedded below are evidence only and do not authorize current work.
+>
 > **Current authority — 2026-07-16**
 >
 > - Manual Sense POS + shared create/edit form + inline validation: **Accepted / Production Closed** on master `a0916784951be69b411066446a03be940373589f`.
@@ -10,17 +165,17 @@
 > - Preset V1C — Consumer Convergence: **Accepted / Production Closed** (ADR-0026; global previous-state writes removed; old rows preserved as ignored history).
 > - Preset V1D — Settings UX and Production Closure: **Accepted / Production Closed**. Settings UX-1 is accepted under ADR-0027; the final matrix covered two local users, English/French, create/clone/rename/switch/shared edit/delete-rebind/refresh persistence, local-only Network, clean Console, database delta, and unchanged ReviewCard due checksum.
 > - ReaderSidebar-Boundary-Fix-1: **Accepted**. Wide sidebar widths are now 540/500/460px, the reader reserves an additional 24px visible outer boundary, and the narrow fallback remains 400px. This was a scoped defect fix, not authorization to enter the Reader architecture phase.
-> - Browser architecture verification: Phase 3A created the Card Info owner, Phase 3B-1 created the Search Surface owner, Phase 3B-2 created the Table Surface owner, Phase 3C-1 created the Scheduling Mutation owner, and Phase 3C-2 created `ReviewCardLifecycleMutationSurface.vue` as the unique lifecycle descriptor and write-request owner inside the ReviewCardManage domain. The separate formal-review entry `SenseReview.vue` still owns its own lifecycle client. The parent is now 1,210 lines with 11 direct `axios.` references and 6 dialogs; the lifecycle child is 414 lines with one descriptor GET, two lifecycle POST requests and three dialogs. Dormant legacy `/enabled` archive/restore methods and dialogs remain without a reachable table entry and are recorded as later compatibility debt.
-> - Current phase: **Browser/ReviewCardManage Phase 3C-2 — Lifecycle Mutation Family** is **Code Complete / Browser Acceptance Pending**. The lifecycle child owns descriptor loading, stale-response protection, frozen `expected_version`, single/bulk transitions, request locks, conflict handling, confirmations and state help. Parent Leech UI delegates its lifecycle writes to the same owner. Browser regression passed 393 tests / 1,366 assertions with two existing skips; lifecycle/Leech regression passed 134 / 341; Unit passed 652 / 1,518; all 57 Node guards and the build passed. Chrome DevTools 1 repeatedly returned 502. The local CDP endpoint was healthy, but the authenticated session had expired and the safety layer blocked shell credential injection, so no authenticated lifecycle write acceptance was performed. **Phase 3C-3 — Delete Mutation Family** is **Planned / Not Authorized**. This task stops before Phase 3C-3. Evidence and boundaries are in `docs/plans/review-card-manage-architecture-convergence-plan.md`.
+> - Browser architecture verification: Phase 3A created the Card Info owner, Phase 3B-1 the Search owner, Phase 3B-2 the Table owner, Phase 3C-1 the Scheduling owner, Phase 3C-2 `ReviewCardLifecycleMutationSurface.vue`, and Phase 3C-4 `ReviewCardLeechMutationSurface.vue`. Card Marker wiring brings the parent to 905 lines with 9 direct `axios.` references and 4 dialogs; marker writes live in their own mutation surface. Leech suspend still delegates to the lifecycle child, so no second lifecycle client was created. Dormant legacy `/enabled` controls remain later compatibility debt.
+> - Current phase: **Phase 3–7 authorized scope closed**. Lifecycle, preview/final package and candidate normalization, confirmed-card generation, source binding, and a blocked external-request preflight are **Accepted** under ADR-0032; `AiStudyCardPendingItemService` is now a 195-line compatibility facade. Real browser acceptance proved dismiss/restore, local request-package generation, visible provider/model/item/field/timeout/cost blockers, explicit local provider-preview failure closure, no provider-domain browser requests, and unchanged learning-data counts. The user explicitly chose to keep the real provider disabled. Evidence: `docs/testing/ai-study-card-service-convergence-browser-acceptance-2026-07-17.md`. Reader UI/architecture remains **Accepted / Production Closed** under ADR-0031. **Phase 3C-3 — Delete Mutation Family** remains **Planned / Not Authorized** and was not executed.
 > - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
-> - Current code-debt assessment: **6.0/10, localized medium-high burden**. Settings convergence plus Browser responsibility extraction leaves 28 production files over 500 lines, 10 over 1,000, and only 1 over 1,500. The largest hotspot is `TextBlockGroup.vue` (2,514 lines), followed by `SenseReview.vue` (1,476), `TextBlockService.php` (1,381) and `ReviewCardManage.vue` (1,210).
-> - DevSpace PHP / PHPUnit follows `vibe-coding-collaboration-rules.md §27.8`: default to log redirection, saved exit code and split suites; do not try the original high-output streamed command first. If the replacement path cannot produce trustworthy evidence, hand the full PHP regression to the next related Codex complex task.
+> - Current code-debt assessment: **6.0/10, localized medium-high burden**. Settings convergence plus Browser responsibility extraction leaves 28 production files over 500 lines, 10 over 1,000, and only 1 over 1,500. The largest hotspot is `TextBlockGroup.vue` (2,514 lines), followed by `SenseReview.vue` (1,476) and `TextBlockService.php` (1,381); `ReviewCardManage.vue` is now 905 lines after Marker coordinator wiring.
+> - DevSpace PHP / PHPUnit verification follows `docs/plans/devspace-php-verification-playbook.md`: use focused tests first, preserve the real exit code and summary through trustworthy tool/job output or output capture outside the repository, split large suites when needed, and mark `Incomplete` when a credible result cannot be recovered. Do not infer pass from truncated or 502 output.
 > - §27.8 workaround verified on 2026-07-15: redirected Unit suite passed 649 tests / 1507 assertions, redirected Feature suite passed 2575 tests / 11537 assertions with 14 skipped, all Node guards passed, frontend build succeeded, DB doctor was healthy, and `git diff --check` passed.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
+> Custom Study 1B: Accepted / Production Closed
 > `/custom-study`, chapter options, the four frozen criteria, stateless open/answer/resume, shared `SenseStudyCard.vue`, `SenseSentencePreview.vue` reuse, sessionStorage token handling, and two-viewport MCP Chrome acceptance are complete. Do not start a follow-up product task. Phase history is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
 > **Study Overview authority**: Accepted. It reuses canonical formal-review eligibility, and the web-side total-flow designer confirmed that no additional independent web re-acceptance is required.
@@ -38,8 +193,8 @@
 > **最后更新**：2026-07-16（Preset V1D 已生产关闭；Reader sidebar boundary fix 已接受；Browser/ReviewCardManage Phase 3A、Phase 3B-1、Phase 3B-2 与 Phase 3C-1 为 Accepted / Production Closed；Phase 3C-2 新增 `ReviewCardLifecycleMutationSurface.vue`，父组件当前为 1,210 行、11 个 direct `axios.` references、6 个 `v-dialog`；生命周期组件为 414 行，拥有 1 个 descriptor GET、2 个 lifecycle POST、3 个对话框，并冻结 `expected_version`、防止旧 descriptor 覆盖、在成功后清理旧快照；全部自动回归通过，但 Chrome DevTools 1 connector 连续 502，本地会话过期，authenticated write acceptance 未完成；当前状态 Code Complete / Browser Acceptance Pending；Phase 3C-3 Delete Mutation Family 为 Planned / Not Authorized，本轮停止；详见 `review-card-manage-architecture-convergence-plan.md`）。历史记录：2026-07-14 (Task 2000-22 `GLM-CustomStudy-Backend-VerticalSlice-StatelessSession-Orchestration-Eligibility-And-API-2000-22` — **Custom Study 1A Phase 3B/4A final closure + Phase 4B backend session vertical slice composite main-line task**（complexity 1000, DCP_ALLOWED=false）。本轮完成：(A) 正式关闭 Phase 3B/4A 文档状态为 Accepted/Closed（5 份文档：ADR-0016、implementation-plan、master-plan、DOCUMENTATION_INDEX、current-working-handoff）。(B) 关闭 candidate_count 产品 Gate — 冻结 Option A（full available candidate count，不按 card_limit 截断）；区分 total_candidates（应用 card_limit 之前）和 total_count（应用 card_limit 之后）；禁止先截断再排序。(C) SessionState 新增 available_candidate_count readonly 字段 + withEligibilityResolution() same-step 不可变复制边界（step 不变、available_candidate_count 不变、identity 字段不变；复用 private helper with incrementStep bool，禁止两套验证）。(D) PreviewPolicy::resolveEligibility() 纯方法不查 DB，通过 withEligibilityResolution() 返回新 State。(E) CustomStudySessionEligibilityService 批量资格复核服务复用 confirmedSenseCardQuery + senseReviewEligible scope，1 次 ReviewCard + eligibility 查询 + 1 次 WordSense eager-load。(F) CustomStudySessionService open/answer/resume 完整编排，不访问 Auth/Request/Session/Settings facade — caller 传递 trusted userId/language/cardLimit。(G) CustomStudyController HTTP 边界 + 三条 POST API `/custom-study/sessions` + `/custom-study/sessions/answer` + `/custom-study/sessions/resume`（auth middleware group）。(H) 安全 + 查询预算（1/100/500 候选）+ 无写入 + token 失败矩阵（统一 404 session_not_found）+ 状态机 + 路由测试。(I) 完整回归 + FACT 自审 70 项 + 4 commits + push + 最终报告。无状态模型：不写 ReviewLog、不改 FSRS、不改 lifecycle。TDD：RED → GREEN → REFACTOR → REGRESSION → FACT → COMMIT → PUSH。**Previous task (2000-21)**: Phase 3B 最终收口 + Phase 4A 会话内部排序复合型主线任务。本轮完成：(A) 修复 Task 2000-20 遗留的文档状态冲突 — master-plan 正文 / ADR §19.4/§19.10 / TokenService docblock 不再写过期 Phase 3A awaiting 或 Phase 3B 未定义状态。(B) 补强文档 harness — `CustomStudySessionArchitectureDocsGuard.test.mjs` 新增 §14 全文零残留检查（26 项断言），禁止旧状态在有效文档任何位置出现。(C) 登记"章节选择器必须显示 candidate_count"未来契约 — ADR §21 + implementation plan Phase 5，candidate_count=0 禁止显示，数量语义（A 全部 vs B card_limit 截断）保留为 OPEN PRODUCT GATE。(D) 开发 `CustomStudySessionOrder` 会话内部排序服务 — 批量加载 ReviewCard（user+language+target_type=sense 隔离），per-mode 排序（source_chapter = canonical；overdue = retrievability ASC；today_forgotten = latest today-again DESC；leech_attention = severity DESC），tie-break 始终用 canonical fallback rank；不应用 card_limit、不创建 SessionState/token、不写任何表、不修改 Queue Order settings、不重新执行 Criteria queries。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 2 commits。**Previous task (2000-20)**: Phase 3B 复合型主线任务。本轮完成：(A) Phase 3A 架构契约和文档冲突收口 — ADR-0016 + implementation plan 不再写 `TokenService (signs/verifies/rotates token)` / `rotate(answer)` / 静态 `Crypt::encryptString()`；payload 补齐 `completed_ids` + `skipped_ineligible_ids`；`mode` 明确为四种 Criteria mode（`today_forgotten` / `overdue` / `source_chapter` / `leech_attention`），`preview-only` 是功能级性质不是 payload `mode` 值；新增可执行文档 guard `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs`（40 项，先 RED 9 项失败后 GREEN 全绿）；Phase 3A 标记为 Accepted。(B) State 显式不可变复制边界 — `CustomStudySessionState::withProgress(currentCardId, readyQueue, delayedRepeatQueue, completedIds, skippedIneligibleIds): self` 保留 identity 字段、自动重算 `completed_count`/`total_count`、自动 `step + 1`、拒绝 `step === PHP_INT_MAX` 溢出；新增 `waitUntil(): ?int` + `isCompleted(): bool` 派生查询；Token 常量 `VERSION` / `MAX_CANDIDATE_COUNT` 改为引用 `CustomStudySessionState`（单一来源）。(C) 纯函数 `CustomStudyPreviewPolicy` — `applyRating(state, rating, now): self` + `resume(state, now): self`，只接受四个冻结小写 rating（`again`/`hard`/`good`/`easy`）；Again/Hard → `delayed_repeat_queue`，Good/Easy → `completed_ids`；ready 优先于 delayed，delayed tie 稳定；不调用 `toArray()`/`fromArray()`，只通过 `withProgress()` 创建新 State；不访问 DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI。(D) 可执行架构 guard — `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs` 同时覆盖 ADR 和 implementation plan。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 3 commits。**Previous task (2000-19)**: Phase 3A `CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit tests；V1 payload 新增 `completed_ids` + `skipped_ineligible_ids`；五状态 union + 互斥不变量；章节选择器未来契约登记。**Custom Study 1A 历史阶段记录（已由生产关闭取代）**：Phase 1、2A、2B、3A 均已完成；Phase 3B Accepted / Closed；Phase 4A Accepted / Closed；backend vertical slice、页面、章节选择器、共享卡面和浏览器验收也已完成。当前权威状态见文件顶部，详细时间线见历史归档。**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14，网页端最终验收）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。**禁止**: 不进入 Phase 5 Frontend / SenseStudyCard / 章节选择器 UI; 不实现 AI 译文; 不自行宣布网页端最终 Accept; 不新增 migration; 不改 FSRS/ReviewLog/lifecycle/rating/AI; 不 .env/AGENTS.md/.omo/.playwright-cli/nul。**Previous task (2000-18)**: Phase 2B `EloquentChapterLocator` + `SourceChapterQuery` + `LeechAttentionQuery` + `CustomStudyQueryService` + 86 行为测试；Phase 2A 文档旧契约修正（CS-3/CS-4 "返回空集合" → "返回可组合 Builder"）。**Previous task (2000-17)**: 长期硬规则治理 §28/§19；Phase 1 错误契约架构修复（`CustomStudyCriteria::fromArray()` 直接抛出结构化 `CustomStudyValidationException`）；Phase 2A `TodayForgottenQuery` + `OverdueQuery` 返回可组合 Builder。**Previous task (2000-16)**: Phase 1 Criteria + Validator + ChapterLocatorInterface + CustomStudyValidationException + 2 unit tests + GLM §8.8 + AI 译文登记 CS-11.5。**Previous task (2000-15)**: Queue Order 阶段正式关闭；Anki 参考优先规则 §8.7；SenseStudyCard 共享卡面展示契约冻结到 ADR-0016 §20.5-§20.8。**Previous task (2000-14) details**: Task 2000-14 fix completed and web-side final Accept issued 2026-07-14。
 > **Custom Study frontend update (2026-07-14)**：`/custom-study` 已接入 setup 与 preview session UI；四种 criteria、章节选择器、card limit、sessionStorage 临时 token、等待倒计时、会话过期清理、查看原文和四个 preview rating 操作均已实现。仅调用既有 Custom Study POST 路由和原文上下文 GET；不调用正式评分端点，不写 ReviewLog/FSRS/lifecycle。
 >
-> **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
-> **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。GLM 新任务应以本文为准（当前工作流：GLM 单 Agent 闭环，见 `vibe-coding-collaboration-rules.md` §1.5）。
+> **文档入口**：新任务按 `AGENTS.md` 与 `docs/architecture/ai-development-rule-system.md` 选择最小加载路线；只有阶段、状态或排序问题才继续读取本文相关段落。
+> **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` 均为历史材料。当前执行与验收规则见 `AGENTS.md` 和 `docs/architecture/ai-development-rule-system.md`；旧附录中的流程记录不自动生效。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
 > **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
 > **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/plans/ai-study-card-v6-real-provider-implementation-plan.md` 与 `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`。V6 provider-preview backend transport、显式 UI trigger、真实浏览器 Network 验收已完成；V6 推荐结果现在只能导入到现有 V4 AI 推荐词列表，默认不勾选，仍需用户手动勾选、生成最终候选包、再走 V5 人工释义确认制卡路径。禁止 provider 输出自动创建 WordSense / ReviewCard、写 ReviewLog、改 FSRS 或暴露 secret。
@@ -237,13 +392,22 @@
 
 ### F. Codex 大任务候选
 
-由网页端总设计师决定。Codex 任务不应从脏上下文开始，必须先看：
-1. `docs/plans/current-working-handoff.md`（本文）
-2. `docs/plans/linguacafe-master-plan.md`
-3. `docs/plans/vibe-coding-collaboration-rules.md`
-4. `docs/plans/repo-architecture-hotspot-audit.md`
-5. `docs/plans/final-architecture-closure-report.md`（架构收口结论）
-6. 按需读 `docs/DOCUMENTATION_INDEX.md`、`docs/HISTORY_INDEX.md`、`docs/adr/ADR-0002-sense-only-and-ai-study-card-boundaries.md`
+由网页端总设计师决定。任何执行任务都不应从脏上下文或历史长文开始。本节使用与 `AGENTS.md` 和 `docs/architecture/ai-development-rule-system.md` 相同的唯一入口，不另设第二套固定清单：
+
+1. `AGENTS.md`；
+2. 本任务相关的本地 Skill；
+3. `docs/architecture/ai-development-rule-system.md`；
+4. Git 分支、最新 commit、工作树和用户未提交改动；
+5. 选择最小任务路线：
+   - 领域术语、状态或数据所有权 → `CONTEXT.md`；
+   - 规则、spec、架构或 harness → `docs/architecture/subtitle-guided-development-summary.md`；
+   - 阶段、状态、优先级或产品排序 → `docs/DOCUMENTATION_INDEX.md`，再读取本文相关段落；master plan / roadmap 只有在账本或排序决策需要时才加载；
+   - 有界模块实现或修复 → owning contract、accepted ADR、相关代码、测试与 harness；除非授权或状态本身是问题，否则不加载本文、master plan 或 roadmap；
+6. 检查本轮准确修改文件和一个既有实现模式。
+
+一旦任务 owner、范围、稳定契约、验证路径和待用户决定事项已经明确，就停止继续加载文档。
+
+`docs/plans/vibe-coding-collaboration-rules.md` 已降级为详细旧版操作附录，只有当前文档明确引用某节时才读取。`repo-architecture-hotspot-audit.md` 和 `final-architecture-closure-report.md` 只作证据或历史背景，不是默认入口。
 
 ## 6. ~~Codex 交接原则~~（已停用 2026-07-13）
 
@@ -275,7 +439,7 @@
 | AI Study Card | 手工确认的 V1–V5 闭环已存在；真实 provider 受环境门槛约束 | 先拆 1,064 行 PendingItem Service，再考虑 provider |
 | 文档 | 已建立 Current authority、Open Work Registry 和 Anki 对齐路线 | 历史长叙述逐步归档，不再作为当前状态入口 |
 
-当前顺序：Preset V1D（Accepted / Production Closed）→ Browser Phase 3A（Accepted）→ Phase 3B-1（Accepted）→ Phase 3B-2（Accepted）→ Phase 3C-1（Accepted / Production Closed）→ Phase 3C-2（Code Complete / Browser Acceptance Pending）→ Phase 3C-3（Planned / Not Authorized）→ Phase 3C-4 → Phase 3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/architecture → AI provider。本轮停止在 Phase 3C-2，不自动进入 Phase 3C-3。
+当前顺序：Preset V1D、Browser 授权范围、Card Marker + Custom Study 1B、Reviewer convergence、Reader UI/architecture 均为 Accepted / Production Closed；当前进入 AI Study Card service/provider environment gate。Phase 3C-3 Delete Mutation Family 仍为 Planned / Not Authorized，未执行且不阻断已授权容器收口。
 
 ## 8. 临时文档使用规则
 

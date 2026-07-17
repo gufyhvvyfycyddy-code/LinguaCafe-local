@@ -3,7 +3,7 @@
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
+> Custom Study 1B: Accepted / Production Closed
 > Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production acceptance are complete. The detailed phase roadmap below is historical implementation context; the concise chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`, and this plan does not authorize 1B or another product task.
 
 

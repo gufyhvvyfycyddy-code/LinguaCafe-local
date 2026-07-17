@@ -496,7 +496,7 @@ class CustomStudySessionStateTest extends TestCase
             'version' => 1,
             'user_id' => 42,
             'language' => 'en',
-            'mode' => 'marked',
+            'mode' => 'unknown_marker_mode',
             'parameters' => [],
             'session_id' => $this->validUuidV4(),
             'issued_at' => $this->validIssuedAt(),

@@ -14,6 +14,7 @@ namespace App\Services;
  *   is:active | is:buried | is:suspended | is:archived  (lifecycle — max 1)
  *   rated:again | rated:hard          (max 2, no duplicates)
  *   prop:lapses{=,>,>=,<,<=}<int>     (V1: only lapses field)
+ *   flag:0..7                         (exact ReviewCard marker)
  *
  * All conditions AND-combined. No OR / NOT / parentheses.
  *
@@ -66,6 +67,7 @@ class ReviewCardBrowserSearchParser
         $lifecycleStatus = null;
         $ratings = [];
         $propertyConditions = [];
+        $marker = null;
 
         foreach ($segments as $segment) {
             if ($segment === '') {
@@ -85,7 +87,7 @@ class ReviewCardBrowserSearchParser
             $prefix = strtolower(substr($segment, 0, $colonPos));
             $valuePart = substr($segment, $colonPos + 1);
 
-            if (!in_array($prefix, ['is', 'rated', 'prop'], true)) {
+            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag'], true)) {
                 // Not an advanced token prefix — treat as plain text
                 // (e.g. http://example.com).
                 $textParts[] = $segment;
@@ -163,6 +165,17 @@ class ReviewCardBrowserSearchParser
                         ];
                     }
                     break;
+                case 'marker':
+                    if ($marker !== null && $marker !== $tokenData['value']) {
+                        $errors[] = [
+                            'token' => $segment,
+                            'reason' => '不能同时指定多个卡片标记。每个查询最多一个 flag:0..7。',
+                            'example' => 'flag:1',
+                        ];
+                    } else {
+                        $marker = $tokenData['value'];
+                    }
+                    break;
             }
         }
 
@@ -180,6 +193,7 @@ class ReviewCardBrowserSearchParser
             textQuery: $textQuery,
             governanceStatus: $governanceStatus,
             lifecycleStatus: $lifecycleStatus,
+            marker: $marker,
             ratings: $ratings,
             propertyConditions: $propertyConditions,
             normalizedTokens: $normalizedTokens,
@@ -208,6 +222,9 @@ class ReviewCardBrowserSearchParser
         if ($prefix === 'prop') {
             return $this->parsePropToken($valuePart, $original);
         }
+        if ($prefix === 'flag') {
+            return $this->parseFlagToken($lowerValue, $original);
+        }
 
         // Should never reach here due to the prefix check above.
         return [
@@ -216,6 +233,31 @@ class ReviewCardBrowserSearchParser
                 'token' => $original,
                 'reason' => '不支持的搜索类型',
                 'example' => 'is:leech',
+            ],
+        ];
+    }
+
+    private function parseFlagToken(string $lowerValue, string $original): array
+    {
+        if (preg_match('/^[0-7]$/', $lowerValue) === 1) {
+            $marker = (int) $lowerValue;
+
+            return [
+                'data' => [
+                    'kind' => 'marker',
+                    'value' => $marker,
+                    'normalized' => 'flag:' . $marker,
+                ],
+                'error' => null,
+            ];
+        }
+
+        return [
+            'data' => null,
+            'error' => [
+                'token' => $original,
+                'reason' => '不支持的 flag: 值。只支持 0 到 7。',
+                'example' => 'flag:1',
             ],
         ];
     }

@@ -86,6 +86,11 @@
                 @view-source="viewSource"
             >
                 <template #header-meta>
+                    <ReviewCardMarkerPicker
+                        :value="Number(currentCard.marker || 0)"
+                        :loading="markerLoading"
+                        @change="setCurrentMarker"
+                    />
                     <v-chip
                         v-if="currentCardIsInactive"
                         x-small
@@ -121,6 +126,12 @@
                             <v-list-item @click="startEdit">
                                 <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
                                 <v-list-item-title>编辑</v-list-item-title>
+                                <v-list-item-action-text>E</v-list-item-action-text>
+                            </v-list-item>
+                            <v-list-item @click="openCardInfo">
+                                <v-list-item-icon><v-icon small>mdi-information-outline</v-icon></v-list-item-icon>
+                                <v-list-item-title>卡片信息</v-list-item-title>
+                                <v-list-item-action-text>I</v-list-item-action-text>
                             </v-list-item>
                             <v-divider v-if="availableLifecycleActions.length" class="my-1" />
                             <v-list-item
@@ -133,6 +144,8 @@
                                     <v-icon small :color="lifecycleActionColor(lifecycleAction)">{{ lifecycleActionIcon(lifecycleAction) }}</v-icon>
                                 </v-list-item-icon>
                                 <v-list-item-title>{{ lifecycleActionLabel(lifecycleAction) }}</v-list-item-title>
+                                <v-list-item-action-text v-if="lifecycleAction === 'bury'">-</v-list-item-action-text>
+                                <v-list-item-action-text v-else-if="lifecycleAction === 'suspend'">@</v-list-item-action-text>
                             </v-list-item>
                             <v-divider class="my-1" />
                             <v-list-item @click="openResetDialog">
@@ -406,10 +419,13 @@
     import SenseReviewLeechPanel from './SenseReviewLeechPanel.vue';
     import SenseReviewLeechRewritePackageDialog from './SenseReviewLeechRewritePackageDialog.vue';
     import SenseStudyCard from './SenseStudyCard.vue';
+    import ReviewCardMarkerPicker from '../ReviewCards/ReviewCardMarkerPicker.vue';
+    import { updateMarker } from '../../services/ReviewCardMarkerApi.js';
+    import { buildReviewCardManageLocation } from '../../services/ReviewCardManageDeepLink.js';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
-    import { runAuthoritativeRatingRecovery } from '../Review/ReviewRatingRecovery.js';
+    import { createRatingRequestCoordinator, ratingRecoveryMessage } from '../Review/ReviewRatingRecovery.js';
     import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from '../Review/ReviewDurationTracker.js';
     import {
         MORE_MENU_ITEMS,
@@ -458,11 +474,14 @@
             SenseReviewLeechPanel,
             SenseReviewLeechRewritePackageDialog,
             SenseStudyCard,
+            ReviewCardMarkerPicker,
         },
         data: function() {
             return {
                 loading: false,
+                markerLoading: false,
                 rating: false,
+                ratingRequestCoordinator: null,
                 error: '',
                 cards: [],
                 summary: {},
@@ -726,6 +745,17 @@
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
             document.removeEventListener('visibilitychange', this.handleReviewVisibility);
+            this.ratingRequestCoordinator.invalidate();
+        },
+        created() {
+            this.ratingRequestCoordinator = createRatingRequestCoordinator({
+                setLocked: value => { this.rating = value; },
+                reloadQueue: () => this.loadCards(),
+                hasLoadError: () => Boolean(this.error),
+                setRecoveryMessage: kind => {
+                    this.error = ratingRecoveryMessage(kind, '词义复习');
+                },
+            });
         },
         mounted() {
             // ADR-0009: Create or restore the per-tab review session ID.
@@ -742,6 +772,19 @@
             document.addEventListener('visibilitychange', this.handleReviewVisibility);
         },
         methods: {
+            setCurrentMarker(marker) {
+                if (!this.currentCard || this.markerLoading) return;
+                this.markerLoading = true;
+                updateMarker(axios, this.currentCard.review_card_id, marker)
+                    .then((response) => {
+                        this.$set(this.currentCard, 'marker', response.data.marker);
+                        this.snackbar = { show: true, text: '标记已更新。', color: 'success' };
+                    })
+                    .catch((error) => {
+                        this.snackbar = { show: true, text: error.response?.data?.message || '标记更新失败。', color: 'error' };
+                    })
+                    .finally(() => { this.markerLoading = false; });
+            },
             handleReviewVisibility() {
                 if (document.visibilityState === 'hidden') pauseDuration(this.reviewDurationTracker);
                 else resumeDuration(this.reviewDurationTracker);
@@ -848,11 +891,8 @@
                 // programmatic calls. The rating buttons are already
                 // disabled via :disabled="rating || ...", but this guard
                 // ensures programmatic calls are also blocked.
-                if (this.rating) {
-                    return;
-                }
-
-                this.rating = true;
+                const seq = this.ratingRequestCoordinator.begin();
+                if (seq === null) return;
                 this.error = '';
                 // Invalidate the interval preview immediately so the old
                 // card's predicted intervals cannot bleed into the next
@@ -888,6 +928,7 @@
                     rating: rating,
                 };
                 axios.post(`/reviews/senses/${this.currentCard.review_card_id}/rate`, payload).then((response) => {
+                    if (!this.ratingRequestCoordinator.isCurrent(seq)) return;
                     this.reviewedCount++;
                     this.summary = response.data.summary;
                     // Record this rating into the page session. The
@@ -916,7 +957,7 @@
                     // Clear any persistent rating-recovery error from a
                     // previous failed attempt, then unlock the buttons.
                     this.error = '';
-                    this.rating = false;
+                    this.ratingRequestCoordinator.succeed(seq);
                 }).catch((error) => {
                     // DEV-RECOVERY-1 (Task 2000-13): delegate the recovery
                     // orchestration to the pure JS helper. The helper keeps
@@ -924,15 +965,7 @@
                     // which returns a Promise, waits for it to settle, then
                     // unlocks. The helper does NOT touch statistics,
                     // ReviewLog, FSRS, or lifecycle.
-                    runAuthoritativeRatingRecovery({
-                        reloadQueue: () => this.loadCards(),
-                        lockRating: () => { this.rating = true; },
-                        unlockRating: () => { this.rating = false; },
-                        setRecoveryMessage: () => {
-                            this.error = '评分结果状态不确定，正在重新加载词义复习队列，请不要重复评分。';
-                        },
-                        preserveLoadError: () => !!this.error,
-                    });
+                    this.ratingRequestCoordinator.recover(seq, error);
                 });
             },
             continueOverLimit() {
@@ -1125,7 +1158,15 @@
                 if (!this.currentCard || this.loading || this.rating || this.lifecycleLoading || this.resetLoading || this.deleteLoading) {
                     return;
                 }
-                switch (event.key) {
+                if ((event.ctrlKey || event.metaKey) && /^[1-7]$/.test(event.key)) {
+                    event.preventDefault();
+                    const marker = Number(event.key);
+                    const nextMarker = Number(this.currentCard.marker || 0) === marker ? 0 : marker;
+                    this.setCurrentMarker(nextMarker);
+                    return;
+                }
+                const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
+                switch (key) {
                     case ' ':
                     case 'Spacebar':
                         event.preventDefault();
@@ -1145,6 +1186,22 @@
                     case '4':
                         if (this.showAnswer) { this.rate('easy'); }
                         break;
+                    case 'e':
+                        event.preventDefault();
+                        this.startEdit();
+                        break;
+                    case 'i':
+                        event.preventDefault();
+                        this.openCardInfo();
+                        break;
+                    case '-':
+                        event.preventDefault();
+                        this.triggerLifecycleHotkey('bury');
+                        break;
+                    case '@':
+                        event.preventDefault();
+                        this.triggerLifecycleHotkey('suspend');
+                        break;
                 }
             },
             // ==================== Edit dialog ====================
@@ -1155,6 +1212,12 @@
                     return;
                 }
                 this.editDialog = true;
+            },
+            openCardInfo() {
+                const location = buildReviewCardManageLocation(this.currentCard, 'sense-review');
+                if (location) {
+                    this.$router.push(location);
+                }
             },
             onCardSaved(saved) {
                 if (!this.cards.length || !saved) {
@@ -1264,6 +1327,12 @@
                 } else {
                     this.openLifecycleDialog(action);
                 }
+            },
+            triggerLifecycleHotkey(action) {
+                if (!this.showAnswer || !this.availableLifecycleActions.includes(action)) {
+                    return;
+                }
+                this.onLifecycleMenuClick(action);
             },
             openLifecycleDialog(action) {
                 this.lifecycleDialogAction = action;

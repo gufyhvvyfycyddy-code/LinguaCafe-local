@@ -3,14 +3,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const root = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/(.:)/, '$1')), '../..');
-const rules = fs.readFileSync(path.join(root, 'docs/plans/vibe-coding-collaboration-rules.md'), 'utf8');
+const rules = fs.readFileSync(path.join(root, 'docs/architecture/ai-development-rule-system.md'), 'utf8');
 
-assert.match(rules, /正式目标模式编程任务[\s\S]{0,500}ARCH-/, 'formal target-mode work must require a real ARCH track');
-assert.match(rules, /正式目标模式编程任务[\s\S]{0,700}DEV-/, 'formal target-mode work must require a user-visible or executable DEV track');
-assert.match(rules, /验收[\s\S]{0,180}(不能|不得)[\s\S]{0,100}(唯一|整个任务)/, 'acceptance alone must not become a normal target-mode task');
-assert.match(rules, /安全 Gate[\s\S]{0,400}产品决定[\s\S]{0,400}(外部授权|环境)[\s\S]{0,400}越界/, 'pure acceptance or docs exceptions must stay explicitly gated');
-assert.match(rules, /复杂度[\s\S]{0,160}(预算|执行预算)[\s\S]{0,160}(不扩大|不得扩大)/, 'complexity must not expand scope');
-assert.match(rules, /(无意义|不必要)[\s\S]{0,120}(抽象|DTO|Repository|Interface|Adapter)/, 'ARCH + DEV must not justify invented abstractions');
-assert.match(rules, /完成当前复合任务[\s\S]{0,180}(停止|不能自动进入下一任务)/, 'the local agent must stop after the composite task');
+assert.match(rules, /Local Architecture Preflight/, 'feature and structural work must run a local architecture preflight');
+assert.match(rules, /Which business\/module owner receives the behavior/, 'preflight must identify the owning module');
+assert.match(rules, /Does the task add or change an observable interface/, 'preflight must identify interface changes');
+assert.match(rules, /Which existing behaviors and consumers can regress/, 'preflight must identify regression scope');
+assert.match(rules, /Feature delivery and broad refactoring are separate/, 'feature delivery and broad refactoring must remain separate');
+assert.match(rules, /necessary small structural adjustment.*purpose, scope, and tests are explicit/s, 'small necessary structural changes must be disclosed and tested');
+assert.match(rules, /Do not create an empty wrapper, duplicate DTO, generic service, repository, interface, or global state/, 'architecture work must not invent empty abstractions');
+assert.match(rules, /Docs\/rules-only work must run rule guards, local-link checks, and `git diff --check`/, 'explicit docs/rules tasks must have their own executable closure');
+assert.match(rules, /The local execution agent stops after the current task/, 'the local execution agent must stop after the current task');
+assert.match(rules, /does not enter the next phase/, 'implementation must not auto-enter the next phase');
 
-console.log('Target-mode composite task rule contract passed.');
+console.log('Current task-boundary and architecture-preflight rule contract passed.');

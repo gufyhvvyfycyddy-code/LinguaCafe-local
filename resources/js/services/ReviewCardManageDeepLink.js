@@ -28,7 +28,7 @@
  * Each source identifies which report the user came from, so the management
  * page can show the correct "返回" button label.
  */
-const VALID_SOURCES = ['daily-report', 'seven-day-trend', 'thirty-day-calendar'];
+const VALID_SOURCES = ['daily-report', 'seven-day-trend', 'thirty-day-calendar', 'sense-review'];
 
 /**
  * Build a router location object for the review-card management page with

@@ -93,7 +93,7 @@ class CustomStudySessionOrder
         //    legacy word cards are silently dropped.
         $cards = ReviewCard::whereIn('id', $uniqueIds)
             ->where('user_id', $userId)
-            ->where('language', $language)
+            ->where('language_id', $language)
             ->where('target_type', ReviewCard::TARGET_SENSE)
             ->get();
 
@@ -143,6 +143,7 @@ class CustomStudySessionOrder
                 );
 
             case CustomStudyCriteria::MODE_SOURCE_CHAPTER:
+            case CustomStudyCriteria::MODE_MARKED:
             default:
                 // source_chapter and unknown modes: pure canonical fallback.
                 return $canonicalOrdered->map->id->values()->all();

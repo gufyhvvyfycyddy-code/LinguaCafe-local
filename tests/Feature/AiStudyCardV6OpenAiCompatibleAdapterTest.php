@@ -246,6 +246,7 @@ class AiStudyCardV6OpenAiCompatibleAdapterTest extends TestCase
             'ai_study_card_v6.provider.model' => 'fake-model',
             'ai_study_card_v6.provider.api_key' => 'test-key-not-real',
             'ai_study_card_v6.request_policy.timeout_seconds' => 15,
+            'ai_study_card_v6.request_policy.max_cost_usd' => 0.05,
             'ai_study_card_v6.network_validation.browser_network_smoke_required_before_real_provider' => true,
         ]);
     }
