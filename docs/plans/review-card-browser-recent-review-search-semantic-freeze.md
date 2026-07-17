@@ -1,8 +1,8 @@
 # Review Card Browser Recent Review Search Semantic Freeze
 
-> **Status**: Phase 8H complete — semantics frozen; runtime implementation not authorized
+> **Status**: Phase 8I complete — semantics frozen, runtime implemented and browser-verified
 > **Date**: 2026-07-17
-> **Scope**: Browser Search recent formal-review windows reconnaissance and contract freeze only
+> **Scope**: Browser Search recent formal-review windows contract plus the accepted minimal runtime slice
 > **Related**: [ADR-0012](../adr/ADR-0012-review-card-browser-search.md), [ADR-0013](../adr/ADR-0013-review-card-browser-search-execution-pipeline.md), [Anki maximal-alignment forward plan](anki-maximal-alignment-gap-audit-and-forward-plan.md)
 
 ## 1. Goal
@@ -16,7 +16,7 @@ rated:good
 rated:easy
 ```
 
-Phase 8H is documentation and read-only reconnaissance only. It does **not** modify the parser, criteria object, query applier, routes, UI, exports, ReviewLog, FSRS, database schema, or runtime search behavior.
+Phase 8H was documentation and read-only reconnaissance only. Phase 8I subsequently implemented exactly this contract through the existing Browser pipeline without adding routes, migrations, indexes, dependencies, export fields, ReviewLog writes, or FSRS behavior.
 
 ## 2. Repository and Anki facts
 
@@ -175,10 +175,27 @@ A separately authorized implementation must prove:
 - frontend help/chips without parser duplication;
 - real localhost Browser, Network, Console, and zero-write acceptance because Phase 8I would change user-visible search behavior.
 
-## 10. Phase 8H conclusion
+## 10. Phase 8I completion evidence
 
-Phase 8H freezes an additive Anki-style numeric `rated:` grammar while preserving LinguaCafe's existing symbolic lifetime-rating tokens. The contract reuses the current formal-review log boundary and natural-day period semantics instead of inventing a parallel notion of “recent”.
+Phase 8I implemented the frozen grammar without creating a second search system:
 
-No runtime grammar, query, UI, route, export, schema, Saved Search, Custom Study, Reviewer, FSRS, ReviewLog, quoted-phrase, negation, OR, or parentheses work was performed.
+- `ReviewCardBrowserSearchParser` accepts and normalizes numeric recent tokens while preserving symbolic lifetime ratings.
+- `ReviewCardBrowserSearchCriteria` carries ordered read-only `{days, rating|null}` conditions.
+- `ReviewCardBrowserSearchQueryApplier` reuses `SenseReviewReportPeriodService::rollingDays()` and applies one correlated `whereExists` per condition.
+- List, JSON export, CSV export, and Anki TSV continue to share the same parsed criteria and execution path.
+- Frontend changes are limited to help text and examples; server-side parsing remains authoritative.
 
-The only next entry is **Phase 8I — Browser Search numeric `rated:` recent-window minimal runtime implementation**. It requires separate authorization and must implement only the contract frozen here.
+Verification completed:
+
+- focused Phase 8I suite: 20 passed / 133 assertions;
+- Browser Search compatibility plus period boundary regression: 184 passed / 785 assertions;
+- 1-, 7-, 30-, and 365-day windows, inclusive start/exclusive end, rating codes 1–4, numeric AND, numeric+symbolic AND, exclusions, exports, structured 422, constant query shape, and zero writes are covered;
+- existing period-service tests cover timezone, month/year crossing, and natural-day boundary ownership;
+- `npm run development` compiled successfully, with only existing Sass deprecation warnings;
+- real localhost Browser accepted `RATED:007:01`, displayed normalized `rated:7:1`, and showed numeric help/rating mappings;
+- the search action issued one local GET to `/review-cards/manage/data`, no write request, and Console contained no error or warning;
+- ReviewLog, ReviewCard, WordSense, and ReviewCardStateEvent counts were unchanged before and after the browser action.
+
+No quoted phrase, negation, OR, parentheses, general AST, route, migration, index, dependency, export field, Saved Search schema, Custom Study mode, Reviewer behavior, FSRS change, or ReviewLog write was added.
+
+The only next entry is **Phase 8J — Browser Search quoted phrase and negation read-only reconnaissance and semantic freeze**. Runtime implementation requires separate authorization.

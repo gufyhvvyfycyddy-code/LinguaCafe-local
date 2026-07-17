@@ -64,6 +64,8 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString('rated:hard', $contents);
         $this->assertStringContainsString('rated:good', $contents);
         $this->assertStringContainsString('rated:easy', $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'rated', 58, '7'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'rated', 58, '7:1'), $contents);
         $this->assertStringContainsString('prop:lapses', $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'due', 58, 'today'), $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'prop', 58, 'stability'), $contents);

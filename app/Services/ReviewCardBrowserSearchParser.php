@@ -12,7 +12,8 @@ namespace App\Services;
  * V1 grammar (case-insensitive, normalized to lowercase):
  *   is:leech | is:struggling          (governance — max 1)
  *   is:active | is:buried | is:suspended | is:archived  (lifecycle — max 1)
- *   rated:again | rated:hard | rated:good | rated:easy  (max 4, no duplicates)
+ *   rated:again | rated:hard | rated:good | rated:easy  (lifetime existence)
+ *   rated:<1..365> | rated:<1..365>:<1..4>  (recent natural-day window)
  *   prop:lapses{=,>,>=,<,<=}<int>     (V1: only lapses field)
  *   flag:0..7                         (exact ReviewCard marker)
  *   state:new | state:learning | state:review | state:relearning  (max 1 distinct)
@@ -73,6 +74,7 @@ class ReviewCardBrowserSearchParser
         $governanceStatus = null;
         $lifecycleStatus = null;
         $ratings = [];
+        $recentReviewConditions = [];
         $propertyConditions = [];
         $marker = null;
         $fsrsStates = [];
@@ -153,6 +155,12 @@ class ReviewCardBrowserSearchParser
                     if (!in_array($tokenData['value'], $ratings, true)) {
                         $ratings[] = $tokenData['value'];
                     }
+                    break;
+                case 'recent_rating':
+                    $recentReviewConditions[] = [
+                        'days' => $tokenData['days'],
+                        'rating' => $tokenData['rating'],
+                    ];
                     break;
                 case 'property':
                     // ADR-0013: Deduplicate identical property conditions
@@ -239,6 +247,7 @@ class ReviewCardBrowserSearchParser
             lifecycleStatus: $lifecycleStatus,
             marker: $marker,
             ratings: $ratings,
+            recentReviewConditions: $recentReviewConditions,
             propertyConditions: $propertyConditions,
             fsrsStates: $fsrsStates,
             dueDate: $dueDate,
@@ -480,12 +489,35 @@ class ReviewCardBrowserSearchParser
             ];
         }
 
+        if (preg_match('/^(\d+)(?::(\d+))?$/', $lowerValue, $matches) === 1) {
+            $days = (int) $matches[1];
+            $ratingCode = isset($matches[2]) ? (int) $matches[2] : null;
+            $ratingMap = [1 => 'again', 2 => 'hard', 3 => 'good', 4 => 'easy'];
+
+            if ($days >= 1 && $days <= 365 && ($ratingCode === null || isset($ratingMap[$ratingCode]))) {
+                $normalized = 'rated:' . $days;
+                if ($ratingCode !== null) {
+                    $normalized .= ':' . $ratingCode;
+                }
+
+                return [
+                    'data' => [
+                        'kind' => 'recent_rating',
+                        'days' => $days,
+                        'rating' => $ratingCode === null ? null : $ratingMap[$ratingCode],
+                        'normalized' => $normalized,
+                    ],
+                    'error' => null,
+                ];
+            }
+        }
+
         return [
             'data' => null,
             'error' => [
                 'token' => $original,
-                'reason' => "不支持的 rated: 值 '{$lowerValue}'。支持: rated:again, rated:hard, rated:good, rated:easy",
-                'example' => 'rated:again',
+                'reason' => '不支持的 rated: 值。支持不限时间的评分名称，或 1 到 365 天及可选评分代码 1 到 4。',
+                'example' => 'rated:7:1',
             ],
         ];
     }

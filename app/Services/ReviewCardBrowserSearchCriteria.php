@@ -18,6 +18,7 @@ namespace App\Services;
  *  - governanceStatus:   'leech' | 'struggling' | null  (ADR-0011 classification)
  *  - lifecycleStatus:    'active' | 'buried' | 'suspended' | 'archived' | null  (ADR-0010)
  *  - ratings:            list<'again'|'hard'|'good'|'easy'>  (max 4, no duplicates)
+ *  - recentReviewConditions: list<array{days: int, rating: string|null}>
  *  - propertyConditions: list<array{field: string, operator: string, value: int|float}>
  *                        (lapses, reps, stability, difficulty)
  *  - fsrsStates:         list<'new'|'learning'|'review'|'relearning'>
@@ -40,6 +41,7 @@ class ReviewCardBrowserSearchCriteria
      * @param string|null $lifecycleStatus
      * @param int|null $marker
      * @param list<'again'|'hard'|'good'|'easy'> $ratings
+     * @param list<array{days: int, rating: 'again'|'hard'|'good'|'easy'|null}> $recentReviewConditions
      * @param list<array{field: string, operator: string, value: int|float}> $propertyConditions
      * @param list<'new'|'learning'|'review'|'relearning'> $fsrsStates
      * @param string|null $dueDate
@@ -55,6 +57,7 @@ class ReviewCardBrowserSearchCriteria
         public readonly ?string $lifecycleStatus,
         public readonly ?int $marker,
         public readonly array $ratings,
+        public readonly array $recentReviewConditions,
         public readonly array $propertyConditions,
         public readonly array $fsrsStates,
         public readonly ?string $dueDate,
@@ -108,6 +111,11 @@ class ReviewCardBrowserSearchCriteria
     public function hasRatings(): bool
     {
         return !empty($this->ratings);
+    }
+
+    public function hasRecentReviewConditions(): bool
+    {
+        return !empty($this->recentReviewConditions);
     }
 
     /**

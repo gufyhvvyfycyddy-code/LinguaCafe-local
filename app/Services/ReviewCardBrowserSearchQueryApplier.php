@@ -56,6 +56,7 @@ class ReviewCardBrowserSearchQueryApplier
 
     public function __construct(
         private ReviewCardMissingFieldQueryApplier $missingFieldApplier,
+        private SenseReviewReportPeriodService $periodService,
     ) {
     }
 
@@ -140,7 +141,41 @@ class ReviewCardBrowserSearchQueryApplier
             });
         }
 
-        // 5. Property conditions on direct ReviewCard FSRS columns.
+        // 5. Recent formal-review windows. Each condition is an independent
+        // existence predicate, preserving the Browser grammar's global AND semantics.
+        foreach ($criteria->recentReviewConditions as $condition) {
+            $days = (int) ($condition['days'] ?? 0);
+            $rating = $condition['rating'] ?? null;
+            if ($days < 1 || $days > SenseReviewReportPeriodService::MAX_DAYS
+                || ($rating !== null && !isset(self::REVIEW_LOG_RATINGS[$rating]))) {
+                $query->whereRaw('1 = 0');
+                continue;
+            }
+
+            $period = $this->periodService->rollingDays(
+                $days,
+                config('app.timezone', 'UTC'),
+            );
+
+            $query->whereExists(function ($subQuery) use ($userId, $language, $rating, $period) {
+                $subQuery->select(DB::raw(1))
+                    ->from('review_logs')
+                    ->whereColumn('review_logs.review_card_id', 'review_cards.id')
+                    ->where('review_logs.user_id', $userId)
+                    ->where('review_logs.language_id', $language)
+                    ->where('review_logs.source', 'sense_review')
+                    ->whereIn('review_logs.rating', array_values(self::REVIEW_LOG_RATINGS))
+                    ->whereNull('review_logs.undone_at')
+                    ->where('review_logs.reviewed_at', '>=', $period['start'])
+                    ->where('review_logs.reviewed_at', '<', $period['end']);
+
+                if ($rating !== null) {
+                    $subQuery->where('review_logs.rating', $rating);
+                }
+            });
+        }
+
+        // 6. Property conditions on direct ReviewCard FSRS columns.
         foreach ($criteria->propertyConditions as $cond) {
             $column = self::FSRS_PROPERTY_COLUMNS[$cond['field']] ?? null;
             if ($column === null) {

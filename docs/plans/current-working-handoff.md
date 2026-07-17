@@ -2,21 +2,23 @@
 
 Status: current
 
-## 0. Phase 8H current authority（2026-07-17）
+## 0. Phase 8I current authority（2026-07-17）
 
-Current phase: **Phase 3–7 authorized scope closed**；Phase 8A–8H 已按顺序完成当前小步。以下 Phase 8G 与更早章节保留历史证据，凡与本节冲突，以本节为准。
+Current phase: **Phase 3–7 authorized scope closed**；Phase 8A–8I 已按顺序完成当前小步。以下 Phase 8H 与更早章节保留历史证据，凡与本节冲突，以本节为准。
 
-- 当前分支：`codex/anki-maximal-alignment-plan`；本轮预检时本地 HEAD、上游和远端均为 `fc291eff0e7d348c6f199a4432b3825e6a7420d5`，工作区保留已完成但尚未提交的 Phase 8D–8G 代码、测试和文档。
-- Phase 8H 只完成 Browser Search recent formal-review windows 的只读侦察与语义冻结；新增 `docs/plans/review-card-browser-recent-review-search-semantic-freeze.md`，没有修改运行时代码、测试、前端、路由、导出、数据库或搜索行为。
-- 冻结的未来首个实现语法为 `rated:<days>` 与 `rated:<days>:<rating-code>`；`days` 只接受 1..365，rating code 只接受 1..4，并沿用 Anki 映射 1=Again、2=Hard、3=Good、4=Easy。
-- 既有 `rated:again|hard|good|easy` 保持为不限时间的正式评分存在条件，不得被数字语法替换或改变；数字与符号 token 继续按全局 AND 独立组合。
-- 窗口语义冻结为应用时区中的自然日滚动窗口：今天加之前 `n-1` 天，左闭右开 `[start_of_first_day, start_of_tomorrow)`；优先复用 `SenseReviewReportPeriodService::rollingDays()`，避免 Browser 与日报/7 日趋势/30 日日历产生时间边界漂移。
-- 只统计同用户、同语言、`source=sense_review`、rating 属于 again/hard/good/easy、`undone_at IS NULL` 的正式 sense ReviewLog；reset、非正式来源、撤销评分、legacy word card、跨用户/语言和未确认 sense 均排除。
-- Phase 8H 不支持 `reviewed:*`、`recent:*`、`rated:today`、`rated:7:again`、`prop:rated`、精确日期/日期范围、小时/周/月窗口、quoted phrase、negation、OR 或 parentheses。
-- Phase 8H 为 docs/rules-only closure：真实浏览器验收不适用；验收只需文档内容、引用路径、范围证明、相关文档检查和 `git diff --check`。
-- 用户本轮明确要求本地与线上 GitHub 同步，因此 Phase 8D–8H 的相关代码、测试和文档将在完成核验后精确暂存、提交并推送；受保护的 `.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md` 不进入提交。
+- 当前分支：`codex/anki-maximal-alignment-plan`；本轮开始时本地 HEAD、上游和 GitHub 分支 tip 均为 `ac40ba193638384b533ce73da9eed1110e85ca94`。
+- Phase 8I 只实现 Phase 8H 已冻结的 `rated:<days>` 与 `rated:<days>:<rating-code>`；`days` 只接受 1..365，rating code 只接受 1..4，映射为 1=Again、2=Hard、3=Good、4=Easy。
+- Parser 保持纯函数；Criteria 新增有序只读 `recentReviewConditions`；Query Applier 复用 `SenseReviewReportPeriodService::rollingDays()`，为每个 recent 条件添加独立的 correlated `whereExists`。
+- 既有 `rated:again|hard|good|easy` 仍表示不限时间的正式评分存在条件；数字 token、符号 token 及其他 Browser 条件继续按全局 AND 独立组合。
+- 时间窗口为应用时区中的自然日滚动窗口：今天加之前 `n-1` 天，左闭右开 `[start_of_first_day, start_of_tomorrow)`；只统计同用户、同语言、`source=sense_review`、有效正式评分且 `undone_at IS NULL` 的 ReviewLog。
+- reset、非正式来源、撤销评分、legacy word card、跨用户/语言和未确认 sense 均被排除；列表、JSON、CSV 与 Anki TSV 继续共用同一 Parser/Criteria/Query Applier 管线。
+- 前端只增加 numeric `rated:` 帮助和组合示例，没有复制完整 parser；没有新增 route、migration、index、dependency、export field、Saved Search schema、Custom Study、Reviewer、FSRS 或 ReviewLog 写路径。
+- 聚焦测试：20 passed / 133 assertions；Browser Search 兼容回归与自然日边界：184 passed / 785 assertions；`npm run development` 编译成功，仅有既有 Sass deprecation warnings。
+- 真实 localhost 页面输入 `RATED:007:01` 后只发出一个本地 GET `/review-cards/manage/data`，页面显示规范化 chip `rated:7:1`；帮助弹窗显示 `rated:7`、`rated:7:1` 与 1–4 评分映射。控制台核验无 error/warn。
+- 浏览器动作前后数据库计数一致：ReviewLog 0、ReviewCard 4、WordSense 4、ReviewCardStateEvent 0。
+- 用户明确要求本地与线上 GitHub 同步，因此本轮完成最终核验后精确暂存、提交并推送；受保护的 `.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md` 不进入提交。
 
-当前唯一下一小步：**Phase 8I — Browser Search numeric `rated:` recent-window 最小运行时实现**。该步骤尚未授权执行；不得在本轮进入 runtime implementation、quoted phrase、negation、OR/parentheses 或其他后续阶段。
+当前唯一下一小步：**Phase 8J — Browser Search quoted phrase 与 negation 只读侦察和语义冻结**。该步骤尚未授权执行；不得在本轮进入 quoted phrase/negation runtime、OR/parentheses 或其他后续阶段。
 
 ## 0A. Phase 8G historical authority（2026-07-17）
 
