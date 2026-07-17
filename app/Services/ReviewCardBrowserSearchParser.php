@@ -41,9 +41,11 @@ class ReviewCardBrowserSearchParser
     private const GOVERNANCE_STATUSES = ['leech', 'struggling'];
     private const LIFECYCLE_STATUSES = ['active', 'buried', 'suspended', 'archived'];
     private const RATINGS = ['again', 'hard', 'good', 'easy'];
-    private const PROP_FIELDS = ['lapses'];
+    private const PROP_FIELDS = ['lapses', 'reps', 'stability', 'difficulty'];
+    private const INTEGER_PROP_FIELDS = ['lapses', 'reps'];
     private const PROP_OPERATORS = ['=', '>', '>=', '<', '<='];
     private const FSRS_STATES = ['new', 'learning', 'review', 'relearning'];
+    private const RELATIVE_DUE_DATES = ['yesterday', 'today', 'tomorrow'];
 
     /**
      * Parse a raw query string into a ReviewCardBrowserSearchCriteria.
@@ -71,6 +73,7 @@ class ReviewCardBrowserSearchParser
         $propertyConditions = [];
         $marker = null;
         $fsrsStates = [];
+        $dueDate = null;
 
         foreach ($segments as $segment) {
             if ($segment === '') {
@@ -90,7 +93,7 @@ class ReviewCardBrowserSearchParser
             $prefix = strtolower(substr($segment, 0, $colonPos));
             $valuePart = substr($segment, $colonPos + 1);
 
-            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag', 'state'], true)) {
+            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag', 'state', 'due'], true)) {
                 // Not an advanced token prefix — treat as plain text
                 // (e.g. http://example.com).
                 $textParts[] = $segment;
@@ -192,6 +195,17 @@ class ReviewCardBrowserSearchParser
                         }
                     }
                     break;
+                case 'due_date':
+                    if ($dueDate !== null && $dueDate !== $tokenData['value']) {
+                        $errors[] = [
+                            'token' => $segment,
+                            'reason' => '不能同时指定多个到期日期。每个查询最多一个 due: 日期条件。',
+                            'example' => 'due:today',
+                        ];
+                    } else {
+                        $dueDate = $tokenData['value'];
+                    }
+                    break;
             }
         }
 
@@ -213,6 +227,7 @@ class ReviewCardBrowserSearchParser
             ratings: $ratings,
             propertyConditions: $propertyConditions,
             fsrsStates: $fsrsStates,
+            dueDate: $dueDate,
             normalizedTokens: $normalizedTokens,
             errors: [],
         );
@@ -244,6 +259,9 @@ class ReviewCardBrowserSearchParser
         }
         if ($prefix === 'state') {
             return $this->parseStateToken($lowerValue, $original);
+        }
+        if ($prefix === 'due') {
+            return $this->parseDueToken($lowerValue, $original);
         }
 
         // Should never reach here due to the prefix check above.
@@ -278,6 +296,36 @@ class ReviewCardBrowserSearchParser
                 'token' => $original,
                 'reason' => '不支持的 flag: 值。只支持 0 到 7。',
                 'example' => 'flag:1',
+            ],
+        ];
+    }
+
+    private function parseDueToken(string $lowerValue, string $original): array
+    {
+        $isRelative = in_array($lowerValue, self::RELATIVE_DUE_DATES, true);
+        $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $lowerValue);
+        $dateErrors = \DateTimeImmutable::getLastErrors();
+        $isAbsolute = $date !== false
+            && $date->format('Y-m-d') === $lowerValue
+            && ($dateErrors === false || ($dateErrors['warning_count'] === 0 && $dateErrors['error_count'] === 0));
+
+        if ($isRelative || $isAbsolute) {
+            return [
+                'data' => [
+                    'kind' => 'due_date',
+                    'value' => $lowerValue,
+                    'normalized' => 'due:' . $lowerValue,
+                ],
+                'error' => null,
+            ];
+        }
+
+        return [
+            'data' => null,
+            'error' => [
+                'token' => $original,
+                'reason' => '不支持的 due: 值。支持 yesterday、today、tomorrow 或 YYYY-MM-DD。',
+                'example' => 'due:today',
             ],
         ];
     }
@@ -379,30 +427,28 @@ class ReviewCardBrowserSearchParser
      */
     private function parsePropToken(string $valuePart, string $original): array
     {
-        // Match: field name (letters), then operator, then integer.
-        // Operators: >=, <=, >, <, = (longest first to avoid partial match)
-        if (!preg_match('/^([a-zA-Z]+)(>=|<=|>|<|=)(-?\d+)$/', $valuePart, $matches)) {
+        if (!preg_match('/^([a-zA-Z]+)(>=|<=|>|<|=)(-?(?:\d+(?:\.\d+)?))$/', $valuePart, $matches)) {
             return [
                 'data' => null,
                 'error' => [
                     'token' => $original,
-                    'reason' => '不支持的属性比较格式。V1 只支持 prop:lapses{=,>,>=,<,<=}<非负整数>',
-                    'example' => 'prop:lapses>=2',
+                    'reason' => '不支持的属性比较格式。支持 lapses、reps、stability、difficulty 与标准比较运算符。',
+                    'example' => 'prop:stability>=3.5',
                 ],
             ];
         }
 
         $field = strtolower($matches[1]);
         $operator = $matches[2];
-        $value = (int) $matches[3];
+        $rawValue = $matches[3];
 
         if (!in_array($field, self::PROP_FIELDS, true)) {
             return [
                 'data' => null,
                 'error' => [
                     'token' => $original,
-                    'reason' => "不支持的属性 '{$field}'。V1 只支持: prop:lapses",
-                    'example' => 'prop:lapses>=2',
+                    'reason' => "不支持的属性 '{$field}'。支持: lapses, reps, stability, difficulty",
+                    'example' => 'prop:stability>=3.5',
                 ],
             ];
         }
@@ -418,16 +464,34 @@ class ReviewCardBrowserSearchParser
             ];
         }
 
-        if ($value < 0) {
+        if ((float) $rawValue < 0) {
             return [
                 'data' => null,
                 'error' => [
                     'token' => $original,
-                    'reason' => '属性值不能为负数。lapses 必须 >= 0',
+                    'reason' => '属性值不能为负数。',
                     'example' => 'prop:lapses=0',
                 ],
             ];
         }
+
+        if (in_array($field, self::INTEGER_PROP_FIELDS, true) && !ctype_digit($rawValue)) {
+            return [
+                'data' => null,
+                'error' => [
+                    'token' => $original,
+                    'reason' => "{$field} 只支持非负整数。",
+                    'example' => 'prop:reps>=4',
+                ],
+            ];
+        }
+
+        $value = in_array($field, self::INTEGER_PROP_FIELDS, true)
+            ? (int) $rawValue
+            : (float) $rawValue;
+        $normalizedValue = is_int($value)
+            ? (string) $value
+            : rtrim(rtrim(sprintf('%.10F', $value), '0'), '.');
 
         return [
             'data' => [
@@ -435,7 +499,7 @@ class ReviewCardBrowserSearchParser
                 'field' => $field,
                 'operator' => $operator,
                 'value' => $value,
-                'normalized' => 'prop:' . $field . $operator . $value,
+                'normalized' => 'prop:' . $field . $operator . $normalizedValue,
             ],
             'error' => null,
         ];

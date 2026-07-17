@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -41,6 +42,13 @@ class ReviewCardBrowserSearchQueryApplier
         'hard' => 'hard',
         'good' => 'good',
         'easy' => 'easy',
+    ];
+
+    private const FSRS_PROPERTY_COLUMNS = [
+        'lapses' => 'review_cards.fsrs_lapses',
+        'reps' => 'review_cards.fsrs_reps',
+        'stability' => 'review_cards.fsrs_stability',
+        'difficulty' => 'review_cards.fsrs_difficulty',
     ];
 
     /**
@@ -124,17 +132,33 @@ class ReviewCardBrowserSearchQueryApplier
             });
         }
 
-        // 5. Property conditions (prop:lapses<op><n>)
+        // 5. Property conditions on direct ReviewCard FSRS columns.
         foreach ($criteria->propertyConditions as $cond) {
-            if ($cond['field'] === 'lapses') {
-                $query->where('review_cards.fsrs_lapses', $cond['operator'], $cond['value']);
+            $column = self::FSRS_PROPERTY_COLUMNS[$cond['field']] ?? null;
+            if ($column === null) {
+                $query->whereRaw('1 = 0');
+                continue;
             }
+            $query->where($column, $cond['operator'], $cond['value']);
         }
 
         // 6. FSRS state conditions (state:new/learning/review/relearning)
         // Max one distinct value — AND-combined with others.
         foreach ($criteria->fsrsStates as $fsrsState) {
             $query->where('review_cards.fsrs_state', $fsrsState);
+        }
+
+        // 7. Exact calendar-day due condition.
+        if ($criteria->hasDueDate()) {
+            $today = Carbon::today();
+            $start = match ($criteria->dueDate) {
+                'yesterday' => $today->copy()->subDay(),
+                'today' => $today->copy(),
+                'tomorrow' => $today->copy()->addDay(),
+                default => Carbon::createFromFormat('Y-m-d', $criteria->dueDate)->startOfDay(),
+            };
+            $query->where('review_cards.fsrs_due_at', '>=', $start)
+                ->where('review_cards.fsrs_due_at', '<', $start->copy()->addDay());
         }
     }
 }

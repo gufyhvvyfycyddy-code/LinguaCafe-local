@@ -2,6 +2,30 @@
 
 Status: current
 
+## 0. Phase 8C current authority（2026-07-17）
+
+Current phase: **Phase 3–7 authorized scope closed**；Phase 8A、8B、8C 已按顺序完成。以下第 1–10 节保留 Phase 8B 交接证据，凡与本节冲突，以本节为准。
+
+- 当前分支：`codex/anki-maximal-alignment-plan`。
+- Phase 8C 完成内容：Browser Search 新增 `due:yesterday`、`due:today`、`due:tomorrow`、`due:YYYY-MM-DD`，以及 `prop:stability`、`prop:difficulty`、`prop:reps` 数值比较；继续复用既有 Criteria、Parser、Query Applier 和四个消费入口。
+- 到期日期按自然日使用左闭右开区间匹配 `review_cards.fsrs_due_at`；两个不同 `due:` 条件返回结构化 422。
+- `lapses`、`reps` 只接受非负整数；`stability`、`difficulty` 接受非负整数或小数；所有属性直接匹配 ReviewCard 的 FSRS 字段，不从 ReviewLog 推断。
+- 列表、JSON export、CSV export、Anki TSV export 保持同一解析和查询语义；用户、语言和 sense-only 边界保持不变。
+- 没有新增 service、route、dependency、AST、migration；没有进入 source、missing、recent、quoted phrase、negation、OR/parentheses、Saved Search schema、Custom Study、Reviewer、FSRS 调度、ReviewLog 写入、Delete Mutation Family 或真实 AI provider。
+- TDD RED：新增测试先因 Criteria 不存在 `dueDate` 且旧 Parser/Query Applier 不支持新语法而失败。
+- 聚焦 GREEN：140 passed / 529 assertions / 0 failures。
+- 前端构建：Laravel Mix compiled successfully；仅有既有 Sass deprecation warnings。
+- 真实 localhost Chrome：在 `/review-cards/manage` 实际输入 `due:today` 与 `prop:stability>=3`，两次均返回 HTTP 200、展示规范化 token、无语法错误；帮助弹窗显示 due/stability/difficulty/reps 与 AND 语义。
+- Browser Network：仅两个本地 GET `/review-cards/manage/data`；无 POST/PUT/PATCH/DELETE，无外部域名；Console 无新增错误。
+- 数据库前后计数一致：ReviewLog 0、ReviewCard 4、WordSense 4、review_card_state_events 0。
+- 完整 PHP：3,283 tests / 13,357 assertions / 14 skipped / 64 pre-existing deprecations / 0 failures（3m30s，exit 0）。
+- 全部 JS guards：67/67 files passed，0 failed；仅有既有 Node module-type warnings。
+- 受保护的既有工作区内容保持原样且不纳入提交：`.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md`。
+
+兼容状态锚点：Custom Study 1B: Accepted / Production Closed。验收文档：`review-card-marker-custom-study-browser-acceptance-2026-07-17.md`。
+
+当前唯一下一小步：**Phase 8D — Browser Search `source:` token 只读侦察与语义冻结**。该步骤尚未授权执行；本窗口必须在 Phase 8C 提交、推送和 SHA 对齐后停止。
+
 ## 1. 更新时间
 
 2026-07-17 13:49:00 +08:00（Asia/Shanghai）。
@@ -81,7 +105,7 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 - 真实 provider 继续 disabled；代码存在不等于生产授权。
 - `php artisan test --compact` 在默认 128MB 下可能因 PHPUnit 结果缓存 OOM；完整回归使用上面的 512MB、`--do-not-cache-result` 原生命令，不能把 OOM 误报为业务失败或通过。
 
-## 9. 当前唯一下一小步
+## 9. Phase 8C 原执行入口（历史，已由第 0 节关闭）
 
 名称：Phase 8C — Browser Search `due:` token 与 FSRS 数值属性最小切片。
 
@@ -103,7 +127,7 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 
 停止条件：Phase 8C 单一切片验证、交接、commit 和普通 push 完成后立即停止，不进入后续 Phase 8 语法。
 
-## 10. 下一窗口直接使用的提示词
+## 10. Phase 8C 原提示词（历史，禁止再次执行）
 
 ```text
 你现在接管一个尚未完成的编程任务。

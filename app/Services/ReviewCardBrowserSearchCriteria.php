@@ -18,10 +18,11 @@ namespace App\Services;
  *  - governanceStatus:   'leech' | 'struggling' | null  (ADR-0011 classification)
  *  - lifecycleStatus:    'active' | 'buried' | 'suspended' | 'archived' | null  (ADR-0010)
  *  - ratings:            list<'again'|'hard'|'good'|'easy'>  (max 4, no duplicates)
- *  - propertyConditions: list<array{field: string, operator: string, value: int}>
- *                        (V1: field is always 'lapses')
+ *  - propertyConditions: list<array{field: string, operator: string, value: int|float}>
+ *                        (lapses, reps, stability, difficulty)
  *  - fsrsStates:         list<'new'|'learning'|'review'|'relearning'>
  *                        (max 1 distinct value, deduplicated)
+ *  - dueDate:            yesterday | today | tomorrow | YYYY-MM-DD | null
  *  - normalizedTokens:   list<string>  recognized tokens in normalized lowercase form
  *  - errors:             list<array{token: string, reason: string, example: string}>
  *
@@ -37,8 +38,9 @@ class ReviewCardBrowserSearchCriteria
      * @param string|null $lifecycleStatus
      * @param int|null $marker
      * @param list<'again'|'hard'|'good'|'easy'> $ratings
-     * @param list<array{field: string, operator: string, value: int}> $propertyConditions
+     * @param list<array{field: string, operator: string, value: int|float}> $propertyConditions
      * @param list<'new'|'learning'|'review'|'relearning'> $fsrsStates
+     * @param string|null $dueDate
      * @param list<string> $normalizedTokens
      * @param list<array{token: string, reason: string, example: string}> $errors
      */
@@ -51,6 +53,7 @@ class ReviewCardBrowserSearchCriteria
         public readonly array $ratings,
         public readonly array $propertyConditions,
         public readonly array $fsrsStates,
+        public readonly ?string $dueDate,
         public readonly array $normalizedTokens,
         public readonly array $errors,
     ) {
@@ -115,6 +118,11 @@ class ReviewCardBrowserSearchCriteria
     public function hasFsrsStates(): bool
     {
         return !empty($this->fsrsStates);
+    }
+
+    public function hasDueDate(): bool
+    {
+        return $this->dueDate !== null;
     }
 
     /**

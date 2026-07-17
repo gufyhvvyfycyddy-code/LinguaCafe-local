@@ -1628,7 +1628,144 @@ class ReviewCardBrowserSearchTest extends TestCase
         $this->assertStringNotContainsString('phase8b-state-excluded', $tsvResponse->getContent());
     }
 
+    // Phase 8C coverage.
+
+    public function test_due_today_returns_only_cards_due_today(): void
+    {
+        $todayCard = $this->makeCard(['fsrs_due_at' => now()->startOfDay()->addHours(12)]);
+        $yesterdayCard = $this->makeCard(['fsrs_due_at' => now()->startOfDay()->subDay()->addHours(12)]);
+        $tomorrowCard = $this->makeCard(['fsrs_due_at' => now()->startOfDay()->addDay()->addHours(12)]);
+        $token = $this->advancedToken('due', 'today');
+        $url = '/' . 'review-cards/manage/data' . '?filter=all&q=' . urlencode($token);
+        $response = $this->actingAs($this->user)->getJson($url);
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($todayCard->id, $cardIds);
+        $this->assertNotContains($yesterdayCard->id, $cardIds);
+        $this->assertNotContains($tomorrowCard->id, $cardIds);
+    }
+
+    public function test_extended_fsrs_properties_filter_direct_card_columns(): void
+    {
+        $matchingCard = $this->makeCard([
+            'fsrs_stability' => 3.5,
+            'fsrs_difficulty' => 6.25,
+            'fsrs_reps' => 4,
+        ]);
+        $wrongStability = $this->makeCard([
+            'fsrs_stability' => 2.5,
+            'fsrs_difficulty' => 6.25,
+            'fsrs_reps' => 4,
+        ]);
+        $wrongDifficulty = $this->makeCard([
+            'fsrs_stability' => 3.5,
+            'fsrs_difficulty' => 8.25,
+            'fsrs_reps' => 4,
+        ]);
+        $wrongReps = $this->makeCard([
+            'fsrs_stability' => 3.5,
+            'fsrs_difficulty' => 6.25,
+            'fsrs_reps' => 3,
+        ]);
+        $query = implode(' ', [
+            $this->advancedToken('prop', 'stability>=3.5'),
+            $this->advancedToken('prop', 'difficulty<7'),
+            $this->advancedToken('prop', 'reps>=4'),
+        ]);
+        $url = '/' . 'review-cards/manage/data?filter=all&q=' . urlencode($query);
+        $response = $this->actingAs($this->user)->getJson($url);
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($matchingCard->id, $cardIds);
+        $this->assertNotContains($wrongStability->id, $cardIds);
+        $this->assertNotContains($wrongDifficulty->id, $cardIds);
+        $this->assertNotContains($wrongReps->id, $cardIds);
+    }
+
+    public function test_due_and_extended_properties_preserve_scope_and_match_all_exports(): void
+    {
+        $today = now()->startOfDay()->addHours(9);
+        $matchingCard = $this->makeCard([
+            'fsrs_due_at' => $today,
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 6,
+        ]);
+        $matchingCard->sense->update(['lemma' => 'phase8c-search-match']);
+        $excludedCard = $this->makeCard([
+            'fsrs_due_at' => now()->startOfDay()->addDay()->addHours(9),
+            'fsrs_stability' => 2.0,
+            'fsrs_difficulty' => 8.0,
+            'fsrs_reps' => 1,
+        ]);
+        $excludedCard->sense->update(['lemma' => 'phase8c-search-excluded']);
+        $otherUser = User::forceCreate([
+            'name' => 'Phase 8C Other User',
+            'email' => 'phase8c-other-' . Str::uuid() . '@example.com',
+            'password' => \Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $otherUserCard = $this->makeCardForUser($otherUser, [
+            'fsrs_due_at' => $today,
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 6,
+        ]);
+        $otherLanguageCard = $this->makeCard([
+            'language' => 'french',
+            'language_id' => 'french',
+            'fsrs_due_at' => $today,
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 6,
+        ]);
+        $legacyWordCard = $this->makeCard([
+            'target_type' => ReviewCard::TARGET_WORD,
+            'fsrs_due_at' => $today,
+            'fsrs_stability' => 4.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 6,
+        ]);
+        $otherUserCard->sense->update(['lemma' => 'phase8c-search-match']);
+        $otherLanguageCard->sense->update(['lemma' => 'phase8c-search-match']);
+        $legacyWordCard->sense->update(['lemma' => 'phase8c-search-match']);
+        $query = urlencode(implode(' ', [
+            'phase8c-search-match',
+            $this->advancedToken('due', 'today'),
+            $this->advancedToken('prop', 'stability>=3'),
+            $this->advancedToken('prop', 'difficulty<=6'),
+            $this->advancedToken('prop', 'reps>=4'),
+        ]));
+        $base = '/' . 'review-cards/manage/';
+        $listResponse = $this->actingAs($this->user)
+            ->getJson($base . 'data?filter=all&q=' . $query . '&per_page=50');
+        $jsonResponse = $this->actingAs($this->user)
+            ->getJson($base . 'export?filter=all&q=' . $query);
+        $csvResponse = $this->actingAs($this->user)
+            ->get($base . 'export-csv?filter=all&q=' . $query);
+        $tsvResponse = $this->actingAs($this->user)
+            ->get($base . 'export-anki-tsv?filter=all&q=' . $query);
+
+        $listResponse->assertStatus(200);
+        $jsonResponse->assertStatus(200);
+        $csvResponse->assertStatus(200);
+        $tsvResponse->assertStatus(200);
+        $this->assertSame([$matchingCard->id], array_column($listResponse->json('items'), 'review_card_id'));
+        $this->assertCount(1, $jsonResponse->json('items'));
+        $this->assertSame('1', $csvResponse->headers->get('X-Export-Count'));
+        $this->assertSame('1', $tsvResponse->headers->get('X-Export-Count'));
+    }
+
     // ─── Helpers ───
+
+    private function advancedToken(string $prefix, string $value): string
+    {
+        return sprintf('%s%c%s', $prefix, 58, $value);
+    }
 
     private function makeCard(array $overrides = []): ReviewCard
     {

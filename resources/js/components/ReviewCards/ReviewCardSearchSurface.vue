@@ -166,8 +166,20 @@
                         </v-list-item>
                         <v-list-item>
                             <v-list-item-content>
-                                <v-list-item-title><code>prop:lapses&gt;=2</code></v-list-item-title>
-                                <v-list-item-subtitle>按遗忘次数筛选，支持 =, &gt;, &gt;=, &lt;, &lt;=</v-list-item-subtitle>
+                                <v-list-item-title><code>prop:lapses&gt;=2</code> / <code>prop:reps&gt;=4</code></v-list-item-title>
+                                <v-list-item-subtitle>按遗忘次数或复习次数筛选，支持 =, &gt;, &gt;=, &lt;, &lt;=</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>prop:stability&gt;=3.5</code> / <code>prop:difficulty&lt;7</code></v-list-item-title>
+                                <v-list-item-subtitle>按 FSRS 稳定性或难度筛选，可使用小数</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>due:yesterday</code> / <code>due:today</code> / <code>due:tomorrow</code> / <code>due:2026-07-17</code></v-list-item-title>
+                                <v-list-item-subtitle>按到期日精确筛选（自然日）</v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
                         <v-list-item>
@@ -289,7 +301,7 @@ export default {
             return query.trim().split(/\s+/).some((segment) => {
                 const colon = segment.indexOf(':');
                 if (colon <= 0) return false;
-                return ['is', 'rated', 'prop'].includes(segment.substring(0, colon).toLowerCase());
+                return ['is', 'rated', 'prop', 'flag', 'state', 'due'].includes(segment.substring(0, colon).toLowerCase());
             });
         },
         stripIsTokens(query) {

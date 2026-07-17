@@ -634,6 +634,132 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         }
     }
 
+    // Phase 8C parser coverage.
+    // Due-date search coverage.
+
+    public function test_due_today_is_parsed(): void
+    {
+        $token = sprintf('%s%c%s', 'due', 58, 'today');
+        $criteria = $this->parser->parse($token);
+        $this->assertSame('today', $criteria->dueDate);
+        $this->assertSame([$token], $criteria->normalizedTokens);
+        $this->assertTrue($criteria->hasDueDate());
+    }
+
+    public function test_due_relative_and_absolute_values_are_parsed(): void
+    {
+        foreach (['yesterday', 'tomorrow', '2026-07-17'] as $value) {
+            $token = $this->advancedToken('due', $value);
+            $criteria = $this->parser->parse($token);
+
+            $this->assertSame($value, $criteria->dueDate);
+            $this->assertSame([$token], $criteria->normalizedTokens);
+        }
+    }
+
+    public function test_duplicate_due_token_is_deduplicated(): void
+    {
+        $token = $this->advancedToken('due', 'today');
+        $criteria = $this->parser->parse($token . ' ' . strtoupper($token));
+
+        $this->assertSame('today', $criteria->dueDate);
+        $this->assertSame([$token], $criteria->normalizedTokens);
+    }
+
+    public function test_different_due_tokens_return_422(): void
+    {
+        try {
+            $this->parser->parse(
+                $this->advancedToken('due', 'today') . ' ' . $this->advancedToken('due', 'tomorrow')
+            );
+            $this->fail('Expected InvalidBrowserSearchException');
+        } catch (InvalidBrowserSearchException $e) {
+            $errors = $e->getErrors();
+            $this->assertCount(1, $errors);
+            $this->assertStringContainsString('不能同时指定多个到期日期', $errors[0]['reason']);
+        }
+    }
+
+    public function test_invalid_due_values_return_structured_errors(): void
+    {
+        foreach (['2026-02-30', 'nextweek'] as $value) {
+            $token = $this->advancedToken('due', $value);
+            try {
+                $this->parser->parse($token);
+                $this->fail('Expected InvalidBrowserSearchException for ' . $token);
+            } catch (InvalidBrowserSearchException $e) {
+                $errors = $e->getErrors();
+                $this->assertCount(1, $errors);
+                $this->assertSame($token, $errors[0]['token']);
+                $this->assertSame($this->advancedToken('due', 'today'), $errors[0]['example']);
+            }
+        }
+    }
+
+    public function test_extended_fsrs_properties_accept_integer_and_decimal_values(): void
+    {
+        $tokens = [
+            $this->advancedToken('prop', 'stability>=3.5'),
+            $this->advancedToken('prop', 'difficulty<=7.25'),
+            $this->advancedToken('prop', 'reps=4'),
+            $this->advancedToken('prop', 'lapses>1'),
+        ];
+        $criteria = $this->parser->parse(implode(' ', $tokens));
+
+        $this->assertSame([
+            ['field' => 'stability', 'operator' => '>=', 'value' => 3.5],
+            ['field' => 'difficulty', 'operator' => '<=', 'value' => 7.25],
+            ['field' => 'reps', 'operator' => '=', 'value' => 4],
+            ['field' => 'lapses', 'operator' => '>', 'value' => 1],
+        ], $criteria->propertyConditions);
+        $this->assertSame($tokens, $criteria->normalizedTokens);
+    }
+
+    public function test_integer_properties_reject_decimal_values(): void
+    {
+        foreach (['reps>=1.5', 'lapses=0.5'] as $value) {
+            try {
+                $this->parser->parse($this->advancedToken('prop', $value));
+                $this->fail('Expected InvalidBrowserSearchException for ' . $value);
+            } catch (InvalidBrowserSearchException $e) {
+                $this->assertCount(1, $e->getErrors());
+            }
+        }
+    }
+
+    public function test_extended_properties_reject_negative_values(): void
+    {
+        $this->expectException(InvalidBrowserSearchException::class);
+
+        $this->parser->parse($this->advancedToken('prop', 'stability>=-0.1'));
+    }
+
+    public function test_due_and_extended_properties_combine_with_existing_tokens(): void
+    {
+        $criteria = $this->parser->parse(implode(' ', [
+            'charge',
+            $this->advancedToken('is', 'active'),
+            $this->advancedToken('state', 'review'),
+            $this->advancedToken('rated', 'good'),
+            $this->advancedToken('flag', '2'),
+            $this->advancedToken('due', 'today'),
+            $this->advancedToken('prop', 'stability>=3'),
+            $this->advancedToken('prop', 'difficulty<8'),
+            $this->advancedToken('prop', 'reps>=4'),
+        ]));
+
+        $this->assertSame('charge', $criteria->textQuery);
+        $this->assertSame('today', $criteria->dueDate);
+        $this->assertSame(['review'], $criteria->fsrsStates);
+        $this->assertSame(['good'], $criteria->ratings);
+        $this->assertSame(2, $criteria->marker);
+        $this->assertCount(3, $criteria->propertyConditions);
+        $this->assertContains($this->advancedToken('due', 'today'), $criteria->normalizedTokens);
+        $this->assertContains($this->advancedToken('prop', 'stability>=3'), $criteria->normalizedTokens);
+        $this->assertContains($this->advancedToken('prop', 'difficulty<8'), $criteria->normalizedTokens);
+        $this->assertContains($this->advancedToken('prop', 'reps>=4'), $criteria->normalizedTokens);
+    }
+
     public function test_multiple_errors_are_all_reported(): void
     {
         try {
@@ -643,5 +769,10 @@ class ReviewCardBrowserSearchParserTest extends TestCase
             $errors = $e->getErrors();
             $this->assertGreaterThanOrEqual(3, count($errors));
         }
+    }
+
+    private function advancedToken(string $prefix, string $value): string
+    {
+        return sprintf('%s%c%s', $prefix, 58, $value);
     }
 }
