@@ -17,6 +17,7 @@ const paths = {
     table: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue'),
     scheduling: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSchedulingMutationSurface.vue'),
     lifecycle: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue'),
+    lifecycleAcceptance: join(root, 'docs', 'testing', 'review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md'),
 };
 
 for (const [name, path] of Object.entries(paths)) {
@@ -71,7 +72,7 @@ assert.doesNotMatch(source.table, /axios\.(post|put|patch|delete)\s*\(/i);
 assert.match(source.drawer, /const seq = \+\+this\.detailRequestSeq/);
 assert.doesNotMatch(source.drawer, /axios\.(post|put|patch|delete)\s*\(/i);
 
-assert.match(source.plan, /Phase 3C-2 — Lifecycle Mutation Family[^\n]*Code Complete \/ Browser Acceptance Pending/);
+assert.match(source.plan, /Phase 3C-2 — Lifecycle Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3C-3 — Delete Mutation Family[^\n]*Planned \/ Not Authorized/);
 assert.match(source.plan, /ReviewCardLifecycleMutationSurface\.vue/);
 assert.match(source.plan, /1,210 lines/);
@@ -94,14 +95,20 @@ assert.match(source.plan, /do not enter the next Phase 3C subphase/);
 
 for (const doc of [source.roadmap, source.master, source.handoff, source.index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /Phase 3C-2[^\n]*Code Complete \/ Browser Acceptance Pending/);
+    assert.match(doc, /Phase 3C-2[^\n]*Accepted \/ Production Closed/);
     assert.match(doc, /1,210/);
     assert.match(doc, /Phase 3C-3[^\n]*Planned \/ Not Authorized/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }
 
-assert.match(source.master, /Current Phase \| Browser\/ReviewCardManage Phase 3C-2[^\n]*Code Complete \/ Browser Acceptance Pending/);
+assert.match(source.master, /Current Phase \| No implementation phase is currently authorized[^\n]*Phase 3C-2 is Accepted \/ Production Closed/);
 assert.match(source.handoff, /Phase 3C-2 — Lifecycle Mutation Family/);
 assert.match(source.index, /Lifecycle Mutation Surface/);
+assert.match(source.lifecycleAcceptance, /Status\*\*: Passed \/ Production Closure Evidence/);
+assert.match(source.lifecycleAcceptance, /Confirming `埋藏到明天`/);
+assert.match(source.lifecycleAcceptance, /confirming `解除埋藏`/);
+assert.match(source.lifecycleAcceptance, /Confirming batch suspend/);
+assert.match(source.lifecycleAcceptance, /confirming batch restore/);
+assert.match(source.lifecycleAcceptance, /Phase 3C-3 Delete Mutation Family remains \*\*Planned \/ Not Authorized\*\*/);
 
 console.log('ReviewCardManage architecture plan guard passed.');

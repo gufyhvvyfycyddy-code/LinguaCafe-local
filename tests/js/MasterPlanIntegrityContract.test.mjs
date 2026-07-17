@@ -25,15 +25,15 @@ const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
 const presetPlan = read('docs/plans/review-settings-preset-v1-plan.md');
 
-const masterAuthority = section(master, '> **Current authority — 2026-07-16**', '> **Custom Study 1A shared card update');
+const masterAuthority = section(master, '> **Current authority — 2026-07-17**', '> **Custom Study 1A shared card update');
 const openWork = section(master, '## 4. Open Work Registry（当前唯一开放工作账本）', '## 5. 颜色语义规则');
 const executionOrder = section(master, '## 8. Anki 对齐产品与架构执行顺序', '## Recent Update: Codex-FinalArchitectureClosureTargetMode-1');
-const handoffAuthority = section(handoff, '> **Current authority — 2026-07-16**', '> **Authoritative Custom Study status');
+const handoffAuthority = section(handoff, '> **Current authority — 2026-07-17**', '> **Authoritative Custom Study status');
 const manualClosure = section(handoff, '## Manual Sense shared form corrective follow-up (2026-07-15)', null);
 
 assert.match(masterAuthority, /Settings architecture convergence/);
 assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A[^\n]*Preset V1B[^\n]*Preset V1C[^\n]*Preset V1D/);
-assert.match(masterAuthority, /Current Phase \| Browser\/ReviewCardManage Phase 3C-2 — Lifecycle Mutation Family is Code Complete \/ Browser Acceptance Pending; Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
+assert.match(masterAuthority, /Current Phase \| No implementation phase is currently authorized; Browser\/ReviewCardManage Phase 3C-2 is Accepted \/ Production Closed; Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
 assert.match(masterAuthority, /28 production files over 500 lines, 10 over 1,000, and 1 over 1,500/);
 assert.match(masterAuthority, /6\.0\/10, localized medium-high burden/);
 assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
@@ -46,7 +46,7 @@ assert.match(openWork, /Preset V1C — Consumer Convergence \| Completed \/ Prod
 assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Completed \/ Production Closed/);
 assert.match(openWork, /fsrs_parameters_previous/);
 assert.match(openWork, /Settings UX-1/);
-assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Phase 3C-2 Code Complete \/ Acceptance Pending/);
+assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Completed \/ Production Closed through Phase 3C-2/);
 assert.match(openWork, /ReviewCardLifecycleMutationSurface\.vue[^\n]*414 行[^\n]*1 个 descriptor GET[^\n]*2 个 lifecycle POST[^\n]*3 个对话框/);
 assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
 assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
@@ -89,7 +89,7 @@ assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增�
 assert.match(executionOrder, /Settings architecture convergence/);
 assert.match(executionOrder, /Preset V1/);
 assert.match(executionOrder, /Completed \/ Production Closed[\s\S]*双用户、English\/French/);
-assert.match(executionOrder, /Phase 3C-2 Code Complete \/ Browser Acceptance Pending/);
+assert.match(executionOrder, /Phase 3C-2 Accepted \/ Production Closed/);
 assert.match(executionOrder, /Phase 3C-3[^\n]*Planned \/ Not Authorized/);
 assert.match(executionOrder, /Browser \/ ReviewCardManage convergence/);
 assert.match(executionOrder, /Card Marker \+ Custom Study 1B/);
@@ -129,7 +129,7 @@ assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
 assert.match(index, /Preset V1A–V1D are Accepted \/ Production Closed/);
 assert.match(index, /two-user, English\/French V1D matrix are complete under ADR-0027/);
-assert.match(index, /Phase 3C-2[^\n]*Code Complete \/ Browser Acceptance Pending[\s\S]*Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
+assert.match(index, /Phase 3C-2[^\n]*Accepted \/ Production Closed[\s\S]*Phase 3C-3 Delete Mutation Family remains Planned \/ Not Authorized/);
 assert.match(index, /1,210 lines[^\n]*11 direct `axios\.` references[^\n]*6 `v-dialog` blocks/);
 assert.match(index, /review-card-manage-architecture-convergence-plan\.md/);
 assert.doesNotMatch(index, /V1D production-closure matrix remains open|V1D broader production closure remains open/);

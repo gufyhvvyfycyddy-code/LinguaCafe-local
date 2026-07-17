@@ -1,8 +1,8 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3C-2 — Lifecycle Mutation Family — Code Complete / Browser Acceptance Pending
+> **Status**: Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed
 >
-> **Current next slice**: Phase 3C-2 authenticated Chrome acceptance — Pending; Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized
+> **Current next slice**: Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized; no implementation phase is currently authorized
 >
 > **Architecture baseline**: master `18c8208073029cfadf89f86634b8f4cad68f4854`
 >
@@ -217,7 +217,7 @@ Group write operations by real domain boundaries while retaining current backend
 Frozen subphase order:
 
 1. **Phase 3C-1 — Due-now / Reset Scheduling Mutation Family — Accepted / Production Closed**. `ReviewCardSchedulingMutationSurface.vue` is the sole owner of the two scheduling POST requests, their targets, request locks and confirmation dialogs. The parent only forwards table intents and consumes semantic card-update/refresh/notify/error events.
-2. **Phase 3C-2 — Lifecycle Mutation Family — Code Complete / Browser Acceptance Pending**. `ReviewCardLifecycleMutationSurface.vue` is the sole descriptor, single/bulk lifecycle request, request-lock, confirmation and state-help owner. Leech governance keeps its own product UI but delegates lifecycle writes to this owner. Production closure remains blocked on authenticated Chrome acceptance.
+2. **Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed**. `ReviewCardLifecycleMutationSurface.vue` is the sole descriptor, single/bulk lifecycle request, request-lock, confirmation and state-help owner. Leech governance keeps its own product UI but delegates lifecycle writes to this owner. Authenticated dual-viewport Chrome acceptance completed on 2026-07-17.
 3. **Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized**. Consolidate single/bulk delete confirmation and request ownership while preserving ReviewLog, occurrence and last-confirmed-sense semantics.
 4. **Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Started**. Consolidate rewrite-package and leech-suspend orchestration while preserving the no-provider/no-auto-create boundary.
 
@@ -249,7 +249,7 @@ Phase 3C-1 TDD and browser evidence on 2026-07-16:
 - deep-link parsing now rejects mixed numeric garbage such as `123abc` and decimal strings such as `1.5` instead of truncating them with `parseInt`;
 - at 900×900 the page had no document-level horizontal overflow, table overflow remained inside `.table-wrapper`, the scheduling dialog remained contained, Console was clean and no external resource was observed.
 
-#### Phase 3C-2 — Lifecycle Mutation Family — Code Complete / Browser Acceptance Pending
+#### Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed
 
 Implemented boundary:
 
@@ -280,8 +280,11 @@ TDD and verification evidence on 2026-07-16:
 - lifecycle command, compatibility, concurrency, queue, danger and UI safety regression passed: 98 tests / 229 assertions;
 - the development build compiled successfully with only existing Sass deprecation warnings;
 - grouped Browser regression passed 393 tests / 1,366 assertions with two existing slow export cases skipped; lifecycle/Leech regression passed 134 tests / 341 assertions; Unit passed 652 tests / 1,518 assertions; all 57 Node guards passed;
-- Chrome DevTools 1 was invoked repeatedly but the platform connector returned 502 each time. The local Chrome DevTools Protocol endpoint was healthy and the management page was reachable, but the existing browser session had expired and the safety layer blocked credential injection through the shell fallback. No authenticated lifecycle write acceptance was performed and no browser-side lifecycle audit events were created;
-- production closure therefore remains pending. This is a tooling/session acceptance blocker, not an automated-test failure.
+- the original implementation pass could not complete authenticated Chrome acceptance because the platform connector returned 502 and the available session had expired;
+- a later authenticated localhost browser pass on 2026-07-17 closed that blocker: at 1920×1080, one single-card bury and unbury each produced exactly one lifecycle-action POST, and a two-card bulk suspend and restore each produced exactly one bulk-lifecycle POST; every confirmed write was followed by one list refresh and one stats refresh;
+- opening single and bulk confirmations produced no write before confirmation, selection cleared after the successful bulk operations, and the visible lifecycle baseline was restored to total 4, active 4, buried 0, suspended 0, archived 0 and due now 4;
+- at 900×900, the state-help and single-card confirmation dialogs remained contained, cancelling created no request and document width matched client width after close;
+- Console contained no error, warning or issue, and every observed resource stayed on `127.0.0.1:8000`; full evidence is recorded in `docs/testing/review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md`.
 
 Anki alignment for 3C-2:
 
@@ -384,4 +387,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3C-2 remains the current phase after its code commit and normal push. Production closure requires a later authenticated Chrome acceptance pass. Phase 3C-3 is **Planned / Not Authorized**. Do not enter the next Phase 3C subphase, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3C-2 is **Accepted / Production Closed** after its authenticated Chrome acceptance pass. Phase 3C-3 is **Planned / Not Authorized**. Do not enter the next Phase 3C subphase, Card Marker, Custom Study 1B or any later phase automatically.
