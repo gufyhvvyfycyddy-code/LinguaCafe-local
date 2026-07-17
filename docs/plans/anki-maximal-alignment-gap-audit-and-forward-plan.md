@@ -94,13 +94,14 @@ Still missing or incomplete:
 
 Already present: separated pending lifecycle, preview/final package, candidate normalization/deduplication, confirmed-card generation, source binding, V6 request/provider/security/parser/schema services, backend-only provider calls, explicit UI trigger, default-unchecked recommendations, and manual V5 confirmation.
 
-Still missing or incomplete:
+Deferred by the user's decision to keep the real provider disabled:
 
 1. Provider usage/token/cost metadata and a configured per-request ceiling; current code exposes model/timeout/quota failure but not cost evidence.
-2. A user-visible preflight showing provider, model, item count, external data fields, timeout, and estimated/unknown cost before the request.
-3. Durable provider request audit metadata without raw prompt, response, source text, headers, or secret values.
-4. Real configured-provider Network acceptance in the current environment, including exactly one local browser request and zero browser calls to provider domains.
-5. Clear retry UX that remains explicit and never turns into background generation.
+2. Durable provider request audit metadata without raw prompt, response, source text, headers, or secret values.
+3. Real configured-provider Network acceptance in the current environment, including exactly one local browser request and zero browser calls to provider domains.
+4. Clear retry UX that remains explicit and never turns into background generation.
+
+The disabled-provider request package already provides the user-visible preflight for provider/model, item count, external fields, timeout, configured/unknown cost ceiling, cost-estimate availability, secret-source category, failure policy, and blocking reasons.
 
 ### 4.6 Statistics and planning
 
@@ -193,11 +194,11 @@ Every phase is separately authorized, implemented, tested, browser-accepted, and
 - Extract one responsibility at a time from `TextBlockGroup.vue` and `TextBlockService.php`; no rewrite and no empty pass-through layers.
 - Close desktop, narrow, touch, keyboard, tokenizer fallback, dictionary, occurrence, and source-context regression after each slice.
 
-### Phase 7 — Service convergence accepted / real provider environment gate
+### Phase 7 — Service convergence and disabled-provider preflight accepted
 
 - Pending lifecycle, preview/final package and candidate normalization, confirmed-card generation, source binding, and disabled-provider browser acceptance are accepted under ADR-0032; the original service is now a compatibility facade.
-- Add cost/usage policy and explicit preflight to the existing V6 boundary.
-- Run one configured real-provider request through the existing local route; capture local Network, external browser-domain absence, response schema, timeout/failure behavior, and zero learning-data writes.
+- The request package now shows provider/model, item count, external fields, timeout, cost ceiling, cost-estimate availability, secret-source category, failure policy, and blocking reasons without exposing secret material.
+- The user explicitly chose to keep the real provider disabled. A configured external request is deferred unless a future task separately authorizes provider, pricing, timeout, secret storage, and Network acceptance.
 - Keep recommendations unchecked and require the existing V5 manual Chinese-definition confirmation.
 
 ### Phase 8 — Search and filtered-study parity
@@ -262,7 +263,7 @@ The remaining differences are either LinguaCafe's deliberate reading/sense model
 
 The current Anki manual still treats four ratings and shortcuts, flags, lifecycle actions, Card Info, Browser search, filtered study, and Leech handling as separate but connected workflows. LinguaCafe now covers the highest-value shared outcomes through sense-card ratings/shortcuts, finite markers, Browser/Custom Study integration, lifecycle/Leech surfaces, and a fail-closed AI boundary. The remaining high-value gaps are the existing Phase 8 search authority, Phase 9 recovery-safe lifecycle parity, analytics drill-down, and portability/recovery. Generic decks, note types, templates, siblings, add-on execution, and AnkiWeb-style sync remain deliberate deviations because LinguaCafe's ownership is reading source → WordSense → sense ReviewCard.
 
-No new implementation phase is justified by this recheck. The next action is either closing the explicitly documented AI provider environment gate or separately authorizing Phase 8; extending the comparison further now would be speculative.
+No new implementation phase is justified by this recheck. The provider is deliberately disabled; the next action is separately authorizing Phase 8. Extending the comparison further now would be speculative.
 
 ## 8. Completion definition
 
@@ -271,7 +272,7 @@ No new implementation phase is justified by this recheck. The next action is eit
 - every Replicate/Adapt item above is implemented or explicitly rejected by a recorded product decision;
 - Browser, Custom Study, Reviewer, analytics, and import/export share the intended backend authorities;
 - all destructive and scheduling actions have browser and data evidence;
-- real AI has cost/security/Network evidence and remains user-confirmed;
+- real AI, if later authorized, has cost/security/Network evidence and remains user-confirmed; the current disabled-provider decision is recorded and fail-closed;
 - current docs and executable guards agree with code and Git;
 - the remaining gaps are only deliberate deviations or optional items rejected by measured demand.
 

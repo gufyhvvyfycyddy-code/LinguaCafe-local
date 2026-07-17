@@ -21,7 +21,7 @@ const phases = [
     '### Phase 4 — Marker + Custom Study 1B',
     '### Phase 5 — Reviewer convergence',
     '### Phase 6 — Reader UX and responsibility extraction',
-    '### Phase 7 — Service convergence accepted / real provider environment gate',
+    '### Phase 7 — Service convergence and disabled-provider preflight accepted',
     '### Phase 8 — Search and filtered-study parity',
     '### Phase 9 — Browser/reviewer lifecycle parity',
     '### Phase 10 — Analytics parity',
@@ -41,6 +41,8 @@ assert.match(plan, /do not add generic decks\/subdecks/);
 assert.match(plan, /### Pass 4 — diminishing returns/);
 assert.match(plan, /### Pass 5 — official-source recheck after Phases 4–7/);
 assert.match(plan, /Pending lifecycle, preview\/final package and candidate normalization, confirmed-card generation, source binding, and disabled-provider browser acceptance are accepted under ADR-0032/);
+assert.match(plan, /The user explicitly chose to keep the real provider disabled/);
+assert.match(plan, /cost-estimate availability/);
 assert.match(plan, /five stateless preview-only modes including marked cards/);
 assert.match(plan, /shared request coordination and failure recovery/);
 assert.match(plan, /active-only lookup sidebar/);
