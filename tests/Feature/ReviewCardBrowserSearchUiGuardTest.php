@@ -61,6 +61,9 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString('is:leech', $contents);
         $this->assertStringContainsString('is:suspended', $contents);
         $this->assertStringContainsString('rated:again', $contents);
+        $this->assertStringContainsString('rated:hard', $contents);
+        $this->assertStringContainsString('rated:good', $contents);
+        $this->assertStringContainsString('rated:easy', $contents);
         $this->assertStringContainsString('prop:lapses', $contents);
         $this->assertStringContainsString('charge is:leech', $contents);
     }

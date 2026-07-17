@@ -205,6 +205,130 @@ class ReviewCardBrowserSearchTest extends TestCase
         $this->assertNotContains($cardWithoutHard->id, $cardIds);
     }
 
+    public function test_rated_good_token_returns_cards_with_good_log(): void
+    {
+        $cardWithGood = $this->makeCard();
+        $this->makeLog($cardWithGood, 'good', 1);
+
+        $cardWithoutGood = $this->makeCard();
+        $this->makeLog($cardWithoutGood, 'easy', 1);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('rated:good'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($cardWithGood->id, $cardIds);
+        $this->assertNotContains($cardWithoutGood->id, $cardIds);
+    }
+
+    public function test_rated_easy_token_returns_cards_with_easy_log(): void
+    {
+        $cardWithEasy = $this->makeCard();
+        $this->makeLog($cardWithEasy, 'easy', 1);
+
+        $cardWithoutEasy = $this->makeCard();
+        $this->makeLog($cardWithoutEasy, 'good', 1);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?q=' . urlencode('rated:easy'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($cardWithEasy->id, $cardIds);
+        $this->assertNotContains($cardWithoutEasy->id, $cardIds);
+    }
+
+    public function test_rated_good_and_easy_exclude_non_formal_reset_and_undone_logs(): void
+    {
+        $matchingCard = $this->makeCard();
+        $this->makeLog($matchingCard, 'good', 2);
+        $this->makeLog($matchingCard, 'easy', 1);
+
+        $nonFormalCard = $this->makeCard();
+        $this->makeLog($nonFormalCard, 'good', 2, 'review');
+        $this->makeLog($nonFormalCard, 'easy', 1, 'review');
+
+        $resetSourceCard = $this->makeCard();
+        $this->makeLog($resetSourceCard, 'good', 2, 'reset');
+        $this->makeLog($resetSourceCard, 'easy', 1, 'reset');
+
+        $undoneCard = $this->makeCard();
+        $this->makeLog($undoneCard, 'good', 2);
+        $this->makeLog($undoneCard, 'easy', 1, 'sense_review', now());
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('rated:good rated:easy') . '&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertSame([$matchingCard->id], $cardIds);
+        $this->assertNotContains($nonFormalCard->id, $cardIds);
+        $this->assertNotContains($resetSourceCard->id, $cardIds);
+        $this->assertNotContains($undoneCard->id, $cardIds);
+    }
+
+    public function test_rated_good_and_easy_respect_user_and_language_isolation(): void
+    {
+        $matchingCard = $this->makeCard();
+        $this->makeLog($matchingCard, 'good', 2);
+        $this->makeLog($matchingCard, 'easy', 1);
+
+        $otherUser = User::forceCreate([
+            'name' => 'Other Rated User',
+            'email' => 'other-rated-' . Str::uuid() . '@example.com',
+            'password' => \Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $otherUserCard = $this->makeCardForUser($otherUser);
+        $this->makeLog($otherUserCard, 'good', 2);
+        $this->makeLog($otherUserCard, 'easy', 1);
+
+        $otherLanguageSense = WordSense::forceCreate([
+            'user_id' => $this->user->id,
+            'language' => 'japanese',
+            'language_id' => 'japanese',
+            'lemma' => 'rated-language-scope',
+            'surface_form' => 'rated-language-scope',
+            'pos' => 'noun',
+            'sense_zh' => '评分语言范围',
+            'sense_en' => 'rated language scope',
+            'aliases_zh' => [],
+            'collocations' => [],
+            'example_sentence_en' => 'Rated language scope.',
+            'example_sentence_zh' => '评分语言范围。',
+            'status' => WordSense::STATUS_CONFIRMED,
+            'is_context_specific' => true,
+            'sense_key' => hash('sha256', strtolower('japanese|rated-language-scope|noun|评分语言范围|rated language scope')),
+        ]);
+        $otherLanguageCard = ReviewCard::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'japanese',
+            'language' => 'japanese',
+            'target_type' => ReviewCard::TARGET_SENSE,
+            'target_id' => $otherLanguageSense->id,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'fsrs_reps' => 2,
+            'fsrs_lapses' => 0,
+            'lifecycle_state' => 'active',
+        ]);
+        $this->makeLog($otherLanguageCard, 'good', 2);
+        $this->makeLog($otherLanguageCard, 'easy', 1);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('rated:good rated:easy') . '&per_page=50');
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($matchingCard->id, $cardIds);
+        $this->assertNotContains($otherUserCard->id, $cardIds);
+        $this->assertNotContains($otherLanguageCard->id, $cardIds);
+    }
+
     // ─── 8. non-sense_review again doesn't count ───
 
     public function test_non_sense_review_again_log_does_not_count(): void
@@ -520,6 +644,47 @@ class ReviewCardBrowserSearchTest extends TestCase
 
         $response->assertStatus(200);
         $this->assertSame('1', $response->headers->get('X-Export-Count'));
+    }
+
+    public function test_rated_good_and_easy_results_match_list_and_all_exports(): void
+    {
+        $matchingCard = $this->makeCard();
+        $matchingCard->sense->update(['lemma' => 'phase8a-formal-match']);
+        $this->makeLog($matchingCard, 'good', 2);
+        $this->makeLog($matchingCard, 'easy', 1);
+
+        $excludedCard = $this->makeCard();
+        $excludedCard->sense->update(['lemma' => 'phase8a-excluded']);
+        $this->makeLog($excludedCard, 'good', 1);
+
+        $query = urlencode('phase8a-formal-match rated:good rated:easy');
+
+        $listResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . $query . '&per_page=50');
+        $jsonResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?filter=all&q=' . $query);
+        $csvResponse = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?filter=all&q=' . $query);
+        $tsvResponse = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?filter=all&q=' . $query);
+
+        $listResponse->assertStatus(200);
+        $jsonResponse->assertStatus(200);
+        $csvResponse->assertStatus(200);
+        $tsvResponse->assertStatus(200);
+
+        $this->assertSame([$matchingCard->id], array_column($listResponse->json('items'), 'review_card_id'));
+        $this->assertCount(1, $jsonResponse->json('items'));
+        $this->assertSame('1', $csvResponse->headers->get('X-Export-Count'));
+        $this->assertSame('1', $tsvResponse->headers->get('X-Export-Count'));
+
+        $jsonItems = json_encode($jsonResponse->json('items'));
+        $this->assertStringContainsString('phase8a-formal-match', $jsonItems);
+        $this->assertStringContainsString('phase8a-formal-match', $csvResponse->getContent());
+        $this->assertStringContainsString('phase8a-formal-match', $tsvResponse->getContent());
+        $this->assertStringNotContainsString('phase8a-excluded', $jsonItems);
+        $this->assertStringNotContainsString('phase8a-excluded', $csvResponse->getContent());
+        $this->assertStringNotContainsString('phase8a-excluded', $tsvResponse->getContent());
     }
 
     // ─── 20. 422 error structure ───
@@ -1418,8 +1583,13 @@ class ReviewCardBrowserSearchTest extends TestCase
         }
     }
 
-    private function makeLog(ReviewCard $card, string $rating, int $daysAgo): void
-    {
+    private function makeLog(
+        ReviewCard $card,
+        string $rating,
+        int $daysAgo,
+        ?string $source = null,
+        ?\DateTimeInterface $undoneAt = null,
+    ): void {
         ReviewLog::create([
             'user_id' => $card->user_id,
             'language_id' => $card->language_id,
@@ -1435,7 +1605,8 @@ class ReviewCardBrowserSearchTest extends TestCase
             'new_stability' => 1.5,
             'previous_difficulty' => 5.0,
             'new_difficulty' => 5.0,
-            'source' => $rating === 'reset' ? 'reset' : 'sense_review',
+            'source' => $source ?? ($rating === 'reset' ? 'reset' : 'sense_review'),
+            'undone_at' => $undoneAt,
         ]);
     }
 }

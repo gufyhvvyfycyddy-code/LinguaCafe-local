@@ -4,18 +4,19 @@ Status: current
 
 ## 1. 更新时间
 
-2026-07-17 12:57:09 +08:00（Asia/Shanghai）。
+2026-07-17 13:22:21 +08:00（Asia/Shanghai）。
 
 ## 2. 仓库与 Git 状态
 
 - 本地仓库：`D:\Document\lingl\LinguaCafe-main`
 - 远端：`git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git`
 - 当前分支：`codex/anki-maximal-alignment-plan`
-- 写入本区块前的 HEAD：`31eed2643eaa72fefdd2796fb9252c02a7157ade`
-- 已验证功能检查点：`eb03f49266c427c495c6174077116e0869d51b74`（Phase 3–7 实现、测试、ADR、验收报告和本交接初稿）。
+- Phase 8A 开始检查点：`c741177fd98bf7ebb1f40be56129ff53ec26ff4b`（`docs: finalize development handoff`）。
+- 已验证功能检查点：`eb03f49266c427c495c6174077116e0869d51b74`（Phase 3–7）。
 - 上游：`origin/codex/anki-maximal-alignment-plan`
-- 写入本区块前本地 HEAD 与上游一致；本次检查点提交后，以远端分支 tip 和最终回复中的 SHA 为恢复入口。
-- 工作区在提交前不干净：包含本次 Phase 3–7 已验证实现、文档和测试；受保护的 `.playwright-cli/`、`nul`，生成的 `public/js/app.js.LICENSE.txt`，以及与本检查点无关的 `docs/architecture/improve-codebase-architecture-install-report.md` 不纳入提交。
+- 预检确认本地 HEAD、上游和 GitHub 分支 tip 均为 `c741177fd98bf7ebb1f40be56129ff53ec26ff4b`，且包含已验证功能检查点。
+- 本次提交完成后，以最终三方一致 SHA 为恢复入口。
+- 受保护的既有工作区内容保持原样且不纳入提交：`.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md`。
 
 ## 3. 项目目标
 
@@ -28,48 +29,45 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 - Phase 5 Reviewer convergence 已关闭：Sense Review 和 legacy Review 共用请求协调、失败恢复与快捷键契约；Sense Review 仍是正式入口。
 - Phase 6 Reader UI/architecture 已关闭：查词侧栏只在实际选词时占位；Reader projection 责任已收敛，未重写阅读主链路。
 - Phase 7 授权范围已关闭：Pending lifecycle、package/candidate、confirmed-card generation/source binding 各有服务所有者，旧 Service 是 195 行兼容 facade；真实 provider 按用户决定保持禁用，预检 fail-closed。
-- 最大 Anki 对齐差距审计与后续 Phase 8–12 计划已在 `docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md`，但没有自动进入 Phase 8。
+- Phase 8A 已完成：现有线性 Browser 语法支持 `rated:good` / `rated:easy`，与 `rated:again` / `rated:hard` 共用 Parser、Criteria 和 Query Applier；列表、JSON、CSV、Anki TSV 四个消费者保持同一查询语义。
+- 最大 Anki 对齐差距审计与后续 Phase 8–12 计划仍在 `docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md`；本窗口只关闭 Phase 8A，没有进入后续语法。
 - 兼容边界未改变：不创建 legacy word card；不改变 FSRS、ReviewLog 生命周期、公开评分值或现有 V1–V6 payload；AI 推荐仍默认不选并经过 V5 人工确认。
 
 ## 5. 本窗口完成的唯一小步骤
 
-目标：把已完成并验证的 Phase 3–7 工作整理成一个可从 GitHub 恢复的检查点，不开发新功能。
+名称：Phase 8A — Browser Search `rated:good` / `rated:easy` 最小切片。
 
-实际范围：
+完成内容：
 
-- Browser/Custom Study：Marker 字段与 migration、marker controller/service/UI、`flag:` 搜索、marked query、Lifecycle/Leech/Container 收敛及测试。
-- Reviewer：共享评分失败恢复、请求协调、快捷键和两个 Review 页面接线及测试。
-- Reader：active-only sidebar、workspace sizing、Reader projection/facade 收敛及测试。
-- AI Study Card：Pending lifecycle/package/generation 服务拆分、disabled-provider preflight、配置/UI/测试。
-- 规则与文档：根规则、领域词汇、规则系统、ADR-0028 至 ADR-0032、路线图、master plan、验收报告和本交接入口。
+- Parser 正式接受并规范化 `rated:again`、`rated:hard`、`rated:good`、`rated:easy`，按首次出现顺序去重。
+- Criteria 的 rating 类型边界同步扩展为四个正式评分。
+- Query Applier 使用单一正式评分映射，并继续严格过滤当前用户、当前语言、`source=sense_review`、`undone_at IS NULL`。
+- 多个 `rated:` token 继续使用 AND 语义。
+- 列表、JSON export、CSV export、Anki TSV export 继续通过同一个 Parser/Criteria/Query Applier 管线消费结果。
+- 搜索帮助文本和 UI guard 增加 Good/Easy 与 AND 组合说明。
 
-关键决定：复用现有服务与 Vue 边界；不新增依赖；不实现 Delete Mutation Family；不启用真实 provider；不把 Phase 8 放入本检查点。Marker migration 是本次唯一数据库 schema 变更，为可逆的单列 additive migration；没有破坏公开接口或 persisted payload。
-
-未采用：一次性重写 ReviewCardManage/Reader、通用 deck/note 模型、provider 密钥/计费基础设施、自动 AI 建卡。原因分别是高风险、违背产品边界或未获授权。
+边界：没有新增 service、route、dependency、AST 或 migration；没有修改 Saved Search schema、Custom Study、Reviewer、FSRS、ReviewLog 写入、Delete Mutation Family、真实 AI provider 或其他 Phase 8 语法。
 
 ## 6. 验证证据
 
-- 最初完整运行发现 `CustomStudySessionStateTest::rejects_unknown_mode_in_from_array` 仍把已合法的 `marked` 当未知模式；只把测试样例改为 `unknown_marker_mode`。聚焦复测：1 test / 1 assertion，通过。
-- 完整 PHP：`php -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --colors=never` → 3,247 tests / 13,205 assertions / 14 skipped / 0 failures / 64 existing deprecations，退出码 0。
-- 全部 JS 守卫：67/67 文件通过，0 failures，退出码 0。
-- 前端构建：`npm run development` → Laravel Mix compiled successfully in 5,923ms（命令总计 6.66s），退出码 0；仅有 335 条既存 Sass deprecation warnings 被折叠。
-- 浏览器证据：
-  - `docs/testing/review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md`
-  - `docs/testing/review-card-leech-mutation-browser-acceptance-2026-07-17.md`
-  - `docs/testing/review-card-marker-custom-study-browser-acceptance-2026-07-17.md`
-  - `docs/testing/reviewer-convergence-browser-acceptance-2026-07-17.md`
-  - `docs/testing/reader-attention-and-facade-browser-acceptance-2026-07-17.md`
-  - `docs/testing/ai-study-card-service-convergence-browser-acceptance-2026-07-17.md`
-- AI disabled-provider follow-up：请求包本地 200；显式 provider preview 按预期 503 fail-closed；浏览器无 provider-domain 请求；preflight 前后 WordSense 180、ReviewCard 103、ReviewLog 168、pending 8 均不变。
-- `git diff --check`、暂存清单检查和 push 三方 SHA postflight 必须在提交前后完成。
+- TDD RED：新增 Parser/Feature 测试后，`rated:good` / `rated:easy` 仅因旧白名单返回 422；现有 Again/Hard 测试保持通过。
+- 聚焦 GREEN：`php artisan test tests/Unit/ReviewCardBrowserSearchParserTest.php tests/Feature/ReviewCardBrowserSearchTest.php tests/Feature/ReviewCardBrowserSearchUiGuardTest.php --stop-on-failure` → 111 passed / 416 assertions / 0 failures。
+- 全部 JS 守卫：67/67 文件通过，退出码 0；只有既有 Node module-type warnings。
+- 前端构建：`npm run development` → Laravel Mix compiled successfully，退出码 0；只有既有 Sass deprecation warnings。
+- 完整 PHP：`php -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --colors=never` → 3,254 tests / 13,244 assertions / 14 skipped / 0 failures / 64 existing deprecations，退出码 0。
+- 真实 localhost Chromium 页面：使用 Section 8 本地账号登录 `/review-cards/manage`；`rated:good` 返回 200、总计 37；`rated:easy` 返回 200、总计 5；两者均显示规范化 token，无语法错误；帮助弹窗包含 Good/Easy 和 AND 说明。
+- 查询期间 Network 只有两个本地 `GET /review-cards/manage/data` XHR，请求 host 仅 `127.0.0.1:8000`，无 POST/PUT/PATCH/DELETE 或外部域名。
+- Console 没有查询功能引入的新错误；页面仍有既有本地 Pusher WebSocket `127.0.0.1:6001` 连接失败噪声，已作为环境基线记录，未在本任务扩修。
+- 数据库前后计数一致：ReviewLog 168、ReviewCard 103、WordSense 180、review_card_state_events 21，证明页面查询零业务写入。
+- Chrome DevTools MCP connector 连续两次返回远端 SSE 404；按同一问题两轮上限停止重试，改用项目已安装 Playwright 驱动真实本地 Chromium 完成页面交互、Network 与 Console 证据，没有用 API 成功替代页面验收。
+- `git diff --check`、精确暂存清单和三方 SHA postflight 在提交前后完成。
 
 ## 7. 未提交或未完成内容
 
-- 功能未完成项：Phase 3C-3 Delete Mutation Family（未授权）；真实 provider（用户决定暂缓）；Phase 8–12（均需分别授权）。
-- 当前故意 RED：无。已发现的 stale `marked` 测试夹具已最小修正并通过。
-- 临时/受保护内容：`.playwright-cli/` 与 `nul` 不处理、不提交；`public/js/app.js.LICENSE.txt` 为构建生成差异，不提交；`docs/architecture/improve-codebase-architecture-install-report.md` 与本检查点无关，不提交。
-- 技术债：旧 handoff 历史正文很长且含历史状态；只有本文件顶部的 `Status: current` 区块和当前索引有授权意义。PHPUnit 有 64 条 doc-comment metadata 弃用提示，未在本收尾任务中扩修。
-- 文档冲突已修正：Card Marker 接线后 `ReviewCardManage.vue` 的当前事实是 905 行，不是 Phase 3D 刚关闭时的 872 行；Custom Study 1B 当前是 Accepted / Production Closed，不是 not started。
+- Phase 8A 已关闭；due/state、FSRS properties、source、missing、recent、quoted phrase、negation、OR/parentheses 均未进入。
+- Phase 3C-3 Delete Mutation Family 仍未授权；真实 provider 继续暂缓。
+- 受保护内容保持原样且不提交：`.playwright-cli/`、`nul`、`public/js/app.js.LICENSE.txt`、`docs/architecture/improve-codebase-architecture-install-report.md`。
+- PHPUnit 的 64 条 doc-comment metadata 弃用提示和本地 Pusher WebSocket 连接噪声属于既有技术债，本任务不扩修。
 
 ## 8. 风险和保护边界
 
@@ -82,24 +80,25 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 
 ## 9. 当前唯一下一小步
 
-名称：Phase 8A — Browser Search `rated:good` / `rated:easy` 最小切片。
+名称：Phase 8B — Browser Search `state:new|learning|review|relearning` 最小切片。
 
-目标：让现有线性 Browser 查询语法支持另外两个正式评分值，并保持列表、JSON/CSV/Anki TSV export 使用同一 Query Applier。
+目标：让现有线性 Browser 查询语法支持一个正式 FSRS 状态 token，并继续让列表、JSON、CSV、Anki TSV 四个消费者使用同一 Criteria 与 Query Applier。
 
-先读：`AGENTS.md`、本文件、`docs/plans/anki-maximal-alignment-gap-audit-and-forward-plan.md`、`app/Services/ReviewCardBrowserSearchCriteria.php`、`ReviewCardBrowserSearchParser.php`、`ReviewCardBrowserSearchQueryApplier.php`、`tests/Unit/ReviewCardBrowserSearchParserTest.php`、`tests/Feature/ReviewCardBrowserSearchTest.php`、`resources/js/components/ReviewCards/ReviewCardSearchSurface.vue`。
+冻结语义：
 
-先写 RED：
+- token 形式：`state:new`、`state:learning`、`state:review`、`state:relearning`。
+- 大小写不敏感，规范化为小写。
+- 相同 token 去重；同一查询出现两个不同 `state:` 值时返回结构化 422，保持线性 AND 语法不引入隐式 OR。
+- Query Applier 只匹配当前用户、当前语言、sense ReviewCard 的 `review_cards.fsrs_state`；不从 ReviewLog 推断状态。
+- 与普通文本、`is:`、`rated:`、`prop:`、`flag:` 可组合。
 
-1. Parser 测试证明 `rated:good` 和 `rated:easy` 被规范化、去重并可与现有 token 组合。
-2. Feature 测试证明只匹配当前用户/语言的真实 `sense_review` Good/Easy 日志，排除 reset、undone 和非正式来源，并锁定列表与三个 export 消费者一致。
+最小实现：扩展现有 Criteria、Parser、Query Applier、帮助文本和对应测试；必要时只读取现有高级筛选的 FSRS state 实现以复用字段语义。不得新增 service、route、dependency、AST 或 migration。
 
-最小 GREEN：只扩展现有 parser rating 白名单/映射、现有 Query Applier rating 映射和帮助文本；不新增 service、route、dependency 或 AST。
+排除：不做 due、FSRS 数值新字段、source、missing、recent、quoted phrase、negation、OR/parentheses；不改 Saved Search schema、Custom Study、Reviewer、FSRS 调度、ReviewLog 写入、数据库 schema、Delete Mutation Family 或真实 AI provider。
 
-排除：不做 quoted phrase、negation、OR/parentheses、due/state/FSRS/source/missing/recent filters；不改 Saved Search schema、Custom Study、Reviewer、FSRS、ReviewLog 写入或数据库 schema；不进入 Phase 8B。
+验收：先 RED 后 GREEN；聚焦 Parser + Browser Search + UI guard；四消费者一致性；全部 JS guards；前端 build；完整 PHP；真实 localhost Browser 查询至少 `state:new` / `state:review`，核查本地 Network、Console 和数据库零写入；`git diff --check`。
 
-验收：聚焦 Parser + Browser Search + UI guard；全部 JS guards；前端 build；完整 PHP 回归；真实登录 Browser 页面分别查询 `rated:good` / `rated:easy`，确认本地 Network、Console 无新增错误和数据库零写入；`git diff --check`。
-
-停止条件：上述单一切片验证、交接、commit 和普通 push 完成后立即停止；任一隔离/消费者一致性失败则记录 Incomplete，不继续其他 Phase 8 语法。
+停止条件：Phase 8B 单一切片验证、交接、commit 和普通 push 完成后立即停止，不进入 due 或其他 Phase 8 语法。
 
 ## 10. 下一窗口直接使用的提示词
 
@@ -109,11 +108,11 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 本地仓库：D:\Document\lingl\LinguaCafe-main
 远端仓库：git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git
 当前分支：codex/anki-maximal-alignment-plan
-已验证功能检查点 SHA：eb03f49266c427c495c6174077116e0869d51b74（先 git fetch origin，再以 origin/codex/anki-maximal-alignment-plan 的 branch tip 为最终交接元数据；核对该 tip 包含此功能检查点）
+Phase 8A 完成检查点：以 `origin/codex/anki-maximal-alignment-plan` 当前 branch tip 为准；该 tip 必须包含 `c741177fd98bf7ebb1f40be56129ff53ec26ff4b` 和本文件记录的 Phase 8A 改动
 
 先读取项目规则、当前计划和 docs/plans/current-working-handoff.md，并核对 Git 状态。必须执行 git status、git branch --show-current、git log -1 --oneline、git rev-parse HEAD、git rev-parse @{u}、git ls-remote origin refs/heads/codex/anki-maximal-alignment-plan，确认本地、上游和远端事实；不得丢弃任何已有未提交文件。
 
-你本窗口只能执行交接文档中定义的唯一下一小步：Phase 8A — Browser Search `rated:good` / `rated:easy` 最小切片。目标是让现有线性查询语法支持另外两个正式评分，并让列表、JSON export、CSV export、Anki TSV export 继续共用一个 Query Applier。
+你本窗口只能执行交接文档中定义的唯一下一小步：Phase 8B — Browser Search `state:new|learning|review|relearning` 最小切片。目标是让现有线性查询语法支持一个正式 FSRS 状态 token，并让列表、JSON export、CSV export、Anki TSV export 继续共用一个 Criteria 与 Query Applier。
 
 先读取：
 - AGENTS.md
@@ -122,16 +121,20 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 - app/Services/ReviewCardBrowserSearchCriteria.php
 - app/Services/ReviewCardBrowserSearchParser.php
 - app/Services/ReviewCardBrowserSearchQueryApplier.php
+- app/Services/ReviewCardManageFilterState.php
+- app/Services/ReviewCardManageQueryService.php
 - tests/Unit/ReviewCardBrowserSearchParserTest.php
 - tests/Feature/ReviewCardBrowserSearchTest.php
 - tests/Feature/ReviewCardBrowserSearchUiGuardTest.php
 - resources/js/components/ReviewCards/ReviewCardSearchSurface.vue
 
-先建立 RED：Parser 测试覆盖 `rated:good` / `rated:easy` 的规范化、去重和组合；Feature 测试覆盖当前用户/语言的真实 sense_review Good/Easy 日志，排除 reset、undone、非正式来源，并覆盖列表与三个 export 消费者一致。确认 RED 原因是尚未支持这两个评分后，才做最小 GREEN。
+先建立 RED：Parser 测试覆盖四个 `state:` 值的大小写规范化、相同 token 去重、与现有 token 组合，以及两个不同 `state:` 值返回结构化 422；Feature 测试覆盖当前用户/语言、sense-only、精确 `review_cards.fsrs_state` 匹配，并锁定列表与三个 export 消费者一致。确认 RED 原因是尚未支持 state token 后，才做最小 GREEN。
 
-最小实现范围：只修改现有 parser rating 白名单/映射、Query Applier rating 映射、必要的 Criteria/帮助文本和对应测试。不得新增 service、route、dependency、AST 或 migration。
+冻结语义：`state:new`、`state:learning`、`state:review`、`state:relearning`；同一查询最多一个不同状态值，相同 token 去重，不引入隐式 OR。Query Applier 直接匹配 ReviewCard 的 `fsrs_state`，不从 ReviewLog 推断状态。
 
-明确排除：quoted phrase、negation、OR/parentheses、due/state/FSRS/source/missing/recent filters、Saved Search schema 改动、Custom Study、Reviewer、FSRS、ReviewLog 写入、Delete Mutation Family、真实 AI provider，以及任何无关重构。保护 sense-only、用户/语言隔离、正式 ReviewLog 来源过滤、现有 endpoint/payload/export 兼容和 `.env*`/`.playwright-cli`/`nul`。
+最小实现范围：只修改现有 Criteria、Parser、Query Applier、必要帮助文本和对应测试；可以只读现有高级筛选的 FSRS state 代码以复用字段语义。不得新增 service、route、dependency、AST 或 migration。
+
+明确排除：due、FSRS 数值新字段、source、missing、recent、quoted phrase、negation、OR/parentheses、Saved Search schema 改动、Custom Study、Reviewer、FSRS 调度、ReviewLog 写入、Delete Mutation Family、真实 AI provider，以及任何无关重构。保护 sense-only、用户/语言隔离、现有 endpoint/payload/export 兼容和 `.env*`/`.playwright-cli`/`nul`。
 
 必须运行：
 1. php artisan test tests/Unit/ReviewCardBrowserSearchParserTest.php tests/Feature/ReviewCardBrowserSearchTest.php tests/Feature/ReviewCardBrowserSearchUiGuardTest.php --stop-on-failure
@@ -139,7 +142,7 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 3. npm run development
 4. php -d memory_limit=512M vendor/bin/phpunit --do-not-cache-result --colors=never
 5. git diff --check
-6. 真实本地 Browser 页面验收：依照 AGENTS.md Section 8 使用 localhost fixture，查询 rated:good / rated:easy，检查本地 Network、Console 和数据库零写入；不得用 API 成功替代页面验收。
+6. 真实本地 Browser 页面验收：依照 AGENTS.md Section 8 使用 localhost fixture，至少查询 `state:new` / `state:review`，检查本地 Network、Console 和数据库零写入；不得用 API 成功替代页面验收。
 
 不要继续后续步骤，即使当前上下文仍然充足。使用测试先行或项目既定流程完成这个小步骤，运行全部规定验证，更新 docs/plans/current-working-handoff.md，精确暂存，提交并正常推送到当前功能分支。禁止 force push、git add .、git add -A、自动合并和清理用户工作区。
 

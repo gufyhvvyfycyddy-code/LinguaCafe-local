@@ -12,7 +12,7 @@ namespace App\Services;
  * V1 grammar (case-insensitive, normalized to lowercase):
  *   is:leech | is:struggling          (governance — max 1)
  *   is:active | is:buried | is:suspended | is:archived  (lifecycle — max 1)
- *   rated:again | rated:hard          (max 2, no duplicates)
+ *   rated:again | rated:hard | rated:good | rated:easy  (max 4, no duplicates)
  *   prop:lapses{=,>,>=,<,<=}<int>     (V1: only lapses field)
  *   flag:0..7                         (exact ReviewCard marker)
  *
@@ -39,7 +39,7 @@ class ReviewCardBrowserSearchParser
 {
     private const GOVERNANCE_STATUSES = ['leech', 'struggling'];
     private const LIFECYCLE_STATUSES = ['active', 'buried', 'suspended', 'archived'];
-    private const RATINGS = ['again', 'hard'];
+    private const RATINGS = ['again', 'hard', 'good', 'easy'];
     private const PROP_FIELDS = ['lapses'];
     private const PROP_OPERATORS = ['=', '>', '>=', '<', '<='];
 
@@ -318,7 +318,7 @@ class ReviewCardBrowserSearchParser
             'data' => null,
             'error' => [
                 'token' => $original,
-                'reason' => "不支持的 rated: 值 '{$lowerValue}'。V1 只支持: rated:again, rated:hard",
+                'reason' => "不支持的 rated: 值 '{$lowerValue}'。支持: rated:again, rated:hard, rated:good, rated:easy",
                 'example' => 'rated:again',
             ],
         ];

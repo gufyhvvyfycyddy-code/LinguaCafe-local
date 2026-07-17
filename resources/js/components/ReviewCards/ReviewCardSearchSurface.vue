@@ -160,8 +160,8 @@
                         </v-list-item>
                         <v-list-item>
                             <v-list-item-content>
-                                <v-list-item-title><code>rated:again</code> / <code>rated:hard</code></v-list-item-title>
-                                <v-list-item-subtitle>只显示有对应评分记录的卡片</v-list-item-subtitle>
+                                <v-list-item-title><code>rated:again</code> / <code>rated:hard</code> / <code>rated:good</code> / <code>rated:easy</code></v-list-item-title>
+                                <v-list-item-subtitle>只显示有对应正式评分记录的卡片；多个评分使用 AND 组合</v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
                         <v-list-item>
@@ -182,6 +182,7 @@
                     <p class="text-body-2 mb-1"><code>charge is:leech</code> — 搜索 charge 且是 Leech</p>
                     <p class="text-body-2 mb-1"><code>is:leech is:suspended</code> — Leech 且已暂停</p>
                     <p class="text-body-2 mb-1"><code>rated:again prop:lapses&gt;=2</code> — 有 Again 记录且遗忘 ≥ 2</p>
+                    <p class="text-body-2 mb-1"><code>rated:good rated:easy</code> — 同时有 Good 和 Easy 正式评分记录</p>
                     <p class="text-body-2 mb-0"><code>charge rated:again prop:lapses&gt;=2</code> — 全部组合</p>
                 </v-card-text>
                 <v-card-actions>

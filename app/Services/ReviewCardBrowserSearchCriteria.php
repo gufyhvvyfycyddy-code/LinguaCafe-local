@@ -17,7 +17,7 @@ namespace App\Services;
  *  - textQuery:          remaining plain text after token extraction (may be empty)
  *  - governanceStatus:   'leech' | 'struggling' | null  (ADR-0011 classification)
  *  - lifecycleStatus:    'active' | 'buried' | 'suspended' | 'archived' | null  (ADR-0010)
- *  - ratings:            list<'again'|'hard'>  (max 2, no duplicates)
+ *  - ratings:            list<'again'|'hard'|'good'|'easy'>  (max 4, no duplicates)
  *  - propertyConditions: list<array{field: string, operator: string, value: int}>
  *                        (V1: field is always 'lapses')
  *  - normalizedTokens:   list<string>  recognized tokens in normalized lowercase form
@@ -34,7 +34,7 @@ class ReviewCardBrowserSearchCriteria
      * @param string|null $governanceStatus
      * @param string|null $lifecycleStatus
      * @param int|null $marker
-     * @param list<'again'|'hard'> $ratings
+     * @param list<'again'|'hard'|'good'|'easy'> $ratings
      * @param list<array{field: string, operator: string, value: int}> $propertyConditions
      * @param list<string> $normalizedTokens
      * @param list<array{token: string, reason: string, example: string}> $errors

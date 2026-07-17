@@ -144,13 +144,50 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         $this->assertSame(['hard'], $criteria->ratings);
     }
 
-    public function test_rated_again_and_hard_combine(): void
+    public function test_all_formal_ratings_combine(): void
     {
-        $criteria = $this->parser->parse('rated:again rated:hard');
+        $criteria = $this->parser->parse('rated:again rated:hard rated:good rated:easy');
 
-        $this->assertContains('again', $criteria->ratings);
-        $this->assertContains('hard', $criteria->ratings);
-        $this->assertCount(2, $criteria->ratings);
+        $this->assertSame(['again', 'hard', 'good', 'easy'], $criteria->ratings);
+        $this->assertSame([
+            'rated:again',
+            'rated:hard',
+            'rated:good',
+            'rated:easy',
+        ], $criteria->normalizedTokens);
+    }
+
+    public function test_rated_good_and_easy_are_normalized_case_insensitively(): void
+    {
+        $criteria = $this->parser->parse('Rated:Good RATED:EASY');
+
+        $this->assertSame(['good', 'easy'], $criteria->ratings);
+        $this->assertSame(['rated:good', 'rated:easy'], $criteria->normalizedTokens);
+    }
+
+    public function test_rated_good_and_easy_deduplicate_in_first_occurrence_order(): void
+    {
+        $criteria = $this->parser->parse('rated:good rated:easy rated:good rated:easy');
+
+        $this->assertSame(['good', 'easy'], $criteria->ratings);
+        $this->assertSame(['rated:good', 'rated:easy'], $criteria->normalizedTokens);
+    }
+
+    public function test_rated_good_and_easy_combine_with_existing_tokens(): void
+    {
+        $criteria = $this->parser->parse('charge is:active rated:good rated:easy prop:lapses>=2 flag:3');
+
+        $this->assertSame('charge', $criteria->textQuery);
+        $this->assertSame('active', $criteria->lifecycleStatus);
+        $this->assertSame(3, $criteria->marker);
+        $this->assertSame(['good', 'easy'], $criteria->ratings);
+        $this->assertSame([
+            'is:active',
+            'rated:good',
+            'rated:easy',
+            'prop:lapses>=2',
+            'flag:3',
+        ], $criteria->normalizedTokens);
     }
 
     // ─── 6. prop 5 operators ───
@@ -352,14 +389,7 @@ class ReviewCardBrowserSearchParserTest extends TestCase
     {
         $this->expectException(InvalidBrowserSearchException::class);
 
-        $this->parser->parse('rated:good');
-    }
-
-    public function test_unknown_rated_easy_throws_422(): void
-    {
-        $this->expectException(InvalidBrowserSearchException::class);
-
-        $this->parser->parse('rated:easy');
+        $this->parser->parse('rated:excellent');
     }
 
     // ─── 14. Unknown prop ───
@@ -516,7 +546,7 @@ class ReviewCardBrowserSearchParserTest extends TestCase
     public function test_multiple_errors_are_all_reported(): void
     {
         try {
-            $this->parser->parse('is:unknown rated:good prop:lapses>>2');
+            $this->parser->parse('is:unknown rated:excellent prop:lapses>>2');
             $this->fail('Expected InvalidBrowserSearchException');
         } catch (InvalidBrowserSearchException $e) {
             $errors = $e->getErrors();

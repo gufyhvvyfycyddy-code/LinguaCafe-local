@@ -16,7 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
  *  - Apply lifecycle condition (is:active/buried/suspended/archived).
  *  - Apply governance condition (is:leech/is:struggling) via pre-computed
  *    matching card IDs (delegated to caller to avoid duplicate classification).
- *  - Apply rated conditions (rated:again/rated:hard) via whereExists.
+ *  - Apply rated conditions (rated:again/rated:hard/rated:good/rated:easy) via whereExists.
  *  - Apply property conditions (prop:lapses<op><n>) via direct column WHERE.
  *
  * Hard rules:
@@ -36,6 +36,13 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class ReviewCardBrowserSearchQueryApplier
 {
+    private const REVIEW_LOG_RATINGS = [
+        'again' => 'again',
+        'hard' => 'hard',
+        'good' => 'good',
+        'easy' => 'easy',
+    ];
+
     /**
      * Apply parsed criteria to a security-scoped query.
      *
@@ -94,19 +101,25 @@ class ReviewCardBrowserSearchQueryApplier
             }
         }
 
-        // 4. Rated conditions (rated:again / rated:hard)
+        // 4. Rated conditions (rated:again / rated:hard / rated:good / rated:easy)
         // Each rating adds a whereExists subquery: the card must have at
         // least one matching ReviewLog. Multiple ratings are AND-combined
         // (card must have at least one of EACH requested rating).
         foreach ($criteria->ratings as $rating) {
-            $query->whereExists(function ($subQuery) use ($userId, $language, $rating) {
+            $reviewLogRating = self::REVIEW_LOG_RATINGS[$rating] ?? null;
+            if ($reviewLogRating === null) {
+                $query->whereRaw('1 = 0');
+                continue;
+            }
+
+            $query->whereExists(function ($subQuery) use ($userId, $language, $reviewLogRating) {
                 $subQuery->select(\Illuminate\Support\Facades\DB::raw(1))
                     ->from('review_logs')
                     ->whereColumn('review_logs.review_card_id', 'review_cards.id')
                     ->where('review_logs.user_id', $userId)
                     ->where('review_logs.language_id', $language)
                     ->where('review_logs.source', '=', 'sense_review')
-                    ->where('review_logs.rating', $rating)
+                    ->where('review_logs.rating', $reviewLogRating)
                     ->whereNull('review_logs.undone_at');
             });
         }
