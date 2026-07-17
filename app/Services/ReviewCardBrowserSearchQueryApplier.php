@@ -130,5 +130,11 @@ class ReviewCardBrowserSearchQueryApplier
                 $query->where('review_cards.fsrs_lapses', $cond['operator'], $cond['value']);
             }
         }
+
+        // 6. FSRS state conditions (state:new/learning/review/relearning)
+        // Max one distinct value — AND-combined with others.
+        foreach ($criteria->fsrsStates as $fsrsState) {
+            $query->where('review_cards.fsrs_state', $fsrsState);
+        }
     }
 }

@@ -543,6 +543,97 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         $this->assertSame([], $meta['tokens']);
     }
 
+    // ─── state: token tests (Phase 8B) ───
+
+    public function test_state_new_is_parsed(): void
+    {
+        $criteria = $this->parser->parse('state:new');
+
+        $this->assertSame(['new'], $criteria->fsrsStates);
+        $this->assertSame(['state:new'], $criteria->normalizedTokens);
+        $this->assertTrue($criteria->hasFsrsStates());
+    }
+
+    public function test_state_learning_is_parsed(): void
+    {
+        $criteria = $this->parser->parse('state:learning');
+
+        $this->assertSame(['learning'], $criteria->fsrsStates);
+    }
+
+    public function test_state_review_is_parsed(): void
+    {
+        $criteria = $this->parser->parse('state:review');
+
+        $this->assertSame(['review'], $criteria->fsrsStates);
+    }
+
+    public function test_state_relearning_is_parsed(): void
+    {
+        $criteria = $this->parser->parse('state:relearning');
+
+        $this->assertSame(['relearning'], $criteria->fsrsStates);
+    }
+
+    public function test_state_is_normalized_case_insensitively(): void
+    {
+        $criteria = $this->parser->parse('State:New STATE:new');
+
+        $this->assertSame(['new'], $criteria->fsrsStates);
+        $this->assertSame(['state:new'], $criteria->normalizedTokens);
+    }
+
+    public function test_duplicate_state_token_is_deduplicated(): void
+    {
+        $criteria = $this->parser->parse('state:review state:review state:review');
+
+        $this->assertSame(['review'], $criteria->fsrsStates);
+        $this->assertSame(['state:review'], $criteria->normalizedTokens);
+    }
+
+    public function test_two_different_state_values_return_422(): void
+    {
+        try {
+            $this->parser->parse('state:new state:review');
+            $this->fail('Expected InvalidBrowserSearchException');
+        } catch (InvalidBrowserSearchException $e) {
+            $errors = $e->getErrors();
+            $this->assertCount(1, $errors);
+            $this->assertStringContainsString('不能同时指定多个不同的 FSRS 状态', $errors[0]['reason']);
+        }
+    }
+
+    public function test_state_combines_with_existing_tokens(): void
+    {
+        $criteria = $this->parser->parse('charge is:active state:review rated:good flag:2');
+
+        $this->assertSame('charge', $criteria->textQuery);
+        $this->assertSame('active', $criteria->lifecycleStatus);
+        $this->assertSame(2, $criteria->marker);
+        $this->assertSame(['good'], $criteria->ratings);
+        $this->assertSame(['review'], $criteria->fsrsStates);
+        $this->assertSame([
+            'is:active',
+            'state:review',
+            'rated:good',
+            'flag:2',
+        ], $criteria->normalizedTokens);
+    }
+
+    public function test_unknown_state_value_returns_structured_error(): void
+    {
+        try {
+            $this->parser->parse('state:unknown');
+            $this->fail('Expected InvalidBrowserSearchException');
+        } catch (InvalidBrowserSearchException $e) {
+            $errors = $e->getErrors();
+            $this->assertCount(1, $errors);
+            $this->assertStringContainsString('不支持的 state:', $errors[0]['reason']);
+            $this->assertSame('state:unknown', $errors[0]['token']);
+            $this->assertSame('state:new', $errors[0]['example']);
+        }
+    }
+
     public function test_multiple_errors_are_all_reported(): void
     {
         try {

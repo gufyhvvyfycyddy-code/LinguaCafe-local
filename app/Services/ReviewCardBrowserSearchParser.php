@@ -15,6 +15,7 @@ namespace App\Services;
  *   rated:again | rated:hard | rated:good | rated:easy  (max 4, no duplicates)
  *   prop:lapses{=,>,>=,<,<=}<int>     (V1: only lapses field)
  *   flag:0..7                         (exact ReviewCard marker)
+ *   state:new | state:learning | state:review | state:relearning  (max 1 distinct)
  *
  * All conditions AND-combined. No OR / NOT / parentheses.
  *
@@ -42,6 +43,7 @@ class ReviewCardBrowserSearchParser
     private const RATINGS = ['again', 'hard', 'good', 'easy'];
     private const PROP_FIELDS = ['lapses'];
     private const PROP_OPERATORS = ['=', '>', '>=', '<', '<='];
+    private const FSRS_STATES = ['new', 'learning', 'review', 'relearning'];
 
     /**
      * Parse a raw query string into a ReviewCardBrowserSearchCriteria.
@@ -68,6 +70,7 @@ class ReviewCardBrowserSearchParser
         $ratings = [];
         $propertyConditions = [];
         $marker = null;
+        $fsrsStates = [];
 
         foreach ($segments as $segment) {
             if ($segment === '') {
@@ -87,7 +90,7 @@ class ReviewCardBrowserSearchParser
             $prefix = strtolower(substr($segment, 0, $colonPos));
             $valuePart = substr($segment, $colonPos + 1);
 
-            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag'], true)) {
+            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag', 'state'], true)) {
                 // Not an advanced token prefix — treat as plain text
                 // (e.g. http://example.com).
                 $textParts[] = $segment;
@@ -176,6 +179,19 @@ class ReviewCardBrowserSearchParser
                         $marker = $tokenData['value'];
                     }
                     break;
+                case 'fsrs_state':
+                    if (!in_array($tokenData['value'], $fsrsStates, true)) {
+                        if (!empty($fsrsStates)) {
+                            $errors[] = [
+                                'token' => $segment,
+                                'reason' => '不能同时指定多个不同的 FSRS 状态。每个查询最多一个 state:new/learning/review/relearning。',
+                                'example' => 'state:new',
+                            ];
+                        } else {
+                            $fsrsStates[] = $tokenData['value'];
+                        }
+                    }
+                    break;
             }
         }
 
@@ -196,6 +212,7 @@ class ReviewCardBrowserSearchParser
             marker: $marker,
             ratings: $ratings,
             propertyConditions: $propertyConditions,
+            fsrsStates: $fsrsStates,
             normalizedTokens: $normalizedTokens,
             errors: [],
         );
@@ -224,6 +241,9 @@ class ReviewCardBrowserSearchParser
         }
         if ($prefix === 'flag') {
             return $this->parseFlagToken($lowerValue, $original);
+        }
+        if ($prefix === 'state') {
+            return $this->parseStateToken($lowerValue, $original);
         }
 
         // Should never reach here due to the prefix check above.
@@ -258,6 +278,32 @@ class ReviewCardBrowserSearchParser
                 'token' => $original,
                 'reason' => '不支持的 flag: 值。只支持 0 到 7。',
                 'example' => 'flag:1',
+            ],
+        ];
+    }
+
+    /**
+     * Parse state:<value> token.
+     */
+    private function parseStateToken(string $lowerValue, string $original): array
+    {
+        if (in_array($lowerValue, self::FSRS_STATES, true)) {
+            return [
+                'data' => [
+                    'kind' => 'fsrs_state',
+                    'value' => $lowerValue,
+                    'normalized' => 'state:' . $lowerValue,
+                ],
+                'error' => null,
+            ];
+        }
+
+        return [
+            'data' => null,
+            'error' => [
+                'token' => $original,
+                'reason' => "不支持的 state: 值 '{$lowerValue}'。支持: state:new, state:learning, state:review, state:relearning",
+                'example' => 'state:new',
             ],
         ];
     }

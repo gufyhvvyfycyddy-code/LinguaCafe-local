@@ -176,6 +176,12 @@
                                 <v-list-item-subtitle>按卡片标记筛选；<code>flag:0</code> 表示未标记</v-list-item-subtitle>
                             </v-list-item-content>
                         </v-list-item>
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>state:new</code> / <code>state:learning</code> / <code>state:review</code> / <code>state:relearning</code></v-list-item-title>
+                                <v-list-item-subtitle>按 FSRS 复习状态筛选（最多一个）</v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
                     </v-list>
                     <v-divider class="my-2" />
                     <p class="text-body-2 mb-1"><strong>组合示例：</strong></p>
@@ -184,6 +190,8 @@
                     <p class="text-body-2 mb-1"><code>rated:again prop:lapses&gt;=2</code> — 有 Again 记录且遗忘 ≥ 2</p>
                     <p class="text-body-2 mb-1"><code>rated:good rated:easy</code> — 同时有 Good 和 Easy 正式评分记录</p>
                     <p class="text-body-2 mb-0"><code>charge rated:again prop:lapses&gt;=2</code> — 全部组合</p>
+                    <p class="text-body-2 mb-0"><code>state:review</code> — 只显示复习状态的卡片</p>
+                    <p class="text-body-2 mb-0"><code>charge state:new rated:again</code> — 搜索 charge、新卡片且有 Again 记录</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />

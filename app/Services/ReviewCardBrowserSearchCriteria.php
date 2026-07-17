@@ -20,6 +20,8 @@ namespace App\Services;
  *  - ratings:            list<'again'|'hard'|'good'|'easy'>  (max 4, no duplicates)
  *  - propertyConditions: list<array{field: string, operator: string, value: int}>
  *                        (V1: field is always 'lapses')
+ *  - fsrsStates:         list<'new'|'learning'|'review'|'relearning'>
+ *                        (max 1 distinct value, deduplicated)
  *  - normalizedTokens:   list<string>  recognized tokens in normalized lowercase form
  *  - errors:             list<array{token: string, reason: string, example: string}>
  *
@@ -36,6 +38,7 @@ class ReviewCardBrowserSearchCriteria
      * @param int|null $marker
      * @param list<'again'|'hard'|'good'|'easy'> $ratings
      * @param list<array{field: string, operator: string, value: int}> $propertyConditions
+     * @param list<'new'|'learning'|'review'|'relearning'> $fsrsStates
      * @param list<string> $normalizedTokens
      * @param list<array{token: string, reason: string, example: string}> $errors
      */
@@ -47,6 +50,7 @@ class ReviewCardBrowserSearchCriteria
         public readonly ?int $marker,
         public readonly array $ratings,
         public readonly array $propertyConditions,
+        public readonly array $fsrsStates,
         public readonly array $normalizedTokens,
         public readonly array $errors,
     ) {
@@ -103,6 +107,14 @@ class ReviewCardBrowserSearchCriteria
     public function hasPropertyConditions(): bool
     {
         return !empty($this->propertyConditions);
+    }
+
+    /**
+     * Whether any fsrs state condition is present.
+     */
+    public function hasFsrsStates(): bool
+    {
+        return !empty($this->fsrsStates);
     }
 
     /**

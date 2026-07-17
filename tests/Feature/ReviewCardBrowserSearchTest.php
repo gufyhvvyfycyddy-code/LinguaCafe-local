@@ -1475,6 +1475,159 @@ class ReviewCardBrowserSearchTest extends TestCase
         $this->assertSame($before, $after, 'ADR-0013: No endpoint may mutate lifecycle state or version.');
     }
 
+    // ─── Phase 8B: state:new/learning/review/relearning ───
+
+    public function test_state_new_returns_only_new_cards(): void
+    {
+        $newCard = $this->makeCard(['fsrs_state' => 'new']);
+        $reviewCard = $this->makeCard(['fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:new'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($newCard->id, $cardIds);
+        $this->assertNotContains($reviewCard->id, $cardIds);
+    }
+
+    public function test_state_learning_returns_only_learning_cards(): void
+    {
+        $learningCard = $this->makeCard(['fsrs_state' => 'learning']);
+        $newCard = $this->makeCard(['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:learning'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($learningCard->id, $cardIds);
+        $this->assertNotContains($newCard->id, $cardIds);
+    }
+
+    public function test_state_review_returns_only_review_cards(): void
+    {
+        $reviewCard = $this->makeCard(['fsrs_state' => 'review']);
+        $newCard = $this->makeCard(['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:review'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($reviewCard->id, $cardIds);
+        $this->assertNotContains($newCard->id, $cardIds);
+    }
+
+    public function test_state_relearning_returns_only_relearning_cards(): void
+    {
+        $relearningCard = $this->makeCard(['fsrs_state' => 'relearning']);
+        $reviewCard = $this->makeCard(['fsrs_state' => 'review']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:relearning'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($relearningCard->id, $cardIds);
+        $this->assertNotContains($reviewCard->id, $cardIds);
+    }
+
+    public function test_state_respects_user_isolation(): void
+    {
+        $card = $this->makeCard(['fsrs_state' => 'new']);
+        $otherUser = User::forceCreate([
+            'name' => 'State Isolation Other',
+            'email' => 'state-isolation-' . Str::uuid() . '@example.com',
+            'password' => \Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $otherCard = $this->makeCardForUser($otherUser, ['fsrs_state' => 'new']);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:new'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($card->id, $cardIds);
+        $this->assertNotContains($otherCard->id, $cardIds);
+    }
+
+    public function test_state_respects_language_isolation(): void
+    {
+        $card = $this->makeCard(['fsrs_state' => 'new']);
+        $otherLangCard = $this->makeCard([
+            'fsrs_state' => 'new',
+            'language' => 'french',
+            'language_id' => 'french',
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:new'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($card->id, $cardIds);
+        $this->assertNotContains($otherLangCard->id, $cardIds);
+    }
+
+    public function test_state_excludes_legacy_word_cards(): void
+    {
+        $senseCard = $this->makeCard(['fsrs_state' => 'new']);
+
+        $wordCard = $this->makeCard([
+            'fsrs_state' => 'new',
+            'target_type' => ReviewCard::TARGET_WORD,
+        ]);
+
+        $response = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . urlencode('state:new'));
+
+        $response->assertStatus(200);
+        $cardIds = array_column($response->json('items'), 'review_card_id');
+        $this->assertContains($senseCard->id, $cardIds);
+        $this->assertNotContains($wordCard->id, $cardIds);
+    }
+
+    public function test_state_results_match_list_and_all_exports(): void
+    {
+        $matchingCard = $this->makeCard(['fsrs_state' => 'review']);
+        $matchingCard->sense->update(['lemma' => 'phase8b-state-match']);
+        $excludedCard = $this->makeCard(['fsrs_state' => 'new']);
+        $excludedCard->sense->update(['lemma' => 'phase8b-state-excluded']);
+
+        $query = urlencode('phase8b-state-match state:review');
+
+        $listResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/data?filter=all&q=' . $query . '&per_page=50');
+        $jsonResponse = $this->actingAs($this->user)
+            ->getJson('/review-cards/manage/export?filter=all&q=' . $query);
+        $csvResponse = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-csv?filter=all&q=' . $query);
+        $tsvResponse = $this->actingAs($this->user)
+            ->get('/review-cards/manage/export-anki-tsv?filter=all&q=' . $query);
+
+        $listResponse->assertStatus(200);
+        $jsonResponse->assertStatus(200);
+        $csvResponse->assertStatus(200);
+        $tsvResponse->assertStatus(200);
+
+        $this->assertSame([$matchingCard->id], array_column($listResponse->json('items'), 'review_card_id'));
+        $this->assertCount(1, $jsonResponse->json('items'));
+        $this->assertSame('1', $csvResponse->headers->get('X-Export-Count'));
+        $this->assertSame('1', $tsvResponse->headers->get('X-Export-Count'));
+
+        $jsonItems = json_encode($jsonResponse->json('items'));
+        $this->assertStringContainsString('phase8b-state-match', $jsonItems);
+        $this->assertStringContainsString('phase8b-state-match', $csvResponse->getContent());
+        $this->assertStringContainsString('phase8b-state-match', $tsvResponse->getContent());
+        $this->assertStringNotContainsString('phase8b-state-excluded', $jsonItems);
+        $this->assertStringNotContainsString('phase8b-state-excluded', $csvResponse->getContent());
+        $this->assertStringNotContainsString('phase8b-state-excluded', $tsvResponse->getContent());
+    }
+
     // ─── Helpers ───
 
     private function makeCard(array $overrides = []): ReviewCard
