@@ -203,6 +203,8 @@ Every phase is separately authorized, implemented, tested, browser-accepted, and
 
 ### Phase 8 — Search and filtered-study parity
 
+Current status (2026-07-17): Phase 8A–8C runtime slices are complete. Phase 8D completed read-only reconnaissance and froze the first `source:` contract in `docs/plans/review-card-browser-source-search-semantic-freeze.md`; Phase 8E implemented that exact source contract. Phase 8F froze `missing:definition|example|source` in `docs/plans/review-card-browser-missing-field-search-semantic-freeze.md`; Phase 8G implemented those exact tokens through the existing Parser/Criteria/Query Applier and one shared missing-field predicate owner used by both token and top-filter paths. Phase 8H completed read-only reconnaissance and froze additive Anki-style `rated:<days>` / `rated:<days>:<1..4>` recent formal-review windows in `docs/plans/review-card-browser-recent-review-search-semantic-freeze.md`, while preserving existing lifetime `rated:again|hard|good|easy` semantics. The next entry is Phase 8I, the separately authorized minimal runtime implementation of that exact numeric recent-window contract; implementation remains unauthorized.
+
 - Expand terms first: marker, all ratings, due/state, FSRS properties, source book/chapter, missing-field, and recent review windows.
 - Add quoted phrases and negation.
 - Add OR/parentheses only after the linear grammar is stable; represent it as a small AST consumed by one query applier.

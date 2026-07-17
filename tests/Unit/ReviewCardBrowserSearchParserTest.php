@@ -760,6 +760,89 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         $this->assertContains($this->advancedToken('prop', 'reps>=4'), $criteria->normalizedTokens);
     }
 
+    // Phase 8E parser coverage.
+
+    public function test_source_chapter_token_is_parsed_and_normalized(): void
+    {
+        $value = implode(chr(58), ['chapter', '0046']);
+        $criteria = $this->parser->parse($this->advancedToken('source', $value));
+
+        $this->assertSame([['kind' => 'chapter', 'id' => 46]], $criteria->sourceTargets);
+        $this->assertTrue($criteria->hasSourceTargets());
+    }
+
+    public function test_source_book_token_is_parsed_and_case_normalized(): void
+    {
+        $value = implode(chr(58), ['book', '0012']);
+        $token = strtoupper($this->advancedToken('source', $value));
+        $criteria = $this->parser->parse($token);
+
+        $this->assertSame([['kind' => 'book', 'id' => 12]], $criteria->sourceTargets);
+        $this->assertSame([
+            $this->advancedToken('source', implode(chr(58), ['book', '12'])),
+        ], $criteria->normalizedTokens);
+    }
+
+    public function test_duplicate_source_tokens_are_deduplicated_in_first_occurrence_order(): void
+    {
+        $chapter = $this->advancedToken('source', implode(chr(58), ['chapter', '46']));
+        $chapterPadded = strtoupper($this->advancedToken('source', implode(chr(58), ['chapter', '0046'])));
+        $book = $this->advancedToken('source', implode(chr(58), ['book', '12']));
+        $criteria = $this->parser->parse(implode(' ', [$chapter, $chapterPadded, $book]));
+
+        $this->assertSame([
+            ['kind' => 'chapter', 'id' => 46],
+            ['kind' => 'book', 'id' => 12],
+        ], $criteria->sourceTargets);
+        $this->assertSame([$chapter, $book], $criteria->normalizedTokens);
+    }
+
+    public function test_distinct_source_tokens_combine_with_existing_grammar(): void
+    {
+        $criteria = $this->parser->parse(implode(' ', [
+            'charge',
+            $this->advancedToken('source', implode(chr(58), ['chapter', '46'])),
+            $this->advancedToken('source', implode(chr(58), ['book', '12'])),
+            $this->advancedToken('state', 'review'),
+            $this->advancedToken('prop', 'lapses>=2'),
+        ]));
+
+        $this->assertSame('charge', $criteria->textQuery);
+        $this->assertCount(2, $criteria->sourceTargets);
+        $this->assertSame(['review'], $criteria->fsrsStates);
+        $this->assertCount(1, $criteria->propertyConditions);
+    }
+
+    public function test_invalid_source_tokens_return_structured_errors(): void
+    {
+        $invalidValues = [
+            ['chapter', '0'],
+            ['chapter', '-1'],
+            ['chapter', '1.5'],
+            ['chapter', ''],
+            ['chapter', '1', 'extra'],
+            ['book', 'abc'],
+            ['unknown', '1'],
+            ['MyBook'],
+        ];
+
+        foreach ($invalidValues as $parts) {
+            $token = $this->advancedToken('source', implode(chr(58), $parts));
+            try {
+                $this->parser->parse($token);
+                $this->fail('Expected InvalidBrowserSearchException for ' . $token);
+            } catch (InvalidBrowserSearchException $e) {
+                $errors = $e->getErrors();
+                $this->assertCount(1, $errors);
+                $this->assertSame($token, $errors[0]['token']);
+                $this->assertSame(
+                    $this->advancedToken('source', implode(chr(58), ['chapter', '46'])),
+                    $errors[0]['example']
+                );
+            }
+        }
+    }
+
     public function test_multiple_errors_are_all_reported(): void
     {
         try {

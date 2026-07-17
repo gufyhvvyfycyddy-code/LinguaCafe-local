@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use App\Models\WordSenseOccurrence;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 /**
  * ReviewCardBrowserSearchQueryApplier
@@ -19,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
  *    matching card IDs (delegated to caller to avoid duplicate classification).
  *  - Apply rated conditions (rated:again/rated:hard/rated:good/rated:easy) via whereExists.
  *  - Apply property conditions (prop:lapses<op><n>) via direct column WHERE.
+ *  - Apply missing-field conditions through the canonical missing predicate owner.
  *
  * Hard rules:
  *  - Does NOT create the base query (caller does that with security scope).
@@ -50,6 +53,11 @@ class ReviewCardBrowserSearchQueryApplier
         'stability' => 'review_cards.fsrs_stability',
         'difficulty' => 'review_cards.fsrs_difficulty',
     ];
+
+    public function __construct(
+        private ReviewCardMissingFieldQueryApplier $missingFieldApplier,
+    ) {
+    }
 
     /**
      * Apply parsed criteria to a security-scoped query.
@@ -160,5 +168,98 @@ class ReviewCardBrowserSearchQueryApplier
             $query->where('review_cards.fsrs_due_at', '>=', $start)
                 ->where('review_cards.fsrs_due_at', '<', $start->copy()->addDay());
         }
+
+        // 8. Real source provenance conditions. Each target is applied as an
+        // independent existence predicate, so distinct source tokens use the
+        // Browser grammar's global AND semantics without duplicating cards.
+        foreach ($criteria->sourceTargets as $sourceTarget) {
+            $this->applySourceTarget($query, $sourceTarget, $userId, $language);
+        }
+
+        // 9. Missing-field conditions. The same predicate owner is also used
+        // by the top-level missing_* filter buttons in ReviewCardManageQueryService.
+        foreach ($criteria->missingFields as $missingField) {
+            $this->missingFieldApplier->apply($query, $missingField, $userId, $language);
+        }
+    }
+
+    /**
+     * @param array{kind: string, id: int} $sourceTarget
+     */
+    private function applySourceTarget(
+        Builder $query,
+        array $sourceTarget,
+        int $userId,
+        string $language,
+    ): void {
+        $kind = $sourceTarget['kind'] ?? null;
+        $sourceId = $sourceTarget['id'] ?? null;
+
+        if (!in_array($kind, ['chapter', 'book'], true) || !is_int($sourceId) || $sourceId <= 0) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->whereHas('sense', function ($senseQuery) use ($kind, $sourceId, $userId, $language) {
+            $senseQuery->where(function ($provenanceQuery) use ($kind, $sourceId, $userId, $language) {
+                $this->applyDirectSourceExists(
+                    $provenanceQuery,
+                    $kind,
+                    $sourceId,
+                    $userId,
+                    $language,
+                );
+
+                $provenanceQuery->orWhereExists(function ($occurrenceQuery) use ($kind, $sourceId, $userId, $language) {
+                    $occurrenceQuery->select(DB::raw(1))
+                        ->from('word_sense_occurrences as source_occurrences')
+                        ->join('chapters as source_occurrence_chapters', 'source_occurrence_chapters.id', '=', 'source_occurrences.chapter_id')
+                        ->whereColumn('source_occurrences.word_sense_id', 'word_senses.id')
+                        ->where('source_occurrences.user_id', $userId)
+                        ->where('source_occurrences.language_id', $language)
+                        ->where('source_occurrences.status', WordSenseOccurrence::STATUS_BOUND)
+                        ->where('source_occurrence_chapters.user_id', $userId)
+                        ->where('source_occurrence_chapters.language', $language);
+
+                    if ($kind === 'chapter') {
+                        $occurrenceQuery->where('source_occurrence_chapters.id', $sourceId);
+                        return;
+                    }
+
+                    $occurrenceQuery
+                        ->join('books as source_occurrence_books', 'source_occurrence_books.id', '=', 'source_occurrence_chapters.book_id')
+                        ->where('source_occurrence_books.id', $sourceId)
+                        ->where('source_occurrence_books.user_id', $userId)
+                        ->where('source_occurrence_books.language', $language);
+                });
+            });
+        });
+    }
+
+    private function applyDirectSourceExists(
+        Builder $query,
+        string $kind,
+        int $sourceId,
+        int $userId,
+        string $language,
+    ): void {
+        $query->whereExists(function ($directQuery) use ($kind, $sourceId, $userId, $language) {
+            $directQuery->select(DB::raw(1))
+                ->from('chapters as source_direct_chapters')
+                ->whereColumn('source_direct_chapters.id', 'word_senses.source_chapter_id')
+                ->where('source_direct_chapters.user_id', $userId)
+                ->where('source_direct_chapters.language', $language);
+
+            if ($kind === 'chapter') {
+                $directQuery->where('source_direct_chapters.id', $sourceId);
+                return;
+            }
+
+            $directQuery
+                ->join('books as source_direct_books', 'source_direct_books.id', '=', 'source_direct_chapters.book_id')
+                ->where('source_direct_books.id', $sourceId)
+                ->where('source_direct_books.user_id', $userId)
+                ->where('source_direct_books.language', $language);
+        });
     }
 }

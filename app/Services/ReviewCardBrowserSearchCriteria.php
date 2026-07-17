@@ -23,6 +23,8 @@ namespace App\Services;
  *  - fsrsStates:         list<'new'|'learning'|'review'|'relearning'>
  *                        (max 1 distinct value, deduplicated)
  *  - dueDate:            yesterday | today | tomorrow | YYYY-MM-DD | null
+ *  - sourceTargets:      list<array{kind: 'chapter'|'book', id: int}>
+ *  - missingFields:      list<'definition'|'example'|'source'>
  *  - normalizedTokens:   list<string>  recognized tokens in normalized lowercase form
  *  - errors:             list<array{token: string, reason: string, example: string}>
  *
@@ -41,6 +43,8 @@ class ReviewCardBrowserSearchCriteria
      * @param list<array{field: string, operator: string, value: int|float}> $propertyConditions
      * @param list<'new'|'learning'|'review'|'relearning'> $fsrsStates
      * @param string|null $dueDate
+     * @param list<array{kind: 'chapter'|'book', id: int}> $sourceTargets
+     * @param list<'definition'|'example'|'source'> $missingFields
      * @param list<string> $normalizedTokens
      * @param list<array{token: string, reason: string, example: string}> $errors
      */
@@ -54,6 +58,8 @@ class ReviewCardBrowserSearchCriteria
         public readonly array $propertyConditions,
         public readonly array $fsrsStates,
         public readonly ?string $dueDate,
+        public readonly array $sourceTargets,
+        public readonly array $missingFields,
         public readonly array $normalizedTokens,
         public readonly array $errors,
     ) {
@@ -123,6 +129,16 @@ class ReviewCardBrowserSearchCriteria
     public function hasDueDate(): bool
     {
         return $this->dueDate !== null;
+    }
+
+    public function hasSourceTargets(): bool
+    {
+        return !empty($this->sourceTargets);
+    }
+
+    public function hasMissingFields(): bool
+    {
+        return !empty($this->missingFields);
     }
 
     /**

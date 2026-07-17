@@ -69,6 +69,11 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString(sprintf('%s%c%s', 'prop', 58, 'stability'), $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'prop', 58, 'difficulty'), $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'prop', 58, 'reps'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'source', 58, 'chapter'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'source', 58, 'book'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'definition'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'example'), $contents);
+        $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'source'), $contents);
         $this->assertStringContainsString('charge is:leech', $contents);
     }
 
@@ -87,7 +92,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
     {
         $surface = file_get_contents($this->searchSurfacePath);
         $this->assertStringContainsString('detectAdvancedTokens(query)', $surface);
-        $this->assertStringContainsString("['is', 'rated', 'prop', 'flag', 'state', 'due']", $surface);
+        $this->assertStringContainsString("['is', 'rated', 'prop', 'flag', 'state', 'due', 'source', 'missing']", $surface);
         $this->assertStringContainsString("this.currentFilter = 'all'", $surface);
         $this->assertStringContainsString('stripIsTokens(query)', $surface);
         $this->assertStringContainsString('removeToken(token)', $surface);

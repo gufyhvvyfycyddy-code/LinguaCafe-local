@@ -4,10 +4,8 @@ namespace App\Services;
 
 use App\Models\ReviewCard;
 use App\Models\WordSense;
-use App\Models\WordSenseOccurrence;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 
 class ReviewCardManageQueryService
 {
@@ -15,6 +13,7 @@ class ReviewCardManageQueryService
         private SenseReviewLeechQueryService $leechQueryService,
         private ReviewCardBrowserSearchParser $searchParser,
         private ReviewCardBrowserSearchQueryApplier $searchApplier,
+        private ReviewCardMissingFieldQueryApplier $missingFieldApplier,
     ) {
     }
 
@@ -279,33 +278,28 @@ class ReviewCardManageQueryService
                 $query->whereIn('review_cards.id', $matchingIds);
                 break;
             case 'missing_definition':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->where(function ($q) {
-                        $q->whereNull('sense_zh')->orWhere('sense_zh', '');
-                    })->where(function ($q) {
-                        $q->whereNull('sense_en')->orWhere('sense_en', '');
-                    });
-                });
+                $this->missingFieldApplier->apply(
+                    $query,
+                    ReviewCardMissingFieldQueryApplier::DEFINITION,
+                    $userId,
+                    $language,
+                );
                 break;
             case 'missing_example':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->where(function ($q) {
-                        $q->whereNull('example_sentence_en')->orWhere('example_sentence_en', '');
-                    });
-                });
+                $this->missingFieldApplier->apply(
+                    $query,
+                    ReviewCardMissingFieldQueryApplier::EXAMPLE,
+                    $userId,
+                    $language,
+                );
                 break;
             case 'missing_source':
-                $query->whereHas('sense', function ($subQuery) {
-                    $subQuery->whereNull('source_chapter_id');
-                })->whereNotExists(function ($subQuery) use ($userId, $language) {
-                    $subQuery->select(DB::raw(1))
-                        ->from('word_sense_occurrences')
-                        ->whereColumn('word_sense_occurrences.word_sense_id', 'review_cards.target_id')
-                        ->where('word_sense_occurrences.user_id', $userId)
-                        ->where('word_sense_occurrences.language_id', $language)
-                        ->where('word_sense_occurrences.status', WordSenseOccurrence::STATUS_BOUND)
-                        ->whereNotNull('word_sense_occurrences.chapter_id');
-                });
+                $this->missingFieldApplier->apply(
+                    $query,
+                    ReviewCardMissingFieldQueryApplier::SOURCE,
+                    $userId,
+                    $language,
+                );
                 break;
         }
     }

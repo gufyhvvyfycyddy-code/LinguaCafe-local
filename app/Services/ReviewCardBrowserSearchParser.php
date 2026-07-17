@@ -16,6 +16,8 @@ namespace App\Services;
  *   prop:lapses{=,>,>=,<,<=}<int>     (V1: only lapses field)
  *   flag:0..7                         (exact ReviewCard marker)
  *   state:new | state:learning | state:review | state:relearning  (max 1 distinct)
+ *   source:chapter:<positive-id> | source:book:<positive-id>
+ *   missing:definition | missing:example | missing:source
  *
  * All conditions AND-combined. No OR / NOT / parentheses.
  *
@@ -46,6 +48,7 @@ class ReviewCardBrowserSearchParser
     private const PROP_OPERATORS = ['=', '>', '>=', '<', '<='];
     private const FSRS_STATES = ['new', 'learning', 'review', 'relearning'];
     private const RELATIVE_DUE_DATES = ['yesterday', 'today', 'tomorrow'];
+    private const MISSING_FIELDS = ['definition', 'example', 'source'];
 
     /**
      * Parse a raw query string into a ReviewCardBrowserSearchCriteria.
@@ -74,6 +77,8 @@ class ReviewCardBrowserSearchParser
         $marker = null;
         $fsrsStates = [];
         $dueDate = null;
+        $sourceTargets = [];
+        $missingFields = [];
 
         foreach ($segments as $segment) {
             if ($segment === '') {
@@ -93,7 +98,7 @@ class ReviewCardBrowserSearchParser
             $prefix = strtolower(substr($segment, 0, $colonPos));
             $valuePart = substr($segment, $colonPos + 1);
 
-            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag', 'state', 'due'], true)) {
+            if (!in_array($prefix, ['is', 'rated', 'prop', 'flag', 'state', 'due', 'source', 'missing'], true)) {
                 // Not an advanced token prefix — treat as plain text
                 // (e.g. http://example.com).
                 $textParts[] = $segment;
@@ -206,6 +211,15 @@ class ReviewCardBrowserSearchParser
                         $dueDate = $tokenData['value'];
                     }
                     break;
+                case 'source':
+                    $sourceTargets[] = [
+                        'kind' => $tokenData['source_kind'],
+                        'id' => $tokenData['source_id'],
+                    ];
+                    break;
+                case 'missing_field':
+                    $missingFields[] = $tokenData['value'];
+                    break;
             }
         }
 
@@ -228,6 +242,8 @@ class ReviewCardBrowserSearchParser
             propertyConditions: $propertyConditions,
             fsrsStates: $fsrsStates,
             dueDate: $dueDate,
+            sourceTargets: $sourceTargets,
+            missingFields: $missingFields,
             normalizedTokens: $normalizedTokens,
             errors: [],
         );
@@ -263,6 +279,12 @@ class ReviewCardBrowserSearchParser
         if ($prefix === 'due') {
             return $this->parseDueToken($lowerValue, $original);
         }
+        if ($prefix === 'source') {
+            return $this->parseSourceToken($lowerValue, $original);
+        }
+        if ($prefix === 'missing') {
+            return $this->parseMissingToken($lowerValue, $original);
+        }
 
         // Should never reach here due to the prefix check above.
         return [
@@ -271,6 +293,56 @@ class ReviewCardBrowserSearchParser
                 'token' => $original,
                 'reason' => '不支持的搜索类型',
                 'example' => 'is:leech',
+            ],
+        ];
+    }
+
+    private function parseMissingToken(string $lowerValue, string $original): array
+    {
+        if (in_array($lowerValue, self::MISSING_FIELDS, true)) {
+            return [
+                'data' => [
+                    'kind' => 'missing_field',
+                    'value' => $lowerValue,
+                    'normalized' => 'missing:' . $lowerValue,
+                ],
+                'error' => null,
+            ];
+        }
+
+        return [
+            'data' => null,
+            'error' => [
+                'token' => $original,
+                'reason' => '不支持的 missing: 值。只支持 definition、example 或 source。',
+                'example' => 'missing:definition',
+            ],
+        ];
+    }
+
+    private function parseSourceToken(string $lowerValue, string $original): array
+    {
+        if (preg_match('/^(chapter|book):(\d+)$/', $lowerValue, $matches) === 1) {
+            $sourceId = (int) $matches[2];
+            if ($sourceId > 0) {
+                return [
+                    'data' => [
+                        'kind' => 'source',
+                        'source_kind' => $matches[1],
+                        'source_id' => $sourceId,
+                        'normalized' => implode(':', ['source', $matches[1], (string) $sourceId]),
+                    ],
+                    'error' => null,
+                ];
+            }
+        }
+
+        return [
+            'data' => null,
+            'error' => [
+                'token' => $original,
+                'reason' => '不支持的 source: 格式。只支持 chapter 或 book 加正整数 ID。',
+                'example' => implode(':', ['source', 'chapter', '46']),
             ],
         ];
     }
