@@ -12,6 +12,7 @@ Status: current
 - 远端：`git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git`
 - 当前分支：`codex/anki-maximal-alignment-plan`
 - 写入本区块前的 HEAD：`31eed2643eaa72fefdd2796fb9252c02a7157ade`
+- 已验证功能检查点：`eb03f49266c427c495c6174077116e0869d51b74`（Phase 3–7 实现、测试、ADR、验收报告和本交接初稿）。
 - 上游：`origin/codex/anki-maximal-alignment-plan`
 - 写入本区块前本地 HEAD 与上游一致；本次检查点提交后，以远端分支 tip 和最终回复中的 SHA 为恢复入口。
 - 工作区在提交前不干净：包含本次 Phase 3–7 已验证实现、文档和测试；受保护的 `.playwright-cli/`、`nul`，生成的 `public/js/app.js.LICENSE.txt`，以及与本检查点无关的 `docs/architecture/improve-codebase-architecture-install-report.md` 不纳入提交。
@@ -108,7 +109,7 @@ LinguaCafe 保持阅读优先和 sense-only 正式复习主线，在不复制 An
 本地仓库：D:\Document\lingl\LinguaCafe-main
 远端仓库：git@github.com:gufyhvvyfycyddy-code/LinguaCafe-local.git
 当前分支：codex/anki-maximal-alignment-plan
-已验证功能检查点 SHA：FUNCTIONAL_CHECKPOINT_SHA（先 git fetch origin，再以 origin/codex/anki-maximal-alignment-plan 的 branch tip 为最终交接元数据；核对该 tip 包含此功能检查点）
+已验证功能检查点 SHA：eb03f49266c427c495c6174077116e0869d51b74（先 git fetch origin，再以 origin/codex/anki-maximal-alignment-plan 的 branch tip 为最终交接元数据；核对该 tip 包含此功能检查点）
 
 先读取项目规则、当前计划和 docs/plans/current-working-handoff.md，并核对 Git 状态。必须执行 git status、git branch --show-current、git log -1 --oneline、git rev-parse HEAD、git rev-parse @{u}、git ls-remote origin refs/heads/codex/anki-maximal-alignment-plan，确认本地、上游和远端事实；不得丢弃任何已有未提交文件。
 
