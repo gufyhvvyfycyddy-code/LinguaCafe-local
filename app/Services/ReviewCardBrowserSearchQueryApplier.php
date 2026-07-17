@@ -54,6 +54,16 @@ class ReviewCardBrowserSearchQueryApplier
         'difficulty' => 'review_cards.fsrs_difficulty',
     ];
 
+    private const SENSE_TEXT_FIELDS = [
+        'lemma',
+        'surface_form',
+        'sense_zh',
+        'sense_en',
+        'example_sentence_en',
+    ];
+
+    private const LIKE_ESCAPE_CHARACTER = '!';
+
     public function __construct(
         private ReviewCardMissingFieldQueryApplier $missingFieldApplier,
         private SenseReviewReportPeriodService $periodService,
@@ -91,6 +101,16 @@ class ReviewCardBrowserSearchQueryApplier
                         ->orWhere('example_sentence_en', 'like', "%{$textQuery}%");
                 });
             });
+        }
+
+        // Quoted phrases and negated text use literal substring semantics.
+        // They deliberately remain separate from the legacy textQuery path so
+        // existing unquoted search behavior is backward compatible.
+        foreach ($criteria->positivePhrases as $positivePhrase) {
+            $this->applyLiteralSenseTextPredicate($query, $positivePhrase, false);
+        }
+        foreach ($criteria->negativeTexts as $negativeText) {
+            $this->applyLiteralSenseTextPredicate($query, $negativeText, true);
         }
 
         // 2. Lifecycle condition (is:active/buried/suspended/archived)
@@ -216,6 +236,45 @@ class ReviewCardBrowserSearchQueryApplier
         foreach ($criteria->missingFields as $missingField) {
             $this->missingFieldApplier->apply($query, $missingField, $userId, $language);
         }
+    }
+
+    private function applyLiteralSenseTextPredicate(
+        Builder $query,
+        string $literal,
+        bool $negated,
+    ): void {
+        $pattern = '%' . $this->escapeLikeLiteral($literal) . '%';
+        $constraint = function ($senseQuery) use ($pattern) {
+            $senseQuery->where(function ($textQuery) use ($pattern) {
+                foreach (self::SENSE_TEXT_FIELDS as $index => $field) {
+                    $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                    $textQuery->{$method}(
+                        $field . " LIKE ? ESCAPE '" . self::LIKE_ESCAPE_CHARACTER . "'",
+                        [$pattern],
+                    );
+                }
+            });
+        };
+
+        if ($negated) {
+            $query->whereDoesntHave('sense', $constraint);
+            return;
+        }
+
+        $query->whereHas('sense', $constraint);
+    }
+
+    private function escapeLikeLiteral(string $literal): string
+    {
+        return str_replace(
+            [self::LIKE_ESCAPE_CHARACTER, '%', '_'],
+            [
+                self::LIKE_ESCAPE_CHARACTER . self::LIKE_ESCAPE_CHARACTER,
+                self::LIKE_ESCAPE_CHARACTER . '%',
+                self::LIKE_ESCAPE_CHARACTER . '_',
+            ],
+            $literal,
+        );
     }
 
     /**

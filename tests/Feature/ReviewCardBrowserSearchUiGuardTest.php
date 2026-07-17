@@ -76,6 +76,10 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'definition'), $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'example'), $contents);
         $this->assertStringContainsString(sprintf('%s%c%s', 'missing', 58, 'source'), $contents);
+        $this->assertStringContainsString('&quot;take charge&quot;', $contents);
+        $this->assertStringContainsString('-charge', $contents);
+        $this->assertStringContainsString('-&quot;avoid responsibility&quot;', $contents);
+        $this->assertStringContainsString('双引号匹配连续短语', $contents);
         $this->assertStringContainsString('charge is:leech', $contents);
     }
 

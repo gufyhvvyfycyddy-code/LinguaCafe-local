@@ -137,9 +137,15 @@
                 <v-card-title>高级搜索语法</v-card-title>
                 <v-card-text>
                     <p class="text-body-2 mb-3">
-                        在搜索框中输入以下 token 可以精确筛选复习卡。所有条件使用 AND 语义组合。普通文本仍会搜索 Lemma / 释义 / 例句。
+                        在搜索框中输入以下 token 或文本条件可以精确筛选复习卡。所有条件使用 AND 语义组合。普通文本仍会搜索 Lemma / 释义 / 例句。
                     </p>
                     <v-list dense class="mb-2">
+                        <v-list-item>
+                            <v-list-item-content>
+                                <v-list-item-title><code>&quot;take charge&quot;</code> / <code>-charge</code> / <code>-&quot;avoid responsibility&quot;</code></v-list-item-title>
+                                <v-list-item-subtitle>双引号匹配连续短语；前导减号排除普通文本或短语。短语内可用 <code>\&quot;</code> 和 <code>\\</code></v-list-item-subtitle>
+                            </v-list-item-content>
+                        </v-list-item>
                         <v-list-item>
                             <v-list-item-content>
                                 <v-list-item-title><code>is:leech</code></v-list-item-title>
@@ -215,6 +221,8 @@
                     </v-list>
                     <v-divider class="my-2" />
                     <p class="text-body-2 mb-1"><strong>组合示例：</strong></p>
+                    <p class="text-body-2 mb-1"><code>&quot;take charge&quot; -burden</code> — 包含连续短语 take charge，且任一可搜索字段都不含 burden</p>
+                    <p class="text-body-2 mb-1"><code>charge -&quot;avoid responsibility&quot;</code> — 搜索 charge，并排除连续短语 avoid responsibility</p>
                     <p class="text-body-2 mb-1"><code>charge is:leech</code> — 搜索 charge 且是 Leech</p>
                     <p class="text-body-2 mb-1"><code>is:leech is:suspended</code> — Leech 且已暂停</p>
                     <p class="text-body-2 mb-1"><code>rated:again prop:lapses&gt;=2</code> — 有 Again 记录且遗忘 ≥ 2</p>

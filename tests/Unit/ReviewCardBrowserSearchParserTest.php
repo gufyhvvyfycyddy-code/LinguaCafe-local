@@ -843,6 +843,105 @@ class ReviewCardBrowserSearchParserTest extends TestCase
         }
     }
 
+    // Phase 8K parser coverage.
+
+    public function test_quoted_phrase_and_negative_text_forms_are_lexed_without_changing_advanced_tokens(): void
+    {
+        $query = 'charge "take responsibility" -burden -"avoid responsibility" is:active';
+        $criteria = $this->parser->parse($query);
+
+        $this->assertSame($query, $criteria->rawQuery);
+        $this->assertSame('charge', $criteria->textQuery);
+        $this->assertSame(['take responsibility'], $criteria->positivePhrases);
+        $this->assertSame(['burden', 'avoid responsibility'], $criteria->negativeTexts);
+        $this->assertSame(['is:active'], $criteria->normalizedTokens);
+        $this->assertTrue($criteria->hasPositivePhrases());
+        $this->assertTrue($criteria->hasNegativeTexts());
+    }
+
+    public function test_quoted_phrase_decodes_supported_escapes_and_preserves_unknown_escapes(): void
+    {
+        $criteria = $this->parser->parse('"say \\"yes\\" at C:\\\\temp and \\q"');
+
+        $this->assertSame(['say "yes" at C:\\temp and \\q'], $criteria->positivePhrases);
+    }
+
+    public function test_phrase_and_negative_predicates_deduplicate_after_decoding_in_first_occurrence_order(): void
+    {
+        $criteria = $this->parser->parse(
+            '"same phrase" "same phrase" -omit -omit -"two words" -"two words"'
+        );
+
+        $this->assertSame(['same phrase'], $criteria->positivePhrases);
+        $this->assertSame(['omit', 'two words'], $criteria->negativeTexts);
+        $this->assertSame([], $criteria->normalizedTokens);
+    }
+
+    public function test_existing_unquoted_text_rejoins_in_order_around_new_text_predicates(): void
+    {
+        $criteria = $this->parser->parse('first "exact phrase" second -excluded third rated:7');
+
+        $this->assertSame('first second third', $criteria->textQuery);
+        $this->assertSame(['exact phrase'], $criteria->positivePhrases);
+        $this->assertSame(['excluded'], $criteria->negativeTexts);
+        $this->assertSame(['rated:7'], $criteria->normalizedTokens);
+    }
+
+    public function test_hyphens_inside_normal_terms_remain_plain_text(): void
+    {
+        $criteria = $this->parser->parse('well-being state-of-the-art');
+
+        $this->assertSame('well-being state-of-the-art', $criteria->textQuery);
+        $this->assertSame([], $criteria->negativeTexts);
+    }
+
+    public function test_malformed_quote_and_minus_grammar_returns_structured_errors(): void
+    {
+        foreach ([
+            '"unterminated',
+            '-"unterminated',
+            '""',
+            '-""',
+            '-',
+            '--charge',
+            'foo"bar',
+            '"foo"bar',
+        ] as $query) {
+            try {
+                $this->parser->parse($query);
+                $this->fail('Expected InvalidBrowserSearchException for ' . $query);
+            } catch (InvalidBrowserSearchException $e) {
+                $this->assertSame('invalid_browser_search', $e->toResponseArray()['code']);
+                $this->assertNotEmpty($e->getErrors());
+                $this->assertSame($query, $e->getErrors()[0]['token']);
+            }
+        }
+    }
+
+    public function test_negated_recognized_advanced_tokens_are_rejected(): void
+    {
+        foreach ([
+            '-is:suspended',
+            '-rated:again',
+            '-rated:7',
+            '-prop:lapses>=2',
+            '-flag:1',
+            '-state:review',
+            '-due:today',
+            '-source:chapter:46',
+            '-missing:source',
+        ] as $query) {
+            try {
+                $this->parser->parse($query);
+                $this->fail('Expected InvalidBrowserSearchException for ' . $query);
+            } catch (InvalidBrowserSearchException $e) {
+                $this->assertCount(1, $e->getErrors());
+                $this->assertSame($query, $e->getErrors()[0]['token']);
+                $this->assertStringContainsString('高级 token', $e->getErrors()[0]['reason']);
+            }
+        }
+    }
+
     public function test_multiple_errors_are_all_reported(): void
     {
         try {

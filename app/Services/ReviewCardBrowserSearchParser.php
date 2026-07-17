@@ -19,8 +19,9 @@ namespace App\Services;
  *   state:new | state:learning | state:review | state:relearning  (max 1 distinct)
  *   source:chapter:<positive-id> | source:book:<positive-id>
  *   missing:definition | missing:example | missing:source
+ *   "<phrase>" | -<plain-term> | -"<phrase>"
  *
- * All conditions AND-combined. No OR / NOT / parentheses.
+ * All conditions AND-combined. No OR / parentheses / advanced-token negation.
  *
  * Pure function contract:
  *  - No DB queries.
@@ -62,14 +63,13 @@ class ReviewCardBrowserSearchParser
     public function parse(string $rawQuery): ReviewCardBrowserSearchCriteria
     {
         $rawQuery = trim($rawQuery);
-        // Collapse multiple whitespace into single spaces for consistent
-        // tokenization. preserve original in rawQuery for display.
-        $normalized = preg_replace('/\s+/', ' ', $rawQuery) ?? '';
-        $segments = $normalized === '' ? [] : explode(' ', $normalized);
+        $lexed = $this->lexQuery($rawQuery);
 
         $textParts = [];
+        $positivePhrases = $lexed['positive_phrases'];
+        $negativeTexts = $lexed['negative_texts'];
         $normalizedTokens = [];
-        $errors = [];
+        $errors = $lexed['errors'];
 
         $governanceStatus = null;
         $lifecycleStatus = null;
@@ -82,7 +82,7 @@ class ReviewCardBrowserSearchParser
         $sourceTargets = [];
         $missingFields = [];
 
-        foreach ($segments as $segment) {
+        foreach ($lexed['segments'] as $segment) {
             if ($segment === '') {
                 continue;
             }
@@ -243,6 +243,8 @@ class ReviewCardBrowserSearchParser
         return new ReviewCardBrowserSearchCriteria(
             rawQuery: $rawQuery,
             textQuery: $textQuery,
+            positivePhrases: $positivePhrases,
+            negativeTexts: $negativeTexts,
             governanceStatus: $governanceStatus,
             lifecycleStatus: $lifecycleStatus,
             marker: $marker,
@@ -255,6 +257,192 @@ class ReviewCardBrowserSearchParser
             missingFields: $missingFields,
             normalizedTokens: $normalizedTokens,
             errors: [],
+        );
+    }
+
+    /**
+     * Split the linear Browser grammar without introducing a general AST.
+     *
+     * @return array{
+     *   segments: list<string>,
+     *   positive_phrases: list<string>,
+     *   negative_texts: list<string>,
+     *   errors: list<array{token: string, reason: string, example: string}>
+     * }
+     */
+    private function lexQuery(string $query): array
+    {
+        $segments = [];
+        $positivePhrases = [];
+        $negativeTexts = [];
+        $errors = [];
+        $length = strlen($query);
+        $offset = 0;
+
+        while ($offset < $length) {
+            while ($offset < $length && ctype_space($query[$offset])) {
+                $offset++;
+            }
+            if ($offset >= $length) {
+                break;
+            }
+
+            $start = $offset;
+            $isNegativePhrase = $query[$offset] === '-'
+                && ($offset + 1) < $length
+                && $query[$offset + 1] === '"';
+
+            if ($query[$offset] === '"' || $isNegativePhrase) {
+                $quoteOffset = $isNegativePhrase ? $offset + 1 : $offset;
+                $offset = $quoteOffset + 1;
+                $decoded = '';
+                $closed = false;
+
+                while ($offset < $length) {
+                    $character = $query[$offset];
+                    if ($character === '\\' && ($offset + 1) < $length) {
+                        $next = $query[$offset + 1];
+                        if ($next === '"' || $next === '\\') {
+                            $decoded .= $next;
+                            $offset += 2;
+                            continue;
+                        }
+
+                        $decoded .= '\\';
+                        $offset++;
+                        continue;
+                    }
+
+                    if ($character === '"') {
+                        $offset++;
+                        $closed = true;
+                        break;
+                    }
+
+                    $decoded .= $character;
+                    $offset++;
+                }
+
+                if (!$closed) {
+                    $errors[] = [
+                        'token' => substr($query, $start),
+                        'reason' => '引号短语没有闭合。',
+                        'example' => '"take charge"',
+                    ];
+                    break;
+                }
+
+                if ($offset < $length && !ctype_space($query[$offset])) {
+                    while ($offset < $length && !ctype_space($query[$offset])) {
+                        $offset++;
+                    }
+                    $errors[] = [
+                        'token' => substr($query, $start, $offset - $start),
+                        'reason' => '引号短语必须作为独立搜索项，并用空白与其他条件分隔。',
+                        'example' => '"take charge"',
+                    ];
+                    continue;
+                }
+
+                $token = substr($query, $start, $offset - $start);
+                if (trim($decoded) === '') {
+                    $errors[] = [
+                        'token' => $token,
+                        'reason' => '引号短语不能为空。',
+                        'example' => '"take charge"',
+                    ];
+                    continue;
+                }
+
+                if ($isNegativePhrase) {
+                    if (!in_array($decoded, $negativeTexts, true)) {
+                        $negativeTexts[] = $decoded;
+                    }
+                } elseif (!in_array($decoded, $positivePhrases, true)) {
+                    $positivePhrases[] = $decoded;
+                }
+                continue;
+            }
+
+            while ($offset < $length && !ctype_space($query[$offset])) {
+                $offset++;
+            }
+            $token = substr($query, $start, $offset - $start);
+
+            if ($token[0] !== '-') {
+                if (str_contains($token, '"')) {
+                    $errors[] = [
+                        'token' => $token,
+                        'reason' => '双引号只能出现在搜索项边界。',
+                        'example' => '"take charge"',
+                    ];
+                } else {
+                    $segments[] = $token;
+                }
+                continue;
+            }
+
+            if ($token === '-') {
+                $errors[] = [
+                    'token' => $token,
+                    'reason' => '减号后必须提供要排除的文本。',
+                    'example' => '-charge',
+                ];
+                continue;
+            }
+
+            if (str_starts_with($token, '--')) {
+                $errors[] = [
+                    'token' => $token,
+                    'reason' => '不支持重复的前导减号。',
+                    'example' => '-charge',
+                ];
+                continue;
+            }
+
+            $negativeText = substr($token, 1);
+            if (str_contains($negativeText, '"')) {
+                $errors[] = [
+                    'token' => $token,
+                    'reason' => '负向引号短语必须使用 -"..." 完整包围。',
+                    'example' => '-"take charge"',
+                ];
+                continue;
+            }
+
+            if ($this->looksLikeRecognizedAdvancedToken($negativeText)) {
+                $errors[] = [
+                    'token' => $token,
+                    'reason' => '当前阶段不支持高级 token 取反；只能排除普通文本或引号短语。',
+                    'example' => '-charge',
+                ];
+                continue;
+            }
+
+            if (!in_array($negativeText, $negativeTexts, true)) {
+                $negativeTexts[] = $negativeText;
+            }
+        }
+
+        return [
+            'segments' => $segments,
+            'positive_phrases' => $positivePhrases,
+            'negative_texts' => $negativeTexts,
+            'errors' => $errors,
+        ];
+    }
+
+    private function looksLikeRecognizedAdvancedToken(string $candidate): bool
+    {
+        $colonPos = strpos($candidate, ':');
+        if ($colonPos === false || $colonPos === 0) {
+            return false;
+        }
+
+        return in_array(
+            strtolower(substr($candidate, 0, $colonPos)),
+            ['is', 'rated', 'prop', 'flag', 'state', 'due', 'source', 'missing'],
+            true,
         );
     }
 

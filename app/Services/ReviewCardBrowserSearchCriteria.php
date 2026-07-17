@@ -14,7 +14,9 @@ namespace App\Services;
  *
  * Fields:
  *  - rawQuery:           the original input string (trimmed)
- *  - textQuery:          remaining plain text after token extraction (may be empty)
+ *  - textQuery:          remaining unquoted positive text after extraction (may be empty)
+ *  - positivePhrases:    ordered, decoded quoted phrases (deduplicated)
+ *  - negativeTexts:      ordered negative plain terms/phrases (deduplicated)
  *  - governanceStatus:   'leech' | 'struggling' | null  (ADR-0011 classification)
  *  - lifecycleStatus:    'active' | 'buried' | 'suspended' | 'archived' | null  (ADR-0010)
  *  - ratings:            list<'again'|'hard'|'good'|'easy'>  (max 4, no duplicates)
@@ -37,6 +39,8 @@ class ReviewCardBrowserSearchCriteria
     /**
      * @param string $rawQuery
      * @param string $textQuery
+     * @param list<string> $positivePhrases
+     * @param list<string> $negativeTexts
      * @param string|null $governanceStatus
      * @param string|null $lifecycleStatus
      * @param int|null $marker
@@ -53,6 +57,8 @@ class ReviewCardBrowserSearchCriteria
     public function __construct(
         public readonly string $rawQuery,
         public readonly string $textQuery,
+        public readonly array $positivePhrases,
+        public readonly array $negativeTexts,
         public readonly ?string $governanceStatus,
         public readonly ?string $lifecycleStatus,
         public readonly ?int $marker,
@@ -82,6 +88,16 @@ class ReviewCardBrowserSearchCriteria
     public function hasTextQuery(): bool
     {
         return $this->textQuery !== '';
+    }
+
+    public function hasPositivePhrases(): bool
+    {
+        return !empty($this->positivePhrases);
+    }
+
+    public function hasNegativeTexts(): bool
+    {
+        return !empty($this->negativeTexts);
     }
 
     /**

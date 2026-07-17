@@ -1,17 +1,17 @@
 # Review Card Browser Quoted Phrase and Negation Semantic Freeze
 
-> **Status**: Phase 8J complete — semantics frozen; runtime implementation not authorized
+> **Status**: Phase 8K complete — frozen quoted-phrase and text-negation contract implemented and verified
 > **Date**: 2026-07-17
-> **Scope**: Browser Search quoted phrase and text-negation reconnaissance and contract freeze only
+> **Scope**: Browser Search quoted phrase and text-negation semantic authority plus accepted minimal runtime closure
 > **Related**: [ADR-0012](../adr/ADR-0012-review-card-browser-search.md), [ADR-0013](../adr/ADR-0013-review-card-browser-search-execution-pipeline.md), [Anki maximal-alignment forward plan](anki-maximal-alignment-gap-audit-and-forward-plan.md)
 
 ## 1. Goal
 
-Freeze the smallest safe quoted-phrase and negation extension after the linear Browser term grammar became stable.
+Freeze and implement the smallest safe quoted-phrase and negation extension after the linear Browser term grammar became stable.
 
-Phase 8J is documentation and read-only reconnaissance only. It does **not** modify the parser, criteria object, query applier, frontend, routes, exports, database schema, Saved Search, Custom Study, Reviewer, ReviewLog, FSRS, or runtime search behavior.
+Phase 8J established the documentation-only contract. Phase 8K implements that exact contract in the existing Parser/Criteria/Query-Applier pipeline, updates only Browser help copy, and keeps routes, exports, database schema, Saved Search, Custom Study, Reviewer, ReviewLog, and FSRS behavior unchanged.
 
-The first future runtime slice is intentionally narrower than Anki's full query language:
+The accepted runtime slice is intentionally narrower than Anki's full query language:
 
 ```text
 "take charge"
@@ -215,7 +215,7 @@ No same-field requirement, implicit OR, precedence rule, or shared-expression gr
 
 ## 10. Architecture placement for Phase 8K
 
-A future minimal runtime implementation must extend the existing Browser pipeline:
+The accepted minimal runtime implementation extends the existing Browser pipeline:
 
 1. `ReviewCardBrowserSearchParser` replaces whitespace-only tokenization with one small pure lexer while preserving existing advanced-token parsing methods.
 2. `ReviewCardBrowserSearchCriteria` gains ordered read-only positive-phrase and negative-text collections while retaining the existing `textQuery` contract.
@@ -228,7 +228,7 @@ No AST is needed for this linear slice. The lexer output must remain smaller and
 
 ## 11. Phase 8K acceptance matrix
 
-A separately authorized implementation must prove:
+The completed implementation proves:
 
 - positive quoted phrase parsing and contiguous matching;
 - negative plain-term and negative quoted-phrase parsing;
@@ -248,7 +248,7 @@ A separately authorized implementation must prove:
 
 ## 12. Explicit exclusions
 
-Phase 8J and the first runtime slice do not add:
+Phase 8J and the completed Phase 8K runtime slice do not add:
 
 - OR, explicit AND keywords, parentheses, precedence, or a general AST;
 - negation of lifecycle, governance, rating, due, property, marker, state, source, or missing-field tokens;
@@ -259,10 +259,12 @@ Phase 8J and the first runtime slice do not add:
 - multiline phrase normalization or HTML-aware text normalization;
 - new route, migration, index, dependency, export field, Saved Search schema, Custom Study mode, Reviewer behavior, FSRS change, or ReviewLog write.
 
-## 13. Phase 8J conclusion
+## 13. Phase 8K conclusion
 
-Phase 8J freezes a bounded linear extension: positive quoted phrases plus negated plain text and negated quoted phrases. It preserves the existing single unquoted `textQuery`, all current advanced-token contracts, global AND behavior, and the shared four-consumer execution pipeline.
+Phase 8J froze a bounded linear extension and Phase 8K implemented it: positive quoted phrases, negated plain text, and negated quoted phrases now share the existing Browser execution pipeline. The implementation preserves the existing single unquoted `textQuery`, current advanced-token contracts, global AND behavior, user/language/sense-only isolation, lifecycle visibility, and identical list/JSON/CSV/Anki TSV membership.
 
-No runtime grammar, query, UI, route, export, schema, Saved Search, Custom Study, Reviewer, FSRS, ReviewLog, advanced-token negation, OR, parentheses, or AST work was performed.
+The parser now uses a small pure lexer, Criteria carries ordered decoded positive and negative text collections, and Query Applier owns literal five-field predicates with explicit LIKE escaping and NULL-safe exclusion. Malformed quote/minus input and recognized advanced-token negation return the existing structured 422. Frontend work is limited to help text and examples.
 
-The only next entry is **Phase 8K — Browser Search quoted phrase and text-negation minimal runtime implementation**. It requires separate authorization and must implement only this frozen contract.
+No route, migration, schema, dependency, Saved Search, Custom Study, Reviewer, FSRS, ReviewLog, advanced-token negation, OR, parentheses, precedence, or general AST work was added.
+
+The only next entry is **Phase 8L — Browser Search OR/parentheses read-only reconnaissance and semantic freeze**. It requires separate authorization and must not implement runtime boolean grammar.
