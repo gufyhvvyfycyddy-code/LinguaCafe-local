@@ -33,7 +33,7 @@ const manualClosure = section(handoff, '## Manual Sense shared form corrective f
 
 assert.match(masterAuthority, /Settings architecture convergence/);
 assert.match(masterAuthority, /Production Closed[^\n]*Preset V1A[^\n]*Preset V1B[^\n]*Preset V1C[^\n]*Preset V1D/);
-assert.match(masterAuthority, /Current Phase \| No implementation phase is currently authorized; Browser\/ReviewCardManage Phase 3C-2 is Accepted \/ Production Closed; Phase 3C-3 Delete Mutation Family is Planned \/ Not Authorized/);
+assert.match(masterAuthority, /Current Phase \| No implementation phase is currently authorized; Browser\/ReviewCardManage Phase 3C-3 is Accepted \/ Production Closed; Phase 3C-4 Leech Governance Mutation Family is Planned \/ Not Authorized/);
 assert.match(masterAuthority, /28 production files over 500 lines, 10 over 1,000, and 1 over 1,500/);
 assert.match(masterAuthority, /6\.0\/10, localized medium-high burden/);
 assert.doesNotMatch(masterAuthority, /Preset V1A[^\n]*Web Acceptance Pending/);
@@ -46,8 +46,8 @@ assert.match(openWork, /Preset V1C — Consumer Convergence \| Completed \/ Prod
 assert.match(openWork, /Preset V1D — Settings UX and Production Closure \| Completed \/ Production Closed/);
 assert.match(openWork, /fsrs_parameters_previous/);
 assert.match(openWork, /Settings UX-1/);
-assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Completed \/ Production Closed through Phase 3C-2/);
-assert.match(openWork, /ReviewCardLifecycleMutationSurface\.vue[^\n]*414 行[^\n]*1 个 descriptor GET[^\n]*2 个 lifecycle POST[^\n]*3 个对话框/);
+assert.match(openWork, /Browser \/ ReviewCardManage architecture convergence \| Completed \/ Production Closed through Phase 3C-3/);
+assert.match(openWork, /ReviewCardDeleteMutationSurface\.vue[^\n]*196 行[^\n]*1 个 DELETE[^\n]*1 个 bulk-delete POST[^\n]*2 个确认弹窗/);
 assert.match(openWork, /Card Marker \+ Custom Study 1B \| Planned/);
 assert.match(openWork, /Real AI provider \/ automatic chapter analysis \| Environment Gate/);
 assert.match(openWork, /Reader-UI-4[^\n]*高级字段默认折叠/);
@@ -89,8 +89,8 @@ assert.match(roadmap, /超过 1,000 行的生产文件不得继续无计划增�
 assert.match(executionOrder, /Settings architecture convergence/);
 assert.match(executionOrder, /Preset V1/);
 assert.match(executionOrder, /Completed \/ Production Closed[\s\S]*双用户、English\/French/);
-assert.match(executionOrder, /Phase 3C-2 Accepted \/ Production Closed/);
-assert.match(executionOrder, /Phase 3C-3[^\n]*Planned \/ Not Authorized/);
+assert.match(executionOrder, /Phase 3C-3 Accepted \/ Production Closed/);
+assert.match(executionOrder, /Phase 3C-4[^\n]*Planned \/ Not Authorized/);
 assert.match(executionOrder, /Browser \/ ReviewCardManage convergence/);
 assert.match(executionOrder, /Card Marker \+ Custom Study 1B/);
 assert.doesNotMatch(executionOrder, /当前没有自动授权的下一产品任务|仍须由用户.*指定/);
@@ -129,8 +129,8 @@ assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
 assert.match(index, /Preset V1A–V1D are Accepted \/ Production Closed/);
 assert.match(index, /two-user, English\/French V1D matrix are complete under ADR-0027/);
-assert.match(index, /Phase 3C-2[^\n]*Accepted \/ Production Closed[\s\S]*Phase 3C-3 Delete Mutation Family remains Planned \/ Not Authorized/);
-assert.match(index, /1,210 lines[^\n]*11 direct `axios\.` references[^\n]*6 `v-dialog` blocks/);
+assert.match(index, /Phase 3C-3[^\n]*Accepted \/ Production Closed[\s\S]*Phase 3C-4 Leech Governance Mutation Family remains Planned \/ Not Authorized/);
+assert.match(index, /1,098 lines[^\n]*9 direct `axios\.` references[^\n]*4 `v-dialog` blocks/);
 assert.match(index, /review-card-manage-architecture-convergence-plan\.md/);
 assert.doesNotMatch(index, /V1D production-closure matrix remains open|V1D broader production closure remains open/);
 assert.match(index, /ADR-0025-review-settings-preset-v1b-management\.md/);

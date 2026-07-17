@@ -18,6 +18,7 @@ class ReviewCardManageUiGuardTest extends TestCase
     private string $managePath;
     private string $schedulingPath;
     private string $lifecyclePath;
+    private string $deletePath;
 
     protected function setUp(): void
     {
@@ -25,13 +26,15 @@ class ReviewCardManageUiGuardTest extends TestCase
         $this->managePath = resource_path('js/components/ReviewCards/ReviewCardManage.vue');
         $this->schedulingPath = resource_path('js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue');
         $this->lifecyclePath = resource_path('js/components/ReviewCards/ReviewCardLifecycleMutationSurface.vue');
+        $this->deletePath = resource_path('js/components/ReviewCards/ReviewCardDeleteMutationSurface.vue');
     }
 
     private function readManagementSafetySources(): string
     {
         return file_get_contents($this->managePath)
             . "\n" . file_get_contents($this->schedulingPath)
-            . "\n" . file_get_contents($this->lifecyclePath);
+            . "\n" . file_get_contents($this->lifecyclePath)
+            . "\n" . file_get_contents($this->deletePath);
     }
 
     public function test_manage_page_file_exists(): void
@@ -39,6 +42,7 @@ class ReviewCardManageUiGuardTest extends TestCase
         $this->assertFileExists($this->managePath, 'ReviewCardManage.vue must exist.');
         $this->assertFileExists($this->schedulingPath, 'ReviewCardSchedulingMutationSurface.vue must exist.');
         $this->assertFileExists($this->lifecyclePath, 'ReviewCardLifecycleMutationSurface.vue must exist.');
+        $this->assertFileExists($this->deletePath, 'ReviewCardDeleteMutationSurface.vue must exist.');
     }
 
     // ==================== Archive dialog ====================

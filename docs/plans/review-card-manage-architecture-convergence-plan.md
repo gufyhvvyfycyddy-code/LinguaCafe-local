@@ -1,10 +1,10 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed
+> **Status**: Phase 3C-3 — Delete Mutation Family — Accepted / Production Closed
 >
-> **Current next slice**: Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized; no implementation phase is currently authorized
+> **Current next slice**: Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Authorized; no implementation phase is currently authorized
 >
-> **Architecture baseline**: master `18c8208073029cfadf89f86634b8f4cad68f4854`
+> **Architecture baseline**: master `2111679c406e32b5bbfcb14ee74ec605a0be99f3`
 >
 > **Phase 3B-1 implementation baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
 >
@@ -25,12 +25,13 @@ Original measured baseline:
 
 The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
-Current measured snapshot on master `18c8208073029cfadf89f86634b8f4cad68f4854`:
+Current measured snapshot after Phase 3C-3:
 
 - 28 production files exceed 500 lines;
 - 10 production files exceed 1,000 lines;
 - only 1 production file now exceeds 1,500 lines (`TextBlockGroup.vue`, 2,514 lines);
-- `ReviewCardManage.vue` is 1,210 lines with 11 direct `axios.` references and 6 dialogs;
+- `ReviewCardManage.vue` is 1,098 lines with 9 direct `axios.` references and 4 dialogs;
+- `ReviewCardDeleteMutationSurface.vue` is 196 lines with one DELETE request, one bulk-delete POST request and two dialogs;
 - current debt assessment is **6.0/10, localized medium-high burden**: the management module has materially converged, while Reader/Reviewer hotspots and residual compatibility code still require staged governance.
 
 ## 2. Anki official reference and the parts LinguaCafe borrows
@@ -218,8 +219,8 @@ Frozen subphase order:
 
 1. **Phase 3C-1 — Due-now / Reset Scheduling Mutation Family — Accepted / Production Closed**. `ReviewCardSchedulingMutationSurface.vue` is the sole owner of the two scheduling POST requests, their targets, request locks and confirmation dialogs. The parent only forwards table intents and consumes semantic card-update/refresh/notify/error events.
 2. **Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed**. `ReviewCardLifecycleMutationSurface.vue` is the sole descriptor, single/bulk lifecycle request, request-lock, confirmation and state-help owner. Leech governance keeps its own product UI but delegates lifecycle writes to this owner. Authenticated dual-viewport Chrome acceptance completed on 2026-07-17.
-3. **Phase 3C-3 — Delete Mutation Family — Planned / Not Authorized**. Consolidate single/bulk delete confirmation and request ownership while preserving ReviewLog, occurrence and last-confirmed-sense semantics.
-4. **Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Started**. Consolidate rewrite-package and leech-suspend orchestration while preserving the no-provider/no-auto-create boundary.
+3. **Phase 3C-3 — Delete Mutation Family — Accepted / Production Closed**. `ReviewCardDeleteMutationSurface.vue` owns the single/bulk delete confirmations, request locks and the two existing delete requests while preserving ReviewLog, occurrence and last-confirmed-sense semantics. Authenticated dual-viewport browser acceptance completed on 2026-07-17.
+4. **Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Authorized**. Consolidate rewrite-package and leech-suspend orchestration while preserving the no-provider/no-auto-create boundary.
 
 Anki alignment for 3C-1:
 
@@ -293,6 +294,36 @@ Anki alignment for 3C-2:
 - LinguaCafe borrows this coordinator-versus-operation separation while retaining its own four-state lifecycle policy, optimistic version, idempotent request ID, audit event and sense-only access contracts;
 - LinguaCafe does not copy Anki deck movement, sibling bury rules, Cards/Notes mode, note deletion or filtered decks.
 
+#### Phase 3C-3 — Delete Mutation Family — Accepted / Production Closed
+
+Implemented boundary:
+
+- created `resources/js/components/ReviewCards/ReviewCardDeleteMutationSurface.vue` at 196 lines;
+- the delete child owns exactly one single-card DELETE request, one selected-card bulk-delete POST request and two confirmation dialogs;
+- `ReviewCardManage.vue` decreased from 1,210 to 1,098 lines;
+- parent direct `axios.` references decreased from 11 to 9 and parent `v-dialog` blocks decreased from 6 to 4;
+- the parent contains no delete request, delete target, request lock, delete confirmation or bulk-delete selection snapshot;
+- the parent only forwards row/selection intents and consumes clear-selection, list refresh, stats refresh, notification and error events;
+- `ReviewCardTableSurface.vue` remains the current-card, selected-card and intent owner and still contains no mutation request;
+- existing delete endpoints, payloads, access checks, ReviewLog preservation, occurrence preservation and last-confirmed-sense behavior remain unchanged;
+- no backend file, route, migration, FSRS logic or ReviewLog write rule changed.
+
+TDD and verification evidence on 2026-07-17:
+
+- `ReviewCardDeleteMutationSurfaceGuard.test.mjs` first failed because the component did not exist, then passed after the responsibility-complete extraction;
+- `ReviewCardManageUiGuardTest.php` now reads safety copy across the parent and delete owner and passed 17 tests / 22 assertions;
+- focused backend delete regression passed 24 tests / 86 assertions;
+- the development build completed with only existing Sass deprecation warnings;
+- authenticated browser acceptance verified the single and two-card bulk flows at 1920×1080 and 900×900: opening either confirmation produced no write, confirming produced exactly one matching DELETE or bulk-delete POST with HTTP 200, selection cleared after bulk success, and all three acceptance rows left the active list;
+- both dialogs remained contained at 900×900, the document had no horizontal overflow, every application request stayed on localhost and the only Console errors were the established local WebSocket fallback failures;
+- full evidence is recorded in `docs/testing/review-card-delete-mutation-browser-acceptance-2026-07-17.md`.
+
+Anki alignment for 3C-3:
+
+- the Browser coordinates the current row and selected card set while operation-specific code owns the dangerous action and confirmation;
+- LinguaCafe retains its existing WordSense/ReviewCard delete contract instead of copying Anki note deletion;
+- ReviewLog and reading-source history remain preserved, and removing the last confirmed sense may return the EncounteredWord to New according to the established backend authority.
+
 ### Phase 3D — Container Closure — Planned / Not Started
 
 Evaluate the final coordinator only after earlier slices are separately accepted. The stretch target is about 1,000 lines; 1,200 is acceptable when further extraction would create meaningless pass-through components.
@@ -314,6 +345,8 @@ Completed Phase 3C target pairs:
 - `DEV-ReviewCardManage-3C-1`: create `ReviewCardSchedulingMutationSurface.vue`, migrate the complete due-now/reset request and confirmation workflow, add executable guards, run grouped regressions and complete authenticated dual-viewport Chrome acceptance.
 - `ARCH-ReviewCardManage-3C-2`: freeze descriptor, single/bulk lifecycle writes, conflicts, request locks and state help as one lifecycle mutation family; retain the backend state machine as sole authority; preserve table intent ownership and Leech product boundaries.
 - `DEV-ReviewCardManage-3C-2`: create `ReviewCardLifecycleMutationSurface.vue`, migrate all lifecycle request/dialog ownership, freeze `expected_version`, add stale-response protection, delegate Leech lifecycle writes, update guards, run grouped regressions and complete authenticated dual-viewport Chrome acceptance.
+- `ARCH-ReviewCardManage-3C-3`: freeze single and selected-card bulk delete as one dangerous mutation family, preserve backend delete authorities and keep ReviewLog, occurrence and last-confirmed-sense semantics unchanged.
+- `DEV-ReviewCardManage-3C-3`: create `ReviewCardDeleteMutationSurface.vue`, migrate both delete requests and confirmations, preserve table intent ownership, add executable guards, run focused regressions and complete authenticated dual-viewport browser acceptance.
 
 ## 7. Phase 3B changed files
 
@@ -387,4 +420,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3C-2 is **Accepted / Production Closed** after its authenticated Chrome acceptance pass. Phase 3C-3 is **Planned / Not Authorized**. Do not enter the next Phase 3C subphase, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3C-3 is **Accepted / Production Closed** after its authenticated browser acceptance pass. Phase 3C-4 is **Planned / Not Authorized**. Do not enter the next Phase 3C subphase, Card Marker, Custom Study 1B or any later phase automatically.
