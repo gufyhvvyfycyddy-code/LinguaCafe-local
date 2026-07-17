@@ -16,7 +16,7 @@ Current phase: **Phase 3–7 authorized scope closed**；Phase 8A–8K 已按顺
 - 列表、JSON export、CSV export、Anki TSV export 继续共用同一个 Parser、Criteria、Query Applier 与查询入口；没有新增 route、migration、schema、dependency、export field、Saved Search schema、Custom Study、Reviewer、FSRS 或 ReviewLog 行为。
 - TDD RED：旧解析器把 quoted phrase 与 negative text 留在普通 `textQuery`，定向运行记录为 1 failed / 69 passed / 13 pending / 229 assertions；随后完成单一实现与测试修正。
 - Phase 8K 聚焦 GREEN：91 passed / 437 assertions / 0 failures；Browser Search 全相关回归：180 passed / 843 assertions / 0 failures。
-- 完整 PHP：3,331 tests / 13,724 assertions / 14 skipped / 64 既有 PHPUnit metadata deprecations / 0 failures（2m58.602s，exit 0）。
+- 完整 PHP：3,331 tests / 13,724 assertions / 14 skipped / 64 既有 PHPUnit metadata deprecations / 0 failures（2m56.381s，exit 0）。
 - 全部 JS guards：67/67 files passed；`npm run development` 编译成功，仅有既有 Sass deprecation warnings。
 - 真实 localhost Chrome：输入 `-"__phase8k_browser_impossible__"` 返回 HTTP 200、无语法错误；帮助弹窗显示 quoted phrase、negative plain term 和 negative phrase；输入 `-state:review` 返回结构化 HTTP 422，页面保留原表格内容。
 - Browser action Network 仅有本地 GET `/review-cards/manage/data` 与图标读取，无 POST/PUT/PATCH/DELETE；Console 只有既有本地 Pusher WebSocket 连接失败和预期的 422 资源记录，没有 Phase 8K 新增运行时错误。
