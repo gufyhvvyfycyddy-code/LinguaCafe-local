@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A–V1D 和 Browser / ReviewCardManage Phase 3A–3D 均已生产关闭。Card Marker / Custom Study 1B 也于 2026-07-18 完成 ReviewCard Marker 持久化、Browser/Card Info 控件、`marked` preview-only 会话、自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收，状态为 Accepted / Production Closed。下一阶段为 Reviewer 架构收敛；Reader 与真实 AI provider 继续按顺序延后。
+Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B 与 Phase 5 Reviewer 架构收敛均已生产关闭。Reviewer 已共享正式 HTTP/评分事务边界并保留两套页面各自语义，自动回归、testing MySQL 写入证据和 authenticated browser 双 viewport 验收通过。当前阶段为 Phase 6 Reader UI 与阅读架构治理；真实 AI provider 继续按顺序延后。
 
 ## 2. 本轮依据
 
@@ -250,7 +250,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：Accepted / Production Closed**。ReviewCard Marker 持久化、单卡/批量 API、Browser/Card Info 控件、`marked` Custom Study 查询与 preview-only 会话均已完成；自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收通过。验收记录见 `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`，稳定契约见 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。下一阶段为 Phase 5 Reviewer 架构收敛。
+状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：Accepted / Production Closed**。ReviewCard Marker 持久化、单卡/批量 API、Browser/Card Info 控件、`marked` Custom Study 查询与 preview-only 会话均已完成；自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收通过。验收记录见 `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`，稳定契约见 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。Phase 5 Reviewer 架构收敛也已 Accepted / Production Closed；当前进入 Phase 6 Reader UI 与阅读架构治理。
 
 优先级：P1。
 
@@ -303,6 +303,8 @@ Custom Study 1B：
 
 优先级：P2。
 
+状态：**Accepted / Production Closed（2026-07-18）**。正式请求和单次评分事务已形成共享边界；Sense history/undo 动作形成独立 owner；legacy 与 Sense 页面语义、后端 endpoint/payload、FSRS 和 ReviewLog 保持不变。证据见 `docs/testing/reviewer-architecture-convergence-browser-acceptance-2026-07-18.md`。
+
 范围：
 
 - `SenseReview.vue`、`Review.vue` 的请求、会话状态、报告弹窗和评分控制继续拆分。
@@ -319,6 +321,8 @@ Custom Study 1B：
 ### Phase 6：Reader UI 与阅读架构治理
 
 优先级：P2。
+
+状态：**Current / architecture gate and scoped plan in progress**。
 
 先做产品小步：
 

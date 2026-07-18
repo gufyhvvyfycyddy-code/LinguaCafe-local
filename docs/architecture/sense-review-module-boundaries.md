@@ -766,6 +766,12 @@ Regression suites all green: ReviewFsrsTest 63, SenseReviewStackUndoTest 15, Rev
 - **No FSRS change**: leech classification does not modify any FSRS field.
 - **No rating change**: leech does not block rating or change hotkeys.
 
+## 13.13 Reviewer Architecture Convergence Closure (2026-07-18)
+
+Phase 5 is **Accepted / Production Closed**. `ReviewApiClient.js` is the stable transport boundary shared by `Review.vue` and `SenseReview.vue`; `ReviewRatingTransaction.js` provides an isolated one-in-flight rating/recovery transaction per component instance. `SenseReviewSessionActionsSurface.vue` owns Sense history, undo requests, request races and conflict presentation, while `SenseReview.vue` remains the canonical owner of queue/session reconciliation after a successful undo.
+
+This convergence does not merge the two reviewer products. Legacy Review remains a compatibility surface, Sense Review remains the formal sense-review entry, and page-specific queue/session behavior stays feature-owned. Backend routes and payloads, interval calculation, FSRS scheduling, ReviewLog semantics, lifecycle rules and hotkeys are unchanged. Closure evidence is recorded in `docs/testing/reviewer-architecture-convergence-browser-acceptance-2026-07-18.md`.
+
 ## 14. Review Card Browser Advanced Search (ADR-0012 — `Anki-Browser-Search-1`)
 
 > **Status**: Current as of 2026-07-13 (ADR-0012 Task 2000-5 complete).

@@ -30,6 +30,7 @@
 | Architecture Gate | `docs/adr/ADR-0001-architecture-gate-workflow.md` |
 | Sense HTTP / Controller | `docs/architecture/sense-http-controller-boundaries.md` |
 | Sense Review | `docs/architecture/sense-review-module-boundaries.md` |
+| Reviewer Phase 5 closure | `docs/testing/reviewer-architecture-convergence-browser-acceptance-2026-07-18.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |

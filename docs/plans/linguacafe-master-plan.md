@@ -6,9 +6,9 @@
 >
 > | State | Work |
 > |---|---|
-> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A; Preset V1B; Preset V1C; Preset V1D; Browser/ReviewCardManage Phase 3A; Browser/ReviewCardManage Phase 3B-1; Browser/ReviewCardManage Phase 3B-2; Browser/ReviewCardManage Phase 3C-1; Browser/ReviewCardManage Phase 3C-2; Browser/ReviewCardManage Phase 3C-3; Browser/ReviewCardManage Phase 3C-4; Browser/ReviewCardManage Phase 3D |
+> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Card Marker + Custom Study 1B is Accepted / Production Closed; Phase 5 Reviewer architecture convergence is next and requires its scoped architecture gate before implementation |
+> | Current Phase | Phase 5 Reviewer architecture convergence is Accepted / Production Closed; Phase 6 Reader UI and reader architecture governance is current |
 > | Authorized Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
@@ -221,8 +221,8 @@
 | 2D | Preset V1D — Settings UX and Production Closure | Completed / Production Closed | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | 无；Settings UX-1、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定和无自动重排矩阵已完成 | ADR-0027；`review-settings-preset-v1-plan.md`；2026-07-15 Chrome 双 viewport + 数据库 delta | 已完成；停止在本阶段 |
 | 3 | Browser / ReviewCardManage architecture convergence | Completed / Production Closed through Phase 3D | Phase 3A 抽取只读 Card Info；Phase 3B-1 抽取 Search；Phase 3B-2 抽取 Table；Phase 3C-1–3C-4 抽取 Scheduling、Lifecycle、Delete、Leech；Phase 3D 清理无入口的旧 `/enabled` 父组件兼容代码并关闭最终容器 | `ReviewCardManage.vue` 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；只保留 stats、list、inline edit、source-context 编排请求；Lifecycle/Leech/Delete/Scheduling owner 不变 | `docs/plans/review-card-manage-architecture-convergence-plan.md`；`docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`；TDD、自动回归、构建与 authenticated MCP Chrome 验收完成 | 已完成；停止在本阶段 |
 | 4 | Card Marker + Custom Study 1B | Accepted / Production Closed | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | ADR-0029；Phase 4 browser acceptance | 2026-07-18 关闭 |
-| 5 | Reviewer architecture convergence | Planned | Sense Review 与 legacy Review 共用请求恢复、会话和评分编排边界 | `SenseReview.vue` 1,476 行；`Review.vue` 1,070 行 | 同路线 Phase 5；ADR-0008–0010 | Card Marker 后授权 |
-| 6 | Reader UI-7 / Reader UI-8 小步优化 | Planned | hover 自动查词开关，降低常驻面板干扰 | 必须逐项真实验收，不和阅读主链路大拆分混做 | 同路线 Phase 6 | Reviewer 收敛后授权 |
+| 5 | Reviewer architecture convergence | Accepted / Production Closed | 共享正式 HTTP 与单次评分事务边界；Sense history/undo 独立 owner；保留两页业务语义 | `SenseReview.vue` 1,249 行；`Review.vue` 1,025 行 | 24-file frontend loop、保护性 PHP suites、双 viewport browser acceptance | 2026-07-18 关闭 |
+| 6 | Reader UI-7 / Reader UI-8 小步优化 | Current | hover 自动查词开关，降低常驻面板干扰 | 必须逐项真实验收，不和阅读主链路大拆分混做 | 同路线 Phase 6 | 直接进入架构闸门与计划 |
 | 7 | Reader architecture governance | Planned | 降低阅读页改一处坏多处的风险 | `TextBlockGroup.vue` 2517 行；`TextBlockService.php` 1382 行；需逐职责 characterization + Chrome | 同路线 Phase 6；hotspot audit | Reader UI 小步后授权 |
 | 8 | AI Study Card service convergence | Planned | V1–V5 工作流后端职责更清楚 | `AiStudyCardPendingItemService.php` 1065 行，多阶段逻辑聚集 | 同路线 Phase 7 | Reader 架构后授权 |
 | 9 | Real AI provider / automatic chapter analysis | Environment Gate | 显式触发的真实 AI 推荐 | provider、secret、成本、超时、数据边界和 Network 验收 | ADR-0004/0005；V6 plan | 环境条件满足后再授权 |
@@ -377,9 +377,9 @@
 | 2C | Preset V1C | Completed / Production Closed | 全消费者收敛；停止 `fsrs_parameters_previous` 全局孤儿状态的新写入/删除 |
 | 2D | Preset V1D | Completed / Production Closed | 双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和无自动重排矩阵已完成 |
 | 3 | Browser / ReviewCardManage convergence | Phase 3D Accepted / Production Closed | Card Info、Search、Table、Due-now / Reset、Lifecycle、Delete 与 Leech Governance Mutation Surface 已形成独立职责所有者；父组件 668 行、4 个协调请求、0 个弹窗；旧 `/enabled` 父组件兼容代码已清理；见 `review-card-manage-architecture-convergence-plan.md` |
-| 4 | Card Marker + Custom Study 1B | Marker 放在 ReviewCard | 对齐 Anki Card Flag；与 lifecycle、leech、WordSense status 分离 |
-| 5 | Reviewer convergence | Sense Review 为正式主入口 | 统一评分恢复、会话、预计间隔和错误处理；legacy 只保留兼容 |
-| 6 | Reader UI + reader architecture | 先小步 UI，后逐职责拆分 | 阅读、原文、多例句、lemma 和 AI 示意卡是 LinguaCafe 特色，必须在强 harness 下治理 |
+| 4 | Card Marker + Custom Study 1B | Accepted / Production Closed | ReviewCard Marker 与 preview-only marked Custom Study 已通过自动与双 viewport 验收 |
+| 5 | Reviewer convergence | Accepted / Production Closed | 正式 HTTP、评分事务与 Sense session actions 已收敛；两套页面语义和后端写入边界不变 |
+| 6 | Reader UI + reader architecture | Current：先小步 UI，后逐职责拆分 | 阅读、原文、多例句、lemma 和 AI 示意卡是 LinguaCafe 特色，必须在强 harness 下治理 |
 | 7 | Real AI provider | Environment Gate | 手工闭环已经可用；外部成本、secret 和数据外发风险更高 |
 
 ### 8.1 已冻结的产品决定
