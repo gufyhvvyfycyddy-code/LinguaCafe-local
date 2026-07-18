@@ -250,8 +250,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'store']);
     Route::patch('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'update']);
     Route::delete('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'destroy']);
+    Route::post('/review-cards/manage/bulk-marker', [App\Http\Controllers\ReviewCardManageController::class, 'bulkMarker']);
     Route::get('/review-cards/manage/{reviewCard}/logs', [App\Http\Controllers\ReviewCardManageController::class, 'logs']);
     Route::get('/review-cards/manage/{reviewCard}/detail', [App\Http\Controllers\ReviewCardManageController::class, 'detail']);
+    Route::patch('/review-cards/manage/{reviewCard}/marker', [App\Http\Controllers\ReviewCardManageController::class, 'marker']);
     Route::patch('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'update']);
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
     Route::post('/review-cards/manage/{reviewCard}/due-now', [App\Http\Controllers\ReviewCardManageController::class, 'dueNow']);

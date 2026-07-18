@@ -318,6 +318,63 @@ class ReviewCardManageController extends Controller
     }
 
     /**
+     * PATCH /review-cards/manage/{reviewCard}/marker
+     */
+    public function marker(Request $request, int $reviewCard): JsonResponse
+    {
+        $validated = $request->validate([
+            'marker' => [
+                'required',
+                'integer',
+                'between:0,7',
+                static function (string $attribute, mixed $value, \Closure $fail): void {
+                    if (!is_int($value)) {
+                        $fail('The marker field must be an integer.');
+                    }
+                },
+            ],
+        ]);
+
+        [$card] = $this->accessService->findManageableSenseCardOrFail(
+            $reviewCard,
+            Auth::user()->id,
+            Auth::user()->selected_language
+        );
+        $card = $this->mutationService->setMarker($card, $validated['marker']);
+
+        return response()->json([
+            'review_card_id' => $card->id,
+            'marker' => $card->marker,
+        ]);
+    }
+
+    /**
+     * POST /review-cards/manage/bulk-marker
+     */
+    public function bulkMarker(Request $request): JsonResponse
+    {
+        $strictInteger = static function (string $attribute, mixed $value, \Closure $fail): void {
+            if (!is_int($value)) {
+                $fail("The {$attribute} field must be an integer.");
+            }
+        };
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids.*' => ['required', 'integer', 'distinct', 'min:1', $strictInteger],
+            'marker' => ['required', 'integer', 'between:0,7', $strictInteger],
+        ]);
+
+        $result = $this->mutationService->bulkSetMarker(
+            $validated['ids'],
+            $validated['marker'],
+            Auth::user()->id,
+            Auth::user()->selected_language
+        );
+
+        return response()->json($result);
+    }
+
+    /**
      * PATCH /review-cards/manage/{reviewCard}/enabled
      * Legacy archive/restore endpoint (ADR-0010 compatibility).
      *

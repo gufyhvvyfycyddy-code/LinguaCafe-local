@@ -75,6 +75,45 @@ class ReviewCardManageMutationService
     }
 
     /**
+     * Set the independent card Marker without touching learning state.
+     */
+    public function setMarker(ReviewCard $card, int $marker): ReviewCard
+    {
+        $card->marker = $marker;
+        $card->save();
+
+        return $card->refresh();
+    }
+
+    /**
+     * Set Marker for accessible confirmed sense cards and hide skipped IDs.
+     *
+     * @return array{affected: int, skipped: int, marker: int}
+     */
+    public function bulkSetMarker(array $ids, int $marker, int $userId, string $language): array
+    {
+        $affected = 0;
+        $skipped = 0;
+
+        DB::transaction(function () use ($ids, $marker, $userId, $language, &$affected, &$skipped) {
+            foreach ($ids as $id) {
+                $card = $this->findManageableSenseCardForMutation($id, $userId, $language);
+
+                if (!$card) {
+                    $skipped++;
+                    continue;
+                }
+
+                $card->marker = $marker;
+                $card->save();
+                $affected++;
+            }
+        });
+
+        return ['affected' => $affected, 'skipped' => $skipped, 'marker' => $marker];
+    }
+
+    /**
      * Bulk archive or restore sense review cards.
      * Uses shared findManageableSenseCardForMutation helper.
      * Returns ['affected' => int, 'skipped' => int].
