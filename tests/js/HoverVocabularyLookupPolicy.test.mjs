@@ -1,9 +1,14 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { resolveHoverVocabularyLookup } from '../../resources/js/services/HoverVocabularyLookupPolicy.js';
 
 const normalizeLemma = (term) => term.toLowerCase().replace(/^the\s+/, '');
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
 
 test('closes only for disabled hover, plain text, or null words', () => {
     for (const input of [
@@ -83,4 +88,13 @@ test('does not mutate frozen hover inputs', () => {
         normalizeLemma,
     }));
     assert.deepEqual(hoveredWords, [word]);
+});
+
+test('TextBlockGroup delegates hover lookup decisions without moving request ownership', () => {
+    assert.match(textBlockSource, /import\s*\{\s*resolveHoverVocabularyLookup\s*\}/);
+    assert.match(textBlockSource, /const lookupDecision = resolveHoverVocabularyLookup\(/);
+    assert.match(textBlockSource, /lookupDecision\.mode === 'closed'/);
+    assert.match(textBlockSource, /lookupDecision\.mode === 'local-only'/);
+    assert.match(textBlockSource, /makeHoverVocabularyBoxSearchRequest\(lookupDecision\.term\)/);
+    assert.match(textBlockSource, /axios\.post\('\/dictionaries\/search-for-hover-vocabulary'/);
 });

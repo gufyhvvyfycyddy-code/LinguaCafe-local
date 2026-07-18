@@ -201,6 +201,7 @@
 
 <script>
     import TextToSpeechService from './../../services/TextToSpeechService';
+    import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
         resolveWordElementFromEventTarget,
@@ -900,7 +901,15 @@
                 this.updateHoverVocabularyBox(data);
             },
             updateHoverVocabularyBox(data) {
-                if (!this.$props.vocabularyHoverBox || this.$props.plainTextMode || data.hoveredWords === null) {
+                const lookupDecision = resolveHoverVocabularyLookup({
+                    hoverBoxEnabled: this.$props.vocabularyHoverBox,
+                    searchEnabled: this.$props.vocabularyHoverBoxSearch,
+                    plainTextMode: this.$props.plainTextMode,
+                    hoveredWords: data.hoveredWords,
+                    normalizeLemma: (lemma) => this.trimSearchTerm(lemma),
+                });
+
+                if (lookupDecision.mode === 'closed') {
                     this.closeHoverBox();
                     return;
                 } else {
@@ -918,7 +927,7 @@
                     }
 
                     // check if dictionary search option is enabled
-                    if (!this.$props.vocabularyHoverBoxSearch) {
+                    if (lookupDecision.mode === 'local-only') {
                         this.hoverVocabularyDelayTimeout = setTimeout(() => {
                             this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'dictionaryTranslation', value: 'dictionary-search-disabled' });
                             this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'apiTranslations', value: [] });
@@ -938,28 +947,7 @@
                             this.updateHoverVocabularyBoxPosition();
                         });
 
-                        if (data.hoveredWords.length === 1) {
-                            var term = data.hoveredWords[0].word;
-                            if (data.hoveredWords[0].lemma.length) {
-                                term = this.trimSearchTerm(data.hoveredWords[0].lemma);
-                            }
-                        } else {
-
-                            // build search term for phrases, and adding spaces
-                            var term = '';
-                            for (let i = 0; i < data.hoveredWords.length; i++) {
-                                term += data.hoveredWords[i].word;
-
-                                if (data.hoveredWords[i].spaceAfter && i < data.hoveredWords.length - 1) {
-                                    term += ' ';
-                                }
-                            }
-
-                            data.hoveredWords.map(hoveredWord => hoveredWord.word).join('');
-                        }
-
-
-                        this.makeHoverVocabularyBoxSearchRequest(term);
+                        this.makeHoverVocabularyBoxSearchRequest(lookupDecision.term);
                     }, this.$props.vocabularyHoverBoxDelay);
                 }
             },
