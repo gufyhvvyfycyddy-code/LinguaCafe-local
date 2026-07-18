@@ -64,6 +64,17 @@
                                     <span class="detail-value"><v-chip x-small :color="stateColor(detailTarget.lifecycle_state)">{{ stateLabel(detailTarget.lifecycle_state) }}</v-chip></span>
                                 </div>
                                 <detail-row label="FSRS State" :value="displayValue(detailTarget.fsrs_state)" />
+                                <div class="detail-row">
+                                    <span class="detail-label">卡片标记</span>
+                                    <span class="detail-value">
+                                        <review-card-marker-picker
+                                            :card-id="detailTarget.review_card_id"
+                                            :marker="detailTarget.marker"
+                                            @updated="onMarkerUpdated"
+                                            @notify="(...args) => $emit('notify', ...args)"
+                                        />
+                                    </span>
+                                </div>
                             </div>
                             <v-divider class="my-3" />
                             <div class="detail-section">
@@ -184,6 +195,7 @@
                     <v-btn text @click="closeDetail">关闭</v-btn>
                     <v-btn v-if="deepLinkSource" text color="primary" @click="$emit('return-to-report')"><v-icon left small>mdi-arrow-left</v-icon>返回学习报告</v-btn>
                     <v-spacer />
+                    <v-btn text color="primary" @click="$emit('study-marked')">学习已标记卡片</v-btn>
                     <v-btn text color="primary" @click="openSource">查看原文</v-btn>
                 </v-card-actions>
             </v-card>
@@ -196,6 +208,7 @@
 
 <script>
 import axios from 'axios';
+import ReviewCardMarkerPicker from './ReviewCardMarkerPicker.vue';
 import { actionColor, actionLabel, stateColor, stateLabel } from '../../services/ReviewCardLifecyclePresentation.js';
 import {
     reasonLabel as leechReasonLabel,
@@ -218,7 +231,7 @@ const DetailRow = {
 };
 
 export default {
-    components: { DetailRow },
+    components: { DetailRow, ReviewCardMarkerPicker },
     props: {
         value: { type: Boolean, default: false },
         reviewCardId: { type: Number, default: null },
@@ -320,6 +333,11 @@ export default {
         openSource() {
             this.$emit('open-source', this.detailTarget);
             this.closeDetail();
+        },
+        onMarkerUpdated(result) {
+            if (!this.detailTarget || !result) return;
+            this.detailTarget = { ...this.detailTarget, marker: result.marker };
+            this.$emit('marker-updated', result);
         },
         displayValue(value, fallback = '—') { return value === null || value === undefined || value === '' ? fallback : value; },
         formatDateTime(value) {

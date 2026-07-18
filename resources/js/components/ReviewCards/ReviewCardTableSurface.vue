@@ -22,6 +22,11 @@
                     @change="changePerPage"
                 />
             </v-col>
+            <v-col cols="12" sm="6" md="8" class="d-flex align-center">
+                <v-btn small text color="primary" @click="$emit('study-marked')">
+                    <v-icon small left>mdi-school-outline</v-icon>学习已标记卡片
+                </v-btn>
+            </v-col>
             <v-col cols="6" sm="3" md="2" class="d-flex align-center justify-end">
                 <v-menu offset-y :close-on-content-click="false" max-height="500">
                     <template #activator="{ on, attrs }">
@@ -111,6 +116,13 @@
                 @change="toggleSelectAll"
             />
             <span class="mr-4 body-2">已选 <strong>{{ selectedIds.length }}</strong> 项</span>
+            <review-card-marker-picker
+                :ids="selectedIds"
+                :marker="0"
+                class="mr-2"
+                @updated="emitBulkMarkerUpdated"
+                @notify="(...args) => $emit('notify', ...args)"
+            />
             <v-menu offset-y>
                 <template #activator="{ on, attrs }">
                     <v-btn small color="primary" class="mr-2" v-bind="attrs" v-on="on" :disabled="bulkLifecycleLoading">
@@ -182,6 +194,7 @@
                             <th v-if="isColumnVisible('example_sentence_en')" class="col-example">例句(英)</th>
                             <th v-if="isColumnVisible('example_sentence_zh')" class="col-example">例句(中)</th>
                             <th v-if="isColumnVisible('source')" class="col-source">溯源</th>
+                            <th class="col-marker">标记</th>
                             <th class="col-status sortable" @click="toggleSort('fsrs_state')">状态 <span class="sort-icon">{{ sortIcon('fsrs_state') }}</span></th>
                             <th v-if="isColumnVisible('fsrs_stability')" class="col-fsrs sortable" @click="toggleSort('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
                             <th v-if="isColumnVisible('fsrs_difficulty')" class="col-fsrs sortable" @click="toggleSort('fsrs_difficulty')">难度 <span class="sort-icon">{{ sortIcon('fsrs_difficulty') }}</span></th>
@@ -246,6 +259,15 @@
                             </td>
                             <td v-if="isColumnVisible('source')" class="col-source" :class="sourceDisplayClass(item)">
                                 {{ item.source_display_label || item.source_chapter_title || sourceKindLabel(item.source_kind) }}
+                            </td>
+                            <td class="col-marker text-center">
+                                <review-card-marker-picker
+                                    :card-id="item.review_card_id"
+                                    :marker="item.marker"
+                                    dense
+                                    @updated="$emit('marker-updated', $event)"
+                                    @notify="(...args) => $emit('notify', ...args)"
+                                />
                             </td>
                             <td class="col-status">
                                 <v-chip x-small :color="stateColor(item.lifecycle_state)">{{ stateLabel(item.lifecycle_state) }}</v-chip>
@@ -333,6 +355,7 @@
 <script>
 import axios from 'axios';
 import { DefaultLocalStorageManager } from '../../services/LocalStorageManagerService.js';
+import ReviewCardMarkerPicker from './ReviewCardMarkerPicker.vue';
 import {
     actionLabel,
     actionColor,
@@ -345,6 +368,7 @@ import {
 } from '../../services/SenseReviewLeechPresentation.js';
 
 export default {
+    components: { ReviewCardMarkerPicker },
     props: {
         items: { type: Array, default: () => [] },
         pagination: { type: Object, default: () => ({ current_page: 1, last_page: 1, total: 0 }) },
@@ -389,7 +413,7 @@ export default {
                 fsrs_last_reviewed_at: true,
                 fsrs_due_at: true,
             },
-            pinnedColumnKeys: ['checkbox', 'lemma', 'sense_zh', 'fsrs_state', 'actions'],
+            pinnedColumnKeys: ['checkbox', 'lemma', 'sense_zh', 'marker', 'fsrs_state', 'actions'],
             configurableColumnDefs: [
                 { key: 'id', label: 'ID' },
                 { key: 'surface_form', label: 'Surface' },
@@ -546,6 +570,9 @@ export default {
         emitBulkLifecycle(action) {
             if (this.selectedIds.length === 0) return;
             this.$emit('bulk-lifecycle', { action, ids: [...this.selectedIds], items: [...this.selectedItems] });
+        },
+        emitBulkMarkerUpdated(result, ids) {
+            this.$emit('bulk-marker-updated', result, ids);
         },
         updateSelectAllState() {
             if (this.items.length === 0) {

@@ -105,6 +105,9 @@
             @bulk-delete="confirmBulkDelete"
             @bulk-rewrite="openBulkRewritePackages"
             @bulk-leech-suspend="confirmBulkLeechSuspend"
+            @marker-updated="onMarkerUpdated"
+            @bulk-marker-updated="onBulkMarkerUpdated"
+            @study-marked="openMarkedStudy"
             @notify="showSnackbar"
         />
 
@@ -124,6 +127,9 @@
             @return-to-report="backToReport"
             @detail-loaded="onDetailLoaded"
             @detail-load-error="onDetailLoadError"
+            @marker-updated="onMarkerUpdated"
+            @study-marked="openMarkedStudy"
+            @notify="showSnackbar"
             @close="onDetailClosed"
         />
 
@@ -502,7 +508,32 @@ export default {
         showSnackbar(text, color) {
             this.snackbar = { show: true, text, color };
         },
-
+        onMarkerUpdated(result) {
+            const reviewCardId = Number(result?.review_card_id);
+            const marker = Number(result?.marker);
+            if (!Number.isInteger(reviewCardId) || !Number.isInteger(marker)) return;
+            const index = this.items.findIndex(item => item.review_card_id === reviewCardId);
+            if (index >= 0) {
+                this.$set(this.items, index, { ...this.items[index], marker });
+            }
+        },
+        onBulkMarkerUpdated(result, ids = []) {
+            if (Number(result?.skipped) > 0) {
+                this.loadData();
+                return;
+            }
+            const marker = Number(result?.marker);
+            const submittedIds = new Set(ids.map(Number));
+            if (!Number.isInteger(marker)) return;
+            this.items.forEach((item, index) => {
+                if (submittedIds.has(item.review_card_id)) {
+                    this.$set(this.items, index, { ...item, marker });
+                }
+            });
+        },
+        openMarkedStudy() {
+            this.$router.push({ path: '/custom-study', query: { mode: 'marked' } });
+        },
         viewSource(item) {
             const card = {
                 lemma: item.lemma,

@@ -27,3 +27,37 @@ test('no other ReviewCard Vue component owns marker HTTP writes', () => {
 
     assert.deepEqual(offenders, []);
 });
+
+test('Browser table exposes row, bulk, and marked-study Marker controls', () => {
+    const source = fs.readFileSync(path.join(reviewCardDir, 'ReviewCardTableSurface.vue'), 'utf8');
+
+    assert.match(source, /import ReviewCardMarkerPicker/);
+    assert.match(source, /<review-card-marker-picker[\s\S]+:card-id="item\.review_card_id"/);
+    assert.match(source, /<review-card-marker-picker[\s\S]+:ids="selectedIds"/);
+    assert.match(source, /marker-updated/);
+    assert.match(source, /bulk-marker-updated/);
+    assert.match(source, /学习已标记卡片/);
+    assert.match(source, /study-marked/);
+});
+
+test('Card Info reuses the picker and emits canonical Marker updates', () => {
+    const source = fs.readFileSync(path.join(reviewCardDir, 'ReviewCardInfoDrawer.vue'), 'utf8');
+
+    assert.match(source, /import ReviewCardMarkerPicker/);
+    assert.match(source, /<review-card-marker-picker/);
+    assert.match(source, /detailTarget\.marker/);
+    assert.match(source, /marker-updated/);
+    assert.match(source, /学习已标记卡片/);
+    assert.match(source, /study-marked/);
+});
+
+test('management container reconciles Marker events and passes no card IDs to Custom Study', () => {
+    const source = fs.readFileSync(path.join(reviewCardDir, 'ReviewCardManage.vue'), 'utf8');
+
+    assert.match(source, /@marker-updated="onMarkerUpdated"/);
+    assert.match(source, /@bulk-marker-updated="onBulkMarkerUpdated"/);
+    assert.match(source, /@study-marked="openMarkedStudy"/);
+    assert.match(source, /path:\s*['"]\/custom-study['"]/);
+    assert.match(source, /query:\s*\{\s*mode:\s*['"]marked['"]\s*\}/);
+    assert.doesNotMatch(source, /query:\s*\{[^}]*ids/);
+});
