@@ -15,6 +15,26 @@ class ReviewCard extends Model
     public const TARGET_SENSE = 'sense';
     public const TARGET_PHRASE = 'phrase';
 
+    public const MARKER_NONE = 0;
+    public const MARKER_RED = 1;
+    public const MARKER_ORANGE = 2;
+    public const MARKER_GREEN = 3;
+    public const MARKER_BLUE = 4;
+    public const MARKER_PINK = 5;
+    public const MARKER_TURQUOISE = 6;
+    public const MARKER_PURPLE = 7;
+
+    public const MARKERS = [
+        self::MARKER_NONE,
+        self::MARKER_RED,
+        self::MARKER_ORANGE,
+        self::MARKER_GREEN,
+        self::MARKER_BLUE,
+        self::MARKER_PINK,
+        self::MARKER_TURQUOISE,
+        self::MARKER_PURPLE,
+    ];
+
     public const LIFECYCLE_ACTIVE = 'active';
     public const LIFECYCLE_BURIED = 'buried';
     public const LIFECYCLE_SUSPENDED = 'suspended';
@@ -51,6 +71,7 @@ class ReviewCard extends Model
             'buried_until' => 'datetime',
             'lifecycle_changed_at' => 'datetime',
             'lifecycle_version' => 'integer',
+            'marker' => 'integer',
         ];
     }
 
