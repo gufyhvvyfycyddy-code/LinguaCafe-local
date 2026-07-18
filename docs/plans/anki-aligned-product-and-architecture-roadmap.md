@@ -250,7 +250,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：Planned / Not Authorized**。本轮停止，不进入下一产品阶段。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
+状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：In Progress**。产品与架构合同已由 ADR-0029 冻结，尚未声明实现或生产验收完成。详细边界见 `docs/superpowers/specs/2026-07-18-card-marker-custom-study-1b-design.md` 与 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。
 
 优先级：P1。
 

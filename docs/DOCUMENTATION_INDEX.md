@@ -35,7 +35,7 @@
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |
 | Review settings preset | `docs/plans/review-settings-preset-v1-plan.md` |
 | Anki 参考产品决策 | `docs/plans/vibe-coding-collaboration-rules.md` §8.7，再查 Anki 官方手册/源码 |
-| Custom Study | `docs/plans/custom-study-1a-implementation-plan.md`、`docs/adr/ADR-0016-custom-study-preview-session.md` |
+| Custom Study / Card Marker | `docs/plans/custom-study-1a-implementation-plan.md`、`docs/adr/ADR-0016-custom-study-preview-session.md`、`docs/adr/ADR-0029-card-marker-and-custom-study-1b.md` |
 | AI study card | `docs/plans/ai-study-card-v1-frozen-plan.md`、V6 plan 及 ADR-0004/0005 |
 | Testing DB | `docs/plans/testing-db-health-playbook.md` |
 | MCP Chrome | `docs/plans/mcp-chrome-local-smoke-playbook.md` |
