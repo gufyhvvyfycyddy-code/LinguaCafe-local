@@ -83,7 +83,7 @@ This Sense-only surface owns:
 - issuing the existing undo request and showing conflict/loading state;
 - emitting canonical `undone` output and a refresh request after success.
 
-It consumes `reviewSessionId`, `open`, and the current card identity through props, and emits `input`, `undone`, `refresh-queue`, and `notify`. It does not create or rate cards, apply FSRS, restore a card locally without a server result, own the page session summary, or decide queue eligibility. `SenseReview.vue` remains responsible for reconciling the canonical restored card into its current queue/session tracker and for the short undo snackbar.
+It consumes `reviewSessionId` and `value` through props. It exposes `reload()` and `requestUndo(action, source)` to the parent and emits `input`, `state-change`, and `undone`. `state-change` is a read-only projection `{latestUndoableAction, activeCount, undoLoadingReviewLogId}` used by the parent's existing toolbar, hotkey, and short undo snackbar; the parent does not copy the child action list or request state. It does not create or rate cards, apply FSRS, restore a card locally without a server result, own the page session summary, or decide queue eligibility. `SenseReview.vue` remains responsible for reconciling the canonical restored card into its current queue/session tracker, reloading queue/stats, and displaying the short undo snackbar.
 
 ## Data flow
 
