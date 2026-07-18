@@ -161,7 +161,7 @@ class ReviewCardInfoTest extends TestCase
     public function test_detail_returns_existing_top_level_fields(): void
     {
         $sense = $this->createSense($this->user->id, 'english');
-        $card = $this->createSenseCard($sense);
+        $card = $this->createSenseCard($sense, ['marker' => ReviewCard::MARKER_PINK]);
 
         $response = $this->actingAs($this->user)
             ->getJson("/review-cards/manage/{$card->id}/detail");
@@ -192,6 +192,7 @@ class ReviewCardInfoTest extends TestCase
             'fsrs_lapses',
             'fsrs_last_reviewed_at',
             'fsrs_enabled',
+            'marker',
             'lifecycle_state',
             'buried_until',
             'lifecycle_changed_at',
@@ -201,6 +202,7 @@ class ReviewCardInfoTest extends TestCase
         ]);
         $this->assertSame($card->id, $response->json('review_card_id'));
         $this->assertSame($sense->id, $response->json('word_sense_id'));
+        $this->assertSame(ReviewCard::MARKER_PINK, $response->json('marker'));
     }
 
     // ─── 2. detail additive returns card_info ───

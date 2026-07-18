@@ -487,7 +487,9 @@ class ReviewCardManageTest extends TestCase
     public function test_item_has_required_fields(): void
     {
         $sense = $this->createSense($this->user->id, 'english');
-        $this->createSenseCard($sense);
+        $card = $this->createSenseCard($sense);
+        $card->marker = ReviewCard::MARKER_BLUE;
+        $card->save();
 
         $response = $this->actingAs($this->user)->get('/review-cards/manage/data');
         $item = $response->json('items.0');
@@ -498,13 +500,14 @@ class ReviewCardManageTest extends TestCase
             'aliases_zh', 'collocations',
             'source_chapter_id', 'source_chapter_title', 'source_kind',
             'source_display_status', 'source_display_label',
-            'fsrs_state', 'fsrs_due_at', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled',
+            'fsrs_state', 'fsrs_due_at', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled', 'marker',
             'missing_definition', 'missing_example', 'missing_source',
         ];
 
         foreach ($requiredFields as $field) {
             $this->assertArrayHasKey($field, $item, "Missing field: {$field}");
         }
+        $this->assertSame(ReviewCard::MARKER_BLUE, $item['marker']);
     }
 
     public function test_manage_data_includes_aliases_and_collocations(): void
