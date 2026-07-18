@@ -1,14 +1,16 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3C-4 — Leech Governance Mutation Family — Accepted / Production Closed
+> **Status**: Phase 3D — Container Closure — Accepted / Production Closed
 >
-> **Current next slice**: Phase 3D — Container Closure — Planned / Not Authorized; no implementation phase is currently authorized
+> **Current next slice**: Card Marker + Custom Study 1B — Planned / Not Authorized; no implementation phase is currently authorized
 >
 > **Architecture baseline**: master `0b293874412458bf0bc8badd3e0d018471c47f85`
 >
 > **Phase 3B-1 implementation baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
 >
 > **Phase 3B-2 execution baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
+>
+> **Phase 3D execution baseline**: master `b5c2b6c86663f9735a78bc26d5619f29282eb4a5`
 >
 > **Scope**: sense-only ReviewCard management; preserve current endpoint, payload, access, lifecycle, delete, reset, ReviewLog and FSRS semantics.
 
@@ -25,15 +27,16 @@ Original measured baseline:
 
 The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
-Current measured snapshot after Phase 3C-4:
+Current measured snapshot after Phase 3D:
 
 - 28 production files exceed 500 lines;
 - 10 production files exceed 1,000 lines;
 - only 1 production file now exceeds 1,500 lines (`TextBlockGroup.vue`, 2,514 lines);
-- `ReviewCardManage.vue` is 767 lines with 7 direct `axios.` references and 2 dialogs;
+- `ReviewCardManage.vue` is 668 lines with 4 direct `axios.` references and no `v-dialog` blocks;
+- the parent keeps only coordinator-owned stats, list, inline edit and source-context requests;
 - `ReviewCardDeleteMutationSurface.vue` is 196 lines with one DELETE request, one bulk-delete POST request and two dialogs;
 - `ReviewCardLeechGovernanceMutationSurface.vue` is 366 lines with two direct `axios.` references and two dialogs;
-- current debt assessment is **6.0/10, localized medium-high burden**: the management module has materially converged, while Reader/Reviewer hotspots and residual compatibility code still require staged governance.
+- current debt assessment is **6.0/10, localized medium-high burden**: the management module is production-closed, while Reader/Reviewer hotspots still require staged governance.
 
 ## 2. Anki official reference and the parts LinguaCafe borrows
 
@@ -360,9 +363,22 @@ Anki alignment for 3C-4:
 - suspending a Leech card still goes through the established lifecycle authority;
 - LinguaCafe keeps its manual external-AI rewrite-package boundary and does not add automatic provider calls or automatic card creation.
 
-### Phase 3D — Container Closure — Planned / Not Authorized
+### Phase 3D — Container Closure — Accepted / Production Closed
 
-Evaluate the final coordinator only after earlier slices are separately accepted. The stretch target is about 1,000 lines; 1,200 is acceptable when further extraction would create meaningless pass-through components.
+Implemented boundary:
+
+- removed the unreachable parent-owned `/enabled` compatibility client, its archive/restore targets, and its two confirmation dialogs;
+- retained the existing backend compatibility route unchanged; this phase changes no endpoint, payload or lifecycle semantic;
+- `ReviewCardLifecycleMutationSurface.vue` remains the only ReviewCardManage-domain lifecycle HTTP owner;
+- the parent remains the coordinator for list loading, FSRS stats, inline sense editing, source context, cross-region refresh and snackbar state;
+- no pass-through component, new client, Vuex module, event bus or dependency was introduced;
+- `ReviewCardManage.vue` decreased from 767 to 668 lines, from 7 to 4 direct `axios.` references, and from 2 to 0 `v-dialog` blocks.
+
+Verification boundary:
+
+- a dedicated container-closure guard failed first on the 767-line parent, then passed after the smallest dead-code removal;
+- existing Search, Table, Card Info, Scheduling, Lifecycle, Delete, Leech and deep-link guards remained green;
+- focused PHP safety tests, frontend build, DB doctor, authenticated dual-viewport Chrome acceptance and request/Console checks are recorded in `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`.
 
 ## 6. Formal target pairing required by the hard rules
 
@@ -385,6 +401,11 @@ Completed Phase 3C target pairs:
 - `DEV-ReviewCardManage-3C-3`: create `ReviewCardDeleteMutationSurface.vue`, migrate both delete requests and confirmations, preserve table intent ownership, add executable guards, run focused regressions and complete authenticated dual-viewport browser acceptance.
 - `ARCH-ReviewCardManage-3C-4`: freeze Leech summary/rewrite-package orchestration as one owner, preserve ADR-0011 no-provider/no-auto-create semantics and retain lifecycle writes under the existing lifecycle owner.
 - `DEV-ReviewCardManage-3C-4`: create `ReviewCardLeechGovernanceMutationSurface.vue`, migrate Leech request/dialog/loading/selection ownership, delegate suspend writes to the lifecycle child, add executable guards and complete authenticated browser acceptance.
+
+Completed Phase 3D target pair:
+
+- `ARCH-ReviewCardManage-3D`: freeze the final coordinator boundary, confirm the old `/enabled` code is unreachable compatibility debt, keep the backend route intact and reject another pass-through extraction.
+- `DEV-ReviewCardManage-3D`: remove only the dead parent state, methods and dialogs; add an executable closure guard; preserve every established owner; run focused regression, build and authenticated dual-viewport Chrome acceptance.
 
 ## 7. Phase 3B changed files
 
@@ -417,7 +438,7 @@ Docs:
 - no FSRS, due, rating or ReviewLog write change;
 - no lifecycle, archive, restore, reset or delete semantic change;
 - no frontend reimplementation of Browser Search grammar;
-- do not enter Phase 3D, Card Marker or Custom Study 1B without a separate task;
+- do not enter Card Marker or Custom Study 1B without a separate task;
 - no deck/subdeck, Note mode, tag tree or Filtered Deck;
 - no new dependency, Vuex module or event bus without proven need;
 - no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
@@ -458,4 +479,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3C-4 is **Accepted / Production Closed** after its authenticated browser acceptance pass. Phase 3D is **Planned / Not Authorized**. Do not enter Phase 3D, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3D is **Accepted / Production Closed** after the container guard, focused regression, build and authenticated browser acceptance pass. Card Marker + Custom Study 1B remains **Planned / Not Authorized**. Do not enter it or any later phase automatically.

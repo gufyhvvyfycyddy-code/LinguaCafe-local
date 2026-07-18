@@ -18,6 +18,8 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
     private string $tableSurfacePath;
     private string $schedulingSurfacePath;
     private string $lifecycleSurfacePath;
+    private string $deleteSurfacePath;
+    private string $leechSurfacePath;
 
     protected function setUp(): void
     {
@@ -27,6 +29,8 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->tableSurfacePath = resource_path('js/components/ReviewCards/ReviewCardTableSurface.vue');
         $this->schedulingSurfacePath = resource_path('js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue');
         $this->lifecycleSurfacePath = resource_path('js/components/ReviewCards/ReviewCardLifecycleMutationSurface.vue');
+        $this->deleteSurfacePath = resource_path('js/components/ReviewCards/ReviewCardDeleteMutationSurface.vue');
+        $this->leechSurfacePath = resource_path('js/components/ReviewCards/ReviewCardLeechGovernanceMutationSurface.vue');
     }
 
     private function browserContents(): string
@@ -39,7 +43,11 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
             . "\n"
             . file_get_contents($this->schedulingSurfacePath)
             . "\n"
-            . file_get_contents($this->lifecycleSurfacePath);
+            . file_get_contents($this->lifecycleSurfacePath)
+            . "\n"
+            . file_get_contents($this->deleteSurfacePath)
+            . "\n"
+            . file_get_contents($this->leechSurfacePath);
     }
 
     public function test_browser_source_files_exist(): void
@@ -49,6 +57,8 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertFileExists($this->tableSurfacePath);
         $this->assertFileExists($this->schedulingSurfacePath);
         $this->assertFileExists($this->lifecycleSurfacePath);
+        $this->assertFileExists($this->deleteSurfacePath);
+        $this->assertFileExists($this->leechSurfacePath);
     }
 
     public function test_search_help_and_examples_exist(): void
@@ -110,16 +120,24 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $contents = $this->browserContents();
         $manageContents = file_get_contents($this->managePath);
         $lifecycleContents = file_get_contents($this->lifecycleSurfacePath);
+        $deleteContents = file_get_contents($this->deleteSurfacePath);
+        $leechContents = file_get_contents($this->leechSurfacePath);
         $this->assertStringContainsString('lifecycleDialog', $lifecycleContents);
         $this->assertStringNotContainsString('lifecycleDialog:', $manageContents);
-        $this->assertStringContainsString('archiveDialog', $manageContents);
-        $this->assertStringContainsString('restoreDialog', $manageContents);
+        $this->assertStringNotContainsString('archiveDialog', $manageContents);
+        $this->assertStringNotContainsString('restoreDialog', $manageContents);
+        $this->assertStringNotContainsString('/enabled', $manageContents);
+        $this->assertStringContainsString('ReviewCardLifecycleMutationSurface', $manageContents);
         $this->assertStringContainsString('resetDialog', file_get_contents($this->schedulingSurfacePath));
         $this->assertStringNotContainsString('resetDialog:', $manageContents);
         $this->assertStringContainsString('bulkLifecycle', $lifecycleContents);
         $this->assertStringContainsString('confirmBulkLifecycle', $manageContents);
-        $this->assertStringContainsString('bulkDelete', $manageContents);
-        $this->assertStringContainsString('bulkRewritePackages', $manageContents);
+        $this->assertStringContainsString('confirmBulkDelete', $manageContents);
+        $this->assertStringContainsString('bulkDeleteDialog', $deleteContents);
+        $this->assertStringNotContainsString('bulkDeleteDialog:', $manageContents);
+        $this->assertStringContainsString('openBulkRewritePackages', $manageContents);
+        $this->assertStringContainsString('bulkRewritePackages', $leechContents);
+        $this->assertStringNotContainsString('bulkRewritePackages:', $manageContents);
         $this->assertStringContainsString('exportCurrentFilter', $contents);
         $this->assertStringContainsString('exportAnkiTsv', $contents);
         $this->assertStringContainsString('exportCsv', $contents);

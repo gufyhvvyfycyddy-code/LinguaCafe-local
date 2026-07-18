@@ -7,11 +7,11 @@ use Tests\TestCase;
 /**
  * OpenCode-ReviewCardManageDangerCopy-1
  *
- * Frontend / UI guard tests for ReviewCardManage.vue safety copy.
+ * Frontend / UI guard tests for ReviewCardManage safety boundaries and copy.
  *
  * The project currently has no dedicated Vue component test runner, so these
- * are PHP source-string guards that scan the component source to lock in the
- * safety dialogs. This is a documented limitation.
+ * are PHP source-string guards that scan the container and mutation owners.
+ * This is a documented limitation.
  */
 class ReviewCardManageUiGuardTest extends TestCase
 {
@@ -45,26 +45,28 @@ class ReviewCardManageUiGuardTest extends TestCase
         $this->assertFileExists($this->deletePath, 'ReviewCardDeleteMutationSurface.vue must exist.');
     }
 
-    // ==================== Archive dialog ====================
+    // ==================== Phase 3D container closure ====================
 
-    public function test_archive_dialog_contains_not_delete_sense_copy(): void
+    public function test_parent_no_longer_contains_legacy_enabled_client(): void
     {
-        $contents = $this->readManagementSafetySources();
-        $this->assertStringContainsString('不会删除词义', $contents, 'archive dialog must state no sense deletion.');
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringNotContainsString('/enabled', $contents, 'container must not retain the legacy enabled endpoint client.');
+        $this->assertStringNotContainsString('toggleEnabled', $contents, 'container must not retain the legacy enabled toggle method.');
     }
 
-    public function test_archive_dialog_contains_not_delete_review_history_copy(): void
+    public function test_parent_no_longer_contains_legacy_archive_restore_dialog_state(): void
     {
-        $contents = $this->readManagementSafetySources();
-        $this->assertStringContainsString('不会删除复习历史', $contents, 'archive dialog must state no review history deletion.');
+        $contents = file_get_contents($this->managePath);
+        foreach (['archiveDialog', 'archiveTarget', 'restoreDialog', 'restoreTarget'] as $legacyState) {
+            $this->assertStringNotContainsString($legacyState, $contents, 'container must not retain legacy dialog state [' . $legacyState . '].');
+        }
     }
 
-    // ==================== Restore dialog ====================
-
-    public function test_restore_dialog_contains_not_reset_progress_copy(): void
+    public function test_lifecycle_owner_remains_registered_after_container_closure(): void
     {
-        $contents = $this->readManagementSafetySources();
-        $this->assertStringContainsString('不会重置复习进度', $contents, 'restore dialog must state no progress reset.');
+        $contents = file_get_contents($this->managePath);
+        $this->assertStringContainsString('<review-card-lifecycle-mutation-surface', $contents);
+        $this->assertStringContainsString('ReviewCardLifecycleMutationSurface', $contents);
     }
 
     // ==================== Due now dialog ====================

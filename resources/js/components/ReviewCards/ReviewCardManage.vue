@@ -155,38 +155,6 @@
             @error="onDeleteError"
         />
 
-        <!-- Archive confirmation dialog -->
-        <v-dialog v-model="archiveDialog" max-width="480">
-            <v-card>
-                <v-card-title class="review-card-manage-archive-title">归档这张复习卡？</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-archive-body">归档后，这张词义卡不会进入日常复习。</p>
-                    <p class="review-card-manage-archive-note text--secondary">不会删除词义，不会删除复习历史，也不会改变阅读页中的来源记录。你之后可以在管理页恢复它。</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="archiveDialog = false">取消</v-btn>
-                    <v-btn color="warning" class="review-card-manage-archive-confirm" @click="doArchive">确认归档</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
-        <!-- Restore confirmation dialog -->
-        <v-dialog v-model="restoreDialog" max-width="480">
-            <v-card>
-                <v-card-title class="review-card-manage-restore-title">恢复这张复习卡？</v-card-title>
-                <v-card-text>
-                    <p class="review-card-manage-restore-body">恢复后，这张词义卡会重新进入日常复习。</p>
-                    <p class="review-card-manage-restore-note text--secondary">不会重置复习进度，也不会删除复习历史。</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="restoreDialog = false">取消</v-btn>
-                    <v-btn color="success" class="review-card-manage-restore-confirm" @click="doRestore">确认恢复</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
         <!-- Snackbar -->
         <v-snackbar v-model="snackbar.show" :color="snackbar.color" :timeout="3000" top>
             {{ snackbar.text }}
@@ -267,10 +235,6 @@ export default {
                 bulkRewriteLoading: false,
                 bulkLeechSuspendLoading: false,
             },
-            archiveDialog: false,
-            archiveTarget: null,
-            restoreDialog: false,
-            restoreTarget: null,
             // ADR-0012: Server-authoritative search response state. The
             // dedicated search surface owns input/filter UI and presents it.
             searchMeta: null,
@@ -468,69 +432,6 @@ export default {
                     this.error = '保存失败：' + (err.response?.data?.message || err.message);
                     this.savingId = null;
                 });
-        },
-
-        toggleEnabled(item) {
-            const newEnabled = !item.fsrs_enabled;
-            axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
-                enabled: newEnabled,
-            })
-            .then(() => {
-                this.showSnackbar('已恢复。该卡会重新进入日常复习。', 'success');
-                this.loadData();
-                this.loadFsrsStats();
-            })
-            .catch((err) => {
-                this.error = '操作失败：' + (err.response?.data?.message || err.message);
-            });
-        },
-
-        confirmArchive(item) {
-            this.archiveTarget = item;
-            this.archiveDialog = true;
-        },
-
-        doArchive() {
-            if (!this.archiveTarget) return;
-            const item = this.archiveTarget;
-            this.archiveDialog = false;
-            this.archiveTarget = null;
-
-            axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
-                enabled: false,
-            })
-            .then(() => {
-                this.showSnackbar('已归档。该卡不会进入日常复习。', 'warning');
-                this.loadData();
-                this.loadFsrsStats();
-            })
-            .catch((err) => {
-                this.error = '操作失败：' + (err.response?.data?.message || err.message);
-            });
-        },
-
-        confirmRestore(item) {
-            this.restoreTarget = item;
-            this.restoreDialog = true;
-        },
-
-        doRestore() {
-            if (!this.restoreTarget) return;
-            const item = this.restoreTarget;
-            this.restoreDialog = false;
-            this.restoreTarget = null;
-
-            axios.patch('/review-cards/manage/' + item.review_card_id + '/enabled', {
-                enabled: true,
-            })
-            .then(() => {
-                this.showSnackbar('已恢复。该卡会重新进入日常复习。', 'success');
-                this.loadData();
-                this.loadFsrsStats();
-            })
-            .catch((err) => {
-                this.error = '操作失败：' + (err.response?.data?.message || err.message);
-            });
         },
 
         // ==================== Lifecycle (ADR-0010 / Phase 3C-2) ====================

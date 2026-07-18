@@ -22,6 +22,7 @@ const paths = {
     lifecycleAcceptance: join(root, 'docs', 'testing', 'review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md'),
     deleteAcceptance: join(root, 'docs', 'testing', 'review-card-delete-mutation-browser-acceptance-2026-07-17.md'),
     leechAcceptance: join(root, 'docs', 'testing', 'review-card-leech-governance-browser-acceptance-2026-07-18.md'),
+    containerAcceptance: join(root, 'docs', 'testing', 'review-card-container-closure-browser-acceptance-2026-07-18.md'),
 };
 
 for (const [name, path] of Object.entries(paths)) {
@@ -32,9 +33,9 @@ const source = Object.fromEntries(Object.entries(paths).map(([name, path]) => [n
 const lines = text => (text.match(/\n/g) || []).length;
 const count = (text, pattern) => (text.match(pattern) || []).length;
 
-assert.equal(lines(source.parent), 767, 'ReviewCardManage.vue line count must remain explicit');
-assert.equal(count(source.parent, /axios\./g), 7, 'parent direct axios count must remain explicit');
-assert.equal(count(source.parent, /<v-dialog/g), 2, 'parent dialog count must remain explicit');
+assert.equal(lines(source.parent), 668, 'ReviewCardManage.vue line count must remain explicit');
+assert.equal(count(source.parent, /axios\./g), 4, 'parent direct axios count must remain explicit');
+assert.equal(count(source.parent, /<v-dialog/g), 0, 'parent dialog count must remain explicit');
 assert.equal(lines(source.table), 872, 'table surface line count must remain explicit');
 assert.equal(count(source.table, /axios\./g), 3, 'table owns exactly three read-only export requests');
 assert.equal(lines(source.scheduling), 117, 'scheduling surface line count must remain explicit');
@@ -65,6 +66,7 @@ assert.match(source.parent, /surface\.runLifecycleAction/);
 assert.match(source.parent, /surface\.runBulkLifecycle/);
 assert.doesNotMatch(source.parent, /\/review-cards\/manage\/leech-summary|\/review-cards\/manage\/bulk-leech-rewrite-packages/);
 assert.doesNotMatch(source.parent, /SenseReviewLeechRewritePackageDialog|v-model="bulkRewriteDialog"|v-model="bulkLeechSuspendDialog"/);
+assert.doesNotMatch(source.parent, /\/enabled|toggleEnabled|confirmArchive|doArchive|confirmRestore|doRestore|archiveDialog|archiveTarget|restoreDialog|restoreTarget/);
 
 assert.match(source.lifecycle, /axios\.get\('\/review-cards\/' \+ normalizedId \+ '\/lifecycle'\)/);
 assert.match(source.lifecycle, /axios\.post\('\/review-cards\/' \+ reviewCardId \+ '\/lifecycle-actions'/);
@@ -111,11 +113,11 @@ assert.doesNotMatch(source.drawer, /axios\.(post|put|patch|delete)\s*\(/i);
 assert.match(source.plan, /Phase 3C-2 — Lifecycle Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3C-3 — Delete Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3C-4 — Leech Governance Mutation Family[^\n]*Accepted \/ Production Closed/);
-assert.match(source.plan, /Phase 3D — Container Closure[^\n]*Planned \/ Not Authorized/);
+assert.match(source.plan, /Phase 3D — Container Closure[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /ReviewCardLifecycleMutationSurface\.vue/);
 assert.match(source.plan, /ReviewCardDeleteMutationSurface\.vue/);
 assert.match(source.plan, /ReviewCardLeechGovernanceMutationSurface\.vue/);
-assert.match(source.plan, /767 lines/);
+assert.match(source.plan, /668 lines/);
 assert.match(source.plan, /366 lines/);
 assert.match(source.plan, /from 9 to 7/);
 assert.match(source.plan, /from 4 to 2/);
@@ -134,19 +136,21 @@ assert.match(source.plan, /你写了一堆文档AI还是不听话？问题不在
 assert.match(source.plan, /一个真实职责/);
 assert.match(source.plan, /ReviewCardManage 域内唯一生命周期请求所有者/);
 assert.match(source.plan, /SenseReview\.vue[^\n]*独立产品入口/);
-assert.match(source.plan, /遗留 `\/enabled`[^\n]*无可达表格入口/);
-assert.match(source.plan, /do not enter Phase 3D/);
+assert.match(source.plan, /removed the unreachable parent-owned `\/enabled` compatibility client/);
+assert.match(source.plan, /ARCH-ReviewCardManage-3D/);
+assert.match(source.plan, /DEV-ReviewCardManage-3D/);
+assert.match(source.plan, /do not enter Card Marker/);
 
 for (const doc of [source.roadmap, source.master, source.handoff, source.index]) {
     assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /Phase 3C-4[^\n]*Accepted \/ Production Closed/);
-    assert.match(doc, /767/);
-    assert.match(doc, /Phase 3D[^\n]*Planned \/ Not Authorized/);
+    assert.match(doc, /(?:Phase 3D|Phase 3A–3D)[^\n]*Accepted \/ Production Closed/);
+    assert.match(doc, /668/);
+    assert.match(doc, /Card Marker[^\n]*Custom Study 1B[^\n]*Planned \/ Not Authorized/);
     assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
 }
 
-assert.match(source.master, /Current Phase \| No implementation phase is currently authorized[^\n]*Phase 3C-4 is Accepted \/ Production Closed/);
-assert.match(source.handoff, /Phase 3C-4 — Leech Governance Mutation Family/);
+assert.match(source.master, /Current Phase \| No implementation phase is currently authorized[^\n]*Phase 3D is Accepted \/ Production Closed/);
+assert.match(source.handoff, /Phase 3D — Container Closure/);
 assert.match(source.index, /Leech Governance Mutation Surface/);
 assert.match(source.lifecycleAcceptance, /Status\*\*: Passed \/ Production Closure Evidence/);
 assert.match(source.lifecycleAcceptance, /Confirming `埋藏到明天`/);
@@ -165,5 +169,10 @@ assert.match(source.leechAcceptance, /active: 4/);
 assert.match(source.leechAcceptance, /suspended: 0/);
 assert.match(source.leechAcceptance, /Phase 3C-4 — Leech Governance Mutation Family is \*\*Accepted \/ Production Closed\*\*/);
 assert.match(source.leechAcceptance, /Phase 3D — Container Closure remains \*\*Planned \/ Not Authorized\*\*/);
+assert.match(source.containerAcceptance, /\*\*Status\*\*: Passed \/ Production Closure Evidence/);
+assert.match(source.containerAcceptance, /668 lines/);
+assert.match(source.containerAcceptance, /no `\/enabled` request/);
+assert.match(source.containerAcceptance, /Phase 3D — Container Closure is \*\*Accepted \/ Production Closed\*\*/);
+assert.match(source.containerAcceptance, /Card Marker \+ Custom Study 1B remains \*\*Planned \/ Not Authorized\*\*/);
 
 console.log('ReviewCardManage architecture plan guard passed.');
