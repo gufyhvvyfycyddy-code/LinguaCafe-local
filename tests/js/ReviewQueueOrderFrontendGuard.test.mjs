@@ -108,18 +108,18 @@ test('currentReviewIndex initialized to -1 on reset', () => {
         'currentReviewIndex must still be reset to -1');
 });
 
-// 7. loadReviews still POSTs to /reviews
-test('loadReviews POSTs to /reviews', () => {
+// 7. loadReviews still delegates to the formal legacy queue request
+test('loadReviews delegates to the legacy queue client', () => {
     const body = extractMethod('loadReviews');
-    assert.ok(body.includes("'/reviews'") || body.includes('"/reviews"'),
-        'loadReviews must still POST to /reviews');
+    assert.ok(body.includes('reviewApi.loadLegacyQueue(data)'),
+        'loadReviews must delegate to reviewApi.loadLegacyQueue');
 });
 
-// 8. rateReview still POSTs to /reviews/rate
-test('rateReview POSTs to /reviews/rate', () => {
+// 8. rateReview still delegates to the formal legacy rating request
+test('rateReview delegates to the legacy rating client', () => {
     const body = extractMethod('rateReview');
-    assert.ok(body.includes('/reviews/rate'),
-        'rateReview must still POST to /reviews/rate');
+    assert.ok(body.includes('reviewApi.rateLegacyCard(payload)'),
+        'rateReview must delegate to reviewApi.rateLegacyCard');
 });
 
 // 9. DEV-QO-5: rateReview passes ignoreDailyLimits to /reviews/rate
@@ -162,10 +162,10 @@ test('ratingLoading flag exists in data()', () => {
         'data() must include ratingLoading: false');
 });
 
-// 14. DEV-QO-6: ratingRequestSequence flag exists in data()
-test('ratingRequestSequence flag exists in data()', () => {
-    assert.ok(/ratingRequestSequence\s*:\s*0/.test(source),
-        'data() must include ratingRequestSequence: 0');
+// 14. DEV-QO-6: a page-local transaction owns request identity
+test('rating transaction exists in data()', () => {
+    assert.ok(/ratingTransaction\s*:\s*createReviewRatingTransaction\(\)/.test(source),
+        'data() must create a page-local rating transaction');
 });
 
 // 15. DEV-QO-6: rateReview checks ratingLoading before proceeding
@@ -175,44 +175,44 @@ test('rateReview checks ratingLoading before proceeding', () => {
         'rateReview must check ratingLoading and return early if true');
 });
 
-// 16. DEV-QO-6: rateReview increments ratingRequestSequence
-test('rateReview increments ratingRequestSequence', () => {
+// 16. DEV-QO-6: rateReview begins a new transaction
+test('rateReview begins a rating transaction', () => {
     const body = extractMethod('rateReview');
-    assert.ok(/\+\+this\.ratingRequestSequence/.test(body),
-        'rateReview must increment ratingRequestSequence');
+    assert.ok(/this\.ratingTransaction\.begin\(\)/.test(body),
+        'rateReview must begin a rating transaction');
 });
 
-// 17. DEV-QO-6: stale response check (seq !== this.ratingRequestSequence)
+// 17. DEV-QO-6: stale response check
 test('rateReview has stale response check', () => {
     const body = extractMethod('rateReview');
-    assert.ok(/seq\s*!==\s*this\.ratingRequestSequence/.test(body),
-        'rateReview must check seq !== this.ratingRequestSequence to drop stale responses');
+    assert.ok(/!this\.ratingTransaction\.isCurrent\(seq\)/.test(body),
+        'rateReview must drop a response whose transaction is no longer current');
 });
 
-// 18. DEV-QO-6: loadReviews increments ratingRequestSequence
-test('loadReviews increments ratingRequestSequence', () => {
+// 18. DEV-QO-6: loadReviews invalidates in-flight requests
+test('loadReviews invalidates the rating transaction', () => {
     const body = extractMethod('loadReviews');
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(body),
-        'loadReviews must increment ratingRequestSequence to invalidate in-flight requests');
+    assert.ok(/this\.ratingTransaction\.invalidate\(\)/.test(body),
+        'loadReviews must invalidate in-flight requests');
 });
 
-// 19. DEV-QO-6: beforeDestroy increments ratingRequestSequence
-test('beforeDestroy increments ratingRequestSequence', () => {
+// 19. DEV-QO-6: beforeDestroy invalidates in-flight requests
+test('beforeDestroy invalidates the rating transaction', () => {
     // beforeDestroy uses "beforeDestroy: function () {" syntax, so we
     // search the whole source for the pattern near beforeDestroy.
     const idx = source.indexOf('beforeDestroy');
     assert.ok(idx !== -1, 'beforeDestroy must exist');
-    // Search within 300 chars after beforeDestroy for the increment.
+    // Search within 300 chars after beforeDestroy for invalidation.
     const region = source.slice(idx, idx + 300);
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(region),
-        'beforeDestroy must increment ratingRequestSequence to invalidate in-flight requests');
+    assert.ok(/this\.ratingTransaction\.invalidate\(\)/.test(region),
+        'beforeDestroy must invalidate in-flight requests');
 });
 
-// 20. DEV-QO-6: enableIgnoreDailyLimits increments ratingRequestSequence
-test('enableIgnoreDailyLimits increments ratingRequestSequence', () => {
+// 20. DEV-QO-6: enableIgnoreDailyLimits invalidates in-flight requests
+test('enableIgnoreDailyLimits invalidates the rating transaction', () => {
     const body = extractMethod('enableIgnoreDailyLimits');
-    assert.ok(/this\.ratingRequestSequence\+\+/.test(body),
-        'enableIgnoreDailyLimits must increment ratingRequestSequence to invalidate in-flight requests');
+    assert.ok(/this\.ratingTransaction\.invalidate\(\)/.test(body),
+        'enableIgnoreDailyLimits must invalidate in-flight requests');
 });
 
 // 21. DEV-QO-6: ratingLoading restored to false in finally

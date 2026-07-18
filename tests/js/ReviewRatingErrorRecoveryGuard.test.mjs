@@ -168,17 +168,17 @@ const reviewRateCatch = extractMainCatchBody(reviewRateMethod);
 const reviewRateThen = extractFirstThenBody(reviewRateMethod);
 const reviewLoadMethod = extractMethod(reviewSource, 'loadReviews');
 
-test('Review.vue imports runAuthoritativeRatingRecovery helper', () => {
+test('Review.vue imports the shared rating transaction', () => {
     assert.ok(
-        reviewSource.includes('import { runAuthoritativeRatingRecovery }'),
-        'Review.vue must import runAuthoritativeRatingRecovery'
+        reviewSource.includes('import { createReviewRatingTransaction }'),
+        'Review.vue must import createReviewRatingTransaction'
     );
 });
 
-test('Review.vue rateReview catch calls runAuthoritativeRatingRecovery', () => {
+test('Review.vue rateReview catch delegates to its rating transaction', () => {
     assert.ok(
-        reviewRateCatch.includes('runAuthoritativeRatingRecovery'),
-        'rateReview catch must call runAuthoritativeRatingRecovery'
+        reviewRateCatch.includes('this.ratingTransaction.recover'),
+        'rateReview catch must call this.ratingTransaction.recover'
     );
 });
 
@@ -190,11 +190,11 @@ test('Review.vue catch does NOT set finished=true', () => {
 });
 
 test('Review.vue correctReviews++ is inside .then() success path', () => {
-    const beforeRequest = reviewRateMethod.split('axios.post')[0];
+    const beforeRequest = reviewRateMethod.split('reviewApi.rateLegacyCard')[0];
     assert.ok(
         !beforeRequest.includes('this.correctReviews ++') &&
         !beforeRequest.includes('this.correctReviews++'),
-        'correctReviews++ must NOT be before axios.post (must be in .then() success path)'
+        'correctReviews++ must NOT be before the formal rating request'
     );
     assert.ok(
         reviewRateThen.includes('this.correctReviews ++') ||
@@ -204,10 +204,10 @@ test('Review.vue correctReviews++ is inside .then() success path', () => {
 });
 
 test('Review.vue countReadWords() is inside .then() success path', () => {
-    const beforeRequest = reviewRateMethod.split('axios.post')[0];
+    const beforeRequest = reviewRateMethod.split('reviewApi.rateLegacyCard')[0];
     assert.ok(
         !beforeRequest.includes('this.countReadWords()'),
-        'countReadWords() must NOT be before axios.post (must be in .then() success path)'
+        'countReadWords() must NOT be before the formal rating request'
     );
     assert.ok(
         reviewRateThen.includes('this.countReadWords()'),
@@ -215,13 +215,12 @@ test('Review.vue countReadWords() is inside .then() success path', () => {
     );
 });
 
-test('Review.vue loadReviews() returns a Promise (return axios.post)', () => {
+test('Review.vue loadReviews() returns the shared client Promise', () => {
     // DEV-RECOVERY-2 (Task 2000-13): loadReviews must return the axios
     // Promise so the recovery helper can reliably await success/failure.
     assert.ok(
-        reviewLoadMethod.includes('return axios.post') ||
-        reviewLoadMethod.includes('return axios.get'),
-        'loadReviews must return the axios Promise (return axios.post/get)'
+        reviewLoadMethod.includes('return reviewApi.loadLegacyQueue'),
+        'loadReviews must return the shared client Promise'
     );
 });
 

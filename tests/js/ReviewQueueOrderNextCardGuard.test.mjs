@@ -114,16 +114,16 @@ test('practiceMode bypasses axios and ReviewLog', () => {
 });
 
 // 6. Stale response drop (seq mismatch)
-test('stale response is dropped when seq mismatches', () => {
+test('stale response is dropped when its transaction is no longer current', () => {
     // In .then()
-    assert.ok(/seq\s*!==\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .then() must check seq !== this.ratingRequestSequence');
+    assert.ok(/!this\.ratingTransaction\.isCurrent\(seq\)/.test(rateReviewBody),
+        'rateReview .then() must reject a stale transaction');
     // In .catch()
-    assert.ok(/catch[\s\S]*?seq\s*!==\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .catch() must also check seq !== this.ratingRequestSequence');
+    assert.ok(/catch[\s\S]*?!this\.ratingTransaction\.isCurrent\(seq\)/.test(rateReviewBody),
+        'rateReview .catch() must also reject a stale transaction');
     // In .finally()
-    assert.ok(/finally[\s\S]*?seq\s*===\s*this\.ratingRequestSequence/.test(rateReviewBody),
-        'rateReview .finally() must check seq === this.ratingRequestSequence before resetting ratingLoading');
+    assert.ok(/finally[\s\S]*?this\.ratingTransaction\.isCurrent\(seq\)/.test(rateReviewBody),
+        'rateReview .finally() must check the current transaction before resetting ratingLoading');
 });
 
 // 7. ratingLoading double-click protection

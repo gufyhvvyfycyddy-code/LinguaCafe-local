@@ -517,10 +517,13 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
-    import { runAuthoritativeRatingRecovery } from './ReviewRatingRecovery.js';
+    import { createReviewApiClient } from './ReviewApiClient.js';
+    import { createReviewRatingTransaction } from './ReviewRatingTransaction.js';
     import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from './ReviewDurationTracker.js';
     import SenseSentencePreview from './SenseSentencePreview.vue';
     import SenseExampleDialog from './SenseExampleDialog.vue';
+
+    const reviewApi = createReviewApiClient();
 
     export default {
         components: {
@@ -577,21 +580,14 @@
                 today: new moment().format('YYYY-MM-DD'), // CHANGE TO SERVER SIDE
                 ignoreDailyLimits: false,
                 dailyLimitSummary: null,
-                // DEV-QO-6: rating request race protection.
-                // ratingLoading disables re-rating while a request is in
-                // flight. ratingRequestSequence is monotonically incremented
-                // per request; only the response carrying the latest sequence
-                // is allowed to mutate reviews / currentReviewIndex /
-                // dailyLimitSummary / finished. Slow responses are dropped.
                 ratingLoading: false,
-                ratingRequestSequence: 0,
+                ratingTransaction: createReviewRatingTransaction(),
                 reviewDurationTracker: createTracker(undefined, document.visibilityState !== 'hidden'),
             }
         },
         props: {
         },
         mounted: function() {
-            // Check localStorage for today's ignore_daily_limits status
             var lsKey = 'linguacafe_sense_review_ignore_daily_limits_' + this.today;
             var stored = localStorage.getItem(lsKey);
             if (stored === 'true') {
@@ -604,8 +600,7 @@
         beforeDestroy: function () {
             window.removeEventListener('keyup', this.hotkey);
             document.removeEventListener('visibilitychange', this.handleReviewVisibility);
-            // DEV-QO-6: invalidate in-flight rating requests on destroy.
-            this.ratingRequestSequence++;
+            this.ratingTransaction.invalidate();
             this.ratingLoading = false;
         },
         methods: {
@@ -624,19 +619,14 @@
                 this.correctReviews = 0;
                 this.reviewError = '';
                 this.dailyLimitSummary = null;
-                // DEV-QO-6: invalidate any in-flight rating request so its
-                // response cannot overwrite the freshly reloaded queue.
-                this.ratingRequestSequence++;
+                this.ratingTransaction.invalidate();
                 this.ratingLoading = false;
                 this.$nextTick(() => {
                     this.loadReviews();
                 });
             },
             loadReviews() {
-                // DEV-QO-6: invalidate any in-flight rating request when the
-                // queue is (re)loaded so stale responses cannot mutate the
-                // new queue state.
-                this.ratingRequestSequence++;
+                this.ratingTransaction.invalidate();
                 this.ratingLoading = false;
 
                 var data = {
@@ -662,11 +652,7 @@
                     data.ignoreDailyLimits = true;
                 }
 
-                // DEV-RECOVERY-2 (Task 2000-13): return the full axios
-                // Promise so the rating-recovery helper can reliably await
-                // success or failure. Callers that ignore the return value
-                // (mounted / ignoreDailyLimits) are unaffected.
-                return axios.post('/reviews', data).then((response) => {
+                return reviewApi.loadLegacyQueue(data).then((response) => {
                     var data = response.data;
                     this.reviews = data.reviews;
                     this.totalReviews = data.reviews.length;
@@ -846,14 +832,9 @@
                 // .then() success path only.
 
                 if (!this.practiceMode) {
-                    // DEV-QO-6: increment sequence and capture for this
-                    // request. Only the response with the latest sequence
-                    // may mutate queue state.
                     this.ratingLoading = true;
-                    const seq = ++this.ratingRequestSequence;
+                    const seq = this.ratingTransaction.begin();
 
-                    // DEV-QO-5: pass ignoreDailyLimits so /reviews/rate uses
-                    // the same daily-limit boundary as /reviews.
                     const payload = {
                         reviewCardId: this.reviews[this.currentReviewIndex].review_card_id,
                         rating: rating,
@@ -863,11 +844,8 @@
                         payload.ignoreDailyLimits = true;
                     }
 
-                    axios.post('/reviews/rate', payload).then((response) => {
-                        // DEV-QO-6: drop stale responses. If a newer request
-                        // has been issued (or the queue was reloaded), this
-                        // response must not mutate state.
-                        if (seq !== this.ratingRequestSequence) {
+                    reviewApi.rateLegacyCard(payload).then((response) => {
+                        if (!this.ratingTransaction.isCurrent(seq)) {
                             return;
                         }
 
@@ -885,39 +863,28 @@
 
                         axios.post('/goals/achievement/review/update').catch(() => {});
 
-                        // DEV-QO-5: update daily limit summary from server.
                         if (response.data && response.data.summary) {
                             this.dailyLimitSummary = response.data.summary;
                         }
 
-                        // Remove the just-rated card from the local queue.
                         this.reviews.splice(this.currentReviewIndex, 1)[0];
 
-                        // DEV-QO-5: consume server-authoritative next_card.
                         const nextCard = response.data && response.data.next_card
                             ? response.data.next_card
                             : null;
 
                         if (nextCard) {
-                            // If next_card already exists in the remaining
-                            // queue (e.g. relearning card re-entering), move
-                            // it to index 0. Otherwise insert it at index 0.
                             const existingIdx = this.reviews.findIndex(
                                 c => c.review_card_id === nextCard.review_card_id
                             );
                             if (existingIdx !== -1) {
-                                // Move existing card to front.
                                 const [existing] = this.reviews.splice(existingIdx, 1);
                                 this.reviews.unshift(existing);
                             } else {
-                                // Insert server-provided next card at front.
                                 this.reviews.unshift(nextCard);
                             }
                             setTimeout(this.next, this.transitionDuration);
                         } else {
-                            // No next card from server. If the local queue
-                            // is empty, finish; otherwise continue with the
-                            // remaining local queue (old-response compat).
                             if (this.reviews.length === 0) {
                                 this.finish();
                             } else {
@@ -925,26 +892,14 @@
                             }
                         }
                     }).catch((error) => {
-                        // DEV-QO-6: only handle error if this is still the
-                        // latest request. Otherwise the error belongs to a
-                        // stale response.
-                        if (seq !== this.ratingRequestSequence) {
+                        if (!this.ratingTransaction.isCurrent(seq)) {
                             return;
                         }
-                        // DEV-RECOVERY-1 (Task 2000-13): delegate the
-                        // recovery orchestration to the pure JS helper.
-                        // The helper keeps ratingLoading=true (buttons
-                        // disabled), calls loadReviews() which returns a
-                        // Promise, waits for it to settle, then unlocks.
-                        // The helper does NOT touch statistics, ReviewLog,
-                        // FSRS, or lifecycle.
-                        // Reset animation and background so the page looks
-                        // operable during reload.
                         this.intoTheCorrectDeckAnimation = false;
                         this.backToDeckAnimation = false;
                         this.newCardAnimation = false;
                         this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
-                        runAuthoritativeRatingRecovery({
+                        this.ratingTransaction.recover({
                             reloadQueue: () => this.loadReviews(),
                             lockRating: () => { this.ratingLoading = true; },
                             unlockRating: () => { this.ratingLoading = false; },
@@ -959,7 +914,7 @@
                         // triggers loadReviews(), the sequence is incremented,
                         // so this finally will NOT reset ratingLoading — the
                         // reload's own .then/.catch is responsible for that.
-                        if (seq === this.ratingRequestSequence) {
+                        if (this.ratingTransaction.isCurrent(seq)) {
                             this.ratingLoading = false;
                         }
                     });
