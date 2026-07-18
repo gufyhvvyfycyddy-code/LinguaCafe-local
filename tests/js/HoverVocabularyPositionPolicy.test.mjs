@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import { resolveHoverVocabularyPosition } from '../../resources/js/services/HoverVocabularyPositionPolicy.js';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
 
 const baseInput = () => ({
     hoverBoxHeight: 100,
@@ -120,4 +126,14 @@ test('does not mutate frozen geometry inputs', () => {
     assert.doesNotThrow(() => resolveHoverVocabularyPosition(input));
     assert.deepEqual(areaRect, { left: 100, right: 900, top: 50, height: 600 });
     assert.deepEqual(wordRect, { left: 400, right: 500, top: 300, bottom: 330 });
+});
+
+test('TextBlockGroup delegates geometry while retaining DOM and Vuex ownership', () => {
+    assert.match(textBlockSource, /import\s*\{\s*resolveHoverVocabularyPosition\s*\}/);
+    assert.match(textBlockSource, /const position = resolveHoverVocabularyPosition\(/);
+    assert.match(textBlockSource, /document\.getElementById\('vocab-hover-box'\)/);
+    assert.match(textBlockSource, /getBoundingClientRect\(\)/);
+    assert.match(textBlockSource, /propertyName: 'positionLeft', value: position\.positionLeft/);
+    assert.match(textBlockSource, /propertyName: 'positionTop', value: position\.positionTop/);
+    assert.match(textBlockSource, /propertyName: 'arrowPosition', value: position\.arrowPosition/);
 });

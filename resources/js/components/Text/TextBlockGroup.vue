@@ -202,6 +202,7 @@
 <script>
     import TextToSpeechService from './../../services/TextToSpeechService';
     import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
+    import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
         resolveWordElementFromEventTarget,
@@ -952,79 +953,28 @@
                 }
             },
             updateHoverVocabularyBoxPosition() {
-                var hoverVocabBoxElement = document.getElementById('vocab-hover-box');
+                const hoverVocabBoxElement = document.getElementById('vocab-hover-box');
                 if (hoverVocabBoxElement === null) {
                     return;
                 }
 
-                var margin = 8;
-                var hoverVocabBoxWidth = 300;
-                var hoverVocabBoxHeight = hoverVocabBoxElement.getBoundingClientRect().height;
-                var vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
-                var vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
+                const vocabBoxAreaElement = document.getElementsByClassName('vocab-box-area')[0];
+                const vocabBoxArea = vocabBoxAreaElement.getBoundingClientRect();
+                const hoveredWordPositions = document.querySelector(
+                    '[wordindex="' + this.$store.state.hoverVocabularyBox.hoveredWords[0].wordIndex + '"]'
+                ).getBoundingClientRect();
+                const position = resolveHoverVocabularyPosition({
+                    hoverBoxHeight: hoverVocabBoxElement.getBoundingClientRect().height,
+                    areaRect: vocabBoxArea,
+                    areaScrollTop: vocabBoxAreaElement.scrollTop,
+                    wordRect: hoveredWordPositions,
+                    preferredPosition: this.$props.vocabularyHoverBoxPreferredPosition,
+                    correctionsEnabled: this.$props.vocabularyHoverBoxPositionCorrections,
+                });
 
-
-                if (this.$store.state.hoverVocabularyBox.hoveredWords.length == 1) {
-                    var hoveredWordPositions = document.querySelector('[wordindex="' + this.$store.state.hoverVocabularyBox.hoveredWords[0].wordIndex + '"]').getBoundingClientRect();
-                } else {
-                    var hoveredWordPositions = document.querySelector('[wordindex="' + this.$store.state.hoverVocabularyBox.hoveredWords[parseInt(this.$store.state.hoverVocabularyBox.hoveredWords.length / 2)].wordIndex + '"]').getBoundingClientRect();
-                }
-
-                var hoveredWordPositions = document.querySelector('[wordindex="' + this.$store.state.hoverVocabularyBox.hoveredWords[0].wordIndex + '"]').getBoundingClientRect();
-
-                // set horizontal position
-               this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionLeft', value: hoveredWordPositions.right - vocabBoxArea.left - hoverVocabBoxWidth / 2 - (hoveredWordPositions.right - hoveredWordPositions.left) / 2 });
-                if (this.$store.state.hoverVocabularyBox.positionLeft < margin) {
-                   this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionLeft', value: margin });
-                } else if (this.$store.state.hoverVocabularyBox.positionLeft > vocabBoxArea.right - vocabBoxArea.left - hoverVocabBoxWidth - margin) {
-                   this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionLeft', value: vocabBoxArea.right - vocabBoxArea.left - hoverVocabBoxWidth - margin });
-                }
-
-                // set vertical position
-
-                // set preferred location
-               this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'arrowPosition', value: this.$props.vocabularyHoverBoxPreferredPosition });
-
-                // correct preferred location based on available space
-
-                /*
-                    Is there enough space on the bottom? If not, move the hover box to the top.
-
-                    There is a special case, when there is not enough space on the bottom, however the top half of the screen is smaller
-                    than the bottom one. However, overflow by the hover box on the top does not affect the scrollbar, while on the bottom it
-                    does, so it won't be corrected.
-                */
-                if (
-                    this.$props.vocabularyHoverBoxPositionCorrections &&
-                    this.$store.state.hoverVocabularyBox.arrowPosition == 'bottom' &&
-                    (vocabBoxArea.height + vocabBoxAreaElement.scrollTop) - (hoveredWordPositions.bottom - vocabBoxArea.top + vocabBoxAreaElement.scrollTop + 25) < hoverVocabBoxHeight
-                ) {
-                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'arrowPosition', value: 'top' });
-                }
-
-                /*
-                    Is there enough space on the top?
-                */
-                if (
-                    this.$props.vocabularyHoverBoxPositionCorrections &&
-                    this.$store.state.hoverVocabularyBox.arrowPosition == 'top' &&
-                    hoveredWordPositions.top - 25 - 30 < hoverVocabBoxHeight
-                ) {
-                    /*
-                        If there's not enuogh space on the top, move the hover box to the bottom, but only if there's enough space on the bottom,
-                        otherwise prefer to use the top position, because that does not cause scroll issues.
-                    */
-                    if ((vocabBoxArea.height + vocabBoxAreaElement.scrollTop) - (hoveredWordPositions.bottom - vocabBoxArea.top + vocabBoxAreaElement.scrollTop + 25) >= hoverVocabBoxHeight) {
-                        this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'arrowPosition', value: 'bottom' });
-                    }
-                }
-
-                // set hover vocabulary box's location based on preference and correction
-                if (this.$store.state.hoverVocabularyBox.arrowPosition == 'top') {
-                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionTop', value: hoveredWordPositions.top - vocabBoxArea.top + vocabBoxAreaElement.scrollTop - hoverVocabBoxHeight - 25 });
-                } else {
-                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionTop', value: hoveredWordPositions.bottom - vocabBoxArea.top + vocabBoxAreaElement.scrollTop + 25 });
-                }
+                this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionLeft', value: position.positionLeft });
+                this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'arrowPosition', value: position.arrowPosition });
+                this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'positionTop', value: position.positionTop });
             },
             removePhraseHover: function() {
                 for (let i  = 0; i < this.words.length; i++) {
