@@ -27,6 +27,7 @@
                 <v-radio-group v-model="mode" label="学习范围" class="mt-0">
                     <v-radio value="today_forgotten" label="今天遗忘过的词义"></v-radio>
                     <v-radio value="overdue" label="已逾期的词义"></v-radio>
+                    <v-radio value="marked" label="已标记的词义"></v-radio>
                     <v-radio value="source_chapter" label="按原文篇章"></v-radio>
                     <v-radio value="leech_attention" label="需要特别关注的困难词义"></v-radio>
                 </v-radio-group>
@@ -93,6 +94,7 @@
     import CustomStudySession from './CustomStudySession.vue';
 
     const SESSION_TOKEN_KEY = 'linguacafe.custom-study.preview-token';
+    const ALLOWED_MODES = ['today_forgotten', 'overdue', 'marked', 'source_chapter', 'leech_attention'];
 
     export default {
         components: {
@@ -144,6 +146,10 @@
             },
         },
         mounted() {
+            const requestedMode = this.$route.query.mode;
+            if (typeof requestedMode === 'string' && ALLOWED_MODES.includes(requestedMode)) {
+                this.mode = requestedMode;
+            }
             this.activeToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
         },
         methods: {
