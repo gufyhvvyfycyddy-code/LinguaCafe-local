@@ -31,6 +31,7 @@ assert.match(page, /validateCardLimit\(\)/);
 assert.match(page, /ALLOWED_MODES/);
 assert.match(page, /this\.\$route\.query\.mode/);
 assert.match(page, /ALLOWED_MODES\.includes\(requestedMode\)/);
+assert.match(page, /ALLOWED_MODES\.includes\(requestedMode\)[\s\S]*sessionStorage\.removeItem\(SESSION_TOKEN_KEY\)[\s\S]*return;/);
 assert.match(page, /请输入 1 到 500 之间的整数。/);
 assert.match(page, /sessionStorage/);
 assert.doesNotMatch(page, /localStorage/);

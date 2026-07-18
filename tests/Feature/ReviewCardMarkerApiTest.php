@@ -138,6 +138,7 @@ class ReviewCardMarkerApiTest extends TestCase
             [[], ['ids', 'marker']],
             [['ids' => [], 'marker' => 1], ['ids']],
             [['ids' => [$card->id, $card->id], 'marker' => 1], ['ids.1']],
+            [['ids' => ['card' => $card->id], 'marker' => 1], ['ids']],
             [['ids' => [0], 'marker' => 1], ['ids.0']],
             [['ids' => range(1, 101), 'marker' => 1], ['ids']],
             [['ids' => [$card->id], 'marker' => 8], ['marker']],
@@ -152,6 +153,19 @@ class ReviewCardMarkerApiTest extends TestCase
                 $response->assertJsonValidationErrors($field);
             }
         }
+
+        $this->actingAs($this->user)
+            ->call(
+                'POST',
+                '/review-cards/manage/bulk-marker',
+                [],
+                [],
+                [],
+                ['CONTENT_TYPE' => 'application/json', 'HTTP_ACCEPT' => 'application/json'],
+                '{"ids":{"0":' . $card->id . '},"marker":1}'
+            )
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('ids');
 
         $this->assertSame(0, $card->fresh()->marker);
     }

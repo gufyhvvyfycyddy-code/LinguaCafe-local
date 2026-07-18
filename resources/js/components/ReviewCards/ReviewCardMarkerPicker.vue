@@ -121,6 +121,7 @@ export default {
 
             const submittedIds = this.normalizedIds.slice();
             this.saving = true;
+            this.$emit('saving-change', true);
             this.errorMessage = '';
 
             const request = this.isBulk
@@ -138,6 +139,7 @@ export default {
                 })
                 .finally(() => {
                     this.saving = false;
+                    this.$emit('saving-change', false);
                 });
         },
     },

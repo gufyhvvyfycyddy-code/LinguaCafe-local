@@ -353,13 +353,27 @@ class ReviewCardManageController extends Controller
      */
     public function bulkMarker(Request $request): JsonResponse
     {
+        $rawPayload = json_decode($request->getContent());
+        $idsAreJsonList = is_object($rawPayload)
+            && property_exists($rawPayload, 'ids')
+            && is_array($rawPayload->ids);
         $strictInteger = static function (string $attribute, mixed $value, \Closure $fail): void {
             if (!is_int($value)) {
                 $fail("The {$attribute} field must be an integer.");
             }
         };
         $validated = $request->validate([
-            'ids' => ['required', 'array', 'min:1', 'max:100'],
+            'ids' => [
+                'required',
+                'array',
+                'min:1',
+                'max:100',
+                static function (string $attribute, mixed $value, \Closure $fail) use ($idsAreJsonList): void {
+                    if (!$idsAreJsonList || !is_array($value) || !array_is_list($value)) {
+                        $fail('The ids field must be a list.');
+                    }
+                },
+            ],
             'ids.*' => ['required', 'integer', 'distinct', 'min:1', $strictInteger],
             'marker' => ['required', 'integer', 'between:0,7', $strictInteger],
         ]);

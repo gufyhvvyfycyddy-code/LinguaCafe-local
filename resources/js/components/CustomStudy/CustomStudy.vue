@@ -149,6 +149,8 @@
             const requestedMode = this.$route.query.mode;
             if (typeof requestedMode === 'string' && ALLOWED_MODES.includes(requestedMode)) {
                 this.mode = requestedMode;
+                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
+                return;
             }
             this.activeToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
         },

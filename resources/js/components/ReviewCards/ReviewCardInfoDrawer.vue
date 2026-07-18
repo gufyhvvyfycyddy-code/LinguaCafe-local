@@ -25,7 +25,7 @@
                 <v-card-title class="d-flex align-center">
                     <span>复习卡详情</span>
                     <v-spacer />
-                    <v-btn icon small @click="closeDetail"><v-icon>mdi-close</v-icon></v-btn>
+                    <v-btn icon small :disabled="markerSaving" @click="closeDetail"><v-icon>mdi-close</v-icon></v-btn>
                 </v-card-title>
                 <v-alert
                     v-if="deepLinkSource"
@@ -71,6 +71,7 @@
                                             :card-id="detailTarget.review_card_id"
                                             :marker="detailTarget.marker"
                                             @updated="onMarkerUpdated"
+                                            @saving-change="onMarkerSavingChange"
                                             @notify="(...args) => $emit('notify', ...args)"
                                         />
                                     </span>
@@ -192,11 +193,11 @@
                     </v-tabs-items>
                 </v-card-text>
                 <v-card-actions>
-                    <v-btn text @click="closeDetail">关闭</v-btn>
-                    <v-btn v-if="deepLinkSource" text color="primary" @click="$emit('return-to-report')"><v-icon left small>mdi-arrow-left</v-icon>返回学习报告</v-btn>
+                    <v-btn text :disabled="markerSaving" @click="closeDetail">关闭</v-btn>
+                    <v-btn v-if="deepLinkSource" text color="primary" :disabled="markerSaving" @click="$emit('return-to-report')"><v-icon left small>mdi-arrow-left</v-icon>返回学习报告</v-btn>
                     <v-spacer />
-                    <v-btn text color="primary" @click="$emit('study-marked')">学习已标记卡片</v-btn>
-                    <v-btn text color="primary" @click="openSource">查看原文</v-btn>
+                    <v-btn text color="primary" :disabled="markerSaving" @click="$emit('study-marked')">学习已标记卡片</v-btn>
+                    <v-btn text color="primary" :disabled="markerSaving" @click="openSource">查看原文</v-btn>
                 </v-card-actions>
             </v-card>
         </template>
@@ -246,6 +247,7 @@ export default {
             detailError: '',
             detailRequestSeq: 0,
             detailTab: 'overview',
+            markerSaving: false,
         };
     },
     computed: {
@@ -317,6 +319,7 @@ export default {
                 });
         },
         closeDetail() {
+            if (this.markerSaving) return;
             this.clearDetailState();
             this.$emit('input', false);
             this.$emit('close');
@@ -338,6 +341,10 @@ export default {
             if (!this.detailTarget || !result) return;
             this.detailTarget = { ...this.detailTarget, marker: result.marker };
             this.$emit('marker-updated', result);
+        },
+        onMarkerSavingChange(saving) {
+            this.markerSaving = Boolean(saving);
+            this.$emit('marker-saving-change', this.markerSaving);
         },
         displayValue(value, fallback = '—') { return value === null || value === undefined || value === '' ? fallback : value; },
         formatDateTime(value) {

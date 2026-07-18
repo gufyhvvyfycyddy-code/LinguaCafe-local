@@ -128,6 +128,7 @@
             @detail-loaded="onDetailLoaded"
             @detail-load-error="onDetailLoadError"
             @marker-updated="onMarkerUpdated"
+            @marker-saving-change="onMarkerSavingChange"
             @study-marked="openMarkedStudy"
             @notify="showSnackbar"
             @close="onDetailClosed"
@@ -227,6 +228,7 @@ export default {
             sourcePayload: {},
             detailDrawer: false,
             detailReviewCardId: null,
+            markerSaving: false,
             // Read-only projection published by ReviewCardLifecycleMutationSurface.
             // The child remains the sole request, target, lock and dialog owner.
             lifecycleSurfaceState: {
@@ -273,6 +275,13 @@ export default {
                 reset_count: 0,
             },
         };
+    },
+    beforeRouteLeave(to, from, next) {
+        if (this.markerSaving) {
+            next(false);
+            return;
+        }
+        next();
     },
     computed: {
         deepLinkedSavedSearchId() {
@@ -516,6 +525,9 @@ export default {
             if (index >= 0) {
                 this.$set(this.items, index, { ...this.items[index], marker });
             }
+        },
+        onMarkerSavingChange(saving) {
+            this.markerSaving = Boolean(saving);
         },
         onBulkMarkerUpdated(result, ids = []) {
             if (Number(result?.skipped) > 0) {

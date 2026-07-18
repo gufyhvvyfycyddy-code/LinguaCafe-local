@@ -13,6 +13,8 @@ test('one marker picker owns both write endpoints', () => {
     assert.match(source, /axios\.patch\([^\n]+\/marker/);
     assert.match(source, /axios\.post\(['"]\/review-cards\/manage\/bulk-marker/);
     assert.match(source, /\$emit\(['"]updated['"]/);
+    assert.match(source, /\$emit\(['"]saving-change['"], true\)/);
+    assert.match(source, /\$emit\(['"]saving-change['"], false\)/);
     assert.match(source, /:loading=["']saving["']/);
     assert.match(source, /aria-label/);
 });
@@ -47,6 +49,11 @@ test('Card Info reuses the picker and emits canonical Marker updates', () => {
     assert.match(source, /<review-card-marker-picker/);
     assert.match(source, /detailTarget\.marker/);
     assert.match(source, /marker-updated/);
+    assert.match(source, /@saving-change="onMarkerSavingChange"/);
+    assert.match(source, /\$emit\('marker-saving-change', this\.markerSaving\)/);
+    assert.match(source, /if \(this\.markerSaving\) return;/);
+    assert.match(source, /:disabled="markerSaving" @click="\$emit\('study-marked'\)"/);
+    assert.match(source, /:disabled="markerSaving" @click="openSource"/);
     assert.match(source, /学习已标记卡片/);
     assert.match(source, /study-marked/);
 });
@@ -55,9 +62,12 @@ test('management container reconciles Marker events and passes no card IDs to Cu
     const source = fs.readFileSync(path.join(reviewCardDir, 'ReviewCardManage.vue'), 'utf8');
 
     assert.match(source, /@marker-updated="onMarkerUpdated"/);
+    assert.match(source, /@marker-saving-change="onMarkerSavingChange"/);
     assert.match(source, /@bulk-marker-updated="onBulkMarkerUpdated"/);
     assert.match(source, /@study-marked="openMarkedStudy"/);
     assert.match(source, /path:\s*['"]\/custom-study['"]/);
     assert.match(source, /query:\s*\{\s*mode:\s*['"]marked['"]\s*\}/);
     assert.doesNotMatch(source, /query:\s*\{[^}]*ids/);
+    assert.match(source, /beforeRouteLeave\(to, from, next\)/);
+    assert.match(source, /if \(this\.markerSaving\)[\s\S]*next\(false\)/);
 });
