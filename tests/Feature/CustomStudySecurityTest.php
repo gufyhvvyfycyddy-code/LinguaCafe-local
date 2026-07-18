@@ -155,12 +155,15 @@ class CustomStudySecurityTest extends TestCase
      * Used when the test needs to switch users mid-test — calling actingAs()
      * twice in one test causes auth.session middleware conflicts.
      */
-    private function openSessionViaService(): string
+    private function openSessionViaService(string $mode = CustomStudyCriteria::MODE_OVERDUE): string
     {
-        $this->eligibleCard();
+        $card = $this->eligibleCard();
+        if ($mode === CustomStudyCriteria::MODE_MARKED) {
+            $card->forceFill(['marker' => ReviewCard::MARKER_ORANGE])->save();
+        }
         $service = app(CustomStudySessionService::class);
         $result = $service->openSession(
-            ['mode' => 'overdue'],
+            ['mode' => $mode],
             $this->user->id,
             $this->language,
             Carbon::now(),
@@ -427,6 +430,17 @@ class CustomStudySecurityTest extends TestCase
         $token = $this->openSessionViaService();
 
         // User B tries to use User A's token.
+        $response = $this->actingAs($this->otherUser)->postJson('/custom-study/sessions/resume', [
+            'token' => $token,
+        ]);
+
+        $this->assert404NoLeakage($response);
+    }
+
+    public function test_marked_mode_token_keeps_the_same_cross_user_isolation(): void
+    {
+        $token = $this->openSessionViaService(CustomStudyCriteria::MODE_MARKED);
+
         $response = $this->actingAs($this->otherUser)->postJson('/custom-study/sessions/resume', [
             'token' => $token,
         ]);

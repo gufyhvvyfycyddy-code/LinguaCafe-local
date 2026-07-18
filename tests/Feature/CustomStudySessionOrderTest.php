@@ -479,6 +479,27 @@ class CustomStudySessionOrderTest extends TestCase
         $this->assertSame($canonicalIds, $result);
     }
 
+    public function test_marked_mode_matches_canonical_queue_order_without_marker_priority(): void
+    {
+        $card1 = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_PURPLE]);
+        $card2 = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_RED]);
+        $card3 = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_BLUE]);
+
+        $input = [$card1->id, $card2->id, $card3->id];
+        $result = $this->order($input, CustomStudyCriteria::MODE_MARKED);
+
+        $orderService = app(ReviewQueueOrderService::class);
+        $timezone = app(ReviewStudyTimezoneService::class)->getStudyTimezone();
+        $cards = ReviewCard::whereIn('id', $input)->get();
+        $canonicalIds = $orderService
+            ->order($cards, $this->user->id, $this->language, $timezone, $this->now, $this->queueOptions())
+            ->map->id->all();
+
+        $this->assertSame($canonicalIds, $result);
+        $source = file_get_contents(app_path('Services/CustomStudy/CustomStudySessionOrder.php'));
+        $this->assertStringContainsString('case CustomStudyCriteria::MODE_MARKED:', $source);
+    }
+
     public function test_22_source_chapter_does_not_use_input_order_as_final(): void
     {
         // Create cards with different fsrs_due_at so canonical order differs from input order.

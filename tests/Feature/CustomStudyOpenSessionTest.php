@@ -8,7 +8,9 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
+use App\Services\CustomStudy\CustomStudyCriteria;
 use App\Services\CustomStudy\CustomStudySessionService;
+use App\Services\CustomStudy\CustomStudySessionState;
 use App\Services\CustomStudy\CustomStudySessionTokenService;
 use App\Services\ReviewQueueOrderOptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -204,6 +206,24 @@ class CustomStudyOpenSessionTest extends TestCase
         $result = $this->openSession(['mode' => 'overdue']);
 
         $this->assertNotEmpty($result['token']);
+        $this->assertSame($card->id, $result['current_card']['review_card_id']);
+    }
+
+    public function test_marked_mode_preserves_the_v1_token_contract(): void
+    {
+        $card = $this->createCard($this->createSense(), [
+            'marker' => ReviewCard::MARKER_GREEN,
+            'fsrs_due_at' => Carbon::now()->addDays(30),
+        ]);
+
+        $result = $this->openSession(['mode' => CustomStudyCriteria::MODE_MARKED]);
+        $state = app(CustomStudySessionTokenService::class)
+            ->verify($result['token'], $this->user->id, $this->language, $this->now);
+
+        $this->assertNotNull($state);
+        $this->assertSame(CustomStudySessionState::VERSION, $state->version());
+        $this->assertSame(CustomStudyCriteria::MODE_MARKED, $state->mode());
+        $this->assertSame([], $state->parameters());
         $this->assertSame($card->id, $result['current_card']['review_card_id']);
     }
 

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Models\EncounteredWord;
+use App\Services\CustomStudy\CustomStudyCriteria;
 use App\Services\CustomStudy\CustomStudySessionService;
 use App\Services\ReviewQueueOrderOptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -98,9 +99,9 @@ class CustomStudyNoWriteAcceptanceTest extends TestCase
         ]);
     }
 
-    private function createCard(WordSense $sense): ReviewCard
+    private function createCard(WordSense $sense, array $overrides = []): ReviewCard
     {
-        return ReviewCard::forceCreate([
+        $defaults = [
             'user_id' => $sense->user_id,
             'language_id' => $sense->language_id,
             'language' => $sense->language,
@@ -118,7 +119,9 @@ class CustomStudyNoWriteAcceptanceTest extends TestCase
             'buried_until' => null,
             'lifecycle_version' => 0,
             'lifecycle_changed_at' => null,
-        ]);
+        ];
+
+        return ReviewCard::forceCreate(array_merge($defaults, $overrides));
     }
 
     private function eligibleCard(): ReviewCard
@@ -140,7 +143,7 @@ class CustomStudyNoWriteAcceptanceTest extends TestCase
                     'id', 'fsrs_due_at', 'fsrs_state', 'fsrs_stability',
                     'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses',
                     'lifecycle_state', 'fsrs_enabled', 'buried_until',
-                    'lifecycle_version', 'lifecycle_changed_at',
+                    'lifecycle_version', 'lifecycle_changed_at', 'marker',
                 ])
                 ->map(fn ($c) => $c->getAttributes())
                 ->all(),
@@ -223,6 +226,38 @@ class CustomStudyNoWriteAcceptanceTest extends TestCase
         $this->openSession();
 
         $this->assertDbUnchanged($before, 'openSession');
+    }
+
+    public function test_marked_open_answer_resume_cycle_does_not_write_marker_or_learning_state(): void
+    {
+        $card1 = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_RED]);
+        $card2 = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_BLUE]);
+        $before = $this->snapshotDbState();
+
+        $opened = $this->service->openSession(
+            ['mode' => CustomStudyCriteria::MODE_MARKED],
+            $this->user->id,
+            $this->language,
+            $this->now,
+            ReviewQueueOrderOptions::defaults()
+        );
+        $answered = $this->service->answer(
+            $opened['token'],
+            'good',
+            $this->user->id,
+            $this->language,
+            $this->now
+        );
+        $this->service->resume(
+            $answered['refreshed_token'],
+            $this->user->id,
+            $this->language,
+            $this->now
+        );
+
+        $this->assertDbUnchanged($before, 'marked open/answer/resume');
+        $this->assertSame(ReviewCard::MARKER_RED, $card1->fresh()->marker);
+        $this->assertSame(ReviewCard::MARKER_BLUE, $card2->fresh()->marker);
     }
 
     public function test_open_session_with_268_candidates_does_not_write(): void

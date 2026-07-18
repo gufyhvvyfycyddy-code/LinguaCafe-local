@@ -27,7 +27,7 @@ use Illuminate\Support\Facades\DB;
  *   → TokenService::issue()
  *
  * Per-mode ordering (ADR-0016 §19):
- *   - source_chapter:   canonical Queue Order (no extra sort).
+ *   - marked/source_chapter: canonical Queue Order (no extra sort).
  *   - overdue:          retrievability ASC; tie → canonical fallback ASC.
  *   - today_forgotten:  latest valid today-again DESC; tie → canonical fallback ASC.
  *   - leech_attention:  severity level DESC (leech=2, struggling=1, stable=0);
@@ -142,9 +142,10 @@ class CustomStudySessionOrder
                     $fallbackRank
                 );
 
+            case CustomStudyCriteria::MODE_MARKED:
             case CustomStudyCriteria::MODE_SOURCE_CHAPTER:
             default:
-                // source_chapter and unknown modes: pure canonical fallback.
+                // Marked, source_chapter, and unknown modes: pure canonical fallback.
                 return $canonicalOrdered->map->id->values()->all();
         }
     }
