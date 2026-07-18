@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。Browser / ReviewCardManage Phase 3A、Phase 3B-1、Phase 3B-2、Phase 3C-1、Phase 3C-2 与 Phase 3C-3 均为 Accepted / Production Closed。Phase 3C-3 已于 2026-07-17 完成 authenticated browser 双 viewport 验收：单卡删除与双卡批量删除均通过真实页面操作，确认前无写请求，确认后分别只有一个 DELETE 与一个 bulk-delete POST，选择状态清零，弹窗在 900×900 内完整显示，全部应用请求保持 localhost-only。Phase 3C-4 — Leech Governance Mutation Family 为 Planned / Not Authorized。详细边界见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。Card Marker / Custom Study 1B、Reviewer、Reader 与真实 AI provider 继续按顺序延后。
+Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。Browser / ReviewCardManage Phase 3A、Phase 3B-1、Phase 3B-2、Phase 3C-1、Phase 3C-2、Phase 3C-3 与 Phase 3C-4 均为 Accepted / Production Closed。Phase 3C-4 已于 2026-07-18 完成 authenticated MCP Chrome 验收：单卡重写包、双卡批量重写包、双卡暂停和恢复均通过真实页面操作，生命周期写入仍由既有 owner 执行，provider/card/ReviewLog safety flags 保持 false，验收后的卡片状态已恢复为 active 4 / suspended 0，Console 无错误或警告，应用资源保持 localhost-only。Phase 3D — Container Closure 为 Planned / Not Authorized。详细边界见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。Card Marker / Custom Study 1B、Reviewer、Reader 与真实 AI provider 继续按顺序延后。
 
 ## 2. 本轮依据
 
@@ -250,7 +250,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A、Phase 3B-1、Phase 3B-2、Phase 3C-1、Phase 3C-2 与 Phase 3C-3 Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface 与 Delete Mutation Surface 已分别形成单一职责所有者。`ReviewCardManage.vue` 当前为 1,098 行、9 个 direct `axios.` references、4 个 `v-dialog`；`ReviewCardDeleteMutationSurface.vue` 为 196 行，拥有一个 DELETE、一个 bulk-delete POST 与两个确认弹窗。Phase 3C-3 的 authenticated browser 双 viewport 验收记录见 `docs/testing/review-card-delete-mutation-browser-acceptance-2026-07-17.md`。**Phase 3C-4 — Leech Governance Mutation Family：Planned / Not Authorized**。本轮停止，不进入 3C-4。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
+状态：**Phase 3A、Phase 3B-1、Phase 3B-2、Phase 3C-1、Phase 3C-2、Phase 3C-3 与 Phase 3C-4 Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。`ReviewCardManage.vue` 当前为 767 行、7 个 direct `axios.` references、2 个 `v-dialog`；`ReviewCardLeechGovernanceMutationSurface.vue` 为 366 行，拥有一个 summary GET、一个 bulk rewrite POST 与两个弹窗，并把暂停写入委托给既有 Lifecycle owner。Phase 3C-4 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-leech-governance-browser-acceptance-2026-07-18.md`。**Phase 3D — Container Closure：Planned / Not Authorized**。本轮停止，不进入 3D。详细分期、允许文件、禁止范围和验收合同见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。
 
 优先级：P1。
 
@@ -268,8 +268,8 @@ Anki 对齐行为：
 - **Phase 3C-1 — Due-now / Reset Scheduling Mutation Family**：Accepted / Production Closed。`ReviewCardSchedulingMutationSurface.vue` 负责两项调度写操作、请求锁与确认框，父页面只协调事件。
 - **Phase 3C-2 — Lifecycle Mutation Family**：Accepted / Production Closed。`ReviewCardLifecycleMutationSurface.vue` 负责 descriptor、单卡/批量生命周期请求、确认框、冲突处理、状态说明和请求锁；父页面只传递意图与只读快照。Authenticated Chrome 双 viewport 验收已于 2026-07-17 完成。
 - **Phase 3C-3 — Delete Mutation Family**：Accepted / Production Closed。
-- **Phase 3C-4 — Leech Governance Mutation Family**：Planned / Not Authorized。
-- **Phase 3C-4 — Leech Governance Mutation Family**：Planned / Not Started。
+- **Phase 3C-4 — Leech Governance Mutation Family**：Accepted / Production Closed。
+- **Phase 3D — Container Closure**：Planned / Not Authorized。
 - **Phase 3D — Container Closure**：消除重复状态所有者，让页面容器只协调区域。
 - 所有写操作继续走现有 Mutation / Lifecycle / Access 服务。
 - 不改变删除、归档、重置和 ReviewLog 保留语义。
@@ -382,7 +382,7 @@ Custom Study 1B：
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A、3B-1、3B-2、3C-1、3C-2 与 3C-3 Accepted / Production Closed；父组件 1,098 行、9 个请求、4 个弹窗；Phase 3C-4 Planned / Not Authorized；见 `review-card-manage-architecture-convergence-plan.md` |
+| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A、3B-1、3B-2、3C-1、3C-2、3C-3 与 3C-4 Accepted / Production Closed；父组件 767 行、7 个请求、2 个弹窗；Phase 3D Planned / Not Authorized；见 `review-card-manage-architecture-convergence-plan.md` |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |

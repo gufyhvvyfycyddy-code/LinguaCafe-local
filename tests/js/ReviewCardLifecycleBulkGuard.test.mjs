@@ -8,6 +8,7 @@ const root = join(__dirname, '..', '..');
 const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 const tablePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardTableSurface.vue');
 const surfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
+const leechPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLeechGovernanceMutationSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
@@ -21,13 +22,14 @@ function test(name, fn) {
     }
 }
 
-for (const path of [parentPath, tablePath, surfacePath]) {
+for (const path of [parentPath, tablePath, surfacePath, leechPath]) {
     test(`File exists: ${path.split(/[\\/]/).pop()}`, () => assert.ok(existsSync(path)));
 }
 
 const parent = readFileSync(parentPath, 'utf8');
 const table = readFileSync(tablePath, 'utf8');
 const surface = readFileSync(surfacePath, 'utf8');
+const leech = readFileSync(leechPath, 'utf8');
 
 for (const method of ['confirmBulk', 'requestBulkLifecycle', 'runBulkLifecycle', 'performBulkLifecycleAction']) {
     test(`Surface has ${method}`, () => assert.ok(surface.includes(`${method}(`)));
@@ -89,8 +91,10 @@ test('Bulk has title hint and color computed values', () => {
 });
 
 test('Leech bulk suspend delegates to shared request owner', () => {
+    assert.ok(leech.includes('this.runBulkLifecycle'));
+    assert.ok(leech.includes("source: 'manage_bulk_leech_suspend'"));
+    assert.ok(parent.includes('runLeechBulkLifecycle'));
     assert.ok(parent.includes('surface.runBulkLifecycle'));
-    assert.ok(parent.includes("source: 'manage_bulk_leech_suspend'"));
 });
 
 test('Surface excludes delete reset and rewrite endpoints', () => {

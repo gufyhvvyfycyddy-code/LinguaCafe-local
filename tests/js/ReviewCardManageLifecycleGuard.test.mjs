@@ -9,6 +9,7 @@ const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'R
 const surfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue');
 const drawerPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue');
 const searchPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
+const leechPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLeechGovernanceMutationSurface.vue');
 
 let passed = 0;
 function test(name, fn) {
@@ -22,7 +23,7 @@ function test(name, fn) {
     }
 }
 
-for (const path of [parentPath, surfacePath, drawerPath, searchPath]) {
+for (const path of [parentPath, surfacePath, drawerPath, searchPath, leechPath]) {
     test(`File exists: ${path.split(/[\\/]/).pop()}`, () => assert.ok(existsSync(path)));
 }
 
@@ -30,6 +31,7 @@ const parent = readFileSync(parentPath, 'utf8');
 const surface = readFileSync(surfacePath, 'utf8');
 const drawer = readFileSync(drawerPath, 'utf8');
 const browser = `${parent}\n${readFileSync(searchPath, 'utf8')}`;
+const leech = readFileSync(leechPath, 'utf8');
 
 for (const state of ['active', 'buried', 'suspended', 'archived']) {
     test(`Has ${state} filter`, () => assert.ok(browser.includes(`value="${state}"`)));
@@ -107,6 +109,10 @@ test('Parent has no lifecycle dialog ownership', () => {
 });
 
 test('Leech governance delegates lifecycle requests', () => {
+    assert.ok(leech.includes('this.runLifecycleAction'));
+    assert.ok(leech.includes('this.runBulkLifecycle'));
+    assert.ok(parent.includes('runLeechLifecycleAction'));
+    assert.ok(parent.includes('runLeechBulkLifecycle'));
     assert.ok(parent.includes('surface.runLifecycleAction'));
     assert.ok(parent.includes('surface.runBulkLifecycle'));
 });

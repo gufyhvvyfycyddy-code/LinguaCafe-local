@@ -1,10 +1,10 @@
 # ReviewCardManage Architecture Convergence Plan
 
-> **Status**: Phase 3C-3 — Delete Mutation Family — Accepted / Production Closed
+> **Status**: Phase 3C-4 — Leech Governance Mutation Family — Accepted / Production Closed
 >
-> **Current next slice**: Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Authorized; no implementation phase is currently authorized
+> **Current next slice**: Phase 3D — Container Closure — Planned / Not Authorized; no implementation phase is currently authorized
 >
-> **Architecture baseline**: master `2111679c406e32b5bbfcb14ee74ec605a0be99f3`
+> **Architecture baseline**: master `0b293874412458bf0bc8badd3e0d018471c47f85`
 >
 > **Phase 3B-1 implementation baseline**: master `666f76a4829034123d275d9ec6a295d8e22dc20a`
 >
@@ -25,13 +25,14 @@ Original measured baseline:
 
 The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
-Current measured snapshot after Phase 3C-3:
+Current measured snapshot after Phase 3C-4:
 
 - 28 production files exceed 500 lines;
 - 10 production files exceed 1,000 lines;
 - only 1 production file now exceeds 1,500 lines (`TextBlockGroup.vue`, 2,514 lines);
-- `ReviewCardManage.vue` is 1,098 lines with 9 direct `axios.` references and 4 dialogs;
+- `ReviewCardManage.vue` is 767 lines with 7 direct `axios.` references and 2 dialogs;
 - `ReviewCardDeleteMutationSurface.vue` is 196 lines with one DELETE request, one bulk-delete POST request and two dialogs;
+- `ReviewCardLeechGovernanceMutationSurface.vue` is 366 lines with two direct `axios.` references and two dialogs;
 - current debt assessment is **6.0/10, localized medium-high burden**: the management module has materially converged, while Reader/Reviewer hotspots and residual compatibility code still require staged governance.
 
 ## 2. Anki official reference and the parts LinguaCafe borrows
@@ -114,9 +115,12 @@ ReviewCardManage.vue
   │    ├─ lifecycle descriptor and stale-response protection
   │    ├─ single / bulk lifecycle requests and locks
   │    └─ lifecycle confirmations and state help
-  └─ future mutation/dialog families (Phase 3C)
-       ├─ delete/bulk delete
-       └─ leech governance/rewrite packages
+  ├─ ReviewCardDeleteMutationSurface.vue
+  │    └─ single / bulk delete requests, locks and confirmations
+  └─ ReviewCardLeechGovernanceMutationSurface.vue
+       ├─ Leech summary and rewrite-package requests
+       ├─ rewrite-package / bulk suspend dialogs and request locks
+       └─ lifecycle writes delegated to ReviewCardLifecycleMutationSurface.vue
 ```
 
 The parent may coordinate list requests, cross-region refresh and snackbar state. It must not re-implement access, lifecycle, leech, delete, search grammar or FSRS rules.
@@ -211,7 +215,7 @@ Corrective follow-up on 2026-07-16:
 - At 900×900, card 156 remained current while card 157 remained selected; the page had no horizontal overflow and only `.table-wrapper` scrolled horizontally. Console remained clean and all observed requests stayed on `127.0.0.1:8000`.
 - The current measured sizes are 1,540 lines for `ReviewCardManage.vue` and 872 lines for `ReviewCardTableSurface.vue`; request and dialog counts remain 19 parent `axios.` references, three child read-only export GET requests and 11 parent `v-dialog` blocks.
 
-### Phase 3C — Mutation and Dialog Families — In Progress
+### Phase 3C — Mutation and Dialog Families — Accepted / Production Closed
 
 Group write operations by real domain boundaries while retaining current backend authorities. No mutation semantics change is authorized by this plan.
 
@@ -220,7 +224,7 @@ Frozen subphase order:
 1. **Phase 3C-1 — Due-now / Reset Scheduling Mutation Family — Accepted / Production Closed**. `ReviewCardSchedulingMutationSurface.vue` is the sole owner of the two scheduling POST requests, their targets, request locks and confirmation dialogs. The parent only forwards table intents and consumes semantic card-update/refresh/notify/error events.
 2. **Phase 3C-2 — Lifecycle Mutation Family — Accepted / Production Closed**. `ReviewCardLifecycleMutationSurface.vue` is the sole descriptor, single/bulk lifecycle request, request-lock, confirmation and state-help owner. Leech governance keeps its own product UI but delegates lifecycle writes to this owner. Authenticated dual-viewport Chrome acceptance completed on 2026-07-17.
 3. **Phase 3C-3 — Delete Mutation Family — Accepted / Production Closed**. `ReviewCardDeleteMutationSurface.vue` owns the single/bulk delete confirmations, request locks and the two existing delete requests while preserving ReviewLog, occurrence and last-confirmed-sense semantics. Authenticated dual-viewport browser acceptance completed on 2026-07-17.
-4. **Phase 3C-4 — Leech Governance Mutation Family — Planned / Not Authorized**. Consolidate rewrite-package and leech-suspend orchestration while preserving the no-provider/no-auto-create boundary.
+4. **Phase 3C-4 — Leech Governance Mutation Family — Accepted / Production Closed**. `ReviewCardLeechGovernanceMutationSurface.vue` owns the Leech summary, rewrite-package requests, dialogs, loading/error state and selected-card suspend orchestration while preserving the no-provider/no-auto-create boundary. Lifecycle HTTP writes still delegate to `ReviewCardLifecycleMutationSurface.vue`.
 
 Anki alignment for 3C-1:
 
@@ -324,7 +328,39 @@ Anki alignment for 3C-3:
 - LinguaCafe retains its existing WordSense/ReviewCard delete contract instead of copying Anki note deletion;
 - ReviewLog and reading-source history remain preserved, and removing the last confirmed sense may return the EncounteredWord to New according to the established backend authority.
 
-### Phase 3D — Container Closure — Planned / Not Started
+#### Phase 3C-4 — Leech Governance Mutation Family — Accepted / Production Closed
+
+Implemented boundary:
+
+- created `resources/js/components/ReviewCards/ReviewCardLeechGovernanceMutationSurface.vue` at 366 lines;
+- the Leech child owns exactly one summary GET, one bulk rewrite-package POST and two dialogs: bulk rewrite package and selected-card bulk suspend;
+- the existing `SenseReviewLeechRewritePackageDialog.vue` remains the single-card rewrite-package request/dialog owner and is reused inside the new surface;
+- `ReviewCardManage.vue` decreased from 1,098 to 767 lines;
+- parent direct `axios.` references decreased from 9 to 7 and parent `v-dialog` blocks decreased from 4 to 2;
+- the parent contains no Leech endpoint, rewrite-package dialog, bulk Leech selection snapshot or Leech request/loading state;
+- the parent only forwards table intents, projects the child loading state and bridges lifecycle actions to `ReviewCardLifecycleMutationSurface.vue`;
+- `ReviewCardLifecycleMutationSurface.vue` remains the sole ReviewCardManage-domain lifecycle HTTP owner; the Leech surface contains no lifecycle endpoint;
+- no backend route, payload, Leech Policy, lifecycle state machine, ReviewLog rule, FSRS field, migration or provider boundary changed.
+
+TDD and verification evidence on 2026-07-18:
+
+- `ReviewCardLeechGovernanceMutationSurfaceGuard.test.mjs` first failed because the owner did not exist, then passed after the responsibility-complete extraction;
+- the prior Leech/lifecycle guards were updated from parent-ownership assumptions to the new singular Leech owner and lifecycle delegation contract;
+- testing database health and `ReviewCardManageUiGuardTest` passed after the local MariaDB process was started with its existing data config; the Windows service itself remains an environment issue because it points to a missing top-level config file;
+- the development build completed successfully with only existing Sass deprecation warnings;
+- authenticated MCP Chrome verified single rewrite-package, two-card bulk rewrite-package and two-card bulk suspend flows. Safety flags remained `provider_called=false`, `card_created=false` and `review_log_created=false`;
+- the two deliberately suspended cards were restored through the existing lifecycle UI before acceptance ended, returning the visible baseline to active 4 and suspended 0;
+- dialog bounds remained inside the viewport, the document had no horizontal overflow, Console contained no error or warning and every observed application request stayed on `127.0.0.1:8000`;
+- full evidence is recorded in `docs/testing/review-card-leech-governance-browser-acceptance-2026-07-18.md`.
+
+Anki alignment for 3C-4:
+
+- the Browser remains a coordinator while operation-specific code owns request, lock, dialog and error state;
+- Leech remains a read-only diagnosis and governance recommendation, not a lifecycle state;
+- suspending a Leech card still goes through the established lifecycle authority;
+- LinguaCafe keeps its manual external-AI rewrite-package boundary and does not add automatic provider calls or automatic card creation.
+
+### Phase 3D — Container Closure — Planned / Not Authorized
 
 Evaluate the final coordinator only after earlier slices are separately accepted. The stretch target is about 1,000 lines; 1,200 is acceptable when further extraction would create meaningless pass-through components.
 
@@ -347,6 +383,8 @@ Completed Phase 3C target pairs:
 - `DEV-ReviewCardManage-3C-2`: create `ReviewCardLifecycleMutationSurface.vue`, migrate all lifecycle request/dialog ownership, freeze `expected_version`, add stale-response protection, delegate Leech lifecycle writes, update guards, run grouped regressions and complete authenticated dual-viewport Chrome acceptance.
 - `ARCH-ReviewCardManage-3C-3`: freeze single and selected-card bulk delete as one dangerous mutation family, preserve backend delete authorities and keep ReviewLog, occurrence and last-confirmed-sense semantics unchanged.
 - `DEV-ReviewCardManage-3C-3`: create `ReviewCardDeleteMutationSurface.vue`, migrate both delete requests and confirmations, preserve table intent ownership, add executable guards, run focused regressions and complete authenticated dual-viewport browser acceptance.
+- `ARCH-ReviewCardManage-3C-4`: freeze Leech summary/rewrite-package orchestration as one owner, preserve ADR-0011 no-provider/no-auto-create semantics and retain lifecycle writes under the existing lifecycle owner.
+- `DEV-ReviewCardManage-3C-4`: create `ReviewCardLeechGovernanceMutationSurface.vue`, migrate Leech request/dialog/loading/selection ownership, delegate suspend writes to the lifecycle child, add executable guards and complete authenticated browser acceptance.
 
 ## 7. Phase 3B changed files
 
@@ -379,7 +417,7 @@ Docs:
 - no FSRS, due, rating or ReviewLog write change;
 - no lifecycle, archive, restore, reset or delete semantic change;
 - no frontend reimplementation of Browser Search grammar;
-- do not enter the next Phase 3C subphase, Card Marker or Custom Study 1B without a separate task;
+- do not enter Phase 3D, Card Marker or Custom Study 1B without a separate task;
 - no deck/subdeck, Note mode, tag tree or Filtered Deck;
 - no new dependency, Vuex module or event bus without proven need;
 - no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
@@ -420,4 +458,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3C-3 is **Accepted / Production Closed** after its authenticated browser acceptance pass. Phase 3C-4 is **Planned / Not Authorized**. Do not enter the next Phase 3C subphase, Card Marker, Custom Study 1B or any later phase automatically.
+Phase 3C-4 is **Accepted / Production Closed** after its authenticated browser acceptance pass. Phase 3D is **Planned / Not Authorized**. Do not enter Phase 3D, Card Marker, Custom Study 1B or any later phase automatically.
