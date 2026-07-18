@@ -43,3 +43,18 @@ test('Sense Review uses the shared formal request owners', () => {
     assert.doesNotMatch(sense, /axios\.get\([^\n]*\/interval-preview/);
     assert.doesNotMatch(sense, /axios\.post\([^\n]*\/reviews\/senses\/[^\n]*\/rate/);
 });
+
+test('Sense session actions have one extracted owner', () => {
+    const surface = readFileSync(
+        new URL('../../resources/js/components/Senses/SenseReviewSessionActionsSurface.vue', import.meta.url),
+        'utf8',
+    );
+    assert.match(sense, /<SenseReviewSessionActionsSurface/);
+    assert.match(sense, /sessionActionProjection:\s*\{/);
+    assert.doesNotMatch(sense, /sessionActions\s*:/);
+    assert.doesNotMatch(sense, /sessionActionsLoading\s*:/);
+    assert.doesNotMatch(sense, /sessionActionRequestSequence\s*:/);
+    assert.doesNotMatch(sense, /\/reviews\/senses\/(session-actions|review-actions)/);
+    assert.match(surface, /reviewApi\.loadSenseSessionActions/);
+    assert.match(surface, /reviewApi\.undoSenseReviewAction/);
+});
