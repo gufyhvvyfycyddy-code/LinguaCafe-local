@@ -211,9 +211,12 @@ test('SenseReview.vue has loadIntervalPreview method', () => {
     assert.ok(reviewSrc.includes('loadIntervalPreview'), 'must have loadIntervalPreview method');
 });
 
-// 20. SenseReview.vue uses correct endpoint path /interval-preview.
-test('SenseReview.vue uses /interval-preview endpoint', () => {
-    assert.ok(reviewSrc.includes('/interval-preview'), 'must use /interval-preview endpoint path');
+// 20. SenseReview.vue delegates interval preview to the shared client.
+test('SenseReview.vue delegates interval preview to the shared client', () => {
+    assert.ok(reviewSrc.includes('reviewApi.loadSenseIntervalPreview(cardId)'),
+        'must use reviewApi.loadSenseIntervalPreview');
+    assert.ok(!/axios\.get\([^\n]*\/interval-preview/.test(reviewSrc),
+        'must not call the interval-preview endpoint directly');
 });
 
 // 21. SenseReview.vue has intervalPreviewRequestSequence for race protection.

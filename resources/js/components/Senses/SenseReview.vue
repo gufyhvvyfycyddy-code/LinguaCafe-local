@@ -409,7 +409,8 @@
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
-    import { runAuthoritativeRatingRecovery } from '../Review/ReviewRatingRecovery.js';
+    import { createReviewApiClient } from '../Review/ReviewApiClient.js';
+    import { createReviewRatingTransaction } from '../Review/ReviewRatingTransaction.js';
     import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from '../Review/ReviewDurationTracker.js';
     import {
         MORE_MENU_ITEMS,
@@ -422,6 +423,8 @@
         blockedReasonLabel,
         buriedRemainingText,
     } from '../../services/ReviewCardLifecyclePresentation.js';
+
+    const reviewApi = createReviewApiClient();
 
     /**
      * SenseReview.vue — page container (refactored).
@@ -555,6 +558,7 @@
                 // discarded so it cannot overwrite a newer rating result or
                 // a newer queue state.
                 loadCardsRequestSequence: 0,
+                ratingTransaction: createReviewRatingTransaction(),
                 reviewDurationTracker: createTracker(undefined, document.visibilityState !== 'hidden'),
                 // ADR-0009: Review session identity + stack undo.
                 // reviewSessionId: UUID per browser tab (sessionStorage,
@@ -726,6 +730,7 @@
         beforeDestroy() {
             window.removeEventListener('keyup', this.handleHotkey);
             document.removeEventListener('visibilitychange', this.handleReviewVisibility);
+            this.ratingTransaction.invalidate();
         },
         mounted() {
             // ADR-0009: Create or restore the per-tab review session ID.
@@ -766,6 +771,7 @@
                     });
             },
             loadCards() {
+                this.ratingTransaction.invalidate();
                 this.loading = true;
                 this.error = '';
                 // DEV-QO-7: capture sequence so stale loadCards() responses
@@ -776,7 +782,7 @@
                 if (this.ignoreDailyLimits) {
                     params.ignoreDailyLimits = true;
                 }
-                return axios.get('/reviews/senses', { params: params }).then((response) => {
+                return reviewApi.loadSenseQueue(params).then((response) => {
                     // DEV-QO-7: drop stale responses so a slow loadCards()
                     // cannot overwrite a newer rating result or queue state.
                     if (seq !== this.loadCardsRequestSequence) {
@@ -822,7 +828,7 @@
                 this.intervalPreviewLoading = true;
                 this.intervalPreviewError = '';
                 this.intervalPreviews = null;
-                axios.get('/reviews/senses/' + cardId + '/interval-preview').then((response) => {
+                reviewApi.loadSenseIntervalPreview(cardId).then((response) => {
                     if (seq !== this.intervalPreviewRequestSequence) {
                         return;
                     }
@@ -853,6 +859,7 @@
                 }
 
                 this.rating = true;
+                const seq = this.ratingTransaction.begin();
                 this.error = '';
                 // Invalidate the interval preview immediately so the old
                 // card's predicted intervals cannot bleed into the next
@@ -887,7 +894,10 @@
                     sense_zh: this.currentCard.sense_zh,
                     rating: rating,
                 };
-                axios.post(`/reviews/senses/${this.currentCard.review_card_id}/rate`, payload).then((response) => {
+                reviewApi.rateSenseCard(this.currentCard.review_card_id, payload).then((response) => {
+                    if (!this.ratingTransaction.isCurrent(seq)) {
+                        return;
+                    }
                     this.reviewedCount++;
                     this.summary = response.data.summary;
                     // Record this rating into the page session. The
@@ -918,13 +928,16 @@
                     this.error = '';
                     this.rating = false;
                 }).catch((error) => {
+                    if (!this.ratingTransaction.isCurrent(seq)) {
+                        return;
+                    }
                     // DEV-RECOVERY-1 (Task 2000-13): delegate the recovery
                     // orchestration to the pure JS helper. The helper keeps
                     // this.rating=true (buttons disabled), calls loadCards()
                     // which returns a Promise, waits for it to settle, then
                     // unlocks. The helper does NOT touch statistics,
                     // ReviewLog, FSRS, or lifecycle.
-                    runAuthoritativeRatingRecovery({
+                    this.ratingTransaction.recover({
                         reloadQueue: () => this.loadCards(),
                         lockRating: () => { this.rating = true; },
                         unlockRating: () => { this.rating = false; },

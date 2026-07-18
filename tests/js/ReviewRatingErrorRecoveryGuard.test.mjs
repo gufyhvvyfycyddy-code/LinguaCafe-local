@@ -285,17 +285,17 @@ const senseRateMethod = extractMethod(senseReviewSource, 'rate');
 const senseRateCatch = extractMainCatchBody(senseRateMethod);
 const senseRateThen = extractFirstThenBody(senseRateMethod);
 
-test('SenseReview.vue imports runAuthoritativeRatingRecovery helper', () => {
+test('SenseReview.vue imports the shared rating transaction', () => {
     assert.ok(
-        senseReviewSource.includes('import { runAuthoritativeRatingRecovery }'),
-        'SenseReview.vue must import runAuthoritativeRatingRecovery'
+        senseReviewSource.includes('import { createReviewRatingTransaction }'),
+        'SenseReview.vue must import createReviewRatingTransaction'
     );
 });
 
-test('SenseReview.vue rate catch calls runAuthoritativeRatingRecovery', () => {
+test('SenseReview.vue rate catch delegates to its rating transaction', () => {
     assert.ok(
-        senseRateCatch.includes('runAuthoritativeRatingRecovery'),
-        'rate catch must call runAuthoritativeRatingRecovery'
+        senseRateCatch.includes('this.ratingTransaction.recover'),
+        'rate catch must call this.ratingTransaction.recover'
     );
 });
 
@@ -329,10 +329,10 @@ test('SenseReview.vue reviewedCount++ remains in .then() success path only', () 
         senseRateThen.includes('this.reviewedCount++'),
         'reviewedCount++ must be in .then() success path'
     );
-    const beforeRequest = senseRateMethod.split('axios.post')[0];
+    const beforeRequest = senseRateMethod.split('reviewApi.rateSenseCard')[0];
     assert.ok(
         !beforeRequest.includes('this.reviewedCount++'),
-        'reviewedCount++ must NOT be before axios.post'
+        'reviewedCount++ must NOT be before the formal rating request'
     );
 });
 
