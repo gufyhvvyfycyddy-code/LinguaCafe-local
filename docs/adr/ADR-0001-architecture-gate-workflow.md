@@ -4,6 +4,8 @@
 
 Accepted
 
+> **Partial supersession:** ADR-0028 replaces only repeated routine approval inside an explicitly authorized persistent goal. Architecture Gate review, scope, safety, and verification remain active; non-goal tasks keep this workflow unchanged.
+
 ## Context
 
 LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项目根目录用 AGENTS.md 约束 AI 行为，每轮任务由网页端 GPT 定义范围并验收）。
