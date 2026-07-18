@@ -263,6 +263,20 @@ class CustomStudyQueryServiceTest extends TestCase
         $this->assertNotContains($stable->id, $ids, 'leech_only must not return stable card.');
     }
 
+    public function test_marked_dispatches_only_to_the_marked_query(): void
+    {
+        $marked = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_BLUE]);
+        $unmarked = $this->createCard($this->createSense(), ['marker' => ReviewCard::MARKER_NONE]);
+
+        $criteria = CustomStudyCriteria::fromArray([
+            'mode' => CustomStudyCriteria::MODE_MARKED,
+        ]);
+        $ids = $this->callService($criteria);
+
+        $this->assertSame([$marked->id], $ids);
+        $this->assertNotContains($unmarked->id, $ids);
+    }
+
     // ─── 5. Unique positive IDs ───
 
     public function test_all_modes_output_unique_positive_integer_ids(): void
@@ -477,8 +491,9 @@ class CustomStudyQueryServiceTest extends TestCase
         $codeOnly = preg_replace('/^\s*\/\/.*$/m', '', $codeOnly);
         $buildCalls = substr_count($codeOnly, '->build(');
         $candidateIdsCalls = substr_count($codeOnly, '->candidateIds(');
-        // 1 ->build for today_forgotten + 1 for overdue + 1 for source_chapter = 3.
-        $this->assertSame(3, $buildCalls, 'Dispatcher must call build() exactly once per SQL-native mode (3 total).');
+        // One ->build call for each SQL-native mode: today_forgotten,
+        // overdue, source_chapter, and marked.
+        $this->assertSame(4, $buildCalls, 'Dispatcher must call build() exactly once per SQL-native mode (4 total).');
         // 1 ->candidateIds for leech_attention.
         $this->assertSame(1, $candidateIdsCalls, 'Dispatcher must call candidateIds() exactly once for leech_attention.');
     }

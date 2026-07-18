@@ -68,6 +68,17 @@ class CustomStudyCriteriaTest extends TestCase
         $this->assertSame([], $criteria->parameters());
     }
 
+    public function test_from_array_accepts_marked_and_ignores_parameters(): void
+    {
+        $criteria = CustomStudyCriteria::fromArray([
+            'mode' => 'marked',
+            'parameters' => ['ids' => [1, 2], 'marker' => 4],
+        ]);
+
+        $this->assertSame('marked', $criteria->mode());
+        $this->assertSame([], $criteria->parameters());
+    }
+
     public function test_from_array_accepts_source_chapter_with_valid_chapter_id(): void
     {
         $criteria = CustomStudyCriteria::fromArray([
@@ -120,7 +131,7 @@ class CustomStudyCriteriaTest extends TestCase
     {
         $this->expectException(CustomStudyValidationException::class);
         CustomStudyCriteria::fromArray([
-            'mode' => 'marked',
+            'mode' => 'unknown_mode',
             'parameters' => [],
         ]);
     }
@@ -129,7 +140,7 @@ class CustomStudyCriteriaTest extends TestCase
     {
         try {
             CustomStudyCriteria::fromArray([
-                'mode' => 'marked',
+                'mode' => 'unknown_mode',
                 'parameters' => [],
             ]);
             $this->fail('Expected CustomStudyValidationException was not thrown');
@@ -349,7 +360,7 @@ class CustomStudyCriteriaTest extends TestCase
         // Two different invalid modes produce different messages but identical
         // field/reason — proving field/reason is NOT derived from message text.
         $reasons = [];
-        foreach (['marked', 'filtered_deck', 'nonexistent', 'RANDOM'] as $badMode) {
+        foreach (['flagged', 'filtered_deck', 'nonexistent', 'RANDOM'] as $badMode) {
             try {
                 CustomStudyCriteria::fromArray(['mode' => $badMode, 'parameters' => []]);
                 $this->fail("Expected exception for mode={$badMode}");

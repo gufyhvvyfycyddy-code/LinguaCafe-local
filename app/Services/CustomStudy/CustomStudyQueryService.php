@@ -3,6 +3,7 @@
 namespace App\Services\CustomStudy;
 
 use App\Services\CustomStudy\Queries\LeechAttentionQuery;
+use App\Services\CustomStudy\Queries\MarkedQuery;
 use App\Services\CustomStudy\Queries\OverdueQuery;
 use App\Services\CustomStudy\Queries\SourceChapterQuery;
 use App\Services\CustomStudy\Queries\TodayForgottenQuery;
@@ -14,7 +15,7 @@ use Illuminate\Support\Carbon;
  * Frozen by Task 2000-18 §6.2 / §10:
  *   - Single entry point that turns a validated CustomStudyCriteria into a
  *     list of unique positive ReviewCard IDs.
- *   - Dispatches to one of the four Query classes based on the criteria
+ *   - Dispatches to one of the five Query classes based on the criteria
  *     mode — does NOT run multiple modes in parallel.
  *   - For SQL-native modes (today_forgotten / overdue / source_chapter)
  *     it terminates the Builder via `pluck('review_cards.id')`.
@@ -35,7 +36,7 @@ use Illuminate\Support\Carbon;
  *
  * Forbidden by Task 2000-18 §6.2:
  *   - No new QueryInterface / DTO / Repository / Adapter. This service is
- *     the ONLY orchestration layer above the four Query classes.
+ *     the ONLY orchestration layer above the five Query classes.
  */
 class CustomStudyQueryService
 {
@@ -43,7 +44,8 @@ class CustomStudyQueryService
         private readonly TodayForgottenQuery $todayForgottenQuery,
         private readonly OverdueQuery $overdueQuery,
         private readonly SourceChapterQuery $sourceChapterQuery,
-        private readonly LeechAttentionQuery $leechAttentionQuery
+        private readonly LeechAttentionQuery $leechAttentionQuery,
+        private readonly MarkedQuery $markedQuery
     ) {
     }
 
@@ -92,6 +94,13 @@ class CustomStudyQueryService
                 $subMode = (string) ($criteria->parameters()['sub_mode'] ?? '');
                 $ids = $this->leechAttentionQuery
                     ->candidateIds($userId, $language, $subMode, $now);
+                break;
+
+            case CustomStudyCriteria::MODE_MARKED:
+                $ids = $this->markedQuery
+                    ->build($userId, $language, $now)
+                    ->pluck('review_cards.id')
+                    ->all();
                 break;
 
             default:
