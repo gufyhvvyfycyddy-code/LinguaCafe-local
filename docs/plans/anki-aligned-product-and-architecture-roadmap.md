@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛和 Preset V1A–V1D 已生产关闭。V1D 已通过纯状态模块、分组回归、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定、数据库 delta 和 Chrome 双 viewport 验收。Browser / ReviewCardManage Phase 3A–3D 均为 Accepted / Production Closed。Phase 3D 于 2026-07-18 删除父组件无入口的旧 `/enabled` archive/restore 客户端、4 个状态字段和 2 个旧确认框；`ReviewCardManage.vue` 现为 668 行、4 个协调请求、0 个 `v-dialog`。现有 Search、Table、Card Info、Scheduling、Lifecycle、Delete 与 Leech owner 及后端兼容 route 保持不变，定向回归、构建与 authenticated MCP Chrome 双 viewport 验收通过。详细边界见 `docs/plans/review-card-manage-architecture-convergence-plan.md`。Card Marker / Custom Study 1B 为下一计划阶段，仍未授权；Reviewer、Reader 与真实 AI provider 继续按顺序延后。
+Settings 架构收敛、Preset V1A–V1D 和 Browser / ReviewCardManage Phase 3A–3D 均已生产关闭。Card Marker / Custom Study 1B 也于 2026-07-18 完成 ReviewCard Marker 持久化、Browser/Card Info 控件、`marked` preview-only 会话、自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收，状态为 Accepted / Production Closed。下一阶段为 Reviewer 架构收敛；Reader 与真实 AI provider 继续按顺序延后。
 
 ## 2. 本轮依据
 
@@ -250,7 +250,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：In Progress**。产品与架构合同已由 ADR-0029 冻结，尚未声明实现或生产验收完成。详细边界见 `docs/superpowers/specs/2026-07-18-card-marker-custom-study-1b-design.md` 与 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。
+状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：Accepted / Production Closed**。ReviewCard Marker 持久化、单卡/批量 API、Browser/Card Info 控件、`marked` Custom Study 查询与 preview-only 会话均已完成；自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收通过。验收记录见 `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`，稳定契约见 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。下一阶段为 Phase 5 Reviewer 架构收敛。
 
 优先级：P1。
 

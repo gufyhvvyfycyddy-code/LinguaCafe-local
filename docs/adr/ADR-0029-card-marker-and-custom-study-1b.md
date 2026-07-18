@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted on 2026-07-18 for roadmap Phase 4 implementation. Completion still requires the automated and authenticated-browser evidence defined below.
+Accepted / Production Closed on 2026-07-18. The automated, isolated testing-database, and authenticated-browser evidence is recorded in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`.
 
 ## Context
 

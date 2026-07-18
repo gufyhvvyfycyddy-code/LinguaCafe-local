@@ -6,20 +6,20 @@
 >
 > | State | Work |
 > |---|---|
-> | Production Closed | Queue Order; Custom Study 1A; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A; Preset V1B; Preset V1C; Preset V1D; Browser/ReviewCardManage Phase 3A; Browser/ReviewCardManage Phase 3B-1; Browser/ReviewCardManage Phase 3B-2; Browser/ReviewCardManage Phase 3C-1; Browser/ReviewCardManage Phase 3C-2; Browser/ReviewCardManage Phase 3C-3; Browser/ReviewCardManage Phase 3C-4; Browser/ReviewCardManage Phase 3D |
+> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A; Preset V1B; Preset V1C; Preset V1D; Browser/ReviewCardManage Phase 3A; Browser/ReviewCardManage Phase 3B-1; Browser/ReviewCardManage Phase 3B-2; Browser/ReviewCardManage Phase 3C-1; Browser/ReviewCardManage Phase 3C-2; Browser/ReviewCardManage Phase 3C-3; Browser/ReviewCardManage Phase 3C-4; Browser/ReviewCardManage Phase 3D |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | No implementation phase is currently authorized; Browser/ReviewCardManage Phase 3D is Accepted / Production Closed; Card Marker + Custom Study 1B is Planned / Not Authorized |
+> | Current Phase | Card Marker + Custom Study 1B is Accepted / Production Closed; Phase 5 Reviewer architecture convergence is next and requires its scoped architecture gate before implementation |
 > | Authorized Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader UI/reader architecture |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
-> Custom Study 1A is Accepted / Production Closed. Custom Study 1B is not started. `/custom-study`, four frozen criteria, chapter options, stateless open/answer/resume, shared `SenseStudyCard.vue`, `SenseSentencePreview.vue` reuse, sessionStorage token handling, and MCP Chrome production acceptance are complete. Historical phase narratives are archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
+> Custom Study 1A and Card Marker + Custom Study 1B are Accepted / Production Closed. `/custom-study` now includes the five frozen criteria, including `marked`; Marker remains ReviewCard metadata and the session remains preview-only. Phase 4 evidence is in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`; earlier 1A history remains archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
 > **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Settings convergence and Browser ownership extraction removed major concentrated debt. The fresh baseline is 28 production files over 500 lines, 10 over 1,000, and 1 over 1,500; current assessment is **6.0/10, localized medium-high burden**. `ReviewCardManage.vue` has improved to 668 lines with 4 coordinator requests and no dialogs, while `TextBlockGroup.vue` (2,514), `SenseReview.vue` (1,476), Reader services and remaining compatibility code still require staged governance.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
+> Custom Study 1B: Accepted / Production Closed
 
 
 > **Custom Study 1A shared card update (2026-07-14)**: `SenseStudyCard.vue` now contains only reusable presentation and uses `SenseSentencePreview.vue`. The established `SenseReview.vue` container still owns lifecycle operations, FSRS details, interval preview, and formal rating controls through slots.
@@ -220,7 +220,7 @@
 | 2C | Preset V1C — Consumer Convergence | Completed / Production Closed | 所有设置消费者只读取当前 binding；不再生成没有用户/语言归属的全局回滚状态 | `fsrs_parameters_previous` 新写入/删除已停止，旧行保持不动并被明确标记为无效历史残留 | ADR-0026；V1C static guard；全量回归 | 已完成 |
 | 2D | Preset V1D — Settings UX and Production Closure | Completed / Production Closed | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | 无；Settings UX-1、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定和无自动重排矩阵已完成 | ADR-0027；`review-settings-preset-v1-plan.md`；2026-07-15 Chrome 双 viewport + 数据库 delta | 已完成；停止在本阶段 |
 | 3 | Browser / ReviewCardManage architecture convergence | Completed / Production Closed through Phase 3D | Phase 3A 抽取只读 Card Info；Phase 3B-1 抽取 Search；Phase 3B-2 抽取 Table；Phase 3C-1–3C-4 抽取 Scheduling、Lifecycle、Delete、Leech；Phase 3D 清理无入口的旧 `/enabled` 父组件兼容代码并关闭最终容器 | `ReviewCardManage.vue` 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；只保留 stats、list、inline edit、source-context 编排请求；Lifecycle/Leech/Delete/Scheduling owner 不变 | `docs/plans/review-card-manage-architecture-convergence-plan.md`；`docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`；TDD、自动回归、构建与 authenticated MCP Chrome 验收完成 | 已完成；停止在本阶段 |
-| 4 | Card Marker + Custom Study 1B | Planned | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 必须落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | 同路线 Phase 4；ADR-0016 | Browser 收敛后授权 |
+| 4 | Card Marker + Custom Study 1B | Accepted / Production Closed | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | ADR-0029；Phase 4 browser acceptance | 2026-07-18 关闭 |
 | 5 | Reviewer architecture convergence | Planned | Sense Review 与 legacy Review 共用请求恢复、会话和评分编排边界 | `SenseReview.vue` 1,476 行；`Review.vue` 1,070 行 | 同路线 Phase 5；ADR-0008–0010 | Card Marker 后授权 |
 | 6 | Reader UI-7 / Reader UI-8 小步优化 | Planned | hover 自动查词开关，降低常驻面板干扰 | 必须逐项真实验收，不和阅读主链路大拆分混做 | 同路线 Phase 6 | Reviewer 收敛后授权 |
 | 7 | Reader architecture governance | Planned | 降低阅读页改一处坏多处的风险 | `TextBlockGroup.vue` 2517 行；`TextBlockService.php` 1382 行；需逐职责 characterization + Chrome | 同路线 Phase 6；hotspot audit | Reader UI 小步后授权 |
