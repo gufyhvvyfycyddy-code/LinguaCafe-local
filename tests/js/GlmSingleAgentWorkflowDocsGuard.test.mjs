@@ -94,39 +94,17 @@ test('no forbidden active CodeBuddy/WorkBuddy phrasings in current rules', () =>
     );
 });
 
-test('current rules file mentions GLM single-agent workflow as current', () => {
+test('current rules assign one main agent responsibility without reviving old roles', () => {
     assert.ok(
-        rulesSource.includes('GLM 单 Agent 闭环'),
-        'Current rules must reference the GLM single-agent workflow'
+        rulesSource.includes('一个主执行 Agent 对结果负责'),
+        'Current rules must assign one main executing agent responsibility'
     );
 });
 
-test('current rules file references the archive pointer for §4.x', () => {
+test('current rules mark old role workflows as historical', () => {
     assert.ok(
-        rulesSource.includes('codebuddy-workbuddy-workflow-archive-2026-07-13.md'),
-        'Current rules must link to the workflow archive file'
-    );
-});
-
-test('current rules file declares §14 workflow discontinued', () => {
-    const section14Line = rulesSource.split('\n').find(line =>
-        line.startsWith('## 14.')
-    );
-    assert.ok(section14Line, '§14 header not found');
-    assert.ok(
-        section14Line.includes('已停用') || section14Line.includes('已归档') || section14Line.includes('~~'),
-        `§14 header must mark workflow discontinued: ${section14Line}`
-    );
-});
-
-test('current rules file declares §18 WorkBuddy discontinued', () => {
-    const section18Line = rulesSource.split('\n').find(line =>
-        line.startsWith('## 18.')
-    );
-    assert.ok(section18Line, '§18 header not found');
-    assert.ok(
-        section18Line.includes('已停用') || section18Line.includes('已归档') || section18Line.includes('~~'),
-        `§18 header must mark WorkBuddy discontinued: ${section18Line}`
+        rulesSource.includes('旧 CodeBuddy / WorkBuddy / GLM 接力流程仅是历史，不再生效'),
+        'Current rules must explicitly de-activate old role workflows'
     );
 });
 

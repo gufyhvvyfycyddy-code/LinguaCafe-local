@@ -86,7 +86,6 @@ const authoritativeSources = [
     ['handoff', handoffSource],
     ['ADR-0016', adrSource],
     ['implementation plan', planSource],
-    ['documentation index', docIndexSource],
 ];
 const PRODUCTION_STATUS = 'Production closure: complete';
 const ACCEPTANCE_STATUS = 'Custom Study 1A: Accepted / Production Closed';
@@ -413,7 +412,7 @@ test('ADR-0016 has the authoritative acceptance status', () => {
     assert.ok(adrSource.includes(ACCEPTANCE_STATUS));
 });
 
-test('all five authoritative documents share the production status trio', () => {
+test('the four status authorities share the production status trio', () => {
     for (const [name, source] of authoritativeSources) {
         assert.ok(source.includes(PRODUCTION_STATUS), `${name} is missing production closure status`);
         assert.ok(source.includes(ACCEPTANCE_STATUS), `${name} is missing final Accept status`);
@@ -490,10 +489,11 @@ test('handoff references Phase 3B', () => {
     );
 });
 
-test('DOCUMENTATION_INDEX references Phase 3B', () => {
+test('DOCUMENTATION_INDEX routes Custom Study to its plan and ADR', () => {
     assert.ok(
-        docIndexSource.toLowerCase().includes('phase 3b'),
-        'DOCUMENTATION_INDEX must reference Phase 3B.'
+        docIndexSource.includes('custom-study-1a-implementation-plan.md') &&
+        docIndexSource.includes('ADR-0016-custom-study-preview-session.md'),
+        'DOCUMENTATION_INDEX must route to the Custom Study plan and ADR.'
     );
 });
 
@@ -684,12 +684,6 @@ test('handoff references Phase 4A', () => {
         'handoff must reference Phase 4A (SessionOrder).'
     );
 });
-test('DOCUMENTATION_INDEX references Phase 4A', () => {
-    assert.ok(
-        docIndexSource.toLowerCase().includes('phase 4a'),
-        'DOCUMENTATION_INDEX must reference Phase 4A (SessionOrder).'
-    );
-});
 
 // 14.6 Chapter picker candidate_count future contract (Task 2000-21 §8.3)
 test('ADR-0016 §21 mentions candidate_count', () => {
@@ -731,12 +725,6 @@ test('handoff references Phase 4B', () => {
     assert.ok(
         handoffSource.toLowerCase().includes('phase 4b'),
         'handoff must reference Phase 4B (backend session vertical slice).'
-    );
-});
-test('DOCUMENTATION_INDEX references Phase 4B', () => {
-    assert.ok(
-        docIndexSource.toLowerCase().includes('phase 4b'),
-        'DOCUMENTATION_INDEX must reference Phase 4B (backend session vertical slice).'
     );
 });
 test('ADR-0016 references Phase 4B', () => {

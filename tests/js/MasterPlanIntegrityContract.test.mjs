@@ -23,6 +23,7 @@ const settingsUxAdr = read('docs/adr/ADR-0027-settings-advanced-tools-ux-state-m
 const roadmap = read('docs/plans/anki-aligned-product-and-architecture-roadmap.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
 const collaborationRules = read('docs/plans/vibe-coding-collaboration-rules.md');
+const agentRules = read('AGENTS.md');
 const presetPlan = read('docs/plans/review-settings-preset-v1-plan.md');
 
 const masterAuthority = section(master, '> **Current authority — 2026-07-18**', '> **Custom Study 1A shared card update');
@@ -126,34 +127,18 @@ assert.match(manualClosure, /All scenarios below were executed on 2026-07-15 and
 assert.doesNotMatch(manualClosure, /web acceptance pending|待网页端执行/);
 
 assert.match(index, /anki-aligned-product-and-architecture-roadmap\.md/);
-assert.match(index, /Preset V1A–V1D are Accepted \/ Production Closed/);
-assert.match(index, /two-user, English\/French V1D matrix are complete under ADR-0027/);
-assert.match(index, /Browser\/ReviewCardManage Phase 3A–3D are Accepted \/ Production Closed/);
-assert.match(index, /668 lines[^\n]*4 direct `axios\.` references[^\n]*no `v-dialog` blocks/);
-assert.match(index, /Card Marker \+ Custom Study 1B remains Planned \/ Not Authorized/);
 assert.match(index, /review-card-manage-architecture-convergence-plan\.md/);
 assert.doesNotMatch(index, /V1D production-closure matrix remains open|V1D broader production closure remains open/);
-assert.match(index, /ADR-0025-review-settings-preset-v1b-management\.md/);
-assert.match(index, /ADR-0026-review-settings-preset-v1c-consumer-convergence\.md/);
-assert.match(index, /ADR-0027-settings-advanced-tools-ux-state-model\.md/);
-assert.match(index, /ADR-0023-settings-architecture-convergence\.md/);
-assert.match(index, /ADR-0024-review-settings-preset-v1a-foundation\.md/);
 assert.match(index, /review-settings-preset-v1-plan\.md/);
-assert.match(index, /old “overall architecture closure 100%” statement is historical/);
-assert.match(index, /§27\.8 — DevSpace PHP \/ PHPUnit 502 截断规则/);
+assert.match(index, /ADR-0023/);
+assert.match(index, /ADR-0027/);
+assert.doesNotMatch(index, /Preset V1A–V1D are Accepted \/ Production Closed/);
 
-assert.match(collaborationRules, /### 27\.8 DevSpace 执行 PHP 测试时的 502 截断规则/);
-assert.match(collaborationRules, /工具传输失败/);
-assert.match(collaborationRules, /不能直接认定为代码测试失败，也不能认定为测试通过/);
-assert.match(collaborationRules, /默认只使用替代检测，禁止先运行原始高输出流式方案/);
-assert.match(collaborationRules, /Feature 永远分组复核，不再运行 Feature 全量命令/);
-assert.match(collaborationRules, /Feature 永远按文件批次或业务模块分组运行/);
-assert.match(collaborationRules, /禁止执行 `php artisan test --testsuite=Feature`/);
-assert.match(collaborationRules, /完整输出重定向到仓库忽略目录中的临时日志/);
-assert.match(collaborationRules, /记录每组文件数、退出码、passed\/skipped\/assertions 摘要/);
-assert.match(collaborationRules, /Incomplete \/ DevSpace PHP verification unavailable/);
-assert.match(collaborationRules, /交给下一轮相关 Codex 复杂主任务执行，不再回退尝试原始 DevSpace 流式方案/);
-assert.match(collaborationRules, /禁止为了绕开 502 使用 SQLite/);
+assert.match(collaborationRules, /### 27\.8 PHP 测试输出/);
+assert.match(collaborationRules, /高输出命令写入已忽略的临时日志/);
+assert.match(collaborationRules, /Feature 按文件或业务模块分组/);
+assert.match(collaborationRules, /失败处理的硬规则见 `AGENTS\.md` §8/);
+assert.match(agentRules, /不得用 SQLite 替代 testing MySQL/);
 
 assert.match(presetPlan, /Preset V1A — Default Preset Foundation and Transparent Binding/);
 assert.match(presetPlan, /每个 `user_id \+ language_id` 只能绑定一个 Preset/);
