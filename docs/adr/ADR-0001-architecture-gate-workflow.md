@@ -44,13 +44,13 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 3. `api-and-interface-design` — 如果涉及接口契约、store、props/events、payload 变化
 4. `documentation-and-adrs` — 如果需要 ADR（架构决策改变时）
 5. `doubt-driven-development` — 实施前对抗性审查
-6. **网页端 GPT 判断是否进入实施** — OpenCode 不能默认继续开发，不能自 Accept
-7. 实施 — 用户确认后才能开始编码
+6. **网页端 GPT 判断是否进入实施** — 普通任务不能默认继续；明确持续目标按 ADR-0028 使用已冻结切片的阶段预授权；OpenCode 不能自 Accept
+7. 实施 — 普通任务由用户确认后开始；明确持续目标仅在 ADR-0028 的范围冻结和强制停止条件满足后开始
 8. `code-review-and-quality` — 实施后质量门
 
 ### 关键约束
 
-- OpenCode 不能默认继续开发
+- OpenCode 不能在 ADR-0028 明确持续目标之外默认继续开发
 - OpenCode 不能自己 Accept
 - 网页端 GPT 是最终判断者
 - 用户是产品判断者
@@ -135,7 +135,7 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 - 涉及阅读页必须跑 text reader smoke guard
 - 实施后必须使用 `code-review-and-quality`
 - 最终报告必须直接输出当前对话窗口
-- 不允许自动进入下一任务
+- 普通任务不允许自动进入下一任务；明确持续目标仅按 ADR-0028 在完成切片审计后继续
 - 每轮任务必须报告文件变动、数据边界、安全边界
 - 架构闸门不替代 GitHub 最新代码核验
 - 闸门流程应定期回顾（至少每 10 轮任务一次）
