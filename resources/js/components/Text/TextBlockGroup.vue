@@ -196,6 +196,7 @@
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
     import { resolveReaderCompletionCandidates } from './../../services/ReaderCompletionCandidatePolicy';
     import { resolveReaderHotkey } from './../../services/ReaderHotkeyPolicy';
+    import * as ReaderLookupResponse from './../../services/ReaderLookupResponsePolicy';
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
@@ -713,39 +714,9 @@
                 axios.post('/dictionaries/search/inflections', {
                     term: term
                 }).then((response) => {
-                    let inflections = [];
-                    if (response.data === '[]' || response.data == '') {
+                    const inflections = ReaderLookupResponse.resolveReaderDisplayedInflections(response.data);
+                    if (inflections === null) {
                         return;
-                    }
-
-                    var data = JSON.parse(response.data);
-                    var displayedInflections = ['Non-past', 'Non-past, polite', 'Past', 'Past, polite', 'Te-form', 'Potential', 'Passive', 'Causative', 'Causative Passive', 'Imperative'];
-
-                    for (var i = 0; i < data.length; i++) {
-                        if (!displayedInflections.includes(data[i].name)) {
-                            continue;
-                        }
-
-                        var index = inflections.findIndex(item => item.name === data[i].name);
-                        if (index == -1) {
-                            inflections.push({
-                                name: data[i].name,
-                            });
-                            index = inflections.length - 1;
-                        }
-                        // add different forms to the item
-                        if (data[i].form == 'aff-plain:') {
-                            inflections[index].affPlain = data[i].value;
-                        }
-                        if (data[i].form == 'aff-formal:') {
-                            inflections[index].affFormal = data[i].value;
-                        }
-                        if (data[i].form == 'neg-plain:') {
-                            inflections[index].negPlain = data[i].value;
-                        }
-                        if (data[i].form == 'neg-formal:') {
-                            inflections[index].negFormal = data[i].value;
-                        }
                     }
 
                     this.$store.commit('vocabularyBox/setInflections', inflections);
@@ -1223,18 +1194,17 @@
                     language: this.$props.language,
                     term: term
                 }).then((response) => {
-                    // return if a different word has been selected
-                    // after the request was sent
-                    if (this.$store.state.hoverVocabularyBox.dictionarySearchTerm !== response.data.term) {
+                    if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(
+                        this.$store.state.hoverVocabularyBox.dictionarySearchTerm,
+                        response.data.term
+                    )) {
                         return;
                     }
 
-                    // return if there is no word selected anymore
-                    if (this.$store.state.hoverVocabularyBox.dictionarySearchTerm === '') {
-                        return;
-                    }
-
-                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'dictionaryTranslation', value: response.data.definitions.join(';') });
+                    this.$store.commit('hoverVocabularyBox/setValue', {
+                        propertyName: 'dictionaryTranslation',
+                        value: ReaderLookupResponse.joinReaderDictionaryDefinitions(response.data.definitions),
+                    });
                     this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
                     this.$nextTick(() => {
                         this.updateHoverVocabularyBoxPosition();
@@ -1247,10 +1217,7 @@
                         language: this.$props.language,
                         term: term
                     }).then((response) => {
-                        let apiDefinitions = [];
-                        response.data.forEach((item) => {
-                            apiDefinitions = apiDefinitions.concat(item.definitions);
-                        });
+                        const apiDefinitions = ReaderLookupResponse.flattenReaderApiDefinitions(response.data);
 
                         console.log('apiDefinitions', response.data, apiDefinitions);
                         this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'apiTranslations', value: apiDefinitions });
