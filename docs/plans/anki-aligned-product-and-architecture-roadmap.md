@@ -34,7 +34,7 @@ Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A�
 
 | 文件 | 行数 | 结构信号 | 风险 |
 |---|---:|---|---|
-| `resources/js/components/Text/TextBlockGroup.vue` | 2,163 | 阅读 token、查词编排、键盘与完成阅读仍高度集中；hover、句子上下文、拖选和短语实例 range 已有纯 policy owner | 高，阅读主链路 |
+| `resources/js/components/Text/TextBlockGroup.vue` | 2,099 | 阅读 token、查词编排与完成阅读仍高度集中；hover、句子上下文、拖选、短语实例 range 和 hotkey intent 已有纯 policy owner | 高，阅读主链路 |
 | `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
 | `app/Services/TextBlockService.php` | 1,381 | 仍保留多类阅读处理职责 | 高，阅读主链路 |
 | `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A hover lookup、Phase 6B hover position、Phase 6C sentence context、Phase 6D drag selection、Phase 6E phrase instance selection policy 与 Phase 6F sidebar action/focus 已 **Accepted / Production Closed**；产品小步已完成，Phase 6 进入逐职责结构治理。
+状态：**Current**。Phase 6A–6G 已 **Accepted / Production Closed**；产品小步已完成，hotkey intent 已从组件提取，Phase 6 继续逐职责结构治理。
 
 先做产品小步：
 
@@ -332,6 +332,7 @@ Custom Study 1B：
 - 拖选范围：Phase 6D 已把端点 guard、正反向规范化、既有 phrase-length 边界、换行过滤和原文顺序收敛到纯 policy；鼠标/触摸事件、timer、选中状态应用和侧栏编排仍由组件负责。验收见 `docs/testing/reader-drag-selection-policy-browser-acceptance-2026-07-23.md`。
 - 短语实例选区：Phase 6E 已把 backward start、换行桥接、精确 phrase index、unique-word enrichment 和原文顺序收敛到纯 policy；短语轮换、lookup count、Vuex、HTTP 和侧栏编排仍由组件负责。验收见 `docs/testing/reader-phrase-instance-selection-policy-browser-acceptance-2026-07-23.md`。
 - 侧栏动作与焦点：Phase 6F 已移除重复发音入口，把普通学习状态与破坏性恢复动作分层，并在打开添加释义时聚焦词典搜索；窄屏 `VocabularyBox` 回退和所有 action owner 保持不变。验收见 `docs/testing/reader-sidebar-action-focus-browser-acceptance-2026-07-23.md`。
+- 快捷键意图：Phase 6G 已把 suppression、legacy key code、stage/Shift 参数和 prevent-default 决策收敛到纯 policy；DOM 判断和全部 speech/stage/scroll/Anki/selection/plain-text effect 仍由组件负责。验收见 `docs/testing/reader-hotkey-policy-browser-acceptance-2026-07-23.md`。
 
 后做结构拆分：
 

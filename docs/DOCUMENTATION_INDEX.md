@@ -37,6 +37,7 @@
 | Reader Phase 6D drag selection closure | `docs/testing/reader-drag-selection-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6E phrase instance selection closure | `docs/testing/reader-phrase-instance-selection-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6F sidebar action/focus closure | `docs/testing/reader-sidebar-action-focus-browser-acceptance-2026-07-23.md` |
+| Reader Phase 6G hotkey policy closure | `docs/testing/reader-hotkey-policy-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |
