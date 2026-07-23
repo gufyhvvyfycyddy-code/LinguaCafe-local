@@ -34,7 +34,7 @@ Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A�
 
 | 文件 | 行数 | 结构信号 | 风险 |
 |---|---:|---|---|
-| `resources/js/components/Text/TextBlockGroup.vue` | 2,041 | 阅读 token、查词编排与完成阅读仍高度集中；hover、句子上下文、拖选、短语实例 range、hotkey intent 和 navigation candidate 已有纯 policy owner | 高，阅读主链路 |
+| `resources/js/components/Text/TextBlockGroup.vue` | 2,035 | 阅读 token 与查词编排仍高度集中；hover、句子上下文、拖选、短语实例 range、hotkey intent、navigation candidate 和 completion candidate 已有纯 policy owner | 高，阅读主链路 |
 | `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
 | `app/Services/TextBlockService.php` | 1,381 | 仍保留多类阅读处理职责 | 高，阅读主链路 |
 | `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A–6H 已 **Accepted / Production Closed**；产品小步已完成，hotkey intent 与 navigation candidate 已从组件提取，Phase 6 继续逐职责结构治理。
+状态：**Current**。Phase 6A–6I 已 **Accepted / Production Closed**；产品小步已完成，hotkey intent、navigation candidate 与 completion candidate 已从组件提取，Phase 6 继续逐职责结构治理。
 
 先做产品小步：
 
@@ -334,10 +334,11 @@ Custom Study 1B：
 - 侧栏动作与焦点：Phase 6F 已移除重复发音入口，把普通学习状态与破坏性恢复动作分层，并在打开添加释义时聚焦词典搜索；窄屏 `VocabularyBox` 回退和所有 action owner 保持不变。验收见 `docs/testing/reader-sidebar-action-focus-browser-acceptance-2026-07-23.md`。
 - 快捷键意图：Phase 6G 已把 suppression、legacy key code、stage/Shift 参数和 prevent-default 决策收敛到纯 policy；DOM 判断和全部 speech/stage/scroll/Anki/selection/plain-text effect 仍由组件负责。验收见 `docs/testing/reader-hotkey-policy-browser-acceptance-2026-07-23.md`。
 - 选择导航：Phase 6H 已把前后方向 anchor、rendered-token skipping、new/highlighted filter 和候选扫描收敛到纯 policy；DOM 测量、hotkey dispatch、`unselectAllWords`、`$nextTick` 和 start/finish effects 仍由组件负责。验收见 `docs/testing/reader-navigation-policy-browser-acceptance-2026-07-23.md`。
+- 完成阅读候选：Phase 6I 已把 `definitions_checked`/负 stage 条件、word-before-phrase 顺序、source index/type/ID 收敛到纯 policy；源对象兼容标记、确认框、`/chapters/finish` payload、完成页和全部持久化效果仍由既有组件负责。验收见 `docs/testing/reader-completion-candidate-policy-browser-acceptance-2026-07-23.md`。
 
 后做结构拆分：
 
-- `TextBlockGroup.vue` 按 token rendering、selection、lookup orchestration、keyboard/hover、reader completion 拆分。
+- `TextBlockGroup.vue` 的 selection、keyboard/hover 和 completion-candidate 纯规则已有 owner；后续继续按 token rendering 与 lookup orchestration 分拆。
 - `TextBlockService.php` 按 tokenizer/fallback、EncounteredWord creation、phrase indexing、reader facade 继续收敛。
 - 每次只拆一个职责，先补 harness，再移动代码。
 
