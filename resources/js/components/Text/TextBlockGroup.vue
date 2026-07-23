@@ -205,6 +205,7 @@
     import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
     import { resolveReaderHotkey } from './../../services/ReaderHotkeyPolicy';
+    import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
@@ -1053,109 +1054,50 @@
                 }
             },
             selectPreviousWord(newWordOnly, highlightedWordOnly) {
-                if (!this.selection.length) {
-                    var currentWordIndex = this.words.length - 1;
-                } else {
-                    var currentWordIndex = this.selection[0].wordIndex;
-                }
-
-                var wordToSelect = -1;
-
-                // there are no previous words
-                if (currentWordIndex == 0) {
-                    return;
-                }
-
-                // go through the text backwards, and find a word to select
-                for (var wordIndex = currentWordIndex - 1; wordIndex >= 0; wordIndex--) {
-                    // skip not displayed whitespace words
-                    if (document.querySelector('.word[wordindex="' + wordIndex  + '"]') === null) {
-                        continue;
-                    }
-
-                    // select the previous word if it's a simple arrow key press
-                    if (!newWordOnly && !highlightedWordOnly) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-
-                    // select the previous new word
-                    if (newWordOnly && this.words[wordIndex].stage == 2) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-
-                    // select the previous highlighted word
-                    if (highlightedWordOnly && this.words[wordIndex].stage < 0) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-                }
-
-                // return if no selectable word was found
+                const wordToSelect = resolveReaderNavigationCandidate({
+                    words: this.words,
+                    selection: this.selection,
+                    direction: 'previous',
+                    newWordOnly,
+                    highlightedWordOnly,
+                    renderedWordIndexes: this.collectRenderedWordIndexes(),
+                });
                 if (wordToSelect === -1) {
                     return;
                 }
 
-                // select the new word
                 this.unselectAllWords();
                 this.$nextTick(() => {
                     this.startSelection(wordToSelect);
-                    this.finishSelection();;
+                    this.finishSelection();
                 });
             },
             selectNextWord(newWordOnly, highlightedWordOnly) {
-                if (!this.selection.length) {
-                    var currentWordIndex = 0;
-                } else {
-                    var currentWordIndex = this.selection[this.selection.length - 1].wordIndex;
-                }
-
-                var wordToSelect = -1;
-
-                // there are no next words to select
-                if (currentWordIndex == this.words.length - 1) {
-                    return;
-                }
-
-                // go through the text forward, and find a word to select
-                for (var wordIndex = currentWordIndex + 1; wordIndex < this.words.length; wordIndex++) {
-                    // skip not displayed whitespace words
-                    if (document.querySelector('.word[wordindex="' + wordIndex  + '"]') === null) {
-                        continue;
-                    }
-
-                    // select the previous word if it's a simple arrow key press
-                    if (!newWordOnly && !highlightedWordOnly) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-
-                    // select the previous new word
-                    if (newWordOnly && this.words[wordIndex].stage == 2) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-
-                    // select the previous highlighted word
-                    if (highlightedWordOnly && this.words[wordIndex].stage < 0) {
-                        wordToSelect = wordIndex;
-                        break;
-                    }
-
-                }
-
-                // return if no selectable word was found
+                const wordToSelect = resolveReaderNavigationCandidate({
+                    words: this.words,
+                    selection: this.selection,
+                    direction: 'next',
+                    newWordOnly,
+                    highlightedWordOnly,
+                    renderedWordIndexes: this.collectRenderedWordIndexes(),
+                });
                 if (wordToSelect === -1) {
                     return;
                 }
 
-                // select the new word
                 this.unselectAllWords();
                 this.$nextTick(() => {
                     this.startSelection(wordToSelect);
-                    this.finishSelection();;
+                    this.finishSelection();
                 });
+            },
+            collectRenderedWordIndexes() {
+                const renderedWordIndexes = new Set();
+                document.querySelectorAll('.word[wordindex]').forEach((wordElement) => {
+                    renderedWordIndexes.add(parseInt(wordElement.getAttribute('wordindex')));
+                });
+
+                return renderedWordIndexes;
             },
             scrollText(direction, largeScroll) {
                 let scrollChange = direction == 'up' ? -40 : 40;
