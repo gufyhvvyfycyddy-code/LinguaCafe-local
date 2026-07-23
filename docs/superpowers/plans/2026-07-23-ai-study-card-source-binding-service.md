@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 Design: `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`
 
-Status: Accepted for Phase 7D implementation
+Status: **Completed / Production Closed** (`8f2a70c`)
 
 ## Frozen slice
 
@@ -46,3 +46,8 @@ Forbidden:
 3. Testing DB health/config, PHP syntax, frontend build, diff/line/owner audit, and scoped five-axis review.
 4. No new browser pass is required if the public/UI flow is unchanged and the complete source-binding facade tests remain green.
 
+## Closure
+
+Accepted evidence: `docs/testing/ai-study-card-source-binding-service-acceptance-2026-07-23.md`.
+
+The coordinator fell from 334 to 243 lines. The direct suite passed 4 tests / 26 assertions, the protected matrix passed 203 tests / 1,571 assertions, and the frontend build succeeded. Phase 7E generation orchestration is the next frozen slice.

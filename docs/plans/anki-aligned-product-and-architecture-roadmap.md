@@ -356,7 +356,7 @@ Custom Study 1B：
 
 优先级：P3 / Environment Gate。
 
-状态：**Current**。Phase 7A Pending lifecycle、7B Preview/final package 与 7C generation-time candidate validation 均已 **Accepted / Production Closed**：lifecycle、package、validation 分别有独立 owner；coordinator 从 1,065 行降至 334 行。下一切片为 source occurrence binding；真实 provider 能力不因 service 收敛自动获得外发授权。
+状态：**Current**。Phase 7A lifecycle、7B package、7C validation 与 7D source binding 均已 **Accepted / Production Closed**，四项职责分别有独立 owner；coordinator 从 1,065 行降至 243 行。下一切片为 confirmed card-generation orchestration；真实 provider 能力不因 service 收敛自动获得外发授权。
 
 先拆 `AiStudyCardPendingItemService.php`：
 
