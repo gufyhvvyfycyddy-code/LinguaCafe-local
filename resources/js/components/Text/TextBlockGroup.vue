@@ -204,6 +204,7 @@
     import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
     import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
+    import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
@@ -750,39 +751,13 @@
                 });
             },
             selectPhraseInstanceByWord: function(wordIndex, phraseIndex) {
-                var currentWordIndex = wordIndex;
-                var newSelection = [];
-
-                // find the first word of the phrase
-                while (currentWordIndex > 0 && (this.words[currentWordIndex - 1].word == 'NEWLINE' || this.words[currentWordIndex - 1].phraseIndexes.includes(phraseIndex))) {
-                    currentWordIndex --;
-                }
-
-                // select the phrasew
-                do {
-                    if (this.words[currentWordIndex].word !== 'NEWLINE') {
-                        const key = this.normalizeWordKey(this.words[currentWordIndex].word);
-                        const uniqueWordIndex = this.uniqueWordMap.get(key);
-                        if (uniqueWordIndex === undefined || !this.uniqueWords[uniqueWordIndex]) {
-                            currentWordIndex++;
-                            continue;
-                        }
-                        var uniqueWord = this.uniqueWords[uniqueWordIndex];
-                        newSelection.push({
-                            word: this.words[currentWordIndex].word,
-                            reading: uniqueWord.reading,
-                            kanji: uniqueWord.kanji,
-                            sentence_index: this.words[currentWordIndex].sentence_index,
-                            wordIndex: currentWordIndex,
-                            uniqueWordIndex: uniqueWordIndex,
-                            spaceAfter: this.words[currentWordIndex].spaceAfter,
-                        });
-                    }
-
-                    currentWordIndex ++;
-                } while(currentWordIndex < this.words.length && (this.words[currentWordIndex].word == 'NEWLINE' || this.words[currentWordIndex].phraseIndexes.includes(phraseIndex)));
-
-                this.ongoingSelection = newSelection;
+                this.ongoingSelection = resolveReaderPhraseInstanceSelection({
+                    words: this.words,
+                    wordIndex,
+                    phraseIndex,
+                    uniqueWords: this.uniqueWords,
+                    uniqueWordMap: this.uniqueWordMap,
+                });
             },
             updateHoverSelection: function(wordIndex) {
                 this.closeHoverBox();
