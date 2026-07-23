@@ -4,6 +4,8 @@ Date: 2026-07-23
 
 Design: `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`
 
+Status: Completed / Production Closed (`7214c3a`)
+
 ## Frozen slice
 
 Move only pending-item lifecycle behavior to `AiStudyCardPendingLifecycleService`:

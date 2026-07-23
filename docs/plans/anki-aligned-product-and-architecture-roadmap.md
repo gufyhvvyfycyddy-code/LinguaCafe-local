@@ -356,7 +356,7 @@ Custom Study 1B：
 
 优先级：P3 / Environment Gate。
 
-状态：**Current**。先审计既有 V1–V6 owners 与 harness，再每次只拆一个仍聚集的职责；真实 provider 能力不因 service 收敛自动获得外发授权。
+状态：**Current**。Phase 7A Pending lifecycle 已 **Accepted / Production Closed**：`AiStudyCardPendingLifecycleService` 拥有 create/reuse/list/dismiss/restore/processed transition，coordinator 从 1,065 行降至 784 行。下一切片为 Preview/final package；真实 provider 能力不因 service 收敛自动获得外发授权。
 
 先拆 `AiStudyCardPendingItemService.php`：
 
