@@ -33,6 +33,7 @@
 | Reviewer Phase 5 closure | `docs/testing/reviewer-architecture-convergence-browser-acceptance-2026-07-18.md` |
 | Reader Phase 6A hover policy closure | `docs/testing/reader-hover-lookup-policy-browser-acceptance-2026-07-18.md` |
 | Reader Phase 6B hover position closure | `docs/testing/reader-hover-position-policy-browser-acceptance-2026-07-23.md` |
+| Reader Phase 6C sentence context closure | `docs/testing/reader-sentence-context-policy-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |

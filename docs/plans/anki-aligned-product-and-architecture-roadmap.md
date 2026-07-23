@@ -322,12 +322,13 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A hover lookup policy 与 Phase 6B hover position policy 已 **Accepted / Production Closed**；Phase 6 其余职责继续逐切片治理。
+状态：**Current**。Phase 6A hover lookup、Phase 6B hover position 与 Phase 6C sentence context policy 已 **Accepted / Production Closed**；Phase 6 其余职责继续逐切片治理。
 
 先做产品小步：
 
 - hover 自动查词开关：现有设置已满足产品需求；Phase 6A 已把 `closed` / `local-only` / `search` 与 term 选择收敛到纯 policy，保留原 UI、endpoint、payload、timer、stale-response 和 click lookup 行为。验收见 `docs/testing/reader-hover-lookup-policy-browser-acceptance-2026-07-18.md`。
 - hover 位置：Phase 6B 已把水平边界、上下偏好、空间不足翻转和滚动偏移收敛到纯 policy；DOM 测量与 Vuex 提交仍由组件负责。验收见 `docs/testing/reader-hover-position-policy-browser-acceptance-2026-07-23.md`。
+- 点词句子上下文：Phase 6C 已把 token-window、缩写/小数/章节边界、长度上限和 `sentence_index` fallback 收敛到纯 policy；Vuex commit、点词和侧栏编排仍由组件负责。验收见 `docs/testing/reader-sentence-context-policy-browser-acceptance-2026-07-23.md`。
 - 隐藏或重组低价值常驻面板。
 - 查词栏信息密度和焦点顺序优化。
 
