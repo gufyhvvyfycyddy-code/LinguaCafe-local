@@ -204,6 +204,7 @@
     import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
     import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
+    import { resolveReaderHotkey } from './../../services/ReaderHotkeyPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
@@ -981,135 +982,70 @@
                 }
             },
             hotkeyHandle(event) {
-                if (!this.$props.hotkeysEnabled) {
-                    return;
-                }
-
-                // Never intercept browser/system shortcuts (Ctrl+F, Ctrl+C, Ctrl+V, Ctrl+A, etc.)
-                if (event.ctrlKey || event.metaKey || event.altKey) {
-                    return;
-                }
-
-                // Do not intercept hotkeys when the user is typing in an input field,
-                // textarea, select, or contentEditable element
                 const target = event.target;
+                let editableTarget = false;
                 if (target instanceof Element) {
                     const tag = target.tagName;
-                    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || target.isContentEditable) {
-                        return;
-                    }
+                    editableTarget = tag === 'INPUT'
+                        || tag === 'TEXTAREA'
+                        || tag === 'SELECT'
+                        || target.isContentEditable;
                 }
 
-                // Do not intercept when a Vuetify dialog, menu, or select is active
-                if (document.querySelector('.v-dialog--active') ||
+                const blockingSurface = Boolean(
+                    document.querySelector('.v-dialog--active') ||
                     document.querySelector('.v-menu__content--active') ||
                     document.querySelector('.v-overlay--active') ||
-                    document.querySelector('.menuable__content__active')) {
+                    document.querySelector('.menuable__content__active')
+                );
+                const intent = resolveReaderHotkey({
+                    enabled: this.$props.hotkeysEnabled,
+                    which: event.which,
+                    ctrlKey: event.ctrlKey,
+                    metaKey: event.metaKey,
+                    altKey: event.altKey,
+                    shiftKey: event.shiftKey,
+                    editableTarget,
+                    blockingSurface,
+                });
+
+                if (!intent) {
                     return;
                 }
 
-                switch(event.which) {
-                    // text to speech
-                    case 86:
+                if (intent.preventDefault) {
+                    event.preventDefault();
+                }
+
+                switch (intent.action) {
+                    case 'text-to-speech':
                         this.textToSpeech();
                         break;
-
-                    // set level to new
-                    case 67:
-                        this.setStage(2);
+                    case 'set-stage':
+                        this.setStage(intent.stage);
                         break;
-
-                    // set level 0-7
-                    case 48:
-                    case 49:
-                    case 50:
-                    case 51:
-                    case 52:
-                    case 53:
-                    case 54:
-                    case 55:
-                        event.preventDefault();
-                        this.setStage(48 - event.which);
-                        break;
-
-                    // set level 0-7 numpad
-                    case 96:
-                    case 97:
-                    case 98:
-                    case 99:
-                    case 100:
-                    case 101:
-                    case 102:
-                    case 103:
-                        event.preventDefault();
-                        this.setStage(96 - event.which);
-                        break;
-
-                    // set level to ignore
-                    case 88:
-                        event.preventDefault();
-                        this.setStage(1);
-                        break;
-
-                        // decrease font size
-                    case 73:
-                        // do not do anything if shift+i is pressed
-                        if (event.shiftKey) {
-                            return;
-                        }
-
+                    case 'decrease-font-size':
                         this.$emit('decrease-font-size');
                         break;
-
-                    // increase font size
-                    case 79:
-                        event.preventDefault();
+                    case 'increase-font-size':
                         this.$emit('increase-font-size');
                         break;
-
-                    // scroll up
-                    case 38:
-                    case 87:
-                        event.preventDefault();
-                        this.scrollText('up', event.shiftKey);
+                    case 'scroll':
+                        this.scrollText(intent.direction, intent.accelerated);
                         break;
-
-                    // scroll down
-                    case 40:
-                    case 83:
-                        event.preventDefault();
-                        this.scrollText('down', event.shiftKey);
-                        break;
-
-                    // add selected word to anki
-                    case 70:
-                        event.preventDefault();
+                    case 'add-to-anki':
                         this.addSelectedWordToAnki();
                         break;
-
-                    // unselect all words
-                    case 27:
-                        event.preventDefault();
+                    case 'unselect':
                         this.unselectAllWords();
                         break;
-
-                    // previous
-                    case 37:
-                    case 65:
-                        event.preventDefault();
-                        this.selectPreviousWord(false, event.shiftKey);
+                    case 'select-previous':
+                        this.selectPreviousWord(false, intent.highlightedOnly);
                         break;
-
-                    // next
-                    case 39:
-                    case 68:
-                        event.preventDefault();
-                        this.selectNextWord(false, event.shiftKey);
+                    case 'select-next':
+                        this.selectNextWord(false, intent.highlightedOnly);
                         break;
-
-                    // plain text mode
-                    case 80:
-                        event.preventDefault();
+                    case 'toggle-plain-text':
                         this.unselectAllWords();
                         this.closeHoverBox();
                         this.$emit('toggle-plain-text-mode');
