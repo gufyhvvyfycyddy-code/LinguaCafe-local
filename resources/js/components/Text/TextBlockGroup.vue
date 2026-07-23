@@ -203,6 +203,7 @@
     import TextToSpeechService from './../../services/TextToSpeechService';
     import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
     import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
+    import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
@@ -604,52 +605,27 @@
                     return;
                 }
 
-                if (wordIndex == this.ongoingSelection[0].wordIndex ||
-                    (wordIndex < this.ongoingSelection[0].wordIndex && this.ongoingSelection.length == this.phraseLengthLimit) ||
-                    (wordIndex > this.ongoingSelection[this.ongoingSelection.length - 1].wordIndex && this.ongoingSelection.length == this.phraseLengthLimit) ||
-                    wordIndex == this.ongoingSelection[this.ongoingSelection.length - 1].wordIndex) {
-                        return;
+                const dragSelection = resolveReaderDragSelection({
+                    words: this.words,
+                    ongoingSelection: this.ongoingSelection,
+                    startingWordIndex: this.ongoingSelectionStartingWordIndex,
+                    targetWordIndex: wordIndex,
+                    phraseLengthLimit: this.phraseLengthLimit,
+                });
+                if (dragSelection === null) {
+                    return;
                 }
 
-                var firstWordIndex = this.ongoingSelectionStartingWordIndex;
-                var lastWordIndex = wordIndex;
-
-                if (firstWordIndex > lastWordIndex) {
-                    firstWordIndex = wordIndex;
-                    lastWordIndex = this.ongoingSelectionStartingWordIndex;
-                }
-
-
-                if (firstWordIndex < this.ongoingSelectionStartingWordIndex - this.phraseLengthLimit + 1) {
-                    firstWordIndex = this.ongoingSelectionStartingWordIndex - this.phraseLengthLimit + 1;
-                }
-
-                if (lastWordIndex - firstWordIndex > this.phraseLengthLimit + 1) {
-                    lastWordIndex -= lastWordIndex - firstWordIndex - this.phraseLengthLimit + 1;
-                }
-
-                this.ongoingSelection = [];
-                for (let i  = 0; i < this.words.length; i++) {
+                for (let i = 0; i < this.words.length; i++) {
                     this.words[i].selected = false;
-
-                    if (i < firstWordIndex || i > lastWordIndex || this.words[i].word === 'NEWLINE') {
-                        continue;
-                    }
-
-                    this.words[i].selected = true;
-                    var selectedWord = {
-                        word: this.words[i].word,
-                        wordIndex: i,
-                        sentence_index: this.words[i].sentence_index,
-                        spaceAfter: this.words[i].spaceAfter,
-                    };
-
-                    this.ongoingSelection.push(selectedWord);
                 }
 
-                if (!this.ongoingSelection.length) {
+                for (let i = 0; i < dragSelection.selectedWordIndexes.length; i++) {
+                    const wordIndex = dragSelection.selectedWordIndexes[i];
+                    this.words[wordIndex].selected = true;
                 }
 
+                this.ongoingSelection = dragSelection.selectedWords;
             },
             finishSelection: function() {
                 if (this.touchTimer) {
