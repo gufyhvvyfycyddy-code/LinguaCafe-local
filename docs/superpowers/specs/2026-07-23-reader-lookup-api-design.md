@@ -49,6 +49,8 @@ Allowed:
 
 - `resources/js/services/ReaderLookupApi.js`
 - `tests/js/ReaderLookupApi.test.mjs`
+- `tests/js/ReaderLookupResponsePolicy.test.mjs` (update the Phase 6K ownership guard; retain every response/effect assertion)
+- `tests/js/HoverVocabularyLookupPolicy.test.mjs` (update the Phase 6A ownership guard; retain every decision/orchestration assertion)
 - `resources/js/components/Text/TextBlockGroup.vue`
 - Phase 6L design, plan, acceptance, index, handoff, master-plan, and roadmap documents
 
@@ -83,6 +85,8 @@ Four thin named functions are the smallest safe transport owner.
 - RED before `ReaderLookupApi.js` exists.
 - Focused tests with a stubbed global axios proving exact method, URL, payload, return identity, and absence of extra calls.
 - Component integration guard proving all four dictionary transports delegate while lifecycle position, guards, conditions, response policies, Vuex effects, catch behavior, and the unrelated Anki settings request remain component-owned.
+- Phase 6K response guard updated to recognize the new transport owner while continuing to require every response-policy and effect boundary.
+- Phase 6A hover-decision guard updated to recognize the new transport owner while continuing to require every lookup-decision and orchestration boundary.
 - Direct-source guard proving the component has no inline `/dictionaries/` axios expressions.
 - Combined Reader Node loop, protected PHP suites, frontend build, and diff checks.
 - Official-browser hover and selected-word lookup continuity at wide and narrow viewports on an isolated testing-MySQL English Reader fixture.

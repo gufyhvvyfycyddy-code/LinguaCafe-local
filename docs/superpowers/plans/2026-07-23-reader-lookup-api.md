@@ -13,6 +13,7 @@ Design: `docs/superpowers/specs/2026-07-23-reader-lookup-api-design.md`
 5. Adapt only the four dictionary transport expressions in `TextBlockGroup.vue`:
    - retain request location, ordering, guards, conditionals, `.then()`/`.catch()`, response policy calls, Vuex effects, and positioning;
    - leave `/settings/get-anki-settings` inline because it is not lookup transport.
+   - update the Phase 6A and Phase 6K integration guards from inline-axios ownership to `ReaderLookupApi` ownership while retaining all decision, orchestration, response, and effect assertions.
 6. Run focused and combined Reader Node loops plus frontend build.
 7. Run protected PHP suites.
 8. Use the official OpenAI Browser connection to verify hover and selected-word lookup continuity on an isolated Reader fixture at true wide and narrow viewports.

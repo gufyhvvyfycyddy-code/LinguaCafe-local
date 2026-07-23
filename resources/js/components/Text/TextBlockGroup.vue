@@ -196,6 +196,7 @@
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
     import { resolveReaderCompletionCandidates } from './../../services/ReaderCompletionCandidatePolicy';
     import { resolveReaderHotkey } from './../../services/ReaderHotkeyPolicy';
+    import * as ReaderLookupApi from './../../services/ReaderLookupApi';
     import * as ReaderLookupResponse from './../../services/ReaderLookupResponsePolicy';
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
@@ -370,7 +371,7 @@
                 this.ankiShowNotifications = response.data.ankiShowNotifications;
             });
 
-            axios.get('/dictionaries/api/is-enabled').then((response) => {
+            ReaderLookupApi.getApiDictionaryEnabled().then((response) => {
                 this.anyApiDictionaryEnabled = response.data;
             });
 
@@ -711,9 +712,7 @@
                 // search inflections
                 this.$store.commit('vocabularyBox/setInflections', []);
                 
-                axios.post('/dictionaries/search/inflections', {
-                    term: term
-                }).then((response) => {
+                ReaderLookupApi.searchReaderInflections(term).then((response) => {
                     const inflections = ReaderLookupResponse.resolveReaderDisplayedInflections(response.data);
                     if (inflections === null) {
                         return;
@@ -1190,10 +1189,7 @@
 
 
                 // make dictionary search
-                axios.post('/dictionaries/search-for-hover-vocabulary', {
-                    language: this.$props.language,
-                    term: term
-                }).then((response) => {
+                ReaderLookupApi.searchReaderHoverDictionary(this.$props.language, term).then((response) => {
                     if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(
                         this.$store.state.hoverVocabularyBox.dictionarySearchTerm,
                         response.data.term
@@ -1213,10 +1209,7 @@
 
                 // make api search
                 if (this.anyApiDictionaryEnabled) {
-                    axios.post('/dictionaries/api/search', {
-                        language: this.$props.language,
-                        term: term
-                    }).then((response) => {
+                    ReaderLookupApi.searchReaderApiDictionary(this.$props.language, term).then((response) => {
                         const apiDefinitions = ReaderLookupResponse.flattenReaderApiDefinitions(response.data);
 
                         console.log('apiDefinitions', response.data, apiDefinitions);

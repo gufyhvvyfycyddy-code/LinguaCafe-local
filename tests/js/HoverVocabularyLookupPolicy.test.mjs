@@ -90,11 +90,11 @@ test('does not mutate frozen hover inputs', () => {
     assert.deepEqual(hoveredWords, [word]);
 });
 
-test('TextBlockGroup delegates hover lookup decisions without moving request ownership', () => {
+test('TextBlockGroup delegates hover decisions while using the dedicated request owner', () => {
     assert.match(textBlockSource, /import\s*\{\s*resolveHoverVocabularyLookup\s*\}/);
     assert.match(textBlockSource, /const lookupDecision = resolveHoverVocabularyLookup\(/);
     assert.match(textBlockSource, /lookupDecision\.mode === 'closed'/);
     assert.match(textBlockSource, /lookupDecision\.mode === 'local-only'/);
     assert.match(textBlockSource, /makeHoverVocabularyBoxSearchRequest\(lookupDecision\.term\)/);
-    assert.match(textBlockSource, /axios\.post\('\/dictionaries\/search-for-hover-vocabulary'/);
+    assert.match(textBlockSource, /ReaderLookupApi\.searchReaderHoverDictionary\(this\.\$props\.language, term\)/);
 });

@@ -157,7 +157,7 @@ test('TextBlockGroup delegates response rules while retaining transport and effe
 
     assert.equal(textBlockSource.includes("import * as ReaderLookupResponse from './../../services/ReaderLookupResponsePolicy'"), true);
     assert.equal(inflectionMethod.includes('ReaderLookupResponse.resolveReaderDisplayedInflections(response.data)'), true);
-    assert.equal(inflectionMethod.includes("axios.post('/dictionaries/search/inflections', {"), true);
+    assert.equal(inflectionMethod.includes('ReaderLookupApi.searchReaderInflections(term)'), true);
     assert.equal(inflectionMethod.includes("this.$store.commit('vocabularyBox/setInflections', [])"), true);
     assert.equal(inflectionMethod.includes("this.$store.commit('vocabularyBox/setInflections', inflections)"), true);
     assert.equal(inflectionMethod.includes('displayedInflections'), false);
@@ -166,8 +166,8 @@ test('TextBlockGroup delegates response rules while retaining transport and effe
     assert.equal(hoverRequestMethod.includes('ReaderLookupResponse.shouldApplyReaderDictionaryResponse'), true);
     assert.equal(hoverRequestMethod.includes('ReaderLookupResponse.joinReaderDictionaryDefinitions'), true);
     assert.equal(hoverRequestMethod.includes('ReaderLookupResponse.flattenReaderApiDefinitions'), true);
-    assert.equal(hoverRequestMethod.includes("axios.post('/dictionaries/search-for-hover-vocabulary', {"), true);
-    assert.equal(hoverRequestMethod.includes("axios.post('/dictionaries/api/search', {"), true);
+    assert.equal(hoverRequestMethod.includes('ReaderLookupApi.searchReaderHoverDictionary(this.$props.language, term)'), true);
+    assert.equal(hoverRequestMethod.includes('ReaderLookupApi.searchReaderApiDictionary(this.$props.language, term)'), true);
     assert.equal(hoverRequestMethod.includes("propertyName: 'dictionaryTranslation'"), true);
     assert.equal(hoverRequestMethod.includes("propertyName: 'apiTranslations'"), true);
     assert.equal(hoverRequestMethod.includes("value: ['error']"), true);
