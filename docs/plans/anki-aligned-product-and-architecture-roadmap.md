@@ -34,7 +34,7 @@ Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A�
 
 | 文件 | 行数 | 结构信号 | 风险 |
 |---|---:|---|---|
-| `resources/js/components/Text/TextBlockGroup.vue` | 2,188 | 阅读 token、查词编排、键盘与完成阅读仍高度集中；hover、句子上下文和拖选 range 已有纯 policy owner | 高，阅读主链路 |
+| `resources/js/components/Text/TextBlockGroup.vue` | 2,163 | 阅读 token、查词编排、键盘与完成阅读仍高度集中；hover、句子上下文、拖选和短语实例 range 已有纯 policy owner | 高，阅读主链路 |
 | `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
 | `app/Services/TextBlockService.php` | 1,381 | 仍保留多类阅读处理职责 | 高，阅读主链路 |
 | `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A hover lookup、Phase 6B hover position、Phase 6C sentence context 与 Phase 6D drag selection policy 已 **Accepted / Production Closed**；Phase 6 其余职责继续逐切片治理。
+状态：**Current**。Phase 6A hover lookup、Phase 6B hover position、Phase 6C sentence context、Phase 6D drag selection 与 Phase 6E phrase instance selection policy 已 **Accepted / Production Closed**；Phase 6 其余职责继续逐切片治理。
 
 先做产品小步：
 
@@ -330,6 +330,7 @@ Custom Study 1B：
 - hover 位置：Phase 6B 已把水平边界、上下偏好、空间不足翻转和滚动偏移收敛到纯 policy；DOM 测量与 Vuex 提交仍由组件负责。验收见 `docs/testing/reader-hover-position-policy-browser-acceptance-2026-07-23.md`。
 - 点词句子上下文：Phase 6C 已把 token-window、缩写/小数/章节边界、长度上限和 `sentence_index` fallback 收敛到纯 policy；Vuex commit、点词和侧栏编排仍由组件负责。验收见 `docs/testing/reader-sentence-context-policy-browser-acceptance-2026-07-23.md`。
 - 拖选范围：Phase 6D 已把端点 guard、正反向规范化、既有 phrase-length 边界、换行过滤和原文顺序收敛到纯 policy；鼠标/触摸事件、timer、选中状态应用和侧栏编排仍由组件负责。验收见 `docs/testing/reader-drag-selection-policy-browser-acceptance-2026-07-23.md`。
+- 短语实例选区：Phase 6E 已把 backward start、换行桥接、精确 phrase index、unique-word enrichment 和原文顺序收敛到纯 policy；短语轮换、lookup count、Vuex、HTTP 和侧栏编排仍由组件负责。验收见 `docs/testing/reader-phrase-instance-selection-policy-browser-acceptance-2026-07-23.md`。
 - 隐藏或重组低价值常驻面板。
 - 查词栏信息密度和焦点顺序优化。
 

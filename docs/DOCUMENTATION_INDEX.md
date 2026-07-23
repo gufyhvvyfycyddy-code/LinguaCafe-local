@@ -35,6 +35,7 @@
 | Reader Phase 6B hover position closure | `docs/testing/reader-hover-position-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6C sentence context closure | `docs/testing/reader-sentence-context-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6D drag selection closure | `docs/testing/reader-drag-selection-policy-browser-acceptance-2026-07-23.md` |
+| Reader Phase 6E phrase instance selection closure | `docs/testing/reader-phrase-instance-selection-policy-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |
