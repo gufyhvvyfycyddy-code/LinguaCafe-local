@@ -30,7 +30,6 @@
                 <span id="vocab-side-box-title" v-else>{{ type === 'word' ? '单词' : '短语' }}</span>
                 <v-spacer />
                 <v-btn v-if="tab == 0 && inflections.length" icon title="显示变形" @click="tab = 1;"><v-icon>mdi-list-box</v-icon></v-btn>
-                <v-btn v-if="tab == 0 && $props.textToSpeechAvailable" icon title="朗读" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
                 <v-btn v-if="tab == 0 && type !== 'new-phrase'" icon title="发送到 Anki" @mouseup.stop="addSelectedWordToAnki"><v-icon>mdi-cards</v-icon></v-btn>
                 <v-btn v-if="tab == 1" icon title="返回单词" @click="tab = 0;"><v-icon>mdi-arrow-left</v-icon></v-btn>
                 <v-btn dark icon title="取消选择" @click="close"><v-icon>mdi-close</v-icon></v-btn>
@@ -74,7 +73,7 @@
                             </div>
                         </div>
                                 <v-spacer />
-                                <v-btn v-if="$props.textToSpeechAvailable" icon title="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
+                                <v-btn v-if="$props.textToSpeechAvailable" icon title="朗读" aria-label="发音" @click="textToSpeech"><v-icon>mdi-bullhorn</v-icon></v-btn>
                             </div>
                             <div v-if="fsrsFamiliarityHasData" class="d-flex align-center mt-1">
                                 <span class="text-caption grey--text mr-2" style="white-space: nowrap;">FSRS 熟悉度：{{ fsrsFamiliarityPercent }}%</span>
@@ -102,12 +101,27 @@
                 <v-textarea v-if="type !== 'word' && ($props.language == 'japanese' || $props.language == 'chinese')" class="default-font my-2" label="读音" filled dense no-resize rounded hide-details height="80" v-model="reading" @keyup="inputChanged" @keydown.stop=";" />
 
                 <template v-if="type !== 'new-phrase'">
-                    <div v-if="type == 'word'" class="d-flex flex-wrap mb-3">
-                        <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
-                        <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
-                        <v-btn small rounded depressed color="error" class="mr-2 mb-2" @click="deleteWord">回归为新词</v-btn>
+                    <div v-if="type == 'word'" class="reader-study-state-actions mb-1">
+                        <div class="text-caption font-weight-medium text--secondary mb-1">学习状态</div>
+                        <div class="d-flex flex-wrap">
+                            <v-btn small rounded depressed color="warning" class="mr-2 mb-2" @click="setStage(1)">忽略</v-btn>
+                            <v-btn small rounded depressed color="success" class="mr-2 mb-2" @click="setStage(0)">标为已知</v-btn>
+                        </div>
                         <!-- V1-V5: AI study card workflow 由共享 feature island 组件负责 -->
                         <AiStudyCardDesktopWorkflow ref="aiStudyCardWorkflow" />
+                    </div>
+                    <div v-if="type == 'word'" class="reader-recovery-action d-flex justify-end mb-3">
+                        <v-btn
+                            small
+                            text
+                            color="error"
+                            class="px-2"
+                            title="删除该词条的学习记录并回归为新词"
+                            @click="deleteWord"
+                        >
+                            <v-icon small class="mr-1">mdi-backup-restore</v-icon>
+                            回归为新词
+                        </v-btn>
                     </div>
                 </template>
 
@@ -145,6 +159,8 @@
                         <!-- Section: Unified candidate list (AI + dictionary) -->
                         <div class="mt-2">
                             <v-text-field
+                                ref="dictionarySearchInput"
+                                aria-label="搜索词典"
                                 placeholder="搜索词典..."
                                 class="dictionary-search-field default-font"
                                 dense
@@ -295,6 +311,7 @@ export default {
         showAddSensePanel(val) {
             if (val) {
                 this.showDictionaryResults = true;
+                this.focusDictionarySearch();
             }
         },
     },
@@ -339,6 +356,13 @@ export default {
             }
         },
         textToSpeech() { this.$emit('textToSpeech'); },
+        focusDictionarySearch() {
+            this.$nextTick(() => {
+                if (this.$refs.dictionarySearchInput) {
+                    this.$refs.dictionarySearchInput.focus();
+                }
+            });
+        },
         searchFieldChanged(event) {
             if (event !== '') {
                 this.searchField = event;
