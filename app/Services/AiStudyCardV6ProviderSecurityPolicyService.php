@@ -6,8 +6,20 @@ class AiStudyCardV6ProviderSecurityPolicyService
 {
     public function snapshot(): array
     {
+        $provider = config('ai_study_card_v6.provider', []);
+
         return [
-            'provider' => config('ai_study_card_v6.provider', []),
+            'provider' => [
+                'name' => (string) ($provider['name'] ?? 'disabled'),
+                'external_requests_enabled' => (bool) ($provider['external_requests_enabled'] ?? false),
+                'allowed_adapter' => (string) ($provider['allowed_adapter'] ?? 'disabled'),
+                'base_url_configured' => is_string($provider['base_url'] ?? null)
+                    && trim($provider['base_url']) !== '',
+                'model_configured' => is_string($provider['model'] ?? null)
+                    && trim($provider['model']) !== '',
+                'secret_configured' => is_string($provider['api_key'] ?? null)
+                    && trim($provider['api_key']) !== '',
+            ],
             'request_policy' => config('ai_study_card_v6.request_policy', []),
             'logging_policy' => config('ai_study_card_v6.logging_policy', []),
             'data_policy' => config('ai_study_card_v6.data_policy', []),

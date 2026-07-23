@@ -104,6 +104,30 @@ class AiStudyCardV6ProviderSecurityConfigTest extends TestCase
         $this->assertTrue($flags['user_confirmation_required']);
     }
 
+    public function test_security_policy_snapshot_never_exposes_secret_or_secret_reference(): void
+    {
+        config([
+            'ai_study_card_v6.provider.api_key' => 'test-secret-must-not-escape',
+            'ai_study_card_v6.provider.secret_reference' => 'TEST_SECRET_REFERENCE',
+            'ai_study_card_v6.provider.base_url' => 'https://provider.example.test',
+        ]);
+
+        $snapshot = app(AiStudyCardV6ProviderSecurityPolicyService::class)->snapshot();
+
+        $this->assertArrayNotHasKey('api_key', $snapshot['provider']);
+        $this->assertArrayNotHasKey('secret_reference', $snapshot['provider']);
+        $this->assertTrue($snapshot['provider']['secret_configured']);
+        $this->assertTrue($snapshot['provider']['base_url_configured']);
+        $this->assertStringNotContainsString(
+            'test-secret-must-not-escape',
+            json_encode($snapshot, JSON_THROW_ON_ERROR),
+        );
+        $this->assertStringNotContainsString(
+            'TEST_SECRET_REFERENCE',
+            json_encode($snapshot, JSON_THROW_ON_ERROR),
+        );
+    }
+
     public function test_v6_config_and_policy_files_do_not_contain_secret_values_or_env_key_names(): void
     {
         $paths = [
