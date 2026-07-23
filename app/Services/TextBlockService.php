@@ -40,6 +40,7 @@ class TextBlockService
      * delegate to it. TextBlockService remains the external facade.
      */
     public ?ReaderDataService $readerDataService = null;
+    private EnglishFallbackTokenizerService $englishFallbackTokenizer;
 
     /*
         This variable contains raw untokenized text. 
@@ -81,6 +82,7 @@ class TextBlockService
         $this->userId = $userId;
         $this->language = $language;
         $this->readerDataService = new ReaderDataService($userId, $language);
+        $this->englishFallbackTokenizer = new EnglishFallbackTokenizerService();
         $this->pythonService = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
     }
 
@@ -755,143 +757,11 @@ class TextBlockService
 
     private function fallbackEnglishTokenize(string $text): array
     {
-        // 安全标记（ZZPARAZZ, ZZNEWLZZ, ZZSECTxZ）都是纯大写字母，
-        // 会被下游 [A-Za-z]+ 作为单个 token 提取，不需要特殊处理。
-        // mapStructuralTokens() 会在 tokenize 之后统一转换为 STRUCT token。
-        $tokens = [];
-        $sentenceIndex = 0;
-
-        $sentences = preg_split(
-            '/((?<=[.!?])\s+)/u',
-            trim($text), -1,
-            PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY
+        return $this->englishFallbackTokenizer->tokenize(
+            $text,
+            fn (): bool => $this->ecdictAvailable(),
+            fn (string $word): bool => $this->lemmaInEcdict($word),
         );
-
-        foreach ($sentences as $sentence) {
-            preg_match_all('/[A-Za-z]+(?:[\'-][A-Za-z]+)?|[0-9]+|[^\sA-Za-z0-9]/u', $sentence, $matches);
-
-            foreach ($matches[0] ?? [] as $surface) {
-                if ($surface === '') {
-                    continue;
-                }
-                $tokens[] = $this->makeFallbackToken($surface, $sentenceIndex);
-            }
-
-            $sentenceIndex++;
-        }
-
-        if (count($tokens) === 0) {
-            throw new \Exception('基础英文分词没有得到可导入的词。');
-        }
-
-        return $tokens;
-    }
-
-    private function makeFallbackToken(string $surface, int $sentenceIndex): \stdClass
-    {
-        $token = new \stdClass();
-        $token->w = $surface;
-        $token->r = '';
-
-        // English alphabetic words: ultra-conservative lemmatization.
-        // The Python tokenizer (spaCy) is the authoritative source for lemmas.
-        // This fallback only runs when Python is completely unavailable,
-        // and it must NEVER generate wrong lemmas (opene, cal, walke, etc.).
-        // It only applies the high-confidence irregular table; everything else
-        // keeps its surface form as the lemma.
-        if (preg_match('/^[A-Za-z]+(?:[\'-][A-Za-z]+)?$/u', $surface)) {
-            $token->l = $this->conservativeFallbackLemma($surface);
-            $token->pos = 'X';
-        } else {
-            $token->l = $surface;
-            $token->pos = 'PUNCT';
-        }
-
-        $token->lr = '';
-        $token->si = $sentenceIndex;
-        $token->g = '';
-        return $token;
-    }
-
-    /**
-     * Ultra-conservative English lemmatization for Python-down fallback ONLY.
-     *
-     * This method must NEVER produce wrong lemmas like "opene", "cal", or
-     * "walke". When in doubt, it keeps the surface form.
-     *
-     * Rules (order matters):
-     *   1. Very short words (< 3 chars) — preserve as-is (is→is, am→am)
-     *   2. Irregular verb/noun table (was → be, children → child, does → do,
-     *      goes → go, left → leave, broken → break) — hand-curated, high confidence
-     *   3. ECDICT-gated -ies → -y / -ie (technologies → technology, stories →
-     *      story, bodies → body; brownies → brownie via -ie fallback). Only
-     *      applied when ECDICT validates the candidate, so wrong lemmas like
-     *      "browny" are never emitted.
-     *   4. -ches/-shes/-xes/-zes → strip -es (watches → watch, fixes → fix,
-     *      boxes → box, buzzes → buzz). Ultra-safe: no English lemma ends in
-     *      "watche"/"boxe"/"fixe". Applied regardless of ECDICT availability.
-     *      -ses is excluded (houses→house vs buses→bus is ambiguous);
-     *      -oes is handled by the irregular table (does→do, goes→go).
-     *   5. Everything else — return lowercase surface (NO -ed/-ing/-s guessing)
-     *
-     * For full lemmatization, the Python tokenizer (spaCy + LemmInflect) must be running.
-     */
-    private function conservativeFallbackLemma(string $surface): string
-    {
-        $lower = mb_strtolower($surface, 'UTF-8');
-
-        // Don't touch structural markers
-        if (preg_match('/^zz(para|newl|sect)/i', $lower)) {
-            return $lower;
-        }
-
-        // 1. Very short words (length < 3): keep as-is.
-        //    This catches "is", "am", "he", "be", "go", "do" etc.
-        //    These are so short that lemmatization is unnecessary and any
-        //    wrong mapping would be confusing (e.g., is→be loses tense info).
-        if (mb_strlen($lower) < 3) {
-            return $lower;
-        }
-
-        // 2. Irregular lookups only (was→be, children→child, etc.)
-        //    No ECDICT verification needed — the irregular table is hand-curated.
-        $irregular = $this->englishIrregularLemma($lower);
-        if ($irregular !== null) {
-            return $irregular;
-        }
-
-        // 3. ECDICT-gated -ies → -y / -ie suffix rule.
-        //    Only applied when ECDICT is available to validate the candidate,
-        //    so wrong lemmas (browny) are never emitted. When ECDICT is
-        //    unavailable, fall through to the safe surface form below.
-        if ($this->ecdictAvailable() && preg_match('/^(.+)ies$/u', $lower, $m) && mb_strlen($m[1]) >= 2) {
-            // -y (technologies → technology, stories → story, bodies → body)
-            $candidateY = $m[1] . 'y';
-            if ($this->lemmaInEcdict($candidateY)) {
-                return $candidateY;
-            }
-            // -ie plural (brownies → brownie, cookies → cookie, movies → movie)
-            $candidateIe = $m[1] . 'ie';
-            if ($this->lemmaInEcdict($candidateIe)) {
-                return $candidateIe;
-            }
-        }
-
-        // 4. -ches/-shes/-xes/-zes → strip -es (watches → watch, fixes → fix,
-        //    boxes → box, buzzes → buzz, washes → wash).
-        //    Ultra-safe: no English lemma ends in "watche"/"boxe"/"fixe", so
-        //    this rule is applied regardless of ECDICT availability.
-        //    -ses is excluded (houses→house vs buses→bus is ambiguous);
-        //    -oes is handled by the irregular table (does→do, goes→go).
-        if (preg_match('/^(.+)(?:ch|sh|x|z)es$/u', $lower, $m) && mb_strlen($m[1]) >= 1) {
-            return preg_replace('/es$/u', '', $lower);
-        }
-
-        // 5. Everything else: return lowercase surface.
-        //    NO -ed/-ing/-s morphological guessing (would risk opene/walke).
-        //    opened→opened, called→called, facts→facts, walking→walking.
-        //    This is safe: the surface form is always recognizable to the user.
-        return $lower;
     }
 
     /**
@@ -1099,185 +969,11 @@ class TextBlockService
     }
 
     /**
-     * Irregular English verb/noun mapping.
-     * Returns the lemma or null if the word is not in the irregular table.
+     * Irregular English verb/noun mapping used by the doctor-only helper.
      */
     private function englishIrregularLemma(string $word): ?string
     {
-        $map = [
-            // be
-            'am' => 'be', 'is' => 'be', 'are' => 'be', 'was' => 'be', 'were' => 'be',
-            'been' => 'be', 'being' => 'be',
-            // have
-            'has' => 'have', 'had' => 'have', 'having' => 'have',
-            // do
-            'does' => 'do', 'did' => 'do', 'done' => 'do', 'doing' => 'do',
-            // go
-            'goes' => 'go', 'went' => 'go', 'gone' => 'go', 'going' => 'go',
-            // say
-            'says' => 'say', 'said' => 'say',
-            // get
-            'got' => 'get', 'gotten' => 'get',
-            // make
-            'made' => 'make', 'makes' => 'make',
-            // know
-            'knew' => 'know', 'known' => 'know',
-            // think
-            'thought' => 'think',
-            // take
-            'took' => 'take', 'taken' => 'take',
-            // see
-            'saw' => 'see', 'seen' => 'see',
-            // come
-            'came' => 'come',
-            // give
-            'gave' => 'give', 'given' => 'give',
-            // find
-            'found' => 'find',
-            // tell
-            'told' => 'tell',
-            // become
-            'became' => 'become',
-            // leave
-            'left' => 'leave',
-            // feel
-            'felt' => 'feel',
-            // put
-            'put' => 'put',
-            // bring
-            'brought' => 'bring',
-            // begin
-            'began' => 'begin', 'begun' => 'begin',
-            // keep
-            'kept' => 'keep',
-            // hold
-            'held' => 'hold',
-            // write
-            'wrote' => 'write', 'written' => 'write',
-            // stand
-            'stood' => 'stand',
-            // hear
-            'heard' => 'hear',
-            // let
-            'let' => 'let',
-            // mean
-            'meant' => 'mean',
-            // set
-            'set' => 'set',
-            // meet
-            'met' => 'meet',
-            // run
-            'ran' => 'run',
-            // pay
-            'paid' => 'pay',
-            // sit
-            'sat' => 'sit',
-            // speak
-            'spoke' => 'speak', 'spoken' => 'speak',
-            // lie
-            'lay' => 'lie', 'lain' => 'lie',
-            // lead
-            'led' => 'lead',
-            // read (past)
-            'read' => 'read',
-            // grow
-            'grew' => 'grow', 'grown' => 'grow',
-            // lose
-            'lost' => 'lose',
-            // fall
-            'fell' => 'fall', 'fallen' => 'fall',
-            // send
-            'sent' => 'send',
-            // build
-            'built' => 'build',
-            // understand
-            'understood' => 'understand',
-            // draw
-            'drew' => 'draw', 'drawn' => 'draw',
-            // break
-            'broke' => 'break', 'broken' => 'break',
-            // spend
-            'spent' => 'spend',
-            // cut
-            'cut' => 'cut',
-            // rise
-            'rose' => 'rise', 'risen' => 'rise',
-            // drive
-            'drove' => 'drive', 'driven' => 'drive',
-            // buy
-            'bought' => 'buy',
-            // wear
-            'wore' => 'wear', 'worn' => 'wear',
-            // choose
-            'chose' => 'choose', 'chosen' => 'choose',
-            // eat
-            'ate' => 'eat', 'eaten' => 'eat',
-            // drink
-            'drank' => 'drink', 'drunk' => 'drink',
-            // sleep
-            'slept' => 'sleep',
-            // sing
-            'sang' => 'sing', 'sung' => 'sing',
-            // teach
-            'taught' => 'teach',
-            // sell
-            'sold' => 'sell',
-            // catch
-            'caught' => 'catch',
-            // fight
-            'fought' => 'fight',
-            // swim
-            'swam' => 'swim', 'swum' => 'swim',
-            // fly
-            'flew' => 'fly', 'flown' => 'fly',
-            // throw
-            'threw' => 'throw', 'thrown' => 'throw',
-            // ride
-            'rode' => 'ride', 'ridden' => 'ride',
-            // shut
-            'shut' => 'shut',
-            // win
-            'won' => 'win',
-            // forget
-            'forgot' => 'forget', 'forgotten' => 'forget',
-            // hang
-            'hung' => 'hang',
-            // cost
-            'cost' => 'cost',
-            // spread
-            'spread' => 'spread',
-            // hit
-            'hit' => 'hit',
-            // hurt
-            'hurt' => 'hurt',
-
-            // Irregular nouns
-            'children' => 'child',
-            'men' => 'man',
-            'women' => 'woman',
-            'people' => 'person',
-            'teeth' => 'tooth',
-            'feet' => 'foot',
-            'mice' => 'mouse',
-            'geese' => 'goose',
-            'oxen' => 'ox',
-            'lives' => 'life',
-            'wives' => 'wife',
-            'knives' => 'knife',
-            'leaves' => 'leaf',
-            'shelves' => 'shelf',
-            'thieves' => 'thief',
-            'wolves' => 'wolf',
-            'halves' => 'half',
-            'selves' => 'self',
-            'elves' => 'elf',
-            'calves' => 'calf',
-            'loaves' => 'loaf',
-            'scarves' => 'scarf',
-            'hooves' => 'hoof',
-        ];
-
-        return $map[$word] ?? null;
+        return $this->englishFallbackTokenizer->irregularLemma($word);
     }
 
     /**
