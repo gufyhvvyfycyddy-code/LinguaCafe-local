@@ -4,7 +4,7 @@
             'text-block-group': true,
             'plain-text-mode': plainTextMode,
             'w-100': true,
-            'spaceless-language': ['chinese', 'japanese', 'thai'].includes($props.language)
+            'spaceless-language': usesSpacelessLanguage()
         }"
     >
         <!-- Delete phrase dialog -->
@@ -84,17 +84,7 @@
                     :wordindex="wordIndex"
                     :stage="word.stage"
                     :phrasestage="word.phraseStage"
-                    :class="{
-                        'no-highlight': hideAllHighlights || (hideNewWordHighlights && word.stage == 2),
-                        'word': true,
-                        'selected-font': true,
-                        'highlighted': word.selected || word.hover,
-                        'source-highlight': word.sourceHighlight,
-                        'phrase': word.phraseIndexes.length,
-                        'space-after': word.spaceAfter,
-                        'phrase-start': word.phraseStart,
-                        'phrase-end': word.phraseEnd,
-                    }"
+                    :class="readerTokenClasses(word)"
                     :style="{
                         'margin-bottom': (lineSpacing * 4) + 'px'
                     }"
@@ -104,10 +94,10 @@
                     --><template v-if="$props.language == 'japanese'"><!--
                         --><ruby class="rubyword selected-font" :wordindex="wordIndex"><!--
                             -->{{ word.word }}<!--
-                            --><rt v-if="word.stage == 2 && furiganaOnNewWords && word.furigana.length && word.word !== word.furigana && !plainTextMode" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
+                            --><rt v-if="showNewWordFurigana(word)" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
                                 -->{{ word.furigana }}<!--
                             --></rt><!--
-                            --><rt v-if="word.stage < 0 && furiganaOnHighlightedWords && word.furigana.length && word.word !== word.furigana && !plainTextMode" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
+                            --><rt v-if="showHighlightedWordFurigana(word)" :style="{'font-size': (fontSize - 4) + 'px'}"><!--
                                 -->{{ word.furigana }}<!--
                             --></rt><!--
                         --></ruby>
@@ -209,6 +199,7 @@
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
+    import * as ReaderTokenPresentation from './../../services/ReaderTokenPresentationPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
         resolveWordElementFromEventTarget,
@@ -393,29 +384,36 @@
             window.removeEventListener('mousemove', this.closeHoverBox);
         },
         methods: {
+            usesSpacelessLanguage() {
+                return ReaderTokenPresentation.usesReaderSpacelessLanguage(this.$props.language);
+            },
             isLastWordOfSentence(wordIndex) {
-                const word = this.words[wordIndex];
-                if (!word || word.is_structure) return false;
-                // Look ahead to find the next non-structure word
-                for (let j = wordIndex + 1; j < this.words.length; j++) {
-                    if (!this.words[j].is_structure) {
-                        return this.words[j].sentence_index !== word.sentence_index;
-                    }
-                }
-                return true; // no more non-structure words
+                return ReaderTokenPresentation.isReaderLastWordOfSentence(this.words, wordIndex);
             },
             getAiTranslation(sentenceIndex) {
-                if (!this.aiSentenceTranslations || !this.aiSentenceTranslations.length) return '';
-                const match = this.aiSentenceTranslations.find(st => st.sentence_index === sentenceIndex);
-                return match ? match.translation_zh : '';
+                return ReaderTokenPresentation.resolveReaderAiTranslation(this.aiSentenceTranslations, sentenceIndex);
             },
-            isSectionMarker(word) {
-                if (typeof word !== 'string') return false;
-                // 新格式: [A] [B] [C] ... [Z]
-                if (word.length === 3 && word[0] === '[' && word[2] === ']' && word[1] >= 'A' && word[1] <= 'Z') return true;
-                // 兼容旧格式: _SECT_X_
-                if (word.startsWith('_SECT_') && word.length === 8) return true;
-                return false;
+            isSectionMarker: ReaderTokenPresentation.isReaderSectionMarker,
+            readerTokenClasses(word) {
+                return ReaderTokenPresentation.resolveReaderTokenClasses({
+                    word,
+                    hideAllHighlights: this.$props.hideAllHighlights,
+                    hideNewWordHighlights: this.$props.hideNewWordHighlights,
+                });
+            },
+            showNewWordFurigana(word) {
+                return ReaderTokenPresentation.shouldShowReaderNewWordFurigana({
+                    word,
+                    furiganaOnNewWords: this.$props.furiganaOnNewWords,
+                    plainTextMode: this.$props.plainTextMode,
+                });
+            },
+            showHighlightedWordFurigana(word) {
+                return ReaderTokenPresentation.shouldShowReaderHighlightedWordFurigana({
+                    word,
+                    furiganaOnHighlightedWords: this.$props.furiganaOnHighlightedWords,
+                    plainTextMode: this.$props.plainTextMode,
+                });
             },
             textToSpeech() {
                 if (!this.selection.length) {
