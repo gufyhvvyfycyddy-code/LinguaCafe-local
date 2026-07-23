@@ -2,7 +2,7 @@
 
 Date: 2026-07-23
 
-Status: **Accepted for audit and fail-closed hardening under goal-mode preauthorization**
+Status: **Accepted / Environment Gate Closed (default-off)**
 
 Authority: `ADR-0004`, `ADR-0005`, `ADR-0028`, and `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`
 
@@ -50,3 +50,7 @@ The accepted ADR-0005 describes the implementation as future work, while the cur
 3. Run PHP syntax, secret/provider frontend scan, exact-scope diff check, authority-conflict search, and five-axis review.
 4. Reuse the already accepted real-browser Network evidence for the unchanged explicit UI trigger, and the Phase 7E official Browser evidence that the default UI shows provider disabled and performs no provider call during the complete V4/V5 flow.
 5. Record that no live provider call was made during this audit.
+
+## Closure
+
+`bd447d1` made policy inspection safe-by-construction. The direct policy suite passed 9 tests / 79 assertions and the full V6 matrix passed 80 tests / 806 assertions. ADR-0030 reconciles the stale implementation-status documents while retaining every activation and safety constraint. No live external request was made.

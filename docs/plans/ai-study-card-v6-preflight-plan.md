@@ -1,8 +1,10 @@
 # AI Study Card V6 Preflight Plan
 
-> **Status**: Frozen architecture preflight. V6-1 provider-disabled request-package preview implemented.
+> **Status**: Historical architecture preflight. Current implementation status is superseded by `ADR-0030`; its V1–V5 reuse and safety boundaries remain active.
 > **Date**: 2026-07-07.
 > **Depends on**: `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md` and `docs/architecture/sense-http-controller-boundaries.md`.
+>
+> Current closure evidence: `docs/testing/ai-study-card-provider-environment-gate-acceptance-2026-07-23.md`.
 
 ---
 

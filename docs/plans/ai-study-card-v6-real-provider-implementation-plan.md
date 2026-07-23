@@ -1,8 +1,10 @@
 # AI Study Card V6 Real Provider Implementation Plan
 
-> **Status**: Frozen plan. V6-5 backend provider-preview skeleton implemented disabled/fail-closed.
+> **Status**: Historical implementation plan. Current implementation status is superseded by `ADR-0030`; the safety and runtime-activation constraints remain active.
 > **Date**: 2026-07-07.
 > **Depends on**: `ADR-0004`, `ADR-0005`, `ai-study-card-v6-preflight-plan.md`, and `ai-study-card-v6-provider-security-plan.md`.
+>
+> Do not use the “future” / “still not implemented” statements below as current repository status. The accepted current state and closure evidence are `ADR-0030` and `docs/testing/ai-study-card-provider-environment-gate-acceptance-2026-07-23.md`.
 
 ---
 

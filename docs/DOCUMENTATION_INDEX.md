@@ -19,6 +19,7 @@
 - 长期工作登记：`docs/plans/linguacafe-master-plan.md`
 - 产品/架构顺序：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`
 - AI 协作与交付：`docs/plans/vibe-coding-collaboration-rules.md`
+- Goal-mode roadmap completion audit: `docs/testing/goal-mode-roadmap-completion-audit-2026-07-23.md`
 - 历史索引：`docs/HISTORY_INDEX.md`
 
 已关闭阶段的结论留在对应计划、验收报告或 history 中；不要复制回本索引。
@@ -50,7 +51,7 @@
 | Review settings preset | `docs/plans/review-settings-preset-v1-plan.md` |
 | Anki 参考产品决策 | `docs/plans/vibe-coding-collaboration-rules.md` §8.7，再查 Anki 官方手册/源码 |
 | Custom Study / Card Marker | `docs/plans/custom-study-1a-implementation-plan.md`、`docs/adr/ADR-0016-custom-study-preview-session.md`、`docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`、`docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md` |
-| AI study card | `docs/plans/ai-study-card-v1-frozen-plan.md`、`docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/plans/ai-study-card-v6-preflight-plan.md` |
+| AI study card / provider boundary | `docs/plans/ai-study-card-v1-frozen-plan.md`、`docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/adr/ADR-0030-ai-study-card-v6-default-off-provider-gate.md`、`docs/testing/ai-study-card-provider-environment-gate-acceptance-2026-07-23.md` |
 | AI Study Card Phase 7 service convergence / lifecycle, package, validation, source, generation closure | `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`、`docs/testing/ai-study-card-pending-lifecycle-service-browser-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-package-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-validation-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-source-binding-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-generation-service-browser-acceptance-2026-07-23.md` |
 | Testing DB | `docs/plans/testing-db-health-playbook.md` |
 | MCP Chrome | `docs/plans/mcp-chrome-local-smoke-playbook.md` |

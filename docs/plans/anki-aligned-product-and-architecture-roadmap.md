@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer、Phase 6 Reader 前后端治理与 Phase 7 AI Study Card service 收敛均已生产关闭。当前只剩真实外部 AI provider 的独立 Environment Gate 审计；审计不等于授权外发。
+Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer、Phase 6 Reader、Phase 7 AI Study Card service 收敛与独立 provider Environment Gate 审计均已关闭。当前无剩余已授权仓库实现里程碑；runtime provider 激活仍需单独批准，不因审计关闭而授权外发。
 
 ## 2. 本轮依据
 
@@ -250,7 +250,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。**Card Marker + Custom Study 1B：Accepted / Production Closed**。ReviewCard Marker 持久化、单卡/批量 API、Browser/Card Info 控件、`marked` Custom Study 查询与 preview-only 会话均已完成；自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收通过。验收记录见 `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`，稳定契约见 `docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`。Phase 5 Reviewer 架构收敛也已 Accepted / Production Closed；当前进入 Phase 6 Reader UI 与阅读架构治理。
+状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。
 
 优先级：P1。
 
@@ -274,16 +274,18 @@ Anki 对齐行为：
 - 不改变删除、归档、重置和 ReviewLog 保留语义。
 - 不复制 Anki 的 Cards/Notes 双模式、deck/subdeck 树、Note 删除语义或 Filtered Deck。
 
-量化目标：
+量化结果：
 
-- `ReviewCardManage.vue` 最终优先降到 1,200 行以内；1,000 行是 stretch target，不得为了数字制造无职责的空壳组件。
-- 页面直接 `axios.` 引用从 24 降到 5 以内。
-- 当前剩余 6 个 dialog 继续按真实功能族归入独立组件。
-- 搜索、导出、详情、批量操作、危险操作全部有自动测试和 MCP Chrome 验收。
+- `ReviewCardManage.vue` 从 3,411 行降到 668 行。
+- 页面直接 `axios.` 引用从 24 降到 4。
+- 页面容器保留 0 个 `v-dialog`。
+- 搜索、导出、详情、批量操作、危险操作均有自动测试和 MCP Chrome 验收。
 
 ### Phase 4：Card Marker + Custom Study 1B
 
 优先级：P1。
+
+状态：**Accepted / Production Closed（2026-07-18）**。ReviewCard Marker、单卡/批量 API、Browser/Card Info 控件、`marked` Custom Study 条件和 preview-only 会话均已通过自动回归、testing MySQL 零写入证明和 authenticated browser 双 viewport 验收。证据见 `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md` 与 ADR-0029。
 
 产品决定：
 
@@ -356,7 +358,7 @@ Custom Study 1B：
 
 优先级：P3 / Environment Gate。
 
-状态：**Accepted / Production Closed**。Phase 7A lifecycle、7B package、7C validation、7D source binding 与 7E generation 均已关闭，五项职责分别有独立 owner；coordinator 从 1,065 行降至 61 行。Phase 7E 的完整保护矩阵通过 1,093 tests / 6,124 assertions，frontend build 成功，official Browser 完成真实人工确认生成与夹具清理。真实 provider 能力不因 service 收敛自动获得外发授权；只进入独立 Environment Gate 审计。
+状态：**Accepted / Production Closed**。Phase 7A lifecycle、7B package、7C validation、7D source binding 与 7E generation 均已关闭，五项职责分别有独立 owner；coordinator 从 1,065 行降至 61 行。Phase 7E 的完整保护矩阵通过 1,093 tests / 6,124 assertions，frontend build 成功，official Browser 完成真实人工确认生成与夹具清理。独立 provider Environment Gate 也已按 ADR-0030 以 default-off / fail-closed 形态关闭；runtime 外发仍需具体授权。
 
 先拆 `AiStudyCardPendingItemService.php`：
 
@@ -366,7 +368,7 @@ Custom Study 1B：
 - Card generation。
 - Source binding。
 
-真实 provider 只在以下条件满足后启动：
+Environment Gate 已按 ADR-0030 以 **default-off / fail-closed** 形态关闭。真实 runtime provider 仍只在以下条件满足后启动：
 
 - provider、模型、成本上限和超时明确。
 - secret 存储方案明确。
@@ -397,11 +399,11 @@ Custom Study 1B：
 | 顺序 | 任务 | 原因 |
 |---:|---|---|
 | 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A、3B-1、3B-2、3C-1、3C-2、3C-3 与 3C-4 Accepted / Production Closed；父组件 767 行、7 个请求、2 个弹窗；Phase 3D Planned / Not Authorized；见 `review-card-manage-architecture-convergence-plan.md` |
+| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A–3D Accepted / Production Closed；父组件 668 行、4 个 direct axios、0 个 dialog |
 | 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
 | 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
 | 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |
-| 7 | AI provider | 当前手工闭环已可用，外部成本和数据风险更高 |
+| 7 | AI provider | default-off implementation gate 已关闭；runtime 激活是环境选择，不是剩余仓库里程碑 |
 
 ## 10. 不进入当前路线的事项
 

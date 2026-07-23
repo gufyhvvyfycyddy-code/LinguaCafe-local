@@ -1,8 +1,10 @@
 # AI Study Card V6 Provider Security Plan
 
-> **Status**: Implemented as a pre-real-provider security gate.
+> **Status**: Historical pre-real-provider baseline. Current implementation status is superseded by `ADR-0030`; its default-off, logging, data, secret, and Network constraints remain active.
 > **Date**: 2026-07-07.
 > **Depends on**: `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`, `docs/plans/ai-study-card-v6-preflight-plan.md`.
+>
+> Current closure evidence: `docs/testing/ai-study-card-provider-environment-gate-acceptance-2026-07-23.md`. Do not treat the older “still not implemented” list as current repository status.
 
 ---
 

@@ -11,10 +11,11 @@
 > - Preset V1D — Settings UX and Production Closure: **Accepted / Production Closed**. Settings UX-1 is accepted under ADR-0027; the final matrix covered two local users, English/French, create/clone/rename/switch/shared edit/delete-rebind/refresh persistence, local-only Network, clean Console, database delta, and unchanged ReviewCard due checksum.
 > - ReaderSidebar-Boundary-Fix-1: **Accepted**. Wide sidebar widths are now 540/500/460px, the reader reserves an additional 24px visible outer boundary, and the narrow fallback remains 400px. This was a scoped defect fix, not authorization to enter the Reader architecture phase.
 > - Browser architecture verification: Phase 3A created the Card Info owner, Phase 3B-1 created the Search Surface owner, Phase 3B-2 created the Table Surface owner, Phase 3C-1 created the Scheduling Mutation owner, Phase 3C-2 created the Lifecycle Mutation owner, Phase 3C-3 created the Delete Mutation owner, Phase 3C-4 created the Leech Governance owner, and Phase 3D closed the final container. `ReviewCardManage.vue` is now 668 lines with 4 direct `axios.` references and no `v-dialog` blocks. It keeps only coordinator-owned stats, list, inline edit and source-context requests. Lifecycle HTTP writes remain owned by `ReviewCardLifecycleMutationSurface.vue`; the unreachable parent `/enabled` archive/restore compatibility client and dialogs have been removed while the backend compatibility route remains unchanged.
-> - Current phase status: **Phase 6A–6M and Phase 7A–7E are Accepted / Production Closed**. Reader pure policies and transports have owners; AI Study Card lifecycle, package, validation, source binding, and generation also have owners. The next step is the separate real-provider Environment Gate audit, which does not authorize an external request.
+> - Current phase status: **The authorized Anki-aligned repository milestone sequence is complete**. Phase 6A–6M, Phase 7A–7E, and the provider Environment Gate audit are closed. Reader and AI Study Card responsibilities have owners; runtime provider activation remains a separate environment-specific decision and is not authorized by closure.
 > - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
 > - Current code-debt assessment: **localized medium burden**. Phase 5 reduced `SenseReview.vue` from 1,476 to 1,249 lines and `Review.vue` from 1,070 to 1,025. Phase 6A–6L left `TextBlockGroup.vue` at 1,993 lines and zero inline dictionary axios expressions; Phase 6M reduced `TextBlockService.php` from 1,382 to 1,077 lines. Phase 7 reduced `AiStudyCardPendingItemService.php` from 1,065 to 61 lines and left it as a stable compatibility facade.
 > - Phase 7A lifecycle through Phase 7E generation: **Accepted / Production Closed** (`7214c3a`, `8f2b078`, `c76c0fe`, `8f2a70c`, `7cf7de9`). The Phase 7E protected matrix passed 1,093 tests / 6,124 assertions, the build succeeded in 6.21 seconds, and official Browser acceptance created one confirmed sense card with a bound synthetic source, zero ReviewLog rows, unchanged new-card FSRS state, and complete fixture cleanup.
+> - Provider Environment Gate: **Accepted / Closed in default-off form** (`bd447d1`, ADR-0030). The full V6 matrix passed 80 tests / 806 assertions. Policy snapshots cannot expose secret values or references. No live external request was made in the closure audit; any runtime provider/model/secret/timeout/cost decision still requires exact approval.
 > - DevSpace PHP / PHPUnit follows `vibe-coding-collaboration-rules.md §27.8`: default to log redirection, saved exit code and split suites; do not try the original high-output streamed command first. If the replacement path cannot produce trustworthy evidence, hand the full PHP regression to the next related Codex complex task.
 > - §27.8 workaround verified on 2026-07-15: redirected Unit suite passed 649 tests / 1507 assertions, redirected Feature suite passed 2575 tests / 11537 assertions with 14 skipped, all Node guards passed, frontend build succeeded, DB doctor was healthy, and `git diff --check` passed.
 >
@@ -267,16 +268,16 @@
 
 | 维度 | 当前事实 | 下一衡量点 |
 |---|---|---|
-| 正式复习主线 | `/reviews/senses` 为主入口；FSRS、ReviewLog、撤销、生命周期、队列顺序、每日上限和 Card Info 已有测试与真实验收 | Reviewer convergence 后减少重复请求与状态编排 |
+| 正式复习主线 | `/reviews/senses` 为主入口；FSRS、ReviewLog、撤销、生命周期、队列顺序、每日上限和 Card Info 已有测试与真实验收；Reviewer convergence 已关闭 | 无开放授权缺口 |
 | Manual Sense | Accepted / Production Closed；create/edit 共享表单，字段验证和失败保留已通过双 viewport Chrome 验收 | 无开放缺口 |
 | Custom Study | 1A、Card Marker + 1B 均 Accepted / Production Closed | `marked` 条件保持 preview-only，不写正式复习状态 |
 | Browser / 管理页 | Phase 3D Accepted / Production Closed；Card Info、Search、Table、Scheduling、Lifecycle、Delete 与 Leech Governance 均有职责所有者 | `ReviewCardManage.vue` 668 行、4 axios、0 dialog；旧 `/enabled` 父组件兼容客户端已删除，生命周期写请求仍由 lifecycle owner 单点拥有 |
-| Settings | Accepted / Production Closed；薄容器 + 五个设置区 + 单一 API client + 四个后端领域服务 | `AdminReviewSettings.vue` 60 行；`SettingsService.php` 105 行；Preset V1 为下一任务 |
-| Reader | 原文、lemma、多例句、颜色和 AI 示意卡已形成特色主线 | `TextBlockGroup.vue` 2,514 行、`TextBlockService.php` 1,381 行；在后续阶段逐职责治理 |
-| AI Study Card | 手工确认的 V1–V5 闭环已存在；真实 provider 受环境门槛约束 | 先拆 1,064 行 PendingItem Service，再考虑 provider |
+| Settings | Accepted / Production Closed；薄容器 + 五个设置区 + 单一 API client + 四个后端领域服务；Preset V1A–V1D 已关闭 | `AdminReviewSettings.vue` 60 行；`SettingsService.php` 105 行；无开放授权缺口 |
+| Reader | 原文、lemma、多例句、颜色和 AI 示意卡已形成特色主线；Phase 6A–6M 已关闭 | `TextBlockGroup.vue` 1,993 行；`TextBlockService.php` 1,077 行；职责 owner 保持 |
+| AI Study Card | V1–V5 人工确认闭环、Phase 7A–7E service convergence 与 provider default-off Environment Gate 均已关闭 | `AiStudyCardPendingItemService.php` 61 行；runtime provider 激活仍需具体授权 |
 | 文档 | 已建立 Current authority、Open Work Registry 和 Anki 对齐路线 | 历史长叙述逐步归档，不再作为当前状态入口 |
 
-当前顺序：Preset V1D（Accepted / Production Closed）→ Browser Phase 3A–3D（Accepted / Production Closed）→ Card Marker + Custom Study 1B（Accepted / Production Closed）→ Reviewer convergence（Accepted / Production Closed）→ Reader UI/architecture（Current）→ AI provider。下一步进入 Reader 的 scoped architecture gate；阅读主链路、surface/lemma、WordSense、ReviewCard、ReviewLog 与 FSRS 边界不得改变。
+当前授权顺序已全部完成：Preset V1D → Browser Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader Phase 6A–6M → AI Study Card Phase 7A–7E → provider default-off Environment Gate。当前没有下一项已授权仓库实现；新的产品扩展或 runtime provider 激活必须另行明确授权。
 
 ## 8. 临时文档使用规则
 

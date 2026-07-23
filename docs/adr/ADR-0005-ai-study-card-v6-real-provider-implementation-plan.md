@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as a **planning and approval gate**. This ADR does not implement a live provider, does not add a provider route, does not add a UI trigger, does not add a secret, and does not authorize external requests.
+Accepted as a **planning and approval gate**. Implementation-status statements are superseded by ADR-0030 because the repository later added a default-off adapter, backend transport, provider-preview route, and explicit UI trigger. All activation, secret, user-confirmation, learning-write, FSRS, and Network constraints in this ADR remain authoritative. Neither ADR authorizes external requests.
 
 ## Date
 
