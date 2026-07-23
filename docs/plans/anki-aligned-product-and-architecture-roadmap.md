@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A hover lookup、Phase 6B hover position、Phase 6C sentence context、Phase 6D drag selection 与 Phase 6E phrase instance selection policy 已 **Accepted / Production Closed**；Phase 6 其余职责继续逐切片治理。
+状态：**Current**。Phase 6A hover lookup、Phase 6B hover position、Phase 6C sentence context、Phase 6D drag selection、Phase 6E phrase instance selection policy 与 Phase 6F sidebar action/focus 已 **Accepted / Production Closed**；产品小步已完成，Phase 6 进入逐职责结构治理。
 
 先做产品小步：
 
@@ -331,8 +331,7 @@ Custom Study 1B：
 - 点词句子上下文：Phase 6C 已把 token-window、缩写/小数/章节边界、长度上限和 `sentence_index` fallback 收敛到纯 policy；Vuex commit、点词和侧栏编排仍由组件负责。验收见 `docs/testing/reader-sentence-context-policy-browser-acceptance-2026-07-23.md`。
 - 拖选范围：Phase 6D 已把端点 guard、正反向规范化、既有 phrase-length 边界、换行过滤和原文顺序收敛到纯 policy；鼠标/触摸事件、timer、选中状态应用和侧栏编排仍由组件负责。验收见 `docs/testing/reader-drag-selection-policy-browser-acceptance-2026-07-23.md`。
 - 短语实例选区：Phase 6E 已把 backward start、换行桥接、精确 phrase index、unique-word enrichment 和原文顺序收敛到纯 policy；短语轮换、lookup count、Vuex、HTTP 和侧栏编排仍由组件负责。验收见 `docs/testing/reader-phrase-instance-selection-policy-browser-acceptance-2026-07-23.md`。
-- 隐藏或重组低价值常驻面板。
-- 查词栏信息密度和焦点顺序优化。
+- 侧栏动作与焦点：Phase 6F 已移除重复发音入口，把普通学习状态与破坏性恢复动作分层，并在打开添加释义时聚焦词典搜索；窄屏 `VocabularyBox` 回退和所有 action owner 保持不变。验收见 `docs/testing/reader-sidebar-action-focus-browser-acceptance-2026-07-23.md`。
 
 后做结构拆分：
 
