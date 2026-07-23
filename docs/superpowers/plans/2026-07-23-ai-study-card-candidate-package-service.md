@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 Design: `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`
 
-Status: Accepted for Phase 7B implementation
+Status: **Completed / Production Closed** (`8f2b078`)
 
 ## Frozen slice
 
@@ -33,3 +33,9 @@ Forbidden:
 4. Syntax, build, diff, line/owner, and scoped five-axis review.
 
 No new browser pass is required if this slice changes no visible/API behavior and the unchanged full V3/V4 facade tests pass; Phase 7A already accepted the visible pending workflow.
+
+## Closure
+
+Accepted evidence: `docs/testing/ai-study-card-candidate-package-service-acceptance-2026-07-23.md`.
+
+The coordinator fell from 784 to 487 lines. The direct suite passed 3 tests / 24 assertions, the protected matrix passed 195 tests / 1,519 assertions, and the frontend build succeeded. Phase 7C candidate/package validation is the next frozen slice.
