@@ -147,11 +147,11 @@ class AiStudyCardCandidateValidationServiceTest extends TestCase
             'chapter_id' => $otherChapter->id,
         ], $aiPrepared['context']);
 
-        $source = file_get_contents(app_path('Services/AiStudyCardPendingItemService.php'));
+        $source = file_get_contents(app_path('Services/AiStudyCardGenerationService.php'));
         $this->assertSame('invalid_pending_item', $invalidPending['skipped']['reason']);
         $this->assertSame('invalid_chapter', $invalidChapter['skipped']['reason']);
         $this->assertStringContainsString(
-            'private AiStudyCardCandidateValidationService $candidateValidationService;',
+            'private AiStudyCardCandidateValidationService $candidateValidationService,',
             $source,
         );
         $this->assertStringContainsString(

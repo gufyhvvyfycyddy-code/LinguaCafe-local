@@ -101,6 +101,7 @@ class AiStudyCardPendingLifecycleServiceTest extends TestCase
         ], $service->emptyInfo());
 
         $source = file_get_contents(app_path('Services/AiStudyCardPendingItemService.php'));
+        $generationSource = file_get_contents(app_path('Services/AiStudyCardGenerationService.php'));
         $this->assertStringContainsString(
             'private AiStudyCardPendingLifecycleService $pendingLifecycleService;',
             $source,
@@ -111,7 +112,7 @@ class AiStudyCardPendingLifecycleServiceTest extends TestCase
         );
         $this->assertStringContainsString(
             '$this->pendingLifecycleService->markProcessed(',
-            $source,
+            $generationSource,
         );
         $this->assertStringNotContainsString('private function normalizeWord(', $source);
         $this->assertStringNotContainsString('private function markPendingItemProcessed(', $source);

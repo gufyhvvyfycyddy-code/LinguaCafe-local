@@ -123,11 +123,11 @@ class AiStudyCardSourceBindingServiceTest extends TestCase
         $first = $service->bind($sense, $card, $candidate);
         $second = $service->bind($sense, $card, $candidate);
 
-        $source = file_get_contents(app_path('Services/AiStudyCardPendingItemService.php'));
+        $source = file_get_contents(app_path('Services/AiStudyCardGenerationService.php'));
         $this->assertSame($first['occurrence_id'], $second['occurrence_id']);
         $this->assertDatabaseCount('word_sense_occurrences', 1);
         $this->assertStringContainsString(
-            'private AiStudyCardSourceBindingService $sourceBindingService;',
+            'private AiStudyCardSourceBindingService $sourceBindingService,',
             $source,
         );
         $this->assertStringContainsString(

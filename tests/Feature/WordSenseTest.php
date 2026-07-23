@@ -1929,11 +1929,16 @@ class WordSenseTest extends TestCase
 
     private function invokeConservativeFallback(string $surface): string
     {
-        $textBlock = new \App\Services\TextBlockService($this->user->id, 'english');
-        $reflector = new \ReflectionClass($textBlock);
-        $method = $reflector->getMethod('conservativeFallbackLemma');
+        $fallbackTokenizer = new \App\Services\EnglishFallbackTokenizerService();
+        $reflector = new \ReflectionClass($fallbackTokenizer);
+        $method = $reflector->getMethod('conservativeLemma');
         $method->setAccessible(true);
-        return $method->invoke($textBlock, $surface);
+        return $method->invoke(
+            $fallbackTokenizer,
+            $surface,
+            static fn (): bool => false,
+            static fn (string $lemma): bool => false,
+        );
     }
 
     public function test_lemma_plural_nouns(): void
