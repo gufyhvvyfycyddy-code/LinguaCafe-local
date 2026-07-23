@@ -34,7 +34,7 @@ Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A�
 
 | 文件 | 行数 | 结构信号 | 风险 |
 |---|---:|---|---|
-| `resources/js/components/Text/TextBlockGroup.vue` | 2,000 | lookup HTTP transport 仍在组件；token presentation、hover、句子上下文、拖选、短语实例 range、hotkey intent、navigation candidate、completion candidate 和 lookup response 已有纯 policy owner | 高，阅读主链路 |
+| `resources/js/components/Text/TextBlockGroup.vue` | 1,993 | 四个 dictionary transport 已归 `ReaderLookupApi`；组件保留 DOM、请求编排/continuation、Vuex、timer、selection 和 persistence effects | 中高，阅读主链路 |
 | `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
 | `app/Services/TextBlockService.php` | 1,381 | 仍保留多类阅读处理职责 | 高，阅读主链路 |
 | `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A–6K 已 **Accepted / Production Closed**；产品小步以及 selection、keyboard/hover、completion、token-presentation、lookup-response 纯规则已有 owner，lookup HTTP transport 是最后一个 Phase 6 前端结构目标。
+状态：**Current**。Phase 6A–6L 已 **Accepted / Production Closed**；Reader frontend convergence 已完成，`TextBlockService.php` tokenizer/fallback convergence 是剩余 Phase 6 backend 目标。
 
 先做产品小步：
 
@@ -337,10 +337,11 @@ Custom Study 1B：
 - 完成阅读候选：Phase 6I 已把 `definitions_checked`/负 stage 条件、word-before-phrase 顺序、source index/type/ID 收敛到纯 policy；源对象兼容标记、确认框、`/chapters/finish` payload、完成页和全部持久化效果仍由既有组件负责。验收见 `docs/testing/reader-completion-candidate-policy-browser-acceptance-2026-07-23.md`。
 - Token 展示：Phase 6J 已把 spaceless language、section marker、句末、严格 AI 译文查找、token class 和两类 furigana 条件收敛到纯 policy；全部模板节点、属性、key、样式、空白注释和事件仍由组件负责。验收见 `docs/testing/reader-token-presentation-policy-browser-acceptance-2026-07-23.md`。
 - 查词响应：Phase 6K 已把 stale-response 判断、本地释义拼接、API 释义展平和词形变化展示解析收敛到纯 policy；全部 endpoint、payload、Vuex、错误处理、定位和 timer 仍由组件负责。验收见 `docs/testing/reader-lookup-response-policy-browser-acceptance-2026-07-23.md`。
+- 查词 transport：Phase 6L 已把四个 dictionary axios expression 收敛到 `ReaderLookupApi`，精确保留 method/URL/payload/Promise、调用位置/顺序/条件和全部 continuation/effect。验收见 `docs/testing/reader-lookup-api-browser-acceptance-2026-07-23.md`。
 
 后做结构拆分：
 
-- `TextBlockGroup.vue` 的 token presentation、selection、keyboard/hover、completion-candidate 和 lookup-response 纯规则已有 owner；Phase 6 最后把 lookup HTTP transport 收敛到专用 client。
+- `TextBlockGroup.vue` 的 frontend extraction 目标已完成：pure rules 与 dictionary transport 均有 owner，组件保留编排和 effects。
 - `TextBlockService.php` 按 tokenizer/fallback、EncounteredWord creation、phrase indexing、reader facade 继续收敛。
 - 每次只拆一个职责，先补 harness，再移动代码。
 
