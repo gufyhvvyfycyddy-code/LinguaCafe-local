@@ -41,6 +41,7 @@
 | Reader Phase 6H navigation policy closure | `docs/testing/reader-navigation-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6I completion candidate policy closure | `docs/testing/reader-completion-candidate-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6J token presentation policy closure | `docs/testing/reader-token-presentation-policy-browser-acceptance-2026-07-23.md` |
+| Reader Phase 6K lookup response policy closure | `docs/testing/reader-lookup-response-policy-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |
