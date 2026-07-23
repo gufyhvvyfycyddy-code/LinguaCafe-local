@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer 与 Phase 6 Reader 前后端架构治理均已生产关闭。当前阶段为 Phase 7 AI Study Card service 收敛；真实外部 AI provider 仍受 Environment Gate 约束。
+Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer、Phase 6 Reader 前后端治理与 Phase 7 AI Study Card service 收敛均已生产关闭。当前只剩真实外部 AI provider 的独立 Environment Gate 审计；审计不等于授权外发。
 
 ## 2. 本轮依据
 
@@ -356,7 +356,7 @@ Custom Study 1B：
 
 优先级：P3 / Environment Gate。
 
-状态：**Current**。Phase 7A lifecycle、7B package、7C validation 与 7D source binding 均已 **Accepted / Production Closed**，四项职责分别有独立 owner；coordinator 从 1,065 行降至 243 行。下一切片为 confirmed card-generation orchestration；真实 provider 能力不因 service 收敛自动获得外发授权。
+状态：**Accepted / Production Closed**。Phase 7A lifecycle、7B package、7C validation、7D source binding 与 7E generation 均已关闭，五项职责分别有独立 owner；coordinator 从 1,065 行降至 61 行。Phase 7E 的完整保护矩阵通过 1,093 tests / 6,124 assertions，frontend build 成功，official Browser 完成真实人工确认生成与夹具清理。真实 provider 能力不因 service 收敛自动获得外发授权；只进入独立 Environment Gate 审计。
 
 先拆 `AiStudyCardPendingItemService.php`：
 

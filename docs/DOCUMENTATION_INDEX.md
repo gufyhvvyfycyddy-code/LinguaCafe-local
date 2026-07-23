@@ -1,6 +1,6 @@
 # LinguaCafe Documentation Index
 
-> 当前入口：2026-07-18。本文只负责路由，不保存任务历史、长篇状态或重复契约。
+> 当前入口：2026-07-23。本文只负责路由，不保存任务历史、长篇状态或重复契约。
 
 ## 1. 新任务读取顺序
 
@@ -51,7 +51,7 @@
 | Anki 参考产品决策 | `docs/plans/vibe-coding-collaboration-rules.md` §8.7，再查 Anki 官方手册/源码 |
 | Custom Study / Card Marker | `docs/plans/custom-study-1a-implementation-plan.md`、`docs/adr/ADR-0016-custom-study-preview-session.md`、`docs/adr/ADR-0029-card-marker-and-custom-study-1b.md`、`docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md` |
 | AI study card | `docs/plans/ai-study-card-v1-frozen-plan.md`、`docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/plans/ai-study-card-v6-preflight-plan.md` |
-| AI Study Card Phase 7 service convergence / lifecycle, package, validation, source closure | `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`、`docs/testing/ai-study-card-pending-lifecycle-service-browser-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-package-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-validation-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-source-binding-service-acceptance-2026-07-23.md` |
+| AI Study Card Phase 7 service convergence / lifecycle, package, validation, source, generation closure | `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`、`docs/testing/ai-study-card-pending-lifecycle-service-browser-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-package-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-candidate-validation-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-source-binding-service-acceptance-2026-07-23.md`、`docs/testing/ai-study-card-generation-service-browser-acceptance-2026-07-23.md` |
 | Testing DB | `docs/plans/testing-db-health-playbook.md` |
 | MCP Chrome | `docs/plans/mcp-chrome-local-smoke-playbook.md` |
 | Text reader smoke | `docs/testing/text-reader-smoke-guard.md` |

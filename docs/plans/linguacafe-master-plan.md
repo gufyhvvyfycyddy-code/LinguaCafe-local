@@ -6,15 +6,15 @@
 >
 > | State | Work |
 > |---|---|
-> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M |
+> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Phase 6A–6M Reader frontend/backend governance is Accepted / Production Closed; Phase 7 AI Study Card service convergence is current |
+> | Current Phase | Phase 7 AI Study Card service convergence is Accepted / Production Closed; real-provider Environment Gate audit is current and does not authorize external sends |
 > | Authorized Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader architecture → AI Study Card service convergence |
 > | Environment Gate | Real external AI/provider work remains last and separately gated |
 >
 > Custom Study 1A and Card Marker + Custom Study 1B are Accepted / Production Closed. `/custom-study` now includes the five frozen criteria, including `marked`; Marker remains ReviewCard metadata and the session remains preview-only. Phase 4 evidence is in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`; earlier 1A history remains archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
-> **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Settings convergence and Browser ownership extraction removed major concentrated debt. The current assessment remains **6.0/10, localized medium-high burden**. `ReviewCardManage.vue` is 668 lines with 4 coordinator requests and no dialogs; Phase 6A–6L reduced `TextBlockGroup.vue` from 2,514 to 1,993 lines with zero inline dictionary axios expressions, and Phase 6M reduced `TextBlockService.php` from 1,382 to 1,077 lines by extracting the production English fallback. Reader governance is closed; `AiStudyCardPendingItemService.php` is the current architecture hotspot.
+> **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Settings convergence and Browser ownership extraction removed major concentrated debt. The current assessment remains **6.0/10, localized medium-high burden**. `ReviewCardManage.vue` is 668 lines with 4 coordinator requests and no dialogs; Phase 6A–6L reduced `TextBlockGroup.vue` from 2,514 to 1,993 lines with zero inline dictionary axios expressions, Phase 6M reduced `TextBlockService.php` from 1,382 to 1,077 lines, and Phase 7 reduced `AiStudyCardPendingItemService.php` from 1,065 to 61 lines with five responsibility owners. Reader and AI Study Card service governance are closed.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -224,7 +224,7 @@
 | 5 | Reviewer architecture convergence | Accepted / Production Closed | 共享正式 HTTP 与单次评分事务边界；Sense history/undo 独立 owner；保留两页业务语义 | `SenseReview.vue` 1,249 行；`Review.vue` 1,025 行 | 24-file frontend loop、保护性 PHP suites、双 viewport browser acceptance | 2026-07-18 关闭 |
 | 6 | Reader UI / frontend architecture governance | Accepted / Production Closed | Phase 6A–6L 已关闭；pure rules 与 dictionary transport 均有 owner，组件保留编排/effects | `TextBlockGroup.vue` 1,993 行、0 个 inline dictionary axios expression | 同路线 Phase 6；6A–6L browser acceptance | 2026-07-23 关闭 |
 | 7 | Reader backend architecture governance | Accepted / Production Closed | `ReaderDataService`、`EncounteredWordCreationService` 与 `EnglishFallbackTokenizerService` 分别拥有读取准备、新词写入和生产 English fallback；门面兼容不变 | `TextBlockService.php` 1,382 → 1,077 行 | Phase 6M acceptance；115 tests / 641 assertions；双 viewport official Browser | 2026-07-23 关闭 |
-| 8 | AI Study Card service convergence | Current | Phase 7A lifecycle、7B package、7C validation、7D source binding 已关闭；剩 generation | coordinator 1,065 → 243 行；四项职责均有 owner | Phase 7 design；7D 203 tests / 1,571 assertions；Phase 7A official Browser cancel/restore | four slices closed；generation current |
+| 8 | AI Study Card service convergence | Completed / Production Closed | Phase 7A lifecycle、7B package、7C validation、7D source binding、7E generation 均有独立 owner | coordinator 1,065 → 61 行；公开 facade 与行为不变 | Phase 7 design；7E 1,093 tests / 6,124 assertions；official Browser confirmed-generation acceptance | 2026-07-23 关闭 |
 | 9 | Real AI provider / automatic chapter analysis | Environment Gate | 显式触发的真实 AI 推荐 | provider、secret、成本、超时、数据边界和 Network 验收 | ADR-0004/0005；V6 plan | 环境条件满足后再授权 |
 | 10 | DevMain old-computer / alternate-repo validation | Deferred / Unverified | 在另一台设备或仓库复现运行 | 当前远端已经确认是 `LinguaCafe-local`；没有切换需求和目标机器证据 | Git remote / current checkout | 未授权 |
 

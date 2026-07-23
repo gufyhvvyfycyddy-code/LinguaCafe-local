@@ -4,7 +4,7 @@ Date: 2026-07-23
 
 Design: `docs/superpowers/specs/2026-07-23-ai-study-card-service-convergence-design.md`
 
-Status: Accepted for Phase 7E implementation
+Status: **Accepted / Production Closed**
 
 ## Frozen slice
 
@@ -33,6 +33,7 @@ Allowed:
 - `app/Services/AiStudyCardGenerationService.php`
 - `app/Services/AiStudyCardPendingItemService.php`
 - `tests/Feature/AiStudyCardGenerationServiceTest.php`
+- existing extracted-owner source guards and the existing WordSense fallback harness where the required matrix proves their ownership references are stale
 - Phase 7E plan/acceptance and authority documents
 
 Forbidden:
@@ -48,3 +49,8 @@ Forbidden:
 4. Testing DB health/config, PHP syntax, frontend build, diff/line/owner audit, and scoped five-axis review.
 5. Official Browser acceptance of one unchanged user-confirmed generation flow after automation passes, followed by fixture cleanup and protected-write delta verification.
 
+## Closure
+
+Implementation `7cf7de9` moved the generation body to its named owner and reduced the compatibility coordinator from 243 to 61 lines. The direct suite passed 4 tests / 36 assertions, the full protected matrix passed 1,093 tests / 6,124 assertions, the frontend build succeeded in 6.21 seconds, and the official Browser completed one authenticated confirmed-generation flow with exact fixture cleanup.
+
+Phase 7A–7E are therefore Accepted / Production Closed. The provider Environment Gate remains a separate fail-closed audit and is not external-send authorization.
