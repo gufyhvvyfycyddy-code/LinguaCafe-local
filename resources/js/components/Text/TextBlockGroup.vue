@@ -204,6 +204,7 @@
     import { resolveHoverVocabularyLookup } from './../../services/HoverVocabularyLookupPolicy';
     import { resolveHoverVocabularyPosition } from './../../services/HoverVocabularyPositionPolicy';
     import { resolveReaderDragSelection } from './../../services/ReaderDragSelectionPolicy';
+    import { resolveReaderCompletionCandidates } from './../../services/ReaderCompletionCandidatePolicy';
     import { resolveReaderHotkey } from './../../services/ReaderHotkeyPolicy';
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
@@ -2010,31 +2011,24 @@
                 return trimmedSearchTerm;
             },
             getLeveledUpWordsAndPhrases() {
-                let data = {
-                    wordIds: [],
-                    phraseIds: [],
-                    wordsAndPhrases: [],
-                }
-
-                // collect words
-                this.uniqueWords.forEach((word) => {
-                    if (!word.definitions_checked && word.stage < 0) {
-                        data.wordIds.push(word.id);
-                        data.wordsAndPhrases.push(word);
-                        data.wordsAndPhrases[data.wordsAndPhrases.length - 1].type = 'word';
-                    }
+                const candidates = resolveReaderCompletionCandidates({
+                    uniqueWords: this.uniqueWords,
+                    phrases: this.phrases,
                 });
 
-                // collect phrases
-                this.phrases.forEach((phrase) => {
-                    if (!phrase.definitions_checked && phrase.stage < 0) {
-                        data.phraseIds.push(phrase.id);
-                        data.wordsAndPhrases.push(phrase);
-                        data.wordsAndPhrases[data.wordsAndPhrases.length - 1].type = 'phrase';
-                    }
+                const wordsAndPhrases = candidates.map((candidate) => {
+                    const sourceItem = candidate.type === 'word'
+                        ? this.uniqueWords[candidate.sourceIndex]
+                        : this.phrases[candidate.sourceIndex];
+                    sourceItem.type = candidate.type;
+                    return sourceItem;
                 });
 
-                return data;
+                return {
+                    wordIds: candidates.filter(candidate => candidate.type === 'word').map(candidate => candidate.id),
+                    phraseIds: candidates.filter(candidate => candidate.type === 'phrase').map(candidate => candidate.id),
+                    wordsAndPhrases,
+                };
             }
         }
     }
