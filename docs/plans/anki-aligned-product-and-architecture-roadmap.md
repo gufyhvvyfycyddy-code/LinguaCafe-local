@@ -9,7 +9,7 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B 与 Phase 5 Reviewer 架构收敛均已生产关闭。Reviewer 已共享正式 HTTP/评分事务边界并保留两套页面各自语义，自动回归、testing MySQL 写入证据和 authenticated browser 双 viewport 验收通过。当前阶段为 Phase 6 Reader UI 与阅读架构治理；真实 AI provider 继续按顺序延后。
+Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer 与 Phase 6 Reader 前后端架构治理均已生产关闭。当前阶段为 Phase 7 AI Study Card service 收敛；真实外部 AI provider 仍受 Environment Gate 约束。
 
 ## 2. 本轮依据
 
@@ -36,7 +36,7 @@ Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A�
 |---|---:|---|---|
 | `resources/js/components/Text/TextBlockGroup.vue` | 1,993 | 四个 dictionary transport 已归 `ReaderLookupApi`；组件保留 DOM、请求编排/continuation、Vuex、timer、selection 和 persistence effects | 中高，阅读主链路 |
 | `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
-| `app/Services/TextBlockService.php` | 1,381 | 仍保留多类阅读处理职责 | 高，阅读主链路 |
+| `app/Services/TextBlockService.php` | 1,077 | 保留 Python-first/import/phrase/Reader 兼容门面；fallback 已有纯 owner | 中，阅读主链路 |
 | `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
 | `app/Services/CustomStudy/CustomStudySessionState.php` | 1,176 | 方法较多，但职责集中在不可变会话状态 | 中 |
 | `app/Services/DictionaryImportService.php` | 1,157 | 覆盖多种格式和导入阶段 | 中高 |
@@ -322,7 +322,7 @@ Custom Study 1B：
 
 优先级：P2。
 
-状态：**Current**。Phase 6A–6L 已 **Accepted / Production Closed**；Reader frontend convergence 已完成，`TextBlockService.php` tokenizer/fallback convergence 是剩余 Phase 6 backend 目标。
+状态：**Accepted / Production Closed**。Phase 6A–6L 完成 Reader frontend convergence；Phase 6M 将生产 English Python-down fallback 收敛到 `EnglishFallbackTokenizerService`，`TextBlockService.php` 从 1,382 行降至 1,077 行并保留兼容门面。
 
 先做产品小步：
 
@@ -338,6 +338,7 @@ Custom Study 1B：
 - Token 展示：Phase 6J 已把 spaceless language、section marker、句末、严格 AI 译文查找、token class 和两类 furigana 条件收敛到纯 policy；全部模板节点、属性、key、样式、空白注释和事件仍由组件负责。验收见 `docs/testing/reader-token-presentation-policy-browser-acceptance-2026-07-23.md`。
 - 查词响应：Phase 6K 已把 stale-response 判断、本地释义拼接、API 释义展平和词形变化展示解析收敛到纯 policy；全部 endpoint、payload、Vuex、错误处理、定位和 timer 仍由组件负责。验收见 `docs/testing/reader-lookup-response-policy-browser-acceptance-2026-07-23.md`。
 - 查词 transport：Phase 6L 已把四个 dictionary axios expression 收敛到 `ReaderLookupApi`，精确保留 method/URL/payload/Promise、调用位置/顺序/条件和全部 continuation/effect。验收见 `docs/testing/reader-lookup-api-browser-acceptance-2026-07-23.md`。
+- English fallback tokenizer：Phase 6M 已把生产 English Python-down fallback、token shape、保守 lemma 规则和 irregular map 收敛到纯 `EnglishFallbackTokenizerService`；Python-first 决策、ECDICT hooks、doctor-only helper、structural mapping、phrase/import/Reader facade 均保持不变。验收见 `docs/testing/english-fallback-tokenizer-service-browser-acceptance-2026-07-23.md`。
 
 后做结构拆分：
 
@@ -354,6 +355,8 @@ Custom Study 1B：
 ### Phase 7：AI Study Card service 收敛与真实 provider
 
 优先级：P3 / Environment Gate。
+
+状态：**Current**。先审计既有 V1–V6 owners 与 harness，再每次只拆一个仍聚集的职责；真实 provider 能力不因 service 收敛自动获得外发授权。
 
 先拆 `AiStudyCardPendingItemService.php`：
 

@@ -43,6 +43,7 @@
 | Reader Phase 6J token presentation policy closure | `docs/testing/reader-token-presentation-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6K lookup response policy closure | `docs/testing/reader-lookup-response-policy-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6L lookup API closure | `docs/testing/reader-lookup-api-browser-acceptance-2026-07-23.md` |
+| Reader Phase 6M English fallback tokenizer / Phase 6 closure | `docs/testing/english-fallback-tokenizer-service-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |

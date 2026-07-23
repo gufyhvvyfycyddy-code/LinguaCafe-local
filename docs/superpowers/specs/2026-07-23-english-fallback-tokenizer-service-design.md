@@ -2,7 +2,7 @@
 
 Date: 2026-07-23
 
-Status: Accepted for Phase 6M implementation under goal-mode staged preauthorization
+Status: Accepted / Production Closed (`65167c1`)
 
 ## Goal
 

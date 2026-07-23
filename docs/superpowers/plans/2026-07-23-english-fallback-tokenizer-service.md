@@ -4,6 +4,8 @@ Date: 2026-07-23
 
 Design: `docs/superpowers/specs/2026-07-23-english-fallback-tokenizer-service-design.md`
 
+Status: Completed / Production Closed (`65167c1`)
+
 ## Steps
 
 1. Add direct service tests and a facade/source integration guard without changing existing fallback behavior tests.
