@@ -1,15 +1,18 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "program_id": "linguacafe-recovery-publication-2026-08",
-  "active_task": "CFH-01",
-  "status": "authorized",
+  "active_task": "CFH-01B",
+  "status": "awaiting_web_acceptance",
   "executor_profile": "reasonix-deepseek-flash",
+  "authorized_from_commit": "a59e5dc6c59f92bafe0bc445adcd584637f1933b",
   "authoritative_handoff": "docs/plans/codex-final-handoff-2026-08-04.md",
   "active_plan": "docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md",
+  "ownership_map": "docs/audits/cfh-01-worktree-ownership-map-2026-08-04.json",
   "allowed_work": [
-    "read_only_worktree_attribution",
-    "governance_document_creation",
-    "workflow_harness_creation"
+    "ownership_schema_completion",
+    "commit_group_freeze",
+    "workflow_harness_strengthening",
+    "current_plan_baseline_correction"
   ],
   "product_code_authorized": false,
   "migration_execution_allowed": false,

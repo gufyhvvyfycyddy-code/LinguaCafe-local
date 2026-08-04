@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-01
+active_task: CFH-01B
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -12,9 +12,9 @@ supervisor_unlock_required: true
 
 ## 1. Current Reality
 
-* GitHub 最新正式基线为 `origin/master` = `4deef9f1db6e63a9940ee253da0dcabc99acc4f9`（2026-08-05 本地 `git fetch origin --prune` 实测，与 Codex handoff 记录一致）。
+* 本计划不永久写死"最新远端"。每个任务开始时必须 `git fetch origin --prune`，以实际 `origin/master` 为准；CFH-01B 的授权起点（`authorized_from_commit`）记录在 `docs/execution/CURRENT_MILESTONE.json`。
 * 本地工作区存在 454 个 Codex 之前留下的资产（110 tracked modified、2 tracked deleted、342 expanded untracked；CFH-01 开始时实测为 110/2/350）。350 条 untracked 中含 11 条本会话自身 `.reasonix/` 运行元数据（7 条 autoresearch + 4 条 desktop-topic），归属 `local_agent_metadata`（不提交）。
-* M0—M18 的本地实现不等于已提交、已推送或正式接受。归属图（`docs/audits/cfh-01-worktree-ownership-map-2026-08-04.json`）是每个路径所有者的唯一机器可读依据。
+* M0—M18 的本地实现不等于已提交、已推送或正式接受。归属图（`docs/audits/cfh-01-worktree-ownership-map-2026-08-04.json`，schema v2）是每个路径所有者的唯一机器可读依据。
 * 交接文档 `docs/plans/codex-final-handoff-2026-08-04.md` 是当前恢复入口。
 * 产品功能开发暂时冻结，直到既有资产完成归属、验证、精确提交与正常推送。
 
@@ -47,15 +47,22 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-01 — Freeze Exact Worktree Ownership And Commit Map`
+`CFH-01B — Complete Ownership Contract And Commit-Group Metadata`
+
+状态：
+
+* CFH-01A（工作区完整清点与治理骨架）已阶段性接受；
+* CFH-01 整体尚未关闭；
+* CFH-01B 仍是纯治理任务：补齐 462 条归属记录的完整机器契约、冻结 commit group 与验证准备度、加强 Harness、修正计划基线表述、更新里程碑锁；
+* 产品代码未授权（`product_code_authorized: false`）。
 
 规则：
 
 * 只读产品代码，禁止修改任何产品源码。
-* 允许创建治理文档与 Harness（计划、里程碑锁、归属图、`RecoveryPublicationWorkflowDocsGuard`）。
+* 只允许修改四个治理文件（归属图、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁）。
 * 不提交产品代码，不推送未验证资产。
 * 不自动进入下一任务（`auto_advance: false`）。
-* 网页端 GPT 验收通过后才解锁下一任务。
+* 网页端 GPT 验收通过后才解锁下一任务；完成后停在 `awaiting_web_acceptance`。
 
 ## 5. Candidate Queue
 
@@ -71,7 +78,7 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-01（当前）。
+1. CFH-01B（当前）。
 2. 根据归属图判断 CFH-02 与 CFH-03 是否可独立执行。
 3. M1—M5 foundation 已推送后再执行 CFH-04。
 4. M10—M18 根据共享文件重新拆分。
