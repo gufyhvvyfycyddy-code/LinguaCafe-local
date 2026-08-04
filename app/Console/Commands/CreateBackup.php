@@ -2,35 +2,28 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Support\Arr;
-use Illuminate\Support\Carbon;
+use App\Exceptions\BackupException;
 use App\Services\BackupService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Storage;
 
 class CreateBackup extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'app:create-backup';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
-    protected $description = 'Creates a backup of the database into the storage folder.';
+    protected $description = 'Creates and publishes a verified database backup.';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    public function handle(BackupService $backups): int
     {
-        $exitCode = (new BackupService())->createBackup();
-        
-        return $exitCode;
+        try {
+            $backup = $backups->createBackup();
+        } catch (BackupException $exception) {
+            $this->error("Backup failed: {$exception->errorCode}");
+
+            return self::FAILURE;
+        }
+
+        $this->info("Backup created: {$backup['backup_id']}");
+
+        return self::SUCCESS;
     }
 }

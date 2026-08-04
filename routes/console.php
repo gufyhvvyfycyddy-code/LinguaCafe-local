@@ -1,6 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Schedule;
+use App\Services\BackupSchedule;
 
+$backupSchedule = app(BackupSchedule::class)->expression();
 
-Schedule::command('app:create-backup')->cron(env('BACKUP_INTERVAL'));
+if ($backupSchedule !== null) {
+    Schedule::command('app:create-backup')
+        ->cron($backupSchedule)
+        ->withoutOverlapping();
+}
