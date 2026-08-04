@@ -309,9 +309,12 @@ if (milestone.status === 'awaiting_web_acceptance') {
     // 最终阶段：M6A 验收报告必须存在并引用真实 40 位产品 commit SHA
     const report = read('docs', 'testing', 'cfh-02b-m6a-publication-acceptance-2026-08-05.md');
     assert.ok(report.length > 0, 'M6A 验收报告存在');
-    const commitMatch = report.match(/[0-9a-f]{40}/);
-    assert.ok(commitMatch, '验收报告引用 40 位产品 commit SHA');
-    assert.ok(commitMatch[0] !== 'f67bc560c59bc6e3b506eb403eb69659699b4f28', '产品 commit SHA 必须是新提交');
+    const allCommits = [...report.matchAll(/[0-9a-f]{40}/g)].map((m) => m[0]);
+    assert.ok(allCommits.length >= 2, '验收报告引用 40 位 commit SHA（基线 + 产品）');
+    assert.ok(
+        allCommits.some((c) => c !== 'f67bc560c59bc6e3b506eb403eb69659699b4f28'),
+        '产品 commit SHA 必须是新提交（非授权基线）',
+    );
 }
 
 // 22. M6B/M6C/M6D 在总计划中仍为 candidate_not_authorized

@@ -1,9 +1,9 @@
 # CFH-02 M6 Publication Plan
 
-> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`（CFH-02A-R1 治理补正后冻结）
-> 状态：`frozen`（只冻结，不实施、不提交产品代码）
+> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`（CFH-02A-R1 治理补正后冻结；CFH-02B-M6A 已按本计划发布）
+> 状态：`M6A 已发布（PUSHED_AWAITING_ACCEPTANCE）`；M6B/M6C/M6D 未发布
 > 机器可读清单：`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
-> 决策：`READY_FOR_CFH02B`（supervisor 已复核归属，见 §15；CFH-02B 仍需单独授权）
+> 决策：`READY_FOR_CFH02B`（supervisor 已复核归属，见 §15；M6A 已发布，M6B 仍需单独授权）
 > 授权：`product_code_authorized: false`；`auto_advance: false`
 
 ## 1. 当前事实

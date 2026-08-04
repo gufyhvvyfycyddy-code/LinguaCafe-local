@@ -4,7 +4,7 @@ program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
 active_task: CFH-02B-M6A
 auto_advance: false
-product_code_authorized: true
+product_code_authorized: false
 supervisor_unlock_required: true
 ---
 
@@ -51,12 +51,11 @@ supervisor_unlock_required: true
 
 状态：
 
-* CFH-01（含 CFH-01A 工作区完整清点与治理骨架、CFH-01B 完整归属契约与提交组元数据）保持 ACCEPTED；
-* CFH-02A（冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵）与 CFH-02A-R1（supervisor 归属决定与 M6 切片契约关闭）均已由网页端 GPT ACCEPTED；manifest `decision.status = READY_FOR_CFH02B`；
-* CFH-02B-M6A 是当前唯一授权任务：从本地 dirty 资产精确提取已存在的 M6A 安全备份切片，验证构建/运行，真实浏览器验收，只提交并推送 M6A（manifest 中 M6A 的 whole files 与精确 patch）；
-* 当前**只授权 M6A**：M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，不得进入；
-* 本轮不允许修改产品代码：默认禁止修改现有产品实现，只允许从现有脏工作区精确提取 M6A 内容；失败时保留证据并停止，不自动修复；
-* M6A 发布完成后停在 `awaiting_web_acceptance`，等待网页端 GPT 验收；`product_code_authorized` 在验收阶段回到 false。
+* CFH-01（含 CFH-01A/CFH-01B）保持 ACCEPTED；CFH-02A 与 CFH-02A-R1 已由网页端 GPT ACCEPTED；
+* CFH-02B-M6A（安全备份切片发布）**已完成并推送**：产品提交 `82b2cf856350561abc54b6e05e51d7a19f120388`（`feat: publish M6A safe backup slice`），验收报告 `docs/testing/cfh-02b-m6a-publication-acceptance-2026-08-05.md`；当前状态 `PUSHED_AWAITING_ACCEPTANCE`，等待网页端 GPT 验收；
+* M6A 发布后 `product_code_authorized` 回到 `false`；不再提交或修改产品代码；
+* M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，**不自动进入 M6B**（`auto_advance: false`）；
+* 本轮发布仅包含 manifest 中 M6A 的 whole files 与精确 patch；M6B 残余代码仍保留在工作区（unstaged），待 M6B 单独授权后另行发布。
 
 规则：
 
