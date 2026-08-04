@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "program_id": "linguacafe-recovery-publication-2026-08",
+  "active_task": "CFH-01",
+  "status": "authorized",
+  "executor_profile": "reasonix-deepseek-flash",
+  "authoritative_handoff": "docs/plans/codex-final-handoff-2026-08-04.md",
+  "active_plan": "docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md",
+  "allowed_work": [
+    "read_only_worktree_attribution",
+    "governance_document_creation",
+    "workflow_harness_creation"
+  ],
+  "product_code_authorized": false,
+  "migration_execution_allowed": false,
+  "database_write_allowed": false,
+  "browser_required": false,
+  "device_required": false,
+  "commit_product_code_allowed": false,
+  "auto_advance": false,
+  "supervisor_unlock_required": true,
+  "on_unexpected_finding": "record_and_stop"
+}

@@ -1,0 +1,2816 @@
+{
+  "schema_version": 1,
+  "purpose": "CFH-01 工作区 462 条变化路径的所有权归属图：每条路径登记唯一主切片、状态与归属证据；无法唯一归属者标记为 SHARED_UNRESOLVED，禁止按该图自动切分。",
+  "baseline": {
+    "branch": "master",
+    "head": "4deef9f1db6e63a9940ee253da0dcabc99acc4f9",
+    "origin_master": "4deef9f1db6e63a9940ee253da0dcabc99acc4f9",
+    "conflicts": [],
+    "counts": {
+      "tracked_modified": 110,
+      "tracked_deleted": 2,
+      "untracked": 350,
+      "total": 462
+    }
+  },
+  "summary": {
+    "CFH-02": 41,
+    "CFH-03-M1": 34,
+    "CFH-03-M2": 10,
+    "CFH-03-M3": 10,
+    "CFH-03-M4": 13,
+    "CFH-03-M5": 9,
+    "CFH-04-M7": 62,
+    "CFH-04-M8": 5,
+    "CFH-05-M9": 31,
+    "DO_NOT_COMMIT": 1,
+    "GOVERNANCE": 41,
+    "local_agent_metadata": 11,
+    "M10": 33,
+    "M11": 15,
+    "M12": 26,
+    "M13": 24,
+    "M14": 9,
+    "M15": 10,
+    "M16": 10,
+    "M17-WEB-ANDROID": 19,
+    "M18-WEB-ANDROID": 16,
+    "SHARED_UNRESOLVED": 32
+  },
+  "entries": [
+    {
+      "path": "app/Console/Commands/CreateBackup.php",
+      "status": "modified",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 备份命令"
+    },
+    {
+      "path": "app/Exceptions/BackupException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 备份异常"
+    },
+    {
+      "path": "app/Http/Controllers/ArticleHealthController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c article health"
+    },
+    {
+      "path": "app/Http/Controllers/BackupController.php",
+      "status": "modified",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 备份控制器"
+    },
+    {
+      "path": "app/Http/Middleware/RejectWritesDuringRestore.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 恢复期间拒绝写入"
+    },
+    {
+      "path": "app/Jobs/ExecuteBackupRestore.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 恢复 job"
+    },
+    {
+      "path": "app/Services/ArticleHealthService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c article health service"
+    },
+    {
+      "path": "app/Services/BackupRestoreService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 恢复服务"
+    },
+    {
+      "path": "app/Services/BackupSchedule.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 备份调度"
+    },
+    {
+      "path": "app/Services/BackupService.php",
+      "status": "modified",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 备份服务"
+    },
+    {
+      "path": "app/Services/DatabaseDumpProcess.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a dump 进程"
+    },
+    {
+      "path": "app/Services/DatabaseRestoreProcess.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b restore 进程"
+    },
+    {
+      "path": "app/Services/RestoreWriteFence.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 写入围栏"
+    },
+    {
+      "path": "app/Services/SafeFilePathService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 安全路径服务"
+    },
+    {
+      "path": "app/Services/SqlDumpInspector.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a dump 检查器"
+    },
+    {
+      "path": "config/article_health.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c 配置"
+    },
+    {
+      "path": "config/backup.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 备份配置"
+    },
+    {
+      "path": "docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 ADR"
+    },
+    {
+      "path": "docs/plans/m6-resilience-health-isolation-implementation-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6 plan"
+    },
+    {
+      "path": "docs/testing/m6a-safe-backup-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 验收文档"
+    },
+    {
+      "path": "docs/testing/m6b-restore-safety-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 验收文档"
+    },
+    {
+      "path": "docs/testing/m6c-article-health-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c 验收文档"
+    },
+    {
+      "path": "docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6d 验收文档"
+    },
+    {
+      "path": "resources/js/components/Health/ArticleHealth.vue",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c article health 页面"
+    },
+    {
+      "path": "resources/js/components/Layout.vue",
+      "status": "modified",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c article-health 导航入口"
+    },
+    {
+      "path": "tests/Feature/ArticleHealthTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c 验收测试"
+    },
+    {
+      "path": "tests/Feature/BackupManagementTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 验收测试"
+    },
+    {
+      "path": "tests/Feature/BackupRestoreManagementTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 验收测试"
+    },
+    {
+      "path": "tests/Feature/ExecuteBackupRestoreTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 验收测试"
+    },
+    {
+      "path": "tests/Feature/M6IsolationAuditTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6d isolation audit 测试"
+    },
+    {
+      "path": "tests/Feature/RestoreWriteFenceTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 验收测试"
+    },
+    {
+      "path": "tests/Fixtures/fake-mysqldump.cs",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a fixture"
+    },
+    {
+      "path": "tests/Fixtures/m6a-browser-server.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 浏览器验收 fixture"
+    },
+    {
+      "path": "tests/Fixtures/m6c-browser-server.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c 浏览器验收 fixture"
+    },
+    {
+      "path": "tests/Fixtures/m6c-tokenizer-health-router.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6c tokenizer 健康路由 fixture"
+    },
+    {
+      "path": "tests/Unit/BackupRestoreServiceTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 单元测试"
+    },
+    {
+      "path": "tests/Unit/BackupScheduleTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 单元测试"
+    },
+    {
+      "path": "tests/Unit/BackupServiceTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 单元测试"
+    },
+    {
+      "path": "tests/Unit/DatabaseDumpProcessTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 单元测试"
+    },
+    {
+      "path": "tests/Unit/DatabaseRestoreProcessTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6b 单元测试"
+    },
+    {
+      "path": "tests/Unit/SqlDumpInspectorTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-02",
+      "evidence": "M6a 单元测试"
+    },
+    {
+      "path": "app/Exceptions/MobileIdempotencyConflictException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 幂等冲突异常"
+    },
+    {
+      "path": "app/Exceptions/MobileReviewCardUnavailableException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 评分卡不可用异常"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileAuthController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 认证端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileBootstrapController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 bootstrap 端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileDeviceController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 设备端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileDictionaryController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 词典端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileSenseReviewController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 sense review 幂等评分端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileSummaryController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 summary 端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileWordSenseController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 word sense 端点"
+    },
+    {
+      "path": "app/Http/Middleware/EnsureActiveMobileDevice.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 设备绑定中间件"
+    },
+    {
+      "path": "app/Http/Responses/MobileApiResponse.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 API 响应格式"
+    },
+    {
+      "path": "app/Models/MobileDevice.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 设备模型"
+    },
+    {
+      "path": "app/Services/MobileIdempotencyService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 幂等服务"
+    },
+    {
+      "path": "app/Services/MobileSenseReviewMutationService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 sense review 写服务"
+    },
+    {
+      "path": "database/migrations/2026_07_28_000001_create_mobile_api_foundation_tables.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 foundation 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0032-mobile-api-foundation-and-idempotent-rating.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 ADR"
+    },
+    {
+      "path": "docs/plans/mobile-api-v1-contract.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 API 契约"
+    },
+    {
+      "path": "docs/testing/mobile-api-foundation-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 验收文档"
+    },
+    {
+      "path": "mobile/.gitignore",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "mobile shell 根配置（M1 foundation）"
+    },
+    {
+      "path": "mobile/capacitor.config.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "Capacitor 配置（shell）"
+    },
+    {
+      "path": "mobile/index.html",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 入口"
+    },
+    {
+      "path": "mobile/package-lock.json",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 依赖锁"
+    },
+    {
+      "path": "mobile/package.json",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 包定义"
+    },
+    {
+      "path": "mobile/src/api.test.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "API client 测试"
+    },
+    {
+      "path": "mobile/src/api.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "mobile API client（M1 foundation）"
+    },
+    {
+      "path": "mobile/src/main.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 入口逻辑"
+    },
+    {
+      "path": "mobile/src/storage.test.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "storage 测试"
+    },
+    {
+      "path": "mobile/src/storage.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "secure token storage（M1 认证）"
+    },
+    {
+      "path": "mobile/src/styles.css",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 样式"
+    },
+    {
+      "path": "mobile/src/types.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 类型"
+    },
+    {
+      "path": "mobile/src/ui.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell UI 工具"
+    },
+    {
+      "path": "mobile/tsconfig.json",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell TS 配置"
+    },
+    {
+      "path": "mobile/vite.config.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "shell 构建配置"
+    },
+    {
+      "path": "tests/Feature/MobileApiFoundationTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M1",
+      "evidence": "M1 验收测试"
+    },
+    {
+      "path": "app/Exceptions/MobileOperationException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 操作异常"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileOperationController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 operation ledger 端点"
+    },
+    {
+      "path": "app/Models/Operation.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 operation 模型"
+    },
+    {
+      "path": "app/Models/OperationChange.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 operation change 模型"
+    },
+    {
+      "path": "app/Services/MobileOperationLedgerService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 ledger 服务"
+    },
+    {
+      "path": "database/migrations/2026_07_28_000002_create_operation_ledger_tables.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 ledger 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0035-mobile-operation-ledger-and-linear-undo-redo.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 ADR"
+    },
+    {
+      "path": "docs/plans/mobile-operation-ledger-m2-implementation-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 plan"
+    },
+    {
+      "path": "docs/testing/mobile-operation-ledger-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 验收文档"
+    },
+    {
+      "path": "tests/Feature/MobileOperationLedgerTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M2",
+      "evidence": "M2 验收测试"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileArticlePackageController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 文章包端点"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileReviewPackageController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 复习包端点"
+    },
+    {
+      "path": "app/Services/InvalidMobilePackageCursorException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 包游标异常"
+    },
+    {
+      "path": "app/Services/InvalidMobilePackageSourceException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 包源异常"
+    },
+    {
+      "path": "app/Services/MobileArticlePackageService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 文章包服务"
+    },
+    {
+      "path": "app/Services/MobileReviewPackageService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 复习包服务"
+    },
+    {
+      "path": "docs/adr/ADR-0041-m3-mobile-download-packages-v1.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 ADR"
+    },
+    {
+      "path": "docs/plans/m3-mobile-download-packages-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 plan"
+    },
+    {
+      "path": "docs/testing/m3-mobile-download-packages-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 验收文档"
+    },
+    {
+      "path": "tests/Feature/M3MobileDownloadPackageTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M3",
+      "evidence": "M3 验收测试"
+    },
+    {
+      "path": "app/Exceptions/MobileQueuedActionDomainException.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 队列动作域异常"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileSyncController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 同步端点"
+    },
+    {
+      "path": "app/Models/MobileClientAction.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 客户端动作模型"
+    },
+    {
+      "path": "app/Services/MobileQueuedActionSyncService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 队列同步服务"
+    },
+    {
+      "path": "app/Services/WordSenseContentVersionService.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 内容版本服务"
+    },
+    {
+      "path": "database/migrations/2026_07_29_000002_add_queued_action_metadata_to_operations.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 队列元数据迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0042-m4-queued-action-sync-and-conflict-simulator.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 ADR"
+    },
+    {
+      "path": "docs/plans/m4-queued-action-sync-conflict-simulator-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 plan"
+    },
+    {
+      "path": "docs/testing/m4-queued-action-sync-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 验收文档"
+    },
+    {
+      "path": "resources/js/components/Mobile/MobileSyncSimulator.vue",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 冲突模拟器 UI"
+    },
+    {
+      "path": "tests/Feature/M4QueuedActionMetadataMigrationTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 迁移测试"
+    },
+    {
+      "path": "tests/Feature/M4QueuedActionSyncTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 同步验收测试"
+    },
+    {
+      "path": "tests/js/MobileSyncSimulatorContract.test.mjs",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M4",
+      "evidence": "M4 模拟器契约"
+    },
+    {
+      "path": "docs/adr/ADR-0043-m5-mobile-reader-reviewer-touch-adaptation.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 ADR"
+    },
+    {
+      "path": "docs/plans/m5-mobile-reader-reviewer-touch-adaptation-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 plan"
+    },
+    {
+      "path": "docs/testing/m5-mobile-reader-reviewer-touch-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 验收文档"
+    },
+    {
+      "path": "resources/js/components/Text/TextBlockGroup.vue",
+      "status": "modified",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 触摸手势改造"
+    },
+    {
+      "path": "resources/js/components/Text/VocabularyBottomSheet.vue",
+      "status": "modified",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 底部词表面板"
+    },
+    {
+      "path": "resources/js/services/ReaderTouchSelectionPolicy.js",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 触摸选择策略"
+    },
+    {
+      "path": "resources/sass/Text/VocabularyBottomSheet.scss",
+      "status": "modified",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 底部面板样式"
+    },
+    {
+      "path": "tests/js/M5MobileTouchAdaptationGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 guard"
+    },
+    {
+      "path": "tests/js/ReaderTouchSelectionPolicy.test.mjs",
+      "status": "untracked",
+      "primary_slice": "CFH-03-M5",
+      "evidence": "M5 策略测试"
+    },
+    {
+      "path": "docs/adr/ADR-0044-m7-android-connected-mvp.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 ADR"
+    },
+    {
+      "path": "docs/plans/m7-android-connected-mvp-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 plan"
+    },
+    {
+      "path": "docs/testing/m7-android-connected-mvp-acceptance-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 验收文档"
+    },
+    {
+      "path": "docs/testing/m7-android-connected-mvp-interim-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 interim 文档"
+    },
+    {
+      "path": "mobile/android/.gitignore",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/.gitignore",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/build.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/capacitor.build.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/proguard-rules.pro",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/androidTest/java/com/getcapacitor/myapp/ExampleInstrumentedTest.java",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/debug/AndroidManifest.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/AndroidManifest.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/java/com/linguacafe/mobile/MainActivity.java",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/java/com/linguacafe/mobile/SecureTokenPlugin.java",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-land-hdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-land-mdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-land-xhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-land-xxhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-land-xxxhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-port-hdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-port-mdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-port-xhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-port-xxhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-port-xxxhdpi/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable-v24/ic_launcher_foreground.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable/ic_launcher_background.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable/ic_stat_linguacafe.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/drawable/splash.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/layout/activity_main.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/values/ic_launcher_background.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/values/strings.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/values/styles.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/main/res/xml/file_paths.xml",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/app/src/test/java/com/getcapacitor/myapp/ExampleUnitTest.java",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/build.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/capacitor.settings.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/gradle.properties",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/gradle/wrapper/gradle-wrapper.jar",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/gradle/wrapper/gradle-wrapper.properties",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/gradlew",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/gradlew.bat",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/settings.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "mobile/android/variables.gradle",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 Android 工程（全部文件）"
+    },
+    {
+      "path": "tests/Feature/M7MobileConnectedApiTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 验收测试"
+    },
+    {
+      "path": "tests/js/M7AndroidConnectedMvpGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M7",
+      "evidence": "M7 guard"
+    },
+    {
+      "path": "docs/adr/ADR-0051-m8-limited-offline-mvp.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M8",
+      "evidence": "M8 ADR"
+    },
+    {
+      "path": "docs/plans/m8-limited-offline-mvp-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M8",
+      "evidence": "M8 plan"
+    },
+    {
+      "path": "docs/testing/m8-limited-offline-mvp-acceptance-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M8",
+      "evidence": "M8 验收文档"
+    },
+    {
+      "path": "mobile/src/offlineRepository.test.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M8",
+      "evidence": "M8 离线仓库测试"
+    },
+    {
+      "path": "mobile/src/offlineRepository.ts",
+      "status": "untracked",
+      "primary_slice": "CFH-04-M8",
+      "evidence": "M8 离线仓库"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileTextImportController.php",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 text-import 端点（m9 plan 数据流）"
+    },
+    {
+      "path": "docs/adr/ADR-0054-m9-ios-mvp-and-release-readiness.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 ADR"
+    },
+    {
+      "path": "docs/plans/m9-ios-mvp-release-plan.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 plan"
+    },
+    {
+      "path": "docs/release/m9-ios-app-store-materials.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 App Store 材料"
+    },
+    {
+      "path": "docs/release/mobile-privacy-and-data-deletion.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 隐私/删除文档"
+    },
+    {
+      "path": "docs/testing/m9-ios-device-and-store-acceptance-playbook.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 设备/商店验收 playbook"
+    },
+    {
+      "path": "docs/testing/m9-ios-mvp-release-acceptance-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 验收文档"
+    },
+    {
+      "path": "mobile/ios/.gitignore",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App.xcodeproj/project.pbxproj",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/AppDelegate.swift",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/Contents.json",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/Splash.imageset/Contents.json",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-1.png",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732-2.png",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Assets.xcassets/Splash.imageset/splash-2732x2732.png",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Base.lproj/LaunchScreen.storyboard",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Base.lproj/Main.storyboard",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/Info.plist",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/MyViewController.swift",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/PrivacyInfo.xcprivacy",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/App/SecureTokenPlugin.swift",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/CapApp-SPM/.gitignore",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/CapApp-SPM/Package.swift",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/CapApp-SPM/README.md",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/App/CapApp-SPM/Sources/CapApp-SPM/CapApp-SPM.swift",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "mobile/ios/debug.xcconfig",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 iOS 工程（全部文件）"
+    },
+    {
+      "path": "tests/Feature/M9MobileTextImportTest.php",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 验收测试"
+    },
+    {
+      "path": "tests/js/M9IosMvpGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "CFH-05-M9",
+      "evidence": "M9 guard"
+    },
+    {
+      "path": "public/js/app.js.LICENSE.txt",
+      "status": "modified",
+      "primary_slice": "DO_NOT_COMMIT",
+      "evidence": "构建生成物，不入库"
+    },
+    {
+      "path": ".gitignore",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "仓库根配置"
+    },
+    {
+      "path": "AGENTS.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "治理硬规则文档"
+    },
+    {
+      "path": "docs/adr/ADR-0001-architecture-gate-workflow.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "架构闸门流程 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0031-goal-mode-roadmap-execution-authorization.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标模式授权 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0033-real-browser-acceptance-channel-fallback.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "浏览器验收通道 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0034-goal-mode-autonomous-decisions-and-deferred-acceptance.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标模式决策梯 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0037-goal-mode-nonblocking-execution-frontier.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "非阻塞执行前沿 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0052-goal-mode-deferred-evidence-clusters.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "deferred 证据簇 ADR，全局治理"
+    },
+    {
+      "path": "docs/adr/ADR-0053-testing-emulator-credential-transport.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "测试凭据传输 ADR，全局治理"
+    },
+    {
+      "path": "docs/architecture/anki-function-and-architecture-sales-comparison-2026-07-23.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史架构对比文档"
+    },
+    {
+      "path": "docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史审计文档"
+    },
+    {
+      "path": "docs/architecture/improve-codebase-architecture-install-report.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史架构改进报告"
+    },
+    {
+      "path": "docs/architecture/upstream-code-test-and-architecture-comparison-2026-07-23.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史 upstream 对比文档"
+    },
+    {
+      "path": "docs/CURRENT_AI_CONTEXT.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "会话上下文，非产品代码"
+    },
+    {
+      "path": "docs/DOCUMENTATION_INDEX.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "文档索引，全部 milestone 共享"
+    },
+    {
+      "path": "docs/plans/anki-aligned-product-and-architecture-roadmap.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史 roadmap"
+    },
+    {
+      "path": "docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "M1-M9+ 权威 roadmap，跨全部 slice"
+    },
+    {
+      "path": "docs/plans/current-working-handoff.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "handoff 文档"
+    },
+    {
+      "path": "docs/plans/linguacafe-master-plan.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史总计划"
+    },
+    {
+      "path": "docs/plans/local-experience-bug-optimization-ledger-2026-07-23.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史 bug 优化台账"
+    },
+    {
+      "path": "docs/plans/mcp-chrome-local-smoke-playbook.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "浏览器 smoke playbook（治理）"
+    },
+    {
+      "path": "docs/plans/reading-inline-review-and-example-pool-plan.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史产品计划，不属于任何 M slice"
+    },
+    {
+      "path": "docs/plans/repo-architecture-hotspot-audit.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "历史架构热点审计"
+    },
+    {
+      "path": "docs/plans/spec-to-harness-candidates.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "harness 候选清单（治理）"
+    },
+    {
+      "path": "docs/plans/vibe-coding-collaboration-rules.md",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "协作规则（治理）"
+    },
+    {
+      "path": "docs/plans/workspace-stabilization-plan-2026-08-03.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "工作区稳定计划（治理）"
+    },
+    {
+      "path": "docs/product-handoff-prompt.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "产品交接提示词"
+    },
+    {
+      "path": "docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "产品决策历史"
+    },
+    {
+      "path": "docs/testing-handoff-2026-07-19.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "testing DB playbook 交接"
+    },
+    {
+      "path": "docs/testing-handoff-2026-07-20.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "testing DB playbook 交接"
+    },
+    {
+      "path": "docs/testing/m0-m18-goal-completion-audit-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标完成审计（跨全部 slice）"
+    },
+    {
+      "path": "scripts/workspace-inventory.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "资产清单脚本（治理）"
+    },
+    {
+      "path": "tests/js/CurrentExecutionWorkflowDocsGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "当前执行工作流 guard（治理）"
+    },
+    {
+      "path": "tests/js/GlmCompositeTaskHardRulesDocsGuard.test.mjs",
+      "status": "deleted",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "被替换的旧 guard（deleted）"
+    },
+    {
+      "path": "tests/js/GlmSingleAgentWorkflowDocsGuard.test.mjs",
+      "status": "deleted",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "被替换的旧 guard（deleted）"
+    },
+    {
+      "path": "tests/js/GoalModeAutonomyDocsGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标模式自主性 guard（治理）"
+    },
+    {
+      "path": "tests/js/GoalRoadmapExecutionAuthorizationDocsGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标 roadmap 授权 guard（治理）"
+    },
+    {
+      "path": "tests/js/GoalStagePreauthorizationDocsGuard.test.mjs",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "目标阶段预授权 guard（治理）"
+    },
+    {
+      "path": "tests/js/LongTermRulesDocsGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "长期规则 guard（治理）"
+    },
+    {
+      "path": "tests/js/MasterPlanIntegrityContract.test.mjs",
+      "status": "modified",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "总计划完整性契约（治理）"
+    },
+    {
+      "path": "tests/js/WorkspaceInventory.test.mjs",
+      "status": "untracked",
+      "primary_slice": "GOVERNANCE",
+      "evidence": "资产清单测试（治理）"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/.create_token",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/logs/heartbeat.jsonl",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/state/directions_tried.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/state/findings.jsonl",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/state/iteration_log.jsonl",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/state/progress.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/autoresearch/20260804-140335-1-870-begin-1-870-linguacafe-reasonix-cfh-01-recovery-pu/state/task_spec.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/desktop-topic-auto-title-meta.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/desktop-topic-created-at.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/desktop-topic-title-sources.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": ".reasonix/desktop-topic-titles.json",
+      "status": "untracked",
+      "primary_slice": "local_agent_metadata",
+      "evidence": "本地 Agent 元数据，不入库"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileReviewCardSearchController.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "m10 plan 引用的移动端只读搜索端点"
+    },
+    {
+      "path": "app/Http/Controllers/ReviewCardManageController.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 管理控制器（m10 plan 允许文件）"
+    },
+    {
+      "path": "app/Http/Controllers/WordSenseTagController.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 tag 端点"
+    },
+    {
+      "path": "app/Models/WordSenseTag.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 tag 模型"
+    },
+    {
+      "path": "app/Services/ReviewCardBrowserSearchQueryApplier.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 查询应用器"
+    },
+    {
+      "path": "app/Services/ReviewCardExportService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "m10 plan 明确列出"
+    },
+    {
+      "path": "app/Services/ReviewCardInfoQueryService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 info drawer 查询"
+    },
+    {
+      "path": "app/Services/ReviewCardManageFilterState.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 过滤器状态"
+    },
+    {
+      "path": "app/Services/ReviewCardManageItemSerializerService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 序列化服务"
+    },
+    {
+      "path": "app/Services/ReviewCardManageQueryService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 管理查询"
+    },
+    {
+      "path": "app/Services/ReviewCardSavedSearchService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 保存搜索"
+    },
+    {
+      "path": "app/Services/StudyOverviewQueryService.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "m10/m12 plan 引用，M10 搜索基础"
+    },
+    {
+      "path": "app/Services/WordSenseTagService.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 tag 服务"
+    },
+    {
+      "path": "database/migrations/2026_07_28_000003_create_word_sense_tags_tables.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 tag 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0038-m10-unified-search-and-word-sense-tags.md",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 ADR"
+    },
+    {
+      "path": "docs/plans/m10-unified-search-tags-browser-foundation-plan.md",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 plan"
+    },
+    {
+      "path": "docs/testing/m10-unified-search-tags-browser-foundation-acceptance-2026-07-28.md",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 验收文档"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardInfoDrawer.vue",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 info drawer"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardManage.vue",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 管理页面"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardSearchSurface.vue",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 搜索面"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardTableSurface.vue",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 表格面"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/WordSenseTagBulkPicker.vue",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 批量打标 UI"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/WordSenseTagManager.vue",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 tag 管理 UI"
+    },
+    {
+      "path": "resources/js/services/ReviewCardManageFilterState.js",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 过滤器状态（前端）"
+    },
+    {
+      "path": "tests/Feature/M10UnifiedSearchTagFoundationTest.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 验收测试"
+    },
+    {
+      "path": "tests/Feature/M10UnifiedSearchTagUiGuardTest.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 guard 测试"
+    },
+    {
+      "path": "tests/Feature/M10WordSenseTagMigrationTest.php",
+      "status": "untracked",
+      "primary_slice": "M10",
+      "evidence": "M10 迁移测试"
+    },
+    {
+      "path": "tests/Feature/ReviewCardBrowserSearchUiGuardTest.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 guard 测试"
+    },
+    {
+      "path": "tests/Feature/ReviewCardManageTest.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 管理测试"
+    },
+    {
+      "path": "tests/Feature/ReviewCardSavedSearchTest.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 保存搜索测试"
+    },
+    {
+      "path": "tests/Feature/StudyOverviewTest.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 overview 测试"
+    },
+    {
+      "path": "tests/js/ReviewCardManageArchitecturePlanGuard.test.mjs",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 架构 guard"
+    },
+    {
+      "path": "tests/Unit/ReviewCardManageFilterStateTest.php",
+      "status": "modified",
+      "primary_slice": "M10",
+      "evidence": "M10 过滤器状态单测"
+    },
+    {
+      "path": "app/Exceptions/ReviewCardManualOperationException.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 手动操作异常"
+    },
+    {
+      "path": "app/Http/Controllers/ReviewCardManualOperationController.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 手动操作端点"
+    },
+    {
+      "path": "app/Services/ReviewCardManageMutationService.php",
+      "status": "modified",
+      "primary_slice": "M11",
+      "evidence": "M11 管理 mutation"
+    },
+    {
+      "path": "app/Services/ReviewCardManualOperationService.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 手动操作服务"
+    },
+    {
+      "path": "app/Services/ReviewCardOperationSnapshotService.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "m11 plan 明确列出"
+    },
+    {
+      "path": "database/migrations/2026_07_28_000004_add_manual_operation_metadata.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 操作元数据迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0039-m11-review-control-and-manual-operation-ledger.md",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 ADR"
+    },
+    {
+      "path": "docs/plans/m11-review-control-manual-scheduling-plan.md",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 plan"
+    },
+    {
+      "path": "docs/testing/m11-review-control-manual-scheduling-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 验收文档"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardDeleteMutationSurface.vue",
+      "status": "modified",
+      "primary_slice": "M11",
+      "evidence": "M11 删除面"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardLifecycleMutationSurface.vue",
+      "status": "modified",
+      "primary_slice": "M11",
+      "evidence": "M11 生命周期面"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue",
+      "status": "modified",
+      "primary_slice": "M11",
+      "evidence": "M11 调度面"
+    },
+    {
+      "path": "tests/Feature/M11ManualOperationFoundationTest.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 验收测试"
+    },
+    {
+      "path": "tests/Feature/M11ManualOperationMigrationTest.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 迁移测试"
+    },
+    {
+      "path": "tests/Feature/M11ManualOperationUiGuardTest.php",
+      "status": "untracked",
+      "primary_slice": "M11",
+      "evidence": "M11 guard 测试"
+    },
+    {
+      "path": "app/Exceptions/SpecialStudyException.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 异常"
+    },
+    {
+      "path": "app/Http/Controllers/SpecialStudySessionController.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 会话端点"
+    },
+    {
+      "path": "app/Models/SpecialStudySession.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 会话模型"
+    },
+    {
+      "path": "app/Models/SpecialStudySessionAction.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 动作模型"
+    },
+    {
+      "path": "app/Services/CustomStudy/CustomStudySessionOrder.php",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 会话顺序"
+    },
+    {
+      "path": "app/Services/CustomStudy/Queries/TodayForgottenQuery.php",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 今日遗忘查询"
+    },
+    {
+      "path": "app/Services/ReviewDailyProgressQueryService.php",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "m12 plan 明确列出"
+    },
+    {
+      "path": "app/Services/SpecialStudy/SpecialStudyAnswerService.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 SpecialStudy 服务族"
+    },
+    {
+      "path": "app/Services/SpecialStudy/SpecialStudyCandidateQueryService.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 SpecialStudy 服务族"
+    },
+    {
+      "path": "app/Services/SpecialStudy/SpecialStudyCriteria.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 SpecialStudy 服务族"
+    },
+    {
+      "path": "app/Services/SpecialStudy/SpecialStudyOptionsService.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 SpecialStudy 服务族"
+    },
+    {
+      "path": "app/Services/SpecialStudy/SpecialStudySessionService.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 SpecialStudy 服务族"
+    },
+    {
+      "path": "database/migrations/2026_07_29_000001_create_special_study_sessions.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0016-custom-study-preview-session.md",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 custom study ADR"
+    },
+    {
+      "path": "docs/adr/ADR-0040-m12-special-study-sessions.md",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 ADR"
+    },
+    {
+      "path": "docs/plans/custom-study-1a-implementation-plan.md",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 custom study plan"
+    },
+    {
+      "path": "docs/plans/m12-special-study-sessions-plan.md",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 plan"
+    },
+    {
+      "path": "docs/testing/m12-special-study-sessions-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 验收文档"
+    },
+    {
+      "path": "resources/js/components/CustomStudy/CustomStudy.vue",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 Custom Study UI"
+    },
+    {
+      "path": "resources/js/components/CustomStudy/SpecialStudySession.vue",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 会话 UI"
+    },
+    {
+      "path": "tests/Feature/M12SpecialStudyExecutionTest.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 验收测试"
+    },
+    {
+      "path": "tests/Feature/M12SpecialStudyFoundationTest.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 验收测试"
+    },
+    {
+      "path": "tests/Feature/M12SpecialStudyMigrationTest.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 迁移测试"
+    },
+    {
+      "path": "tests/Feature/M12SpecialStudyQueryTest.php",
+      "status": "untracked",
+      "primary_slice": "M12",
+      "evidence": "M12 查询测试"
+    },
+    {
+      "path": "tests/js/CustomStudyPageGuard.test.mjs",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 页面 guard"
+    },
+    {
+      "path": "tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs",
+      "status": "modified",
+      "primary_slice": "M12",
+      "evidence": "M12 架构 guard"
+    },
+    {
+      "path": "app/Exceptions/AdvancedReviewSettingsValidationException.php",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 高级设置校验异常"
+    },
+    {
+      "path": "app/Http/Controllers/SettingsController.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 设置端点"
+    },
+    {
+      "path": "app/Services/FsrsRetentionWorkloadSimulationService.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "m13 plan 明确列出"
+    },
+    {
+      "path": "app/Services/ReviewCardFsrsSnapshotService.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "m13 plan 明确列出"
+    },
+    {
+      "path": "app/Services/Settings/AdvancedReviewSettingsService.php",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 高级设置服务"
+    },
+    {
+      "path": "app/Services/Settings/FsrsOptimizationSettingsService.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 FSRS 优化设置"
+    },
+    {
+      "path": "app/Services/Settings/Presets/ReviewSettingsPresetConfig.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 预设配置"
+    },
+    {
+      "path": "app/Services/SettingsService.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 设置服务"
+    },
+    {
+      "path": "database/migrations/2026_07_29_000003_add_fsrs_step_index_to_review_cards.php",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 fsrs step 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0045-m13-review-settings-workload-planner.md",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 ADR"
+    },
+    {
+      "path": "docs/plans/m13-review-settings-workload-planner-plan.md",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 plan"
+    },
+    {
+      "path": "docs/testing/m13-review-settings-workload-planner-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 验收文档"
+    },
+    {
+      "path": "resources/js/components/Admin/AdminDashboard.vue",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 管理面板"
+    },
+    {
+      "path": "resources/js/components/Admin/AdminReviewSettings.vue",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 设置页"
+    },
+    {
+      "path": "resources/js/components/Admin/ReviewSettings/FsrsAdvancedToolsPanel.vue",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 高级工具面板"
+    },
+    {
+      "path": "resources/js/components/Admin/ReviewSettings/FsrsSchedulingSettingsPanel.vue",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 调度设置面板"
+    },
+    {
+      "path": "resources/js/components/Admin/ReviewSettings/FsrsWorkloadPlannerPanel.vue",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 负载规划面板"
+    },
+    {
+      "path": "resources/js/services/AdminReviewSettingsApi.js",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 设置 API client"
+    },
+    {
+      "path": "tests/Feature/FsrsRetentionWorkloadSimulationTest.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 模拟测试"
+    },
+    {
+      "path": "tests/Feature/M13ReviewSettingsTest.php",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 验收测试"
+    },
+    {
+      "path": "tests/Feature/ReviewSettingsPresetFoundationTest.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 预设测试"
+    },
+    {
+      "path": "tests/js/M13ReviewSettingsUiGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M13",
+      "evidence": "M13 guard"
+    },
+    {
+      "path": "tests/Unit/ReviewCardFsrsSnapshotServiceTest.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 snapshot 单测"
+    },
+    {
+      "path": "tests/Unit/ReviewSettingsPresetConfigTest.php",
+      "status": "modified",
+      "primary_slice": "M13",
+      "evidence": "M13 预设单测"
+    },
+    {
+      "path": "app/Services/StatisticsExportService.php",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "m14 plan 明确列出"
+    },
+    {
+      "path": "app/Services/StatisticsService.php",
+      "status": "modified",
+      "primary_slice": "M14",
+      "evidence": "m14 plan 明确列出"
+    },
+    {
+      "path": "docs/adr/ADR-0046-m14-statistics-card-info-v3.md",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 ADR"
+    },
+    {
+      "path": "docs/plans/m14-statistics-card-info-v3-plan.md",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 plan"
+    },
+    {
+      "path": "docs/testing/m14-statistics-card-info-v3-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 验收文档"
+    },
+    {
+      "path": "resources/js/components/Home/Statistics.vue",
+      "status": "modified",
+      "primary_slice": "M14",
+      "evidence": "M14 统计页"
+    },
+    {
+      "path": "resources/js/components/Home/StatisticsMiniChart.vue",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 迷你图表"
+    },
+    {
+      "path": "tests/Feature/M14StatisticsCardInfoTest.php",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 验收测试"
+    },
+    {
+      "path": "tests/js/M14StatisticsUiGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M14",
+      "evidence": "M14 guard"
+    },
+    {
+      "path": "app/Http/Controllers/KnowledgeHygieneController.php",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 端点"
+    },
+    {
+      "path": "app/Models/KnowledgeHygieneOperation.php",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 模型"
+    },
+    {
+      "path": "app/Services/KnowledgeHygieneService.php",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 服务"
+    },
+    {
+      "path": "database/migrations/2026_07_29_000004_create_knowledge_hygiene_operations.php",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0047-m15-browser-knowledge-hygiene-v3.md",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 ADR"
+    },
+    {
+      "path": "docs/plans/m15-browser-knowledge-hygiene-v3-plan.md",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 plan"
+    },
+    {
+      "path": "docs/testing/m15-browser-knowledge-hygiene-v3-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 验收文档"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/KnowledgeHygienePanel.vue",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 面板 UI"
+    },
+    {
+      "path": "tests/Feature/M15KnowledgeHygieneTest.php",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 验收测试"
+    },
+    {
+      "path": "tests/js/M15KnowledgeHygieneUiGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M15",
+      "evidence": "M15 guard"
+    },
+    {
+      "path": "app/Http/Controllers/PortableDataController.php",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 端点"
+    },
+    {
+      "path": "app/Services/AnkiWordSensePackageService.php",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 Anki 包服务"
+    },
+    {
+      "path": "app/Services/PortableDataImportPlanService.php",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 导入计划服务"
+    },
+    {
+      "path": "app/Services/PortableDataService.php",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 服务"
+    },
+    {
+      "path": "docs/adr/ADR-0048-m16-portable-data-and-anki-interoperability-v1.md",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 ADR"
+    },
+    {
+      "path": "docs/plans/m16-portable-data-and-anki-interoperability-v1-plan.md",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 plan"
+    },
+    {
+      "path": "docs/testing/m16-portable-data-and-anki-interoperability-v1-acceptance-2026-07-29.md",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 验收文档"
+    },
+    {
+      "path": "resources/js/components/ReviewCards/PortableDataPanel.vue",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 面板 UI"
+    },
+    {
+      "path": "tests/Feature/M16PortableDataTest.php",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 验收测试"
+    },
+    {
+      "path": "tests/js/M16PortableDataUiGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M16",
+      "evidence": "M16 guard"
+    },
+    {
+      "path": "app/Http/Controllers/SenseReviewController.php",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "m17 plan 明确列出"
+    },
+    {
+      "path": "app/Services/SenseReviewCardSerializerService.php",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 sense review 序列化"
+    },
+    {
+      "path": "app/Services/SenseReviewQueryService.php",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 sense review 查询"
+    },
+    {
+      "path": "docs/adr/ADR-0049-m17-review-experience-accessibility-web-v2.md",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 ADR"
+    },
+    {
+      "path": "docs/plans/m17-review-experience-accessibility-web-v2-plan.md",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 plan"
+    },
+    {
+      "path": "docs/testing/m17-review-experience-accessibility-web-v2-acceptance-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 验收文档"
+    },
+    {
+      "path": "resources/js/components/Review/ReviewExperiencePreferences.js",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 偏好"
+    },
+    {
+      "path": "resources/js/components/Review/ReviewExperienceTimer.js",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 计时器"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseReview.vue",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 复习页"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseReviewExperienceBar.vue",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 体验栏"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseReviewExperienceController.vue",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 体验控制器"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseReviewPreviousCardDialog.vue",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 上一卡对话框"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseReviewRatingControls.vue",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 评分控件"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseStudyCard.vue",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 学习卡"
+    },
+    {
+      "path": "tests/Feature/M17ReviewExperienceTest.php",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 验收测试"
+    },
+    {
+      "path": "tests/Feature/SenseReviewActionTransactionTest.php",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 事务测试"
+    },
+    {
+      "path": "tests/Feature/SenseReviewSelectedExampleAlignmentTest.php",
+      "status": "modified",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 对齐测试"
+    },
+    {
+      "path": "tests/js/M17ReviewExperienceTimer.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 timer guard"
+    },
+    {
+      "path": "tests/js/M17ReviewExperienceUiGuard.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M17-WEB-ANDROID",
+      "evidence": "M17 UI guard"
+    },
+    {
+      "path": "app/Http/Controllers/MediaController.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 media 端点"
+    },
+    {
+      "path": "app/Models/MediaAsset.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 media 模型"
+    },
+    {
+      "path": "app/Models/MediaReference.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 media 引用模型"
+    },
+    {
+      "path": "app/Services/MediaAssetService.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "m18 plan 唯一二进制写入点"
+    },
+    {
+      "path": "app/Services/MediaManifestService.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 manifest 服务"
+    },
+    {
+      "path": "config/media.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 配置"
+    },
+    {
+      "path": "database/migrations/2026_08_01_000001_create_media_assets_and_references.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 迁移"
+    },
+    {
+      "path": "docs/adr/ADR-0050-m18-media-pronunciation-offline-audio-v1.md",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 ADR"
+    },
+    {
+      "path": "docs/plans/m18-media-pronunciation-offline-audio-v1-plan-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 plan"
+    },
+    {
+      "path": "docs/testing/m18-media-pronunciation-offline-audio-v1-acceptance-2026-08-01.md",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 验收文档"
+    },
+    {
+      "path": "mobile/src/mediaCache.test.ts",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 媒体缓存测试"
+    },
+    {
+      "path": "mobile/src/mediaCache.ts",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 媒体缓存"
+    },
+    {
+      "path": "resources/js/components/Review/MediaSlot.js",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 media slot UI（M18MediaSlot guard 契约）"
+    },
+    {
+      "path": "resources/js/components/Senses/SenseMediaControls.vue",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 sense media 控件"
+    },
+    {
+      "path": "tests/Feature/M18MediaIntegrityTest.php",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 验收测试"
+    },
+    {
+      "path": "tests/js/M18MediaSlot.test.mjs",
+      "status": "untracked",
+      "primary_slice": "M18-WEB-ANDROID",
+      "evidence": "M18 guard"
+    },
+    {
+      "path": "app/Http/Controllers/BookController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/ChapterController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/FontTypeController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/HomeController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/ImageController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileMediaController.php",
+      "status": "untracked",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Http/Controllers/VocabularyController.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Jobs/ProcessChapter.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Models/ReviewCard.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Models/ReviewLog.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Models/User.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Models/WordSense.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Providers/AppServiceProvider.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/BookService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/ChapterService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/FsrsSchedulingService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/ImageService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/ReviewCardService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/VocabularyQueryService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "app/Services/VocabularyService.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "bootstrap/app.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "config/filesystems.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "config/queue.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "resources/js/app.js",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "routes/api.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "routes/console.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "routes/web.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "tests/Feature/EncounteredWordLearningEnrollmentTest.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "tests/Feature/MorphologyLemmaDefectFixTest.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "tests/Feature/MorphologyMatrixImportRegressionTest.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "tests/Feature/ReviewFsrsTest.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    },
+    {
+      "path": "tests/Unit/FsrsSchedulingServiceTest.php",
+      "status": "modified",
+      "primary_slice": "SHARED_UNRESOLVED",
+      "evidence": "无任何 plan/ADR/测试引用可唯一归属；为多 slice 共享核心或无法确定归属的文件"
+    }
+  ],
+  "generated_at": "2026-08-04T16:48:13.965Z",
+  "method": "逐路径匹配 plan/ADR/验收文档/guard 测试引用；mobile/android 与 mobile/ios 按工程前缀整体归属；规则表见生成脚本（/tmp/cfh01_rules.mjs）。"
+}

@@ -4,6 +4,8 @@ Final conclusion: **HANDOFF_READY_WITH_BLOCKERS**
 
 This document is the authoritative resume point for the current local workspace. It records observable local state; it does not convert uncommitted implementation or historical acceptance reports into pushed Git evidence.
 
+> **Recovery execution status (2026-08-05, CFH-01):** this handoff is superseded as the *active execution contract* by `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md` (status: `current`, active task `CFH-01`). The milestone lock is `docs/execution/CURRENT_MILESTONE.json`, the exact per-path ownership map is `docs/audits/cfh-01-worktree-ownership-map-2026-08-04.json` (462 paths), and the workflow contract is guarded by `tests/js/RecoveryPublicationWorkflowDocsGuard.test.mjs`. This file keeps its historical content and remains the resume entry for the pre-existing workspace state recorded below.
+
 ## 1. Handoff Baseline
 
 - Baseline time: 2026-08-04 21:37:35 Asia/Shanghai.
