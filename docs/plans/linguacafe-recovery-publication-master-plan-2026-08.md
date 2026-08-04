@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-02A
+active_task: CFH-02A-R1
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -47,20 +47,21 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`
+`CFH-02A-R1 — Apply Supervisor Ownership Decision And Close M6 Slice Contract`
 
 状态：
 
-* CFH-01（含 CFH-01A 工作区完整清点与治理骨架、CFH-01B 完整归属契约与提交组元数据）已由网页端 GPT 接受并关闭；
-* CFH-02A 是当前唯一授权任务：冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵（`docs/plans/cfh-02-m6-publication-plan.md` + `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json` + `tests/js/M6PublicationSliceDocsGuard.test.mjs`）；
-* CFH-02A 仍是纯治理任务：只读分析产品代码，不修改、不提交任何产品代码；
-* CFH-02B（M6 实施与提交）为 `candidate_not_authorized`，必须等待网页端 GPT 验收 CFH-02A 并复核 manifest 决策；
-* 产品代码未授权（`product_code_authorized: false`）。
+* CFH-01（含 CFH-01A 工作区完整清点与治理骨架、CFH-01B 完整归属契约与提交组元数据）保持 ACCEPTED；
+* CFH-02A（冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵，产物为 publication plan + manifest + M6 guard）分析交付已由网页端 GPT 阶段性接受，CFH-02A 整体尚未关闭；
+* CFH-02A-R1 是当前唯一授权任务：应用 supervisor 对 `AdminDashboard.vue` 的归属决定（M13 → CFH-02，`M6_SHARED`）并关闭 M6 切片契约（`decision.status = READY_FOR_CFH02B`）；
+* supervisor 归属决定：`resources/js/components/Admin/AdminDashboard.vue` 正式归属 CFH-02（`primary_slice: CFH-02`、`related_milestones: ["M6"]`、`readiness: needs_browser`、`commit_group: CFH-02`）；M6A/M6B 只精确暂存各自 UI 片段，每次暂存后检查完整 cached diff；
+* CFH-02B（M6 实施与提交）继续为 `candidate_not_authorized`，必须等待网页端 GPT 验收 CFH-02A-R1 并单独授权；
+* 产品代码未授权（`product_code_authorized: false`）；本轮不改变任何产品功能状态。
 
 规则：
 
 * 只读产品代码，禁止修改任何产品源码。
-* 只允许修改本轮允许的治理文件（M6 publication plan、M6 manifest、M6 guard、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁；归属图只读不修改）。
+* 只允许修改本轮允许的治理文件（M6 publication plan、M6 manifest、M6 guard、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁；归属图仅允许 supervisor 决定驱动的归属修正）。
 * 不提交产品代码，不推送未验证资产。
 * 不自动进入下一任务（`auto_advance: false`）。
 * 网页端 GPT 验收通过后才解锁下一任务；完成后停在 `awaiting_web_acceptance`。
@@ -69,7 +70,7 @@ supervisor_unlock_required: true
 
 登记但不授权：
 
-* `CFH-02B` — M6 实施与提交（依赖 CFH-02A 验收与 supervisor 复核 manifest 决策）
+* `CFH-02B` — M6 实施与提交（依赖 CFH-02A-R1 验收与网页端 GPT 单独授权）
 * `CFH-03` — M1—M5 dependency-ordered publication
 * `CFH-04` — M7—M8 Android and offline publication
 * `CFH-05` — iOS capability closure
@@ -79,8 +80,8 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-02A（当前）。
-2. CFH-02B（M6 实施与提交）依赖 CFH-02A 验收与 supervisor 复核 manifest 决策。
+1. CFH-02A-R1（当前）。
+2. CFH-02B（M6 实施与提交）依赖 CFH-02A-R1 验收与网页端 GPT 单独授权。
 3. 根据归属图判断 CFH-03 与后续切片是否可独立执行。
 4. M1—M5 foundation 已推送后再执行 CFH-04。
 5. M10—M18 根据共享文件重新拆分。

@@ -25,7 +25,7 @@
     "needs_ios": 0,
     "blocked_external": 22,
     "by_primary_slice": {
-      "CFH-02": 41,
+      "CFH-02": 42,
       "CFH-03-M1": 34,
       "CFH-03-M2": 10,
       "CFH-03-M3": 10,
@@ -40,7 +40,7 @@
       "M10": 33,
       "M11": 15,
       "M12": 26,
-      "M13": 24,
+      "M13": 23,
       "M14": 9,
       "M15": 10,
       "M16": 10,
@@ -8303,26 +8303,36 @@
       "path": "resources/js/components/Admin/AdminDashboard.vue",
       "git_state": "modified",
       "asset_type": "product_source",
-      "primary_slice": "M13",
+      "primary_slice": "CFH-02",
       "related_milestones": [
-        "M13"
+        "M6"
       ],
       "readiness": "needs_browser",
       "evidence": [
         {
+          "kind": "diff",
+          "source": "git-diff",
+          "detail": "当前 diff 仅包含 M6A 备份 UI 与 M6B 恢复 UI；未发现 M13 产品改动"
+        },
+        {
           "kind": "milestone_plan",
-          "source": "docs/plans/m13-review-settings-workload-planner-plan.md",
-          "detail": "resources/js/components/Admin/AdminDashboard.vue 属于 M13 切片；docs/plans/m13-review-settings-workload-planner-plan.md 定义该切片的文件范围与职责"
+          "source": "docs/plans/m6-resilience-health-isolation-implementation-plan.md",
+          "detail": "M6A 与 M6B allowed files 均明确包含 AdminDashboard.vue"
         },
         {
           "kind": "acceptance_report",
-          "source": "docs/testing/m13-review-settings-workload-planner-acceptance-2026-07-29.md",
-          "detail": "docs/testing/m13-review-settings-workload-planner-acceptance-2026-07-29.md 登记 M13 切片的验收证据，覆盖 resources/js/components/Admin/AdminDashboard.vue"
+          "source": "docs/testing/m6a-safe-backup-acceptance-2026-07-28.md",
+          "detail": "M6A 浏览器验收覆盖后台备份 UI"
+        },
+        {
+          "kind": "acceptance_report",
+          "source": "docs/testing/m6b-restore-safety-acceptance-2026-07-28.md",
+          "detail": "M6B 验收覆盖恢复预览、确认和状态 UI"
         }
       ],
       "shared_with": [],
-      "commit_group": "M13",
-      "notes": ""
+      "commit_group": "CFH-02",
+      "notes": "M6_SHARED：M6A 与 M6B 使用同一 Vue 文件的不同片段。CFH-02B 必须精确 patch staging；不得在单一阶段未经 cached diff 审查整文件提交。"
     },
     {
       "path": "resources/js/components/Admin/AdminReviewSettings.vue",

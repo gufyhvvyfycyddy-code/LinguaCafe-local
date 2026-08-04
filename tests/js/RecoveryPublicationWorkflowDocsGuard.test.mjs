@@ -32,9 +32,13 @@ assert.ok(!masterPlan.includes('status: authorized'));
 // 26. 恢复计划不得再把旧提交称为永久的"GitHub 最新正式基线"
 assert.ok(!masterPlan.includes('GitHub 最新正式基线'));
 assert.ok(masterPlan.includes('不永久写死'));
-// 27. 里程碑完成状态只能是 awaiting_web_acceptance，不能是 accepted
+// 3. CFH-02A-R1 最终提交时 milestone.status 必须为 awaiting_web_acceptance
+//    （status 只允许 authorized / awaiting_web_acceptance；本轮提交前必须收尾为 awaiting_web_acceptance）
 assert.ok(milestone.status === 'authorized' || milestone.status === 'awaiting_web_acceptance');
 assert.ok(milestone.status !== 'accepted');
+if (milestone.active_task === 'CFH-02A-R1') {
+    assert.equal(milestone.status, 'awaiting_web_acceptance', 'CFH-02A-R1 提交时 status 必须为 awaiting_web_acceptance');
+}
 // 29. 权威 handoff 存在且 master plan 声明指向它
 assert.ok(handoff.includes('HANDOFF_READY_WITH_BLOCKERS'));
 assert.ok(masterPlan.includes('authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md'));
@@ -160,5 +164,18 @@ const counts = ownership.baseline.counts;
 assert.equal(counts.total, counts.tracked_modified + counts.tracked_deleted + counts.untracked);
 assert.equal(ownership.entries.length, counts.total);
 assert.deepEqual(ownership.baseline.conflicts, []);
+
+// 32. AdminDashboard.vue 归属由 supervisor 决定为 CFH-02（M6_SHARED），不得再为 M13
+const adminDashboard = ownership.entries.find((e) => e.path === 'resources/js/components/Admin/AdminDashboard.vue');
+assert.ok(adminDashboard, 'AdminDashboard.vue 必须存在于归属图');
+assert.equal(adminDashboard.primary_slice, 'CFH-02', 'AdminDashboard primary_slice 必须为 CFH-02');
+assert.notEqual(adminDashboard.primary_slice, 'M13', 'AdminDashboard 不得再 primary_slice=M13');
+assert.deepEqual(adminDashboard.related_milestones, ['M6'], 'AdminDashboard related_milestones 必须为 [M6]');
+assert.equal(adminDashboard.commit_group, 'CFH-02', 'AdminDashboard commit_group 必须为 CFH-02');
+assert.equal(adminDashboard.readiness, 'needs_browser', 'AdminDashboard readiness 必须为 needs_browser');
+
+// 33. CFH-02B 继续 candidate_not_authorized（§4 明确表述，§5 登记队列）
+assert.ok(masterPlan.includes('CFH-02B（M6 实施与提交）继续为 `candidate_not_authorized`'), 'master plan §4 中 CFH-02B 必须保持 candidate_not_authorized');
+assert.ok(!masterPlan.includes('CFH-02B — `status: authorized`') && !masterPlan.includes('CFH-02B` — `status: authorized`'), 'CFH-02B 不得被误授权');
 
 console.log('Recovery publication workflow docs guard (v2 contract) passed.');

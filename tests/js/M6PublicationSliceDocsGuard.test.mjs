@@ -53,8 +53,8 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.equal(milestone.active_task, 'CFH-02A', 'milestone.active_task');
-assert.match(masterPlan, /active_task: CFH-02A/);
+assert.equal(milestone.active_task, 'CFH-02A-R1', 'milestone.active_task');
+assert.match(masterPlan, /active_task: CFH-02A-R1/);
 assert.equal(milestone.product_code_authorized, false);
 assert.match(masterPlan, /product_code_authorized: false/);
 assert.equal(milestone.auto_advance, false);
@@ -256,5 +256,50 @@ for (const f of manifest.direct_files) {
 // 16. CFH-01 ownership map 未被修改（schema v2 关键字段）
 assert.equal(ownership.schema_version, 2);
 assert.equal(ownership.entries.length, 462);
+
+// ================= CFH-02A-R1 supervisor 决定契约（任务 §14） =================
+
+const ADMIN_DASHBOARD = 'resources/js/components/Admin/AdminDashboard.vue';
+
+// 17. AdminDashboard 必须为 direct file（M6_SHARED、stage_exact_patch、browser_required=true）
+const adminDashboard = manifest.direct_files.find((f) => f.path === ADMIN_DASHBOARD);
+assert.ok(adminDashboard, 'AdminDashboard.vue 必须为 manifest direct file');
+assert.equal(adminDashboard.m6_phase, 'M6_SHARED', 'AdminDashboard m6_phase 必须为 M6_SHARED');
+assert.equal(adminDashboard.publication_action, 'stage_exact_patch', 'AdminDashboard 必须 stage_exact_patch');
+assert.equal(adminDashboard.browser_required, true, 'AdminDashboard 必须 browser_required=true');
+assert.ok(adminDashboard.required_tests.includes('npm run development'), 'AdminDashboard 必须要求 npm run development');
+assert.ok(adminDashboard.base_blob_sha.length > 0, 'AdminDashboard 为 tracked modified，base_blob_sha 非空');
+
+// 18. AdminDashboard 不得进入 excluded_files，不得进入任何 whole_files
+assert.ok(
+    !manifest.excluded_files.some((f) => f.path === ADMIN_DASHBOARD),
+    'AdminDashboard 不得进入 excluded_files',
+);
+for (const c of manifest.commit_sequence) {
+    assert.ok(
+        !c.whole_files.includes(ADMIN_DASHBOARD),
+        `AdminDashboard 不得进入 whole_files: ${c.commit_id}`,
+    );
+}
+
+// 19. AdminDashboard 必须同时进入 M6A 与 M6B patch_files
+const m6aCommit = manifest.commit_sequence.find((c) => c.commit_id === 'M6A');
+const m6bCommit = manifest.commit_sequence.find((c) => c.commit_id === 'M6B');
+assert.ok(m6aCommit && m6aCommit.patch_files.includes(ADMIN_DASHBOARD), 'AdminDashboard 必须在 M6A patch_files');
+assert.ok(m6bCommit && m6bCommit.patch_files.includes(ADMIN_DASHBOARD), 'AdminDashboard 必须在 M6B patch_files');
+
+// 20. manifest decision 冻结为 READY_FOR_CFH02B（治理条件满足，不等于产品代码授权）
+assert.equal(manifest.decision.status, 'READY_FOR_CFH02B', 'decision.status 必须为 READY_FOR_CFH02B');
+assert.equal(manifest.decision.safe_to_start_cfh02b, true, 'safe_to_start_cfh02b 必须为 true');
+assert.equal(manifest.decision.product_code_authorized, false, 'product_code_authorized 必须为 false');
+
+// 21. milestone final status 必须 awaiting_web_acceptance（CFH-02A-R1 提交时）
+assert.equal(milestone.status, 'awaiting_web_acceptance', 'milestone.status 必须为 awaiting_web_acceptance');
+
+// 22. CFH-02B 在总计划中仍为 candidate_not_authorized
+assert.ok(
+    masterPlan.includes('CFH-02B（M6 实施与提交）继续为 `candidate_not_authorized`'),
+    'CFH-02B 必须保持 candidate_not_authorized',
+);
 
 console.log('M6 publication slice docs guard passed.');

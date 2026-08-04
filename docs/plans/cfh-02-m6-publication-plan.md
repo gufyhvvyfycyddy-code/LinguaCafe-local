@@ -1,9 +1,9 @@
 # CFH-02 M6 Publication Plan
 
-> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`
-> 状态：`frozen`（本轮只冻结，不实施、不提交产品代码）
+> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`（CFH-02A-R1 治理补正后冻结）
+> 状态：`frozen`（只冻结，不实施、不提交产品代码）
 > 机器可读清单：`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
-> 决策：`NEEDS_SUPERVISOR_DECISION`（唯一阻塞项见 §15）
+> 决策：`READY_FOR_CFH02B`（supervisor 已复核归属，见 §15；CFH-02B 仍需单独授权）
 > 授权：`product_code_authorized: false`；`auto_advance: false`
 
 ## 1. 当前事实
@@ -67,11 +67,10 @@
 
 ## 7. 排除文件
 
-见 manifest `excluded_files`（12 条）。要点：
+见 manifest `excluded_files`（11 条）。要点：
 
 - **protected_regression_only**：`FsrsSchedulingService`、`ReviewCardService`、`ReviewFsrsTest`、`FsrsSchedulingServiceTest` —— 仅跑回归，不进入 M6 提交。
 - **其他里程碑**：`routes/api.php`（移动 API）、`app/Models/*`（ReviewCard/ReviewLog/User/WordSense）、`MobileMediaController`（M18）。
-- **归属冲突**：`AdminDashboard.vue`（见 §15）。
 - **M18 片段**：`config/filesystems.php` 的 media disk 不在 M6 提交内。
 
 ## 8. 测试矩阵
@@ -121,20 +120,31 @@
 - patch anchor 无法稳定定位或 hunk SHA 无法重建。
 - 必须修改产品代码才能完成计划、必须新增或修改 ADR、必须执行 migration 或数据库写入、必须修改 `.env`、必须运行真实恢复。
 - ownership map 与当前路径集合无法对应；出现任务外文件变化；远端前进或冲突。
-- AdminDashboard.vue 归属未获 supervisor 决定前不进入 CFH-02B。
+- AdminDashboard.vue 归属已由 supervisor 复核决定为 CFH-02（M6_SHARED，见 §15）；CFH-02B 在获得网页端 GPT 单独授权前不得开始。
 
 ## 14. CFH-02B 的进入条件
 
-- manifest decision 由 supervisor 更新为 `READY_FOR_CFH02B`（或按决定调整 AdminDashboard.vue 归属后重新冻结）。
+- manifest decision 已由 supervisor 更新为 `READY_FOR_CFH02B`（CFH-02A-R1 完成归属修正并冻结 42 条 direct / 22 条 shared）。
 - 网页端 GPT 验收本轮治理交付（master plan / milestone lock / guard / manifest / plan 一致性）。
-- CFH-02B 授权后才允许实施与提交；本轮 `product_code_authorized` 保持 `false`。
+- CFH-02B 授权后才允许实施与提交；本轮 `product_code_authorized` 保持 `false`；CFH-02B 仍需网页端 GPT 单独授权。
 
-## 15. 唯一阻塞项：AdminDashboard.vue 归属冲突
+## 15. 唯一阻塞项：AdminDashboard.vue 归属冲突（已由 supervisor 消解）
 
-- **M6 计划证据**：`docs/plans/m6-resilience-health-isolation-implementation-plan.md` L68（M6A allowed files）与 L207（M6B allowed files）均列出 `resources/js/components/Admin/AdminDashboard.vue`；工作区 diff（358 行新增）全部为备份列表/创建/恢复预览/RESTORE 确认 UI。
-- **归属图证据**：CFH-01 归属图 `primary_slice=M13`、`shared_with=[]`，但 M13 计划与 M13 验收报告均未覆盖该文件——归属图该条证据与事实不符。
-- **契约约束**：manifest 的 `direct_files` 必须与归属图 CFH-02 集合一致，`shared_files` 必须来自 `SHARED_UNRESOLVED`；AdminDashboard.vue 两者皆不满足，无法在本轮登记为 M6 提交文件。
-- **结论**：`decision.status = NEEDS_SUPERVISOR_DECISION`，`safe_to_start_cfh02b = false`。请 supervisor（网页端 GPT）复核：确认归属图修正为 CFH-02（M6A/M6B）后更新里程碑锁，或将 manifest 决策更新后再授权 CFH-02B。
+**当前结论（CFH-02A-R1）**：supervisor（网页端 GPT）已复核并确认 `resources/js/components/Admin/AdminDashboard.vue` 正式归属 CFH-02，为 M6A 与 M6B 共用的 `M6_SHARED` UI 文件：
+
+- `primary_slice: CFH-02`、`related_milestones: ["M6"]`、`readiness: needs_browser`、`commit_group: CFH-02`、`shared_with: []`。
+- manifest 已将该文件登记为 `direct_files` 第 42 条（`m6_phase: M6_SHARED`、`publication_action: stage_exact_patch`、`browser_required: true`），并从 `excluded_files` 移除。
+- `decision.status = READY_FOR_CFH02B`，`safe_to_start_cfh02b = true` 仅表示治理条件已满足；**CFH-02B 仍需网页端 GPT 单独授权**。
+
+**历史（CFH-02A 期间，保留备查）**：CFH-01 归属图曾将该文件误标为 `primary_slice=M13`，且 M13 计划与 M13 验收报告均未覆盖该文件；M6 实施计划 L68（M6A allowed files）与 L207（M6B allowed files）均列出该文件，工作区 diff（358 行新增）全部为备份/恢复 UI。CFH-02A 当时无法在契约内登记，曾置为 `NEEDS_SUPERVISOR_DECISION`。
+
+**提交边界（supervisor 决定第 5、6 点）**：
+
+- **M6A 只精确暂存**：备份列表、创建备份、刷新备份列表、M6A 状态/错误/成功反馈对应片段。
+- **M6B 只精确暂存**：restore preview、RESTORE 文本确认、恢复提交、恢复状态轮询、恢复错误/完成反馈对应片段。
+- 每次暂存后必须检查完整 `git diff --cached`（含 `--check`），不得在任一阶段未经 cached diff 审查整文件提交。
+- 不得把页面中未来出现的其他里程碑改动带入 M6。
+- 页面验收必须使用真实浏览器（AGENTS.md §8），不得以 API 调用冒充按钮验收。
 
 ## 16. 历史与状态声明
 

@@ -7,14 +7,14 @@
     "origin_master_at_task_start": "6530870a775f14c47d497dd49ca4b0c8687377df",
     "ownership_map_sha256": "139167ff2225d4d1feedc1df4ae628056dfe9ac7ffea425bc80be4d6e57596e1",
     "worktree_status_sha256": "0765b842906fc3ea57320425ddb46b794e8e3a0e31b40bcb5d967d7414cec6e4",
-    "direct_file_count": 41,
+    "direct_file_count": 42,
     "candidate_shared_file_count": 22
   },
   "decision": {
-    "status": "NEEDS_SUPERVISOR_DECISION",
-    "reason": "41 条 CFH-02 直接文件全部核实；22 条 shared_with 含 CFH-02 的共享文件逐一判定（17 include_whole_file、4 stage_exact_patch、1 exclude）。唯一阻塞：resources/js/components/Admin/AdminDashboard.vue 被 M6 计划 L68/L207 明确列为 M6A/M6B allowed file 且工作区 diff 全部为备份/恢复 UI，但 CFH-01 归属图 primary_slice=M13 且 M13 计划/验收报告均无该文件——归属冲突无法在本轮契约内消解（guard 要求 direct 与 CFH-02 集合一致、shared 必须来自 SHARED_UNRESOLVED），需 supervisor 复核归属后再开始 CFH-02B。",
+    "status": "READY_FOR_CFH02B",
+    "reason": "Supervisor 已确认 AdminDashboard.vue 属于 CFH-02 的 M6_SHARED UI；42 条 direct 与 22 条 shared 均已冻结，M6A/M6B 使用精确 patch staging，产品代码仍需单独授权。",
     "product_code_authorized": false,
-    "safe_to_start_cfh02b": false
+    "safe_to_start_cfh02b": true
   },
   "commit_sequence": [
     {
@@ -41,7 +41,8 @@
         "app/Console/Commands/CreateBackup.php",
         "app/Http/Controllers/BackupController.php",
         "app/Services/BackupService.php",
-        "routes/web.php"
+        "routes/web.php",
+        "resources/js/components/Admin/AdminDashboard.vue"
       ],
       "tests": [
         "php artisan test --filter=BackupManagementTest",
@@ -50,7 +51,7 @@
         "php artisan test --filter=DatabaseDumpProcessTest"
       ],
       "browser_steps": [
-        "m6a-browser-server.php fixture 启动（APP_ENV=testing、专用 testing DB、MYSQLDUMP_BINARY=fake-mysqldump）后，真实浏览器登录管理员账号，POST /backups 创建备份，验证列表出现新备份、UI 成功提示、Network 无凭据泄漏"
+        "m6a-browser-server.php fixture 启动（APP_ENV=testing、专用 testing DB、MYSQLDUMP_BINARY=fake-mysqldump）后，真实浏览器登录管理员账号，打开后台备份列表，POST /backups 创建备份，验证列表出现新备份与成功反馈；核对 Console/Network 无凭据泄漏、无错误；确认页面未触发任何恢复后端调用（不出现恢复误调用）"
       ],
       "stop_conditions": [
         "fake mysqldump 未生效或真实数据库被触碰",
@@ -84,7 +85,8 @@
         "bootstrap/app.php",
         "app/Http/Controllers/BackupController.php",
         "app/Services/BackupService.php",
-        "routes/web.php"
+        "routes/web.php",
+        "resources/js/components/Admin/AdminDashboard.vue"
       ],
       "tests": [
         "php artisan test --filter=BackupRestoreManagementTest",
@@ -95,7 +97,7 @@
         "php artisan test --filter=SqlDumpInspectorTest"
       ],
       "browser_steps": [
-        "真实浏览器：备份列表选择备份 → restore-preview → 输入 RESTORE 确认 → 恢复执行与状态轮询；验证 RejectWritesDuringRestore 期间写入被拒、恢复完成可读"
+        "真实浏览器（仅 testing 隔离环境）：备份列表选择备份 → restore-preview 预览 → 输入 RESTORE 文本确认 → 恢复执行与状态轮询；验证 RejectWritesDuringRestore 写入围栏生效、恢复完成可读；核对 Console/Network 证据且无凭据泄漏"
       ],
       "stop_conditions": [
         "真实恢复被执行（本轮只允许 testing 隔离库）",
@@ -676,6 +678,18 @@
       "required_tests": ["php artisan test --filter=SqlDumpInspectorTest"],
       "browser_required": false,
       "notes": "Ownership map says M6A, M6 plan L209 says M6B; plan wins"
+    },
+    {
+      "path": "resources/js/components/Admin/AdminDashboard.vue",
+      "git_state": "modified",
+      "m6_phase": "M6_SHARED",
+      "publication_action": "stage_exact_patch",
+      "working_tree_sha256": "bfca0b22d8c9df6da66333254d445606d3d7cf009f5f6c285c26b91499ef8c0a",
+      "base_blob_sha": "da910562669cd90b3a32464e2b547140aaac752e",
+      "evidence": ["git diff: 当前 diff 仅含 M6A 备份列表/创建/刷新/反馈与 M6B 恢复预览/RESTORE 确认/状态轮询/反馈，无 M13 内容", "M6 plan L68/L207: M6A 与 M6B allowed files 均明确包含 AdminDashboard.vue", "M6A acceptance: 浏览器验收覆盖后台备份 UI", "M6B acceptance: 验收覆盖恢复预览、确认和状态 UI", "M13 plan/acceptance 均无该文件（supervisor 核查结论）"],
+      "required_tests": ["npm run development"],
+      "browser_required": true,
+      "notes": "M6_SHARED：M6A（备份列表/创建/刷新/反馈）与 M6B（恢复预览/RESTORE 确认/提交/轮询/反馈）使用同一 Vue 文件的不同片段。CFH-02B 必须按阶段精确 patch staging，每次暂存后检查完整 cached diff；不得在单一阶段未经 cached diff 审查整文件提交。"
     }
   ]
 ,
@@ -1082,12 +1096,6 @@
       "path": "app/Http/Controllers/Mobile/MobileMediaController.php",
       "reason": "shared_with 不含 CFH-02",
       "owner": "M18-WEB-ANDROID",
-      "required_as_regression": false
-    },
-    {
-      "path": "resources/js/components/Admin/AdminDashboard.vue",
-      "reason": "归属冲突：M6 计划 L68/L207 明确列为 M6A/M6B allowed file 且 diff 全部为备份/恢复 UI，但 CFH-01 归属图 primary_slice=M13 且 M13 计划/验收报告均无该文件。guard 要求 direct 与 CFH-02 集合一致、shared 必须来自 SHARED_UNRESOLVED，本契约无法登记。需 supervisor 复核归属",
-      "owner": "SUPERVISOR_DECISION_REQUIRED",
       "required_as_regression": false
     },
     {
