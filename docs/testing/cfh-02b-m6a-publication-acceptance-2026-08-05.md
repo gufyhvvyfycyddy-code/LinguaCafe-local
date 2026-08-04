@@ -111,7 +111,7 @@ MCP Chrome 不可用（MCP server 列表为空），按 AGENTS.md §8 / ADR-0033
 7. `page.reload()` 刷新页面
 8. 验证备份仍显示（15 项）
 9. 收集 Console 与 Network 全量证据
-10. 截图存档：`/tmp/m6a_admin_before.png`、`/tmp/m6a_admin_after_create.png`、`/tmp/m6a_admin_after_reload.png`
+10. 截图存档（临时目录，仅本机验收证据，不入仓库）：`<temp>/m6a_admin_before.png`、`<temp>/m6a_admin_after_create.png`、`<temp>/m6a_admin_after_reload.png`
 
 ## 12. 登录账号
 
