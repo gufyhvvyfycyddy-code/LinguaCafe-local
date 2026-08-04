@@ -62,7 +62,7 @@ Publication plan: `docs/plans/cfh-02-m6-publication-plan.md`
 
 1. `git write-tree` → `b33d9122…`（index 树）
 2. `git commit-tree` → 临时提交对象 `4263a7be…`（不移动分支）
-3. `git worktree add --detach C:/Users/Administrator/.devspace/worktrees/cfh02b-m6a-tree 4263a7be`（仓库外 disposable worktree）
+3. `git worktree add --detach <仓库外 disposable worktree 路径> 4263a7be`（仓库外临时测试树，测试结束后删除）
 4. `vendor`/`node_modules` 以 junction 复用主项目；`.env.testing` 为 git 跟踪版本（worktree checkout 自带）
 5. worktree 与 cached diff 一致（checkout 即 staged tree 提交）
 6. 首次 worktree 建于系统 Temp 被自动清理，已重建至 `.devspace` 稳定位置；测试结束后删除
