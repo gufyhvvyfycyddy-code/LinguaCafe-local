@@ -11,12 +11,12 @@ const masterPlan = read('docs', 'plans', 'linguacafe-recovery-publication-master
 const milestone = JSON.parse(read('docs', 'execution', 'CURRENT_MILESTONE.json'));
 const handoff = read('docs', 'plans', 'codex-final-handoff-2026-08-04.md');
 
-// 1. 总计划 front matter 与里程碑锁一致（active_task 相同）
-assert.equal(milestone.active_task, 'CFH-01B');
-assert.match(masterPlan, /active_task: CFH-01B/);
-// 2. active_task 为 CFH-01B
-assert.equal(milestone.active_task, 'CFH-01B');
+// 1. 总计划 front matter 与里程碑锁一致（active_task 动态比较，不再硬编码）
+assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
+// 2. active_task 为当前授权任务（由 milestone 锁提供）
 assert.equal(milestone.schema_version, 2);
+assert.ok(milestone.active_task.length > 0);
+assert.ok(milestone.active_task.startsWith('CFH-'), `active_task 前缀: ${milestone.active_task}`);
 // 3. product_code_authorized 为 false
 assert.equal(milestone.product_code_authorized, false);
 assert.match(masterPlan, /product_code_authorized: false/);

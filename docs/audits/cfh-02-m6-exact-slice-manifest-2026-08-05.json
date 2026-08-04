@@ -1,0 +1,1146 @@
+{
+  "schema_version": 1,
+  "program_id": "linguacafe-recovery-publication-2026-08",
+  "task_id": "CFH-02A",
+  "baseline": {
+    "authorized_from_commit": "6530870a775f14c47d497dd49ca4b0c8687377df",
+    "origin_master_at_task_start": "6530870a775f14c47d497dd49ca4b0c8687377df",
+    "ownership_map_sha256": "139167ff2225d4d1feedc1df4ae628056dfe9ac7ffea425bc80be4d6e57596e1",
+    "worktree_status_sha256": "0765b842906fc3ea57320425ddb46b794e8e3a0e31b40bcb5d967d7414cec6e4",
+    "direct_file_count": 41,
+    "candidate_shared_file_count": 22
+  },
+  "decision": {
+    "status": "NEEDS_SUPERVISOR_DECISION",
+    "reason": "41 条 CFH-02 直接文件全部核实；22 条 shared_with 含 CFH-02 的共享文件逐一判定（17 include_whole_file、4 stage_exact_patch、1 exclude）。唯一阻塞：resources/js/components/Admin/AdminDashboard.vue 被 M6 计划 L68/L207 明确列为 M6A/M6B allowed file 且工作区 diff 全部为备份/恢复 UI，但 CFH-01 归属图 primary_slice=M13 且 M13 计划/验收报告均无该文件——归属冲突无法在本轮契约内消解（guard 要求 direct 与 CFH-02 集合一致、shared 必须来自 SHARED_UNRESOLVED），需 supervisor 复核归属后再开始 CFH-02B。",
+    "product_code_authorized": false,
+    "safe_to_start_cfh02b": false
+  },
+  "commit_sequence": [
+    {
+      "commit_id": "M6A",
+      "phase": "M6A",
+      "depends_on": [],
+      "whole_files": [
+        "app/Exceptions/BackupException.php",
+        "docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md",
+        "docs/plans/m6-resilience-health-isolation-implementation-plan.md",
+        "app/Services/BackupSchedule.php",
+        "app/Services/DatabaseDumpProcess.php",
+        "config/backup.php",
+        "routes/console.php",
+        "tests/Feature/BackupManagementTest.php",
+        "tests/Unit/BackupScheduleTest.php",
+        "tests/Unit/BackupServiceTest.php",
+        "tests/Unit/DatabaseDumpProcessTest.php",
+        "tests/Fixtures/fake-mysqldump.cs",
+        "tests/Fixtures/m6a-browser-server.php",
+        "docs/testing/m6a-safe-backup-acceptance-2026-07-28.md"
+      ],
+      "patch_files": [
+        "app/Console/Commands/CreateBackup.php",
+        "app/Http/Controllers/BackupController.php",
+        "app/Services/BackupService.php",
+        "routes/web.php"
+      ],
+      "tests": [
+        "php artisan test --filter=BackupManagementTest",
+        "php artisan test --filter=BackupScheduleTest",
+        "php artisan test --filter=BackupServiceTest",
+        "php artisan test --filter=DatabaseDumpProcessTest"
+      ],
+      "browser_steps": [
+        "m6a-browser-server.php fixture 启动（APP_ENV=testing、专用 testing DB、MYSQLDUMP_BINARY=fake-mysqldump）后，真实浏览器登录管理员账号，POST /backups 创建备份，验证列表出现新备份、UI 成功提示、Network 无凭据泄漏"
+      ],
+      "stop_conditions": [
+        "fake mysqldump 未生效或真实数据库被触碰",
+        "凭据出现在命令、响应、异常或日志",
+        "失败发布仍产生备份或删除既有备份",
+        "浏览器验收显示真实数据库写入"
+      ]
+    },
+    {
+      "commit_id": "M6B",
+      "phase": "M6B",
+      "depends_on": ["M6A"],
+      "whole_files": [
+        "app/Http/Middleware/RejectWritesDuringRestore.php",
+        "app/Jobs/ExecuteBackupRestore.php",
+        "app/Services/BackupRestoreService.php",
+        "app/Services/DatabaseRestoreProcess.php",
+        "app/Services/RestoreWriteFence.php",
+        "app/Services/SqlDumpInspector.php",
+        "app/Providers/AppServiceProvider.php",
+        "config/queue.php",
+        "tests/Feature/BackupRestoreManagementTest.php",
+        "tests/Feature/ExecuteBackupRestoreTest.php",
+        "tests/Feature/RestoreWriteFenceTest.php",
+        "tests/Unit/BackupRestoreServiceTest.php",
+        "tests/Unit/DatabaseRestoreProcessTest.php",
+        "tests/Unit/SqlDumpInspectorTest.php",
+        "docs/testing/m6b-restore-safety-acceptance-2026-07-28.md"
+      ],
+      "patch_files": [
+        "bootstrap/app.php",
+        "app/Http/Controllers/BackupController.php",
+        "app/Services/BackupService.php",
+        "routes/web.php"
+      ],
+      "tests": [
+        "php artisan test --filter=BackupRestoreManagementTest",
+        "php artisan test --filter=ExecuteBackupRestoreTest",
+        "php artisan test --filter=RestoreWriteFenceTest",
+        "php artisan test --filter=BackupRestoreServiceTest",
+        "php artisan test --filter=DatabaseRestoreProcessTest",
+        "php artisan test --filter=SqlDumpInspectorTest"
+      ],
+      "browser_steps": [
+        "真实浏览器：备份列表选择备份 → restore-preview → 输入 RESTORE 确认 → 恢复执行与状态轮询；验证 RejectWritesDuringRestore 期间写入被拒、恢复完成可读"
+      ],
+      "stop_conditions": [
+        "真实恢复被执行（本轮只允许 testing 隔离库）",
+        "写入围栏未生效",
+        "preview token 可绕过或校验失效",
+        "SQL 注入/危险语句未被拒绝"
+      ]
+    },
+    {
+      "commit_id": "M6C",
+      "phase": "M6C",
+      "depends_on": ["M6A", "M6B"],
+      "whole_files": [
+        "app/Http/Controllers/ArticleHealthController.php",
+        "app/Services/ArticleHealthService.php",
+        "config/article_health.php",
+        "resources/js/components/Health/ArticleHealth.vue",
+        "resources/js/components/Layout.vue",
+        "tests/Feature/ArticleHealthTest.php",
+        "tests/Fixtures/m6c-browser-server.php",
+        "tests/Fixtures/m6c-tokenizer-health-router.php",
+        "docs/testing/m6c-article-health-acceptance-2026-07-28.md"
+      ],
+      "patch_files": [
+        "resources/js/app.js",
+        "routes/web.php"
+      ],
+      "tests": [
+        "php artisan test --filter=ArticleHealthTest",
+        "npm run development"
+      ],
+      "browser_steps": [
+        "真实浏览器：侧栏出现「内容健康」入口，打开 /article-health 页面，验证健康状态展示与真实 tokenizer 探活"
+      ],
+      "stop_conditions": [
+        "页面无法渲染或 Console 有新错误",
+        "tokenizer 探活失败未显示",
+        "Layout 侧栏入口缺失"
+      ]
+    },
+    {
+      "commit_id": "M6D",
+      "phase": "M6D",
+      "depends_on": ["M6A", "M6B", "M6C"],
+      "whole_files": [
+        "app/Services/SafeFilePathService.php",
+        "app/Http/Controllers/FontTypeController.php",
+        "app/Http/Controllers/ImageController.php",
+        "app/Http/Controllers/BookController.php",
+        "app/Http/Controllers/ChapterController.php",
+        "app/Http/Controllers/VocabularyController.php",
+        "app/Jobs/ProcessChapter.php",
+        "app/Services/BookService.php",
+        "app/Services/ChapterService.php",
+        "app/Services/ImageService.php",
+        "app/Services/VocabularyQueryService.php",
+        "app/Services/VocabularyService.php",
+        "tests/Feature/M6IsolationAuditTest.php",
+        "tests/Feature/EncounteredWordLearningEnrollmentTest.php",
+        "tests/Feature/MorphologyLemmaDefectFixTest.php",
+        "tests/Feature/MorphologyMatrixImportRegressionTest.php",
+        "docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md"
+      ],
+      "patch_files": [
+        "app/Http/Controllers/HomeController.php"
+      ],
+      "tests": [
+        "php artisan test --filter=M6IsolationAuditTest",
+        "php artisan test --filter=EncounteredWordLearningEnrollmentTest",
+        "php artisan test --filter=MorphologyLemmaDefectFixTest",
+        "php artisan test --filter=MorphologyMatrixImportRegressionTest",
+        "php artisan test --filter=ReviewFsrsTest"
+      ],
+      "browser_steps": [
+        "真实浏览器：跨用户/跨语言 Book/Chapter/Vocabulary 读写被拒；font/image/manual 目录穿越被拒；合法文件正常渲染"
+      ],
+      "stop_conditions": [
+        "跨用户或跨语言资源可读/可写",
+        "ProcessChapter 载荷不匹配仍可处理",
+        "目录穿越可逃逸 approved root",
+        "FSRS/ReviewCard 回归失败"
+      ]
+    }
+  ]
+,
+  "direct_files": [
+    {
+      "path": "app/Console/Commands/CreateBackup.php",
+      "git_state": "modified",
+      "m6_phase": "M6A",
+      "publication_action": "stage_exact_patch",
+      "working_tree_sha256": "28d8ac2d577e4dc2810e685dea302bdee36d171e47ebee3e394b016bd3cb2bf8",
+      "base_blob_sha": "ee5138a626bf583613324b3b59debf091b3a6de5",
+      "evidence": ["M6 plan M6A allowed files; diff is M6A-only backup command refactor"],
+      "required_tests": ["php artisan test --filter=BackupManagementTest"],
+      "browser_required": false,
+      "notes": "diff matches M6 plan; conservative stage_exact_patch"
+    },
+    {
+      "path": "app/Exceptions/BackupException.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "a4000159396f0f7d39ad5f1a174c1e3ef0ae5ee33a7623fa4ee62d7ecde5c75a",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A allowed files; untracked"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": "Shared by M6A+M6B; committed once in M6A"
+    },
+    {
+      "path": "app/Http/Controllers/ArticleHealthController.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "5cfe4347550d2a75ed94728b77c0d41c028428e0ddfde9faedade998e74e5e92",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=ArticleHealthTest"],
+      "browser_required": true,
+      "notes": ""
+    },
+    {
+      "path": "app/Http/Controllers/BackupController.php",
+      "git_state": "modified",
+      "m6_phase": "M6_SHARED",
+      "publication_action": "stage_exact_patch",
+      "working_tree_sha256": "5aad1510c1c559f56a5cd2f902ebf7cb63c35ecb28c636d5ec9a7a2e39e2dff4",
+      "base_blob_sha": "f4cc57b488722c47b366a9234e59ce5bca1f42f8",
+      "evidence": ["M6 plan M6A+M6B allowed files; diff has index/store (M6A) + previewRestore/restore/restoreStatus (M6B)"],
+      "required_tests": ["php artisan test --filter=BackupManagementTest", "php artisan test --filter=BackupRestoreManagementTest"],
+      "browser_required": false,
+      "notes": "M6A patch = index/store; M6B patch = previewRestore/restore/restoreStatus; anchors are method signatures"
+    },
+    {
+      "path": "app/Http/Middleware/RejectWritesDuringRestore.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "d0b5baa2adae535a75355dfa6c740c4f51581bfc4b0d3f056a258d250d6229f3",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=RestoreWriteFenceTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Jobs/ExecuteBackupRestore.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "321e387218e8be41d282c02629ef5937dfe3aa3cd9a3c91d98e7c3a27f83ee4c",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=ExecuteBackupRestoreTest"],
+      "browser_required": false,
+      "notes": ""
+    }
+,
+    {
+      "path": "app/Services/ArticleHealthService.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "d0e1a724eedf14ab9f52c7af048eedcbc08176c4cc127fda63ce5ceb89cbe5e1",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=ArticleHealthTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/BackupRestoreService.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "a36f8c818975b6b74a6e9dc7defdbe0ad934aee53974322dbd97bf300bbd1bad",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=BackupRestoreServiceTest", "php artisan test --filter=BackupRestoreManagementTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/BackupSchedule.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "92568615c11c9c5253c0da0caf67aa7427a37c84016214ad5cd568902dff5169",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=BackupScheduleTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/BackupService.php",
+      "git_state": "modified",
+      "m6_phase": "M6_SHARED",
+      "publication_action": "stage_exact_patch",
+      "working_tree_sha256": "ed182362a44854b657b709e3b9bfc98114245b8593251ba0c6d177b8c6189a27",
+      "base_blob_sha": "1aab897af2234d5dea35402cca471b724df51db5",
+      "evidence": ["M6 plan M6A+M6B allowed files; diff has createBackup/listBackups (M6A) + inspectBackup ID lookup (M6B per plan L87)"],
+      "required_tests": ["php artisan test --filter=BackupServiceTest", "php artisan test --filter=BackupRestoreServiceTest"],
+      "browser_required": false,
+      "notes": "M6A patch = createBackup/withExclusiveOperation/listBackups; M6B patch = inspectBackup"
+    },
+    {
+      "path": "app/Services/DatabaseDumpProcess.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "d1c2161957f9ed890dda9e2f526c44b862a9aec9fc326690eca064bb3cef7518",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=DatabaseDumpProcessTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/DatabaseRestoreProcess.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "e66c0b842c1bbae168e3e0abd6bfaadbc5faacd8188eabc91f638e25379b1f8d",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=DatabaseRestoreProcessTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/RestoreWriteFence.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "8a414d3b7d9496b5bbcda284e985befbe7c5578a40884f20ed092015e2399c21",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=RestoreWriteFenceTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "app/Services/SafeFilePathService.php",
+      "git_state": "untracked",
+      "m6_phase": "M6D",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "fe40e7767c207e15b8bab288e9d69d4dd27727212574abaa63ec38c5f25e7590",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6D allowed files (L398); untracked"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "browser_required": false,
+      "notes": "Ownership map says M6B, M6 plan L398 says M6D; plan wins"
+    },
+    {
+      "path": "app/Services/SqlDumpInspector.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "0ce65b1bc58ba819beded2445efa88de57f1a77a95af0fa22348db10ccfea443",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6B allowed files (L194); untracked"],
+      "required_tests": ["php artisan test --filter=SqlDumpInspectorTest"],
+      "browser_required": false,
+      "notes": "Ownership map says M6A, M6 plan L194 says M6B; plan wins"
+    }
+,
+    {
+      "path": "config/article_health.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "8b9e824f72fbae182eb75eee5c33e791513dc840172c808041daae5c7d34fd77",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=ArticleHealthTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "config/backup.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "e34401c5d8617364d9f188c8f4f263d96b2472ba062d70d00d66f6e1bb2c13a2",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A allowed files; untracked"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md",
+      "git_state": "untracked",
+      "m6_phase": "M6_SHARED",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "bd82bbc62d4d99aa97db9627651cb0ad97f3f0115e2a099a5ba4ef44849daab4",
+      "base_blob_sha": "",
+      "evidence": ["M6 ADR; documentation for whole M6"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": "M6-wide doc; commit in M6A as M6 contract doc"
+    },
+    {
+      "path": "docs/plans/m6-resilience-health-isolation-implementation-plan.md",
+      "git_state": "untracked",
+      "m6_phase": "M6_SHARED",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "a715505be4189f757adfd74698cf3dcf3679147188c60fc96f6c666bd500023f",
+      "base_blob_sha": "",
+      "evidence": ["M6 implementation plan; documentation for whole M6"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": "M6-wide doc; commit in M6A as M6 contract doc"
+    },
+    {
+      "path": "docs/testing/m6a-safe-backup-acceptance-2026-07-28.md",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "85983495e9f77e595ea0206d66ada614d2e253b16b6376d498d294f9f94f46fc",
+      "base_blob_sha": "",
+      "evidence": ["M6A acceptance report"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "docs/testing/m6b-restore-safety-acceptance-2026-07-28.md",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "b94e7a65f0d1925cc4346ba4ed7389fdbdaf2814d98a9778c435b76e12dcc01a",
+      "base_blob_sha": "",
+      "evidence": ["M6B acceptance report"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "docs/testing/m6c-article-health-acceptance-2026-07-28.md",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "b39979344b3d3d2069e5e51093528c706fad765f1002dad513605336f6fa5578",
+      "base_blob_sha": "",
+      "evidence": ["M6C acceptance report"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md",
+      "git_state": "untracked",
+      "m6_phase": "M6D",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "d4d8cfe1bd714229cf9fcf59bda80936f0dbdca8e48799cd4f62fca87dba626c",
+      "base_blob_sha": "",
+      "evidence": ["M6D acceptance report"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "resources/js/components/Health/ArticleHealth.vue",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "472894ddc9fe99efbe1c9176e79513567fac4e3555adb58c24bb2263a3064ca7",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C allowed files; untracked"],
+      "required_tests": [],
+      "browser_required": true,
+      "notes": "Requires npm run development + real browser"
+    },
+    {
+      "path": "resources/js/components/Layout.vue",
+      "git_state": "modified",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "9f2da8a5f2eeaf88a1035624ad438a568ee45aed4e8f911ead6417d12c1ee9b3",
+      "base_blob_sha": "fea3faded8b8493676575c9ee717b17339aa6e99",
+      "evidence": ["M6 plan M6C allowed files; diff is M6C-only sidebar entry"],
+      "required_tests": [],
+      "browser_required": true,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/ArticleHealthTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "295a3fd60d19b340f5f6c945c2b7e10f26c2221a082d1234b86dfcaaa42ab0fa",
+      "base_blob_sha": "",
+      "evidence": ["M6C test; untracked"],
+      "required_tests": ["php artisan test --filter=ArticleHealthTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/BackupManagementTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "2ef19961f9fc1cab667647687f0fa2124e537c93521b69a534f9f0e74a5afe68",
+      "base_blob_sha": "",
+      "evidence": ["M6A test; untracked"],
+      "required_tests": ["php artisan test --filter=BackupManagementTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/BackupRestoreManagementTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "e93bfa8d150a22082024fc1b3545c0cfb0ce1d535e3562c430c7d8dc814de10e",
+      "base_blob_sha": "",
+      "evidence": ["M6B test; untracked"],
+      "required_tests": ["php artisan test --filter=BackupRestoreManagementTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/ExecuteBackupRestoreTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "8a2d7b69ed6dd0160908e90715f4f94b1bcfbc0982e2bbbc307d8bbe1b3a30fd",
+      "base_blob_sha": "",
+      "evidence": ["M6B test; untracked"],
+      "required_tests": ["php artisan test --filter=ExecuteBackupRestoreTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/M6IsolationAuditTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6D",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "30c829c89d5145b013074dcea40565312557fecd2f07d6f79c4bf4c85a9cf4c7",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6D allowed files; untracked"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Feature/RestoreWriteFenceTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "a3a991638643496ba8a6ef8a0ba8b8117bf09d9596586a2c352088a96a91e169",
+      "base_blob_sha": "",
+      "evidence": ["M6B test; untracked"],
+      "required_tests": ["php artisan test --filter=RestoreWriteFenceTest"],
+      "browser_required": false,
+      "notes": ""
+    }
+,
+    {
+      "path": "tests/Fixtures/fake-mysqldump.cs",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "3193ac238017b901f89795defb86af855b41976f07611d47ab226ebeceaed94e",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A fixture; untracked"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": "Compiled only to testing temp dir for real-browser acceptance"
+    },
+    {
+      "path": "tests/Fixtures/m6a-browser-server.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "e9d0a06d442944a32a552db9181ace79de99dc976815e316027907d560194e30",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6A fixture; untracked"],
+      "required_tests": [],
+      "browser_required": true,
+      "notes": "Testing-env browser server for M6A acceptance"
+    },
+    {
+      "path": "tests/Fixtures/m6c-browser-server.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "79551e22d611138735986050f09667b5bdc808bf90457704fee6ba7420c41641",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C fixture; untracked"],
+      "required_tests": [],
+      "browser_required": true,
+      "notes": "Testing-env browser server for M6C acceptance"
+    },
+    {
+      "path": "tests/Fixtures/m6c-tokenizer-health-router.php",
+      "git_state": "untracked",
+      "m6_phase": "M6C",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "3eb1cc49b021a04fea2bf3385fdba5e3549c1abe35b1b74e15c21a682ab28177",
+      "base_blob_sha": "",
+      "evidence": ["M6 plan M6C fixture; untracked"],
+      "required_tests": [],
+      "browser_required": false,
+      "notes": "Tokenizer health probe router for M6C acceptance"
+    },
+    {
+      "path": "tests/Unit/BackupRestoreServiceTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "51e00d52a63ddd99b350f2374358a6e5dac59b28dde76a5df476494422812bc9",
+      "base_blob_sha": "",
+      "evidence": ["M6B unit test; untracked"],
+      "required_tests": ["php artisan test --filter=BackupRestoreServiceTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Unit/BackupScheduleTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "532ec3d2d46ead078fe599278b3f5dd2d8e89c939aa3a50f79997db0781e176f",
+      "base_blob_sha": "",
+      "evidence": ["M6A unit test; untracked"],
+      "required_tests": ["php artisan test --filter=BackupScheduleTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Unit/BackupServiceTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "143d034e445e80c3dc6f8138b49b57de3067fa8c7325042265f979201c6ce667",
+      "base_blob_sha": "",
+      "evidence": ["M6A unit test; untracked"],
+      "required_tests": ["php artisan test --filter=BackupServiceTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Unit/DatabaseDumpProcessTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6A",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "69fde65289db8ae2579e2e7fb525aea15621a3f110c68740df20ddf46c7e20b2",
+      "base_blob_sha": "",
+      "evidence": ["M6A unit test; untracked"],
+      "required_tests": ["php artisan test --filter=DatabaseDumpProcessTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Unit/DatabaseRestoreProcessTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "32c139dca7ea74c1caae1c5a49501e94223266998e1bf6d41532b0d7c8963c54",
+      "base_blob_sha": "",
+      "evidence": ["M6B unit test; untracked"],
+      "required_tests": ["php artisan test --filter=DatabaseRestoreProcessTest"],
+      "browser_required": false,
+      "notes": ""
+    },
+    {
+      "path": "tests/Unit/SqlDumpInspectorTest.php",
+      "git_state": "untracked",
+      "m6_phase": "M6B",
+      "publication_action": "include_whole_file",
+      "working_tree_sha256": "0c869dbb900c1bc8d92b349eba7c860dcd48aed5db51a82c4758016608ac78ac",
+      "base_blob_sha": "",
+      "evidence": ["M6B unit test (plan L209); untracked"],
+      "required_tests": ["php artisan test --filter=SqlDumpInspectorTest"],
+      "browser_required": false,
+      "notes": "Ownership map says M6A, M6 plan L209 says M6B; plan wins"
+    }
+  ]
+,
+  "shared_files": [
+    {
+      "path": "app/Http/Controllers/BookController.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "9fe5b5badd33e1a997dec97e55717152fc03c3a6b578028fbe01483653efabe5",
+      "base_blob_sha": "903e0d1d60809252c215ba828c05c7cce5891290",
+      "symbols": ["getBookWordCounts", "updateBook", "deleteBook"],
+      "selected_hunks": [],
+      "non_m6_owners": ["CFH-03-M5"],
+      "evidence": ["M6 plan M6D allowed files L402; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": "Diff 全部为 M6D language 参数透传；CFH-03-M5 仅运行依赖，无代码混入"
+    },
+    {
+      "path": "app/Http/Controllers/ChapterController.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "525ea28f3025c626b8908f5d6246b3284473de9fdfa7843d7a97e4beabe913df",
+      "base_blob_sha": "bcfde90f4af8b82c2832a7c99525431f0b313df9",
+      "symbols": ["getChaptersForBook", "getChaptersBookCount", "getChapterForEditor", "createChapter", "updateChapter"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L404; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Http/Controllers/FontTypeController.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "a43d9e8aebe6d161ca9ba6abd2ef9a68fdca2e19d1ac74b9a0497db06db68a95",
+      "base_blob_sha": "86a57438b465cda9a5d095455c21608ea0951844",
+      "symbols": ["getFontTypeFile"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L400; diff is SafeFilePathService (M6D)"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Http/Controllers/HomeController.php",
+      "m6_role": "required_runtime",
+      "decision": "stage_exact_patch",
+      "working_tree_sha256": "082df83a376da48a7ee376ed4472e57b1de7020020deefee8b657b847302f206",
+      "base_blob_sha": "efaebfa9e031843ff9dccac0e96a75982f35a902",
+      "symbols": ["getUserManualFile", "getStatistics", "exportStatistics"],
+      "selected_hunks": [
+        {
+          "symbol": "getUserManualFile",
+          "start_anchor": "public function getUserManualFile",
+          "end_anchor": "resolveExistingDirectChild",
+          "reason": "M6D SafeFilePathService 手动文件安全解析；getStatistics/exportStatistics 属 M14 不得混入",
+          "hunk_sha256": "c4ec14674aaf500325712776a5856979dfddbf1146da58f06b3b8c831c900732"
+        }
+      ],
+      "non_m6_owners": ["M14"],
+      "evidence": ["M6 plan M6D allowed files L399; diff 混 M6D SafeFilePathService + M14 StatisticsExportService"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": "M6D patch 仅含 SafeFilePathService import + getUserManualFile 方法；M14 片段必须排除"
+    },
+    {
+      "path": "app/Http/Controllers/ImageController.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "2a155e5425a9ae59b6e48657e5b921fc8650c3cc9c7a0f4aec821bb7032d9743",
+      "base_blob_sha": "d766b380845b74460e25e58735c110d2d429e4cf",
+      "symbols": ["getBookImage", "getKanjiImage"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L401; diff is SafeFilePathService + language (M6D)"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Http/Controllers/VocabularyController.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "81a5b8bf2d93477d2606eff9e654c0c85051eeb3e8110cb77769e334999857a8",
+      "base_blob_sha": "e2b69f10a63f8fe0c9f03439406654440f76d207",
+      "symbols": ["getUniqueWord", "updateWord", "getPhrase", "updatePhrase"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L406; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Jobs/ProcessChapter.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "0927e5577e4bd9752c47fddf68696141fa4dd7ed14a5f15889c03401e72359de",
+      "base_blob_sha": "12a10a9892b3ab8d3e1859c5e6fd86af095814df",
+      "symbols": ["handle", "failed"],
+      "selected_hunks": [],
+      "non_m6_owners": ["CFH-05-M9"],
+      "evidence": ["M6 plan M6D allowed files L407; diff is (chapter_id,user_id,language) scope proof"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": "M9 仅运行依赖（mobile import 触发 job），diff 无 M9 代码"
+    },
+    {
+      "path": "app/Providers/AppServiceProvider.php",
+      "m6_role": "required_registration",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "69da4f42e8d65dc89715ab34426bff9f413db8854a0ea9402fcf62cecdc08bfd",
+      "base_blob_sha": "211af5534e5d19fdd72c2731b2017987a6515acc",
+      "symbols": ["boot"],
+      "selected_hunks": [],
+      "non_m6_owners": ["CFH-03-M1"],
+      "evidence": ["M6 plan M6B allowed files L203; diff is RestoreWriteFence guard only"],
+      "required_tests": ["php artisan test --filter=RestoreWriteFenceTest"],
+      "notes": "diff 仅 M6B RestoreWriteFence 注册；M1 仅未来共用，当前无代码"
+    },
+    {
+      "path": "app/Services/BookService.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "976b039e6c52bfd5a55e0a36e80257aa617850d443ddfe730c964c8ba4e4c5ac",
+      "base_blob_sha": "a013872d158d1ebe0fdfd6c15be2c29bd9f595ab",
+      "symbols": ["getBookWordCounts", "updateBookWordCount", "updateBook", "deleteBook"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L409; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Services/ChapterService.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "a21c359cfb20bfe22190076c3487a8d3fc292ef1c1da2a9a0a4b75ca25ad73c8",
+      "base_blob_sha": "bacf85e94b89c2e52eb76f500cd1010c46dfdb2b",
+      "symbols": ["getChaptersForBook", "getChaptersBookCount", "getChapterForEditor", "finishChapter"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L410; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Services/ImageService.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "cdeca5339c221a15c18dd3422f83c41420dae5d319726e6697e6891e49cb14ba",
+      "base_blob_sha": "3b1a452b88c9decd1aa2c7663982eaaf855ebb5d",
+      "symbols": ["getBookImage"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L402; diff is SafeFilePathService + language (M6D)"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    }
+,
+    {
+      "path": "app/Services/VocabularyQueryService.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "e8580280520256ce4cf9543246233191866d8051cccd95ce8a5866edb7fd77ba",
+      "base_blob_sha": "db56dbbedc188312edf69d5d9f7440a41d5d612d",
+      "symbols": ["getUniqueWord", "getPhrase", "getExampleSentence"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L411; diff is pure M6D language predicate"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "app/Services/VocabularyService.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "0440435567f52565843ef2deb5805304f220fdae83b07ba409ac0375cb1b42cf",
+      "base_blob_sha": "80c6ec6ac440b099e6536cf5ccd9a7c4f89a0e4d",
+      "symbols": ["getUniqueWord", "updateWord", "extractSentenceText", "updatePhrase"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6D allowed files L412; diff is language predicate + chapter ownership proof"],
+      "required_tests": ["php artisan test --filter=M6IsolationAuditTest"],
+      "notes": ""
+    },
+    {
+      "path": "bootstrap/app.php",
+      "m6_role": "required_registration",
+      "decision": "stage_exact_patch",
+      "working_tree_sha256": "48f2161def5b23e87a013dfc71ea498b95d85a1301979094dc50fce2ff6a12a9",
+      "base_blob_sha": "b82fc0644057b603877c526c92b5a64cc5a57b62",
+      "symbols": ["withMiddleware", "RejectWritesDuringRestore"],
+      "selected_hunks": [
+        {
+          "symbol": "RejectWritesDuringRestore use",
+          "start_anchor": "->withMiddleware(function (Middleware $middleware) {",
+          "end_anchor": "$middleware->api(prepend: [",
+          "reason": "M6B write-fence import; MobileApiResponse/exception imports are M1",
+          "hunk_sha256": "9e6d04ec84bad18e973656fa61c026ddb8a7d94772d03ec75cd9fc1f5022a260"
+        },
+        {
+          "symbol": "RejectWritesDuringRestore prepend",
+          "start_anchor": "->withMiddleware(function (Middleware $middleware) {",
+          "end_anchor": "$middleware->api(prepend: [",
+          "reason": "M6B global write-fence prepend; api routes and exception renderers are M1",
+          "hunk_sha256": "9d58cdfd901d4f3a15f641ae1623e928624ab4043da8bb3ce31d420d58dc294a"
+        }
+      ],
+      "non_m6_owners": ["CFH-03-M1"],
+      "evidence": ["M6 plan M6B allowed files L204; diff mixes M6B prepend + M1 mobile exceptions/api"],
+      "required_tests": ["php artisan test --filter=RestoreWriteFenceTest"],
+      "notes": "M6B patch is exactly 2 hunks; api routing, mobile.device alias, MobileApiResponse exceptions all excluded"
+    },
+    {
+      "path": "config/filesystems.php",
+      "m6_role": "unrelated",
+      "decision": "exclude_from_m6",
+      "working_tree_sha256": "100e36ae418db848e4c4b8924a0be981c65e37fa21e0495fb75a03a44f3be279",
+      "base_blob_sha": "c60f8ac7960070cbd6bb71556a00be4beb465100",
+      "symbols": [],
+      "selected_hunks": [],
+      "non_m6_owners": ["M18-WEB-ANDROID"],
+      "evidence": ["diff adds only media disk (storage_path('media')); MediaAssetService (M18) reads config('media.disk'); M6 backup uses existing backup disk"],
+      "required_tests": [],
+      "notes": "No M6 code; media disk belongs to M18"
+    },
+    {
+      "path": "config/queue.php",
+      "m6_role": "required_configuration",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "48d6f353749a1470e9a014b2d78f1927706854bfd4903211ef35ebca2f8a126a",
+      "base_blob_sha": "116bd8d002477e76510418cdbe2ac90a92ea7ce7",
+      "symbols": ["redis-restore"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6B allowed files L206; diff adds only redis-restore queue"],
+      "required_tests": ["php artisan test --filter=ExecuteBackupRestoreTest"],
+      "notes": ""
+    }
+,
+    {
+      "path": "resources/js/app.js",
+      "m6_role": "required_ui_entry",
+      "decision": "stage_exact_patch",
+      "working_tree_sha256": "2470ef2437e97a02cd8dd2f98ea28401cce92e49d080fe8dd67e344bf23c1861",
+      "base_blob_sha": "17d1f25dc87eb11baea381b7f5c7e7ab7592dd8a",
+      "symbols": ["ArticleHealth"],
+      "selected_hunks": [
+        {
+          "symbol": "ArticleHealth registration",
+          "start_anchor": "const Attributions = require('./components/Home/Attributions.vue').default;",
+          "end_anchor": "const Library = require('./components/Library/Library.vue').default;",
+          "reason": "M6C ArticleHealth component registration; MobileSyncSimulator is M4",
+          "hunk_sha256": "f0e6057ff60bc629d370731ddeaee61c00c17fd9185821078f2b23b1ebec7a5f"
+        }
+      ],
+      "non_m6_owners": ["CFH-03-M4"],
+      "evidence": ["M6C route registration; diff mixes M6C ArticleHealth + M4 MobileSyncSimulator"],
+      "required_tests": ["npm run development"],
+      "notes": "M6C patch covers ArticleHealth require + /article-health route only; MobileSyncSimulator excluded"
+    },
+    {
+      "path": "routes/console.php",
+      "m6_role": "required_route",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "eddf7e3dcefd63e77342bf56f6960e40c513a092180e09ea76c23e0f6f4fe1a6",
+      "base_blob_sha": "ab62da5e74b989da45d217e9a728054eceb41e70",
+      "symbols": ["BackupSchedule", "Schedule"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6 plan M6A allowed files L66; diff is BackupSchedule cron registration only"],
+      "required_tests": ["php artisan test --filter=BackupScheduleTest"],
+      "notes": ""
+    },
+    {
+      "path": "routes/web.php",
+      "m6_role": "required_route",
+      "decision": "stage_exact_patch",
+      "working_tree_sha256": "6c4e5beb5cf33a5e9e7deff782e111ef98ea2835ff665c9ed68148068a0f502b",
+      "base_blob_sha": "6a8c024fbf0462b10c969ab0a6d3c84dc923eaf4",
+      "symbols": ["backup routes", "backup-restores", "article-health"],
+      "selected_hunks": [
+        {
+          "symbol": "backup-restores status route",
+          "start_anchor": "Route::get('/backup-restores/{operationId}'",
+          "end_anchor": "->middleware('web');",
+          "reason": "M6B restoreStatus route",
+          "hunk_sha256": "ba40e3a41f24735b42614f0f6eee12d735ddab73d7bc6e4d6c53c3085af965cd"
+        },
+        {
+          "symbol": "backup CRUD routes",
+          "start_anchor": "// backup",
+          "end_anchor": "Route::post('/backups/{backupId}/restore'",
+          "reason": "M6A index/store + M6B preview/restore routes",
+          "hunk_sha256": "67074a22b16c8f534763e77de5c23d428352b262d0e8223cad81dcc683ee5f00"
+        },
+        {
+          "symbol": "article-health routes",
+          "start_anchor": "Route::get('/article-health'",
+          "end_anchor": "Route::get('/article-health/data'",
+          "reason": "M6C page + data routes; adjacent media routes are M18",
+          "hunk_sha256": "fd03b7ea951d1b0e82d887edd853485f53aa51b2f97126d230a1a269316fbe10"
+        }
+      ],
+      "non_m6_owners": ["CFH-03-M4", "M10", "M11", "M12", "M13", "M14", "M15", "M18"],
+      "evidence": ["M6 plan M6A/M6B/M6C allowed files all include routes/web.php; diff mixes M6 + M10-M18 routes"],
+      "required_tests": ["php artisan test --filter=BackupManagementTest", "php artisan test --filter=BackupRestoreManagementTest", "php artisan test --filter=ArticleHealthTest"],
+      "notes": "M6A patch=backup CRUD; M6B patch=backup-restores status; M6C patch=article-health. testing sentinel, media, special-study, portable, tags, manual-operations, knowledge-hygiene routes all excluded"
+    },
+    {
+      "path": "tests/Feature/EncounteredWordLearningEnrollmentTest.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "7defd78d4ac34103b099bf86969767a7ab4b33f41bcf9ddc06c44e04f28cc959",
+      "base_blob_sha": "7bf5490e625a381d3d34d6565b9512415f5dcd08",
+      "symbols": ["updateWord signature adaptation"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6D signature adaptation (updateWord gains language); diff is M6D-only"],
+      "required_tests": ["php artisan test --filter=EncounteredWordLearningEnrollmentTest"],
+      "notes": "M6 plan M6D allows directly affected existing tests"
+    },
+    {
+      "path": "tests/Feature/MorphologyLemmaDefectFixTest.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "c86c1eb035c9114301f7a7a107a09c4e3406cfc6ad567ea52c9bb03264b260a4",
+      "base_blob_sha": "290b2a60f7d358da7b4c87c6b47bb1602e43a767",
+      "symbols": ["processChapterText signature adaptation"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6D signature adaptation (processChapterText gains language); diff is M6D-only"],
+      "required_tests": ["php artisan test --filter=MorphologyLemmaDefectFixTest"],
+      "notes": "M6 plan M6D allows directly affected existing tests"
+    },
+    {
+      "path": "tests/Feature/MorphologyMatrixImportRegressionTest.php",
+      "m6_role": "required_runtime",
+      "decision": "include_whole_file",
+      "working_tree_sha256": "2eef9a39c0d6603118f9962a7787392414631ca38d1613170e605a8e611cacdf",
+      "base_blob_sha": "17d7ecfe71c8aba8db23da4d2b2122a06885dc36",
+      "symbols": ["processChapterText signature adaptation"],
+      "selected_hunks": [],
+      "non_m6_owners": [],
+      "evidence": ["M6D signature adaptation; diff is M6D-only"],
+      "required_tests": ["php artisan test --filter=MorphologyMatrixImportRegressionTest"],
+      "notes": "M6 plan M6D allows directly affected existing tests"
+    }
+  ]
+,
+  "excluded_files": [
+    {
+      "path": "app/Services/FsrsSchedulingService.php",
+      "reason": "shared_with 不含 CFH-02；无 M6 代码片段，仅保护回归",
+      "owner": "M11/M13/M1/M4/M7",
+      "required_as_regression": true
+    },
+    {
+      "path": "app/Services/ReviewCardService.php",
+      "reason": "shared_with 不含 CFH-02；无 M6 代码片段，仅保护回归",
+      "owner": "M11/M13/M1/M4/M7",
+      "required_as_regression": true
+    },
+    {
+      "path": "tests/Feature/ReviewFsrsTest.php",
+      "reason": "shared_with 不含 CFH-02；无 M6 代码片段，仅保护回归",
+      "owner": "M13/M1/M4/M7",
+      "required_as_regression": true
+    },
+    {
+      "path": "tests/Unit/FsrsSchedulingServiceTest.php",
+      "reason": "shared_with 不含 CFH-02；无 M6 代码片段，仅保护回归",
+      "owner": "M13/M1/M4/M7",
+      "required_as_regression": true
+    },
+    {
+      "path": "routes/api.php",
+      "reason": "shared_with 不含 CFH-02；全部为移动 API 里程碑路由",
+      "owner": "CFH-03-M1/M2/M3/M4/CFH-04-M7/CFH-05-M9/M10/M11/M12",
+      "required_as_regression": false
+    },
+    {
+      "path": "app/Models/ReviewCard.php",
+      "reason": "shared_with 不含 CFH-02；ReviewCard 生命周期属其他里程碑",
+      "owner": "M11/M12/M13",
+      "required_as_regression": true
+    },
+    {
+      "path": "app/Models/ReviewLog.php",
+      "reason": "shared_with 不含 CFH-02；ReviewLog 属其他里程碑",
+      "owner": "M11/M12",
+      "required_as_regression": true
+    },
+    {
+      "path": "app/Models/User.php",
+      "reason": "shared_with 不含 CFH-02",
+      "owner": "CFH-03-M1",
+      "required_as_regression": false
+    },
+    {
+      "path": "app/Models/WordSense.php",
+      "reason": "shared_with 不含 CFH-02",
+      "owner": "M10/M18-WEB-ANDROID/CFH-03-M1",
+      "required_as_regression": true
+    },
+    {
+      "path": "app/Http/Controllers/Mobile/MobileMediaController.php",
+      "reason": "shared_with 不含 CFH-02",
+      "owner": "M18-WEB-ANDROID",
+      "required_as_regression": false
+    },
+    {
+      "path": "resources/js/components/Admin/AdminDashboard.vue",
+      "reason": "归属冲突：M6 计划 L68/L207 明确列为 M6A/M6B allowed file 且 diff 全部为备份/恢复 UI，但 CFH-01 归属图 primary_slice=M13 且 M13 计划/验收报告均无该文件。guard 要求 direct 与 CFH-02 集合一致、shared 必须来自 SHARED_UNRESOLVED，本契约无法登记。需 supervisor 复核归属",
+      "owner": "SUPERVISOR_DECISION_REQUIRED",
+      "required_as_regression": false
+    },
+    {
+      "path": "config/filesystems.php",
+      "reason": "diff 仅 media disk（M18）；M6 无代码片段",
+      "owner": "M18-WEB-ANDROID",
+      "required_as_regression": false
+    }
+  ],
+  "verification_matrix": {
+    "harness": [
+      "node --test tests/js/RecoveryPublicationWorkflowDocsGuard.test.mjs",
+      "node --test tests/js/M6PublicationSliceDocsGuard.test.mjs",
+      "node --test tests/js/WorkspaceInventory.test.mjs"
+    ],
+    "git_checks": [
+      "git diff --check",
+      "git diff --cached --check",
+      "git diff --cached --stat",
+      "git diff --cached --name-only"
+    ],
+    "m6_php_tests": [
+      "php artisan test --filter=BackupManagementTest",
+      "php artisan test --filter=BackupRestoreManagementTest",
+      "php artisan test --filter=ExecuteBackupRestoreTest",
+      "php artisan test --filter=RestoreWriteFenceTest",
+      "php artisan test --filter=ArticleHealthTest",
+      "php artisan test --filter=M6IsolationAuditTest",
+      "php artisan test --filter=BackupRestoreServiceTest",
+      "php artisan test --filter=BackupScheduleTest",
+      "php artisan test --filter=BackupServiceTest",
+      "php artisan test --filter=DatabaseDumpProcessTest",
+      "php artisan test --filter=DatabaseRestoreProcessTest",
+      "php artisan test --filter=SqlDumpInspectorTest",
+      "php artisan test --filter=EncounteredWordLearningEnrollmentTest",
+      "php artisan test --filter=MorphologyLemmaDefectFixTest",
+      "php artisan test --filter=MorphologyMatrixImportRegressionTest",
+      "php artisan test --filter=ReviewFsrsTest"
+    ],
+    "frontend": [
+      "npm run development"
+    ],
+    "browser_required_phases": {
+      "M6A": "m6a-browser-server.php fixture + real browser backup creation",
+      "M6B": "real browser restore preview + RESTORE confirmation + status polling",
+      "M6C": "real browser /article-health page + tokenizer probe",
+      "M6D": "real browser cross-user/cross-language rejection + traversal rejection"
+    },
+    "protected_regressions": [
+      "php artisan test --filter=ReviewFsrsTest",
+      "php artisan test --filter=FsrsSchedulingServiceTest",
+      "php artisan test --filter=ReviewCardManageTest",
+      "php artisan test --filter=TextReaderSmokeTest"
+    ]
+  }
+}

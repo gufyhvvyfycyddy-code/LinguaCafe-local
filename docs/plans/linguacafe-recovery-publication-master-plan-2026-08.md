@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-01B
+active_task: CFH-02A
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -12,7 +12,7 @@ supervisor_unlock_required: true
 
 ## 1. Current Reality
 
-* 本计划不永久写死"最新远端"。每个任务开始时必须 `git fetch origin --prune`，以实际 `origin/master` 为准；CFH-01B 的授权起点（`authorized_from_commit`）记录在 `docs/execution/CURRENT_MILESTONE.json`。
+* 本计划不永久写死"最新远端"。每个任务开始时必须 `git fetch origin --prune`，以实际 `origin/master` 为准；当前任务的授权起点（`authorized_from_commit`）记录在 `docs/execution/CURRENT_MILESTONE.json`。
 * 本地工作区存在 454 个 Codex 之前留下的资产（110 tracked modified、2 tracked deleted、342 expanded untracked；CFH-01 开始时实测为 110/2/350）。350 条 untracked 中含 11 条本会话自身 `.reasonix/` 运行元数据（7 条 autoresearch + 4 条 desktop-topic），归属 `local_agent_metadata`（不提交）。
 * M0—M18 的本地实现不等于已提交、已推送或正式接受。归属图（`docs/audits/cfh-01-worktree-ownership-map-2026-08-04.json`，schema v2）是每个路径所有者的唯一机器可读依据。
 * 交接文档 `docs/plans/codex-final-handoff-2026-08-04.md` 是当前恢复入口。
@@ -47,19 +47,20 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-01B — Complete Ownership Contract And Commit-Group Metadata`
+`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`
 
 状态：
 
-* CFH-01A（工作区完整清点与治理骨架）已阶段性接受；
-* CFH-01 整体尚未关闭；
-* CFH-01B 仍是纯治理任务：补齐 462 条归属记录的完整机器契约、冻结 commit group 与验证准备度、加强 Harness、修正计划基线表述、更新里程碑锁；
+* CFH-01（含 CFH-01A 工作区完整清点与治理骨架、CFH-01B 完整归属契约与提交组元数据）已由网页端 GPT 接受并关闭；
+* CFH-02A 是当前唯一授权任务：冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵（`docs/plans/cfh-02-m6-publication-plan.md` + `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json` + `tests/js/M6PublicationSliceDocsGuard.test.mjs`）；
+* CFH-02A 仍是纯治理任务：只读分析产品代码，不修改、不提交任何产品代码；
+* CFH-02B（M6 实施与提交）为 `candidate_not_authorized`，必须等待网页端 GPT 验收 CFH-02A 并复核 manifest 决策；
 * 产品代码未授权（`product_code_authorized: false`）。
 
 规则：
 
 * 只读产品代码，禁止修改任何产品源码。
-* 只允许修改四个治理文件（归属图、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁）。
+* 只允许修改本轮允许的治理文件（M6 publication plan、M6 manifest、M6 guard、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁；归属图只读不修改）。
 * 不提交产品代码，不推送未验证资产。
 * 不自动进入下一任务（`auto_advance: false`）。
 * 网页端 GPT 验收通过后才解锁下一任务；完成后停在 `awaiting_web_acceptance`。
@@ -68,7 +69,7 @@ supervisor_unlock_required: true
 
 登记但不授权：
 
-* `CFH-02` — M6 restore safety revalidation and commit
+* `CFH-02B` — M6 实施与提交（依赖 CFH-02A 验收与 supervisor 复核 manifest 决策）
 * `CFH-03` — M1—M5 dependency-ordered publication
 * `CFH-04` — M7—M8 Android and offline publication
 * `CFH-05` — iOS capability closure
@@ -78,11 +79,12 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-01B（当前）。
-2. 根据归属图判断 CFH-02 与 CFH-03 是否可独立执行。
-3. M1—M5 foundation 已推送后再执行 CFH-04。
-4. M10—M18 根据共享文件重新拆分。
-5. CFH-05 需要外部 Mac/Xcode/Apple 能力（`BLOCKED_EXTERNAL` 能力簇）。
+1. CFH-02A（当前）。
+2. CFH-02B（M6 实施与提交）依赖 CFH-02A 验收与 supervisor 复核 manifest 决策。
+3. 根据归属图判断 CFH-03 与后续切片是否可独立执行。
+4. M1—M5 foundation 已推送后再执行 CFH-04。
+5. M10—M18 根据共享文件重新拆分。
+6. CFH-05 需要外部 Mac/Xcode/Apple 能力（`BLOCKED_EXTERNAL` 能力簇）。
 
 ## 7. Acceptance Gates
 
