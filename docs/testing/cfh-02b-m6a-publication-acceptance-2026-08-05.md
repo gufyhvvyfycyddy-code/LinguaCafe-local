@@ -23,7 +23,8 @@ Publication plan: `docs/plans/cfh-02-m6-publication-plan.md`
 
 - SHA: `82b2cf856350561abc54b6e05e51d7a19f120388`（`feat: publish M6A safe backup slice`）
 - changed paths: 19（14 whole files + 5 patch files，见 §3/§4）
-- 2007 insertions / 120 deletions；不含 M6B/M6C/M6D 内容；不含任务外文件
+- 2007 insertions / 120 deletions；不含 M6B/C/D 可执行代码与路由、不含任务外文件
+- 注：`config/backup.php` 按 manifest 冻结为 M6A `include_whole_file`，文件内约 15 个 `restore_*` 配置键为 **dormant**（仅 env 引用、无秘密值；M6B 代码未提交时不被任何代码读取）——与 manifest 对该文件的 M6_SHARED 处理一致（参见 manifest 中 BackupException 条目注释）
 
 ## 3. Whole files（14）
 
@@ -160,7 +161,8 @@ MCP Chrome 不可用（MCP server 列表为空），按 AGENTS.md §8 / ADR-0033
 
 ## 19. 最终状态
 
-- final HEAD = origin/master = `46f3adea4e40c6644314bc62e56f2f7754ab12a4`（push 后确认，ahead/behind 0/0）
+- push 时点 final HEAD = origin/master = `46f3adea4e40c6644314bc62e56f2f7754ab12a4`（ahead/behind 0/0）
+- 后续文档修正 commit（不改变产品/治理语义）：`7a6fc60d`（填写 final HEAD）、`26d47ee2`（移除绝对路径）、及本修正；最终 tip 以最终任务报告为准
 - milestone lock: `active_task: CFH-02B-M6A`、`status: awaiting_web_acceptance`、`product_code_authorized: false`、`commit_product_code_allowed: false`、`database_write_allowed: false`、`browser_required: false`、`auto_advance: false`、`supervisor_unlock_required: true`
 - master plan: M6A `PUSHED_AWAITING_ACCEPTANCE`；CFH-02B-M6A 当前完成等待验收；M6B/M6C/M6D `candidate_not_authorized`；不自动进入 M6B
 
