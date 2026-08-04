@@ -160,7 +160,7 @@ MCP Chrome 不可用（MCP server 列表为空），按 AGENTS.md §8 / ADR-0033
 
 ## 19. 最终状态
 
-- final HEAD = origin/master = `<由 push 后 git rev-parse 确认>`（详见最终任务报告）
+- final HEAD = origin/master = `46f3adea4e40c6644314bc62e56f2f7754ab12a4`（push 后确认，ahead/behind 0/0）
 - milestone lock: `active_task: CFH-02B-M6A`、`status: awaiting_web_acceptance`、`product_code_authorized: false`、`commit_product_code_allowed: false`、`database_write_allowed: false`、`browser_required: false`、`auto_advance: false`、`supervisor_unlock_required: true`
 - master plan: M6A `PUSHED_AWAITING_ACCEPTANCE`；CFH-02B-M6A 当前完成等待验收；M6B/M6C/M6D `candidate_not_authorized`；不自动进入 M6B
 
