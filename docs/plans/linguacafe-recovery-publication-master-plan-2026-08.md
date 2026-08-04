@@ -2,9 +2,9 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-02A-R1
+active_task: CFH-02B-M6A
 auto_advance: false
-product_code_authorized: false
+product_code_authorized: true
 supervisor_unlock_required: true
 ---
 
@@ -47,30 +47,32 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-02A-R1 — Apply Supervisor Ownership Decision And Close M6 Slice Contract`
+`CFH-02B-M6A — Publish And Verify Safe Backup Slice`
 
 状态：
 
 * CFH-01（含 CFH-01A 工作区完整清点与治理骨架、CFH-01B 完整归属契约与提交组元数据）保持 ACCEPTED；
-* CFH-02A（冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵，产物为 publication plan + manifest + M6 guard）分析交付已由网页端 GPT 阶段性接受，CFH-02A 整体尚未关闭；
-* CFH-02A-R1 是当前唯一授权任务：应用 supervisor 对 `AdminDashboard.vue` 的归属决定（M13 → CFH-02，`M6_SHARED`）并关闭 M6 切片契约（`decision.status = READY_FOR_CFH02B`）；
-* supervisor 归属决定：`resources/js/components/Admin/AdminDashboard.vue` 正式归属 CFH-02（`primary_slice: CFH-02`、`related_milestones: ["M6"]`、`readiness: needs_browser`、`commit_group: CFH-02`）；M6A/M6B 只精确暂存各自 UI 片段，每次暂存后检查完整 cached diff；
-* CFH-02B（M6 实施与提交）继续为 `candidate_not_authorized`，必须等待网页端 GPT 验收 CFH-02A-R1 并单独授权；
-* 产品代码未授权（`product_code_authorized: false`）；本轮不改变任何产品功能状态。
+* CFH-02A（冻结 M6 精确提交边界、共享文件最小代码片段与验证矩阵）与 CFH-02A-R1（supervisor 归属决定与 M6 切片契约关闭）均已由网页端 GPT ACCEPTED；manifest `decision.status = READY_FOR_CFH02B`；
+* CFH-02B-M6A 是当前唯一授权任务：从本地 dirty 资产精确提取已存在的 M6A 安全备份切片，验证构建/运行，真实浏览器验收，只提交并推送 M6A（manifest 中 M6A 的 whole files 与精确 patch）；
+* 当前**只授权 M6A**：M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，不得进入；
+* 本轮不允许修改产品代码：默认禁止修改现有产品实现，只允许从现有脏工作区精确提取 M6A 内容；失败时保留证据并停止，不自动修复；
+* M6A 发布完成后停在 `awaiting_web_acceptance`，等待网页端 GPT 验收；`product_code_authorized` 在验收阶段回到 false。
 
 规则：
 
-* 只读产品代码，禁止修改任何产品源码。
-* 只允许修改本轮允许的治理文件（M6 publication plan、M6 manifest、M6 guard、`RecoveryPublicationWorkflowDocsGuard`、本计划、里程碑锁；归属图仅允许 supervisor 决定驱动的归属修正）。
-* 不提交产品代码，不推送未验证资产。
-* 不自动进入下一任务（`auto_advance: false`）。
-* 网页端 GPT 验收通过后才解锁下一任务；完成后停在 `awaiting_web_acceptance`。
+* 只发布 manifest 中 M6A 的 whole files 与精确 patch；禁止 bulk staging（`git add .` / `git add -A`）。
+* 不修改产品代码；M6A 代码、测试或验收失败时不修复、不扩大范围，保留准确证据并停止，后续修复另开任务。
+* 精确 staged-tree 验证（`git write-tree` + `commit-tree` + 仓库外 disposable worktree），不得在脏工作区测试后冒充精确验证。
+* 真实浏览器验收（manifest 指定 M6A fixture，APP_ENV=testing、专用 testing DB、fake mysqldump、临时 backup storage）；不得用 API 结果冒充。
+* 不自动进入下一任务（`auto_advance: false`）；M6B/M6C/M6D 均未授权。
 
 ## 5. Candidate Queue
 
 登记但不授权：
 
-* `CFH-02B` — M6 实施与提交（依赖 CFH-02A-R1 验收与网页端 GPT 单独授权）
+* `M6B` — 恢复安全（restore preview/confirm/polling；依赖 M6A 发布验收与网页端 GPT 单独授权）
+* `M6C` — 内容健康（依赖 M6A/M6B 发布验收与单独授权）
+* `M6D` — 隔离收口（依赖 M6A/M6B/M6C 发布验收与单独授权）
 * `CFH-03` — M1—M5 dependency-ordered publication
 * `CFH-04` — M7—M8 Android and offline publication
 * `CFH-05` — iOS capability closure
@@ -80,8 +82,8 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-02A-R1（当前）。
-2. CFH-02B（M6 实施与提交）依赖 CFH-02A-R1 验收与网页端 GPT 单独授权。
+1. CFH-02B-M6A（当前，M6A 安全备份发布）。
+2. M6B（恢复安全）依赖 M6A 发布验收与网页端 GPT 单独授权；M6C/M6D 依次依赖前序发布验收。
 3. 根据归属图判断 CFH-03 与后续切片是否可独立执行。
 4. M1—M5 foundation 已推送后再执行 CFH-04。
 5. M10—M18 根据共享文件重新拆分。

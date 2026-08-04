@@ -53,10 +53,15 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.equal(milestone.active_task, 'CFH-02A-R1', 'milestone.active_task');
-assert.match(masterPlan, /active_task: CFH-02A-R1/);
-assert.equal(milestone.product_code_authorized, false);
-assert.match(masterPlan, /product_code_authorized: false/);
+assert.equal(milestone.active_task, 'CFH-02B-M6A', 'milestone.active_task');
+assert.match(masterPlan, /active_task: CFH-02B-M6A/);
+if (milestone.active_task === 'CFH-02B-M6A' && milestone.status === 'authorized') {
+    assert.equal(milestone.product_code_authorized, true);
+    assert.match(masterPlan, /product_code_authorized: true/);
+} else {
+    assert.equal(milestone.product_code_authorized, false);
+    assert.match(masterPlan, /product_code_authorized: false/);
+}
 assert.equal(milestone.auto_advance, false);
 assert.match(masterPlan, /auto_advance: false/);
 assert.equal(milestone.supervisor_unlock_required, true);
@@ -293,13 +298,26 @@ assert.equal(manifest.decision.status, 'READY_FOR_CFH02B', 'decision.status 必�
 assert.equal(manifest.decision.safe_to_start_cfh02b, true, 'safe_to_start_cfh02b 必须为 true');
 assert.equal(manifest.decision.product_code_authorized, false, 'product_code_authorized 必须为 false');
 
-// 21. milestone final status 必须 awaiting_web_acceptance（CFH-02A-R1 提交时）
-assert.equal(milestone.status, 'awaiting_web_acceptance', 'milestone.status 必须为 awaiting_web_acceptance');
+// 21. milestone 状态机：authorized（发布授权）/ awaiting_web_acceptance（验收）双阶段
+assert.ok(['authorized', 'awaiting_web_acceptance'].includes(milestone.status), 'milestone.status 合法');
+assert.equal(milestone.auto_advance, false, 'auto_advance=false');
+assert.equal(milestone.supervisor_unlock_required, true, 'supervisor_unlock_required=true');
+if (milestone.status === 'awaiting_web_acceptance') {
+    assert.equal(milestone.product_code_authorized, false, '最终 product_code_authorized=false');
+    assert.equal(milestone.commit_product_code_allowed, false, '最终 commit_product_code_allowed=false');
+    assert.equal(milestone.database_write_allowed, false, '最终 database_write_allowed=false');
+    // 最终阶段：M6A 验收报告必须存在并引用真实 40 位产品 commit SHA
+    const report = read('docs', 'testing', 'cfh-02b-m6a-publication-acceptance-2026-08-05.md');
+    assert.ok(report.length > 0, 'M6A 验收报告存在');
+    const commitMatch = report.match(/[0-9a-f]{40}/);
+    assert.ok(commitMatch, '验收报告引用 40 位产品 commit SHA');
+    assert.ok(commitMatch[0] !== 'f67bc560c59bc6e3b506eb403eb69659699b4f28', '产品 commit SHA 必须是新提交');
+}
 
-// 22. CFH-02B 在总计划中仍为 candidate_not_authorized
+// 22. M6B/M6C/M6D 在总计划中仍为 candidate_not_authorized
 assert.ok(
-    masterPlan.includes('CFH-02B（M6 实施与提交）继续为 `candidate_not_authorized`'),
-    'CFH-02B 必须保持 candidate_not_authorized',
+    masterPlan.includes('M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'),
+    'M6B/M6C/M6D 必须保持 candidate_not_authorized',
 );
 
 console.log('M6 publication slice docs guard passed.');
