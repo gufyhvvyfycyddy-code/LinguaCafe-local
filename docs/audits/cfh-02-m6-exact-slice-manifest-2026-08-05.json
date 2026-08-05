@@ -8,7 +8,7 @@
     "ownership_map_sha256": "139167ff2225d4d1feedc1df4ae628056dfe9ac7ffea425bc80be4d6e57596e1",
     "worktree_status_sha256": "0765b842906fc3ea57320425ddb46b794e8e3a0e31b40bcb5d967d7414cec6e4",
     "direct_file_count": 42,
-    "candidate_shared_file_count": 22
+    "candidate_shared_file_count": 23
   },
   "decision": {
     "status": "READY_FOR_CFH02B",
@@ -29,7 +29,6 @@
         "app/Services/DatabaseDumpProcess.php",
         "config/backup.php",
         "routes/console.php",
-        "tests/Feature/BackupManagementTest.php",
         "tests/Unit/BackupScheduleTest.php",
         "tests/Unit/BackupServiceTest.php",
         "tests/Unit/DatabaseDumpProcessTest.php",
@@ -73,6 +72,7 @@
         "app/Services/SqlDumpInspector.php",
         "app/Providers/AppServiceProvider.php",
         "config/queue.php",
+        "tests/Feature/BackupManagementTest.php",
         "tests/Feature/BackupRestoreManagementTest.php",
         "tests/Feature/ExecuteBackupRestoreTest.php",
         "tests/Feature/RestoreWriteFenceTest.php",
@@ -86,24 +86,32 @@
         "app/Http/Controllers/BackupController.php",
         "app/Services/BackupService.php",
         "routes/web.php",
-        "resources/js/components/Admin/AdminDashboard.vue"
+        "resources/js/components/Admin/AdminDashboard.vue",
+        "resources/js/components/Admin/AdminSettingsLayout.vue",
+        "resources/js/components/Layout.vue"
       ],
       "tests": [
+        "php artisan test --filter=BackupManagementTest",
         "php artisan test --filter=BackupRestoreManagementTest",
         "php artisan test --filter=ExecuteBackupRestoreTest",
         "php artisan test --filter=RestoreWriteFenceTest",
         "php artisan test --filter=BackupRestoreServiceTest",
         "php artisan test --filter=DatabaseRestoreProcessTest",
-        "php artisan test --filter=SqlDumpInspectorTest"
+        "php artisan test --filter=SqlDumpInspectorTest",
+        "php artisan test --filter=BackupServiceTest"
       ],
       "browser_steps": [
-        "真实浏览器（仅 testing 隔离环境）：备份列表选择备份 → restore-preview 预览 → 输入 RESTORE 文本确认 → 恢复执行与状态轮询；验证 RejectWritesDuringRestore 写入围栏生效、恢复完成可读；核对 Console/Network 证据且无凭据泄漏"
+        "m6b-browser-server.php fixture（APP_ENV=testing、专用 testing DB、fake restore）下，真实浏览器桌面视口（约 1440x900）：登录已登录非管理员标记账号 → 打开 /admin/dashboard 备份页 → 选择备份 → 确认弹窗（只含备份名称/时间、风险提示、RESTORE 输入框、取消/确认恢复）→ 输入错误文本/小写/带空格 RESTORE 时按钮禁用 → 输入 RESTORE 后按钮启用 → 点击确认恢复 → 只产生一个 operation → 状态轮询至成功或受控 fake 状态；核对 Console/Network 无凭据泄漏、restore-preview 请求数为 0、preview_token 出现次数为 0；手机视口（约 390x844）重复完整流程并验证无水平溢出、弹窗完整可见、触摸按钮可用、刷新后仍可恢复 operation 状态；保存桌面与手机截图 SHA-256"
       ],
       "stop_conditions": [
         "真实恢复被执行（本轮只允许 testing 隔离库）",
         "写入围栏未生效",
-        "preview token 可绕过或校验失效",
-        "SQL 注入/危险语句未被拒绝"
+        "restore-preview 路由或 preview_token 仍存在",
+        "is_admin 仍作为备份/恢复权限边界",
+        "确认按钮在输入 RESTORE 前可点击或提交时非禁用",
+        "SQL 注入/危险语句未被拒绝",
+        "手机端无法完成确认或水平溢出",
+        "凭据出现在命令、响应、异常或日志"
       ]
     },
     {
@@ -225,12 +233,12 @@
       "git_state": "modified",
       "m6_phase": "M6_SHARED",
       "publication_action": "stage_exact_patch",
-      "working_tree_sha256": "5aad1510c1c559f56a5cd2f902ebf7cb63c35ecb28c636d5ec9a7a2e39e2dff4",
+      "working_tree_sha256": "140848de7ff5fffd32768bdcfecc1234ca6aeafbeadd48db07bc8149914d5f24",
       "base_blob_sha": "f4cc57b488722c47b366a9234e59ce5bca1f42f8",
-      "evidence": ["M6 plan M6A+M6B allowed files; diff has index/store (M6A) + previewRestore/restore/restoreStatus (M6B)"],
+      "evidence": ["M6 plan M6A+M6B allowed files; diff has index/store (M6A) + restore/restoreStatus (M6B), previewRestore removed"],
       "required_tests": ["php artisan test --filter=BackupManagementTest", "php artisan test --filter=BackupRestoreManagementTest"],
       "browser_required": false,
-      "notes": "M6A patch = index/store; M6B patch = previewRestore/restore/restoreStatus; anchors are method signatures"
+      "notes": "M6A patch = index/store; M6B patch = restore/restoreStatus（移除 previewRestore，restore 只收 confirmation）; anchors are method signatures"
     },
     {
       "path": "app/Http/Middleware/RejectWritesDuringRestore.php",
@@ -274,7 +282,7 @@
       "git_state": "untracked",
       "m6_phase": "M6B",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "a36f8c818975b6b74a6e9dc7defdbe0ad934aee53974322dbd97bf300bbd1bad",
+      "working_tree_sha256": "74ec567eb33d9b4baca2fbbe757c2e664afe0077fe533ca55b645e31d84658b6",
       "base_blob_sha": "",
       "evidence": ["M6 plan M6B allowed files; untracked"],
       "required_tests": ["php artisan test --filter=BackupRestoreServiceTest", "php artisan test --filter=BackupRestoreManagementTest"],
@@ -395,7 +403,7 @@
       "git_state": "untracked",
       "m6_phase": "M6_SHARED",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "bd82bbc62d4d99aa97db9627651cb0ad97f3f0115e2a099a5ba4ef44849daab4",
+      "working_tree_sha256": "f78e0e31ab765293ddd01797ac9a81c44d103eb30522afb6ea4c04392009295a",
       "base_blob_sha": "",
       "evidence": ["M6 ADR; documentation for whole M6"],
       "required_tests": [],
@@ -407,7 +415,7 @@
       "git_state": "untracked",
       "m6_phase": "M6_SHARED",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "a715505be4189f757adfd74698cf3dcf3679147188c60fc96f6c666bd500023f",
+      "working_tree_sha256": "14b11369d2940628d61fde1a912acc4c8bc41bd591c14acff2f9429bf65cbe9b",
       "base_blob_sha": "",
       "evidence": ["M6 implementation plan; documentation for whole M6"],
       "required_tests": [],
@@ -431,12 +439,12 @@
       "git_state": "untracked",
       "m6_phase": "M6B",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "b94e7a65f0d1925cc4346ba4ed7389fdbdaf2814d98a9778c435b76e12dcc01a",
+      "working_tree_sha256": "9e75d2829421d4b5752036e2952a27f37147dd7091cb0cbac93c24472c9c4f2e",
       "base_blob_sha": "",
-      "evidence": ["M6B acceptance report"],
+      "evidence": ["CFH-02A frozen M6B acceptance evidence; historical record only"],
       "required_tests": [],
       "browser_required": false,
-      "notes": ""
+      "notes": "HISTORICAL DOCUMENT: describes the superseded preview-token/admin-only implementation. The current contract is ADR-0055 (equal-privilege, no user-visible preview) and the current acceptance record is docs/testing/cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md. Kept in the slice for ownership-map consistency; readers must not treat it as the current contract."
     },
     {
       "path": "docs/testing/m6c-article-health-acceptance-2026-07-28.md",
@@ -479,12 +487,12 @@
       "git_state": "modified",
       "m6_phase": "M6C",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "9f2da8a5f2eeaf88a1035624ad438a568ee45aed4e8f911ead6417d12c1ee9b3",
+      "working_tree_sha256": "9bd36231c4dd9cd29982c6c35854dde50bbf036b76fe7b9bef9aaf6734df72c8",
       "base_blob_sha": "fea3faded8b8493676575c9ee717b17339aa6e99",
-      "evidence": ["M6 plan M6C allowed files; diff is M6C-only sidebar entry"],
+      "evidence": ["M6 plan M6C allowed files; diff is M6C sidebar entry + M6B backup nav entry"],
       "required_tests": [],
       "browser_required": true,
-      "notes": ""
+      "notes": "M6B adds backup nav entry (name=备份, url=/admin/dashboard) via exact patch in M6B commit; M6C whole-file commit follows"
     },
     {
       "path": "tests/Feature/ArticleHealthTest.php",
@@ -501,26 +509,26 @@
     {
       "path": "tests/Feature/BackupManagementTest.php",
       "git_state": "untracked",
-      "m6_phase": "M6A",
+      "m6_phase": "M6B",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "2ef19961f9fc1cab667647687f0fa2124e537c93521b69a534f9f0e74a5afe68",
+      "working_tree_sha256": "36e93392d0d9853bafecab9adcf35b1773f608d4641fbae4b6b79d817b813b68",
       "base_blob_sha": "",
-      "evidence": ["M6A test; untracked"],
+      "evidence": ["M6B reworked permission test; M6A version shipped in M6A commit"],
       "required_tests": ["php artisan test --filter=BackupManagementTest"],
       "browser_required": false,
-      "notes": ""
+      "notes": "M6B rework: test_backup_routes_require_an_authenticated_user replaces admin-only assertion; shipped with M6B commit"
     },
     {
       "path": "tests/Feature/BackupRestoreManagementTest.php",
       "git_state": "untracked",
       "m6_phase": "M6B",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "e93bfa8d150a22082024fc1b3545c0cfb0ce1d535e3562c430c7d8dc814de10e",
+      "working_tree_sha256": "a9d1fcfdee5689ea131cc24b5055e4853efe14f1e90233f44c4bea25f5895d0b",
       "base_blob_sha": "",
-      "evidence": ["M6B test; untracked"],
+      "evidence": ["M6B reworked HTTP contract test; M6A version none"],
       "required_tests": ["php artisan test --filter=BackupRestoreManagementTest"],
       "browser_required": false,
-      "notes": ""
+      "notes": "M6B rework: no restore-preview, confirmation strictness, idempotent double-submit, user-scoped status"
     },
     {
       "path": "tests/Feature/ExecuteBackupRestoreTest.php",
@@ -612,12 +620,12 @@
       "git_state": "untracked",
       "m6_phase": "M6B",
       "publication_action": "include_whole_file",
-      "working_tree_sha256": "51e00d52a63ddd99b350f2374358a6e5dac59b28dde76a5df476494422812bc9",
+      "working_tree_sha256": "a475956f9fa9199b43d9f85b57009b0a696adebfd60e79bca3e97571786c6ba0",
       "base_blob_sha": "",
-      "evidence": ["M6B unit test; untracked"],
+      "evidence": ["M6B reworked unit test; M6A version none"],
       "required_tests": ["php artisan test --filter=BackupRestoreServiceTest"],
       "browser_required": false,
-      "notes": ""
+      "notes": "M6B rework: preview token tests replaced by server-side validation/idempotency/user-scope tests"
     },
     {
       "path": "tests/Unit/BackupScheduleTest.php",
@@ -684,12 +692,12 @@
       "git_state": "modified",
       "m6_phase": "M6_SHARED",
       "publication_action": "stage_exact_patch",
-      "working_tree_sha256": "bfca0b22d8c9df6da66333254d445606d3d7cf009f5f6c285c26b91499ef8c0a",
+      "working_tree_sha256": "4124a0f4b18146dd46c9e54bf95f15ae86746703e87953577fc471df53761097",
       "base_blob_sha": "da910562669cd90b3a32464e2b547140aaac752e",
-      "evidence": ["git diff: 当前 diff 仅含 M6A 备份列表/创建/刷新/反馈与 M6B 恢复预览/RESTORE 确认/状态轮询/反馈，无 M13 内容", "M6 plan L68/L207: M6A 与 M6B allowed files 均明确包含 AdminDashboard.vue", "M6A acceptance: 浏览器验收覆盖后台备份 UI", "M6B acceptance: 验收覆盖恢复预览、确认和状态 UI", "M13 plan/acceptance 均无该文件（supervisor 核查结论）"],
+      "evidence": ["git diff: 当前 diff 仅含 M6A 备份列表/创建/刷新/反馈与 M6B 恢复确认弹窗（无预览）/RESTORE 输入/状态反馈/响应式，无 M13 内容", "M6 plan L68/L207: M6A 与 M6B allowed files 均明确包含 AdminDashboard.vue", "M6A acceptance: 浏览器验收覆盖后台备份 UI", "M6B acceptance: 验收覆盖确认弹窗、状态反馈和响应式 UI", "M13 plan/acceptance 均无该文件（supervisor 核查结论）"],
       "required_tests": ["npm run development"],
       "browser_required": true,
-      "notes": "M6_SHARED：M6A（备份列表/创建/刷新/反馈）与 M6B（恢复预览/RESTORE 确认/提交/轮询/反馈）使用同一 Vue 文件的不同片段。CFH-02B 必须按阶段精确 patch staging，每次暂存后检查完整 cached diff；不得在单一阶段未经 cached diff 审查整文件提交。"
+      "notes": "M6_SHARED：M6A（备份列表/创建/刷新/反馈）与 M6B（确认弹窗/RESTORE 输入与按钮状态机/提交/轮询/状态反馈/响应式）使用同一 Vue 文件的不同片段。M6B 契约：无用户可见预览（不显示 checksum/tables/manifest/路径/SQL/warnings），确认必须精确输入 RESTORE 并再次点击；轮询错误仅 404 清除本地 operation 记录（网络/维护窗口错误保留，支持刷新后恢复）；CFH-02B 必须按阶段精确 patch staging，每次暂存后检查完整 cached diff；不得在单一阶段未经 cached diff 审查整文件提交。"
     }
   ]
 ,
@@ -876,7 +884,7 @@
       "path": "bootstrap/app.php",
       "m6_role": "required_registration",
       "decision": "stage_exact_patch",
-      "working_tree_sha256": "48f2161def5b23e87a013dfc71ea498b95d85a1301979094dc50fce2ff6a12a9",
+      "working_tree_sha256": "6eef52255b2cfaa318f5a87c896126b92240597c3d28a6c5dccbcc22194f9583",
       "base_blob_sha": "b82fc0644057b603877c526c92b5a64cc5a57b62",
       "symbols": ["withMiddleware", "RejectWritesDuringRestore"],
       "selected_hunks": [
@@ -891,8 +899,8 @@
           "symbol": "RejectWritesDuringRestore prepend",
           "start_anchor": "->withMiddleware(function (Middleware $middleware) {",
           "end_anchor": "$middleware->api(prepend: [",
-          "reason": "M6B global write-fence prepend; api routes and exception renderers are M1",
-          "hunk_sha256": "9d58cdfd901d4f3a15f641ae1623e928624ab4043da8bb3ce31d420d58dc294a"
+          "reason": "M6B global write-fence prepend + maintenance except for status polling; api routes and exception renderers are M1",
+          "hunk_sha256": "bd757a808aa393d0c257bf264f12f1cc1dc0049eaf856d11d45a2ee8bb3889f3"
         }
       ],
       "non_m6_owners": ["CFH-03-M1"],
@@ -965,23 +973,23 @@
       "path": "routes/web.php",
       "m6_role": "required_route",
       "decision": "stage_exact_patch",
-      "working_tree_sha256": "6c4e5beb5cf33a5e9e7deff782e111ef98ea2835ff665c9ed68148068a0f502b",
+      "working_tree_sha256": "7abaae657a42bc50013b398f103260580bfeeb2921cdc3f7b76df8fcbdacf286",
       "base_blob_sha": "6a8c024fbf0462b10c969ab0a6d3c84dc923eaf4",
       "symbols": ["backup routes", "backup-restores", "article-health"],
       "selected_hunks": [
         {
           "symbol": "backup-restores status route",
           "start_anchor": "Route::get('/backup-restores/{operationId}'",
-          "end_anchor": "->middleware('web');",
-          "reason": "M6B restoreStatus route",
-          "hunk_sha256": "ba40e3a41f24735b42614f0f6eee12d735ddab73d7bc6e4d6c53c3085af965cd"
+          "end_anchor": "Route::get('/backup-restores/{operationId}', [App\\Http\\Controllers\\BackupController::class, 'restoreStatus']);",
+          "reason": "M6B restoreStatus route moved into auth group",
+          "hunk_sha256": "06f7fdd248c19df00d919f952d038a2d0e414be3af7b5930e66c0d6ccab021a3"
         },
         {
           "symbol": "backup CRUD routes",
-          "start_anchor": "// backup",
-          "end_anchor": "Route::post('/backups/{backupId}/restore'",
-          "reason": "M6A index/store + M6B preview/restore routes",
-          "hunk_sha256": "67074a22b16c8f534763e77de5c23d428352b262d0e8223cad81dcc683ee5f00"
+          "start_anchor": "// backup (equal privilege for every authenticated user; no admin boundary)",
+          "end_anchor": "Route::get('/backup-restores/{operationId}'",
+          "reason": "M6A index/store + M6B restore routes moved out of admin group; restore-preview removed",
+          "hunk_sha256": "a317bed342b8959552eda27b1ef399bee82b0beee7968c8045a2cd8792eee896"
         },
         {
           "symbol": "article-health routes",
@@ -994,7 +1002,28 @@
       "non_m6_owners": ["CFH-03-M4", "M10", "M11", "M12", "M13", "M14", "M15", "M18"],
       "evidence": ["M6 plan M6A/M6B/M6C allowed files all include routes/web.php; diff mixes M6 + M10-M18 routes"],
       "required_tests": ["php artisan test --filter=BackupManagementTest", "php artisan test --filter=BackupRestoreManagementTest", "php artisan test --filter=ArticleHealthTest"],
-      "notes": "M6A patch=backup CRUD; M6B patch=backup-restores status; M6C patch=article-health. testing sentinel, media, special-study, portable, tags, manual-operations, knowledge-hygiene routes all excluded"
+      "notes": "M6A patch=backup CRUD; M6B patch=backup-restores status + backup routes moved out of admin group（remove restore-preview）; M6C patch=article-health. testing sentinel, media, special-study, portable, tags, manual-operations, knowledge-hygiene routes all excluded"
+    },
+    {
+      "path": "resources/js/components/Admin/AdminSettingsLayout.vue",
+      "m6_role": "required_ui_entry",
+      "decision": "stage_exact_patch",
+      "working_tree_sha256": "bb4036759cb9a79de9d8be488663922386d1f401ed23aac3299b1d7aad100376",
+      "base_blob_sha": "34acf7d28aa7b1f3a6faa9433e11c483e818e669",
+      "symbols": ["non-admin backup tab"],
+      "selected_hunks": [
+        {
+          "symbol": "non-admin backup tab",
+          "start_anchor": "v-else class=\"restore-user-container\"",
+          "end_anchor": "this.tab = 0;",
+          "reason": "M6B equal-privilege page: non-admin users see only the backup tab; the /admin page path is not a permission boundary",
+          "hunk_sha256": "e82ddac77c6896029d7935bde862f3c636cbc4ebdb769e05f5aaf756e0abba74"
+        }
+      ],
+      "non_m6_owners": [],
+      "evidence": ["CFH-02B-M6B equal-privilege contract (ADR-0055): AdminDashboard page path must not be an admin boundary", "git diff HEAD: only the non-admin backup tab branch and mounted tab reset"],
+      "required_tests": ["npm run development"],
+      "notes": "Registered by CFH-02B-M6B (not in CFH-02A inventory because the file was clean at CFH-01); M6B patch is the non-admin backup tab branch"
     },
     {
       "path": "tests/Feature/EncounteredWordLearningEnrollmentTest.php",
