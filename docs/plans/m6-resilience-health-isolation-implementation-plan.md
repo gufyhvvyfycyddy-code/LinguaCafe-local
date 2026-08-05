@@ -97,17 +97,17 @@ forbidden. Existing unrelated working-tree changes remain user assets.
   database identity outside testing. Active restore and rollback both reset the
   selected schema inventory before importing the pinned dump. It exposes these
   operations without logging credentials or SQL.
-- `BackupRestoreService` owns preview-token issuance, durable operation creation,
-  operation status, and restore orchestration.
-  Preview revalidates containment, manifest compatibility, exact size/checksum,
-  dump inventory, and disk headroom, then stores a short-lived token bound to
-  the admin user, backup ID, and checksum. Execute consumes that token under a
-  restore lock, revalidates the immutable preview facts, and runs isolated
-  validation. It then enters application maintenance mode, proves application
-  writers have quiesced, holds the backup-operation lock continuously while
-  creating a pinned safety snapshot, restoring the active database, checking
-  the restored connection, and performing any rollback.
-- Preview tokens, operation records, restore/backup locks, maintenance ownership,
+- `BackupRestoreService` owns server-side restore preflight, durable operation
+  creation, operation status, and restore orchestration.
+  Confirmation (CFH-02B-M6B, ADR-0055) revalidates containment, manifest
+  compatibility, exact size/checksum, dump inventory, and disk headroom
+  **server-side, without any preview token**, then creates the operation record.
+  The restore runner revalidates the immutable preflight facts, runs isolated
+  validation, enters application maintenance mode, proves application writers
+  have quiesced, holds the backup-operation lock continuously while creating a
+  pinned safety snapshot, restoring the active database, checking the restored
+  connection, and performing any rollback.
+- Operation records, restore/backup locks, maintenance ownership,
   and failure markers use one explicitly configured coordination cache store
   outside the restored database. The single-host default is Laravel's file
   store; multi-host deployments must configure a shared non-database store.
@@ -119,32 +119,33 @@ forbidden. Existing unrelated working-tree changes remain user assets.
   restore/backup operation lock must outlive both, so a live lease is retried
   instead of allowing concurrent execution.
 - `BackupController` remains the HTTP adapter and returns the existing stable
-  `{error: {code, message}}` shape. Routes remain under the existing
-  `auth`/`auth.session`/`admin` group.
-- `AdminDashboard.vue` owns selection, preview presentation, exact `RESTORE`
-  confirmation, loading/error/success states, and post-success list refresh.
-  It never receives a filesystem path and never bypasses the preview token.
+  `{error: {code, message}}` shape. Backup/restore routes sit under the
+  `auth`/`auth.session` group only; no `admin` middleware and no `is_admin`
+  check applies (equal privilege, ADR-0055).
+- `AdminDashboard.vue` owns selection, the confirmation dialog (backup name or
+  creation time, risk notice, exact `RESTORE` input, cancel/confirm buttons),
+  loading/error/success states, status polling, and post-success list refresh.
+  It never receives a filesystem path and never submits a preview token or
+  checksum. It is responsive on desktop and phone web.
 
-### Public HTTP contract
+### Public HTTP contract (CFH-02B-M6B, ADR-0055)
 
-- `POST /backups/{backupId}/restore-preview` has no mutation payload and returns
-  `201 {preview: {token, backup_id, checksum, created_at, expires_at,
-  size_bytes, uncompressed_size_bytes, table_count, tables, required_tables,
-  warnings}}`.
-- `POST /backups/{backupId}/restore` requires
-  `{preview_token, checksum, confirmation: "RESTORE"}` and returns
-  `202 {restore_operation: {operation_id, backup_id, checksum, status,
-  created_at}}`.
-- `GET /backup-restores/{operationId}` requires the opaque status capability
-  returned only by successful administrator confirmation. It reads the
-  external operation record without querying the database being restored, so
-  status remains observable during maintenance or manual recovery. It never
-  exposes paths, credentials, SQL, or process output.
-- Preview tokens are opaque, single-use, administrator-bound, backup-bound,
-  checksum-bound, and expire after the configured TTL. Missing, expired,
-  replayed, cross-admin, or checksum-mismatched tokens fail closed.
-- Preview is read-only. Execute is the sole restore write entrance. A changed
-  payload or manifest invalidates execution before any active-database write.
+- `POST /backups/{backupId}/restore-preview` **no longer exists**; the route,
+  controller method, service method, UI request/state, and tests are removed.
+- `POST /backups/{backupId}/restore` requires only
+  `{confirmation: "RESTORE"}` (exact, case-sensitive, no extra whitespace) and
+  returns `202 {restore_operation: {operation_id, backup_id, status,
+  created_at}}`. The client never submits `preview_token` or `checksum`; the
+  server revalidates the backup itself before creating any operation record.
+- `GET /backup-restores/{operationId}` requires login (no admin role) and
+  reads the external operation record without querying the database being
+  restored, so status remains observable during maintenance or manual
+  recovery. It never exposes paths, credentials, SQL, or process output.
+- Repeated confirmation of the same backup by the same user returns the
+  existing operation (idempotent); a different user gets a stable conflict.
+  Double-clicks and HTTP timeouts produce at most one operation.
+- Execute is the sole restore write entrance. A changed payload or manifest
+  invalidates execution before any active-database write.
 
 ### Compatibility and failure boundaries
 

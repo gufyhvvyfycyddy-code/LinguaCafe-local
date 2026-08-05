@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-02B-M6A-R2
+active_task: CFH-02B-M6B
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -47,31 +47,32 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-02B-M6A-R2 — Complete MCP Invocation Trace Contract`
+`CFH-02B-M6B — Rework And Publish Single-Owner Restore For Responsive Web`
 
 状态：
 
-* CFH-01、CFH-02A、CFH-02A-R1 保持 ACCEPTED；CFH-02B-M6A 产品提交（`82b2cf856350561abc54b6e05e51d7a19f120388`）保持 `PUSHED_AWAITING_ACCEPTANCE`（不回滚）；
-* CFH-02B-M6A-R1（MCP Chrome 恢复与强制验收）页面行为已由网页端 GPT **阶段性接受**；M6A 最终验收 Incomplete——原因：evidence JSON 缺少 session/invocation 标识与逐步 steps，Guard 漏检；
-* CFH-02B-M6A-R2 是当前唯一授权任务：从 Reasonix 会话日志恢复真实调用追踪标识（session/invocation），将完整调用序列写入机器证据（schema v2：mcp.session_or_invocation_ids、steps、screenshots），加强 Guard 拒绝旧 schema v1，更新验收报告/总计划/里程碑锁；
-* 本轮不修改任何产品代码；Playwright 旧证据不构成最终验收（browser_channel 强制 `mcp_chrome`）；
-* M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，**不自动进入 M6B**（`auto_advance: false`）。
+* CFH-01、CFH-02A、CFH-02A-R1 保持 ACCEPTED；
+* CFH-02B-M6A 产品提交（`82b2cf856350561abc54b6e05e51d7a19f120388`）、CFH-02B-M6A-R1（MCP Chrome 恢复与强制验收）、CFH-02B-M6A-R2（MCP 调用追踪契约补正）均保持 ACCEPTED（不回滚）；
+* CFH-02B-M6B 是当前唯一任务（执行前处于 `candidate_not_authorized`，未按第六节授权前不修改产品代码）：重新发布单所有者恢复流程——所有已登录用户拥有相同的备份与恢复能力（不再区分管理员）、未登录用户仍不可访问、无用户可见恢复预览、确认必须精确输入 `RESTORE`（区分大小写、无多余空格）并再次点击"确认恢复"、桌面与手机响应式网页均须支持；
+* 本任务冻结产品契约（网页端 GPT 已确认，不得重新讨论或扩展）：equal-privilege（无 admin/is_admin 权限边界）、no user-visible preview（取消用户预览不等于取消后台安全检查）、exact RESTORE input + final click、desktop and phone responsive web、internal safety checks preserved；
+* M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，**不自动进入**（`auto_advance: false`）。
 
 规则：
 
-* 追踪标识必须来自宿主真实日志（`reasonix-events-log` 等），禁止伪造、禁止用顺序号冒充、禁止仅填调用数量。
-* evidence JSON 为 schema v2 精确顶层字段；steps 每项 invocation_id 必须存在于 `session_or_invocation_ids`；不得记录凭据与绝对本地路径。
-* 只允许修改 6 个治理文件（evidence JSON、验收报告、本计划、里程碑锁、两个 Guard）；不修改产品代码、manifest、ownership map、M6B 残余。
-* Guard 必须拒绝旧 schema v1（无 session/invocation 标识）与仅填写调用数量的旧证据。
-* 不自动进入下一任务（`auto_advance: false`）；M6B/M6C/M6D 均未授权。
+* 移除 restore-preview endpoint / preview_token / 用户可见技术预览（数据库表、checksum、manifest、SQL、warnings 均不展示）；`POST /backups/{backupId}/restore` 只接受 `{"confirmation": "RESTORE"}`，必须通过 auth + auth.session，不检查 is_admin；
+* 服务端在任何活动数据库写入前自动完成：备份验证、路径 containment、checksum/required tables/危险 SQL/解压上限/磁盘空间检查、operation-private immutable pin、不可猜测且幂等的 operation record、安全快照、隔离验证、RestoreWriteFence、维护模式、失败自动回滚（回滚失败保持维护模式并标记 failed_manual_recovery）；
+* 状态接口 `GET /backup-restores/{operationId}` 保持可读（已登录、不检查管理员角色、maintenance mode 期间仍可读取、不暴露敏感细节）；
+* 同一备份的重复确认、双击最终确认、HTTP 超时后再次提交必须幂等，只产生一个 operation；backup lock 与 restore lock 覆盖完整执行期；
+* 旧 admin/preview 测试必须重写（不得只追加新测试）；旧 M6B 代码不得原样提交；
+* 只允许修改 M6B 冻结范围（新 HTTP 契约、网页 UI、响应式、对应测试与治理文件）；不修改 manifest、ownership map、M6A 已接受代码；
+* 不自动进入下一任务（`auto_advance: false`）；M6C/M6D 未授权。
 
 ## 5. Candidate Queue
 
 登记但不授权：
 
-* `M6B` — 恢复安全（restore preview/confirm/polling；依赖 M6A 发布验收与网页端 GPT 单独授权）
-* `M6C` — 内容健康（依赖 M6A/M6B 发布验收与单独授权）
-* `M6D` — 隔离收口（依赖 M6A/M6B/M6C 发布验收与单独授权）
+* `M6C` — 内容健康（依赖 M6B 发布验收与单独授权）
+* `M6D` — 隔离收口（依赖 M6B/M6C 发布验收与单独授权）
 * `CFH-03` — M1—M5 dependency-ordered publication
 * `CFH-04` — M7—M8 Android and offline publication
 * `CFH-05` — iOS capability closure
@@ -81,8 +82,8 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-02B-M6A-R2（当前，MCP 调用追踪契约补正）。
-2. M6B（恢复安全）依赖 M6A 网页端验收与网页端 GPT 单独授权；M6C/M6D 依次依赖前序发布验收。
+1. CFH-02B-M6B（当前，单所有者恢复重做与发布；依赖网页端 GPT 已冻结的产品契约）。
+2. M6C/M6D 依次依赖 M6B 发布验收与网页端 GPT 单独授权。
 3. 根据归属图判断 CFH-03 与后续切片是否可独立执行。
 4. M1—M5 foundation 已推送后再执行 CFH-04。
 5. M10—M18 根据共享文件重新拆分。

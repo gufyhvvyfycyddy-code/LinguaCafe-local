@@ -53,9 +53,9 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2'].includes(milestone.active_task), 'milestone.active_task 合法');
+assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2', 'CFH-02B-M6B'].includes(milestone.active_task), 'milestone.active_task 合法');
 assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
-if (milestone.active_task === 'CFH-02B-M6A' && milestone.status === 'authorized') {
+if (['CFH-02B-M6A', 'CFH-02B-M6B'].includes(milestone.active_task) && milestone.status === 'authorized') {
     assert.equal(milestone.product_code_authorized, true);
     assert.match(masterPlan, /product_code_authorized: true/);
 } else {
@@ -117,11 +117,17 @@ const ROLES = new Set(['required_runtime', 'required_registration', 'required_ro
 const SHARED_KEYS = ['base_blob_sha', 'decision', 'evidence', 'm6_role', 'non_m6_owners', 'notes', 'path', 'required_tests', 'selected_hunks', 'symbols', 'working_tree_sha256'];
 const HUNK_KEYS = ['end_anchor', 'hunk_sha256', 'reason', 'start_anchor', 'symbol'];
 
-// 8. shared file 无重复且必须来自 SHARED_UNRESOLVED
+// 8. shared file 无重复且必须来自 SHARED_UNRESOLVED（M6B equal-privilege 页面文件除外，ADR-0055）
+const M6B_EQUAL_PRIVILEGE_PAGE_FILES = new Set([
+    'resources/js/components/Admin/AdminSettingsLayout.vue',
+]);
 const sharedPaths = manifest.shared_files.map((f) => f.path);
 assert.equal(new Set(sharedPaths).size, sharedPaths.length, 'shared file 无重复');
 const unresolvedByPath = new Map(ownership.entries.filter((e) => e.primary_slice === 'SHARED_UNRESOLVED').map((e) => [e.path, e]));
 for (const path of sharedPaths) {
+    if (M6B_EQUAL_PRIVILEGE_PAGE_FILES.has(path)) {
+        continue;
+    }
     assert.ok(unresolvedByPath.has(path), `shared file 来自 SHARED_UNRESOLVED: ${path}`);
 }
 
@@ -214,6 +220,10 @@ for (const c of manifest.commit_sequence) {
         wholeCommitted.set(p, c.commit_id);
     }
     for (const p of c.patch_files) {
+        // M6B may carry an exact hunk of a later-phase whole file (Layout.vue backup nav, ADR-0055)
+        if (p === 'resources/js/components/Layout.vue') {
+            continue;
+        }
         const action = decisionByPath.get(p);
         assert.equal(action, 'stage_exact_patch', `patch 文件必须 stage_exact_patch: ${c.commit_id} -> ${p}`);
     }
@@ -230,6 +240,10 @@ for (const c of manifest.commit_sequence) {
 // 12. commit sequence 中路径必须在 direct/shared 决策中存在
 for (const c of manifest.commit_sequence) {
     for (const p of [...c.whole_files, ...c.patch_files]) {
+        if (p === 'resources/js/components/Layout.vue') {
+            // M6B exact-hunk exception for the M6C whole-file Layout.vue (ADR-0055 backup nav)
+            continue;
+        }
         const action = decisionByPath.get(p);
         assert.ok(action !== undefined, `commit 路径有决策: ${c.commit_id} -> ${p}`);
         assert.ok(['include_whole_file', 'stage_exact_patch'].includes(action), `commit 路径决策可提交: ${p} -> ${action}`);
@@ -389,12 +403,49 @@ if (milestone.status === 'awaiting_web_acceptance') {
         // 历史 R1 契约（只接受 schema v1 之上、但本轮后 evidence 已是 v2——旧契约分支不再读取 evidence 细节）
         assert.ok(report.includes('MCP Chrome Mandatory Revalidation'), '验收报告包含 MCP Chrome Mandatory Revalidation 章节');
     }
+} else if (milestone.active_task === 'CFH-02B-M6B') {
+    // M6B 双阶段：authorized（当前，实施与发布）/ awaiting_web_acceptance（网页端验收）
+    if (milestone.status === 'authorized') {
+        assert.equal(milestone.product_code_authorized, true, 'M6B 授权阶段 product_code_authorized=true');
+        assert.equal(milestone.commit_product_code_allowed, true, 'M6B 授权阶段 commit_product_code_allowed=true');
+        assert.equal(milestone.database_write_allowed, true, 'M6B 授权阶段 database_write_allowed=true');
+        assert.equal(milestone.database_write_scope, 'isolated_testing_database_and_temporary_restore_storage_only', 'M6B 数据库写入仅 testing 隔离');
+        assert.equal(milestone.browser_required, true, 'M6B 授权阶段 browser_required=true');
+        assert.equal(milestone.browser_channel, 'mcp_chrome', 'M6B 强制 browser_channel=mcp_chrome');
+        assert.equal(milestone.device_required, false, 'M6B 不要求原生设备');
+        assert.equal(milestone.migration_execution_allowed, false, 'M6B 不执行 migration');
+        assert.ok(masterPlan.includes('equal-privilege'), 'master plan 冻结 equal-privilege');
+        assert.ok(masterPlan.includes('no user-visible preview'), 'master plan 冻结 no user-visible preview');
+        assert.ok(masterPlan.includes('exact RESTORE input + final click'), 'master plan 冻结 exact RESTORE input + final click');
+        assert.ok(masterPlan.includes('desktop and phone responsive web'), 'master plan 冻结 desktop and phone responsive web');
+        assert.ok(masterPlan.includes('internal safety checks preserved'), 'master plan 冻结 internal safety checks preserved');
+        assert.ok(!m6bCommit.whole_files.includes(ADMIN_DASHBOARD) && m6bCommit.patch_files.includes(ADMIN_DASHBOARD), 'AdminDashboard 以精确 patch 进入 M6B');
+    } else {
+        assert.equal(milestone.status, 'awaiting_web_acceptance', 'M6B 最终阶段必须 awaiting_web_acceptance');
+        assert.equal(milestone.product_code_authorized, false, 'M6B 最终阶段 product_code_authorized=false');
+        assert.equal(milestone.commit_product_code_allowed, false, 'M6B 最终阶段 commit_product_code_allowed=false');
+        assert.equal(milestone.database_write_allowed, false, 'M6B 最终阶段 database_write_allowed=false');
+        assert.equal(milestone.browser_required, false, 'M6B 最终阶段 browser_required=false');
+        const m6bReport = read('docs', 'testing', 'cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md');
+        assert.ok(m6bReport.length > 0, 'M6B 验收报告存在');
+        const allCommits = [...m6bReport.matchAll(/[0-9a-f]{40}/g)].map((m) => m[0]);
+        assert.ok(allCommits.length >= 2, 'M6B 验收报告引用 40 位 commit SHA（基线 + 产品）');
+        assert.ok(m6bReport.includes('equal-privilege'), 'M6B 验收报告包含 equal-privilege');
+        assert.ok(m6bReport.includes('RESTORE'), 'M6B 验收报告包含 RESTORE 确认契约');
+    }
 }
 
-// 22. M6B/M6C/M6D 在总计划中仍为 candidate_not_authorized
-assert.ok(
-    masterPlan.includes('M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'),
-    'M6B/M6C/M6D 必须保持 candidate_not_authorized',
-);
+// 22. M6C/M6D 在总计划中仍为 candidate_not_authorized（M6B 为当前任务）
+if (milestone.active_task === 'CFH-02B-M6B') {
+    assert.ok(
+        masterPlan.includes('M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'),
+        'M6C/M6D 必须保持 candidate_not_authorized',
+    );
+} else {
+    assert.ok(
+        masterPlan.includes('M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'),
+        'M6B/M6C/M6D 必须保持 candidate_not_authorized',
+    );
+}
 
 console.log('M6 publication slice docs guard passed.');

@@ -4,6 +4,17 @@ Status: Accepted for implementation
 Date: 2026-07-28  
 Roadmap: `docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`
 
+> **Supersession note (2026-08-05)**: the M6B public contract below
+> (admin-only, preview-then-execute, preview token) is **partially
+> superseded** by `ADR-0055-single-owner-restore-without-user-visible-preview.md`
+> (CFH-02B-M6B): every authenticated user can restore (no admin boundary),
+> the restore-preview endpoint and preview token are removed, and the
+> client submits only `{"confirmation": "RESTORE"}`. The internal safety
+> mechanisms described here (SqlDumpInspector, isolated validation,
+> safety snapshot, write fence, maintenance ownership, rollback,
+> coordination store) remain fully in force and are preserved unchanged.
+> This ADR keeps its historical text intact.
+
 ## 1. Context
 
 M6 combines three high-risk responsibilities that must close before external

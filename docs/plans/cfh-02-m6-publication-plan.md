@@ -1,10 +1,10 @@
 # CFH-02 M6 Publication Plan
 
-> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`（CFH-02A-R1 治理补正后冻结；CFH-02B-M6A 已按本计划发布）
-> 状态：`M6A 已发布（PUSHED_AWAITING_ACCEPTANCE）`；M6B/M6C/M6D 未发布
+> 任务：`CFH-02A — Freeze Exact M6 Publication Slice And Shared-Seam Patches`（CFH-02A-R1 治理补正后冻结；CFH-02B-M6A 已按本计划发布；CFH-02B-M6B 已按本计划与 ADR-0055 重做并发布）
+> 状态：`M6A 已发布（PUSHED_AWAITING_ACCEPTANCE）`；`M6B 已按 CFH-02B 重做（no-preview / equal-privilege / responsive web，待网页端验收）`；M6C/M6D 未发布
 > 机器可读清单：`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
-> 决策：`READY_FOR_CFH02B`（supervisor 已复核归属，见 §15；M6A 已发布，M6B 仍需单独授权）
-> 授权：`product_code_authorized: false`；`auto_advance: false`
+> 决策：`READY_FOR_CFH02B`（supervisor 已复核归属，见 §15；M6A 已发布，M6B 已授权实施，M6C 仍需单独授权）
+> 授权：`product_code_authorized: true（仅 CFH-02B-M6B 阶段）`；`auto_advance: false`
 
 ## 1. 当前事实
 
@@ -15,8 +15,8 @@
 
 ## 2. M6 用户可见功能
 
-- 管理员可从页面创建数据库备份并查看备份列表（M6A）。
-- 管理员可预览备份内容、输入 `RESTORE` 确认后执行受控恢复，恢复期间应用拒绝写入（M6B）。
+- 已登录用户（不区分管理员）可从页面创建数据库备份并查看备份列表（M6A，CFH-02B-M6B 起对全部登录用户开放）。
+- 已登录用户选择备份后直接打开确认弹窗，必须精确输入 `RESTORE` 并再次点击「确认恢复」后执行受控恢复；无用户可见预览；恢复期间应用拒绝写入（M6B，CFH-02B 重做）。
 - 管理员可在「内容健康」页查看文章健康状态（M6C）。
 - 跨用户/跨语言资源读写被拒绝，文件路径穿越被拒绝（M6D）。
 
@@ -25,7 +25,7 @@
 | 阶段 | 职责 | 验收报告 |
 |---|---|---|
 | M6A | 安全备份：dump 进程参数隔离、临时文件、校验和、manifest、原子发布、保留策略 | `docs/testing/m6a-safe-backup-acceptance-2026-07-28.md` |
-| M6B | 恢复安全：preview token、SqlDumpInspector、DatabaseRestoreProcess、写入围栏、维护模式、安全快照回滚 | `docs/testing/m6b-restore-safety-acceptance-2026-07-28.md` |
+| M6B | 恢复安全：服务端 preflight（无用户可见 preview）、精确 `RESTORE` 确认、写入围栏、维护模式、安全快照回滚 | `docs/testing/m6b-restore-safety-acceptance-2026-07-28.md`（历史）、CFH-02B-M6B 验收报告（重做后） |
 | M6C | 文章健康：健康检查服务、ArticleHealth 页面、tokenizer 探活 | `docs/testing/m6c-article-health-acceptance-2026-07-28.md` |
 | M6D | 隔离收口：user/language 谓词、SafeFilePathService、ProcessChapter 作用域证明 | `docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md` |
 
@@ -43,7 +43,7 @@
 见 manifest `commit_sequence[*].whole_files`。要点：
 
 - **M6A 整文件**：`app/Exceptions/BackupException.php`、`app/Services/BackupSchedule.php`、`app/Services/DatabaseDumpProcess.php`、`config/backup.php`、`routes/console.php`、M6 契约文档（ADR-0036、实施计划）、M6A 测试与 fixtures、M6A 验收报告。
-- **M6B 整文件**：`app/Http/Middleware/RejectWritesDuringRestore.php`、`app/Jobs/ExecuteBackupRestore.php`、`app/Services/BackupRestoreService.php`、`app/Services/DatabaseRestoreProcess.php`、`app/Services/RestoreWriteFence.php`、`app/Services/SqlDumpInspector.php`、`app/Providers/AppServiceProvider.php`、`config/queue.php`、M6B 测试与验收报告。
+- **M6B 整文件**：`app/Http/Middleware/RejectWritesDuringRestore.php`、`app/Jobs/ExecuteBackupRestore.php`、`app/Services/BackupRestoreService.php`、`app/Services/DatabaseRestoreProcess.php`、`app/Services/RestoreWriteFence.php`、`app/Services/SqlDumpInspector.php`、`app/Providers/AppServiceProvider.php`、`config/queue.php`、`tests/Feature/BackupManagementTest.php`（M6B 重做版）、M6B 测试与验收报告。
 - **M6C 整文件**：`app/Http/Controllers/ArticleHealthController.php`、`app/Services/ArticleHealthService.php`、`config/article_health.php`、`resources/js/components/Health/ArticleHealth.vue`、`resources/js/components/Layout.vue`、M6C 测试/fixtures/验收报告。
 - **M6D 整文件**：`app/Services/SafeFilePathService.php`、M6D 允许的 11 个 controller/service/job、4 个签名适配测试、M6IsolationAuditTest、M6D 验收报告。
 
@@ -52,14 +52,15 @@
 | 文件 | 阶段 | hunk 锚点 | hunk SHA-256 |
 |---|---|---|---|
 | `routes/web.php` | M6A | `// backup` → `Route::post('/backups/{backupId}/restore'` | `67074a22...` |
-| `routes/web.php` | M6B | `Route::get('/backup-restores/{operationId}'` → `->middleware('web');` | `ba40e3a4...` |
+| `routes/web.php` | M6B | `// backup (equal privilege...` → `Route::get('/backup-restores/{operationId}'`（backup 路由移出 admin 组 + 删除 restore-preview） | `a317bed3...` |
+| `routes/web.php` | M6B | `Route::get('/backup-restores/{operationId}'` status 路由移入 auth 组 | `06f7fdd2...` |
 | `routes/web.php` | M6C | `Route::get('/article-health'` → `/article-health/data` | `fd03b7ea...` |
 | `bootstrap/app.php` | M6B | `use App\Http\Middleware\AdminMiddleware;` → `use Illuminate\Foundation\Application;`（仅 RejectWritesDuringRestore 行） | `9e6d04ec...` |
 | `bootstrap/app.php` | M6B | `->withMiddleware(...)` → `$middleware->api(prepend: [`（仅 prepend 行） | `9d58cdfd...` |
 | `resources/js/app.js` | M6C | `const Attributions = ...` → `const Library = ...`（仅 ArticleHealth 行）+ `/article-health` 路由行 | `f0e6057f...` |
 | `app/Http/Controllers/HomeController.php` | M6D | `use App\Services\SafeFilePathService;` + `getUserManualFile` 方法 | `c4ec1467...` |
 | `app/Http/Controllers/BackupController.php` | M6A | `index`/`store` 方法 | 见 manifest |
-| `app/Http/Controllers/BackupController.php` | M6B | `previewRestore`/`restore`/`restoreStatus` 方法 | 见 manifest |
+| `app/Http/Controllers/BackupController.php` | M6B | `restore`/`restoreStatus` 方法（移除 `previewRestore`，restore 只收 confirmation） | 见 manifest |
 | `app/Services/BackupService.php` | M6A | `createBackup`/`withExclusiveOperation`/`listBackups` | 见 manifest |
 | `app/Services/BackupService.php` | M6B | `inspectBackup` | 见 manifest |
 
@@ -85,7 +86,7 @@
 | 阶段 | 操作 | 证据 |
 |---|---|---|
 | M6A | m6a-browser-server fixture（APP_ENV=testing + 专用 testing DB + fake mysqldump）下，管理员登录，POST /backups 创建备份，列表出现新备份，UI 成功提示，Network 无凭据 | `docs/testing/m6a-safe-backup-acceptance-2026-07-28.md` |
-| M6B | 真实浏览器：选择备份 → restore-preview → 输入 `RESTORE` → 恢复执行与状态轮询；恢复期间写入被拒 | `docs/testing/m6b-restore-safety-acceptance-2026-07-28.md` |
+| M6B | 真实浏览器（桌面约 1440×900 + 手机约 390×844）：已登录非管理员账号打开备份页 → 选择备份 → 确认弹窗（无 preview 内容）→ 输入错误/小写/带空格 RESTORE 时按钮禁用 → 输入 `RESTORE` 后点击确认恢复 → 单 operation + 状态轮询 → 成功或受控 fake 状态；Console/Network 无凭据、restore-preview 请求数 0、preview_token 出现次数 0 | CFH-02B-M6B 验收报告 |
 | M6C | 侧栏「内容健康」入口，`/article-health` 页面健康状态与 tokenizer 探活 | `docs/testing/m6c-article-health-acceptance-2026-07-28.md` |
 | M6D | 跨用户/跨语言读写被拒、目录穿越被拒、合法文件正常渲染 | `docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md` |
 
@@ -97,7 +98,7 @@
 - 不执行 migration、回填、drop/truncate、`migrate:fresh/refresh/reset`、`db:wipe`。
 - 不修改 `.env`、密钥、既有账号凭据。
 - 不绕过权限、认证、user/language 隔离或既有唯一写入入口。
-- 恢复路径必须是 `BackupService`（发布/清单权威）→ `BackupRestoreService`（preview/operation 编排）→ `DatabaseRestoreProcess`（隔离恢复进程）；`SqlDumpInspector` 只检查不执行 SQL。
+- 恢复路径必须是 `BackupService`（发布/清单权威）→ `BackupRestoreService`（服务端 preflight/operation 编排，无用户可见 preview）→ `DatabaseRestoreProcess`（隔离恢复进程）；`SqlDumpInspector` 只检查不执行 SQL。
 - 恢复期间 `RejectWritesDuringRestore` + `RestoreWriteFence` 必须证明写入被拒。
 - fake mysqldump fixture 只编译到 testing 临时目录；任何真实数据库触碰即为停止条件。
 
@@ -141,7 +142,7 @@
 **提交边界（supervisor 决定第 5、6 点）**：
 
 - **M6A 只精确暂存**：备份列表、创建备份、刷新备份列表、M6A 状态/错误/成功反馈对应片段。
-- **M6B 只精确暂存**：restore preview、RESTORE 文本确认、恢复提交、恢复状态轮询、恢复错误/完成反馈对应片段。
+- **M6B 只精确暂存**：确认弹窗（备份名称/时间、风险提示、RESTORE 输入、取消/确认恢复按钮）、恢复提交、恢复状态轮询、恢复错误/完成反馈对应片段；不包含任何 preview/checksum 展示片段。
 - 每次暂存后必须检查完整 `git diff --cached`（含 `--check`），不得在任一阶段未经 cached diff 审查整文件提交。
 - 不得把页面中未来出现的其他里程碑改动带入 M6。
 - 页面验收必须使用真实浏览器（AGENTS.md §8），不得以 API 调用冒充按钮验收。

@@ -17,8 +17,9 @@ assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
 assert.equal(milestone.schema_version, 2);
 assert.ok(milestone.active_task.length > 0);
 assert.ok(milestone.active_task.startsWith('CFH-'), `active_task 前缀: ${milestone.active_task}`);
-// 3. product_code_authorized 状态机：仅 CFH-02B-M6A 授权阶段允许 true
-if (milestone.active_task === 'CFH-02B-M6A' && milestone.status === 'authorized') {
+// 3. product_code_authorized 状态机：仅授权阶段（CFH-02B-M6A / CFH-02B-M6B）允许 true
+const PRODUCT_AUTHORIZED_TASKS = ['CFH-02B-M6A', 'CFH-02B-M6B'];
+if (PRODUCT_AUTHORIZED_TASKS.includes(milestone.active_task) && milestone.status === 'authorized') {
     assert.equal(milestone.product_code_authorized, true);
     assert.match(masterPlan, /product_code_authorized: true/);
 } else {
@@ -44,7 +45,34 @@ assert.ok(milestone.status !== 'accepted');
 if (milestone.active_task === 'CFH-02A-R1') {
     assert.equal(milestone.status, 'awaiting_web_acceptance', 'CFH-02A-R1 提交时 status 必须为 awaiting_web_acceptance');
 }
-// 3b. CFH-02B-M6A / CFH-02B-M6A-R1 / CFH-02B-M6A-R2 授权/验收双阶段
+// 3c. CFH-02B-M6B 授权/验收双阶段（equal-privilege、no-preview、responsive web）
+if (milestone.active_task === 'CFH-02B-M6B') {
+    assert.equal(milestone.auto_advance, false);
+    assert.equal(milestone.supervisor_unlock_required, true);
+    assert.equal(milestone.migration_execution_allowed, false, 'CFH-02B-M6B 不执行 migration');
+    assert.equal(milestone.browser_channel, 'mcp_chrome', 'CFH-02B-M6B 强制 browser_channel=mcp_chrome');
+    assert.equal(milestone.device_required, false, 'CFH-02B-M6B 不要求原生设备（响应式网页）');
+    if (milestone.status === 'authorized') {
+        assert.equal(milestone.product_code_authorized, true, 'CFH-02B-M6B 授权阶段 product_code_authorized=true');
+        assert.equal(milestone.commit_product_code_allowed, true, 'CFH-02B-M6B 授权阶段 commit_product_code_allowed=true');
+        assert.equal(milestone.database_write_allowed, true, 'CFH-02B-M6B 授权阶段 database_write_allowed=true（仅 testing 隔离）');
+        assert.equal(milestone.database_write_scope, 'isolated_testing_database_and_temporary_restore_storage_only', 'CFH-02B-M6B 数据库写入范围仅 testing 隔离');
+        assert.equal(milestone.browser_required, true, 'CFH-02B-M6B 授权阶段 browser_required=true');
+        assert.ok(masterPlan.includes('CFH-02B-M6B — Rework And Publish Single-Owner Restore For Responsive Web'), 'master plan 当前任务为 CFH-02B-M6B');
+        assert.ok(masterPlan.includes('equal-privilege'), 'master plan 冻结 equal-privilege');
+        assert.ok(masterPlan.includes('no user-visible preview'), 'master plan 冻结 no user-visible preview');
+        assert.ok(masterPlan.includes('exact RESTORE input + final click'), 'master plan 冻结 exact RESTORE input + final click');
+        assert.ok(masterPlan.includes('desktop and phone responsive web'), 'master plan 冻结 desktop and phone responsive web');
+        assert.ok(masterPlan.includes('internal safety checks preserved'), 'master plan 冻结 internal safety checks preserved');
+        assert.ok(masterPlan.includes('M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'), 'M6C/M6D 必须保持 candidate_not_authorized');
+    } else {
+        assert.equal(milestone.status, 'awaiting_web_acceptance');
+        assert.equal(milestone.product_code_authorized, false, '最终阶段 product_code_authorized=false');
+        assert.equal(milestone.commit_product_code_allowed, false, '最终阶段 commit_product_code_allowed=false');
+        assert.equal(milestone.database_write_allowed, false, '最终阶段 database_write_allowed=false');
+        assert.equal(milestone.browser_required, false, '最终阶段 browser_required=false');
+    }
+}
 if (['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2'].includes(milestone.active_task)) {
     assert.equal(milestone.auto_advance, false);
     assert.equal(milestone.supervisor_unlock_required, true);
@@ -216,8 +244,12 @@ assert.deepEqual(adminDashboard.related_milestones, ['M6'], 'AdminDashboard rela
 assert.equal(adminDashboard.commit_group, 'CFH-02', 'AdminDashboard commit_group 必须为 CFH-02');
 assert.equal(adminDashboard.readiness, 'needs_browser', 'AdminDashboard readiness 必须为 needs_browser');
 
-// 33. M6B/M6C/M6D 继续 candidate_not_authorized（§4 明确表述，§5 登记队列）
-assert.ok(masterPlan.includes('M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'), 'master plan §4 中 M6B/M6C/M6D 必须保持 candidate_not_authorized');
+// 33. M6C/M6D 继续 candidate_not_authorized（M6B 为当前任务；§4 明确表述，§5 登记队列）
+if (milestone.active_task === 'CFH-02B-M6B') {
+    assert.ok(masterPlan.includes('M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'), 'master plan §4 中 M6C/M6D 必须保持 candidate_not_authorized');
+} else {
+    assert.ok(masterPlan.includes('M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'), 'master plan §4 中 M6B/M6C/M6D 必须保持 candidate_not_authorized');
+}
 assert.ok(masterPlan.includes('每项状态均为：`status: candidate_not_authorized`'), 'master plan §5 候选队列保持 candidate_not_authorized');
 assert.ok(!masterPlan.includes('status: authorized'), 'master plan 不得出现 status: authorized');
 
