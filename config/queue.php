@@ -72,6 +72,15 @@ return [
             'after_commit' => false,
         ],
 
+        'redis-restore' => [
+            'driver' => 'redis',
+            'connection' => env('BACKUP_RESTORE_REDIS_CONNECTION', 'default'),
+            'queue' => env('BACKUP_RESTORE_QUEUE', 'maintenance'),
+            'retry_after' => (int) env('BACKUP_RESTORE_RETRY_AFTER', 22200),
+            'block_for' => 5,
+            'after_commit' => true,
+        ],
+
     ],
 
     /*

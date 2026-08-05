@@ -10,6 +10,11 @@ use App\Services\AiStudyCardV6ProviderTransportInterface;
 use App\Services\CustomStudy\ChapterLocatorInterface;
 use App\Services\CustomStudy\EloquentChapterLocator;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Console\Events\CommandStarting;
+use Illuminate\Database\Connection;
+use Illuminate\Database\Events\ConnectionEstablished;
+use Illuminate\Support\Facades\Event;
+use RuntimeException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -44,6 +49,36 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        $guardedConnections = [];
+        $installRestoreWriteGuard = function (Connection $connection) use (&$guardedConnections): void {
+            $connectionId = spl_object_id($connection);
+            if (isset($guardedConnections[$connectionId])) {
+                return;
+            }
+
+            $guardedConnections[$connectionId] = true;
+            $connection->beforeExecuting(function (string $query): void {
+                $this->app->make(\App\Services\RestoreWriteFence::class)
+                    ->assertQueryAllowed($query);
+            });
+        };
+
+        Event::listen(
+            ConnectionEstablished::class,
+            function (ConnectionEstablished $event) use ($installRestoreWriteGuard): void {
+                $installRestoreWriteGuard($event->connection);
+            },
+        );
+        foreach ($this->app->make('db')->getConnections() as $connection) {
+            $installRestoreWriteGuard($connection);
+        }
+
+        Event::listen(CommandStarting::class, function (CommandStarting $event) {
+            if ($this->app->make(\App\Services\RestoreWriteFence::class)->active()) {
+                throw new RuntimeException(
+                    'Console writes are fenced while database recovery is running.',
+                );
+            }
+        });
     }
 }

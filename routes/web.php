@@ -35,13 +35,18 @@ Route::post('/login', [App\Http\Controllers\UserController::class, 'authenticate
 
 Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
 
+    // backup (equal privilege for every authenticated user; no admin boundary)
+    Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index']);
+    Route::post('/backups', [App\Http\Controllers\BackupController::class, 'store']);
+    Route::post('/backups/{backupId}/restore', [App\Http\Controllers\BackupController::class, 'restore']);
+    Route::get('/backup-restores/{operationId}', [App\Http\Controllers\BackupController::class, 'restoreStatus']);
+
+    // backup page is reachable by every authenticated user; it is not an admin boundary
+    Route::get('/admin/{page?}', [App\Http\Controllers\HomeController::class, 'index']);
+
     Route::group(['middleware' => 'admin'], function () {
         Route::get('/dev', [App\Http\Controllers\HomeController::class, 'index']);
         
-        // backup
-        Route::get('/backups', [App\Http\Controllers\BackupController::class, 'index']);
-        Route::post('/backups', [App\Http\Controllers\BackupController::class, 'store']);
-
         // users
         Route::get ('/users/get', [App\Http\Controllers\UserController::class, 'getUsers']);
         Route::post('/users/update', [App\Http\Controllers\UserController::class, 'updateUser']);
@@ -55,9 +60,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         // dictionaries
         Route::post('/dictionary/update', [App\Http\Controllers\DictionaryController::class, 'updateDictionary']);
         
-        // vue routes            
-        Route::get('/admin/{page?}', [App\Http\Controllers\HomeController::class, 'index']);
-
         // fonts
         Route::get ('/fonts/get', [App\Http\Controllers\FontTypeController::class, 'getInstalledFontTypes']);
         Route::post('/fonts/upload', [App\Http\Controllers\FontTypeController::class, 'uploadFontType']);

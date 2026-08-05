@@ -33,8 +33,15 @@
             </v-tab-item>
         </v-tabs-items>
     </v-container>
-    <v-container v-else>
-        你没有权限访问此页面。
+    <v-container v-else class="restore-user-container">
+        <v-tabs v-model="tab" background-color="foreground" class="rounded-lg border overflow-hidden" @change="tabChanged">
+            <v-tab>备份</v-tab>
+        </v-tabs>
+        <v-tabs-items v-model="tab" id="backup-tab-items" elevation="0" class="no-background rounded-lg mt-4 pa-6">
+            <v-tab-item :value="0">
+                <admin-dashboard></admin-dashboard>
+            </v-tab-item>
+        </v-tabs-items>
     </v-container>
 </template>
 
@@ -72,7 +79,11 @@
         mounted() {
             if (this.$route.params.page !== undefined) {
                 this.tab = this.tabIndexes[this.$route.params.page];
-            } 
+            }
+            if (!this.$store.getters['shared/userAdmin']) {
+                // Non-admin users only have the backup tab (equal privilege).
+                this.tab = 0;
+            }
         },
         methods: {
             tabChanged(event) {

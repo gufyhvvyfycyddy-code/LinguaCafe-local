@@ -50,14 +50,19 @@ class BackupManagementTest extends TestCase
             ->assertJsonPath('backups.0.backup_id', $backupId);
     }
 
-    public function test_backup_routes_require_an_authenticated_administrator(): void
+    public function test_backup_routes_require_an_authenticated_user(): void
     {
         $this->getJson('/backups')->assertUnauthorized();
         $this->postJson('/backups')->assertUnauthorized();
 
         $ordinaryUser = $this->user('backup-user@example.test', false);
-        $this->actingAs($ordinaryUser)->getJson('/backups')->assertForbidden();
-        $this->actingAs($ordinaryUser)->postJson('/backups')->assertForbidden();
+        $this->actingAs($ordinaryUser)->getJson('/backups')->assertOk();
+
+        $this->bindSuccessfulRunner();
+        $this->actingAs($ordinaryUser)
+            ->postJson('/backups')
+            ->assertCreated()
+            ->assertJsonPath('backup.status', 'successful');
     }
 
     public function test_legacy_get_mutation_is_removed(): void

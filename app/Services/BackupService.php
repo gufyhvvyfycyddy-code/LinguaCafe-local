@@ -106,6 +106,54 @@ class BackupService
         return $backups;
     }
 
+    /**
+     * @return array{manifest: array, manifest_sha256: string, payload_path: string}
+     */
+    public function inspectBackup(string $backupId): array
+    {
+        if (! Str::isUuid($backupId)) {
+            throw new BackupException(
+                'BACKUP_NOT_FOUND',
+                'The requested backup was not found.',
+                404,
+            );
+        }
+
+        foreach ($this->listBackups() as $manifest) {
+            if (! hash_equals($manifest['backup_id'], $backupId)) {
+                continue;
+            }
+
+            $disk = $this->disk();
+            $payloadPath = $disk->path($manifest['payload_file']);
+            $manifestFile = Str::beforeLast($manifest['payload_file'], '.sql.gz') . '.json';
+            $manifestPath = $disk->path($manifestFile);
+            $root = realpath($disk->path(''));
+            $realPayloadPath = realpath($payloadPath);
+            $realManifestPath = realpath($manifestPath);
+
+            if ($root === false
+                || $realPayloadPath === false
+                || $realManifestPath === false
+                || ! $this->pathIsContained($root, $realPayloadPath)
+                || ! $this->pathIsContained($root, $realManifestPath)) {
+                break;
+            }
+
+            return [
+                'manifest' => $manifest,
+                'manifest_sha256' => hash_file('sha256', $realManifestPath),
+                'payload_path' => $realPayloadPath,
+            ];
+        }
+
+        throw new BackupException(
+            'BACKUP_NOT_FOUND',
+            'The requested backup was not found.',
+            404,
+        );
+    }
+
     private function createLocked(int $maxBackups, array $protectedBackupIds): array
     {
         $disk = $this->disk();

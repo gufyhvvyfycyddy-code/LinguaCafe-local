@@ -165,6 +165,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: '备份',
+                        url: '/admin/dashboard',
+                        icon: 'mdi-database',
+                        bottomNav: false,
+                    },
+                    {
                         name: '设置',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',
