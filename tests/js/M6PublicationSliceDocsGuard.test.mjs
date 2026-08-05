@@ -53,7 +53,7 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2', 'CFH-02B-M6B'].includes(milestone.active_task), 'milestone.active_task 合法');
+assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2', 'CFH-02B-M6B', 'CFH-02B-M6B-R1'].includes(milestone.active_task), 'milestone.active_task 合法');
 assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
 if (['CFH-02B-M6A', 'CFH-02B-M6B'].includes(milestone.active_task) && milestone.status === 'authorized') {
     assert.equal(milestone.product_code_authorized, true);
@@ -436,7 +436,7 @@ if (milestone.status === 'awaiting_web_acceptance') {
 }
 
 // 22. M6C/M6D 在总计划中仍为 candidate_not_authorized（M6B 为当前任务）
-if (milestone.active_task === 'CFH-02B-M6B') {
+if (['CFH-02B-M6B', 'CFH-02B-M6B-R1'].includes(milestone.active_task)) {
     assert.ok(
         masterPlan.includes('M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`'),
         'M6C/M6D 必须保持 candidate_not_authorized',
@@ -447,5 +447,100 @@ if (milestone.active_task === 'CFH-02B-M6B') {
         'M6B/M6C/M6D 必须保持 candidate_not_authorized',
     );
 }
+
+// 23. CFH-02B-M6B-R1 MCP evidence 契约（任务 §六/§十）
+const M6B_EVIDENCE = 'docs/testing/cfh-02b-m6b-mcp-chrome-evidence-2026-08-05.json';
+assert.ok(existsSync(join(root, M6B_EVIDENCE)), 'M6B evidence JSON 必须存在');
+const evidence = readJson(M6B_EVIDENCE);
+const EVIDENCE_TOP = ['schema_version', 'task_id', 'product_commit', 'acceptance_commit', 'browser_channel', 'fallback_used', 'trace_source', 'mcp', 'environment', 'desktop', 'phone', 'steps', 'network', 'console', 'screenshots', 'tests', 'security', 'conclusion'];
+assert.deepEqual(Object.keys(evidence).sort(), [...EVIDENCE_TOP].sort(), 'evidence 顶层字段精确（不得增删）');
+assert.equal(evidence.schema_version, 1, 'evidence schema_version=1');
+assert.equal(evidence.task_id, 'CFH-02B-M6B-R1', 'evidence task_id');
+assert.equal(evidence.product_commit, 'e3619cb33f60ea9a20552038ec1ef16fcf1185db', 'product_commit 精确');
+assert.equal(evidence.acceptance_commit, '8125564049957511e776905374fdb9791804248d', 'acceptance_commit 精确');
+assert.equal(evidence.browser_channel, 'mcp_chrome', 'browser_channel=mcp_chrome');
+assert.equal(evidence.fallback_used, false, 'fallback_used=false');
+assert.equal(evidence.conclusion, 'PASS', 'conclusion=PASS');
+// mcp：session/invocation/tool 非空，invocation 为宿主 call_ 格式
+assert.equal(evidence.mcp.server_name, 'chrome-devtools', 'MCP server_name');
+assert.equal(evidence.mcp.server_package, 'chrome-devtools-mcp', 'MCP server_package');
+assert.ok(Array.isArray(evidence.mcp.session_ids) && evidence.mcp.session_ids.length > 0, 'session_ids 非空');
+assert.ok(Array.isArray(evidence.mcp.invocation_ids) && evidence.mcp.invocation_ids.length > 0, 'invocation_ids 非空');
+assert.ok(evidence.mcp.invocation_ids.every((id) => /^call_[0-9a-zA-Z_]+$/.test(id)), 'invocation IDs 为宿主 call_ 格式（非人工编号）');
+assert.ok(Array.isArray(evidence.mcp.tool_names) && evidence.mcp.tool_names.length > 0, 'tool_names 非空');
+// steps：连续、可追踪、桌面/手机都有
+assert.ok(Array.isArray(evidence.steps) && evidence.steps.length > 0, 'steps 非空');
+const evIds = new Set(evidence.mcp.invocation_ids);
+const evTools = new Set(evidence.mcp.tool_names);
+const evViewports = new Set();
+evidence.steps.forEach((s, i) => {
+    assert.equal(s.sequence, i + 1, `steps 连续: step ${i + 1}`);
+    assert.ok(['desktop', 'phone'].includes(s.viewport), `viewport 合法: step ${s.sequence}`);
+    assert.ok(evIds.has(s.invocation_id), `invocation ID 可追踪: step ${s.sequence}`);
+    assert.ok(evTools.has(s.tool_name), `tool_name 存在: step ${s.sequence}`);
+    assert.equal(typeof s.action, 'string');
+    assert.equal(typeof s.target, 'string');
+    assert.equal(typeof s.result, 'string');
+    assert.equal(typeof s.success, 'boolean');
+    evViewports.add(s.viewport);
+});
+assert.ok(evViewports.has('desktop') && evViewports.has('phone'), 'desktop 与 phone 都有步骤');
+// desktop 确认状态完整
+assert.equal(evidence.desktop.viewport_width, 1440, 'desktop viewport_width=1440');
+assert.equal(evidence.desktop.viewport_height, 900, 'desktop viewport_height=900');
+assert.equal(evidence.desktop.login_success, true, 'desktop login_success');
+assert.equal(evidence.desktop.invalid_confirmation_disabled, true, 'invalid_confirmation_disabled');
+assert.equal(evidence.desktop.lowercase_confirmation_disabled, true, 'lowercase_confirmation_disabled');
+assert.equal(evidence.desktop.trailing_space_confirmation_disabled, true, 'trailing_space_confirmation_disabled');
+assert.equal(evidence.desktop.exact_confirmation_enabled, true, 'exact_confirmation_enabled');
+assert.equal(evidence.desktop.final_click_performed, true, 'final_click_performed');
+assert.equal(evidence.desktop.operation_created, true, 'operation_created');
+assert.equal(evidence.desktop.polling_completed, true, 'polling_completed');
+assert.equal(evidence.desktop.restore_preview_request_count, 0, 'restore_preview_request_count=0');
+assert.equal(evidence.desktop.preview_token_occurrences, 0, 'preview_token_occurrences=0');
+// phone 响应式状态完整
+assert.equal(evidence.phone.viewport_width, 390, 'phone viewport_width=390');
+assert.equal(evidence.phone.viewport_height, 844, 'phone viewport_height=844');
+assert.equal(evidence.phone.login_success, true, 'phone login_success');
+assert.equal(evidence.phone.horizontal_overflow, false, 'horizontal_overflow=false');
+assert.equal(evidence.phone.dialog_fully_visible, true, 'dialog_fully_visible');
+assert.equal(evidence.phone.input_focusable, true, 'input_focusable');
+assert.equal(evidence.phone.touch_buttons_usable, true, 'touch_buttons_usable');
+assert.equal(evidence.phone.exact_confirmation_enabled, true, 'phone exact_confirmation_enabled');
+assert.equal(evidence.phone.final_click_performed, true, 'phone final_click_performed');
+assert.equal(evidence.phone.polling_completed, true, 'phone polling_completed');
+assert.equal(evidence.phone.refresh_resume_verified, true, 'refresh_resume_verified');
+// screenshots：SHA 合法、仓库外、invocation 可追踪
+assert.ok(Array.isArray(evidence.screenshots) && evidence.screenshots.length >= 3, '至少 3 张截图');
+for (const s of evidence.screenshots) {
+    assert.ok(/^[0-9a-f]{64}$/.test(s.sha256), `screenshot SHA 合法: ${s.label}`);
+    assert.equal(s.stored_outside_repository, true, `screenshot 仓库外存储: ${s.label}`);
+    assert.ok(evIds.has(s.related_invocation_id), `screenshot invocation 可追踪: ${s.label}`);
+    assert.ok(['desktop', 'phone'].includes(s.viewport), `screenshot viewport 合法: ${s.label}`);
+}
+// tests 数字与报告一致（真实日志）
+assert.equal(evidence.tests.passed, 66, 'tests passed=66');
+assert.equal(evidence.tests.failed, 0, 'tests failed=0');
+assert.equal(evidence.tests.assertions, 227, 'tests assertions=227');
+assert.ok(/^[0-9a-f]{64}$/.test(evidence.tests.source_log_sha256), 'tests source_log_sha256 合法');
+assert.ok(evidence.tests.command.includes('php artisan test'), 'tests command 为 PHPUnit');
+// security 标志
+assert.equal(evidence.security.app_env_testing, true, 'app_env_testing=true');
+assert.equal(evidence.security.dedicated_testing_database, true, 'dedicated_testing_database=true');
+assert.equal(evidence.security.fake_mysqldump, true, 'fake_mysqldump=true');
+assert.equal(evidence.security.fake_restore, true, 'fake_restore=true');
+assert.equal(evidence.security.real_database_touched, false, 'real_database_touched=false');
+assert.equal(evidence.security.real_restore_executed, false, 'real_restore_executed=false');
+assert.equal(evidence.security.credentials_recorded, false, 'credentials_recorded=false');
+assert.equal(evidence.security.absolute_local_paths_recorded, false, 'absolute_local_paths_recorded=false');
+// 原始文本：无凭据值、无本地绝对路径（evidence 与验收报告）
+// 注意：只嵌入唯一片段（而非完整凭据值）以减小测试源码中的秘密暴露面。
+const rawEvidence = read(M6B_EVIDENCE);
+assert.ok(!/200hbt|6529781@qq\.com|Authorization\s*[:=]|Bearer\s+[A-Za-z0-9]|session[_-]?token\s*[:=]/i.test(rawEvidence), 'evidence 不含凭据值');
+assert.ok(!/D:\\Document\\|D:\/Document/i.test(rawEvidence), 'evidence 不含本地绝对路径');
+const m6bReport = read('docs', 'testing', 'cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md');
+assert.ok(m6bReport.includes('66 passed (227 assertions)'), '验收报告测试数字与 evidence 一致');
+assert.ok(!/D:\\Document\\|D:\/Document/i.test(m6bReport), '验收报告不含本地绝对路径');
+assert.ok(!/200hbt|6529781@qq\.com|Authorization\s*[:=]|Bearer\s+[A-Za-z0-9]|session[_-]?token\s*[:=]/i.test(m6bReport), '验收报告不含账号密码');
 
 console.log('M6 publication slice docs guard passed.');

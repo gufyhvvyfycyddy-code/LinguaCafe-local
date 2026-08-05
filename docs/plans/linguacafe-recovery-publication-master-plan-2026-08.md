@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-02B-M6B
+active_task: CFH-02B-M6B-R1
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -49,6 +49,11 @@ supervisor_unlock_required: true
 
 `CFH-02B-M6B — Rework And Publish Single-Owner Restore For Responsive Web`
 
+当前阶段：
+
+* `CFH-02B-M6B-R1 — Close MCP Trace And Governance Evidence`：M6B 产品代码、测试结构和桌面/手机页面行为已被网页端 GPT 阶段性接受；M6B 整体仍 **Incomplete**，等待 MCP trace/evidence 收口（真实 MCP 调用凭证、测试数字校正、绝对路径移除、manifest 矛盾表述修正、Guard 加强）；R1 只做证据与治理收口，不修改产品代码；
+* M6C/M6D 未授权。
+
 状态：
 
 * CFH-01、CFH-02A、CFH-02A-R1 保持 ACCEPTED；
@@ -64,7 +69,7 @@ supervisor_unlock_required: true
 * 状态接口 `GET /backup-restores/{operationId}` 保持可读（已登录、不检查管理员角色、maintenance mode 期间仍可读取、不暴露敏感细节）；
 * 同一备份的重复确认、双击最终确认、HTTP 超时后再次提交必须幂等，只产生一个 operation；backup lock 与 restore lock 覆盖完整执行期；
 * 旧 admin/preview 测试必须重写（不得只追加新测试）；旧 M6B 代码不得原样提交；
-* 只允许修改 M6B 冻结范围（新 HTTP 契约、网页 UI、响应式、对应测试与治理文件）；不修改 manifest、ownership map、M6A 已接受代码；
+* 只允许修改 M6B 冻结范围（新 HTTP 契约、网页 UI、响应式、对应测试与治理文件）；不随意扩大或重写 manifest、ownership map，不修改 M6A 已接受代码；验收证据提交允许同步 manifest 的实际 M6B 文件边界、SHA、测试和浏览器步骤（已提交的 manifest 变更属于 M6B 验收同步）；CFH-02B-M6B-R1 本轮不再修改 manifest；
 * 不自动进入下一任务（`auto_advance: false`）；M6C/M6D 未授权。
 
 ## 5. Candidate Queue

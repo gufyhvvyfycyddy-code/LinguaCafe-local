@@ -9,12 +9,12 @@ Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 
 ## 1. Baseline
 
-- repository: `D:\Document\lingl\LinguaCafe-main`
+- repository: `<repository>`
 - branch: `master`
 - start HEAD: `ac847263f7e926798c098d2ccb942a8321e1121a`
 - origin/master: `ac847263f7e926798c098d2ccb942a8321e1121a` (ahead 0 / behind 0)
 - dirty paths at start: 491 (108 modified + 2 deleted + 381 untracked, all pre-existing assets)
-- external snapshot: `D:\Document\lingl\cfh-02b-m6b-snapshot\` (HEAD, origin/master, NUL-safe
+- external snapshot: `<external-snapshot>` (outside the repository; HEAD, origin/master, NUL-safe
   porcelain status, status_sha256, ownership_map_sha256, m6_manifest_sha256, timestamp;
   no `.env*` content or hash read)
 
@@ -83,8 +83,14 @@ Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 - M6B suite (rewritten, not appended): BackupServiceTest, SqlDumpInspectorTest,
   DatabaseRestoreProcessTest, BackupRestoreServiceTest, BackupManagementTest,
   BackupRestoreManagementTest, ExecuteBackupRestoreTest, RestoreWriteFenceTest
-  — **64 passed (217 assertions)** in the disposable staged-tree worktree
+  — **66 passed (227 assertions)** in the disposable staged-tree worktree
   (APP_ENV=testing, dedicated `linguacafe_fsrs_test` database).
+  The earlier intermediate run reported 64 passed (217 assertions); the two
+  final regression tests (running re-confirmation non-concurrency, terminal-
+  failure retry) were added afterwards. The authoritative figure for the final
+  product commit `e3619cb3` is 66 passed (227 assertions) — re-run during
+  CFH-02B-M6B-R1 with the raw output logged and hashed
+  (`<temp>/m6b-tests-final.log`, sha256 `0f6f1fb43df62e6fb839340b263471eee194259ff3cca91f24ad70dc85697266`).
 - Coverage: unauthenticated rejection; authenticated non-admin access; no
   is_admin requirement; restore-preview route absent (404); no preview_token;
   confirmation missing/incorrect/case/whitespace/exact; server-side checksum
@@ -107,8 +113,8 @@ Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 
 - M6B staged tree (23 files, `git diff --cached --check` clean) built with
   `git write-tree` + `git commit-tree`, verified in the disposable worktree
-  `D:\Document\lingl\cfh-02b-m6b-staged-tree` (detached):
-  - PHP M6B suite 64 passed (connected to `linguacafe_fsrs_test` under
+  `<disposable-worktree>` (detached):
+  - PHP M6B suite 66 passed (connected to `linguacafe_fsrs_test` under
     APP_ENV=testing),
   - `npm run development` compiled successfully,
   - guards pass in the main worktree (16/16); the worktree itself cannot pass
@@ -118,17 +124,35 @@ Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 
 ## 7. MCP Chrome acceptance (mandatory real-browser channel)
 
+Machine-readable evidence: `docs/testing/cfh-02b-m6b-mcp-chrome-evidence-2026-08-05.json`
+(schema_version 1; `task_id: CFH-02B-M6B-R1`; product_commit `e3619cb3…`;
+acceptance_commit `8125564…`; browser_channel `mcp_chrome`; fallback_used
+`false`; conclusion `PASS`). It contains the full invocation ledger and the
+per-step mapping; this Markdown intentionally keeps only summaries — detailed
+invocation identifiers live exclusively in the JSON file.
+
+- Trace source: ReasoniX session log for the CFH-02B-M6B session
+  (`20260805-045043.028046700-…-recovery-56f878916378a5dc.jsonl`, read-only
+  copy sha256 `a9e1aff19b40d4c7ad433b920382477fe71d4c46ce4b50cfa6099a8e57d8b7e8`);
+  no independent MCP host event log exists (host `mcp-state` holds only the
+  npm cache). Earlier M6B acceptance attempts in the same log produced 10
+  real invocations, all failed/timeouts — they are recorded in the evidence
+  JSON as history, not as acceptance steps.
+- Evidence totals: 1 session; 109 MCP Chrome invocations; 28 evidence steps
+  (desktop 17, phone 11); 13 tool names; 3 screenshots (hashes in §7 below
+  and in the JSON). Desktop viewport 1440×900; phone viewport 390×844
+  (mobile+touch emulation).
 - MCP server: `chrome-devtools` (MCP Chrome). Tools: navigate_page, emulate,
   take_snapshot, evaluate_script (DOM click/input events for Vuetify
-  compatibility), fill_form, wait_for, list_network_requests,
+  compatibility), wait_for, list_network_requests,
   get_network_request, list_console_messages, take_screenshot.
 - Invocation/session identifiers: chrome-devtools MCP pages at
   `http://127.0.0.1:8092` (testing server bound to the disposable staged-tree
   worktree, APP_ENV=testing, dedicated `linguacafe_fsrs_test` database,
   fake mysqldump / fake mysql binaries, mock redis on 127.0.0.1:6379,
   queue worker on redis-restore). Testing identity created through the normal
-  registration page in the testing database and demoted to `is_admin=0`
-  (minimum privilege; password entered only through the UI).
+  registration page in the testing database (minimum privilege; credentials
+  entered only through the browser UI; credentials never recorded).
 - Desktop (default viewport and 1440×900): login → open /admin/dashboard as
   non-admin → backup list readable → select backup → confirmation dialog
   (backup name/time, risk notice, RESTORE input, cancel/confirm) → invalid/
@@ -149,10 +173,14 @@ Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 - Network: `restore-preview` request count **0**; `preview_token` occurrences
   **0**; restore request bodies contain only `{"confirmation":"RESTORE"}`
   (no checksum/tables/warnings); no credentials in requests/responses.
-- Screenshots (SHA-256):
-  - desktop restore success (default viewport): `9c8ddabbb76c4cb20bbf6feef92e5a8db00f02c62d1b2fa6d9e798ba8944e505`
-  - desktop 1440×900 modal: `66768d5642519c9dc317caa7a38f8075e33e242b63728792b9673d58b03ac1be`
-  - phone restore success (390×844): `6d8d381780cddbf2381f5992348f5cd6bb2394db2358d9d804483e69dd4c9d94`
+- Screenshots (SHA-256; originals stored outside the repository in the
+  external snapshot, cf. `stored_outside_repository` in the evidence JSON):
+  - desktop restore dialog with enabled confirm (1440×900):
+    `57a5edb213e896f7edd8935af913ca71c309b26866876c21b59cb860b9445833`
+  - desktop restore success (1440×900):
+    `9cbd996e9749ba4eaae2ec86074449d1e517d39dea9c74886fbd3fb0cbf7e02a`
+  - phone restore success (390×844):
+    `57ef672971cbc51083636134940d080c8606f2f5d91b65b2ab9d18bcab8d8ae0`
 
 ## 8. Defects found and fixed during acceptance
 
