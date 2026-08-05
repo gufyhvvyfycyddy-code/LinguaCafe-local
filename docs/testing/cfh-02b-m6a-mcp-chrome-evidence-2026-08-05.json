@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "task_id": "CFH-02B-M6A-R1",
+  "product_commit": "82b2cf856350561abc54b6e05e51d7a19f120388",
+  "browser_channel": "mcp_chrome",
+  "fallback_used": false,
+  "mcp": {
+    "server_name": "chrome-devtools",
+    "server_package": "chrome-devtools-mcp (official Google, installed via install_source, verified 29 tools)",
+    "tool_names": [
+      "list_pages",
+      "navigate_page",
+      "take_snapshot",
+      "fill_form",
+      "click",
+      "wait_for",
+      "evaluate_script",
+      "list_console_messages",
+      "list_network_requests",
+      "take_screenshot"
+    ],
+    "invocation_count": 25
+  },
+  "environment": {
+    "server_url": "http://127.0.0.1:8091",
+    "server_pid": 14276,
+    "server_command": "php -S 127.0.0.1:8091 ../tests/Fixtures/m6a-browser-server.php (from M6A product-commit worktree public dir)",
+    "worktree_commit": "82b2cf856350561abc54b6e05e51d7a19f120388",
+    "app_env": "testing",
+    "testing_database_confirmed": true,
+    "testing_database_name_fingerprint": "621d416d7573d440cefa43611dc6df8b5a986deb0e140d0e97620b50c7db1881",
+    "fake_mysqldump_confirmed": true,
+    "fake_mysqldump_binary": "tests/Fixtures/fake-mysqldump.cs compiled to storage/framework/testing/m6a-fake-mysqldump.exe (fixture MYSQLDUMP_BINARY)",
+    "temporary_backup_storage_confirmed": true,
+    "real_database_touched": false,
+    "real_restore_executed": false
+  },
+  "account": {
+    "task_account_used": true,
+    "account_created_this_task": false,
+    "account_exists_in_testing_db": true,
+    "login_success": true
+  },
+  "result": {
+    "initial_backup_count": 0,
+    "final_backup_count": 1,
+    "created_backup_id": "21468d87-2408-43ac-9697-c0b122ee7e1a",
+    "created_backup_payload": "linguacafe_20260805_031259_21468d87-2408-43ac-9697-c0b122ee7e1a.sql.gz",
+    "created_backup_sha256": "20dc2bc0bba6a2ae578ed41fee08ab9578fab6fba49a28cf23675946721146de",
+    "created_backup_size_bytes": 190,
+    "success_feedback_present": true,
+    "success_feedback_text": "备份创建成功：linguacafe_20260805_031259_21468d87-2408-43ac-9697-c0b122ee7e1a.sql.gz",
+    "reload_persisted": true,
+    "reload_feedback_text": "页面刷新后备份仍显示在列表中（同 payload 文件名与校验值）",
+    "restore_request_count": 0,
+    "restore_requests": []
+  },
+  "console": {
+    "new_application_errors": [],
+    "known_noise": [
+      "WebSocket connection refused (ws/wss local Pusher fallback, pre-existing local degradation)",
+      "Slow network font fallback info",
+      "Vue devtools development-mode info"
+    ]
+  },
+  "network": {
+    "credential_leak_detected": false,
+    "key_requests": [
+      { "method": "POST", "path": "/backups", "status": 201 },
+      { "method": "GET", "path": "/backups", "status": 200 },
+      { "method": "GET", "path": "/backups", "status": 200 },
+      { "method": "GET", "path": "/backups", "status": 200 }
+    ],
+    "all_statuses": "200/201 only; no 4xx/5xx"
+  },
+  "screenshot": {
+    "path": "<temp>/m6a_r1_admin_final.png",
+    "sha256": "4dd1d1b453e1c2b7de073788330ed911aac9512d840f3ff5066871f19415f02f"
+  },
+  "conclusion": "PASS",
+  "notes": "MCP Chrome real-browser acceptance of the pushed M6A product commit 82b2cf85 completed: login with task-provided local testing account, backup list, create backup (POST /backups 201), success alert, list refresh, page reload persistence, zero restore requests, no credential leaks, fake mysqldump payload confirmed. Playwright evidence from the previous task is preserved but does NOT constitute the final web acceptance (browser_channel=mcp_chrome)."
+}

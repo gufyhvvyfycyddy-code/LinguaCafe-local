@@ -1,7 +1,8 @@
 # CFH-02B-M6A Safe Backup Publication Acceptance — 2026-08-05
 
 Status: **PUSHED_AWAITING_ACCEPTANCE**（等待网页端 GPT 验收）
-Task: `CFH-02B-M6A — Publish And Verify Safe Backup Slice`
+MCP Chrome Mandatory Revalidation: **updated**（CFH-02B-M6A-R1 已完成，见 §21）
+Task: `CFH-02B-M6A — Publish And Verify Safe Backup Slice` / `CFH-02B-M6A-R1 — Restore MCP Chrome And Complete Mandatory Browser Acceptance`
 Roadmap: `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`
 Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
 Publication plan: `docs/plans/cfh-02-m6-publication-plan.md`
@@ -163,11 +164,55 @@ MCP Chrome 不可用（MCP server 列表为空），按 AGENTS.md §8 / ADR-0033
 
 - push 时点 final HEAD = origin/master = `46f3adea4e40c6644314bc62e56f2f7754ab12a4`（ahead/behind 0/0）
 - 后续文档修正 commit（不改变产品/治理语义）：`7a6fc60d`（填写 final HEAD）、`26d47ee2`（移除绝对路径）、及本修正；最终 tip 以最终任务报告为准
-- milestone lock: `active_task: CFH-02B-M6A`、`status: awaiting_web_acceptance`、`product_code_authorized: false`、`commit_product_code_allowed: false`、`database_write_allowed: false`、`browser_required: false`、`auto_advance: false`、`supervisor_unlock_required: true`
-- master plan: M6A `PUSHED_AWAITING_ACCEPTANCE`；CFH-02B-M6A 当前完成等待验收；M6B/M6C/M6D `candidate_not_authorized`；不自动进入 M6B
+- milestone lock: `active_task: CFH-02B-M6A-R1`、`status: awaiting_web_acceptance`、`product_code_authorized: false`、`commit_product_code_allowed: false`、`database_write_allowed: false`、`browser_required: false`、`auto_advance: false`、`supervisor_unlock_required: true`
+- master plan: M6A `PUSHED_AWAITING_ACCEPTANCE`；CFH-02B-M6A-R1 当前完成等待验收；M6B/M6C/M6D `candidate_not_authorized`；不自动进入 M6B
 
 ## 20. 最终结论
 
 `M6A_READY_FOR_WEB_ACCEPTANCE`
 
 - 不进入下一任务；等待网页端 GPT 验收
+
+## 21. MCP Chrome Mandatory Revalidation（CFH-02B-M6A-R1，2026-08-05）
+
+Status: **updated**（强制 MCP Chrome 真实浏览器验收已完成）
+
+### 21.1 MCP Chrome 恢复
+
+- 根因（CFH-02B-M6A 轮）：`<Reasonix home>/config.toml` 无任何 `[[plugins]]` 条目，MCP Chrome 从未安装（非配置未加载/路径/版本/端口问题；Node v22.16.0、Chrome stable 均满足要求）。
+- 恢复（CFH-02B-M6A-R1）：官方成熟方案 `chrome-devtools-mcp`（Google 官方，v1.6.0）经 `install_source` 安装为 stdio MCP server（command=npx, args=[-y, chrome-devtools-mcp]），安装验证 toolCount=29；修改前外部备份 `config.toml.bak-cfh02b-m6a-r1-20260805`；重启 host 后 status=ready/authorized/connected。
+- 实际调用确认：`mcp-tool:chrome-devtools/list_pages` 返回真实页面（about:blank → 目标页面）。
+
+### 21.2 验收环境（M6A 产品 commit 精确 worktree）
+
+- `git worktree add --detach <仓库外路径> 82b2cf856350561abc54b6e05e51d7a19f120388`；vendor/node_modules junction 复用；grep 确认无 M6B 代码（inspectBackup/BackupRestoreService/restore-preview 零命中）。
+- 服务器：`php -S 127.0.0.1:8091 ../tests/Fixtures/m6a-browser-server.php`（worktree/public，PID 14276）；fixture 设 APP_ENV=testing、MYSQLDUMP_BINARY=编译的 fake exe、BACKUP_ENABLED=false、CACHE_STORE=array。
+- testing DB：`linguacafe_fsrs_test`（worktree .env.testing tinker 确认，专用测试库）。
+- 测试账号：使用当前任务提示词提供的本地测试账号和密码（testing 库已存在，未新建）。
+
+### 21.3 MCP Chrome 操作步骤与结果（25 次真实工具调用）
+
+1. `list_pages` 验证 MCP 连接（真实页面）。
+2. `navigate_page` → `http://127.0.0.1:8091/login`；`take_snapshot` 确认 Vue 登录表单（邮箱/密码/登录按钮）。
+3. `fill_form` 填写测试账号；`click` 登录按钮 → 跳转首页（认证成功）。
+4. `navigate_page` → `/admin`；`take_snapshot`：备份卡片渲染（M6A-only 组件），初始空状态「还没有成功发布的备份」。
+5. 创建备份：MCP `click` 未触发 Vue 事件（两次观察无 POST），改用 `evaluate_script` 派发 DOM click（受控 DOM 用户事件）→ `POST /backups` 返回 **201**。
+6. `wait_for`「备份创建成功」命中：alert「备份创建成功：linguacafe_20260805_031259_21468d87-…sql.gz」。
+7. 列表出现新备份（190 B · 校验值 20dc2bc0bba6…）。
+8. `navigate_page`（reload）→ 备份持久化（同 payload 文件名与校验值仍显示）。
+9. `list_console_messages`：无 M6A 相关错误；仅已知噪音（WebSocket 本地 Pusher 降级、字体/开发模式 info）。
+10. `list_network_requests`（保留 44 请求）：`POST /backups [201]`、`GET /backups` ×3 [200]、其余全 200；**零 restore 请求**（无 restore-preview/restore/restore-status/backup-restores）。
+11. `take_screenshot` 存档（临时目录）。
+12. fake mysqldump 生效：payload 内容 = fake 输出（`-- LinguaCafe M6 testing-only browser acceptance dump` + CREATE TABLE 骨架），manifest status=successful、sha256 与页面校验值一致；未触碰真实数据库。
+
+### 21.4 机器可读证据
+
+`docs/testing/cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json`（schema_version=1；browser_channel=mcp_chrome；fallback_used=false；testing_database_confirmed/fake_mysqldump_confirmed=true；real_database_touched/real_restore_executed=false；restore_request_count=0；credential_leak_detected=false；new_application_errors=[]；conclusion=PASS）。
+
+### 21.5 与 Playwright 旧证据的关系
+
+CFH-02B-M6A 轮的 Playwright 证据保留（产品提交内容一致），但**不构成最终网页端验收**（browser_channel 强制 mcp_chrome）。本节的 MCP Chrome 验收为最终强制验收。
+
+### 21.6 结论
+
+`M6A_MCP_READY_FOR_WEB_ACCEPTANCE`（MCP Chrome 强制验收通过；等待网页端 GPT 最终验收）

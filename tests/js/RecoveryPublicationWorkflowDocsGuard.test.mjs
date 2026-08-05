@@ -44,15 +44,24 @@ assert.ok(milestone.status !== 'accepted');
 if (milestone.active_task === 'CFH-02A-R1') {
     assert.equal(milestone.status, 'awaiting_web_acceptance', 'CFH-02A-R1 提交时 status 必须为 awaiting_web_acceptance');
 }
-// 3b. CFH-02B-M6A 授权/验收双阶段：authorized 允许产品发布，awaiting_web_acceptance 必须回收授权
-if (milestone.active_task === 'CFH-02B-M6A') {
+// 3b. CFH-02B-M6A / CFH-02B-M6A-R1 授权/验收双阶段：authorized 允许（仅 M6A）验收活动，awaiting_web_acceptance 必须回收全部授权
+if (milestone.active_task === 'CFH-02B-M6A' || milestone.active_task === 'CFH-02B-M6A-R1') {
     assert.equal(milestone.auto_advance, false);
     assert.equal(milestone.supervisor_unlock_required, true);
     if (milestone.status === 'authorized') {
-        assert.equal(milestone.product_code_authorized, true, 'CFH-02B-M6A 授权阶段 product_code_authorized=true');
-        assert.equal(milestone.commit_product_code_allowed, true, 'CFH-02B-M6A 授权阶段 commit_product_code_allowed=true');
-        assert.equal(milestone.database_write_allowed, true, 'CFH-02B-M6A 授权阶段 database_write_allowed=true（仅 testing 隔离）');
-        assert.equal(milestone.browser_required, true, 'CFH-02B-M6A 授权阶段 browser_required=true');
+        if (milestone.active_task === 'CFH-02B-M6A-R1') {
+            // R1 只做验收，不发布产品代码
+            assert.equal(milestone.product_code_authorized, false, 'CFH-02B-M6A-R1 授权阶段 product_code_authorized=false');
+            assert.equal(milestone.commit_product_code_allowed, false, 'CFH-02B-M6A-R1 授权阶段 commit_product_code_allowed=false');
+            assert.equal(milestone.database_write_allowed, true, 'CFH-02B-M6A-R1 授权阶段 database_write_allowed=true（仅 testing 隔离）');
+            assert.equal(milestone.browser_required, true, 'CFH-02B-M6A-R1 授权阶段 browser_required=true');
+            assert.equal(milestone.browser_channel, 'mcp_chrome', 'CFH-02B-M6A-R1 强制 browser_channel=mcp_chrome');
+        } else {
+            assert.equal(milestone.product_code_authorized, true, 'CFH-02B-M6A 授权阶段 product_code_authorized=true');
+            assert.equal(milestone.commit_product_code_allowed, true, 'CFH-02B-M6A 授权阶段 commit_product_code_allowed=true');
+            assert.equal(milestone.database_write_allowed, true, 'CFH-02B-M6A 授权阶段 database_write_allowed=true（仅 testing 隔离）');
+            assert.equal(milestone.browser_required, true, 'CFH-02B-M6A 授权阶段 browser_required=true');
+        }
     } else {
         assert.equal(milestone.status, 'awaiting_web_acceptance');
         assert.equal(milestone.product_code_authorized, false, '最终阶段 product_code_authorized=false');

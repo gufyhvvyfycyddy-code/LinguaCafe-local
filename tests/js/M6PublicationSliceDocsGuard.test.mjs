@@ -53,8 +53,8 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.equal(milestone.active_task, 'CFH-02B-M6A', 'milestone.active_task');
-assert.match(masterPlan, /active_task: CFH-02B-M6A/);
+assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1'].includes(milestone.active_task), 'milestone.active_task 合法');
+assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
 if (milestone.active_task === 'CFH-02B-M6A' && milestone.status === 'authorized') {
     assert.equal(milestone.product_code_authorized, true);
     assert.match(masterPlan, /product_code_authorized: true/);
@@ -315,6 +315,36 @@ if (milestone.status === 'awaiting_web_acceptance') {
         allCommits.some((c) => c !== 'f67bc560c59bc6e3b506eb403eb69659699b4f28'),
         '产品 commit SHA 必须是新提交（非授权基线）',
     );
+
+    // CFH-02B-M6A-R1：MCP Chrome 强制验收证据契约（任务 §13/§16）
+    if (milestone.active_task === 'CFH-02B-M6A-R1') {
+        const evidence = readJson('docs', 'testing', 'cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json');
+        assert.equal(evidence.schema_version, 1, 'evidence schema_version');
+        assert.equal(evidence.task_id, 'CFH-02B-M6A-R1', 'evidence task_id');
+        assert.equal(evidence.product_commit, '82b2cf856350561abc54b6e05e51d7a19f120388', 'evidence product_commit');
+        assert.equal(evidence.browser_channel, 'mcp_chrome', 'evidence browser_channel 必须为 mcp_chrome');
+        assert.equal(evidence.fallback_used, false, 'evidence fallback_used 必须为 false');
+        assert.ok(evidence.mcp.server_name.length > 0, 'evidence mcp.server_name 非空');
+        assert.ok(Array.isArray(evidence.mcp.tool_names) && evidence.mcp.tool_names.length > 0, 'evidence mcp.tool_names 非空');
+        assert.equal(evidence.environment.app_env, 'testing', 'evidence app_env=testing');
+        assert.equal(evidence.environment.testing_database_confirmed, true, 'evidence testing_database_confirmed');
+        assert.equal(evidence.environment.fake_mysqldump_confirmed, true, 'evidence fake_mysqldump_confirmed');
+        assert.equal(evidence.environment.temporary_backup_storage_confirmed, true, 'evidence temporary_backup_storage_confirmed');
+        assert.equal(evidence.environment.real_database_touched, false, 'evidence real_database_touched=false');
+        assert.equal(evidence.environment.real_restore_executed, false, 'evidence real_restore_executed=false');
+        assert.equal(evidence.account.task_account_used, true, 'evidence task_account_used');
+        assert.equal(evidence.account.login_success, true, 'evidence login_success');
+        assert.ok(evidence.result.final_backup_count > evidence.result.initial_backup_count, 'evidence final>initial 备份数');
+        assert.equal(evidence.result.reload_persisted, true, 'evidence reload_persisted');
+        assert.equal(evidence.result.success_feedback_present, true, 'evidence success_feedback_present');
+        assert.equal(evidence.result.restore_request_count, 0, 'evidence restore_request_count=0');
+        assert.equal(evidence.network.credential_leak_detected, false, 'evidence credential_leak_detected=false');
+        assert.ok(Array.isArray(evidence.console.new_application_errors) && evidence.console.new_application_errors.length === 0, 'evidence new_application_errors 为空');
+        assert.equal(evidence.conclusion, 'PASS', 'evidence conclusion=PASS');
+        assert.ok(report.includes('MCP Chrome Mandatory Revalidation'), '验收报告包含 MCP Chrome Mandatory Revalidation 章节');
+        assert.ok(report.includes('不构成最终网页端验收'), '验收报告不得把 Playwright 称为最终门禁');
+        assert.equal(milestone.browser_channel, 'mcp_chrome', 'milestone browser_channel=mcp_chrome');
+    }
 }
 
 // 22. M6B/M6C/M6D 在总计划中仍为 candidate_not_authorized
