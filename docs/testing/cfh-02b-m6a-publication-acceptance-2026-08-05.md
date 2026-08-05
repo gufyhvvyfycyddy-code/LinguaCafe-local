@@ -207,7 +207,7 @@ Status: **updated**（强制 MCP Chrome 真实浏览器验收已完成）
 
 ### 21.4 机器可读证据
 
-`docs/testing/cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json`（schema_version=1；browser_channel=mcp_chrome；fallback_used=false；testing_database_confirmed/fake_mysqldump_confirmed=true；real_database_touched/real_restore_executed=false；restore_request_count=0；credential_leak_detected=false；new_application_errors=[]；conclusion=PASS）。
+`docs/testing/cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json`（R1 时点：schema_version=1；browser_channel=mcp_chrome；fallback_used=false；testing_database_confirmed/fake_mysqldump_confirmed=true；real_database_touched/real_restore_executed=false；restore_request_count=0；credential_leak_detected=false；new_application_errors=[]；conclusion=PASS）。该文件已于 R2 重写为 schema v2（见 §22），本节为 R1 历史记录。
 
 ### 21.5 与 Playwright 旧证据的关系
 
@@ -216,3 +216,33 @@ CFH-02B-M6A 轮的 Playwright 证据保留（产品提交内容一致），但**
 ### 21.6 结论
 
 `M6A_MCP_READY_FOR_WEB_ACCEPTANCE`（MCP Chrome 强制验收通过；等待网页端 GPT 最终验收）
+
+## 22. MCP Invocation Trace Closure（CFH-02B-M6A-R2，2026-08-05）
+
+### 22.1 旧证据缺口
+
+上一轮（R1）evidence JSON（schema v1）只记录 `invocation_count: 25`，未保存任务要求的 session/invocation 标识，也没有逐步 steps；Guard 同样漏检该要求。网页端 GPT 结论：M6A 最终验收 Incomplete，本轮补机器调用追踪契约。
+
+### 22.2 追踪恢复
+
+- 恢复方式：从 Reasonix 会话日志（`reasonix-events-log`）提取真实 MCP 调用记录，**未重新执行页面流程**（fresh rerun 不需要）。
+- trace source：`reasonix-events-log`。
+- 源日志：Reasonix sessions 目录中 R1 任务的会话 JSONL（含 78 处 chrome-devtools 记录）；SHA-256：`eb98578d38314a4f4e81fe2501d767ccf753a47c166ff2c8839538d711ae150b`（仓库外，供网页端 GPT 核对调用标识真实性）。
+- 恢复结果：33 条真实 `use_capability`（chrome-devtools 相关）调用记录；其中 27 条为 chrome-devtools 工具调用（含如实保留的失败步骤：参数错误、超时、click 未触发等），4 条为旧工具名 `browser_list_pages` 的失败尝试（工具不存在，未计入 steps），2 条为 `mcp-server` inspect。
+- session 标识：1 个（宿主会话 ID）；invocation 标识：27 个（宿主生成的 `call_*` 稳定调用 ID，非顺序号）。
+- steps 数量：27；tool names：10（list_pages、navigate_page、take_snapshot、fill_form、click、wait_for、evaluate_script、list_console_messages、list_network_requests、take_screenshot）。
+- 无伪造标识（全部来自宿主日志）；未使用顺序号冒充。
+
+### 22.3 机器证据
+
+- 文件：`docs/testing/cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json`（schema_version=2，精确顶层字段）。
+- session/invocation 标识数量：28（1 session + 27 invocation，见 JSON `mcp.session_or_invocation_ids`）。
+- steps 数量：27（JSON `steps`，sequence 1-27 连续，每步含真实 invocation_id、action、target、result、success）。
+- screenshots 数量：1；SHA-256：`4dd1d1b4…`（见 JSON `screenshots`；related_invocation_id 可追踪）。
+- 凭据检查：不包含密码、cookie、token、Authorization、Bearer 值（扫描 0 命中）。
+- 路径检查：不包含绝对本地路径（截图等以 `<temp>` 占位）。
+- 内部标识不全量重复进 Markdown（以 JSON 为唯一机器来源）。
+
+### 22.4 结论
+
+`M6A_TRACE_READY_FOR_WEB_ACCEPTANCE`（机器调用追踪契约已补齐；等待网页端 GPT 最终验收）

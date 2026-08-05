@@ -53,7 +53,7 @@ if (manifest.decision.safe_to_start_cfh02b === true) {
 assert.ok(manifest.decision.reason.length > 0, 'decision.reason 非空');
 
 // 4. 与 milestone lock / master plan 一致
-assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1'].includes(milestone.active_task), 'milestone.active_task 合法');
+assert.ok(['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2'].includes(milestone.active_task), 'milestone.active_task 合法');
 assert.match(masterPlan, new RegExp(`active_task: ${milestone.active_task}`));
 if (milestone.active_task === 'CFH-02B-M6A' && milestone.status === 'authorized') {
     assert.equal(milestone.product_code_authorized, true);
@@ -316,16 +316,57 @@ if (milestone.status === 'awaiting_web_acceptance') {
         '产品 commit SHA 必须是新提交（非授权基线）',
     );
 
-    // CFH-02B-M6A-R1：MCP Chrome 强制验收证据契约（任务 §13/§16）
-    if (milestone.active_task === 'CFH-02B-M6A-R1') {
+    // CFH-02B-M6A-R2：MCP Invocation Trace 证据契约（任务 §九/§十三，schema v2）
+    if (milestone.active_task === 'CFH-02B-M6A-R2') {
         const evidence = readJson('docs', 'testing', 'cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json');
-        assert.equal(evidence.schema_version, 1, 'evidence schema_version');
-        assert.equal(evidence.task_id, 'CFH-02B-M6A-R1', 'evidence task_id');
+        // 1-3. 顶层字段精确 / schema_version=2 / task_id
+        const expectedTop = ['schema_version', 'task_id', 'product_commit', 'browser_channel', 'fallback_used', 'mcp', 'environment', 'account', 'steps', 'result', 'console', 'network', 'screenshots', 'conclusion'];
+        assert.deepEqual(Object.keys(evidence).sort(), [...expectedTop].sort(), 'evidence 顶层字段精确');
+        assert.equal(evidence.schema_version, 2, 'evidence schema_version=2（拒绝旧 v1）');
+        assert.equal(evidence.task_id, 'CFH-02B-M6A-R2', 'evidence task_id');
         assert.equal(evidence.product_commit, '82b2cf856350561abc54b6e05e51d7a19f120388', 'evidence product_commit');
         assert.equal(evidence.browser_channel, 'mcp_chrome', 'evidence browser_channel 必须为 mcp_chrome');
         assert.equal(evidence.fallback_used, false, 'evidence fallback_used 必须为 false');
-        assert.ok(evidence.mcp.server_name.length > 0, 'evidence mcp.server_name 非空');
-        assert.ok(Array.isArray(evidence.mcp.tool_names) && evidence.mcp.tool_names.length > 0, 'evidence mcp.tool_names 非空');
+        // 4. mcp 字段精确
+        const expectedMcp = ['server_name', 'server_package', 'tool_names', 'session_or_invocation_ids', 'trace_source'];
+        assert.deepEqual(Object.keys(evidence.mcp).sort(), [...expectedMcp].sort(), 'evidence mcp 字段精确');
+        assert.equal(evidence.mcp.server_name, 'chrome-devtools', 'evidence mcp.server_name');
+        assert.ok(['reasonix-events-log', 'mcp-host-event-log', 'reasonix-session-resource', 'fresh-mcp-rerun'].includes(evidence.mcp.trace_source), 'evidence trace_source 合法');
+        // 5-7. session_or_invocation_ids 非空、非空字符串、禁止简单人为顺序号
+        const ids = evidence.mcp.session_or_invocation_ids;
+        assert.ok(Array.isArray(ids) && ids.length > 0, 'session_or_invocation_ids 非空数组');
+        for (const id of ids) {
+            assert.ok(typeof id === 'string' && id.length > 0, '每个标识为非空字符串');
+            assert.ok(!/^\d+$/.test(id), `禁止纯数字顺序号冒充标识: ${id}`);
+            assert.ok(!/^step-\d+$/i.test(id), `禁止 step-N 顺序号冒充标识: ${id}`);
+        }
+        // 8-13. steps 非空、sequence 连续、tool_name 属于 tool_names、invocation_id 可追踪、action/target/result 非空、覆盖关键操作
+        const steps = evidence.steps;
+        assert.ok(Array.isArray(steps) && steps.length > 0, 'steps 非空数组');
+        steps.forEach((s, i) => {
+            assert.equal(s.sequence, i + 1, `sequence 连续: ${s.sequence}`);
+            assert.ok(evidence.mcp.tool_names.includes(s.tool_name), `tool_name 属于 tool_names: ${s.tool_name}`);
+            assert.ok(ids.includes(s.invocation_id), `invocation_id 可追踪: ${s.invocation_id}`);
+            assert.ok(typeof s.action === 'string' && s.action.length > 0, 'action 非空');
+            assert.ok(typeof s.target === 'string' && s.target.length > 0, 'target 非空');
+            assert.ok(typeof s.result === 'string' && s.result.length > 0, 'result 非空');
+            assert.ok(typeof s.success === 'boolean', 'success 为布尔');
+        });
+        const stepTools = steps.map((s) => s.tool_name);
+        for (const required of ['list_pages', 'navigate_page', 'take_snapshot', 'fill_form', 'click', 'wait_for', 'evaluate_script', 'list_console_messages', 'list_network_requests', 'take_screenshot']) {
+            assert.ok(stepTools.includes(required), `steps 覆盖关键操作: ${required}`);
+        }
+        // 14-16. screenshots 非空、SHA 合法、related_invocation_id 可追踪
+        assert.ok(Array.isArray(evidence.screenshots) && evidence.screenshots.length > 0, 'screenshots 非空数组');
+        for (const shot of evidence.screenshots) {
+            assert.ok(/^[0-9a-f]{64}$/.test(shot.sha256), `screenshot SHA-256 64 位小写 hex: ${shot.sha256}`);
+            assert.equal(shot.stored_outside_repository, true, 'screenshot stored_outside_repository');
+            assert.ok(ids.includes(shot.related_invocation_id), `screenshot related_invocation_id 可追踪: ${shot.related_invocation_id}`);
+        }
+        // 17. 不包含 password/cookie/Authorization/Bearer/session token 值
+        const raw = JSON.stringify(evidence);
+        assert.ok(!/(100200hbt|1816529781@qq\.com|Authorization\s*[:=]|Bearer\s+[A-Za-z0-9]|session[_-]?token\s*[:=])/i.test(raw), 'evidence 不含凭据值');
+        // 18. 原环境/结果/Console/Network/安全断言全部保留
         assert.equal(evidence.environment.app_env, 'testing', 'evidence app_env=testing');
         assert.equal(evidence.environment.testing_database_confirmed, true, 'evidence testing_database_confirmed');
         assert.equal(evidence.environment.fake_mysqldump_confirmed, true, 'evidence fake_mysqldump_confirmed');
@@ -341,9 +382,12 @@ if (milestone.status === 'awaiting_web_acceptance') {
         assert.equal(evidence.network.credential_leak_detected, false, 'evidence credential_leak_detected=false');
         assert.ok(Array.isArray(evidence.console.new_application_errors) && evidence.console.new_application_errors.length === 0, 'evidence new_application_errors 为空');
         assert.equal(evidence.conclusion, 'PASS', 'evidence conclusion=PASS');
-        assert.ok(report.includes('MCP Chrome Mandatory Revalidation'), '验收报告包含 MCP Chrome Mandatory Revalidation 章节');
+        assert.ok(report.includes('MCP Invocation Trace Closure'), '验收报告包含 MCP Invocation Trace Closure 章节');
         assert.ok(report.includes('不构成最终网页端验收'), '验收报告不得把 Playwright 称为最终门禁');
         assert.equal(milestone.browser_channel, 'mcp_chrome', 'milestone browser_channel=mcp_chrome');
+    } else if (milestone.active_task === 'CFH-02B-M6A-R1') {
+        // 历史 R1 契约（只接受 schema v1 之上、但本轮后 evidence 已是 v2——旧契约分支不再读取 evidence 细节）
+        assert.ok(report.includes('MCP Chrome Mandatory Revalidation'), '验收报告包含 MCP Chrome Mandatory Revalidation 章节');
     }
 }
 

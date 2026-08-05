@@ -44,12 +44,19 @@ assert.ok(milestone.status !== 'accepted');
 if (milestone.active_task === 'CFH-02A-R1') {
     assert.equal(milestone.status, 'awaiting_web_acceptance', 'CFH-02A-R1 提交时 status 必须为 awaiting_web_acceptance');
 }
-// 3b. CFH-02B-M6A / CFH-02B-M6A-R1 授权/验收双阶段：authorized 允许（仅 M6A）验收活动，awaiting_web_acceptance 必须回收全部授权
-if (milestone.active_task === 'CFH-02B-M6A' || milestone.active_task === 'CFH-02B-M6A-R1') {
+// 3b. CFH-02B-M6A / CFH-02B-M6A-R1 / CFH-02B-M6A-R2 授权/验收双阶段
+if (['CFH-02B-M6A', 'CFH-02B-M6A-R1', 'CFH-02B-M6A-R2'].includes(milestone.active_task)) {
     assert.equal(milestone.auto_advance, false);
     assert.equal(milestone.supervisor_unlock_required, true);
     if (milestone.status === 'authorized') {
-        if (milestone.active_task === 'CFH-02B-M6A-R1') {
+        if (milestone.active_task === 'CFH-02B-M6A-R2') {
+            // R2 仅从日志恢复追踪标识（fresh rerun 时 browser/db 才为 true）
+            assert.equal(milestone.product_code_authorized, false, 'CFH-02B-M6A-R2 授权阶段 product_code_authorized=false');
+            assert.equal(milestone.commit_product_code_allowed, false, 'CFH-02B-M6A-R2 授权阶段 commit_product_code_allowed=false');
+            assert.equal(milestone.database_write_allowed, false, 'CFH-02B-M6A-R2 仅日志恢复 database_write_allowed=false');
+            assert.equal(milestone.browser_required, false, 'CFH-02B-M6A-R2 仅日志恢复 browser_required=false');
+            assert.equal(milestone.browser_channel, 'mcp_chrome', 'CFH-02B-M6A-R2 强制 browser_channel=mcp_chrome');
+        } else if (milestone.active_task === 'CFH-02B-M6A-R1') {
             // R1 只做验收，不发布产品代码
             assert.equal(milestone.product_code_authorized, false, 'CFH-02B-M6A-R1 授权阶段 product_code_authorized=false');
             assert.equal(milestone.commit_product_code_allowed, false, 'CFH-02B-M6A-R1 授权阶段 commit_product_code_allowed=false');

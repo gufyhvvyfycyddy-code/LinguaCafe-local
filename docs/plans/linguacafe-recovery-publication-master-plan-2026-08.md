@@ -2,7 +2,7 @@
 document_status: current
 program_id: linguacafe-recovery-publication-2026-08
 authoritative_handoff: docs/plans/codex-final-handoff-2026-08-04.md
-active_task: CFH-02B-M6A-R1
+active_task: CFH-02B-M6A-R2
 auto_advance: false
 product_code_authorized: false
 supervisor_unlock_required: true
@@ -47,22 +47,22 @@ supervisor_unlock_required: true
 
 当前唯一任务：
 
-`CFH-02B-M6A-R1 — Restore MCP Chrome And Complete Mandatory Browser Acceptance`
+`CFH-02B-M6A-R2 — Complete MCP Invocation Trace Contract`
 
 状态：
 
-* CFH-01、CFH-02A、CFH-02A-R1 保持 ACCEPTED；CFH-02B-M6A 产品提交（`82b2cf856350561abc54b6e05e51d7a19f120388`）已推送，保持 `PUSHED_AWAITING_ACCEPTANCE`（不回滚）；
-* 网页端 GPT 结论：M6A 产品提交/精确 staged-tree 测试/前端构建阶段性接受；M6A 整体 Incomplete——原因：上一轮使用 Playwright 降级通道，不满足 MCP Chrome 硬验收规则；
-* CFH-02B-M6A-R1（MCP Chrome 强制验收补正）**已完成**：MCP Chrome 已恢复（chrome-devtools-mcp 官方安装，toolCount=29 验证）并对产品提交 `82b2cf856350561abc54b6e05e51d7a19f120388` 完成真实页面验收（登录/备份列表/创建备份 POST 201/刷新持久化/零 restore 请求/无凭据泄漏）；机器可读证据 `docs/testing/cfh-02b-m6a-mcp-chrome-evidence-2026-08-05.json`（conclusion=PASS）；M6A 保持 `PUSHED_AWAITING_ACCEPTANCE`，等待网页端 GPT 最终验收；
-* 本轮不修改任何产品代码；Playwright 旧证据保留但**不构成最终网页端验收**（browser_channel 强制 `mcp_chrome`）；
+* CFH-01、CFH-02A、CFH-02A-R1 保持 ACCEPTED；CFH-02B-M6A 产品提交（`82b2cf856350561abc54b6e05e51d7a19f120388`）保持 `PUSHED_AWAITING_ACCEPTANCE`（不回滚）；
+* CFH-02B-M6A-R1（MCP Chrome 恢复与强制验收）页面行为已由网页端 GPT **阶段性接受**；M6A 最终验收 Incomplete——原因：evidence JSON 缺少 session/invocation 标识与逐步 steps，Guard 漏检；
+* CFH-02B-M6A-R2 是当前唯一授权任务：从 Reasonix 会话日志恢复真实调用追踪标识（session/invocation），将完整调用序列写入机器证据（schema v2：mcp.session_or_invocation_ids、steps、screenshots），加强 Guard 拒绝旧 schema v1，更新验收报告/总计划/里程碑锁；
+* 本轮不修改任何产品代码；Playwright 旧证据不构成最终验收（browser_channel 强制 `mcp_chrome`）；
 * M6B（恢复安全）、M6C（内容健康）、M6D（隔离收口）均为 `candidate_not_authorized`，**不自动进入 M6B**（`auto_advance: false`）。
 
 规则：
 
-* MCP Chrome 必须真实调用（server 名称、tool 名称、invocation/session 证据、页面 URL、DOM 操作、Console、Network、截图哈希）；不得用 Playwright/curl/fetch/PHPUnit 代替。
-* 只允许修改 5 个治理文件并新建 1 个 evidence JSON（见任务 §八）；不修改产品代码、manifest、ownership map、M6B 残余。
-* MCP 配置修复位于仓库外，先备份、最小修改、不写凭据；修复后必须重启/刷新实际 MCP host 并实际调用只读能力确认。
-* 验收使用 M6A 产品 commit 的仓库外 disposable worktree（`git worktree add --detach`），testing DB、fake mysqldump、临时 backup storage。
+* 追踪标识必须来自宿主真实日志（`reasonix-events-log` 等），禁止伪造、禁止用顺序号冒充、禁止仅填调用数量。
+* evidence JSON 为 schema v2 精确顶层字段；steps 每项 invocation_id 必须存在于 `session_or_invocation_ids`；不得记录凭据与绝对本地路径。
+* 只允许修改 6 个治理文件（evidence JSON、验收报告、本计划、里程碑锁、两个 Guard）；不修改产品代码、manifest、ownership map、M6B 残余。
+* Guard 必须拒绝旧 schema v1（无 session/invocation 标识）与仅填写调用数量的旧证据。
 * 不自动进入下一任务（`auto_advance: false`）；M6B/M6C/M6D 均未授权。
 
 ## 5. Candidate Queue
@@ -81,7 +81,7 @@ supervisor_unlock_required: true
 
 ## 6. Dependency Order
 
-1. CFH-02B-M6A-R1（当前，MCP Chrome 强制验收补正）。
+1. CFH-02B-M6A-R2（当前，MCP 调用追踪契约补正）。
 2. M6B（恢复安全）依赖 M6A 网页端验收与网页端 GPT 单独授权；M6C/M6D 依次依赖前序发布验收。
 3. 根据归属图判断 CFH-03 与后续切片是否可独立执行。
 4. M1—M5 foundation 已推送后再执行 CFH-04。
