@@ -105,7 +105,7 @@ class AiStudyCardV6PreflightArchitectureGuardTest extends TestCase
             $contents = file_get_contents($path);
 
             foreach ($forbiddenProviderPatterns as $pattern) {
-                $this->assertStringNotContainsString($pattern, $contents, basename($path) . " must not call or expose real provider/API-key material in V6 preflight: {$pattern}");
+                $this->assertStringNotContainsString($pattern, $contents, basename($path)." must not call or expose real provider/API-key material in V6 preflight: {$pattern}");
             }
         }
     }
@@ -138,16 +138,18 @@ class AiStudyCardV6PreflightArchitectureGuardTest extends TestCase
             $contents = file_get_contents($path);
 
             foreach ($forbiddenProviderPatterns as $pattern) {
-                $this->assertStringNotContainsString($pattern, $contents, basename($path) . " must not call or expose real provider/API-key material in V6 preflight: {$pattern}");
+                $this->assertStringNotContainsString($pattern, $contents, basename($path)." must not call or expose real provider/API-key material in V6 preflight: {$pattern}");
             }
         }
     }
 
-    public function test_documentation_index_registers_v6_adr_and_plan(): void
+    public function test_documentation_index_registers_current_v6_authority_and_acceptance(): void
     {
         $index = file_get_contents(base_path('docs/DOCUMENTATION_INDEX.md'));
 
         $this->assertStringContainsString('ADR-0004-ai-study-card-v6-real-ai-boundary.md', $index);
-        $this->assertStringContainsString('ai-study-card-v6-preflight-plan.md', $index);
+        $this->assertStringContainsString('ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md', $index);
+        $this->assertStringContainsString('ADR-0030-ai-study-card-v6-default-off-provider-gate.md', $index);
+        $this->assertStringContainsString('ai-study-card-provider-environment-gate-acceptance-2026-07-23.md', $index);
     }
 }
