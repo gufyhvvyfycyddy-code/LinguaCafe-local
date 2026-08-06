@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted / Closed — implementation and Android 12 emulator acceptance complete
+Accepted / Closed — implementation and the 2026-08-01 Android 12 emulator scope are complete; the exact 2026-08-06 rebuilt debug APK device revalidation is deferred
 
 ## Goal and non-goals
 
@@ -13,7 +13,8 @@ summary and a local reminder.
 
 M7 does not persist downloadable packages, queue offline writes, perform
 background sync, implement iOS, change FSRS, create a second server authority,
-embed the authenticated Web site, or publish to an application store.
+embed the authenticated Web site, or publish to an application store. A debug
+APK build is not release APK/AAB, signing, Play Console or store evidence.
 
 ## Architecture gate
 
@@ -85,6 +86,16 @@ handling.
 
 Implementation, official Chrome responsive acceptance, API/client regression,
 Capacitor sync, the debug APK build and the booted Android 12 emulator workflow
-are complete. The final device report records login, reading, lookup, creation,
-rating/undo, summary, reminder, native transport and Keystore-at-rest evidence.
+were completed for the 2026-08-01 accepted artifact scope. The final device
+report records login, reading, lookup, creation, rating/undo, summary, reminder,
+native transport and Keystore-at-rest evidence.
+
+Repository publication revalidation on 2026-08-06 confirmed the 56 tracked
+Android source/config files in `f243a9c`, Mobile Vitest 29/29, production build,
+offline Gradle test/assemble, current package/assets, zero sourcemaps and the
+current HTTPS/pagination/local-debug safeguards. No device or emulator was
+connected for that exact rebuilt APK, so its installation, Instrumentation,
+login, native UI and logcat matrix remain deferred. Historical device evidence
+must not be relabeled as latest-bundle device evidence.
+
 Evidence: `docs/testing/m7-android-connected-mvp-acceptance-2026-08-01.md`.

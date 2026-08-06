@@ -31,6 +31,30 @@ From `mobile/`:
 npm ci
 npm test -- --run
 npm run cap:sync:ios
+```
+
+### Post-sync Web asset integrity gate
+
+Do not continue merely because Capacitor reports a successful sync. From
+`mobile/`, resolve the JS/CSS filenames referenced by both `dist/index.html`
+and `ios/App/App/public/index.html`, then require:
+
+1. referenced JS filenames are identical;
+2. referenced CSS filenames are identical;
+3. `shasum -a 256` values for index, referenced main JS and referenced CSS are
+   identical between `dist` and generated iOS public;
+4. `find ios/App/App/public -name '*.map'` returns zero files;
+5. no bundle referenced by the pre-sync index remains referenced after sync;
+6. the generated main JS contains all three current safeguards:
+   `正式移动端仅允许 HTTPS`, `服务器分页信息无效`, and `仅用于本地调试`.
+
+Record filenames and SHA-256 values as external evidence without committing the
+generated directory. Any mismatch, sourcemap or missing safeguard blocks Xcode
+compile, simulator/device testing, archive and release work.
+
+Only after this gate passes:
+
+```bash
 cd ios/App
 xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
 xcrun simctl list devices available

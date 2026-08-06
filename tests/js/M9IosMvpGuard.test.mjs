@@ -22,7 +22,9 @@ const controller = read('app', 'Http', 'Controllers', 'Mobile', 'MobileTextImpor
 const apiContract = read('docs', 'plans', 'mobile-api-v1-contract.md');
 const plan = read('docs', 'plans', 'm9-ios-mvp-release-plan.md');
 const adr = read('docs', 'adr', 'ADR-0054-m9-ios-mvp-and-release-readiness.md');
+const acceptance = read('docs', 'testing', 'm9-ios-mvp-release-acceptance-2026-08-01.md');
 const devicePlaybook = read('docs', 'testing', 'm9-ios-device-and-store-acceptance-playbook.md');
+const iosGitignore = read('mobile', 'ios', '.gitignore');
 const storeMaterials = read('docs', 'release', 'm9-ios-app-store-materials.md');
 const privacyNotice = read('docs', 'release', 'mobile-privacy-and-data-deletion.md');
 
@@ -72,12 +74,18 @@ assert.match(apiContract, /POST \/imports\/text/);
 assert.match(apiContract, /library\.text_import/);
 assert.match(apiContract, /never retries an ambiguous upload\s+automatically/);
 
+assert.match(adr, /Accepted under current goal authorization/);
+assert.match(plan, /Implementation Accepted \/ iOS capability cluster Not Complete/);
 for (const source of [plan, adr]) {
-  assert.match(source, /Accepted under current goal authorization/);
   assert.match(source, /Keychain/);
   assert.match(source, /\.txt/);
   assert.match(source, /真实|Real iOS|real iOS/);
 }
+assert.match(plan, /22 tracked iOS source\/config files/);
+assert.match(plan, /must not be staged/);
+assert.match(plan, /post-sync integrity\s+gate/);
+assert.match(plan, /zero sourcemaps/);
+assert.match(plan, /HTTPS, pagination and\s+local-debug safeguards/);
 assert.match(storeMaterials, /Status: release candidate; not submitted/);
 assert.match(storeMaterials, /Tracking: No/);
 assert.match(storeMaterials, /Required external values and evidence before submission/);
@@ -85,7 +93,32 @@ assert.match(privacyNotice, /does not track users across apps or websites/);
 assert.match(privacyNotice, /server-data\s+deletion/);
 assert.match(privacyNotice, /does not offer account creation/);
 assert.match(privacyNotice, /future mobile release adds account creation/);
+assert.match(acceptance, /2026-08-06 repository publication revalidation/);
+assert.match(acceptance, /currently stale/);
+assert.match(acceptance, /contains four sourcemaps/);
+assert.match(acceptance, /must run controlled\s+`cap sync ios`/);
+assert.match(acceptance, /does not promote the iOS capability cluster to complete/);
+for (const ignoredPath of [
+  'App/App/public',
+  'DerivedData',
+  'xcuserdata',
+  '*.mobileprovision',
+  '*.p12',
+  '*.xcarchive',
+  'capacitor-cordova-ios-plugins',
+  'App/App/capacitor.config.json',
+  'App/App/config.xml',
+]) {
+  assert.match(iosGitignore, new RegExp(ignoredPath.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+}
 assert.match(devicePlaybook, /CODE_SIGNING_ALLOWED=NO/);
+assert.match(devicePlaybook, /Post-sync Web asset integrity gate/);
+assert.match(devicePlaybook, /referenced JS filenames are identical/);
+assert.match(devicePlaybook, /`shasum -a 256` values for index, referenced main JS and referenced CSS are\s+identical/);
+assert.match(devicePlaybook, /find ios\/App\/App\/public -name '\*\.map'/);
+for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信息无效', '仅用于本地调试']) {
+  assert.match(devicePlaybook, new RegExp(safeguard));
+}
 assert.match(devicePlaybook, /testing environment and dedicated testing database/);
 assert.match(devicePlaybook, /Never print or screenshot the bearer token itself/);
 assert.match(devicePlaybook, /Only after actual App Store Connect review/);

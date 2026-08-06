@@ -1,6 +1,6 @@
 # M9 — iOS MVP and release readiness plan
 
-Status: Accepted under current goal authorization
+Status: Implementation Accepted / iOS capability cluster Not Complete
 
 ## Goal and non-goals
 
@@ -34,7 +34,14 @@ unchanged; the new import endpoint is additive. Web import remains unchanged.
 - `mobile/package.json`, `mobile/package-lock.json`, `mobile/capacitor.config.ts`
 - `mobile/src/api.ts`, `mobile/src/api.test.ts`, `mobile/src/storage.ts`,
   `mobile/src/storage.test.ts`, `mobile/src/ui.ts`, `mobile/src/styles.css`
-- generated `mobile/ios/**`
+- the 22 tracked iOS source/config files under `mobile/ios/**`, published in
+  `4be6c39`;
+- ignored generated iOS Web/config output may be refreshed by controlled
+  Capacitor sync for validation, but must not be staged: `App/App/public/**`,
+  `App/App/capacitor.config.json`, `App/App/config.xml` and generated Cordova
+  plugin output;
+- iOS build, DerivedData, xcuserdata, signing, provisioning and archive output
+  remain excluded from Git;
 - `routes/api.php`
 - one M9 mobile import Controller and its targeted Feature test
 - `docs/plans/mobile-api-v1-contract.md` for the additive import contract
@@ -52,8 +59,14 @@ moving.
 2. Mobile import Feature tests prove authentication/device binding, validation,
    user/language isolation, exactly-once replay and conflict rejection.
 3. Production Web build and iOS Capacitor sync pass where the host supports it.
+   Before any Xcode compile or device/archive action, the post-sync integrity
+   gate must prove that generated index/JS/CSS filenames and SHA-256 values
+   match current `mobile/dist`, generated public contains zero sourcemaps, no
+   stale bundle remains referenced, and the current HTTPS, pagination and
+   local-debug safeguards are present.
 4. Static guard proves Keychain accessibility, iOS plugin registration, privacy
-   manifest, safe-area CSS, document input and release artifacts.
+   manifest, safe-area CSS, document input, source/generated ownership and
+   release artifacts.
 5. Real iOS simulator/device evidence covers the named flows in ADR-0054.
 6. Signing/archive/store submission is reported only from actual Apple tooling;
    documents or static inspection cannot substitute for it.

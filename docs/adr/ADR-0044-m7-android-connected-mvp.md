@@ -11,10 +11,12 @@ packages, idempotent formal rating, operation-ledger undo and touch-ready Web
 interaction contracts. M7 needs an installable Android client without creating
 a second server authority or prematurely implementing M8 offline sync.
 
-The repository currently has no Android project, Java/Android SDK wiring or
-native credential storage. Reusing the full Laravel/Vue Web application inside
-a remote WebView would not exercise the Mobile API and would couple the native
-shell to Web session cookies.
+At the time of this decision, the repository had no Android project,
+Java/Android SDK wiring or native credential storage. Reusing the full
+Laravel/Vue Web application inside a remote WebView would not exercise the
+Mobile API and would couple the native shell to Web session cookies. The
+resulting Android project was later published in `f243a9c`; this paragraph is
+historical context, not a statement about the current tree.
 
 ## Decision
 
@@ -24,11 +26,13 @@ TypeScript/Vite application and consumes only `/api/v1/mobile`.
 
 Responsibilities:
 
-- `mobile/src/api`: envelope-aware Mobile API client; never computes FSRS.
+- `mobile/src/api.ts`: envelope-aware Mobile API client; never computes FSRS.
 - Official Capacitor HTTP patches native `fetch`/XHR so the Android shell uses
   the Mobile API's device-bound Bearer contract rather than being mistaken for
   a browser-cookie/CSRF session; the Web build keeps the normal Web fetch path.
-- `mobile/src/session`: base URL/device/session orchestration.
+- `mobile/src/ui.ts`, `mobile/src/api.ts` and `mobile/src/storage.ts` jointly
+  provide base URL, device and session orchestration. No separate physical
+  `mobile/src/session.ts` module is frozen by this ADR.
 - Android `SecureToken` Capacitor plugin: encrypt the one-time Sanctum token
   with Android Keystore AES/GCM and store only ciphertext in private
   SharedPreferences.

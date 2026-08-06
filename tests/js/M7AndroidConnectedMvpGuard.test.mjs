@@ -19,6 +19,8 @@ const routes = read('routes/api.php');
 const bootstrap = read('app/Http/Controllers/Mobile/MobileBootstrapController.php');
 const adr = read('docs/adr/ADR-0044-m7-android-connected-mvp.md');
 const plan = read('docs/plans/m7-android-connected-mvp-plan.md');
+const interimAcceptance = read('docs/testing/m7-android-connected-mvp-interim-2026-07-29.md');
+const finalAcceptance = read('docs/testing/m7-android-connected-mvp-acceptance-2026-08-01.md');
 
 for (const dependency of [
   '@capacitor/core',
@@ -67,6 +69,22 @@ for (const text of ['安全登录', '创建学习词义', '显示答案', '撤�
 assert.match(ui, /设备令牌仍安全保存在本机/);
 assert.match(ui, /startError\.status === 401/);
 assert.match(adr, /connected-only/i);
+assert.match(adr, /At the time of this decision/);
+assert.match(adr, /mobile\/src\/api\.ts/);
+assert.match(adr, /No separate physical\s+`mobile\/src\/session\.ts`/);
+assert.doesNotMatch(adr, /`mobile\/src\/api`/);
 assert.match(plan, /M8 offline queue/i);
+assert.match(plan, /exact 2026-08-06 rebuilt debug APK device revalidation is deferred/);
+assert.match(plan, /debug\s+APK build is not release APK\/AAB, signing, Play Console or store evidence/);
+assert.match(plan, /Historical device evidence\s+must not be relabeled as latest-bundle device evidence/);
+assert.match(interimAcceptance, /# M7 Android Connected MVP — Interim Acceptance/);
+assert.match(interimAcceptance, /Acceptance Deferred — Not Complete/);
+assert.match(interimAcceptance, /This interim evidence releases no device acceptance claim/);
+assert.match(finalAcceptance, /2026-08-06 repository publication revalidation/);
+assert.match(finalAcceptance, /No Android device or emulator was connected on 2026-08-06/);
+assert.match(finalAcceptance, /must not be described as device-revalidated, release-signed or\s+store-ready/);
+for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信息无效', '仅用于本地调试']) {
+  assert.match(`${api}\n${ui}`, new RegExp(safeguard));
+}
 
 console.log('M7 Android connected MVP guard passed.');
