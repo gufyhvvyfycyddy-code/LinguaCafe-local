@@ -1,7 +1,10 @@
 # CFH-02B-M6A Safe Backup Publication Acceptance — 2026-08-05
 
-Status: **PUSHED_AWAITING_ACCEPTANCE**（等待网页端 GPT 验收）
-MCP Chrome Mandatory Revalidation: **updated**（CFH-02B-M6A-R1 已完成，见 §21）
+Status: **ACCEPTED / PUBLISHED**（2026-08-06 治理收敛后关闭）
+MCP Chrome Mandatory Revalidation: **PASS**（CFH-02B-M6A-R1/R2 已完成，见 §21–22）
+
+> Sections that record `awaiting_web_acceptance` or `PUSHED_AWAITING_ACCEPTANCE`
+> are historical checkpoints. They do not override this final status.
 Task: `CFH-02B-M6A — Publish And Verify Safe Backup Slice` / `CFH-02B-M6A-R1 — Restore MCP Chrome And Complete Mandatory Browser Acceptance`
 Roadmap: `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`
 Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
@@ -169,9 +172,9 @@ MCP Chrome 不可用（MCP server 列表为空），按 AGENTS.md §8 / ADR-0033
 
 ## 20. 最终结论
 
-`M6A_READY_FOR_WEB_ACCEPTANCE`
+`M6A_PUBLICATION_ACCEPTED`
 
-- 不进入下一任务；等待网页端 GPT 验收
+- M6A 已发布并关闭；本报告不授权进入下一任务。
 
 ## 21. MCP Chrome Mandatory Revalidation（CFH-02B-M6A-R1，2026-08-05）
 
@@ -215,7 +218,7 @@ CFH-02B-M6A 轮的 Playwright 证据保留（产品提交内容一致），但**
 
 ### 21.6 结论
 
-`M6A_MCP_READY_FOR_WEB_ACCEPTANCE`（MCP Chrome 强制验收通过；等待网页端 GPT 最终验收）
+`M6A_MCP_ACCEPTED`（MCP Chrome 强制验收通过；该行取代历史等待状态）
 
 ## 22. MCP Invocation Trace Closure（CFH-02B-M6A-R2，2026-08-05）
 
@@ -245,4 +248,4 @@ CFH-02B-M6A 轮的 Playwright 证据保留（产品提交内容一致），但**
 
 ### 22.4 结论
 
-`M6A_TRACE_READY_FOR_WEB_ACCEPTANCE`（机器调用追踪契约已补齐；等待网页端 GPT 最终验收）
+`M6A_TRACE_ACCEPTED`（机器调用追踪契约已补齐并纳入最终关闭）

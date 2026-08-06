@@ -1,8 +1,9 @@
 # ADR-0055 — Single-Owner Restore Without User-Visible Preview (Equal Privilege, Responsive Web)
 
-Status: Accepted for implementation  
-Date: 2026-08-05  
-Program: `linguacafe-recovery-publication-2026-08` (CFH-02B-M6B)  
+Status: Accepted / Implemented / Production Closed<br>
+Date: 2026-08-05<br>
+Closed: 2026-08-06 governance reconciliation<br>
+Program: `linguacafe-recovery-publication-2026-08` (CFH-02B-M6B)
 Supersedes in part: ADR-0036 §M6B (preview-token and admin-only contract)
 
 ## 1. Context
@@ -104,15 +105,16 @@ changed the public contract:
   `RejectWritesDuringRestore`, `ExecuteBackupRestore`, maintenance
   ownership, safety snapshot, rollback, coordination store, and required
   tables are preserved unchanged.
-- M6C (article health) and M6D (isolation closeout) remain
-  `candidate_not_authorized`; this ADR does not authorize them.
+- This ADR changes only the M6B public restore contract. It did not itself
+  authorize M6C or M6D; their final status is governed by the M6 implementation
+  plan and their own acceptance reports.
 - The `restore_preview_ttl_seconds` configuration key is no longer read by
   the service; it is left in place for backward compatibility and removed
   together with any later config cleanup slice.
 
-## 4. Acceptance
+## 4. Acceptance and closure evidence
 
-CFH-02B-M6B closes only when:
+CFH-02B-M6B closed after all of the following were verified:
 
 - unauthenticated requests to backup/restore routes are rejected;
 - authenticated non-admin users can list/create backups and confirm a
@@ -131,7 +133,10 @@ CFH-02B-M6B closes only when:
 
 ## 5. Consequences
 
-The restore contract becomes single-owner and preview-free while keeping
-all server-side safety. Old admin/preview tests are rewritten, not merely
-appended to. ADR-0036 §M6B remains as history with a supersession note;
-this ADR is the current authority for the public restore contract.
+The restore contract is single-owner and preview-free while keeping all
+server-side safety. Old admin/preview tests were rewritten, not merely appended
+to. ADR-0036 §M6B remains as history with a supersession note; this ADR is the
+current authority for the public restore contract. The executable and browser
+evidence is recorded in
+`docs/testing/cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md` and its
+machine-readable MCP evidence JSON.

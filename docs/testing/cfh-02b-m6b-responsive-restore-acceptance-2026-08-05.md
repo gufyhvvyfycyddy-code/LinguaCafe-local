@@ -1,11 +1,15 @@
 # CFH-02B-M6B Responsive Restore Web Acceptance — 2026-08-05
 
-Status: **Accepted (implementation) — awaiting web-side acceptance**
+Status: **ACCEPTED / PUBLISHED / PRODUCTION CLOSED**（2026-08-06 治理收敛）
 Program: `linguacafe-recovery-publication-2026-08`
 Task: `CFH-02B-M6B — Rework And Publish Single-Owner Restore For Responsive Web`
 Plan: `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`
 Contract: `docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`
 Manifest: `docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`
+
+> Sections that describe interim authorization, `candidate_not_authorized`,
+> `product_code_authorized=true`, or `awaiting_web_acceptance` are historical
+> checkpoints. They do not override the final closed status above.
 
 ## 1. Baseline
 
@@ -217,7 +221,15 @@ invocation identifiers live exclusively in the JSON file.
   (product_code_authorized=true) and final lock
   (awaiting_web_acceptance, product_code_authorized=false)
 
-## 10. Security notes
+## 10. Final verdict
+
+`M6B_RESPONSIVE_RESTORE_ACCEPTED`
+
+The equal-privilege, no-user-visible-preview, exact-`RESTORE`, responsive-web
+contract is accepted and published. This report does not authorize M6C, M6D, or
+any new product task; their status is governed by their own plans and evidence.
+
+## 11. Security notes
 
 - Testing database `linguacafe_fsrs_test` only; no development/staging/
   production database was touched; no real restore was executed (fake mysql
