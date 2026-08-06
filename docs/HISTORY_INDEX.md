@@ -1,7 +1,7 @@
 # LinguaCafe History Index
 
 > **Status**: Historical document index.
-> **Last updated**: 2026-07-13 (Task 2000-12 — added CodeBuddy/WorkBuddy workflow archive reference).
+> **Last updated**: 2026-08-06 (historical QA handoffs registered; current execution replacement corrected).
 
 This file keeps old documents discoverable while lowering their context priority. Do not delete these files, and do not start a new task from them.
 
@@ -62,6 +62,16 @@ The following archive files preserve discontinued workflow rules for historical 
 
 | Archive | Discontinued | What it preserves | Current replacement |
 |---|---|---|---|
-| `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md` | 2026-07-13 | Full text of the cancelled CodeBuddy / WorkBuddy / three-employee workflow rules (original §4.x, §14, §18, §20, §23 of `vibe-coding-collaboration-rules.md`). | `vibe-coding-collaboration-rules.md` §1.5 GLM 单 Agent 闭环规则 (current). |
+| `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md` | 2026-07-13 | Full text of the cancelled CodeBuddy / WorkBuddy / three-employee workflow rules (original §4.x, §14, §18, §20, §23 of `vibe-coding-collaboration-rules.md`). | Current execution uses local Codex directly or webpage GPT through DevSpace; see `vibe-coding-collaboration-rules.md` §1.5. |
 
-Rules from the old §14 that remain valid (MCP Chrome testing, To-do list, dual-track parallelism, task packaging) have been migrated into the current GLM chapters of `vibe-coding-collaboration-rules.md`; the archive does not repeat their current text.
+Rules from the old §14 that remain valid, such as real-browser acceptance, To-do tracking and bounded parallel work, have been migrated into the current collaboration rules and browser playbook. The archive does not repeat their current text.
+
+## 6. Historical QA Handoffs
+
+These files preserve the 2026-07-19/20 browser QA record. They are not current prompts and must not create new Issues without current-code and real-browser revalidation.
+
+| File | Status | Historical facts | Current rule |
+|---|---|---|---|
+| `docs/product-handoff-prompt.md` | Historical / Superseded | The original prompt said seven Issues remained to be filed; those were later filed as `#12`–`#18` and largely duplicate `#5`–`#11`. | Do not execute; start a new Issue-triage task from current `master` and current Issue state. |
+| `docs/testing-handoff-2026-07-19.md` | Historical QA Snapshot | Records the first browser exploration and the findings later represented by Issues `#2`–`#11`. | Revalidate every finding; do not reuse the historical identity or environment assumptions. |
+| `docs/testing-handoff-2026-07-20.md` | Historical QA Snapshot | Records three submitted and seven pending findings; the pending set was subsequently filed as `#12`–`#18`. | Do not file the seven items again; triage duplicates and refresh evidence first. |

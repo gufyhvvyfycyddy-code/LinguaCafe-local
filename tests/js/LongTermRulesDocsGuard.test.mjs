@@ -10,6 +10,10 @@ const read = path => readFileSync(join(root, path), 'utf8');
 const agents = read('AGENTS.md');
 const rules = read('docs/plans/vibe-coding-collaboration-rules.md');
 const index = read('docs/DOCUMENTATION_INDEX.md');
+const historyIndex = read('docs/HISTORY_INDEX.md');
+const productQaHandoff = read('docs/product-handoff-prompt.md');
+const qaHandoff0719 = read('docs/testing-handoff-2026-07-19.md');
+const qaHandoff0720 = read('docs/testing-handoff-2026-07-20.md');
 const currentContext = read('docs/CURRENT_AI_CONTEXT.md');
 const gitignore = read('.gitignore');
 const browserPlaybook = read('docs/plans/mcp-chrome-local-smoke-playbook.md');
@@ -53,6 +57,23 @@ assert.match(index, /ADR-0033-real-browser-acceptance-channel-fallback\.md/);
 assert.match(index, /workspace-stabilization-plan-2026-08-03\.md/);
 assert.match(index, /node scripts\/workspace-inventory\.mjs/);
 assert.doesNotMatch(index, /### 28\.1/);
+
+assert.match(historyIndex, /Historical QA Handoffs/);
+assert.match(historyIndex, /docs\/product-handoff-prompt\.md/);
+assert.match(historyIndex, /docs\/testing-handoff-2026-07-19\.md/);
+assert.match(historyIndex, /docs\/testing-handoff-2026-07-20\.md/);
+assert.match(historyIndex, /local Codex directly or webpage GPT through DevSpace/);
+assert.doesNotMatch(historyIndex, /GLM 单 Agent 闭环规则 \(current\)/);
+assert.match(productQaHandoff, /Historical QA handoff \/ Superseded/);
+assert.match(productQaHandoff, /Do not execute this file as a current task prompt/);
+assert.match(productQaHandoff, /#12`–`#18[\s\S]{0,100}#5`–`#11/);
+assert.match(productQaHandoff, /不得再次提交“剩余 7 个问题”/);
+for (const handoff of [qaHandoff0719, qaHandoff0720]) {
+    assert.match(handoff, /Historical QA Snapshot/);
+    assert.match(handoff, /2026-08-06/);
+    assert.match(handoff, /重新验证|revalidation/);
+}
+assert.match(qaHandoff0720, /已提交，禁止重复创建/);
 
 assert.match(currentContext, /本文件更新前，本地 `master`、`origin\/master` 与远端 `master` 对齐到/);
 assert.match(currentContext, /执行新任务仍必须重新运行 Git preflight/);
