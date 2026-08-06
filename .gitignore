@@ -36,3 +36,34 @@ yarn-error.log
 /data/
 /CODEX_SESSION_DIAGNOSIS.txt
 .codex/
+
+# Local browser and acceptance artifacts
+/.playwright-cli/
+/output/
+/screenshots/
+/audit_screenshots/
+/after_*.png
+/*_page.png
+
+# Local request captures and sensitive browser state
+/cookies.txt
+/login.html
+/routes.txt
+/body.md
+
+# One-off local diagnosis scripts and Windows artifacts
+/_tmp_*.php
+/test.php
+/test2.php
+/test4.php
+/test-script.php
+/audit_browser.py
+/*.tmp
+/nul
+
+# Local agent session, diagnosis, and one-off patch artifacts
+/.reasonix/
+/.reasonix-m6b-tmp/
+/.tmp-extract-goal/
+/LinguaCafe_M6B_plan_correction.patch
+/LinguaCafe_M6B_final_governance_correction.patch
