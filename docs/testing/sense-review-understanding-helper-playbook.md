@@ -214,7 +214,7 @@ npm run development
 
 ### Steps
 
-1. Login to `http://127.0.0.1:8000` (account: `1816529781@qq.com`).
+1. Login to `http://127.0.0.1:8000` using the task-provided account only after proving it is scoped to the dedicated testing database and least privilege; otherwise create a task-specific testing identity through the normal UI.
 2. Navigate to `/reviews/senses`.
 3. Confirm the page loads and the target card is displayed (check `lemma`).
 4. Click "显示答案" (or press Space).

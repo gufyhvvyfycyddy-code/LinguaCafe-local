@@ -20,6 +20,10 @@ const roadmap = read(
 );
 const collaboration = read('docs', 'plans', 'vibe-coding-collaboration-rules.md');
 const browserPlaybook = read('docs', 'plans', 'mcp-chrome-local-smoke-playbook.md');
+const fsrsRoadmap = read('docs', 'plans', 'linguacafe-fsrs-roadmap.md');
+const inlineReviewPlan = read('docs', 'plans', 'reading-inline-review-and-example-pool-plan.md');
+const queueOrderPlan = read('docs', 'plans', 'review-queue-order-implementation-plan.md');
+const understandingPlaybook = read('docs', 'testing', 'sense-review-understanding-helper-playbook.md');
 const current = read('docs', 'CURRENT_AI_CONTEXT.md');
 const acceptance = read(
   'docs',
@@ -66,6 +70,16 @@ assert.match(adr53, /does not authorize existing credentials/);
 for (const source of [agents, adr33, adr34, browserPlaybook]) {
   assert.match(source, /提供的.*测试账号[\s\S]{0,120}(?:专用 testing 数据库|testing 数据库)[\s\S]{0,80}权限/);
 }
+assert.match(fsrsRoadmap, /具体账号和临时密码已从仓库文档移除/);
+assert.match(fsrsRoadmap, /具体 session 值已从仓库文档移除/);
+assert.match(fsrsRoadmap, /专用 testing 数据库[\s\S]{0,120}最小权限/);
+assert.doesNotMatch(fsrsRoadmap, /test123456|R2XqJGnAUzRzZrsF3TMdJnoE0d3zDafmJbxAe5yN|1816529781@qq\.com/);
+for (const source of [queueOrderPlan, understandingPlaybook]) {
+  assert.match(source, /dedicated testing database[\s\S]{0,80}least privilege/);
+  assert.doesNotMatch(source, /1816529781@qq\.com/);
+}
+assert.match(inlineReviewPlan, /PD-012.*已经完成产品冻结[\s\S]{0,120}业务代码尚未授权/);
+assert.doesNotMatch(inlineReviewPlan, /该方案尚未冻结|product semantics reopened|Reading inline review scoring still frozen/);
 
 // Repository rules must never launder an explicit platform safety refusal.
 for (const source of [agents, adr33, adr34, collaboration, browserPlaybook]) {

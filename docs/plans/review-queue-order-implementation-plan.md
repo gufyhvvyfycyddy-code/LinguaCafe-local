@@ -240,7 +240,7 @@ Pending — to be executed in VERIFY-2 step.
 
 | Step | Item |
 |---|---|
-| 1 | Login as 1816529781@qq.com |
+| 1 | Use the task-provided account only after proving it is scoped to the dedicated testing database and least privilege; otherwise create a task-specific testing identity through the normal UI |
 | 2 | Open `/review/sense` |
 | 3 | Confirm GET `/reviews/senses` returns cards in Queue Order |
 | 4 | Verify queue order: intraday → interday/review (per setting) → new (per setting) |

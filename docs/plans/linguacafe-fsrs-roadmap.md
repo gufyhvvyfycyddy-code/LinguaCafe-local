@@ -259,11 +259,11 @@
   - 未提供 token 颜色变化截图（词 A 从 New→Learning 7 绿色，词 B 保持 New 颜色）。
   - 未提供词 A 在 /vocabulary/search 的浏览器显示证据。
   - 未在浏览器中执行词 B 的等级按钮 7 点击动作。
-  - ⚠️ 修改了真实用户 5（1816529781@qq.com）的密码为临时密码 `test123456`，原 bcrypt hash 未完整保存，需用户手动恢复或重置密码。
+  - ⚠️ 历史验收曾违规修改既有用户密码，且未完整保存原密码哈希；具体账号和临时密码已从仓库文档移除。该轮不得据此宣称认证安全验收通过。
 
 	**C.18-c 补齐视觉验收与测试账户隔离**（2026-06-25）：
-	- **账号隔离方式**：方式 A — 复用用户 5 既有 session（`R2XqJGnAUzRzZrsF3TMdJnoE0d3zDafmJbxAe5yN`），通过 `CookieValuePrefix` 正确加密后注入 Playwright cookie，浏览器全程 headless，无需密码。
-	- **未修改真实用户 5 密码**：本轮未写入或修改用户 5 的 password hash。
+	- **历史账号隔离方式**：该轮曾复用既有 session 并向 Playwright 注入浏览器 Cookie；具体 session 值已从仓库文档移除。此方式只作为历史记录，不再作为当前验收方案。
+	- **未再次修改既有用户密码**：本轮未写入或修改既有用户的 password hash。
 	- **词 A（sharply, id=2811, stage=-7）**：
 	  - token 绿色截图：`c18c-token-a-green.png` ✅
 	  - /vocabulary/search 等级显示截图：`c18c-vocabulary-a-learning.png` ✅
@@ -1080,15 +1080,18 @@ D 系列的目标是把 LinguaCafe 的 FSRS 设置页从"状态说明页"升级�
 - **涉及 UI 的任务必须提供真实浏览器证据**：包括但不限于 checkbox 视觉状态截图、token 颜色变化截图、DevTools Network 面板截图、/vocabulary/search 页面截图。
 - **没有真实浏览器证据时的 roadmap 记录规则**：只能写"HTTP/DB 验证通过，浏览器视觉验收待完成"，不得写"浏览器回归验收完成"或"浏览器验收通过"。
 
-### Decision 6 — 浏览器验收不得修改真实用户认证数据
+### Decision 6 — 浏览器验收不得修改既有用户认证数据
 
-**日期**：2026-06-25
+**历史日期**：2026-06-25
 
-- 自动化浏览器验收不得修改真实用户密码。
-- 如需登录，应使用既有测试账号，或让用户手动登录后复用 session（如 Playwright 的 `storageState`）。
-- 如果必须创建测试账号，必须先征得用户确认，并明确账号、密码、清理方式。
-- 不得把真实用户密码改成公开临时密码（如 `test123456`）。
-- 验收报告必须区分视觉证据、Network 证据、DB 证据，不能用 DB 推断代替视觉截图。
+**当前纠正**：2026-08-06，以 `docs/plans/mcp-chrome-local-smoke-playbook.md` 为准。
+
+- 自动化浏览器验收不得读取、修改、重置或复用既有用户密码、session token 或认证 Cookie。
+- 当前任务提供的测试账号只有在 server-bound 证据证明其位于专用 testing 数据库、且权限不高于当前切片所需时才可使用。
+- 不满足上述条件时，在专用 testing 数据库通过正常注册/登录入口创建任务专属、最小权限身份；不需要为该安全测试身份逐项重新询问。
+- 临时密码只保存在当前进程内存中，不进入仓库、shell 参数、命令输出、截图、浏览器密码库或最终报告。
+- 不得在普通开发数据库创建临时账号后再直接删号清理，也不得把既有用户密码改成公开临时密码。
+- 验收报告必须区分视觉证据、Network 证据和数据库 delta，不能用数据库推断代替真实页面操作。
 
 ### ReviewCardManage-ServiceBoundary-1 — 管理页 Controller 职责分离
 
