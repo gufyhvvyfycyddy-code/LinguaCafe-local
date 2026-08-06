@@ -1,7 +1,7 @@
 # Spec To Tests / Smoke / Harness Candidates
 
 > **Status**: Candidate list plus completed conversions.
-> **Last updated**: 2026-07-03 (GLM-ArchitectureFirst1000-SafeStability-1).
+> **Last updated**: 2026-07-23 (confirmed product backlog + current execution workflow guard).
 
 This document turns soft project rules into executable verification candidates. Completed rows record what has already moved from prose into tests/smoke/harness; open rows remain candidates and do not authorize code changes by themselves.
 
@@ -37,8 +37,15 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 | Frontend review entry unification | Daily review entry should be user-facing "复习" and enter sense-only mainline | Completed by code change plus MCP Chrome smoke: homepage/nav → `/reviews/senses`; old `/senses/review`, `/review/false/-1/-1`, `/review-cards/manage` remain accessible | Homepage/nav/review routes | Done |
 | Legacy entry hidden from ordinary lookup UI | Ordinary users should not see "旧词条释义 / 旧版释义 / 旧版示意 / legacy word review" in lookup components | Completed in `tests/Feature/LegacyEntryUiGuardTest.php`: checks `WordSensesList.vue`, `VocabularySideBox.vue`, and `VocabularyBox.vue` do not expose blocked legacy-entry copy | Text lookup UI | Done |
 | Finished reading safety boundary | Finished reading may set yellow new words known, but must not write review data or affect other users/languages | Completed in `tests/Feature/FinishedReadingSafetyTest.php`: yellow `stage=2` → known, green stage unchanged, WordSense/ReviewCard/ReviewLog/FSRS unchanged, other user/language isolation, `autoMoveWordsToKnown=false` does not auto-known | `ChapterService::finishChapter()` | Done |
-| AI recommended words exclude user selections | AI suggestions must not duplicate words/phrases manually selected by the user | Future contract tests plus MCP Chrome confirmation modal smoke | Future AI study card recommendation flow | P1 before implementation |
-| AI recommended words default unchecked | User confirmation must be explicit | MCP Chrome smoke for modal initial state | Future AI study card recommendation flow | P1 before implementation |
+| Current execution workflow | Active docs must name local Codex or webpage GPT through DevSpace, require FastCtx-first work, and keep Codex++ parallel mode future-only | Completed by `tests/js/CurrentExecutionWorkflowDocsGuard.test.mjs`; obsolete single-agent guard deleted | Collaboration docs | Done |
+| Automatic backup and restore | Product accepted; restore must preview scope, create pre-restore snapshot, and fail atomically | Future feature tests for backup inventory/checksum/ownership/failed restore rollback plus real restore UI smoke on disposable data | Backup / restore | P0 before implementation |
+| WordSense Tag | Tags belong to WordSense, not ReviewCard Marker; user/language isolation and bulk actions must hold | Future model/service/API tests plus Browser/Custom Study real-page smoke | WordSense / Browser | P1 before implementation |
+| Unified Search Criteria | Same criteria semantics must be reusable by Browser, Saved Search, Custom Study, stats and export | Shared parser/serializer contract tests; identical query must return identical scoped IDs across consumers | Search / Browser / Custom Study / stats / export | P1 before implementation |
+| Statistics V2 metric definitions | Future load, retention, difficulty and reading-conversion metrics must share one definition | Metric-definition unit tests, scoped query tests, timezone boundary tests and UI/API agreement checks | Statistics | P1 before implementation |
+| APKG export V1 | One WordSense per card; meaning and each example translation are clozed; all real examples are ordered; no multimedia in V1 | Package schema tests, deterministic note GUID tests, source-example order/dedupe tests, import smoke in a disposable Anki profile | Export | P1 before implementation |
+| Article health check | Current scope is articles only; detect broken structure, tokenizer degradation, invalid source references and fallback concentration | Read-only diagnosis tests, repair preview tests, backup-before-repair proof and no-multimedia scope guard | Import / article / source context | P1 before implementation |
+| Browser AI duplicate-sense package | AI receives exported sense data and returns fixed-format advice; AI cannot directly merge/delete/rewrite | Package minimization tests, parser tolerance, user/language isolation, preview-only diff and explicit-confirmation mutation tests | Browser / WordSense | P1 before implementation |
+| Controlled plugin API | Plugins use versioned capabilities and least privilege; protected writes cannot be bypassed | Manifest/schema tests, permission denial tests, timeout/failure isolation, compatibility checks and audit log | Plugin platform | P1 before implementation |
 | AI translations do not create review cards | Reading aid must not write learning data by itself | Existing tests plus a regression test around confirm/current endpoints if gaps appear | AI reading assist | P1 |
 | Legacy word cards stay out of daily mainline | New review flow should stay sense-only | Feature tests for queue filters and daily review entry | Review queue / FSRS | P1 |
 | ReviewLog preserved by default | Delete/archive/reset flows must not silently erase history | Existing WordSense tests plus ReviewCardManage logs regression coverage | WordSense / ReviewCardManage | P1 |
@@ -88,6 +95,9 @@ Natural-language specs reduce ambiguity, but they are not hard constraints. High
 
 ## 4. Next Candidate Shortlist
 
+用户已接受的新产品方向只进入规划池，不因出现在本表而自动授权代码实现。PD-012“阅读中直接刷词义卡 V1”已经完成产品冻结，但当前只允许 Architecture Spec、ADR 与 Harness 迁移设计，业务代码仍未授权；无密码 Profile、AI 新文章流程、翻译布局、移动端身份细节和商业模式仍需按产品讨论路线冻结后，才能新增或替换对应 Harness。
+
+
 If the project owner asks for the next hardening task, the lowest-risk remaining candidates are:
 
 1. `AIStudyCard-RealRecommendation-Harness-1` — before wiring real AI recommendation (auto AI call), add tests/smoke for API key safety, request/response boundary, and ensure V4 dedupe/default-unchecked/confirmation logic still holds when AI is the source of recommendations. The V4 final candidates package `safety_flags` (no_ai_called_by_linguacafe / ai_response_pasted_by_user / user_confirmation_required_before_card_generation) is the contract baseline that must remain true even after real AI calls are added (i.e., real AI calls must happen in a separate step, not inside the final-candidates-package endpoint).
@@ -116,7 +126,7 @@ Selection still belongs to the project owner / webpage-side designer. Agents mus
 **建议实现方式**：
 - 不新增自动化命令（纯流程规则）。
 - 建议在 `mcp-chrome-local-smoke-playbook.md` 新增一节 `lemma / morphology click sample rotation` 作为操作指南。
-- CodeBuddy 在每轮 MCP 测试后核查测试词是否与上一轮重复。
+- 最终汇总方在每轮 MCP 测试后核查测试词是否与上一轮重复。
 - 如果重复比例超过 30%，网页端总设计师应当标记 Incomplete 或要求补充新词。
 
 ## 5. Deferred Candidate Rationale

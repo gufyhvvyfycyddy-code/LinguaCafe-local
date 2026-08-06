@@ -1,5 +1,8 @@
 # Improve Codebase Architecture — Install Report
 
+> **Status**: Historical installation report for the 2026-06-30 project Skill copy. It is not proof that the 2026-07-17 `Architecture_Skills_Only_2026-07-17.zip` package is installed in the repository.
+> **2026-07-17 clarification**: the new package was read from an external temporary extraction and was not copied into or committed to LinguaCafe. Current task routing and high-risk workflow are defined by `AGENTS.md` and `docs/plans/vibe-coding-collaboration-rules.md`; this historical report does not prove that any Skill is currently available to the active execution tool.
+
 ## 安装时间
 
 2026-06-30 03:15 UTC+8

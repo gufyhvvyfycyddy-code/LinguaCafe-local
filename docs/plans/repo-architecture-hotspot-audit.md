@@ -1,5 +1,7 @@
 # LinguaCafe 全仓库架构热点审计
 
+> **最小上下文提示**：当前状态先读 `docs/CURRENT_AI_CONTEXT.md` 并重新运行 Git / 工作区盘点；`docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md` 只提供 2026-07-23 历史快照。本文保留历史增量审计，仅在追溯具体架构决定时按段读取。
+
 > **Current authority correction — 2026-07-15**
 >
 > Current priority and measurable targets are governed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`. The old “overall architecture closure 100%” statement is a historical phase label and is not a current code-quality conclusion.
@@ -972,7 +974,7 @@ ImportController → ImportService → (文件上传/journal) → ProcessChapter
 **是否需要 MCP Chrome**：✅ 需要（或用 Playwright + MCP Chrome 联合验收）
 **为什么现在做**：阅读页是学习流程核心，零测试风险高。Playwright 可以捕获 hover/click/vocab box 等关键交互。不需要改业务代码。
 **允许修改文件**：
-- `tests/Browser/TextReaderSmokeTest.php`（新增）
+- `tests/Browser/TextReaderSmokeTest.php`（历史拟新增路径；实际未创建，不是当前入口）
 - `playwright.config.js`（新增/修改）
 - `docs/plans/*`
 **禁止范围**：
@@ -1790,7 +1792,7 @@ TextBlockService、VocabularyService、DictionaryImportService 拆分前必须�
 ### 8. MCP Chrome 真实页面双 viewport 验收
 
 **宽屏 1920x900**：
-- 登录 `1816529781@qq.com` → `/reviews/senses` 显示 22 张到期 sense card
+- 登录 `当前任务提示词提供的本地测试账号` → `/reviews/senses` 显示 22 张到期 sense card
 - 通过 `evaluate_script` + `fetch('/reviews/senses?ignoreDailyLimits=true')` 筛选出 3 张多例句卡（`occurrence_count=2`）：`codex_sense_smoke_20260702_b_bind_target` / `codex_sense_smoke_20260702_b_confirm_target` / `codexmatrix`
 - 多例句提示 chip 正确显示「本词义已有 2 条来源例句」
 - 点击显示答案 → 答案侧完整：中文释义/英文释义/近义译法/搭配/例句/补充例句/FSRS 详情/评分按钮
@@ -1916,7 +1918,7 @@ TextBlockService、VocabularyService、DictionaryImportService 拆分前必须�
 ### 5. MCP Chrome 真实页面双 viewport 验收
 
 **宽屏 1920x900**：
-- 登录 `1816529781@qq.com` → `/reviews/senses` 显示 sense#61（`codex_sense_smoke_20260702_b_confirm_target`, occurrence_count=2）
+- 登录 `当前任务提示词提供的本地测试账号` → `/reviews/senses` 显示 sense#61（`codex_sense_smoke_20260702_b_confirm_target`, occurrence_count=2）
 - 卡片显示例句「The marker codex_sense_smoke_20260702_b_confirm appears in this smoke sentence.」
 - 显示答案 → More 菜单确认 divider 视觉分隔（DOM 验证：6 个子元素，`<HR class="my-1 v-divider theme--light">` 位于「重置」与「彻底删除」之间）
 - 点击「查看原文」→ Network 确认 `GET /senses/61/source-context-list?preferred_occurrence_id=11 [200]`（前端正确传参）
