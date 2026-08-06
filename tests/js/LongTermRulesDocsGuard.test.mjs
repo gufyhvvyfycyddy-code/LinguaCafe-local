@@ -54,7 +54,9 @@ assert.match(index, /workspace-stabilization-plan-2026-08-03\.md/);
 assert.match(index, /node scripts\/workspace-inventory\.mjs/);
 assert.doesNotMatch(index, /### 28\.1/);
 
-assert.match(currentContext, /本地 `master`、`origin\/master` 与远端 `master` 当前对齐/);
+assert.match(currentContext, /本文件更新前，本地 `master`、`origin\/master` 与远端 `master` 对齐到/);
+assert.match(currentContext, /执行新任务仍必须重新运行 Git preflight/);
+assert.match(currentContext, /不得把本段 SHA 当作永久实时值/);
 assert.match(currentContext, /工作区收口优先于继续扩大产品范围/);
 assert.ok(
     currentContext.split(/\r?\n/).length <= 320,

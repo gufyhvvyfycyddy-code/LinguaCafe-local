@@ -1,0 +1,227 @@
+# LinguaCafe 当前 AI 最小上下文
+
+> 状态：Current / Minimal Context
+> 日期：2026-08-06
+> 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
+
+## 1. 当前代码事实
+
+- 当前仓库：LinguaCafe 主开发 checkout；实际本机路径由执行环境解析，不写入仓库文档。
+- 当前分支：`master`。
+- 2026-08-06 已推送的提交链：Android 原生工程 `f243a9c` → iOS 原生工程 `4be6c39` → 移动端治理文档 `9229639d` → M7/M9 验收 Guard 纠偏 `550f5116`。
+- 本文件更新前，本地 `master`、`origin/master` 与远端 `master` 对齐到 `550f51168256ee065c9323af998d0a741c79d21f`，ahead/behind 为 0/0，暂存区与冲突均为 0。执行新任务仍必须重新运行 Git preflight，不得把本段 SHA 当作永久实时值。
+- 当前工作树仍包含多组未提交用户资产，覆盖测试、文档和生成材料；不得批量删除、整体忽略、reset、stash、checkout、clean 或自动纳入提交。精确数量与类别以 `node scripts/workspace-inventory.mjs` 和 `git status --short` 的实时结果为准。
+- 2026-08-06 提交前 PHP 最终质量基线：Unit 727 tests / 1778 assertions / 0 failures；Feature 2811 tests / 13306 assertions / 0 failures / 14 skipped / 64 PHPUnit 12 metadata deprecations。Feature 必须直接使用 `php -d memory_limit=512M vendor/bin/phpunit tests/Feature`；`php -d memory_limit=512M artisan test` 的父进程参数不能可靠约束其 PHPUnit 子进程。
+- Feature 全套曾因 `ReviewCardMarkerMigrationTest` 的 MySQL DDL 隐式提交留下 1 条 ReviewCard，导致后续 11 项顺序依赖失败；测试已增加显式清理，完整共享进程回归已恢复为 0 failures。
+- 2026-08-03 已把 `.playwright-cli/`、`output/`、截图目录、临时登录页面、Cookie 捕获、根目录一次性 PHP/Python 调试脚本等本地产物加入 `.gitignore`。这一步只降低 Git 噪声，不删除任何已有文件。
+- 后续收口必须先运行只读工作区盘点，再按一个功能切片一组地核对代码、测试、迁移和验收文档；不得自动清理、覆盖或把无关改动混入同一提交。
+- 历史 roadmap 曾授权按云端主导移动化路线推进 M0–M18，并由 ADR-0031/ADR-0034/ADR-0037/ADR-0052 约束架构、验证和 deferred evidence。该历史授权不等于当前任务授权：`docs/execution/CURRENT_MILESTONE.json` 当前为 `active_task=NONE`、`allowed_work=[]`、`product_code_authorized=false`、`auto_advance=false`，因此不得自动进入新的产品切片。
+
+本文件记录的是本地工作树事实。远端 GitHub、Agent 报告或旧交接与本地不一致时，先说明差异，不能擅自 reset、merge 或把任一方冒充唯一事实。
+
+## 2. 产品主线
+
+LinguaCafe 是阅读优先的 sense-only 学习系统：
+
+- `WordSense` 是正式学习内容。
+- `ReviewCard.target_type=sense` 是正式 FSRS 调度对象。
+- `ReviewLog` 只记录真实评分和已冻结的审计动作。
+- `EncounteredWord` 负责阅读颜色、词形出现和兼容状态。
+- `WordSenseOccurrence` 保存来源和例句证据。
+- `target_type=word` 是 legacy 兼容层，不进入新功能主线，也不得未经独立决策删除。
+- AI 推荐默认不选，中文释义必须由用户确认；默认不得自动建卡、写 ReviewLog 或改变 FSRS。
+
+### 2.1 云端主导移动化路线
+
+2026-07-28 用户要求存档新的战略规划：Laravel 与中央数据库继续作为账号、WordSense、ReviewCard、ReviewLog、FSRS、文章和 AI 数据的权威来源；网页端承担完整管理；Android/iOS 承担日常阅读与复习；移动端采用文章包、短期复习包和离线操作队列形成有限离线，不建设 Anki 式完整本地权威数据库与 collection 合并协议。
+
+当前权威计划：`docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`。
+
+M1：Mobile API Foundation 与正式评分幂等已 `Accepted / Closed`。实现、
+API/ADR、testing MySQL 自动化与 Web 评分 HTTP/数据库兼容回归已通过；M5
+testing server-bound 真实 `/reviews/senses` 页面验收只产生一次 POST、一次
+ReviewLog 与一次 ReviewCard 调度更新，补齐原 deferred Web UI seam。证据见
+`docs/testing/m5-mobile-reader-reviewer-touch-acceptance-2026-07-29.md`。
+M2 Operation Ledger 已按 ADR-0035 完成并验收关闭：Mobile 正式评分已接入
+中央 operation/change ledger、最近操作查询、线性 LIFO undo/redo、幂等和
+version/state 冲突保护；旧 Web rating/undo seam 保持不变。证据见
+`docs/testing/mobile-operation-ledger-acceptance-2026-07-28.md`。ADR-0036 将 M6
+冻结为 M6A 安全备份、M6B 恢复安全、M6C 文章健康、M6D 隔离审计。
+M6A–M6D 均已通过聚焦测试、受保护回归、所需前端构建、真实页面和清理审计，
+状态为 Accepted / Closed；证据见
+`docs/testing/m6a-safe-backup-acceptance-2026-07-28.md` 与
+`docs/testing/m6b-restore-safety-acceptance-2026-07-28.md` 与
+`docs/testing/m6c-article-health-acceptance-2026-07-28.md` 与
+`docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md`。M6 整体
+Accepted / Closed。M10 的统一 Criteria、WordSense Tag、Browser/Saved Search/
+Study Overview/export parity 与移动只读搜索也已 Accepted / Closed，证据见
+`docs/testing/m10-unified-search-tags-browser-foundation-acceptance-2026-07-28.md`；
+M11 Review Control 与手动调度已 Accepted / Closed，证据见
+`docs/testing/m11-review-control-manual-scheduling-acceptance-2026-07-29.md`；
+M12 Special Study Sessions 已 Accepted / Closed，证据见
+`docs/testing/m12-special-study-sessions-acceptance-2026-07-29.md`；
+M3 Article Package + Short-term Review Package V1 已 Accepted / Closed，证据见
+`docs/testing/m3-mobile-download-packages-acceptance-2026-07-29.md`；
+M4 Sync Queue + Conflict Simulator 已 Accepted / Closed，证据见
+`docs/testing/m4-queued-action-sync-acceptance-2026-07-29.md`；M5 Mobile
+Reader / Reviewer Touch Adaptation V1 也已 Accepted / Closed。M7 的 2026-08-01
+Android 12 模拟器范围与 M8 已 Accepted / Closed；2026-08-06 从 `f243a9c`
+重新构建的 debug APK 通过测试和构建，但当时没有设备或模拟器连接，因此该精确
+APK 没有最新设备复验，也不代表 release/AAB/签名/Play Store。M17 的 Web slice
+已关闭，其 Haptics/Notifications Android 事实属于 M7 平台证据；M18 的共享实现与
+Web/Android 离线音频证据已关闭。M10–M16 同样均已关闭。
+M9 的 22 个 iOS source/config 文件已在 `4be6c39` 入库并通过 Windows 静态审查，
+但 ignored iOS generated public 仍是旧 bundle、含 sourcemap，必须在授权
+macOS/Xcode 环境受控 sync 并通过资源完整性门禁后才能编译。Xcode、签名、
+iOS 模拟器/真机、TestFlight 与 App Store 能力簇仍 `Not Complete`。
+
+Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动调度治理、专项学习会话、复习设置与负担模拟、Statistics/Card Info、Browser 数据治理、`.apkg` 与便携数据、自动推进/无障碍、媒体与离线音频。它们不要求等待 iOS 完成，但分别依赖 M1、M2、M6、M10 或移动端基础；旧 Tag/Statistics/Custom Study/Browser V2/Export 条目不得作为第二套重复任务执行。
+
+## 3. 大计划完成情况
+
+当前 Anki 对齐的已授权仓库里程碑已经完成：
+
+1. Settings 架构收敛：Production Closed。
+2. Preset V1A–V1D：Production Closed。
+3. Browser / ReviewCardManage Phase 3A–3D：Production Closed。
+4. Card Marker + Custom Study 1B：Production Closed。
+5. Reviewer 架构收敛：Production Closed。
+6. Reader Phase 6A–6M：Production Closed。
+7. AI Study Card service Phase 7A–7E：Production Closed。
+8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
+
+“里程碑完成”不代表代码没有 Bug，也不代表 runtime 外部 AI 已获授权。当前进入的是维护、真实体验修复和产品 Gate 阶段。
+
+## 4. 当前本地维护账本
+
+详细原因、影响和验收标准见：
+
+`docs/plans/local-experience-bug-optimization-ledger-2026-07-23.md`
+
+建议修复顺序尚未获得实现授权：
+
+1. P0：恢复 Python tokenizer，建立统一启动、健康检查和导入前阻断/警告。
+2. P1：修复首次账号目标初始化与统计读取竞态。
+3. P1：补生僻词悬浮空状态。
+4. P1：手动词义表单不再无条件默认 `verb`。
+5. P1：URL、邮箱、路径等不可学习片段不得污染词汇。
+6. P1：fallback 必须尊重段落、换行和 section 句界。
+7. P1：普通阅读模式 DOM 必须包含真实空格。
+8. P1/P2：Jellyfin 等可选集成缺失时返回安全默认值，不抛 500。
+9. P2：重复查词请求、WebSocket 失败重连和其他控制台噪声收敛。
+10. Product Accepted / Planning Required：自动备份恢复、WordSense Tag、统一搜索、统计 V2、`.apkg` 导出、文章健康检查、Browser V2、兼容的复习设置和受控插件接口。
+11. P0 工具链：Reasonix 监督发送、排队与直接引导尚未具备事务性可靠性。当前 Playwright 监督台 + WinApp UIA + 会话日志只属于 `Workaround Active`；超时后必须按唯一 marker 对账，未在当前轮次找到 `role=user` 消息时不得宣称引导成功。所有 workaround 必须保留根治任务和退出验收。详见 `docs/plans/reasonix-supervision-toolchain-bug-ledger-2026-08-05.md`。
+
+用户已确认的产品方向与待讨论议题见 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`。已接受：备份恢复、WordSense Tag、统一搜索、统计、指定格式 `.apkg`、文章健康检查、Browser 增强、兼容的复习设置、AI 重复词义文件闭环、受控插件接口和六项架构优化。通用 Note Type/Card Template、任意 Deck/Subdeck 和 sibling cards 不进入计划。
+
+账号治理规则已登记：保留一个永久本地主管理员，开发数据库用户总数不超过 10；临时测试用户完成后清理。具体账号信息只留在本地任务上下文，不复制到公开文档或报告。
+
+## 5. 当前代码规模
+
+下表保留的是 **2026-07-23 历史对比快照**，只用于理解项目相对原项目的量级变化，不代表 2026-08-06 或当前工作树的实时计数。实际当前数量必须重新运行工作区盘点；统计不含 `vendor`、`node_modules`、构建产物和未跟踪临时文件：
+
+| 区域 | 官方原项目快照 | 2026-07-23 本地快照 | 增量 |
+|---|---:|---:|---:|
+| 后端 PHP | 13,543 | 46,233 | +32,690 |
+| 前端 JS/Vue/Sass | 28,993 | 50,020 | +21,027 |
+| migration / seeder | 2,982 | 3,971 | +989 |
+| Python tools | 1,055 | 1,816 | +761 |
+| **生产与工具合计** | **46,573** | **102,040** | **+55,467** |
+| 测试 | 214 | 93,128 | +92,914 |
+| Markdown 文档 | 1,178 | 38,788 | +37,610 |
+
+2026-08-06 工作树抽查的主要热点：
+
+- `TextBlockGroup.vue`：当前工作树约 2,141 行，Reader DOM、选择和副作用编排。
+- `SenseReview.vue`：当前工作树约 1,389 行，正式复习会话编排。
+- `CustomStudySessionState.php`：约 1,176 行，状态职责集中但体量大。
+- `DictionaryImportService.php`：约 1,157 行，多格式导入和数据切换风险。
+- `TextBlockService.php`：当前工作树约 1,077 行，Reader/import 兼容门面。
+- `Review.vue`：约 1,025 行，legacy Reviewer。
+- `ReviewCardManage.vue` 已收敛到当前工作树约 776 行，但仍是管理页的高影响入口，修改时继续使用现有子组件边界和页面验收。
+
+两个仓库没有共同 Git 祖先，因此代码增量是快照差值，不是提交历史意义上的精确新增行数。详细对比见 `docs/architecture/upstream-code-test-and-architecture-comparison-2026-07-23.md`。
+
+大文件本身不自动构成重构任务。只有当前 Bug 触及该职责、现有 owner 不清或无法可靠测试时，才拆一个可验证 seam。
+
+## 6. Bug 与架构的关系
+
+当前问题不是单一“大组件导致一切”，主要分为六类：
+
+1. **启动与默认值所有权缺失**：tokenizer、Jellyfin、Anki、reviewIntervals、首次 goals 初始化分散在页面访问和运行时补种中。
+2. **导入前置条件不完整**：服务健康、特殊片段识别、结构边界和原子词典替换没有统一 preflight。
+3. **语义文本与视觉渲染混用**：CSS margin 提供视觉空格，但 DOM 没有语义空格。
+4. **展示状态缺口**：词典无结果、功能未配置、搜索失败没有统一状态模型。
+5. **副作用所有者重复**：桌面侧栏和弹出词汇框各自加载同一 AI/词典上下文，缺少共享请求键和在途复用。
+6. **可选集成未 fail-soft**：未配置的扩展功能被当成服务器故障，产生 500 和控制台噪声。
+
+推荐目标结构见：
+
+`docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md`
+
+## 7. AI 文档加载规则
+
+每轮只加载：
+
+1. `AGENTS.md`。
+2. 本文件。
+3. 一个任务相关 ADR / 模块契约。
+4. 将修改的源码、调用方和相关测试。
+5. 一个既有验收范例。
+
+只有需要追溯历史决定时才读取：
+
+- `docs/plans/current-working-handoff.md`
+- `docs/plans/linguacafe-master-plan.md`
+- `docs/plans/repo-architecture-hotspot-audit.md`
+- `docs/history/`
+
+这些文件仍包含被旧文档 guard 锁定的历史正文，不能作为当前状态的第一入口。
+
+## 8. 当前执行方式与 Guard 收敛状态
+
+当前实际执行方式已经明确：
+
+1. 使用本地 Codex 直接处理；或
+2. 网页端 GPT 通过 DevSpace 直接处理；
+3. 两种方式在文件发现、搜索、读取、替换和命令执行中都优先使用 FastCtx。
+
+以下旧流程均已停用，不再作为当前规则：
+
+- “一个主执行 Agent 对全部结果负责”；
+- OpenCode → CodeBuddy → WorkBuddy 接力；
+- CodeBuddy / WorkBuddy 固定复核链。
+
+旧“单主 Agent”正文已从当前协作规则删除，`GlmSingleAgentWorkflowDocsGuard.test.mjs` 已由 `CurrentExecutionWorkflowDocsGuard.test.mjs` 取代。新 guard 只保护当前两种执行路径、FastCtx-first 和“未来并行能力不得冒充已实现”。
+
+文档 guard 收敛：
+
+1. ✅ `MasterPlanIntegrityContract.test.mjs` 已更新：不再锁定旧代码规模，转为验证当前权威状态和已关闭里程碑。
+2. ✅ `ReviewCardManageArchitecturePlanGuard.test.mjs` 已更新：不再锁定精确行数或旧阶段文案，转为验证语义所有权边界。
+3. handoff 和 master plan 仍包含大量历史完成报告。它们继续作为追溯材料，不再作为新任务默认上下文。新增状态只能先写入本文档或当前模块文档，禁止继续把整段执行报告堆回 handoff 顶部。
+4. 工作区收口优先于继续扩大产品范围：先把现有正式改动按功能切片盘点、验证和存档，再进入新的大功能。
+
+未来方向仅登记为规划：网页端 GPT 制定计划，把任务拆给网页端 DevSpace 和本地 Codex++；Codex++ 接入 DeepSeek Flash，并可进一步指挥接入同一 API 的扩展并行执行。该能力尚未完整实现，不能作为当前可用工具链或验收事实。
+
+## 9. 字幕原则
+
+本轮从用户上传的 8 份 `.srt` 中提炼了以下稳定原则；未读取任何压缩包：
+
+- 上下文容量有限，当前事实和历史证据必须分层。
+- Spec 记录已经稳定、反复相关、违反代价高的决定；探索期意见不能提前冻结。
+- Harness 锁定少数承重不变量，必须覆盖正常路径和拒绝路径。
+- AI 更擅长延续清晰架构，不能替代产品与架构判断。
+- 模块化按责任和数据流进行；过度拆分也会增加接口成本。
+- 测试困难通常提示责任、输入输出或副作用边界不清。
+- 每次只做一个可独立验收的小切片，最终验收发生在 Agent 输出之外。
+
+## 10. 历史 roadmap 状态与当前停止点
+
+- 历史持续目标按云端主导、有限离线路线推进全部里程碑；这是已完成工作的路线记录，不是当前新的代码授权。
+- 当前里程碑锁为 `active_task=NONE`、`allowed_work=[]`、`product_code_authorized=false`、`auto_advance=false`。当前只允许完成已明确授权的提交前收口，不得自动进入新的产品功能切片。
+- M1–M8、M10–M16 已 Accepted / Closed；M17 Web slice 已关闭，Android Haptics/Local Notifications 证据由 M7 平台验收持有；M18 共享实现与 Web/Android 离线音频证据已关闭。M9 source/config 与发布材料为 Implementation Accepted。
+- M5 testing-bound 真实 `/reviews/senses` 页面评分已清零 M1 deferred seam。
+- 2026-08-01 booted Android 12 模拟器完成了 M7/M8 以及相关 Haptics/Notifications/离线音频平台证据；2026-08-06 最新重建 debug APK 没有设备复验。当前唯一未完成的产品能力簇仍是 M9 iOS sync/Xcode/签名/模拟器/真机/TestFlight/App Store，且 sync 前必须清除旧 generated bundle 与 sourcemap。
+- M0–M18 最终审计见
+  `docs/testing/m0-m18-goal-completion-audit-2026-08-01.md`：仓库内实现切片已经清零，
+  整体目标在上述 iOS 能力簇取得真实证据前仍为 `Not Complete`。

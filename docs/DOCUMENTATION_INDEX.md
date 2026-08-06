@@ -1,6 +1,6 @@
 # LinguaCafe Documentation Index
 
-> 当前入口：2026-08-01。本文只负责路由，不保存任务历史、长篇状态或重复契约。
+> 当前入口：2026-08-06。本文只负责路由，不保存任务历史、长篇状态或重复契约。
 
 ## 1. 新任务读取顺序
 
@@ -22,10 +22,10 @@
 - 长期工作登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论路线：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 产品/架构顺序：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`
-- 当前代码、文档与 Bug 架构审计：`docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md`
-- Anki 功能与架构通俗对比：`docs/architecture/anki-function-and-architecture-sales-comparison-2026-07-23.md`
+- 2026-07-23 历史代码、文档与 Bug 架构快照：`docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md`
+- 2026-07-23 Anki 功能与架构历史通俗对比：`docs/architecture/anki-function-and-architecture-sales-comparison-2026-07-23.md`
 - 云端主导移动化路线、成本与技术里程碑：`docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`
-- 原项目代码、测试与架构对比：`docs/architecture/upstream-code-test-and-architecture-comparison-2026-07-23.md`
+- 2026-07-23 原项目代码、测试与架构历史对比：`docs/architecture/upstream-code-test-and-architecture-comparison-2026-07-23.md`
 - 体验、Bug、架构和治理总台账：`docs/plans/local-experience-bug-optimization-ledger-2026-07-23.md`
 - Reasonix 监督、Playwright/WinApp 桥、mid-turn steer 与 workaround 根治台账：`docs/plans/reasonix-supervision-toolchain-bug-ledger-2026-08-05.md`
 - 当前执行方式与未来 Codex++ 并行方向：`docs/plans/vibe-coding-collaboration-rules.md` §1.5、`docs/CURRENT_AI_CONTEXT.md` §8；当前 guard 为 `tests/js/CurrentExecutionWorkflowDocsGuard.test.mjs`
@@ -70,7 +70,7 @@
 | Spec → harness | `docs/plans/spec-to-harness-candidates.md` |
 | 产品讨论：阅读内评分 / AI 阅读 / 翻译布局 | `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md` §4–5 |
 | 云端主导移动端、有限离线、成本和下一技术里程碑 | `docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`、`docs/plans/mobile-api-v1-contract.md`、`docs/adr/ADR-0031-goal-mode-roadmap-execution-authorization.md`、`docs/adr/ADR-0032-mobile-api-foundation-and-idempotent-rating.md`、`docs/adr/ADR-0034-goal-mode-autonomous-decisions-and-deferred-acceptance.md`、`docs/adr/ADR-0037-goal-mode-nonblocking-execution-frontier.md`、`docs/adr/ADR-0035-mobile-operation-ledger-and-linear-undo-redo.md`、`docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/adr/ADR-0038-m10-unified-search-and-word-sense-tags.md`、`docs/plans/m6-resilience-health-isolation-implementation-plan.md`、`docs/plans/m10-unified-search-tags-browser-foundation-plan.md`、`docs/testing/mobile-api-foundation-acceptance-2026-07-28.md`、`docs/testing/mobile-operation-ledger-acceptance-2026-07-28.md`、`docs/testing/m5-mobile-reader-reviewer-touch-acceptance-2026-07-29.md`、`docs/testing/m6a-safe-backup-acceptance-2026-07-28.md`、`docs/testing/m6b-restore-safety-acceptance-2026-07-28.md`、`docs/testing/m6c-article-health-acceptance-2026-07-28.md`、`docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md` |
-| 恢复与发布程序（CFH-01/02；当前：CFH-02B-M6B） | `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`、`docs/execution/CURRENT_MILESTONE.json`、`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`、`docs/plans/cfh-02-m6-publication-plan.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/testing/cfh-02b-m6a-publication-acceptance-2026-08-05.md` |
+| 恢复与发布程序（CFH-01/02；已关闭，当前无 active task） | `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`、`docs/execution/CURRENT_MILESTONE.json`、`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`、`docs/plans/cfh-02-m6-publication-plan.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/testing/cfh-02b-m6a-publication-acceptance-2026-08-05.md`、`docs/testing/cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md` |
 | M10 统一查询、WordSense Tag、Browser 与移动搜索验收 | `docs/testing/m10-unified-search-tags-browser-foundation-acceptance-2026-07-28.md` |
 | M11 Review Control 与手动调度 | `docs/adr/ADR-0039-m11-review-control-and-manual-operation-ledger.md`、`docs/plans/m11-review-control-manual-scheduling-plan.md`、`docs/testing/m11-review-control-manual-scheduling-acceptance-2026-07-29.md` |
 | M12 Special Study Sessions / Custom Study V2 | `docs/adr/ADR-0040-m12-special-study-sessions.md`、`docs/plans/m12-special-study-sessions-plan.md`、`docs/testing/m12-special-study-sessions-acceptance-2026-07-29.md` |
@@ -78,7 +78,7 @@
 | M14 Statistics 与 Card Info V3 | `docs/adr/ADR-0046-m14-statistics-card-info-v3.md`、`docs/plans/m14-statistics-card-info-v3-plan.md`、`docs/testing/m14-statistics-card-info-v3-acceptance-2026-07-29.md` |
 | M15 Browser Knowledge Hygiene V3 | `docs/adr/ADR-0047-m15-browser-knowledge-hygiene-v3.md`、`docs/plans/m15-browser-knowledge-hygiene-v3-plan.md`、`docs/testing/m15-browser-knowledge-hygiene-v3-acceptance-2026-07-29.md` |
 | M16 Portable Data 与 Anki Interoperability V1 | `docs/adr/ADR-0048-m16-portable-data-and-anki-interoperability-v1.md`、`docs/plans/m16-portable-data-and-anki-interoperability-v1-plan.md`、`docs/testing/m16-portable-data-and-anki-interoperability-v1-acceptance-2026-07-29.md` |
-| M17 Review Experience 与 Accessibility V2（Web + Android） | `docs/adr/ADR-0049-m17-review-experience-accessibility-web-v2.md`、`docs/plans/m17-review-experience-accessibility-web-v2-plan.md`、`docs/testing/m17-review-experience-accessibility-web-v2-acceptance-2026-08-01.md` |
+| M17 Review Experience 与 Accessibility V2（Web；Android 平台证据归 M7） | `docs/adr/ADR-0049-m17-review-experience-accessibility-web-v2.md`、`docs/plans/m17-review-experience-accessibility-web-v2-plan.md`、`docs/testing/m17-review-experience-accessibility-web-v2-acceptance-2026-08-01.md` |
 | M18 Media、发音与离线音频完整性 V1 | `docs/adr/ADR-0050-m18-media-pronunciation-offline-audio-v1.md`、`docs/plans/m18-media-pronunciation-offline-audio-v1-plan-2026-08-01.md`、`docs/testing/m18-media-pronunciation-offline-audio-v1-acceptance-2026-08-01.md` |
 | M3 文章下载包与短期复习包 V1 | `docs/adr/ADR-0041-m3-mobile-download-packages-v1.md`、`docs/plans/m3-mobile-download-packages-plan.md`、`docs/plans/mobile-api-v1-contract.md`、`docs/testing/m3-mobile-download-packages-acceptance-2026-07-29.md` |
 | M4 同步操作队列与冲突模拟器 | `docs/adr/ADR-0042-m4-queued-action-sync-and-conflict-simulator.md`、`docs/plans/m4-queued-action-sync-conflict-simulator-plan.md`、`docs/plans/mobile-api-v1-contract.md`、`docs/testing/m4-queued-action-sync-acceptance-2026-07-29.md` |

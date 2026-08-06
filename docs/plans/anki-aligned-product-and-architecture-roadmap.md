@@ -9,60 +9,26 @@
 
 LinguaCafe 保留阅读优先、sense-only、原文定位、多例句、lemma 和 AI 示意卡能力。复习、设置、浏览器、Preset、Custom Study、Card Info、Leech、统计和撤销等通用学习能力，以 Anki 官方产品语义和代码分层为第一参考。
 
-Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer、Phase 6 Reader、Phase 7 AI Study Card service 收敛与独立 provider Environment Gate 审计均已关闭。当前无剩余已授权仓库实现里程碑；runtime provider 激活仍需单独批准，不因审计关闭而授权外发。
+Settings 架构收敛、Preset V1A–V1D、Browser / ReviewCardManage Phase 3A–3D、Card Marker / Custom Study 1B、Phase 5 Reviewer、Phase 6 Reader、Phase 7 AI Study Card service 收敛与 provider Environment Gate 审计均已关闭。用户已接受新的产品规划方向，但尚未授权代码实现；runtime provider 激活仍需单独批准。
 
 ## 2. 本轮依据
 
-### 2.1 仓库事实
+### 2.1 当前仓库与架构事实
 
-当前生产代码规模：
+当前代码规模、测试规模、热点文件和架构负担会持续变化，不再在本路线中冻结一次性行数或永久评分。
 
-| 区域 | 行数 |
-|---|---:|
-| `app/` | 43,220 |
-| `resources/js/` | 43,930 |
-| `tests/` | 89,549 |
-| `docs/` | 31,083 |
+当前数据只从以下入口读取：
 
-生产文件体量：
+- `docs/CURRENT_AI_CONTEXT.md`；
+- `docs/architecture/upstream-code-test-and-architecture-comparison-2026-07-23.md`；
+- `docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md`。
 
-- 28 个生产文件超过 500 行。
-- 10 个生产文件超过 1,000 行。
-- 1 个生产文件超过 1,500 行。
+稳定结论只有：
 
-主要热点：
-
-| 文件 | 行数 | 结构信号 | 风险 |
-|---|---:|---|---|
-| `resources/js/components/Text/TextBlockGroup.vue` | 1,993 | 四个 dictionary transport 已归 `ReaderLookupApi`；组件保留 DOM、请求编排/continuation、Vuex、timer、selection 和 persistence effects | 中高，阅读主链路 |
-| `resources/js/components/Senses/SenseReview.vue` | 1,476 | 11 个 axios 引用、4 个 dialog；正式复习编排仍集中 | 中高 |
-| `app/Services/TextBlockService.php` | 1,077 | 保留 Python-first/import/phrase/Reader 兼容门面；fallback 已有纯 owner | 中，阅读主链路 |
-| `resources/js/components/ReviewCards/ReviewCardManage.vue` | 668 | 4 个协调请求、0 个 `v-dialog`；Card Info/Search/Table/Scheduling/Lifecycle/Delete/Leech 均有独立所有者 | 低，Browser 容器已生产关闭 |
-| `app/Services/CustomStudy/CustomStudySessionState.php` | 1,176 | 方法较多，但职责集中在不可变会话状态 | 中 |
-| `app/Services/DictionaryImportService.php` | 1,157 | 覆盖多种格式和导入阶段 | 中高 |
-| `resources/js/components/Review/Review.vue` | 1,070 | 仍承担 legacy 队列和页面编排 | 中 |
-| `app/Services/AiStudyCardPendingItemService.php` | 1,064 | V1–V5 多阶段逻辑聚集 | 高 |
-
-### 2.2 屎山程度评估
-
-当前评分：**6.0 / 10，局部中高负担**。
-
-支撑可维护性的因素：
-
-- WordSense、ReviewCard、ReviewLog、FSRS、Occurrence 已有明确数据职责。
-- 自动测试数量高，关键写入路径已有事务、权限和回归护栏。
-- 多个 Controller、Query Service、Serializer、Policy 已完成分离。
-- ReviewCardManage 已从 3,411 行降至 668 行，并形成 Card Info、Search、Table、Scheduling、Lifecycle、Delete、Leech 七个职责完整的所有者。
-- MCP Chrome 验收流程已建立。
-
-增加维护成本的因素：
-
-- Reader 与 Reviewer 的超大 Vue 页面仍同时承担请求、状态、展示、弹窗和业务编排。
-- `TextBlockService`、`AiStudyCardPendingItemService` 等热点仍聚集多类职责；Settings 已完成拆分，不能重新膨胀。
-- ReviewCardManage 父组件已收口为 4 个协调请求和 0 个对话框；无可达入口的 legacy `/enabled` 前端兼容代码已删除，后端兼容 route 保留。
-- master plan、handoff、hotspot audit 仍很长；当前状态必须只从 Current authority、Open Work Registry 和本路线读取。
-- 旧计划仍把已完成任务写成计划中，容易触发重复开发。
-- “总体架构收口 100%”缺少可量化依据，和当前热点数量冲突。
+- WordSense、ReviewCard、ReviewLog、FSRS 和 Occurrence 已形成明确数据职责；
+- Settings、Browser、Custom Study、Reviewer、Reader 和 AI Study Card 已建立领域 owner；
+- Reader、Reviewer、导入、启动与默认值仍是主要维护风险；
+- 测试和文档必须保护用户行为与数据，不锁定文件精确行数、日期或旧阶段文案。
 
 ### 2.3 Anki 官方参考来源
 
@@ -125,7 +91,7 @@ LinguaCafe 采用相同方向：
 | FSRS 设置 + 每日上限 + 队列顺序 | Deck Options | 由 Preset 管理 |
 | Preset | Deck Options Preset | Preset 归属于用户；每个用户 + 语言唯一绑定；同一用户多语言可共享；不建立 deck 树 |
 | Card Marker | Card Flag | 卡片级关注标记，和 lifecycle、leech 分离 |
-| WordSense Tag（未来） | Note Tag | 内容级分类，暂不和 Card Marker 混用 |
+| WordSense Tag（已接受，待规划） | Note Tag | 内容级分类，和 Card Marker 分离 |
 | 阅读页 | LinguaCafe 独有内容采集层 | 保留原文、lemma、点词、多例句和 AI 示意卡 |
 
 ## 6. 产品总原则
@@ -136,8 +102,10 @@ LinguaCafe 采用相同方向：
 - FSRS、预计间隔、撤销、ReviewLog、生命周期和 Leech 治理。
 - Browser 的搜索、保存搜索、列表、编辑区、Card Info 和批量操作。
 - Deck Options / Preset 的共享、复制、重命名、删除和默认值。
-- Custom Study 的临时会话、今日忘记、逾期、指定范围和额外上限。
-- Card Marker / Flag 和 Note Tag 分离。
+- Custom Study 的临时会话、今日忘记、逾期、指定范围和额外上限；后续继续学习兼容的 Filtered Deck 能力。
+- Card Marker / Flag 和 WordSense Tag 分离。
+- 自动备份与恢复、统一搜索、更完整统计、`.apkg` 内容卡导出和文章健康检查。
+- 受控插件接口，而不是插件任意写数据库。
 - 调度、搜索、统计、设置和 UI 分层。
 
 ### 6.2 保留 LinguaCafe 特色的部分
@@ -147,7 +115,7 @@ LinguaCafe 采用相同方向：
 - 原文定位、当前例句、多来源例句和例句轮换。
 - surface → lemma 识别和熟词僻义。
 - AI 译文和 AI 示意卡分离。
-- AI 推荐必须经过人工确认，中文释义必须由用户确认后再建卡。
+- AI 推荐必须经过人工确认，中文释义必须由用户确认后再建卡；重复词义整理也采用文件包 + 固定提示词 + 人工确认。
 - EncounteredWord 继续负责阅读颜色和熟悉度总览。
 
 ## 7. 实施顺序
@@ -250,7 +218,7 @@ Anki 对齐行为：
 
 ### Phase 3：Browser / ReviewCardManage 架构收敛
 
-状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 当前为 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；后端兼容 route、Lifecycle owner 和所有既有语义保持不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。
+状态：**Phase 3A–3D Accepted / Production Closed**。Card Info、Search、Table、Due-now / Reset Scheduling Mutation Surface、Lifecycle Mutation Surface、Delete Mutation Surface 与 Leech Governance Mutation Surface 已分别形成单一职责所有者。Phase 3D 删除父组件无入口的 legacy `/enabled` archive/restore 客户端和旧确认框，`ReviewCardManage.vue` 已收敛为协调容器；Search、Table、Card Info、Scheduling、Lifecycle、Delete 和 Leech Governance 保持独立 owner，后端兼容 route 和既有语义不变。Phase 3D 的 authenticated MCP Chrome 验收记录见 `docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`。
 
 优先级：P1。
 
@@ -274,12 +242,12 @@ Anki 对齐行为：
 - 不改变删除、归档、重置和 ReviewLog 保留语义。
 - 不复制 Anki 的 Cards/Notes 双模式、deck/subdeck 树、Note 删除语义或 Filtered Deck。
 
-量化结果：
+关闭结果：
 
-- `ReviewCardManage.vue` 从 3,411 行降到 668 行。
-- 页面直接 `axios.` 引用从 24 降到 4。
-- 页面容器保留 0 个 `v-dialog`。
-- 搜索、导出、详情、批量操作、危险操作均有自动测试和 MCP Chrome 验收。
+- 页面容器不再拥有子区域弹窗和危险写操作。
+- Search、Table、Card Info、Scheduling、Lifecycle、Delete 和 Leech Governance 各有明确 owner。
+- 搜索、导出、详情、批量操作和危险操作均有自动测试与真实页面验收。
+- 文件行数属于变化中的测量值，不再作为长期 Harness。
 
 ### Phase 4：Card Marker + Custom Study 1B
 
@@ -292,13 +260,13 @@ Anki 对齐行为：
 - Card Marker 参考 Anki Card Flag，落在 ReviewCard。
 - Marker 和 lifecycle、leech、WordSense status 分离。
 - V1 使用有限颜色/等级，不允许自由文本滥用。
-- WordSense Tag 作为未来 Note Tag 能力，单独规划。
+- WordSense Tag 已获得产品接受，作为 Note Tag 类内容能力单独规划。
 
 Custom Study 1B：
 
 - 增加“已标记卡片”条件。
 - 允许从 Browser / Card Info 进入临时学习。
-- 继续保持 preview-only 或明确的正式评分模式，不能混淆。
+- 当前继续保持 preview-only；是否扩展为正式评分模式已进入产品讨论，冻结前不改 Harness。
 - 临时会话不改正常队列归属。
 
 ### Phase 5：Reviewer 架构收敛
@@ -377,6 +345,25 @@ Environment Gate 已按 ADR-0030 以 **default-off / fail-closed** 形态关闭�
 - AI 推荐仍默认不选。
 - AI reason 不自动写入中文释义。
 
+### Phase 8：已接受的新产品规划（尚未授权实现）
+
+权威产品决定：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`。
+
+已接受：
+
+- 自动备份与恢复；
+- WordSense Tag；
+- 统一 Search Criteria；
+- Statistics V2；
+- 固定模板 `.apkg` 内容卡导出；
+- 只针对文章的健康检查；
+- Browser V2 与 AI 重复词义文件闭环；
+- 与 sense-only FSRS 兼容的更多复习设置；
+- 受控插件接口；
+- Custom Study 继续向 Anki 靠拢，但正式评分语义待讨论。
+
+PD-012“阅读中直接刷词义卡 V1”已完成产品冻结，但当前只允许 Architecture Spec / ADR / Harness 迁移设计，尚未获得业务代码授权。尚未冻结的议题包括：无密码 Profile、AI 新文章入口、整体翻译布局、移动端身份细节、同步身份和商业模式；冻结前不得修改对应现有 Harness。
+
 ## 8. 架构预算与门禁
 
 从本路线生效后：
@@ -396,14 +383,11 @@ Environment Gate 已按 ADR-0030 以 **default-off / fail-closed** 形态关闭�
 
 ## 9. 当前优先级
 
-| 顺序 | 任务 | 原因 |
-|---:|---|---|
-| 1 | Preset V1A–V1D | Default、绑定、管理动作、共享提示、消费者收敛、高级工具 UX 和最终生产矩阵均已完成 |
-| 2 | Browser / ReviewCardManage 架构收敛 | Phase 3A–3D Accepted / Production Closed；父组件 668 行、4 个 direct axios、0 个 dialog |
-| 4 | Card Marker + Custom Study 1B | 复用 Browser 和 Custom Study 1A，补齐 Anki Flag/Filtered Deck 路线 |
-| 5 | Reviewer 架构收敛 | 减少两套复习页面重复状态和请求逻辑 |
-| 6 | Reader UI 小步 + Reader 架构治理 | 保留特色，降低最高风险阅读热点 |
-| 7 | AI provider | default-off implementation gate 已关闭；runtime 激活是环境选择，不是剩余仓库里程碑 |
+既有授权阶段均已关闭。PD-012 已获得产品冻结资格，但不是 active task，当前只允许架构设计；其他新功能目前只获得产品规划资格，尚未冻结最终实施顺序。
+
+规划池包括：备份恢复、WordSense Tag、统一搜索、统计 V2、`.apkg`、文章健康检查、Browser V2、兼容设置和插件接口。Custom Study 扩展必须等评分语义讨论完成。
+
+PD-012 进入实现前必须先完成 Architecture Spec、ADR 与 Harness 迁移设计，并取得新的业务代码授权。其他未冻结方向继续按产品讨论推进：AI 阅读与翻译排版；档案/手机/同步身份；三平台/插件/商业模式。
 
 ## 10. 不进入当前路线的事项
 
@@ -412,6 +396,7 @@ Environment Gate 已按 ADR-0030 以 **default-off / fail-closed** 形态关闭�
 - WordSense 自动生成正反两张 sibling cards。
 - phrase FSRS。
 - 删除 legacy word card 兼容层。
-- 手机端适配。
-- 自动生成释义后直接建卡。
-- 自动评分或 AI 代替用户评分。
+- AI 代替用户评分。
+- 自动生成释义后未经确认直接建卡。
+
+手机端、无密码 Profile 和商业模式不再列为永久排除项，但仍属于未冻结讨论，不得直接实施。阅读中直接刷词义卡 V1 已由 PD-012 完成产品冻结，但在 Architecture Spec、ADR、Harness 迁移设计和新业务代码授权完成前仍不得实施。

@@ -1,6 +1,8 @@
 # LinguaCafe 总控大计划
 
-> **Current authority — 2026-07-23**
+> **最小上下文提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md`。本文保留被既有文档 guard 引用的当前表和历史证据；只在选择产品任务时读取 Open Work Registry 和相关阶段，不默认加载全文。
+
+> **Current authority — 2026-08-06**
 >
 > Product and architecture order is governed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`.
 >
@@ -8,13 +10,14 @@
 > |---|---|
 > | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E; provider Environment Gate (default-off) |
 > | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Authorized Anki-aligned repository milestone sequence complete; runtime provider activation remains a separate environment-specific decision |
-> | Authorized Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader architecture → AI Study Card service convergence |
+> | Current Phase | Recovery/publication is closed. Existing authorized repository milestones are closed; the Open Work Registry contains five operational or externally deferred items. Frozen product decisions are tracked separately and are not active tasks. |
+> | Closed Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader architecture → AI Study Card service convergence |
 > | Environment Gate | Default-off provider implementation gate is closed; runtime external activation remains separately gated |
+> | Frozen Product Gate | PD-012 阅读中直接刷词义卡 V1 is Product Frozen / Architecture Spec Allowed / Product Code Not Authorized; it is not an active task |
 >
 > Custom Study 1A and Card Marker + Custom Study 1B are Accepted / Production Closed. `/custom-study` now includes the five frozen criteria, including `marked`; Marker remains ReviewCard metadata and the session remains preview-only. Phase 4 evidence is in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`; earlier 1A history remains archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
-> **Architecture status correction**: the old “overall architecture closure 100%” statement is historical. Settings convergence and Browser ownership extraction removed major concentrated debt. The current assessment remains **6.0/10, localized medium-high burden**. `ReviewCardManage.vue` is 668 lines with 4 coordinator requests and no dialogs; Phase 6A–6L reduced `TextBlockGroup.vue` from 2,514 to 1,993 lines with zero inline dictionary axios expressions, Phase 6M reduced `TextBlockService.php` from 1,382 to 1,077 lines, and Phase 7 reduced `AiStudyCardPendingItemService.php` from 1,065 to 61 lines with five responsibility owners. Reader and AI Study Card service governance are closed.
+> **Architecture status**: current measurements and hotspot evidence live in `docs/CURRENT_AI_CONTEXT.md` and the architecture audits. This authority block does not freeze file line counts or a permanent numeric debt score.
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -26,7 +29,7 @@
 
 > **Historical Phase 5A update (superseded 2026-07-14)**: this earlier slice added the authenticated read-only `GET /custom-study/chapter-options` endpoint and aligned sentence/token/translation identity before the frontend existed. The production frontend and browser closure described in the authoritative status above now supersede that interim state.
 
-> **最后更新**：2026-07-18（Browser/ReviewCardManage Phase 3D Container Closure 已 Accepted / Production Closed；删除父组件无可达入口的旧 `/enabled` archive/restore 客户端、4 个状态字段和 2 个旧确认框；`ReviewCardManage.vue` 收敛为 668 行、4 个 direct axios references、0 个 v-dialog；既有职责 owner 和后端兼容 route 保持不变；RED/GREEN guard、定向测试、构建与 authenticated MCP Chrome 验收通过；Card Marker + Custom Study 1B 为 Planned / Not Authorized，本轮停止；详见 docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md 与 docs/plans/review-card-manage-architecture-convergence-plan.md）。历史最近任务记录：2026-07-14 (Task 2000-20 `GLM-CustomStudy-Phase3B-Pure-Transition-Policy-And-Contract-Harness-2000-20` — **Custom Study 1A Phase 3B 复合型主线任务**。本轮完成：(A) Phase 3A 架构契约和文档冲突收口 — ADR-0016 + implementation plan 不再写 `TokenService (signs/verifies/rotates token)` / `rotate(answer)` / 静态 `Crypt::encryptString()`；payload 补齐 `completed_ids` + `skipped_ineligible_ids`；`mode` 明确为四种 Criteria mode（`today_forgotten` / `overdue` / `source_chapter` / `leech_attention`），`preview-only` 是功能级性质不是 payload `mode` 值；新增可执行文档 guard `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs`（40 项，先 RED 9 项失败后 GREEN 全绿）；Phase 3A 标记为 Accepted。(B) State 显式不可变复制边界 — `CustomStudySessionState::withProgress(currentCardId, readyQueue, delayedRepeatQueue, completedIds, skippedIneligibleIds): self` 保留 identity 字段、自动重算 `completed_count`/`total_count`、自动 `step + 1`、拒绝 `step === PHP_INT_MAX` 溢出；新增 `waitUntil(): ?int` + `isCompleted(): bool` 派生查询；Token 常量 `VERSION` / `MAX_CANDIDATE_COUNT` 改为引用 `CustomStudySessionState`（单一来源）。(C) 纯函数 `CustomStudyPreviewPolicy` — `applyRating(state, rating, now): self` + `resume(state, now): self`，只接受四个冻结小写 rating（`again`/`hard`/`good`/`easy`）；Again/Hard → `delayed_repeat_queue`，Good/Easy → `completed_ids`；ready 优先于 delayed，delayed tie 稳定；不调用 `toArray()`/`fromArray()`，只通过 `withProgress()` 创建新 State；不访问 DB/Auth/Request/Crypt/ReviewLog/FSRS/lifecycle/AI。(D) 可执行架构 guard — `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs` 同时覆盖 ADR 和 implementation plan。(E) TDD（RED → GREEN → REFACTOR）+ 完整回归 + FACT 自审 + 3 commits。**Previous task (2000-19)**: Phase 3A `CustomStudySessionState` + `CustomStudySessionTokenService` + `CustomStudySessionStateException` + 2 unit tests；V1 payload 新增 `completed_ids` + `skipped_ineligible_ids`；五状态 union + 互斥不变量；章节选择器未来契约登记。**Custom Study 1A 历史阶段状态（已由生产关闭取代）**：Phase 1、2A、2B、3A、3B 的架构与测试均已完成；后续 API、前端、共享卡面、章节选择器和浏览器收口也已完成。当前权威状态见文件顶部。**Queue Order 状态**：✅ Accepted / 生产验收通过（Task 2000-14）。**硬规则权威位置**：`vibe-coding-collaboration-rules.md` §28 需求放置/复合任务/报告闭环；§19 复杂度规则。本文件不复制全文，仅引用。当前工作流: GLM 单 Agent 闭环, 详见 `vibe-coding-collaboration-rules.md` §1.5; CodeBuddy/WorkBuddy 已停用, 旧规则见 `docs/history/codebuddy-workbuddy-workflow-archive-2026-07-13.md`)。
+> **最后更新**：2026-08-06。恢复发布程序已关闭；当前运行/维护事项已收敛到 Open Work Registry 的五项。PD-012 等已冻结但尚未获得业务代码授权的产品决定由产品决定文档单独持有，不冒充 active task；已完成里程碑不再重复列入待办。详见 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -207,26 +210,21 @@
 | GM52-AIStudyCardV5-DesktopArchitectureConvergence-1000-1 | 桌面端 AIStudyCard V5 架构收敛。把 `VocabularySideBox.vue` 与 `VocabularyBox.vue` 中重复的 V5 生成学习卡逻辑（结果展示模板、确认对话框模板、候选项构造逻辑、POST 请求逻辑）抽成共享结构。新增 `resources/js/services/AiStudyCardGenerateCardsService.js`（3 个纯函数：`buildGenerateCardItems` / `filterConfirmedGenerateCardItems` / `generateAiStudyCards`，通过传入 axios 实例发请求，不调外部 AI，不写 ReviewLog/FSRS/ReviewCard）；新增 `resources/js/components/Text/AiStudyCardGenerateCardsDialog.vue`（共享确认对话框，v-model + items/loading/error props + confirm event，不直接请求后端）；新增 `resources/js/components/Text/AiStudyCardGenerateCardsResult.vue`（共享结果展示，result prop + go-to-sense-reviews/dismiss events，不直接请求后端）。两个父组件精简为只持有 dialog open 状态、result/loading/error、调用共享 helper、传数据、跳转 `/reviews/senses`。新增 `tests/Feature/AiStudyCardV5DesktopArchitectureGuardTest.php`（17 项 / 134 assertions）：锁定共享文件存在性、两父组件引用共享组件、不再包含重复 V5 模板/逻辑指纹、AI reason 不自动填 sense_zh、service 暴露 3 个纯函数、Dialog/Result 只 emit 事件不直接调后端、BottomSheet 不含 V5 流程、无外部 AI provider 字符串、无 ReviewLog/FSRS/legacy word card 创建调用。重写 `tests/Feature/VocabularyBoxV5UiGuardTest.php`（16 项 / 104 assertions）：扫描目标从单一 VocabularyBox.vue 扩展到 4 个文件。MCP Chrome 真实验收：1920x900 宽屏 VocabularySideBox + 900x900 半屏 VocabularyBox 均完整走通 V5，Network 仅 127.0.0.1 本地请求，无外部 AI 调用，Console 仅预期 WebSocket 降级。9 个测试套件全绿（363 tests / 0 failures），`npm run development` 编译成功。**不新增产品能力；不碰后端业务逻辑；不改 TextBlockGroup.vue；不处理 VocabularyBottomSheet.vue（当前产品范围外）；不实现手机端 V5；不写 ReviewLog；不改 FSRS；不新增 migration；不自动调 AI；不创建 legacy word card；不删除 WordSense/ReviewCard/ReviewLog/legacy 兼容层。** |
 | GM52-AIStudyCardV5-DesktopWorkflowFeatureIsland-1000-2 | 桌面端 AIStudyCard V1-V5 工作流收敛为独立 feature island。在上一轮（DesktopArchitectureConvergence）只把 V5 生成学习卡的 Dialog/Result/Service 收敛的基础上，本轮把 V1（pending item 标记）→ V2（待解释列表/取消/恢复）→ V3（preview-package 安全包）→ V4（粘贴 AI 推荐词 JSON / parse / dedupe / final-candidates-package）→ V5（generate-cards 确认生成学习卡）的完整桌面端流程收敛到一个独立 feature island 组件 `AiStudyCardDesktopWorkflow.vue`（约 1019 行，包含 V1-V5 全部模板/data/methods，通过 `computed: mapState('vocabularyBox', {...})` 从 store 获取上下文）。新增 `resources/js/services/AiStudyCardRecommendationParserService.js`（225 行，3 个纯函数 `buildUserSelectedKeys` / `parseAiRecommendations` / `rededupeRecommendations`，不 import Vue/Vuex/DOM，解析失败安全返回 `{ ok: false, error, recommendations: [] }`）+ `resources/js/services/AiStudyCardPendingWorkflowService.js`（195 行，6 个函数 `createPendingItem` / `listPendingItems` / `dismissPendingItem` / `restorePendingItem` / `buildPreviewPackage` / `buildFinalCandidatesPackage` + re-export 3 个 from `AiStudyCardGenerateCardsService.js` 保持 V5 hardening 边界）。两个父组件 `VocabularySideBox.vue` 与 `VocabularyBox.vue` 只负责挂载该组件，不再各自维护完整 AIStudyCard 流程。期间修复 `VocabularySideBox.vue` mojibake 语法错误（上轮 PowerShell 脚本按行号删除代码后遗留的中文注释/字符串 `?/span>`、`?/v-btn>`、`?/v-chip>` 破损标签 + `setAiLookupError(...)` 缺失闭合引号导致 `npm run development` 失败）。新增 `tests/Feature/AiStudyCardDesktopWorkflowArchitectureGuardTest.php`（22 项 / 293 assertions）：锁定 feature island 文件存在性、两父组件挂载该组件、不再包含重复 V1-V5 模板/data 字段（指纹检测：`待 AI 解释`、`<v-dialog v-model="aiPendingListDialog"`、`<v-dialog v-model="aiStudyCardPreviewDialog"`、`aiPendingItems`、`aiPreviewPackage`、`aiFinalCandidatesPackage`、`aiSelectedRecommendationIndices`）、`AiStudyCardRecommendationParserService` 暴露 3 个纯函数、`AiStudyCardPendingWorkflowService` 暴露 6 个函数 + re-export 3 个、解析失败安全失败、AI 推荐词默认 unchecked、AI reason 不自动填 sense_zh、sense_zh 初始化为空、sense_en 允许为空、`VocabularyBottomSheet.vue` 不含 V1-V5 流程、无外部 AI provider 字符串、无 ReviewLog/FSRS/legacy word card 创建调用。MCP Chrome 真实双 viewport 完整 V1-V5 回归验收全通过：A. 1920x900 宽屏 VocabularySideBox（POST /pending-items → list/dismiss/restore → preview-package → 粘贴 AI 推荐词 JSON（agency/observation）→ final-candidates-package → generate-cards → 「已生成 2 张学习卡」→ WordSense #78/79 + ReviewCard #80/81 (target_type=sense) → Network 30 个请求全部 127.0.0.1:8000）；B. 900x900 半屏 VocabularyBox（导航栏折叠为「更多」菜单 → 完整 V1-V5 流程，使用不同 AI 推荐词（progress）→ generate-cards 200 → WordSense #80/81 + ReviewCard #82/83 (target_type=sense) → Network 19 个请求全部本地）。关键安全契约两个 viewport 均确认：AI 推荐词默认 unchecked / AI reason 不自动填 sense_zh / sense_zh 初始化为空 / sense_en 允许为空 / 无外部 AI provider 调用 / 无 ReviewLog 写入 / 无 legacy word card 创建 / 所有 ReviewCard target_type=sense。10 个测试套件全绿（385 tests / 0 failures）：AiStudyCardDesktopWorkflowArchitectureGuardTest 22 (293) / AiStudyCardV5DesktopArchitectureGuardTest 17 (146) / VocabularyBoxV5UiGuardTest 16 (131) / AiStudyCardPendingItemTest 86 (484) / WordSenseTest 134 (555) / ReviewFsrsTest 63 (374) / SenseReview 19 (98) / SenseTokenPayloadTest 16 (45) / TestingDatabaseHealthConfigTest 6 (50) / TestingDatabaseHealthTest 6 (47)。`npm run development` 编译成功。**不新增产品能力；不碰后端业务逻辑；不碰手机端/BottomSheet；不改 TextBlockGroup.vue；不实现手机端/BottomSheet V1-V5；不自动调 AI；不接 AI provider；不读写 .env；不新增 API key；不写 ReviewLog；不改 FSRS；不重排已有卡；不创建 legacy word card；不删除 WordSense/ReviewCard/ReviewLog/legacy 兼容层；不新增 migration；不清库；不 DCP；不 notification script；不处理 .omo/；不提交敏感文件；不把 API 200 当页面验收。** |
 
-## 4. Open Work Registry（当前唯一开放工作账本）
+## 4. Open Work Registry（当前运行、维护与外部能力账本）
 
-> 本节是当前任务状态的唯一权威来源。后文 `Recent Update` 和旧阶段表只用于追溯，不能重新升格为待办。状态词只使用：Completed、Code Complete / Acceptance Pending、Partial、Deferred、Product Gate、Environment Gate、Planned、Unverified、Superseded。
+> 本节只保留尚未完成、仍需外部能力或需要新授权的运行/维护事项。已关闭里程碑只在对应 ADR、验收报告和历史段落中保留，不再重复列入当前待办。已冻结的产品决定由产品决定文档单独持有，不因为“可进入 Architecture Spec”而成为当前 active task。
 
-| 顺序 | 任务 | 状态 | 用户能获得什么 | 当前缺口 / 阻塞 | 证据位置 | 开发授权 |
-|---:|---|---|---|---|---|---|
-| 0 | Manual Sense POS + shared form + inline validation | Completed / Production Closed | 创建和编辑共用表单，错误就地显示，失败保留草稿 | 无 | ADR-0022；2026-07-15 DevSpace5 + Chrome 验收 | 已完成 |
-| 1 | Settings architecture convergence | Completed / Production Closed | 设置页按目标、队列、状态、高级工具和旧 SRS 分区；后续 Preset 不再堆进超大页面 | `AdminReviewSettings.vue` 60 行；15 个请求集中到 API client；`SettingsService.php` 105 行兼容门面 | ADR-0023；Chrome 双 viewport；设置/重排回归 | 已完成 |
-| 2A | FSRS-Anki-Mgmt-9 Preset V1A | Completed / Production Closed | 当前用户的每种学习语言都能稳定读取一个 Default Preset；现有设置页和调度透明使用用户 + 语言配置 | 无阻断；网页端已复核代码、数据库、双 viewport、真实语言切换与全量回归 | ADR-0024；`review-settings-preset-v1-plan.md`；2026-07-15 web acceptance | 已完成 |
-| 2B | Preset V1B — Management Operations and UI | Completed / Production Closed | 新增、复制、重命名、删除、切换 Preset；设置页成为当前 Preset 编辑器 | 无阻断；Default 保护、用户隔离、共享语言提示和删除重绑定均已通过真实页面验收 | ADR-0025；`review-settings-preset-v1b-execution-plan.md` | 已完成 |
-| 2C | Preset V1C — Consumer Convergence | Completed / Production Closed | 所有设置消费者只读取当前 binding；不再生成没有用户/语言归属的全局回滚状态 | `fsrs_parameters_previous` 新写入/删除已停止，旧行保持不动并被明确标记为无效历史残留 | ADR-0026；V1C static guard；全量回归 | 已完成 |
-| 2D | Preset V1D — Settings UX and Production Closure | Completed / Production Closed | 管理动作、空状态、危险操作和多语言共享形成完整稳定体验 | 无；Settings UX-1、双用户、English/French、CRUD、共享修改、刷新持久化、删除重绑定和无自动重排矩阵已完成 | ADR-0027；`review-settings-preset-v1-plan.md`；2026-07-15 Chrome 双 viewport + 数据库 delta | 已完成；停止在本阶段 |
-| 3 | Browser / ReviewCardManage architecture convergence | Completed / Production Closed through Phase 3D | Phase 3A 抽取只读 Card Info；Phase 3B-1 抽取 Search；Phase 3B-2 抽取 Table；Phase 3C-1–3C-4 抽取 Scheduling、Lifecycle、Delete、Leech；Phase 3D 清理无入口的旧 `/enabled` 父组件兼容代码并关闭最终容器 | `ReviewCardManage.vue` 668 行、4 个 direct `axios.` references、0 个 `v-dialog`；只保留 stats、list、inline edit、source-context 编排请求；Lifecycle/Leech/Delete/Scheduling owner 不变 | `docs/plans/review-card-manage-architecture-convergence-plan.md`；`docs/testing/review-card-container-closure-browser-acceptance-2026-07-18.md`；TDD、自动回归、构建与 authenticated MCP Chrome 验收完成 | 已完成；停止在本阶段 |
-| 4 | Card Marker + Custom Study 1B | Accepted / Production Closed | 可标记重点卡，并在 Custom Study 中临时学习已标记卡 | Marker 落在 ReviewCard，和 lifecycle、leech、WordSense status 分离 | ADR-0029；Phase 4 browser acceptance | 2026-07-18 关闭 |
-| 5 | Reviewer architecture convergence | Accepted / Production Closed | 共享正式 HTTP 与单次评分事务边界；Sense history/undo 独立 owner；保留两页业务语义 | `SenseReview.vue` 1,249 行；`Review.vue` 1,025 行 | 24-file frontend loop、保护性 PHP suites、双 viewport browser acceptance | 2026-07-18 关闭 |
-| 6 | Reader UI / frontend architecture governance | Accepted / Production Closed | Phase 6A–6L 已关闭；pure rules 与 dictionary transport 均有 owner，组件保留编排/effects | `TextBlockGroup.vue` 1,993 行、0 个 inline dictionary axios expression | 同路线 Phase 6；6A–6L browser acceptance | 2026-07-23 关闭 |
-| 7 | Reader backend architecture governance | Accepted / Production Closed | `ReaderDataService`、`EncounteredWordCreationService` 与 `EnglishFallbackTokenizerService` 分别拥有读取准备、新词写入和生产 English fallback；门面兼容不变 | `TextBlockService.php` 1,382 → 1,077 行 | Phase 6M acceptance；115 tests / 641 assertions；双 viewport official Browser | 2026-07-23 关闭 |
-| 8 | AI Study Card service convergence | Completed / Production Closed | Phase 7A lifecycle、7B package、7C validation、7D source binding、7E generation 均有独立 owner | coordinator 1,065 → 61 行；公开 facade 与行为不变 | Phase 7 design；7E 1,093 tests / 6,124 assertions；official Browser confirmed-generation acceptance | 2026-07-23 关闭 |
-| 9 | V6 provider implementation gate | Completed / Environment Gate Closed (default-off) | 显式本地后端 trigger、default-unchecked 推荐、V4/V5 人工确认复用 | runtime provider 未启用；自动章节分析不在当前产品范围 | ADR-0004/0005/0030；80 tests / 806 assertions；既有 browser Network evidence | 2026-07-23 关闭；外发仍需具体授权 |
-| 10 | DevMain old-computer / alternate-repo validation | Deferred / Unverified | 在另一台设备或仓库复现运行 | 当前远端已经确认是 `LinguaCafe-local`；没有切换需求和目标机器证据 | Git remote / current checkout | 未授权 |
+| 顺序 | 事项 | 当前状态 | 下一步 / 停止条件 | 权威证据 |
+|---:|---|---|---|---|
+| 1 | M9 iOS sync、编译、签名、设备、TestFlight 与 App Store 证据 | `Deferred / Not Complete` | 需要 macOS、Xcode、Apple 签名身份和真实设备/商店能力；当前 ignored iOS generated public 仍为旧 bundle 且含 sourcemap，必须先受控 sync 并通过资源完整性门禁；不得在 Windows 上伪造完成 | ADR-0052、ADR-0054、M9 acceptance/playbook |
+| 2 | Runtime AI provider 激活 | `Environment Gate / Explicit Authorization Required` | 只有用户明确批准 provider、模型、密钥、外发、成本和超时后才能启用；default-off 保持关闭 | ADR-0004、ADR-0005、ADR-0030 |
+| 3 | 本地体验与 Bug 维护账本 | `Planned / Not Yet Authorized` | 按 P0/P1 顺序一次选择一个可验证切片；不得把维护任务扩成新产品开发 | `local-experience-bug-optimization-ledger-2026-07-23.md` |
+| 4 | Reasonix / DevSpace / 浏览器监督工具链可靠性 | `Workaround Active / Root Fix Open` | 继续使用唯一 marker、会话对账和失败留证；在根治验收前不得把 workaround 称为稳定能力 | `reasonix-supervision-toolchain-bug-ledger-2026-08-05.md` |
+| 5 | 旧电脑或其他仓库复现 | `Deferred / Unverified` | 只有用户提供目标设备或明确切换仓库时再执行 | 当前 checkout 与 remote 事实 |
+
+> **冻结产品决定路由**：PD-012“阅读中直接刷词义卡 V1”已完成产品冻结，当前只允许 Architecture Spec / ADR / Harness 迁移设计；`product_code_authorized=false` 时不得修改业务代码。PD-013 的 M1“下一里程碑”措辞只属于 2026-07-28 历史路线基线，已被后续 M1–M18 实现链消费，不构成当前下一任务授权。
+
+当前仓库内 M1–M8、M10–M16、M17 Web slice、M18 共享实现与 Web/Android 证据，以及 Settings/Browser/Reader/Reviewer/AI Study Card default-off 路线均已有关闭证据。M17 的 Android Haptics/Local Notifications 事实由 M7 平台验收持有，不属于第二套 M17 Android 实现。它们不是开放任务；出现真实回归时按 Bug 切片重新进入，而不是复跑整个里程碑。
 
 ### 4.1 已纠正的过期状态
 
@@ -247,8 +245,8 @@
 |---|---|---|
 | AI-Reading-Assist-6 词组与单词双路径 | Partial | 已有 phrase 识别与用户选择能力，完整产品流程需要按真实材料复核后再决定，不阻塞当前路线 |
 | Lemma per-occurrence override | Deferred | 当前单 lemma 模型仍有词性歧义残留；改数据模型会影响阅读、查词和 WordSense 绑定，放在 Reader 架构阶段重新评估 |
-| WordSense Tag / Note Tag | Product Gate | Card Marker V1 先做卡片级关注；内容级自由标签以后独立设计，避免两种标记混用 |
-| Mobile / BottomSheet | Deferred | 当前产品范围为桌面端，不把桌面 V1–V5 工作流复制到移动组件 |
+| WordSense Tag / Note Tag | Planned / Product Accepted | 内容级自由标签已接受；保持与 Card Marker 分离，实施前冻结标签结构和批量语义 |
+| Mobile / BottomSheet | Superseded by M1–M9 roadmap | 路线基线已在 2026-07-28 冻结为云端权威、有限离线；具体页面与商业细节按对应里程碑继续冻结 |
 
 ---
 
@@ -277,7 +275,9 @@
 
 ## 7. Anki 参考规则
 
-本文档适用于网页端 GPT 和本地 OpenCode Agent：
+当前已确认产品方向与待讨论边界以 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md` 为准。
+
+本文档适用于网页端 GPT、网页端 DevSpace 和本地 Codex：
 
 1. **必须先查 Anki**：涉及以下主题时，在提出产品问题或生成开发提示词前，必须先查看 Anki 官方手册 / 代码仓库 / 功能讨论：
 
@@ -578,7 +578,7 @@
   - `tests/Feature/SenseReviewExampleRotationTest.php`（10 项 / 31 assertions）：覆盖单 occurrence 显示该例句 / 3 occurrence 不永远第一条 / 评分后下一次尽量不同 / `displayed_occurrence_id` 在 payload / `occurrence_count` 在 payload / 无 occurrence fallback 到 card 例句 / 无任何例句空状态 / 轮换不写 ReviewLog / 轮换不改 FSRS / 轮换不影响每日上限
 - **测试结果**：13 个测试套件全绿（410 tests / 0 failures）；`npm run development` Compiled Successfully（6403ms，app.js 7.4 MiB）。
 - **MCP Chrome 真实页面双 viewport 验收**（GLM 自己执行，未用 API 200 代替）：
-  - 宽屏 1920x900：登录 `1816529781@qq.com` → `/reviews/senses` 显示 22 张到期 sense card → 筛选出 3 张多例句卡（`occurrence_count=2`）：`codex_sense_smoke_20260702_b_bind_target` / `codex_sense_smoke_20260702_b_confirm_target` / `codexmatrix` → 多例句提示 chip 正确显示「本词义已有 2 条来源例句」 → 显示答案 → 答案侧完整 → 评分 `good` → 跳到下一张多例句卡，提示 chip 同样正确 → 查看原文/译文对话框打开（sourceCount=1，未跟随 occurrence_count=2 → **P2 记录**） → 轮换验证（临时 PHP 脚本对 card#61 reps 0-10 序列化，产生 2 个不同 `displayed_occurrence_id`，DB 未写入）。Network 全部 127.0.0.1:8000，Console 仅 WebSocket 降级。
+  - 宽屏 1920x900：登录 `当前任务提示词提供的本地测试账号` → `/reviews/senses` 显示 22 张到期 sense card → 筛选出 3 张多例句卡（`occurrence_count=2`）：`codex_sense_smoke_20260702_b_bind_target` / `codex_sense_smoke_20260702_b_confirm_target` / `codexmatrix` → 多例句提示 chip 正确显示「本词义已有 2 条来源例句」 → 显示答案 → 答案侧完整 → 评分 `good` → 跳到下一张多例句卡，提示 chip 同样正确 → 查看原文/译文对话框打开（sourceCount=1，未跟随 occurrence_count=2 → **P2 记录**） → 轮换验证（临时 PHP 脚本对 card#61 reps 0-10 序列化，产生 2 个不同 `displayed_occurrence_id`，DB 未写入）。Network 全部 127.0.0.1:8000，Console 仅 WebSocket 降级。
   - 半屏 900x900：无横向滚动（`scrollWidth=892=clientWidth=892`）→ 多例句提示 chip 不挤、不挡评分按钮 → 答案侧布局正常 → 查看原文/译文对话框正常打开。Network 全部本地，Console 仅 WebSocket 降级。
   - 未做 mobile viewport 主流程验收（当前产品无手机端）。
 - **安全边界确认**：未读写 `.env`；未清库；未 `migrate:fresh` / `db:wipe`；未 DCP；未运行 notification script；未自动调用 AI；未接入 DeepSeek/OpenAI/任意 AI provider；未新增 API key；未写 ReviewLog（轮换验证后 DB `ReviewLog` 总数未变）；未改 FSRS（轮换验证后 `fsrs_reps` / `fsrs_due_at` / `fsrs_stability` / `fsrs_difficulty` / `fsrs_state` / `fsrs_lapses` 未变）；未重排已有 ReviewCard；未创建 legacy word ReviewCard；未删除 WordSense/ReviewCard/ReviewLog；未删除 legacy 兼容层；未修改 TextBlockGroup.vue / VocabularyBottomSheet.vue；未实现手机端 / BottomSheet V5；未进入 V6；未新增 migration（仅 SELECT 现有 occurrence 数据）；未破坏现有 source context fallback（`SenseSourceContextService` 未修改，仅记录 P2）。
@@ -1341,7 +1341,7 @@ V6-18 收口了 V5 结果页的候选项总览。本轮验证并锁定了「V5 �
 
 ### MCP Chrome 真实页面验收
 
-- 登录 `1816529781@qq.com` → `/reviews/senses`，复习 5 张卡（published / codexmatrix / technology / city / window）
+- 登录 `当前任务提示词提供的本地测试账号` → `/reviews/senses`，复习 5 张卡（published / codexmatrix / technology / city / window）
 - card 63 (lemma: published)：理解辅助块展开显示 explanation / meaning_boundary / context_hint / judgment_basis
 - 查看原文对话框显示「已定位到当前复习例句」（`preferred_occurrence_id=16` 生效）
 - 切换例句：理解辅助跟随当前 occurrence
