@@ -43,9 +43,10 @@ class VocabularyQueryService {
         $this->itemsPerPage = 30;
     }
 
-    public function getUniqueWord($userId, $wordId) {
+    public function getUniqueWord($userId, $language, $wordId) {
         $word = EncounteredWord
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $wordId)
             ->first();
 
@@ -56,9 +57,10 @@ class VocabularyQueryService {
         return $word;
     }
 
-    public function getPhrase($userId, $phraseId) {
+    public function getPhrase($userId, $language, $phraseId) {
         $phrase = Phrase
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $phraseId)
             ->first();
 
@@ -69,9 +71,10 @@ class VocabularyQueryService {
         return $phrase;
     }
 
-    public function getExampleSentence($userId, $targetType, $targetId) {
+    public function getExampleSentence($userId, $language, $targetType, $targetId) {
         $exampleSentence = ExampleSentence
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('target_type', $targetType)
             ->where('target_id', $targetId)
             ->first();

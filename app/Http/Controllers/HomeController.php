@@ -6,6 +6,7 @@ use App\Models\User;
 use App\Services\GoalService;
 
 use App\Services\SettingsService;
+use App\Services\SafeFilePathService;
 use App\Services\StatisticsService;
 use Illuminate\Support\Facades\Auth;
 
@@ -141,7 +142,10 @@ class HomeController extends Controller {
         return response()->json($manualTree, 200);
     }
 
-    public function getUserManualFile($fileName) {
-        return response()->file('./../manual/' . $fileName . '.md');
+    public function getUserManualFile($fileName, SafeFilePathService $files) {
+        return response()->file($files->resolveExistingDirectChild(
+            public_path('../manual'),
+            $fileName . '.md'
+        ));
     }
 }

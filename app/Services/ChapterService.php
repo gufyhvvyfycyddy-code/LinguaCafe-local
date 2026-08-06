@@ -39,10 +39,11 @@ class ChapterService {
         $this->goalService = $goalService;
     }
 
-    public function getChaptersForBook($userId, $bookId) {
+    public function getChaptersForBook($userId, $language, $bookId) {
         $book = Book
             ::where('id', $bookId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
         
         if (!$book) {
@@ -53,6 +54,7 @@ class ChapterService {
             ::select(['id', 'name', 'read_count', 'word_count', 'unique_word_ids', 'processing_status'])
             ->where('book_id', $bookId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->get();
 
         $words = EncounteredWord
@@ -79,10 +81,11 @@ class ChapterService {
         return $data;
     }
 
-    public function getChaptersBookCount($userId, $userUuid, $bookId) {
+    public function getChaptersBookCount($userId, $userUuid, $language, $bookId) {
         $book = Book
             ::where('id', $bookId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
         
         if (!$book) {
@@ -92,6 +95,7 @@ class ChapterService {
         $chapters = Chapter
             ::where('book_id', $bookId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->get();
 
         $words = EncounteredWord
@@ -134,11 +138,12 @@ class ChapterService {
         return $allChapterWordCounts;
     }
     
-    public function getChapterForEditor($userId, $chapterId) {
+    public function getChapterForEditor($userId, $language, $chapterId) {
         $chapter = Chapter::
             select(['name', 'raw_text', 'type'])
             ->where('id', $chapterId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
 
         if (!$chapter) {
@@ -224,6 +229,14 @@ class ChapterService {
     }
 
     public function finishChapter($userId, $chapterId, $autoMoveWordsToKnown, $uniqueWords, $autoLevelUpWords, $leveledUpWords, $leveledUpPhrases, $language) {
+        $chapterInScope = Chapter::where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->exists();
+        if (!$chapterInScope) {
+            throw new \Exception('Chapter does not exist in the selected language.');
+        }
+
         // automove words that the user sees the first time,
         // but they already know it to learned stage.
         DB::beginTransaction();
@@ -250,6 +263,7 @@ class ChapterService {
         $chapter = Chapter
             ::where('id', $chapterId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
 
         if (!$chapter) {
@@ -301,12 +315,13 @@ class ChapterService {
         return true;
     }
 
-    public function createChapter($userId, $userUuid, $bookId, $chapterName, $chapterText) {
+    public function createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText) {
 
         // retrieve book
         $book = Book
             ::where('id', $bookId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
 
         if (!$book) {
@@ -326,19 +341,27 @@ class ChapterService {
         $chapter->unique_words = '';
         $chapter->save();
 
-        $this->updateChapter($userId, $userUuid, $chapter->id, $chapter->name, $chapterText);
+        $this->updateChapter(
+            $userId,
+            $userUuid,
+            $language,
+            $chapter->id,
+            $chapter->name,
+            $chapterText
+        );
         
         return true;
     }
 
     // updates the name and text of a chapter
-    public function updateChapter($userId, $userUuid, $chapterId, $chapterName, $chapterText) {
+    public function updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText) {
         DB::disableQueryLog();
         
         // retrieve chapter
         $chapter = Chapter
             ::where('id', $chapterId)
             ->where('user_id', $userId)
+            ->where('language', $language)
             ->first();
 
         if (!$chapter) {
@@ -357,16 +380,17 @@ class ChapterService {
     }
 
     // processes a chapter's raw text, and returns the amount of words in the chapter
-    public function processChapterText($userId, $chapterId) {
+    public function processChapterText($userId, $language, $chapterId) {
         DB::disableQueryLog();
         $bookId = null;
 
-        DB::transaction(function() use(&$bookId, $userId, $chapterId) {
+        DB::transaction(function() use(&$bookId, $userId, $language, $chapterId) {
             // retrieve chapter
             $chapter = Chapter
                 ::lockForUpdate()
                 ->where('id', $chapterId)
                 ->where('user_id', $userId)
+                ->where('language', $language)
                 ->first();
 
             if (!$chapter) {
@@ -412,14 +436,15 @@ class ChapterService {
             $bookId = $chapter->book_id;    
         });
         
-        $this->bookService->updateBookWordCount($userId, $bookId);
+        $this->bookService->updateBookWordCount($userId, $language, $bookId);
     }
 
-    public function deleteChapter($userId, $chapterId) {
+    public function deleteChapter($userId, $language, $chapterId) {
         
         // retrieve chapter
         $chapter = Chapter
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $chapterId)
             ->first();
 
@@ -432,15 +457,16 @@ class ChapterService {
         $chapter->delete();
 
         // update book word counts
-        $this->bookService->updateBookWordCount($userId, $chapter->book_id);
+        $this->bookService->updateBookWordCount($userId, $language, $chapter->book_id);
 
         return true;
     }
 
-    public function retryFailedChapters($userId, $userUuid, $bookId) {
+    public function retryFailedChapters($userId, $userUuid, $language, $bookId) {
         
         $chapters = Chapter
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('book_id', $bookId)
             ->get();
 

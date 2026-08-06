@@ -1,14 +1,15 @@
 # M6 Resilience, Health, and Isolation Implementation Plan
 
-> Status: M6A–M6D Accepted / Closed; M6 Closed  
-> Date: 2026-07-28  
-> Architecture: ADR-0036
+> Status: M6A–M6D Accepted / Closed; M6 Closed<br>
+> Last reconciled: 2026-08-06<br>
+> Architecture: ADR-0036, with the current M6B public contract superseded by ADR-0055
 
 ## Goal and non-goals
 
 Close the M6 roadmap milestone through ordered M6A–M6D slices: safe automatic
-backup, previewed recoverable restore, read-only article health, and executable
-multi-user/resource isolation evidence.
+backup, server-preflighted confirmation-gated restore without a user-visible
+preview, read-only article health, and executable multi-user/resource isolation
+evidence.
 
 Do not add cloud quota/billing, multimedia backup, generic storage browsing,
 automatic data repair, native mobile UI, deployment, or any real restore of
@@ -23,11 +24,11 @@ development/production/user data.
    - move admin creation from GET to POST;
    - configure fail-closed scheduling.
 2. **M6B Restore safety**
-   - archive validation and preview token;
-   - safety snapshot and operation lock;
-   - isolated temporary-database validation;
+   - server-side archive validation with no client preview token;
+   - exact `RESTORE` confirmation and idempotent operation creation;
+   - safety snapshot, operation lock, and isolated temporary-database validation;
    - active restore coordinator with automatic safety rollback;
-   - admin preview/confirm UI.
+   - equal-privilege responsive confirmation UI for authenticated users.
 3. **M6C Article health**
    - stable finding schema and scoped read service;
    - tokenizer, structure, source/occurrence, fallback, pollution checks;
@@ -220,16 +221,15 @@ M6B may modify only:
 
 ### M6B minimum validation
 
-- Preview accepts one valid bounded dump and rejects tampering, size/checksum
-  drift, traversal, incompatible format/driver/scope, missing required tables,
-  dangerous statements, malformed gzip, insufficient disk, and zip-bomb-sized
-  expansion.
-- Tokens prove expiry, single use, admin binding, backup/checksum binding, and
-  no restore-process call on rejection.
+- Server-side preflight accepts one valid bounded dump and rejects tampering,
+  size/checksum drift, traversal, incompatible format/driver/scope, missing
+  required tables, dangerous statements, malformed gzip, insufficient disk,
+  and zip-bomb-sized expansion before an executable operation is created.
+- Contract tests prove the restore-preview route is absent, the client sends no
+  preview token or checksum, and only exact `RESTORE` confirmation is accepted.
 - Coordination tests prove the selected cache store is non-database, operation
-  creation is idempotent, Redis dispatch is required, status is
-  administrator-bound, and replay returns the same operation rather than
-  starting a second restore.
+  creation is idempotent, Redis dispatch is required, status is user-scoped,
+  and replay returns the same operation rather than starting a second restore.
 - Process tests prove argument boundaries, secret redaction, streamed input,
   safe temporary database identifiers, cleanup on every exit, inventory
   comparison, and timeout/failure mapping.
@@ -237,12 +237,14 @@ M6B may modify only:
   maintenance/quiescence → continuous backup lock → pinned snapshot → active
   restore ordering, immutable revalidation, reconnect/health check, automatic
   rollback, and maintenance retention on rollback/health-check failure.
-- Feature tests prove administrator-only access, validation/error schemas, and
-  no second restore write entrance.
+- Feature tests prove unauthenticated rejection, equal access for authenticated
+  users without an admin-role check, validation/error schemas, and no second
+  restore write entrance.
 - `npm run development`, protected import/tokenizer/Mobile/FSRS/WordSense
-  regressions, documentation guards, and a real-browser preview/confirm-state
-  acceptance pass. The real-browser batch must not execute a development-data
-  restore.
+  regressions, documentation guards, and desktop/phone real-browser
+  confirmation-and-polling acceptance pass. The browser batch must use only an
+  isolated testing database and fake restore process; it must never restore
+  development, staging, production, or user data.
 
 ## M6C frozen architecture and allowed files
 

@@ -36,9 +36,10 @@ class VocabularyController extends Controller {
 
     public function getUniqueWord($wordId, GetUniqueWordRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $word = $this->vocabularyService->getUniqueWord($userId, $wordId);
+            $word = $this->vocabularyService->getUniqueWord($userId, $language, $wordId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -48,6 +49,7 @@ class VocabularyController extends Controller {
 
     public function updateWord(UpdateWordRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         $wordId = $request->post('id');
         $wordData = [];
         $wordStage = null;
@@ -103,7 +105,14 @@ class VocabularyController extends Controller {
         }
 
         try {
-            $this->vocabularyService->updateWord($userId, $wordId, $wordData, $wordStage, $bridgeContext);
+            $this->vocabularyService->updateWord(
+                $userId,
+                $language,
+                $wordId,
+                $wordData,
+                $wordStage,
+                $bridgeContext
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -112,6 +121,7 @@ class VocabularyController extends Controller {
         if ($request->has('study_base')) {
             $word = \App\Models\EncounteredWord::where('id', $wordId)
                 ->where('user_id', $userId)
+                ->where('language', $language)
                 ->first();
             if ($word) {
                 $surface = mb_strtolower(trim($word->word), 'UTF-8');
@@ -273,9 +283,10 @@ class VocabularyController extends Controller {
 
     public function getPhrase($phraseId, GetPhraseRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $phrase = $this->vocabularyService->getPhrase($userId, $phraseId);
+            $phrase = $this->vocabularyService->getPhrase($userId, $language, $phraseId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -303,6 +314,7 @@ class VocabularyController extends Controller {
 
     public function updatePhrase(UpdatePhraseRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         $phraseId = $request->post('id');
         $phraseData = [];
         $phraseStage = null;
@@ -328,7 +340,13 @@ class VocabularyController extends Controller {
         }
 
         try {
-            $this->vocabularyService->updatePhrase($userId, $phraseId, $phraseData, $phraseStage);
+            $this->vocabularyService->updatePhrase(
+                $userId,
+                $language,
+                $phraseId,
+                $phraseData,
+                $phraseStage
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -352,9 +370,15 @@ class VocabularyController extends Controller {
 
     public function getExampleSentence($targetType, $targetId, GetExampleSentenceRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         
         try {
-            $exampleSentence = $this->vocabularyService->getExampleSentence($userId, $targetType, $targetId);
+            $exampleSentence = $this->vocabularyService->getExampleSentence(
+                $userId,
+                $language,
+                $targetType,
+                $targetId
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

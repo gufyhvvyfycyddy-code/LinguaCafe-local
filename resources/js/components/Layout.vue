@@ -171,6 +171,12 @@
                         bottomNav: false,
                     },
                     {
+                        name: '内容健康',
+                        url: '/article-health',
+                        icon: 'mdi-heart-pulse',
+                        bottomNav: false,
+                    },
+                    {
                         name: '设置',
                         url: '/user-settings',
                         icon: 'mdi-account-cog',

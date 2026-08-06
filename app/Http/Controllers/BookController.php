@@ -31,9 +31,10 @@ class BookController extends Controller {
 
     public function getBookWordCounts($bookId, GetBookWordCountsRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $wordCounts = $this->bookService->getBookWordCounts($userId, $bookId);
+            $wordCounts = $this->bookService->getBookWordCounts($userId, $language, $bookId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -60,12 +61,13 @@ class BookController extends Controller {
 
     public function updateBook(UpdateBookRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         $bookId = $request->post('bookId');
         $bookName = $request->post('bookName');
         $bookCoverFile = $request->file('bookCover');
         
         try {
-            $this->bookService->updateBook($userId, $bookId, $bookName, $bookCoverFile);
+            $this->bookService->updateBook($userId, $language, $bookId, $bookName, $bookCoverFile);
         } catch (\Throwable $e) {
             abort(500, $e->getMessage());
         } catch (\Exception $e) {
@@ -78,9 +80,10 @@ class BookController extends Controller {
     public function deleteBook(DeleteBookRequest $request) {
         $bookId = $request->post('bookId');
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $this->bookService->deleteBook($userId, $bookId);
+            $this->bookService->deleteBook($userId, $language, $bookId);
         } catch (\Throwable $e) {
             abort(500, $e->getMessage());
         } catch (\Exception $e) {

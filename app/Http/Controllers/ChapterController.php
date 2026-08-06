@@ -26,10 +26,11 @@ class ChapterController extends Controller {
 
     public function getChaptersForBook(GetChaptersForBookRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         $bookId = intval($request->bookId);
         
         try {
-            $chapters = $this->chapterService->getChaptersForBook($userId, $bookId);
+            $chapters = $this->chapterService->getChaptersForBook($userId, $language, $bookId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -40,10 +41,11 @@ class ChapterController extends Controller {
     public function getChaptersBookCount($bookId, GetChaptersWordCountRequest $request) {
         $userId = Auth::user()->id;
         $userUuid = Auth::user()->uuid;
+        $language = Auth::user()->selected_language;
         $bookId = intval($request->bookId);
         
         try {
-            $chapterWordCounts = $this->chapterService->getChaptersBookCount($userId, $userUuid, $bookId);
+            $chapterWordCounts = $this->chapterService->getChaptersBookCount($userId, $userUuid, $language, $bookId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -53,10 +55,11 @@ class ChapterController extends Controller {
 
     public function getChapterForEditor(GetChapterForEditorRequest $request) {
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
         $chapterId = $request->chapterId;
 
         try {
-            $chapter = $this->chapterService->getChapterForEditor($userId, $chapterId);
+            $chapter = $this->chapterService->getChapterForEditor($userId, $language, $chapterId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -101,12 +104,13 @@ class ChapterController extends Controller {
     public function createChapter(CreateChapterRequest $request) {
         $userId = Auth::user()->id;
         $userUuid = Auth::user()->uuid;
+        $language = Auth::user()->selected_language;
         $chapterName = $request->chapterName;
         $bookId = $request->bookId;
         $chapterText = is_null($request->chapterText) ? '' : $request->chapterText;
 
         try {
-            $this->chapterService->createChapter($userId, $userUuid, $bookId, $chapterName, $chapterText);
+            $this->chapterService->createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -117,12 +121,13 @@ class ChapterController extends Controller {
     public function updateChapter(UpdateChapterRequest $request) {
         $userId = Auth::user()->id;
         $userUuid = Auth::user()->uuid;
+        $language = Auth::user()->selected_language;
         $chapterName = $request->chapterName;
         $chapterId = $request->chapterId;
         $chapterText = $request->chapterText;
 
         try {
-            $this->chapterService->updateChapter($userId, $userUuid, $chapterId, $chapterName, $chapterText);
+            $this->chapterService->updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -133,9 +138,10 @@ class ChapterController extends Controller {
     public function deleteChapter(DeleteChapterRequest $request) {
         $chapterId = $request->post('chapterId');
         $userId = Auth::user()->id;
+        $language = Auth::user()->selected_language;
 
         try {
-            $this->chapterService->deleteChapter($userId, $chapterId);
+            $this->chapterService->deleteChapter($userId, $language, $chapterId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -146,9 +152,10 @@ class ChapterController extends Controller {
     public function retryFailedChapters($bookId, RetryFailedChaptersRequest $request) {
         $userId = Auth::user()->id;
         $userUuid = Auth::user()->uuid;
+        $language = Auth::user()->selected_language;
 
         try {
-            $this->chapterService->retryFailedChapters($userId, $userUuid, $bookId);
+            $this->chapterService->retryFailedChapters($userId, $userUuid, $language, $bookId);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

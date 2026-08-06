@@ -58,10 +58,15 @@ class ProcessChapter implements ShouldQueue
             $chapter = Chapter::query()
                 ->where('id', $this->chapterId)
                 ->where('user_id', $this->userId)
+                ->where('language', $this->language)
                 ->first();
 
+            if (!$chapter) {
+                throw new \RuntimeException('Chapter scope does not match the queued job.');
+            }
+
             // process chapter text
-            $chapterService->processChapterText($this->userId, $this->chapterId);
+            $chapterService->processChapterText($this->userId, $this->language, $this->chapterId);
             
             // index phrases that were created while the job was running
             $phrases = Phrase
@@ -97,6 +102,7 @@ class ProcessChapter implements ShouldQueue
         $chapter = Chapter
             ::where('id', $this->chapterId)
             ->where('user_id', $this->userId)
+            ->where('language', $this->language)
             ->first();
 
         if (!$chapter) {

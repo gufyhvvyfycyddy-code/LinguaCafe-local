@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Storage;
 use App\Services\FontTypeService;
+use App\Services\SafeFilePathService;
 
 // request classes
 use App\Http\Requests\FontTypes\UploadFontTypeRequest;
@@ -29,19 +30,23 @@ class FontTypeController extends Controller {
         return response()->json($fonts, 200);
     }
 
-    public function getFontTypeFile($fileName, GetFontTypeFileRequest $request) {
+    public function getFontTypeFile(
+        $fileName,
+        GetFontTypeFileRequest $request,
+        SafeFilePathService $files
+    ) {
         /*
             Files that start with the word Default are 
             default files stored in the public folder.
         */
         
         if (mb_strpos($fileName, 'Default') === 0) {
-            $imagePath = Storage::disk('default-files')->path('/fonts/' . $fileName);
+            $root = Storage::disk('default-files')->path('/fonts');
         } else {
-            $imagePath = Storage::path('/fonts/' . $fileName);
+            $root = Storage::path('/fonts');
         }
         
-        return response()->file($imagePath);
+        return response()->file($files->resolveExistingDirectChild($root, $fileName));
     }
 
     public function getFontTypesForLanguage($language, GetFontTypesForLanguageRequest $request) {

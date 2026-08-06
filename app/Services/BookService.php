@@ -31,9 +31,10 @@ class BookService {
     }
 
 
-    public function getBookWordCounts($userId, $bookId) {
+    public function getBookWordCounts($userId, $language, $bookId) {
         $book = Book
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $bookId)
             ->first();
                 
@@ -59,10 +60,11 @@ class BookService {
         other word counts are being calculated in real time.
     */
 
-    public function updateBookWordCount($userId, $bookId) {
+    public function updateBookWordCount($userId, $language, $bookId) {
         // calculate book word count
         $bookWordCount = Chapter
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('book_id', $bookId)
             ->where('processing_status', ChapterProcessingStatusEnum::PROCESSED->value)
             ->sum('word_count');
@@ -72,6 +74,7 @@ class BookService {
         // update book word count
         Book
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $bookId)
             ->update(['word_count' => $bookWordCount]);
     }
@@ -95,9 +98,10 @@ class BookService {
         return true;
     }
 
-    public function updateBook($userId, $bookId, $bookName, $bookCoverFile) {
+    public function updateBook($userId, $language, $bookId, $bookName, $bookCoverFile) {
         $book = Book
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $bookId)
             ->first();
 
@@ -133,9 +137,10 @@ class BookService {
         $book->save();
     }
 
-    public function deleteBook($userId, $bookId) {
+    public function deleteBook($userId, $language, $bookId) {
         $book = Book
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $bookId)
             ->first();
 
@@ -145,6 +150,7 @@ class BookService {
 
         Chapter
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('book_id', $bookId)
             ->delete();
             

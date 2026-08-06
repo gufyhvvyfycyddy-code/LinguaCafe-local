@@ -40,13 +40,21 @@ class VocabularyService {
      * paths and write paths. These proxies remain so existing callers
      * (tests, jobs, controllers that haven't migrated yet) keep working.
      */
-    public function getUniqueWord($userId, $wordId) {
-        return $this->vocabularyQueryService->getUniqueWord($userId, $wordId);
+    public function getUniqueWord($userId, $language, $wordId) {
+        return $this->vocabularyQueryService->getUniqueWord($userId, $language, $wordId);
     }
 
-    public function updateWord($userId, $wordId, $wordData, $wordStage = null, array $bridgeContext = []) {
+    public function updateWord(
+        $userId,
+        $language,
+        $wordId,
+        $wordData,
+        $wordStage = null,
+        array $bridgeContext = []
+    ) {
         $word = EncounteredWord
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $wordId)
             ->first();
 
@@ -82,6 +90,16 @@ class VocabularyService {
     {
         $lemma = $word->base_word ?: mb_strtolower($word->word, 'UTF-8');
         $surface = $context['word'] ?? $word->word;
+
+        if (!empty($context['chapter_id']) && isset($context['sentence_index'])) {
+            $chapterIsOwned = Chapter::where('id', (int) $context['chapter_id'])
+                ->where('user_id', $word->user_id)
+                ->where('language', $word->language)
+                ->exists();
+            if (!$chapterIsOwned) {
+                return;
+            }
+        }
 
         // 已有关联 sense 则复用，否则创建
         $existingSense = \App\Models\WordSense::where('encountered_word_id', $word->id)
@@ -126,7 +144,15 @@ class VocabularyService {
         $sentenceId = (string) $context['sentence_index'];
 
         // 提取句子文本
-        $sentenceEn = $this->extractSentenceText($chapterId, (int) $context['sentence_index']);
+        $sentenceEn = $this->extractSentenceText(
+            $word->user_id,
+            $word->language,
+            $chapterId,
+            (int) $context['sentence_index']
+        );
+        if ($sentenceEn === null) {
+            return;
+        }
         if ($sentenceEn === '') {
             // fallback: 至少用 surface 或 lemma，避免 /senses/review 显示空句子
             $sentenceEn = $surface ?: $lemma;
@@ -179,11 +205,19 @@ class VocabularyService {
         ]);
     }
 
-    private function extractSentenceText(int $chapterId, int $sentenceIndex): string
+    private function extractSentenceText(
+        int $userId,
+        string $language,
+        int $chapterId,
+        int $sentenceIndex
+    ): ?string
     {
-        $chapter = Chapter::find($chapterId);
+        $chapter = Chapter::where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->first();
         if (!$chapter) {
-            return '';
+            return null;
         }
 
         try {
@@ -496,7 +530,13 @@ class VocabularyService {
         });
     }
 
-    public function updatePhrase($userId, $phraseId, $phraseData, $phraseStage = null) {
+    public function updatePhrase(
+        $userId,
+        $language,
+        $phraseId,
+        $phraseData,
+        $phraseStage = null
+    ) {
 
         /*
             Unset words in case it somehow ended up in the array, because
@@ -507,6 +547,7 @@ class VocabularyService {
 
         $phrase = Phrase
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('id', $phraseId)
             ->first();
 
@@ -524,8 +565,8 @@ class VocabularyService {
         return true;
     }
 
-    public function getPhrase($userId, $phraseId) {
-        return $this->vocabularyQueryService->getPhrase($userId, $phraseId);
+    public function getPhrase($userId, $language, $phraseId) {
+        return $this->vocabularyQueryService->getPhrase($userId, $language, $phraseId);
     }
 
     public function deletePhrase($userId, $language, $phraseId) {
@@ -596,14 +637,35 @@ class VocabularyService {
         return true;
     }
 
-    public function getExampleSentence($userId, $targetType, $targetId) {
-        return $this->vocabularyQueryService->getExampleSentence($userId, $targetType, $targetId);
+    public function getExampleSentence($userId, $language, $targetType, $targetId) {
+        return $this->vocabularyQueryService->getExampleSentence(
+            $userId,
+            $language,
+            $targetType,
+            $targetId
+        );
     }
 
     public function createOrUpdateExampleSentence($userId, $language, $targetType, $targetId, $exampleSentenceWords) {
+        $targetExists = $targetType === 'word'
+            ? EncounteredWord::where('id', $targetId)
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->exists()
+            : ($targetType === 'phrase'
+                ? Phrase::where('id', $targetId)
+                    ->where('user_id', $userId)
+                    ->where('language', $language)
+                    ->exists()
+                : false);
+        if (!$targetExists) {
+            throw new \Exception('Example sentence target does not exist in the selected language.');
+        }
+
         // Retrieve example sentence.
         $exampleSentence = ExampleSentence
             ::where('user_id', $userId)
+            ->where('language', $language)
             ->where('target_type', $targetType)
             ->where('target_id', $targetId)
             ->first();
