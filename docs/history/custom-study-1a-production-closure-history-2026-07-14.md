@@ -15,7 +15,9 @@ This file preserves the phase-by-phase execution history that was removed from t
 
 Earlier documents described backend-only phases, an absent frontend, and pending final acceptance. Those statements were accurate at their original dates but are no longer current project status. They remain historical evidence only and must not be copied back into the authoritative status blocks.
 
-## Current authority
+## Authority snapshot as of 2026-07-14 (historical)
+
+The links below now maintain current status. The bullet list that follows preserves the dated 2026-07-14 checkpoint and must not be read as current authorization or current completion status.
 
 Current status is maintained in:
 
@@ -25,8 +27,8 @@ Current status is maintained in:
 - `docs/adr/ADR-0016-custom-study-preview-session.md`
 - `docs/plans/custom-study-1a-implementation-plan.md`
 
-Current status:
+Dated checkpoint recorded by this history file:
 
 - Production closure: complete
 - Custom Study 1A: Accepted / Production Closed
-- Custom Study 1B: not started
+- Custom Study 1B: not started as of 2026-07-14; this historical statement is superseded by ADR-0029 and its 2026-07-18 browser acceptance

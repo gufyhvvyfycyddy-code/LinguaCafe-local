@@ -3,8 +3,8 @@
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
-> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production acceptance are complete. The detailed phase roadmap below is historical implementation context; the concise chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`, and this plan does not authorize 1B or another product task.
+> Custom Study 1B: Accepted / Production Closed
+> Backend, chapter options, example identity/alignment, shared Sense card, setup/session frontend, executable state tests, query-budget evidence, and MCP Chrome production acceptance are complete. Card Marker + Custom Study 1B is also closed under ADR-0029. The detailed phase roadmap below is historical 1A implementation context and does not authorize future formal-rating expansion or another product task.
 
 
 > **Status**: Architecture and production implementation are complete through the 1A browser-verified preview workflow. The phase ledger below records how that result was built; current acceptance status is defined only by the authoritative block above.
@@ -21,7 +21,7 @@
 3. Confirmation that Queue Order production acceptance (Task 2000-10A) is closed.
 4. Confirmation that the `Card Marker` 1B prerequisite is NOT being snuck into 1A.
 
-**Phase status (Task 2000-22)**:
+**Historical phase snapshot (Task 2000-22, as of 2026-07-14)**: the phase labels below preserve what was true at that checkpoint. Statements such as “awaiting web-side acceptance” and “NOT started” are dated history only; they are superseded by the authoritative production-closure block above.
 - Phase 1 (CS-1 `CustomStudyCriteria` + CS-2 `CustomStudyCriteriaValidator` + `ChapterLocatorInterface` + `CustomStudyValidationException` + 2 unit test files): ✅ Code and tests completed in Task 2000-16. ✅ Error contract architecture fixed in Task 2000-17 (Criteria throws structured `CustomStudyValidationException` directly with stable `field`/`reason`; Validator no longer parses message text). ✅ Accepted by web-side.
 - Phase 2A (CS-3 `TodayForgottenQuery` + CS-4 `OverdueQuery`): ✅ Code and tests completed in Task 2000-17. ✅ Accepted by web-side. ✅ Phase 2A 文档旧契约 (CS-3/CS-4 "返回空集合"描述) 在 Task 2000-18 修正为 "返回可组合 Builder".
 - Phase 2B (CS-5 `SourceChapterQuery` + CS-6 `LeechAttentionQuery` + `EloquentChapterLocator` + `CustomStudyQueryService`): ✅ Code and tests completed in Task 2000-18. ✅ Accepted by web-side (Task 2000-19 docs closure). Two-layer boundary frozen: SQL-native Queries return Builder (today_forgotten/overdue/source_chapter); `LeechAttentionQuery` is Policy-derived returning `list<int>` (复用 `SenseReviewLeechQueryService` + `SenseReviewLeechPolicy`, no Policy duplication). `CustomStudyQueryService` is the unified `candidateIds()` boundary for the four modes — no `QueryInterface`, no DTO, no Repository, no Adapter.
@@ -345,7 +345,7 @@ This plan follows strict TDD (red → green → refactor). Each task lists the t
 **Tests count**: ~12
 
 #### Task CS-10: Session-internal ordering
-**Test first**: `tests/Unit/CustomStudySessionOrderTest.php`
+**Test first**: `tests/Feature/CustomStudySessionOrderTest.php`
 - `today_forgotten` order: most recent Again first (by `ReviewLog.reviewed_at DESC`), fallback to Queue Order.
 - `overdue` order: ascending retrievability (reuse `ReviewQueueOrderService` retrievability computation), fallback to Queue Order.
 - `source_chapter` order: current Queue Order (no override).
@@ -475,7 +475,7 @@ AI 译文卡面显示：
 **Tests count**: ~8 base guard tests + 17 future implementation matrix tests (Task 2000-15) + 9 AI translation tests (Task 2000-16) = 26 future tests registered, not yet executed.
 
 #### Task CS-12: Session UI — show card + advance
-**Guard test first**: `tests/js/CustomStudySessionUiGuard.test.mjs`
+**Guard tests**: `tests/js/CustomStudySessionGuard.test.mjs`, `tests/js/CustomStudySessionCoordinator.test.mjs`, and `tests/js/CustomStudyPageGuard.test.mjs`
 - Reuses `SenseStudyCard` display component (does NOT duplicate card rendering).
 - Four buttons: Again / Hard / Good / Easy (calls `POST /custom-study/sessions/answer` with `{ token, rating }`).
 - Stale-response guard: `answerLoading` flag + `answerRequestSequence` counter. Slow responses with old token are dropped.
@@ -561,7 +561,7 @@ AI 译文卡面显示：
 - `tests/Unit/CustomStudySessionStateTest.php`
 - `tests/Unit/CustomStudyPreviewPolicyTest.php`
 - `tests/Unit/CustomStudySessionTokenServiceTest.php`
-- `tests/Unit/CustomStudySessionOrderTest.php`
+- `tests/Feature/CustomStudySessionOrderTest.php`
 - `tests/Feature/CustomStudyTodayForgottenQueryTest.php`
 - `tests/Feature/CustomStudyOverdueQueryTest.php`
 - `tests/Feature/CustomStudySourceChapterQueryTest.php`
@@ -572,7 +572,7 @@ AI 译文卡面显示：
 - `tests/Feature/CustomStudyRoutesTest.php`
 - `tests/js/CustomStudyPageGuard.test.mjs`
 - `tests/js/SenseStudyCardGuard.test.mjs`
-- `tests/js/CustomStudySessionUiGuard.test.mjs`
+- `tests/js/CustomStudySessionGuard.test.mjs`
 
 ### Docs — create/modify
 - `docs/adr/ADR-0016-custom-study-preview-session.md` (already created in 2000-10A)
@@ -620,7 +620,7 @@ AI 译文卡面显示：
 | `CustomStudySessionStateTest` | Unit | ~14 | current_card_id exclusivity (invariant 1), state transitions (invariants 6-8), no loss/duplication (invariant 4), completed_count consistency (invariant 5), skipped_ineligible (invariant 11), reliable ending (invariant 12) |
 | `CustomStudyPreviewPolicyTest` | Unit | ~10 | again→delayed(60s), hard→delayed(600s), good→completed, easy→completed, wait_until computation, no re-enter ready, pure function |
 | `CustomStudySessionTokenServiceTest` | Unit | ~12 | issue, verify valid, tampered, expired, wrong user, wrong language, wrong version, payload shape, 4h expiry, UUID v4 session_id, token size cap |
-| `CustomStudySessionOrderTest` | Unit | ~10 | per-mode order, fallback to Queue Order, deterministic, no global setting change |
+| `CustomStudySessionOrderTest` | Feature | current executable suite | per-mode order, fallback to Queue Order, deterministic behavior, isolation, query budget, and no global setting change |
 | `CustomStudyTodayForgottenQueryTest` | Feature | ~9 | source/rating/undone_at filter, day boundary via ReviewStudyTimezoneService, eligibility, confirmed sense, no write, query count |
 | `CustomStudyOverdueQueryTest` | Feature | ~7 | strict < dayStart, eligibility, confirmed sense, empty, no write, query count |
 | `CustomStudySourceChapterQueryTest` | Feature | ~9 | source_chapter_id match, occurrence match, distinct, no leakage, no per-card query, eligibility, no write |
@@ -637,7 +637,7 @@ AI 译文卡面显示：
 |---|---|---|
 | `CustomStudyPageGuard.test.mjs` | ~8 | page exists, Vuetify imports, no inline axios, no Math.random, no localStorage token, no eval/v-html |
 | `SenseStudyCardGuard.test.mjs` | ~8 | pure presentation, no axios, no queue, no ReviewLog, no FSRS, no Math.random, no localStorage, no eval/v-html |
-| `CustomStudySessionUiGuard.test.mjs` | ~14 | reuses SenseStudyCard, four rating buttons, rotating token, stale-response guard, double-click guard, completed state, wait_until countdown, token in sessionStorage, exit button, no AI |
+| `CustomStudySessionGuard.test.mjs` + `CustomStudySessionCoordinator.test.mjs` + `CustomStudyPageGuard.test.mjs` | current executable suites | shared SenseStudyCard, four preview ratings, token/sessionStorage boundary, stale-response and double-submit protection, completed/wait states, page ownership, exit behavior, and no AI/formal rating |
 | **Subtotal** | **~30** | |
 
 ---
@@ -645,7 +645,7 @@ AI 译文卡面显示：
 ## MCP Chrome matrix (real browser acceptance — to be run when implementation is authorized)
 
 ### Setup
-- Account: `1816529781@qq.com` (or local admin fallback).
+- Account: `当前任务提示词提供的本地测试账号` (or local admin fallback).
 - Two viewports: 1920×1080 and 900×900.
 - Test data: prepare a chapter with confirmed sense cards including overdue, today-forgotten (via prior Again ratings), and leech-classified cards.
 
@@ -721,7 +721,7 @@ Suggested commits (do NOT use `git add -A` or `git add .` — stage files explic
 - `tests/Unit/CustomStudySessionStateTest.php`
 - `tests/Unit/CustomStudyPreviewPolicyTest.php`
 - `tests/Unit/CustomStudySessionTokenServiceTest.php`
-- `tests/Unit/CustomStudySessionOrderTest.php`
+- `tests/Feature/CustomStudySessionOrderTest.php`
 - `tests/Feature/CustomStudyOpenSessionTest.php`
 - `tests/Feature/CustomStudyAnswerTest.php`
 - `tests/Feature/CustomStudyResumeTest.php`
@@ -734,7 +734,7 @@ Suggested commits (do NOT use `git add -A` or `git add .` — stage files explic
 - `resources/js/components/Senses/SenseReview.vue` (refactor to use SenseStudyCard — behavior-preserving)
 - `tests/js/SenseStudyCardGuard.test.mjs`
 - `tests/js/CustomStudyPageGuard.test.mjs`
-- `tests/js/CustomStudySessionUiGuard.test.mjs`
+- `tests/js/CustomStudySessionGuard.test.mjs`
 
 ### Commit 4: `docs: update custom study 1a status after implementation`
 - `docs/plans/linguacafe-master-plan.md`

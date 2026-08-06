@@ -44,6 +44,25 @@ const DOC_INDEX_PATH = join(
     __dirname, '..', '..',
     'docs', 'DOCUMENTATION_INDEX.md'
 );
+const ADR_0029_PATH = join(
+    __dirname, '..', '..',
+    'docs', 'adr', 'ADR-0029-card-marker-and-custom-study-1b.md'
+);
+const ONE_B_ACCEPTANCE_PATH = join(
+    __dirname, '..', '..',
+    'docs', 'testing', 'card-marker-custom-study-1b-browser-acceptance-2026-07-18.md'
+);
+const HISTORY_PATH = join(
+    __dirname, '..', '..',
+    'docs', 'history', 'custom-study-1a-production-closure-history-2026-07-14.md'
+);
+const ORDER_TEST_PATH = join(
+    __dirname, '..', '..',
+    'tests', 'Feature', 'CustomStudySessionOrderTest.php'
+);
+const SESSION_GUARD_PATH = join(__dirname, 'CustomStudySessionGuard.test.mjs');
+const SESSION_COORDINATOR_PATH = join(__dirname, 'CustomStudySessionCoordinator.test.mjs');
+const PAGE_GUARD_PATH = join(__dirname, 'CustomStudyPageGuard.test.mjs');
 const CUSTOM_STUDY_PAGE_PATH = join(
     __dirname, '..', '..',
     'resources', 'js', 'components', 'CustomStudy', 'CustomStudy.vue'
@@ -78,6 +97,9 @@ const planSource = readSafe(PLAN_PATH);
 const masterPlanSource = readSafe(MASTER_PLAN_PATH);
 const handoffSource = readSafe(HANDOFF_PATH);
 const docIndexSource = readSafe(DOC_INDEX_PATH);
+const adr0029Source = readSafe(ADR_0029_PATH);
+const oneBAcceptanceSource = readSafe(ONE_B_ACCEPTANCE_PATH);
+const historySource = readSafe(HISTORY_PATH);
 const customStudyPageSource = readSafe(CUSTOM_STUDY_PAGE_PATH);
 const senseStudyCardSource = readSafe(SENSE_STUDY_CARD_PATH);
 const routesSource = readSafe(ROUTES_PATH);
@@ -89,7 +111,7 @@ const authoritativeSources = [
 ];
 const PRODUCTION_STATUS = 'Production closure: complete';
 const ACCEPTANCE_STATUS = 'Custom Study 1A: Accepted / Production Closed';
-const ONE_B_STATUS = 'Custom Study 1B: not started';
+const ONE_B_STATUS = 'Custom Study 1B: Accepted / Production Closed';
 const OBSOLETE_CURRENT_STATUS_PATTERNS = [
     /custom study 1a:\s*awaiting web-side process designer final accept/i,
     /custom study 1a[^\n]{0,240}awaiting final accept/i,
@@ -127,6 +149,18 @@ test('handoff exists', () => {
 
 test('DOCUMENTATION_INDEX exists', () => {
     assert.ok(docIndexSource.length > 0, 'DOCUMENTATION_INDEX is missing or empty');
+});
+
+test('1B closure evidence and dated 1A history exist', () => {
+    assert.ok(adr0029Source.length > 0, 'ADR-0029 is missing or empty');
+    assert.ok(oneBAcceptanceSource.length > 0, 'Custom Study 1B browser acceptance is missing or empty');
+    assert.ok(historySource.length > 0, 'Custom Study 1A history is missing or empty');
+});
+
+test('documented executable Custom Study guards and order test exist', () => {
+    for (const filePath of [ORDER_TEST_PATH, SESSION_GUARD_PATH, SESSION_COORDINATOR_PATH, PAGE_GUARD_PATH]) {
+        assert.ok(existsSync(filePath), `documented executable file is missing: ${filePath}`);
+    }
 });
 
 // ---------------------------------------------------------------------------
@@ -416,16 +450,37 @@ test('the four status authorities share the production status trio', () => {
     for (const [name, source] of authoritativeSources) {
         assert.ok(source.includes(PRODUCTION_STATUS), `${name} is missing production closure status`);
         assert.ok(source.includes(ACCEPTANCE_STATUS), `${name} is missing final Accept status`);
-        assert.ok(source.includes(ONE_B_STATUS), `${name} is missing 1B not-started status`);
+        assert.ok(source.includes(ONE_B_STATUS), `${name} is missing final 1B production status`);
     }
 });
 
-test('all five authoritative documents contain no obsolete current Custom Study status', () => {
+test('current authoritative documents contain no obsolete current Custom Study status', () => {
     for (const [name, source] of authoritativeSources) {
         for (const pattern of OBSOLETE_CURRENT_STATUS_PATTERNS) {
             assert.ok(!pattern.test(source), `${name} contains obsolete current status matching ${pattern}`);
         }
     }
+});
+
+test('ADR-0029 and browser evidence independently close Custom Study 1B', () => {
+    assert.match(adr0029Source, /Accepted \/ Production Closed on 2026-07-18/);
+    assert.match(oneBAcceptanceSource, /satisfies ADR-0029 and is Accepted \/ Production Closed/);
+});
+
+test('the 2026-07-14 history labels its 1B status as a dated superseded snapshot', () => {
+    assert.match(historySource, /Authority snapshot as of 2026-07-14 \(historical\)/);
+    assert.match(historySource, /not started as of 2026-07-14/);
+    assert.match(historySource, /superseded by ADR-0029/);
+});
+
+test('active Custom Study documents reference only tracked executable test paths', () => {
+    assert.doesNotMatch(adrSource, /CustomStudySessionUiGuard\.test\.mjs/);
+    assert.doesNotMatch(planSource, /tests\/Unit\/CustomStudySessionOrderTest\.php/);
+    assert.doesNotMatch(planSource, /CustomStudySessionUiGuard\.test\.mjs/);
+    assert.match(planSource, /tests\/Feature\/CustomStudySessionOrderTest\.php/);
+    assert.match(planSource, /CustomStudySessionGuard\.test\.mjs/);
+    assert.match(planSource, /CustomStudySessionCoordinator\.test\.mjs/);
+    assert.match(planSource, /CustomStudyPageGuard\.test\.mjs/);
 });
 
 test('production implementation facts exist in code and routes', () => {
@@ -462,16 +517,14 @@ test('implementation plan says TokenService issue() + verify() only', () => {
 // ---------------------------------------------------------------------------
 
 test('master plan references Phase 3A as Accepted', () => {
-    // master plan must NOT say Phase 3A is "awaiting acceptance" or "尚未最终关闭".
-    // It should reflect Phase 3A Accepted.
     assert.ok(
         !masterPlanSource.includes('Phase 3A 尚未最终关闭'),
         'master plan must not say "Phase 3A 尚未最终关闭" — Task 2000-20 closes Phase 3A.'
     );
-    assert.ok(
-        !masterPlanSource.toLowerCase().includes('phase 3a') && true
-        || masterPlanSource.toLowerCase().includes('phase 3a'),
-        'master plan must reference Phase 3A'
+    assert.match(
+        masterPlanSource,
+        /Phase 3A–3D[^\n]*Accepted \/ Production Closed|Phase 3A[^\n]*Accepted/,
+        'master plan must carry an accepted Phase 3A status.'
     );
 });
 
@@ -482,11 +535,11 @@ test('master plan references Phase 3B completion as historical architecture', ()
     );
 });
 
-test('handoff references Phase 3B', () => {
-    assert.ok(
-        handoffSource.toLowerCase().includes('phase 3b'),
-        'handoff must reference Phase 3B.'
-    );
+
+test('handoff keeps current Custom Study closure and future expansion gate', () => {
+    assert.ok(handoffSource.includes('Custom Study 1A: Accepted / Production Closed'));
+    assert.ok(handoffSource.includes('Custom Study 1B: Accepted / Production Closed'));
+    assert.ok(handoffSource.includes('Future expansion toward Anki-style formal Custom Study scoring is a new Product Gate'));
 });
 
 test('DOCUMENTATION_INDEX routes Custom Study to its plan and ADR', () => {
@@ -678,12 +731,6 @@ test('master plan references Phase 4A', () => {
         'master plan must reference Phase 4A (SessionOrder).'
     );
 });
-test('handoff references Phase 4A', () => {
-    assert.ok(
-        handoffSource.toLowerCase().includes('phase 4a'),
-        'handoff must reference Phase 4A (SessionOrder).'
-    );
-});
 
 // 14.6 Chapter picker candidate_count future contract (Task 2000-21 §8.3)
 test('ADR-0016 §21 mentions candidate_count', () => {
@@ -719,12 +766,6 @@ test('master plan references Phase 4B', () => {
     assert.ok(
         masterPlanSource.toLowerCase().includes('phase 4b'),
         'master plan must reference Phase 4B (backend session vertical slice).'
-    );
-});
-test('handoff references Phase 4B', () => {
-    assert.ok(
-        handoffSource.toLowerCase().includes('phase 4b'),
-        'handoff must reference Phase 4B (backend session vertical slice).'
     );
 });
 test('ADR-0016 references Phase 4B', () => {
@@ -843,20 +884,6 @@ test('master plan marks Phase 4A as Accepted / Closed', () => {
         /Phase 4A.*Accepted \/ Closed/.test(masterPlanSource) ||
         /Phase 4A.*✅.*Closed/.test(masterPlanSource),
         'master plan must mark Phase 4A as Accepted / Closed.'
-    );
-});
-test('handoff marks Phase 3B as Accepted / Closed', () => {
-    assert.ok(
-        /Phase 3B.*Accepted \/ Closed/.test(handoffSource) ||
-        /Phase 3B.*✅.*Closed/.test(handoffSource),
-        'handoff must mark Phase 3B as Accepted / Closed.'
-    );
-});
-test('handoff marks Phase 4A as Accepted / Closed', () => {
-    assert.ok(
-        /Phase 4A.*Accepted \/ Closed/.test(handoffSource) ||
-        /Phase 4A.*✅.*Closed/.test(handoffSource),
-        'handoff must mark Phase 4A as Accepted / Closed.'
     );
 });
 

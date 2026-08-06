@@ -3,8 +3,8 @@
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
 > Custom Study 1A: Accepted / Production Closed
-> Custom Study 1B: not started
-> The backend, chapter options, aligned example identity, shared Sense card, setup/session frontend, executable state tests, query budgets, and MCP Chrome production acceptance implement this architecture. Superseded phase chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
+> Custom Study 1B: Accepted / Production Closed
+> The backend, chapter options, aligned example identity, shared Sense card, setup/session frontend, executable state tests, query budgets, and MCP Chrome production acceptance implement the 1A preview architecture. Card Marker + Custom Study 1B is also closed under ADR-0029. This ADR remains the authority only for the 1A preview-session architecture; future formal-rating expansion requires a new product decision. Superseded phase chronology is archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 
 **Historical phase ledger (superseded as current status by the block above):**
 
@@ -624,7 +624,7 @@ The implementation plan must include the following files. This list is authorita
 
 #### 19.14 Tests — Phase 4A (existing, Accepted / Closed, Task 2000-21 + Task 2000-22 final closure)
 
-- `tests/Feature/CustomStudySessionOrderTest.php` — 55+ behavior tests covering: empty input; dedup; positive-int filter; cross-user/language/legacy-word filter; single batch ReviewCard load; single canonical fallback computation; per-mode ordering (source_chapter = canonical; overdue = retrievability ASC; today_forgotten = latest today-again DESC; leech_attention = severity DESC); tie-break on canonical fallback; stable determinism; no card_limit; no Criteria query re-run; no SessionState/token creation; no DB writes; no settings mutation; no QueryService call; single `describeForCards()` call; preloaded cards; no `describeForCard()` / `summary()`; no N+1.
+- `tests/Feature/CustomStudySessionOrderTest.php` — behavior coverage for input filtering, user/language/sense-card isolation, canonical fallback reuse, per-mode ordering, stable determinism, query budgets, and no session/token/write side effects.
 
 #### 19.15 Tests — Phase 4B (existing, code/tests complete pending web-side acceptance, Task 2000-22)
 
@@ -639,7 +639,9 @@ Backend:
 Frontend (Node guard tests, NOT created in Task 2000-22 — authorized only by future Phase 6/7 task):
 - `tests/js/SenseStudyCardGuard.test.mjs`
 - `tests/js/CustomStudyPageGuard.test.mjs`
-- `tests/js/CustomStudySessionUiGuard.test.mjs`
+- `tests/js/CustomStudySessionGuard.test.mjs`
+- `tests/js/CustomStudySessionCoordinator.test.mjs`
+- `tests/js/CustomStudyPageGuard.test.mjs`
 
 Node architecture guard tests (created in Task 2000-22):
 - `tests/js/CustomStudySessionArchitectureDocsGuard.test.mjs` — extended in Task 2000-22 to verify: Phase 3B Accepted/Closed, Phase 4A Accepted/Closed, Phase 4B file list, `available_candidate_count` in payload, `OPEN PRODUCT GATE` removed, candidate_count = Option A (not card_limit-truncated), `withEligibilityResolution` same-step boundary, V1 query budget truthfully recorded (no "card_limit 张" wording).
