@@ -20,6 +20,7 @@ class ReviewCardManageFilterStateTest extends TestCase
             'due_range' => 'today',
             'reps_min' => '3',
             'lapses_min' => null,
+            'tag_ids' => [],
         ]);
 
         $expected = [
@@ -31,6 +32,7 @@ class ReviewCardManageFilterStateTest extends TestCase
             'due_range' => 'today',
             'reps_min' => 3,
             'lapses_min' => null,
+            'tag_ids' => [],
         ];
 
         $this->assertSame($expected, $state->toArray());
@@ -49,6 +51,7 @@ class ReviewCardManageFilterStateTest extends TestCase
             'due_range' => 'all',
             'reps_min' => null,
             'lapses_min' => null,
+            'tag_ids' => [],
         ], ReviewCardManageFilterState::fromArray([])->toArray());
     }
 
@@ -74,6 +77,9 @@ class ReviewCardManageFilterStateTest extends TestCase
             'due range' => [['due_range' => 'month'], 'due_range'],
             'negative reps' => [['reps_min' => -1], 'reps_min'],
             'float lapses' => [['lapses_min' => 1.5], 'lapses_min'],
+            'tags shape' => [['tag_ids' => '1'], 'tag_ids'],
+            'invalid tag id' => [['tag_ids' => [0]], 'tag_ids.0'],
+            'duplicate tag id' => [['tag_ids' => [1, 1]], 'tag_ids.1'],
         ];
     }
 }

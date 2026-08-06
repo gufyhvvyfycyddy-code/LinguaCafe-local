@@ -2,10 +2,10 @@
     <div class="review-card-delete-mutation-surface">
         <v-dialog v-model="deleteDialog" max-width="500">
             <v-card>
-                <v-card-title class="error--text review-card-manage-delete-title">彻底删除这张词义复习卡？</v-card-title>
+                <v-card-title class="error--text review-card-manage-delete-title">将这张词义复习卡移入最近删除？</v-card-title>
                 <v-card-text>
                     <p class="review-card-manage-delete-body">这会移除这张词义复习卡，并让该释义不再作为已确认词义出现在阅读页候选中。</p>
-                    <p class="review-card-manage-delete-note text--secondary">复习历史会保留，阅读来源记录会保留。不会删除其他词义。</p>
+                    <p class="review-card-manage-delete-note text--secondary">复习历史和阅读来源记录会保留；30 天内可从“知识库整理 → 最近删除”恢复同一张卡。</p>
                     <p class="review-card-manage-delete-last-sense text--secondary">如果这是该单词最后一个已确认词义，该单词会回到"新词"状态。</p>
                 </v-card-text>
                 <v-card-actions>
@@ -16,14 +16,14 @@
                         :loading="deleteLoading"
                         class="review-card-manage-delete-confirm"
                         @click="doDelete"
-                    >确认彻底删除</v-btn>
+                    >移入最近删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
 
         <v-dialog v-model="bulkDeleteDialog" max-width="560">
             <v-card>
-                <v-card-title class="error--text review-card-manage-bulk-delete-title">批量彻底删除选中的词义复习卡？</v-card-title>
+                <v-card-title class="error--text review-card-manage-bulk-delete-title">将选中的词义复习卡移入最近删除？</v-card-title>
                 <v-card-text>
                     <p class="review-card-manage-bulk-delete-scope">只会处理你当前勾选的复习卡，不会按筛选条件全量删除。</p>
                     <div v-if="visibleBulkDeleteItems.length > 0" class="bulk-delete-list mb-3">
@@ -35,7 +35,7 @@
                             还有 {{ hiddenBulkDeleteCount }} 张未显示。
                         </div>
                     </div>
-                    <p class="review-card-manage-bulk-delete-note text--secondary">对应释义会退出已确认词义候选，复习历史会保留，阅读来源记录会保留。</p>
+                    <p class="review-card-manage-bulk-delete-note text--secondary">对应释义会退出已确认词义候选；复习历史和阅读来源记录会保留，30 天内可逐项恢复。</p>
                     <p class="review-card-manage-bulk-delete-last-sense text--secondary">如果某个单词没有其他已确认词义，它会回到"新词"状态。</p>
                 </v-card-text>
                 <v-card-actions>
@@ -46,7 +46,7 @@
                         :loading="bulkDeleteLoading"
                         class="review-card-manage-bulk-delete-confirm"
                         @click="doBulkDelete"
-                    >确认批量彻底删除</v-btn>
+                    >批量移入最近删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -102,7 +102,7 @@ export default {
                 .then((response) => {
                     this.$emit(
                         'notify',
-                        response.data.message || '已彻底删除词义复习卡。该释义不会再出现在阅读页，复习历史已保留。',
+                        response.data.message || '已移入最近删除，30 天内可以恢复。',
                         'success'
                     );
                     this.$emit('clear-selection');
@@ -141,7 +141,7 @@ export default {
             axios.post('/review-cards/manage/bulk-delete', { ids })
                 .then((response) => {
                     const data = response.data || {};
-                    let message = data.message || '已彻底删除词义复习卡，复习历史已保留。';
+                    let message = data.message || '已移入最近删除，30 天内可以恢复。';
                     if (data.skipped > 0) {
                         message += ' 其中有 ' + data.skipped + ' 张跳过处理。';
                     }

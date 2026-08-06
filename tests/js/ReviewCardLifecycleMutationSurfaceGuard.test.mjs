@@ -38,7 +38,10 @@ assert.doesNotMatch(parent, bulkLifecycleEndpoint, 'parent must not own bulk lif
 assert.doesNotMatch(table, /axios\.(post|patch|delete)\s*\(/i, 'table must remain intent-only');
 
 assert.equal((surface.match(/axios\.get\s*\(/g) || []).length, 1, 'surface must own exactly one descriptor GET');
-assert.equal((surface.match(/axios\.post\s*\(/g) || []).length, 2, 'surface must own exactly two lifecycle POST requests');
+assert.equal((surface.match(/axios\.post\s*\(/g) || []).length, 4, 'surface owns manual-operation preview/apply plus direct and bulk lifecycle POSTs');
+assert.match(surface, /manual-operations\/preview/, 'bury/suspend/resume must use the shared manual-operation preview');
+assert.match(surface, /manual-operations\/apply/, 'bury/suspend/resume must use the shared manual-operation apply');
+assert.match(surface, /expected_state_fingerprint:/, 'manual lifecycle apply must carry the preview fingerprint');
 assert.equal((surface.match(/<v-dialog/g) || []).length, 3, 'surface must own single, bulk and state-help dialogs');
 
 for (const state of [
@@ -88,7 +91,7 @@ assert.match(surface, /actionLabel/);
 assert.match(surface, /actionHint/);
 assert.match(surface, /actionColor/);
 assert.doesNotMatch(surface, /ReviewLog|fsrs_(state|due|stability|difficulty|reps|lapses)|WordSense/);
-assert.doesNotMatch(surface, /bulk-delete|rewrite-package|due-now|\/reset/);
+assert.doesNotMatch(surface, /bulk-delete|rewrite-package|\/due-now|\/reset/);
 assert.doesNotMatch(surface, /Vuex|mapState|mapActions|eventBus|EventBus/);
 
 assert.match(parent, /lifecycleSurfaceState/);

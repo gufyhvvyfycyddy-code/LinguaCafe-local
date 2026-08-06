@@ -7,6 +7,16 @@
             @apply="applySavedSearch"
         />
 
+        <word-sense-tag-manager
+            :selected-tag-ids="advancedFilters.tagIds"
+            :refresh-key="tagCatalogRefreshKey"
+            class="mb-3"
+            @selection-change="applyTagSelection"
+            @catalog-change="$emit('tag-catalog-change', $event)"
+            @catalog-mutated="$emit('tag-catalog-mutated')"
+            @notify="(...args) => $emit('notify', ...args)"
+        />
+
         <v-row class="mb-3" dense align="center">
             <v-col cols="12" sm="5" md="4">
                 <v-text-field
@@ -189,19 +199,21 @@
 
 <script>
 import ReviewCardSavedSearchPanel from './ReviewCardSavedSearchPanel.vue';
+import WordSenseTagManager from './WordSenseTagManager.vue';
 import {
     applyReviewCardManageFilterState,
     buildReviewCardManageFilterState,
 } from '../../services/ReviewCardManageFilterState.js';
 
 export default {
-    components: { ReviewCardSavedSearchPanel },
+    components: { ReviewCardSavedSearchPanel, WordSenseTagManager },
     props: {
         filterState: { type: Object, required: true },
         language: { type: String, default: 'english' },
         initialSavedSearchId: { type: Number, default: null },
         searchMeta: { type: Object, default: null },
         searchErrors: { type: Array, default: () => [] },
+        tagCatalogRefreshKey: { type: Number, default: 0 },
     },
     data() {
         return {
@@ -217,6 +229,7 @@ export default {
                 dueRange: 'all',
                 repsMin: null,
                 lapsesMin: null,
+                tagIds: [],
             },
             fsrsStateOptions: [
                 { label: '新卡', value: 'new' },
@@ -242,7 +255,8 @@ export default {
             return this.advancedFilters.fsrsStates.length > 0
                 || this.advancedFilters.dueRange !== 'all'
                 || this.advancedFilters.repsMin !== null
-                || this.advancedFilters.lapsesMin !== null;
+                || this.advancedFilters.lapsesMin !== null
+                || this.advancedFilters.tagIds.length > 0;
         },
     },
     watch: {
@@ -311,12 +325,17 @@ export default {
         applyAdvancedFilter() {
             this.emitApply();
         },
+        applyTagSelection(tagIds) {
+            this.advancedFilters.tagIds = [...tagIds].map(Number);
+            this.emitApply();
+        },
         clearAdvancedFilter() {
             this.advancedFilters = {
                 fsrsStates: [],
                 dueRange: 'all',
                 repsMin: null,
                 lapsesMin: null,
+                tagIds: [],
             };
             this.emitApply();
         },

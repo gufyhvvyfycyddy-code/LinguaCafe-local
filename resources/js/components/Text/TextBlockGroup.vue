@@ -58,7 +58,8 @@
             @mouseup.stop="finishSelection"
             @touchstart="startSelectionTouchEvent"
             @touchmove="updateSelectionTouchEvent"
-            @touchend="finishSelection"
+            @touchend="finishSelectionTouchEvent"
+            @touchcancel="cancelSelectionTouchEvent"
             >
 
             <template v-for="(word, wordIndex) in words"><!--
@@ -115,14 +116,14 @@
 
         <!-- Vocabulary popup box -->
         <vocabulary-hover-box
-            v-if="$store.state.hoverVocabularyBox.active &&  !vocabularyBoxActive && !$store.state.hoverVocabularyBox.disabledWhileSelecting"
+            v-if="hoverInteractionAvailable && $store.state.hoverVocabularyBox.active && !vocabularyBoxActive && !$store.state.hoverVocabularyBox.disabledWhileSelecting"
             ref="hoverVocabBox"
             :key="'hover-vocab-box' + $store.state.hoverVocabularyBox.key"
         ></vocabulary-hover-box>
 
         <!-- Vocabulary popup box -->
         <vocabulary-box
-            v-if="(!$props.vocabularySidebar || !$props.vocabularySidebarFits) && $store.state.vocabularyBox.active && (!$props.vocabularyBottomSheet || !$store.state.vocabularyBox.vocabularyBottomSheetVisible)"
+            v-if="(!$props.vocabularySidebar || !$props.vocabularySidebarFits) && $store.state.vocabularyBox.active && !shouldUseVocabularyBottomSheet"
             ref="vocabularyBox"
             :language="$props.language"
             :auto-highlight-words="$props.autoHighlightWords"
@@ -143,11 +144,11 @@
         <v-bottom-sheet
             v-if="
                 (!$props.vocabularySidebar || !$props.vocabularySidebarFits)
-                && $store.state.vocabularyBox.active
-                && $props.vocabularyBottomSheet
-                && $store.state.vocabularyBox.vocabularyBottomSheetVisible
+                && shouldUseVocabularyBottomSheet
             "
             v-model="$store.state.vocabularyBox.active"
+            class="mobile-vocabulary-bottom-sheet"
+            data-testid="mobile-vocabulary-bottom-sheet"
             persistent
             scrollable
         >
@@ -201,6 +202,13 @@
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
+    import {
+        READER_TOUCH_LONG_PRESS_MS,
+        activateReaderTouchLongPress,
+        createReaderTouchSelectionGesture,
+        resolveReaderTouchEndAction,
+        updateReaderTouchSelectionGesture,
+    } from './../../services/ReaderTouchSelectionPolicy';
     import * as ReaderTokenPresentation from './../../services/ReaderTokenPresentationPolicy';
     import { getReaderSidebarWidthForWorkspace } from './../../services/ReaderWorkspaceSizingService';
     import {
@@ -243,7 +251,10 @@
                 // text selection
                 phraseLengthLimit: 14,
                 touchTimer: null,
-                touchStartWordIndex: -1,
+                touchGesture: null,
+                hoverInteractionAvailable: true,
+                mobileSheetHistoryArmed: false,
+                mobileSheetHistoryBaseState: null,
                 selection: [],
                 ongoingSelection: [],
                 selectedPhrase: -1,
@@ -355,16 +366,40 @@
                 default: () => [],
             },
         },
-        computed: mapState({
+        computed: {
+            ...mapState({
             vocabularyBoxActive: state => state.vocabularyBox.active,
             vocabularyBottomSheetVisible: state => state.vocabularyBox.vocabularyBottomSheetVisible,
-        }),
+            }),
+            shouldUseVocabularyBottomSheet() {
+                return this.vocabularyBoxActive && this.vocabularyBottomSheetVisible;
+            },
+        },
+        watch: {
+            vocabularyBoxActive(active) {
+                if (active && this.shouldUseVocabularyBottomSheet) {
+                    this.armMobileSheetHistory();
+                    return;
+                }
+                if (!active) {
+                    this.disarmMobileSheetHistory(true);
+                }
+            },
+            vocabularyBottomSheetVisible(visible) {
+                if (visible && this.vocabularyBoxActive) {
+                    this.armMobileSheetHistory();
+                } else if (!visible) {
+                    this.disarmMobileSheetHistory(true);
+                }
+            },
+        },
         mounted() {
             this.preProcessWords();
             window.addEventListener('resize', this.resizeHandle);
             window.addEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.addEventListener('keydown', this.hotkeyHandle);
             window.addEventListener('mousemove', this.closeHoverBox);
+            window.addEventListener('popstate', this.handleMobileSheetPopState);
 
             axios.get('/settings/get-anki-settings').then((response) => {
                 this.ankiAutoAddCards = response.data.ankiAutoAddCards;
@@ -376,14 +411,20 @@
             });
 
             this.resizeHandle();
+            if (this.shouldUseVocabularyBottomSheet) {
+                this.armMobileSheetHistory();
+            }
             this.updatePhraseBorders();
             this.updateTextToSpeechState();
         },
         beforeDestroy() {
+            this.clearTouchSelectionTimer();
             window.removeEventListener('resize', this.resizeHandle);
             window.removeEventListener('mouseup', this.unselectAllWordsOnEmptyClick);
             window.removeEventListener('keydown', this.hotkeyHandle);
             window.removeEventListener('mousemove', this.closeHoverBox);
+            window.removeEventListener('popstate', this.handleMobileSheetPopState);
+            this.disarmMobileSheetHistory(false);
         },
         methods: {
             usesSpacelessLanguage() {
@@ -444,6 +485,12 @@
                 this.textToSpeechAvailable = this.textToSpeechService.getLanguageVoices().length > 0;
             },
             startSelectionTouchEvent: function(event) {
+                this.clearTouchSelectionTimer();
+                this.touchGesture = null;
+                if (!event.touches || event.touches.length !== 1) {
+                    return;
+                }
+
                 var element = resolveWordElementFromEventTarget(event.target);
                 if (!element) {
                     this.unselectAllWords();
@@ -460,10 +507,18 @@
                     return;
                 }
 
-                this.touchStartWordIndex = wordIndex;
+                const touch = event.touches[0];
+                this.touchGesture = createReaderTouchSelectionGesture({
+                    wordIndex,
+                    clientX: touch.clientX,
+                    clientY: touch.clientY,
+                });
                 this.touchTimer = setTimeout(() => {
-                    this.startSelection(wordIndex);
-                }, 500);
+                    this.touchGesture = activateReaderTouchLongPress(this.touchGesture);
+                    if (this.touchGesture && this.touchGesture.longPressActivated) {
+                        this.startSelection(this.touchGesture.wordIndex);
+                    }
+                }, READER_TOUCH_LONG_PRESS_MS);
             },
             startSelectionMouseEvent(event) {
                 if (this.$props.plainTextMode) {
@@ -487,38 +542,71 @@
                 this.startSelection(wordIndex);
             },
             updateSelectionTouchEvent: function(event) {
-                if (!event.cancelable) {
-                    if (this.touchTimer) {
-                        clearTimeout(this.touchTimer);
-                        this.touchTimer = null;
-                    }
-
+                if (!this.touchGesture || !event.touches || event.touches.length !== 1) {
                     return;
                 }
 
-                if (this.ongoingSelection.length) {
+                const touch = event.touches[0];
+                this.touchGesture = updateReaderTouchSelectionGesture(
+                    this.touchGesture,
+                    {
+                        clientX: touch.clientX,
+                        clientY: touch.clientY,
+                    },
+                );
+
+                if (!this.touchGesture.longPressActivated) {
+                    if (this.touchGesture.moved) {
+                        this.clearTouchSelectionTimer();
+                    }
+                    return;
+                }
+
+                if (event.cancelable) {
                     event.preventDefault();
                 }
-
-                var touch = event.changedTouches[0];
-                var element = resolveWordElementFromPoint(touch.clientX, touch.clientY);
-
-                var wordIndex = null;
-                if (element) {
-                    wordIndex = element.getAttribute('wordindex');
+                const element = resolveWordElementFromPoint(touch.clientX, touch.clientY);
+                const wordIndex = readWordIndexFromElement(element);
+                if (wordIndex !== -1 && this.ongoingSelection.length) {
+                    this.updateSelection(wordIndex);
                 }
+            },
+            finishSelectionTouchEvent(event) {
+                const gesture = this.touchGesture;
+                const action = resolveReaderTouchEndAction(gesture);
+                this.clearTouchSelectionTimer();
+                this.touchGesture = null;
 
-                if (this.touchTimer) {
-                    if ((wordIndex === null || parseInt(wordIndex) !== this.touchStartWordIndex)) {
-                        clearTimeout(this.touchTimer);
-                        this.touchTimer = null;
-                    }
-
+                if ((action === 'tap' || action === 'finish') && event.cancelable) {
+                    event.preventDefault();
+                }
+                if (action === 'tap') {
+                    this.startSelection(gesture.wordIndex);
+                    this.finishSelection();
                     return;
                 }
-
-                if (wordIndex !== null && this.ongoingSelection.length) {
-                    this.updateSelection(wordIndex);
+                if (action === 'finish') {
+                    this.finishSelection();
+                }
+            },
+            cancelSelectionTouchEvent() {
+                const hadActiveSelection = Boolean(
+                    this.touchGesture && this.touchGesture.longPressActivated,
+                );
+                this.clearTouchSelectionTimer();
+                this.touchGesture = null;
+                if (hadActiveSelection) {
+                    this.unselectAllWordsProcess();
+                    this.$store.commit('hoverVocabularyBox/setValue', {
+                        propertyName: 'disabledWhileSelecting',
+                        value: false,
+                    });
+                }
+            },
+            clearTouchSelectionTimer() {
+                if (this.touchTimer) {
+                    clearTimeout(this.touchTimer);
+                    this.touchTimer = null;
                 }
             },
             updateSelectionMouseEvent(event) {
@@ -731,6 +819,10 @@
                 });
             },
             updateHoverSelection: function(wordIndex) {
+                if (!this.hoverInteractionAvailable) {
+                    this.closeHoverBox();
+                    return;
+                }
                 this.closeHoverBox();
 
                 var hoveredWords = [];
@@ -1849,12 +1941,68 @@
                 });
             },
             resizeHandle() {
+                this.hoverInteractionAvailable = Boolean(
+                    window.matchMedia
+                    && window.matchMedia('(hover: hover) and (pointer: fine)').matches,
+                );
+                if (!this.hoverInteractionAvailable) {
+                    this.closeHoverBox();
+                }
+
                 // update bottom sheet vocabulary
                 this.$store.commit('vocabularyBox/setVocabularyBottomSheetVisible', (window.innerWidth <= 768));
 
                 this.$nextTick(() => {
                     this.updateVocabBoxPosition();
                 });
+            },
+            armMobileSheetHistory() {
+                if (this.mobileSheetHistoryArmed || !this.shouldUseVocabularyBottomSheet) {
+                    return;
+                }
+
+                this.mobileSheetHistoryBaseState = window.history.state;
+                const currentState = (
+                    this.mobileSheetHistoryBaseState
+                    && typeof this.mobileSheetHistoryBaseState === 'object'
+                ) ? this.mobileSheetHistoryBaseState : {};
+                window.history.pushState({
+                    ...currentState,
+                    __linguacafeMobileVocabularySheet: true,
+                }, '', window.location.href);
+                this.mobileSheetHistoryArmed = true;
+            },
+            disarmMobileSheetHistory(consumeEntry) {
+                if (!this.mobileSheetHistoryArmed) {
+                    return;
+                }
+
+                const ownsCurrentEntry = Boolean(
+                    window.history.state
+                    && window.history.state.__linguacafeMobileVocabularySheet,
+                );
+                this.mobileSheetHistoryArmed = false;
+                if (consumeEntry && ownsCurrentEntry) {
+                    window.history.back();
+                    return;
+                }
+                if (ownsCurrentEntry) {
+                    window.history.replaceState(
+                        this.mobileSheetHistoryBaseState,
+                        '',
+                        window.location.href,
+                    );
+                }
+            },
+            handleMobileSheetPopState() {
+                if (!this.mobileSheetHistoryArmed) {
+                    return;
+                }
+
+                this.mobileSheetHistoryArmed = false;
+                if (this.vocabularyBoxActive) {
+                    this.unselectAllWords();
+                }
             },
             updateVocabBoxPosition() {
                 var margin = 8;

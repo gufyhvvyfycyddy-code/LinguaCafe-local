@@ -20,6 +20,7 @@ class ReviewCardExportService
         'example_sentence_zh',
         'aliases_zh',
         'collocations',
+        'tags',
         'source_chapter_id',
         'source_chapter_title',
         'source_kind',
@@ -79,7 +80,7 @@ class ReviewCardExportService
 
     public function buildAnkiTsv(Collection $items): string
     {
-        $headers = ['Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Source', 'FsrsState'];
+        $headers = ['Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Tags', 'Source', 'FsrsState'];
         $lines = [];
         $lines[] = implode("\t", $headers);
 
@@ -93,6 +94,7 @@ class ReviewCardExportService
             $exampleZh = $this->tsvEscape($item['example_sentence_zh'] ?? '');
             $aliasesZh = $this->tsvEscape($this->joinArray($item['aliases_zh'] ?? []));
             $collocations = $this->tsvEscape($this->joinArray($item['collocations'] ?? []));
+            $tags = $this->tsvEscape($this->ankiTagNames($item['tags'] ?? []));
             $source = $this->tsvEscape($item['source_chapter_title'] ?? '');
             $fsrsState = $this->tsvEscape($item['fsrs_state'] ?? '');
 
@@ -120,7 +122,7 @@ class ReviewCardExportService
 
             $lines[] = implode("\t", [
                 $front, $back, $lemma, $surface, $pos, $senseZh, $senseEn,
-                $exampleEn, $exampleZh, $aliasesZh, $collocations, $source, $fsrsState,
+                $exampleEn, $exampleZh, $aliasesZh, $collocations, $tags, $source, $fsrsState,
             ]);
         }
 
@@ -136,7 +138,11 @@ class ReviewCardExportService
         foreach ($items as $item) {
             $row = [];
             foreach ($selectedFields as $field) {
-                $row[] = $this->csvCellValue($item[$field] ?? null);
+                $value = $item[$field] ?? null;
+                if ($field === 'tags' && is_array($value)) {
+                    $value = $this->tagNames($value);
+                }
+                $row[] = $this->csvCellValue($value);
             }
             fputcsv($stream, $row);
         }
@@ -162,6 +168,32 @@ class ReviewCardExportService
             $value = "'" . $value;
         }
         return $value;
+    }
+
+    private function tagNames(array $tags, string $separator = ', '): string
+    {
+        $names = array_map(
+            fn ($tag) => is_array($tag) ? ($tag['name'] ?? '') : (string) $tag,
+            $tags,
+        );
+
+        return implode($separator, array_values(array_filter(
+            $names,
+            fn (string $name): bool => $name !== '',
+        )));
+    }
+
+    private function ankiTagNames(array $tags): string
+    {
+        $names = array_map(
+            fn (string $name): string => preg_replace('/\s+/u', '_', trim($name)) ?? '',
+            explode("\n", $this->tagNames($tags, "\n")),
+        );
+
+        return implode(' ', array_values(array_filter(
+            $names,
+            fn (string $name): bool => $name !== '',
+        )));
     }
 
     private function tsvEscape(?string $value): string

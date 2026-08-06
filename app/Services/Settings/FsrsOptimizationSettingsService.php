@@ -231,6 +231,47 @@ class FsrsOptimizationSettingsService
             ->count('id');
         $canOptimizeByCount = $eligible >= self::MIN_REQUIRED;
         $canBuildTrainset = $trainableCards > 0;
+        $ratingCounts = $this->eligibleReviewLogs($userId, $language)
+            ->select('review_logs.rating', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('review_logs.rating')
+            ->pluck('cnt', 'rating')
+            ->map(fn ($count): int => (int) $count)
+            ->all();
+        $ratingUsage = [
+            'again' => $ratingCounts['again'] ?? 0,
+            'hard' => $ratingCounts['hard'] ?? 0,
+            'good' => $ratingCounts['good'] ?? 0,
+            'easy' => $ratingCounts['easy'] ?? 0,
+        ];
+        $healthWarnings = [];
+        if ($eligible < self::MIN_REQUIRED) {
+            $healthWarnings[] = [
+                'code' => 'INSUFFICIENT_HISTORY',
+                'severity' => 'info',
+                'message' => '有效记录不足 300 条，参数优化结果可能不稳定。',
+            ];
+        }
+        if ($ratingUsage['hard'] >= 20 && $ratingUsage['hard'] > max(1, $ratingUsage['again']) * 3) {
+            $healthWarnings[] = [
+                'code' => 'HARD_MAY_REPLACE_AGAIN',
+                'severity' => 'warning',
+                'message' => 'Hard 明显多于 Again。忘记答案时应选择 Again，Hard 只表示费力但仍记得。',
+            ];
+        }
+        if ($eligible >= 20 && ($ratingUsage['easy'] / $eligible) > 0.50) {
+            $healthWarnings[] = [
+                'code' => 'EASY_OVERUSE',
+                'severity' => 'warning',
+                'message' => 'Easy 占比超过一半；请只在答案确实非常轻松时使用。',
+            ];
+        }
+        if (!$canBuildTrainset && $eligible > 0) {
+            $healthWarnings[] = [
+                'code' => 'SHALLOW_CARD_HISTORY',
+                'severity' => 'info',
+                'message' => '多数卡片还没有至少两次有效复习，暂时无法形成训练序列。',
+            ];
+        }
 
         [$level, $message] = match (true) {
             $canOptimizeByCount && $canBuildTrainset => ['ready', '已有足够有效复习记录，可以尝试计算优化参数。'],
@@ -255,6 +296,11 @@ class FsrsOptimizationSettingsService
             'can_build_trainset' => $canBuildTrainset,
             'diagnosis_level' => $level,
             'diagnosis_message' => $message,
+            'rating_usage' => $ratingUsage,
+            'health_status' => collect($healthWarnings)->contains(
+                fn (array $warning): bool => $warning['severity'] === 'warning'
+            ) ? 'warning' : ($healthWarnings === [] ? 'healthy' : 'info'),
+            'health_warnings' => $healthWarnings,
         ];
     }
 

@@ -40,6 +40,7 @@ class ReviewCardSavedSearchTest extends TestCase
             'due_range' => 'today',
             'reps_min' => 2,
             'lapses_min' => 1,
+            'tag_ids' => [],
         ], $overrides);
     }
 
@@ -51,7 +52,8 @@ class ReviewCardSavedSearchTest extends TestCase
         ])->assertCreated()
             ->assertJsonPath('name', 'Today Review')
             ->assertJsonPath('filter_state.sort_dir', 'asc')
-            ->assertJsonPath('filter_state_version', 1);
+            ->assertJsonPath('filter_state_version', 2)
+            ->assertJsonPath('filter_state.tag_ids', []);
 
         $id = $created->json('id');
 
@@ -156,11 +158,36 @@ class ReviewCardSavedSearchTest extends TestCase
             'language_id' => 'english',
             'name' => 'Future schema',
             'normalized_name' => 'future schema',
-            'filter_state_version' => 2,
+            'filter_state_version' => 3,
             'filter_state' => $this->state(),
         ]);
 
         $this->actingAs($this->user)->getJson('/review-cards/manage/saved-searches')
             ->assertStatus(422)->assertJsonValidationErrors('saved_searches');
+    }
+
+    public function test_v1_saved_search_remains_readable_with_empty_tags_and_upgrades_on_edit(): void
+    {
+        $row = ReviewCardSavedSearch::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'name' => 'Legacy',
+            'normalized_name' => 'legacy',
+            'filter_state_version' => 1,
+            'filter_state' => array_diff_key($this->state(), ['tag_ids' => true]),
+        ]);
+
+        $this->actingAs($this->user)->getJson('/review-cards/manage/saved-searches')
+            ->assertOk()
+            ->assertJsonPath('items.0.id', $row->id)
+            ->assertJsonPath('items.0.filter_state_version', 1)
+            ->assertJsonPath('items.0.filter_state.tag_ids', []);
+
+        $this->actingAs($this->user)->patchJson(
+            "/review-cards/manage/saved-searches/{$row->id}",
+            ['filter_state' => $this->state(['tag_ids' => [9, 2]])],
+        )->assertOk()
+            ->assertJsonPath('filter_state_version', 2)
+            ->assertJsonPath('filter_state.tag_ids', [2, 9]);
     }
 }

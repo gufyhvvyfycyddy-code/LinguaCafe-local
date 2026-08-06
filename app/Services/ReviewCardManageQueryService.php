@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Models\WordSenseTag;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -105,6 +106,8 @@ class ReviewCardManageQueryService
             })
             ->with('sense');
 
+        $this->applyTagCriteria($query, $state->get('tag_ids'), $userId, $language);
+
         // ADR-0012: Pre-compute governance matching IDs if needed.
         // If filter=leech|struggling AND is:leech|is:struggling token both
         // request the SAME status, compute once and reuse. If they request
@@ -139,6 +142,36 @@ class ReviewCardManageQueryService
         $this->applySort($query, $state);
 
         return $query;
+    }
+
+    private function applyTagCriteria(
+        $query,
+        array $tagIds,
+        int $userId,
+        string $language,
+    ): void {
+        if ($tagIds === []) {
+            return;
+        }
+
+        $availableCount = WordSenseTag::query()
+            ->whereIn('id', $tagIds)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->count();
+
+        if ($availableCount !== count($tagIds)) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        foreach ($tagIds as $tagId) {
+            $query->whereHas('sense.tags', function ($tagQuery) use ($tagId, $userId, $language) {
+                $tagQuery->where('word_sense_tags.id', $tagId)
+                    ->where('word_sense_tags.user_id', $userId)
+                    ->where('word_sense_tags.language_id', $language);
+            });
+        }
     }
 
     /**

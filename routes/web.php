@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\DB;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,6 +17,32 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return ['Laravel' => app()->version()];
 });
+
+if (app()->environment('testing')) {
+    Route::get('/__testing/acceptance-sentinel', function () {
+        $requestIp = request()->ip();
+        $serverIp = request()->server('SERVER_ADDR');
+        $hostIps = gethostbynamel(gethostname()) ?: [];
+        $isLocalRequest = in_array($requestIp, ['127.0.0.1', '::1'], true)
+            || (is_string($serverIp) && hash_equals($serverIp, $requestIp))
+            || in_array($requestIp, $hostIps, true);
+        abort_unless($isLocalRequest, 404);
+
+        $sentinel = env('LINGUACAFE_TEST_SENTINEL');
+        $database = DB::connection()->getDatabaseName();
+        $databaseIsTesting = is_string($database)
+            && str_contains(strtolower($database), 'test');
+        $sentinelPresent = is_string($sentinel)
+            && str_starts_with($sentinel, '__testing_acceptance_sentinel_')
+            && DB::table('migrations')->where('migration', $sentinel)->exists();
+
+        return response()->json([
+            'environment' => app()->environment(),
+            'database_is_testing' => $databaseIsTesting,
+            'sentinel_present' => $sentinelPresent,
+        ], $databaseIsTesting && $sentinelPresent ? 200 : 503);
+    });
+}
 
 require __DIR__.'/auth.php';
 
@@ -77,6 +104,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'updateFsrsDailyLimits']);
         Route::get('/settings/fsrs/queue-order', [App\Http\Controllers\SettingsController::class, 'getFsrsQueueOrder']);
         Route::post('/settings/fsrs/queue-order', [App\Http\Controllers\SettingsController::class, 'updateFsrsQueueOrder']);
+        Route::get('/settings/fsrs/advanced-settings', [App\Http\Controllers\SettingsController::class, 'getAdvancedReviewSettings']);
+        Route::put('/settings/fsrs/advanced-settings', [App\Http\Controllers\SettingsController::class, 'updateAdvancedReviewSettings']);
         Route::post('/settings/fsrs/retention-workload-simulation', [App\Http\Controllers\SettingsController::class, 'retentionWorkloadSimulation']);
         Route::post('/settings/global/update', [App\Http\Controllers\SettingsController::class, 'updateGlobalSettings']);
         Route::post('/settings/global/get', [App\Http\Controllers\SettingsController::class, 'getGlobalSettingsByName']);
@@ -130,6 +159,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/article-health', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/article-health/data', [App\Http\Controllers\ArticleHealthController::class, 'show']);
     Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);
+    Route::post('/word-senses/{wordSense}/media', [App\Http\Controllers\MediaController::class, 'store'])->whereNumber('wordSense');
+    Route::delete('/media/references/{referenceId}', [App\Http\Controllers\MediaController::class, 'destroy']);
+    Route::get('/media/assets/{assetId}', [App\Http\Controllers\MediaController::class, 'download'])->name('media.download');
+    Route::get('/media/check', [App\Http\Controllers\MediaController::class, 'check']);
     Route::get('/reviews/senses/today-limits', [App\Http\Controllers\ReviewTodayLimitsController::class, 'show']);
     Route::put('/reviews/senses/today-limits', [App\Http\Controllers\ReviewTodayLimitsController::class, 'update']);
     Route::delete('/reviews/senses/today-limits', [App\Http\Controllers\ReviewTodayLimitsController::class, 'destroy']);
@@ -145,9 +178,20 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/kanji/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/kanji/{character}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/review-cards/manage', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/mobile-sync-simulator', [App\Http\Controllers\HomeController::class, 'index']);
 
     // home
     Route::post('/statistics/get', [App\Http\Controllers\HomeController::class, 'getStatistics']);
+    Route::post('/statistics/export/{format}', [App\Http\Controllers\HomeController::class, 'exportStatistics']);
+    Route::get('/review-cards/knowledge-hygiene/preferences', [App\Http\Controllers\KnowledgeHygieneController::class, 'preferences']);
+    Route::put('/review-cards/knowledge-hygiene/preferences', [App\Http\Controllers\KnowledgeHygieneController::class, 'savePreferences']);
+    Route::post('/review-cards/knowledge-hygiene/find-replace/preview', [App\Http\Controllers\KnowledgeHygieneController::class, 'findReplacePreview']);
+    Route::post('/review-cards/knowledge-hygiene/find-replace/apply', [App\Http\Controllers\KnowledgeHygieneController::class, 'applyFindReplace']);
+    Route::post('/review-cards/knowledge-hygiene/duplicates', [App\Http\Controllers\KnowledgeHygieneController::class, 'duplicates']);
+    Route::post('/review-cards/knowledge-hygiene/merge/preview', [App\Http\Controllers\KnowledgeHygieneController::class, 'mergePreview']);
+    Route::post('/review-cards/knowledge-hygiene/merge/apply', [App\Http\Controllers\KnowledgeHygieneController::class, 'applyMerge']);
+    Route::get('/review-cards/knowledge-hygiene/recent-deletes', [App\Http\Controllers\KnowledgeHygieneController::class, 'recentDeletes']);
+    Route::post('/review-cards/knowledge-hygiene/operations/{operationId}/undo', [App\Http\Controllers\KnowledgeHygieneController::class, 'undo']);
     Route::get('/config/get/{configPath}', [App\Http\Controllers\HomeController::class, 'getConfig']);
 
     // user manual
@@ -218,6 +262,17 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/custom-study/sessions/answer', [App\Http\Controllers\CustomStudyController::class, 'answer']);
     Route::post('/custom-study/sessions/resume', [App\Http\Controllers\CustomStudyController::class, 'resume']);
 
+    // M12 server-authoritative Special Study sessions. Legacy Custom Study
+    // token routes above remain unchanged for compatibility.
+    Route::get('/special-study/options', [App\Http\Controllers\SpecialStudySessionController::class, 'options']);
+    Route::get('/special-study/sessions', [App\Http\Controllers\SpecialStudySessionController::class, 'index']);
+    Route::post('/special-study/sessions', [App\Http\Controllers\SpecialStudySessionController::class, 'store']);
+    Route::get('/special-study/sessions/{sessionId}', [App\Http\Controllers\SpecialStudySessionController::class, 'show']);
+    Route::put('/special-study/sessions/{sessionId}/save', [App\Http\Controllers\SpecialStudySessionController::class, 'save']);
+    Route::post('/special-study/sessions/{sessionId}/answer', [App\Http\Controllers\SpecialStudySessionController::class, 'answer']);
+    Route::post('/special-study/sessions/{sessionId}/rebuild', [App\Http\Controllers\SpecialStudySessionController::class, 'rebuild']);
+    Route::post('/special-study/sessions/{sessionId}/end', [App\Http\Controllers\SpecialStudySessionController::class, 'end']);
+
     // sense mapping review
     Route::get('/senses/occurrences', [App\Http\Controllers\SenseOccurrenceController::class, 'index']);
     Route::get('/senses/candidates', [App\Http\Controllers\SenseOccurrenceController::class, 'candidates']);
@@ -251,10 +306,21 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/review-cards/manage/export', [App\Http\Controllers\ReviewCardManageController::class, 'export']);
     Route::get('/review-cards/manage/export-anki-tsv', [App\Http\Controllers\ReviewCardManageController::class, 'exportAnkiTsv']);
     Route::get('/review-cards/manage/export-csv', [App\Http\Controllers\ReviewCardManageController::class, 'exportCsv']);
+    Route::get('/review-cards/manage/portable/export-anki', [App\Http\Controllers\PortableDataController::class, 'exportAnki']);
+    Route::get('/review-cards/manage/portable/export-json', [App\Http\Controllers\PortableDataController::class, 'exportContentJson']);
+    Route::get('/review-cards/manage/portable/export-csv', [App\Http\Controllers\PortableDataController::class, 'exportContentCsv']);
+    Route::get('/review-cards/manage/portable/export-full', [App\Http\Controllers\PortableDataController::class, 'exportFullPackage']);
+    Route::post('/review-cards/manage/portable/import-preview', [App\Http\Controllers\PortableDataController::class, 'previewImport']);
+    Route::post('/review-cards/manage/portable/import-apply', [App\Http\Controllers\PortableDataController::class, 'applyImport']);
     Route::get('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'index']);
     Route::post('/review-cards/manage/saved-searches', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'store']);
     Route::patch('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'update']);
     Route::delete('/review-cards/manage/saved-searches/{savedSearch}', [App\Http\Controllers\ReviewCardSavedSearchController::class, 'destroy']);
+    Route::get('/review-cards/manage/tags', [App\Http\Controllers\WordSenseTagController::class, 'index']);
+    Route::post('/review-cards/manage/tags', [App\Http\Controllers\WordSenseTagController::class, 'store']);
+    Route::post('/review-cards/manage/tags/bulk-assignments', [App\Http\Controllers\WordSenseTagController::class, 'bulkAssignments']);
+    Route::patch('/review-cards/manage/tags/{tag}', [App\Http\Controllers\WordSenseTagController::class, 'update']);
+    Route::delete('/review-cards/manage/tags/{tag}', [App\Http\Controllers\WordSenseTagController::class, 'destroy']);
     Route::post('/review-cards/manage/bulk-marker', [App\Http\Controllers\ReviewCardManageController::class, 'bulkMarker']);
     Route::get('/review-cards/manage/{reviewCard}/logs', [App\Http\Controllers\ReviewCardManageController::class, 'logs']);
     Route::get('/review-cards/manage/{reviewCard}/detail', [App\Http\Controllers\ReviewCardManageController::class, 'detail']);
@@ -263,6 +329,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::patch('/review-cards/manage/{reviewCard}/enabled', [App\Http\Controllers\ReviewCardManageController::class, 'enabled']);
     Route::post('/review-cards/manage/{reviewCard}/due-now', [App\Http\Controllers\ReviewCardManageController::class, 'dueNow']);
     Route::post('/review-cards/manage/{reviewCard}/reset', [App\Http\Controllers\ReviewCardManageController::class, 'reset']);
+    Route::post('/review-cards/{reviewCard}/manual-operations/preview', [App\Http\Controllers\ReviewCardManualOperationController::class, 'preview']);
+    Route::post('/review-cards/{reviewCard}/manual-operations/apply', [App\Http\Controllers\ReviewCardManualOperationController::class, 'apply']);
+    Route::post('/review-card-operations/{operationId}/undo', [App\Http\Controllers\ReviewCardManualOperationController::class, 'undo']);
+    Route::post('/review-card-operations/{operationId}/redo', [App\Http\Controllers\ReviewCardManualOperationController::class, 'redo']);
     Route::delete('/review-cards/manage/{reviewCard}', [App\Http\Controllers\ReviewCardManageController::class, 'destroy']);
     Route::post('/review-cards/manage/bulk-enabled', [App\Http\Controllers\ReviewCardManageController::class, 'bulkEnabled']);
     Route::post('/review-cards/manage/bulk-delete', [App\Http\Controllers\ReviewCardManageController::class, 'bulkDestroy']);

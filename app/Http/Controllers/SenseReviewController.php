@@ -14,6 +14,7 @@ use App\Services\SenseReviewSessionActionService;
 use App\Services\SenseReviewSevenDayTrendService;
 use App\Services\SenseReviewThirtyDayCalendarService;
 use App\Services\SenseReviewUndoService;
+use App\Services\Settings\Presets\ReviewSettingsResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -31,6 +32,7 @@ class SenseReviewController extends Controller
         private SenseReviewSessionActionService $sessionActionService,
         private SenseReviewUndoService $undoService,
         private SenseReviewRatingContract $ratingContract,
+        private ReviewSettingsResolver $reviewSettingsResolver,
     ) {
     }
 
@@ -44,6 +46,7 @@ class SenseReviewController extends Controller
         $language = Auth::user()->selected_language;
         $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
         $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $experience = $this->reviewSettingsResolver->resolve($userId, $language)->experience();
 
         // SenseReview-BatchFeedback-1000-1: serialize the queue with a single
         // batch ReviewLog query instead of N per-card queries. The serializer
@@ -52,6 +55,12 @@ class SenseReviewController extends Controller
         return response()->json([
             'cards' => $this->senseReviewCardSerializerService->serializeMany($result['cards']),
             'summary' => $result['summary'],
+            'experience' => [
+                'show_timer' => $experience['show_timer'],
+                'question_timer_seconds' => $experience['question_timer_seconds'],
+                'answer_timer_seconds' => $experience['answer_timer_seconds'],
+                'auto_advance_enabled' => $experience['auto_advance_enabled'],
+            ],
         ]);
     }
 

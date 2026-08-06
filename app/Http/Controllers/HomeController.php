@@ -8,6 +8,8 @@ use App\Services\GoalService;
 use App\Services\SettingsService;
 use App\Services\SafeFilePathService;
 use App\Services\StatisticsService;
+use App\Services\StatisticsExportService;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 // request classes
@@ -17,6 +19,7 @@ class HomeController extends Controller {
 
     public function __construct(
         private StatisticsService $statisticsService, 
+        private StatisticsExportService $statisticsExportService,
         private GoalService $goalService,
         private SettingsService $settingsService
     ) {
@@ -60,17 +63,48 @@ class HomeController extends Controller {
         ]);
     }
 
-    public function getStatistics() {
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
+    public function getStatistics(Request $request) {
+        $user = Auth::user();
+        $request->validate([
+            'period_days' => 'sometimes|integer|in:7,30,90,365',
+        ]);
 
         try {
-            $statistics = $this->statisticsService->getStatistics($userId, $language);
+            $statistics = $this->statisticsService->getStatistics(
+                $user->id,
+                $user->selected_language,
+                $request,
+                $user->timezone ?? 'UTC',
+            );
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
 
         return response()->json($statistics, 200);
+    }
+
+    public function exportStatistics(Request $request, string $format) {
+        abort_unless(in_array($format, ['csv', 'pdf'], true), 404);
+        $user = Auth::user();
+        $request->validate([
+            'period_days' => 'sometimes|integer|in:7,30,90,365',
+        ]);
+        $report = $this->statisticsService->getStatistics(
+            $user->id,
+            $user->selected_language,
+            $request,
+            $user->timezone ?? 'UTC',
+        );
+        $body = $format === 'csv'
+            ? $this->statisticsExportService->csv($report)
+            : $this->statisticsExportService->pdf($report);
+        $contentType = $format === 'csv' ? 'text/csv; charset=UTF-8' : 'application/pdf';
+
+        return response($body, 200, [
+            'Content-Type' => $contentType,
+            'Content-Disposition' => "attachment; filename=\"linguacafe-statistics.{$format}\"",
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
     }
 
     public function getConfig($configPath, GetConfigRequest $request) {

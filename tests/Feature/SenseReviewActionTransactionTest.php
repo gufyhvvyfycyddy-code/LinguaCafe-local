@@ -83,9 +83,9 @@ class SenseReviewActionTransactionTest extends TestCase
         $this->assertNotNull($log->before_card_snapshot, 'before_card_snapshot must be written');
         $this->assertNotNull($log->after_card_snapshot, 'after_card_snapshot must be written');
 
-        // before snapshot should contain 8 fields
-        $this->assertCount(8, $log->before_card_snapshot);
-        $this->assertCount(8, $log->after_card_snapshot);
+        // ADR-0045 adds the optional fsrs_step_index to new snapshots.
+        $this->assertCount(9, $log->before_card_snapshot);
+        $this->assertCount(9, $log->after_card_snapshot);
 
         // before snapshot should reflect the 'new' state
         $this->assertSame('new', $log->before_card_snapshot['fsrs_state']);

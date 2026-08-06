@@ -15,6 +15,7 @@ use App\Http\Requests\Settings\GetGlobalSettingsByNameRequest;
 use App\Http\Requests\Settings\UpdateGlobalSettingsRequest;
 use App\Http\Requests\Settings\GetUserSettingsByNameRequest;
 use App\Http\Requests\Settings\UpdateUserSettingsRequest;
+use App\Exceptions\AdvancedReviewSettingsValidationException;
 
 class SettingsController extends Controller
 {
@@ -221,6 +222,38 @@ class SettingsController extends Controller
             $this->settingsService->getFsrsQueueOrder($user->id, $user->selected_language),
             200
         );
+    }
+
+    public function getAdvancedReviewSettings()
+    {
+        $user = Auth::user();
+
+        return response()->json(
+            $this->settingsService->getAdvancedReviewSettings($user->id, $user->selected_language),
+            200,
+        );
+    }
+
+    public function updateAdvancedReviewSettings(Request $request)
+    {
+        $user = Auth::user();
+
+        try {
+            return response()->json(
+                $this->settingsService->updateAdvancedReviewSettings(
+                    $user->id,
+                    $user->selected_language,
+                    $request->only(['scheduling', 'experience']),
+                ),
+                200,
+            );
+        } catch (AdvancedReviewSettingsValidationException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+                'errors' => $exception->getErrors(),
+            ], 422);
+        }
     }
 
     /**

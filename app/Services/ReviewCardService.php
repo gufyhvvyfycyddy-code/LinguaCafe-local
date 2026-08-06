@@ -103,9 +103,31 @@ class ReviewCardService
      * Existing review_logs are preserved. A new ReviewLog with rating='reset'
      * and source='reset' is created.
      */
-    public function resetCard(int $userId, string $language, int $reviewCardId): ReviewCard
+    public function resetCard(
+        int $userId,
+        string $language,
+        int $reviewCardId,
+        bool $resetCounts = true,
+    ): ReviewCard
     {
-        return DB::transaction(function () use ($userId, $language, $reviewCardId) {
+        return $this->resetCardWithLog(
+            $userId,
+            $language,
+            $reviewCardId,
+            $resetCounts,
+        )['card'];
+    }
+
+    /**
+     * @return array{card: ReviewCard, review_log: ReviewLog}
+     */
+    public function resetCardWithLog(
+        int $userId,
+        string $language,
+        int $reviewCardId,
+        bool $resetCounts = true,
+    ): array {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId, $resetCounts) {
             $card = ReviewCard::lockForUpdate()
                 ->where('user_id', $userId)
                 ->where('language_id', $language)
@@ -133,20 +155,25 @@ class ReviewCardService
                 'stability' => $card->fsrs_stability,
                 'difficulty' => $card->fsrs_difficulty,
             ];
+            $beforeSnapshot = $this->snapshotService->capture($card);
 
             // ADR-0010: Reset only FSRS scheduling fields. Do NOT touch
             // lifecycle_state, buried_until, lifecycle_version,
             // lifecycle_changed_at, or fsrs_enabled (mirror).
             $card->fsrs_state = 'new';
+            $card->fsrs_step_index = null;
             $card->fsrs_due_at = Carbon::now();
             $card->fsrs_stability = null;
             $card->fsrs_difficulty = null;
-            $card->fsrs_reps = 0;
-            $card->fsrs_lapses = 0;
+            if ($resetCounts) {
+                $card->fsrs_reps = 0;
+                $card->fsrs_lapses = 0;
+            }
             $card->fsrs_last_reviewed_at = null;
             $card->save();
+            $afterSnapshot = $this->snapshotService->capture($card);
 
-            ReviewLog::create([
+            $reviewLog = ReviewLog::create([
                 'user_id' => $userId,
                 'language_id' => $language,
                 'language' => $language,
@@ -162,9 +189,14 @@ class ReviewCardService
                 'previous_difficulty' => $previous['difficulty'],
                 'new_difficulty' => $card->fsrs_difficulty,
                 'source' => 'reset',
+                'before_card_snapshot' => $beforeSnapshot,
+                'after_card_snapshot' => $afterSnapshot,
             ]);
 
-            return $card;
+            return [
+                'card' => $card,
+                'review_log' => $reviewLog,
+            ];
         });
     }
 
@@ -190,7 +222,34 @@ class ReviewCardService
         ?string $reviewSessionId = null,
         ?int $reviewDurationMs = null,
     ): ReviewCard {
-        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs) {
+        return $this->recordReviewWithLog(
+            $userId,
+            $language,
+            $reviewCardId,
+            $rating,
+            $source,
+            $reviewSessionId,
+            $reviewDurationMs,
+        )['card'];
+    }
+
+    /**
+     * Record one formal rating and return the exact card/log pair created by
+     * the same transaction. recordReview() remains the compatibility interface.
+     *
+     * @return array{card: ReviewCard, review_log: ReviewLog}
+     */
+    public function recordReviewWithLog(
+        int $userId,
+        string $language,
+        int $reviewCardId,
+        string $rating,
+        string $source = 'review',
+        ?string $reviewSessionId = null,
+        ?int $reviewDurationMs = null,
+        ?Carbon $reviewedAt = null,
+    ): array {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs, $reviewedAt) {
             // ADR-0010: Only queue-eligible cards can be rated.
             // - lifecycle_state = 'active'
             // - buried_until IS NULL OR buried_until <= now
@@ -226,9 +285,10 @@ class ReviewCardService
                 'difficulty' => $card->fsrs_difficulty,
             ];
 
-            $schedule = $this->fsrsSchedulingService->schedule($card, $rating);
+            $schedule = $this->fsrsSchedulingService->schedule($card, $rating, $reviewedAt);
 
             $card->fsrs_state = $schedule['state'];
+            $card->fsrs_step_index = $schedule['step_index'];
             $card->fsrs_due_at = $schedule['due_at'];
             $card->fsrs_stability = $schedule['stability'];
             $card->fsrs_difficulty = $schedule['difficulty'];
@@ -240,7 +300,7 @@ class ReviewCardService
             // Capture complete FSRS state after the rating (ADR-0009).
             $afterSnapshot = $this->snapshotService->capture($card);
 
-            ReviewLog::create([
+            $reviewLog = ReviewLog::create([
                 'user_id' => $userId,
                 'language_id' => $language,
                 'language' => $language,
@@ -263,7 +323,10 @@ class ReviewCardService
                 'after_card_snapshot' => $afterSnapshot,
             ]);
 
-            return $card;
+            return [
+                'card' => $card,
+                'review_log' => $reviewLog,
+            ];
         });
     }
 

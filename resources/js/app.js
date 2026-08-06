@@ -233,6 +233,7 @@ const CustomStudy = require('./components/CustomStudy/CustomStudy.vue').default;
 const ReadingInlineConfirmationManage = require('./components/Senses/ReadingInlineConfirmationManage.vue').default;
 const ReviewCardManage = require('./components/ReviewCards/ReviewCardManage.vue').default;
 const StudyOverview = require('./components/StudyOverview/StudyOverview.vue').default;
+const MobileSyncSimulator = require('./components/Mobile/MobileSyncSimulator.vue').default;
 const Vocabulary = require('./components/Vocabulary/Vocabulary.vue').default;
 const KanjiList = require('./components/Kanji/KanjiList.vue').default;
 const KanjiDetails = require('./components/Kanji/KanjiDetails.vue').default;
@@ -261,6 +262,7 @@ const router = new VueRouter({
         { path: '/senses/inline-confirmations/manage', component: ReadingInlineConfirmationManage },
         { path: '/review-cards/manage', component: ReviewCardManage },
         { path: '/study-overview', component: StudyOverview },
+        { path: '/mobile-sync-simulator', component: MobileSyncSimulator },
         { path: '/vocabulary/search', component: Vocabulary },
         { path: '/vocabulary/search/:text/:stage/:book/:chapter/:translation/:phrases/:orderBy/:page', component: Vocabulary },
         { path: '/kanji/search', component: KanjiList },

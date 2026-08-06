@@ -77,6 +77,16 @@
                                 </div>
                                 <div class="caption grey--text">参数数量：{{ advancedToolsView.parameterCount }} 个</div>
                                 <div v-if="advancedToolsView.lastOptimizedAt" class="caption grey--text">最近优化：{{ formatDate(advancedToolsView.lastOptimizedAt) }}</div>
+                                <v-alert
+                                    v-for="warning in healthWarnings"
+                                    :key="warning.code"
+                                    dense
+                                    outlined
+                                    :type="warning.severity === 'warning' ? 'warning' : 'info'"
+                                    class="mt-3 mb-0"
+                                >
+                                    {{ warning.message }}
+                                </v-alert>
 
                                 <v-btn
                                     class="mt-3"
@@ -273,6 +283,9 @@ export default {
             if (level === 'medium') return 'warning';
             if (level === 'high' || level === 'blocked') return 'error';
             return 'success';
+        },
+        healthWarnings() {
+            return this.optimizationStatus?.diagnostics?.health_warnings || [];
         },
     },
     mounted() {

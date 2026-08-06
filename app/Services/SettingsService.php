@@ -6,6 +6,7 @@ use App\Services\Settings\FsrsDailyLimitsSettingsService;
 use App\Services\Settings\FsrsOptimizationSettingsService;
 use App\Services\Settings\FsrsQueueOrderSettingsService;
 use App\Services\Settings\SettingValueService;
+use App\Services\Settings\AdvancedReviewSettingsService;
 
 /**
  * Backward-compatible settings facade.
@@ -25,6 +26,7 @@ class SettingsService
         private FsrsOptimizationSettingsService $fsrsOptimization,
         private FsrsDailyLimitsSettingsService $fsrsDailyLimits,
         private FsrsQueueOrderSettingsService $fsrsQueueOrder,
+        private AdvancedReviewSettingsService $advancedReviewSettings,
     ) {
     }
 
@@ -101,5 +103,15 @@ class SettingsService
     public function restoreFsrsDefaultParameters(int $userId, string $language): array
     {
         return $this->fsrsOptimization->restoreDefaults($userId, $language);
+    }
+
+    public function getAdvancedReviewSettings(int $userId, string $language): array
+    {
+        return $this->advancedReviewSettings->get($userId, $language);
+    }
+
+    public function updateAdvancedReviewSettings(int $userId, string $language, array $input): array
+    {
+        return $this->advancedReviewSettings->update($userId, $language, $input);
     }
 }

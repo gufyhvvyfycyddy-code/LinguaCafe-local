@@ -5,37 +5,53 @@ const page = readFileSync(
     new URL('../../resources/js/components/CustomStudy/CustomStudy.vue', import.meta.url),
     'utf8',
 );
+const session = readFileSync(
+    new URL('../../resources/js/components/CustomStudy/SpecialStudySession.vue', import.meta.url),
+    'utf8',
+);
+const legacySession = readFileSync(
+    new URL('../../resources/js/components/CustomStudy/CustomStudySession.vue', import.meta.url),
+    'utf8',
+);
 const app = readFileSync(new URL('../../resources/js/app.js', import.meta.url), 'utf8');
 const layout = readFileSync(new URL('../../resources/js/components/Layout.vue', import.meta.url), 'utf8');
 
-assert.match(page, /\/custom-study\/chapter-options/);
-assert.match(page, /\/custom-study\/sessions/);
-assert.match(page, /today_forgotten/);
-assert.match(page, /overdue/);
-assert.match(page, /value="marked" label="已标记的词义"/);
-assert.match(page, /source_chapter/);
-assert.match(page, /leech_attention/);
-assert.match(page, /leech_only/);
-assert.match(page, /leech_plus_struggling/);
-assert.match(page, /card_limit/);
-assert.match(page, /id: item\.chapter_id/);
-assert.match(page, /chapter_name/);
-assert.match(page, /book_name/);
-assert.match(page, /candidate_count/);
-assert.match(page, /当前可用/);
-assert.match(page, /本次最多学习/);
-assert.match(page, /canStart/);
-assert.match(page, /!canStart \|\| starting/);
-assert.match(page, /@blur="validateCardLimit"/);
-assert.match(page, /validateCardLimit\(\)/);
-assert.match(page, /ALLOWED_MODES/);
-assert.match(page, /this\.\$route\.query\.mode/);
-assert.match(page, /ALLOWED_MODES\.includes\(requestedMode\)/);
-assert.match(page, /ALLOWED_MODES\.includes\(requestedMode\)[\s\S]*sessionStorage\.removeItem\(SESSION_TOKEN_KEY\)[\s\S]*return;/);
-assert.match(page, /请输入 1 到 500 之间的整数。/);
-assert.match(page, /sessionStorage/);
+for (const scenario of ['today_forgotten', 'backlog', 'review_ahead', 'recent_new', 'filtered']) {
+    assert.match(page, new RegExp(scenario));
+}
+for (const sort of ['most_overdue', 'most_lapses', 'lowest_retrievability', 'random', 'source']) {
+    assert.match(page, new RegExp(sort));
+}
+for (const filter of ['tag_ids', 'markers', 'article_ids', 'chapter_ids', 'lifecycle_states', 'fsrs_states']) {
+    assert.match(page, new RegExp(filter));
+}
+
+assert.match(page, /\/special-study\/options/);
+assert.match(page, /\/special-study\/sessions/);
+assert.match(page, /\/reviews\/senses\/today-limits/);
+assert.match(page, /最近新建词义/);
+assert.match(page, /预览（不影响排程）/);
+assert.match(page, /提前正式复习（会重新排程）/);
+assert.match(page, /正式评分（写入 ReviewLog 与 FSRS）/);
+assert.match(page, /不移动卡片/);
 assert.doesNotMatch(page, /localStorage/);
 assert.doesNotMatch(page, /\$store/);
+
+assert.match(session, /client_action_id/);
+assert.match(session, /expected_revision/);
+assert.match(session, /review_duration_ms/);
+assert.match(session, /\/answer/);
+assert.match(session, /\/save/);
+assert.match(session, /\/rebuild/);
+assert.match(session, /\/end/);
+assert.match(session, /预览模式：回答只推进本次会话/);
+assert.match(session, /正式评分：回答会写入 ReviewLog、FSRS 与撤销账本/);
+
+// The old encrypted-token component remains available for route/API
+// compatibility even though the page now uses the M12 aggregate.
+assert.match(legacySession, /\/custom-study\/sessions\/answer/);
+assert.match(legacySession, /\/custom-study\/sessions\/resume/);
+
 assert.match(app, /path: '\/custom-study', component: CustomStudy/);
 assert.match(layout, /url: '\/custom-study'/);
 

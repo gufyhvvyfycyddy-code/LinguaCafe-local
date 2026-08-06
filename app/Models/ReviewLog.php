@@ -9,6 +9,14 @@ class ReviewLog extends Model
 {
     use HasFactory;
 
+    public const SOURCE_SENSE_REVIEW = 'sense_review';
+    public const SOURCE_SPECIAL_STUDY = 'special_study';
+
+    public const FORMAL_RATING_SOURCES = [
+        self::SOURCE_SENSE_REVIEW,
+        self::SOURCE_SPECIAL_STUDY,
+    ];
+
     protected $fillable = [
         'user_id',
         'language_id',

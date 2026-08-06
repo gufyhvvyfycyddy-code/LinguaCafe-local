@@ -3,6 +3,7 @@
 namespace App\Services\CustomStudy;
 
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Services\ReviewQueueOrderOptions;
 use App\Services\ReviewQueueOrderService;
 use App\Services\ReviewStudyTimezoneService;
@@ -214,7 +215,7 @@ class CustomStudySessionOrder
             ->whereIn('review_card_id', $candidateIdList)
             ->where('user_id', $userId)
             ->where('language_id', $language)
-            ->where('source', 'sense_review')
+            ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)
             ->where('rating', 'again')
             ->whereNull('undone_at')
             ->where('reviewed_at', '>=', $dayStart)

@@ -1,7 +1,12 @@
 <template>
-    <v-container id="sense-review">
-        <v-card outlined class="rounded-lg px-4 pb-4 my-4" :loading="loading">
-            <div class="subheader my-4 d-flex align-center">
+    <v-container
+        id="sense-review"
+        class="sense-review-page"
+        :class="{ 'review-high-contrast': experiencePreferences.highContrast, 'review-reduce-motion': experiencePreferences.reduceMotion }"
+        data-testid="sense-review-page"
+    >
+        <v-card outlined class="sense-review-summary rounded-lg px-4 pb-4 my-4" :loading="loading">
+            <div class="sense-review-summary-bar subheader my-4 d-flex align-center flex-wrap">
                 词义复习
                 <v-spacer></v-spacer>
                 <v-chip class="mx-1" color="foreground">到期数量 {{ summary.due_count || 0 }}</v-chip>
@@ -77,15 +82,40 @@
         <SenseReviewReportCenter v-model="reportCenterOpen" />
         <SenseReviewTodayLimitsDialog v-model="todayLimitsOpen" @changed="onTodayLimitsChanged" />
 
-        <v-card v-if="currentCard && !showSummaryView" outlined class="rounded-lg pa-5">
+        <SenseReviewExperienceController
+            v-if="currentCard && !showSummaryView"
+            :experience="reviewExperience"
+            :card="currentCard"
+            :show-answer="showAnswer"
+            :previous-available="!!previousCardSnapshot"
+            :busy="reviewExperienceBusy"
+            :overlay-open="experienceOverlayOpen"
+            @reveal-answer="showAnswer = true"
+            @focus-rating="focusRatingControls"
+            @card-started="onExperienceCardStarted"
+            @preferences-change="experiencePreferences = $event"
+            @marker-updated="onCurrentMarkerUpdated"
+            @notify="showSnackbar"
+            @previous-card="previousCardDialog = true"
+            @view-source="viewSource"
+            @bury="executeLifecycleAction('bury')"
+        />
+
+        <v-card v-if="currentCard && !showSummaryView" outlined class="sense-review-card rounded-lg pa-5">
             <SenseStudyCard
+                ref="studyCard"
                 :card="currentCard"
                 :show-answer="showAnswer"
-                :font-size="20"
+                :font-size="experiencePreferences.fontSize"
                 @reveal="showAnswer = true"
                 @view-source="viewSource"
             >
                 <template #header-meta>
+                    <SenseMediaControls
+                        :card="currentCard"
+                        @updated="onCurrentMediaUpdated"
+                        @notify="showSnackbar"
+                    />
                     <v-chip
                         v-if="currentCardIsInactive"
                         x-small
@@ -101,11 +131,14 @@
 
                 <template #reveal>
                     <v-btn
+                        ref="revealButton"
                         depressed
                         rounded
                         color="primary"
                         large
-                        :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
+                        class="mobile-reveal-button"
+                        data-testid="show-sense-answer"
+                        :disabled="rating || deleteLoading || manualOperationBusy || lifecycleLoading"
                         @click="showAnswer = true"
                     >显示答案</v-btn>
                 </template>
@@ -138,6 +171,14 @@
                             <v-list-item @click="openResetDialog">
                                 <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
                                 <v-list-item-title>重置学习进度</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="openDueNowDialog">
+                                <v-list-item-icon><v-icon small>mdi-clock-fast</v-icon></v-list-item-icon>
+                                <v-list-item-title>立即到期</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="openSetDueDialog">
+                                <v-list-item-icon><v-icon small>mdi-calendar-clock</v-icon></v-list-item-icon>
+                                <v-list-item-title>设置到期日</v-list-item-title>
                             </v-list-item>
                             <v-divider class="my-1" />
                             <v-list-item @click="openDeleteDialog">
@@ -187,7 +228,8 @@
 
                 <template #after-answer>
                     <SenseReviewRatingControls
-                        :disabled="rating || deleteLoading || resetLoading || lifecycleLoading"
+                        ref="ratingControls"
+                        :disabled="rating || deleteLoading || manualOperationBusy || lifecycleLoading"
                         :interval-previews="intervalPreviews"
                         :preview-loading="intervalPreviewLoading"
                         :preview-error="intervalPreviewError"
@@ -240,27 +282,6 @@
             </v-card>
         </v-dialog>
 
-        <!-- Reset confirmation dialog -->
-        <v-dialog v-model="resetDialog" max-width="500">
-            <v-card>
-                <v-card-title>重置为新学卡</v-card-title>
-                <v-card-text>
-                    <p>这会清空这张词义卡的 FSRS 记忆状态，并把它重新设为新学卡。</p>
-                    <p>复习历史会保留，释义、例句和原文位置不会改变。</p>
-                    <p v-if="currentCardIsInactive" class="warning--text">
-                        注意：此卡当前为「{{ stateLabel(currentCardLifecycleState) }}」状态，重置不会自动恢复到学习队列。请先恢复生命周期状态。
-                    </p>
-                    <p v-else>重置后，这张卡会立即重新进入复习队列。</p>
-                    <p class="font-weight-bold">确定重置吗？</p>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="resetDialog = false" :disabled="resetLoading">取消</v-btn>
-                    <v-btn color="primary" :loading="resetLoading" @click="resetCard">确认重置</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
-
         <!-- Delete confirmation dialog -->
         <v-dialog v-model="deleteDialog" max-width="480">
             <v-card>
@@ -281,7 +302,7 @@
             v-model="sourceDialog"
             :payload="sourcePayload"
             language="english"
-            :font-size="16"
+            :font-size="experiencePreferences.fontSize"
         />
 
         <!-- Snackbar -->
@@ -316,6 +337,19 @@
             @state-change="onSessionActionStateChange"
             @undone="onSessionActionUndone"
         />
+        <SenseReviewPreviousCardDialog
+            v-model="previousCardDialog"
+            :snapshot="previousCardSnapshot"
+            @undo="requestUndo($event, 'sense_review_previous_card')"
+        />
+        <ReviewCardSchedulingMutationSurface
+            ref="manualSchedulingSurface"
+            @refresh-list="loadCards"
+            @refresh-stats="loadFsrsStats"
+            @notify="showSnackbar"
+            @error="showSnackbar($event, 'error')"
+            @state-change="onManualOperationStateChange"
+        />
     </v-container>
 </template>
 
@@ -331,7 +365,11 @@
     import SenseReviewTodayLimitsDialog from './SenseReviewTodayLimitsDialog.vue';
     import SenseReviewLeechPanel from './SenseReviewLeechPanel.vue';
     import SenseReviewLeechRewritePackageDialog from './SenseReviewLeechRewritePackageDialog.vue';
+    import SenseReviewExperienceController from './SenseReviewExperienceController.vue';
+    import SenseReviewPreviousCardDialog from './SenseReviewPreviousCardDialog.vue';
+    import SenseMediaControls from './SenseMediaControls.vue';
     import SenseStudyCard from './SenseStudyCard.vue';
+    import ReviewCardSchedulingMutationSurface from '../ReviewCards/ReviewCardSchedulingMutationSurface.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
@@ -386,7 +424,11 @@
             SenseReviewTodayLimitsDialog,
             SenseReviewLeechPanel,
             SenseReviewLeechRewritePackageDialog,
+            SenseReviewExperienceController,
+            SenseReviewPreviousCardDialog,
+            SenseMediaControls,
             SenseStudyCard,
+            ReviewCardSchedulingMutationSurface,
         },
         data: function() {
             return {
@@ -399,9 +441,8 @@
                 // Edit dialog (state reduced to visibility only; form + save
                 // logic live in SenseReviewEditDialog).
                 editDialog: false,
-                // Reset dialog
-                resetDialog: false,
-                resetLoading: false,
+                manualOperationOpen: false,
+                manualOperationBusy: false,
                 // Delete dialog
                 deleteDialog: false,
                 deleteLoading: false,
@@ -502,9 +543,22 @@
                 // leechRewriteDialog: dialog visibility (v-model).
                 // The dialog fetches its own data on open.
                 leechRewriteDialog: false,
+                reviewExperience: {},
+                experiencePreferences: { fontSize: 20, highContrast: false, reduceMotion: false },
+                previousCardSnapshot: null,
+                previousCardDialog: false,
             }
         },
         computed: {
+            reviewExperienceBusy() {
+                return this.loading || this.rating || this.deleteLoading || this.manualOperationBusy || this.lifecycleLoading;
+            },
+            experienceOverlayOpen() {
+                return this.editDialog || this.lifecycleDialog || this.manualOperationOpen
+                    || this.deleteDialog || this.sourceDialog || this.reportCenterOpen
+                    || this.todayLimitsOpen || this.sessionActionDrawerOpen
+                    || this.previousCardDialog || this.showSessionSummary || this.leechRewriteDialog;
+            },
             currentCard() {
                 return this.cards.length ? this.cards[0] : null;
             },
@@ -611,6 +665,7 @@
                 if (val && this.currentCard) {
                     this.loadIntervalPreview();
                     this.fetchLifecycleDescriptor();
+                    this.$nextTick(this.focusRatingControls);
                 }
             },
             // When the current card changes (new card loaded after rating,
@@ -656,6 +711,28 @@
                 if (document.visibilityState === 'hidden') pauseDuration(this.reviewDurationTracker);
                 else resumeDuration(this.reviewDurationTracker);
             },
+            focusRevealButton() {
+                const target = this.$refs.revealButton;
+                const element = target?.$el || target;
+                if (element && typeof element.focus === 'function') element.focus();
+                else this.$refs.studyCard?.focusCard();
+            },
+            focusRatingControls() {
+                this.$refs.ratingControls?.focusFirst();
+            },
+            onExperienceCardStarted() {
+                this.$nextTick(this.focusRevealButton);
+            },
+            onCurrentMarkerUpdated(payload) {
+                if (!this.currentCard || !payload) return;
+                this.currentCard.marker = Number(payload.marker || 0);
+                this.cards = [...this.cards];
+            },
+            onCurrentMediaUpdated(media) {
+                if (!this.currentCard) return;
+                this.currentCard.media = Array.isArray(media) ? media : [];
+                this.cards = [...this.cards];
+            },
             onTodayLimitsChanged(limits) {
                 this.summary = Object.assign({}, this.summary, limits);
                 this.ignoreDailyLimits = false;
@@ -695,6 +772,7 @@
                     }
                     this.cards = response.data.cards;
                     this.summary = response.data.summary;
+                    this.reviewExperience = response.data.experience || {};
                     this.fsrsDetailOpen = false;
                     this.showAnswer = false;
                     // When the queue naturally drains AND the user has
@@ -821,6 +899,11 @@
                     // metadata from the backend (review_log_id, rating_label,
                     // undoable). Do NOT fake the review_log_id on the frontend.
                     const action = response.data.action;
+                    this.previousCardSnapshot = {
+                        card: reviewedCard || cardSnapshot,
+                        action: action || { rating, rating_label: rating, undoable: false },
+                        durationMs: payload.review_duration_ms,
+                    };
                     if (action && action.undoable) {
                         this.showUndoSnackbar(action, reviewedCard);
                     }
@@ -888,6 +971,10 @@
             },
             onSessionActionUndone(data) {
                 this.undoSnackbar.show = false;
+                if (this.previousCardSnapshot?.action?.review_log_id === data.review_log_id) {
+                    this.previousCardSnapshot.action.undoable = false;
+                    this.previousCardSnapshot = { ...this.previousCardSnapshot };
+                }
                 const restoredCardId = data.restored_card ? data.restored_card.review_card_id : null;
                 this.loadCards().then(() => {
                     if (restoredCardId) {
@@ -924,7 +1011,7 @@
                         return;
                     }
                     // No dialog that might be using Ctrl+Z for its own purpose.
-                    if (this.editDialog || this.lifecycleDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                    if (this.editDialog || this.lifecycleDialog || this.manualOperationOpen || this.deleteDialog || this.sourceDialog) {
                         return;
                     }
                     // No study report open.
@@ -952,10 +1039,10 @@
                 if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
                     return;
                 }
-                if (this.editDialog || this.lifecycleDialog || this.resetDialog || this.deleteDialog || this.sourceDialog) {
+                if (this.editDialog || this.lifecycleDialog || this.manualOperationOpen || this.deleteDialog || this.sourceDialog) {
                     return;
                 }
-                if (!this.currentCard || this.loading || this.rating || this.lifecycleLoading || this.resetLoading || this.deleteLoading) {
+                if (!this.currentCard || this.loading || this.rating || this.lifecycleLoading || this.manualOperationBusy || this.deleteLoading) {
                     return;
                 }
                 switch (event.key) {
@@ -1112,17 +1199,34 @@
                 const expectedVersion = this.lifecycleDescriptor
                     ? this.lifecycleDescriptor.version
                     : null;
-                const requestId = (window.crypto && typeof window.crypto.randomUUID === 'function')
-                    ? window.crypto.randomUUID()
-                    : ('lc-' + Date.now() + '-' + Math.random().toString(36).slice(2));
+                const requestId = this.createManualOperationId();
+                const manualAction = {
+                    bury: 'bury_next_day',
+                    suspend: 'suspend',
+                    resume: 'resume',
+                }[action];
 
                 this.lifecycleLoading = true;
-                axios.post(`/review-cards/${this.currentCard.review_card_id}/lifecycle-actions`, {
-                    action: action,
-                    request_id: requestId,
-                    expected_version: expectedVersion,
-                    source: 'sense_review',
-                }).then((response) => {
+                const request = manualAction
+                    ? axios.post(
+                        `/review-cards/${this.currentCard.review_card_id}/manual-operations/preview`,
+                        { action: manualAction, options: {} },
+                    ).then((previewResponse) => axios.post(
+                        `/review-cards/${this.currentCard.review_card_id}/manual-operations/apply`,
+                        {
+                            operation_id: requestId,
+                            action: manualAction,
+                            options: {},
+                            expected_state_fingerprint: previewResponse.data.expected_state_fingerprint,
+                        },
+                    ))
+                    : axios.post(`/review-cards/${this.currentCard.review_card_id}/lifecycle-actions`, {
+                        action: action,
+                        request_id: requestId,
+                        expected_version: expectedVersion,
+                        source: 'sense_review',
+                    });
+                request.then((response) => {
                     this.lifecycleDialog = false;
                     const label = actionLabel(action);
                     const alreadyApplied = response.data?.already_applied;
@@ -1171,27 +1275,29 @@
                 if (!this.currentCard) {
                     return;
                 }
-                this.resetDialog = true;
+                this.$refs.manualSchedulingSurface?.confirmReset(this.currentCard);
             },
-            resetCard() {
-                if (!this.currentCard) {
-                    return;
+            openDueNowDialog() {
+                if (!this.currentCard) return;
+                this.$refs.manualSchedulingSurface?.confirmDueNow(this.currentCard);
+            },
+            openSetDueDialog() {
+                if (!this.currentCard) return;
+                this.$refs.manualSchedulingSurface?.confirmSetDue(this.currentCard);
+            },
+            onManualOperationStateChange(state) {
+                this.manualOperationOpen = !!state?.open;
+                this.manualOperationBusy = !!state?.busy;
+            },
+            createManualOperationId() {
+                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                    return window.crypto.randomUUID();
                 }
-
-                this.resetLoading = true;
-                axios.post(`/review-cards/manage/${this.currentCard.review_card_id}/reset`)
-                    .then((response) => {
-                        this.resetDialog = false;
-                        this.showSnackbar(response.data?.message || '已重置为新学卡。该卡会重新进入复习队列。', 'success');
-                        this.loadCards();
-                        this.loadFsrsStats();
-                    })
-                    .catch((err) => {
-                        this.showSnackbar(err.response?.data?.message || '重置失败。', 'error');
-                    })
-                    .finally(() => {
-                        this.resetLoading = false;
-                    });
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                    const r = Math.random() * 16 | 0;
+                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                    return v.toString(16);
+                });
             },
             // ==================== Delete ====================
             openDeleteDialog() {
@@ -1247,3 +1353,37 @@
         }
     }
 </script>
+
+<style scoped>
+    .sense-review-summary-bar {
+        gap: 6px;
+    }
+
+    @media (max-width: 600px) {
+        .sense-review-page {
+            padding: 8px 8px calc(12px + env(safe-area-inset-bottom, 0px));
+        }
+        .sense-review-summary {
+            margin-top: 4px !important;
+            padding-right: 10px !important;
+            padding-left: 10px !important;
+        }
+        .sense-review-summary-bar {
+            align-items: flex-start !important;
+        }
+        .sense-review-summary-bar > .spacer {
+            display: none;
+        }
+        .sense-review-summary-bar .v-chip {
+            margin: 2px !important;
+        }
+        .sense-review-card {
+            padding: 14px 12px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
+            overflow: visible;
+        }
+        .mobile-reveal-button {
+            width: 100%;
+            min-height: 52px;
+        }
+    }
+</style>

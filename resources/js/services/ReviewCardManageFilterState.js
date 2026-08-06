@@ -8,6 +8,10 @@ export function buildReviewCardManageFilterState(vm) {
         due_range: vm.advancedFilters?.dueRange || 'all',
         reps_min: nullableNonNegativeInteger(vm.advancedFilters?.repsMin),
         lapses_min: nullableNonNegativeInteger(vm.advancedFilters?.lapsesMin),
+        tag_ids: [...(vm.advancedFilters?.tagIds || [])]
+            .map(Number)
+            .filter(value => Number.isInteger(value) && value > 0)
+            .sort((left, right) => left - right),
     };
 }
 export function applyReviewCardManageFilterState(vm, state) {
@@ -21,6 +25,7 @@ export function applyReviewCardManageFilterState(vm, state) {
         dueRange: state.due_range || 'all',
         repsMin: state.reps_min ?? null,
         lapsesMin: state.lapses_min ?? null,
+        tagIds: [...(state.tag_ids || [])].map(Number),
     };
 }
 

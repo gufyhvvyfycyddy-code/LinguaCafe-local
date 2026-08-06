@@ -27,8 +27,8 @@
           - Preview error shows a single shared hint above the buttons;
             the four buttons remain fully usable.
     -->
-    <div>
-        <div class="text-center caption grey--text mb-2">
+    <div class="sense-rating-controls" data-testid="sense-rating-controls">
+        <div class="rating-hotkey-hint text-center caption grey--text mb-2">
             {{ hotkeyHint }}
         </div>
         <v-alert
@@ -38,16 +38,19 @@
             text
             class="text-center mb-2"
         >{{ previewError }}</v-alert>
-        <div class="d-flex justify-center flex-wrap mt-6">
+        <div class="rating-button-grid d-flex justify-center flex-wrap mt-6">
             <v-btn
                 v-for="rating in ratings"
                 :key="rating.value"
+                :ref="`rating-${rating.value}`"
                 depressed
                 rounded
                 :color="rating.color"
                 class="ma-2 rating-btn"
                 :disabled="disabled"
                 :title="intervalTooltip(rating.value)"
+                :aria-label="ratingAriaLabel(rating)"
+                :data-testid="`sense-rating-${rating.value}`"
                 @click="$emit('rating', rating.value)"
             >
                 <div class="d-flex flex-column align-center">
@@ -121,6 +124,12 @@
             };
         },
         methods: {
+            focusFirst() {
+                const target = this.$refs['rating-again'];
+                const component = Array.isArray(target) ? target[0] : target;
+                const element = component?.$el || component;
+                if (element && typeof element.focus === 'function') element.focus();
+            },
             intervalText(value) {
                 if (!this.intervalPreviews || !this.intervalPreviews[value]) {
                     return '';
@@ -132,6 +141,10 @@
                     return '';
                 }
                 return this.intervalPreviews[value].tooltip || '';
+            },
+            ratingAriaLabel(rating) {
+                const interval = this.intervalText(rating.value);
+                return interval ? `${rating.label}，预计间隔 ${interval}` : rating.label;
             },
         },
     }
@@ -149,5 +162,33 @@
         min-height: 48px;
         padding-top: 8px;
         padding-bottom: 8px;
+    }
+
+    @media (max-width: 600px) {
+        .sense-rating-controls {
+            position: sticky;
+            bottom: 0;
+            z-index: 4;
+            margin-top: 16px;
+            padding: 10px 8px calc(10px + env(safe-area-inset-bottom, 0px));
+            background: var(--v-foreground-base);
+            border-top: 1px solid var(--v-customBorder-base);
+        }
+        .rating-hotkey-hint {
+            display: none;
+        }
+        .rating-button-grid {
+            display: grid !important;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 0 !important;
+        }
+        .rating-btn {
+            width: 100%;
+            min-width: 0 !important;
+            min-height: 52px;
+            margin: 0 !important;
+            padding: 8px 6px;
+        }
     }
 </style>

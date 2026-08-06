@@ -11,7 +11,13 @@ use Illuminate\Validation\ValidationException;
 class ReviewCardSavedSearchService
 {
     public const MAX_PER_LANGUAGE = 50;
-    public const FILTER_STATE_VERSION = 1;
+    public const FILTER_STATE_VERSION = 2;
+    private const SUPPORTED_FILTER_STATE_VERSIONS = [1, 2];
+
+    public static function supportsFilterStateVersion(int $version): bool
+    {
+        return in_array($version, self::SUPPORTED_FILTER_STATE_VERSIONS, true);
+    }
 
     public function list(int $userId, string $language)
     {
@@ -22,13 +28,20 @@ class ReviewCardSavedSearchService
             ->orderByDesc('id')
             ->get();
 
-        if ($rows->contains(fn ($row) => $row->filter_state_version !== self::FILTER_STATE_VERSION)) {
+        if ($rows->contains(fn ($row) => !self::supportsFilterStateVersion(
+            $row->filter_state_version,
+        ))) {
             throw ValidationException::withMessages([
                 'saved_searches' => 'A saved search uses an unsupported filter state version.',
             ]);
         }
 
-        return $rows;
+        return $rows->each(function ($row) {
+            $row->setAttribute(
+                'filter_state',
+                ReviewCardManageFilterState::fromArray($row->filter_state)->toArray(),
+            );
+        });
     }
 
     public function create(int $userId, string $language, string $name, array $filterState): ReviewCardSavedSearch
@@ -76,11 +89,16 @@ class ReviewCardSavedSearchService
         }
 
         $row = $query->firstOrFail();
-        if ($row->filter_state_version !== self::FILTER_STATE_VERSION) {
+        if (!self::supportsFilterStateVersion($row->filter_state_version)) {
             throw ValidationException::withMessages([
                 'saved_searches' => 'This saved search uses an unsupported filter state version.',
             ]);
         }
+
+        $row->setAttribute(
+            'filter_state',
+            ReviewCardManageFilterState::fromArray($row->filter_state)->toArray(),
+        );
 
         return $row;
     }

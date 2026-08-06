@@ -1,7 +1,14 @@
 <template>
-    <div class="sense-study-card">
-        <div class="d-flex align-center mb-3">
-            <div>
+    <div
+        ref="cardRoot"
+        class="sense-study-card"
+        data-testid="sense-study-card"
+        role="group"
+        :aria-label="`${card.lemma} 复习卡，${showAnswer ? '答案面' : '问题面'}`"
+        tabindex="-1"
+    >
+        <div class="sense-study-card-header d-flex align-center flex-wrap mb-3">
+            <div class="sense-study-card-title">
                 <div class="text-h5 default-font">{{ card.lemma }}</div>
                 <div class="text--secondary">
                     {{ card.surface_form || card.lemma }}
@@ -23,7 +30,7 @@
                     class="ml-2"
                 >本词义已有 {{ card.occurrence_count }} 条来源例句</v-chip>
             </div>
-            <v-sheet outlined rounded class="pa-3 mb-3">
+            <v-sheet outlined rounded class="sense-study-question pa-3 mb-3">
                 <SenseSentencePreview
                     :tokens="card.example_sentence_tokens"
                     :sentence-text="card.example_sentence_en"
@@ -39,21 +46,35 @@
             </div>
         </div>
 
-        <div v-if="!showAnswer" class="d-flex justify-center mb-4">
+        <div v-if="!showAnswer" class="sense-study-reveal d-flex justify-center mb-4">
             <slot name="reveal">
-                <v-btn depressed rounded color="primary" large @click="$emit('reveal')">
+                <v-btn
+                    depressed
+                    rounded
+                    color="primary"
+                    large
+                    class="mobile-reveal-button"
+                    data-testid="show-sense-answer"
+                    @click="$emit('reveal')"
+                >
                     显示答案
                 </v-btn>
             </slot>
         </div>
 
-        <div v-if="!showAnswer" class="text-center caption grey--text mt-2">
+        <div v-if="!showAnswer" class="sense-study-hotkey-hint text-center caption grey--text mt-2">
             快捷键：Space 显示答案
         </div>
 
-        <template v-if="showAnswer">
-            <div class="d-flex justify-end align-center mb-3" style="gap: 8px;">
-                <v-btn small text @click="$emit('view-source')">
+        <div v-if="showAnswer" role="region" aria-label="词义卡答案">
+            <div class="sense-study-answer-toolbar d-flex justify-end align-center mb-3">
+                <v-btn
+                    small
+                    text
+                    class="sense-study-source-button"
+                    data-testid="view-sense-source"
+                    @click="$emit('view-source')"
+                >
                     <v-icon small left>mdi-book-open-page-variant</v-icon>查看原文
                 </v-btn>
                 <slot name="answer-toolbar"></slot>
@@ -115,8 +136,10 @@
                 </v-col>
             </v-row>
 
-            <slot name="after-answer"></slot>
-        </template>
+            <div class="sense-study-card-rating-dock">
+                <slot name="after-answer"></slot>
+            </div>
+        </div>
     </div>
 </template>
 
@@ -166,6 +189,9 @@
             },
         },
         methods: {
+            focusCard() {
+                this.$refs.cardRoot?.focus();
+            },
             hasText(value) {
                 return typeof value === 'string' && value.trim() !== '';
             },
@@ -179,8 +205,54 @@
 </script>
 
 <style scoped>
+    .sense-study-card-header {
+        gap: 8px;
+    }
+    .sense-study-card-title {
+        min-width: 0;
+    }
+    .sense-study-answer-toolbar {
+        gap: 8px;
+    }
     .sense-main {
         font-size: 24px;
         font-weight: 600;
+    }
+
+    @media (max-width: 600px) {
+        .sense-study-card-header {
+            align-items: flex-start !important;
+        }
+        .sense-study-card-title {
+            flex: 1 1 100%;
+        }
+        .sense-study-question {
+            padding: 12px !important;
+        }
+        .sense-study-reveal,
+        .sense-study-reveal .mobile-reveal-button {
+            width: 100%;
+        }
+        .sense-study-reveal .mobile-reveal-button {
+            min-height: 52px;
+        }
+        .sense-study-hotkey-hint {
+            display: none;
+        }
+        .sense-study-answer-toolbar {
+            justify-content: space-between !important;
+            min-height: 48px;
+        }
+        .sense-study-source-button {
+            min-height: 44px;
+            margin-left: -8px;
+        }
+        .sense-main {
+            font-size: 1.35rem;
+        }
+        .sense-study-card-rating-dock {
+            margin-right: -8px;
+            margin-left: -8px;
+        }
     }
 </style>

@@ -27,7 +27,9 @@ class StudyOverviewQueryService
         $now ??= Carbon::now();
         $savedSearch = $savedSearchId ? ReviewCardSavedSearch::query()
             ->where('id', $savedSearchId)->where('user_id', $userId)->where('language_id', $language)->firstOrFail() : null;
-        if ($savedSearch && $savedSearch->filter_state_version !== 1) {
+        if ($savedSearch && !ReviewCardSavedSearchService::supportsFilterStateVersion(
+            $savedSearch->filter_state_version,
+        )) {
             throw ValidationException::withMessages(['saved_search_id' => 'Saved Search version is not supported.']);
         }
         $state = ReviewCardManageFilterState::fromArray($savedSearch?->filter_state ?? ['filter' => 'all']);
@@ -46,7 +48,7 @@ class StudyOverviewQueryService
             $logs = ReviewLog::query()->notUndone()
                 ->whereIn('review_card_id', $cardIds)
                 ->where('user_id', $userId)->where('language_id', $language)
-                ->where('source', 'sense_review')->where('rating', '!=', 'reset')
+                ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)->where('rating', '!=', 'reset')
                 ->where('reviewed_at', '<', $bounds['next_day_start'])
                 ->orderBy('review_card_id')->orderBy('reviewed_at')->orderBy('id')
                 ->limit(self::MAX_LOGS + 1)->get();

@@ -6,7 +6,9 @@ use App\Services\ReviewQueueOrderOptions;
 
 final class ReviewSettingsPresetConfig
 {
-    public const SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 2;
+    private const LEGACY_SCHEMA_VERSION = 1;
+    private const EASY_DAY_MODES = ['normal', 'reduced', 'minimum'];
 
     private const FALLBACK_PARAMETERS = [
         0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604,
@@ -40,12 +42,15 @@ final class ReviewSettingsPresetConfig
                 'new_cards_ignore_review_limit' => false,
             ],
             'queue_order' => ReviewQueueOrderOptions::defaults()->toArray(),
+            'scheduling' => self::schedulingDefaults(),
+            'experience' => self::experienceDefaults(),
         ]);
     }
 
     public static function fromArray(array $input): self
     {
-        if (($input['schema_version'] ?? null) !== self::SCHEMA_VERSION) {
+        $version = $input['schema_version'] ?? null;
+        if (!in_array($version, [self::LEGACY_SCHEMA_VERSION, self::SCHEMA_VERSION], true)) {
             throw new \InvalidArgumentException('Unsupported review settings preset schema.');
         }
 
@@ -76,6 +81,38 @@ final class ReviewSettingsPresetConfig
 
         $queue = ReviewQueueOrderOptions::fromArray($input['queue_order'] ?? [])->toArray();
         unset($queue['scope'], $queue['preset_supported']);
+        $scheduling = array_replace(
+            self::schedulingDefaults(),
+            is_array($input['scheduling'] ?? null) ? $input['scheduling'] : [],
+        );
+        $maximumInterval = self::integer($scheduling, 'maximum_interval_days', 1, 36500);
+        $minimumRelearningInterval = self::integer(
+            $scheduling,
+            'minimum_relearning_interval_days',
+            1,
+            $maximumInterval,
+        );
+        $easyDays = $scheduling['easy_days'] ?? null;
+        if (!is_array($easyDays) || count($easyDays) !== 7) {
+            throw new \InvalidArgumentException('easy_days must contain exactly seven values.');
+        }
+        $easyDays = array_values(array_map(function (mixed $mode): string {
+            if (!is_string($mode) || !in_array($mode, self::EASY_DAY_MODES, true)) {
+                throw new \InvalidArgumentException('Invalid Easy Day mode.');
+            }
+            return $mode;
+        }, $easyDays));
+
+        $experience = array_replace(
+            self::experienceDefaults(),
+            is_array($input['experience'] ?? null) ? $input['experience'] : [],
+        );
+        $questionSeconds = self::integer($experience, 'question_timer_seconds', 0, 3600);
+        $answerSeconds = self::integer($experience, 'answer_timer_seconds', 0, 3600);
+        $autoAdvance = self::boolean($experience, 'auto_advance_enabled');
+        if ($autoAdvance && $questionSeconds === 0 && $answerSeconds === 0) {
+            throw new \InvalidArgumentException('Auto advance requires a non-zero question or answer timer.');
+        }
 
         return new self([
             'schema_version' => self::SCHEMA_VERSION,
@@ -87,12 +124,34 @@ final class ReviewSettingsPresetConfig
             ],
             'daily_limits' => $normalizedLimits,
             'queue_order' => $queue,
+            'scheduling' => [
+                'learning_steps_minutes' => self::stepMinutes($scheduling, 'learning_steps_minutes'),
+                'relearning_steps_minutes' => self::stepMinutes($scheduling, 'relearning_steps_minutes'),
+                'maximum_interval_days' => $maximumInterval,
+                'minimum_relearning_interval_days' => $minimumRelearningInterval,
+                'easy_days' => $easyDays,
+            ],
+            'experience' => [
+                'show_timer' => self::boolean($experience, 'show_timer'),
+                'question_timer_seconds' => $questionSeconds,
+                'answer_timer_seconds' => $answerSeconds,
+                'auto_advance_enabled' => $autoAdvance,
+                'audio_autoplay' => self::boolean($experience, 'audio_autoplay'),
+                'audio_replay_answer' => self::boolean($experience, 'audio_replay_answer'),
+            ],
         ]);
     }
 
     public function withPatch(array $patch): self
     {
-        return self::fromArray(array_replace_recursive($this->config, $patch));
+        $merged = array_replace_recursive($this->config, $patch);
+        foreach (['learning_steps_minutes', 'relearning_steps_minutes'] as $key) {
+            if (array_key_exists($key, $patch['scheduling'] ?? [])) {
+                $merged['scheduling'][$key] = $patch['scheduling'][$key];
+            }
+        }
+
+        return self::fromArray($merged);
     }
 
     public function toArray(): array
@@ -135,6 +194,25 @@ final class ReviewSettingsPresetConfig
         return $this->config['queue_order'];
     }
 
+    public function scheduling(): array
+    {
+        return $this->config['scheduling'];
+    }
+
+    public function experience(): array
+    {
+        return $this->config['experience'];
+    }
+
+    public function advancedSettingsForApi(): array
+    {
+        return [
+            'schema_version' => self::SCHEMA_VERSION,
+            'scheduling' => $this->scheduling(),
+            'experience' => $this->experience(),
+        ];
+    }
+
     private static function normalizeParameters(mixed $parameters): array
     {
         if (!is_array($parameters) || count($parameters) < 19 || count($parameters) > 21) {
@@ -166,5 +244,53 @@ final class ReviewSettingsPresetConfig
             throw new \InvalidArgumentException("{$key} is out of range.");
         }
         return $value;
+    }
+
+    private static function schedulingDefaults(): array
+    {
+        return [
+            'learning_steps_minutes' => [10, 30],
+            'relearning_steps_minutes' => [10],
+            'maximum_interval_days' => 36500,
+            'minimum_relearning_interval_days' => 1,
+            'easy_days' => array_fill(0, 7, 'normal'),
+        ];
+    }
+
+    private static function experienceDefaults(): array
+    {
+        return [
+            'show_timer' => true,
+            'question_timer_seconds' => 0,
+            'answer_timer_seconds' => 0,
+            'auto_advance_enabled' => false,
+            'audio_autoplay' => false,
+            'audio_replay_answer' => false,
+        ];
+    }
+
+    private static function stepMinutes(array $values, string $key): array
+    {
+        $steps = $values[$key] ?? null;
+        if (!is_array($steps) || count($steps) > 10) {
+            throw new \InvalidArgumentException("{$key} must be an array with at most ten values.");
+        }
+
+        $normalized = [];
+        foreach (array_values($steps) as $step) {
+            if (filter_var($step, FILTER_VALIDATE_INT) === false) {
+                throw new \InvalidArgumentException("{$key} values must be integers.");
+            }
+            $minutes = (int) $step;
+            if ($minutes < 1 || $minutes >= 1440) {
+                throw new \InvalidArgumentException("{$key} values must be between 1 and 1439 minutes.");
+            }
+            if ($normalized !== [] && $minutes <= end($normalized)) {
+                throw new \InvalidArgumentException("{$key} values must be strictly increasing.");
+            }
+            $normalized[] = $minutes;
+        }
+
+        return $normalized;
     }
 }

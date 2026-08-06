@@ -66,7 +66,7 @@
                         <strong>重置</strong>：清空 FSRS 调度进度，不影响生命周期状态。
                     </p>
                     <p class="text--secondary text-body-2 mb-0">
-                        <strong>删除</strong>：永久移除复习卡，独立于生命周期状态。
+                        <strong>移入最近删除</strong>：移除复习卡但保留复习历史和来源记录，30 天内可恢复。
                     </p>
                 </v-card-text>
                 <v-card-actions>
@@ -260,7 +260,11 @@ export default {
             if (window.crypto && typeof window.crypto.randomUUID === 'function') {
                 return window.crypto.randomUUID();
             }
-            return 'lc-' + Date.now() + '-' + Math.random().toString(36).slice(2);
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
         },
         requestLifecycleAction({ action, item, expectedVersion = null, source = 'review_card_manage' }) {
             if (this.lifecycleLoading) {
@@ -273,6 +277,28 @@ export default {
 
             this.lifecycleLoading = true;
             this.publishState();
+            const manualAction = {
+                bury: 'bury_next_day',
+                suspend: 'suspend',
+                resume: 'resume',
+            }[action];
+            if (manualAction) {
+                return axios.post(
+                    '/review-cards/' + reviewCardId + '/manual-operations/preview',
+                    { action: manualAction, options: {} },
+                ).then((previewResponse) => axios.post(
+                    '/review-cards/' + reviewCardId + '/manual-operations/apply',
+                    {
+                        operation_id: this.createRequestId(),
+                        action: manualAction,
+                        options: {},
+                        expected_state_fingerprint: previewResponse.data.expected_state_fingerprint,
+                    },
+                )).finally(() => {
+                    this.lifecycleLoading = false;
+                    this.publishState();
+                });
+            }
             return axios.post('/review-cards/' + reviewCardId + '/lifecycle-actions', {
                 action,
                 request_id: this.createRequestId(),

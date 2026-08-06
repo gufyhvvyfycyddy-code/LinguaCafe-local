@@ -62,6 +62,14 @@ export function updateQueueOrder(payload) {
     return axios.post('/settings/fsrs/queue-order', payload);
 }
 
+export function getAdvancedReviewSettings() {
+    return axios.get('/settings/fsrs/advanced-settings');
+}
+
+export function updateAdvancedReviewSettings(payload) {
+    return axios.put('/settings/fsrs/advanced-settings', payload);
+}
+
 export function previewOptimization() {
     return axios.post('/settings/fsrs/optimize');
 }

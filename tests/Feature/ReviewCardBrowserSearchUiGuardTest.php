@@ -128,7 +128,7 @@ class ReviewCardBrowserSearchUiGuardTest extends TestCase
         $this->assertStringNotContainsString('restoreDialog', $manageContents);
         $this->assertStringNotContainsString('/enabled', $manageContents);
         $this->assertStringContainsString('ReviewCardLifecycleMutationSurface', $manageContents);
-        $this->assertStringContainsString('resetDialog', file_get_contents($this->schedulingSurfacePath));
+        $this->assertStringContainsString("action === 'reset_new'", file_get_contents($this->schedulingSurfacePath));
         $this->assertStringNotContainsString('resetDialog:', $manageContents);
         $this->assertStringContainsString('bulkLifecycle', $lifecycleContents);
         $this->assertStringContainsString('confirmBulkLifecycle', $manageContents);

@@ -317,7 +317,11 @@ class MorphologyMatrixImportRegressionTest extends TestCase
             'type' => 'text',
         ]);
 
-        $this->chapterService->processChapterText($this->user->id, $chapter->id);
+        $this->chapterService->processChapterText(
+            $this->user->id,
+            $chapter->language,
+            $chapter->id
+        );
 
         return $chapter->fresh();
     }

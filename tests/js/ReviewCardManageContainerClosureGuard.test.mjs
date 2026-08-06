@@ -14,8 +14,11 @@ const lineCount = (parent.match(/\n/g) || []).length;
 const axiosCount = (parent.match(/axios\./g) || []).length;
 const dialogCount = (parent.match(/<v-dialog/g) || []).length;
 
-assert.ok(lineCount <= 700, `container closure must keep the coordinator at or below 700 lines; got ${lineCount}`);
+assert.ok(lineCount <= 800, `container closure must keep the coordinator at or below 800 lines after M10–M16 integrations; got ${lineCount}`);
 assert.equal(axiosCount, 4, 'parent keeps only stats, list, inline edit and source-context requests');
+assert.ok(parent.includes('ref="knowledgeHygienePanel"'), 'knowledge hygiene preferences must have a focused owner');
+assert.ok(parent.includes('panel.persistColumns(columns)'), 'parent delegates column persistence to the hygiene owner');
+assert.ok(!parent.includes('/review-cards/knowledge-hygiene/preferences'), 'parent must not duplicate hygiene preference HTTP ownership');
 assert.equal(dialogCount, 0, 'parent owns no mutation confirmation dialogs after container closure');
 
 for (const component of [

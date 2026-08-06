@@ -10,10 +10,11 @@ use Carbon\Carbon;
  *
  * Captures and restores the complete FSRS state of a ReviewCard
  * for the undo ledger. Each snapshot is a plain associative array
- * containing exactly 8 fields — nothing more, nothing less.
+ * containing the legacy 8 fields plus the optional M13 learning-step index.
  *
  * Snapshot fields:
  *   fsrs_state            string
+ *   fsrs_step_index       integer or null (optional for legacy snapshots)
  *   fsrs_due_at           ISO 8601 string (normalized from Carbon)
  *   fsrs_stability        float (normalized to 6 decimal places)
  *   fsrs_difficulty       float (normalized to 6 decimal places)
@@ -22,7 +23,7 @@ use Carbon\Carbon;
  *   fsrs_lapses           integer
  *   fsrs_enabled          boolean
  *
- * Design rules (frozen in ADR-0009):
+ * Design rules (ADR-0009, extended compatibly by ADR-0045):
  *   - capture() does NOT query the database and does NOT save.
  *   - restore() sets attributes on the model but does NOT save.
  *   - matches() does NOT query the database.
@@ -39,6 +40,18 @@ class ReviewCardFsrsSnapshotService
      * The exact fields captured in every snapshot.
      */
     public const SNAPSHOT_FIELDS = [
+        'fsrs_state',
+        'fsrs_step_index',
+        'fsrs_due_at',
+        'fsrs_stability',
+        'fsrs_difficulty',
+        'fsrs_last_reviewed_at',
+        'fsrs_reps',
+        'fsrs_lapses',
+        'fsrs_enabled',
+    ];
+
+    public const LEGACY_SNAPSHOT_FIELDS = [
         'fsrs_state',
         'fsrs_due_at',
         'fsrs_stability',
@@ -59,6 +72,9 @@ class ReviewCardFsrsSnapshotService
     {
         return [
             'fsrs_state' => $card->fsrs_state,
+            'fsrs_step_index' => $card->fsrs_step_index !== null
+                ? (int) $card->fsrs_step_index
+                : null,
             'fsrs_due_at' => $card->fsrs_due_at
                 ? Carbon::parse($card->fsrs_due_at)->toIso8601String()
                 : null,
@@ -96,6 +112,9 @@ class ReviewCardFsrsSnapshotService
         $this->validate($snapshot);
 
         $card->fsrs_state = $snapshot['fsrs_state'];
+        $card->fsrs_step_index = array_key_exists('fsrs_step_index', $snapshot)
+            ? ($snapshot['fsrs_step_index'] !== null ? (int) $snapshot['fsrs_step_index'] : null)
+            : null;
         $card->fsrs_due_at = $snapshot['fsrs_due_at']
             ? Carbon::parse($snapshot['fsrs_due_at'])
             : null;
@@ -132,7 +151,10 @@ class ReviewCardFsrsSnapshotService
         $current = $this->capture($card);
 
         // Compare each field with type-aware normalization.
-        foreach (self::SNAPSHOT_FIELDS as $field) {
+        $fields = array_key_exists('fsrs_step_index', $snapshot)
+            ? self::SNAPSHOT_FIELDS
+            : self::LEGACY_SNAPSHOT_FIELDS;
+        foreach ($fields as $field) {
             if (!$this->fieldMatches($current[$field], $snapshot[$field], $field)) {
                 return false;
             }
@@ -153,7 +175,10 @@ class ReviewCardFsrsSnapshotService
         $this->validate($snapshot);
 
         $parts = [];
-        foreach (self::SNAPSHOT_FIELDS as $field) {
+        $fields = array_key_exists('fsrs_step_index', $snapshot)
+            ? self::SNAPSHOT_FIELDS
+            : self::LEGACY_SNAPSHOT_FIELDS;
+        foreach ($fields as $field) {
             $value = $snapshot[$field];
             if ($value === null) {
                 $parts[] = $field . ':null';
@@ -178,7 +203,7 @@ class ReviewCardFsrsSnapshotService
      */
     public function validate(array $snapshot): void
     {
-        foreach (self::SNAPSHOT_FIELDS as $field) {
+        foreach (self::LEGACY_SNAPSHOT_FIELDS as $field) {
             if (!array_key_exists($field, $snapshot)) {
                 throw new \InvalidArgumentException(
                     "Snapshot missing required field: {$field}"
@@ -189,6 +214,14 @@ class ReviewCardFsrsSnapshotService
         // Type checks (null is allowed for nullable fields).
         if (!is_string($snapshot['fsrs_state'])) {
             throw new \InvalidArgumentException('fsrs_state must be a string');
+        }
+        if (array_key_exists('fsrs_step_index', $snapshot)
+            && $snapshot['fsrs_step_index'] !== null
+            && (!is_numeric($snapshot['fsrs_step_index'])
+                || (int) $snapshot['fsrs_step_index'] < 0
+                || (int) $snapshot['fsrs_step_index'] > 9)
+        ) {
+            throw new \InvalidArgumentException('fsrs_step_index must be null or an integer from 0 to 9');
         }
         if ($snapshot['fsrs_due_at'] !== null && !is_string($snapshot['fsrs_due_at'])) {
             throw new \InvalidArgumentException('fsrs_due_at must be a string or null');
@@ -243,7 +276,7 @@ class ReviewCardFsrsSnapshotService
             return (bool) $current === (bool) $snapshot;
         }
 
-        if ($field === 'fsrs_reps' || $field === 'fsrs_lapses') {
+        if ($field === 'fsrs_reps' || $field === 'fsrs_lapses' || $field === 'fsrs_step_index') {
             return (int) $current === (int) $snapshot;
         }
 

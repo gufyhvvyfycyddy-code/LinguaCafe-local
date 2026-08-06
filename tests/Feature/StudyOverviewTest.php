@@ -87,6 +87,51 @@ class StudyOverviewTest extends TestCase
         $this->actingAs($other)->getJson('/study-overview/data?saved_search_id=' . $saved->id)->assertNotFound();
     }
 
+    public function test_v2_saved_search_reuses_tag_criteria(): void
+    {
+        $tagged = $this->card('tagged-card', 'review', now()->addDay(), now()->subDay());
+        $this->card('untagged-card', 'review', now()->addDay(), now()->subDay());
+        $tagId = DB::table('word_sense_tags')->insertGetId([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'name' => 'Overview',
+            'normalized_name' => 'overview',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        DB::table('word_sense_tag_assignments')->insert([
+            'word_sense_id' => $tagged->target_id,
+            'word_sense_tag_id' => $tagId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $saved = ReviewCardSavedSearch::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'name' => 'Tagged',
+            'normalized_name' => 'tagged',
+            'filter_state_version' => 2,
+            'filter_state' => [
+                'q' => '',
+                'filter' => 'all',
+                'sort_by' => 'id',
+                'sort_dir' => 'desc',
+                'fsrs_states' => [],
+                'due_range' => 'all',
+                'reps_min' => null,
+                'lapses_min' => null,
+                'tag_ids' => [$tagId],
+            ],
+        ]);
+
+        $this->actingAs($this->user)
+            ->getJson('/study-overview/data?saved_search_id=' . $saved->id)
+            ->assertOk()
+            ->assertJsonPath('meta.scope_card_count', 1)
+            ->assertJsonPath('meta.filter_state.tag_ids.0', $tagId)
+            ->assertJsonPath('deep_link', '/review-cards/manage?saved_search_id=' . $saved->id);
+    }
+
     public function test_period_validation_and_authentication(): void
     {
         $this->getJson('/study-overview/data')->assertUnauthorized();

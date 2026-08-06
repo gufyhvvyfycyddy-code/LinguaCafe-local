@@ -123,6 +123,12 @@
                 @updated="emitBulkMarkerUpdated"
                 @notify="(...args) => $emit('notify', ...args)"
             />
+            <word-sense-tag-bulk-picker
+                :review-card-ids="selectedIds"
+                :tags="tagCatalog"
+                @updated="$emit('tags-updated')"
+                @notify="(...args) => $emit('notify', ...args)"
+            />
             <v-menu offset-y>
                 <template #activator="{ on, attrs }">
                     <v-btn small color="primary" class="mr-2" v-bind="attrs" v-on="on" :disabled="bulkLifecycleLoading">
@@ -142,7 +148,7 @@
                     </v-list-item>
                 </v-list>
             </v-menu>
-            <v-btn small color="error" class="mr-2" @click="emitBulk('bulk-delete')">批量彻底删除</v-btn>
+            <v-btn small color="error" class="mr-2" @click="emitBulk('bulk-delete')">批量移入最近删除</v-btn>
             <v-btn
                 small
                 color="primary"
@@ -194,6 +200,7 @@
                             <th v-if="isColumnVisible('example_sentence_en')" class="col-example">例句(英)</th>
                             <th v-if="isColumnVisible('example_sentence_zh')" class="col-example">例句(中)</th>
                             <th v-if="isColumnVisible('source')" class="col-source">溯源</th>
+                            <th v-if="isColumnVisible('tags')" class="col-tags">标签</th>
                             <th class="col-marker">标记</th>
                             <th class="col-status sortable" @click="toggleSort('fsrs_state')">状态 <span class="sort-icon">{{ sortIcon('fsrs_state') }}</span></th>
                             <th v-if="isColumnVisible('fsrs_stability')" class="col-fsrs sortable" @click="toggleSort('fsrs_stability')">稳定度 <span class="sort-icon">{{ sortIcon('fsrs_stability') }}</span></th>
@@ -260,6 +267,16 @@
                             <td v-if="isColumnVisible('source')" class="col-source" :class="sourceDisplayClass(item)">
                                 {{ item.source_display_label || item.source_chapter_title || sourceKindLabel(item.source_kind) }}
                             </td>
+                            <td v-if="isColumnVisible('tags')" class="col-tags">
+                                <v-chip
+                                    v-for="tag in item.tags || []"
+                                    :key="tag.id"
+                                    x-small
+                                    outlined
+                                    class="mr-1 mb-1"
+                                >{{ tag.name }}</v-chip>
+                                <span v-if="!item.tags || item.tags.length === 0" class="text--secondary">—</span>
+                            </td>
                             <td class="col-marker text-center">
                                 <review-card-marker-picker
                                     :card-id="item.review_card_id"
@@ -320,9 +337,10 @@
                                         <v-list dense>
                                             <v-list-item @click="emitRow('source', item)"><v-list-item-title>查看原文</v-list-item-title></v-list-item>
                                             <v-list-item @click="emitRow('reset', item)"><v-list-item-title>重置</v-list-item-title></v-list-item>
+                                            <v-list-item @click="emitRow('set-due', item)"><v-list-item-title>设置到期日</v-list-item-title></v-list-item>
                                             <v-list-item @click="emitRow('rewrite-package', item)"><v-list-item-title>生成重写包</v-list-item-title></v-list-item>
                                             <v-list-item v-if="item.leech_status === 'leech'" @click="emitRow('suspend-leech', item)"><v-list-item-title class="warning--text">暂停</v-list-item-title></v-list-item>
-                                            <v-list-item @click="emitRow('delete', item)"><v-list-item-title class="error--text">彻底删除</v-list-item-title></v-list-item>
+                                            <v-list-item @click="emitRow('delete', item)"><v-list-item-title class="error--text">移入最近删除</v-list-item-title></v-list-item>
                                         </v-list>
                                     </v-menu>
                                 </template>
@@ -356,6 +374,7 @@
 import axios from 'axios';
 import { DefaultLocalStorageManager } from '../../services/LocalStorageManagerService.js';
 import ReviewCardMarkerPicker from './ReviewCardMarkerPicker.vue';
+import WordSenseTagBulkPicker from './WordSenseTagBulkPicker.vue';
 import {
     actionLabel,
     actionColor,
@@ -368,7 +387,7 @@ import {
 } from '../../services/SenseReviewLeechPresentation.js';
 
 export default {
-    components: { ReviewCardMarkerPicker },
+    components: { ReviewCardMarkerPicker, WordSenseTagBulkPicker },
     props: {
         items: { type: Array, default: () => [] },
         pagination: { type: Object, default: () => ({ current_page: 1, last_page: 1, total: 0 }) },
@@ -391,6 +410,8 @@ export default {
         bulkLifecycleLoading: { type: Boolean, default: false },
         bulkRewriteLoading: { type: Boolean, default: false },
         bulkLeechSuspendLoading: { type: Boolean, default: false },
+        tagCatalog: { type: Array, default: () => [] },
+        visibleColumns: { type: Array, default: null },
     },
     data() {
         return {
@@ -406,6 +427,7 @@ export default {
                 example_sentence_en: false,
                 example_sentence_zh: false,
                 source: true,
+                tags: true,
                 fsrs_stability: true,
                 fsrs_difficulty: true,
                 fsrs_reps: true,
@@ -422,6 +444,7 @@ export default {
                 { key: 'example_sentence_en', label: '例句(英)' },
                 { key: 'example_sentence_zh', label: '例句(中)' },
                 { key: 'source', label: '溯源' },
+                { key: 'tags', label: '标签' },
                 { key: 'fsrs_stability', label: '稳定度' },
                 { key: 'fsrs_difficulty', label: '难度' },
                 { key: 'fsrs_reps', label: '复习' },
@@ -447,6 +470,7 @@ export default {
                 { key: 'collocations', label: '搭配' },
                 { key: 'source_chapter_title', label: '来源章节' },
                 { key: 'source_kind', label: '来源类型' },
+                { key: 'tags', label: 'WordSense 标签' },
                 { key: 'fsrs_state', label: 'FSRS 状态' },
                 { key: 'fsrs_due_at', label: '到期时间' },
                 { key: 'fsrs_stability', label: '稳定度' },
@@ -515,6 +539,13 @@ export default {
         },
     },
     watch: {
+        visibleColumns: {
+            immediate: true,
+            handler(columns) {
+                if (!Array.isArray(columns) || columns.length === 0) return;
+                this.applyServerColumns(columns);
+            },
+        },
         items: {
             immediate: true,
             handler() {
@@ -668,6 +699,27 @@ export default {
             if (Object.prototype.hasOwnProperty.call(this.columnSettings, key)) return this.columnSettings[key];
             return Object.prototype.hasOwnProperty.call(this.columnDefaults, key) ? this.columnDefaults[key] : true;
         },
+        applyServerColumns(columns) {
+            const serverKeys = new Set(columns);
+            const mapping = {
+                surface_form: 'surface_form',
+                pos: 'pos',
+                sense_en: 'sense_en',
+                example_sentence_en: 'example_sentence_en',
+                example_sentence_zh: 'example_sentence_zh',
+                source: 'source_chapter_title',
+                tags: 'tags',
+                fsrs_stability: 'fsrs_stability',
+                fsrs_difficulty: 'fsrs_difficulty',
+                fsrs_reps: 'fsrs_reps',
+                fsrs_lapses: 'fsrs_lapses',
+                fsrs_due_at: 'fsrs_due_at',
+            };
+            Object.keys(mapping).forEach((key) => {
+                this.$set(this.columnSettings, key, serverKeys.has(mapping[key]));
+            });
+            this.ensureVisibleSortColumn();
+        },
         loadColumnSettings() {
             try {
                 const saved = DefaultLocalStorageManager.loadSetting('reviewCardManageColumnSettings');
@@ -685,6 +737,27 @@ export default {
             } catch (error) {
                 // Local preferences are optional; keep the page usable when storage is unavailable.
             }
+            this.$emit('columns-change', this.serverVisibleColumns());
+        },
+        serverVisibleColumns() {
+            const mapping = {
+                surface_form: 'surface_form',
+                pos: 'pos',
+                sense_en: 'sense_en',
+                example_sentence_en: 'example_sentence_en',
+                example_sentence_zh: 'example_sentence_zh',
+                source: 'source_chapter_title',
+                tags: 'tags',
+                fsrs_stability: 'fsrs_stability',
+                fsrs_difficulty: 'fsrs_difficulty',
+                fsrs_reps: 'fsrs_reps',
+                fsrs_lapses: 'fsrs_lapses',
+                fsrs_due_at: 'fsrs_due_at',
+            };
+            const pinned = ['lemma', 'sense_zh', 'marker', 'fsrs_state', 'lifecycle_state'];
+            return pinned.concat(Object.keys(mapping)
+                .filter(key => this.isColumnVisible(key))
+                .map(key => mapping[key]));
         },
         toggleColumnVisibility(key) {
             if (this.pinnedColumnKeys.includes(key)) return;

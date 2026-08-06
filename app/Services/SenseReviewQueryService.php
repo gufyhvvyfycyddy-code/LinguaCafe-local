@@ -69,7 +69,7 @@ class SenseReviewQueryService
      * undone actions, and non-sense_review sources.
      *
      * Builds on confirmedSenseReviewLogQuery() and adds:
-     *   - source = 'sense_review' (only real sense review ratings count)
+     *   - source is one of ReviewLog::FORMAL_RATING_SOURCES
      *   - source != reset AND rating != reset (reset exclusion — redundant
      *     with the positive source filter, but kept for clarity and safety)
      *   - undone_at IS NULL (undo exclusion, ADR-0009)
@@ -83,7 +83,10 @@ class SenseReviewQueryService
     public function nonResetSenseReviewLogQuery(int $userId, string $language, Carbon $since): Builder
     {
         return $this->confirmedSenseReviewLogQuery($userId, $language, $since)
-            ->where('review_logs.source', '=', 'sense_review')
+            ->whereIn(
+                'review_logs.source',
+                ReviewLog::FORMAL_RATING_SOURCES,
+            )
             ->where('review_logs.source', '!=', 'reset')
             ->where('review_logs.rating', '!=', 'reset')
             ->whereNull('review_logs.undone_at');
@@ -91,7 +94,7 @@ class SenseReviewQueryService
 
     /**
      * Card-scoped ReviewLog query that only includes real sense review
-     * ratings (source = 'sense_review'), excluding reset-type entries,
+     * ratings (normal or Special Study), excluding reset-type entries,
      * undone actions, and all other sources.
      *
      * Unlike the sense-scoped helpers above, this does NOT join
@@ -105,7 +108,7 @@ class SenseReviewQueryService
      * reset exclusion, and undo exclusion all live in one place.
      *
      * Boundary (ADR-0011 update):
-     *   - source = 'sense_review': INCLUDED
+     *   - formal rating sources:   INCLUDED
      *   - source = 'reset':        EXCLUDED
      *   - rating = 'reset':        EXCLUDED
      *   - undone_at non-null:      EXCLUDED
@@ -120,7 +123,7 @@ class SenseReviewQueryService
     {
         return ReviewLog::query()
             ->whereIn('review_card_id', $cardIds)
-            ->where('source', '=', 'sense_review')
+            ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)
             ->where('rating', '!=', 'reset')
             ->where('source', '!=', 'reset')
             ->whereNull('undone_at');

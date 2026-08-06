@@ -3887,11 +3887,11 @@ class ReviewCardManageTest extends TestCase
 
         $headers = explode("\t", $lines[0]);
         $this->assertSame([
-            'Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Source', 'FsrsState',
+            'Front', 'Back', 'Lemma', 'Surface', 'POS', 'SenseZh', 'SenseEn', 'ExampleEn', 'ExampleZh', 'AliasesZh', 'Collocations', 'Tags', 'Source', 'FsrsState',
         ], $headers);
 
         $cols = explode("\t", $lines[1]);
-        $this->assertCount(13, $cols, 'TSV data has 13 columns');
+        $this->assertCount(14, $cols, 'TSV data has 14 columns');
         $this->assertStringContainsString('hello', $cols[2]); // Lemma
         $this->assertStringContainsString('Hello world.', $cols[7]); // ExampleEn
 
@@ -3983,7 +3983,7 @@ class ReviewCardManageTest extends TestCase
 
         foreach ($lines as $line) {
             $cols = explode("\t", $line);
-            $this->assertCount(13, $cols, 'Each row must have exactly 13 columns');
+            $this->assertCount(14, $cols, 'Each row must have exactly 14 columns');
         }
 
         // Tab and newline should be replaced with space
@@ -4012,7 +4012,7 @@ class ReviewCardManageTest extends TestCase
 
         foreach ($lines as $line) {
             $cols = explode("\t", $line);
-            $this->assertCount(13, $cols, 'Each row must have exactly 13 columns');
+            $this->assertCount(14, $cols, 'Each row must have exactly 14 columns');
         }
 
         $dataLine = $lines[1];

@@ -80,14 +80,22 @@ class FsrsSchedulingService
             $itemState = $this->fallbackItemState($card, $rating, $reviewedAt);
         }
 
-        $interval = max(1, (int) round($itemState['interval']));
+        $config = $this->resolvedConfig($card);
+        $scheduling = $config->scheduling();
+        $interval = min(
+            $scheduling['maximum_interval_days'],
+            max(1, (int) round($itemState['interval'])),
+        );
+        $policy = $this->applyStepPolicy($card, $rating, $reviewedAt, $interval, $scheduling);
 
         return [
-            'state' => $this->nextState($card, $rating),
-            'due_at' => $reviewedAt->copy()->addDays($interval),
+            'state' => $policy['state'],
+            'step_index' => $policy['step_index'],
+            'due_at' => $policy['due_at'],
             'stability' => $itemState['stability'],
             'difficulty' => $itemState['difficulty'],
-            'lapses' => $card->fsrs_lapses + ($rating === self::RATING_AGAIN ? 1 : 0),
+            'lapses' => $card->fsrs_lapses
+                + ($rating === self::RATING_AGAIN && $card->fsrs_state === 'review' ? 1 : 0),
             'reviewed_at' => $reviewedAt,
         ];
     }
@@ -111,7 +119,7 @@ class FsrsSchedulingService
      *
      * The rating order comes from ratings() — there is no second map.
      *
-     * @return array<string, array{state: string, due_at: Carbon, stability: float, difficulty: float, lapses: int, reviewed_at: Carbon, interval_seconds: int}>
+     * @return array<string, array{state: string, step_index: ?int, due_at: Carbon, stability: float, difficulty: float, lapses: int, reviewed_at: Carbon, interval_seconds: int}>
      */
     public function previewAllRatings(ReviewCard $card, ?Carbon $reviewedAt = null): array
     {
@@ -123,6 +131,7 @@ class FsrsSchedulingService
             $intervalSeconds = (int) max(0, $reviewedAt->diffInSeconds($schedule['due_at'], false));
             $preview[$rating] = [
                 'state' => $schedule['state'],
+                'step_index' => $schedule['step_index'],
                 'due_at' => $schedule['due_at'],
                 'stability' => $schedule['stability'],
                 'difficulty' => $schedule['difficulty'],
@@ -229,17 +238,133 @@ class FsrsSchedulingService
         ];
     }
 
-    private function nextState(ReviewCard $card, string $rating): string
+    private function resolvedConfig(ReviewCard $card)
     {
+        $userId = (int) $card->user_id;
+        $language = (string) $card->language_id;
+        if ($userId > 0 && $language !== '') {
+            return $this->reviewSettings->resolve($userId, $language);
+        }
+
+        return \App\Services\Settings\Presets\ReviewSettingsPresetConfig::defaults();
+    }
+
+    private function applyStepPolicy(
+        ReviewCard $card,
+        string $rating,
+        Carbon $reviewedAt,
+        int $fsrsIntervalDays,
+        array $settings,
+    ): array {
+        $currentState = (string) $card->fsrs_state;
+        $phase = in_array($currentState, ['learning', 'relearning'], true)
+            ? $currentState
+            : ($currentState === 'new' ? 'learning' : null);
+
+        if ($currentState === 'review' && $rating === self::RATING_AGAIN) {
+            $phase = 'relearning';
+        }
+
+        if ($phase !== null) {
+            $steps = $phase === 'learning'
+                ? $settings['learning_steps_minutes']
+                : $settings['relearning_steps_minutes'];
+            $stepResult = $this->stepResult(
+                $phase,
+                $steps,
+                $card->fsrs_step_index,
+                $rating,
+                $reviewedAt,
+            );
+            if ($stepResult !== null) {
+                return $stepResult;
+            }
+        }
+
+        if ($phase === 'relearning') {
+            $fsrsIntervalDays = max(
+                $settings['minimum_relearning_interval_days'],
+                $fsrsIntervalDays,
+            );
+        }
+        $fsrsIntervalDays = min($settings['maximum_interval_days'], $fsrsIntervalDays);
+        $dueAt = $this->applyEasyDays(
+            $reviewedAt,
+            $fsrsIntervalDays,
+            $settings['maximum_interval_days'],
+            $settings['easy_days'],
+        );
+
+        return [
+            'state' => 'review',
+            'step_index' => null,
+            'due_at' => $dueAt,
+        ];
+    }
+
+    private function stepResult(
+        string $phase,
+        array $steps,
+        mixed $currentIndex,
+        string $rating,
+        Carbon $reviewedAt,
+    ): ?array {
+        if ($steps === [] || $rating === self::RATING_EASY) {
+            return null;
+        }
+
+        $index = $currentIndex === null ? -1 : (int) $currentIndex;
         if ($rating === self::RATING_AGAIN) {
-            return 'relearning';
+            $nextIndex = 0;
+            $minutes = $steps[0];
+        } elseif ($rating === self::RATING_HARD) {
+            $nextIndex = min(count($steps) - 1, max(0, $index));
+            $currentMinutes = $steps[min($nextIndex, count($steps) - 1)];
+            $followingMinutes = $steps[min($nextIndex + 1, count($steps) - 1)];
+            $minutes = min(1439, (int) ceil(($currentMinutes + $followingMinutes) / 2));
+        } else {
+            $nextIndex = $index < 0 ? 1 : $index + 1;
+            if (!array_key_exists($nextIndex, $steps)) {
+                return null;
+            }
+            $minutes = $steps[$nextIndex];
         }
 
-        if ($card->fsrs_reps === 0 && $rating === self::RATING_HARD) {
-            return 'learning';
+        return [
+            'state' => $phase,
+            'step_index' => $nextIndex,
+            'due_at' => $reviewedAt->copy()->addMinutes($minutes),
+        ];
+    }
+
+    private function applyEasyDays(
+        Carbon $reviewedAt,
+        int $intervalDays,
+        int $maximumIntervalDays,
+        array $easyDays,
+    ): Carbon {
+        if ($intervalDays < 2 || count(array_unique($easyDays)) === 1) {
+            return $reviewedAt->copy()->addDays($intervalDays);
         }
 
-        return 'review';
+        $weights = ['normal' => 0.0, 'reduced' => 1.0, 'minimum' => 2.0];
+        $bestInterval = $intervalDays;
+        $bestScore = INF;
+        foreach (range(-2, 2) as $shift) {
+            $candidateInterval = $intervalDays + $shift;
+            if ($candidateInterval < 1 || $candidateInterval > $maximumIntervalDays) {
+                continue;
+            }
+            $candidate = $reviewedAt->copy()->addDays($candidateInterval);
+            $score = ($weights[$easyDays[$candidate->dayOfWeek] ?? 'normal'] ?? 0.0)
+                + (abs($shift) * 0.3);
+            if ($score < $bestScore) {
+                $bestScore = $score;
+                $bestInterval = $candidateInterval;
+            }
+        }
+
+        return $reviewedAt->copy()->addDays($bestInterval);
     }
 
     private function allowsInternalFallback(): bool

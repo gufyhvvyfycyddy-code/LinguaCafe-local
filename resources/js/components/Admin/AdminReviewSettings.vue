@@ -11,6 +11,8 @@
             :fsrs-stats="fsrsStats"
         />
         <fsrs-queue-order-settings-panel :key="`queue-${settingsRefreshKey}`" />
+        <fsrs-scheduling-settings-panel :key="`scheduling-${settingsRefreshKey}`" />
+        <fsrs-workload-planner-panel :key="`planner-${settingsRefreshKey}`" />
         <fsrs-status-panel
             :refresh-key="statsRefreshKey"
             @stats-loaded="handleStatsLoaded"
@@ -29,6 +31,8 @@ import CurrentReviewSettingsPreset from './ReviewSettings/CurrentReviewSettingsP
 import FsrsQueueOrderSettingsPanel from './ReviewSettings/FsrsQueueOrderSettingsPanel.vue';
 import FsrsStatusPanel from './ReviewSettings/FsrsStatusPanel.vue';
 import FsrsAdvancedToolsPanel from './ReviewSettings/FsrsAdvancedToolsPanel.vue';
+import FsrsSchedulingSettingsPanel from './ReviewSettings/FsrsSchedulingSettingsPanel.vue';
+import FsrsWorkloadPlannerPanel from './ReviewSettings/FsrsWorkloadPlannerPanel.vue';
 import LegacySrsSettingsPanel from './ReviewSettings/LegacySrsSettingsPanel.vue';
 
 export default {
@@ -38,6 +42,8 @@ export default {
         FsrsQueueOrderSettingsPanel,
         FsrsStatusPanel,
         FsrsAdvancedToolsPanel,
+        FsrsSchedulingSettingsPanel,
+        FsrsWorkloadPlannerPanel,
         LegacySrsSettingsPanel,
     },
     props: {

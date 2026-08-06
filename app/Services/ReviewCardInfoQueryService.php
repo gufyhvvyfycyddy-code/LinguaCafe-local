@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ReviewCard;
 use App\Models\ReviewCardStateEvent;
 use App\Models\ReviewLog;
+use App\Models\Operation;
 use App\Models\WordSense;
 use Illuminate\Support\Carbon;
 
@@ -40,6 +41,7 @@ class ReviewCardInfoQueryService
 
     public function __construct(
         private SenseReviewLeechQueryService $leechQueryService,
+        private MobileOperationLedgerService $operationLedger,
     ) {
     }
 
@@ -71,8 +73,84 @@ class ReviewCardInfoQueryService
                 'items' => $this->queryLifecycleEvents($card, $userId),
                 'limit' => self::EVENT_LIMIT,
             ],
+            'manual_operations' => [
+                'items' => $this->queryManualOperations(
+                    $card,
+                    $userId,
+                    $language,
+                ),
+                'limit' => self::EVENT_LIMIT,
+            ],
+            'statistics' => $this->queryStatistics($card, $userId, $language),
             'leech' => $this->resolveLeechDescriptor($card),
         ];
+    }
+
+    private function queryStatistics(ReviewCard $card, int $userId, string $language): array
+    {
+        $logs = ReviewLog::query()
+            ->where('review_card_id', $card->id)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)
+            ->notUndone()
+            ->get(['rating', 'review_duration_ms', 'reviewed_at', 'new_due_at']);
+        $durations = $logs->pluck('review_duration_ms')
+            ->filter(fn ($value) => $value !== null)
+            ->map(fn ($value) => min(60000, max(0, (int) $value)));
+        $retrievability = null;
+        if ($card->fsrs_stability !== null && $card->fsrs_last_reviewed_at) {
+            $elapsedDays = max(0.0, Carbon::parse($card->fsrs_last_reviewed_at)
+                ->diffInSeconds(Carbon::now(), false) / 86400);
+            $retrievability = round(pow(
+                1.0 + ($elapsedDays / (9.0 * max(0.01, (float) $card->fsrs_stability))),
+                -1,
+            ), 4);
+        }
+
+        return [
+            'current' => [
+                'state' => $card->fsrs_state,
+                'due_at' => optional($card->fsrs_due_at)->toISOString(),
+                'stability' => $card->fsrs_stability,
+                'difficulty' => $card->fsrs_difficulty,
+                'retrievability' => $retrievability,
+                'reps' => (int) $card->fsrs_reps,
+                'lapses' => (int) $card->fsrs_lapses,
+            ],
+            'ratings' => [
+                'again' => $logs->where('rating', 'again')->count(),
+                'hard' => $logs->where('rating', 'hard')->count(),
+                'good' => $logs->where('rating', 'good')->count(),
+                'easy' => $logs->where('rating', 'easy')->count(),
+            ],
+            'review_time' => [
+                'total_seconds' => round($durations->sum() / 1000, 1),
+                'average_seconds' => $durations->isEmpty() ? null : round($durations->avg() / 1000, 1),
+                'timed_reviews' => $durations->count(),
+            ],
+        ];
+    }
+
+    private function queryManualOperations(
+        ReviewCard $card,
+        int $userId,
+        string $language,
+    ): array {
+        $operations = Operation::query()
+            ->with([
+                'device',
+                'changes' => fn ($query) => $query->orderBy('version'),
+            ])
+            ->where('review_card_id', $card->id)
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('scope_type', Operation::SCOPE_REVIEW_CONTROL)
+            ->orderByDesc('last_transition_sequence')
+            ->limit(self::EVENT_LIMIT)
+            ->get();
+
+        return $this->operationLedger->presentMany($operations);
     }
 
     /**

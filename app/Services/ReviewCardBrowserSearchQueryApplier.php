@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -101,7 +102,10 @@ class ReviewCardBrowserSearchQueryApplier
                     ->whereColumn('review_logs.review_card_id', 'review_cards.id')
                     ->where('review_logs.user_id', $userId)
                     ->where('review_logs.language_id', $language)
-                    ->where('review_logs.source', '=', 'sense_review')
+                    ->whereIn(
+                        'review_logs.source',
+                        ReviewLog::FORMAL_RATING_SOURCES,
+                    )
                     ->where('review_logs.rating', $rating)
                     ->whereNull('review_logs.undone_at');
             });

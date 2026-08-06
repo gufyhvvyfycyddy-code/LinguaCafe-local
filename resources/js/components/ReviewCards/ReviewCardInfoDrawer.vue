@@ -139,6 +139,49 @@
 
                         <v-tab-item value="history">
                             <div class="detail-section">
+                                <div class="detail-section-title">Manual operations（最近 {{ manualOperationsLimit }} 条）</div>
+                                <v-alert v-if="manualOperationError" type="error" dense text class="mb-2">
+                                    {{ manualOperationError }}
+                                </v-alert>
+                                <div v-if="manualOperations.length === 0" class="text-caption text--secondary py-2">暂无手动操作。</div>
+                                <div v-for="operation in manualOperations" v-else :key="operation.operation_id" class="log-entry mb-2 pa-2">
+                                    <div class="d-flex align-center" style="gap: 6px;">
+                                        <v-chip x-small color="primary">{{ manualOperationLabel(operation.operation_type) }}</v-chip>
+                                        <v-chip x-small outlined>{{ operation.status }}</v-chip>
+                                        <span class="text-caption">#{{ operation.operation_id.slice(0, 8) }}</span>
+                                        <v-spacer />
+                                        <span class="text-caption text--secondary">{{ formatDateTime(operation.created_at) }}</span>
+                                    </div>
+                                    <div class="text-caption mt-1">
+                                        来源：{{ operation.source_channel || '—' }}
+                                        <span v-if="operation.source_device_uuid"> · {{ operation.source_device_uuid }}</span>
+                                    </div>
+                                    <div class="text-caption text--secondary mt-1">
+                                        {{ operationStateSummary(operation.before_state) }}
+                                        → {{ operationStateSummary(operation.after_state) }}
+                                    </div>
+                                    <div class="mt-1">
+                                        <v-btn
+                                            v-if="operation.can_undo"
+                                            x-small
+                                            text
+                                            color="primary"
+                                            :loading="manualTransitionLoadingId === operation.operation_id"
+                                            @click="transitionManualOperation(operation, 'undo')"
+                                        >撤销</v-btn>
+                                        <v-btn
+                                            v-if="operation.can_redo"
+                                            x-small
+                                            text
+                                            color="primary"
+                                            :loading="manualTransitionLoadingId === operation.operation_id"
+                                            @click="transitionManualOperation(operation, 'redo')"
+                                        >重做</v-btn>
+                                    </div>
+                                </div>
+                            </div>
+                            <v-divider class="my-3" />
+                            <div class="detail-section">
                                 <div class="detail-section-title">生命周期记录（最近 {{ lifecycleEventsLimit }} 条）</div>
                                 <div v-if="lifecycleEvents.length === 0" class="text-caption text--secondary py-2">暂无生命周期记录。</div>
                                 <div v-for="event in lifecycleEvents" v-else :key="event.id" class="log-entry mb-2 pa-2">
@@ -248,6 +291,8 @@ export default {
             detailRequestSeq: 0,
             detailTab: 'overview',
             markerSaving: false,
+            manualTransitionLoadingId: null,
+            manualOperationError: '',
         };
     },
     computed: {
@@ -265,6 +310,8 @@ export default {
         reviewLogsLimit() { return this.cardInfo?.review_logs?.limit || 20; },
         lifecycleEvents() { return this.cardInfo?.lifecycle_events?.items || []; },
         lifecycleEventsLimit() { return this.cardInfo?.lifecycle_events?.limit || 20; },
+        manualOperations() { return this.cardInfo?.manual_operations?.items || []; },
+        manualOperationsLimit() { return this.cardInfo?.manual_operations?.limit || 20; },
         leech() { return this.cardInfo?.leech || null; },
     },
     watch: {
@@ -295,6 +342,56 @@ export default {
         leechStatusColor,
         leechStatusLabel,
         leechSuggestionLabel,
+        manualOperationLabel(operationType) {
+            return {
+                'review_control.bury_next_day': '搁置到下一学习日',
+                'review_control.suspend': '暂停',
+                'review_control.resume': '恢复',
+                'review_control.set_due': '设置到期日',
+                'review_control.due_now': '立即到期',
+                'review_control.reset_new': '重置为新卡',
+            }[operationType] || operationType;
+        },
+        operationStateSummary(snapshot) {
+            if (!snapshot) return '—';
+            const fsrs = snapshot.fsrs || {};
+            const lifecycle = snapshot.lifecycle || {};
+            return [
+                fsrs.fsrs_state || '—',
+                lifecycle.lifecycle_state || '—',
+                fsrs.fsrs_due_at ? this.formatDateTime(fsrs.fsrs_due_at) : '无到期日',
+            ].join(' / ');
+        },
+        transitionManualOperation(operation, direction) {
+            if (this.manualTransitionLoadingId) return;
+            this.manualTransitionLoadingId = operation.operation_id;
+            this.manualOperationError = '';
+            axios.post(
+                '/review-card-operations/' + operation.operation_id + '/' + direction,
+                {
+                    client_action_id: this.createRequestId(),
+                    expected_version: operation.version,
+                },
+            ).then(() => {
+                this.$emit('notify', direction === 'undo' ? '已撤销手动操作。' : '已重做手动操作。', 'success');
+                this.loadCardInfo(this.activeReviewCardId);
+            }).catch((error) => {
+                this.manualOperationError = error.response?.data?.message || '操作失败。';
+                if (error.response?.status === 409) this.loadCardInfo(this.activeReviewCardId);
+            }).finally(() => {
+                this.manualTransitionLoadingId = null;
+            });
+        },
+        createRequestId() {
+            if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+                return window.crypto.randomUUID();
+            }
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                const r = Math.random() * 16 | 0;
+                const v = c === 'x' ? r : (r & 0x3 | 0x8);
+                return v.toString(16);
+            });
+        },
         loadCardInfo(reviewCardId) {
             const seq = ++this.detailRequestSeq;
             this.detailLoading = true;
@@ -332,6 +429,8 @@ export default {
             this.detailLoading = false;
             this.detailError = '';
             this.detailTab = 'overview';
+            this.manualTransitionLoadingId = null;
+            this.manualOperationError = '';
         },
         openSource() {
             this.$emit('open-source', this.detailTarget);

@@ -16,7 +16,7 @@ test('build emits the canonical backend shape', () => {
 
     assert.deepEqual(state, {
         q: 'is:review hard', filter: 'all', sort_by: 'fsrs_due_at', sort_dir: 'asc',
-        fsrs_states: ['review'], due_range: 'today', reps_min: 2, lapses_min: null,
+        fsrs_states: ['review'], due_range: 'today', reps_min: 2, lapses_min: null, tag_ids: [],
     });
 });
 

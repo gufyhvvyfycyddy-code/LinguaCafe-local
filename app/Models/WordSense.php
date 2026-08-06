@@ -53,4 +53,19 @@ class WordSense extends Model
         return $this->hasOne(ReviewCard::class, 'target_id')
             ->where('target_type', ReviewCard::TARGET_SENSE);
     }
+
+    public function tags()
+    {
+        return $this->belongsToMany(
+            WordSenseTag::class,
+            'word_sense_tag_assignments',
+            'word_sense_id',
+            'word_sense_tag_id',
+        )->withTimestamps();
+    }
+
+    public function mediaReferences()
+    {
+        return $this->hasMany(MediaReference::class);
+    }
 }

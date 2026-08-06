@@ -41,6 +41,8 @@ class FsrsRetentionWorkloadSimulationTest extends TestCase
         $response->assertJsonPath('simulation_available', true);
         $response->assertJsonPath('total_candidates', 0);
         $this->assertCount(0, $response->json('options'));
+        $response->assertJsonPath('planner.available', false);
+        $this->assertCount(3, $response->json('planner.horizons'));
     }
 
     public function test_simulation_returns_four_options_when_cards_exist(): void
@@ -85,6 +87,10 @@ class FsrsRetentionWorkloadSimulationTest extends TestCase
         $this->assertContains('90%', $labels);
         $this->assertContains('93%', $labels);
         $this->assertContains('95%', $labels);
+        $response->assertJsonPath('planner.available', true);
+        $this->assertSame([30, 90, 365], array_column($response->json('planner.horizons'), 'days'));
+        $this->assertCount(365, $response->json('planner.daily'));
+        $this->assertSame(1, $response->json('planner.assumptions.candidate_cards'));
     }
 
     public function test_simulation_does_not_write_to_database(): void

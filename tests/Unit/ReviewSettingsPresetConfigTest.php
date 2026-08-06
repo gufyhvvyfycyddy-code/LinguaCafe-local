@@ -7,11 +7,11 @@ use PHPUnit\Framework\TestCase;
 
 class ReviewSettingsPresetConfigTest extends TestCase
 {
-    public function test_defaults_are_exact_v1_schema(): void
+    public function test_defaults_are_exact_v2_schema(): void
     {
         $config = ReviewSettingsPresetConfig::defaults()->toArray();
 
-        $this->assertSame(1, $config['schema_version']);
+        $this->assertSame(2, $config['schema_version']);
         $this->assertSame(0.90, $config['fsrs']['desired_retention']);
         $this->assertSame('default', $config['fsrs']['parameters_source']);
         $this->assertNull($config['fsrs']['parameters_optimized_at']);
@@ -29,6 +29,11 @@ class ReviewSettingsPresetConfigTest extends TestCase
             'review_sort_order' => 'due_random',
             'new_sort_order' => 'created_asc',
         ], $config['queue_order']);
+        $this->assertSame([10, 30], $config['scheduling']['learning_steps_minutes']);
+        $this->assertSame([10], $config['scheduling']['relearning_steps_minutes']);
+        $this->assertSame(36500, $config['scheduling']['maximum_interval_days']);
+        $this->assertSame(array_fill(0, 7, 'normal'), $config['scheduling']['easy_days']);
+        $this->assertFalse($config['experience']['auto_advance_enabled']);
         $this->assertArrayNotHasKey('fsrs_parameters_previous', $config);
     }
 
@@ -51,5 +56,36 @@ class ReviewSettingsPresetConfigTest extends TestCase
 
         $this->assertArrayNotHasKey('today_only', $normalized);
         $this->assertArrayNotHasKey('parameters_previous', $normalized['fsrs']);
+    }
+
+    public function test_v1_schema_is_normalized_to_v2_defaults(): void
+    {
+        $input = ReviewSettingsPresetConfig::defaults()->toArray();
+        $input['schema_version'] = 1;
+        unset($input['scheduling'], $input['experience']);
+
+        $normalized = ReviewSettingsPresetConfig::fromArray($input)->toArray();
+
+        $this->assertSame(2, $normalized['schema_version']);
+        $this->assertSame([10, 30], $normalized['scheduling']['learning_steps_minutes']);
+        $this->assertSame(0, $normalized['experience']['question_timer_seconds']);
+    }
+
+    public function test_auto_advance_requires_a_timer(): void
+    {
+        $input = ReviewSettingsPresetConfig::defaults()->toArray();
+        $input['experience']['auto_advance_enabled'] = true;
+
+        $this->expectException(\InvalidArgumentException::class);
+        ReviewSettingsPresetConfig::fromArray($input);
+    }
+
+    public function test_steps_must_be_same_day_and_increasing(): void
+    {
+        $input = ReviewSettingsPresetConfig::defaults()->toArray();
+        $input['scheduling']['learning_steps_minutes'] = [30, 10, 1440];
+
+        $this->expectException(\InvalidArgumentException::class);
+        ReviewSettingsPresetConfig::fromArray($input);
     }
 }

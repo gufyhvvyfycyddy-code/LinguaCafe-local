@@ -26,7 +26,7 @@
         <div class="d-flex flex-wrap align-center mb-2">
             <div>
                 <h2 class="mb-1">复习卡管理</h2>
-                <p class="text--secondary mb-0">管理词义复习卡，可批量归档、恢复或彻底删除。</p>
+                <p class="text--secondary mb-0">管理词义复习卡，可批量归档、恢复或移入最近删除。</p>
             </div>
         </div>
 
@@ -59,7 +59,27 @@
             :initial-saved-search-id="deepLinkedSavedSearchId"
             :search-meta="searchMeta"
             :search-errors="searchErrors"
+            :tag-catalog-refresh-key="tagCatalogRefreshKey"
             @apply="applySearchFilterState"
+            @tag-catalog-change="tagCatalog = $event"
+            @tag-catalog-mutated="loadData"
+            @notify="showSnackbar"
+        />
+
+        <knowledge-hygiene-panel
+            ref="knowledgeHygienePanel"
+            :preferences="hygienePreferences"
+            :filter-state="currentFilterState"
+            @preferences-updated="onHygienePreferencesUpdated"
+            @apply-view="applyHygieneView"
+            @refresh="refreshAfterHygiene"
+            @notify="showSnackbar"
+        />
+
+        <portable-data-panel
+            :filter-state="currentFilterState"
+            @refresh="loadData"
+            @notify="showSnackbar"
         />
 
         <review-card-table-surface
@@ -85,6 +105,8 @@
             :bulk-lifecycle-loading="lifecycleSurfaceState.bulkLoading"
             :bulk-rewrite-loading="leechGovernanceSurfaceState.bulkRewriteLoading"
             :bulk-leech-suspend-loading="leechGovernanceSurfaceState.bulkLeechSuspendLoading"
+            :tag-catalog="tagCatalog"
+            :visible-columns="hygienePreferences.columns"
             @page-change="changePage"
             @per-page-change="changePerPage"
             @sort-change="changeSort"
@@ -96,6 +118,7 @@
             @lifecycle-menu-toggle="onLifecycleMenuToggle"
             @lifecycle-action="onLifecycleMenuClick"
             @due-now="confirmDueNow"
+            @set-due="confirmSetDue"
             @source="viewSource"
             @reset="confirmReset"
             @rewrite-package="openRewritePackageDialog"
@@ -107,8 +130,10 @@
             @bulk-leech-suspend="confirmBulkLeechSuspend"
             @marker-updated="onMarkerUpdated"
             @bulk-marker-updated="onBulkMarkerUpdated"
+            @tags-updated="onTagsUpdated"
             @study-marked="openMarkedStudy"
             @notify="showSnackbar"
+            @columns-change="saveHygieneColumns"
         />
 
         <!-- Source dialog -->
@@ -183,6 +208,8 @@ import ReviewCardSchedulingMutationSurface from './ReviewCardSchedulingMutationS
 import ReviewCardLifecycleMutationSurface from './ReviewCardLifecycleMutationSurface.vue';
 import ReviewCardDeleteMutationSurface from './ReviewCardDeleteMutationSurface.vue';
 import ReviewCardLeechGovernanceMutationSurface from './ReviewCardLeechGovernanceMutationSurface.vue';
+import KnowledgeHygienePanel from './KnowledgeHygienePanel.vue';
+import PortableDataPanel from './PortableDataPanel.vue';
 
 export default {
     components: {
@@ -194,6 +221,8 @@ export default {
         ReviewCardLifecycleMutationSurface,
         ReviewCardDeleteMutationSurface,
         ReviewCardLeechGovernanceMutationSurface,
+        KnowledgeHygienePanel,
+        PortableDataPanel,
     },
     props: {
         language: {
@@ -216,6 +245,7 @@ export default {
                 due_range: 'all',
                 reps_min: null,
                 lapses_min: null,
+                tag_ids: [],
             },
             perPage: 20,
             currentPage: 1,
@@ -247,6 +277,9 @@ export default {
             // dedicated search surface owns input/filter UI and presents it.
             searchMeta: null,
             searchErrors: [],
+            tagCatalog: [],
+            tagCatalogRefreshKey: 0,
+            hygienePreferences: { columns: [], views: [] },
             snackbar: { show: false, text: '', color: 'success' },
             // Deep link state (ADR-0007): when the page is opened via
             // /review-cards/manage?review_card_id=...&from=daily-report,
@@ -294,6 +327,7 @@ export default {
                 sort_by: this.sortBy,
                 sort_dir: this.sortDir,
                 fsrs_states: [...(this.browserFilterState.fsrs_states || [])],
+                tag_ids: [...(this.browserFilterState.tag_ids || [])],
             };
         },
         statsChips() {
@@ -319,10 +353,33 @@ export default {
         this.handleDeepLink();
     },
     methods: {
+        onHygienePreferencesUpdated(preferences) {
+            this.hygienePreferences = preferences;
+        },
+        saveHygieneColumns(columns) {
+            const panel = this.$refs.knowledgeHygienePanel;
+            if (panel && typeof panel.persistColumns === 'function') panel.persistColumns(columns);
+        },
+        applyHygieneView(view) {
+            this.hygienePreferences = {
+                ...this.hygienePreferences,
+                columns: [...(view.columns || [])],
+            };
+            this.applySearchFilterState({
+                ...this.browserFilterState,
+                ...(view.filterState || {}),
+            });
+        },
+        refreshAfterHygiene() {
+            this.clearTableSelection();
+            this.loadData();
+            this.loadFsrsStats();
+        },
         applySearchFilterState(filterState) {
             this.browserFilterState = {
                 ...filterState,
                 fsrs_states: [...(filterState.fsrs_states || [])],
+                tag_ids: [...(filterState.tag_ids || [])],
             };
             this.sortBy = filterState.sort_by || 'id';
             this.sortDir = filterState.sort_dir || 'desc';
@@ -482,6 +539,10 @@ export default {
             this.$refs.schedulingMutationSurface.confirmDueNow(item);
         },
 
+        confirmSetDue(item) {
+            this.$refs.schedulingMutationSurface.confirmSetDue(item);
+        },
+
         confirmReset(item) {
             this.$refs.schedulingMutationSurface.confirmReset(item);
         },
@@ -542,6 +603,10 @@ export default {
                     this.$set(this.items, index, { ...item, marker });
                 }
             });
+        },
+        onTagsUpdated() {
+            this.tagCatalogRefreshKey += 1;
+            this.loadData();
         },
         openMarkedStudy() {
             this.$router.push({ path: '/custom-study', query: { mode: 'marked' } });

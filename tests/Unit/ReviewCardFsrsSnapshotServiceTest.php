@@ -28,7 +28,7 @@ class ReviewCardFsrsSnapshotServiceTest extends TestCase
     }
 
     /**
-     * Build an in-memory ReviewCard with all 8 FSRS fields populated.
+     * Build an in-memory ReviewCard with the current FSRS fields populated.
      * No database connection is required — attributes are set directly.
      *
      * Uses array_key_exists (not ??) so that explicit null overrides
@@ -38,6 +38,7 @@ class ReviewCardFsrsSnapshotServiceTest extends TestCase
     {
         $card = new ReviewCard();
         $card->fsrs_state = array_key_exists('fsrs_state', $overrides) ? $overrides['fsrs_state'] : 'review';
+        $card->fsrs_step_index = array_key_exists('fsrs_step_index', $overrides) ? $overrides['fsrs_step_index'] : null;
         $card->fsrs_due_at = array_key_exists('fsrs_due_at', $overrides) ? $overrides['fsrs_due_at'] : Carbon::parse('2026-07-11T10:00:00+00:00');
         $card->fsrs_stability = array_key_exists('fsrs_stability', $overrides) ? $overrides['fsrs_stability'] : 1.23456789;
         $card->fsrs_difficulty = array_key_exists('fsrs_difficulty', $overrides) ? $overrides['fsrs_difficulty'] : 5.67890123;
@@ -50,7 +51,7 @@ class ReviewCardFsrsSnapshotServiceTest extends TestCase
 
     // ==================== capture ====================
 
-    public function test_capture_returns_exactly_8_fields(): void
+    public function test_capture_returns_the_current_snapshot_fields(): void
     {
         $card = $this->makeCard();
         $snapshot = $this->service->capture($card);
@@ -59,6 +60,19 @@ class ReviewCardFsrsSnapshotServiceTest extends TestCase
             ReviewCardFsrsSnapshotService::SNAPSHOT_FIELDS,
             array_keys($snapshot),
         );
+    }
+
+    public function test_legacy_snapshot_matches_and_restores_with_a_cleared_step(): void
+    {
+        $card = $this->makeCard(['fsrs_step_index' => 1]);
+        $legacy = $this->service->capture($card);
+        unset($legacy['fsrs_step_index']);
+        $card->fsrs_step_index = 2;
+
+        $this->assertTrue($this->service->matches($card, $legacy));
+        $this->service->restore($card, $legacy);
+        $this->assertNull($card->fsrs_step_index);
+        $this->assertSame(32, strlen($this->service->fingerprint($legacy)));
     }
 
     public function test_capture_normalizes_datetime_to_iso8601(): void

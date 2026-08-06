@@ -16,6 +16,7 @@ use App\Services\ReviewCardManageQueryService;
 use App\Services\ReviewCardManageFilterState;
 use App\Services\ReviewCardManageMutationService;
 use App\Services\InvalidBrowserSearchException;
+use App\Services\KnowledgeHygieneService;
 use App\Services\SenseReviewLeechQueryService;
 use App\Services\WordSenseService;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +38,7 @@ class ReviewCardManageController extends Controller
         private ReviewCardLifecycleCommandService $lifecycleCommandService,
         private SenseReviewLeechQueryService $leechQueryService,
         private ReviewCardInfoQueryService $cardInfoQueryService,
+        private KnowledgeHygieneService $knowledgeHygiene,
     )
     {
     }
@@ -495,13 +497,16 @@ class ReviewCardManageController extends Controller
             $reviewCard, Auth::user()->id, Auth::user()->selected_language
         );
 
-        $this->wordSenseService->removeSenseFromReviewSystem($sense, true);
+        $operation = $this->knowledgeHygiene->safeDelete(
+            $card, $sense, Auth::user()->id, Auth::user()->selected_language
+        );
 
         return response()->json([
             'deleted' => true,
             'review_card_id' => $reviewCard,
             'word_sense_id' => $sense->id,
-            'message' => '已彻底删除词义复习卡。该释义不会再出现在阅读页，阅读记录和复习历史已保留。',
+            'operation_id' => $operation->operation_id,
+            'message' => '已移入最近删除。阅读记录和复习历史已保留，可在 30 天内恢复。',
         ]);
     }
 
@@ -558,7 +563,7 @@ class ReviewCardManageController extends Controller
 
     /**
      * POST /review-cards/manage/bulk-delete
-     * Bulk permanently delete sense review cards and reject the linked WordSenses.
+     * Move selected sense review cards into the 30-day restorable delete log.
      * WordSense is set to rejected so it no longer appears in reading page candidates.
      * WordSenseOccurrence and review_logs are preserved.
      * Body: { ids: int[] }
@@ -570,17 +575,29 @@ class ReviewCardManageController extends Controller
             return response()->json(['message' => '请选择至少一张复习卡。'], 422);
         }
 
-        $result = $this->mutationService->bulkDestroy(
-            $ids,
-            Auth::user()->id,
-            Auth::user()->selected_language,
-            $this->wordSenseService,
-        );
+        $deleted = 0;
+        $skipped = 0;
+        $operationIds = [];
+        foreach (array_values(array_unique(array_map('intval', $ids))) as $id) {
+            try {
+                [$card, $sense] = $this->accessService->findManageableSenseCardOrFail(
+                    $id, Auth::user()->id, Auth::user()->selected_language
+                );
+                $operation = $this->knowledgeHygiene->safeDelete(
+                    $card, $sense, Auth::user()->id, Auth::user()->selected_language
+                );
+                $operationIds[] = $operation->operation_id;
+                $deleted++;
+            } catch (\Symfony\Component\HttpKernel\Exception\NotFoundHttpException) {
+                $skipped++;
+            }
+        }
 
         return response()->json([
-            'deleted' => $result['deleted'],
-            'skipped' => $result['skipped'],
-            'message' => "已彻底删除 {$result['deleted']} 张词义复习卡。对应释义不会再出现在阅读页，阅读记录和复习历史已保留。",
+            'deleted' => $deleted,
+            'skipped' => $skipped,
+            'operation_ids' => $operationIds,
+            'message' => "已将 {$deleted} 张词义复习卡移入最近删除，可在 30 天内恢复。",
         ]);
     }
 

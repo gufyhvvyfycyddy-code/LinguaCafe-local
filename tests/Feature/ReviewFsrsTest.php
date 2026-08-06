@@ -143,7 +143,7 @@ class ReviewFsrsTest extends TestCase
             $this->assertNotNull($card->fsrs_last_reviewed_at);
             $this->assertNotNull($card->fsrs_stability);
             $this->assertNotNull($card->fsrs_difficulty);
-            $this->assertSame($rating === 'again' ? 1 : 0, $card->fsrs_lapses);
+            $this->assertSame(0, $card->fsrs_lapses, 'A new-card Again is a learning step, not a lapse.');
 
             $log = ReviewLog::first();
             $this->assertNotNull($log);

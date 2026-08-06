@@ -1,274 +1,487 @@
 <template>
-    <v-container class="custom-study-page" fluid>
-        <CustomStudySession
-            v-if="activeToken"
-            :initial-token="activeToken"
-            :initial-payload="initialSessionPayload"
-            @token-updated="updateToken"
-            @exit="clearSession"
-            @expired="onSessionExpired"
+    <v-container fluid class="special-study-page">
+        <SpecialStudySession
+            v-if="activeSession"
+            :session="activeSession"
+            @updated="applySession"
+            @exit="leaveSession"
         />
 
-        <v-card v-else outlined class="rounded-lg pa-5 custom-study-setup">
-            <div class="d-flex align-center mb-2">
+        <div v-else class="special-study-setup">
+            <div class="d-flex flex-wrap align-center mb-4">
                 <div>
-                    <div class="text-h5">自定义学习</div>
-                    <div class="text--secondary mt-1">选择一个只读预览队列，按自己的节奏练习词义。</div>
+                    <div class="text-h5">专项学习</div>
+                    <div class="text--secondary mt-1">按目标建立临时学习会话，不移动卡片，也不改变长期归属。</div>
                 </div>
+                <v-spacer></v-spacer>
+                <v-btn text href="/reviews/senses">返回普通复习</v-btn>
             </div>
-
-            <v-alert type="info" dense outlined class="mb-5">
-                这是预览学习：不会写入复习记录，也不会改变正常复习队列或 FSRS 排程。
-            </v-alert>
 
             <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
 
-            <v-form @submit.prevent="startSession">
-                <v-radio-group v-model="mode" label="学习范围" class="mt-0">
-                    <v-radio value="today_forgotten" label="今天遗忘过的词义"></v-radio>
-                    <v-radio value="overdue" label="已逾期的词义"></v-radio>
-                    <v-radio value="marked" label="已标记的词义"></v-radio>
-                    <v-radio value="source_chapter" label="按原文篇章"></v-radio>
-                    <v-radio value="leech_attention" label="需要特别关注的困难词义"></v-radio>
-                </v-radio-group>
+            <v-row>
+                <v-col cols="12" lg="8">
+                    <v-card outlined class="rounded-lg pa-5">
+                        <div class="text-h6 mb-4">新建会话</div>
+                        <v-select
+                            v-model="scenario"
+                            :items="scenarioItems"
+                            item-text="label"
+                            item-value="value"
+                            label="学习目标"
+                            outlined
+                            dense
+                        ></v-select>
 
-                <v-select
-                    v-if="mode === 'source_chapter'"
-                    v-model="chapterId"
-                    :items="chapterOptions"
-                    :loading="chapterOptionsLoading"
-                    :disabled="chapterOptionsLoading"
-                    item-text="label"
-                    item-value="id"
-                    label="篇章"
-                    outlined
-                    dense
-                    :error-messages="chapterError"
-                    @change="chapterError = ''"
-                ></v-select>
+                        <v-select
+                            v-model="executionMode"
+                            :items="availableExecutionModes"
+                            item-text="label"
+                            item-value="value"
+                            label="会话行为"
+                            outlined
+                            dense
+                        ></v-select>
 
-                <v-alert
-                    v-if="mode === 'source_chapter' && !chapterOptionsLoading && !chapterOptions.length"
-                    type="info"
-                    dense
-                    outlined
-                >
-                    当前没有包含可用预览卡片的篇章。
-                </v-alert>
+                        <v-alert :type="impactAlert.type" dense outlined>
+                            {{ impactAlert.text }}
+                        </v-alert>
 
-                <v-alert v-if="selectedChapterOption" type="info" dense outlined>
-                    当前可用 {{ selectedChapterOption.candidateCount }} 张，本次最多学习 {{ validCardLimit || 100 }} 张。
-                </v-alert>
+                        <v-row dense>
+                            <v-col v-if="showDays" cols="12" sm="6">
+                                <v-text-field
+                                    v-model.number="days"
+                                    type="number"
+                                    min="1"
+                                    max="365"
+                                    label="天数"
+                                    outlined
+                                    dense
+                                ></v-text-field>
+                            </v-col>
+                            <v-col cols="12" sm="6">
+                                <v-text-field
+                                    v-model.number="cardLimit"
+                                    type="number"
+                                    min="1"
+                                    max="500"
+                                    label="本次最多卡片数"
+                                    outlined
+                                    dense
+                                ></v-text-field>
+                            </v-col>
+                            <v-col cols="12" sm="6">
+                                <v-select
+                                    v-model="sort"
+                                    :items="sortItems"
+                                    item-text="label"
+                                    item-value="value"
+                                    label="排序"
+                                    outlined
+                                    dense
+                                ></v-select>
+                            </v-col>
+                            <v-col cols="12" sm="6">
+                                <v-text-field
+                                    v-model="name"
+                                    label="保存名称（可选）"
+                                    maxlength="100"
+                                    outlined
+                                    dense
+                                ></v-text-field>
+                            </v-col>
+                        </v-row>
 
-                <v-radio-group v-if="mode === 'leech_attention'" v-model="leechSubMode" label="困难词义范围">
-                    <v-radio value="leech_only" label="仅顽固遗忘词义"></v-radio>
-                    <v-radio value="leech_plus_struggling" label="顽固遗忘词义与近期困难词义"></v-radio>
-                </v-radio-group>
+                        <v-expansion-panels flat class="mb-4">
+                            <v-expansion-panel>
+                                <v-expansion-panel-header>进一步筛选（可选）</v-expansion-panel-header>
+                                <v-expansion-panel-content>
+                                    <v-select
+                                        v-model="filters.tag_ids"
+                                        :items="options.tags"
+                                        item-text="name"
+                                        item-value="id"
+                                        label="WordSense 标签（同时满足）"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                    ></v-select>
+                                    <v-select
+                                        v-model="filters.markers"
+                                        :items="options.markers"
+                                        item-text="label"
+                                        item-value="value"
+                                        label="Card Marker"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                    ></v-select>
+                                    <v-select
+                                        v-model="filters.article_ids"
+                                        :items="options.articles"
+                                        item-text="name"
+                                        item-value="id"
+                                        label="文章来源"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                    ></v-select>
+                                    <v-select
+                                        v-model="filters.chapter_ids"
+                                        :items="chapterOptions"
+                                        item-text="label"
+                                        item-value="id"
+                                        label="章节"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                    ></v-select>
+                                    <v-select
+                                        v-model="filters.lifecycle_states"
+                                        :items="lifecycleItems"
+                                        item-text="label"
+                                        item-value="value"
+                                        label="生命周期"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                        :disabled="executionMode !== 'preview'"
+                                    ></v-select>
+                                    <v-select
+                                        v-model="filters.fsrs_states"
+                                        :items="fsrsStateItems"
+                                        item-text="label"
+                                        item-value="value"
+                                        label="FSRS 状态"
+                                        multiple
+                                        chips
+                                        small-chips
+                                        outlined
+                                        dense
+                                    ></v-select>
+                                </v-expansion-panel-content>
+                            </v-expansion-panel>
+                        </v-expansion-panels>
 
-                <v-text-field
-                    v-model.number="cardLimit"
-                    type="number"
-                    min="1"
-                    max="500"
-                    step="1"
-                    label="本次最多练习卡片数"
-                    hint="1–500，默认 100"
-                    persistent-hint
-                    outlined
-                    dense
-                    class="custom-study-card-limit"
-                    :error-messages="cardLimitError"
-                    @input="cardLimitError = ''"
-                    @blur="validateCardLimit"
-                ></v-text-field>
+                        <v-btn
+                            color="primary"
+                            :loading="starting"
+                            :disabled="starting || !validDefinition"
+                            @click="startSession"
+                        >
+                            建立专项学习会话
+                        </v-btn>
+                    </v-card>
+                </v-col>
 
-                <v-btn color="primary" :loading="starting" :disabled="!canStart || starting" type="submit">
-                    开始预览学习
-                </v-btn>
-            </v-form>
-        </v-card>
+                <v-col cols="12" lg="4">
+                    <v-card outlined class="rounded-lg pa-4 mb-4">
+                        <div class="text-subtitle-1 font-weight-medium mb-2">仅今天的学习上限</div>
+                        <div class="caption text--secondary mb-3">临时增加量会在下一个学习日自动失效，不修改永久设置。</div>
+                        <v-text-field
+                            v-model.number="todayLimits.new_limit_delta"
+                            type="number"
+                            min="0"
+                            max="999"
+                            label="额外新卡"
+                            outlined
+                            dense
+                        ></v-text-field>
+                        <v-text-field
+                            v-model.number="todayLimits.review_limit_delta"
+                            type="number"
+                            min="0"
+                            max="9999"
+                            label="额外复习卡"
+                            outlined
+                            dense
+                        ></v-text-field>
+                        <v-switch
+                            v-model="todayLimits.pause_new_cards"
+                            label="今天暂停新卡"
+                            class="mt-0"
+                        ></v-switch>
+                        <v-btn small color="primary" :loading="limitsSaving" @click="saveTodayLimits">应用</v-btn>
+                        <v-btn small text :disabled="limitsSaving" @click="clearTodayLimits">清除</v-btn>
+                    </v-card>
+
+                    <v-card outlined class="rounded-lg pa-4">
+                        <div class="d-flex align-center mb-2">
+                            <div class="text-subtitle-1 font-weight-medium">已保存会话</div>
+                            <v-spacer></v-spacer>
+                            <v-btn icon small :loading="savedLoading" @click="loadSaved">
+                                <v-icon small>mdi-refresh</v-icon>
+                            </v-btn>
+                        </div>
+                        <v-progress-linear v-if="savedLoading" indeterminate></v-progress-linear>
+                        <v-alert v-else-if="!savedSessions.length" type="info" dense text>
+                            还没有保存的会话。
+                        </v-alert>
+                        <v-list v-else dense>
+                            <v-list-item v-for="item in savedSessions" :key="item.id">
+                                <v-list-item-content>
+                                    <v-list-item-title>{{ item.name }}</v-list-item-title>
+                                    <v-list-item-subtitle>
+                                        {{ scenarioLabel(item.scenario) }} · {{ statusLabel(item.status) }}
+                                    </v-list-item-subtitle>
+                                </v-list-item-content>
+                                <v-list-item-action>
+                                    <v-btn small text color="primary" @click="openSaved(item)">打开</v-btn>
+                                </v-list-item-action>
+                            </v-list-item>
+                        </v-list>
+                    </v-card>
+                </v-col>
+            </v-row>
+        </div>
     </v-container>
 </template>
 
 <script>
-    import CustomStudySession from './CustomStudySession.vue';
-
-    const SESSION_TOKEN_KEY = 'linguacafe.custom-study.preview-token';
-    const ALLOWED_MODES = ['today_forgotten', 'overdue', 'marked', 'source_chapter', 'leech_attention'];
+    import SpecialStudySession from './SpecialStudySession.vue';
 
     export default {
-        components: {
-            CustomStudySession,
-        },
+        components: { SpecialStudySession },
         data() {
             return {
-                mode: 'today_forgotten',
-                chapterId: null,
-                leechSubMode: 'leech_only',
+                scenario: 'today_forgotten',
+                executionMode: 'preview',
+                sort: 'lowest_retrievability',
+                days: 7,
                 cardLimit: 100,
-                chapterOptions: [],
-                chapterOptionsLoading: false,
+                name: '',
+                filters: {
+                    tag_ids: [],
+                    markers: [],
+                    article_ids: [],
+                    chapter_ids: [],
+                    lifecycle_states: ['active'],
+                    fsrs_states: [],
+                },
+                options: { tags: [], markers: [], articles: [], chapters: [] },
+                activeSession: null,
+                savedSessions: [],
+                savedLoading: false,
                 starting: false,
                 error: '',
-                chapterError: '',
-                cardLimitError: '',
-                activeToken: '',
-                initialSessionPayload: null,
+                limitsSaving: false,
+                todayLimits: {
+                    new_limit_delta: 0,
+                    review_limit_delta: 0,
+                    pause_new_cards: false,
+                },
+                scenarioItems: [
+                    { value: 'today_forgotten', label: '今天回答 Again 的词义' },
+                    { value: 'backlog', label: '逾期与积压' },
+                    { value: 'review_ahead', label: '提前复习未来卡片' },
+                    { value: 'recent_new', label: '预览最近新建词义' },
+                    { value: 'filtered', label: '按筛选条件学习' },
+                ],
+                sortItems: [
+                    { value: 'most_overdue', label: '最逾期优先' },
+                    { value: 'most_lapses', label: 'Lapses 最多优先' },
+                    { value: 'lowest_retrievability', label: '可提取率最低优先' },
+                    { value: 'random', label: '随机（本次固定）' },
+                    { value: 'source', label: '按文章来源' },
+                ],
+                lifecycleItems: [
+                    { value: 'active', label: 'Active' },
+                    { value: 'buried', label: 'Buried' },
+                    { value: 'suspended', label: 'Suspended' },
+                    { value: 'archived', label: 'Archived' },
+                ],
+                fsrsStateItems: [
+                    { value: 'new', label: 'New' },
+                    { value: 'learning', label: 'Learning' },
+                    { value: 'review', label: 'Review' },
+                    { value: 'relearning', label: 'Relearning' },
+                ],
             };
         },
-        watch: {
-            mode(value) {
-                this.error = '';
-                this.chapterError = '';
-                if (value === 'source_chapter') {
-                    this.loadChapterOptions();
+        computed: {
+            availableExecutionModes() {
+                if (this.scenario === 'recent_new') {
+                    return [{ value: 'preview', label: '预览（不影响排程）' }];
                 }
+                if (this.scenario === 'review_ahead') {
+                    return [
+                        { value: 'preview', label: '预览（不影响排程）' },
+                        { value: 'early_review', label: '提前正式复习（会重新排程）' },
+                    ];
+                }
+                return [
+                    { value: 'preview', label: '预览（不影响排程）' },
+                    { value: 'formal', label: '正式评分（写入 ReviewLog 与 FSRS）' },
+                ];
+            },
+            impactAlert() {
+                if (this.executionMode === 'preview') {
+                    return { type: 'info', text: '预览模式：按钮只推进本次会话，不写 ReviewLog，也不改变 FSRS 或正常队列。' };
+                }
+                if (this.executionMode === 'early_review') {
+                    return { type: 'warning', text: '提前正式复习：每次评分都会写入 ReviewLog，并按当前时刻重新计算 FSRS 到期时间。' };
+                }
+                return { type: 'warning', text: '正式评分：每次回答都会进入正常 ReviewLog、FSRS 和撤销账本，并计入今天的复习数量。' };
+            },
+            showDays() {
+                return ['review_ahead', 'recent_new'].includes(this.scenario);
+            },
+            validDefinition() {
+                return Number.isInteger(Number(this.cardLimit))
+                    && Number(this.cardLimit) >= 1
+                    && Number(this.cardLimit) <= 500
+                    && (!this.showDays || (
+                        Number.isInteger(Number(this.days))
+                        && Number(this.days) >= 1
+                        && Number(this.days) <= 365
+                    ));
+            },
+            chapterOptions() {
+                return this.options.chapters.map(item => ({
+                    id: item.id,
+                    label: `${item.article_name || '未命名材料'} · ${item.name || `章节 ${item.id}`}`,
+                }));
             },
         },
-        computed: {
-            validCardLimit() {
-                const cardLimit = Number(this.cardLimit);
-                return Number.isInteger(cardLimit) && cardLimit >= 1 && cardLimit <= 500
-                    ? cardLimit
-                    : null;
-            },
-            selectedChapterOption() {
-                if (!Number.isInteger(this.chapterId)) {
-                    return null;
+        watch: {
+            scenario() {
+                const allowed = this.availableExecutionModes.map(item => item.value);
+                if (!allowed.includes(this.executionMode)) {
+                    this.executionMode = allowed[0];
                 }
-                return this.chapterOptions.find((item) => item.id === this.chapterId) || null;
             },
-            canStart() {
-                if (!this.validCardLimit) {
-                    return false;
+            executionMode(value) {
+                if (value !== 'preview') {
+                    this.filters.lifecycle_states = ['active'];
                 }
-                return this.mode !== 'source_chapter' || Boolean(this.selectedChapterOption);
             },
         },
         mounted() {
-            const requestedMode = this.$route.query.mode;
-            if (typeof requestedMode === 'string' && ALLOWED_MODES.includes(requestedMode)) {
-                this.mode = requestedMode;
-                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
-                return;
-            }
-            this.activeToken = window.sessionStorage.getItem(SESSION_TOKEN_KEY) || '';
+            this.loadOptions();
+            this.loadSaved();
+            this.loadTodayLimits();
         },
         methods: {
-            loadChapterOptions() {
-                if (this.chapterOptionsLoading || this.chapterOptions.length) {
-                    return;
+            async loadOptions() {
+                try {
+                    const response = await axios.get('/special-study/options');
+                    this.options = Object.assign(this.options, response.data || {});
+                } catch (error) {
+                    this.error = '无法加载专项学习筛选项。';
                 }
-
-                this.chapterOptionsLoading = true;
-                axios.get('/custom-study/chapter-options')
-                    .then((response) => {
-                        const items = response.data && Array.isArray(response.data.items) ? response.data.items : [];
-                        this.chapterOptions = items.map((item) => ({
-                            id: item.chapter_id,
-                            candidateCount: item.candidate_count,
-                            label: this.chapterLabel(item),
-                        }));
-                    })
-                    .catch(() => {
-                        this.error = '无法加载可用篇章，请稍后重试。';
-                    })
-                    .finally(() => {
-                        this.chapterOptionsLoading = false;
-                    });
             },
-            chapterLabel(item) {
-                const bookTitle = item.book_name || '未命名材料';
-                const chapterTitle = item.chapter_name || `篇章 ${item.chapter_id}`;
-                const count = Number.isInteger(item.candidate_count) ? ` · ${item.candidate_count} 张可用卡片` : '';
-                return `${bookTitle} · ${chapterTitle}${count}`;
+            async loadSaved() {
+                this.savedLoading = true;
+                try {
+                    const response = await axios.get('/special-study/sessions');
+                    this.savedSessions = response.data.sessions || [];
+                } catch (error) {
+                    this.error = '无法加载已保存会话。';
+                } finally {
+                    this.savedLoading = false;
+                }
             },
-            validateCardLimit() {
-                this.cardLimitError = this.validCardLimit
-                    ? ''
-                    : '请输入 1 到 500 之间的整数。';
-                return Boolean(this.validCardLimit);
+            async loadTodayLimits() {
+                try {
+                    const response = await axios.get('/reviews/senses/today-limits');
+                    const override = response.data.override || {};
+                    this.todayLimits = {
+                        new_limit_delta: Number(override.new_limit_delta || 0),
+                        review_limit_delta: Number(override.review_limit_delta || 0),
+                        pause_new_cards: Boolean(override.pause_new_cards),
+                    };
+                } catch (error) {
+                    this.error = '无法加载今天的学习上限。';
+                }
             },
-            startSession() {
-                this.error = '';
-                this.chapterError = '';
-
-                if (!this.validateCardLimit()) {
-                    return;
+            async saveTodayLimits() {
+                this.limitsSaving = true;
+                try {
+                    await axios.put('/reviews/senses/today-limits', this.todayLimits);
+                } catch (error) {
+                    this.applyError(error, '无法保存今天的学习上限。');
+                } finally {
+                    this.limitsSaving = false;
                 }
-                const cardLimit = this.validCardLimit;
-
-                const parameters = {};
-                if (this.mode === 'source_chapter') {
-                    if (!Number.isInteger(this.chapterId) || this.chapterId <= 0) {
-                        this.chapterError = '请选择一个篇章。';
-                        return;
-                    }
-                    parameters.chapter_id = this.chapterId;
+            },
+            async clearTodayLimits() {
+                this.limitsSaving = true;
+                try {
+                    await axios.delete('/reviews/senses/today-limits');
+                    this.todayLimits = { new_limit_delta: 0, review_limit_delta: 0, pause_new_cards: false };
+                } catch (error) {
+                    this.applyError(error, '无法清除今天的学习上限。');
+                } finally {
+                    this.limitsSaving = false;
                 }
-                if (this.mode === 'leech_attention') {
-                    parameters.sub_mode = this.leechSubMode;
-                }
-
+            },
+            async startSession() {
+                if (!this.validDefinition) return;
                 this.starting = true;
-                axios.post('/custom-study/sessions', {
-                    mode: this.mode,
-                    parameters: parameters,
-                    card_limit: cardLimit,
-                })
-                    .then((response) => {
-                        const payload = response.data || {};
-                        if (!payload.token) {
-                            this.error = '创建预览会话失败，请重试。';
-                            return;
-                        }
-                        this.initialSessionPayload = payload;
-                        this.updateToken(payload.token);
-                    })
-                    .catch((requestError) => {
-                        this.applyRequestError(requestError);
-                    })
-                    .finally(() => {
-                        this.starting = false;
+                this.error = '';
+                try {
+                    const response = await axios.post('/special-study/sessions', {
+                        scenario: this.scenario,
+                        execution_mode: this.executionMode,
+                        sort: this.sort,
+                        days: Number(this.days),
+                        card_limit: Number(this.cardLimit),
+                        name: this.name.trim() || null,
+                        filters: this.filters,
                     });
-            },
-            updateToken(token) {
-                if (!token) {
-                    return;
+                    this.activeSession = response.data;
+                    if (response.data.saved) await this.loadSaved();
+                } catch (error) {
+                    this.applyError(error, '无法建立专项学习会话。');
+                } finally {
+                    this.starting = false;
                 }
-                this.activeToken = token;
-                window.sessionStorage.setItem(SESSION_TOKEN_KEY, token);
             },
-            onSessionExpired(message) {
-                this.clearSession();
-                this.error = message || '预览会话已过期或不存在。';
-            },
-            clearSession() {
-                this.activeToken = '';
-                this.initialSessionPayload = null;
-                window.sessionStorage.removeItem(SESSION_TOKEN_KEY);
-            },
-            applyRequestError(requestError) {
-                const payload = requestError.response && requestError.response.data ? requestError.response.data : null;
-                this.error = payload && payload.message ? payload.message : '请求失败，请稍后重试。';
-                if (payload && payload.error && payload.error.field === 'chapter_id') {
-                    this.chapterError = this.error;
+            async openSaved(item) {
+                this.error = '';
+                try {
+                    const response = await axios.get(`/special-study/sessions/${item.id}`);
+                    this.activeSession = response.data;
+                } catch (error) {
+                    this.applyError(error, '无法打开已保存会话。');
                 }
-                if (payload && payload.error && payload.error.field === 'card_limit') {
-                    this.cardLimitError = this.error;
-                }
+            },
+            applySession(session) {
+                this.activeSession = session;
+                if (session && session.saved) this.loadSaved();
+            },
+            leaveSession() {
+                this.activeSession = null;
+                this.loadSaved();
+            },
+            applyError(error, fallback) {
+                const payload = error.response && error.response.data;
+                this.error = payload && payload.message ? payload.message : fallback;
+            },
+            scenarioLabel(value) {
+                const item = this.scenarioItems.find(candidate => candidate.value === value);
+                return item ? item.label : value;
+            },
+            statusLabel(value) {
+                return { active: '进行中', completed: '已完成', ended: '已结束' }[value] || value;
             },
         },
     };
 </script>
 
 <style scoped>
-    .custom-study-setup {
-        max-width: 760px;
+    .special-study-setup {
+        max-width: 1180px;
         margin: 0 auto;
-    }
-
-    .custom-study-card-limit {
-        max-width: 320px;
     }
 </style>

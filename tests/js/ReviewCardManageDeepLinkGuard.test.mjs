@@ -284,16 +284,24 @@ test('ReviewCardManage.vue shows deep link hint when opened from report', () => 
     assert.ok(/deepLink\.active/.test(src), 'ReviewCardManage must track deepLink.active state');
 });
 
-test('ReviewCardManage.vue does not write ReviewLog or modify FSRS during deep link', () => {
+test('deep-link opening is read-only and does not auto-trigger Card Info actions', () => {
     const src = readFileSync(MANAGE_PATH, 'utf-8');
     const drawer = readFileSync(DRAWER_PATH, 'utf-8');
-    // Extract the loadDeepLinkDetail method block
     const methodMatch = src.match(/loadDeepLinkDetail\(reviewCardId\)\s*\{([\s\S]*?)\n\s*\},/);
     assert.ok(methodMatch, 'loadDeepLinkDetail method must exist');
     const methodBody = methodMatch[1];
     assert.ok(!/axios\./.test(methodBody), 'parent deep-link handoff must not make an HTTP request');
     assert.ok(/axios\.get/.test(drawer), 'drawer must use the canonical read request');
-    assert.ok(!/axios\.(post|put|delete|patch)/.test(drawer), 'drawer must NOT use write APIs');
+    assert.equal((drawer.match(/axios\.post\s*\(/g) || []).length, 1, 'drawer exposes only explicit manual-operation undo/redo');
+    assert.ok(/transitionManualOperation\(operation, direction\)/.test(drawer));
+    const watchStart = drawer.indexOf('    watch: {');
+    const methodsStart = drawer.indexOf('    methods: {', watchStart);
+    assert.ok(watchStart >= 0 && methodsStart > watchStart, 'watch section must exist');
+    const watchSection = drawer.slice(watchStart, methodsStart);
+    assert.ok(!watchSection.includes('transitionManualOperation'), 'opening a deep link must not auto-trigger the explicit write action');
+    assert.ok(watchSection.includes('this.loadCardInfo(reviewCardId)'), 'opening a deep link only loads canonical detail');
+    assert.ok(!/\/rate\b|lifecycle-actions|manual-operations\/(preview|apply)|bulk-delete/.test(drawer),
+        'drawer must not own rating, lifecycle, scheduling apply or delete writes');
 });
 
 test('ReviewCardManage.vue preserves review_card_id in URL for refresh', () => {

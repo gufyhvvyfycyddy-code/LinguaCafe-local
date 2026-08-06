@@ -3,6 +3,7 @@
 namespace App\Services\CustomStudy\Queries;
 
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Services\ReviewStudyTimezoneService;
 use App\Services\SenseReviewQueryService;
 use Carbon\Carbon;
@@ -61,7 +62,10 @@ class TodayForgottenQuery
                     ->whereColumn('review_logs.review_card_id', 'review_cards.id')
                     ->where('review_logs.user_id', $userId)
                     ->where('review_logs.language_id', $language)
-                    ->where('review_logs.source', 'sense_review')
+                    ->whereIn(
+                        'review_logs.source',
+                        ReviewLog::FORMAL_RATING_SOURCES,
+                    )
                     ->where('review_logs.rating', 'again')
                     ->whereNull('review_logs.undone_at')
                     ->where('review_logs.reviewed_at', '>=', $dayStart)

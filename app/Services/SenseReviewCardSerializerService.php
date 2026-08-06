@@ -41,6 +41,7 @@ class SenseReviewCardSerializerService
         private WordSenseExamplePoolService $examplePoolService,
         private SenseReviewLearningFeedbackService $feedbackService,
         private SenseExampleIdentityResolver $exampleIdentityResolver,
+        private MediaManifestService $mediaManifest,
     ) {
     }
 
@@ -205,12 +206,18 @@ class SenseReviewCardSerializerService
             'displayed_occurrence_id' => $displayedOccurrenceId,
             'occurrence_count' => $occurrenceCount,
             'example_source_status' => $exampleSourceStatus,
+            'media' => $options['media'] ?? $this->mediaManifest->forSense(
+                (int) $sense->user_id,
+                (string) $sense->language_id,
+                (int) $sense->id,
+            ),
             'fsrs_state' => $card->fsrs_state,
             'fsrs_due_at' => $card->fsrs_due_at,
             'fsrs_stability' => $card->fsrs_stability,
             'fsrs_difficulty' => $card->fsrs_difficulty,
             'fsrs_reps' => $card->fsrs_reps,
             'fsrs_lapses' => $card->fsrs_lapses,
+            'marker' => (int) ($card->marker ?? 0),
             // SenseReview-LearningFeedback-1000-1: read-only aggregate of
             // this card's ReviewLog history. Delegated to the dedicated
             // SenseReviewLearningFeedbackService (single source of truth for
@@ -280,14 +287,20 @@ class SenseReviewCardSerializerService
             }
         }
         $translationAssists = $this->translationAssistMap($chapterIds, $userIds, $languages);
+        $mediaBySense = $this->mediaManifest->forSenseIds(
+            (int) $cards->first()->sense->user_id,
+            (string) $cards->first()->sense->language_id,
+            $cards->map(fn (ReviewCard $card) => (int) $card->sense->id)->all(),
+        );
 
-        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $exampleBatch, $options) {
+        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $exampleBatch, $mediaBySense, $options) {
             $perCardOptions = $options;
             $perCardOptions['learning_feedback'] = $feedbackMap[$card->id] ?? null;
             $perCardOptions['example_candidates'] = $candidateMap[$card->id];
             $perCardOptions['translation_assists'] = $translationAssists;
             $perCardOptions['token_chapters'] = $exampleBatch['chapters'];
             $perCardOptions['occurrence_evidence'] = $exampleBatch['occurrence_evidence'];
+            $perCardOptions['media'] = $mediaBySense[$card->sense->id] ?? [];
 
             return $this->serialize($card, $perCardOptions);
         })->values()->all();

@@ -206,14 +206,14 @@ class SenseReviewSelectedExampleAlignmentTest extends TestCase
         $queries = collect(DB::getQueryLog());
         DB::disableQueryLog();
 
-        foreach (['word_sense_occurrences', 'chapters', 'chapter_ai_reading_assists', 'review_logs'] as $table) {
+        foreach (['word_sense_occurrences', 'chapters', 'chapter_ai_reading_assists', 'review_logs', 'media_references'] as $table) {
             $this->assertLessThanOrEqual(
                 1,
                 $queries->filter(fn (array $query) => str_contains(strtolower($query['query'] ?? ''), $table))->count(),
                 "{$table} query count must stay constant for {$cardCount} cards.",
             );
         }
-        $this->assertLessThanOrEqual(4, $queries->count());
+        $this->assertLessThanOrEqual(5, $queries->count());
         $this->assertSame($second->id, $second->fresh()->id);
         $this->assertSame($prototypeSense->id, $prototypeSense->fresh()->id);
     }

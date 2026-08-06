@@ -58,6 +58,8 @@ const expectedApiMethods = [
     'updateDailyLimits',
     'getQueueOrder',
     'updateQueueOrder',
+    'getAdvancedReviewSettings',
+    'updateAdvancedReviewSettings',
     'previewOptimization',
     'applyOptimization',
     'restoreDefaultParameters',
@@ -68,7 +70,7 @@ const expectedApiMethods = [
 for (const method of expectedApiMethods) {
     assert.match(api, new RegExp(`export function ${method}\\b`), `API client must export ${method}`);
 }
-assert.equal((api.match(/axios\./g) || []).length, 21, 'all 21 settings HTTP calls must live in the API client');
+assert.equal((api.match(/axios\./g) || []).length, 23, 'all 23 settings HTTP calls must live in the API client');
 
 for (const panelPath of panelPaths) {
     const panel = read(panelPath);

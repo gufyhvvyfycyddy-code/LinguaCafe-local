@@ -29,7 +29,7 @@ final class ReviewCardManageFilterState
     {
         return self::fromArray($request->only([
             'q', 'filter', 'sort_by', 'sort_dir', 'fsrs_states',
-            'due_range', 'reps_min', 'lapses_min',
+            'due_range', 'reps_min', 'lapses_min', 'tag_ids',
         ]));
     }
 
@@ -56,6 +56,8 @@ final class ReviewCardManageFilterState
             'due_range' => ['sometimes', 'string', 'in:' . implode(',', self::DUE_RANGES)],
             'reps_min' => ['sometimes', 'nullable', 'integer', 'min:0'],
             'lapses_min' => ['sometimes', 'nullable', 'integer', 'min:0'],
+            'tag_ids' => ['sometimes', 'array', 'max:20'],
+            'tag_ids.*' => ['integer', 'min:1', 'distinct'],
         ]);
         $validator->validate();
 
@@ -73,6 +75,7 @@ final class ReviewCardManageFilterState
             'due_range' => $input['due_range'] ?? 'all',
             'reps_min' => self::nullableInt($input['reps_min'] ?? null),
             'lapses_min' => self::nullableInt($input['lapses_min'] ?? null),
+            'tag_ids' => self::sortedIds($input['tag_ids'] ?? []),
         ]);
     }
 
@@ -89,5 +92,13 @@ final class ReviewCardManageFilterState
     private static function nullableInt($value): ?int
     {
         return $value === null || $value === '' ? null : (int) $value;
+    }
+
+    private static function sortedIds(array $values): array
+    {
+        $values = array_values(array_unique(array_map('intval', $values)));
+        sort($values, SORT_NUMERIC);
+
+        return $values;
     }
 }

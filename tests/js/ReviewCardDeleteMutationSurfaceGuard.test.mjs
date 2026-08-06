@@ -53,8 +53,7 @@ for (const state of [
 
 assert.match(surface, /visibleBulkDeleteItems/);
 assert.match(surface, /hiddenBulkDeleteCount/);
-assert.match(surface, /复习历史会保留/);
-assert.match(surface, /阅读来源记录会保留/);
+assert.match(surface, /复习历史和阅读来源记录会保留/);
 assert.match(surface, /最后一个已确认词义/);
 assert.match(surface, /不会按筛选条件全量删除/);
 assert.match(surface, /if \(!this\.deleteTarget \|\| this\.deleteLoading\) return/);

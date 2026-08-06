@@ -15,6 +15,13 @@ class ReviewCardManageItemSerializerService
      */
     public function buildItems($cards, int $userId, string $language)
     {
+        $cards->loadMissing(['sense.tags' => function ($tagQuery) use ($userId, $language) {
+            $tagQuery->where('word_sense_tags.user_id', $userId)
+                ->where('word_sense_tags.language_id', $language)
+                ->orderBy('word_sense_tags.normalized_name')
+                ->orderBy('word_sense_tags.id');
+        }]);
+
         // Collect all sense IDs
         $senseIds = $cards->pluck('target_id')->filter()->unique()->values()->toArray();
 
@@ -110,6 +117,7 @@ class ReviewCardManageItemSerializerService
                 'fsrs_last_reviewed_at' => optional($card->fsrs_last_reviewed_at)->toISOString(),
                 'aliases_zh' => $sense->aliases_zh ?: [],
                 'collocations' => $sense->collocations ?: [],
+                'tags' => $this->serializeTags($sense),
                 'fsrs_enabled' => $card->fsrs_enabled,
                 'marker' => (int) $card->marker,
                 // ADR-0010: lifecycle fields (no audit metadata exposed)
@@ -129,6 +137,12 @@ class ReviewCardManageItemSerializerService
      */
     public function serializeCard(ReviewCard $card, WordSense $sense): array
     {
+        $sense->loadMissing(['tags' => function ($tagQuery) use ($sense) {
+            $tagQuery->where('word_sense_tags.user_id', $sense->user_id)
+                ->where('word_sense_tags.language_id', $sense->language_id)
+                ->orderBy('word_sense_tags.normalized_name')
+                ->orderBy('word_sense_tags.id');
+        }]);
         $occurrenceChapterId = WordSenseOccurrence::query()
             ->where('word_sense_id', $sense->id)
             ->where('user_id', $sense->user_id)
@@ -163,6 +177,7 @@ class ReviewCardManageItemSerializerService
             'example_sentence_zh' => $sense->example_sentence_zh,
             'aliases_zh' => $sense->aliases_zh ?: [],
             'collocations' => $sense->collocations ?: [],
+            'tags' => $this->serializeTags($sense),
             'source_chapter_id' => $sourceChapterId,
             'source_chapter_title' => $sourceChapterTitle,
             'source_kind' => $sourceKind,
@@ -227,5 +242,17 @@ class ReviewCardManageItemSerializerService
             return 'card_example';
         }
         return 'missing';
+    }
+
+    private function serializeTags(WordSense $sense): array
+    {
+        return $sense->tags
+            ->sortBy(fn ($tag) => [$tag->normalized_name, $tag->id])
+            ->values()
+            ->map(fn ($tag) => [
+                'id' => $tag->id,
+                'name' => $tag->name,
+            ])
+            ->all();
     }
 }

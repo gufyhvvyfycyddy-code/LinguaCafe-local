@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -32,7 +33,7 @@ class ReviewDailyProgressQueryService
             ->where('cards.user_id', $userId)
             ->where('cards.language_id', $language)
             ->where('cards.target_type', ReviewCard::TARGET_SENSE)
-            ->where('candidate.source', 'sense_review')
+            ->whereIn('candidate.source', ReviewLog::FORMAL_RATING_SOURCES)
             ->where('candidate.rating', '!=', 'reset')
             ->whereNull('candidate.undone_at')
             ->where('candidate.previous_state', 'new')
@@ -43,7 +44,10 @@ class ReviewDailyProgressQueryService
                     ->from('review_logs as earlier')
                     ->whereColumn('earlier.review_card_id', 'candidate.review_card_id')
                     ->whereColumn('earlier.id', '<', 'candidate.id')
-                    ->where('earlier.source', 'sense_review')
+                    ->whereIn(
+                        'earlier.source',
+                        ReviewLog::FORMAL_RATING_SOURCES,
+                    )
                     ->where('earlier.rating', '!=', 'reset')
                     ->whereNull('earlier.undone_at');
             })

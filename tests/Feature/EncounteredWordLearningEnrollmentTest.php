@@ -143,6 +143,7 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
 
         app(VocabularyService::class)->updateWord(
             $this->user->id,
+            'english',
             $word->id,
             ['translation' => '纯内容编辑', 'reading' => 'reading', 'study_base' => 'base'],
             null,
@@ -165,6 +166,7 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
 
         app(VocabularyService::class)->updateWord(
             $this->user->id,
+            'english',
             $word->id,
             ['translation' => '新词内容'],
             null,
@@ -195,7 +197,12 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
         ])->save();
         $snapshot = $card->fresh()->only(['fsrs_state', 'fsrs_stability', 'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled', 'fsrs_due_at']);
 
-        app(VocabularyService::class)->updateWord($this->user->id, $word->id, ['translation' => 'after']);
+        app(VocabularyService::class)->updateWord(
+            $this->user->id,
+            'english',
+            $word->id,
+            ['translation' => 'after']
+        );
 
         $this->assertEquals($snapshot, $card->fresh()->only(array_keys($snapshot)));
         $this->assertSame(0, WordSense::count());
@@ -207,12 +214,12 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
         $word = $this->word('explicit-stage', 2, ['translation' => '旧翻译']);
         $service = app(VocabularyService::class);
 
-        $service->updateWord($this->user->id, $word->id, [], -7);
+        $service->updateWord($this->user->id, 'english', $word->id, [], -7);
         $card = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->firstOrFail();
         $this->assertTrue((bool) $card->fsrs_enabled);
         $this->assertSame(1, WordSense::where('encountered_word_id', $word->id)->count());
 
-        $service->updateWord($this->user->id, $word->id, [], 0);
+        $service->updateWord($this->user->id, 'english', $word->id, [], 0);
         $this->assertFalse((bool) $card->fresh()->fsrs_enabled);
     }
 

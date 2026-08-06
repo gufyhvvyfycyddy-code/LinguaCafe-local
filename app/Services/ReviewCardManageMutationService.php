@@ -188,17 +188,31 @@ class ReviewCardManageMutationService
      */
     public function updateSenseTextFields(WordSense $sense, Request $request): WordSense
     {
+        $changes = [];
         foreach (self::EDITABLE_FIELDS as $field) {
             if ($request->has($field)) {
-                $value = $request->input($field);
-
-                // Normalize array fields: accept comma-separated strings or arrays
-                if (in_array($field, ['aliases_zh', 'collocations'], true)) {
-                    $value = $this->normalizeArray($value);
-                }
-
-                $sense->{$field} = $value;
+                $changes[$field] = $request->input($field);
             }
+        }
+
+        return $this->updateSenseTextFieldsFromArray($sense, $changes);
+    }
+
+    /**
+     * Update the same text-field whitelist from an already validated payload.
+     */
+    public function updateSenseTextFieldsFromArray(WordSense $sense, array $changes): WordSense
+    {
+        foreach (self::EDITABLE_FIELDS as $field) {
+            if (!array_key_exists($field, $changes)) {
+                continue;
+            }
+
+            $value = $changes[$field];
+            if (in_array($field, ['aliases_zh', 'collocations'], true)) {
+                $value = $this->normalizeArray($value);
+            }
+            $sense->{$field} = $value;
         }
 
         $sense->save();

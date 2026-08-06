@@ -1,5 +1,36 @@
 <template>
-    <v-card id="vocab-bottom-sheet" color="foreground" @mouseup.stop=";">
+    <v-card
+        id="vocab-bottom-sheet"
+        class="vocab-bottom-sheet-card"
+        color="foreground"
+        role="dialog"
+        aria-label="点词与短语工具"
+        data-testid="vocabulary-bottom-sheet-card"
+        @mouseup.stop=";"
+    >
+        <div class="vocab-bottom-sheet-grip" aria-hidden="true"></div>
+        <div class="vocab-bottom-sheet-header">
+            <div class="vocab-bottom-sheet-heading">
+                <div class="caption text--secondary">点词结果</div>
+                <div class="text-h6 text-truncate" data-testid="mobile-selection-title">
+                    {{ selectionTitle }}
+                </div>
+                <div class="caption text--secondary">
+                    轻点查词；长按后拖动可选择短语
+                </div>
+            </div>
+            <v-btn
+                icon
+                large
+                class="vocab-bottom-sheet-close"
+                aria-label="关闭点词面板"
+                data-testid="close-mobile-vocabulary-sheet"
+                @click="unselectAllWords"
+            >
+                <v-icon>mdi-close</v-icon>
+            </v-btn>
+        </div>
+
         <!-- Content -->
         <div class="px-3">
             <v-tabs-items v-model="tab">
@@ -175,20 +206,22 @@
             <!-- Stage buttons-->
             <template v-if="type !== 'new-phrase'">
                 <div id="vocabulary-bottom-sheet-stage-buttons" class="mb-1">
-                    <v-btn :class="{'v-btn--active': stage == -7}" @click="setStage(-7)">7</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -6}" @click="setStage(-6)">6</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -5}" @click="setStage(-5)">5</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -4}" @click="setStage(-4)">4</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -3}" @click="setStage(-3)">3</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -2}" @click="setStage(-2)">2</v-btn>
-                    <v-btn :class="{'v-btn--active': stage == -1}" @click="setStage(-1)">1</v-btn>
+                    <v-btn aria-label="学习阶段 7" :class="{'v-btn--active': stage == -7}" @click="setStage(-7)">7</v-btn>
+                    <v-btn aria-label="学习阶段 6" :class="{'v-btn--active': stage == -6}" @click="setStage(-6)">6</v-btn>
+                    <v-btn aria-label="学习阶段 5" :class="{'v-btn--active': stage == -5}" @click="setStage(-5)">5</v-btn>
+                    <v-btn aria-label="学习阶段 4" :class="{'v-btn--active': stage == -4}" @click="setStage(-4)">4</v-btn>
+                    <v-btn aria-label="学习阶段 3" :class="{'v-btn--active': stage == -3}" @click="setStage(-3)">3</v-btn>
+                    <v-btn aria-label="学习阶段 2" :class="{'v-btn--active': stage == -2}" @click="setStage(-2)">2</v-btn>
+                    <v-btn aria-label="学习阶段 1" :class="{'v-btn--active': stage == -1}" @click="setStage(-1)">1</v-btn>
                     <v-btn 
+                        aria-label="标为已知"
                         :class="{'v-btn--active': stage == 0}"
                         @click="setStage(0)" 
                     >
                         <v-icon>mdi-check</v-icon>
                     </v-btn>
                     <v-btn 
+                        aria-label="忽略"
                         :class="{'v-btn--active': stage == 1}" 
                         @click="setStage(1)" 
                         v-if="type == 'word'"
@@ -245,10 +278,11 @@
             <!-- Close button -->
             <v-btn 
                 class="w-100 mx-0 mt-2"
-                height="42px"
+                height="48px"
                 color="primary" 
                 rounded 
                 depressed 
+                data-testid="close-mobile-vocabulary-sheet-bottom"
                 @click="unselectAllWords()"
             >关闭</v-btn>
         </v-card-actions>
@@ -285,7 +319,8 @@ export default {
         anyApiDictionaryEnabled: Boolean,
         textToSpeechAvailable: Boolean,
     },
-    computed: mapState({
+    computed: {
+        ...mapState({
             active: state => state.vocabularyBox.active,
             type: state => state.vocabularyBox.type,
             word: state => state.vocabularyBox.word,
@@ -303,12 +338,19 @@ export default {
             width: state => state.vocabularyBox.width,
             height: state => state.vocabularyBox.height,
         }),
+        selectionTitle() {
+            if (this.type !== 'word' && this.phraseText.trim()) {
+                return this.phraseText.trim();
+            }
+            return this.word || '已选择内容';
+        },
+    },
     mounted() {
         this.updateDataFromStore();
 
         // generate phrase text
         for (let wordIndex = 0; wordIndex < this.phrase.length; wordIndex++) {
-            if (this.phrase.word === 'NEWLINE') {
+            if (this.phrase[wordIndex].word === 'NEWLINE') {
                 continue;
             }
             
