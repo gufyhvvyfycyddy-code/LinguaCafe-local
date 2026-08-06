@@ -24,11 +24,21 @@ class ImportSupportedDictionaryRequest extends FormRequest
     public function rules()
     {
         return [
-            'dictionaryName' => 'required|string',
-            'dictionaryFileName' => 'required|string',
-            'dictionarySourceLanguage' => 'required|string',
-            'dictionaryTargetLanguage' => 'required|string',
-            'dictionaryDatabaseName' => 'required|string',
+            'dictionaryName' => ['required', 'string', 'max:255'],
+            'dictionaryFileName' => [
+                'required',
+                'string',
+                'max:255',
+                'regex:/\A(?!.*\.\.)(?!.*[\/\\\\\x00])[^\/\\\\\x00]+\z/u',
+            ],
+            'dictionarySourceLanguage' => ['required', 'string', 'max:64'],
+            'dictionaryTargetLanguage' => ['required', 'string', 'max:64'],
+            'dictionaryDatabaseName' => [
+                'required',
+                'string',
+                'max:40',
+                'regex:/\Adict_[a-z0-9_]+\z/',
+            ],
         ];
     }
 }

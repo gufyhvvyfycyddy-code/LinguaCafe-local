@@ -5,12 +5,10 @@ namespace App\Http\Controllers;
 use App\Http\Requests\Dictionaries\CreateCustomApiDictionaryRequest;
 use App\Models\Dictionary;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use App\Services\DictionaryService;
 use Illuminate\Support\Facades\Auth;
 
 // services
-use Illuminate\Support\Facades\Schema;
 use App\Services\DictionaryImportService;
 
 // request classes
@@ -303,46 +301,28 @@ class DictionaryController extends Controller
         return json_encode($dictionariesFound);
     }
 
-    public function importSupportedDictionary(ImportSupportedDictionaryRequest $request) {
+    public function importSupportedDictionary(ImportSupportedDictionaryRequest $request)
+    {
         set_time_limit(2400);
         $userUuid = Auth::user()->uuid;
-        $dictionaryName = $request->post('dictionaryName');
-        $dictionaryFileName = $request->post('dictionaryFileName');
-        $dictionarySourceLanguage = $request->post('dictionarySourceLanguage');
-        $dictionaryTargetLanguage = $request->post('dictionaryTargetLanguage');
-        $dictionaryDatabaseName = $request->post('dictionaryDatabaseName');
-        
+        $validated = $request->validated();
+
         try {
-            $this->dictionaryImportService->importSupportedDictionary(
-                $userUuid, 
-                $dictionaryName, 
-                $dictionaryFileName, 
-                $dictionarySourceLanguage, 
-                $dictionaryTargetLanguage, 
-                $dictionaryDatabaseName
+            $imported = $this->dictionaryImportService->importSupportedDictionary(
+                $userUuid,
+                $validated['dictionaryName'],
+                $validated['dictionaryFileName'],
+                $validated['dictionarySourceLanguage'],
+                $validated['dictionaryTargetLanguage'],
+                $validated['dictionaryDatabaseName']
             );
-        } catch (\Throwable $t) {
-            if ($dictionaryName !== 'JMDict') {
-                DB
-                    ::table('dictionaries')
-                    ->where('database_table_name', $dictionaryDatabaseName)
-                    ->delete();
+        } catch (\Throwable $exception) {
+            report($exception);
+            abort(500, 'Dictionary import failed.');
+        }
 
-                Schema::dropIfExists($dictionaryDatabaseName);
-            }
-            
-            abort(500, $t->getMessage());
-        } catch (\Exception $e) {
-            if ($dictionaryName !== 'JMDict') {
-                DB
-                    ::table('dictionaries')
-                    ->where('database_table_name', $dictionaryDatabaseName)
-                    ->delete();
-
-                Schema::dropIfExists($dictionaryDatabaseName);
-            }
-            
-            abort(500, $e->getMessage());
+        if ($imported !== true) {
+            abort(500, 'Dictionary import failed.');
         }
 
         return response()->json('Dictionary has been imported successfully.', 200);
