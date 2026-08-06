@@ -4,7 +4,7 @@
 
 Accepted
 
-> **Partial supersession:** ADR-0028 replaces only repeated routine approval inside an explicitly authorized persistent goal. Architecture Gate review, scope, safety, and verification remain active; non-goal tasks keep this workflow unchanged.
+> **Partial supersession:** ADR-0031 supersedes ADR-0028 and replaces repeated routine approval inside an explicitly authorized roadmap goal. ADR-0034 adds the delegated decision ladder, testing-only acceptance identity, platform-safety classification, and `Acceptance Deferred — Not Complete` dependency rule. Architecture Gate review, frozen-slice scope, safety, and truthful verification remain active; non-goal tasks keep this workflow unchanged.
 
 ## Context
 
@@ -40,19 +40,19 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 ### 高风险任务完整流程
 
 1. `context-engineering` — 整理最小上下文包
-2. `improve-codebase-architecture` — 架构侦查 + 风险报告（HTML）
+2. FastCtx 驱动的仓库架构侦查 + 风险报告；`improve-codebase-architecture` 可用且适用时优先使用，但不强制某个报告格式或单一工具
 3. `api-and-interface-design` — 如果涉及接口契约、store、props/events、payload 变化
 4. `documentation-and-adrs` — 如果需要 ADR（架构决策改变时）
 5. `doubt-driven-development` — 实施前对抗性审查
-6. **网页端 GPT 判断是否进入实施** — 普通任务不能默认继续；明确持续目标按 ADR-0028 使用已冻结切片的阶段预授权；OpenCode 不能自 Accept
-7. 实施 — 普通任务由用户确认后开始；明确持续目标仅在 ADR-0028 的范围冻结和强制停止条件满足后开始
+6. **实施判断** — 普通任务不能默认继续；明确持续目标按 ADR-0031/ADR-0034/ADR-0037 使用已冻结切片的 roadmap 执行授权和决策梯
+7. 实施 — 普通任务由用户确认后开始；明确持续目标的切片文档若只展开已接受 roadmap，可标记为 `Accepted under current goal authorization`，在范围冻结、依赖证明和保留停止条件满足后直接开始
 8. `code-review-and-quality` — 实施后质量门
 
 ### 关键约束
 
-- OpenCode 不能在 ADR-0028 明确持续目标之外默认继续开发
-- OpenCode 不能自己 Accept
-- 网页端 GPT 是最终判断者
+- OpenCode 不能在 ADR-0031/ADR-0034/ADR-0037 明确持续目标之外默认继续开发
+- OpenCode 不能自行批准新的产品边界；可以冻结并接受当前目标已授权决定的切片化展开
+- 普通任务由网页端 GPT/用户判断；明确持续目标由 Architecture Gate 和可执行证据判断切片是否进入实施
 - 用户是产品判断者
 - 实施前必须有架构报告（或 scouting report）
 - 涉及阅读页必须跑 text reader smoke guard
@@ -84,7 +84,7 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 
 ### 本轮特殊例外
 
-本轮提交 AGENTS.md 和 .opencode/skills/ 是用户明确授权的一次性例外。后续默认禁止随意修改 AGENTS.md。
+修改 AGENTS.md 仍需用户明确授权。本 ADR 的一次性例外已结束；2026-07-28 用户对目标模式消阻规则的再次明确授权记录在 ADR-0037。
 
 ## Alternatives Considered
 
@@ -115,13 +115,13 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 - 更少越界变更（闸门在实施前拦截高风险操作）
 - 更强的可追溯性（ADR 记录每次架构决策）
 - 更适合长期维护（不再无限膨胀大组件）
-- 更清晰的责任边界（OpenCode 执行技能，网页端 GPT 决策，用户最终确认）
+- 更清晰的责任边界（普通任务由用户决策；持续目标由用户预授权边界、Architecture Gate 与证据共同约束）
 
 ### 成本
 
 - 流程更慢：高风险任务需要 7 步走完才能编码
 - 每轮报告更长：需要包含架构审查、风险表、组件边界
-- 需要网页端 GPT 判断：闸门不是自动的，每次需要人决策
+- 普通任务仍需要人工判断；明确持续目标的闸门是自动执行的安全检查，不是逐切片人工暂停点
 
 ### 风险
 
@@ -135,7 +135,7 @@ LinguaCafe 正在通过 Vibe Coding + OpenCode 方式推进本地开发（在项
 - 涉及阅读页必须跑 text reader smoke guard
 - 实施后必须使用 `code-review-and-quality`
 - 最终报告必须直接输出当前对话窗口
-- 普通任务不允许自动进入下一任务；明确持续目标仅按 ADR-0028 在完成切片审计后继续
+- 普通任务不允许自动进入下一任务；明确持续目标按 ADR-0031/ADR-0034/ADR-0037 在完成切片审计后继续，deferred 前置按依赖路径限制且只允许不触及缺失行为的切片
 - 每轮任务必须报告文件变动、数据边界、安全边界
 - 架构闸门不替代 GitHub 最新代码核验
 - 闸门流程应定期回顾（至少每 10 轮任务一次）
