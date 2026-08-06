@@ -1,0 +1,97 @@
+import { describe, expect, it } from 'vitest';
+import { OfflineRepository, type OfflineState, type OfflineStateStore } from './offlineRepository';
+
+class MemoryStore implements OfflineStateStore {
+  readonly values = new Map<string, OfflineState>();
+
+  async read(key: string): Promise<OfflineState | null> {
+    const value = this.values.get(key);
+    return value ? structuredClone(value) : null;
+  }
+
+  async write(key: string, state: OfflineState): Promise<void> {
+    this.values.set(key, structuredClone(state));
+  }
+
+  async delete(key: string): Promise<void> {
+    this.values.delete(key);
+  }
+}
+
+describe('OfflineRepository', () => {
+  it('isolates cached packages by user and language', async () => {
+    const store = new MemoryStore();
+    const english = new OfflineRepository(7, 'English', store);
+    const spanish = new OfflineRepository(7, 'Spanish', store);
+    const otherUser = new OfflineRepository(8, 'English', store);
+
+    await english.saveArticles([{ book_id: 3, name: 'Book', language: 'English', chapter_count: 1 }]);
+
+    expect(await english.articles()).toHaveLength(1);
+    expect(await spanish.articles()).toBeNull();
+    expect(await otherUser.articles()).toBeNull();
+  });
+
+  it('persists snapshots and allocates monotonic rating sequence', async () => {
+    const store = new MemoryStore();
+    const repository = new OfflineRepository(7, 'English', store);
+    await repository.saveChapters(3, [{ chapter_id: 9, name: 'One', token_count: 2 }]);
+    await repository.saveChapterTokens(3, 9, [{
+      position: 1,
+      word: 'Hello',
+      lemma: 'hello',
+      pos: 'noun',
+      source_sentence_identity: 1,
+      is_structure: false,
+      space_after: true,
+    }]);
+    const first = await repository.enqueueRating(10, 'good', 1200, new Date('2026-08-01T00:00:00Z'));
+    const second = await repository.enqueueRating(11, 'again', 900, new Date('2026-08-01T00:00:01Z'));
+
+    expect((await repository.chapters(3))?.[0].chapter_id).toBe(9);
+    expect((await repository.chapterTokens(3, 9))?.[0].lemma).toBe('hello');
+    expect([first.sequence, second.sequence]).toEqual([1, 2]);
+    expect(await repository.pendingCardIds()).toEqual(new Set([10, 11]));
+  });
+
+  it('removes successes, retains retryable actions and records terminal issues', async () => {
+    const repository = new OfflineRepository(7, 'English', new MemoryStore());
+    const applied = await repository.enqueueRating(10, 'good', 100);
+    const retryable = await repository.enqueueRating(11, 'hard', 100);
+    const conflict = await repository.enqueueRating(12, 'easy', 100);
+
+    await repository.applySyncResults([
+      { client_action_id: applied.client_action_id, outcome: 'applied', error: null },
+      {
+        client_action_id: retryable.client_action_id,
+        outcome: 'retryable',
+        error: { code: 'INTERNAL_ERROR', message: 'retry', retryable: true },
+      },
+      {
+        client_action_id: conflict.client_action_id,
+        outcome: 'conflict',
+        error: { code: 'OUT_OF_ORDER_ACTION', message: 'newer rating exists' },
+      },
+    ]);
+
+    expect((await repository.queuedActions()).map(item => item.client_action_id))
+      .toEqual([retryable.client_action_id]);
+    expect(await repository.issues()).toEqual([expect.objectContaining({
+      client_action_id: conflict.client_action_id,
+      code: 'OUT_OF_ORDER_ACTION',
+    })]);
+  });
+
+  it('deletes only the active user-language scope during local sign-out cleanup', async () => {
+    const store = new MemoryStore();
+    const current = new OfflineRepository(7, 'English', store);
+    const other = new OfflineRepository(8, 'English', store);
+    await current.saveArticles([{ book_id: 1, name: 'Current', language: 'English', chapter_count: 1 }]);
+    await other.saveArticles([{ book_id: 2, name: 'Other', language: 'English', chapter_count: 1 }]);
+
+    await current.clear();
+
+    expect(await current.articles()).toBeNull();
+    expect(await other.articles()).toHaveLength(1);
+  });
+});
