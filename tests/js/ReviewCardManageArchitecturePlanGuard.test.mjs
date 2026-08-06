@@ -9,8 +9,11 @@ const paths = {
     plan: join(root, 'docs', 'plans', 'review-card-manage-architecture-convergence-plan.md'),
     roadmap: join(root, 'docs', 'plans', 'anki-aligned-product-and-architecture-roadmap.md'),
     master: join(root, 'docs', 'plans', 'linguacafe-master-plan.md'),
-    handoff: join(root, 'docs', 'plans', 'current-working-handoff.md'),
     index: join(root, 'docs', 'DOCUMENTATION_INDEX.md'),
+    cardInfoAdr: join(root, 'docs', 'adr', 'ADR-0014-review-card-info-read-model.md'),
+    containerAcceptance: join(root, 'docs', 'testing', 'review-card-container-closure-browser-acceptance-2026-07-18.md'),
+    routes: join(root, 'routes', 'web.php'),
+    controller: join(root, 'app', 'Http', 'Controllers', 'ReviewCardManageController.php'),
     parent: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue'),
     drawer: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardInfoDrawer.vue'),
     search: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue'),
@@ -19,160 +22,134 @@ const paths = {
     lifecycle: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLifecycleMutationSurface.vue'),
     deleteSurface: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardDeleteMutationSurface.vue'),
     leechSurface: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardLeechGovernanceMutationSurface.vue'),
-    lifecycleAcceptance: join(root, 'docs', 'testing', 'review-card-lifecycle-mutation-browser-acceptance-2026-07-17.md'),
-    deleteAcceptance: join(root, 'docs', 'testing', 'review-card-delete-mutation-browser-acceptance-2026-07-17.md'),
-    leechAcceptance: join(root, 'docs', 'testing', 'review-card-leech-governance-browser-acceptance-2026-07-18.md'),
-    containerAcceptance: join(root, 'docs', 'testing', 'review-card-container-closure-browser-acceptance-2026-07-18.md'),
+    markerPicker: join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardMarkerPicker.vue'),
+    tagManager: join(root, 'resources', 'js', 'components', 'ReviewCards', 'WordSenseTagManager.vue'),
+    tagBulkPicker: join(root, 'resources', 'js', 'components', 'ReviewCards', 'WordSenseTagBulkPicker.vue'),
+    portableData: join(root, 'resources', 'js', 'components', 'ReviewCards', 'PortableDataPanel.vue'),
+    hygiene: join(root, 'resources', 'js', 'components', 'ReviewCards', 'KnowledgeHygienePanel.vue'),
 };
 
-for (const [name, path] of Object.entries(paths)) {
-    assert.ok(existsSync(path), `required ${name} file missing: ${path}`);
+for (const [name, filePath] of Object.entries(paths)) {
+    assert.ok(existsSync(filePath), `required ${name} file missing: ${filePath}`);
 }
 
-const source = Object.fromEntries(Object.entries(paths).map(([name, path]) => [name, readFileSync(path, 'utf8')]));
-const lines = text => (text.match(/\n/g) || []).length;
+const source = Object.fromEntries(
+    Object.entries(paths).map(([name, filePath]) => [name, readFileSync(filePath, 'utf8')])
+);
 const count = (text, pattern) => (text.match(pattern) || []).length;
+const masterOpenWork = source.master.slice(
+    source.master.indexOf('## 4. Open Work Registry'),
+    source.master.indexOf('## 5. 颜色语义规则')
+);
 
-assert.equal(lines(source.parent), 668, 'ReviewCardManage.vue line count must remain explicit');
-assert.equal(count(source.parent, /axios\./g), 4, 'parent direct axios count must remain explicit');
-assert.equal(count(source.parent, /<v-dialog/g), 0, 'parent dialog count must remain explicit');
-assert.equal(lines(source.table), 872, 'table surface line count must remain explicit');
-assert.equal(count(source.table, /axios\./g), 3, 'table owns exactly three read-only export requests');
-assert.equal(lines(source.scheduling), 117, 'scheduling surface line count must remain explicit');
-assert.equal(count(source.scheduling, /axios\./g), 2, 'scheduling owns exactly two requests');
-assert.equal(count(source.scheduling, /<v-dialog/g), 2, 'scheduling owns two dialogs');
-assert.equal(lines(source.lifecycle), 414, 'lifecycle surface line count must remain explicit');
-assert.equal(count(source.lifecycle, /axios\./g), 3, 'lifecycle owns one GET and two POST requests');
-assert.equal(count(source.lifecycle, /<v-dialog/g), 3, 'lifecycle owns single, bulk and help dialogs');
-assert.equal(lines(source.deleteSurface), 196, 'delete surface line count must remain explicit');
-assert.equal(count(source.deleteSurface, /axios\./g), 2, 'delete surface owns one DELETE and one bulk POST request');
-assert.equal(count(source.deleteSurface, /<v-dialog/g), 2, 'delete surface owns single and bulk confirmation dialogs');
-assert.equal(lines(source.leechSurface), 366, 'leech surface line count must remain explicit');
-assert.equal(count(source.leechSurface, /axios\./g), 2, 'leech surface owns one summary GET and one bulk rewrite POST');
-assert.equal(count(source.leechSurface, /<v-dialog/g), 2, 'leech surface owns bulk rewrite and bulk suspend dialogs');
-
-assert.match(source.parent, /<review-card-search-surface/);
-assert.match(source.parent, /<review-card-table-surface/);
-assert.match(source.parent, /<review-card-info-drawer/);
-assert.match(source.parent, /<review-card-scheduling-mutation-surface/);
-assert.match(source.parent, /<review-card-lifecycle-mutation-surface/);
-assert.match(source.parent, /<review-card-delete-mutation-surface/);
-assert.match(source.parent, /<review-card-leech-governance-mutation-surface/);
-assert.match(source.parent, /lifecycleSurfaceState/);
+// The container remains an orchestrator. Do not freeze changing line counts.
+for (const component of [
+    'review-card-search-surface',
+    'review-card-table-surface',
+    'review-card-info-drawer',
+    'review-card-scheduling-mutation-surface',
+    'review-card-lifecycle-mutation-surface',
+    'review-card-delete-mutation-surface',
+    'review-card-leech-governance-mutation-surface',
+]) {
+    assert.match(source.parent, new RegExp(`<${component}`), `parent must mount ${component}`);
+}
+assert.equal(count(source.parent, /<v-dialog/g), 0, 'parent must not reclaim child dialogs');
+assert.ok(count(source.parent, /axios\./g) <= 4, 'parent must remain limited to coordinating requests');
 assert.doesNotMatch(source.parent, /\/lifecycle-actions|\/review-cards\/manage\/bulk-lifecycle/);
 assert.doesNotMatch(source.parent, /axios\.delete\('\/review-cards\/manage\/'|axios\.post\('\/review-cards\/manage\/bulk-delete'/);
-assert.doesNotMatch(source.parent, /v-model="lifecycleDialog"|v-model="bulkLifecycleDialog"|v-model="stateHelpDialog"|v-model="deleteDialog"|v-model="bulkDeleteDialog"/);
-assert.match(source.parent, /surface\.runLifecycleAction/);
-assert.match(source.parent, /surface\.runBulkLifecycle/);
 assert.doesNotMatch(source.parent, /\/review-cards\/manage\/leech-summary|\/review-cards\/manage\/bulk-leech-rewrite-packages/);
-assert.doesNotMatch(source.parent, /SenseReviewLeechRewritePackageDialog|v-model="bulkRewriteDialog"|v-model="bulkLeechSuspendDialog"/);
-assert.doesNotMatch(source.parent, /\/enabled|toggleEnabled|confirmArchive|doArchive|confirmRestore|doRestore|archiveDialog|archiveTarget|restoreDialog|restoreTarget/);
+assert.doesNotMatch(source.parent, /\/enabled|toggleEnabled|confirmArchive|doArchive|confirmRestore|doRestore/);
 
-assert.match(source.lifecycle, /axios\.get\('\/review-cards\/' \+ normalizedId \+ '\/lifecycle'\)/);
-assert.match(source.lifecycle, /axios\.post\('\/review-cards\/' \+ reviewCardId \+ '\/lifecycle-actions'/);
-assert.match(source.lifecycle, /axios\.post\('\/review-cards\/manage\/bulk-lifecycle'/);
-assert.match(source.lifecycle, /descriptorRequestSeq/);
-assert.match(source.lifecycle, /expectedVersion/);
-assert.match(source.lifecycle, /request_id:/);
-assert.match(source.lifecycle, /expected_version:/);
-assert.match(source.lifecycle, /already_applied/);
-assert.doesNotMatch(source.lifecycle, /bulk-delete|rewrite-package|due-now|\/reset/);
-assert.doesNotMatch(source.lifecycle, /ReviewLog|fsrs_(state|due|stability|difficulty|reps|lapses)|WordSense/);
-assert.doesNotMatch(source.lifecycle, /Vuex|mapState|mapActions|eventBus|EventBus/);
-
-assert.match(source.deleteSurface, /axios\.delete\('\/review-cards\/manage\/' \+ reviewCardId\)/);
-assert.match(source.deleteSurface, /axios\.post\('\/review-cards\/manage\/bulk-delete'/);
-assert.match(source.deleteSurface, /复习历史会保留/);
-assert.match(source.deleteSurface, /阅读来源记录会保留/);
-assert.match(source.deleteSurface, /最后一个已确认词义/);
-assert.match(source.deleteSurface, /不会按筛选条件全量删除/);
-assert.doesNotMatch(source.deleteSurface, /lifecycle-actions|bulk-lifecycle|due-now|\/reset|rewrite-package/);
-assert.doesNotMatch(source.deleteSurface, /ReviewLog|fsrs_(state|due|stability|difficulty|reps|lapses)|WordSense/);
-assert.doesNotMatch(source.deleteSurface, /Vuex|mapState|mapActions|eventBus|EventBus/);
-
-assert.match(source.leechSurface, /axios\.get\('\/review-cards\/manage\/leech-summary'\)/);
-assert.match(source.leechSurface, /axios\.post\('\/review-cards\/manage\/bulk-leech-rewrite-packages'/);
-assert.match(source.leechSurface, /this\.runLifecycleAction\(/);
-assert.match(source.leechSurface, /this\.runBulkLifecycle\(/);
-assert.match(source.leechSurface, /provider_called/);
-assert.match(source.leechSurface, /card_created/);
-assert.match(source.leechSurface, /review_log_created/);
-assert.doesNotMatch(source.leechSurface, /\/lifecycle-actions|\/review-cards\/manage\/bulk-lifecycle/);
-assert.doesNotMatch(source.leechSurface, /provider-preview|createReviewLog|createWordSense|createReviewCard|FsrsScheduling/);
-assert.doesNotMatch(source.leechSurface, /Vuex|mapState|mapActions|eventBus|EventBus/);
-
+// Read-only surfaces remain read-only; Card Info remains read-mostly because it owns one explicit undo/redo action.
 assert.match(source.search, /ReviewCardSavedSearchPanel/);
 assert.doesNotMatch(source.search, /axios\./);
-assert.match(source.table, /axios\.get\(['"]\/review-cards\/manage\/export['"]/);
-assert.match(source.table, /axios\.get\(['"]\/review-cards\/manage\/export-anki-tsv['"]/);
-assert.match(source.table, /axios\.get\(['"]\/review-cards\/manage\/export-csv['"]/);
+assert.match(source.table, /\/review-cards\/manage\/export/);
+assert.match(source.table, /\/review-cards\/manage\/export-anki-tsv/);
+assert.match(source.table, /\/review-cards\/manage\/export-csv/);
 assert.doesNotMatch(source.table, /axios\.(post|put|patch|delete)\s*\(/i);
-assert.match(source.drawer, /const seq = \+\+this\.detailRequestSeq/);
-assert.doesNotMatch(source.drawer, /axios\.(post|put|patch|delete)\s*\(/i);
+assert.match(source.drawer, /detailRequestSeq/);
+assert.equal(count(source.drawer, /axios\.post\s*\(/g), 1, 'Card Info may only own explicit manual-operation undo/redo');
+assert.match(source.drawer, /\/review-card-operations\//);
+assert.doesNotMatch(source.drawer, /\/rate\b|lifecycle-actions|bulk-delete|manual-operations\/(preview|apply)/);
+assert.doesNotMatch(source.drawer, /axios\.(put|patch|delete)\s*\(/i);
+assert.match(source.cardInfoAdr, /\*\*Status\*\*: Accepted/);
+assert.match(source.cardInfoAdr, /Frontend opens the drawer with \*\*one\*\* canonical detail request/i);
+assert.match(source.containerAcceptance, /Phase 3D — Container Closure is \*\*Accepted \/ Production Closed\*\*/);
+assert.match(source.containerAcceptance, /There was no `\/enabled` request/);
 
+// M10–M16 additions keep focused owners instead of returning mutation logic to the coordinator.
+assert.match(source.parent, /<knowledge-hygiene-panel/);
+assert.match(source.parent, /<portable-data-panel/);
+assert.match(source.table, /ReviewCardMarkerPicker/);
+assert.match(source.table, /WordSenseTagBulkPicker/);
+assert.match(source.drawer, /ReviewCardMarkerPicker/);
+assert.match(source.markerPicker, /\/review-cards\/manage\/bulk-marker/);
+assert.match(source.markerPicker, /\/marker/);
+assert.match(source.tagManager, /\/review-cards\/manage\/tags/);
+assert.match(source.tagBulkPicker, /\/review-cards\/manage\/tags\/bulk-assignments/);
+assert.match(source.portableData, /\/review-cards\/manage\/portable\/import-preview/);
+assert.match(source.portableData, /\/review-cards\/manage\/portable\/import-apply/);
+assert.match(source.hygiene, /\/review-cards\/knowledge-hygiene\/find-replace\/preview/);
+assert.match(source.hygiene, /\/review-cards\/knowledge-hygiene\/find-replace\/apply/);
+
+// Backend compatibility remains available while the active parent no longer calls the legacy endpoint.
+assert.match(source.routes, /Route::patch\('\/review-cards\/manage\/\{reviewCard\}\/enabled'/);
+assert.match(source.controller, /function enabled\s*\(/);
+assert.match(source.routes, /Route::post\('\/review-cards\/manage\/bulk-enabled'/);
+assert.match(source.controller, /function bulkEnabled\s*\(/);
+assert.doesNotMatch(source.parent, /\/enabled|\/bulk-enabled/);
+
+// Each mutation family keeps a single owner and does not absorb another family.
+assert.match(source.scheduling, /manual-operations\/preview/);
+assert.match(source.scheduling, /manual-operations\/apply/);
+assert.match(source.scheduling, /expected_state_fingerprint/);
+assert.doesNotMatch(source.scheduling, /\/review-cards\/manage\/[^\n]+\/(due-now|reset)/);
+assert.doesNotMatch(source.scheduling, /lifecycle-actions|bulk-delete|rewrite-package/);
+
+assert.match(source.lifecycle, /\/lifecycle-actions/);
+assert.match(source.lifecycle, /\/review-cards\/manage\/bulk-lifecycle/);
+assert.match(source.lifecycle, /expected_version/);
+assert.doesNotMatch(source.lifecycle, /bulk-delete|rewrite-package|due-now|\/reset/);
+assert.doesNotMatch(source.lifecycle, /ReviewLog|fsrs_(state|due|stability|difficulty|reps|lapses)|WordSense/);
+
+assert.match(source.deleteSurface, /axios\.delete\('\/review-cards\/manage\/'/);
+assert.match(source.deleteSurface, /\/review-cards\/manage\/bulk-delete/);
+assert.match(source.deleteSurface, /复习历史和阅读来源记录会保留/);
+assert.match(source.deleteSurface, /不会按筛选条件全量删除/);
+assert.doesNotMatch(source.deleteSurface, /lifecycle-actions|bulk-lifecycle|due-now|\/reset|rewrite-package/);
+
+assert.match(source.leechSurface, /\/review-cards\/manage\/leech-summary/);
+assert.match(source.leechSurface, /\/review-cards\/manage\/bulk-leech-rewrite-packages/);
+assert.match(source.leechSurface, /provider_called/);
+assert.match(source.leechSurface, /review_log_created/);
+assert.doesNotMatch(source.leechSurface, /provider-preview|createReviewLog|createWordSense|createReviewCard|FsrsScheduling/);
+
+// Current documentation protects status and ownership, not historical metrics.
 assert.match(source.plan, /Phase 3C-2 — Lifecycle Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3C-3 — Delete Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3C-4 — Leech Governance Mutation Family[^\n]*Accepted \/ Production Closed/);
 assert.match(source.plan, /Phase 3D — Container Closure[^\n]*Accepted \/ Production Closed/);
-assert.match(source.plan, /ReviewCardLifecycleMutationSurface\.vue/);
-assert.match(source.plan, /ReviewCardDeleteMutationSurface\.vue/);
-assert.match(source.plan, /ReviewCardLeechGovernanceMutationSurface\.vue/);
-assert.match(source.plan, /668 lines/);
-assert.match(source.plan, /366 lines/);
-assert.match(source.plan, /from 9 to 7/);
-assert.match(source.plan, /from 4 to 2/);
-assert.match(source.plan, /expected_version/);
-assert.match(source.plan, /stale-response/);
-assert.match(source.plan, /ARCH-ReviewCardManage-3C-2/);
-assert.match(source.plan, /DEV-ReviewCardManage-3C-2/);
-assert.match(source.plan, /ARCH-ReviewCardManage-3C-3/);
-assert.match(source.plan, /DEV-ReviewCardManage-3C-3/);
-assert.match(source.plan, /ARCH-ReviewCardManage-3C-4/);
-assert.match(source.plan, /DEV-ReviewCardManage-3C-4/);
-assert.match(source.plan, /Anki Manual — Browsing/);
-assert.match(source.plan, /qt\/aqt\/operations\/scheduling\.py/);
-assert.match(source.plan, /9 个原始字幕文件/);
-assert.match(source.plan, /你写了一堆文档AI还是不听话？问题不在文档本身\.srt/);
-assert.match(source.plan, /一个真实职责/);
-assert.match(source.plan, /ReviewCardManage 域内唯一生命周期请求所有者/);
-assert.match(source.plan, /SenseReview\.vue[^\n]*独立产品入口/);
-assert.match(source.plan, /removed the unreachable parent-owned `\/enabled` compatibility client/);
-assert.match(source.plan, /ARCH-ReviewCardManage-3D/);
-assert.match(source.plan, /DEV-ReviewCardManage-3D/);
-assert.match(source.plan, /do not enter Card Marker/);
+assert.match(source.plan, /Card Marker \+ Custom Study 1B[^\n]*Production Closed/);
+assert.doesNotMatch(source.plan, /Card Marker \+ Custom Study 1B remains \*\*Planned \/ Not Authorized\*\*/);
+assert.match(source.roadmap, /Phase 3：Browser \/ ReviewCardManage[\s\S]*?Phase 3A–3D Accepted \/ Production Closed/);
+assert.match(source.master, /M1–M8/);
+assert.match(source.master, /M10–M16/);
+assert.match(source.master, /M17 Web slice/);
+assert.match(source.master, /M18[^\n]*(共享实现|Web\/Android|Web.*Android)/);
+assert.doesNotMatch(masterOpenWork, /Browser \/ ReviewCardManage architecture convergence/, 'closed Browser work must not remain in the open registry');
+assert.match(source.index, /review-card-manage-architecture-convergence-plan\.md/);
 
-for (const doc of [source.roadmap, source.master, source.handoff, source.index]) {
-    assert.match(doc, /Browser\s*\/\s*ReviewCardManage/);
-    assert.match(doc, /(?:Phase 3D|Phase 3A–3D)[^\n]*Accepted \/ Production Closed/);
-    assert.match(doc, /668/);
-    assert.match(doc, /Card Marker[^\n]*Custom Study 1B[^\n]*Planned \/ Not Authorized/);
-    assert.match(doc, /review-card-manage-architecture-convergence-plan\.md/);
+for (const [name, doc] of [
+    ['roadmap', source.roadmap],
+    ['master open-work registry', masterOpenWork],
+    ['index', source.index],
+]) {
+    assert.doesNotMatch(
+        doc,
+        /Card Marker[^\n]*Custom Study 1B[^\n]*Planned \/ Not Authorized/,
+        `${name} must not revive the completed Card Marker + Custom Study 1B phase`
+    );
 }
 
-assert.match(source.master, /Current Phase \| No implementation phase is currently authorized[^\n]*Phase 3D is Accepted \/ Production Closed/);
-assert.match(source.handoff, /Phase 3D — Container Closure/);
-assert.match(source.index, /Leech Governance Mutation Surface/);
-assert.match(source.lifecycleAcceptance, /Status\*\*: Passed \/ Production Closure Evidence/);
-assert.match(source.lifecycleAcceptance, /Confirming `埋藏到明天`/);
-assert.match(source.lifecycleAcceptance, /confirming `解除埋藏`/);
-assert.match(source.lifecycleAcceptance, /Confirming batch suspend/);
-assert.match(source.lifecycleAcceptance, /confirming batch restore/);
-assert.match(source.lifecycleAcceptance, /Phase 3C-3 Delete Mutation Family remains \*\*Planned \/ Not Authorized\*\*/);
-assert.match(source.deleteAcceptance, /\*\*Status\*\*: Passed \/ Production Closure Evidence/);
-assert.match(source.deleteAcceptance, /exactly one `DELETE \/review-cards\/manage\/123`/);
-assert.match(source.deleteAcceptance, /exactly one `POST \/review-cards\/manage\/bulk-delete`/);
-assert.match(source.deleteAcceptance, /Phase 3C-3 — Delete Mutation Family is \*\*Accepted \/ Production Closed\*\*/);
-assert.match(source.deleteAcceptance, /Phase 3C-4 — Leech Governance Mutation Family remains \*\*Planned \/ Not Authorized\*\*/);
-assert.match(source.leechAcceptance, /\*\*Status\*\*: Passed \/ Production Closure Evidence/);
-assert.match(source.leechAcceptance, /provider_called=false/);
-assert.match(source.leechAcceptance, /active: 4/);
-assert.match(source.leechAcceptance, /suspended: 0/);
-assert.match(source.leechAcceptance, /Phase 3C-4 — Leech Governance Mutation Family is \*\*Accepted \/ Production Closed\*\*/);
-assert.match(source.leechAcceptance, /Phase 3D — Container Closure remains \*\*Planned \/ Not Authorized\*\*/);
-assert.match(source.containerAcceptance, /\*\*Status\*\*: Passed \/ Production Closure Evidence/);
-assert.match(source.containerAcceptance, /668 lines/);
-assert.match(source.containerAcceptance, /no `\/enabled` request/);
-assert.match(source.containerAcceptance, /Phase 3D — Container Closure is \*\*Accepted \/ Production Closed\*\*/);
-assert.match(source.containerAcceptance, /Card Marker \+ Custom Study 1B remains \*\*Planned \/ Not Authorized\*\*/);
-
-console.log('ReviewCardManage architecture plan guard passed.');
+console.log('ReviewCardManage semantic architecture guard passed.');

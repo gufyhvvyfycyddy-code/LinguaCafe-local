@@ -2,7 +2,7 @@
 
 > **Status**: Phase 3D — Container Closure — Accepted / Production Closed
 >
-> **Current next slice**: Card Marker + Custom Study 1B — Planned / Not Authorized; no implementation phase is currently authorized
+> **Current next slice**: none. Phase 3A–3D, Card Marker + Custom Study 1B, and the later M10–M16 Browser integrations are closed; new work comes only from the current Open Work Registry.
 >
 > **Architecture baseline**: master `0b293874412458bf0bc8badd3e0d018471c47f85`
 >
@@ -27,16 +27,15 @@ Original measured baseline:
 
 The goal is incremental responsibility separation. Each phase must move one real responsibility, preserve behavior and pass real browser acceptance.
 
-Current measured snapshot after Phase 3D:
+Current reconciled snapshot after the later M10–M16 integrations (2026-08-06):
 
-- 28 production files exceed 500 lines;
-- 10 production files exceed 1,000 lines;
-- only 1 production file now exceeds 1,500 lines (`TextBlockGroup.vue`, 2,514 lines);
-- `ReviewCardManage.vue` is 668 lines with 4 direct `axios.` references and no `v-dialog` blocks;
+- `ReviewCardManage.vue` is 776 lines with 4 direct `axios.` references and no `v-dialog` blocks;
 - the parent keeps only coordinator-owned stats, list, inline edit and source-context requests;
-- `ReviewCardDeleteMutationSurface.vue` is 196 lines with one DELETE request, one bulk-delete POST request and two dialogs;
-- `ReviewCardLeechGovernanceMutationSurface.vue` is 366 lines with two direct `axios.` references and two dialogs;
-- current debt assessment is **6.0/10, localized medium-high burden**: the management module is production-closed, while Reader/Reviewer hotspots still require staged governance.
+- `KnowledgeHygienePanel.vue` owns the preference GET/PUT and all M15 mutation requests; the parent only delegates column persistence and consumes the returned preferences;
+- `ReviewCardInfoDrawer.vue` is read-mostly: it owns one canonical detail GET and one explicit user-triggered manual-operation undo/redo POST; it does not own rating, direct FSRS, lifecycle, scheduling apply, or delete writes;
+- `ReviewCardSchedulingMutationSurface.vue` owns the M11 server preview/apply pair and sends the preview's complete state fingerprint on apply; legacy direct due-now/reset writes are superseded;
+- lifecycle, delete, leech, marker, tag, portable-data and hygiene families retain focused owners;
+- the 800-line guard is an alert boundary, not a reason to create empty wrappers. Request ownership, dialogs and side effects remain the primary architecture checks.
 
 ## 2. Anki official reference and the parts LinguaCafe borrows
 
@@ -57,7 +56,7 @@ Borrowed principles:
 2. Search parsing and result presentation have separate owners.
 3. Saved Search belongs with the search/filter surface.
 4. Current-card state and selected-row state stay distinct.
-5. Card Info has a dedicated read-only owner.
+5. Card Info has a dedicated read-mostly owner: detail loading is read-only; explicit Marker interaction and manual-operation undo/redo remain separately gated user actions.
 6. Table ownership is handled after search ownership, in a separate phase.
 7. Bury, Suspend, Reset, Set Due and Delete remain different product commands with different confirmations and side effects; a generic mutation abstraction must not erase those distinctions.
 
@@ -68,7 +67,7 @@ Deliberate LinguaCafe deviations:
 - Do not copy Anki note-deletion semantics; existing WordSense/ReviewCard and ReviewLog-retention contracts remain authoritative.
 - Do not expand Browser Search V1 into OR, NOT, parentheses, dates or regular expressions during architecture convergence.
 - Do not create Filtered Deck semantics. Custom Study remains the temporary-study boundary.
-- Card flags remain a future Card Marker reference.
+- Card Marker is implemented under ADR-0029; future marker expansion must preserve its existing ReviewCard metadata ownership and must not be folded into Browser Search or lifecycle semantics.
 
 ## 3. Subtitle-derived long-project rules
 
@@ -111,9 +110,10 @@ ReviewCardManage.vue
   ├─ ReviewCardInfoDrawer.vue
   │    ├─ one canonical detail request
   │    ├─ overview / history / diagnosis
+  │    ├─ explicit Marker and manual-operation undo/redo controls
   │    └─ stale-response and close cleanup
   ├─ ReviewCardSchedulingMutationSurface.vue
-  │    └─ due-now / reset requests, locks and dialogs
+  │    └─ manual-operation preview/apply, full-state fingerprint, locks and dialog
   ├─ ReviewCardLifecycleMutationSurface.vue
   │    ├─ lifecycle descriptor and stale-response protection
   │    ├─ single / bulk lifecycle requests and locks
@@ -438,7 +438,7 @@ Docs:
 - no FSRS, due, rating or ReviewLog write change;
 - no lifecycle, archive, restore, reset or delete semantic change;
 - no frontend reimplementation of Browser Search grammar;
-- do not enter Card Marker or Custom Study 1B without a separate task;
+- Card Marker + Custom Study 1B is already Production Closed; do not reopen or extend it without a separate authorized task;
 - no deck/subdeck, Note mode, tag tree or Filtered Deck;
 - no new dependency, Vuex module or event bus without proven need;
 - no `.env`, `AGENTS.md`, `.omo/`, `.playwright-cli/` or `nul` changes;
@@ -479,4 +479,4 @@ Refuse when:
 
 ## 11. Stop rule
 
-Phase 3D is **Accepted / Production Closed** after the container guard, focused regression, build and authenticated browser acceptance pass. Card Marker + Custom Study 1B remains **Planned / Not Authorized**. Do not enter it or any later phase automatically.
+Phase 3D and Card Marker + Custom Study 1B are **Accepted / Production Closed**. This plan authorizes no new Browser phase: any further architecture or product work must come from the current Open Work Registry or a separately approved task, and must not start automatically.
