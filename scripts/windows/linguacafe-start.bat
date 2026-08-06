@@ -34,6 +34,13 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%~dp0tokenizer-start.bat" --no-pause
+if errorlevel 1 (
+    echo [LinguaCafe] Tokenizer startup failed. LinguaCafe was not started.
+    pause
+    exit /b 1
+)
+
 powershell -NoProfile -ExecutionPolicy Bypass -Command "try { $r = Invoke-WebRequest -Uri '%APP_URL%' -UseBasicParsing -TimeoutSec 2; exit 0 } catch { exit 1 }" >nul 2>&1
 if not errorlevel 1 (
     echo [LinguaCafe] Server already appears to be running.

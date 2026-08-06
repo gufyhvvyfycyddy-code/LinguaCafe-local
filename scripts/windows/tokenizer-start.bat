@@ -13,11 +13,10 @@ if not exist "%TOKENIZER_SCRIPT%" (
     exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command "try { Invoke-WebRequest -Uri '%TOKENIZER_URL%/models/list' -UseBasicParsing -TimeoutSec 2 | Out-Null; exit 0 } catch { exit 1 }" >nul 2>&1
-if not errorlevel 1 (
-    echo [LinguaCafe] Tokenizer is already running.
+if not exist "%TOKENIZER_PROCESS_SCRIPT%" (
+    echo [LinguaCafe] Tokenizer process launcher not found: %TOKENIZER_PROCESS_SCRIPT%
     if /i not "%~1"=="--no-pause" pause
-    exit /b 0
+    exit /b 1
 )
 
 if exist "%TOKENIZER_VENV%\Scripts\python.exe" (
@@ -41,8 +40,20 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo [LinguaCafe] Opening tokenizer in a new window.
-start "LinguaCafe Python Tokenizer" cmd /k "cd /d ""%PROJECT_DIR%"" && ""%TOKENIZER_PYTHON%"" ""%TOKENIZER_SCRIPT%"""
+powershell -NoProfile -ExecutionPolicy Bypass -File "%TOKENIZER_PROCESS_SCRIPT%" ^
+    -ProjectDir "%PROJECT_DIR%" ^
+    -TokenizerScript "%TOKENIZER_SCRIPT%" ^
+    -PythonExe "%TOKENIZER_PYTHON%" ^
+    -TokenizerUrl "%TOKENIZER_URL%" ^
+    -RuntimeDir "%TOKENIZER_RUNTIME_DIR%"
+
+if errorlevel 1 (
+    echo [LinguaCafe] Tokenizer failed to start. Review logs under:
+    echo %TOKENIZER_RUNTIME_DIR%
+    if /i not "%~1"=="--no-pause" pause
+    exit /b 1
+)
 
 if /i not "%~1"=="--no-pause" pause
 endlocal
+exit /b 0

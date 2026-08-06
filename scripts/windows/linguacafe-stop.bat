@@ -11,5 +11,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call "%~dp0tokenizer-stop.bat" --no-pause
+if errorlevel 1 (
+    echo [LinguaCafe] Laravel stopped, but tokenizer shutdown needs attention.
+    pause
+    exit /b 1
+)
+
 pause
 endlocal
