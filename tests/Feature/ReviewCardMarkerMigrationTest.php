@@ -57,6 +57,7 @@ class ReviewCardMarkerMigrationTest extends TestCase
     public function test_down_then_up_is_reversible_and_backfills_existing_rows(): void
     {
         $migration = require database_path('migrations/2026_07_18_000001_add_marker_to_review_cards.php');
+        $id = null;
 
         try {
             $migration->down();
@@ -68,8 +69,11 @@ class ReviewCardMarkerMigrationTest extends TestCase
             $this->assertTrue(Schema::hasColumn('review_cards', 'marker'));
             $this->assertSame(0, (int) DB::table('review_cards')->where('id', $id)->value('marker'));
         } finally {
-            if (!Schema::hasColumn('review_cards', 'marker')) {
+            if (! Schema::hasColumn('review_cards', 'marker')) {
                 $migration->up();
+            }
+            if ($id !== null) {
+                DB::table('review_cards')->where('id', $id)->delete();
             }
         }
     }
