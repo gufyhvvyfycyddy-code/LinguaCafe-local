@@ -120,22 +120,40 @@ class ImportController extends Controller {
     public function getSubtitleFileContent(GetSubtitleFileContentRequest $request) {
         $subtitleFile = $request->file('subtitleFile');
         $userId = Auth::user()->id;
+        $fileName = null;
 
-        // move file to temp folder
         try {
             $fileName = $this->tempFileService->moveFileToTempFolder($userId, $subtitleFile);
-            
-            // get subtitle content
-            $subtitleContent = $this->importService->getSubtitleFileContent(storage_path('app/temp') . '/' . $fileName);
-        } catch (\Exception $e) {
-            $this->tempFileService->deleteTempFile($fileName);
-            abort(500, $e->getMessage());
+            $subtitleContent = $this->importService->getSubtitleFileContent(
+                storage_path('app/temp') . '/' . $fileName,
+            );
+        } catch (\Exception $exception) {
+            if (is_string($fileName)) {
+                try {
+                    $this->tempFileService->deleteTempFile($fileName);
+                } catch (\Throwable $cleanupException) {
+                    Log::warning('subtitle_temp_cleanup_failed', [
+                        'exception' => $cleanupException::class,
+                    ]);
+                }
+            }
+
+            Log::warning('subtitle_file_read_failed', [
+                'stage' => $fileName === null ? 'store' : 'parse',
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'SUBTITLE_FILE_READ_FAILED',
+                    'message' => '暂时无法读取字幕文件，请重试。',
+                ],
+            ], 500);
         }
 
-        // delete temp file
         $this->tempFileService->deleteTempFile($fileName);
 
-        return response()->json($subtitleContent, 200);
+        return new JsonResponse($subtitleContent, 200);
     }
 
     public function getWebsiteText(GetWebsiteTextRequest $request) {
