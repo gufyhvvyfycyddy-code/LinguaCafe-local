@@ -19,6 +19,8 @@
     </source>
     <php>
         <env name="APP_ENV" value="testing"/>
+        <env name="TESTING_DB_LEASE_DATABASE_ID" value="linguacafe-fsrs-testing-mysql"/>
+        <env name="TESTING_DB_LEASE_WAIT_MS" value="0"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
