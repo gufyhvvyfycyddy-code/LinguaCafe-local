@@ -368,7 +368,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/finish', [App\Http\Controllers\ChapterController::class, 'finishChapter']);
     Route::post('/chapters/update', [App\Http\Controllers\ChapterController::class, 'updateChapter']);
     Route::post('/chapters/create', [App\Http\Controllers\ChapterController::class, 'createChapter']);
-    Route::get('/chapters/retry-failed-chapters/{bookId}', [App\Http\Controllers\ChapterController::class, 'retryFailedChapters']);
+    Route::post('/chapters/retry-failed-chapters/{bookId}', [App\Http\Controllers\ChapterController::class, 'retryFailedChapters']);
 
     // AI reading assist
     Route::post('/chapters/ai-assist/source', [App\Http\Controllers\AiReadingAssistController::class, 'source']);
