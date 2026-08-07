@@ -53,7 +53,7 @@ class JellyfinService {
             $session = new \stdClass();
             $session->client = $sessions[$sessionCounter]['Client'];
             $session->userName = $sessions[$sessionCounter]['UserName'];
-            $session->userId = $sessions[$sessionCounter]['NowPlayingItem']['Id'];
+            $session->userId = $sessions[$sessionCounter]['UserId'] ?? null;
             $session->title = $sessions[$sessionCounter]['NowPlayingItem']['Name'];
             $session->type = $sessions[$sessionCounter]['NowPlayingItem']['Type'];
 
@@ -74,7 +74,11 @@ class JellyfinService {
 
             $calculatedSessions[] = $session;
 
-            $mediaSource = $this->makeRequest('GET', '/Items/' . $session->nowPlayingItemId . '/PlaybackInfo?userId=' . $session->userId);
+            $playbackInfoUrl = '/Items/' . $session->nowPlayingItemId . '/PlaybackInfo';
+            if (is_string($session->userId) && $session->userId !== '') {
+                $playbackInfoUrl .= '?userId=' . rawurlencode($session->userId);
+            }
+            $mediaSource = $this->makeRequest('GET', $playbackInfoUrl);
             $mediaSource = $mediaSource['MediaSources'][0];
 
             for ($subtitleCounter = 0; $subtitleCounter < count($mediaSource['MediaStreams']); $subtitleCounter++) {
@@ -83,7 +87,7 @@ class JellyfinService {
                     continue;
                 }
 
-                $subtitleText = $this->makeRequest('GET', '/Videos/' . $session->nowPlayingItemId . '/' . $session->mediaSourceId . '/Subtitles/ ' . $mediaSource['MediaStreams'][$subtitleCounter]['Index'] . '/0/Stream.js');
+                $subtitleText = $this->makeRequest('GET', '/Videos/' . $session->nowPlayingItemId . '/' . $session->mediaSourceId . '/Subtitles/' . $mediaSource['MediaStreams'][$subtitleCounter]['Index'] . '/0/Stream.js');
                 
                 // add language for subtitles that Jellyfin did not recognise
                 if (!isset($mediaSource['MediaStreams'][$subtitleCounter]['Language'])) {
