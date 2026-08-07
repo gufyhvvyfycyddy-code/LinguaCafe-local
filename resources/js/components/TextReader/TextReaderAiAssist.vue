@@ -46,10 +46,27 @@
                         </v-btn>
                         <div v-if="sourceCopied" class="caption green--text mt-1">
                             <v-icon small color="success">mdi-check-circle</v-icon>
-                            已复制本章英文和 AI 分析提示词。你可以把提示词发送给 DeepSeek Flash 或 DeepSeek Pro。两者都使用同一导入格式，系统不强制选择。
+                            已复制 AI 提示词。你可以把提示词发送给 DeepSeek Flash 或 DeepSeek Pro。两者都使用同一导入格式，系统不强制选择。
                         </div>
-                        <div v-if="sourceCopied && sourceMeta.schemaVersion" class="caption text--secondary mt-2">
+                        <div v-if="sourceMeta.schemaVersion" class="caption text--secondary mt-2">
                             V2 目标 {{ sourceMeta.targetCount }} 个 · AI 包 {{ sourceMeta.packageCount }} 份。目标数和分包数以服务器返回为准。
+                        </div>
+                        <div v-if="sourcePackages.length > 1" class="mt-2">
+                            <v-alert dense outlined type="info" class="mb-2">
+                                本章被拆成 {{ sourcePackages.length }} 个 AI 包。请逐包复制提示词，并把每一包返回的 JSON 粘贴到下方对应位置；缺任一包都不会导入。
+                            </v-alert>
+                            <v-btn
+                                v-for="(pkg, index) in sourcePackages"
+                                :key="'copy-prompt-' + readerAiAssistPackageKey(pkg, index)"
+                                small
+                                outlined
+                                color="primary"
+                                class="mr-2 mb-2"
+                                @click="copyPackagePrompt(pkg, index)"
+                            >
+                                <v-icon left small>mdi-content-copy</v-icon>
+                                复制第 {{ Number(pkg.part_index || index + 1) }} / {{ sourcePackages.length }} 包
+                            </v-btn>
                         </div>
                     </div>
 
@@ -60,7 +77,30 @@
                         <div class="text-subtitle-1 font-weight-medium mb-2">
                             步骤 2：粘贴 AI 返回内容
                         </div>
+                        <template v-if="usesV2PackageImport">
+                            <div
+                                v-for="(pkg, index) in sourcePackages"
+                                :key="'ai-return-' + readerAiAssistPackageKey(pkg, index)"
+                                class="mb-3"
+                            >
+                                <div class="caption font-weight-medium mb-1">
+                                    第 {{ Number(pkg.part_index || index + 1) }} / {{ sourcePackages.length }} 包 AI 返回 JSON
+                                    <span v-if="copiedSourcePartIndex === Number(pkg.part_index || index + 1)" class="green--text ml-1">（刚复制了这一包提示词）</span>
+                                </div>
+                                <v-textarea
+                                    v-model="aiTextByPart[readerAiAssistPackageKey(pkg, index)]"
+                                    :label="'粘贴第 ' + Number(pkg.part_index || index + 1) + ' 包 JSON'"
+                                    rows="5"
+                                    outlined
+                                    dense
+                                    hide-details="auto"
+                                    :disabled="previewLoading"
+                                    placeholder="只粘贴这一包对应的严格 JSON..."
+                                ></v-textarea>
+                            </div>
+                        </template>
                         <v-textarea
+                            v-else
                             v-model="aiText"
                             label="把 AI 返回的 JSON 粘贴到这里"
                             rows="6"
@@ -75,7 +115,7 @@
                             depressed
                             color="secondary"
                             :loading="previewLoading"
-                            :disabled="!aiText.trim()"
+                            :disabled="!aiImportReady"
                             @click="parsePreview"
                         >
                             <v-icon left>mdi-magnify-scan</v-icon>
@@ -398,10 +438,14 @@
 <script>
     import { buildReaderAiAssistV2SourceRequest } from '../../services/ReaderUnfamiliarTargetPolicy.js';
     import {
+        buildReaderAiAssistV2ImportRequest,
+        isReaderAiAssistV2,
         normalizeReaderAiAssistPreview,
         normalizeReaderAiAssistSourceMeta,
         readerAiAssistErrorMessage,
+        readerAiAssistPackageKey,
         readerAiAssistResultLabel,
+        readerAiAssistV2InputsComplete,
     } from '../../services/ReaderAiAssistV2Policy.js';
 
     export default {
@@ -419,6 +463,8 @@
                 sourceMeta: { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' },
                 previewLoading: false,
                 aiText: '',
+                aiTextByPart: {},
+                copiedSourcePartIndex: null,
 
                 confirmLoading: false,
                 confirmSuccess: false,
@@ -443,6 +489,18 @@
                         this.$emit('input', v);
                     }
                 },
+            },
+            sourcePackages() {
+                return Array.isArray(this.sourceMeta.packages) ? this.sourceMeta.packages : [];
+            },
+            usesV2PackageImport() {
+                return isReaderAiAssistV2(this.sourceMeta) && this.sourcePackages.length > 0;
+            },
+            aiImportReady() {
+                if (this.usesV2PackageImport) {
+                    return readerAiAssistV2InputsComplete(this.sourceMeta, this.aiTextByPart);
+                }
+                return Boolean(this.aiText && this.aiText.trim());
             },
             items() {
                 if (!this.previewResult || !this.previewResult.items) {
@@ -522,6 +580,7 @@
         },
         methods: {
             resultLabel: readerAiAssistResultLabel,
+            readerAiAssistPackageKey,
             confidenceColor(level) {
                 const map = {
                     high: 'green',
@@ -548,6 +607,9 @@
                 this.sourceCopied = false;
                 this.sourceMeta = { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' };
                 this.previewLoading = false;
+                this.aiText = '';
+                this.aiTextByPart = {};
+                this.copiedSourcePartIndex = null;
                 this.confirmLoading = false;
                 this.confirmSuccess = false;
                 this.confirmError = '';
@@ -558,6 +620,52 @@
                 this.previewErrorList = [];
                 this.error = '';
                 this.detailSearchQuery = '';
+            },
+            initializeAiPartTexts() {
+                const next = {};
+                this.sourcePackages.forEach((pkg, index) => {
+                    next[readerAiAssistPackageKey(pkg, index)] = '';
+                });
+                this.aiTextByPart = next;
+            },
+            copyTextToClipboard(text) {
+                if (!text) return Promise.reject(new Error('AI prompt is empty.'));
+                if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                    return navigator.clipboard.writeText(text);
+                }
+                const textarea = document.createElement('textarea');
+                textarea.value = text;
+                textarea.style.position = 'fixed';
+                textarea.style.opacity = '0';
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                return Promise.resolve();
+            },
+            copyPackagePrompt(pkg, index) {
+                const prompt = pkg && pkg.prompt ? pkg.prompt : '';
+                const partIndex = Number((pkg && pkg.part_index) || index + 1);
+                return this.copyTextToClipboard(prompt).then(() => {
+                    this.sourceCopied = true;
+                    this.copiedSourcePartIndex = partIndex;
+                }).catch(() => {
+                    this.error = '复制 AI 提示词失败，请重试。';
+                });
+            },
+            buildImportRequest(applyTrustAi = false) {
+                if (this.usesV2PackageImport) {
+                    return buildReaderAiAssistV2ImportRequest(
+                        this.chapterId,
+                        this.sourceMeta,
+                        this.aiTextByPart,
+                        applyTrustAi,
+                    );
+                }
+                return {
+                    chapterId: this.chapterId,
+                    aiText: this.aiText,
+                };
             },
             loadSource() {
                 if (!this.chapterId) {
@@ -575,21 +683,20 @@
                 ).then((response) => {
                     const data = response.data;
                     this.sourceMeta = normalizeReaderAiAssistSourceMeta(data);
-                    const prompt = this.sourceMeta.prompt;
-                    navigator.clipboard.writeText(prompt).then(() => {
-                        this.sourceCopied = true;
-                    }).catch(() => {
-                        // Fallback
-                        const textarea = document.createElement('textarea');
-                        textarea.value = prompt;
-                        textarea.style.position = 'fixed';
-                        textarea.style.opacity = '0';
-                        document.body.appendChild(textarea);
-                        textarea.select();
-                        document.execCommand('copy');
-                        document.body.removeChild(textarea);
-                        this.sourceCopied = true;
-                    });
+                    this.aiText = '';
+                    this.initializeAiPartTexts();
+                    const firstPackage = this.sourcePackages[0];
+                    if (firstPackage) {
+                        this.copyPackagePrompt(firstPackage, 0);
+                    } else if (this.sourceMeta.prompt) {
+                        this.copyTextToClipboard(this.sourceMeta.prompt).then(() => {
+                            this.sourceCopied = true;
+                        }).catch(() => {
+                            this.error = '复制 AI 提示词失败，请重试。';
+                        });
+                    } else {
+                        this.error = '服务器没有返回可复制的 AI 提示词。';
+                    }
                 }).catch((error) => {
                     this.error = readerAiAssistErrorMessage(error, '加载 AI 提示词失败。');
                 }).finally(() => {
@@ -597,8 +704,10 @@
                 });
             },
             parsePreview() {
-                if (!this.aiText.trim()) {
-                    this.error = '请先粘贴 AI 返回内容。';
+                if (!this.aiImportReady) {
+                    this.error = this.usesV2PackageImport
+                        ? '请把每个 AI 包返回的 JSON 都粘贴完整。'
+                        : '请先粘贴 AI 返回内容。';
                     return;
                 }
 
@@ -613,10 +722,7 @@
                 this.previewError = '';
                 this.previewErrorList = [];
 
-                axios.post('/chapters/ai-assist/preview', {
-                    chapterId: this.chapterId,
-                    aiText: this.aiText,
-                }).then((response) => {
+                axios.post('/chapters/ai-assist/preview', this.buildImportRequest(false)).then((response) => {
                     this.previewResult = normalizeReaderAiAssistPreview(response.data);
                     this.previewStep = 'overview';
                     this.activeDetailType = null;
@@ -635,8 +741,10 @@
                 });
             },
             confirmSave() {
-                if (!this.aiText.trim() || !this.chapterId) {
-                    this.confirmError = '缺少 AI 内容或章节信息。';
+                if (!this.aiImportReady || !this.chapterId) {
+                    this.confirmError = this.usesV2PackageImport
+                        ? 'AI 分包内容不完整，暂不能保存。'
+                        : '缺少 AI 内容或章节信息。';
                     return;
                 }
 
@@ -644,10 +752,10 @@
                 this.confirmError = '';
                 this.confirmSuccess = false;
 
-                axios.post('/chapters/ai-assist/confirm', {
-                    chapterId: this.chapterId,
-                    aiText: this.aiText,
-                }).then((response) => {
+                axios.post(
+                    '/chapters/ai-assist/confirm',
+                    this.buildImportRequest(this.trustAiReadingSenseBinding),
+                ).then((response) => {
                     this.confirmSuccess = true;
                     this.confirmError = '';
                 }).catch((error) => {
