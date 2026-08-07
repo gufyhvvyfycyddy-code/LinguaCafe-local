@@ -19,9 +19,11 @@ use App\Http\Requests\Chapters\GetChaptersWordCountRequest;
 
 class ChapterController extends Controller {
     private $chapterService;
+    private $readingFinishSettlementService;
 
-    public function __construct(ChapterService $chapterService) {
+    public function __construct(ChapterService $chapterService, \App\Services\ReadingFinishSettlementService $readingFinishSettlementService) {
         $this->chapterService = $chapterService;
+        $this->readingFinishSettlementService = $readingFinishSettlementService;
     }
 
     public function getChaptersForBook(GetChaptersForBookRequest $request) {
@@ -85,14 +87,32 @@ class ChapterController extends Controller {
     public function finishChapter(FinishChapterRequest $request) {
         $userId = Auth::user()->id;
         $language = Auth::user()->selected_language;
-        $uniqueWords = json_decode($request->post('uniqueWords'));
-        $autoLevelUpWords = $request->post('autoLevelUpWords');
-        $leveledUpWords = json_decode($request->post('leveledUpWords'));
-        $leveledUpPhrases = json_decode($request->post('leveledUpPhrases'));
+        $uniqueWords = json_decode($request->post('uniqueWords')) ?: [];
+        $autoLevelUpWords = $request->boolean('autoLevelUpWords');
+        $leveledUpWords = json_decode($request->post('leveledUpWords')) ?: [];
+        $leveledUpPhrases = json_decode($request->post('leveledUpPhrases')) ?: [];
         $autoMoveWordsToKnown = boolval($request->post('autoMoveWordsToKnown'));
-        $chapterId = $request->chapterId;
+        $chapterId = (int) $request->chapterId;
+        $readingSessionId = $request->post('reading_session_id');
 
         try {
+            if ($readingSessionId) {
+                $result = $this->readingFinishSettlementService->finishChapterWithSession(
+                    $userId,
+                    $language,
+                    $chapterId,
+                    $readingSessionId,
+                    $autoMoveWordsToKnown,
+                    is_array($uniqueWords) ? $uniqueWords : [],
+                    $autoLevelUpWords,
+                    is_array($leveledUpWords) ? $leveledUpWords : [],
+                    is_array($leveledUpPhrases) ? $leveledUpPhrases : [],
+                    (string) ($request->post('settlement_mode') ?: 'preflight')
+                );
+
+                return response()->json($result, 200);
+            }
+
             $this->chapterService->finishChapter($userId, $chapterId, $autoMoveWordsToKnown, $uniqueWords, $autoLevelUpWords, $leveledUpWords, $leveledUpPhrases, $language);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());

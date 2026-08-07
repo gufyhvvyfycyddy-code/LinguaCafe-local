@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Services\AiReadingAssistService;
+use App\Services\AiReadingAssistV2Service;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -13,81 +14,75 @@ class AiReadingAssistController extends Controller
     ) {
     }
 
-    /**
-     * Return the AI analysis prompt for a chapter.
-     *
-     * POST /chapters/ai-assist/source
-     */
     public function source(Request $request)
     {
-        $request->validate([
+        $data = $request->validate([
             'chapterId' => ['required', 'integer', 'min:1'],
+            'schema_version' => ['nullable', 'string'],
         ]);
 
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-        $chapterId = (int) $request->post('chapterId');
-
-        $result = $this->aiReadingAssistService->buildPromptForChapter($userId, $language, $chapterId);
-
-        if (!$result['success']) {
-            return response()->json($result, 404);
+        $schemaVersion = $data['schema_version'] ?? null;
+        $markedTargets = null;
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            $validatedV2 = $request->validate([
+                'marked_targets' => ['nullable', 'array'],
+                'marked_targets.*.kind' => ['required_with:marked_targets', 'in:word,phrase'],
+                'marked_targets.*.start_word_index' => ['required_with:marked_targets', 'integer', 'min:0'],
+                'marked_targets.*.end_word_index' => ['required_with:marked_targets', 'integer', 'min:0'],
+            ]);
+            if (array_key_exists('marked_targets', $validatedV2)) {
+                $markedTargets = $validatedV2['marked_targets'];
+            }
         }
 
-        return response()->json($result, 200);
+        $result = $this->aiReadingAssistService->buildPromptForChapter(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            (int) $data['chapterId'],
+            $schemaVersion,
+            $markedTargets,
+        );
+
+        return response()->json($result, $result['success'] ? 200 : 404);
     }
 
-    /**
-     * Preview-parse AI returned content without writing anything.
-     *
-     * POST /chapters/ai-assist/preview
-     */
-    /**
-     * Get the current saved AI reading assist data for a chapter.
-     *
-     * GET /chapters/ai-assist/current/{chapterId}
-     */
     public function current(int $chapterId)
     {
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-
-        $result = $this->aiReadingAssistService->getCurrentAssist($userId, $language, $chapterId);
-
-        $statusCode = $result['success'] ? 200 : 404;
-
-        return response()->json($result, $statusCode);
+        $result = $this->aiReadingAssistService->getCurrentAssist(Auth::user()->id, Auth::user()->selected_language, $chapterId);
+        return response()->json($result, $result['success'] ? 200 : 404);
     }
 
     public function preview(Request $request)
     {
         $request->validate([
             'chapterId' => ['required', 'integer', 'min:1'],
-            'aiText' => ['required', 'string', 'min:1'],
+            'schema_version' => ['nullable', 'string'],
         ]);
 
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-        $chapterId = (int) $request->post('chapterId');
-        $aiText = $request->post('aiText');
+        $schemaVersion = $request->post('schema_version');
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            $request->validate([
+                'parts' => ['required', 'array', 'min:1'],
+            ]);
+            $payload = $request->post('parts');
+        } else {
+            $request->validate([
+                'aiText' => ['required', 'string', 'min:1'],
+            ]);
+            $payload = (string) $request->post('aiText');
+        }
 
-        $result = $this->aiReadingAssistService->previewImport($userId, $language, $chapterId, $aiText);
+        $result = $this->aiReadingAssistService->previewImport(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            (int) $request->post('chapterId'),
+            $payload,
+            $schemaVersion,
+        );
 
-        $statusCode = $result['success'] ? 200 : 422;
-
-        return response()->json($result, $statusCode);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 
-    /**
-     * Confirm and save the AI analysis result.
-     *
-     * POST /chapters/ai-assist/confirm
-     */
-    /**
-     * Look up AI vocabulary and phrase suggestions for a word in a sentence.
-     *
-     * GET /chapters/ai-assist/lookup/{chapterId}
-     */
     public function lookup(int $chapterId, Request $request)
     {
         $request->validate([
@@ -96,35 +91,48 @@ class AiReadingAssistController extends Controller
             'sentence_index' => ['required', 'integer', 'min:0'],
         ]);
 
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-        $word = $request->query('word', '');
-        $lemma = $request->query('lemma', '');
-        $sentenceIndex = (int) $request->query('sentence_index', 0);
+        $result = $this->aiReadingAssistService->lookupSuggestions(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $chapterId,
+            $request->query('word', ''),
+            $request->query('lemma', ''),
+            (int) $request->query('sentence_index', 0),
+        );
 
-        $result = $this->aiReadingAssistService->lookupSuggestions($userId, $language, $chapterId, $word, $lemma, $sentenceIndex);
-
-        $statusCode = $result['success'] ? 200 : 404;
-
-        return response()->json($result, $statusCode);
+        return response()->json($result, $result['success'] ? 200 : 404);
     }
 
     public function confirm(Request $request)
     {
         $request->validate([
             'chapterId' => ['required', 'integer', 'min:1'],
-            'aiText' => ['required', 'string', 'min:1'],
+            'schema_version' => ['nullable', 'string'],
+            'apply_trust_ai' => ['nullable', 'boolean'],
         ]);
 
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-        $chapterId = (int) $request->post('chapterId');
-        $aiText = $request->post('aiText');
+        $schemaVersion = $request->post('schema_version');
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            $request->validate([
+                'parts' => ['required', 'array', 'min:1'],
+            ]);
+            $payload = $request->post('parts');
+        } else {
+            $request->validate([
+                'aiText' => ['required', 'string', 'min:1'],
+            ]);
+            $payload = (string) $request->post('aiText');
+        }
 
-        $result = $this->aiReadingAssistService->confirmImport($userId, $language, $chapterId, $aiText);
+        $result = $this->aiReadingAssistService->confirmImport(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            (int) $request->post('chapterId'),
+            $payload,
+            $schemaVersion,
+            (bool) $request->boolean('apply_trust_ai'),
+        );
 
-        $statusCode = $result['success'] ? 200 : 422;
-
-        return response()->json($result, $statusCode);
+        return response()->json($result, $result['success'] ? 200 : 422);
     }
 }

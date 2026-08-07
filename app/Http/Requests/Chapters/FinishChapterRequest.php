@@ -6,21 +6,11 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class FinishChapterRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     *
-     * @return bool
-     */
     public function authorize()
     {
         return true;
     }
 
-    /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array
-     */
     public function rules()
     {
         return [
@@ -30,6 +20,8 @@ class FinishChapterRequest extends FormRequest
             'leveledUpWords' => 'required|json',
             'leveledUpPhrases' => 'required|json',
             'autoMoveWordsToKnown' => 'required|boolean',
+            'reading_session_id' => 'nullable|string|uuid',
+            'settlement_mode' => 'nullable|in:preflight,trust',
         ];
     }
 }

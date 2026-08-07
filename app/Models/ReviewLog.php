@@ -11,10 +11,14 @@ class ReviewLog extends Model
 
     public const SOURCE_SENSE_REVIEW = 'sense_review';
     public const SOURCE_SPECIAL_STUDY = 'special_study';
+    public const SOURCE_READING_PASSIVE = 'reading_passive';
+    public const SOURCE_READING_EXPLICIT = 'reading_explicit';
 
     public const FORMAL_RATING_SOURCES = [
         self::SOURCE_SENSE_REVIEW,
         self::SOURCE_SPECIAL_STUDY,
+        self::SOURCE_READING_PASSIVE,
+        self::SOURCE_READING_EXPLICIT,
     ];
 
     protected $fillable = [

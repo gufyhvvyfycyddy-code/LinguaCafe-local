@@ -39,7 +39,12 @@ use App\Models\ReviewLog;
 class SenseReviewUndoPolicy
 {
     public const SUPPORTED_RATINGS = ['again', 'hard', 'good', 'easy'];
-    public const SUPPORTED_SOURCES = ['sense_review', 'review'];
+    public const SUPPORTED_SOURCES = [
+        ReviewLog::SOURCE_SENSE_REVIEW,
+        'review',
+        'reading_passive',
+        'reading_explicit',
+    ];
 
     public const REASON_WRONG_SESSION = 'wrong_session';
     public const REASON_NOT_LATEST = 'not_latest_action';

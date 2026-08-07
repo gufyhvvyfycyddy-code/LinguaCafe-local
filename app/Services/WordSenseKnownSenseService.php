@@ -130,6 +130,49 @@ class WordSenseKnownSenseService
      *    it is purely a structural flag.
      *  - read_only: always true here. This method does not write anything.
      */
+    /**
+     * Batch-load confirmed sense candidates for normalized lemmas.
+     *
+     * @param array<int, string> $lemmas
+     * @return array<string, array<int, array{word_sense_id:int,sense_zh:?string,sense_en:?string,pos:?string}>>
+     */
+    public function confirmedCandidatesByLemma(int $userId, string $language, array $lemmas): array
+    {
+        $normalized = array_values(array_unique(array_filter(array_map(
+            fn ($lemma) => mb_strtolower(trim((string) $lemma)),
+            $lemmas,
+        ), fn ($lemma) => $lemma !== '')));
+
+        if (empty($normalized)) {
+            return [];
+        }
+
+        $rows = WordSense::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('status', WordSense::STATUS_CONFIRMED)
+            ->whereIn('lemma', $normalized)
+            ->orderBy('id')
+            ->get(['id', 'lemma', 'sense_zh', 'sense_en', 'pos']);
+
+        $result = [];
+        foreach ($normalized as $lemma) {
+            $result[$lemma] = [];
+        }
+        foreach ($rows as $sense) {
+            $lemma = mb_strtolower(trim((string) $sense->lemma));
+            $result[$lemma] ??= [];
+            $result[$lemma][] = [
+                'word_sense_id' => (int) $sense->id,
+                'sense_zh' => $sense->sense_zh,
+                'sense_en' => $sense->sense_en,
+                'pos' => $sense->pos,
+            ];
+        }
+
+        return $result;
+    }
+
     public function knownSenseLookupPayload(int $userId, string $language, string $lemma): array
     {
         $confirmed = $this->listConfirmedSensesForLemma($userId, $language, $lemma);
