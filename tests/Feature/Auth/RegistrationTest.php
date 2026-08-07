@@ -31,4 +31,66 @@ class RegistrationTest extends TestCase
             'password_changed' => true,
         ]);
     }
+
+    public function test_authenticated_non_admin_cannot_create_another_user_or_grant_admin(): void
+    {
+        config(['linguacafe.allow_web_register' => true]);
+        User::factory()->create(['is_admin' => true]);
+        $ordinaryUser = User::factory()->create(['is_admin' => false]);
+
+        $this->actingAs($ordinaryUser)
+            ->post('/users/create', [
+                'name' => 'Escalated User',
+                'email' => 'escalated@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+                'isAdmin' => true,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'escalated@example.com',
+        ]);
+    }
+
+    public function test_authenticated_non_admin_cannot_create_a_regular_user_even_when_public_registration_is_enabled(): void
+    {
+        config(['linguacafe.allow_web_register' => true]);
+        User::factory()->create(['is_admin' => true]);
+        $ordinaryUser = User::factory()->create(['is_admin' => false]);
+
+        $this->actingAs($ordinaryUser)
+            ->post('/users/create', [
+                'name' => 'Regular Invite',
+                'email' => 'regular-invite@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+                'isAdmin' => false,
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('users', [
+            'email' => 'regular-invite@example.com',
+        ]);
+    }
+
+    public function test_authenticated_admin_can_create_an_admin_user(): void
+    {
+        $admin = User::factory()->create(['is_admin' => true]);
+
+        $this->actingAs($admin)
+            ->post('/users/create', [
+                'name' => 'Second Admin',
+                'email' => 'second-admin@example.com',
+                'password' => 'password',
+                'password_confirmation' => 'password',
+                'isAdmin' => true,
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('users', [
+            'email' => 'second-admin@example.com',
+            'is_admin' => true,
+        ]);
+    }
 }

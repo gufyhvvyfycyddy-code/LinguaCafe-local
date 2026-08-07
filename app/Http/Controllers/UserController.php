@@ -128,6 +128,10 @@ class UserController extends Controller {
         $isAdmin = $userCount === 0 ? true : $request->post('isAdmin');
         $passwordChanged = $userCount === 0;
 
+        if (Auth::check() && !((bool) Auth::user()->is_admin)) {
+            abort(403, 'Only administrators can create users while signed in.');
+        }
+
         // If this is the first user, it can be created without any authorization.
         if (!Auth::check() && $userCount !== 0 && !$allowPublicRegistration) {
             abort(401, 'Not authorized to create a user.');
