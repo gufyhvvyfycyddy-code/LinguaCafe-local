@@ -187,7 +187,7 @@ class MediaAssetService
         });
     }
 
-    public function download(string $assetId, int $userId, string $language): array
+    public function resolveDownload(string $assetId, int $userId, string $language): array
     {
         $asset = MediaAsset::query()
             ->where('public_id', $assetId)
@@ -198,8 +198,21 @@ class MediaAssetService
             ->firstOrFail();
         $root = Storage::disk((string) config('media.disk'))->path('user-' . $userId);
         $path = $this->safePaths->resolveExistingDirectChild($root, $asset->storage_name);
-        $asset->forceFill(['last_accessed_at' => now()])->saveQuietly();
+
         return ['asset' => $asset, 'path' => $path];
+    }
+
+    public function recordDownloadAccess(MediaAsset $asset): void
+    {
+        $asset->forceFill(['last_accessed_at' => now()])->saveQuietly();
+    }
+
+    public function download(string $assetId, int $userId, string $language): array
+    {
+        $file = $this->resolveDownload($assetId, $userId, $language);
+        $this->recordDownloadAccess($file['asset']);
+
+        return $file;
     }
 
     public function check(int $userId, string $language): array

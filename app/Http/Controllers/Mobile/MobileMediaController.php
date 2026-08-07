@@ -46,7 +46,7 @@ class MobileMediaController extends Controller
     public function download(Request $request, string $assetId): BinaryFileResponse
     {
         $user = $request->user();
-        $file = $this->media->download($assetId, $user->id, $user->selected_language);
+        $file = $this->media->resolveDownload($assetId, $user->id, $user->selected_language);
         $asset = $file['asset'];
         $response = response()->file($file['path'], [
             'Content-Type' => $asset->mime_type,
@@ -56,6 +56,11 @@ class MobileMediaController extends Controller
         $response->setPrivate();
         $response->setMaxAge(86400);
         $response->setImmutable();
+
+        if (! $request->isMethod('HEAD')) {
+            $this->media->recordDownloadAccess($asset);
+        }
+
         return $response;
     }
 }
