@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 // services
 use App\Services\ImportService;
@@ -99,11 +101,20 @@ class ImportController extends Controller {
 
         try {
             $subtitleList = $this->importService->getYoutubeSubtitles($url);
-        } catch (\Exception $e) {
-            return $e->getMessage();
+        } catch (\Exception $exception) {
+            Log::warning('youtube_subtitle_lookup_failed', [
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'YOUTUBE_SUBTITLE_SERVICE_UNAVAILABLE',
+                    'message' => '暂时无法获取 YouTube 字幕，请稍后重试。',
+                ],
+            ], 503);
         }
 
-        return response()->json($subtitleList, 200);
+        return new JsonResponse($subtitleList, 200);
     }
 
     public function getSubtitleFileContent(GetSubtitleFileContentRequest $request) {
