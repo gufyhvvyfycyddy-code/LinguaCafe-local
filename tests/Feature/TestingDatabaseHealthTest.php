@@ -20,9 +20,11 @@ class TestingDatabaseHealthTest extends TestCase
 {
     public function test_app_env_is_testing(): void
     {
-        $this->assertSame('testing', $this->app->environment(),
-            'APP_ENV must be "testing" for feature tests. ' .
-            'Check phpunit.xml <env name="APP_ENV" value="testing"/>.'
+        $this->assertSame(
+            'testing',
+            $this->app->environment(),
+            'APP_ENV must be "testing" for feature tests. '.
+            'Check phpunit.xml <env name="APP_ENV" value="testing"/>.',
         );
     }
 
@@ -31,9 +33,11 @@ class TestingDatabaseHealthTest extends TestCase
         $dbName = Config::get('database.connections.mysql.database');
 
         $this->assertNotNull($dbName, 'No database name configured for mysql connection in testing env.');
-        $this->assertStringContainsString('test', strtolower($dbName),
-            "Database '{$dbName}' does not look like a testing database " .
-            '(expected name containing "test"). Aborting to protect real data.'
+        $this->assertStringContainsString(
+            'test',
+            strtolower($dbName),
+            "Database '{$dbName}' does not look like a testing database ".
+            '(expected name containing "test"). Aborting to protect real data.',
         );
     }
 
@@ -41,9 +45,11 @@ class TestingDatabaseHealthTest extends TestCase
     {
         $dbName = Config::get('database.connections.mysql.database');
 
-        $this->assertNotSame('linguacafe_fsrs', $dbName,
-            'Testing database must NOT be the default "linguacafe_fsrs" database. ' .
-            'Set DB_DATABASE in .env.testing to "linguacafe_fsrs_test" or similar.'
+        $this->assertNotSame(
+            'linguacafe_fsrs',
+            $dbName,
+            'Testing database must NOT be the default "linguacafe_fsrs" database. '.
+            'Set DB_DATABASE in .env.testing to "linguacafe_fsrs_test" or similar.',
         );
     }
 
@@ -58,10 +64,10 @@ class TestingDatabaseHealthTest extends TestCase
 
         $this->assertTrue(
             Schema::hasTable('migrations'),
-            "Migrations table does not exist in '{$dbName}'. " .
-            "Run: php artisan migrate --env=testing\n" .
-            "Do NOT run: php artisan migrate:fresh\n" .
-            "Do NOT run: php artisan db:wipe"
+            "Migrations table does not exist in '{$dbName}'. ".
+            "Run: php artisan migrate --env=testing\n".
+            "Do NOT run: php artisan migrate:fresh\n".
+            'Do NOT run: php artisan db:wipe',
         );
     }
 
@@ -73,21 +79,34 @@ class TestingDatabaseHealthTest extends TestCase
 
         $count = DB::table('migrations')->count();
 
-        $this->assertGreaterThan(0, $count,
-            'Migrations table is empty, which means no migrations have been run. ' .
-            'Run: php artisan migrate --env=testing'
+        $this->assertGreaterThan(
+            0,
+            $count,
+            'Migrations table is empty, which means no migrations have been run. '.
+            'Run: php artisan migrate --env=testing',
         );
     }
 
     public function test_no_destructive_commands_in_test_bootstrap(): void
     {
-        $bootstrapPath = __DIR__ . '/../bootstrap.php';
+        $bootstrapPath = __DIR__.'/../bootstrap.php';
 
         if (! file_exists($bootstrapPath)) {
             $this->markTestSkipped('tests/bootstrap.php not found — skipping static check.');
         }
 
-        $contents = file_get_contents($bootstrapPath);
+        $leasePath = __DIR__.'/../Support/TestingDatabaseLease.php';
+        $runnerPath = __DIR__.'/../Support/run-with-testing-db-lease.php';
+        $this->assertFileExists($leasePath);
+        $this->assertFileExists($runnerPath);
+
+        $contents = file_get_contents($bootstrapPath)
+            .file_get_contents($leasePath)
+            .file_get_contents($runnerPath);
+
+        $this->assertStringContainsString('TestingDatabaseLease::acquireOrInheritForProject', $contents);
+        $this->assertStringNotContainsString('storage/framework/testing/phpunit-db.lock', $contents);
+        $this->assertStringContainsString('LEASE_ACQUIRE_FAILED', $contents);
 
         $dangerous = [
             'migrate:fresh',
@@ -100,8 +119,10 @@ class TestingDatabaseHealthTest extends TestCase
         ];
 
         foreach ($dangerous as $pattern) {
-            $this->assertStringNotContainsString($pattern, $contents,
-                "tests/bootstrap.php must NOT contain '{$pattern}'."
+            $this->assertStringNotContainsString(
+                $pattern,
+                $contents,
+                "tests/bootstrap.php must NOT contain '{$pattern}'.",
             );
         }
 
@@ -117,8 +138,10 @@ class TestingDatabaseHealthTest extends TestCase
             if (str_contains($trimmed, 'ftruncate(') || str_contains($trimmed, 'flock(')) {
                 continue;
             }
-            $this->assertStringNotContainsStringIgnoringCase('truncate', $trimmed,
-                "tests/bootstrap.php must NOT call truncate (ftruncate is safe). Offending line: {$trimmed}"
+            $this->assertStringNotContainsStringIgnoringCase(
+                'truncate',
+                $trimmed,
+                "tests/bootstrap.php must NOT call truncate (ftruncate is safe). Offending line: {$trimmed}",
             );
         }
     }
