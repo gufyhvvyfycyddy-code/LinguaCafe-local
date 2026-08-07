@@ -32,9 +32,23 @@ test('formal command requires both explicit rating and concrete WordSense with a
     assert.deepEqual(buildReaderInlineOfficialRatingCommand(state, candidates, 'session-1'), {
         reviewCardId: 195,
         wordSenseId: 95,
-        payload: { rating: 'hard', review_session_id: 'session-1' },
+        payload: {
+            rating: 'hard',
+            reading_session_id: 'session-1',
+            occurrence_id: 'occ2-bank',
+        },
         occurrenceId: 'occ2-bank',
     });
+});
+
+test('Reader explicit rating refuses to build without reading-session and occurrence identity', () => {
+    let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
+    state = chooseReaderInlineRating(state, 'good');
+    state = chooseReaderInlineSense(state, 81);
+    assert.equal(buildReaderInlineOfficialRatingCommand(state, candidates, ''), null);
+
+    const noOccurrence = { ...state, occurrence: { surface: 'bank' } };
+    assert.equal(buildReaderInlineOfficialRatingCommand(noOccurrence, candidates, 'session-1'), null);
 });
 
 test('candidate without official ReviewCard cannot be rated by the Reader', () => {
