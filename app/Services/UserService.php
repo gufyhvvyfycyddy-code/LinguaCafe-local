@@ -88,7 +88,7 @@ class UserService {
                 ->count();
 
             if ($otherAdminAccounts === 0) {
-                throw new \Exception('You cannot remove admin rights from the last admin user.');
+                throw new \DomainException('The system must keep at least one administrator account.');
             }
         }
 

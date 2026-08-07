@@ -160,8 +160,15 @@ class UserController extends Controller {
 
         try {
             $this->userService->updateUser($userId, $name, $email, $isAdmin);
-        } catch(\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\DomainException $exception) {
+            return response()->json([
+                'error' => [
+                    'code' => 'LAST_ADMIN_REQUIRED',
+                    'message' => '系统必须至少保留一个管理员账号。',
+                ],
+            ], 409);
+        } catch (\Throwable $exception) {
+            abort(500, 'User update failed.');
         }
 
         return response()->json('User has been updated successfully.', 200);
