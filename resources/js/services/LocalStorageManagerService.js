@@ -26,7 +26,9 @@ export const settingNames = {
     uiLanguage: 'ui-language',
     libraryLayout: 'library-layout',
     wordCountDisplayType: 'word-count-display-type',
-    textToSpeechSpeed: 'text-to-speech-speed'
+    textToSpeechSpeed: 'text-to-speech-speed',
+    trustAiReadingSenseBinding: 'trust-ai-reading-sense-binding',
+    autoAddAiNewSenseToLearning: 'auto-add-ai-new-sense-to-learning'
 };
 
 
@@ -55,6 +57,8 @@ export const defaultSettings = {
      autoLevelUpWords: false,
      showSubtitleTimestamps: true,
      spaceBetweenSubtitles: 20,
+     trustAiReadingSenseBinding: false,
+     autoAddAiNewSenseToLearning: false,
 
      // Review Settings
      reviewSentenceMode: 'plain-text',

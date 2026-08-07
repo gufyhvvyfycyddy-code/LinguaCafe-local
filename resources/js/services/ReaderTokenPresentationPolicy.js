@@ -50,6 +50,7 @@ export function resolveReaderTokenClasses({
     word,
     hideAllHighlights,
     hideNewWordHighlights,
+    markedUnfamiliar = false,
 }) {
     return {
         'no-highlight': hideAllHighlights || (hideNewWordHighlights && word.stage == 2),
@@ -57,6 +58,7 @@ export function resolveReaderTokenClasses({
         'selected-font': true,
         highlighted: word.selected || word.hover,
         'source-highlight': word.sourceHighlight,
+        'reader-unfamiliar-target': Boolean(markedUnfamiliar),
         phrase: word.phraseIndexes.length,
         'space-after': word.spaceAfter,
         'phrase-start': word.phraseStart,

@@ -85,7 +85,7 @@
                     :wordindex="wordIndex"
                     :stage="word.stage"
                     :phrasestage="word.phraseStage"
-                    :class="readerTokenClasses(word)"
+                    :class="readerTokenClasses(word, wordIndex)"
                     :style="{
                         'margin-bottom': (lineSpacing * 4) + 'px'
                     }"
@@ -202,6 +202,7 @@
     import { resolveReaderNavigationCandidate } from './../../services/ReaderNavigationPolicy';
     import { resolveReaderPhraseInstanceSelection } from './../../services/ReaderPhraseInstanceSelectionPolicy';
     import { resolveReaderSentenceContext } from './../../services/ReaderSentenceContextPolicy';
+    import { resolveReaderUnfamiliarTarget } from './../../services/ReaderUnfamiliarTargetPolicy';
     import {
         READER_TOUCH_LONG_PRESS_MS,
         activateReaderTouchLongPress,
@@ -365,6 +366,14 @@
                 type: Array,
                 default: () => [],
             },
+            unfamiliarMarkMode: {
+                type: Boolean,
+                default: false,
+            },
+            unfamiliarWordIndexes: {
+                type: Array,
+                default: () => [],
+            },
         },
         computed: {
             ...mapState({
@@ -437,11 +446,12 @@
                 return ReaderTokenPresentation.resolveReaderAiTranslation(this.aiSentenceTranslations, sentenceIndex);
             },
             isSectionMarker: ReaderTokenPresentation.isReaderSectionMarker,
-            readerTokenClasses(word) {
+            readerTokenClasses(word, wordIndex) {
                 return ReaderTokenPresentation.resolveReaderTokenClasses({
                     word,
                     hideAllHighlights: this.$props.hideAllHighlights,
                     hideNewWordHighlights: this.$props.hideNewWordHighlights,
+                    markedUnfamiliar: this.$props.unfamiliarWordIndexes.includes(wordIndex),
                 });
             },
             showNewWordFurigana(word) {
@@ -727,6 +737,11 @@
                 }
 
                 this.selectionOngoing = false;
+                if (this.$props.unfamiliarMarkMode) {
+                    this.finishUnfamiliarMarkSelection();
+                    return;
+                }
+
                 if (this.ongoingSelection.length == 1) {
                     // if the selected word is in an phrase, select the phrase instead
                     var selectedPhrase = this.getSelectedPhraseIndex();
@@ -790,7 +805,47 @@
 
                     this.updatePhraseBorders();
                     this.updateVocabBoxDataAfterSelection();
+                    this.emitReaderOccurrenceOpened();
                 }
+            },
+            emitReaderOccurrenceOpened() {
+                const result = resolveReaderUnfamiliarTarget({
+                    selection: this.selection,
+                    words: this.words,
+                });
+                if (!result.ok || result.target.kind !== 'word' || this.selection.length !== 1) return;
+                const selected = this.selection[0];
+                const unique = this.uniqueWords[selected.uniqueWordIndex] || {};
+                this.$emit('reader-occurrence-opened', {
+                    ...result.target,
+                    lemma: unique.base_word || unique.word || result.target.surface,
+                    surface: result.target.surface,
+                });
+            },
+            finishUnfamiliarMarkSelection() {
+                const result = resolveReaderUnfamiliarTarget({
+                    selection: this.ongoingSelection,
+                    words: this.words,
+                });
+
+                for (let index = 0; index < this.words.length; index++) {
+                    this.words[index].selected = false;
+                }
+                this.selection = [];
+                this.ongoingSelection = [];
+                this.selectedPhrase = -1;
+                this.$store.commit('vocabularyBox/setActive', false);
+                this.$store.commit('hoverVocabularyBox/setValue', {
+                    propertyName: 'disabledWhileSelecting',
+                    value: false,
+                });
+
+                if (!result.ok) {
+                    this.$emit('unfamiliar-mark-rejected', result.error);
+                    return;
+                }
+
+                this.$emit('mark-unfamiliar', result.target);
             },
             requestInflections: function(term) {
                 if (this.$props.language !== 'japanese') {
@@ -2139,3 +2194,11 @@
         }
     }
 </script>
+
+<style scoped>
+    .word.reader-unfamiliar-target {
+        background: rgba(255, 193, 7, 0.22);
+        box-shadow: inset 0 -2px 0 rgba(255, 152, 0, 0.85);
+        border-radius: 2px;
+    }
+</style>
