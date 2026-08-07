@@ -6,7 +6,9 @@ use App\Models\EncounteredWord;
 use App\Models\Goal;
 use App\Models\GoalAchievement;
 use App\Models\User;
+use App\Support\GoalIdentity;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class GoalService
@@ -35,16 +37,21 @@ class GoalService
 
     public function ensureDefaultGoalsForLockedUser(int $userId, string $language): void
     {
-        $language = mb_strtolower(trim($language), 'UTF-8');
+        $language = GoalIdentity::normalizeLanguage($language);
+        $existingTypes = Goal::query()
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->whereIn('type', array_keys(self::DEFAULT_GOALS))
+            ->where(function ($query): void {
+                $query->whereNull('target_id')
+                    ->orWhereRaw("TRIM(target_id) = ''");
+            })
+            ->pluck('type')
+            ->map(fn ($type) => GoalIdentity::normalizeType((string) $type))
+            ->all();
 
         foreach (self::DEFAULT_GOALS as $type => $defaults) {
-            $exists = Goal::query()
-                ->where('user_id', $userId)
-                ->where('language', $language)
-                ->where('type', $type)
-                ->exists();
-
-            if ($exists) {
+            if (in_array($type, $existingTypes, true)) {
                 continue;
             }
 
@@ -53,8 +60,20 @@ class GoalService
             $goal->language = $language;
             $goal->name = $defaults['name'];
             $goal->type = $type;
+            $goal->target_id = null;
             $goal->quantity = $defaults['quantity'];
-            $goal->save();
+
+            try {
+                $goal->save();
+                $existingTypes[] = $type;
+            } catch (QueryException $exception) {
+                if (! GoalIdentity::isIdentityDuplicate($exception)
+                    || ! $this->defaultGoalExists($userId, $language, $type)) {
+                    throw $exception;
+                }
+
+                $existingTypes[] = $type;
+            }
         }
     }
 
@@ -64,10 +83,9 @@ class GoalService
     */
     public function updateGoalAchievement($userId, $language, $type, $achievedQuantity)
     {
-        $goal = Goal::where('user_id', $userId)
-            ->where('language', $language)
-            ->where('type', $type)
-            ->first();
+        $language = GoalIdentity::normalizeLanguage((string) $language);
+        $type = GoalIdentity::normalizeType((string) $type);
+        $goal = $this->defaultGoalQuery((int) $userId, $language, $type)->first();
 
         if (! $goal) {
             // Auto-recover: create missing goals for this user/language, then retry
@@ -77,10 +95,7 @@ class GoalService
                 'type' => $type,
             ]);
             $this->createGoalsForLanguage($userId, $language);
-            $goal = Goal::where('user_id', $userId)
-                ->where('language', $language)
-                ->where('type', $type)
-                ->first();
+            $goal = $this->defaultGoalQuery((int) $userId, $language, $type)->first();
             if (! $goal) {
                 // Still missing after creation — skip gracefully instead of crashing vocabulary save
                 \Log::error("GoalService: unable to create goal type={$type} for user={$userId} language={$language}");
@@ -113,6 +128,7 @@ class GoalService
 
     public function getGoals($userId, $language)
     {
+        $language = GoalIdentity::normalizeLanguage((string) $language);
         $goals = Goal::where('user_id', $userId)
             ->where('language', $language)
             ->get();
@@ -153,10 +169,10 @@ class GoalService
 
     public function getCalendarData($userId, $language)
     {
+        $language = GoalIdentity::normalizeLanguage((string) $language);
         $calendarData = [];
 
         // query goal achievements
-        $goalAchievements = GoalAchievement::where('user_id', $userId)->where('language', $language)->get();
         $goalAchievements = DB::table('goal_achievements')
             ->leftJoin('goals', 'goal_achievements.goal_id', '=', 'goals.id')
             ->select('goals.name', 'goals.type', 'goal_achievements.id', 'goal_achievements.day', 'goal_achievements.achieved_quantity', 'goal_achievements.goal_quantity')
@@ -229,11 +245,15 @@ class GoalService
 
     public function updateCalendarData($userId, $language, $achievementGoalId, $achievementType, $day, $newValue)
     {
+        $language = GoalIdentity::normalizeLanguage((string) $language);
+        $achievementType = GoalIdentity::normalizeType((string) $achievementType);
+
         if ($achievementGoalId === -1) {
-            $goal = Goal::where('user_id', $userId)
-                ->where('language', $language)
-                ->where('type', $achievementType)
-                ->first();
+            $goal = $this->defaultGoalQuery(
+                (int) $userId,
+                $language,
+                $achievementType,
+            )->first();
 
             if (! $goal) {
                 throw new \Exception('Goal not found.');
@@ -254,5 +274,22 @@ class GoalService
         }
 
         return true;
+    }
+
+    private function defaultGoalExists(int $userId, string $language, string $type): bool
+    {
+        return $this->defaultGoalQuery($userId, $language, $type)->exists();
+    }
+
+    private function defaultGoalQuery(int $userId, string $language, string $type)
+    {
+        return Goal::query()
+            ->where('user_id', $userId)
+            ->where('language', GoalIdentity::normalizeLanguage($language))
+            ->where('type', GoalIdentity::normalizeType($type))
+            ->where(function ($query): void {
+                $query->whereNull('target_id')
+                    ->orWhereRaw("TRIM(target_id) = ''");
+            });
     }
 }
