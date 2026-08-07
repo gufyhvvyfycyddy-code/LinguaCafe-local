@@ -22,7 +22,7 @@ class SenseSourceContextService
     ) {
     }
 
-    public function sourceContext(int $userId, string $language, int $senseId, bool $allowRecoveryWriteBack = true): array
+    public function sourceContext(int $userId, string $language, int $senseId, bool $allowRecoveryWriteBack = false): array
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
         $sourceOccurrence = $this->resolver->resolveSourceOccurrence($sense);
@@ -133,7 +133,7 @@ class SenseSourceContextService
         string $language,
         int $senseId,
         ?int $preferredOccurrenceId = null,
-        bool $allowRecoveryWriteBack = true,
+        bool $allowRecoveryWriteBack = false,
     ): array
     {
         $sense = $this->resolver->resolveSense($userId, $language, $senseId);
@@ -362,7 +362,7 @@ class SenseSourceContextService
         WordSense $sense,
         ?WordSenseOccurrence $occurrence,
         ?string $exampleSentence,
-        bool $allowRecoveryWriteBack = true,
+        bool $allowRecoveryWriteBack = false,
     ): ?array {
         if (!$exampleSentence) {
             return null;
@@ -442,7 +442,7 @@ class SenseSourceContextService
         WordSense $sense,
         ?WordSenseOccurrence $occurrence,
         ?string $exampleSentence,
-        bool $allowRecoveryWriteBack = true,
+        bool $allowRecoveryWriteBack = false,
     ): ?array {
         if (!$exampleSentence) {
             return null;

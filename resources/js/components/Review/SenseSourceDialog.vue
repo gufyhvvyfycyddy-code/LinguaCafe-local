@@ -80,6 +80,7 @@
                 loading: false,
                 error: '',
                 context: null,
+                sourceContextRequestSequence: 0,
             };
         },
         computed: {
@@ -102,7 +103,10 @@
             value(newValue) {
                 if (newValue) {
                     this.loadSourceContext();
+                    return;
                 }
+                this.sourceContextRequestSequence += 1;
+                this.loading = false;
             },
             senseId() {
                 if (this.value) {
@@ -116,18 +120,23 @@
                     return;
                 }
 
+                const requestSequence = ++this.sourceContextRequestSequence;
+                const senseId = this.senseId;
                 this.loading = true;
                 this.error = '';
                 this.context = null;
 
-                axios.get('/senses/' + this.senseId + '/source-context')
+                axios.get('/senses/' + senseId + '/source-context')
                     .then((response) => {
+                        if (requestSequence !== this.sourceContextRequestSequence || senseId !== this.senseId) return;
                         this.context = response.data;
                     })
                     .catch(() => {
+                        if (requestSequence !== this.sourceContextRequestSequence || senseId !== this.senseId) return;
                         this.error = '原文位置加载失败。';
                     })
                     .finally(() => {
+                        if (requestSequence !== this.sourceContextRequestSequence) return;
                         this.loading = false;
                     });
             },

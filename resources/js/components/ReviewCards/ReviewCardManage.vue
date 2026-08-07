@@ -256,6 +256,7 @@ export default {
             editForm: {},
             sourceDialog: false,
             sourcePayload: {},
+            sourceContextRequestSequence: 0,
             detailDrawer: false,
             detailReviewCardId: null,
             markerSaving: false,
@@ -612,6 +613,7 @@ export default {
             this.$router.push({ path: '/custom-study', query: { mode: 'marked' } });
         },
         viewSource(item) {
+            const requestSequence = ++this.sourceContextRequestSequence;
             const card = {
                 lemma: item.lemma,
                 surface_form: item.surface_form,
@@ -623,16 +625,12 @@ export default {
 
             axios.get('/senses/' + item.word_sense_id + '/source-context')
                 .then((response) => {
+                    if (requestSequence !== this.sourceContextRequestSequence) return;
                     this.sourcePayload = { card: card, context: response.data };
                     this.sourceDialog = true;
-                    // If the source-context API recovered source (wrote back chapter_id),
-                    // refresh the list item so the outer display updates.
-                    const ctx = response.data;
-                    if (ctx && (ctx.source_kind === 'chapter_recovered' || ctx.source_kind === 'chapter_fuzzy' || ctx.source_kind === 'chapter_fuzzy_title')) {
-                        this.loadData();
-                    }
                 })
                 .catch(() => {
+                    if (requestSequence !== this.sourceContextRequestSequence) return;
                     this.sourcePayload = { card: card, context: null, error: '获取原文失败。' };
                     this.sourceDialog = true;
                 });

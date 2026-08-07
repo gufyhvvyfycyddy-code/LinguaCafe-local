@@ -624,10 +624,11 @@ class SenseSourceContextTest extends TestCase
         }
         $this->assertTrue($hasTarget, 'Bureau token should be marked as target');
 
-        // Verify write-back to WordSense
+        // Recovery is a read-only preview. The returned location must not be
+        // persisted merely because a user viewed source context.
         $sense->refresh();
-        $this->assertSame($chapter->id, $sense->source_chapter_id, 'WordSense.source_chapter_id should be written back');
-        $this->assertSame('1', $sense->sentence_id, 'WordSense.sentence_id should be written back');
+        $this->assertNull($sense->source_chapter_id, 'GET recovery must not write WordSense.source_chapter_id');
+        $this->assertNull($sense->sentence_id, 'GET recovery must not write WordSense.sentence_id');
     }
 
     public function test_source_context_recovers_chapter_from_chapter_title(): void
@@ -683,9 +684,9 @@ class SenseSourceContextTest extends TestCase
         }
         $this->assertTrue($hasTarget, 'Bricks token should be marked as target');
 
-        // Verify write-back to WordSense
+        // Title recovery remains usable without converting a read into a write.
         $sense->refresh();
-        $this->assertSame($chapter->id, $sense->source_chapter_id, 'WordSense.source_chapter_id should be written back');
+        $this->assertNull($sense->source_chapter_id, 'GET title recovery must not write WordSense.source_chapter_id');
     }
 
     public function test_source_context_keeps_card_example_when_recovery_fails(): void
@@ -1590,7 +1591,7 @@ class SenseSourceContextTest extends TestCase
 
     // ==================== Supplementary characterization tests ====================
 
-    public function test_chapter_recovered_writes_back_source_fields(): void
+    public function test_chapter_recovered_preview_does_not_write_source_fields(): void
     {
         // Create a chapter that will be matched by example sentence
         $processedWords = [
@@ -1625,9 +1626,10 @@ class SenseSourceContextTest extends TestCase
         $data = $response->json();
         $this->assertSame('chapter_recovered', $data['source_kind']);
 
-        // Verify write-back
+        // Verify the recovered result is presentation-only.
         $sense->refresh();
-        $this->assertNotNull($sense->source_chapter_id);
+        $this->assertNull($sense->source_chapter_id);
+        $this->assertNull($sense->sentence_id);
     }
 
     public function test_card_example_does_not_write_back_to_sense(): void

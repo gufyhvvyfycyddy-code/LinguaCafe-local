@@ -569,6 +569,7 @@
                 sourceLoading: false,
                 sourceFallbackDialog: false,
                 sourceFallbackContext: null,
+                sourceContextRequestSequence: 0,
                 sourceError: '',
                 correctReviews: 0,
                 language: '',
@@ -959,6 +960,8 @@
                 this.reviewDurationTracker = createTracker(undefined, document.visibilityState !== 'hidden');
 
                 this.exampleSentence = null;
+                this.sourceContextRequestSequence += 1;
+                this.sourceLoading = false;
                 this.sourceFallbackDialog = false;
                 this.sourceFallbackContext = null;
                 this.sourceError = '';
@@ -996,11 +999,17 @@
                     return;
                 }
 
+                const requestSequence = ++this.sourceContextRequestSequence;
+                const senseId = card.word_sense_id;
                 this.sourceLoading = true;
                 this.sourceError = '';
 
-                axios.get('/senses/' + card.word_sense_id + '/source-context')
+                axios.get('/senses/' + senseId + '/source-context')
                     .then((response) => {
+                        const currentCard = this.reviews[this.currentReviewIndex];
+                        if (requestSequence !== this.sourceContextRequestSequence
+                            || !currentCard
+                            || currentCard.word_sense_id !== senseId) return;
                         this.sourceFallbackContext = {
                             card: card,
                             context: response.data,
@@ -1008,6 +1017,10 @@
                         this.sourceFallbackDialog = true;
                     })
                     .catch(() => {
+                        const currentCard = this.reviews[this.currentReviewIndex];
+                        if (requestSequence !== this.sourceContextRequestSequence
+                            || !currentCard
+                            || currentCard.word_sense_id !== senseId) return;
                         this.sourceFallbackContext = {
                             card: card,
                             context: null,
@@ -1016,6 +1029,7 @@
                         this.sourceFallbackDialog = true;
                     })
                     .finally(() => {
+                        if (requestSequence !== this.sourceContextRequestSequence) return;
                         this.sourceLoading = false;
                     });
             },
