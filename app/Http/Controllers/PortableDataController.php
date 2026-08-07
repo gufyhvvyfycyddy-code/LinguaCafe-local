@@ -15,6 +15,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 class PortableDataController extends Controller
 {
@@ -41,7 +42,11 @@ class PortableDataController extends Controller
             try {
                 readfile($package['path']);
             } finally {
-                $this->anki->cleanupPackage($package['path']);
+                try {
+                    $this->anki->cleanupPackage($package['path']);
+                } catch (Throwable $cleanupException) {
+                    report($cleanupException);
+                }
             }
         }, 'linguacafe-wordsenses-' . now()->format('Ymd-His') . '.apkg', [
             'Content-Type' => 'application/octet-stream',
@@ -122,7 +127,11 @@ class PortableDataController extends Controller
             try {
                 readfile($package['path']);
             } finally {
-                $this->portable->cleanupPackage($package['path']);
+                try {
+                    $this->portable->cleanupPackage($package['path']);
+                } catch (Throwable $cleanupException) {
+                    report($cleanupException);
+                }
             }
         }, 'linguacafe-portable-' . now()->format('Ymd-His') . '.lcpkg', [
             'Content-Type' => 'application/zip',

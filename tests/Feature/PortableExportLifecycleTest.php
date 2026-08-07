@@ -101,7 +101,10 @@ class PortableExportLifecycleTest extends TestCase
                 'count' => 0,
                 'sha256' => str_repeat('a', 64),
             ]);
-            $mock->shouldReceive('cleanupPackage')->once()->with($missing);
+            $mock->shouldReceive('cleanupPackage')
+                ->once()
+                ->with($missing)
+                ->andThrow(new RuntimeException('planned cleanup failure'));
         });
 
         $response = $this->actingAs($this->admin)
@@ -112,8 +115,9 @@ class PortableExportLifecycleTest extends TestCase
         try {
             ($response->baseResponse->getCallback())();
             $this->fail('Expected the missing stream source to fail.');
-        } catch (\Illuminate\Routing\Exceptions\StreamedResponseException) {
-            $this->addToAssertionCount(1);
+        } catch (\Illuminate\Routing\Exceptions\StreamedResponseException $exception) {
+            $this->assertStringContainsString('readfile', $exception->getMessage());
+            $this->assertStringNotContainsString('planned cleanup failure', $exception->getMessage());
         } finally {
             ob_end_clean();
         }
