@@ -41,7 +41,8 @@ export function replaceReaderInlineOccurrence(state, occurrence) {
 }
 
 export function buildReaderInlineOfficialRatingCommand(state, candidates = [], readingSessionId = '') {
-    if (!state?.occurrence || !state.showAnswer || !READER_INLINE_RATINGS.includes(state.pendingRating)) return null;
+    const occurrenceId = state?.occurrence?.occurrence_id || '';
+    if (!occurrenceId || !readingSessionId || !state.showAnswer || !READER_INLINE_RATINGS.includes(state.pendingRating)) return null;
     const selectedId = Number(state.selectedWordSenseId);
     const candidate = (Array.isArray(candidates) ? candidates : []).find(
         item => Number(item.word_sense_id || item.sense_id) === selectedId,
@@ -54,8 +55,9 @@ export function buildReaderInlineOfficialRatingCommand(state, candidates = [], r
         wordSenseId: selectedId,
         payload: {
             rating: state.pendingRating,
-            ...(readingSessionId ? { review_session_id: readingSessionId } : {}),
+            reading_session_id: readingSessionId,
+            occurrence_id: occurrenceId,
         },
-        occurrenceId: state.occurrence.occurrence_id || null,
+        occurrenceId,
     };
 }
