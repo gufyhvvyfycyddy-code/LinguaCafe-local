@@ -94,7 +94,12 @@ class UserController extends Controller {
  
             return response()->json('User has been logged in successfully.', 200);
         } else {
-            return response()->json('Login error.', 500);
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_CREDENTIALS',
+                    'message' => 'The email or password is incorrect.',
+                ],
+            ], 401);
         }
     }
 

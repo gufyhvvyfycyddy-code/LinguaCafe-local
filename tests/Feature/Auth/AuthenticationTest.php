@@ -29,12 +29,16 @@ class AuthenticationTest extends TestCase
     {
         $user = User::factory()->create();
 
-        $this->post('/login', [
+        $response = $this->postJson('/login', [
             'email' => $user->email,
             'password' => 'wrong-password',
         ]);
 
         $this->assertGuest();
+        $response
+            ->assertUnauthorized()
+            ->assertJsonPath('error.code', 'INVALID_CREDENTIALS')
+            ->assertJsonPath('error.message', 'The email or password is incorrect.');
     }
 
     public function test_users_can_logout(): void

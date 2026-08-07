@@ -124,6 +124,8 @@
 </template>
 
 <script>
+import { resolveLoginError } from '../../services/AuthLoginErrorPolicy';
+
 const AccountForm = {
     props: {
         value: Boolean,
@@ -256,14 +258,10 @@ export default {
                 email: this.email,
                 password: this.password,
                 remember: true
-            }).then((response) => {
-                if (response.status === 200) {
-                    window.location.href = '/';
-                } else {
-                    this.error = '邮箱或密码不正确。';
-                }
-            }).catch(() => {
-                this.error = '邮箱或密码不正确。';
+            }).then(() => {
+                window.location.href = '/';
+            }).catch((error) => {
+                this.error = resolveLoginError(error);
             }).finally(() => {
                 this.loading = false;
             });
