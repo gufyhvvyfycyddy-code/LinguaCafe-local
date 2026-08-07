@@ -63,6 +63,26 @@ class UserManagementValidationTest extends TestCase
             ->assertJsonValidationErrors('userId');
     }
 
+    public function test_last_admin_demotion_returns_conflict(): void
+    {
+        $admin = User::factory()->create([
+            'is_admin' => true,
+            'email' => 'last-admin@example.test',
+        ]);
+
+        $this->actingAs($admin)
+            ->postJson('/users/update', [
+                'userId' => $admin->id,
+                'name' => $admin->name,
+                'email' => $admin->email,
+                'isAdmin' => false,
+            ])
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'LAST_ADMIN_REQUIRED');
+
+        $this->assertTrue((bool) $admin->fresh()->is_admin);
+    }
+
     public function test_admin_update_can_keep_the_targets_current_email(): void
     {
         $admin = User::factory()->create(['is_admin' => true]);
