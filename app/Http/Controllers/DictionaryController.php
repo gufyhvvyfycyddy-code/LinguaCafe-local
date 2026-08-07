@@ -341,6 +341,8 @@ class DictionaryController extends Controller
     public function deleteDictionary($dictionaryId, DeleteDictionaryRequest $request) {
         try {
             $this->dictionaryService->deleteDictionary($dictionaryId);
+        } catch (\DomainException $e) {
+            abort(409, $e->getMessage());
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

@@ -481,6 +481,10 @@ class DictionaryService {
             throw new \Exception('Dictionary does not exist.');
         }
 
+        if ($dictionary->database_table_name === 'dict_jp_jmdict') {
+            throw new \DomainException('JMDict cannot be deleted.');
+        }
+
         if($dictionary->database_table_name !== 'API') {
             Schema::drop($dictionary->database_table_name);
         }
