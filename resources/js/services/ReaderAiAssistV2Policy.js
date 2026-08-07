@@ -35,7 +35,40 @@ export function normalizeReaderAiAssistSourceMeta(data = {}) {
 
 export function isReaderAiAssistV2(payload = {}) {
     return payload.schema_version === READER_UNFAMILIAR_SCHEMA_VERSION
+        || payload.schemaVersion === READER_UNFAMILIAR_SCHEMA_VERSION
         || payload.contract_version === READER_UNFAMILIAR_SCHEMA_VERSION;
+}
+
+export function readerAiAssistPackageKey(pkg = {}, index = 0) {
+    const partIndex = Number(pkg.part_index || index + 1);
+    return String(Number.isInteger(partIndex) && partIndex > 0 ? partIndex : index + 1);
+}
+
+export function readerAiAssistV2InputsComplete(sourceMeta = {}, aiTextByPart = {}) {
+    const packages = Array.isArray(sourceMeta.packages) ? sourceMeta.packages : [];
+    if (!packages.length) return false;
+    return packages.every((pkg, index) => {
+        const key = readerAiAssistPackageKey(pkg, index);
+        return typeof aiTextByPart[key] === 'string' && aiTextByPart[key].trim().length > 0;
+    });
+}
+
+export function buildReaderAiAssistV2ImportRequest(
+    chapterId,
+    sourceMeta = {},
+    aiTextByPart = {},
+    applyTrustAi = false,
+) {
+    const packages = Array.isArray(sourceMeta.packages) ? sourceMeta.packages : [];
+    return {
+        chapterId,
+        schema_version: sourceMeta.schemaVersion || READER_UNFAMILIAR_SCHEMA_VERSION,
+        parts: packages.map((pkg, index) => ({
+            manifest_token: pkg.manifest_token || '',
+            ai_text: String(aiTextByPart[readerAiAssistPackageKey(pkg, index)] || ''),
+        })),
+        apply_trust_ai: Boolean(applyTrustAi),
+    };
 }
 
 function legacyWordToResult(item) {
