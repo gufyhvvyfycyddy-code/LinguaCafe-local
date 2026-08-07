@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Exceptions\DictionaryReadException;
 use App\Http\Requests\Dictionaries\CreateCustomApiDictionaryRequest;
 use App\Models\Dictionary;
 use Illuminate\Http\Request;
@@ -42,22 +43,41 @@ class DictionaryController extends Controller
         Returns a list of dictionaries.
     */
     public function getDictionaries() {
-
         try {
             $dictionaries = $this->dictionaryService->getDictionaries();
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'error' => [
+                    'code' => 'DICTIONARY_LIST_UNAVAILABLE',
+                    'message' => 'Dictionary settings are temporarily unavailable.',
+                ],
+            ], 500);
         }
 
         return response()->json($dictionaries, 200);
     }
 
     public function getDictionary($dictionaryId, GetDictionaryRequest $request) {
-        
         try {
             $dictionary = $this->dictionaryService->getDictionary($dictionaryId);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (DictionaryReadException $exception) {
+            return response()->json([
+                'error' => [
+                    'code' => $exception->errorCode,
+                    'message' => $exception->publicMessage,
+                ],
+            ], $exception->httpStatus);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'error' => [
+                    'code' => 'DICTIONARY_READ_FAILED',
+                    'message' => 'Dictionary information is temporarily unavailable.',
+                ],
+            ], 500);
         }
 
         return response()->json($dictionary, 200);

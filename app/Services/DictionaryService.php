@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Exceptions\DictionaryReadException;
+use App\Services\Dictionaries\DictionaryHealthService;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -18,45 +20,64 @@ use App\Models\VocabularyJmdict;
 
 class DictionaryService {
 
-    public function __construct() {
+    public function __construct(
+        private DictionaryHealthService $dictionaryHealthService,
+    ) {
     }
 
     public function getDictionaries() {
-        $dictionaries = Dictionary::get();
+        $dictionaries = Dictionary::query()->orderBy('id')->get();
+        $healthById = $this->dictionaryHealthService->classifyCollection($dictionaries);
 
         foreach ($dictionaries as $dictionary) {
-            if ($dictionary->database_table_name == 'API') {
-                $dictionary->records = '-';
-            } else {
-                $dictionary->records = DB
-                    ::table($dictionary->database_table_name)
-                    ->selectRaw('count(*) as record_count')
-                    ->get();
-
-                $dictionary->records = $dictionary->records[0]->record_count;
-            }
+            $health = $healthById[(int) $dictionary->id];
+            $dictionary->health = $health->toArray();
+            $dictionary->records = $this->recordCountForDictionary($dictionary, $health);
         }
 
         return $dictionaries;
     }
 
     public function getDictionary($dictionaryId) {
-        $dictionary = Dictionary
-            ::where('id', $dictionaryId)
-            ->first();
+        $dictionary = Dictionary::query()->where('id', $dictionaryId)->first();
 
-        if ($dictionary->database_table_name == 'API') {
-            $dictionary->records = '-';
-        } else {
-            $dictionary->records = DB
-                ::table($dictionary->database_table_name)
-                ->selectRaw('count(*) as record_count')
-                ->get();
-
-            $dictionary->records = $dictionary->records[0]->record_count;
+        if (! $dictionary) {
+            throw DictionaryReadException::notFound();
         }
 
+        $dictionaries = Dictionary::query()->get();
+        $health = $this->dictionaryHealthService->classifyCollection($dictionaries)[(int) $dictionary->id];
+        $dictionary->health = $health->toArray();
+        $dictionary->records = $this->recordCountForDictionary($dictionary, $health);
+
         return $dictionary;
+    }
+
+    private function recordCountForDictionary(Dictionary $dictionary, $health): int|string|null
+    {
+        if ($dictionary->database_table_name === 'API') {
+            return '-';
+        }
+
+        if (! $health->canCountRecords()) {
+            return null;
+        }
+
+        try {
+            return DB::table($dictionary->database_table_name)->count();
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $dictionary->health = [
+                'status' => 'unknown',
+                'code' => 'DICTIONARY_HEALTH_UNKNOWN',
+                'message' => '词典状态暂时无法确认。',
+                'query_available' => false,
+                'repair_required' => true,
+            ];
+
+            return null;
+        }
     }
 
     public function updateDictionary($dictionaryId, $dictionaryData) {
