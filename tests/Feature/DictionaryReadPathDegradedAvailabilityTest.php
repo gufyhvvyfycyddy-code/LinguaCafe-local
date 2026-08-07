@@ -29,18 +29,32 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
     /** @var string[] */
     private array $createdTables = [];
 
+    /** @var int[] */
+    private array $createdMetadataIds = [];
+
+    /** @var int[] */
+    private array $createdUserIds = [];
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->admin = $this->createUser(true, 'english');
-        $this->reader = $this->createUser(false, 'english');
+        $this->reader = $this->createUser(false, 'r11r_english');
     }
 
     protected function tearDown(): void
     {
         foreach (array_reverse(array_unique($this->createdTables)) as $tableName) {
             Schema::dropIfExists($tableName);
+        }
+
+        if ($this->createdMetadataIds !== []) {
+            DB::table('dictionaries')->whereIn('id', array_unique($this->createdMetadataIds))->delete();
+        }
+
+        if ($this->createdUserIds !== []) {
+            DB::table('users')->whereIn('id', array_unique($this->createdUserIds))->delete();
         }
 
         parent::tearDown();
@@ -156,8 +170,8 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
         $this->createDictionaryTable($goodTable, [
             ['word' => 'friendly', 'definitions' => 'kind; pleasant'],
         ]);
-        $this->createMetadata('R11R Healthy Lookup', $goodTable, true, 'english');
-        $badId = $this->createMetadata('R11R Broken Lookup', $missingTable, true, 'english');
+        $this->createMetadata('R11R Healthy Lookup', $goodTable, true, 'r11r_english');
+        $badId = $this->createMetadata('R11R Broken Lookup', $missingTable, true, 'r11r_english');
 
         $response = $this->actingAs($this->reader)
             ->postJson('/dictionaries/search', [
@@ -178,7 +192,7 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
     public function test_all_configured_local_dictionaries_unavailable_returns_safe_503(): void
     {
         $missingTable = $this->uniqueTable('all_bad');
-        $this->createMetadata('R11R All Bad', $missingTable, true, 'english');
+        $this->createMetadata('R11R All Bad', $missingTable, true, 'r11r_english');
 
         $response = $this->actingAs($this->reader)
             ->postJson('/dictionaries/search-for-hover-vocabulary', [
@@ -209,7 +223,7 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
     public function test_disabled_broken_dictionary_is_not_queried_or_reported_as_runtime_warning(): void
     {
         $missingTable = $this->uniqueTable('disabled_lookup');
-        $this->createMetadata('R11R Disabled Broken', $missingTable, false, 'english');
+        $this->createMetadata('R11R Disabled Broken', $missingTable, false, 'r11r_english');
 
         $response = $this->actingAs($this->reader)
             ->postJson('/dictionaries/search', [
@@ -256,7 +270,7 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
         $this->createDictionaryTable($table, [
             ['word' => 'term', 'definitions' => 'definition'],
         ]);
-        $this->createMetadata('R11R Validation', $table, true, 'english');
+        $this->createMetadata('R11R Validation', $table, true, 'r11r_english');
 
         $this->actingAs($this->reader)
             ->postJson('/dictionaries/search', ['language' => 'english', 'term' => " \t\n "])
@@ -277,7 +291,7 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
 
     private function createUser(bool $admin, string $language): User
     {
-        return User::forceCreate([
+        $user = User::forceCreate([
             'name' => $admin ? 'R11R Admin' : 'R11R Reader',
             'email' => 'r11r-'.Str::uuid().'@example.test',
             'password' => Hash::make('password'),
@@ -286,6 +300,10 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
             'is_admin' => $admin,
             'uuid' => (string) Str::uuid(),
         ]);
+
+        $this->createdUserIds[] = $user->id;
+
+        return $user;
     }
 
     /** @param array<int, array{word: string, definitions: string}> $rows */
@@ -314,7 +332,7 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
         bool $enabled,
         string $sourceLanguage = 'english',
     ): int {
-        return DB::table('dictionaries')->insertGetId([
+        $id = DB::table('dictionaries')->insertGetId([
             'name' => $name,
             'type' => 'supported',
             'api_host' => null,
@@ -326,6 +344,10 @@ class DictionaryReadPathDegradedAvailabilityTest extends TestCase
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        $this->createdMetadataIds[] = $id;
+
+        return $id;
     }
 
     private function uniqueTable(string $purpose): string

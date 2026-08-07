@@ -144,57 +144,78 @@ class DictionaryController extends Controller
     }
 
     public function searchDefinitions(SearchDefinitionsRequest $request) {
-        $language = $request->post('language');
-        $term = $request->post('term');
+        $language = Auth::user()->selected_language;
+        $term = $request->validated('term');
 
         try {
-            $searchResult = $this->dictionaryService->searchDefinitions($language, $term);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
-        }
+            return response()->json(
+                $this->dictionaryService->searchDefinitions($language, $term),
+                200,
+            );
+        } catch (DictionaryReadException $exception) {
+            return $this->dictionaryReadExceptionResponse($exception);
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return response()->json($searchResult, 200);
+            return $this->dictionaryReadFailureResponse();
+        }
     }
 
     /*
         This function returns a list of exact matches from dictionaries for the hover popup vocabulary.
     */
     public function searchDefinitionsForHoverVocabulary(SearchDefinitionsForHoverVocabularyRequest $request) {
-        $language = $request->post('language');
-        $term = $request->post('term');
+        $language = Auth::user()->selected_language;
+        $term = $request->validated('term');
 
         try {
-            $searchResult = $this->dictionaryService->searchDefinitionsForHoverVocabulary($language, $term);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
-        }
+            return response()->json(
+                $this->dictionaryService->searchDefinitionsForHoverVocabulary($language, $term),
+                200,
+            );
+        } catch (DictionaryReadException $exception) {
+            return $this->dictionaryReadExceptionResponse($exception);
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return response()->json($searchResult, 200);
+            return $this->dictionaryReadFailureResponse();
+        }
     }
 
     public function searchApiDictionaries(SearchApiRequest $request) {
-        $language = $request->post('language');
-        $term = $request->post('term');
+        $language = Auth::user()->selected_language;
+        $term = $request->validated('term');
 
         try {
-            $definitions = $this->dictionaryService->searchApiDictionaries($language, $term);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
-        }
+            return response()->json(
+                $this->dictionaryService->searchApiDictionaries($language, $term),
+                200,
+            );
+        } catch (DictionaryReadException $exception) {
+            return $this->dictionaryReadExceptionResponse($exception);
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return response()->json($definitions, 200);
+            return $this->dictionaryReadFailureResponse();
+        }
     }
 
     public function searchInflections(SearchInflectionsRequest $request) {
-        $term = $request->term;
+        $language = Auth::user()->selected_language;
+        $term = $request->validated('term');
 
         try {
-            $inflections = $this->dictionaryService->searchInflections($term);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
-        }
+            return response()->json(
+                $this->dictionaryService->searchInflections($language, $term),
+                200,
+            );
+        } catch (DictionaryReadException $exception) {
+            return $this->dictionaryReadExceptionResponse($exception);
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return response()->json($inflections, 200);
+            return $this->dictionaryReadFailureResponse();
+        }
     }
 
     public function createDeeplDictionary(CreateDeeplDictionaryRequest $request) {
@@ -368,5 +389,25 @@ class DictionaryController extends Controller
         }
 
         return response()->json('Dictionary has been deleted successfully.', 200);
+    }
+
+    private function dictionaryReadExceptionResponse(DictionaryReadException $exception)
+    {
+        return response()->json([
+            'error' => [
+                'code' => $exception->errorCode,
+                'message' => $exception->publicMessage,
+            ],
+        ], $exception->httpStatus);
+    }
+
+    private function dictionaryReadFailureResponse()
+    {
+        return response()->json([
+            'error' => [
+                'code' => 'DICTIONARY_LOOKUP_FAILED',
+                'message' => 'Dictionary lookup failed.',
+            ],
+        ], 500);
     }
 }

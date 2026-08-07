@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Exceptions\DictionaryReadException;
 use App\Services\Dictionaries\DictionaryHealthService;
+use App\Services\Dictionaries\DictionaryLookupResultPolicy;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
@@ -22,6 +23,7 @@ class DictionaryService {
 
     public function __construct(
         private DictionaryHealthService $dictionaryHealthService,
+        private DictionaryLookupResultPolicy $dictionaryLookupResultPolicy,
     ) {
     }
 
@@ -127,86 +129,117 @@ class DictionaryService {
         ];
     }
 
-    public function searchDefinitions($language, $term) {
-        $searchResultDictionaries = [];
-        $dictionaries = Dictionary
-            ::where('enabled', true)
-            ->where('source_language', $language)
-            ->get();
+    public function searchDefinitions(string $language, string $term): array
+    {
+        $dictionaries = $this->applicableLocalDictionaries($language);
+        if ($dictionaries->isEmpty()) {
+            return [
+                'term' => $term,
+                'results' => [],
+                'warnings' => [],
+                'configured' => false,
+            ];
+        }
 
-        // go through each dictionary and search in them
+        $healthById = $this->dictionaryHealthService->classifyCollection(Dictionary::query()->get());
+        $results = [];
+        $warnings = [];
+        $successfulQueries = 0;
+
         foreach ($dictionaries as $dictionary) {
-            $searchResultDictionary = new \stdClass();
-            $searchResultDictionary->name = $dictionary->name;
-            $searchResultDictionary->color = $dictionary->color;
-            
-            if ($dictionary->name === 'JMDict') {
-                $searchResultDictionary->jmdictRecords = $this->searchJmDict($term);
-            } else if($dictionary->type === 'supported' || $dictionary->type === 'custom_csv') {
-                $searchResultDictionary->records = $this->searchImportedDictionary($dictionary->database_table_name, $term);
-            } else {
+            $health = $healthById[(int) $dictionary->id];
+            if (! $health->queryAvailable) {
+                $warnings[] = $this->warningFromHealth($dictionary, $health);
                 continue;
             }
 
-            $searchResultDictionaries[] = $searchResultDictionary;
+            try {
+                $result = [
+                    'name' => $dictionary->name,
+                    'color' => $dictionary->color,
+                ];
+
+                if ($dictionary->database_table_name === DictionaryHealthService::JMDICT_TARGET) {
+                    $result['jmdictRecords'] = $this->searchJmDict($term);
+                } else {
+                    $result['records'] = $this->searchImportedDictionary(
+                        $dictionary->database_table_name,
+                        $term,
+                    );
+                }
+
+                $results[] = $result;
+                $successfulQueries++;
+            } catch (\Throwable $exception) {
+                report($exception);
+                $warnings[] = $this->runtimeWarning($dictionary);
+            }
         }
 
-        return $searchResultDictionaries;
+        if ($successfulQueries === 0) {
+            throw DictionaryReadException::lookupUnavailable();
+        }
+
+        return [
+            'term' => $term,
+            'results' => $results,
+            'warnings' => $warnings,
+            'configured' => true,
+        ];
     }
 
-    // This function returns a list of exact matches from dictionaries for the hover popup vocabulary.
-    public function searchDefinitionsForHoverVocabulary($language, $term) {
-        $limit = 9;
-        $searchResults = [];
-        
-        $dictionaries = Dictionary
-            ::where('enabled', true)
-            ->where('source_language', $language)
-            ->get();
+    public function searchDefinitionsForHoverVocabulary(string $language, string $term): array
+    {
+        $dictionaries = $this->applicableLocalDictionaries($language);
+        if ($dictionaries->isEmpty()) {
+            return [
+                'term' => $term,
+                'definitions' => [],
+                'warnings' => [],
+                'configured' => false,
+            ];
+        }
 
-        // go through each dictionary and search in them
+        $healthById = $this->dictionaryHealthService->classifyCollection(Dictionary::query()->get());
+        $definitions = [];
+        $warnings = [];
+        $successfulQueries = 0;
+
         foreach ($dictionaries as $dictionary) {
-            $results = [];
-
-            // make search based on dictionary type
-            if ($dictionary->name == 'JMDict') {
-                $searchRecords = $this->searchJmDict($term, true);
-            } else if ($dictionary->database_table_name == 'API') {
-                // skip dictionary if it's an api
+            $health = $healthById[(int) $dictionary->id];
+            if (! $health->queryAvailable) {
+                $warnings[] = $this->warningFromHealth($dictionary, $health);
                 continue;
-            } else {
-                $searchRecords = $this->searchImportedDictionary($dictionary->database_table_name, $term, true);
             }
 
-            // add definitions to the final search results
-            foreach ($searchRecords as $searchRecord) {
-                foreach ($searchRecord->definitions as $definition) {
-                    // break loop if the search result limit is reached
-                    if (count($searchResults) > $limit) {
-                        break;
-                    }
-                    
-                    // add definitions based on dictionary type
-                    if ($dictionary->name == 'JMDict') {
-                        foreach (explode(',', $definition) as $splitDefinition) {
-                            $searchResults[] = $splitDefinition;
-                        }
-                    } else {
-                        $searchResults[] = $definition;
+            try {
+                $records = $dictionary->database_table_name === DictionaryHealthService::JMDICT_TARGET
+                    ? $this->searchJmDict($term, true)
+                    : $this->searchImportedDictionary($dictionary->database_table_name, $term, true);
+
+                foreach ($records as $record) {
+                    foreach ($record->definitions as $definition) {
+                        $definitions[] = $definition;
                     }
                 }
+
+                $successfulQueries++;
+            } catch (\Throwable $exception) {
+                report($exception);
+                $warnings[] = $this->runtimeWarning($dictionary);
             }
         }
 
-        /*
-            Return the found definitions and the search term. Search
-            term must be returned so the client knows which request it.
-        */
-        $result = new \stdClass();
-        $result->term = $term;
-        $result->definitions = array_values(array_unique($searchResults));
+        if ($successfulQueries === 0) {
+            throw DictionaryReadException::lookupUnavailable();
+        }
 
-        return $result;
+        return [
+            'term' => $term,
+            'definitions' => $this->dictionaryLookupResultPolicy->dedupeAndCap($definitions),
+            'warnings' => $warnings,
+            'configured' => true,
+        ];
     }
     
     public function searchApiDictionaries(string $sourceLanguage, string $term): array
@@ -434,7 +467,51 @@ class DictionaryService {
         ]);
     }
     
-    public function searchInflections($term) {
+    public function searchInflections(string $language, string $term): array
+    {
+        $dictionaries = Dictionary::query()
+            ->where('enabled', true)
+            ->where('source_language', $language)
+            ->where('database_table_name', DictionaryHealthService::JMDICT_TARGET)
+            ->get();
+
+        if ($dictionaries->isEmpty()) {
+            return [
+                'term' => $term,
+                'inflections' => [],
+                'warnings' => [],
+                'configured' => false,
+            ];
+        }
+
+        $healthById = $this->dictionaryHealthService->classifyCollection(Dictionary::query()->get());
+        $warnings = [];
+
+        foreach ($dictionaries as $dictionary) {
+            $health = $healthById[(int) $dictionary->id];
+            if (! $health->queryAvailable) {
+                $warnings[] = $this->warningFromHealth($dictionary, $health);
+                continue;
+            }
+
+            try {
+                return [
+                    'term' => $term,
+                    'inflections' => $this->searchInflectionsFromJmdict($term),
+                    'warnings' => $warnings,
+                    'configured' => true,
+                ];
+            } catch (\Throwable $exception) {
+                report($exception);
+                $warnings[] = $this->runtimeWarning($dictionary);
+            }
+        }
+
+        throw DictionaryReadException::lookupUnavailable();
+    }
+
+    private function searchInflectionsFromJmdict(string $term): array|string
+    {
         $ids = [];
         
         // exact word matches
@@ -515,6 +592,37 @@ class DictionaryService {
         return true;
     }
 
+    private function applicableLocalDictionaries(string $language)
+    {
+        return Dictionary::query()
+            ->where('enabled', true)
+            ->where('source_language', $language)
+            ->whereIn('type', ['supported', 'custom_csv'])
+            ->where('database_table_name', '<>', 'API')
+            ->orderBy('id')
+            ->get();
+    }
+
+    private function warningFromHealth(Dictionary $dictionary, $health): array
+    {
+        return [
+            'dictionary_id' => (int) $dictionary->id,
+            'dictionary_name' => (string) $dictionary->name,
+            'code' => $health->code,
+            'message' => $health->message,
+        ];
+    }
+
+    private function runtimeWarning(Dictionary $dictionary): array
+    {
+        return [
+            'dictionary_id' => (int) $dictionary->id,
+            'dictionary_name' => (string) $dictionary->name,
+            'code' => 'DICTIONARY_QUERY_FAILED',
+            'message' => '该词典暂时无法查询。',
+        ];
+    }
+
     private function searchImportedDictionary($dictionaryTable, $term, $strict = false) {
         $records = [];
         
@@ -535,30 +643,33 @@ class DictionaryService {
         }
 
         foreach ($dictionaryWords as $word) {
-            $definitions = explode(';', $word->definitions);
-            
-            if (strlen($word->definitions) === 0) {
+            $definitions = $this->dictionaryLookupResultPolicy->splitImportedDefinitions(
+                (string) $word->definitions,
+            );
+            if ($definitions === []) {
                 continue;
             }
 
-            // check if there are duplicate records
-            $duplicate = false;
-            foreach ($records as $record) {
-                if ($record->word == $word->word) {
-                    if (!in_array($word->definitions, $record->definitions, true)) {
-                        $record->definitions[] = $word->definitions;
-                    }
-                    
-                    $duplicate = true;
+            $recordIndex = null;
+            foreach ($records as $index => $record) {
+                if ($record->word === $word->word) {
+                    $recordIndex = $index;
+                    break;
                 }
             }
 
-            if (!$duplicate) {
+            if ($recordIndex === null) {
                 $record = new \stdClass();
                 $record->word = $word->word;
                 $record->definitions = $definitions;
                 $records[] = $record;
+                continue;
             }
+
+            $records[$recordIndex]->definitions = $this->dictionaryLookupResultPolicy->dedupeAndCap(
+                array_merge($records[$recordIndex]->definitions, $definitions),
+                40,
+            );
         }
 
         return $records;

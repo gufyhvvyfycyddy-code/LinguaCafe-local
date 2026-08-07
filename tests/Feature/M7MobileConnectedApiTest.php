@@ -40,9 +40,11 @@ class M7MobileConnectedApiTest extends TestCase
     public function test_local_dictionary_lookup_is_bounded_read_only_and_language_scoped(): void
     {
         [$token] = $this->issueToken($this->user);
-        $result = (object) [
+        $result = [
             'term' => 'friendly',
-            'definitions' => array_merge(['友好的'], array_fill(0, 15, '重复')),
+            'definitions' => array_merge(['友好的'], array_fill(0, 9, '重复')),
+            'warnings' => [],
+            'configured' => true,
         ];
         $dictionary = $this->mock(DictionaryService::class);
         $dictionary->shouldReceive('searchDefinitionsForHoverVocabulary')
@@ -61,7 +63,9 @@ class M7MobileConnectedApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.term', 'friendly')
             ->assertJsonPath('data.local_only', true)
-            ->assertJsonPath('data.read_only', true);
+            ->assertJsonPath('data.read_only', true)
+            ->assertJsonPath('data.configured', true)
+            ->assertJsonPath('data.warnings', []);
 
         $this->assertCount(10, $response->json('data.definitions'));
         $this->assertSame($before, [
