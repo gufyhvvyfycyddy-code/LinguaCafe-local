@@ -9,13 +9,31 @@ use Illuminate\Support\Facades\Log;
 
 class AiReadingAssistService
 {
+    public function __construct(
+        private AiReadingAssistV2Service $aiReadingAssistV2Service,
+    ) {
+    }
     /**
      * Build the full AI analysis prompt for a given chapter.
      *
      * @return array{success: bool, chapter_id?: int, chapter_title?: string, prompt?: string, article_word_count?: int, message?: string}
      */
-    public function buildPromptForChapter(int $userId, string $language, int $chapterId): array
-    {
+    public function buildPromptForChapter(
+        int $userId,
+        string $language,
+        int $chapterId,
+        ?string $schemaVersion = null,
+        ?array $expectedMarkedTargets = null,
+    ): array {
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            return $this->aiReadingAssistV2Service->buildSourcePackages(
+                $userId,
+                $language,
+                $chapterId,
+                $expectedMarkedTargets,
+            );
+        }
+
         $chapter = Chapter::where('id', $chapterId)
             ->where('user_id', $userId)
             ->where('language', $language)
@@ -100,8 +118,12 @@ class AiReadingAssistService
      *
      * @return array
      */
-    public function previewImport(int $userId, string $language, int $chapterId, string $rawAiText): array
+    public function previewImport(int $userId, string $language, int $chapterId, mixed $rawAiText, ?string $schemaVersion = null): array
     {
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            return $this->aiReadingAssistV2Service->previewImport($userId, $language, $chapterId, is_array($rawAiText) ? $rawAiText : []);
+        }
+
         // 1. Verify chapter ownership
         $chapter = Chapter::where('id', $chapterId)
             ->where('user_id', $userId)
@@ -308,19 +330,43 @@ class AiReadingAssistService
                 'success' => true,
                 'chapter_id' => (int) $chapterId,
                 'has_saved_assist' => false,
+                'schema_version' => null,
+                'source_revision' => null,
                 'sentence_translations' => [],
+                'verification_items' => [],
                 'summary' => null,
             ];
         }
 
-        return [
+        $result = [
             'success' => true,
             'chapter_id' => (int) $chapterId,
             'has_saved_assist' => true,
+            'schema_version' => $record->schema_version,
+            'source_revision' => $record->source_revision,
             'sentence_translations' => $record->sentence_translations ?? [],
             'summary' => $record->summary,
             'updated_at' => $record->updated_at?->toIso8601String(),
         ];
+
+        if ($record->schema_version === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            $result['items'] = $record->validated_payload ?? [];
+            $result += $this->aiReadingAssistV2Service->currentVerificationItems(
+                $userId,
+                $language,
+                $chapterId,
+                $record,
+            );
+            if (($result['assist_stale'] ?? false) === true) {
+                $result['has_saved_assist'] = false;
+                $result['sentence_translations'] = [];
+                $result['items'] = [];
+            }
+        } else {
+            $result['verification_items'] = [];
+        }
+
+        return $result;
     }
 
     /**
@@ -332,8 +378,12 @@ class AiReadingAssistService
      *
      * @return array
      */
-    public function confirmImport(int $userId, string $language, int $chapterId, string $rawAiText): array
+    public function confirmImport(int $userId, string $language, int $chapterId, mixed $rawAiText, ?string $schemaVersion = null, bool $applyTrustAi = false): array
     {
+        if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
+            return $this->aiReadingAssistV2Service->confirmImport($userId, $language, $chapterId, is_array($rawAiText) ? $rawAiText : [], $applyTrustAi);
+        }
+
         // 1. Verify chapter ownership
         $chapter = Chapter::where('id', $chapterId)
             ->where('user_id', $userId)
@@ -403,11 +453,14 @@ class AiReadingAssistService
             ],
             [
                 'schema_version' => $schemaVersion,
+                'source_revision' => null,
+                'payload_hash' => null,
                 'sentence_translations' => $sentenceTranslations,
                 'vocabulary_items' => $vocabularyItems,
                 'phrase_items' => $phraseItems,
                 'warnings' => $warnings,
                 'summary' => $summary,
+                'validated_payload' => null,
             ]
         );
 
