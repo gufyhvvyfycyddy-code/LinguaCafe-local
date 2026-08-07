@@ -36,7 +36,9 @@ class EnsureActiveMobileDevice
             );
         }
 
-        $device->forceFill(['last_active_at' => now()])->save();
+        if (! $request->isMethod('HEAD')) {
+            $device->forceFill(['last_active_at' => now()])->save();
+        }
         $request->attributes->set('mobile_device', $device);
 
         return $next($request);
