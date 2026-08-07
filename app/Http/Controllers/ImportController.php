@@ -151,20 +151,35 @@ class ImportController extends Controller {
             ], 500);
         }
 
-        $this->tempFileService->deleteTempFile($fileName);
+        try {
+            $this->tempFileService->deleteTempFile($fileName);
+        } catch (\Throwable $cleanupException) {
+            Log::warning('subtitle_temp_cleanup_failed', [
+                'exception' => $cleanupException::class,
+            ]);
+        }
 
         return new JsonResponse($subtitleContent, 200);
     }
 
     public function getWebsiteText(GetWebsiteTextRequest $request) {
         $url = $request->post('url');
-        
+
         try {
             $websiteText = $this->importService->getWebsiteText($url);
-        } catch(\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\Exception $exception) {
+            Log::warning('website_text_lookup_failed', [
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'WEBSITE_TEXT_SERVICE_UNAVAILABLE',
+                    'message' => '暂时无法获取网页内容，请稍后重试。',
+                ],
+            ], 503);
         }
 
-        return response()->json($websiteText, 200);
+        return new JsonResponse($websiteText, 200);
     }
 }

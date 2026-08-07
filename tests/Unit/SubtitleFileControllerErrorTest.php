@@ -72,6 +72,38 @@ class SubtitleFileControllerErrorTest extends TestCase
         );
     }
 
+    public function test_cleanup_failure_after_success_does_not_hide_the_parsed_payload(): void
+    {
+        Auth::shouldReceive('user')->andReturn((object) ['id' => 42]);
+        Log::spy();
+
+        $tempFiles = $this->createMock(TempFileService::class);
+        $tempFiles->expects($this->once())
+            ->method('moveFileToTempFolder')
+            ->willReturn('42_sample.srt');
+        $tempFiles->expects($this->once())
+            ->method('deleteTempFile')
+            ->with('42_sample.srt')
+            ->willThrowException(new \RuntimeException('cleanup internals'));
+
+        $payload = [['start' => 0, 'end' => 1, 'text' => 'Example']];
+        $imports = $this->createMock(ImportService::class);
+        $imports->expects($this->once())
+            ->method('getSubtitleFileContent')
+            ->willReturn($payload);
+
+        $response = (new ImportController($imports, $tempFiles))
+            ->getSubtitleFileContent($this->requestWithSubtitle());
+
+        $this->assertInstanceOf(JsonResponse::class, $response);
+        $this->assertSame(200, $response->getStatusCode());
+        $this->assertSame($payload, $response->getData(true));
+        Log::shouldHaveReceived('warning')->once()->with(
+            'subtitle_temp_cleanup_failed',
+            ['exception' => \RuntimeException::class],
+        );
+    }
+
     public function test_success_still_cleans_temp_file_and_preserves_payload(): void
     {
         Auth::shouldReceive('user')->andReturn((object) ['id' => 42]);
