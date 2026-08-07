@@ -244,6 +244,11 @@ class DictionaryService {
     
     public function searchApiDictionaries(string $sourceLanguage, string $term): array
     {
+        return $this->searchApiDictionariesIsolated($sourceLanguage, $term);
+    }
+
+    private function searchApiDictionariesLegacy(string $sourceLanguage, string $term): array
+    {
         $definitions = [];
         $termHash = md5(mb_strtolower($term, 'UTF-8'));
         $apiDictionaries = Dictionary::query()
@@ -410,6 +415,198 @@ class DictionaryService {
         return $definitions;
     }
 
+    private function searchApiDictionariesIsolated(string $sourceLanguage, string $term): array
+    {
+        $dictionaries = Dictionary::query()
+            ->whereIn('type', ['my_memory', 'deepl', 'libre_translate', 'custom_api'])
+            ->where('enabled', true)
+            ->where('source_language', $sourceLanguage)
+            ->orderBy('id')
+            ->get();
+
+        if ($dictionaries->isEmpty()) {
+            return [
+                'term' => $term,
+                'results' => [],
+                'warnings' => [],
+                'configured' => false,
+            ];
+        }
+
+        $results = [];
+        $warnings = [];
+        $successfulProviders = 0;
+
+        foreach ($dictionaries as $dictionary) {
+            try {
+                $providerResult = $this->queryApiProvider($dictionary, $term);
+                $successfulProviders++;
+                if ($providerResult !== null) {
+                    $results[] = $providerResult;
+                }
+            } catch (\Throwable $exception) {
+                report($exception);
+                $warnings[] = [
+                    'dictionary_id' => (int) $dictionary->id,
+                    'dictionary_name' => (string) $dictionary->name,
+                    'code' => 'DICTIONARY_API_PROVIDER_FAILED',
+                    'message' => '该在线词典暂时无法查询。',
+                ];
+            }
+        }
+
+        if ($successfulProviders === 0) {
+            throw DictionaryReadException::lookupUnavailable();
+        }
+
+        return [
+            'term' => $term,
+            'results' => $results,
+            'warnings' => $warnings,
+            'configured' => true,
+        ];
+    }
+
+    private function queryApiProvider(Dictionary $dictionary, string $term): ?array
+    {
+        $definition = null;
+        $responseTerm = $term;
+
+        if ($dictionary->type === 'deepl') {
+            $termHash = md5(mb_strtolower($term, 'UTF-8'));
+            $cache = DeeplCache::query()
+                ->where('source_language', $dictionary->source_language)
+                ->where('target_language', $dictionary->target_language)
+                ->where('hash', $termHash)
+                ->first();
+
+            if ($cache) {
+                $definition = (string) $cache->definition;
+            } else {
+                $codes = config('linguacafe.languages.deepl_language_codes', []);
+                $sourceCode = $codes[$dictionary->source_language] ?? null;
+                $targetCode = $codes[$dictionary->target_language] ?? null;
+                $hostSetting = Setting::where('name', 'deeplHost')->first();
+                $keySetting = Setting::where('name', 'deeplApiKey')->first();
+                if (! $sourceCode || ! $targetCode || ! $hostSetting || ! $keySetting) {
+                    throw new \RuntimeException('DeepL provider configuration is incomplete.');
+                }
+
+                $sourceCode = $sourceCode === 'EN-US' ? 'EN' : $sourceCode;
+                $sourceCode = $sourceCode === 'PT-PT' ? 'PT' : $sourceCode;
+                $response = Http::withHeaders([
+                    'Authorization' => 'DeepL-Auth-Key '.$keySetting->decode(),
+                    'Content-Type' => 'application/json',
+                ])->post($hostSetting->decode().'/translate', [
+                    'text' => [$term],
+                    'source_lang' => $sourceCode,
+                    'target_lang' => $targetCode,
+                ]);
+                $data = $this->validatedJsonResponse($response);
+                $definition = $data['translations'][0]['text'] ?? null;
+                if (! is_string($definition) || trim($definition) === '') {
+                    throw new \RuntimeException('DeepL provider response is invalid.');
+                }
+
+                $deeplCache = new DeeplCache();
+                $deeplCache->source_language = $dictionary->source_language;
+                $deeplCache->target_language = $dictionary->target_language;
+                $deeplCache->hash = $termHash;
+                $deeplCache->definition = $definition;
+                $deeplCache->save();
+            }
+        } elseif ($dictionary->type === 'my_memory') {
+            $codes = config('linguacafe.languages.my_memory_supported_target_languages', []);
+            $sourceCode = $codes[$dictionary->source_language] ?? null;
+            $targetCode = $codes[$dictionary->target_language] ?? null;
+            if (! $sourceCode || ! $targetCode) {
+                throw new \RuntimeException('MyMemory provider configuration is incomplete.');
+            }
+
+            $response = Http::get('https://api.mymemory.translated.net/get', [
+                'q' => $term,
+                'langpair' => $sourceCode.'|'.$targetCode,
+            ]);
+            $data = $this->validatedJsonResponse($response);
+            $definitions = [];
+            foreach (($data['matches'] ?? []) as $match) {
+                if (! is_array($match)) {
+                    continue;
+                }
+                $segment = $match['segment'] ?? null;
+                $translation = $match['translation'] ?? null;
+                if (! is_string($segment) || ! is_string($translation) || ! str_contains($segment, $term)) {
+                    continue;
+                }
+                $responseTerm = $segment;
+                $definitions[] = $translation;
+            }
+
+            $definitions = $this->dictionaryLookupResultPolicy->dedupeAndCap($definitions);
+            if ($definitions === []) {
+                return null;
+            }
+
+            return [
+                'dictionary' => $dictionary->name,
+                'dictionaryColor' => $dictionary->color,
+                'definitions' => $definitions,
+                'term' => $responseTerm,
+            ];
+        } elseif ($dictionary->type === 'libre_translate') {
+            $codes = config('linguacafe.languages.libre_translate_language_codes', []);
+            $host = Setting::where('name', 'libreTranslateHost')->first()?->decode();
+            if (! $host || ! isset($codes[$dictionary->source_language], $codes[$dictionary->target_language])) {
+                throw new \RuntimeException('LibreTranslate provider configuration is incomplete.');
+            }
+            $response = Http::post($host, [
+                'q' => $term,
+                'source' => $codes[$dictionary->source_language],
+                'target' => $codes[$dictionary->target_language],
+            ]);
+            $data = $this->validatedJsonResponse($response);
+            $definition = $data['translatedText'] ?? null;
+        } elseif ($dictionary->type === 'custom_api') {
+            if (! is_string($dictionary->api_host) || trim($dictionary->api_host) === '') {
+                throw new \RuntimeException('Custom provider configuration is incomplete.');
+            }
+            $response = Http::post($dictionary->api_host, [
+                'q' => $term,
+                'source' => strtolower($dictionary->source_language),
+                'target' => strtolower($dictionary->target_language),
+            ]);
+            $data = $this->validatedJsonResponse($response);
+            $definition = $data['translatedText'] ?? null;
+        } else {
+            throw new \RuntimeException('Unsupported dictionary provider.');
+        }
+
+        if (! is_string($definition) || trim($definition) === '') {
+            throw new \RuntimeException('Dictionary provider response is invalid.');
+        }
+
+        return [
+            'dictionary' => $dictionary->name,
+            'dictionaryColor' => $dictionary->color,
+            'definitions' => [trim($definition)],
+            'term' => $responseTerm,
+        ];
+    }
+
+    private function validatedJsonResponse($response): array
+    {
+        if (! $response instanceof \Illuminate\Http\Client\Response || ! $response->ok()) {
+            throw new \RuntimeException('Dictionary provider request failed.');
+        }
+
+        $data = $response->json();
+        if (! is_array($data)) {
+            throw new \RuntimeException('Dictionary provider response is invalid.');
+        }
+
+        return $data;
+    }
+
     private function buildDeeplRequest(Pool $pool, Dictionary $dictionary, string $term): void
     {
         $deeplApiKey = Setting::where('name', 'deeplApiKey')->first()->decode();
@@ -560,14 +757,35 @@ class DictionaryService {
         }
     }
 
-    public function getDictionaryRecordCount($dictionaryTableName) {
-        if (!Schema::hasTable($dictionaryTableName)) {
-            throw new \Exception('Table not found.');
+    public function getDictionaryRecordCount(string $dictionaryTableName): int
+    {
+        if (
+            preg_match('/_(stage|backup|failed)_[a-f0-9]+\z/', $dictionaryTableName) === 1
+            || $dictionaryTableName === 'API'
+        ) {
+            throw DictionaryReadException::recordCountNotAllowed();
         }
 
-        $recordCount = DB::table($dictionaryTableName)->count();
-        
-        return $recordCount;
+        $dictionaries = Dictionary::query()->get();
+        $matching = $dictionaries->where('database_table_name', $dictionaryTableName);
+        if ($matching->count() !== 1) {
+            throw DictionaryReadException::recordCountNotAllowed();
+        }
+
+        $dictionary = $matching->first();
+        $health = $this->dictionaryHealthService->classifyCollection($dictionaries)[(int) $dictionary->id];
+        if (! $health->canCountRecords()) {
+            throw DictionaryReadException::recordCountNotAllowed();
+        }
+
+        if (
+            $dictionaryTableName !== DictionaryHealthService::JMDICT_TARGET
+            && ! str_starts_with($dictionaryTableName, 'dict_')
+        ) {
+            throw DictionaryReadException::recordCountNotAllowed();
+        }
+
+        return DB::table($dictionaryTableName)->count();
     }
 
     public function deleteDictionary($dictionaryId) {

@@ -114,6 +114,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/dictionaries/get-supported-dictionary-file-information', [App\Http\Controllers\DictionaryController::class, 'getDictionaryFileInformation']);
         Route::post('/dictionaries/import', [App\Http\Controllers\DictionaryController::class, 'importSupportedDictionary']);
         Route::get('/dictionaries/get-record-count/{dictionaryTableName}', [App\Http\Controllers\DictionaryController::class, 'getDictionaryRecordCount']);
+        Route::get('/dictionaries/doctor', [App\Http\Controllers\DictionaryController::class, 'doctor']);
         Route::get('/dictionaries/deepl/get-usage', [App\Http\Controllers\DictionaryController::class, 'getDeeplCharacterLimit']);
         Route::get('/dictionaries/get', [App\Http\Controllers\DictionaryController::class, 'getDictionaries']);
         Route::get('/dictionaries/get/{dictionaryId}', [App\Http\Controllers\DictionaryController::class, 'getDictionary']);

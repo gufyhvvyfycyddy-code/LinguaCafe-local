@@ -7,6 +7,7 @@ use App\Http\Requests\Dictionaries\CreateCustomApiDictionaryRequest;
 use App\Models\Dictionary;
 use Illuminate\Http\Request;
 use App\Services\DictionaryService;
+use App\Services\Dictionaries\DictionaryDoctorService;
 use Illuminate\Support\Facades\Auth;
 
 // services
@@ -33,10 +34,16 @@ class DictionaryController extends Controller
 {
     private $dictionaryService;
     private $dictionaryImportService;
+    private $dictionaryDoctorService;
     
-    public function __construct(DictionaryService $dictionaryService, DictionaryImportService $dictionaryImportService) {
+    public function __construct(
+        DictionaryService $dictionaryService,
+        DictionaryImportService $dictionaryImportService,
+        DictionaryDoctorService $dictionaryDoctorService,
+    ) {
         $this->dictionaryService = $dictionaryService;
         $this->dictionaryImportService = $dictionaryImportService;
+        $this->dictionaryDoctorService = $dictionaryDoctorService;
     }
 
     /*
@@ -371,12 +378,37 @@ class DictionaryController extends Controller
 
     public function getDictionaryRecordCount($dictionaryTableName, GetDictionaryRecordCountRequest $request) {
         try {
-            $recordCount = $this->dictionaryService->getDictionaryRecordCount($dictionaryTableName);
-        } catch(\Exception $e) {
-            abort(500, $e->getMessage());
-        }
+            return response()->json([
+                'count' => $this->dictionaryService->getDictionaryRecordCount($dictionaryTableName),
+            ], 200);
+        } catch (DictionaryReadException $exception) {
+            return $this->dictionaryReadExceptionResponse($exception);
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return response()->json($recordCount, 200);
+            return response()->json([
+                'error' => [
+                    'code' => 'DICTIONARY_RECORD_COUNT_FAILED',
+                    'message' => 'Dictionary record count is temporarily unavailable.',
+                ],
+            ], 500);
+        }
+    }
+
+    public function doctor()
+    {
+        try {
+            return response()->json($this->dictionaryDoctorService->inspect(), 200);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            return response()->json([
+                'error' => [
+                    'code' => 'DICTIONARY_DOCTOR_FAILED',
+                    'message' => 'Dictionary diagnostics are temporarily unavailable.',
+                ],
+            ], 500);
+        }
     }
 
     public function deleteDictionary($dictionaryId, DeleteDictionaryRequest $request) {
