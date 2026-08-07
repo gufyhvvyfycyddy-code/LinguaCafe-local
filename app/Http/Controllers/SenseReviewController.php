@@ -17,6 +17,7 @@ use App\Services\SenseReviewUndoService;
 use App\Services\Settings\Presets\ReviewSettingsResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SenseReviewController extends Controller
 {
@@ -33,6 +34,7 @@ class SenseReviewController extends Controller
         private SenseReviewUndoService $undoService,
         private SenseReviewRatingContract $ratingContract,
         private ReviewSettingsResolver $reviewSettingsResolver,
+        private \App\Services\ReadingSessionService $readingSessionService,
     ) {
     }
 
@@ -70,6 +72,8 @@ class SenseReviewController extends Controller
             'rating' => ['required', 'in:again,hard,good,easy'],
             'review_session_id' => ['nullable', 'string', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'reading_session_id' => ['nullable', 'string', 'uuid'],
+            'occurrence_id' => ['nullable', 'string'],
         ]);
 
         $userId = Auth::user()->id;
@@ -77,33 +81,80 @@ class SenseReviewController extends Controller
         $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
         $reviewSessionId = $request->post('review_session_id');
         $reviewDurationMs = $request->post('review_duration_ms');
+        $readingSessionId = $request->post('reading_session_id');
+        $occurrenceId = $request->post('occurrence_id');
+
+        if (($readingSessionId && !$occurrenceId) || (!$readingSessionId && $occurrenceId)) {
+            abort(422, 'reading_session_id and occurrence_id must be provided together.');
+        }
 
         $card = ReviewCard::where('id', $reviewCardId)
             ->where('user_id', $userId)
             ->where('language_id', $language)
             ->where('target_type', ReviewCard::TARGET_SENSE)
             ->first();
-
         if (!$card) {
             abort(404, 'Sense review card does not exist.');
         }
 
         $rating = $request->post('rating');
-        $updatedCard = $this->reviewCardService->recordReview(
-            $userId,
-            $language,
-            $card->id,
-            $rating,
-            'sense_review',
-            $reviewSessionId,
-            $reviewDurationMs,
-        );
+        $latestLog = null;
+        if ($readingSessionId && $occurrenceId) {
+            $reviewed = DB::transaction(function () use (
+                $userId,
+                $language,
+                $readingSessionId,
+                $occurrenceId,
+                $card,
+                $rating,
+                $reviewDurationMs
+            ) {
+                $this->readingSessionService->validateExplicitRatingContext(
+                    $userId,
+                    $language,
+                    $readingSessionId,
+                    $occurrenceId,
+                    $card,
+                );
 
-        // Build action metadata for the undo ledger (ADR-0009).
-        $latestLog = ReviewLog::where('review_card_id', $card->id)
-            ->where('user_id', $userId)
-            ->orderBy('id', 'desc')
-            ->first();
+                $reviewed = $this->reviewCardService->recordReviewWithLog(
+                    $userId,
+                    $language,
+                    $card->id,
+                    $rating,
+                    ReviewLog::SOURCE_READING_EXPLICIT,
+                    $readingSessionId,
+                    $reviewDurationMs,
+                );
+
+                $this->readingSessionService->recordExplicitRating(
+                    $userId,
+                    $language,
+                    $readingSessionId,
+                    $occurrenceId,
+                    $card->id,
+                    (int) $card->target_id,
+                );
+
+                return $reviewed;
+            });
+            $updatedCard = $reviewed['card'];
+            $latestLog = $reviewed['review_log'];
+        } else {
+            $updatedCard = $this->reviewCardService->recordReview(
+                $userId,
+                $language,
+                $card->id,
+                $rating,
+                ReviewLog::SOURCE_SENSE_REVIEW,
+                $reviewSessionId,
+                $reviewDurationMs,
+            );
+            $latestLog = ReviewLog::where('review_card_id', $card->id)
+                ->where('user_id', $userId)
+                ->orderBy('id', 'desc')
+                ->first();
+        }
 
         $action = null;
         if ($latestLog) {
@@ -119,7 +170,6 @@ class SenseReviewController extends Controller
             ];
         }
 
-        // Use limit-aware next and summary
         $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
         $nextCard = $result['cards']->first();
 

@@ -376,6 +376,13 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/ai-assist/confirm', [App\Http\Controllers\AiReadingAssistController::class, 'confirm']);
     Route::get('/chapters/ai-assist/current/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'current']);
     Route::get('/chapters/ai-assist/lookup/{chapterId}', [App\Http\Controllers\AiReadingAssistController::class, 'lookup']);
+    Route::get('/chapters/{chapterId}/reading-unfamiliar-targets', [App\Http\Controllers\ReadingUnfamiliarTargetController::class, 'index']);
+    Route::post('/chapters/{chapterId}/reading-unfamiliar-targets', [App\Http\Controllers\ReadingUnfamiliarTargetController::class, 'store']);
+    Route::delete('/chapters/{chapterId}/reading-unfamiliar-targets/{occurrenceId}', [App\Http\Controllers\ReadingUnfamiliarTargetController::class, 'destroy']);
+    Route::get('/chapters/{chapterId}/reading-occurrence-evidence', [App\Http\Controllers\ReadingOccurrenceEvidenceController::class, 'index']);
+    Route::post('/chapters/{chapterId}/reading-occurrence-evidence', [App\Http\Controllers\ReadingOccurrenceEvidenceController::class, 'store']);
+    Route::post('/chapters/{chapterId}/reading-sessions', [App\Http\Controllers\ReadingSessionController::class, 'store']);
+    Route::post('/chapters/reading-sessions/interactions', [App\Http\Controllers\ReadingSessionController::class, 'recordInteraction']);
 
     // AI study card pending markers
     Route::get('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'index']);
