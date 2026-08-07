@@ -17,6 +17,7 @@
                     <v-tab>文本</v-tab>
                     <v-tab>词汇框</v-tab>
                     <v-tab>悬浮词汇框</v-tab>
+                    <v-tab>AI 阅读辅助</v-tab>
                 </v-tabs>
                 <v-tabs-items v-model="tab" elevation="0" class="rounded-lg mt-4 pa-6">
                     <!-- Text section -->
@@ -437,6 +438,42 @@
                                     hide-details
                                     @change="saveSettings"
                                 ></v-select>
+                            </v-col>
+                        </v-row>
+                    </v-tab-item>
+
+                    <!-- AI reading assist section -->
+                    <v-tab-item :value="3">
+                        <v-alert type="info" text dense class="mb-5">
+                            这两个偏好已经预留，但正式后端绑定接口尚未在本 Lane 接通，因此当前保持禁用。它们不会自动产生复习评分。
+                        </v-alert>
+                        <v-row>
+                            <v-col cols="8" md="7" class="switch-container mt-0 mb-md-5">
+                                <div>信任 AI 的高置信词义匹配</div>
+                                <div class="caption text--secondary mt-1">后端契约接通后，仅对服务器确认可用的 high + matched_existing 生效；不会自动评分。</div>
+                            </v-col>
+                            <v-col cols="4" md="5" class="switch-container d-flex align-center justify-end">
+                                <v-switch
+                                    color="primary"
+                                    v-model="settings.trustAiReadingSenseBinding"
+                                    disabled
+                                    @change="saveSettings"
+                                ></v-switch>
+                            </v-col>
+                        </v-row>
+                        <v-divider class="mb-4" />
+                        <v-row>
+                            <v-col cols="8" md="7" class="switch-container mt-0 mb-md-5">
+                                <div>AI 发现新词义后自动加入学习</div>
+                                <div class="caption text--secondary mt-1">后端契约接通后，只影响你明确标记“不认识”的目标；它与“信任 AI 的旧词义匹配”是两个独立选择。</div>
+                            </v-col>
+                            <v-col cols="4" md="5" class="switch-container d-flex align-center justify-end">
+                                <v-switch
+                                    color="primary"
+                                    v-model="settings.autoAddAiNewSenseToLearning"
+                                    disabled
+                                    @change="saveSettings"
+                                ></v-switch>
                             </v-col>
                         </v-row>
                     </v-tab-item>

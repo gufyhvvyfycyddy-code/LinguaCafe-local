@@ -48,6 +48,9 @@
                             <v-icon small color="success">mdi-check-circle</v-icon>
                             已复制本章英文和 AI 分析提示词。你可以把提示词发送给 DeepSeek Flash 或 DeepSeek Pro。两者都使用同一导入格式，系统不强制选择。
                         </div>
+                        <div v-if="sourceCopied && sourceMeta.schemaVersion" class="caption text--secondary mt-2">
+                            V2 目标 {{ sourceMeta.targetCount }} 个 · AI 包 {{ sourceMeta.packageCount }} 份。目标数和分包数以服务器返回为准。
+                        </div>
                     </div>
 
                     <v-divider class="mb-4"></v-divider>
@@ -272,8 +275,14 @@
                                 <div v-if="vi.pos" class="caption grey--text mb-1">
                                     词性：<span v-html="hl(vi.pos, detailSearchQuery)"></span>
                                 </div>
+                                <div v-if="vi.result" class="caption mb-1">
+                                    AI 判断：<strong>{{ resultLabel(vi.result) }}</strong>
+                                </div>
                                 <div class="body-2 mb-1">
                                     中文释义：<span v-html="hl(vi.meaning_zh, detailSearchQuery)"></span>
+                                </div>
+                                <div v-if="vi.sense_en" class="body-2 mb-1 text--secondary">
+                                    English：<span v-html="hl(vi.sense_en, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.sentence_index" class="caption grey--text mb-1">
                                     所在句：{{ vi.sentence_index }}
@@ -317,6 +326,9 @@
                                 </div>
                                 <div class="body-2 mb-1">
                                     中文释义：<span v-html="hl(pi.meaning_zh, detailSearchQuery)"></span>
+                                </div>
+                                <div v-if="pi.sense_en" class="body-2 mb-1 text--secondary">
+                                    English：<span v-html="hl(pi.sense_en, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="pi.trigger_words && pi.trigger_words.length" class="caption grey--text mb-1">
                                     触发词：<span v-html="hl(pi.trigger_words.join('、'), detailSearchQuery)"></span>
@@ -384,15 +396,27 @@
 </template>
 
 <script>
+    import { buildReaderAiAssistV2SourceRequest } from '../../services/ReaderUnfamiliarTargetPolicy.js';
+    import {
+        normalizeReaderAiAssistPreview,
+        normalizeReaderAiAssistSourceMeta,
+        readerAiAssistErrorMessage,
+        readerAiAssistResultLabel,
+    } from '../../services/ReaderAiAssistV2Policy.js';
+
     export default {
         props: {
             value: Boolean,
             chapterId: [Number, String],
+            markedTargets: { type: Array, default: () => [] },
+            trustAiReadingSenseBinding: { type: Boolean, default: false },
+            autoAddAiNewSenseToLearning: { type: Boolean, default: false },
         },
         data: function() {
             return {
                 sourceLoading: false,
                 sourceCopied: false,
+                sourceMeta: { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' },
                 previewLoading: false,
                 aiText: '',
 
@@ -447,10 +471,10 @@
                 return this.filterList(this.items.sentence_translations, this.detailSearchQuery, ['source_text', 'translation_zh']);
             },
             filteredVocabularyItems() {
-                return this.filterList(this.items.vocabulary_items, this.detailSearchQuery, ['surface', 'suggested_lemma', 'pos', 'meaning_zh', 'source_sentence', 'reason', 'confidence']);
+                return this.filterList(this.items.vocabulary_items, this.detailSearchQuery, ['surface', 'suggested_lemma', 'lemma', 'pos', 'meaning_zh', 'sense_zh', 'sense_en', 'result', 'source_sentence', 'reason', 'confidence']);
             },
             filteredPhraseItems() {
-                return this.filterList(this.items.phrase_items, this.detailSearchQuery, ['phrase', 'meaning_zh', 'trigger_words', 'source_sentence', 'reason', 'confidence']);
+                return this.filterList(this.items.phrase_items, this.detailSearchQuery, ['phrase', 'meaning_zh', 'sense_zh', 'sense_en', 'trigger_words', 'source_sentence', 'reason', 'confidence']);
             },
             filteredWarnings() {
                 return this.filterList(this.items.warnings, this.detailSearchQuery, ['type', 'message']);
@@ -497,6 +521,7 @@
             },
         },
         methods: {
+            resultLabel: readerAiAssistResultLabel,
             confidenceColor(level) {
                 const map = {
                     high: 'green',
@@ -521,6 +546,7 @@
             reset() {
                 this.sourceLoading = false;
                 this.sourceCopied = false;
+                this.sourceMeta = { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' };
                 this.previewLoading = false;
                 this.confirmLoading = false;
                 this.confirmSuccess = false;
@@ -543,11 +569,13 @@
                 this.error = '';
                 this.sourceCopied = false;
 
-                axios.post('/chapters/ai-assist/source', {
-                    chapterId: this.chapterId,
-                }).then((response) => {
+                axios.post(
+                    '/chapters/ai-assist/source',
+                    buildReaderAiAssistV2SourceRequest(this.chapterId, this.markedTargets),
+                ).then((response) => {
                     const data = response.data;
-                    const prompt = data.prompt || '';
+                    this.sourceMeta = normalizeReaderAiAssistSourceMeta(data);
+                    const prompt = this.sourceMeta.prompt;
                     navigator.clipboard.writeText(prompt).then(() => {
                         this.sourceCopied = true;
                     }).catch(() => {
@@ -563,7 +591,7 @@
                         this.sourceCopied = true;
                     });
                 }).catch((error) => {
-                    this.error = error.response?.data?.message || '加载失败。';
+                    this.error = readerAiAssistErrorMessage(error, '加载 AI 提示词失败。');
                 }).finally(() => {
                     this.sourceLoading = false;
                 });
@@ -589,7 +617,7 @@
                     chapterId: this.chapterId,
                     aiText: this.aiText,
                 }).then((response) => {
-                    this.previewResult = response.data;
+                    this.previewResult = normalizeReaderAiAssistPreview(response.data);
                     this.previewStep = 'overview';
                     this.activeDetailType = null;
                     this.detailSearchQuery = '';
@@ -600,7 +628,7 @@
                         this.previewErrorList = data.errors || [];
                         this.previewStep = 'input';
                     } else {
-                        this.error = error.response?.data?.message || '请求失败。';
+                        this.error = readerAiAssistErrorMessage(error, '解析预览失败。');
                     }
                 }).finally(() => {
                     this.previewLoading = false;
@@ -623,8 +651,7 @@
                     this.confirmSuccess = true;
                     this.confirmError = '';
                 }).catch((error) => {
-                    const data = error.response?.data;
-                    this.confirmError = data?.message || '保存失败。';
+                    this.confirmError = readerAiAssistErrorMessage(error, '保存失败。');
                     this.confirmSuccess = false;
                 }).finally(() => {
                     this.confirmLoading = false;

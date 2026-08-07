@@ -20,7 +20,24 @@
         <text-reader-ai-assist
             v-model="aiAssistDialog"
             :chapter-id="chapterId"
+            :marked-targets="markedUnfamiliarTargets"
+            :trust-ai-reading-sense-binding="settings.trustAiReadingSenseBinding"
+            :auto-add-ai-new-sense-to-learning="settings.autoAddAiNewSenseToLearning"
         ></text-reader-ai-assist>
+
+        <reading-sense-verification-dialog
+            v-model="readingSenseVerificationDialog"
+            :items="readingSenseVerificationItems"
+            :loading="readingSenseVerificationLoading"
+            :error="readingSenseVerificationError"
+            :busy-occurrence-id="readingSenseVerificationBusyId"
+            :resolution-enabled="false"
+            @refresh="loadAiAssistCurrent"
+        />
+
+        <v-snackbar v-model="readerNotice.show" :color="readerNotice.color" :timeout="3500" top>
+            {{ readerNotice.text }}
+        </v-snackbar>
 
         <!-- Toolbar -->
         <div id="reader-box" :style="readerBoxStyle" v-if="chapterId !== null">
@@ -35,6 +52,17 @@
                     <v-btn title="减小字号" icon @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
                     <v-btn title="切换纯文本模式" icon @click="togglePlainTextMode"><v-icon :color="settings.plainTextMode ? 'primary' : ''">mdi-format-text</v-icon></v-btn>
                     <v-btn title="查看快捷键" icon @click="toggleHotkeyDialog"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
+                    <v-btn
+                        :title="unfamiliarMarkMode ? '退出标记不认识模式' : '标记不认识的词或词组'"
+                        icon
+                        @click="toggleUnfamiliarMarkMode"
+                    ><v-icon :color="unfamiliarMarkMode ? 'warning' : ''">mdi-marker</v-icon></v-btn>
+                    <v-btn
+                        title="词义核对列表"
+                        icon
+                        :disabled="!readingSenseVerificationItems.length"
+                        @click="readingSenseVerificationDialog = true"
+                    ><v-icon>mdi-format-list-checks</v-icon></v-btn>
                     <v-btn title="AI 阅读辅助" icon @click="openAiAssistDialog"><v-icon>mdi-robot</v-icon></v-btn>
                     <v-btn
                         v-if="hasSavedAiAssist"
@@ -130,6 +158,10 @@
                         :hotkeys-enabled="true"
                         :show-ai-translations="showAiTranslations"
                         :ai-sentence-translations="aiSentenceTranslations"
+                        :unfamiliar-mark-mode="unfamiliarMarkMode"
+                        :unfamiliar-word-indexes="markedUnfamiliarWordIndexes"
+                        @mark-unfamiliar="onMarkUnfamiliar"
+                        @unfamiliar-mark-rejected="onUnfamiliarMarkRejected"
                         @increase-font-size="increaseFontSize"
                         @decrease-font-size="decreaseFontSize"
                         @toggle-plain-text-mode="togglePlainTextMode"
@@ -274,6 +306,12 @@
     import {formatNumber} from './../../helper.js';
     import { DefaultLocalStorageManager, defaultSettings } from './../../services/LocalStorageManagerService';
     import { requestErrorMessage } from './../../services/UiTextService';
+    import ReadingSenseVerificationDialog from './ReadingSenseVerificationDialog.vue';
+    import {
+        readerUnfamiliarWordIndexes,
+        toggleReaderUnfamiliarTarget,
+    } from './../../services/ReaderUnfamiliarTargetPolicy';
+    import { normalizeReadingSenseVerificationItems } from './../../services/ReadingSenseVerificationPolicy';
     import {
         getReaderSidebarReservationWidthForWorkspace,
         getReaderSidebarWidthForWorkspace,
@@ -281,6 +319,9 @@
     } from './../../services/ReaderWorkspaceSizingService';
 
     export default {
+        components: {
+            ReadingSenseVerificationDialog,
+        },
         data: function() {
             return {
                 hotkeyDialog: false,
@@ -348,10 +389,18 @@
                 leveledUpWordsAndPhrases: null,
                 saving: false,
 
-                // AI reading assist
+                // AI reading assist / explicit unfamiliar targets
                 showAiTranslations: false,
                 hasSavedAiAssist: false,
                 aiSentenceTranslations: [],
+                unfamiliarMarkMode: false,
+                markedUnfamiliarTargets: [],
+                readingSenseVerificationDialog: false,
+                readingSenseVerificationItems: [],
+                readingSenseVerificationLoading: false,
+                readingSenseVerificationError: '',
+                readingSenseVerificationBusyId: '',
+                readerNotice: { show: false, text: '', color: 'info' },
 
                 // source highlight
                 sourceHighlightTimer: null,
@@ -468,6 +517,9 @@
             sidebarPaddingWidth() {
                 return getReaderSidebarReservationWidthForWorkspace(this.readerWorkspaceWidth()) + 'px !important';
             },
+            markedUnfamiliarWordIndexes() {
+                return readerUnfamiliarWordIndexes(this.markedUnfamiliarTargets);
+            },
         },
         methods: {
             readerWorkspaceWidth() {
@@ -479,17 +531,22 @@
             },
             loadAiAssistCurrent() {
                 if (!this.chapterId) return;
+                this.readingSenseVerificationLoading = true;
                 axios.get('/chapters/ai-assist/current/' + this.chapterId).then((response) => {
                     const data = response.data;
                     if (data.success) {
                         this.hasSavedAiAssist = data.has_saved_assist;
                         this.aiSentenceTranslations = data.sentence_translations || [];
+                        this.readingSenseVerificationItems = normalizeReadingSenseVerificationItems(data);
+                        this.readingSenseVerificationError = '';
                         if (!data.has_saved_assist) {
                             this.showAiTranslations = false;
                         }
                     }
                 }).catch(() => {
-                    // Silently fail — AI assist is optional
+                    // AI assist is optional; keep ordinary Reader interaction usable.
+                }).finally(() => {
+                    this.readingSenseVerificationLoading = false;
                 });
             },
             vocabularySidebarTest() {
@@ -613,6 +670,33 @@
             },
             toggleHotkeyDialog() {
                 this.hotkeyDialog = !this.hotkeyDialog;
+            },
+            toggleUnfamiliarMarkMode() {
+                this.unfamiliarMarkMode = !this.unfamiliarMarkMode;
+                if (this.$refs.interactiveText) {
+                    this.$refs.interactiveText.unselectAllWords();
+                }
+                this.readerNotice = {
+                    show: true,
+                    color: this.unfamiliarMarkMode ? 'warning' : 'info',
+                    text: this.unfamiliarMarkMode
+                        ? '标记模式已开启：点一下标记单词；长按/拖动可标记同一句词组。再次点已标记位置可取消。'
+                        : '已退出标记模式，点词恢复普通查词。',
+                };
+            },
+            onMarkUnfamiliar(target) {
+                this.markedUnfamiliarTargets = toggleReaderUnfamiliarTarget(
+                    this.markedUnfamiliarTargets,
+                    target,
+                );
+                this.readerNotice = {
+                    show: true,
+                    color: 'info',
+                    text: `本章已标记 ${this.markedUnfamiliarTargets.length} 个不认识目标。`,
+                };
+            },
+            onUnfamiliarMarkRejected(message) {
+                this.readerNotice = { show: true, color: 'warning', text: message };
             },
             openAiAssistDialog() {
                 this.aiAssistDialog = true;

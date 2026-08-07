@@ -114,11 +114,31 @@ test('resolves the established token class map', () => {
         'selected-font': true,
         highlighted: true,
         'source-highlight': true,
+        'reader-unfamiliar-target': false,
         phrase: 2,
         'space-after': true,
         'phrase-start': false,
         'phrase-end': true,
     });
+});
+
+test('adds Reader-only unfamiliar presentation without changing stage semantics', () => {
+    const word = {
+        stage: -2,
+        selected: false,
+        hover: false,
+        sourceHighlight: false,
+        phraseIndexes: [],
+        spaceAfter: false,
+    };
+    const classes = resolveReaderTokenClasses({
+        word,
+        hideAllHighlights: false,
+        hideNewWordHighlights: false,
+        markedUnfamiliar: true,
+    });
+    assert.equal(classes['reader-unfamiliar-target'], true);
+    assert.equal(word.stage, -2);
 });
 
 test('preserves loose stage-two handling for hidden new-word highlights', () => {
@@ -222,7 +242,8 @@ test('does not mutate frozen presentation inputs', () => {
 test('TextBlockGroup delegates presentation while retaining the token DOM boundary', () => {
     assert.equal(textBlockSource.includes("import * as ReaderTokenPresentation from './../../services/ReaderTokenPresentationPolicy'"), true);
     assert.equal(textBlockSource.includes("'spaceless-language': usesSpacelessLanguage()"), true);
-    assert.equal(textBlockSource.includes(':class="readerTokenClasses(word)"'), true);
+    assert.equal(textBlockSource.includes(':class="readerTokenClasses(word, wordIndex)"'), true);
+    assert.equal(textBlockSource.includes('const wordIndex = this.words.indexOf(word)'), false);
     assert.equal(textBlockSource.includes('v-if="showNewWordFurigana(word)"'), true);
     assert.equal(textBlockSource.includes('v-if="showHighlightedWordFurigana(word)"'), true);
     assert.equal(textBlockSource.includes('isSectionMarker: ReaderTokenPresentation.isReaderSectionMarker'), true);
