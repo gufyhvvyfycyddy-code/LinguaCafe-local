@@ -53,6 +53,15 @@
                 ></v-text-field>
             </v-card-title>
 
+            <v-alert
+                v-if="listError"
+                type="error"
+                text
+                class="mx-4 mb-2"
+            >
+                {{ listError }}
+            </v-alert>
+
             <v-data-table
                 class="ma-4 mb-0 no-hover"
                 :headers="dictionaryTableHeaders"
@@ -63,7 +72,26 @@
 
                 <!-- Records -->
                 <template v-slot:item.records="{ item }">
-                    {{ item.records == '-' ? '-' : formatNumber(item.records) }}
+                    {{ item.records === null ? '—' : (item.records == '-' ? '-' : formatNumber(item.records)) }}
+                </template>
+
+                <!-- Health -->
+                <template v-slot:item.health="{ item }">
+                    <div class="py-2 text-left">
+                        <v-chip
+                            small
+                            :color="item.health && item.health.query_available ? 'success' : 'warning'"
+                            :dark="Boolean(item.health && item.health.query_available)"
+                        >
+                            {{ healthLabel(item.health && item.health.status) }}
+                        </v-chip>
+                        <div
+                            v-if="item.health && item.health.repair_required"
+                            class="text-caption warning--text mt-1"
+                        >
+                            需要修复：{{ item.health.message }}
+                        </div>
+                    </div>
                 </template>
 
                 <!-- Source language -->
@@ -117,6 +145,7 @@
         data: function() {
             return {
                 loading: true,
+                listError: '',
                 dictionaries: [],
                 importDialog: false,
                 deleteDialog: {
@@ -148,6 +177,12 @@
                         text: '数据库表',
                         value: 'database_table_name',
                         align: 'center',
+                    },
+                    {
+                        text: '健康状态',
+                        value: 'health',
+                        align: 'center',
+                        sortable: false,
                     },
                     {
                         text: '源语言',
@@ -231,22 +266,40 @@
             },
             loadDictionaries() {
                 this.loading = true;
+                this.listError = '';
                 axios.get('/dictionaries/get').then((response) => {
-                    this.loading = false;
-                    let data = response.data;
+                    const data = Array.isArray(response.data) ? response.data : [];
 
                     for (let dictionaryIndex = 0; dictionaryIndex < data.length; dictionaryIndex ++) {
                         data[dictionaryIndex].tempColor = data[dictionaryIndex].color;
                         data[dictionaryIndex].colorPicker = false;
                         data[dictionaryIndex].colorPickerMobile = false;
                         data[dictionaryIndex].expanded = false;
-                        data[dictionaryIndex].enabled = (data[dictionaryIndex].enabled === 1);
+                        data[dictionaryIndex].enabled = (data[dictionaryIndex].enabled === 1 || data[dictionaryIndex].enabled === true);
                         data[dictionaryIndex].index = dictionaryIndex;
                     }
 
                     this.dictionaries = data;
-                    console.log(this.dictionaries);
+                }).catch(() => {
+                    this.dictionaries = [];
+                    this.listError = '词典列表暂时无法加载，请稍后重试。';
+                }).finally(() => {
+                    this.loading = false;
                 });
+            },
+            healthLabel(status) {
+                const labels = {
+                    healthy: '正常',
+                    disabled: '已停用',
+                    missing_table: '数据缺失',
+                    invalid_schema: '结构异常',
+                    duplicate_target: '配置冲突',
+                    incomplete_group: '词典组不完整',
+                    metadata_missing: '配置缺失',
+                    conflicting_generation: '版本冲突',
+                    unknown: '状态未知',
+                };
+                return labels[status] || '状态未知';
             },
             formatNumber: formatNumber
         }

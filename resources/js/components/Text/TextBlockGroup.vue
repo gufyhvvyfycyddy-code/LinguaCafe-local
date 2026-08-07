@@ -240,6 +240,7 @@
                 ankiAutoAddCards: false,
                 ankiShowNotifications: false,
                 anyApiDictionaryEnabled: false,
+                currentInflectionSearchTerm: '',
 
                 // hover vocabulary box
                 hoverVocabularyDelayTimeout: null,
@@ -793,6 +794,7 @@
                 }
             },
             requestInflections: function(term) {
+                this.currentInflectionSearchTerm = term;
                 if (this.$props.language !== 'japanese') {
                     return;
                 }
@@ -801,12 +803,28 @@
                 this.$store.commit('vocabularyBox/setInflections', []);
                 
                 ReaderLookupApi.searchReaderInflections(term).then((response) => {
-                    const inflections = ReaderLookupResponse.resolveReaderDisplayedInflections(response.data);
+                    const envelope = ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'inflections');
+                    const warnings = ReaderLookupResponse.normalizeDictionaryWarnings(response.data.warnings);
+                    if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(
+                        this.currentInflectionSearchTerm,
+                        envelope.term
+                    )) {
+                        return;
+                    }
+                    const inflections = ReaderLookupResponse.resolveReaderDisplayedInflections(response.data.inflections);
                     if (inflections === null) {
+                        if (warnings.length) {
+                            this.$store.commit('vocabularyBox/setInflections', []);
+                        }
                         return;
                     }
 
                     this.$store.commit('vocabularyBox/setInflections', inflections);
+                }).catch(() => {
+                    if (this.currentInflectionSearchTerm !== term) {
+                        return;
+                    }
+                    this.$store.commit('vocabularyBox/setInflections', []);
                 });
             },
             selectPhraseInstanceByWord: function(wordIndex, phraseIndex) {
@@ -1282,16 +1300,38 @@
 
                 // make dictionary search
                 ReaderLookupApi.searchReaderHoverDictionary(this.$props.language, term).then((response) => {
+                    const envelope = ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'definitions');
                     if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(
                         this.$store.state.hoverVocabularyBox.dictionarySearchTerm,
-                        response.data.term
+                        envelope.term
                     )) {
                         return;
                     }
 
+                    let dictionaryTranslation = ReaderLookupResponse.joinReaderDictionaryDefinitions(envelope.results);
+                    if (!envelope.configured) {
+                        dictionaryTranslation = 'dictionary-not-configured';
+                    } else if (envelope.warnings.length && dictionaryTranslation) {
+                        dictionaryTranslation = 'dictionary-warning:' + dictionaryTranslation;
+                    } else if (envelope.warnings.length) {
+                        dictionaryTranslation = 'dictionary-unavailable';
+                    }
+
                     this.$store.commit('hoverVocabularyBox/setValue', {
                         propertyName: 'dictionaryTranslation',
-                        value: ReaderLookupResponse.joinReaderDictionaryDefinitions(response.data.definitions),
+                        value: dictionaryTranslation,
+                    });
+                    this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
+                    this.$nextTick(() => {
+                        this.updateHoverVocabularyBoxPosition();
+                    });
+                }).catch(() => {
+                    if (this.$store.state.hoverVocabularyBox.dictionarySearchTerm !== term) {
+                        return;
+                    }
+                    this.$store.commit('hoverVocabularyBox/setValue', {
+                        propertyName: 'dictionaryTranslation',
+                        value: 'dictionary-unavailable',
                     });
                     this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
                     this.$nextTick(() => {
@@ -1302,16 +1342,35 @@
                 // make api search
                 if (this.anyApiDictionaryEnabled) {
                     ReaderLookupApi.searchReaderApiDictionary(this.$props.language, term).then((response) => {
-                        const apiDefinitions = ReaderLookupResponse.flattenReaderApiDefinitions(response.data);
-
-                        console.log('apiDefinitions', response.data, apiDefinitions);
+                        const envelope = ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'results');
+                        if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(
+                            this.$store.state.hoverVocabularyBox.dictionarySearchTerm,
+                            envelope.term
+                        )) {
+                            return;
+                        }
+                        const apiDefinitions = ReaderLookupResponse.flattenReaderApiDefinitions(envelope.results);
+                        if (envelope.warnings.length) {
+                            apiDefinitions.push('dictionary-warning');
+                        }
                         this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'apiTranslations', value: apiDefinitions });
                         this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
                         this.$nextTick(() => {
                             this.updateHoverVocabularyBoxPosition();
                         });
-                    }).catch(() => {
-                        this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'apiTranslations', value: ['error'] });
+                    }).catch((error) => {
+                        if (this.$store.state.hoverVocabularyBox.dictionarySearchTerm !== term) {
+                            return;
+                        }
+                        const lookupError = ReaderLookupResponse.resolveReaderLookupError(error);
+                        this.$store.commit('hoverVocabularyBox/setValue', {
+                            propertyName: 'apiTranslations',
+                            value: [lookupError.unavailable ? 'dictionary-unavailable' : 'error'],
+                        });
+                        this.$store.commit('hoverVocabularyBox/setValue', { propertyName: 'key', value: this.$store.state.hoverVocabularyBox.key + 1 });
+                        this.$nextTick(() => {
+                            this.updateHoverVocabularyBoxPosition();
+                        });
                     });
                 }
             },

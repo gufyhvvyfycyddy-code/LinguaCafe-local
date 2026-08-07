@@ -26,6 +26,26 @@
             </div>
         </div>
 
+        <v-alert
+            v-if="dictionaryWarnings.length"
+            dense
+            text
+            type="warning"
+            class="mb-2"
+        >
+            部分词典暂时不可用，已保留可用词典的结果。
+        </v-alert>
+
+        <v-alert
+            v-if="apiWarnings.length"
+            dense
+            text
+            type="warning"
+            class="mb-2"
+        >
+            部分在线词典暂时不可用，已保留其他查询结果。
+        </v-alert>
+
         <div class="search-result disabled" v-if="!dictionarySearchLoading && !dictionarySearchResultsFound">
             <div class="search-result-title default-font" :title="$props.searchTerm">
                 <div class="dictionary-title-icon mr-1" style="background-color: var(--v-primary-base);">
@@ -103,6 +123,8 @@
 
 <script>
 import AiSuggestionPanel from './AiSuggestionPanel.vue';
+import * as ReaderLookupApi from './../../services/ReaderLookupApi';
+import * as ReaderLookupResponse from './../../services/ReaderLookupResponsePolicy';
 
 export default {
     components: {
@@ -141,6 +163,10 @@ export default {
             dictionaryApiSearchLoading: false,
             dictionarySearchResultsFound: true,
             dictionaryMessage: '暂无词典结果。',
+            dictionaryWarnings: [],
+            apiWarnings: [],
+            requestSequence: 0,
+            currentRequestSequence: 0,
             apiSearchResults: [],
         };
     },
@@ -174,50 +200,91 @@ export default {
             return rule ? rule.pos : 'other';
         },
         makeSearchRequest() {
+            const term = (this.$props.searchTerm || '').trim();
+            const requestSequence = ++this.requestSequence;
+            this.currentRequestSequence = requestSequence;
             this.searchResults = [];
             this.apiSearchResults = [];
+            this.dictionaryWarnings = [];
+            this.apiWarnings = [];
             this.dictionaryMessage = '暂无词典结果。';
-            if (this.$props.searchTerm == '') {
+            if (term === '') {
+                this.dictionarySearchLoading = false;
+                this.dictionaryApiSearchLoading = false;
                 return;
             }
 
             this.dictionarySearchLoading = true;
             this.dictionarySearchResultsFound = false;
-            axios.post('/dictionaries/search', {
-                language: this.$props.language,
-                term: this.$props.searchTerm
-            }).then((response) => {
-                this.processVocabularySearchResults(response.data);
-                if (!this.dictionarySearchResultsFound && (!Array.isArray(response.data) || response.data.length === 0)) {
-                    this.dictionaryMessage = '词典未配置，请先导入或配置词典数据。';
+            ReaderLookupApi.searchReaderDictionary(this.$props.language, term).then((response) => {
+                if (requestSequence !== this.currentRequestSequence) {
+                    return;
                 }
-            }).catch(() => {
+                const envelope = ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'results');
+                if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(term, envelope.term)) {
+                    return;
+                }
+                this.dictionaryWarnings = envelope.warnings;
+                this.processVocabularySearchResults(envelope.results);
+                if (!this.dictionarySearchResultsFound) {
+                    this.dictionaryMessage = envelope.configured
+                        ? '暂无词典结果。'
+                        : '词典未配置，请先导入或配置词典数据。';
+                }
+            }).catch((error) => {
+                if (requestSequence !== this.currentRequestSequence) {
+                    return;
+                }
+                const lookupError = ReaderLookupResponse.resolveReaderLookupError(error);
                 this.searchResults = [];
                 this.dictionarySearchResultsFound = false;
-                this.dictionaryMessage = '词典查询失败，请检查词典配置。';
+                this.dictionaryMessage = lookupError.unavailable
+                    ? '词典服务暂时不可用，请检查词典配置。'
+                    : '词典查询失败，请稍后重试。';
             }).finally(() => {
-                this.dictionarySearchLoading = false;
+                if (requestSequence === this.currentRequestSequence) {
+                    this.dictionarySearchLoading = false;
+                }
             });
 
             if (this.$props.anyApiDictionaryEnabled) {
                 this.dictionaryApiSearchLoading = true;
-                axios.post('/dictionaries/api/search', {
-                    language: this.$props.language,
-                    term: this.$props.searchTerm
-                }).then((response) => {
-                    this.apiSearchResults = response.data;
-                }).catch(() => {
+                ReaderLookupApi.searchReaderApiDictionary(this.$props.language, term).then((response) => {
+                    if (requestSequence !== this.currentRequestSequence) {
+                        return;
+                    }
+                    const envelope = ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'results');
+                    if (!ReaderLookupResponse.shouldApplyReaderDictionaryResponse(term, envelope.term)) {
+                        return;
+                    }
+                    this.apiSearchResults = envelope.results;
+                    this.apiWarnings = envelope.warnings;
+                }).catch((error) => {
+                    if (requestSequence !== this.currentRequestSequence) {
+                        return;
+                    }
                     this.apiSearchResults = [];
+                    const lookupError = ReaderLookupResponse.resolveReaderLookupError(error);
+                    this.apiWarnings = [{
+                        code: lookupError.code || 'DICTIONARY_API_PROVIDER_FAILED',
+                        message: lookupError.unavailable
+                            ? '在线词典服务暂时不可用。'
+                            : '在线词典查询失败。',
+                    }];
                 }).finally(() => {
-                    this.dictionaryApiSearchLoading = false;
+                    if (requestSequence === this.currentRequestSequence) {
+                        this.dictionaryApiSearchLoading = false;
+                    }
                 });
+            } else {
+                this.dictionaryApiSearchLoading = false;
             }
         },
         processVocabularySearchResults(data) {
             this.searchResults = [];
 
             for (let dictionaryIndex = 0; dictionaryIndex < data.length; dictionaryIndex++) {
-                if (data[dictionaryIndex].name == 'JMDict') {
+                if (Array.isArray(data[dictionaryIndex].jmdictRecords)) {
                     const searchResult = {
                         dictionary: data[dictionaryIndex].name,
                         color: data[dictionaryIndex].color,

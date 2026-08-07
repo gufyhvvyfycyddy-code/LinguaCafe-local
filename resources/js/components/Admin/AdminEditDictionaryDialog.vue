@@ -12,7 +12,13 @@
             </v-card-title>
 
             <!-- Content -->
-            <v-card-text class="pt-4 pb-6" v-if="dictionary">
+            <v-card-text class="pt-4 pb-6" v-if="loadError">
+                <v-alert type="error" text>
+                    {{ loadError }}
+                </v-alert>
+            </v-card-text>
+
+            <v-card-text class="pt-4 pb-6" v-else-if="dictionary">
 
                 <!-- Forms -->
                 <template v-if="saveResult !== 'success'">
@@ -286,6 +292,7 @@
         data: function() {
             return {
                 loading: true,
+                loadError: '',
                 saveResult: '',
                 colorPicker: false,
                 supportedSourceLanguages: [],
@@ -303,7 +310,6 @@
                 axios.get('/dictionaries/get/' + this.$props.dictionaryId),
                 axios.get('/config/get/linguacafe.languages.my_memory_supported_target_languages'),
             ]).then(axios.spread((response1, response2, response3, response4, response5) => {
-                this.loading = false;
                 this.dictionary = response4.data;
 
                 // add supported source languages
@@ -337,7 +343,12 @@
                         selected: false
                     });
                 });
-            }));
+            })).catch(() => {
+                this.dictionary = null;
+                this.loadError = '词典信息暂时无法加载，请关闭后重试。';
+            }).finally(() => {
+                this.loading = false;
+            });
         },
         methods: {
             save() {

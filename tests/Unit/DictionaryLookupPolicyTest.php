@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Services\Dictionaries\DictionaryLookupRequestPolicy;
 use App\Services\Dictionaries\DictionaryLookupResultPolicy;
 use InvalidArgumentException;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class DictionaryLookupPolicyTest extends TestCase
@@ -19,7 +20,7 @@ class DictionaryLookupPolicyTest extends TestCase
         $this->assertSame("e\u{0301}", $policy->normalize(" e\u{0301} "));
     }
 
-    /** @dataProvider invalidTerms */
+    #[DataProvider('invalidTerms')]
     public function test_request_policy_rejects_blank_overlong_or_control_terms(string $term): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -2,6 +2,13 @@ export function getApiDictionaryEnabled() {
     return axios.get('/dictionaries/api/is-enabled');
 }
 
+export function searchReaderDictionary(language, term) {
+    return axios.post('/dictionaries/search', {
+        language,
+        term,
+    });
+}
+
 export function searchReaderInflections(term) {
     return axios.post('/dictionaries/search/inflections', { term });
 }

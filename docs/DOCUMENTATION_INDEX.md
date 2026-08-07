@@ -57,6 +57,7 @@
 | Reader Phase 6L lookup API closure | `docs/testing/reader-lookup-api-browser-acceptance-2026-07-23.md` |
 | Reader Phase 6M English fallback tokenizer / Phase 6 closure | `docs/testing/english-fallback-tokenizer-service-browser-acceptance-2026-07-23.md` |
 | Reader 数据契约 | `docs/plans/textblock-reader-data-contract.md` |
+| Dictionary read health / degraded lookup / doctor | `docs/architecture/dictionary-read-path-contract.md` |
 | Source context | `docs/plans/sense-source-context-contract.md` |
 | ReviewCardManage | `docs/plans/review-card-manage-architecture-convergence-plan.md` |
 | Review settings preset | `docs/plans/review-settings-preset-v1-plan.md` |

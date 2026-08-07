@@ -5,9 +5,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 import {
+    DICTIONARY_LOOKUP_UNAVAILABLE,
     flattenReaderApiDefinitions,
     joinReaderDictionaryDefinitions,
+    normalizeDictionaryWarnings,
     resolveReaderDisplayedInflections,
+    resolveReaderLookupEnvelope,
+    resolveReaderLookupError,
     shouldApplyReaderDictionaryResponse,
 } from '../../resources/js/services/ReaderLookupResponsePolicy.js';
 
@@ -20,6 +24,57 @@ test('accepts only the current non-empty strict dictionary term', () => {
     assert.equal(shouldApplyReaderDictionaryResponse('', ''), false);
     assert.equal(shouldApplyReaderDictionaryResponse(2, '2'), false);
     assert.equal(shouldApplyReaderDictionaryResponse('2', 2), false);
+});
+
+test('normalizes degraded lookup envelopes without mutating the response', () => {
+    const source = Object.freeze({
+        term: 'alpha',
+        results: Object.freeze([{ name: 'dictionary' }]),
+        warnings: Object.freeze([Object.freeze({
+            dictionary_id: 7,
+            dictionary_name: 'Broken',
+            code: 'DICTIONARY_TABLE_MISSING',
+            message: '不可用',
+        })]),
+        configured: true,
+    });
+
+    assert.deepEqual(resolveReaderLookupEnvelope(source, 'results'), {
+        term: 'alpha',
+        results: [{ name: 'dictionary' }],
+        warnings: [{
+            dictionaryId: 7,
+            dictionaryName: 'Broken',
+            code: 'DICTIONARY_TABLE_MISSING',
+            message: '不可用',
+        }],
+        configured: true,
+    });
+    assert.equal(source.results.length, 1);
+});
+
+test('normalizes malformed warnings and classifies total outage errors', () => {
+    assert.deepEqual(normalizeDictionaryWarnings(null), []);
+    assert.deepEqual(normalizeDictionaryWarnings([null, 'bad', {}]), [{
+        dictionaryId: null,
+        dictionaryName: '',
+        code: 'DICTIONARY_QUERY_FAILED',
+        message: '部分词典暂时不可用。',
+    }]);
+    assert.deepEqual(resolveReaderLookupError({
+        response: {
+            data: {
+                error: {
+                    code: DICTIONARY_LOOKUP_UNAVAILABLE,
+                    message: 'unavailable',
+                },
+            },
+        },
+    }), {
+        code: DICTIONARY_LOOKUP_UNAVAILABLE,
+        message: 'unavailable',
+        unavailable: true,
+    });
 });
 
 test('joins local dictionary definitions with the established delimiter', () => {
@@ -156,7 +211,8 @@ test('TextBlockGroup delegates response rules while retaining transport and effe
     );
 
     assert.equal(textBlockSource.includes("import * as ReaderLookupResponse from './../../services/ReaderLookupResponsePolicy'"), true);
-    assert.equal(inflectionMethod.includes('ReaderLookupResponse.resolveReaderDisplayedInflections(response.data)'), true);
+    assert.equal(inflectionMethod.includes("ReaderLookupResponse.resolveReaderLookupEnvelope(response.data, 'inflections')"), true);
+    assert.equal(inflectionMethod.includes('ReaderLookupResponse.resolveReaderDisplayedInflections(response.data.inflections)'), true);
     assert.equal(inflectionMethod.includes('ReaderLookupApi.searchReaderInflections(term)'), true);
     assert.equal(inflectionMethod.includes("this.$store.commit('vocabularyBox/setInflections', [])"), true);
     assert.equal(inflectionMethod.includes("this.$store.commit('vocabularyBox/setInflections', inflections)"), true);
@@ -170,7 +226,9 @@ test('TextBlockGroup delegates response rules while retaining transport and effe
     assert.equal(hoverRequestMethod.includes('ReaderLookupApi.searchReaderApiDictionary(this.$props.language, term)'), true);
     assert.equal(hoverRequestMethod.includes("propertyName: 'dictionaryTranslation'"), true);
     assert.equal(hoverRequestMethod.includes("propertyName: 'apiTranslations'"), true);
-    assert.equal(hoverRequestMethod.includes("value: ['error']"), true);
+    assert.equal(hoverRequestMethod.includes('ReaderLookupResponse.resolveReaderLookupEnvelope'), true);
+    assert.equal(hoverRequestMethod.includes('ReaderLookupResponse.resolveReaderLookupError'), true);
+    assert.equal(hoverRequestMethod.includes("'dictionary-unavailable'"), true);
     assert.equal(hoverRequestMethod.includes('this.updateHoverVocabularyBoxPosition()'), true);
     assert.equal(hoverRequestMethod.includes("response.data.definitions.join(';')"), false);
     assert.equal(hoverRequestMethod.includes('apiDefinitions.concat'), false);
