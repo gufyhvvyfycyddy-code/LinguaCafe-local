@@ -115,7 +115,7 @@
                         border="left"
                         dark
                     >
-                        <div v-html="errorMessage"></div>
+                        <div style="white-space: pre-line;">{{ errorMessage }}</div>
                     </v-alert>
                 </v-form>
             </v-card-text>
@@ -142,6 +142,8 @@
 </template>
 
 <script>
+    import { requestValidationErrorMessage } from '../../services/UiTextService';
+
     export default {
         props: {
             value : Boolean,
@@ -242,23 +244,7 @@
                     this.$emit('user-saved');
                 }).catch((error) => {
                     this.saving = false;
-                    this.errorMessage = '';
-
-                    // add all error messages to the save result
-                    if (error.response.data.errors === undefined) {
-                        this.errorMessage = error.response.data.message;
-                    } else {
-                        var index = 0;
-                        for (const [key, value] of Object.entries(error.response.data.errors)) {
-                            if (index) {
-                                this.errorMessage += '<br>';
-                            }
-
-                            this.errorMessage += value.join('<br>');
-
-                            index ++;
-                        }
-                    }
+                    this.errorMessage = requestValidationErrorMessage(error, '用户保存失败，请稍后重试。');
                 });
             },
             close() {
