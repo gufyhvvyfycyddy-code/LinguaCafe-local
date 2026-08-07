@@ -65,7 +65,7 @@ FROM (
         user_id,
         LOWER(TRIM(language)) AS language_norm,
         LOWER(TRIM(type)) AS type_norm,
-        {$targetScope} AS target_scope,
+        BINARY ({$targetScope}) AS target_scope,
         COUNT(*) AS identity_rows,
         COUNT(DISTINCT quantity) AS quantity_variants,
         COUNT(DISTINCT BINARY name) AS name_variants,

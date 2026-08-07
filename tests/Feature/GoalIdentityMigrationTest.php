@@ -110,6 +110,20 @@ class GoalIdentityMigrationTest extends TestCase
         $this->assertTrue(GoalIdentity::constraintPresent(DB::connection(), $this->table));
     }
 
+    public function test_audit_preserves_case_for_non_numeric_target_scope(): void
+    {
+        $this->insertGoal(1005, 'english', 'read_book_chapter', 'Book-A', 1);
+        $this->insertGoal(1005, 'english', 'read_book_chapter', 'book-a', 2);
+
+        $audit = GoalIdentity::audit(DB::connection(), $this->table, null);
+
+        $this->assertSame(0, $audit['duplicate_identity_groups']);
+        $this->assertFalse($audit['has_issues']);
+
+        GoalIdentity::addConstraint(DB::connection(), $this->table, null);
+        $this->assertTrue(GoalIdentity::constraintPresent(DB::connection(), $this->table));
+    }
+
     private function insertGoal(
         int $userId,
         string $language,
