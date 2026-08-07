@@ -2,65 +2,74 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-
+use App\Models\EncounteredWord;
 use App\Models\Goal;
 use App\Models\GoalAchievement;
-use App\Models\EncounteredWord;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
-class GoalService {
-    
-    public function __construct() {
-    }
-    
-    public function createGoalsForLanguage($userId, $language) {
-        $goal = Goal
-            ::where('user_id', $userId)
-            ->where('language', $language)
-            ->first();
+class GoalService
+{
+    private const DEFAULT_GOALS = [
+        'review' => ['name' => 'Reviews', 'quantity' => 0],
+        'read_words' => ['name' => 'Reading', 'quantity' => 1000],
+        'learn_words' => ['name' => 'New words', 'quantity' => 10],
+    ];
 
-        if (!$goal) {
-            $goal = new Goal();
-            $goal->user_id = $userId;
-            $goal->language = $language;
-            $goal->name = 'Reviews';
-            $goal->type = 'review';
-            $goal->quantity = 0;
-            $goal->save();
+    public function __construct() {}
 
-            $goal = new Goal();
-            $goal->user_id = $userId;
-            $goal->language = $language;
-            $goal->name = 'Reading';
-            $goal->type = 'read_words';
-            $goal->quantity = 1000;
-            $goal->save();
+    public function createGoalsForLanguage($userId, $language)
+    {
+        DB::transaction(function () use ($userId, $language): void {
+            User::query()
+                ->whereKey($userId)
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            $goal = new Goal();
-            $goal->user_id = $userId;
-            $goal->language = $language;
-            $goal->name = 'New words';
-            $goal->type = 'learn_words';
-            $goal->quantity = 10;
-            $goal->save();
-        }
+            $this->ensureDefaultGoalsForLockedUser((int) $userId, (string) $language);
+        }, 3);
 
         return true;
+    }
+
+    public function ensureDefaultGoalsForLockedUser(int $userId, string $language): void
+    {
+        $language = mb_strtolower(trim($language), 'UTF-8');
+
+        foreach (self::DEFAULT_GOALS as $type => $defaults) {
+            $exists = Goal::query()
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->where('type', $type)
+                ->exists();
+
+            if ($exists) {
+                continue;
+            }
+
+            $goal = new Goal();
+            $goal->user_id = $userId;
+            $goal->language = $language;
+            $goal->name = $defaults['name'];
+            $goal->type = $type;
+            $goal->quantity = $defaults['quantity'];
+            $goal->save();
+        }
     }
 
     /*
         Updates today's goal achievement, and if it
         does not exist yet, it will create one.
     */
-    public function updateGoalAchievement($userId, $language, $type, $achievedQuantity) {
-        $goal = Goal
-            ::where('user_id', $userId)
+    public function updateGoalAchievement($userId, $language, $type, $achievedQuantity)
+    {
+        $goal = Goal::where('user_id', $userId)
             ->where('language', $language)
             ->where('type', $type)
             ->first();
 
-        if (!$goal) {
+        if (! $goal) {
             // Auto-recover: create missing goals for this user/language, then retry
             \Log::warning('GoalService: goals missing, auto-creating', [
                 'user_id' => $userId,
@@ -72,21 +81,21 @@ class GoalService {
                 ->where('language', $language)
                 ->where('type', $type)
                 ->first();
-            if (!$goal) {
+            if (! $goal) {
                 // Still missing after creation — skip gracefully instead of crashing vocabulary save
                 \Log::error("GoalService: unable to create goal type={$type} for user={$userId} language={$language}");
+
                 return false;
             }
         }
 
-        $achievement = GoalAchievement
-            ::where('user_id', $userId)
+        $achievement = GoalAchievement::where('user_id', $userId)
             ->where('language', $language)
             ->where('goal_id', $goal->id)
             ->where('day', Carbon::now()->toDateString())
             ->first();
-        
-        if (!$achievement) {
+
+        if (! $achievement) {
             $achievement = new GoalAchievement();
             $achievement->language = $language;
             $achievement->user_id = $userId;
@@ -95,7 +104,6 @@ class GoalService {
             $achievement->goal_quantity = $goal->quantity;
             $achievement->day = Carbon::now()->toDateString();
         }
-        
 
         $achievement->achieved_quantity += $achievedQuantity;
         $achievement->save();
@@ -103,9 +111,9 @@ class GoalService {
         return true;
     }
 
-    public function getGoals($userId, $language) {
-        $goals = Goal
-            ::where('user_id', $userId)
+    public function getGoals($userId, $language)
+    {
+        $goals = Goal::where('user_id', $userId)
             ->where('language', $language)
             ->get();
 
@@ -116,13 +124,13 @@ class GoalService {
         return $goals;
     }
 
-    public function updateGoal($userId, $goalId, $newGoalQuantity) {
-        $goal = Goal
-            ::where('user_id', $userId)
+    public function updateGoal($userId, $goalId, $newGoalQuantity)
+    {
+        $goal = Goal::where('user_id', $userId)
             ->where('id', $goalId)
             ->first();
 
-        if (!$goal) {
+        if (! $goal) {
             throw new \Exception('Goal not found.');
         }
 
@@ -130,8 +138,7 @@ class GoalService {
         $goal->save();
 
         // also update today's goal achievement
-        $achievement = GoalAchievement
-            ::where('user_id', $userId)
+        $achievement = GoalAchievement::where('user_id', $userId)
             ->where('goal_id', $goal->id)
             ->where('day', Carbon::today()->format('Y-m-d'))
             ->first();
@@ -144,7 +151,8 @@ class GoalService {
         return true;
     }
 
-    public function getCalendarData($userId, $language) {
+    public function getCalendarData($userId, $language)
+    {
         $calendarData = [];
 
         // query goal achievements
@@ -174,7 +182,7 @@ class GoalService {
             $achievementData->day = $achievement->day;
             $achievementData->achievedQuantity = $achievement->achieved_quantity;
             $achievementData->goalQuantity = $achievement->goal_quantity;
-            
+
             if ($dayIndex !== -1) {
                 array_push($calendarData[$dayIndex]->achievements, $achievementData);
             } else {
@@ -192,7 +200,6 @@ class GoalService {
             ->whereNotNull('next_review')
             ->selectRaw(DB::raw('next_review as day, count(id) as quantity'))
             ->groupBy('next_review')->get();
-
 
         // add reviews due to calendar data
         foreach ($reviewsDue as $review) {
@@ -220,18 +227,18 @@ class GoalService {
         return $calendarData;
     }
 
-    public function updateCalendarData($userId, $language, $achievementGoalId, $achievementType, $day, $newValue) {
+    public function updateCalendarData($userId, $language, $achievementGoalId, $achievementType, $day, $newValue)
+    {
         if ($achievementGoalId === -1) {
-            $goal = Goal::
-                where('user_id', $userId)
+            $goal = Goal::where('user_id', $userId)
                 ->where('language', $language)
                 ->where('type', $achievementType)
                 ->first();
-            
-            if (!$goal) {
+
+            if (! $goal) {
                 throw new \Exception('Goal not found.');
             }
-            
+
             $achievement = new GoalAchievement();
             $achievement->user_id = $userId;
             $achievement->language = $language;
@@ -241,8 +248,7 @@ class GoalService {
             $achievement->day = $day;
             $achievement->save();
         } else {
-            GoalAchievement::
-                where('user_id', $userId)
+            GoalAchievement::where('user_id', $userId)
                 ->where('id', $achievementGoalId)
                 ->update(['achieved_quantity' => $newValue]);
         }

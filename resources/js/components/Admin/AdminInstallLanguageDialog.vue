@@ -1,12 +1,12 @@
 <template>
     <v-dialog v-model="value" persistent max-width="500px" height="300px">
-        <v-card class="rounded-lg" :loading="installing">
+        <v-card class="rounded-lg" :loading="installing || selecting">
             <v-card-title>
                 <v-icon class="mr-2">mdi-download</v-icon>
                 <span class="text-h5">安装语言</span>
                 
                 <v-spacer></v-spacer>
-                <v-btn icon @click="close" :disabled="installing">
+                <v-btn icon @click="close" :disabled="installing || selecting">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
@@ -35,11 +35,24 @@
                             depressed 
                             rounded 
                             color="foreground" 
+                            :loading="selecting"
+                            :disabled="selecting || installing"
                             @click="selectNewLanguage" 
                         >
                             切换到 {{ $props.language }}
                         </v-btn>
                     </div>
+                </v-alert>
+
+                <v-alert
+                    v-if="selectionError"
+                    dense
+                    class="rounded-lg mt-4"
+                    color="error"
+                    type="error"
+                    border="left"
+                >
+                    {{ selectionError }}
                 </v-alert>
 
                 <!-- Error message -->
@@ -64,17 +77,17 @@
                 <v-spacer></v-spacer>
 
                 <!-- Cancel button -->
-                <v-btn rounded text @click="close" :disabled="installing" v-if="installResult !== 'success'">
+                <v-btn rounded text @click="close" :disabled="installing || selecting" v-if="installResult !== 'success'">
                     取消
                 </v-btn>
                 
                 <!-- Close button -->
-                <v-btn rounded text @click="close" :disabled="installing" v-if="installResult === 'success'">
+                <v-btn rounded text @click="close" :disabled="installing || selecting" v-if="installResult === 'success'">
                     关闭
                 </v-btn>
                 
                 <!-- Install button -->
-                <v-btn rounded text @click="install" :disabled="installing" v-if="installResult !== 'success'">
+                <v-btn rounded text @click="install" :disabled="installing || selecting" v-if="installResult !== 'success'">
                     <v-icon class="mr-1">mdi-download</v-icon>
                     安装
                 </v-btn>
@@ -84,6 +97,8 @@
 </template>
 
 <script>
+    import { requestErrorMessage } from './../../services/UiTextService';
+
     export default {
         props: {
             value : Boolean,
@@ -94,6 +109,8 @@
             return {
                 installResult: '',
                 installing: false,
+                selecting: false,
+                selectionError: '',
             };
         },
         mounted: function() {
@@ -117,16 +134,33 @@
                 });
             },
             selectNewLanguage() {
-                var language = this.$props.language;
+                if (this.selecting) {
+                    return;
+                }
 
-                axios.get('/languages/select/' + language).then(function (response) {
+                var language = this.$props.language.toLowerCase();
+                this.selecting = true;
+                this.selectionError = '';
+
+                axios.put('/languages/select/' + language).then(function (response) {
                     document.location.href = '/admin/languages';
-                }.bind(this)).catch(function (error) {}).then(() => {
+                }.bind(this)).catch((error) => {
+                    if (error?.response?.status === 419) {
+                        this.selectionError = '页面验证已过期，请刷新页面后重试。';
+                    } else if (error?.response?.status === 503) {
+                        this.selectionError = '数据库正在恢复，暂时无法切换学习语言。';
+                    } else {
+                        this.selectionError = requestErrorMessage(error, '学习语言切换失败，请稍后重试。');
+                    }
+                }).finally(() => {
+                    this.selecting = false;
                 });
             },
             close() {
                 this.installResult = '';
                 this.installing = false;
+                this.selecting = false;
+                this.selectionError = '';
                 this.$emit('input', false);
             }
         }

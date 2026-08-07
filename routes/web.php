@@ -130,7 +130,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
 
     // languages
     Route::get('/languages/get-language-selection-dialog-data', [App\Http\Controllers\LanguageController::class, 'getLanguageSelectionDialogData']);
-    Route::get('/languages/select/{language}', [App\Http\Controllers\LanguageController::class, 'selectLanguage']);
+    Route::put('/languages/select/{language}', [App\Http\Controllers\LanguageController::class, 'selectLanguage']);
 
     // users
     Route::post('/users/update-password', [App\Http\Controllers\UserController::class, 'updatePassword']);

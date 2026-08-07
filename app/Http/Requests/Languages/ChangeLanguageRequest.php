@@ -24,14 +24,14 @@ class ChangeLanguageRequest extends FormRequest
     public function rules()
     {
         return [
-            'language' => 'required|string',
+            'language' => 'required|string|max:64',
         ];
     }
 
     protected function prepareForValidation()
     {
         $this->merge([
-            'language' => $this->route('language'),
+            'language' => mb_strtolower(trim((string) $this->route('language')), 'UTF-8'),
         ]);
     }
 }
