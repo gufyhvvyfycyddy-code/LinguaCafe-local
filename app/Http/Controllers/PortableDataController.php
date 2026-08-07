@@ -27,6 +27,7 @@ class PortableDataController extends Controller
 
     public function exportAnki(Request $request): StreamedResponse|JsonResponse
     {
+        $this->rejectHead($request);
         $items = $this->items($request);
         if ($items instanceof JsonResponse) {
             return $items;
@@ -51,6 +52,7 @@ class PortableDataController extends Controller
 
     public function exportContentJson(Request $request): JsonResponse
     {
+        $this->rejectHead($request);
         $items = $this->items($request);
         if ($items instanceof JsonResponse) {
             return $items;
@@ -71,6 +73,7 @@ class PortableDataController extends Controller
 
     public function exportContentCsv(Request $request): StreamedResponse|JsonResponse
     {
+        $this->rejectHead($request);
         $items = $this->items($request);
         if ($items instanceof JsonResponse) {
             return $items;
@@ -103,6 +106,7 @@ class PortableDataController extends Controller
 
     public function exportFullPackage(Request $request): StreamedResponse|JsonResponse
     {
+        $this->rejectHead($request);
         $items = $this->allSenseItems();
         if ($items instanceof JsonResponse) {
             return $items;
@@ -153,6 +157,13 @@ class PortableDataController extends Controller
             $user->id,
             $user->selected_language,
         ));
+    }
+
+    private function rejectHead(Request $request): void
+    {
+        if ($request->isMethod('HEAD')) {
+            abort(405);
+        }
     }
 
     private function items(Request $request)

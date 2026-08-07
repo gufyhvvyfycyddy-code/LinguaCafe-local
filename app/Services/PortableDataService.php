@@ -44,6 +44,7 @@ class PortableDataService
         private BackupService $backups,
         private PortableDataImportPlanService $importPlan,
         private MediaAssetService $media,
+        private PortableExportWorkspaceService $workspaces,
     ) {}
 
     public function contentEnvelope(
@@ -83,10 +84,9 @@ class PortableDataService
         bool $includeMedia = false,
     ): array
     {
-        $directory = storage_path('app/temp/portable-' . bin2hex(random_bytes(12)));
-        if (! mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('Unable to create the portable export workspace.');
-        }
+        $directory = $this->workspaces->create(
+            PortableExportWorkspaceService::KIND_PORTABLE_EXPORT,
+        );
         $packagePath = $directory . DIRECTORY_SEPARATOR . 'linguacafe-portable-data.lcpkg';
 
         try {
@@ -167,7 +167,11 @@ class PortableDataService
                 'media_count' => count($mediaEnvelope['assets'] ?? []),
             ];
         } catch (Throwable $exception) {
-            $this->cleanupPackage($packagePath);
+            try {
+                $this->cleanupPackage($packagePath);
+            } catch (Throwable $cleanupException) {
+                report($cleanupException);
+            }
             throw $exception;
         }
     }
@@ -384,15 +388,7 @@ class PortableDataService
 
     public function cleanupPackage(string $packagePath): void
     {
-        $directory = dirname($packagePath);
-        $normalized = str_replace('\\', '/', $directory);
-        if (! str_starts_with($normalized, str_replace('\\', '/', storage_path('app/temp/portable-')))) {
-            return;
-        }
-        foreach (array_diff(scandir($directory) ?: [], ['.', '..']) as $entry) {
-            @unlink($directory . DIRECTORY_SEPARATOR . $entry);
-        }
-        @rmdir($directory);
+        $this->workspaces->cleanup(dirname($packagePath));
     }
 
     /** @return array<int,array<string,mixed>> */

@@ -11,6 +11,10 @@ use ZipArchive;
 
 class AnkiWordSensePackageService
 {
+    public function __construct(private PortableExportWorkspaceService $workspaces)
+    {
+    }
+
     public const NOTE_TYPE = 'LinguaCafe WordSense v1';
     public const DECK_NAME = 'LinguaCafe::WordSense';
     public const MODEL_ID = 1767225600001;
@@ -41,10 +45,9 @@ class AnkiWordSensePackageService
             throw new InvalidArgumentException('The Anki export exceeds the supported record limit.');
         }
 
-        $directory = storage_path('app/temp/anki-' . bin2hex(random_bytes(12)));
-        if (! mkdir($directory, 0700, true) && ! is_dir($directory)) {
-            throw new RuntimeException('Unable to create the Anki export workspace.');
-        }
+        $directory = $this->workspaces->create(
+            PortableExportWorkspaceService::KIND_ANKI_EXPORT,
+        );
 
         $databasePath = $directory . DIRECTORY_SEPARATOR . 'collection.anki2';
         $packagePath = $directory . DIRECTORY_SEPARATOR . 'linguacafe-wordsenses.apkg';
@@ -70,7 +73,11 @@ class AnkiWordSensePackageService
                 'sha256' => hash_file('sha256', $packagePath),
             ];
         } catch (Throwable $exception) {
-            $this->deleteDirectory($directory);
+            try {
+                $this->workspaces->cleanup($directory);
+            } catch (Throwable $cleanupException) {
+                report($cleanupException);
+            }
             throw $exception;
         } finally {
             if (is_file($databasePath)) {
@@ -151,10 +158,7 @@ class AnkiWordSensePackageService
 
     public function cleanupPackage(string $packagePath): void
     {
-        $directory = dirname($packagePath);
-        if (str_starts_with(str_replace('\\', '/', $directory), str_replace('\\', '/', storage_path('app/temp/anki-')))) {
-            $this->deleteDirectory($directory);
-        }
+        $this->workspaces->cleanup(dirname($packagePath));
     }
 
     private function createCollection(
@@ -417,15 +421,4 @@ class AnkiWordSensePackageService
         )));
     }
 
-    private function deleteDirectory(string $directory): void
-    {
-        if (! is_dir($directory)) {
-            return;
-        }
-        foreach (array_diff(scandir($directory) ?: [], ['.', '..']) as $entry) {
-            $path = $directory . DIRECTORY_SEPARATOR . $entry;
-            is_dir($path) ? $this->deleteDirectory($path) : @unlink($path);
-        }
-        @rmdir($directory);
-    }
 }
