@@ -13,6 +13,7 @@ use App\Services\SettingsService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Mockery\MockInterface;
 use Tests\TestCase;
 
 class FsrsOptimizationSettingsTest extends TestCase
@@ -132,6 +133,23 @@ class FsrsOptimizationSettingsTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('review_count', 1);
+    }
+
+    public function test_optimize_failure_uses_error_status_and_does_not_expose_exception_details(): void
+    {
+        $this->mock(SettingsService::class, function (MockInterface $mock): void {
+            $mock->shouldReceive('computeFsrsOptimizationPreview')
+                ->once()
+                ->with($this->user->id, 'english')
+                ->andThrow(new \RuntimeException('sensitive optimizer path and payload'));
+        });
+
+        $this->actingAs($this->user)
+            ->postJson('/settings/fsrs/optimize')
+            ->assertStatus(500)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('message', '参数优化计算失败，请稍后重试。')
+            ->assertJsonMissing(['message' => 'sensitive optimizer path and payload']);
     }
 
     public function test_optimize_preflight_does_not_modify_fsrs_settings_when_records_are_insufficient(): void

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Request;
 
 // services
@@ -97,11 +98,17 @@ class SettingsController extends Controller
             } else {
                 $result = $this->settingsService->computeFsrsOptimizationPreview($user->id, $user->selected_language);
             }
-        } catch (\Exception $e) {
+        } catch (\Throwable $exception) {
+            Log::error('FSRS parameter optimization failed.', [
+                'exception' => get_class($exception),
+                'user_id' => $user->id,
+                'confirm' => $request->boolean('confirm'),
+            ]);
+
             return response()->json([
                 'success' => false,
-                'message' => '参数优化计算失败：' . $e->getMessage(),
-            ], 200);
+                'message' => '参数优化计算失败，请稍后重试。',
+            ], 500);
         }
 
         return response()->json($result, 200);
