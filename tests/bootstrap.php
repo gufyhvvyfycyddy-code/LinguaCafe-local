@@ -1,69 +1,42 @@
 <?php
 
 /**
- * tests/bootstrap.php — PHPUnit bootstrap with testing DB process lock.
+ * PHPUnit bootstrap for the machine-global testing database lease.
  *
- * Prevents concurrent PHPUnit processes from corrupting the shared MySQL
- * testing database (linguacafe_fsrs_test) when both use RefreshDatabase.
- *
- * The lock uses flock(LOCK_EX) on a file inside storage/framework/testing/ so
- * it works on both Windows and Linux without OS-level IPC.
- *
- * Design constraints:
- *  - Does NOT read .env or .env.testing.
- *  - Does NOT connect to any database.
- *  - Does NOT run migrations.
- *  - Does NOT delete any data.
- *  - Safe to run during normal application bootstrap in testing environment.
+ * All LinguaCafe worktrees that target the same logical testing database use
+ * one OS file lock under the system temporary directory. The bootstrap never
+ * reads environment files, opens a database connection, or runs migrations.
  */
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__.'/../vendor/autoload.php';
+require_once __DIR__.'/Support/TestingDatabaseLease.php';
 
-$appEnv = getenv('APP_ENV') ?: '';
+use Tests\Support\TestingDatabaseLease;
+use Tests\Support\TestingDatabaseLeaseException;
 
-if (strtolower($appEnv) === 'testing') {
-    $lockDir = __DIR__ . '/../storage/framework/testing';
+$appEnv = strtolower((string) (getenv('APP_ENV') ?: ''));
 
-    if (! is_dir($lockDir)) {
-        @mkdir($lockDir, 0775, true);
+if ($appEnv === 'testing') {
+    $waitValue = (string) (getenv('TESTING_DB_LEASE_WAIT_MS') ?: '0');
+    $waitMs = ctype_digit($waitValue) ? (int) $waitValue : -1;
+    $label = (string) (getenv('TESTING_DB_LEASE_LABEL') ?: 'phpunit');
+
+    try {
+        $testingDatabaseLease = TestingDatabaseLease::acquireOrInheritForProject(
+            dirname(__DIR__),
+            label: $label,
+            waitMs: $waitMs,
+        );
+    } catch (TestingDatabaseLeaseException $error) {
+        fwrite(STDERR, "[testing-db-lease] LEASE_ACQUIRE_FAILED code={$error->machineCode}\n");
+        throw new RuntimeException('Testing database lease acquisition failed.', 0, $error);
     }
 
-    if (! is_dir($lockDir)) {
-        fwrite(STDERR, "[bootstrap] WARNING: Cannot create lock directory: {$lockDir}\n");
-        return;
+    foreach ($testingDatabaseLease->createInheritanceProof() as $name => $value) {
+        putenv("{$name}={$value}");
+        $_ENV[$name] = $value;
+        $_SERVER[$name] = $value;
     }
 
-    $lockFile = $lockDir . '/phpunit-db.lock';
-    $lockFp = @fopen($lockFile, 'c');
-
-    if (! $lockFp) {
-        fwrite(STDERR, "[bootstrap] WARNING: Cannot open lock file: {$lockFile}\n");
-        return;
-    }
-
-    // Non-blocking attempt first so we can print a message if another process
-    // is already running tests.
-    $locked = flock($lockFp, LOCK_EX | LOCK_NB, $wouldBlock);
-
-    if (! $locked && $wouldBlock) {
-        fwrite(STDERR, "[bootstrap] Another PHPUnit process holds the testing DB lock. Waiting...\n");
-        $locked = flock($lockFp, LOCK_EX);
-    }
-
-    if (! $locked) {
-        fwrite(STDERR, "[bootstrap] WARNING: Could not acquire testing DB lock. Tests may race.\n");
-        fclose($lockFp);
-        return;
-    }
-
-    // Truncate lock file so the first line always carries the current PID
-    ftruncate($lockFp, 0);
-    fwrite($lockFp, getmypid() . "\n");
-
-    register_shutdown_function(function () use ($lockFp): void {
-        if (is_resource($lockFp)) {
-            @flock($lockFp, LOCK_UN);
-            @fclose($lockFp);
-        }
-    });
+    $GLOBALS['linguacafeTestingDatabaseLease'] = $testingDatabaseLease;
 }
