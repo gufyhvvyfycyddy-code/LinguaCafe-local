@@ -510,9 +510,15 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $this->assertSame(1, ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
-    public function test_true_explicit_vs_finish_race_never_creates_both_explicit_and_passive_for_same_card_session(): void
+    public function test_raw_api_explicit_vs_finish_race_without_preacknowledged_intent_is_first_lock_wins_without_double_formal_rating(): void
     {
         $this->bindCurrentOccurrenceTo($this->sense);
+        $this->assertSame(
+            0,
+            ReadingSessionInteraction::where('reading_session_id', $this->session->id)->count(),
+            'Raw API race scope requires no committed opened/helped/explicit intent before the barrier.',
+        );
+
         $results = $this->runConcurrent([
             ['explicit-rate', $this->explicitWorkerPayload('hard', $this->readingActionId(34))],
             ['finish-commit', $this->finishWorkerPayload()],
@@ -523,15 +529,84 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $logs = ReviewLog::where('review_card_id', $this->card->id)
             ->whereIn('source', [ReviewLog::SOURCE_READING_EXPLICIT, ReviewLog::SOURCE_READING_PASSIVE])
             ->get();
-        $this->assertCount(1, $logs, $this->workerDiagnostics($results));
+        $explicitCount = $logs->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->count();
+        $passiveCount = $logs->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count();
+        $this->assertCount(1, $logs, 'Raw API first-lock-wins must still produce exactly one formal outcome. '.$this->workerDiagnostics($results));
+        $this->assertFalse(
+            $explicitCount > 0 && $passiveCount > 0,
+            'Raw API first-lock-wins must never create both reading_explicit and reading_passive. '.$this->workerDiagnostics($results),
+        );
 
         $explicitStatus = $results[0]['json']['http_status'];
         if ($explicitStatus >= 200 && $explicitStatus < 300) {
+            $this->assertSame(1, $explicitCount, $this->workerDiagnostics($results));
+            $this->assertSame(0, $passiveCount, $this->workerDiagnostics($results));
             $this->assertSame(ReviewLog::SOURCE_READING_EXPLICIT, $logs[0]->source, $this->workerDiagnostics($results));
             $this->assertSame($logs[0]->id, $results[0]['json']['body']['action']['review_log_id']);
+        } else {
+            $this->assertSame(409, $explicitStatus, $this->workerDiagnostics($results));
             $this->assertSame(
-                0,
-                ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count(),
+                ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+                $results[0]['json']['body']['error_code'] ?? null,
+                $this->workerDiagnostics($results),
+            );
+            $this->assertSame(0, $explicitCount, $this->workerDiagnostics($results));
+            $this->assertSame(1, $passiveCount, $this->workerDiagnostics($results));
+            $this->assertSame(ReviewLog::SOURCE_READING_PASSIVE, $logs[0]->source, $this->workerDiagnostics($results));
+        }
+
+        $this->assertSame(1, ReadingSessionCompletion::where('reading_session_id', $this->session->id)->count(), $this->workerDiagnostics($results));
+    }
+
+    public function test_preacknowledged_opened_intent_keeps_passive_zero_during_explicit_vs_finish_race(): void
+    {
+        $this->bindCurrentOccurrenceTo($this->sense);
+        $acknowledgement = app(ReadingSessionService::class)->recordOccurrenceInteraction(
+            $this->user->id,
+            'english',
+            $this->session->uuid,
+            ReadingSessionInteraction::TYPE_OPENED,
+            $this->occurrenceId,
+        );
+        $this->assertTrue($acknowledgement['recorded'] ?? false, 'Opened intent must be positively acknowledged before the race barrier is released.');
+        $this->assertSame($this->occurrenceId, $acknowledgement['occurrence_id'] ?? null);
+        $this->assertSame(
+            1,
+            ReadingSessionInteraction::where('reading_session_id', $this->session->id)
+                ->where('interaction_type', ReadingSessionInteraction::TYPE_OPENED)
+                ->where('occurrence_id', $this->occurrenceId)
+                ->count(),
+            'Opened intent must be durably committed before concurrent Finish/explicit workers start.',
+        );
+
+        $results = $this->runConcurrent([
+            ['explicit-rate', $this->explicitWorkerPayload('hard', $this->readingActionId(36))],
+            ['finish-commit', $this->finishWorkerPayload()],
+        ]);
+
+        $this->assertWorkerOutcome($results[0], [ReadingSessionService::ERROR_SESSION_NOT_ACTIVE]);
+        $this->assertWorkerOutcome($results[1]);
+        $explicitCount = ReviewLog::where('review_card_id', $this->card->id)
+            ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
+            ->count();
+        $passiveCount = ReviewLog::where('review_card_id', $this->card->id)
+            ->where('source', ReviewLog::SOURCE_READING_PASSIVE)
+            ->count();
+        $this->assertSame(
+            0,
+            $passiveCount,
+            'Once opened is acknowledged, later Finish must never create reading_passive for that occurrence. '.$this->workerDiagnostics($results),
+        );
+        $this->assertLessThanOrEqual(1, $explicitCount, $this->workerDiagnostics($results));
+
+        $explicitStatus = $results[0]['json']['http_status'];
+        if ($explicitStatus >= 200 && $explicitStatus < 300) {
+            $this->assertSame(1, $explicitCount, $this->workerDiagnostics($results));
+            $this->assertSame(
+                ReviewLog::where('review_card_id', $this->card->id)
+                    ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
+                    ->sole()->id,
+                $results[0]['json']['body']['action']['review_log_id'],
                 $this->workerDiagnostics($results),
             );
         } else {
@@ -541,9 +616,19 @@ class ReadingReviewConcurrencyContractTest extends TestCase
                 $results[0]['json']['body']['error_code'] ?? null,
                 $this->workerDiagnostics($results),
             );
-            $this->assertSame(ReviewLog::SOURCE_READING_PASSIVE, $logs[0]->source, $this->workerDiagnostics($results));
-            $this->assertSame(1, ReadingSessionCompletion::where('reading_session_id', $this->session->id)->count());
+            $this->assertSame(0, $explicitCount, $this->workerDiagnostics($results));
         }
+
+        $this->assertSame(1, ReadingSessionCompletion::where('reading_session_id', $this->session->id)->count(), $this->workerDiagnostics($results));
+        $this->assertSame(1, $this->chapter->fresh()->read_count, $this->workerDiagnostics($results));
+        $this->assertSame(
+            0,
+            ReadingSessionCardSettlement::where('reading_session_id', $this->session->id)
+                ->where('review_card_id', $this->card->id)
+                ->count(),
+            'Acknowledged opened intent must prevent passive card settlement side effects.',
+        );
+        $this->assertLessThanOrEqual(1, $explicitCount + $passiveCount, 'The race must not duplicate formal logs. '.$this->workerDiagnostics($results));
     }
 
     public function test_true_opened_vs_finish_race_has_no_impossible_opened_plus_passive_terminal_state(): void
