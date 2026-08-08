@@ -61,10 +61,9 @@ for (const file of readingSourceFiles) {
     }
 }
 
-if (readingSourceFiles.length === 0) {
-    console.log('PhaseBFormalRatingWriteSurfaceGuard: Phase B reading sources not yet present (Lane1 pending); formal-writer baseline verified.');
-} else {
-    console.log(`PhaseBFormalRatingWriteSurfaceGuard: checked ${readingSourceFiles.length} file(s) carrying reading rating source semantics.`);
-}
-
+assert.ok(
+    readingSourceFiles.length > 0,
+    'PhaseBFormalRatingWriteSurfaceGuard must resolve the concrete reading_passive/reading_explicit production surfaces',
+);
+console.log(`PhaseBFormalRatingWriteSurfaceGuard: checked ${readingSourceFiles.length} file(s) carrying reading rating source semantics.`);
 console.log('PhaseBFormalRatingWriteSurfaceGuard passed.');

@@ -2,83 +2,191 @@
 
 namespace Tests\Unit;
 
-use Tests\TestCase;
+use App\Services\AiReadingAssistV2Service;
+use PHPUnit\Framework\TestCase;
+use Tests\Support\PabR3AiReadingAssistV2Harness as V2Harness;
 
-/**
- * PAB R2 V2 50-target batching / atomic merge contract.
- *
- * PENDING_INTEGRATION_RUN: R1 freezes the behavior but not the callable
- * package/merge method signature, and the Lane 3 baseline has no V2 contract
- * service. These scenarios must be wired to Backend Core by Lane 4. A
- * test-local batching implementation is intentionally forbidden because it
- * would only prove the test helper itself.
- */
 class AiReadingAssistV2BatchingTest extends TestCase
 {
-    public function test_20_targets_build_one_part(): void
+    private mixed $previousFacadeApplication;
+
+    protected function setUp(): void
     {
-        $this->pendingBatchSeam('20 total deduplicated targets => exactly 1 part.');
+        parent::setUp();
+        $this->previousFacadeApplication = V2Harness::installPureCryptoFacade();
     }
 
-    public function test_49_targets_build_one_part(): void
+    protected function tearDown(): void
     {
-        $this->pendingBatchSeam('49 total deduplicated targets => exactly 1 part.');
+        \Mockery::close();
+        V2Harness::restoreFacadeApplication($this->previousFacadeApplication);
+        parent::tearDown();
     }
 
-    public function test_50_targets_build_one_part(): void
+    private function serviceForCount(int $count, ?array &$catalog = null): AiReadingAssistV2Service
     {
-        $this->pendingBatchSeam('50 total deduplicated targets => exactly 1 part.');
+        $catalog = V2Harness::catalog($count);
+        return V2Harness::service(fn () => $catalog);
     }
 
-    public function test_51_targets_build_two_parts(): void
+    #[\PHPUnit\Framework\Attributes\DataProvider('packageCountProvider')]
+    public function test_targets_are_split_into_exact_fifty_target_parts(int $targets, int $expectedParts): void
     {
-        $this->pendingBatchSeam('51 targets => exactly 2 parts with max 50 targets in each part.');
+        $service = $this->serviceForCount($targets, $catalog);
+        $result = $service->buildSourcePackages(V2Harness::USER_ID, V2Harness::LANGUAGE, V2Harness::CHAPTER_ID);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame($expectedParts, $result['package_count']);
+        $this->assertSame($expectedParts, $result['part_count']);
+        $this->assertSame($targets, $result['target_count']);
+        foreach ($result['packages'] as $package) {
+            $this->assertLessThanOrEqual(50, $package['target_count']);
+        }
     }
 
-    public function test_100_targets_build_two_parts(): void
+    public static function packageCountProvider(): array
     {
-        $this->pendingBatchSeam('100 targets => exactly 2 parts.');
+        return [
+            '20 => 1' => [20, 1],
+            '49 => 1' => [49, 1],
+            '50 => 1' => [50, 1],
+            '51 => 2' => [51, 2],
+            '100 => 2' => [100, 2],
+            '101 => 3' => [101, 3],
+        ];
     }
 
-    public function test_101_targets_build_three_parts(): void
+    public function test_missing_part_rejects_whole_preview(): void
     {
-        $this->pendingBatchSeam('101 targets => exactly 3 parts.');
+        $service = $this->serviceForCount(51, $catalog);
+        $packages = V2Harness::packages($service);
+        $result = $service->previewImport(
+            V2Harness::USER_ID,
+            V2Harness::LANGUAGE,
+            V2Harness::CHAPTER_ID,
+            [V2Harness::importPart($packages[0])],
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_PART_SET_INCOMPLETE, $result['error_code']);
     }
 
-    public function test_missing_part_rejects_whole_import(): void
+    public function test_duplicate_part_rejects_whole_preview(): void
     {
-        $this->pendingBatchSeam('A missing part_index in the expected 1..part_count set rejects the whole import with zero save/evidence delta.');
-    }
+        $service = $this->serviceForCount(51, $catalog);
+        $packages = V2Harness::packages($service);
+        $part = V2Harness::importPart($packages[0]);
+        $result = $service->previewImport(
+            V2Harness::USER_ID,
+            V2Harness::LANGUAGE,
+            V2Harness::CHAPTER_ID,
+            [$part, $part],
+        );
 
-    public function test_duplicate_part_rejects_whole_import(): void
-    {
-        $this->pendingBatchSeam('Duplicate part_index/package submission rejects the whole import rather than choosing one copy.');
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_PART_SET_INCOMPLETE, $result['error_code']);
     }
 
     public function test_duplicate_target_across_parts_is_rejected(): void
     {
-        $this->pendingBatchSeam('The same occurrence_id appearing in two parts is rejected; merged target sets must be disjoint and complete.');
+        $service = $this->serviceForCount(51, $catalog);
+        $packages = V2Harness::packages($service);
+        $firstManifest = json_decode(\Illuminate\Support\Facades\Crypt::decryptString($packages[0]['manifest_token']), true, 512, JSON_THROW_ON_ERROR);
+        $duplicateId = $firstManifest['target_ids'][0];
+        $duplicateCandidates = $firstManifest['candidate_sets'][$duplicateId] ?? [];
+        $packages[1]['manifest_token'] = V2Harness::mutateManifestToken(
+            $packages[1]['manifest_token'],
+            function (array $manifest) use ($duplicateId, $duplicateCandidates): array {
+                $manifest['target_ids'][0] = $duplicateId;
+                $manifest['candidate_sets'][$duplicateId] = $duplicateCandidates;
+                return $manifest;
+            },
+        );
+
+        $result = $service->previewImport(
+            V2Harness::USER_ID,
+            V2Harness::LANGUAGE,
+            V2Harness::CHAPTER_ID,
+            array_map(fn (array $package) => V2Harness::importPart($package), $packages),
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_DUPLICATE_OCCURRENCE_ID, $result['error_code']);
     }
 
     public function test_part_two_and_later_reject_sentence_translations(): void
     {
-        $this->pendingBatchSeam('part_index >= 2 requires sentence_translations === []; only part 1 owns the full chapter translation set.');
+        $service = $this->serviceForCount(51, $catalog);
+        $packages = V2Harness::packages($service);
+        $parts = [];
+        foreach ($packages as $index => $package) {
+            $payload = V2Harness::aiPayload($package);
+            if ($index === 1) {
+                $payload['sentence_translations'] = [[
+                    'sentence_index' => 0,
+                    'source_text' => 'Harness sentence.',
+                    'translation_zh' => '不应由第二部分携带',
+                ]];
+            }
+            $parts[] = V2Harness::importPart($package, $payload);
+        }
+
+        $result = $service->previewImport(V2Harness::USER_ID, V2Harness::LANGUAGE, V2Harness::CHAPTER_ID, $parts);
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_TRANSLATION_SET_MISMATCH, $result['error_code']);
     }
 
-    public function test_mixed_source_revision_or_package_metadata_is_rejected(): void
+    public function test_stale_source_revision_in_manifest_is_rejected(): void
     {
-        $this->pendingBatchSeam('All parts must validate their authenticated package metadata and share the expected current source_revision; mixed/stale metadata fails closed.');
-    }
-
-    public function test_complete_part_set_merges_all_targets_for_one_atomic_chapter_save(): void
-    {
-        $this->pendingBatchSeam('After all parts parse and validate, merge in memory to the exact target set and perform one atomic chapter-assist confirm/save; no per-part partial save.');
-    }
-
-    private function pendingBatchSeam(string $assertion): never
-    {
-        $this->markTestIncomplete(
-            'PENDING_INTEGRATION_RUN: Backend Core package/merge seam is absent from the Lane 3 baseline. Required assertion: ' . $assertion
+        $service = $this->serviceForCount(51, $catalog);
+        $packages = V2Harness::packages($service);
+        $packages[1]['manifest_token'] = V2Harness::mutateManifestToken(
+            $packages[1]['manifest_token'],
+            function (array $manifest): array {
+                $manifest['source_revision'] = 'sha256:stale';
+                return $manifest;
+            },
         );
+
+        $parts = array_map(fn (array $package) => V2Harness::importPart($package), $packages);
+        $result = $service->previewImport(V2Harness::USER_ID, V2Harness::LANGUAGE, V2Harness::CHAPTER_ID, $parts);
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_STALE_SOURCE, $result['error_code']);
+    }
+
+    public function test_candidate_scope_change_invalidates_stale_manifest(): void
+    {
+        $catalog = V2Harness::catalog(1, [0 => [111]]);
+        $service = V2Harness::service(function () use (&$catalog) {
+            return $catalog;
+        });
+        $package = V2Harness::packages($service)[0];
+
+        $catalog = V2Harness::catalog(1, [0 => [222]]);
+        $result = $service->previewImport(
+            V2Harness::USER_ID,
+            V2Harness::LANGUAGE,
+            V2Harness::CHAPTER_ID,
+            [V2Harness::importPart($package)],
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_CANDIDATE_MISMATCH, $result['error_code']);
+    }
+
+    public function test_complete_part_set_merges_every_target_exactly_once_in_memory(): void
+    {
+        $service = $this->serviceForCount(101, $catalog);
+        $packages = V2Harness::packages($service);
+        $parts = array_map(fn (array $package) => V2Harness::importPart($package), $packages);
+
+        $result = $service->previewImport(V2Harness::USER_ID, V2Harness::LANGUAGE, V2Harness::CHAPTER_ID, $parts);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(3, $result['items']['part_count']);
+        $this->assertCount(3, $result['items']['package_ids']);
+        $this->assertCount(101, $result['items']['word_results']);
+        $this->assertSame(101, count(array_unique(array_column($result['items']['word_results'], 'occurrence_id'))));
+        $this->assertSame(101, $result['summary']['word_target_count']);
     }
 }

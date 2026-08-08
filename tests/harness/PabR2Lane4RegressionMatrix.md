@@ -1,124 +1,98 @@
-# PAB R2 Lane 4 Regression Matrix
+# PAB R3 Integration Regression Matrix
 
-Purpose: handoff from Lane 3 Safety Harness to the single Integration/Browser owner. Lane 3 does not run shared-testing-DB Feature tests or browser writes.
+Purpose: hand off the R3 executable harness to the single Integration owner. This Harness lane does not run shared-testing-DB tests, migrations, or browser writes.
 
-## 1. Pure / parallel-safe gate first
+## 1. Required-suite rule
 
-Run before any testing-DB ownership is acquired:
+A zero exit code alone is insufficient. Every required suite must execute real tests/assertions. Any unexpected `incomplete`, `skipped`, `pending`, `No tests found`, or zero-assertion result is a gate failure.
 
-- `php -l tests/Fixtures/ai-assist-v2/v2-payloads.php`
-- `php -l tests/Unit/AiReadingAssistV1CompatParserTest.php`
-- `php -l tests/Unit/AiReadingAssistV2StrictParserTest.php`
-- `php -l tests/Unit/AiReadingAssistV2CandidateOwnershipTest.php`
-- `php -l tests/Unit/AiReadingAssistV2BatchingTest.php`
-- `php -l tests/Feature/AiReadingAssistV2WriteBoundaryTest.php`
-- `php -l tests/Feature/ReadingReviewSettlementContractTest.php`
-- `php -l tests/Feature/ReadingReviewSourceUndoAnalyticsTest.php`
-- `node tests/js/AiReadingAssistV1CompatibilityGuard.test.mjs`
-- `node tests/js/PhaseAReviewWriteSurfaceGuard.test.mjs`
-- `node tests/js/PhaseBFormalRatingWriteSurfaceGuard.test.mjs`
-- `node tests/js/ReadingRatingSourceContractGuard.test.mjs`
-- `git diff --check`
+Run the meta gate from a worktree with normal Composer dependencies available:
 
-Expected before Backend Core merge:
+- parallel-safe: `node tests/harness/run-pab-r3-required-suites.mjs`
+- after acquiring the exclusive testing-DB lease: `node tests/harness/run-pab-r3-required-suites.mjs --integration`
 
-- V1 parser/compatibility guards: GREEN.
-- Phase A/B mutation-surface baseline guards: GREEN when no forbidden path exists.
-- V2 service-dependent Unit tests: RED/PENDING until the concrete Backend Core seam exists.
-- `ReadingRatingSourceContractGuard`: intentionally RED until `reading_passive` and `reading_explicit` are registered by Backend Core in both formal-rating and undo source authorities.
+The runner includes the actual V2 strict/batching seams, DB ownership/write boundaries, true process/barrier concurrency, unfamiliar-snapshot optimistic conflict, undo/analytics, and all static source guards.
 
-## 2. Exclusive testing DB — Phase A
+## 2. Parallel-safe checks before DB ownership
 
-Acquire the single shared testing-DB owner. Run serially; never in parallel with another Lane.
+Run first:
 
-New contract suites:
+- `php -l` over every changed R3 PHP test/support file;
+- `node --check tests/harness/run-pab-r3-required-suites.mjs`;
+- `node tests/js/AiReadingAssistV1CompatibilityGuard.test.mjs`;
+- `node tests/js/PhaseAReviewWriteSurfaceGuard.test.mjs`;
+- `node tests/js/PhaseBFormalRatingWriteSurfaceGuard.test.mjs`;
+- `node tests/js/ReadingRatingSourceContractGuard.test.mjs`;
+- `git diff --check`.
 
-- `AiReadingAssistV2StrictParserTest`
-- `AiReadingAssistV2CandidateOwnershipTest`
-- `AiReadingAssistV2BatchingTest`
-- `AiReadingAssistV2WriteBoundaryTest`
+Required pure PHP suites once `vendor/` is present:
 
-Existing V1 regression suites:
+- `AiReadingAssistV1CompatParserTest`;
+- `AiReadingAssistV2StrictParserTest`;
+- `AiReadingAssistV2BatchingTest`.
 
-- `AiReadingAssistPreviewTest`
-- `AiReadingAssistConfirmTest`
-- `AiReadingAssistCurrentTest`
-- `AiReadingAssistLookupTest`
-- `AiReadingAssistSentenceAlignmentTest`
+The R3 Phase A guard must resolve and scan the concrete production owners `AiReadingAssistV2Service`, `ReadingOccurrenceSenseEvidenceService`, and `ReadingUnfamiliarTargetService`. A missing owner is a hard failure.
 
-Required Phase A evidence:
+## 3. Exclusive testing DB — Phase A
 
-- strict V2 rejects code fences, prose and trailing-comma repair;
-- exact target/part/source/candidate ownership failures are fail-closed;
-- preview failure and preview success have zero business writes;
-- invalid confirm has zero partial writes;
-- valid confirm changes only the explicitly allowed raw-assist/evidence owners;
-- trust-high matched_existing can create binding evidence only;
-- medium/low/ambiguous/new_sense do not auto-bind or rate;
-- user evidence overrides trust_ai and is not overwritten by AI re-import;
-- ReviewLog count is unchanged through every Phase A path;
-- capture an existing sense card with `ReviewCardFsrsSnapshotService::capture()` before each trust/manual confirmation and assert the complete snapshot is unchanged afterward;
-- old numeric `confidence`, `auto_fsrs_allowed` and `bulkConfirmHighConfidence()` do not participate in V2 behavior;
-- V1 source/preview/confirm/current/lookup and sentence translations remain compatible.
+Acquire the official machine-global testing-DB lease and prove APP_ENV/testing sentinel before any DB-backed test. Run serially.
 
-## 3. Exclusive testing DB — Phase B
+Required suites:
 
-Run only after Phase A gates are green and Backend Core + Reader UX are integrated.
+- `AiReadingAssistV2CandidateOwnershipTest`;
+- `AiReadingAssistV2WriteBoundaryTest`;
+- `ReadingUnfamiliarTargetSnapshotConflictTest`;
+- existing V1 preview/confirm/current/lookup/sentence-alignment regressions.
 
-New contract suites:
+Required evidence:
 
-- `ReadingReviewSettlementContractTest`
-- `ReadingReviewSourceUndoAnalyticsTest`
+- strict V2 parser rejects repair/fuzzy input and numeric-string type drift;
+- candidate IDs are current, confirmed, same-user, same-language and server-scoped;
+- 20/49/50/51/100/101 target partitioning is exact; missing/duplicate/stale parts fail closed;
+- preview is zero-write and invalid confirm is atomic zero-write;
+- Trust AI changes only allowed assist/evidence state; medium/low/ambiguous/new-sense do not auto-bind or rate;
+- user evidence remains stronger than Trust AI;
+- every Phase A path leaves ReviewLog count and full ReviewCard FSRS snapshot unchanged;
+- changed source/target/candidate scope invalidates stale manifests;
+- stale whole-snapshot replacement is rejected and cannot erase newer user intent;
+- legacy numeric confidence / `auto_fsrs_allowed` paths do not become V2 formal-rating paths.
 
-Existing formal-writer / undo / analytics regression suites:
+Phase A is not green until all applicable assertions execute with zero unexpected incomplete/skip/pending.
 
-- `FsrsSchedulingServiceTest`
-- `ReviewFsrsTest`
-- `SenseReviewStackUndoTest`
-- `SenseReviewUndoneAnalyticsTest`
-- `SenseReviewUndoPolicyTest`
-- the relevant SenseReview analytics/report suites that consume `ReviewLog::FORMAL_RATING_SOURCES`
+## 4. Exclusive testing DB — Phase B
 
-Required Phase B evidence:
+Run only after Phase A is green and Backend + Reader candidates are integrated.
 
-- passive reliable/user-confirmed/trust-high single-sense evidence settles `Good` once with `source=reading_passive`;
-- ambiguous/new_sense/excluded/medium/low/opened/helped create zero passive rating;
-- explicit Again/Hard/Good/Easy writes exactly one `reading_explicit` log through the formal writer;
-- explicit rating suppresses passive Good for the same sense/session;
-- multiple occurrences of one sense collapse to one passive log per session;
-- finish retry is idempotent by server-side session/request/card identity;
-- a new reading session can rate the same sense again;
-- marked_unknown/new_sense remains zero-passive in the same reading;
+Required suites:
+
+- `ReadingReviewSettlementContractTest`;
+- `ReadingReviewConcurrencyContractTest`;
+- `ReadingReviewSourceUndoAnalyticsTest`;
+- existing FSRS writer, undo, and analytics regressions.
+
+Required evidence:
+
+- start/resume returns one current active session; a completed resume returns the stored completion result;
+- explicit Again/Hard/Good/Easy uses the canonical endpoint and produces one `reading_explicit` ReviewLog with exact before-snapshot;
+- sequential and true simultaneous duplicate explicit requests create one formal action/log;
+- preflight with unresolved=0 is still zero-write;
+- old `trust` settlement mode is rejected;
+- unresolved commit is zero-write;
+- true simultaneous Finish commits produce one completion, one legacy finish effect, at most one passive log/card;
+- explicit-vs-Finish, opened/helped-vs-Finish, evidence-correction-vs-Finish, and source-change-vs-Finish use real two-process barriers and admit only serialized terminal states;
+- explicit wins over passive when it is the recorded session action; opened/helped suppress passive;
+- same-sense multiple occurrences collapse to one passive Good per session; a truly new later session may rate again;
+- marked/newly-resolved same-reading items remain excluded;
 - cross-user/language/session replay fails closed;
-- no reading code calls `ReviewLog::create()` or `FsrsSchedulingService` directly outside `ReviewCardService`;
-- both reading sources are in the formal-rating source registry and the undo policy;
-- undo restores the complete before snapshot, retains the original ReviewLog, sets `undone_at`, and never invents a redo rating;
-- product analytics includes active reading ratings and excludes undone reading ratings via `notUndone` / equivalent centralized query behavior.
+- reading formal sources remain in `ReviewLog::FORMAL_RATING_SOURCES` and `SenseReviewUndoPolicy`; analytics consume centralized formal-source/not-undone semantics;
+- undo restores the complete before-card snapshot and retains the audit ReviewLog.
 
-## 4. Browser gate — only after all automated gates are green
+The concurrency suite deliberately uses `proc_open` workers released by a parent `go` barrier. Sequential calls do not count as concurrency evidence.
 
-Use one sentinel-bound `APP_ENV=testing` server tied to the exclusive testing DB. Real browser only; API/fetch cannot substitute for the UI actions.
+## 5. Browser gate
 
-Phase A:
+Only after all automated Phase A and Phase B gates are green, use one sentinel-bound APP_ENV=testing server and a real browser. Preserve the Frozen Contract’s desktop/430/390 Reader flows, refresh recovery pointer, ambiguous Finish-response recovery, candidate filtering/new-sense continuation, preflight summary, retry/idempotency, undo, Console, Network, and DB evidence requirements.
 
-- explicit unknown marking remains distinct from ordinary lookup/open;
-- V2 source/copy/import/preview/confirm flow;
-- strict invalid JSON and stale/mismatched package error UX;
-- verification list states for matched/new/ambiguous and high/medium/low;
-- Trust AI only auto-verifies eligible high matched_existing;
-- Finish Reading is not blocked by unresolved Phase A items;
-- ReviewLog count and pre-existing ReviewCard FSRS snapshot unchanged.
+## 6. Stop line
 
-Phase B:
-
-- passive read + Finish Reading produces only eligible Good ratings;
-- opened/helped and explicitly reviewed occurrences suppress passive Good;
-- explicit Again/Hard/Good/Easy works from Reader and produces the correct source;
-- double-click/retry/finish retry creates no duplicate rating;
-- same-sense multiple occurrences create one passive rating per session;
-- undo of a reading rating visibly restores the prior card state and keeps the audit action;
-- Console has no blocking error; Network shows only expected local requests; no external AI provider call is introduced by this harness.
-
-## 5. Stop line
-
-Lane 4 may report `PHASE_A_AND_B_ACCEPTED` only when every applicable Phase A and Phase B automated + real-browser gate is green. If Phase B remains red/pending, use `PHASE_A_ACCEPTED_PHASE_B_INCOMPLETE` or a lower conclusion. Do not enter Phase C.
+Integration may accept Phase A first. It may accept Phase B only after every applicable DB/concurrency/browser gate is green. It must not enter Phase C automatically. Any missing dependency, non-executed required suite, unexpected incomplete/skip/pending, or unavailable browser/DB evidence must remain explicitly incomplete rather than being converted to a pass.

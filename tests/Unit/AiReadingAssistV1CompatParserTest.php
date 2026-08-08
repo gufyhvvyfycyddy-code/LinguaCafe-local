@@ -3,7 +3,8 @@
 namespace Tests\Unit;
 
 use App\Services\AiReadingAssistService;
-use Tests\TestCase;
+use App\Services\AiReadingAssistV2Service;
+use PHPUnit\Framework\TestCase;
 
 /**
  * V1 宽松 JSON 解析兼容护栏（Phase A5 / V1 compatibility）。
@@ -23,7 +24,13 @@ class AiReadingAssistV1CompatParserTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->service = app(AiReadingAssistService::class);
+        $this->service = new AiReadingAssistService(\Mockery::mock(AiReadingAssistV2Service::class));
+    }
+
+    protected function tearDown(): void
+    {
+        \Mockery::close();
+        parent::tearDown();
     }
 
     private function v1Payload(): array

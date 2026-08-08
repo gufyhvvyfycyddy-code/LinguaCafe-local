@@ -1,7 +1,7 @@
 // Phase A review write-surface guard (static).
 // 冻结语义：Phase A（AI Reading Assist V2 preview/confirm + evidence）绝不写 ReviewLog/ReviewCard/FSRS；
 // 不触达 legacy bulkConfirmHighConfidence / numeric confidence threshold / auto_fsrs_allowed（AC §J, SH:514-529）。
-// V2 生产文件由 Lane1 落地；文件不存在时 guard 保持通过并输出等待说明（Lane4 重跑后持续生效）。
+// R3 guard 必须解析出全部具体 production owner；任一 owner 缺失都直接失败。
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -39,27 +39,34 @@ for (const pattern of forbidden) {
     assert.doesNotMatch(v1Source, pattern, `AiReadingAssistService.php must not ${pattern}`);
 }
 
-// 2) 未来 Phase A owner 文件（Lane1 落地后生效）
+// 2) Phase A production owners. These are the concrete R2/R3 seams.
+const phaseAOwnerNames = new Set([
+    'AiReadingAssistV2Service.php',
+    'ReadingOccurrenceSenseEvidenceService.php',
+    'ReadingUnfamiliarTargetService.php',
+]);
 const phaseACandidates = listFiles(appServices).filter((p) =>
-    /AiReadingAssistV2ContractService\.php$/.test(p) ||
-    /ReadingOccurrenceSenseEvidenceService\.php$/.test(p)
+    phaseAOwnerNames.has(p.split(/[\\/]/).at(-1))
 );
-if (phaseACandidates.length === 0) {
-    console.log('PhaseAReviewWriteSurfaceGuard: V2/evidence services not yet present (Lane1 pending); guard idle.');
-} else {
-    for (const file of phaseACandidates) {
-        const source = readFileSync(file, 'utf8');
-        for (const pattern of forbidden) {
-            assert.doesNotMatch(source, pattern, `${file} must not ${pattern}`);
-        }
-        // 三层存储边界（AC §1.7）：evidence owner 绝不 import FSRS writer
-        if (file.endsWith('ReadingOccurrenceSenseEvidenceService.php')) {
-            assert.doesNotMatch(source, /ReviewCardService/);
-            assert.doesNotMatch(source, /FsrsSchedulingService/);
-        }
+const resolvedPhaseAOwnerNames = phaseACandidates
+    .map((p) => p.split(/[\\/]/).at(-1))
+    .sort();
+assert.deepEqual(
+    resolvedPhaseAOwnerNames,
+    [...phaseAOwnerNames].sort(),
+    'PhaseAReviewWriteSurfaceGuard must resolve exactly the concrete Phase A service owners',
+);
+for (const file of phaseACandidates) {
+    const source = readFileSync(file, 'utf8');
+    for (const pattern of forbidden) {
+        assert.doesNotMatch(source, pattern, `${file} must not ${pattern}`);
     }
-    console.log(`PhaseAReviewWriteSurfaceGuard: checked ${phaseACandidates.length} Phase A service file(s).`);
+    if (file.endsWith('ReadingOccurrenceSenseEvidenceService.php')) {
+        assert.doesNotMatch(source, /ReviewCardService/);
+        assert.doesNotMatch(source, /FsrsSchedulingService/);
+    }
 }
+console.log(`PhaseAReviewWriteSurfaceGuard: checked ${phaseACandidates.length} concrete Phase A service owner(s).`);
 
 // 3) Reader 侧 AI assist UI 不得直接调用评分端点
 const readerAiAssistPath = join(root, 'resources/js/components/TextReader/TextReaderAiAssist.vue');
