@@ -5,6 +5,21 @@ use Tests\Support\TestingDatabaseLeaseException;
 
 require_once __DIR__.'/TestingDatabaseLease.php';
 
+function parseBoundedProbeHoldMs(string $value): int
+{
+    if ($value === ''
+        || ! ctype_digit($value)
+        || strlen($value) > 6
+        || (int) $value < 100
+        || (int) $value > 60_000
+    ) {
+        fwrite(STDERR, "LEASE_WORKER_HOLD_MS_INVALID\n");
+        exit(TestingDatabaseLease::EXIT_USAGE);
+    }
+
+    return (int) $value;
+}
+
 $operation = $argv[1] ?? '';
 $identity = $argv[2] ?? '';
 $baseDirectory = $argv[3] ?? '';
@@ -12,6 +27,32 @@ $baseDirectory = $baseDirectory !== '' ? $baseDirectory : null;
 $label = $argv[4] ?? 'worker';
 
 try {
+    if ($operation === 'project-probe-hold') {
+        $projectRoot = $argv[2] ?? '';
+        $databaseIdentifier = $argv[3] ?? '';
+        $leaseBaseDirectory = ($argv[4] ?? '') !== '' ? $argv[4] : null;
+        $projectLabel = $argv[5] ?? 'project-probe';
+        $maxHoldMs = parseBoundedProbeHoldMs($argv[6] ?? '');
+        $lease = TestingDatabaseLease::acquireOrInheritForProject(
+            $projectRoot,
+            label: $projectLabel,
+            databaseIdentifier: $databaseIdentifier,
+            leaseBaseDirectory: $leaseBaseDirectory,
+        );
+        fwrite(
+            STDOUT,
+            'READY '.(string) getmypid().' '.($lease->isInherited() ? 'INHERITED' : 'OWNED')."\n",
+        );
+        fflush(STDOUT);
+        $deadline = hrtime(true) + ($maxHoldMs * 1_000_000);
+        while (hrtime(true) < $deadline) {
+            usleep(50_000);
+        }
+        $lease->release();
+        fwrite(STDOUT, "EXPIRED\n");
+        exit(0);
+    }
+
     if ($operation === 'project-hold' || $operation === 'project-try') {
         $projectRoot = $argv[2] ?? '';
         $databaseIdentifier = $argv[3] ?? '';

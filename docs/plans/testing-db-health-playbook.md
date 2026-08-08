@@ -73,6 +73,15 @@ php tests/Support/run-with-testing-db-lease.php --status
 
 Do not run a testing server or testing database fixture command directly. The runner must acquire the lease before it starts the child process.
 
+For lease/crash diagnostics that deliberately keep a lease open, use the bounded testing-only probe instead of ad-hoc `php -r` holders:
+
+```bash
+php tests/Support/testing-db-lease-worker.php project-probe-hold \
+  <project-root> <logical-db-id> <temp-lease-base> <label> <max-hold-ms>
+```
+
+`max-hold-ms` is mandatory and limited to 100–60000 ms. The probe prints `READY <pid> OWNED|INHERITED`, self-releases at the deadline, prints `EXPIRED`, and exits. It does not connect to Laravel or MySQL. A parent task may terminate earlier, but the dead-man deadline ensures the probe cannot remain an independent lease owner for hours after its parent disappears.
+
 ### 3.2 If health check fails
 
 | Failure | Probable cause | Safe fix |
@@ -81,6 +90,7 @@ Do not run a testing server or testing database fixture command directly. The ru
 | `is not production database` | Testing DB = default DB | Ensure `.env.testing` overrides `DB_DATABASE` |
 | `migrations table does not exist` | Testing DB not initialized | `php artisan migrate --env=testing` |
 | `migrations are empty` | Migrations run but table empty | `php artisan migrate --env=testing` |
+| `active lease + old probe label + missing/dead parent` | A diagnostic holder outlived its task | Revalidate the exact PID, command, label, age, task ownership, and official `--status`. If it is a proven orphan, recover only that exact process. Never delete the lock file or infer staleness from metadata age alone. |
 
 ### 3.3 What NOT to do
 
@@ -90,6 +100,8 @@ Do not run a testing server or testing database fixture command directly. The ru
 - **Do NOT** bypass `run-with-testing-db-lease.php` for a testing server, migration check, fixture, sentinel, or browser-acceptance server
 - **Do NOT** treat a metadata PID as proof that a lease is active; only the OS lock is authoritative
 - **Do NOT** run two testing database writers at the same time; the second must fail fast or use an explicitly bounded wait
+- **Do NOT** create a live lease probe with direct `acquireForProject(...)` followed by an unbounded `while (true)` / equivalent infinite holder; use `project-probe-hold` with a finite deadline
+- **Do NOT** kill a lease owner from PID/age metadata alone, delete the `.lock` file, or steal an active OS lock; `flock` remains the ownership authority
 
 ### 3.4 How to report health check failure
 

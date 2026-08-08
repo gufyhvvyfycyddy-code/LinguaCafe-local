@@ -131,6 +131,159 @@ class TestingDatabaseLeaseProcessTest extends TestCase
         }
     }
 
+    public function test_bounded_project_probe_exits_after_parent_is_abnormally_terminated(): void
+    {
+        $fixture = $this->createGitWorktreeFixture();
+        $base = $this->temporaryDirectory('lease-parent-crash-');
+        $databaseIdentifier = 'bounded-parent-'.bin2hex(random_bytes(6));
+        $identity = TestingDatabaseLease::identityForProject(
+            $fixture['repository'],
+            $databaseIdentifier,
+        );
+        $parentCode = <<<'PHP'
+$worker = $argv[1] ?? '';
+$projectRoot = $argv[2] ?? '';
+$databaseIdentifier = $argv[3] ?? '';
+$baseDirectory = $argv[4] ?? '';
+$child = proc_open(
+    [
+        PHP_BINARY,
+        $worker,
+        'project-probe-hold',
+        $projectRoot,
+        $databaseIdentifier,
+        $baseDirectory,
+        'bounded-parent-probe',
+        '2000',
+    ],
+    [
+        0 => ['file', 'php://stdin', 'r'],
+        1 => ['file', 'php://stdout', 'w'],
+        2 => ['file', 'php://stderr', 'w'],
+    ],
+    $pipes,
+    getcwd(),
+    null,
+    ['bypass_shell' => true],
+);
+if (! is_resource($child)) {
+    fwrite(STDERR, "PARENT_CHILD_START_FAILED\n");
+    exit(70);
+}
+$deadline = hrtime(true) + 10_000_000_000;
+while (hrtime(true) < $deadline) {
+    usleep(50_000);
+}
+@proc_terminate($child);
+@proc_close($child);
+PHP;
+        $parent = $this->startProcess([
+            PHP_BINARY,
+            '-r',
+            $parentCode,
+            '--',
+            $this->worker,
+            $fixture['repository'],
+            $databaseIdentifier,
+            $base,
+        ], $this->environmentWithoutInheritance('testing'));
+
+        try {
+            $ready = $this->readLine($parent['pipes'][1], 10);
+            $this->assertMatchesRegularExpression('/^READY [0-9]+ OWNED$/', $ready);
+            $this->assertTrue(TestingDatabaseLease::statusIdentity($identity, $base)['active']);
+
+            $startedAt = hrtime(true);
+            proc_terminate($parent['process']);
+            $this->assertTrue($this->waitForProcessExit($parent['process'], 5));
+
+            $blocked = $this->runProcess([
+                PHP_BINARY,
+                $this->worker,
+                'try',
+                $identity,
+                $base,
+                'bounded-parent-blocked',
+            ], $this->environmentWithoutInheritance('testing'));
+            $this->assertSame(TestingDatabaseLease::EXIT_BUSY, $blocked['exit_code']);
+
+            $finished = $this->finishProcess($parent);
+            $parent = null;
+            $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+            $this->assertNotSame(0, $finished['exit_code']);
+            $this->assertStringContainsString('EXPIRED', $finished['stdout']);
+            $this->assertLessThan(5.0, $elapsedSeconds, 'Bounded probe outlived its dead-man deadline.');
+
+            $after = $this->runProcess([
+                PHP_BINARY,
+                $this->worker,
+                'try',
+                $identity,
+                $base,
+                'bounded-parent-after',
+            ], $this->environmentWithoutInheritance('testing'));
+            $this->assertSame(0, $after['exit_code'], $after['stderr']);
+            $this->assertStringContainsString('ACQUIRED', $after['stdout']);
+        } finally {
+            $this->terminateProcess($parent);
+            $deadline = hrtime(true) + 5_000_000_000;
+            while (TestingDatabaseLease::statusIdentity($identity, $base)['active']
+                && hrtime(true) < $deadline
+            ) {
+                usleep(50_000);
+            }
+            $this->removeDirectory($base);
+            $this->removeGitWorktreeFixture($fixture);
+        }
+    }
+
+    public function test_bounded_project_probe_rejects_missing_or_out_of_range_deadlines(): void
+    {
+        $base = $this->temporaryDirectory('lease-probe-deadline-');
+        $databaseIdentifier = 'bounded-deadline-'.bin2hex(random_bytes(6));
+
+        try {
+            foreach (['', '99', '60001', '9999999'] as $maxHoldMs) {
+                $command = [
+                    PHP_BINARY,
+                    $this->worker,
+                    'project-probe-hold',
+                    $this->root,
+                    $databaseIdentifier,
+                    $base,
+                    'deadline-guard',
+                ];
+                if ($maxHoldMs !== '') {
+                    $command[] = $maxHoldMs;
+                }
+                $result = $this->runProcess(
+                    $command,
+                    $this->environmentWithoutInheritance('testing'),
+                );
+                $this->assertSame(TestingDatabaseLease::EXIT_USAGE, $result['exit_code']);
+                $this->assertStringContainsString('LEASE_WORKER_HOLD_MS_INVALID', $result['stderr']);
+            }
+        } finally {
+            $this->removeDirectory($base);
+        }
+    }
+
+    public function test_testing_db_lease_worker_rejects_unbounded_holder_loops(): void
+    {
+        $source = file_get_contents($this->worker);
+        $this->assertIsString($source);
+        $normalized = preg_replace('/\s+/', '', $source);
+        $this->assertIsString($normalized);
+        $this->assertStringContainsString('project-probe-hold', $source);
+        foreach (['while(true)', 'while(1)', 'for(;;)'] as $unboundedLoop) {
+            $this->assertStringNotContainsString(
+                $unboundedLoop,
+                $normalized,
+                'testing-db-lease-worker.php must not contain an unconditional unbounded holder loop.',
+            );
+        }
+    }
+
     public function test_three_barrier_coordinated_competitors_produce_exactly_one_owner(): void
     {
         $base = $this->temporaryDirectory('lease-race-');

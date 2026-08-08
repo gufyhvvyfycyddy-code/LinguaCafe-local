@@ -72,6 +72,13 @@ active when the OS lock can be acquired.
 The runner is fail-fast by default. A caller may request a finite wait with
 `--wait-ms`; infinite waiting is not supported.
 
+Deliberate lease/crash diagnostics must use the testing-only bounded probe in
+`tests/Support/testing-db-lease-worker.php`. Its maximum hold duration is an
+explicit argument capped at 60 seconds. The probe may own the lease directly or
+inherit a runner-owned lease, and it self-releases when the deadline expires.
+Standalone `acquireForProject()` plus an unbounded holder loop is outside this
+contract.
+
 ### Parent and child ownership
 
 A runner child must not deadlock by trying to reacquire its parent's lease.
@@ -123,7 +130,9 @@ Stable runner exit codes:
   that bypass it remain unsafe and are a process violation.
 - Normal child exit, PHP exceptions, shutdown, handled Ctrl+C / Ctrl+Break, and catchable POSIX INT / TERM / HUP / QUIT paths are cleaned up by the runner. A child that ignores graceful termination is force-terminated after a bounded grace period. An uncatchable operating-system kill may
   release the lock before an independently running child is terminated; such
-  hard-kill behavior must not be used as the normal stop mechanism.
+  hard-kill behavior must not be used as the normal stop mechanism. Testing-only
+  lease/crash probe children additionally carry their own finite dead-man
+  deadline so a hard-killed parent cannot leave a probe running indefinitely.
 - `flock` semantics must be provided by the local filesystem. Network filesystems
   with incompatible locking are outside this local-development contract.
 
