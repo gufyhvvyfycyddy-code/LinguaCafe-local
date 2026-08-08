@@ -136,61 +136,28 @@ class TestingDatabaseLeaseProcessTest extends TestCase
         $fixture = $this->createGitWorktreeFixture();
         $base = $this->temporaryDirectory('lease-parent-crash-');
         $databaseIdentifier = 'bounded-parent-'.bin2hex(random_bytes(6));
+        $probeLabel = 'bounded-parent-probe-'.bin2hex(random_bytes(6));
+        $pidFile = $base.DIRECTORY_SEPARATOR.'probe.pid';
         $identity = TestingDatabaseLease::identityForProject(
             $fixture['repository'],
             $databaseIdentifier,
         );
-        $parentCode = <<<'PHP'
-$worker = $argv[1] ?? '';
-$projectRoot = $argv[2] ?? '';
-$databaseIdentifier = $argv[3] ?? '';
-$baseDirectory = $argv[4] ?? '';
-$child = proc_open(
-    [
-        PHP_BINARY,
-        $worker,
-        'project-probe-hold',
-        $projectRoot,
-        $databaseIdentifier,
-        $baseDirectory,
-        'bounded-parent-probe',
-        '2000',
-    ],
-    [
-        0 => ['file', 'php://stdin', 'r'],
-        1 => ['file', 'php://stdout', 'w'],
-        2 => ['file', 'php://stderr', 'w'],
-    ],
-    $pipes,
-    getcwd(),
-    null,
-    ['bypass_shell' => true],
-);
-if (! is_resource($child)) {
-    fwrite(STDERR, "PARENT_CHILD_START_FAILED\n");
-    exit(70);
-}
-$deadline = hrtime(true) + 10_000_000_000;
-while (hrtime(true) < $deadline) {
-    usleep(50_000);
-}
-@proc_terminate($child);
-@proc_close($child);
-PHP;
-        $parent = $this->startProcess([
-            PHP_BINARY,
-            '-r',
-            $parentCode,
-            '--',
-            $this->worker,
+        $parent = $this->startParentedProjectProbe(
             $fixture['repository'],
             $databaseIdentifier,
             $base,
-        ], $this->environmentWithoutInheritance('testing'));
+            $probeLabel,
+            2000,
+            $pidFile,
+        );
+        $probePid = null;
+        $probeFragments = ['project-probe-hold', $databaseIdentifier, $probeLabel];
 
         try {
+            $probePid = $this->waitForProbePid($pidFile, 5);
             $ready = $this->readLine($parent['pipes'][1], 10);
-            $this->assertMatchesRegularExpression('/^READY [0-9]+ OWNED$/', $ready);
+            $this->assertSame('READY '.$probePid.' OWNED', $ready);
+            $this->assertSame('match', $this->inspectExactProbe($probePid, $probeFragments));
             $this->assertTrue(TestingDatabaseLease::statusIdentity($identity, $base)['active']);
 
             $startedAt = hrtime(true);
@@ -207,12 +174,22 @@ PHP;
             ], $this->environmentWithoutInheritance('testing'));
             $this->assertSame(TestingDatabaseLease::EXIT_BUSY, $blocked['exit_code']);
 
-            $finished = $this->finishProcess($parent);
+            $finished = $this->finishProcess($parent, 1.0);
             $parent = null;
-            $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+            $this->assertFalse($finished['timed_out']);
             $this->assertNotSame(0, $finished['exit_code']);
-            $this->assertStringContainsString('EXPIRED', $finished['stdout']);
+
+            $expiredWithinDeadline = $this->waitForLeaseInactive($identity, $base, 4.0);
+            $cleanup = $expiredWithinDeadline
+                ? 'not-needed'
+                : $this->terminateExactProbe($probePid, $probeFragments);
+            $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+            $this->assertTrue(
+                $expiredWithinDeadline,
+                'Bounded probe exceeded its wall-clock deadline; exact cleanup='.$cleanup,
+            );
             $this->assertLessThan(5.0, $elapsedSeconds, 'Bounded probe outlived its dead-man deadline.');
+            $this->assertSame('absent', $this->inspectExactProbe($probePid, $probeFragments));
 
             $after = $this->runProcess([
                 PHP_BINARY,
@@ -226,12 +203,79 @@ PHP;
             $this->assertStringContainsString('ACQUIRED', $after['stdout']);
         } finally {
             $this->terminateProcess($parent);
-            $deadline = hrtime(true) + 5_000_000_000;
-            while (TestingDatabaseLease::statusIdentity($identity, $base)['active']
-                && hrtime(true) < $deadline
-            ) {
-                usleep(50_000);
+            if (is_int($probePid)) {
+                $this->terminateExactProbe($probePid, $probeFragments);
             }
+            $this->waitForLeaseInactive($identity, $base, 3.0);
+            $this->removeDirectory($base);
+            $this->removeGitWorktreeFixture($fixture);
+        }
+    }
+
+    public function test_process_harness_times_out_and_cleans_only_its_exact_probe_child(): void
+    {
+        $fixture = $this->createGitWorktreeFixture();
+        $base = $this->temporaryDirectory('lease-harness-timeout-');
+        $databaseIdentifier = 'harness-timeout-'.bin2hex(random_bytes(6));
+        $probeLabel = 'harness-timeout-probe-'.bin2hex(random_bytes(6));
+        $identity = TestingDatabaseLease::identityForProject(
+            $fixture['repository'],
+            $databaseIdentifier,
+        );
+        $probe = $this->startProcess([
+            PHP_BINARY,
+            $this->worker,
+            'project-probe-hold',
+            $fixture['repository'],
+            $databaseIdentifier,
+            $base,
+            $probeLabel,
+            '5000',
+        ], $this->environmentWithoutInheritance('testing'));
+        $probePid = null;
+        $probeFragments = ['project-probe-hold', $databaseIdentifier, $probeLabel];
+
+        try {
+            $ready = $this->readLine($probe['pipes'][1], 10);
+            $this->assertMatchesRegularExpression('/^READY [0-9]+ OWNED$/', $ready);
+            $parts = explode(' ', $ready);
+            $this->assertCount(3, $parts);
+            $probePid = (int) $parts[1];
+            $this->assertGreaterThan(0, $probePid);
+            $this->assertSame('match', $this->inspectExactProbe($probePid, $probeFragments));
+            $this->assertTrue(TestingDatabaseLease::statusIdentity($identity, $base)['active']);
+
+            $startedAt = hrtime(true);
+            $finished = $this->finishProcess(
+                $probe,
+                0.75,
+                fn (): string => $this->terminateExactProbe($probePid, $probeFragments),
+            );
+            $probe = null;
+            $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
+
+            $this->assertTrue($finished['timed_out'], 'The deliberate long-lived probe must hit the harness deadline.');
+            $this->assertSame('terminated', $finished['timeout_cleanup']);
+            $this->assertLessThan(3.0, $elapsedSeconds, 'Harness timeout/cleanup exceeded its fixed safety bound.');
+            $this->assertTrue($this->waitForLeaseInactive($identity, $base, 2.0));
+            $this->assertSame('absent', $this->inspectExactProbe($probePid, $probeFragments));
+
+            $after = $this->runProcess([
+                PHP_BINARY,
+                $this->worker,
+                'try',
+                $identity,
+                $base,
+                'harness-timeout-after',
+            ], $this->environmentWithoutInheritance('testing'));
+            $this->assertSame(0, $after['exit_code'], $after['stderr']);
+            $this->assertStringContainsString('ACQUIRED', $after['stdout']);
+        } finally {
+            $this->terminateProcess($probe);
+            if (is_int($probePid)) {
+                $this->terminateExactProbe($probePid, $probeFragments);
+            }
+            $this->waitForLeaseInactive($identity, $base, 3.0);
             $this->removeDirectory($base);
             $this->removeGitWorktreeFixture($fixture);
         }
@@ -956,37 +1000,463 @@ PHP;
     }
 
     /**
+     * @return array{process: resource, pipes: array<int, resource>}
+     */
+    private function startParentedProjectProbe(
+        string $projectRoot,
+        string $databaseIdentifier,
+        string $baseDirectory,
+        string $label,
+        int $maxHoldMs,
+        string $pidFile,
+    ): array {
+        $parentCode = <<<'PHP'
+$worker = $argv[1] ?? '';
+$projectRoot = $argv[2] ?? '';
+$databaseIdentifier = $argv[3] ?? '';
+$baseDirectory = $argv[4] ?? '';
+$label = $argv[5] ?? '';
+$maxHoldMs = $argv[6] ?? '';
+$pidFile = $argv[7] ?? '';
+$child = proc_open(
+    [
+        PHP_BINARY,
+        $worker,
+        'project-probe-hold',
+        $projectRoot,
+        $databaseIdentifier,
+        $baseDirectory,
+        $label,
+        $maxHoldMs,
+    ],
+    [
+        0 => ['file', 'php://stdin', 'r'],
+        1 => ['file', 'php://stdout', 'w'],
+        2 => ['file', 'php://stderr', 'w'],
+    ],
+    $pipes,
+    getcwd(),
+    null,
+    ['bypass_shell' => true],
+);
+if (! is_resource($child)) {
+    fwrite(STDERR, "PARENT_CHILD_START_FAILED\n");
+    exit(70);
+}
+$status = proc_get_status($child);
+$childPid = is_array($status) ? ($status['pid'] ?? null) : null;
+if (! is_int($childPid) || $childPid <= 0 || $pidFile === '') {
+    @proc_terminate($child, 9);
+    @proc_close($child);
+    fwrite(STDERR, "PARENT_CHILD_IDENTITY_FAILED\n");
+    exit(71);
+}
+$pidTemp = $pidFile.'.tmp-'.getmypid();
+if (file_put_contents($pidTemp, (string) $childPid."\n", LOCK_EX) === false
+    || ! @rename($pidTemp, $pidFile)
+) {
+    @unlink($pidTemp);
+    @proc_terminate($child, 9);
+    @proc_close($child);
+    fwrite(STDERR, "PARENT_CHILD_IDENTITY_FAILED\n");
+    exit(71);
+}
+$outerDeadline = hrtime(true) + (((int) $maxHoldMs + 5000) * 1_000_000);
+while (hrtime(true) < $outerDeadline) {
+    $status = proc_get_status($child);
+    if (! is_array($status) || ! ($status['running'] ?? false)) {
+        @proc_close($child);
+        exit(0);
+    }
+    usleep(50_000);
+}
+@proc_terminate($child);
+$killDeadline = hrtime(true) + 1_000_000_000;
+do {
+    $status = proc_get_status($child);
+    if (! is_array($status) || ! ($status['running'] ?? false)) {
+        break;
+    }
+    usleep(50_000);
+} while (hrtime(true) < $killDeadline);
+$status = proc_get_status($child);
+if (is_array($status) && ($status['running'] ?? false)) {
+    @proc_terminate($child, 9);
+}
+@proc_close($child);
+PHP;
+
+        return $this->startProcess([
+            PHP_BINARY,
+            '-r',
+            $parentCode,
+            '--',
+            $this->worker,
+            $projectRoot,
+            $databaseIdentifier,
+            $baseDirectory,
+            $label,
+            (string) $maxHoldMs,
+            $pidFile,
+        ], $this->environmentWithoutInheritance('testing'));
+    }
+
+    private function waitForProbePid(string $pidFile, int $timeoutSeconds): int
+    {
+        $deadline = hrtime(true) + ($timeoutSeconds * 1_000_000_000);
+        do {
+            if (is_file($pidFile)) {
+                $contents = trim((string) file_get_contents($pidFile));
+                if (ctype_digit($contents) && (int) $contents > 0) {
+                    return (int) $contents;
+                }
+            }
+            usleep(25_000);
+        } while (hrtime(true) < $deadline);
+
+        $this->fail('Timed out before the parent published the exact task-owned probe PID.');
+    }
+
+    /** @param list<string> $expectedFragments */
+    private function inspectExactProbe(int $pid, array $expectedFragments): string
+    {
+        if (PHP_OS_FAMILY === 'Windows') {
+            $fragmentLiterals = array_map(
+                static fn (string $fragment): string => "'".str_replace("'", "''", $fragment)."'",
+                $expectedFragments,
+            );
+            $script = '$TargetProcessId = '.$pid."\n"
+                .'$fragments = @('.implode(', ', $fragmentLiterals).")\n"
+                . <<<'POWERSHELL'
+$process = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $TargetProcessId) -ErrorAction SilentlyContinue
+if ($null -eq $process) {
+    Write-Output 'ABSENT'
+    exit 0
+}
+$commandLine = [string] $process.CommandLine
+foreach ($fragment in $fragments) {
+    if ([string]::IsNullOrEmpty($fragment) -or -not $commandLine.Contains($fragment)) {
+        Write-Output 'MISMATCH'
+        exit 0
+    }
+}
+Write-Output 'MATCH'
+POWERSHELL;
+            $result = $this->runProcess([
+                'powershell.exe',
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                $script,
+            ], null, 3.0);
+            if ($result['timed_out']) {
+                return 'inspection-timeout';
+            }
+
+            return strtolower(trim($result['stdout']));
+        }
+
+        $commandLine = null;
+        $procCommandLine = '/proc/'.$pid.'/cmdline';
+        if (is_readable($procCommandLine)) {
+            $contents = file_get_contents($procCommandLine);
+            if ($contents === false || $contents === '') {
+                return 'absent';
+            }
+            $commandLine = str_replace("\0", ' ', $contents);
+        } else {
+            $result = $this->runProcess(['ps', '-p', (string) $pid, '-o', 'command='], null, 2.0);
+            if ($result['timed_out']) {
+                return 'inspection-timeout';
+            }
+            if ($result['exit_code'] !== 0 || trim($result['stdout']) === '') {
+                return 'absent';
+            }
+            $commandLine = $result['stdout'];
+        }
+
+        foreach ($expectedFragments as $fragment) {
+            if ($fragment === '' || ! str_contains($commandLine, $fragment)) {
+                return 'mismatch';
+            }
+        }
+
+        return 'match';
+    }
+
+    /** @param list<string> $expectedFragments */
+    private function terminateExactProbe(int $pid, array $expectedFragments): string
+    {
+        $inspection = $this->inspectExactProbe($pid, $expectedFragments);
+        if ($inspection === 'absent') {
+            return 'absent';
+        }
+        if ($inspection !== 'match') {
+            return $inspection;
+        }
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $fragmentLiterals = array_map(
+                static fn (string $fragment): string => "'".str_replace("'", "''", $fragment)."'",
+                $expectedFragments,
+            );
+            $script = '$TargetProcessId = '.$pid."\n"
+                .'$fragments = @('.implode(', ', $fragmentLiterals).")\n"
+                . <<<'POWERSHELL'
+$info = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $TargetProcessId) -ErrorAction SilentlyContinue
+if ($null -eq $info) {
+    Write-Output 'ABSENT'
+    exit 0
+}
+$commandLine = [string] $info.CommandLine
+foreach ($fragment in $fragments) {
+    if ([string]::IsNullOrEmpty($fragment) -or -not $commandLine.Contains($fragment)) {
+        Write-Output 'MISMATCH'
+        exit 0
+    }
+}
+try {
+    $process = [System.Diagnostics.Process]::GetProcessById($TargetProcessId)
+    if ($process.HasExited) {
+        Write-Output 'ABSENT'
+        exit 0
+    }
+    $process.Kill()
+    if (-not $process.WaitForExit(2000)) {
+        Write-Output 'TERMINATION_TIMEOUT'
+        exit 0
+    }
+    Write-Output 'TERMINATED'
+} catch [System.ArgumentException] {
+    Write-Output 'ABSENT'
+}
+POWERSHELL;
+            $result = $this->runProcess([
+                'powershell.exe',
+                '-NoProfile',
+                '-NonInteractive',
+                '-Command',
+                $script,
+            ], null, 4.0);
+            if ($result['timed_out']) {
+                return 'termination-tool-timeout';
+            }
+
+            return strtolower(trim($result['stdout']));
+        }
+
+        if (function_exists('posix_kill')) {
+            $signal = defined('SIGKILL') ? SIGKILL : 9;
+            if (! @posix_kill($pid, $signal)) {
+                return $this->inspectExactProbe($pid, $expectedFragments) === 'absent'
+                    ? 'absent'
+                    : 'termination-failed';
+            }
+        } else {
+            $result = $this->runProcess(['kill', '-9', (string) $pid], null, 2.0);
+            if ($result['timed_out']) {
+                return 'termination-tool-timeout';
+            }
+        }
+
+        $deadline = hrtime(true) + 2_000_000_000;
+        do {
+            if ($this->inspectExactProbe($pid, $expectedFragments) === 'absent') {
+                return 'terminated';
+            }
+            usleep(25_000);
+        } while (hrtime(true) < $deadline);
+
+        return 'termination-timeout';
+    }
+
+    private function waitForLeaseInactive(string $identity, string $base, float $timeoutSeconds): bool
+    {
+        $deadline = hrtime(true) + max(1, (int) round($timeoutSeconds * 1_000_000_000));
+        do {
+            if (! TestingDatabaseLease::statusIdentity($identity, $base)['active']) {
+                return true;
+            }
+            usleep(25_000);
+        } while (hrtime(true) < $deadline);
+
+        return ! TestingDatabaseLease::statusIdentity($identity, $base)['active'];
+    }
+
+    /**
      * @param  list<string>  $command
      * @param  array<string, string>|null  $environment
-     * @return array{exit_code: int, stdout: string, stderr: string}
+     * @return array{exit_code: int, stdout: string, stderr: string, timed_out: bool, timeout_cleanup: ?string}
      */
-    private function runProcess(array $command, ?array $environment = null): array
-    {
-        $entry = $this->startProcess($command, $environment);
-        fclose($entry['pipes'][0]);
+    private function runProcess(
+        array $command,
+        ?array $environment = null,
+        float $timeoutSeconds = 15.0,
+    ): array {
+        $stdoutPath = tempnam(sys_get_temp_dir(), 'lease-stdout-');
+        $stderrPath = tempnam(sys_get_temp_dir(), 'lease-stderr-');
+        $this->assertIsString($stdoutPath);
+        $this->assertIsString($stderrPath);
+        $process = null;
+        $stdin = null;
+        $observedExitCode = null;
+        $timedOut = false;
 
-        return $this->finishProcess($entry);
+        try {
+            $process = proc_open(
+                $command,
+                [
+                    0 => ['pipe', 'r'],
+                    1 => ['file', $stdoutPath, 'w'],
+                    2 => ['file', $stderrPath, 'w'],
+                ],
+                $pipes,
+                $this->root,
+                $environment,
+                ['bypass_shell' => true],
+            );
+            $this->assertIsResource($process, 'Could not start lease process.');
+            $stdin = $pipes[0] ?? null;
+            if (is_resource($stdin)) {
+                fclose($stdin);
+                $stdin = null;
+            }
+
+            $deadline = hrtime(true) + max(1, (int) round($timeoutSeconds * 1_000_000_000));
+            do {
+                $status = proc_get_status($process);
+                if (is_array($status)
+                    && ! ($status['running'] ?? false)
+                    && is_int($status['exitcode'] ?? null)
+                    && $status['exitcode'] !== -1
+                ) {
+                    $observedExitCode = $status['exitcode'];
+                }
+                if (! is_array($status) || ! ($status['running'] ?? false)) {
+                    break;
+                }
+                if (hrtime(true) >= $deadline) {
+                    $timedOut = true;
+                    @proc_terminate($process);
+                    if (! $this->waitForProcessExit($process, 1)) {
+                        @proc_terminate($process, 9);
+                        $this->waitForProcessExit($process, 1);
+                    }
+                    break;
+                }
+                usleep(25_000);
+            } while (true);
+
+            $status = proc_get_status($process);
+            if (is_array($status)
+                && ! ($status['running'] ?? false)
+                && is_int($status['exitcode'] ?? null)
+                && $status['exitcode'] !== -1
+            ) {
+                $observedExitCode = $status['exitcode'];
+            }
+            $closeExitCode = proc_close($process);
+            $process = null;
+            $exitCode = $closeExitCode !== -1 ? $closeExitCode : ($observedExitCode ?? -1);
+            $stdout = (string) file_get_contents($stdoutPath);
+            $stderr = (string) file_get_contents($stderrPath);
+
+            return [
+                'exit_code' => $exitCode,
+                'stdout' => $stdout,
+                'stderr' => $stderr,
+                'timed_out' => $timedOut,
+                'timeout_cleanup' => null,
+            ];
+        } finally {
+            if (is_resource($stdin)) {
+                fclose($stdin);
+            }
+            if (is_resource($process)) {
+                @proc_terminate($process, 9);
+                if ($this->waitForProcessExit($process, 1)) {
+                    @proc_close($process);
+                }
+            }
+            @unlink($stdoutPath);
+            @unlink($stderrPath);
+        }
     }
 
     /**
      * @param  array{process: resource, pipes: array<int, resource>}  $entry
-     * @return array{exit_code: int, stdout: string, stderr: string}
+     * @param  (callable(): string)|null  $onTimeout
+     * @return array{exit_code: int, stdout: string, stderr: string, timed_out: bool, timeout_cleanup: ?string}
      */
-    private function finishProcess(array $entry): array
-    {
-        foreach ([1, 2] as $index) {
-            stream_set_blocking($entry['pipes'][$index], true);
+    private function finishProcess(
+        array $entry,
+        float $timeoutSeconds = 15.0,
+        ?callable $onTimeout = null,
+    ): array {
+        $deadline = hrtime(true) + max(1, (int) round($timeoutSeconds * 1_000_000_000));
+        $timedOut = false;
+        $timeoutCleanup = null;
+        $observedExitCode = null;
+
+        do {
+            $status = proc_get_status($entry['process']);
+            if (is_array($status)
+                && ! ($status['running'] ?? false)
+                && is_int($status['exitcode'] ?? null)
+                && $status['exitcode'] !== -1
+            ) {
+                $observedExitCode = $status['exitcode'];
+            }
+            if (! is_array($status) || ! ($status['running'] ?? false)) {
+                break;
+            }
+            if (hrtime(true) >= $deadline) {
+                $timedOut = true;
+                break;
+            }
+            usleep(25_000);
+        } while (true);
+
+        if ($timedOut && $onTimeout !== null) {
+            try {
+                $timeoutCleanup = $onTimeout();
+            } catch (\Throwable $error) {
+                $timeoutCleanup = 'cleanup-error:'.$error->getMessage();
+            }
         }
-        $stdout = stream_get_contents($entry['pipes'][1]);
-        $stderr = stream_get_contents($entry['pipes'][2]);
+
+        $status = proc_get_status($entry['process']);
+        if (is_array($status) && ($status['running'] ?? false)) {
+            @proc_terminate($entry['process']);
+            if (! $this->waitForProcessExit($entry['process'], 1)) {
+                @proc_terminate($entry['process'], 9);
+                $this->waitForProcessExit($entry['process'], 1);
+            }
+        }
+
         foreach ($entry['pipes'] as $pipe) {
             if (is_resource($pipe)) {
                 fclose($pipe);
             }
         }
-        $exitCode = proc_close($entry['process']);
+        $status = proc_get_status($entry['process']);
+        if (is_array($status)
+            && ! ($status['running'] ?? false)
+            && is_int($status['exitcode'] ?? null)
+            && $status['exitcode'] !== -1
+        ) {
+            $observedExitCode = $status['exitcode'];
+        }
+        $closeExitCode = proc_close($entry['process']);
+        $exitCode = $closeExitCode !== -1 ? $closeExitCode : ($observedExitCode ?? -1);
 
-        return ['exit_code' => $exitCode, 'stdout' => $stdout, 'stderr' => $stderr];
+        return [
+            'exit_code' => $exitCode,
+            'stdout' => '',
+            'stderr' => '',
+            'timed_out' => $timedOut,
+            'timeout_cleanup' => $timeoutCleanup,
+        ];
     }
 
     /** @param array{process: resource, pipes: array<int, resource>}|null $entry */
@@ -996,7 +1466,7 @@ PHP;
             return;
         }
         @proc_terminate($entry['process']);
-        $this->finishProcess($entry);
+        $this->finishProcess($entry, 2.0);
     }
 
     /** @param resource $process */
