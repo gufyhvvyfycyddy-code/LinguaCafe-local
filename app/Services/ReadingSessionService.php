@@ -402,6 +402,7 @@ class ReadingSessionService
         ReadingSessionInteraction $interaction,
     ): ReviewLog {
         $reviewLog = ReviewLog::query()
+            ->lockForUpdate()
             ->where('id', $interaction->review_log_id)
             ->where('user_id', $session->user_id)
             ->where('language_id', $session->language_id)
