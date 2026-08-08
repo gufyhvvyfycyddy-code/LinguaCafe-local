@@ -133,15 +133,15 @@ class SenseReviewController extends Controller
                         return $replay;
                     }
 
+                    $this->readingSessionService->assertNoActiveExplicitRating(
+                        $session,
+                        $reviewCardId,
+                    );
                     $context = $this->readingSessionService->lockExplicitRatingContext(
                         $userId,
                         $language,
                         $readingSessionId,
                         $occurrenceId,
-                        $reviewCardId,
-                    );
-                    $this->readingSessionService->assertNoActiveExplicitRating(
-                        $context['session'],
                         $reviewCardId,
                     );
 
