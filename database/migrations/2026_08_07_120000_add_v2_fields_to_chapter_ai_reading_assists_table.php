@@ -11,6 +11,7 @@ return new class extends Migration
         Schema::table('chapter_ai_reading_assists', function (Blueprint $table) {
             $table->string('source_revision', 80)->nullable()->after('schema_version');
             $table->string('payload_hash', 80)->nullable()->after('source_revision');
+            $table->string('target_scope_hash', 80)->nullable()->after('payload_hash');
             $table->longText('validated_payload')->nullable()->after('summary');
         });
     }
@@ -21,6 +22,7 @@ return new class extends Migration
             $table->dropColumn([
                 'source_revision',
                 'payload_hash',
+                'target_scope_hash',
                 'validated_payload',
             ]);
         });

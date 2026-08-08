@@ -21,6 +21,22 @@ class ReadingChapterTextService
         return $chapter;
     }
 
+    public function lockChapterForUser(int $userId, string $language, int $chapterId): Chapter
+    {
+        $chapter = Chapter::query()
+            ->lockForUpdate()
+            ->where('id', $chapterId)
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->first();
+
+        if (!$chapter) {
+            throw new \InvalidArgumentException('Chapter does not exist in the current user and language scope.');
+        }
+
+        return $chapter;
+    }
+
     public function resolveChapter(int $userId, string $language, int $chapterId): Chapter
     {
         return $this->chapterForUser($userId, $language, $chapterId);

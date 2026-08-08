@@ -33,6 +33,7 @@ return new class extends Migration
             $table->string('interaction_type', 32);
             $table->unsignedBigInteger('word_sense_id')->nullable();
             $table->unsignedBigInteger('review_card_id')->nullable();
+            $table->unsignedBigInteger('review_log_id')->nullable()->index();
             $table->json('metadata')->nullable();
             $table->timestamps();
 

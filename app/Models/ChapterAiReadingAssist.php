@@ -16,6 +16,7 @@ class ChapterAiReadingAssist extends Model
         'schema_version',
         'source_revision',
         'payload_hash',
+        'target_scope_hash',
         'sentence_translations',
         'vocabulary_items',
         'phrase_items',

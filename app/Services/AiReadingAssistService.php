@@ -24,6 +24,7 @@ class AiReadingAssistService
         int $chapterId,
         ?string $schemaVersion = null,
         ?array $expectedMarkedTargets = null,
+        ?string $expectedMarkedTargetsSnapshotVersion = null,
     ): array {
         if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
             return $this->aiReadingAssistV2Service->buildSourcePackages(
@@ -31,6 +32,7 @@ class AiReadingAssistService
                 $language,
                 $chapterId,
                 $expectedMarkedTargets,
+                $expectedMarkedTargetsSnapshotVersion,
             );
         }
 
@@ -242,6 +244,15 @@ class AiReadingAssistService
         if (!$record) {
             return [
                 'success' => true,
+                'vocabulary_suggestions' => [],
+                'phrase_suggestions' => [],
+            ];
+        }
+        if ($record->schema_version === AiReadingAssistV2Service::SCHEMA_VERSION
+            && !$this->aiReadingAssistV2Service->isRecordCurrent($userId, $language, $chapterId, $record)) {
+            return [
+                'success' => true,
+                'assist_stale' => true,
                 'vocabulary_suggestions' => [],
                 'phrase_suggestions' => [],
             ];

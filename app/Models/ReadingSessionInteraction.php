@@ -22,6 +22,7 @@ class ReadingSessionInteraction extends Model
         'interaction_type',
         'word_sense_id',
         'review_card_id',
+        'review_log_id',
         'metadata',
     ];
 
@@ -30,6 +31,7 @@ class ReadingSessionInteraction extends Model
         return [
             'word_sense_id' => 'integer',
             'review_card_id' => 'integer',
+            'review_log_id' => 'integer',
             'metadata' => 'array',
         ];
     }
