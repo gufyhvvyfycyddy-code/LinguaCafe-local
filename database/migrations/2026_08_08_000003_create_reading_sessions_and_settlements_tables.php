@@ -29,6 +29,7 @@ return new class extends Migration
             $table->unsignedBigInteger('user_id')->index();
             $table->string('language_id')->index();
             $table->string('interaction_key', 160);
+            $table->uuid('reading_action_id')->nullable();
             $table->string('occurrence_id', 80)->nullable();
             $table->string('interaction_type', 32);
             $table->unsignedBigInteger('word_sense_id')->nullable();
@@ -38,6 +39,11 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['reading_session_id', 'interaction_key'], 'reading_session_interaction_unique');
+            $table->unique(['reading_session_id', 'reading_action_id'], 'reading_session_action_id_unique');
+            $table->index(
+                ['reading_session_id', 'review_card_id', 'interaction_type'],
+                'reading_session_explicit_card_index'
+            );
         });
 
         Schema::create('reading_session_card_settlements', function (Blueprint $table) {

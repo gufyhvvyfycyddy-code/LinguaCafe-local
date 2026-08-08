@@ -18,6 +18,7 @@ class ReadingSessionInteraction extends Model
         'user_id',
         'language_id',
         'interaction_key',
+        'reading_action_id',
         'occurrence_id',
         'interaction_type',
         'word_sense_id',

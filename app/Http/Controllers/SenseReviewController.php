@@ -74,6 +74,7 @@ class SenseReviewController extends Controller
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
             'reading_session_id' => ['nullable', 'string', 'uuid'],
             'occurrence_id' => ['nullable', 'string'],
+            'reading_action_id' => ['nullable', 'string', 'uuid'],
         ]);
 
         $userId = Auth::user()->id;
@@ -83,9 +84,14 @@ class SenseReviewController extends Controller
         $reviewDurationMs = $request->post('review_duration_ms');
         $readingSessionId = $request->post('reading_session_id');
         $occurrenceId = $request->post('occurrence_id');
+        $readingActionId = $request->post('reading_action_id');
 
-        if (($readingSessionId && !$occurrenceId) || (!$readingSessionId && $occurrenceId)) {
-            abort(422, 'reading_session_id and occurrence_id must be provided together.');
+        $hasReadingContext = $readingSessionId !== null
+            || $occurrenceId !== null
+            || $readingActionId !== null;
+        if ($hasReadingContext
+            && ($readingSessionId === null || $occurrenceId === null || $readingActionId === null)) {
+            abort(422, 'reading_session_id, occurrence_id, and reading_action_id must be provided together.');
         }
 
         $card = null;
@@ -111,8 +117,22 @@ class SenseReviewController extends Controller
                     $reviewCardId,
                     $rating,
                     $reviewDurationMs,
-                    $ignoreDailyLimits
+                    $ignoreDailyLimits,
+                    $readingActionId
                 ) {
+                    $session = $this->readingSessionService->lockOwnedSessionForExplicitAction(
+                        $userId,
+                        $language,
+                        $readingSessionId,
+                    );
+                    $replay = $this->readingSessionService->explicitRatingReplay(
+                        $session,
+                        $readingActionId,
+                    );
+                    if ($replay !== null) {
+                        return $replay;
+                    }
+
                     $context = $this->readingSessionService->lockExplicitRatingContext(
                         $userId,
                         $language,
@@ -120,10 +140,10 @@ class SenseReviewController extends Controller
                         $occurrenceId,
                         $reviewCardId,
                     );
-                    $replay = $this->readingSessionService->explicitRatingReplay($context['session'], $reviewCardId);
-                    if ($replay !== null) {
-                        return $replay;
-                    }
+                    $this->readingSessionService->assertNoActiveExplicitRating(
+                        $context['session'],
+                        $reviewCardId,
+                    );
 
                     $reviewed = $this->reviewCardService->recordReviewWithLog(
                         $userId,
@@ -140,6 +160,7 @@ class SenseReviewController extends Controller
                         $reviewed['card'],
                         $reviewed['review_log'],
                         $ignoreDailyLimits,
+                        $readingActionId,
                     );
                     $this->readingSessionService->recordExplicitRatingLocked(
                         $context['session'],
@@ -147,6 +168,7 @@ class SenseReviewController extends Controller
                         (int) $context['review_card']->id,
                         (int) $context['sense']->id,
                         (int) $reviewed['review_log']->id,
+                        $readingActionId,
                         $payload,
                     );
 
@@ -204,6 +226,7 @@ class SenseReviewController extends Controller
         ReviewCard $updatedCard,
         ReviewLog $latestLog,
         bool $ignoreDailyLimits,
+        string $readingActionId,
     ): array {
         $action = [
             'review_log_id' => $latestLog->id,
@@ -211,6 +234,7 @@ class SenseReviewController extends Controller
             'rating' => $latestLog->rating,
             'rating_label' => $this->ratingContract->labelFor($latestLog->rating),
             'reviewed_at' => $latestLog->reviewed_at?->toIso8601String(),
+            'reading_action_id' => $readingActionId,
             'undoable' => $latestLog->before_card_snapshot !== null
                 && $latestLog->review_session_id !== null
                 && $latestLog->undone_at === null,
@@ -235,6 +259,8 @@ class SenseReviewController extends Controller
             \App\Services\ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH => 409,
             \App\Services\ReadingSessionService::ERROR_SESSION_STALE_SOURCE => 409,
             \App\Services\ReadingSessionService::ERROR_OCCURRENCE_STALE => 409,
+            \App\Services\ReadingSessionService::ERROR_EXPLICIT_ACTION_UNDONE => 409,
+            \App\Services\ReadingSessionService::ERROR_EXPLICIT_ACTION_ACTIVE => 409,
             \App\Services\ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
         ];
         if (!isset($statuses[$code])) {

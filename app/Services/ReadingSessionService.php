@@ -6,6 +6,7 @@ use App\Models\ReadingSession;
 use App\Models\ReadingSessionCompletion;
 use App\Models\ReadingSessionInteraction;
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Models\WordSense;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -18,6 +19,8 @@ class ReadingSessionService
     public const ERROR_SESSION_CHAPTER_MISMATCH = 'READING_SESSION_CHAPTER_MISMATCH';
     public const ERROR_SESSION_STALE_SOURCE = 'READING_SESSION_STALE_SOURCE';
     public const ERROR_OCCURRENCE_STALE = 'READING_OCCURRENCE_STALE';
+    public const ERROR_EXPLICIT_ACTION_UNDONE = 'READING_EXPLICIT_ACTION_UNDONE';
+    public const ERROR_EXPLICIT_ACTION_ACTIVE = 'READING_EXPLICIT_ACTION_ACTIVE';
     public const ERROR_EXPLICIT_CONTEXT_INVALID = 'READING_EXPLICIT_CONTEXT_INVALID';
 
     public function __construct(
@@ -135,12 +138,11 @@ class ReadingSessionService
         return $session;
     }
 
-    public function lockActiveSessionContext(
+    public function lockOwnedSessionForExplicitAction(
         int $userId,
         string $language,
         string $sessionId,
-        ?int $chapterId = null,
-    ): array {
+    ): ReadingSession {
         $session = ReadingSession::query()
             ->lockForUpdate()
             ->where('uuid', $sessionId)
@@ -150,6 +152,17 @@ class ReadingSessionService
         if (!$session) {
             throw new \InvalidArgumentException(self::ERROR_SESSION_NOT_FOUND);
         }
+
+        return $session;
+    }
+
+    public function lockActiveSessionContext(
+        int $userId,
+        string $language,
+        string $sessionId,
+        ?int $chapterId = null,
+    ): array {
+        $session = $this->lockOwnedSessionForExplicitAction($userId, $language, $sessionId);
         if ($chapterId !== null && (int) $session->chapter_id !== $chapterId) {
             throw new \InvalidArgumentException(self::ERROR_SESSION_CHAPTER_MISMATCH);
         }
@@ -290,18 +303,25 @@ class ReadingSessionService
         ];
     }
 
-    public function explicitRatingReplay(ReadingSession $session, int $reviewCardId): ?array
-    {
+    public function explicitRatingReplay(
+        ReadingSession $session,
+        string $readingActionId,
+    ): ?array {
         $interaction = ReadingSessionInteraction::query()
-            ->lockForUpdate()
             ->where('reading_session_id', $session->id)
-            ->where('interaction_key', ReadingSessionInteraction::TYPE_EXPLICIT_RATED . ':' . $reviewCardId)
+            ->where('reading_action_id', $readingActionId)
             ->first();
         if (!$interaction) {
             return null;
         }
-        if (!$interaction->review_log_id) {
+        if ($interaction->interaction_type !== ReadingSessionInteraction::TYPE_EXPLICIT_RATED
+            || !$interaction->review_log_id) {
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+
+        $reviewLog = $this->explicitReviewLogForInteraction($session, $interaction);
+        if ($reviewLog->undone_at !== null) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_UNDONE);
         }
 
         $metadata = is_array($interaction->metadata) ? $interaction->metadata : [];
@@ -312,28 +332,53 @@ class ReadingSessionService
         return $metadata['response_payload'];
     }
 
+    public function assertNoActiveExplicitRating(
+        ReadingSession $session,
+        int $reviewCardId,
+    ): void {
+        $previousActions = ReadingSessionInteraction::query()
+            ->where('reading_session_id', $session->id)
+            ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
+            ->where('review_card_id', $reviewCardId)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($previousActions as $previousAction) {
+            if (!$previousAction->review_log_id) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+            }
+
+            $reviewLog = $this->explicitReviewLogForInteraction($session, $previousAction);
+            if ($reviewLog->undone_at === null) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_ACTIVE);
+            }
+        }
+    }
+
     public function recordExplicitRatingLocked(
         ReadingSession $session,
         array $target,
         int $reviewCardId,
         int $wordSenseId,
         int $reviewLogId,
+        string $readingActionId,
         array $responsePayload,
     ): ReadingSessionInteraction {
-        $interactionKey = ReadingSessionInteraction::TYPE_EXPLICIT_RATED . ':' . $reviewCardId;
-        $interaction = ReadingSessionInteraction::query()
+        $existing = ReadingSessionInteraction::query()
             ->where('reading_session_id', $session->id)
-            ->where('interaction_key', $interactionKey)
+            ->where('reading_action_id', $readingActionId)
             ->first();
-        if (!$interaction) {
-            $interaction = new ReadingSessionInteraction();
-            $interaction->reading_session_id = $session->id;
-            $interaction->interaction_key = $interactionKey;
+        if ($existing) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
         }
 
+        $interaction = new ReadingSessionInteraction();
+        $interaction->reading_session_id = $session->id;
+        $interaction->interaction_key = ReadingSessionInteraction::TYPE_EXPLICIT_RATED . ':action:' . $readingActionId;
         $interaction->fill([
             'user_id' => $session->user_id,
             'language_id' => $session->language_id,
+            'reading_action_id' => $readingActionId,
             'occurrence_id' => $target['occurrence_id'],
             'interaction_type' => ReadingSessionInteraction::TYPE_EXPLICIT_RATED,
             'word_sense_id' => $wordSenseId,
@@ -343,12 +388,32 @@ class ReadingSessionService
                 'chapter_id' => $session->chapter_id,
                 'source_revision' => $session->source_revision,
                 'sentence_index' => $target['sentence_index'],
+                'reading_action_id' => $readingActionId,
                 'response_payload' => $responsePayload,
             ],
         ]);
         $interaction->save();
 
         return $interaction;
+    }
+
+    private function explicitReviewLogForInteraction(
+        ReadingSession $session,
+        ReadingSessionInteraction $interaction,
+    ): ReviewLog {
+        $reviewLog = ReviewLog::query()
+            ->where('id', $interaction->review_log_id)
+            ->where('user_id', $session->user_id)
+            ->where('language_id', $session->language_id)
+            ->where('review_card_id', $interaction->review_card_id)
+            ->where('review_session_id', $session->uuid)
+            ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
+            ->first();
+        if (!$reviewLog) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+
+        return $reviewLog;
     }
 
     public function interactionSummary(ReadingSession $session): array
