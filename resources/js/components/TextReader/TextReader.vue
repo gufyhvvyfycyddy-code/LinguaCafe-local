@@ -369,19 +369,25 @@
         normalizeReadingSenseVerificationItems,
     } from './../../services/ReadingSenseVerificationPolicy';
     import {
+        buildReaderExplicitRatingActionCommand,
         buildReaderFinishRequest,
         buildReadingInteractionRequest,
+        clearReaderExplicitRatingRetry,
         clearReaderManualSenseContinuation,
         clearReadingSessionRecoveryId,
         createReaderRequestId,
         filterCandidatesToReadingTarget,
         findReadingTargetForOpenedSelection,
+        loadReaderExplicitRatingRetry,
         loadReaderManualSenseContinuation,
         loadReadingSessionRecoveryId,
         normalizeReaderEvidencePage,
         normalizeReaderFinishResult,
         normalizeReaderUnfamiliarSnapshot,
         normalizeReadingSessionResponse,
+        readerExplicitActionConflictCode,
+        readerExplicitRatingCommandMatchesSession,
+        saveReaderExplicitRatingRetry,
         saveReaderManualSenseContinuation,
         saveReadingSessionRecoveryId,
     } from './../../services/ReaderRecoveryPolicy';
@@ -561,6 +567,7 @@
                 this.bookName = data.bookName;
                 this.chapterId = data.chapterId;
                 this.pendingManualSenseContinuation = loadReaderManualSenseContinuation(this.chapterId);
+                this.inlineOutcomeUnknownCommand = loadReaderExplicitRatingRetry(this.chapterId);
                 this.wordCount = data.wordCount;
                 this.chapterName = data.chapterName;
                 this.bookId = data.bookId;
@@ -640,6 +647,61 @@
                     clearReaderManualSenseContinuation(this.chapterId);
                 }
             },
+            setInlineOutcomeUnknownCommand(command) {
+                if (!this.chapterId) {
+                    this.inlineOutcomeUnknownCommand = command || null;
+                    return Boolean(command);
+                }
+                if (!command) {
+                    this.inlineOutcomeUnknownCommand = null;
+                    clearReaderExplicitRatingRetry(this.chapterId);
+                    return true;
+                }
+                if (!saveReaderExplicitRatingRetry(this.chapterId, command)) {
+                    this.inlineOutcomeUnknownCommand = null;
+                    clearReaderExplicitRatingRetry(this.chapterId);
+                    return false;
+                }
+                this.inlineOutcomeUnknownCommand = command;
+                return true;
+            },
+            prepareInlineOfficialRatingCommand(command, readingActionId = '') {
+                if (!command || !command.reviewCardId || !command.payload || !this.readingSessionId || !this.readingSourceRevision) return null;
+                const identifiedCommand = { ...command, sourceRevision: this.readingSourceRevision };
+                if (!readerExplicitRatingCommandMatchesSession(
+                    identifiedCommand,
+                    this.readingSessionId,
+                    this.readingSourceRevision,
+                )) {
+                    this.inlineReviewError = '正式评分身份与当前服务器阅读会话不一致。已停止提交，请刷新当前词后重新选择。';
+                    return null;
+                }
+                const actionCommand = buildReaderExplicitRatingActionCommand(identifiedCommand, readingActionId);
+                if (!actionCommand) {
+                    this.inlineReviewError = '当前浏览器无法提供安全随机 UUID。已停止正式评分，避免使用可预测的动作编号。';
+                    this.setReaderNotice(this.inlineReviewError, 'warning');
+                    return null;
+                }
+                return actionCommand;
+            },
+            clearManualContinuationForRatingCommand(command) {
+                const continuation = this.pendingManualSenseContinuation;
+                const actionId = command && command.payload ? command.payload.reading_action_id : '';
+                if (continuation && continuation.readingActionId && continuation.readingActionId === actionId) {
+                    this.setPendingManualSenseContinuation(null);
+                }
+            },
+            releaseManualContinuationActionForRatingCommand(command) {
+                const continuation = this.pendingManualSenseContinuation;
+                const actionId = command && command.payload ? command.payload.reading_action_id : '';
+                if (continuation && continuation.readingActionId && continuation.readingActionId === actionId) {
+                    this.setPendingManualSenseContinuation({
+                        ...continuation,
+                        readingActionId: '',
+                        readingSessionId: '',
+                    });
+                }
+            },
             adoptActiveReadingSession(normalized) {
                 if (!normalized || normalized.completed || !normalized.readingSessionId) return false;
                 const previousSessionId = this.readingSessionId;
@@ -656,6 +718,21 @@
                 this.readingSourceStale = false;
                 this.readingTargets = normalized.targets;
                 saveReadingSessionRecoveryId(this.chapterId, normalized.readingSessionId);
+                if (this.inlineOutcomeUnknownCommand) {
+                    const retryPayload = this.inlineOutcomeUnknownCommand.payload || {};
+                    if (retryPayload.reading_session_id !== normalized.readingSessionId
+                        || this.inlineOutcomeUnknownCommand.sourceRevision !== normalized.sourceRevision) {
+                        this.setInlineOutcomeUnknownCommand(null);
+                        this.setReaderNotice('上一次结果未知的评分不属于当前服务器阅读会话，已停止自动重试。请重新打开词义后再评分。', 'warning');
+                    }
+                }
+                if (this.pendingManualSenseContinuation
+                    && this.pendingManualSenseContinuation.readingActionId
+                    && (this.pendingManualSenseContinuation.readingSessionId !== normalized.readingSessionId
+                        || this.pendingManualSenseContinuation.sourceRevision !== normalized.sourceRevision)) {
+                    this.setPendingManualSenseContinuation(null);
+                    this.setReaderNotice('上一次新增词义后的正式评分动作不属于当前服务器阅读会话，已停止续接。新词义仍由服务器保留，可重新打开后评分。', 'warning');
+                }
                 this.mergeReadingVerificationState();
                 return true;
             },
@@ -671,6 +748,10 @@
                 this.inlineReviewOccurrence = null;
                 this.inlineReviewCandidates = [];
                 this.inlineReviewDialog = false;
+                this.setInlineOutcomeUnknownCommand(null);
+                if (this.pendingManualSenseContinuation && this.pendingManualSenseContinuation.readingActionId) {
+                    this.setPendingManualSenseContinuation(null);
+                }
                 this.finishPreflight = null;
                 this.finishCommitDialog = false;
                 this.mergeReadingVerificationState();
@@ -757,6 +838,10 @@
                 this.readingSessionId = this.finishPreflight.readingSessionId || this.readingSessionId;
                 this.readingSourceRevision = this.finishPreflight.sourceRevision || this.readingSourceRevision;
                 clearReadingSessionRecoveryId(this.chapterId);
+                this.setInlineOutcomeUnknownCommand(null);
+                if (this.pendingManualSenseContinuation && this.pendingManualSenseContinuation.readingActionId) {
+                    this.setPendingManualSenseContinuation(null);
+                }
                 if (!this.leveledUpWordsAndPhrases) {
                     this.leveledUpWordsAndPhrases = { wordsAndPhrases: [], wordIds: [], phraseIds: [] };
                 }
@@ -1004,25 +1089,29 @@
                 if (this.inlineOutcomeUnknownCommand) {
                     return this.performInlineOfficialRating(this.inlineOutcomeUnknownCommand, true);
                 }
-                return this.performInlineOfficialRating(command, true);
+                const actionCommand = this.prepareInlineOfficialRatingCommand(command);
+                if (!actionCommand) return Promise.resolve(false);
+                return this.performInlineOfficialRating(actionCommand, true);
             },
             retryInlineOutcomeUnknownRating() {
                 if (!this.inlineOutcomeUnknownCommand) return Promise.resolve(false);
                 return this.performInlineOfficialRating(this.inlineOutcomeUnknownCommand, true);
             },
             performInlineOfficialRating(command, manageBusy = true) {
-                if (!command || !command.reviewCardId || !command.payload) return Promise.resolve(false);
+                if (!command || !command.reviewCardId || !command.payload || !command.payload.reading_action_id) return Promise.resolve(false);
+                if (!readerExplicitRatingCommandMatchesSession(command, this.readingSessionId, this.readingSourceRevision)) {
+                    this.setInlineOutcomeUnknownCommand(null);
+                    this.inlineReviewError = '这笔评分的恢复身份已经与当前服务器阅读会话不一致。已停止重试，请重新打开词义后评分。';
+                    return Promise.resolve(false);
+                }
                 if (manageBusy && this.inlineReviewBusy) return Promise.resolve(false);
                 if (manageBusy) this.inlineReviewBusy = true;
                 this.inlineReviewError = '';
                 return reviewApi.rateSenseCard(command.reviewCardId, command.payload)
                     .then((response) => {
                         const action = response.data && response.data.action ? response.data.action : null;
-                        this.inlineOutcomeUnknownCommand = null;
-                        if (this.pendingManualSenseContinuation
-                            && this.pendingManualSenseContinuation.occurrenceId === command.occurrenceId) {
-                            this.setPendingManualSenseContinuation(null);
-                        }
+                        this.setInlineOutcomeUnknownCommand(null);
+                        this.clearManualContinuationForRatingCommand(command);
                         this.inlineReviewDialog = false;
                         this.inlineReviewError = '';
                         if (action && action.review_log_id) {
@@ -1037,15 +1126,37 @@
                     })
                     .catch((error) => {
                         const status = error && error.response ? error.response.status : null;
-                        if (!error || !error.response || status >= 500) {
-                            this.inlineOutcomeUnknownCommand = command;
-                            this.inlineReviewError = '评分请求已经发出，但服务器结果暂时无法确认。当前评分和词义已锁定；请安全重试刚才这一笔，服务器会按阅读会话返回已完成结果，避免重复评分。';
+                        const code = error && error.response
+                            ? readerExplicitActionConflictCode(error.response.data || {})
+                            : '';
+                        if (code === 'READING_EXPLICIT_ACTION_UNDONE') {
+                            this.setInlineOutcomeUnknownCommand(null);
+                            this.releaseManualContinuationActionForRatingCommand(command);
+                            this.inlineReviewDialog = false;
+                            this.inlineReviewError = '服务器确认这笔旧评分动作已经撤销。旧动作编号不会再次评分；需要重新评分时请重新打开词义。';
+                            this.setReaderNotice(this.inlineReviewError, 'warning');
+                            this.refreshReadingSessionTargets();
+                        } else if (code === 'READING_EXPLICIT_ACTION_ACTIVE') {
+                            this.setInlineOutcomeUnknownCommand(null);
+                            this.clearManualContinuationForRatingCommand(command);
+                            this.inlineReviewDialog = false;
+                            this.inlineReviewError = '服务器确认当前卡片已有仍生效的阅读评分。页面已停止生成新的动作编号，请刷新对账后再决定是否撤销或重新评分。';
+                            this.setReaderNotice(this.inlineReviewError, 'warning');
+                            this.refreshReadingSessionTargets();
+                        } else if (!error || !error.response || status >= 500) {
+                            if (!this.setInlineOutcomeUnknownCommand(command)) {
+                                this.inlineReviewError = '评分结果未知，但当前页面无法安全保存这笔动作编号。已停止自动重试；请刷新本章让服务器对账。';
+                            } else {
+                                this.inlineReviewError = '评分请求已经发出，但服务器结果暂时无法确认。当前评分、词义和动作编号已锁定；刷新或重试都会复用刚才这一笔，避免重复评分。';
+                            }
                         } else if (status === 409 || status === 422) {
-                            this.inlineOutcomeUnknownCommand = null;
+                            this.setInlineOutcomeUnknownCommand(null);
+                            this.releaseManualContinuationActionForRatingCommand(command);
                             this.inlineReviewError = '服务器拒绝了这次评分：阅读会话、出现位置或词义候选已经变化。请刷新当前词后重新选择。';
                             this.refreshReadingSessionTargets();
                         } else {
-                            this.inlineOutcomeUnknownCommand = null;
+                            this.setInlineOutcomeUnknownCommand(null);
+                            this.clearManualContinuationForRatingCommand(command);
                             this.inlineReviewError = requestErrorMessage(error, '正式评分失败，请重试。');
                         }
                         return false;
@@ -1115,6 +1226,14 @@
             },
             continueManualSenseRating(continuation) {
                 if (!continuation || !continuation.senseId || !continuation.reviewCardId || !this.readingSessionId) return Promise.resolve(false);
+                if (continuation.sourceRevision && continuation.sourceRevision !== this.readingSourceRevision) {
+                    this.inlineReviewError = '新增词义后的评分续接属于旧文章版本。已停止续接，请刷新本章后重新打开这个词。';
+                    return Promise.resolve(false);
+                }
+                if (continuation.readingActionId && continuation.readingSessionId !== this.readingSessionId) {
+                    this.inlineReviewError = '新增词义后的评分动作属于另一阅读会话。已停止旧动作重试，请重新打开这个词后评分。';
+                    return Promise.resolve(false);
+                }
                 this.inlineReviewBusy = true;
                 this.inlineReviewError = '';
                 return axios.post('/chapters/' + this.chapterId + '/reading-occurrence-evidence', {
@@ -1136,7 +1255,7 @@
                             error.readerContinuationBlocked = true;
                             throw error;
                         }
-                        return this.performInlineOfficialRating({
+                        const actionCommand = this.prepareInlineOfficialRatingCommand({
                             reviewCardId: continuation.reviewCardId,
                             occurrenceId: continuation.occurrenceId,
                             payload: {
@@ -1144,11 +1263,14 @@
                                 reading_session_id: this.readingSessionId,
                                 occurrence_id: continuation.occurrenceId,
                             },
-                        }, false);
-                    })
-                    .then((success) => {
-                        if (success) this.setPendingManualSenseContinuation(null);
-                        return success;
+                        }, continuation.readingActionId || '');
+                        if (!actionCommand) return false;
+                        this.setPendingManualSenseContinuation({
+                            ...continuation,
+                            readingActionId: actionCommand.payload.reading_action_id,
+                            readingSessionId: actionCommand.payload.reading_session_id,
+                        });
+                        return this.performInlineOfficialRating(actionCommand, false);
                     })
                     .catch((error) => {
                         if (error && error.readerContinuationBlocked) {
@@ -1171,7 +1293,13 @@
                     this.inlineUndoSnackbar = { show: true, text: '服务器没有返回这次评分所属的会话身份，已停止撤销，避免撤销到别的阅读会话。' };
                     return;
                 }
-                if (!this.inlineUndoRequestId) this.inlineUndoRequestId = createReaderRequestId();
+                if (!this.inlineUndoRequestId) {
+                    this.inlineUndoRequestId = createReaderRequestId();
+                    if (!this.inlineUndoRequestId) {
+                        this.inlineUndoSnackbar = { show: true, text: '当前浏览器无法生成安全撤销请求编号。已停止撤销，请刷新后重试。' };
+                        return;
+                    }
+                }
                 this.inlineUndoBusy = true;
                 const requestId = this.inlineUndoRequestId;
                 return reviewApi.undoSenseReviewAction(action.review_log_id, {

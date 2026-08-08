@@ -3,18 +3,25 @@ import fs from 'node:fs';
 import test from 'node:test';
 
 import {
+    buildReaderExplicitRatingActionCommand,
     buildReaderFinishRequest,
     buildReadingInteractionRequest,
+    clearReaderExplicitRatingRetry,
     clearReaderManualSenseContinuation,
     clearReadingSessionRecoveryId,
+    createReaderActionId,
     filterCandidatesToReadingTarget,
     findReadingTargetForOpenedSelection,
+    loadReaderExplicitRatingRetry,
     loadReaderManualSenseContinuation,
     loadReadingSessionRecoveryId,
     normalizeReaderEvidencePage,
     normalizeReaderFinishResult,
     normalizeReaderUnfamiliarSnapshot,
     normalizeReadingSessionResponse,
+    readerExplicitActionConflictCode,
+    readerExplicitRatingCommandMatchesSession,
+    saveReaderExplicitRatingRetry,
     saveReaderManualSenseContinuation,
     saveReadingSessionRecoveryId,
 } from '../../resources/js/services/ReaderRecoveryPolicy.js';
@@ -235,6 +242,8 @@ test('manual-sense continuation survives a page refresh inside the chapter sessi
         reviewCardId: null,
         outcomeUnknown: true,
         sourceRevision: 'rev-1',
+        readingActionId: '',
+        readingSessionId: '',
         form: { pos: 'noun', sense_zh: '堤岸', sense_en: 'river bank' },
     });
     assert.equal(loadReaderManualSenseContinuation(43, storage), null);
@@ -258,4 +267,156 @@ test('production Reader restores and persists manual-sense continuation rather t
     assert.match(reader, /clearReaderManualSenseContinuation\(this\.chapterId\)/);
     assert.match(reader, /保护状态已保存在本章会话中/);
     assert.doesNotMatch(reader, /pendingManualSenseContinuation\.occurrenceId !== this\.inlineReviewOccurrence\.occurrence_id\)[\s\S]{0,120}pendingManualSenseContinuation = null/);
+});
+
+test('Reader action ids use secure browser randomness and fail closed without a secure source', () => {
+    const direct = 'ed45a9e1-f2fe-4a2f-97fc-9bf819f6f2c1';
+    assert.equal(createReaderActionId({ randomUUID: () => direct }), direct);
+
+    const fallback = createReaderActionId({
+        getRandomValues(bytes) {
+            for (let index = 0; index < bytes.length; index += 1) bytes[index] = index;
+            return bytes;
+        },
+    });
+    assert.match(fallback, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    assert.equal(createReaderActionId({}), '');
+
+    const sequence = [
+        'd69193d6-cf47-45d1-8ca5-e85b4007a090',
+        '3203554b-a6d6-4d52-9bb8-8c6c7301dd75',
+    ];
+    const sequenceSource = { randomUUID: () => sequence.shift() };
+    const firstActionId = createReaderActionId(sequenceSource);
+    const secondActionId = createReaderActionId(sequenceSource);
+    assert.notEqual(firstActionId, secondActionId);
+
+    const recovery = fs.readFileSync('resources/js/services/ReaderRecoveryPolicy.js', 'utf8');
+    assert.doesNotMatch(recovery, /Math\.random/);
+});
+
+test('explicit rating action preparation binds identity, reuses retries, and mints a new id for a new intent', () => {
+    const base = {
+        reviewCardId: 195,
+        wordSenseId: 95,
+        occurrenceId: 'occ-bank',
+        sourceRevision: 'rev-1',
+        payload: {
+            rating: 'hard',
+            reading_session_id: sessionPayload.reading_session_id,
+            occurrence_id: 'occ-bank',
+        },
+    };
+    assert.equal(readerExplicitRatingCommandMatchesSession(base, sessionPayload.reading_session_id, 'rev-1'), true);
+    assert.equal(readerExplicitRatingCommandMatchesSession(base, 'other-session', 'rev-1'), false);
+    assert.equal(readerExplicitRatingCommandMatchesSession(base, sessionPayload.reading_session_id, 'rev-2'), false);
+    assert.equal(readerExplicitRatingCommandMatchesSession({
+        ...base,
+        payload: { ...base.payload, occurrence_id: 'other-occurrence' },
+    }, sessionPayload.reading_session_id, 'rev-1'), false);
+
+    const actionIds = [
+        '5bf75efa-1b63-4b1a-907d-3f6019be0f13',
+        'dde353e8-54b2-4420-8cc0-4bcf78b5c83e',
+    ];
+    const cryptoSource = { randomUUID: () => actionIds.shift() };
+    const first = buildReaderExplicitRatingActionCommand(base, '', cryptoSource);
+    assert.equal(first.payload.reading_action_id, '5bf75efa-1b63-4b1a-907d-3f6019be0f13');
+
+    const exactRetry = buildReaderExplicitRatingActionCommand(first, '', {});
+    assert.deepEqual(exactRetry, first);
+    const recoveredRetry = buildReaderExplicitRatingActionCommand(base, first.payload.reading_action_id, {});
+    assert.equal(recoveredRetry.payload.reading_action_id, first.payload.reading_action_id);
+
+    const newIntent = buildReaderExplicitRatingActionCommand(base, '', cryptoSource);
+    assert.equal(newIntent.payload.reading_action_id, 'dde353e8-54b2-4420-8cc0-4bcf78b5c83e');
+    assert.notEqual(newIntent.payload.reading_action_id, first.payload.reading_action_id);
+    assert.equal(buildReaderExplicitRatingActionCommand(base, 'predictable-id', cryptoSource), null);
+});
+
+test('explicit action conflict parser recognizes only the two frozen fail-closed codes', () => {
+    assert.equal(readerExplicitActionConflictCode({ error_code: 'READING_EXPLICIT_ACTION_UNDONE' }), 'READING_EXPLICIT_ACTION_UNDONE');
+    assert.equal(readerExplicitActionConflictCode({ code: 'READING_EXPLICIT_ACTION_ACTIVE' }), 'READING_EXPLICIT_ACTION_ACTIVE');
+    assert.equal(readerExplicitActionConflictCode({ error_code: 'READING_SESSION_STALE_SOURCE' }), '');
+    assert.equal(readerExplicitActionConflictCode({}), '');
+});
+
+test('outcome-unknown explicit rating recovery preserves the exact action and semantic command across refresh', () => {
+    const storage = memoryStorage();
+    const command = {
+        reviewCardId: 195,
+        wordSenseId: 95,
+        occurrenceId: 'occ-bank',
+        sourceRevision: 'rev-1',
+        payload: {
+            rating: 'hard',
+            reading_session_id: sessionPayload.reading_session_id,
+            occurrence_id: 'occ-bank',
+            reading_action_id: '23cb8132-11db-43f7-a5c7-a5a52ae14d19',
+        },
+    };
+    assert.equal(saveReaderExplicitRatingRetry(42, command, storage), true);
+    assert.deepEqual(loadReaderExplicitRatingRetry(42, storage), command);
+    assert.equal(clearReaderExplicitRatingRetry(42, storage), true);
+    assert.equal(loadReaderExplicitRatingRetry(42, storage), null);
+});
+
+test('explicit retry storage fails closed when sessionStorage writes or clears throw', () => {
+    const command = {
+        reviewCardId: 195,
+        wordSenseId: 95,
+        occurrenceId: 'occ-bank',
+        sourceRevision: 'rev-1',
+        payload: {
+            rating: 'hard',
+            reading_session_id: sessionPayload.reading_session_id,
+            occurrence_id: 'occ-bank',
+            reading_action_id: '23cb8132-11db-43f7-a5c7-a5a52ae14d19',
+        },
+    };
+    assert.equal(saveReaderExplicitRatingRetry(42, command, {
+        setItem() { throw new Error('quota exceeded'); },
+    }), false);
+    assert.equal(clearReaderExplicitRatingRetry(42, {
+        removeItem() { throw new Error('storage unavailable'); },
+    }), false);
+});
+
+test('explicit rating recovery rejects missing or malformed action identity instead of minting a replacement', () => {
+    const storage = memoryStorage();
+    const base = {
+        reviewCardId: 195,
+        wordSenseId: 95,
+        occurrenceId: 'occ-bank',
+        sourceRevision: 'rev-1',
+        payload: {
+            rating: 'hard',
+            reading_session_id: sessionPayload.reading_session_id,
+            occurrence_id: 'occ-bank',
+        },
+    };
+    assert.equal(saveReaderExplicitRatingRetry(42, base, storage), false);
+    assert.equal(saveReaderExplicitRatingRetry(42, {
+        ...base,
+        payload: { ...base.payload, reading_action_id: 'predictable-id' },
+    }, storage), false);
+});
+
+test('manual-sense continuation keeps the formal action id only after formal rating has started', () => {
+    const storage = memoryStorage();
+    const continuation = {
+        occurrenceId: 'occ-bank',
+        rating: 'good',
+        senseId: 95,
+        reviewCardId: 195,
+        outcomeUnknown: false,
+        sourceRevision: 'rev-1',
+        readingActionId: '7bc5f158-414d-4b94-9824-b8910ddf2a2d',
+        readingSessionId: sessionPayload.reading_session_id,
+        form: { pos: 'noun', sense_zh: '河岸', sense_en: 'river bank' },
+    };
+    assert.equal(saveReaderManualSenseContinuation(42, continuation, storage), true);
+    assert.deepEqual(loadReaderManualSenseContinuation(42, storage), continuation);
+    assert.equal(saveReaderManualSenseContinuation(42, { ...continuation, readingSessionId: '' }, storage), false);
+    assert.equal(saveReaderManualSenseContinuation(42, { ...continuation, sourceRevision: '' }, storage), false);
 });
