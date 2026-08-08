@@ -390,6 +390,16 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
     }
 
+    public function test_opened_occurrence_alone_creates_zero_passive_rating(): void
+    {
+        [, $card, $target] = $this->addEligibleTarget();
+        $this->interactionSummary['opened_occurrence_ids'][$target['occurrence_id']] = true;
+
+        $this->finish('commit');
+
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
+    }
+
     public function test_explicit_rating_wins_over_passive_for_same_sense_session(): void
     {
         [$sense, $card] = $this->addEligibleTarget();
