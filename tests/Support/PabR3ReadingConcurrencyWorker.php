@@ -18,6 +18,7 @@ final class PabR3ReadingConcurrencyWorker
         return match ($operation) {
             'start-session' => self::startSession($payload),
             'explicit-rate' => self::explicitRate($payload),
+            'explicit-undo' => self::explicitUndo($payload),
             'finish-commit' => self::finishCommit($payload),
             'interaction' => self::interaction($payload),
             'user-evidence' => self::userEvidence($payload),
@@ -46,6 +47,7 @@ final class PabR3ReadingConcurrencyWorker
                 'rating' => (string) $payload['rating'],
                 'reading_session_id' => (string) $payload['reading_session_id'],
                 'occurrence_id' => (string) $payload['occurrence_id'],
+                'reading_action_id' => (string) $payload['reading_action_id'],
                 'ignoreDailyLimits' => true,
             ],
         );
@@ -55,6 +57,30 @@ final class PabR3ReadingConcurrencyWorker
 
         return [
             'operation' => 'explicit-rate',
+            'http_status' => $response->getStatusCode(),
+            'body' => $response->getData(true),
+        ];
+    }
+
+    private static function explicitUndo(array $payload): array
+    {
+        Auth::loginUsingId((int) $payload['user_id']);
+        $reviewLogId = (int) $payload['review_log_id'];
+        $request = Request::create(
+            '/reviews/senses/review-actions/'.$reviewLogId.'/undo',
+            'POST',
+            [
+                'review_session_id' => (string) $payload['review_session_id'],
+                'undo_request_id' => (string) $payload['undo_request_id'],
+                'source' => (string) ($payload['source'] ?? 'sense_review_snackbar'),
+            ],
+        );
+        $request->headers->set('Accept', 'application/json');
+
+        $response = app(SenseReviewController::class)->undo($reviewLogId, $request);
+
+        return [
+            'operation' => 'explicit-undo',
             'http_status' => $response->getStatusCode(),
             'body' => $response->getData(true),
         ];
