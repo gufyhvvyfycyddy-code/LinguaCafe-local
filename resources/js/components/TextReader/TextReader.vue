@@ -97,7 +97,8 @@
                     <v-btn
                         title="复习当前点开的词义"
                         icon
-                        :disabled="!inlineReviewOccurrence || !readingSessionId"
+                        :disabled="!inlineReviewOccurrence || !readingSessionId || inlineReviewIntentBusy"
+                        :loading="inlineReviewIntentBusy"
                         @click="startInlineReview"
                     ><v-icon :color="inlineReviewOccurrence ? 'primary' : ''">mdi-cards-outline</v-icon></v-btn>
                     <v-btn title="AI 阅读辅助" icon :disabled="readingSourceStale" @click="openAiAssistDialog"><v-icon>mdi-robot</v-icon></v-btn>
@@ -361,6 +362,12 @@
     import ReaderInlineSenseReviewDialog from './ReaderInlineSenseReviewDialog.vue';
     import { createReviewApiClient } from '../Review/ReviewApiClient.js';
     import {
+        awaitReaderInlineOpenedBarrier,
+        createReaderInlineReviewIntent,
+        readerInlineOpenedFailureMessage,
+        resolveReaderInteractionAttempt,
+    } from './../../services/ReaderInlineSenseReviewPolicy';
+    import {
         readerUnfamiliarTargetKey,
         readerUnfamiliarWordIndexes,
     } from './../../services/ReaderUnfamiliarTargetPolicy';
@@ -501,6 +508,7 @@
                 inlineReviewCandidates: [],
                 inlineReviewCandidatesLoading: false,
                 inlineReviewCandidatesError: '',
+                inlineReviewIntentBusy: false,
                 inlineReviewBusy: false,
                 inlineReviewError: '',
                 inlineOutcomeUnknownCommand: null,
@@ -970,27 +978,55 @@
             recordReadingInteraction(interactionType, occurrence) {
                 const occurrenceId = typeof occurrence === 'string' ? occurrence : (occurrence && occurrence.occurrence_id);
                 const sessionId = this.readingSessionId;
+                const sourceRevision = this.readingSourceRevision;
                 const payload = buildReadingInteractionRequest(sessionId, occurrenceId, interactionType);
                 if (!payload) return Promise.resolve(false);
                 const key = interactionType + ':' + occurrenceId;
                 const existing = this.readingInteractionEntries[key];
-                if (existing && existing.sessionId === sessionId && existing.status === 'acknowledged') return Promise.resolve(true);
-                if (existing && existing.sessionId === sessionId && existing.status === 'pending' && this.readingInteractionPromises[key]) {
-                    return this.readingInteractionPromises[key];
-                }
-                this.$set(this.readingInteractionEntries, key, { interactionType, occurrenceId, sessionId, status: 'pending' });
+                const attempt = resolveReaderInteractionAttempt(
+                    existing,
+                    sessionId,
+                    sourceRevision,
+                    this.readingInteractionPromises[key],
+                );
+                if (attempt.kind === 'acknowledged') return Promise.resolve(true);
+                if (attempt.kind === 'pending') return attempt.promise;
+                this.$set(this.readingInteractionEntries, key, {
+                    interactionType,
+                    occurrenceId,
+                    sessionId,
+                    sourceRevision,
+                    status: 'pending',
+                });
                 const promise = axios.post('/chapters/reading-sessions/interactions', payload)
                     .then(() => {
                         const current = this.readingInteractionEntries[key];
-                        if (current && current.sessionId === sessionId) {
-                            this.$set(this.readingInteractionEntries, key, { interactionType, occurrenceId, sessionId, status: 'acknowledged' });
+                        if (current && current.sessionId === sessionId && current.sourceRevision === sourceRevision) {
+                            this.$set(this.readingInteractionEntries, key, {
+                                interactionType,
+                                occurrenceId,
+                                sessionId,
+                                sourceRevision,
+                                status: 'acknowledged',
+                            });
                         }
-                        return this.readingSessionId === sessionId;
+                        return this.readingSessionId === sessionId && this.readingSourceRevision === sourceRevision;
                     })
-                    .catch(() => {
+                    .catch((error) => {
                         const current = this.readingInteractionEntries[key];
-                        if (current && current.sessionId === sessionId) {
-                            this.$set(this.readingInteractionEntries, key, { interactionType, occurrenceId, sessionId, status: 'failed' });
+                        const status = error && error.response ? error.response.status : null;
+                        const responseData = error && error.response && error.response.data ? error.response.data : {};
+                        const errorCode = responseData.error_code || responseData.code || '';
+                        if (current && current.sessionId === sessionId && current.sourceRevision === sourceRevision) {
+                            this.$set(this.readingInteractionEntries, key, {
+                                interactionType,
+                                occurrenceId,
+                                sessionId,
+                                sourceRevision,
+                                status: 'failed',
+                                errorCode,
+                                outcomeUnknown: !error || !error.response || status >= 500,
+                            });
                         }
                         return false;
                     })
@@ -1057,30 +1093,68 @@
                     .finally(() => { this.inlineReviewCandidatesLoading = false; });
             },
             startInlineReview() {
-                if (!this.readingSessionId || !this.inlineReviewOccurrence) return;
+                if (!this.readingSessionId || !this.inlineReviewOccurrence) return Promise.resolve(false);
+                if (this.inlineReviewIntentBusy) return Promise.resolve(false);
                 if (this.inlineOutcomeUnknownCommand
                     && this.inlineOutcomeUnknownCommand.occurrenceId !== this.inlineReviewOccurrence.occurrence_id) {
                     this.setReaderNotice('上一笔正式评分结果仍未知。请重新点回刚才的词安全重试，或刷新本章让服务器对账后再继续评分。', 'warning');
-                    return;
+                    return Promise.resolve(false);
                 }
                 if (this.inlineReviewCandidatesLoading) {
                     this.setReaderNotice('正在加载服务器确认的词义卡信息，请稍后再点一次复习。', 'info');
-                    return;
+                    return Promise.resolve(false);
                 }
                 if (this.inlineReviewCandidatesError) {
                     this.setReaderNotice(this.inlineReviewCandidatesError + ' 正在重试详情查询。', 'warning');
                     const target = this.inlineReviewOccurrence;
-                    this.loadInlineReviewCandidates(target).then(() => {
+                    return this.loadInlineReviewCandidates(target).then(() => {
                         if (!this.inlineReviewCandidatesError
                             && this.inlineReviewOccurrence
                             && this.inlineReviewOccurrence.occurrence_id === target.occurrence_id) {
-                            this.startInlineReview();
+                            return this.startInlineReview();
                         }
+                        return false;
                     });
-                    return;
                 }
+                const target = this.inlineReviewOccurrence;
+                const intent = createReaderInlineReviewIntent(
+                    this.readingSessionId,
+                    this.readingSourceRevision,
+                    target,
+                );
+                if (!intent) {
+                    this.setReaderNotice('当前阅读会话还没有可确认的词义复习身份，请刷新本章后重试。', 'warning');
+                    return Promise.resolve(false);
+                }
+                this.inlineReviewIntentBusy = true;
                 this.inlineReviewError = '';
-                this.inlineReviewDialog = true;
+                return awaitReaderInlineOpenedBarrier(
+                    intent,
+                    () => this.recordReadingInteraction('opened', target),
+                    () => createReaderInlineReviewIntent(
+                        this.readingSessionId,
+                        this.readingSourceRevision,
+                        this.inlineReviewOccurrence,
+                    ),
+                ).then((barrierResult) => {
+                    if (barrierResult === 'stale') {
+                        this.setReaderNotice('当前词、文章版本或阅读会话已经变化。已停止打开评分，请重新点词后再试。', 'warning');
+                        return false;
+                    }
+                    if (barrierResult !== 'acknowledged') {
+                        const entry = this.readingInteractionEntries['opened:' + intent.occurrenceId];
+                        if (entry && entry.errorCode === 'READING_SESSION_STALE_SOURCE') {
+                            this.invalidateStaleReadingSession();
+                            return false;
+                        }
+                        this.setReaderNotice(readerInlineOpenedFailureMessage(entry), 'warning');
+                        return false;
+                    }
+                    this.inlineReviewDialog = true;
+                    return true;
+                }).finally(() => {
+                    this.inlineReviewIntentBusy = false;
+                });
             },
             onInlineReviewReveal(occurrence) {
                 if (occurrence && occurrence.occurrence_id) this.recordReadingInteraction('helped', occurrence);

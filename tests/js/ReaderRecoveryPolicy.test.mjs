@@ -198,7 +198,9 @@ test('production Reader fails closed on stale source and scopes interaction ackn
     assert.match(reader, /code === 'READING_SESSION_STALE_SOURCE'[\s\S]{0,180}invalidateStaleReadingSession/);
     assert.match(reader, /文章内容已在服务器发生变化/);
     assert.match(reader, /const sessionId = this\.readingSessionId/);
-    assert.match(reader, /existing\.sessionId === sessionId/);
+    assert.match(reader, /const sourceRevision = this\.readingSourceRevision/);
+    assert.match(reader, /resolveReaderInteractionAttempt\(/);
+    assert.match(reader, /current\.sessionId === sessionId && current\.sourceRevision === sourceRevision/);
     assert.match(reader, /this\.readingInteractionPromises\[key\] === promise/);
     assert.match(reader, /allItems\.length !== expectedTotal/);
 });
