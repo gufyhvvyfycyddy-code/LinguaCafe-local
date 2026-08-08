@@ -24,6 +24,7 @@ use App\Services\ReviewCardFsrsSnapshotService;
 use App\Services\ReviewCardService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
@@ -40,6 +41,8 @@ class ReadingReviewConcurrencyContractTest extends TestCase
     private ReviewCard $card;
     private string $occurrenceId;
     private ReadingSession $session;
+    /** @var array<int, int> */
+    private array $extraUserIds = [];
 
     protected function setUp(): void
     {
@@ -101,21 +104,10 @@ class ReadingReviewConcurrencyContractTest extends TestCase
     protected function tearDown(): void
     {
         if ($this->user !== null) {
-            $userId = $this->user->id;
-            ReadingSessionCardSettlement::query()->where('user_id', $userId)->delete();
-            ReadingSessionCompletion::query()->where('user_id', $userId)->delete();
-            ReadingSessionInteraction::query()->where('user_id', $userId)->delete();
-            ReadingOccurrenceSenseEvidence::query()->where('user_id', $userId)->delete();
-            ReadingUnfamiliarTarget::query()->where('user_id', $userId)->delete();
-            ReviewLog::query()->where('user_id', $userId)->delete();
-            ReadingSession::query()->where('user_id', $userId)->delete();
-            ReviewCard::query()->where('user_id', $userId)->delete();
-            GoalAchievement::query()->where('user_id', $userId)->delete();
-            Goal::query()->where('user_id', $userId)->delete();
-            WordSense::query()->where('user_id', $userId)->delete();
-            Chapter::query()->where('user_id', $userId)->delete();
-            Book::query()->where('user_id', $userId)->delete();
-            User::query()->where('id', $userId)->delete();
+            $this->deleteTestUserData($this->user->id);
+        }
+        foreach ($this->extraUserIds as $userId) {
+            $this->deleteTestUserData($userId);
         }
         parent::tearDown();
     }
@@ -159,6 +151,113 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $this->assertSame($first->json('action.review_log_id'), $second->json('action.review_log_id'));
     }
 
+    public function test_explicit_rating_rejects_unrelated_owned_card_outside_current_occurrence_candidates(): void
+    {
+        $unrelatedSense = $this->makeSense('shore', '岸');
+        $unrelatedCard = app(ReviewCardService::class)->ensureSenseCard($unrelatedSense);
+        $this->activateCard($unrelatedCard);
+
+        $this->assertExplicitPairingRejected(
+            $unrelatedCard,
+            $this->occurrenceId,
+            422,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID,
+        );
+    }
+
+    public function test_explicit_rating_rejects_stale_non_current_occurrence_identity(): void
+    {
+        $this->assertExplicitPairingRejected(
+            $this->card,
+            'occ2_stale_non_current',
+            409,
+            ReadingSessionService::ERROR_OCCURRENCE_STALE,
+        );
+    }
+
+    public function test_explicit_rating_rejects_cross_user_card_pairing(): void
+    {
+        $foreignUser = User::forceCreate([
+            'name' => 'PAB R3 Foreign Rating Owner',
+            'email' => 'pab-r3-foreign-'.Str::uuid().'@example.test',
+            'password' => Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $this->extraUserIds[] = $foreignUser->id;
+        $foreignSense = $this->makeSense('bank', '外部用户词义', $foreignUser);
+        $foreignCard = app(ReviewCardService::class)->ensureSenseCard($foreignSense);
+        $this->activateCard($foreignCard);
+
+        $this->assertExplicitPairingRejected(
+            $foreignCard,
+            $this->occurrenceId,
+            422,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID,
+        );
+    }
+
+    public function test_explicit_rating_rejects_cross_language_card_pairing(): void
+    {
+        $foreignLanguageSense = $this->makeSense('bank', '德语词义', $this->user, 'german');
+        $foreignLanguageCard = app(ReviewCardService::class)->ensureSenseCard($foreignLanguageSense);
+        $this->activateCard($foreignLanguageCard);
+
+        $this->assertExplicitPairingRejected(
+            $foreignLanguageCard,
+            $this->occurrenceId,
+            422,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID,
+        );
+    }
+
+    public function test_explicit_outer_transaction_rolls_back_formal_rating_when_ledger_write_fails(): void
+    {
+        $snapshotService = app(ReviewCardFsrsSnapshotService::class);
+        $beforeSnapshot = $snapshotService->capture($this->card->fresh());
+        $beforeLogs = ReviewLog::where('review_card_id', $this->card->id)->count();
+        $beforeLedger = ReadingSessionInteraction::where('reading_session_id', $this->session->id)->count();
+        $catalog = app(ReadingTargetCatalogService::class)->build($this->user->id, 'english', $this->chapter->id);
+        $target = $catalog['targets_by_id'][$this->occurrenceId] ?? null;
+        $this->assertIsArray($target);
+
+        $originalSessionService = app(ReadingSessionService::class);
+        $sessionService = Mockery::mock(ReadingSessionService::class);
+        $sessionService->shouldReceive('lockExplicitRatingContext')->once()->andReturn([
+            'session' => $this->session,
+            'catalog' => $catalog,
+            'target' => $target,
+            'review_card' => $this->card,
+            'sense' => $this->sense,
+        ]);
+        $sessionService->shouldReceive('explicitRatingReplay')->once()->andReturn(null);
+        $sessionService->shouldReceive('recordExplicitRatingLocked')->once()->andThrow(
+            new RuntimeException('PAB_R3_EXPLICIT_LEDGER_ROLLBACK'),
+        );
+        $this->app->instance(ReadingSessionService::class, $sessionService);
+
+        $this->withoutExceptionHandling();
+        try {
+            $this->actingAs($this->user)->postJson('/reviews/senses/'.$this->card->id.'/rate', [
+                'rating' => 'hard',
+                'reading_session_id' => $this->session->uuid,
+                'occurrence_id' => $this->occurrenceId,
+                'ignoreDailyLimits' => true,
+            ]);
+            $this->fail('Injected explicit-ledger failure must escape the request and roll back the outer transaction.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('PAB_R3_EXPLICIT_LEDGER_ROLLBACK', $e->getMessage());
+        } finally {
+            $this->app->instance(ReadingSessionService::class, $originalSessionService);
+            $this->withExceptionHandling();
+        }
+
+        $this->assertTrue($snapshotService->matches($this->card->fresh(), $beforeSnapshot));
+        $this->assertSame($beforeLogs, ReviewLog::where('review_card_id', $this->card->id)->count());
+        $this->assertSame($beforeLedger, ReadingSessionInteraction::where('reading_session_id', $this->session->id)->count());
+    }
+
     public function test_true_concurrent_duplicate_explicit_rating_creates_one_formal_log(): void
     {
         $payload = $this->explicitWorkerPayload('good');
@@ -170,8 +269,8 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $this->assertAllWorkersSucceeded($results);
         $logs = ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->get();
         $this->assertCount(1, $logs);
-        $this->assertSame($logs[0]->id, $results[0]['json']['action']['review_log_id']);
-        $this->assertSame($logs[0]->id, $results[1]['json']['action']['review_log_id']);
+        $this->assertSame($logs[0]->id, $results[0]['json']['body']['action']['review_log_id']);
+        $this->assertSame($logs[0]->id, $results[1]['json']['body']['action']['review_log_id']);
     }
 
     public function test_true_concurrent_start_creates_one_current_active_session(): void
@@ -223,8 +322,26 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             ->whereIn('source', [ReviewLog::SOURCE_READING_EXPLICIT, ReviewLog::SOURCE_READING_PASSIVE])
             ->get();
         $this->assertCount(1, $logs, $this->workerDiagnostics($results));
-        $this->assertContains($logs[0]->source, [ReviewLog::SOURCE_READING_EXPLICIT, ReviewLog::SOURCE_READING_PASSIVE]);
-        $this->assertLessThanOrEqual(1, ReadingSessionCompletion::where('reading_session_id', $this->session->id)->count());
+
+        $explicitStatus = $results[0]['json']['http_status'];
+        if ($explicitStatus >= 200 && $explicitStatus < 300) {
+            $this->assertSame(ReviewLog::SOURCE_READING_EXPLICIT, $logs[0]->source, $this->workerDiagnostics($results));
+            $this->assertSame($logs[0]->id, $results[0]['json']['body']['action']['review_log_id']);
+            $this->assertSame(
+                0,
+                ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count(),
+                $this->workerDiagnostics($results),
+            );
+        } else {
+            $this->assertSame(409, $explicitStatus, $this->workerDiagnostics($results));
+            $this->assertSame(
+                ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+                $results[0]['json']['body']['error_code'] ?? null,
+                $this->workerDiagnostics($results),
+            );
+            $this->assertSame(ReviewLog::SOURCE_READING_PASSIVE, $logs[0]->source, $this->workerDiagnostics($results));
+            $this->assertSame(1, ReadingSessionCompletion::where('reading_session_id', $this->session->id)->count());
+        }
     }
 
     public function test_true_opened_vs_finish_race_has_no_impossible_opened_plus_passive_terminal_state(): void
@@ -318,12 +435,66 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         }
     }
 
-    private function makeSense(string $lemma, string $senseZh): WordSense
+    private function assertExplicitPairingRejected(
+        ReviewCard $card,
+        string $occurrenceId,
+        int $expectedStatus,
+        string $expectedErrorCode,
+    ): void {
+        $snapshotService = app(ReviewCardFsrsSnapshotService::class);
+        $beforeSnapshot = $snapshotService->capture($card->fresh());
+        $beforeLogs = ReviewLog::count();
+        $beforeLedger = ReadingSessionInteraction::query()
+            ->where('reading_session_id', $this->session->id)
+            ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
+            ->count();
+
+        $response = $this->actingAs($this->user)->postJson('/reviews/senses/'.$card->id.'/rate', [
+            'rating' => 'good',
+            'reading_session_id' => $this->session->uuid,
+            'occurrence_id' => $occurrenceId,
+            'ignoreDailyLimits' => true,
+        ]);
+
+        $response->assertStatus($expectedStatus)
+            ->assertJsonPath('success', false)
+            ->assertJsonPath('error_code', $expectedErrorCode);
+        $this->assertSame($beforeLogs, ReviewLog::count());
+        $this->assertTrue($snapshotService->matches($card->fresh(), $beforeSnapshot));
+        $this->assertSame(
+            $beforeLedger,
+            ReadingSessionInteraction::query()
+                ->where('reading_session_id', $this->session->id)
+                ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
+                ->count(),
+        );
+    }
+
+    private function activateCard(ReviewCard $card): ReviewCard
     {
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_due_at' => now(),
+            'fsrs_reps' => 0,
+            'fsrs_lapses' => 0,
+        ])->save();
+
+        return $card->fresh();
+    }
+
+    private function makeSense(
+        string $lemma,
+        string $senseZh,
+        ?User $owner = null,
+        string $language = 'english',
+    ): WordSense {
+        $owner ??= $this->user;
+
         return WordSense::forceCreate([
-            'user_id' => $this->user->id,
-            'language' => 'english',
-            'language_id' => 'english',
+            'user_id' => $owner->id,
+            'language' => $language,
+            'language_id' => $language,
             'lemma' => $lemma,
             'surface_form' => $lemma,
             'pos' => 'NOUN',
@@ -333,8 +504,26 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             'collocations' => [],
             'status' => WordSense::STATUS_CONFIRMED,
             'is_context_specific' => true,
-            'sense_key' => hash('sha256', $lemma.'|'.$senseZh.'|'.Str::uuid()),
+            'sense_key' => hash('sha256', $language.'|'.$lemma.'|'.$senseZh.'|'.Str::uuid()),
         ]);
+    }
+
+    private function deleteTestUserData(int $userId): void
+    {
+        ReadingSessionCardSettlement::query()->where('user_id', $userId)->delete();
+        ReadingSessionCompletion::query()->where('user_id', $userId)->delete();
+        ReadingSessionInteraction::query()->where('user_id', $userId)->delete();
+        ReadingOccurrenceSenseEvidence::query()->where('user_id', $userId)->delete();
+        ReadingUnfamiliarTarget::query()->where('user_id', $userId)->delete();
+        ReviewLog::query()->where('user_id', $userId)->delete();
+        ReadingSession::query()->where('user_id', $userId)->delete();
+        ReviewCard::query()->where('user_id', $userId)->delete();
+        GoalAchievement::query()->where('user_id', $userId)->delete();
+        Goal::query()->where('user_id', $userId)->delete();
+        WordSense::query()->where('user_id', $userId)->delete();
+        Chapter::query()->where('user_id', $userId)->delete();
+        Book::query()->where('user_id', $userId)->delete();
+        User::query()->where('id', $userId)->delete();
     }
 
     private function bindCurrentOccurrenceTo(WordSense $sense): void
@@ -468,7 +657,27 @@ PHP;
     {
         if ($result['exitCode'] === 0) {
             $this->assertIsArray($result['json'], $this->workerDiagnostics([$result]));
-            return;
+            if ($result['operation'] !== 'explicit-rate') {
+                return;
+            }
+
+            $this->assertSame('explicit-rate', $result['json']['operation'] ?? null, $this->workerDiagnostics([$result]));
+            $this->assertIsInt($result['json']['http_status'] ?? null, $this->workerDiagnostics([$result]));
+            $this->assertIsArray($result['json']['body'] ?? null, $this->workerDiagnostics([$result]));
+            $status = $result['json']['http_status'];
+            if ($status >= 200 && $status < 300) {
+                $this->assertIsArray($result['json']['body']['action'] ?? null, $this->workerDiagnostics([$result]));
+                $this->assertArrayHasKey('review_log_id', $result['json']['body']['action'], $this->workerDiagnostics([$result]));
+                return;
+            }
+
+            $errorCode = $result['json']['body']['error_code'] ?? null;
+            if (in_array($errorCode, $allowedErrors, true)) {
+                $this->addToAssertionCount(1);
+                return;
+            }
+
+            $this->fail('Unexpected explicit-rate HTTP/application outcome: '.$this->workerDiagnostics([$result]));
         }
 
         foreach ($allowedErrors as $allowedError) {

@@ -4,10 +4,13 @@ namespace Tests\Feature;
 
 use App\Models\Book;
 use App\Models\Chapter;
+use App\Models\Goal;
+use App\Models\GoalAchievement;
 use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\ReadingSession;
 use App\Models\ReadingSessionCardSettlement;
 use App\Models\ReadingSessionCompletion;
+use App\Models\ReadingUnfamiliarTarget;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
@@ -17,11 +20,13 @@ use App\Services\ReadingChapterTextService;
 use App\Services\ReadingFinishSettlementService;
 use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingSessionService;
+use App\Services\ReviewCardFsrsSnapshotService;
 use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
+use RuntimeException;
 use Tests\Support\PabR3AiReadingAssistV2Harness as V2Harness;
 use Tests\TestCase;
 
@@ -83,8 +88,10 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->service = $this->makeSettlementService();
     }
 
-    private function makeSettlementService(): ReadingFinishSettlementService
-    {
+    private function makeSettlementService(
+        ?ReviewCardService $cardService = null,
+        ?ChapterService $chapterService = null,
+    ): ReadingFinishSettlementService {
         $sessionService = Mockery::mock(ReadingSessionService::class);
         $sessionService->shouldReceive('resolveOwnedSession')->andReturnUsing(function (int $userId, string $language, string $uuid) {
             $session = ReadingSession::query()
@@ -106,36 +113,40 @@ class ReadingReviewSettlementContractTest extends TestCase
         $evidenceService->shouldReceive('currentEvidenceMap')->andReturnUsing(fn () => $this->evidenceMap);
         $evidenceService->shouldReceive('isCurrentConfirmedBinding')->andReturn(true);
 
-        $cardService = Mockery::mock(ReviewCardService::class);
-        $cardService->shouldReceive('recordReviewWithLog')->andReturnUsing(function (
-            int $userId,
-            string $language,
-            int $reviewCardId,
-            string $rating,
-            string $source,
-            ?string $reviewSessionId = null,
-            ...$rest
-        ) {
-            $this->formalWriteCount++;
-            $log = ReviewLog::forceCreate([
-                'user_id' => $userId,
-                'language_id' => $language,
-                'language' => $language,
-                'review_card_id' => $reviewCardId,
-                'rating' => $rating,
-                'reviewed_at' => now(),
-                'source' => $source,
-                'review_session_id' => $reviewSessionId,
-            ]);
-            return ['review_log' => $log, 'card' => ReviewCard::findOrFail($reviewCardId)];
-        });
+        if ($cardService === null) {
+            $cardService = Mockery::mock(ReviewCardService::class);
+            $cardService->shouldReceive('recordReviewWithLog')->andReturnUsing(function (
+                int $userId,
+                string $language,
+                int $reviewCardId,
+                string $rating,
+                string $source,
+                ?string $reviewSessionId = null,
+                ...$rest
+            ) {
+                $this->formalWriteCount++;
+                $log = ReviewLog::forceCreate([
+                    'user_id' => $userId,
+                    'language_id' => $language,
+                    'language' => $language,
+                    'review_card_id' => $reviewCardId,
+                    'rating' => $rating,
+                    'reviewed_at' => now(),
+                    'source' => $source,
+                    'review_session_id' => $reviewSessionId,
+                ]);
+                return ['review_log' => $log, 'card' => ReviewCard::findOrFail($reviewCardId)];
+            });
+        }
 
-        $chapterService = Mockery::mock(ChapterService::class);
-        $chapterService->shouldReceive('finishChapter')->andReturnUsing(function (...$args) {
-            $this->legacyFinishCount++;
-            $this->chapter->increment('read_count');
-            return true;
-        });
+        if ($chapterService === null) {
+            $chapterService = Mockery::mock(ChapterService::class);
+            $chapterService->shouldReceive('finishChapter')->andReturnUsing(function (...$args) {
+                $this->legacyFinishCount++;
+                $this->chapter->increment('read_count');
+                return true;
+            });
+        }
 
         return new ReadingFinishSettlementService($sessionService, $evidenceService, $cardService, $chapterService);
     }
@@ -321,6 +332,55 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(1, $this->legacyFinishCount);
     }
 
+    public function test_finish_outer_transaction_rolls_back_formal_rating_settlement_and_completion_when_late_finish_step_fails(): void
+    {
+        $sense = $this->makeSense('finish-rollback');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_due_at' => now(),
+        ])->save();
+        $this->addEligibleTarget('occ2_finish_rollback', 'passive_disambiguation', $sense);
+
+        $snapshotService = app(ReviewCardFsrsSnapshotService::class);
+        $beforeSnapshot = $snapshotService->capture($card->fresh());
+        $before = [
+            'logs' => ReviewLog::count(),
+            'settlements' => ReadingSessionCardSettlement::count(),
+            'completions' => ReadingSessionCompletion::count(),
+            'read_count' => $this->chapter->read_count,
+            'goals' => Goal::where('user_id', $this->user->id)->count(),
+            'goal_achievements' => GoalAchievement::where('user_id', $this->user->id)->count(),
+            'session_status' => $this->session->status,
+            'session_completed_at' => $this->session->completed_at,
+        ];
+
+        $throwingChapterService = Mockery::mock(ChapterService::class);
+        $throwingChapterService->shouldReceive('finishChapter')->once()->andThrow(
+            new RuntimeException('PAB_R3_FINISH_OUTER_ROLLBACK'),
+        );
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class), $throwingChapterService);
+
+        try {
+            $this->finish('commit');
+            $this->fail('Injected late Finish failure must roll back the whole outer transaction.');
+        } catch (RuntimeException $e) {
+            $this->assertSame('PAB_R3_FINISH_OUTER_ROLLBACK', $e->getMessage());
+        }
+
+        $this->assertTrue($snapshotService->matches($card->fresh(), $beforeSnapshot));
+        $this->assertSame($before['logs'], ReviewLog::count());
+        $this->assertSame($before['settlements'], ReadingSessionCardSettlement::count());
+        $this->assertSame($before['completions'], ReadingSessionCompletion::count());
+        $this->assertSame($before['read_count'], $this->chapter->fresh()->read_count);
+        $this->assertSame($before['goals'], Goal::where('user_id', $this->user->id)->count());
+        $this->assertSame($before['goal_achievements'], GoalAchievement::where('user_id', $this->user->id)->count());
+        $this->session->refresh();
+        $this->assertSame($before['session_status'], $this->session->status);
+        $this->assertEquals($before['session_completed_at'], $this->session->completed_at);
+    }
+
     public function test_opened_or_helped_occurrence_creates_zero_passive_rating(): void
     {
         [, $card, $target] = $this->addEligibleTarget();
@@ -348,13 +408,52 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
-    public function test_same_reading_marked_or_newly_resolved_target_has_zero_passive_good(): void
+    public function test_same_reading_new_marked_unknown_learning_state_has_zero_passive_good(): void
     {
-        [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_marked', 'marked_unknown');
+        [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_marked_new', 'marked_unknown');
+        $evidence->updated_at = $this->session->started_at->copy()->subMinute();
+        $this->evidenceMap[$target['occurrence_id']] = $evidence;
+        ReadingUnfamiliarTarget::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'source_revision' => V2Harness::SOURCE_REVISION,
+            'occurrence_id' => $target['occurrence_id'],
+            'kind' => 'word',
+            'start_word_index' => $target['start_word_index'],
+            'end_word_index' => $target['end_word_index'],
+            'sentence_index' => $target['sentence_index'],
+            'surface' => $target['surface'],
+            'lemma' => $target['lemma'],
+            'pos' => $target['pos'],
+            'source_sentence' => $target['source_sentence'],
+        ]);
+
+        $this->finish('commit');
+
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
+    }
+
+    public function test_same_reading_marked_unknown_user_resolution_has_zero_passive_good(): void
+    {
+        [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_marked_resolved', 'marked_unknown');
         $evidence->updated_at = $this->session->started_at->copy()->addSecond();
         $this->evidenceMap[$target['occurrence_id']] = $evidence;
         $this->finish('commit');
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
+    }
+
+    public function test_recent_trust_ai_high_matched_existing_passive_disambiguation_remains_eligible(): void
+    {
+        [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_trust_recent', 'passive_disambiguation');
+        $evidence->resolution_source = ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI;
+        $evidence->updated_at = $this->session->started_at->copy()->addSecond();
+        $this->evidenceMap[$target['occurrence_id']] = $evidence;
+
+        $result = $this->finish('commit');
+
+        $this->assertTrue($result['completed']);
+        $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
     public function test_excluded_new_sense_and_non_current_binding_create_zero_passive_rating(): void
@@ -368,6 +467,27 @@ class ReadingReviewSettlementContractTest extends TestCase
             $this->assertSame(0, $result['passive_good_count']);
         }
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
+    }
+
+    public function test_marked_unknown_binding_resolved_in_one_reading_becomes_eligible_in_a_later_session(): void
+    {
+        [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_marked_later', 'marked_unknown');
+        $evidence->updated_at = $this->session->started_at->copy()->addSecond();
+        $this->evidenceMap[$target['occurrence_id']] = $evidence;
+
+        $first = $this->finish('commit');
+        $this->assertTrue($first['completed']);
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
+
+        $this->session = ReadingSession::forceCreate([
+            'uuid' => (string) Str::uuid(), 'user_id' => $this->user->id, 'language_id' => 'english',
+            'chapter_id' => $this->chapter->id, 'source_revision' => V2Harness::SOURCE_REVISION,
+            'status' => ReadingSession::STATUS_ACTIVE, 'started_at' => now(),
+        ]);
+        $second = $this->finish('commit');
+
+        $this->assertTrue($second['completed']);
+        $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
     public function test_later_new_reading_session_can_rate_same_sense_again(): void
