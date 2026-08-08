@@ -1,5 +1,6 @@
 const SESSION_KEY_PREFIX = 'linguacafe-reading-session-id';
 const MANUAL_SENSE_CONTINUATION_KEY_PREFIX = 'linguacafe-reader-manual-sense-continuation';
+const EXPLICIT_RATING_RETRY_KEY_PREFIX = 'linguacafe-reader-explicit-rating-retry';
 
 function positiveInteger(value) {
     const number = Number(value);
@@ -13,6 +14,84 @@ function nonNegativeInteger(value) {
 
 function text(value) {
     return typeof value === 'string' ? value.trim() : '';
+}
+
+function normalizeUuid(value) {
+    const normalized = text(value).toLowerCase();
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(normalized)
+        ? normalized
+        : '';
+}
+
+function defaultCryptoSource() {
+    return typeof globalThis !== 'undefined' && globalThis.crypto ? globalThis.crypto : null;
+}
+
+export function createReaderActionId(cryptoSource = defaultCryptoSource()) {
+    if (!cryptoSource) return '';
+    if (typeof cryptoSource.randomUUID === 'function') {
+        try {
+            const generated = normalizeUuid(cryptoSource.randomUUID());
+            if (generated) return generated;
+        } catch (_) {
+            // Fall through to getRandomValues when randomUUID is unavailable at runtime.
+        }
+    }
+    if (typeof cryptoSource.getRandomValues !== 'function') return '';
+    try {
+        const bytes = new Uint8Array(16);
+        cryptoSource.getRandomValues(bytes);
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+        return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    } catch (_) {
+        return '';
+    }
+}
+
+export function createReaderRequestId(cryptoSource = defaultCryptoSource()) {
+    return createReaderActionId(cryptoSource);
+}
+
+export function readerExplicitRatingCommandMatchesSession(command = {}, readingSessionId = '', sourceRevision = '') {
+    const payload = command.payload && typeof command.payload === 'object' ? command.payload : {};
+    return Boolean(
+        positiveInteger(command.reviewCardId)
+        && text(command.occurrenceId)
+        && text(command.occurrenceId) === text(payload.occurrence_id)
+        && text(payload.reading_session_id)
+        && text(payload.reading_session_id) === text(readingSessionId)
+        && text(command.sourceRevision)
+        && text(command.sourceRevision) === text(sourceRevision),
+    );
+}
+
+export function buildReaderExplicitRatingActionCommand(
+    command = {},
+    readingActionId = '',
+    cryptoSource = defaultCryptoSource(),
+) {
+    const payload = command.payload && typeof command.payload === 'object' ? command.payload : {};
+    const rawExistingActionId = text(payload.reading_action_id);
+    const rawRecoveredActionId = text(readingActionId);
+    const existingActionId = rawExistingActionId ? normalizeUuid(rawExistingActionId) : '';
+    const recoveredActionId = rawRecoveredActionId ? normalizeUuid(rawRecoveredActionId) : '';
+    if ((rawExistingActionId && !existingActionId) || (rawRecoveredActionId && !recoveredActionId)) return null;
+    const actionId = existingActionId || recoveredActionId || createReaderActionId(cryptoSource);
+    if (!actionId) return null;
+    return {
+        ...command,
+        payload: {
+            ...payload,
+            reading_action_id: actionId,
+        },
+    };
+}
+
+export function readerExplicitActionConflictCode(responseData = {}) {
+    const code = text(responseData && (responseData.error_code || responseData.code));
+    return ['READING_EXPLICIT_ACTION_UNDONE', 'READING_EXPLICIT_ACTION_ACTIVE'].includes(code) ? code : '';
 }
 
 export function readerRecoveryStorageKey(chapterId) {
@@ -64,6 +143,12 @@ function normalizeManualSenseContinuation(value = {}) {
     const reviewCardId = positiveInteger(value.reviewCardId);
     const outcomeUnknown = value.outcomeUnknown === true;
     if (!outcomeUnknown && (!senseId || !reviewCardId)) return null;
+    const rawReadingActionId = text(value.readingActionId);
+    const readingActionId = rawReadingActionId ? normalizeUuid(rawReadingActionId) : '';
+    if (rawReadingActionId && !readingActionId) return null;
+    const readingSessionId = text(value.readingSessionId);
+    const sourceRevision = text(value.sourceRevision);
+    if (readingActionId && (!readingSessionId || !sourceRevision)) return null;
     const form = value.form && typeof value.form === 'object'
         ? {
             pos: text(value.form.pos),
@@ -77,7 +162,9 @@ function normalizeManualSenseContinuation(value = {}) {
         senseId,
         reviewCardId,
         outcomeUnknown,
-        sourceRevision: text(value.sourceRevision),
+        sourceRevision,
+        readingActionId,
+        readingSessionId,
         form,
     };
 }
@@ -117,6 +204,84 @@ export function clearReaderManualSenseContinuation(
     if (!key || !storage) return false;
     storage.removeItem(key);
     return true;
+}
+
+export function readerExplicitRatingRetryStorageKey(chapterId) {
+    const id = positiveInteger(chapterId);
+    return id ? `${EXPLICIT_RATING_RETRY_KEY_PREFIX}:${id}` : '';
+}
+
+function normalizeExplicitRatingRetry(command = {}) {
+    const reviewCardId = positiveInteger(command.reviewCardId);
+    const wordSenseId = positiveInteger(command.wordSenseId);
+    const occurrenceId = text(command.occurrenceId);
+    const sourceRevision = text(command.sourceRevision);
+    const payload = command.payload && typeof command.payload === 'object' ? command.payload : {};
+    const rating = text(payload.rating);
+    const readingSessionId = text(payload.reading_session_id);
+    const payloadOccurrenceId = text(payload.occurrence_id);
+    const readingActionId = normalizeUuid(payload.reading_action_id);
+    if (!reviewCardId || !occurrenceId || !sourceRevision || !readingSessionId || payloadOccurrenceId !== occurrenceId
+        || !['again', 'hard', 'good', 'easy'].includes(rating) || !readingActionId) {
+        return null;
+    }
+    return {
+        reviewCardId,
+        wordSenseId,
+        occurrenceId,
+        sourceRevision,
+        payload: {
+            rating,
+            reading_session_id: readingSessionId,
+            occurrence_id: occurrenceId,
+            reading_action_id: readingActionId,
+        },
+    };
+}
+
+export function loadReaderExplicitRatingRetry(
+    chapterId,
+    storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null),
+) {
+    const key = readerExplicitRatingRetryStorageKey(chapterId);
+    if (!key || !storage) return null;
+    try {
+        const raw = storage.getItem(key);
+        if (!raw) return null;
+        return normalizeExplicitRatingRetry(JSON.parse(raw));
+    } catch (_) {
+        return null;
+    }
+}
+
+export function saveReaderExplicitRatingRetry(
+    chapterId,
+    command,
+    storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null),
+) {
+    const key = readerExplicitRatingRetryStorageKey(chapterId);
+    const normalized = normalizeExplicitRatingRetry(command);
+    if (!key || !storage || !normalized) return false;
+    try {
+        storage.setItem(key, JSON.stringify(normalized));
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
+export function clearReaderExplicitRatingRetry(
+    chapterId,
+    storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null),
+) {
+    const key = readerExplicitRatingRetryStorageKey(chapterId);
+    if (!key || !storage) return false;
+    try {
+        storage.removeItem(key);
+        return true;
+    } catch (_) {
+        return false;
+    }
 }
 
 function normalizeCandidate(candidate = {}) {
@@ -295,15 +460,4 @@ export function readerOutcomeUnknown(message = '请求已发出，但服务器�
         outcomeUnknown: true,
         message,
     };
-}
-
-export function createReaderRequestId() {
-    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, character => {
-        const random = Math.random() * 16 | 0;
-        const value = character === 'x' ? random : (random & 0x3 | 0x8);
-        return value.toString(16);
-    });
 }
