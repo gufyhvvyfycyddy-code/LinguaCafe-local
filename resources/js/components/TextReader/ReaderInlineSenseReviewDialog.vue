@@ -8,9 +8,10 @@
             </v-card-title>
             <v-card-text>
                 <v-alert dense text type="info">
-                    这是一次明确评分。只有你显示答案、选择 Again / Hard / Good / Easy，并选定具体词义后，才会提交正式复习。
+                    这是一次明确评分。显示答案、选择 Again / Hard / Good / Easy，再选定具体词义后才会提交正式复习。
                 </v-alert>
                 <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
+                <v-alert v-if="outcomeUnknown" dense outlined type="warning">服务器结果未知期间，评分与词义选择已锁定。只能安全重试刚才那一笔正式评分。</v-alert>
 
                 <div v-if="occurrence" class="mb-4">
                     <div class="text-h5 font-weight-medium">{{ occurrence.surface || occurrence.lemma }}</div>
@@ -25,18 +26,15 @@
                 <template v-else>
                     <div class="mb-5">
                         <div class="text-subtitle-1 font-weight-medium mb-2">1. 你刚才回想得怎么样？</div>
-                        <sense-review-rating-controls
-                            :disabled="busy"
-                            @rating="chooseRating"
-                        />
+                        <sense-review-rating-controls :disabled="busy || outcomeUnknown" @rating="chooseRating" />
                         <div v-if="state.pendingRating" class="caption text--secondary text-center mt-1">
-                            已选择 {{ ratingLabel(state.pendingRating) }}，还需要选择具体词义才能提交。
+                            已选择 {{ ratingLabel(state.pendingRating) }}，还需要确定具体词义。
                         </div>
                     </div>
 
-                    <div>
+                    <div v-if="!manualMode">
                         <div class="text-subtitle-1 font-weight-medium mb-2">2. 这次复习的是哪个具体词义？</div>
-                        <v-radio-group v-model="selectedSenseId" :disabled="busy" class="mt-0">
+                        <v-radio-group v-model="selectedSenseId" :disabled="busy || outcomeUnknown" class="mt-0">
                             <v-radio
                                 v-for="candidate in ratableCandidates"
                                 :key="candidate.word_sense_id || candidate.sense_id"
@@ -52,8 +50,43 @@
                             </v-radio>
                         </v-radio-group>
                         <v-alert v-if="!ratableCandidates.length" type="warning" dense text>
-                            当前没有可通过正式 Sense Review 入口评分的词义卡。
+                            当前候选里没有可评分的词义卡。可以手动新增这个词义后，继续提交刚才选择的评分。
                         </v-alert>
+                        <v-btn text small color="primary" :disabled="busy || outcomeUnknown || !state.pendingRating" @click="openManualMode">
+                            都不是 / 新增词义
+                        </v-btn>
+                    </div>
+
+                    <div v-else>
+                        <div class="text-subtitle-1 font-weight-medium mb-2">2. 新增这个词义</div>
+                        <v-select
+                            v-model="manualSense.pos"
+                            :items="posOptions"
+                            item-text="text"
+                            item-value="value"
+                            label="词性"
+                            outlined
+                            dense
+                            :disabled="busy || outcomeUnknown"
+                        />
+                        <v-text-field
+                            v-model.trim="manualSense.sense_zh"
+                            label="中文释义"
+                            outlined
+                            dense
+                            :disabled="busy || outcomeUnknown"
+                        />
+                        <v-text-field
+                            v-model.trim="manualSense.sense_en"
+                            label="English（可选）"
+                            outlined
+                            dense
+                            :disabled="busy || outcomeUnknown"
+                        />
+                        <v-alert dense text type="info">
+                            保存成功后会把本次出现位置绑定到新词义，并沿用刚才的 {{ ratingLabel(state.pendingRating) }} 评分；不会再让你选第二次评分。
+                        </v-alert>
+                        <v-btn text small :disabled="busy || outcomeUnknown" @click="manualMode = false">返回已有词义</v-btn>
                     </div>
                 </template>
             </v-card-text>
@@ -61,13 +94,29 @@
                 <v-btn text :disabled="busy" @click="close">取消</v-btn>
                 <v-spacer />
                 <v-btn
-                    v-if="state.showAnswer"
+                    v-if="state.showAnswer && !manualMode && !outcomeUnknown"
                     color="primary"
                     depressed
                     :loading="busy"
                     :disabled="!canSubmit"
                     @click="submit"
                 >提交正式评分</v-btn>
+                <v-btn
+                    v-if="state.showAnswer && manualMode && !outcomeUnknown"
+                    color="primary"
+                    depressed
+                    :loading="busy"
+                    :disabled="!canCreateSense"
+                    @click="createSenseAndSubmit"
+                >新增并提交评分</v-btn>
+                <v-btn
+                    v-if="outcomeUnknown"
+                    color="warning"
+                    depressed
+                    :loading="busy"
+                    :disabled="busy"
+                    @click="$emit('retry-outcome-unknown')"
+                >安全重试刚才评分</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -81,6 +130,7 @@
         chooseReaderInlineSense,
         clearReaderInlinePendingRating,
         createReaderInlineSenseReviewState,
+        normalizeReaderManualSensePos,
         revealReaderInlineSenseAnswer,
         replaceReaderInlineOccurrence,
     } from '../../services/ReaderInlineSenseReviewPolicy.js';
@@ -95,10 +145,23 @@
             readingSessionId: { type: String, default: '' },
             busy: { type: Boolean, default: false },
             error: { type: String, default: '' },
+            outcomeUnknown: { type: Boolean, default: false },
         },
         data() {
             return {
                 state: createReaderInlineSenseReviewState(this.occurrence),
+                manualMode: false,
+                manualSense: { pos: 'other', sense_zh: '', sense_en: '' },
+                posOptions: [
+                    { value: 'noun', text: '名词' },
+                    { value: 'verb', text: '动词' },
+                    { value: 'adjective', text: '形容词' },
+                    { value: 'adverb', text: '副词' },
+                    { value: 'preposition', text: '介词' },
+                    { value: 'conjunction', text: '连词' },
+                    { value: 'phrase', text: '短语' },
+                    { value: 'other', text: '其他' },
+                ],
             };
         },
         computed: {
@@ -122,19 +185,36 @@
             canSubmit() {
                 return Boolean(this.command) && !this.busy;
             },
+            canCreateSense() {
+                return Boolean(
+                    this.state.pendingRating
+                    && this.occurrence
+                    && this.manualSense.pos
+                    && this.manualSense.sense_zh.trim()
+                    && !this.busy
+                    && !this.outcomeUnknown
+                );
+            },
         },
         watch: {
             occurrence(next) {
                 this.state = replaceReaderInlineOccurrence(this.state, next);
+                this.resetManualSense(next);
             },
             value(open) {
-                if (!open) this.state = clearReaderInlinePendingRating(this.state);
-                else this.state = replaceReaderInlineOccurrence(this.state, this.occurrence);
+                if (!open) {
+                    this.state = clearReaderInlinePendingRating(this.state);
+                    this.manualMode = false;
+                } else {
+                    this.state = replaceReaderInlineOccurrence(this.state, this.occurrence);
+                    this.resetManualSense(this.occurrence);
+                }
             },
         },
         methods: {
             reveal() {
                 this.state = revealReaderInlineSenseAnswer(this.state);
+                this.$emit('reveal', this.occurrence);
             },
             chooseRating(rating) {
                 this.state = chooseReaderInlineRating(this.state, rating);
@@ -145,8 +225,28 @@
             submit() {
                 if (this.command) this.$emit('submit', this.command);
             },
+            openManualMode() {
+                if (!this.state.pendingRating) return;
+                this.manualMode = true;
+            },
+            createSenseAndSubmit() {
+                if (!this.canCreateSense) return;
+                this.$emit('create-sense-and-submit', {
+                    occurrence: this.occurrence,
+                    rating: this.state.pendingRating,
+                    form: { ...this.manualSense },
+                });
+            },
+            resetManualSense(occurrence) {
+                this.manualSense = {
+                    pos: normalizeReaderManualSensePos(occurrence && occurrence.pos),
+                    sense_zh: '',
+                    sense_en: '',
+                };
+            },
             close() {
                 this.state = clearReaderInlinePendingRating(this.state);
+                this.manualMode = false;
                 this.$emit('input', false);
                 this.$emit('cancel');
             },

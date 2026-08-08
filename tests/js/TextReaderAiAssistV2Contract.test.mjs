@@ -103,3 +103,17 @@ test('Reader AI Assist requests V2 source contract, wires strict V2 import, and 
     assert.match(source, /resultLabel\(vi\.result\)/);
     assert.match(source, /vi\.sense_en/);
 });
+
+test('Reader AI V2 source sends the server unfamiliar-target snapshot version and fails closed before freshness is known', () => {
+    const source = fs.readFileSync('resources/js/components/TextReader/TextReaderAiAssist.vue', 'utf8');
+    assert.match(source, /markedTargetsSnapshotVersion/);
+    assert.match(source, /marked_targets_snapshot_version:\s*this\.markedTargetsSnapshotVersion/);
+    assert.match(source, /服务器标记快照尚未加载/);
+});
+
+test('successful AI confirm notifies Reader to refresh persisted evidence', () => {
+    const assist = fs.readFileSync('resources/js/components/TextReader/TextReaderAiAssist.vue', 'utf8');
+    const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+    assert.match(assist, /this\.\$emit\('confirmed'\)/);
+    assert.match(reader, /@confirmed="refreshReadingSenseVerification"/);
+});
