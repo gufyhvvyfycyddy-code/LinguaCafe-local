@@ -52,7 +52,12 @@ final class PabR3ReadingConcurrencyWorker
         $request->headers->set('Accept', 'application/json');
 
         $response = app(SenseReviewController::class)->rate((int) $payload['review_card_id'], $request);
-        return $response->getData(true);
+
+        return [
+            'operation' => 'explicit-rate',
+            'http_status' => $response->getStatusCode(),
+            'body' => $response->getData(true),
+        ];
     }
 
     private static function finishCommit(array $payload): array

@@ -26,6 +26,7 @@ const nodeSuites = [
     ['tests/js/PhaseAReviewWriteSurfaceGuard.test.mjs', 'passed'],
     ['tests/js/PhaseBFormalRatingWriteSurfaceGuard.test.mjs', 'passed'],
     ['tests/js/ReadingRatingSourceContractGuard.test.mjs', 'passed'],
+    ['tests/js/PabR3ParallelSafeRunnerContract.test.mjs', 'passed'],
 ];
 
 const forbiddenOutcome = /\b(?:incomplete|skipped|pending)\b|No tests found|No tests executed|No tests!/i;
@@ -78,15 +79,13 @@ for (const [file, marker] of nodeSuites) {
 console.log(`PAB-R3 required-suite meta gate passed (${integration ? 'integration' : 'parallel-safe'} mode).`);
 
 function runPurePhpSuite(suite, file) {
-    if (existsSync(join(root, 'vendor', 'autoload.php'))) {
-        run(PHP_BINARY(), ['artisan', 'test', `--filter=${suite}`], suite, true);
-        return;
+    const localAutoload = join(root, 'vendor', 'autoload.php');
+    const externalAutoload = process.env.PAB_R3_VENDOR_AUTOLOAD;
+    const autoload = existsSync(localAutoload) ? localAutoload : externalAutoload;
+    if (!autoload || !existsSync(autoload)) {
+        throw new Error(`${suite} cannot run: neither local vendor/autoload.php nor PAB_R3_VENDOR_AUTOLOAD is available.`);
     }
 
-    const externalAutoload = process.env.PAB_R3_VENDOR_AUTOLOAD;
-    if (!externalAutoload || !existsSync(externalAutoload)) {
-        throw new Error(`${suite} cannot run: local vendor/autoload.php is absent and PAB_R3_VENDOR_AUTOLOAD was not supplied.`);
-    }
     const code = String.raw`
 $loader = require $argv[1];
 $root = $argv[2];
@@ -96,7 +95,7 @@ chdir($root);
 $runner = new PHPUnit\TextUI\Application();
 exit($runner->run(['phpunit', '--no-configuration', $argv[3]]));
 `;
-    run(PHP_BINARY(), ['-r', code, externalAutoload, root, file], suite, true);
+    run(PHP_BINARY(), ['-r', code, autoload, root, file], suite, true);
 }
 
 function PHP_BINARY() {
