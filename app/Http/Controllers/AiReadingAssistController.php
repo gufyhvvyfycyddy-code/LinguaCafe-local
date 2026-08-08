@@ -23,15 +23,18 @@ class AiReadingAssistController extends Controller
 
         $schemaVersion = $data['schema_version'] ?? null;
         $markedTargets = null;
+        $markedTargetsSnapshotVersion = null;
         if ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION) {
             $validatedV2 = $request->validate([
                 'marked_targets' => ['nullable', 'array'],
                 'marked_targets.*.kind' => ['required_with:marked_targets', 'in:word,phrase'],
                 'marked_targets.*.start_word_index' => ['required_with:marked_targets', 'integer', 'min:0'],
                 'marked_targets.*.end_word_index' => ['required_with:marked_targets', 'integer', 'min:0'],
+                'marked_targets_snapshot_version' => ['nullable', 'string', 'min:1'],
             ]);
             if (array_key_exists('marked_targets', $validatedV2)) {
                 $markedTargets = $validatedV2['marked_targets'];
+                $markedTargetsSnapshotVersion = $validatedV2['marked_targets_snapshot_version'] ?? null;
             }
         }
 
@@ -41,9 +44,15 @@ class AiReadingAssistController extends Controller
             (int) $data['chapterId'],
             $schemaVersion,
             $markedTargets,
+            $markedTargetsSnapshotVersion,
         );
 
-        return response()->json($result, $result['success'] ? 200 : 404);
+        return response()->json(
+            $result,
+            $result['success'] ? 200 : ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION
+                ? $this->v2FailureStatus($result)
+                : 404),
+        );
     }
 
     public function current(int $chapterId)
@@ -80,7 +89,12 @@ class AiReadingAssistController extends Controller
             $schemaVersion,
         );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json(
+            $result,
+            $result['success'] ? 200 : ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION
+                ? $this->v2FailureStatus($result)
+                : 422),
+        );
     }
 
     public function lookup(int $chapterId, Request $request)
@@ -133,6 +147,28 @@ class AiReadingAssistController extends Controller
             (bool) $request->boolean('apply_trust_ai'),
         );
 
-        return response()->json($result, $result['success'] ? 200 : 422);
+        return response()->json(
+            $result,
+            $result['success'] ? 200 : ($schemaVersion === AiReadingAssistV2Service::SCHEMA_VERSION
+                ? $this->v2FailureStatus($result)
+                : 422),
+        );
+    }
+
+    private function v2FailureStatus(array $result): int
+    {
+        $code = $result['error_code'] ?? null;
+        if ($code === AiReadingAssistV2Service::ERROR_INTERNAL) {
+            return 500;
+        }
+        if (in_array($code, [
+            AiReadingAssistV2Service::ERROR_STALE_SOURCE,
+            AiReadingAssistV2Service::ERROR_TARGET_SET_MISMATCH,
+            AiReadingAssistV2Service::ERROR_CANDIDATE_MISMATCH,
+        ], true)) {
+            return 409;
+        }
+
+        return 422;
     }
 }

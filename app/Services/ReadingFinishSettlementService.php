@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\Chapter;
 use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\ReadingSession;
 use App\Models\ReadingSessionCardSettlement;
@@ -18,7 +17,6 @@ class ReadingFinishSettlementService
 {
     public function __construct(
         private ReadingSessionService $readingSessionService,
-        private ReadingTargetCatalogService $targetCatalogService,
         private ReadingOccurrenceSenseEvidenceService $evidenceService,
         private ReviewCardService $reviewCardService,
         private ChapterService $chapterService,
@@ -37,41 +35,15 @@ class ReadingFinishSettlementService
         array $leveledUpPhrases,
         string $settlementMode = 'preflight'
     ): array {
-        if (!in_array($settlementMode, ['preflight', 'trust'], true)) {
-            throw new \InvalidArgumentException('Unsupported reading settlement mode.');
-        }
-
-        $session = $this->readingSessionService->resolveOwnedSession($userId, $language, $readingSessionId);
-        if ((int) $session->chapter_id !== $chapterId) {
-            throw new \InvalidArgumentException('Reading session does not belong to the requested chapter.');
-        }
-
-        $completion = ReadingSessionCompletion::query()->where('reading_session_id', $session->id)->first();
-        if ($completion) {
-            return $completion->result + [
-                'success' => true,
-                'already_completed' => true,
-            ];
-        }
-        if ($session->status !== ReadingSession::STATUS_ACTIVE) {
-            throw new \InvalidArgumentException('Reading session is not active.');
-        }
-
-        $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-        if ($catalog['source_revision'] !== $session->source_revision) {
-            throw new \InvalidArgumentException('Reading session source revision is stale.');
-        }
-
-        $plan = $this->buildPlan($userId, $language, $session, $catalog, $settlementMode);
-        if ($settlementMode !== 'trust' && $plan['unresolved_count'] > 0) {
-            return $this->preflightResult($session, $plan);
+        if (!in_array($settlementMode, ['preflight', 'commit'], true)) {
+            throw new \InvalidArgumentException('READING_FINISH_MODE_INVALID');
         }
 
         return DB::transaction(function () use (
             $userId,
             $language,
             $chapterId,
-            $session,
+            $readingSessionId,
             $autoMoveWordsToKnown,
             $uniqueWords,
             $autoLevelUpWords,
@@ -81,49 +53,47 @@ class ReadingFinishSettlementService
         ) {
             $lockedSession = ReadingSession::query()
                 ->lockForUpdate()
-                ->where('id', $session->id)
+                ->where('uuid', $readingSessionId)
                 ->where('user_id', $userId)
                 ->where('language_id', $language)
                 ->where('chapter_id', $chapterId)
                 ->first();
             if (!$lockedSession) {
-                throw new \InvalidArgumentException('Reading session no longer belongs to the current scope.');
+                throw new \InvalidArgumentException(ReadingSessionService::ERROR_SESSION_NOT_FOUND);
             }
 
             $completion = ReadingSessionCompletion::query()
-                ->lockForUpdate()
                 ->where('reading_session_id', $lockedSession->id)
                 ->first();
             if ($completion) {
-                return $completion->result + [
-                    'success' => true,
-                    'already_completed' => true,
-                ];
+                return $completion->result;
             }
             if ($lockedSession->status !== ReadingSession::STATUS_ACTIVE) {
-                throw new \InvalidArgumentException('Reading session is not active.');
+                throw new \InvalidArgumentException(ReadingSessionService::ERROR_SESSION_NOT_ACTIVE);
             }
 
-            $currentCatalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-            if ($currentCatalog['source_revision'] !== $lockedSession->source_revision) {
-                throw new \InvalidArgumentException('Reading session source revision is stale.');
-            }
+            $context = $this->readingSessionService->lockActiveSessionContext(
+                $userId,
+                $language,
+                $readingSessionId,
+                $chapterId,
+            );
+            $lockedSession = $context['session'];
+            $currentCatalog = $context['catalog'];
+            $currentPlan = $this->buildPlan($userId, $language, $lockedSession, $currentCatalog);
+            $alreadySettledCount = ReadingSessionCardSettlement::query()
+                ->where('reading_session_id', $lockedSession->id)
+                ->count();
 
-            $currentPlan = $this->buildPlan($userId, $language, $lockedSession, $currentCatalog, $settlementMode);
-            if ($settlementMode !== 'trust' && $currentPlan['unresolved_count'] > 0) {
-                return $this->preflightResult($lockedSession, $currentPlan);
+            $projection = $this->preflightResult($lockedSession, $currentPlan, $alreadySettledCount);
+            if ($settlementMode === 'preflight') {
+                return $projection;
             }
-
-            // Serialize legacy Finish mutations for this chapter while keeping the
-            // existing ChapterService as the one compatibility implementation.
-            $chapter = Chapter::query()
-                ->lockForUpdate()
-                ->where('id', $chapterId)
-                ->where('user_id', $userId)
-                ->where('language', $language)
-                ->first();
-            if (!$chapter) {
-                throw new \InvalidArgumentException('Chapter does not exist in the current user and language scope.');
+            if ($currentPlan['unresolved_count'] > 0) {
+                return array_merge($projection, [
+                    'settlement_mode' => 'commit',
+                    'can_commit' => false,
+                ]);
             }
 
             $appliedCount = 0;
@@ -178,15 +148,18 @@ class ReadingFinishSettlementService
                 'success' => true,
                 'completed' => true,
                 'preflight_required' => false,
+                'can_commit' => false,
                 'already_completed' => false,
-                'settlement_mode' => $settlementMode,
+                'settlement_mode' => 'commit',
                 'passive_good_count' => $appliedCount,
                 'planned_passive_good_count' => $currentPlan['passive_good_count'],
+                'already_settled_count' => $alreadySettledCount,
                 'unresolved_count' => $currentPlan['unresolved_count'],
                 'excluded_count' => $currentPlan['excluded_count'],
                 'passive_occurrence_ids' => $currentPlan['passive_occurrence_ids'],
                 'unresolved_occurrence_ids' => $currentPlan['unresolved_occurrence_ids'],
                 'excluded_occurrence_ids' => $currentPlan['excluded_occurrence_ids'],
+                'conflict_codes' => [],
                 'chapter_id' => $chapterId,
                 'reading_session_id' => $lockedSession->uuid,
                 'source_revision' => $lockedSession->source_revision,
@@ -210,7 +183,6 @@ class ReadingFinishSettlementService
         string $language,
         ReadingSession $session,
         array $catalog,
-        string $settlementMode,
     ): array {
         $evidenceMap = $this->evidenceService->currentEvidenceMap(
             $userId,
@@ -325,13 +297,19 @@ class ReadingFinishSettlementService
         ];
     }
 
-    private function preflightResult(ReadingSession $session, array $plan): array
+    private function preflightResult(ReadingSession $session, array $plan, int $alreadySettledCount): array
     {
+        $canCommit = $plan['unresolved_count'] === 0;
+
         return [
             'success' => true,
             'completed' => false,
             'preflight_required' => true,
+            'can_commit' => $canCommit,
+            'already_completed' => false,
+            'already_settled_count' => $alreadySettledCount,
             'settlement_mode' => 'preflight',
+            'conflict_codes' => $canCommit ? [] : ['READING_FINISH_UNRESOLVED'],
             'chapter_id' => (int) $session->chapter_id,
             'reading_session_id' => $session->uuid,
             'source_revision' => $session->source_revision,

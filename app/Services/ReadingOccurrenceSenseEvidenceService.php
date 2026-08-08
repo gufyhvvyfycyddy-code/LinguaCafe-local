@@ -10,6 +10,7 @@ class ReadingOccurrenceSenseEvidenceService
 {
     public function __construct(
         private ReadingTargetCatalogService $targetCatalogService,
+        private ReadingChapterTextService $chapterTextService,
     ) {
     }
 
@@ -21,21 +22,21 @@ class ReadingOccurrenceSenseEvidenceService
         string $resolution,
         ?int $wordSenseId,
     ): ReadingOccurrenceSenseEvidence {
-        $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-        $target = $catalog['targets_by_id'][$occurrenceId] ?? null;
-        if (!$target) {
-            throw new \InvalidArgumentException('Occurrence does not exist in the current chapter revision.');
-        }
-
         return DB::transaction(function () use (
             $userId,
             $language,
             $chapterId,
-            $catalog,
-            $target,
+            $occurrenceId,
             $resolution,
             $wordSenseId,
         ) {
+            $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
+            $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
+            $target = $catalog['targets_by_id'][$occurrenceId] ?? null;
+            if (!$target) {
+                throw new \InvalidArgumentException('READING_OCCURRENCE_STALE');
+            }
+
             $validatedSenseId = $this->validateResolution(
                 $userId,
                 $language,
@@ -45,7 +46,6 @@ class ReadingOccurrenceSenseEvidenceService
                 ReadingOccurrenceSenseEvidence::SOURCE_USER,
                 null,
             );
-
             $evidence = ReadingOccurrenceSenseEvidence::query()
                 ->lockForUpdate()
                 ->where('user_id', $userId)
@@ -54,7 +54,6 @@ class ReadingOccurrenceSenseEvidenceService
                 ->where('source_revision', $catalog['source_revision'])
                 ->where('occurrence_id', $target['occurrence_id'])
                 ->first();
-
             if (!$evidence) {
                 $evidence = new ReadingOccurrenceSenseEvidence();
             }
@@ -102,48 +101,42 @@ class ReadingOccurrenceSenseEvidenceService
             return [];
         }
 
-        $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-        $validated = [];
-        foreach ($matches as $match) {
-            $confidence = (string) ($match['confidence'] ?? '');
-            if ($confidence !== 'high') {
-                throw new \InvalidArgumentException('Trusted AI evidence requires high confidence.');
+        return DB::transaction(function () use ($userId, $language, $chapterId, $matches, $payloadHash) {
+            $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
+            $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
+            $validated = [];
+            foreach ($matches as $match) {
+                $confidence = (string) ($match['confidence'] ?? '');
+                if ($confidence !== 'high') {
+                    throw new \InvalidArgumentException('Trusted AI evidence requires high confidence.');
+                }
+
+                $target = is_array($match['target'] ?? null) ? $match['target'] : [];
+                $current = $catalog['targets_by_id'][$target['occurrence_id'] ?? ''] ?? null;
+                if (!$current || !$this->sameTargetIdentity($current, $target)) {
+                    throw new \InvalidArgumentException('READING_TRUST_AI_TARGET_STALE');
+                }
+
+                $packageId = trim((string) ($match['package_id'] ?? ''));
+                if ($packageId === '') {
+                    throw new \InvalidArgumentException('Trusted AI evidence requires the source package_id.');
+                }
+
+                $validated[] = [
+                    'target' => $current,
+                    'package_id' => $packageId,
+                    'word_sense_id' => $this->validateResolution(
+                        $userId,
+                        $language,
+                        $current,
+                        ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+                        isset($match['word_sense_id']) ? (int) $match['word_sense_id'] : null,
+                        ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI,
+                        $confidence,
+                    ),
+                ];
             }
 
-            $target = is_array($match['target'] ?? null) ? $match['target'] : [];
-            $current = $catalog['targets_by_id'][$target['occurrence_id'] ?? ''] ?? null;
-            if (!$current || !$this->sameTargetIdentity($current, $target)) {
-                throw new \InvalidArgumentException('Trusted AI occurrence is stale or no longer matches server identity.');
-            }
-
-            $packageId = trim((string) ($match['package_id'] ?? ''));
-            if ($packageId === '') {
-                throw new \InvalidArgumentException('Trusted AI evidence requires the source package_id.');
-            }
-
-            $validated[] = [
-                'target' => $current,
-                'package_id' => $packageId,
-                'word_sense_id' => $this->validateResolution(
-                    $userId,
-                    $language,
-                    $current,
-                    ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
-                    isset($match['word_sense_id']) ? (int) $match['word_sense_id'] : null,
-                    ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI,
-                    $confidence,
-                ),
-            ];
-        }
-
-        return DB::transaction(function () use (
-            $userId,
-            $language,
-            $chapterId,
-            $catalog,
-            $validated,
-            $payloadHash,
-        ) {
             $saved = [];
             foreach ($validated as $match) {
                 $current = $match['target'];
@@ -160,7 +153,6 @@ class ReadingOccurrenceSenseEvidenceService
                     $saved[] = $evidence;
                     continue;
                 }
-
                 if (!$evidence) {
                     $evidence = new ReadingOccurrenceSenseEvidence();
                 }
@@ -220,9 +212,22 @@ class ReadingOccurrenceSenseEvidenceService
     /**
      * @return array{source_revision:string,items:array<int,array>,stale_evidence_count:int}
      */
-    public function listForChapter(int $userId, string $language, int $chapterId): array
-    {
+    public function listForChapter(
+        int $userId,
+        string $language,
+        int $chapterId,
+        int $offset = 0,
+        int $limit = 200,
+    ): array {
+        $offset = max(0, $offset);
+        $limit = max(1, min(500, $limit));
         $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
+        $total = ReadingOccurrenceSenseEvidence::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('chapter_id', $chapterId)
+            ->where('source_revision', $catalog['source_revision'])
+            ->count();
         $rows = ReadingOccurrenceSenseEvidence::query()
             ->where('user_id', $userId)
             ->where('language_id', $language)
@@ -230,7 +235,8 @@ class ReadingOccurrenceSenseEvidenceService
             ->where('source_revision', $catalog['source_revision'])
             ->orderBy('start_word_index')
             ->orderBy('end_word_index')
-            ->limit(500)
+            ->offset($offset)
+            ->limit($limit)
             ->get();
 
         $staleCount = ReadingOccurrenceSenseEvidence::query()
@@ -281,10 +287,17 @@ class ReadingOccurrenceSenseEvidenceService
             ];
         }
 
+        $nextOffset = $offset + count($items);
+
         return [
             'source_revision' => $catalog['source_revision'],
             'items' => $items,
             'stale_evidence_count' => $staleCount,
+            'total' => $total,
+            'offset' => $offset,
+            'limit' => $limit,
+            'has_more' => $nextOffset < $total,
+            'next_offset' => $nextOffset < $total ? $nextOffset : null,
         ];
     }
 

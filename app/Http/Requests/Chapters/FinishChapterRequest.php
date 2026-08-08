@@ -21,7 +21,7 @@ class FinishChapterRequest extends FormRequest
             'leveledUpPhrases' => 'required|json',
             'autoMoveWordsToKnown' => 'required|boolean',
             'reading_session_id' => 'nullable|string|uuid',
-            'settlement_mode' => 'nullable|in:preflight,trust',
+            'settlement_mode' => 'nullable|in:preflight,commit',
         ];
     }
 }

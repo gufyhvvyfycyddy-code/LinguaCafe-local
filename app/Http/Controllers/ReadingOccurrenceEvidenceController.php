@@ -12,9 +12,20 @@ class ReadingOccurrenceEvidenceController extends Controller
     {
     }
 
-    public function index(int $chapterId)
+    public function index(int $chapterId, Request $request)
     {
-        return response()->json($this->service->listForChapter(Auth::user()->id, Auth::user()->selected_language, $chapterId));
+        $data = $request->validate([
+            'offset' => ['nullable', 'integer', 'min:0'],
+            'limit' => ['nullable', 'integer', 'min:1', 'max:500'],
+        ]);
+
+        return response()->json($this->service->listForChapter(
+            Auth::user()->id,
+            Auth::user()->selected_language,
+            $chapterId,
+            (int) ($data['offset'] ?? 0),
+            (int) ($data['limit'] ?? 200),
+        ));
     }
 
     public function store(int $chapterId, Request $request)
@@ -25,15 +36,27 @@ class ReadingOccurrenceEvidenceController extends Controller
             'word_sense_id' => ['nullable', 'integer', 'min:1'],
         ]);
 
-        $evidence = $this->service->storeUserDecision(
-            Auth::user()->id,
-            Auth::user()->selected_language,
-            $chapterId,
-            $data['occurrence_id'],
-            $data['resolution'],
-            isset($data['word_sense_id']) ? (int) $data['word_sense_id'] : null,
-        );
+        try {
+            $evidence = $this->service->storeUserDecision(
+                Auth::user()->id,
+                Auth::user()->selected_language,
+                $chapterId,
+                $data['occurrence_id'],
+                $data['resolution'],
+                isset($data['word_sense_id']) ? (int) $data['word_sense_id'] : null,
+            );
 
-        return response()->json(['success' => true, 'evidence_id' => $evidence->id]);
+            return response()->json(['success' => true, 'evidence_id' => $evidence->id]);
+        } catch (\InvalidArgumentException $e) {
+            $isStale = $e->getMessage() === 'READING_OCCURRENCE_STALE';
+
+            return response()->json([
+                'success' => false,
+                'error_code' => $isStale ? 'READING_OCCURRENCE_STALE' : 'READING_EVIDENCE_INVALID',
+                'message' => $isStale
+                    ? 'Reading occurrence is stale.'
+                    : 'Reading evidence is invalid for the current server state.',
+            ], $isStale ? 409 : 422);
+        }
     }
 }

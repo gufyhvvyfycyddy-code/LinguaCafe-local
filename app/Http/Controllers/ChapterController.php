@@ -97,20 +97,45 @@ class ChapterController extends Controller {
 
         try {
             if ($readingSessionId) {
-                $result = $this->readingFinishSettlementService->finishChapterWithSession(
-                    $userId,
-                    $language,
-                    $chapterId,
-                    $readingSessionId,
-                    $autoMoveWordsToKnown,
-                    is_array($uniqueWords) ? $uniqueWords : [],
-                    $autoLevelUpWords,
-                    is_array($leveledUpWords) ? $leveledUpWords : [],
-                    is_array($leveledUpPhrases) ? $leveledUpPhrases : [],
-                    (string) ($request->post('settlement_mode') ?: 'preflight')
-                );
+                try {
+                    $result = $this->readingFinishSettlementService->finishChapterWithSession(
+                        $userId,
+                        $language,
+                        $chapterId,
+                        $readingSessionId,
+                        $autoMoveWordsToKnown,
+                        is_array($uniqueWords) ? $uniqueWords : [],
+                        $autoLevelUpWords,
+                        is_array($leveledUpWords) ? $leveledUpWords : [],
+                        is_array($leveledUpPhrases) ? $leveledUpPhrases : [],
+                        (string) ($request->post('settlement_mode') ?: 'preflight')
+                    );
 
-                return response()->json($result, 200);
+                    return response()->json($result, 200);
+                } catch (\InvalidArgumentException $e) {
+                    $knownCodes = [
+                        \App\Services\ReadingSessionService::ERROR_SESSION_NOT_FOUND,
+                        \App\Services\ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+                        \App\Services\ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH,
+                        \App\Services\ReadingSessionService::ERROR_SESSION_STALE_SOURCE,
+                        'READING_FINISH_MODE_INVALID',
+                    ];
+                    $code = in_array($e->getMessage(), $knownCodes, true)
+                        ? $e->getMessage()
+                        : 'READING_FINISH_CONFLICT';
+
+                    return response()->json([
+                        'success' => false,
+                        'error_code' => $code,
+                        'message' => 'Reading finish conflicts with the current server state.',
+                    ], $code === \App\Services\ReadingSessionService::ERROR_SESSION_NOT_FOUND ? 404 : 409);
+                } catch (\Throwable $e) {
+                    return response()->json([
+                        'success' => false,
+                        'error_code' => 'READING_FINISH_INTERNAL_ERROR',
+                        'message' => 'Reading finish could not be completed.',
+                    ], 500);
+                }
             }
 
             $this->chapterService->finishChapter($userId, $chapterId, $autoMoveWordsToKnown, $uniqueWords, $autoLevelUpWords, $leveledUpWords, $leveledUpPhrases, $language);

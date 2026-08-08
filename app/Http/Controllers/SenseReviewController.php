@@ -88,73 +88,90 @@ class SenseReviewController extends Controller
             abort(422, 'reading_session_id and occurrence_id must be provided together.');
         }
 
-        $card = ReviewCard::where('id', $reviewCardId)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('target_type', ReviewCard::TARGET_SENSE)
-            ->first();
-        if (!$card) {
-            abort(404, 'Sense review card does not exist.');
+        $card = null;
+        if (!$readingSessionId) {
+            $card = ReviewCard::where('id', $reviewCardId)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('target_type', ReviewCard::TARGET_SENSE)
+                ->first();
+            if (!$card) {
+                abort(404, 'Sense review card does not exist.');
+            }
         }
 
         $rating = $request->post('rating');
-        $latestLog = null;
         if ($readingSessionId && $occurrenceId) {
-            $reviewed = DB::transaction(function () use (
-                $userId,
-                $language,
-                $readingSessionId,
-                $occurrenceId,
-                $card,
-                $rating,
-                $reviewDurationMs
-            ) {
-                $this->readingSessionService->validateExplicitRatingContext(
+            try {
+                $payload = DB::transaction(function () use (
                     $userId,
                     $language,
                     $readingSessionId,
                     $occurrenceId,
-                    $card,
-                );
-
-                $reviewed = $this->reviewCardService->recordReviewWithLog(
-                    $userId,
-                    $language,
-                    $card->id,
+                    $reviewCardId,
                     $rating,
-                    ReviewLog::SOURCE_READING_EXPLICIT,
-                    $readingSessionId,
                     $reviewDurationMs,
-                );
+                    $ignoreDailyLimits
+                ) {
+                    $context = $this->readingSessionService->lockExplicitRatingContext(
+                        $userId,
+                        $language,
+                        $readingSessionId,
+                        $occurrenceId,
+                        $reviewCardId,
+                    );
+                    $replay = $this->readingSessionService->explicitRatingReplay($context['session'], $reviewCardId);
+                    if ($replay !== null) {
+                        return $replay;
+                    }
 
-                $this->readingSessionService->recordExplicitRating(
-                    $userId,
-                    $language,
-                    $readingSessionId,
-                    $occurrenceId,
-                    $card->id,
-                    (int) $card->target_id,
-                );
+                    $reviewed = $this->reviewCardService->recordReviewWithLog(
+                        $userId,
+                        $language,
+                        $context['review_card']->id,
+                        $rating,
+                        ReviewLog::SOURCE_READING_EXPLICIT,
+                        $readingSessionId,
+                        $reviewDurationMs,
+                    );
+                    $payload = $this->buildRatePayload(
+                        $userId,
+                        $language,
+                        $reviewed['card'],
+                        $reviewed['review_log'],
+                        $ignoreDailyLimits,
+                    );
+                    $this->readingSessionService->recordExplicitRatingLocked(
+                        $context['session'],
+                        $context['target'],
+                        (int) $context['review_card']->id,
+                        (int) $context['sense']->id,
+                        (int) $reviewed['review_log']->id,
+                        $payload,
+                    );
 
-                return $reviewed;
-            });
-            $updatedCard = $reviewed['card'];
-            $latestLog = $reviewed['review_log'];
-        } else {
-            $updatedCard = $this->reviewCardService->recordReview(
-                $userId,
-                $language,
-                $card->id,
-                $rating,
-                ReviewLog::SOURCE_SENSE_REVIEW,
-                $reviewSessionId,
-                $reviewDurationMs,
-            );
-            $latestLog = ReviewLog::where('review_card_id', $card->id)
-                ->where('user_id', $userId)
-                ->orderBy('id', 'desc')
-                ->first();
+                    return $payload;
+                });
+
+                return response()->json($payload);
+            } catch (\InvalidArgumentException $e) {
+                return $this->readingContractError($e);
+            }
         }
+
+        $updatedCard = $this->reviewCardService->recordReview(
+            $userId,
+            $language,
+            $card->id,
+            $rating,
+            ReviewLog::SOURCE_SENSE_REVIEW,
+            $reviewSessionId,
+            $reviewDurationMs,
+        );
+        $latestLog = ReviewLog::where('review_card_id', $card->id)
+            ->where('user_id', $userId)
+            ->orderBy('id', 'desc')
+            ->first();
 
         $action = null;
         if ($latestLog) {
@@ -179,6 +196,56 @@ class SenseReviewController extends Controller
             'summary' => $result['summary'],
             'action' => $action,
         ]);
+    }
+
+    private function buildRatePayload(
+        int $userId,
+        string $language,
+        ReviewCard $updatedCard,
+        ReviewLog $latestLog,
+        bool $ignoreDailyLimits,
+    ): array {
+        $action = [
+            'review_log_id' => $latestLog->id,
+            'review_session_id' => $latestLog->review_session_id,
+            'rating' => $latestLog->rating,
+            'rating_label' => $this->ratingContract->labelFor($latestLog->rating),
+            'reviewed_at' => $latestLog->reviewed_at?->toIso8601String(),
+            'undoable' => $latestLog->before_card_snapshot !== null
+                && $latestLog->review_session_id !== null
+                && $latestLog->undone_at === null,
+        ];
+        $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $nextCard = $result['cards']->first();
+
+        return [
+            'reviewed_card' => $this->senseReviewCardSerializerService->serialize($updatedCard->load('sense')),
+            'next_card' => $nextCard ? $this->senseReviewCardSerializerService->serialize($nextCard) : null,
+            'summary' => $result['summary'],
+            'action' => $action,
+        ];
+    }
+
+    private function readingContractError(\InvalidArgumentException $exception)
+    {
+        $code = $exception->getMessage();
+        $statuses = [
+            \App\Services\ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
+            \App\Services\ReadingSessionService::ERROR_SESSION_NOT_ACTIVE => 409,
+            \App\Services\ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH => 409,
+            \App\Services\ReadingSessionService::ERROR_SESSION_STALE_SOURCE => 409,
+            \App\Services\ReadingSessionService::ERROR_OCCURRENCE_STALE => 409,
+            \App\Services\ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+        ];
+        if (!isset($statuses[$code])) {
+            $code = \App\Services\ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID;
+        }
+
+        return response()->json([
+            'success' => false,
+            'error_code' => $code,
+            'message' => 'Reading rating conflicts with the current server state.',
+        ], $statuses[$code]);
     }
 
     /**

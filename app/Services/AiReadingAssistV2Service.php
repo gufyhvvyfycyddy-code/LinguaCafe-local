@@ -30,6 +30,7 @@ class AiReadingAssistV2Service
         private ReadingTargetCatalogService $targetCatalogService,
         private ReadingUnfamiliarTargetService $unfamiliarTargetService,
         private ReadingOccurrenceSenseEvidenceService $evidenceService,
+        private ReadingChapterTextService $chapterTextService,
     ) {
     }
 
@@ -38,13 +39,20 @@ class AiReadingAssistV2Service
         string $language,
         int $chapterId,
         ?array $expectedMarkedTargets = null,
+        ?string $expectedMarkedTargetsSnapshotVersion = null,
     ): array {
         try {
             if ($expectedMarkedTargets !== null) {
                 try {
-                    $this->unfamiliarTargetService->syncClientSnapshot($userId, $language, $chapterId, $expectedMarkedTargets);
+                    $this->unfamiliarTargetService->syncClientSnapshot(
+                        $userId,
+                        $language,
+                        $chapterId,
+                        $expectedMarkedTargets,
+                        $expectedMarkedTargetsSnapshotVersion,
+                    );
                 } catch (\InvalidArgumentException|\Illuminate\Validation\ValidationException $e) {
-                    $this->reject(self::ERROR_TARGET_SET_MISMATCH, $e->getMessage());
+                    $this->reject(self::ERROR_TARGET_SET_MISMATCH, 'V2 marked target snapshot is stale or invalid.');
                 }
             }
             $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
@@ -136,7 +144,7 @@ class AiReadingAssistV2Service
             return [
                 'success' => false,
                 'error_code' => self::ERROR_INTERNAL,
-                'message' => $e->getMessage(),
+                'message' => 'V2 reading-assist source request could not be processed.',
             ];
         }
     }
@@ -148,11 +156,16 @@ class AiReadingAssistV2Service
         ChapterAiReadingAssist $record,
     ): array {
         $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
-        if (!$record->source_revision || $record->source_revision !== $catalog['source_revision']) {
+        $currentScopeHash = $this->targetScopeHash($catalog['targets']);
+        if (!$record->source_revision
+            || $record->source_revision !== $catalog['source_revision']
+            || !$record->target_scope_hash
+            || !hash_equals($record->target_scope_hash, $currentScopeHash)) {
             return [
                 'assist_stale' => true,
                 'verification_items' => [],
                 'current_source_revision' => $catalog['source_revision'],
+                'current_target_scope_hash' => $currentScopeHash,
             ];
         }
 
@@ -175,9 +188,6 @@ class AiReadingAssistV2Service
 
         $items = [];
         foreach ($catalog['targets'] as $target) {
-            if (count($items) >= 500) {
-                break;
-            }
             $occurrenceId = $target['occurrence_id'];
             $result = $resultByOccurrence[$occurrenceId] ?? null;
             if (!$result) {
@@ -202,7 +212,25 @@ class AiReadingAssistV2Service
             'assist_stale' => false,
             'verification_items' => $items,
             'current_source_revision' => $catalog['source_revision'],
+            'current_target_scope_hash' => $currentScopeHash,
         ];
+    }
+
+    public function isRecordCurrent(
+        int $userId,
+        string $language,
+        int $chapterId,
+        ChapterAiReadingAssist $record,
+    ): bool {
+        $catalog = $this->targetCatalogService->build($userId, $language, $chapterId);
+        if (!$record->source_revision || $record->source_revision !== $catalog['source_revision']) {
+            return false;
+        }
+        if (!$record->target_scope_hash) {
+            return false;
+        }
+
+        return hash_equals($record->target_scope_hash, $this->targetScopeHash($catalog['targets']));
     }
 
     public function previewImport(int $userId, string $language, int $chapterId, array $parts): array
@@ -225,7 +253,7 @@ class AiReadingAssistV2Service
                 'success' => false,
                 'parsed' => false,
                 'error_code' => self::ERROR_INTERNAL,
-                'message' => $e->getMessage(),
+                'message' => 'V2 reading-assist preview could not be processed.',
             ];
         }
     }
@@ -233,8 +261,9 @@ class AiReadingAssistV2Service
     public function confirmImport(int $userId, string $language, int $chapterId, array $parts, bool $applyTrustAi = false): array
     {
         try {
-            $merged = $this->validateAndMergeParts($userId, $language, $chapterId, $parts);
-            $saved = DB::transaction(function () use ($userId, $language, $chapterId, $merged, $applyTrustAi) {
+            $saved = DB::transaction(function () use ($userId, $language, $chapterId, $parts, $applyTrustAi) {
+                $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
+                $merged = $this->validateAndMergeParts($userId, $language, $chapterId, $parts);
                 $projection = $this->legacyProjection($merged);
                 $payloadHash = 'sha256:' . hash('sha256', json_encode(
                     $merged['validated_payload'],
@@ -251,6 +280,7 @@ class AiReadingAssistV2Service
                         'schema_version' => self::SCHEMA_VERSION,
                         'source_revision' => $merged['source_revision'],
                         'payload_hash' => $payloadHash,
+                        'target_scope_hash' => $merged['target_scope_hash'],
                         'sentence_translations' => $merged['validated_payload']['sentence_translations'],
                         'vocabulary_items' => $projection['vocabulary_items'],
                         'phrase_items' => $projection['phrase_items'],
@@ -278,6 +308,7 @@ class AiReadingAssistV2Service
                 'chapter_id' => $chapterId,
                 'schema_version' => self::SCHEMA_VERSION,
                 'source_revision' => $saved->source_revision,
+                'target_scope_hash' => $saved->target_scope_hash,
                 'summary' => $saved->summary,
                 'message' => '本章 AI 辅助内容已保存。',
             ];
@@ -287,7 +318,7 @@ class AiReadingAssistV2Service
             return [
                 'success' => false,
                 'error_code' => self::ERROR_INTERNAL,
-                'message' => $e->getMessage(),
+                'message' => 'V2 import could not be saved.',
             ];
         }
     }
@@ -423,6 +454,7 @@ class AiReadingAssistV2Service
         return [
             'package_ids' => array_values($packageIdsByPart),
             'source_revision' => $catalog['source_revision'],
+            'target_scope_hash' => $scopeHash,
             'validated_payload' => $validatedPayload,
             'summary' => [
                 'sentence_translation_count' => count($sentenceTranslations),
@@ -942,7 +974,7 @@ class AiReadingAssistV2Service
         return $sets;
     }
 
-    private function targetScopeHash(array $targets): string
+    public function targetScopeHash(array $targets): string
     {
         $scope = [];
         foreach ($targets as $target) {
