@@ -20,9 +20,9 @@ use Tests\TestCase;
 /**
  * PAB R2 Phase B source / undo / analytics acceptance tests.
  *
- * PENDING_INTEGRATION_RUN: this class writes the shared testing DB and MUST be
- * run only by Lane 4 after Backend Core has registered reading_passive and
- * reading_explicit. Lane 3 only lints/commits it.
+ * INTEGRATION_DB_ONLY: this class writes the shared testing DB and MUST be
+ * run only by the Integration owner after Backend Core has registered
+ * reading_passive and reading_explicit. This lane only lints/commits it.
  */
 class ReadingReviewSourceUndoAnalyticsTest extends TestCase
 {
