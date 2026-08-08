@@ -1,5 +1,20 @@
 export const READER_INLINE_RATINGS = Object.freeze(['again', 'hard', 'good', 'easy']);
 
+export function normalizeReaderManualSensePos(value) {
+    const normalized = String(value || '').trim().toLowerCase();
+    const aliases = {
+        noun: 'noun', n: 'noun',
+        verb: 'verb', v: 'verb',
+        adjective: 'adjective', adj: 'adjective',
+        adverb: 'adverb', adv: 'adverb',
+        preposition: 'preposition', prep: 'preposition', adp: 'preposition',
+        conjunction: 'conjunction', conj: 'conjunction', cconj: 'conjunction', sconj: 'conjunction',
+        phrase: 'phrase',
+        other: 'other',
+    };
+    return aliases[normalized] || 'other';
+}
+
 export function createReaderInlineSenseReviewState(occurrence = null) {
     return {
         occurrence,

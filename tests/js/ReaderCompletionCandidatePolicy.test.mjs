@@ -160,12 +160,15 @@ test('TextBlockGroup delegates classification and preserves its compatibility ad
     assert.doesNotMatch(methodSource, /definitions_checked|stage < 0/);
 });
 
-test('TextReader keeps the established finish call and payload boundary', () => {
+test('TextReader keeps the established completion-candidate payload inside the R3 preflight/commit boundary', () => {
     assert.match(
         textReaderSource,
         /this\.leveledUpWordsAndPhrases = this\.\$refs\.interactiveText\.getLeveledUpWordsAndPhrases\(\);/,
     );
-    assert.match(textReaderSource, /axios\.post\('\/chapters\/finish', \{/);
+    assert.match(textReaderSource, /buildFinishBasePayload\(\)/);
+    assert.match(textReaderSource, /axios\.post\('\/chapters\/finish', requestPayload\)/);
+    assert.match(textReaderSource, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'preflight'\)/);
+    assert.match(textReaderSource, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'commit'\)/);
     assert.match(textReaderSource, /uniqueWords: JSON\.stringify\(this\.\$refs\.interactiveText\.uniqueWords\)/);
     assert.match(textReaderSource, /leveledUpWords: JSON\.stringify\(this\.leveledUpWordsAndPhrases\.wordIds\)/);
     assert.match(textReaderSource, /leveledUpPhrases: JSON\.stringify\(this\.leveledUpWordsAndPhrases\.phraseIds\)/);

@@ -453,6 +453,7 @@
             value: Boolean,
             chapterId: [Number, String],
             markedTargets: { type: Array, default: () => [] },
+            markedTargetsSnapshotVersion: { type: String, default: '' },
             trustAiReadingSenseBinding: { type: Boolean, default: false },
             autoAddAiNewSenseToLearning: { type: Boolean, default: false },
         },
@@ -672,6 +673,10 @@
                     this.error = '未选择章节。';
                     return;
                 }
+                if (!this.markedTargetsSnapshotVersion) {
+                    this.error = '服务器标记快照尚未加载，无法生成 V2 请求。请返回阅读页后重试。';
+                    return;
+                }
 
                 this.sourceLoading = true;
                 this.error = '';
@@ -679,7 +684,10 @@
 
                 axios.post(
                     '/chapters/ai-assist/source',
-                    buildReaderAiAssistV2SourceRequest(this.chapterId, this.markedTargets),
+                    {
+                        ...buildReaderAiAssistV2SourceRequest(this.chapterId, this.markedTargets),
+                        marked_targets_snapshot_version: this.markedTargetsSnapshotVersion || null,
+                    },
                 ).then((response) => {
                     const data = response.data;
                     this.sourceMeta = normalizeReaderAiAssistSourceMeta(data);
@@ -758,6 +766,7 @@
                 ).then((response) => {
                     this.confirmSuccess = true;
                     this.confirmError = '';
+                    this.$emit('confirmed');
                 }).catch((error) => {
                     this.confirmError = readerAiAssistErrorMessage(error, '保存失败。');
                     this.confirmSuccess = false;

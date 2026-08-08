@@ -445,18 +445,17 @@
                     <!-- AI reading assist section -->
                     <v-tab-item :value="3">
                         <v-alert type="info" text dense class="mb-5">
-                            这两个偏好已经预留，但正式后端绑定接口尚未在本 Lane 接通，因此当前保持禁用。它们不会自动产生复习评分。
+                            “信任 AI”只会在后续生成或重新确认 V2 结果时，对服务器持久化的 high + matched_existing 证据生效。切换开关不会追溯修改旧结果，也不会产生正式复习评分。自动新增词义仍保持关闭。
                         </v-alert>
                         <v-row>
                             <v-col cols="8" md="7" class="switch-container mt-0 mb-md-5">
                                 <div>信任 AI 的高置信词义匹配</div>
-                                <div class="caption text--secondary mt-1">后端契约接通后，仅对服务器确认可用的 high + matched_existing 生效；不会自动评分。</div>
+                                <div class="caption text--secondary mt-1">仅对后续生成或重新确认的 V2 结果生效；服务器持久化证据才是依据，不会自动评分。</div>
                             </v-col>
                             <v-col cols="4" md="5" class="switch-container d-flex align-center justify-end">
                                 <v-switch
                                     color="primary"
                                     v-model="settings.trustAiReadingSenseBinding"
-                                    disabled
                                     @change="saveSettings"
                                 ></v-switch>
                             </v-col>
@@ -465,7 +464,7 @@
                         <v-row>
                             <v-col cols="8" md="7" class="switch-container mt-0 mb-md-5">
                                 <div>AI 发现新词义后自动加入学习</div>
-                                <div class="caption text--secondary mt-1">后端契约接通后，只影响你明确标记“不认识”的目标；它与“信任 AI 的旧词义匹配”是两个独立选择。</div>
+                                <div class="caption text--secondary mt-1">本功能仍未开放。AI 不会自动创建或加入新词义；新增词义必须由你明确确认。</div>
                             </v-col>
                             <v-col cols="4" md="5" class="switch-container d-flex align-center justify-end">
                                 <v-switch

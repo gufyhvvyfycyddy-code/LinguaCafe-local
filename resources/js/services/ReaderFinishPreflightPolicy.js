@@ -1,27 +1,24 @@
-const READING_SESSION_STORAGE_KEY_PREFIX = 'linguacafe-reading-session-id';
+import {
+    buildReaderFinishRequest,
+    clearReadingSessionRecoveryId,
+    loadReadingSessionRecoveryId,
+    normalizeReaderFinishResult,
+    saveReadingSessionRecoveryId,
+} from './ReaderRecoveryPolicy.js';
 
-function randomSessionId() {
-    if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') {
-        return crypto.randomUUID();
-    }
-    return `reading-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+// Kept as a compatibility export for existing Reader tests/imports. The name is
+// historical: R3 never creates an ID on the client. It only returns a
+// server-issued recovery pointer already stored for this chapter.
+export function getOrCreateReadingSessionId(chapterId, storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null)) {
+    return loadReadingSessionRecoveryId(chapterId, storage);
 }
 
-export function getOrCreateReadingSessionId(
-    chapterId,
-    storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null),
-) {
-    const normalizedChapterId = Number(chapterId);
-    if (!Number.isInteger(normalizedChapterId) || normalizedChapterId <= 0) {
-        return randomSessionId();
-    }
-    if (!storage) return randomSessionId();
-    const key = `${READING_SESSION_STORAGE_KEY_PREFIX}:${normalizedChapterId}`;
-    const existing = storage.getItem(key);
-    if (existing) return existing;
-    const created = randomSessionId();
-    storage.setItem(key, created);
-    return created;
+export function rememberServerReadingSessionId(chapterId, readingSessionId, storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null)) {
+    return saveReadingSessionRecoveryId(chapterId, readingSessionId, storage);
+}
+
+export function forgetServerReadingSessionId(chapterId, storage = (typeof sessionStorage !== 'undefined' ? sessionStorage : null)) {
+    return clearReadingSessionRecoveryId(chapterId, storage);
 }
 
 export function createReaderReadingInteractionState(readingSessionId = '') {
@@ -52,42 +49,50 @@ export function markReaderOccurrenceReviewed(state, occurrenceId) {
     };
 }
 
-export function buildReaderFinishPreflightRequest(state, chapterId) {
-    return {
-        chapter_id: Number(chapterId),
-        reading_session_id: state?.readingSessionId || '',
-        explicitly_opened_occurrence_ids: [...(state?.openedOccurrenceIds || [])],
-        explicitly_reviewed_occurrence_ids: [...(state?.reviewedOccurrenceIds || [])],
-    };
+// R3 Finish authority lives on the server. This helper only adds the opaque
+// server session and settlement mode to the legacy chapter-finish payload.
+export function buildReaderFinishPreflightRequest(state, chapterId, basePayload = {}) {
+    return buildReaderFinishRequest(
+        { ...basePayload, chapter_id: Number(chapterId) },
+        state?.readingSessionId || '',
+        'preflight',
+    );
 }
 
 export function normalizeReaderFinishPreflight(payload = {}) {
-    const source = payload.preflight || payload;
-    const count = value => {
-        const number = Number(value || 0);
-        return Number.isFinite(number) && number >= 0 ? number : 0;
-    };
+    const normalized = normalizeReaderFinishResult(payload);
     return {
-        passiveGoodCount: count(source.passive_good_count),
-        pendingConfirmationCount: count(source.pending_confirmation_count || source.pending_count),
-        excludedCount: count(source.excluded_count),
-        alreadySettledCount: count(source.already_settled_count),
-        canFinish: source.can_finish !== false,
-        message: source.message || '',
+        passiveGoodCount: normalized.passiveGoodCount,
+        pendingConfirmationCount: normalized.unresolvedCount,
+        unresolvedCount: normalized.unresolvedCount,
+        unresolvedOccurrenceIds: normalized.unresolvedOccurrenceIds,
+        excludedCount: normalized.excludedCount,
+        alreadySettledCount: normalized.alreadySettledCount,
+        canFinish: normalized.canCommit,
+        canCommit: normalized.canCommit,
+        completed: normalized.completed,
+        preflightRequired: normalized.preflightRequired,
+        message: payload.message || '',
         backendAvailable: true,
         raw: payload,
     };
 }
 
-export function readerFinishPreflightUnavailable(message = '无法确认本次阅读结算，请稍后重试。当前没有被动评分被提交。') {
+export function readerFinishPreflightUnavailable(message = '无法确认本次阅读结算。服务器结果目前未知；已保留阅读会话，恢复网络后可安全重试。') {
     return {
         passiveGoodCount: 0,
         pendingConfirmationCount: 0,
+        unresolvedCount: 0,
+        unresolvedOccurrenceIds: [],
         excludedCount: 0,
         alreadySettledCount: 0,
         canFinish: false,
+        canCommit: false,
+        completed: false,
+        preflightRequired: true,
         message,
         backendAvailable: false,
+        outcomeUnknown: true,
         raw: null,
     };
 }

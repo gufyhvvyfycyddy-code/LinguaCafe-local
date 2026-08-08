@@ -6,6 +6,7 @@ import {
     buildReadingSenseResolutionIntent,
     isTrustAiVerified,
     isReadingSenseWordTarget,
+    mergeReadingSenseVerificationItems,
     readingSenseVerificationState,
     readingSenseVerificationSummary,
 } from '../../resources/js/services/ReadingSenseVerificationPolicy.js';
@@ -82,4 +83,29 @@ test('verification dialog is chapter-level and never mounts InlineSensePreviewPa
     assert.match(source, /本次不计入被动复习/);
     assert.match(source, /改选已学词义/);
     assert.match(source, /词组只展示 AI 释义，不进入 WordSense 绑定或被动复习/);
+});
+
+
+test('verification merge keeps server target candidates while overlaying persisted evidence', () => {
+    const merged = mergeReadingSenseVerificationItems({
+        targets: [{
+            occurrence_id: 'occ2_bank',
+            kind: 'word',
+            start_word_index: 4,
+            candidate_word_senses: item.candidate_word_senses,
+        }],
+        assistItems: [{ occurrence_id: 'occ2_bank', result: 'matched_existing', confidence: 'high' }],
+        evidenceItems: [{
+            occurrence_id: 'occ2_bank',
+            resolution: 'matched_existing',
+            word_sense_id: 95,
+            binding_current: true,
+            candidate_word_senses: item.candidate_word_senses,
+        }],
+    });
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0].evidence.resolution, 'matched_existing');
+    assert.equal(merged[0].evidence.word_sense_id, 95);
+    assert.equal(merged[0].candidate_word_senses.length, 2);
+    assert.equal(readingSenseVerificationState(merged[0]), 'verified');
 });
