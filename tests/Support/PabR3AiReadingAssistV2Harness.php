@@ -3,6 +3,7 @@
 namespace Tests\Support;
 
 use App\Services\AiReadingAssistV2Service;
+use App\Services\ReadingChapterTextService;
 use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingTargetCatalogService;
 use App\Services\ReadingUnfamiliarTargetService;
@@ -103,8 +104,14 @@ final class PabR3AiReadingAssistV2Harness
 
         $unfamiliar = Mockery::mock(ReadingUnfamiliarTargetService::class);
         $evidenceService ??= Mockery::mock(ReadingOccurrenceSenseEvidenceService::class);
+        $chapterTextService = Mockery::mock(ReadingChapterTextService::class);
 
-        return new AiReadingAssistV2Service($catalogService, $unfamiliar, $evidenceService);
+        return new AiReadingAssistV2Service(
+            $catalogService,
+            $unfamiliar,
+            $evidenceService,
+            $chapterTextService,
+        );
     }
 
     public static function packages(AiReadingAssistV2Service $service): array

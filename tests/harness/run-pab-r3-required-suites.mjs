@@ -86,16 +86,22 @@ function runPurePhpSuite(suite, file) {
         throw new Error(`${suite} cannot run: neither local vendor/autoload.php nor PAB_R3_VENDOR_AUTOLOAD is available.`);
     }
 
+    const appRoot = process.env.PAB_R3_APP_ROOT || root;
+    if (!existsSync(join(appRoot, 'app'))) {
+        throw new Error(`${suite} cannot run: PAB_R3_APP_ROOT does not contain an app directory.`);
+    }
+
     const code = String.raw`
 $loader = require $argv[1];
-$root = $argv[2];
-$loader->addPsr4('App\\', $root.'/app/', true);
-$loader->addPsr4('Tests\\', $root.'/tests/', true);
-chdir($root);
+$testsRoot = $argv[2];
+$appRoot = $argv[3];
+$loader->addPsr4('App\\', $appRoot.'/app/', true);
+$loader->addPsr4('Tests\\', $testsRoot.'/tests/', true);
+chdir($testsRoot);
 $runner = new PHPUnit\TextUI\Application();
-exit($runner->run(['phpunit', '--no-configuration', $argv[3]]));
+exit($runner->run(['phpunit', '--no-configuration', $argv[4]]));
 `;
-    run(PHP_BINARY(), ['-r', code, autoload, root, file], suite, true);
+    run(PHP_BINARY(), ['-r', code, autoload, root, appRoot, file], suite, true);
 }
 
 function PHP_BINARY() {
