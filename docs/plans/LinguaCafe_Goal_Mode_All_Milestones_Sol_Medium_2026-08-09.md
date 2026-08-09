@@ -244,8 +244,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | FND-01 | DONE | 建立/恢复单一 Goal branch、fresh authority map、checkpoint | 现有 master/candidate refs、AGENTS、当前计划 | refs/branch/worktree 记录；无用户资产被改；本文件 checkpoint 更新 |
 | FND-02 | DONE | 独立 re-audit `f1e4898e`，确认 numeric-PID kill blocker 真关闭 | 现有 47/524 pure suite、TestingDatabaseLease contract | 新鲜代码 audit + targeted/full pure tests；无 numeric PID termination path；lease/process residue=0 |
 | FND-03 | DONE | 修复 Sentinel helper cancellation，优先把 acceptance server 变成 helper 直接拥有的单一真实 server process | `f971df50`、现有 lease/sentinel helper | process-level test 证明 cancel 后 child/server/port 全结束；sentinel cleanup 在 lease release 前；不新增第二 lease/worker/通用 supervisor |
-| FND-04 | ACTIVE | 独立 audit 修后的 Sentinel helper | FND-03 | blocker=0；pure/process tests 真实通过；无 false-green cleanup |
-| FND-05 | TODO | 组合 Backend + Reader + Harness + Infra + Sentinel 到 Goal branch | 五个已验候选 | merge/cherry-pick provenance；无手工语义漂移；non-DB gates 全绿 |
+| FND-04 | DONE | 独立 audit 修后的 Sentinel helper | FND-03 | blocker=0；pure/process tests 真实通过；无 false-green cleanup |
+| FND-05 | ACTIVE | 组合 Backend + Reader + Harness + Infra + Sentinel 到 Goal branch | 五个已验候选 | merge/cherry-pick provenance；无手工语义漂移；non-DB gates 全绿 |
 | FND-06 | TODO | 在官方 testing DB lease 下运行 PAB-R3 DB/concurrency integration | 现有 65 DB-backed tests、lease harness | B14/B16/action-id/undo/rerate/explicit-vs-Finish/opened precedence/rollback 等真实 DB tests 绿；lease/sentinel clean |
 
 ---
@@ -472,21 +472,21 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `FND-04`
-- Last DONE: `FND-03`
+- Active milestone: `FND-05`
+- Last DONE: `FND-04`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — FND-04
+### ACTIVE MILESTONE ARCHITECTURE GATE — FND-05
 
-- 目标：在提交后的 Goal branch 上独立复审 FND-03，证明直接 server ownership、同源 cancellation、cleanup 顺序与测试均无 blocker/false-green。
-- 不做：不新增行为、不顺手重构、不连接数据库、不修改产品代码；仅 Required/Blocker 才回到 FND-03 allowlist 修复。
-- Owner/seam：只读审查 `run-pab-r3-browser-acceptance.php` 与 `PabR3BrowserAcceptanceHarnessTest.php` 的命令准备、process resource 生命周期和 lease/sentinel 边界。
-- Allowlist：默认仅本控制面；发现 Required/Blocker 时才重新开放 FND-03 两个文件。
-- 数据/兼容边界：不得创建数据库 sentinel；用 fake sentinel + pure/process server 验证，不把报告标签当清理证据。
-- 最小验证：fresh diff/call-chain review；PHP parse；18 helper tests；65 lease+helper pure/process tests；lease/server/probe residue=0。
+- 目标：把已验 Backend `20a11670`、Reader `e09569bf`、Harness `dfd98446` 的共享祖先与增量按 provenance 组合进 Goal branch；Infra/Sentinel 已在 FND-02/03 落入，不重复实现。
+- 不做：不手工重写候选语义、不执行 migration/数据库测试、不修相邻产品问题、不扩大到 Phase A 新行为。
+- Owner/seam：Backend 保持正式 rating/undo/action-id owner；Reader 只消费 server session/action/opened ACK；Harness 只验证合同。冲突只允许在三个候选的共同祖先与增量间按提交拓扑消解。
+- Allowlist：严格为 `origin/master..20a11670`、`origin/master..e09569bf`、`origin/master..dfd98446` 的文件并集，加本控制面；任何并集外文件禁止修改。
+- 数据/兼容边界：migration 文件只进入版本控制，不执行；正式评分仍走既有唯一服务链；V1/旧 Reader 兼容由候选现有测试证明，不新增 fallback。
+- 最小验证：逐提交 provenance/merge-clean 检查；PHP parse/focused pure；全量 JS 357/357；`npm run development`；PAB-R3 non-DB harness/pure gates；worktree 无冲突或残渣。
 
 ### PROGRESS LOG
 
@@ -501,6 +501,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 10:24 | FND-02 | DONE | Goal branch tip | f1e4898e 仅保留 PID/command inspection 为只读证据，所有 termination 使用原始 proc_open resource；47/47 tests、523 assertions，1 个与改动无关的 host symlink capability skip；lease inactive、stale metadata=false、PHP probe residue=0 | FND-03`
 
 `2026-08-09 10:27 | FND-03 | DONE | Goal branch tip | artisan serve acceptance 命令转换为 helper 直接拥有的单层 php -S；同一个 cancellation probe 驱动 child loop；18/18 focused、65/65 combined、613 assertions，已知 host symlink capability skip 1；lease inactive、server/probe residue=0；fresh review Required/Blocker=0 | FND-04`
+
+`2026-08-09 10:32 | FND-04 | DONE | Goal branch tip | 独立审查先发现真实 process test 绕过 artisan preparation 的 false-green Required；已改为贯通 artisan→php -S→cancel→proc_close→port closed；复审 Blocker=0/Required=0；18/18 focused、65/65 combined、613 assertions；lease inactive、residue=0 | FND-05`
 
 ### DECISION LOG
 

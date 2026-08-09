@@ -557,6 +557,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $public = $root.DIRECTORY_SEPARATOR.'public';
         mkdir($public, 0700, true);
         file_put_contents($public.DIRECTORY_SEPARATOR.'index.html', 'ready');
+        file_put_contents($root.DIRECTORY_SEPARATOR.'server.php', "<?php\nreturn false;\n");
 
         $reservation = null;
         $port = null;
@@ -591,7 +592,15 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
             $environment['APP_ENV'] = 'testing';
             try {
                 \runPabR3BrowserAcceptanceChild(
-                    [PHP_BINARY, '-S', '127.0.0.1:'.$port, '-t', $public],
+                    [
+                        PHP_BINARY,
+                        'artisan',
+                        '--env=testing',
+                        'serve',
+                        '--no-reload',
+                        '--host=127.0.0.1',
+                        '--port='.$port,
+                    ],
                     $environment,
                     $root,
                     $cancellationRequested,
@@ -616,6 +625,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
             } while (hrtime(true) < $closeDeadline);
             $this->assertTrue($portClosed, 'Cancellation must leave no listening server on the acceptance port.');
         } finally {
+            @unlink($root.DIRECTORY_SEPARATOR.'server.php');
             @unlink($public.DIRECTORY_SEPARATOR.'index.html');
             @rmdir($public);
             @rmdir($root);
