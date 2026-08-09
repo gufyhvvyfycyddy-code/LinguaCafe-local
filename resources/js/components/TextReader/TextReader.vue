@@ -1501,13 +1501,13 @@
                 const basePayload = this.buildFinishBasePayload();
                 if (!basePayload) return;
                 this.saving = true;
-                this.finished = true;
                 this.finishError = false;
                 return axios.post('/chapters/finish', basePayload)
                     .then((response) => {
                         this.saving = false;
                         this.finishError = !response || response.status !== 200;
                         if (!this.finishError) {
+                            this.finished = true;
                             this.setReaderNotice('本章阅读状态已保存。', 'success');
                         }
                         return !this.finishError;

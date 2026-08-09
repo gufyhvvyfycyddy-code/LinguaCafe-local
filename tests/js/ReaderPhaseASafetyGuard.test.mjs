@@ -78,6 +78,11 @@ test('Phase A Finish uses the legacy-compatible non-settlement request', () => {
     assert.ok(finishStart >= 0 && finishEnd > finishStart);
     assert.match(finishMethod, /const basePayload = this\.buildFinishBasePayload\(\)/);
     assert.match(finishMethod, /axios\.post\('\/chapters\/finish', basePayload\)/);
+    const postStart = finishMethod.indexOf("axios.post('/chapters/finish', basePayload)");
+    const finishedStart = finishMethod.indexOf('this.finished = true');
+    assert.ok(postStart >= 0 && finishedStart > postStart, 'Phase A must enter finished state only after the server response succeeds.');
+    assert.doesNotMatch(finishMethod.slice(0, postStart), /this\.finished\s*=\s*true/);
+    assert.match(finishMethod, /if \(!this\.finishError\) \{\s*this\.finished = true/);
     assert.doesNotMatch(finishMethod, /readingSessionId|settlement_mode|buildReaderFinishRequest|preFinishSafetyCheck/);
     assert.match(reader, /仍待核对的词义不会阻止完成/);
     assert.match(reader, /不会因为完成阅读而提交词义评分或改变复习计划/);

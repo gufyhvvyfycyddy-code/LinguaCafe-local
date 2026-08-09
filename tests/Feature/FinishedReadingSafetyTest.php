@@ -14,6 +14,7 @@ use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\ReadingChapterTextService;
 use App\Services\ReviewCardFsrsSnapshotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -115,21 +116,32 @@ class FinishedReadingSafetyTest extends TestCase
         $sense = $this->createWordSense($word);
         $card = $this->createReviewCard($sense);
         $log = $this->createReviewLog($card);
+        $chapterText = app(ReadingChapterTextService::class);
+        $sourceRevision = $chapterText->sourceRevision($this->chapter);
+        $occurrenceId = $chapterText->occurrenceId(
+            $this->user->id,
+            'english',
+            $this->chapter->id,
+            $sourceRevision,
+            ReadingUnfamiliarTarget::KIND_WORD,
+            0,
+            0,
+        );
         $session = ReadingSession::forceCreate([
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
             'user_id' => $this->user->id,
             'language_id' => 'english',
             'chapter_id' => $this->chapter->id,
-            'source_revision' => hash('sha256', 'phase-a-finish-source'),
+            'source_revision' => $sourceRevision,
             'status' => ReadingSession::STATUS_ACTIVE,
             'started_at' => now(),
         ]);
-        ReadingUnfamiliarTarget::forceCreate([
+        $target = ReadingUnfamiliarTarget::forceCreate([
             'user_id' => $this->user->id,
             'language_id' => 'english',
             'chapter_id' => $this->chapter->id,
-            'source_revision' => hash('sha256', 'phase-a-finish-source'),
-            'occurrence_id' => 'occ2_phase_a_unverified',
+            'source_revision' => $sourceRevision,
+            'occurrence_id' => $occurrenceId,
             'kind' => ReadingUnfamiliarTarget::KIND_WORD,
             'start_word_index' => 0,
             'end_word_index' => 0,
@@ -139,6 +151,10 @@ class FinishedReadingSafetyTest extends TestCase
             'pos' => 'adjective',
             'source_sentence' => 'Yellow green known words.',
         ]);
+
+        $this->assertSame($sourceRevision, $session->source_revision);
+        $this->assertSame($sourceRevision, $target->source_revision);
+        $this->assertSame($occurrenceId, $target->occurrence_id);
 
         $snapshotService = app(ReviewCardFsrsSnapshotService::class);
         $beforeCard = $snapshotService->capture($card->fresh());
@@ -154,7 +170,7 @@ class FinishedReadingSafetyTest extends TestCase
         $this->actingAs($this->user)->postJson('/chapters/finish', $payload)->assertOk();
 
         $this->assertSame(1, $this->chapter->fresh()->read_count);
-        $this->assertSame(1, ReadingUnfamiliarTarget::where('occurrence_id', 'occ2_phase_a_unverified')->count());
+        $this->assertSame(1, ReadingUnfamiliarTarget::where('occurrence_id', $occurrenceId)->count());
         $this->assertSame(ReadingSession::STATUS_ACTIVE, $session->fresh()->status);
         $this->assertNull($session->fresh()->completed_at);
         $this->assertTrue($snapshotService->matches($card->fresh(), $beforeCard));
