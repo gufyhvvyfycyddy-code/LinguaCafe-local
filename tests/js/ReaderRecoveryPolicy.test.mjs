@@ -162,7 +162,7 @@ test('Finish request supports only preflight/commit and consumes server completi
     }).passiveGoodCount, 4);
 });
 
-test('production Reader wires recovery, explicit interaction, manual continuation, undo and two-stage Finish without client session minting', () => {
+test('production Reader keeps recovery, explicit interaction, manual continuation, undo and dormant two-stage settlement without client session minting', () => {
     const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
     const recovery = fs.readFileSync('resources/js/services/ReaderRecoveryPolicy.js', 'utf8');
     assert.match(reader, /resume_reading_session_id/);
@@ -172,8 +172,10 @@ test('production Reader wires recovery, explicit interaction, manual continuatio
     assert.match(reader, /reading-occurrence-evidence/);
     assert.match(reader, /undoSenseReviewAction/);
     assert.match(recovery, /settlement_mode/);
-    assert.match(reader, /'preflight'/);
-    assert.match(reader, /'commit'/);
+    assert.match(reader, /preflightFinishSettlement\(\)/);
+    assert.match(reader, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'preflight'\)/);
+    assert.match(reader, /commitFinish\(\)/);
+    assert.match(reader, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'commit'\)/);
     assert.doesNotMatch(recovery, /readingSessionId\s*=\s*createReaderRequestId/);
 });
 

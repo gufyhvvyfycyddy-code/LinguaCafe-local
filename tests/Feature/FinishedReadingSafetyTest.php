@@ -5,11 +5,16 @@ namespace Tests\Feature;
 use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\EncounteredWord;
+use App\Models\ReadingSessionCardSettlement;
+use App\Models\ReadingSessionCompletion;
+use App\Models\ReadingSession;
+use App\Models\ReadingUnfamiliarTarget;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
+use App\Services\ReviewCardFsrsSnapshotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Tests\TestCase;
@@ -102,6 +107,61 @@ class FinishedReadingSafetyTest extends TestCase
         $this->assertSame(2, $newWord->fresh()->stage);
         $this->assertSame(1, $this->chapter->fresh()->read_count);
         $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_phase_a_finish_does_not_block_on_unverified_target_or_write_formal_review_state(): void
+    {
+        $word = $this->createEncounteredWord($this->user, 'english', 'yellow', 2);
+        $sense = $this->createWordSense($word);
+        $card = $this->createReviewCard($sense);
+        $log = $this->createReviewLog($card);
+        $session = ReadingSession::forceCreate([
+            'uuid' => (string) \Illuminate\Support\Str::uuid(),
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'source_revision' => hash('sha256', 'phase-a-finish-source'),
+            'status' => ReadingSession::STATUS_ACTIVE,
+            'started_at' => now(),
+        ]);
+        ReadingUnfamiliarTarget::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'source_revision' => hash('sha256', 'phase-a-finish-source'),
+            'occurrence_id' => 'occ2_phase_a_unverified',
+            'kind' => ReadingUnfamiliarTarget::KIND_WORD,
+            'start_word_index' => 0,
+            'end_word_index' => 0,
+            'sentence_index' => 0,
+            'surface' => 'Yellow',
+            'lemma' => 'yellow',
+            'pos' => 'adjective',
+            'source_sentence' => 'Yellow green known words.',
+        ]);
+
+        $snapshotService = app(ReviewCardFsrsSnapshotService::class);
+        $beforeCard = $snapshotService->capture($card->fresh());
+        $before = [
+            'logs' => ReviewLog::count(),
+            'settlements' => ReadingSessionCardSettlement::count(),
+            'completions' => ReadingSessionCompletion::count(),
+        ];
+
+        $payload = $this->finishPayload([], ['autoMoveWordsToKnown' => false]);
+        $this->assertArrayNotHasKey('reading_session_id', $payload);
+        $this->assertArrayNotHasKey('settlement_mode', $payload);
+        $this->actingAs($this->user)->postJson('/chapters/finish', $payload)->assertOk();
+
+        $this->assertSame(1, $this->chapter->fresh()->read_count);
+        $this->assertSame(1, ReadingUnfamiliarTarget::where('occurrence_id', 'occ2_phase_a_unverified')->count());
+        $this->assertSame(ReadingSession::STATUS_ACTIVE, $session->fresh()->status);
+        $this->assertNull($session->fresh()->completed_at);
+        $this->assertTrue($snapshotService->matches($card->fresh(), $beforeCard));
+        $this->assertSame($before['logs'], ReviewLog::count());
+        $this->assertSame($before['settlements'], ReadingSessionCardSettlement::count());
+        $this->assertSame($before['completions'], ReadingSessionCompletion::count());
+        $this->assertNotNull(ReviewLog::find($log->id));
     }
 
     private function finishPayload(array $uniqueWords, array $overrides = []): array

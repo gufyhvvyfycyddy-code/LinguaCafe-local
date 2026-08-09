@@ -321,15 +321,15 @@
         <!-- Finished reading confirmation dialog (UX guard against accidental clicks) -->
         <v-dialog v-model="finishConfirmDialog" max-width="480">
             <v-card>
-                <v-card-title>检查完成阅读条件？</v-card-title>
+                <v-card-title>确认完成阅读？</v-card-title>
                 <v-card-text>
-                    <p>下一步只会向服务器读取本次阅读的结算预览，不会提交被动评分，也不会结束阅读会话。</p>
-                    <p class="text--secondary text-caption">服务器会根据本次阅读会话、词义绑定和查词/查看答案记录计算结果。若仍有待核对词义，会先带你回到核对列表。</p>
+                    <p>这会保存本章的普通完成状态。仍待核对的词义不会阻止完成，你之后仍可重新打开本章继续核对。</p>
+                    <p class="text--secondary text-caption">本阶段不会因为完成阅读而提交词义评分或改变复习计划。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
-                    <v-btn text :disabled="finishChecking" @click="finishConfirmDialog = false">取消</v-btn>
-                    <v-btn color="primary" :loading="finishChecking" @click="finish()">检查结算</v-btn>
+                    <v-btn text :disabled="saving" @click="finishConfirmDialog = false">取消</v-btn>
+                    <v-btn color="primary" :loading="saving" @click="finish()">确认完成</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -1498,6 +1498,28 @@
             },
             finish() {
                 this.finishConfirmDialog = false;
+                const basePayload = this.buildFinishBasePayload();
+                if (!basePayload) return;
+                this.saving = true;
+                this.finished = true;
+                this.finishError = false;
+                return axios.post('/chapters/finish', basePayload)
+                    .then((response) => {
+                        this.saving = false;
+                        this.finishError = !response || response.status !== 200;
+                        if (!this.finishError) {
+                            this.setReaderNotice('本章阅读状态已保存。', 'success');
+                        }
+                        return !this.finishError;
+                    })
+                    .catch((error) => {
+                        this.saving = false;
+                        this.finishError = true;
+                        this.setReaderNotice(requestErrorMessage(error, '完成状态暂时无法保存，请重试。'), 'warning');
+                        return false;
+                    });
+            },
+            preflightFinishSettlement() {
                 if (!this.readingSessionId) {
                     this.setReaderNotice('服务器阅读会话尚未就绪，无法检查完成结算。请稍后重试。', 'warning');
                     return;

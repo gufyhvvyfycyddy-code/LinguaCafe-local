@@ -69,3 +69,16 @@ test('Reader recovery policy cannot mint a reading-session id', () => {
     assert.match(reader, /resume_reading_session_id/);
     assert.match(reader, /reading_session_id/);
 });
+
+test('Phase A Finish uses the legacy-compatible non-settlement request', () => {
+    const finishStart = reader.indexOf('finish() {');
+    const finishEnd = reader.indexOf('preflightFinishSettlement() {', finishStart);
+    const finishMethod = reader.slice(finishStart, finishEnd);
+
+    assert.ok(finishStart >= 0 && finishEnd > finishStart);
+    assert.match(finishMethod, /const basePayload = this\.buildFinishBasePayload\(\)/);
+    assert.match(finishMethod, /axios\.post\('\/chapters\/finish', basePayload\)/);
+    assert.doesNotMatch(finishMethod, /readingSessionId|settlement_mode|buildReaderFinishRequest|preFinishSafetyCheck/);
+    assert.match(reader, /仍待核对的词义不会阻止完成/);
+    assert.match(reader, /不会因为完成阅读而提交词义评分或改变复习计划/);
+});
