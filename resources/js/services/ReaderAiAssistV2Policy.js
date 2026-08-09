@@ -46,8 +46,8 @@ export function readerAiAssistPackageKey(pkg = {}) {
 export function readerAiAssistV2InputsComplete(sourceMeta = {}, aiTextByPart = {}) {
     const packages = Array.isArray(sourceMeta.packages) ? sourceMeta.packages : [];
     if (!packages.length) return false;
-    return packages.every((pkg, index) => {
-        const key = readerAiAssistPackageKey(pkg, index);
+    return packages.every((pkg) => {
+        const key = readerAiAssistPackageKey(pkg);
         return typeof aiTextByPart[key] === 'string' && aiTextByPart[key].trim().length > 0;
     });
 }
@@ -62,9 +62,9 @@ export function buildReaderAiAssistV2ImportRequest(
     return {
         chapterId,
         schema_version: sourceMeta.schemaVersion || READER_UNFAMILIAR_SCHEMA_VERSION,
-        parts: packages.map((pkg, index) => ({
+        parts: packages.map((pkg) => ({
             manifest_token: pkg.manifest_token || '',
-            ai_text: String(aiTextByPart[readerAiAssistPackageKey(pkg, index)] || ''),
+            ai_text: String(aiTextByPart[readerAiAssistPackageKey(pkg)] || ''),
         })),
         apply_trust_ai: Boolean(applyTrustAi),
     };

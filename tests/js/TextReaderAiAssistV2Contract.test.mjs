@@ -39,7 +39,7 @@ test('builds V2 multi-part import body from server-issued manifests and fails cl
         ],
     });
 
-    assert.equal(readerAiAssistPackageKey(sourceMeta.packages[1], 1), '2');
+    assert.equal(readerAiAssistPackageKey(sourceMeta.packages[1]), '2');
     assert.equal(readerAiAssistV2InputsComplete(sourceMeta, { 1: '{"part":1}', 2: '' }), false);
     assert.equal(readerAiAssistV2InputsComplete(sourceMeta, { 1: '{"part":1}', 2: '{"part":2}' }), true);
 
@@ -103,7 +103,7 @@ test('V2 metadata keeps real aliases but does not invent missing contract fields
     assert.equal(normalized.packageCount, 2);
     assert.equal(isReaderAiAssistV2({ schemaVersion: 'linguacafe_ai_reading_assist_v2' }), true);
     assert.equal(isReaderAiAssistV2({ contract_version: 'linguacafe_ai_reading_assist_v2' }), false);
-    assert.equal(readerAiAssistPackageKey(normalized.packages[0], 0), '');
+    assert.equal(readerAiAssistPackageKey(normalized.packages[0]), '');
     assert.equal(readerAiAssistV2InputsComplete(normalized, { 1: '{"part":1}' }), false);
 });
 
@@ -113,7 +113,8 @@ test('Reader AI Assist requests V2 source contract, wires strict V2 import, and 
     assert.match(source, /sourceMeta\.targetCount/);
     assert.match(source, /sourceMeta\.packageCount/);
     assert.match(source, /sourcePackages\.length > 1/);
-    assert.match(source, /copyPackagePrompt\(pkg, index\)/);
+    assert.match(source, /copyPackagePrompt\(pkg\)/);
+    assert.doesNotMatch(source, /part_index \|\| index \+ 1|readerAiAssistPackageKey\(pkg, index\)/);
     assert.match(source, /buildReaderAiAssistV2ImportRequest/);
     assert.match(source, /this\.buildImportRequest\(false\)/);
     assert.match(source, /this\.buildImportRequest\(this\.trustAiReadingSenseBinding\)/);

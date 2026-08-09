@@ -56,16 +56,16 @@
                                 本章被拆成 {{ sourcePackages.length }} 个 AI 包。请逐包复制提示词，并把每一包返回的 JSON 粘贴到下方对应位置；缺任一包都不会导入。
                             </v-alert>
                             <v-btn
-                                v-for="(pkg, index) in sourcePackages"
-                                :key="'copy-prompt-' + readerAiAssistPackageKey(pkg, index)"
+                                v-for="pkg in sourcePackages"
+                                :key="'copy-prompt-' + readerAiAssistPackageKey(pkg)"
                                 small
                                 outlined
                                 color="primary"
                                 class="mr-2 mb-2"
-                                @click="copyPackagePrompt(pkg, index)"
+                                @click="copyPackagePrompt(pkg)"
                             >
                                 <v-icon left small>mdi-content-copy</v-icon>
-                                复制第 {{ Number(pkg.part_index || index + 1) }} / {{ sourcePackages.length }} 包
+                                复制第 {{ Number(pkg.part_index) || '?' }} / {{ sourcePackages.length }} 包
                             </v-btn>
                         </div>
                     </div>
@@ -79,17 +79,17 @@
                         </div>
                         <template v-if="usesV2PackageImport">
                             <div
-                                v-for="(pkg, index) in sourcePackages"
-                                :key="'ai-return-' + readerAiAssistPackageKey(pkg, index)"
+                                v-for="pkg in sourcePackages"
+                                :key="'ai-return-' + readerAiAssistPackageKey(pkg)"
                                 class="mb-3"
                             >
                                 <div class="caption font-weight-medium mb-1">
-                                    第 {{ Number(pkg.part_index || index + 1) }} / {{ sourcePackages.length }} 包 AI 返回 JSON
-                                    <span v-if="copiedSourcePartIndex === Number(pkg.part_index || index + 1)" class="green--text ml-1">（刚复制了这一包提示词）</span>
+                                    第 {{ Number(pkg.part_index) || '?' }} / {{ sourcePackages.length }} 包 AI 返回 JSON
+                                    <span v-if="copiedSourcePartIndex === Number(pkg.part_index)" class="green--text ml-1">（刚复制了这一包提示词）</span>
                                 </div>
                                 <v-textarea
-                                    v-model="aiTextByPart[readerAiAssistPackageKey(pkg, index)]"
-                                    :label="'粘贴第 ' + Number(pkg.part_index || index + 1) + ' 包 JSON'"
+                                    v-model="aiTextByPart[readerAiAssistPackageKey(pkg)]"
+                                    :label="'粘贴第 ' + (Number(pkg.part_index) || '?') + ' 包 JSON'"
                                     rows="5"
                                     outlined
                                     dense
@@ -624,8 +624,8 @@
             },
             initializeAiPartTexts() {
                 const next = {};
-                this.sourcePackages.forEach((pkg, index) => {
-                    next[readerAiAssistPackageKey(pkg, index)] = '';
+                this.sourcePackages.forEach((pkg) => {
+                    next[readerAiAssistPackageKey(pkg)] = '';
                 });
                 this.aiTextByPart = next;
             },
@@ -644,9 +644,9 @@
                 document.body.removeChild(textarea);
                 return Promise.resolve();
             },
-            copyPackagePrompt(pkg, index) {
+            copyPackagePrompt(pkg) {
                 const prompt = pkg && pkg.prompt ? pkg.prompt : '';
-                const partIndex = Number((pkg && pkg.part_index) || index + 1);
+                const partIndex = Number(pkg && pkg.part_index);
                 return this.copyTextToClipboard(prompt).then(() => {
                     this.sourceCopied = true;
                     this.copiedSourcePartIndex = partIndex;
@@ -695,7 +695,7 @@
                     this.initializeAiPartTexts();
                     const firstPackage = this.sourcePackages[0];
                     if (firstPackage) {
-                        this.copyPackagePrompt(firstPackage, 0);
+                        this.copyPackagePrompt(firstPackage);
                     } else if (this.sourceMeta.prompt) {
                         this.copyTextToClipboard(this.sourceMeta.prompt).then(() => {
                             this.sourceCopied = true;
