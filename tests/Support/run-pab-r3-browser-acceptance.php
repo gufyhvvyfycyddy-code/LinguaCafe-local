@@ -312,17 +312,13 @@ final class PabR3BrowserAcceptanceHarness
     /** @param list<string> $command */
     private static function assertSentinelSafeCommand(array $command): void
     {
-        $artisanIndex = null;
-        foreach ($command as $index => $argument) {
-            $candidate = str_replace('\\', '/', $argument);
-            if (basename($candidate) === 'artisan') {
-                $artisanIndex = $index;
-                break;
-            }
-        }
-        if ($artisanIndex === null) {
+        $artisanArgument = $command[1] ?? null;
+        if (! is_string($artisanArgument)
+            || basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan'
+        ) {
             return;
         }
+        $artisanIndex = 1;
 
         $isServeCommand = false;
         for ($index = $artisanIndex + 1, $count = count($command); $index < $count; $index++) {
@@ -430,15 +426,16 @@ function parsePabR3BrowserAcceptanceArguments(array $arguments): array
  */
 function preparePabR3BrowserAcceptanceChild(array $command, string $projectRoot): array
 {
-    $artisanIndex = null;
-    $serveIndex = null;
-    foreach ($command as $index => $argument) {
-        if ($artisanIndex === null && basename(str_replace('\\', '/', $argument)) === 'artisan') {
-            $artisanIndex = $index;
+    $artisanArgument = $command[1] ?? null;
+    if (! is_string($artisanArgument)
+        || basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan'
+    ) {
+        return ['command' => $command, 'working_directory' => $projectRoot];
+    }
 
-            continue;
-        }
-        if ($artisanIndex !== null && $argument === 'serve') {
+    $serveIndex = null;
+    for ($index = 2, $count = count($command); $index < $count; $index++) {
+        if ($command[$index] === 'serve') {
             $serveIndex = $index;
             break;
         }
