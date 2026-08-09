@@ -6,6 +6,7 @@ use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\ReadingUnfamiliarTarget;
 use App\Models\User;
+use App\Services\AiReadingAssistV2Service;
 use App\Services\ReadingUnfamiliarTargetService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -13,14 +14,61 @@ use Illuminate\Support\Str;
 use Tests\TestCase;
 
 /**
- * R3 optimistic-concurrency contract for whole-snapshot replacement.
- * Integration executes this against the merged Backend implementation.
+ * AI source snapshot consistency must remain read-only while preserving stale-version rejection.
  */
 class ReadingUnfamiliarTargetSnapshotConflictTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_stale_whole_snapshot_cannot_erase_newer_user_intent(): void
+    public function test_current_version_conflicting_ai_source_cannot_replace_server_targets(): void
+    {
+        [$user, $chapter, $targets, $assist] = $this->fixture();
+        $targets->createTarget($user->id, 'english', $chapter->id, ReadingUnfamiliarTarget::KIND_WORD, 0, 0);
+        $snapshot = $targets->listCurrentTargets($user->id, 'english', $chapter->id);
+
+        $result = $assist->buildSourcePackages(
+            $user->id,
+            'english',
+            $chapter->id,
+            [[
+                'kind' => ReadingUnfamiliarTarget::KIND_WORD,
+                'start_word_index' => 1,
+                'end_word_index' => 1,
+            ]],
+            $this->snapshotVersion($snapshot),
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_TARGET_SET_MISMATCH, $result['error_code']);
+        $final = $targets->listCurrentTargets($user->id, 'english', $chapter->id);
+        $this->assertSame([0], array_column($final['targets'], 'start_word_index'));
+    }
+
+    public function test_stale_ai_source_cannot_erase_newer_server_intent(): void
+    {
+        [$user, $chapter, $targets, $assist] = $this->fixture();
+        $staleSnapshot = $targets->listCurrentTargets($user->id, 'english', $chapter->id);
+        $targets->createTarget($user->id, 'english', $chapter->id, ReadingUnfamiliarTarget::KIND_WORD, 0, 0);
+
+        $result = $assist->buildSourcePackages(
+            $user->id,
+            'english',
+            $chapter->id,
+            [[
+                'kind' => ReadingUnfamiliarTarget::KIND_WORD,
+                'start_word_index' => 1,
+                'end_word_index' => 1,
+            ]],
+            $this->snapshotVersion($staleSnapshot),
+        );
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(AiReadingAssistV2Service::ERROR_TARGET_SET_MISMATCH, $result['error_code']);
+        $final = $targets->listCurrentTargets($user->id, 'english', $chapter->id);
+        $this->assertSame([0], array_column($final['targets'], 'start_word_index'));
+    }
+
+    private function fixture(): array
     {
         $user = User::forceCreate([
             'name' => 'PAB R3 Snapshot',
@@ -49,38 +97,13 @@ class ReadingUnfamiliarTargetSnapshotConflictTest extends TestCase
             'subtitle_timestamps' => '[]',
             'processing_status' => 'processed',
         ]);
-        $service = app(ReadingUnfamiliarTargetService::class);
 
-        $clientA = $service->listCurrentTargets($user->id, 'english', $chapter->id);
-        $clientB = $service->listCurrentTargets($user->id, 'english', $chapter->id);
-        $versionA = $this->snapshotVersion($clientA);
-        $versionB = $this->snapshotVersion($clientB);
-        $this->assertSame($versionA, $versionB);
-
-        $this->syncWithExpectedVersion($service, $user->id, $chapter->id, [[
-            'kind' => ReadingUnfamiliarTarget::KIND_WORD,
-            'start_word_index' => 0,
-            'end_word_index' => 0,
-        ]], $versionA);
-        $afterA = $service->listCurrentTargets($user->id, 'english', $chapter->id);
-        $this->assertNotSame($versionA, $this->snapshotVersion($afterA));
-        $this->assertSame([0], array_column($afterA['targets'], 'start_word_index'));
-
-        $staleFailure = null;
-        try {
-            $this->syncWithExpectedVersion($service, $user->id, $chapter->id, [[
-                'kind' => ReadingUnfamiliarTarget::KIND_WORD,
-                'start_word_index' => 1,
-                'end_word_index' => 1,
-            ]], $versionB);
-        } catch (\Throwable $e) {
-            $staleFailure = $e;
-        }
-        $this->assertNotNull($staleFailure, 'A stale whole-snapshot replacement must be rejected.');
-        $this->assertNotSame('', trim($staleFailure->getMessage()));
-
-        $final = $service->listCurrentTargets($user->id, 'english', $chapter->id);
-        $this->assertSame([0], array_column($final['targets'], 'start_word_index'), 'Stale client B must not erase client A intent.');
+        return [
+            $user,
+            $chapter,
+            app(ReadingUnfamiliarTargetService::class),
+            app(AiReadingAssistV2Service::class),
+        ];
     }
 
     private function snapshotVersion(array $payload): string
@@ -92,20 +115,4 @@ class ReadingUnfamiliarTargetSnapshotConflictTest extends TestCase
         return $payload['snapshot_version'];
     }
 
-    private function syncWithExpectedVersion(
-        ReadingUnfamiliarTargetService $service,
-        int $userId,
-        int $chapterId,
-        array $targets,
-        string $expectedVersion,
-    ): array {
-        $method = new \ReflectionMethod($service, 'syncClientSnapshot');
-        $this->assertGreaterThanOrEqual(
-            5,
-            $method->getNumberOfParameters(),
-            'R3 syncClientSnapshot must accept an expected server-issued snapshot version/token.',
-        );
-
-        return $service->syncClientSnapshot($userId, 'english', $chapterId, $targets, $expectedVersion);
-    }
 }

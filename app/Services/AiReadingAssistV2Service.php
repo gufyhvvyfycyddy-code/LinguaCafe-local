@@ -44,14 +44,18 @@ class AiReadingAssistV2Service
         try {
             if ($expectedMarkedTargets !== null) {
                 try {
-                    $this->unfamiliarTargetService->syncClientSnapshot(
+                    $snapshot = $this->unfamiliarTargetService->listCurrentTargets(
                         $userId,
                         $language,
                         $chapterId,
-                        $expectedMarkedTargets,
-                        $expectedMarkedTargetsSnapshotVersion,
                     );
-                } catch (\InvalidArgumentException|\Illuminate\Validation\ValidationException $e) {
+                } catch (\InvalidArgumentException $e) {
+                    $this->reject(self::ERROR_TARGET_SET_MISMATCH, 'V2 marked target snapshot is stale or invalid.');
+                }
+                $currentSnapshotVersion = (string) ($snapshot['snapshot_version'] ?? '');
+                if ($currentSnapshotVersion === ''
+                    || !$expectedMarkedTargetsSnapshotVersion
+                    || !hash_equals($currentSnapshotVersion, $expectedMarkedTargetsSnapshotVersion)) {
                     $this->reject(self::ERROR_TARGET_SET_MISMATCH, 'V2 marked target snapshot is stale or invalid.');
                 }
             }
