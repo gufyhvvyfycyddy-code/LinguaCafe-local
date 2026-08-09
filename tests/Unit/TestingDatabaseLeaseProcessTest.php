@@ -180,13 +180,10 @@ class TestingDatabaseLeaseProcessTest extends TestCase
             $this->assertNotSame(0, $finished['exit_code']);
 
             $expiredWithinDeadline = $this->waitForLeaseInactive($identity, $base, 4.0);
-            $cleanup = $expiredWithinDeadline
-                ? 'not-needed'
-                : $this->terminateExactProbe($probePid, $probeFragments);
             $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
             $this->assertTrue(
                 $expiredWithinDeadline,
-                'Bounded probe exceeded its wall-clock deadline; exact cleanup='.$cleanup,
+                'Bounded probe exceeded its wall-clock deadline; numeric-PID cleanup is intentionally unavailable.',
             );
             $this->assertLessThan(5.0, $elapsedSeconds, 'Bounded probe outlived its dead-man deadline.');
             $this->assertSame('absent', $this->inspectExactProbe($probePid, $probeFragments));
@@ -203,9 +200,6 @@ class TestingDatabaseLeaseProcessTest extends TestCase
             $this->assertStringContainsString('ACQUIRED', $after['stdout']);
         } finally {
             $this->terminateProcess($parent);
-            if (is_int($probePid)) {
-                $this->terminateExactProbe($probePid, $probeFragments);
-            }
             $this->waitForLeaseInactive($identity, $base, 3.0);
             $this->removeDirectory($base);
             $this->removeGitWorktreeFixture($fixture);
@@ -246,11 +240,7 @@ class TestingDatabaseLeaseProcessTest extends TestCase
             $this->assertTrue(TestingDatabaseLease::statusIdentity($identity, $base)['active']);
 
             $startedAt = hrtime(true);
-            $finished = $this->finishProcess(
-                $probe,
-                0.75,
-                fn (): string => $this->terminateExactProbe($probePid, $probeFragments),
-            );
+            $finished = $this->finishProcess($probe, 0.75);
             $probe = null;
             $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
 
@@ -272,13 +262,41 @@ class TestingDatabaseLeaseProcessTest extends TestCase
             $this->assertStringContainsString('ACQUIRED', $after['stdout']);
         } finally {
             $this->terminateProcess($probe);
-            if (is_int($probePid)) {
-                $this->terminateExactProbe($probePid, $probeFragments);
-            }
             $this->waitForLeaseInactive($identity, $base, 3.0);
             $this->removeDirectory($base);
             $this->removeGitWorktreeFixture($fixture);
         }
+    }
+
+    public function test_process_cleanup_has_no_numeric_pid_kill_path_and_identity_mismatch_is_read_only(): void
+    {
+        $source = file_get_contents(__FILE__);
+        $this->assertIsString($source);
+        $normalized = preg_replace('/\s+/', '', $source);
+        $this->assertIsString($normalized);
+
+        $forbidden = [
+            'terminate'.'ExactProbe(',
+            'GetProcess'.'ById(',
+            'posix'.'_kill(',
+            "['kill',"."'-9',",
+        ];
+        foreach ($forbidden as $needle) {
+            $this->assertStringNotContainsString(
+                $needle,
+                $normalized,
+                'Cleanup must not re-resolve a numeric PID for termination.',
+            );
+        }
+
+        $currentPid = getmypid();
+        $this->assertIsInt($currentPid);
+        $this->assertGreaterThan(0, $currentPid);
+        $this->assertSame(
+            'mismatch',
+            $this->inspectExactProbe($currentPid, ['probe-mismatch-'.bin2hex(random_bytes(8))]),
+        );
+        $this->assertSame($currentPid, getmypid(), 'Identity mismatch inspection must be observation-only.');
     }
 
     public function test_bounded_project_probe_rejects_missing_or_out_of_range_deadlines(): void
@@ -1184,92 +1202,6 @@ POWERSHELL;
         return 'match';
     }
 
-    /** @param list<string> $expectedFragments */
-    private function terminateExactProbe(int $pid, array $expectedFragments): string
-    {
-        $inspection = $this->inspectExactProbe($pid, $expectedFragments);
-        if ($inspection === 'absent') {
-            return 'absent';
-        }
-        if ($inspection !== 'match') {
-            return $inspection;
-        }
-
-        if (PHP_OS_FAMILY === 'Windows') {
-            $fragmentLiterals = array_map(
-                static fn (string $fragment): string => "'".str_replace("'", "''", $fragment)."'",
-                $expectedFragments,
-            );
-            $script = '$TargetProcessId = '.$pid."\n"
-                .'$fragments = @('.implode(', ', $fragmentLiterals).")\n"
-                . <<<'POWERSHELL'
-$info = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $TargetProcessId) -ErrorAction SilentlyContinue
-if ($null -eq $info) {
-    Write-Output 'ABSENT'
-    exit 0
-}
-$commandLine = [string] $info.CommandLine
-foreach ($fragment in $fragments) {
-    if ([string]::IsNullOrEmpty($fragment) -or -not $commandLine.Contains($fragment)) {
-        Write-Output 'MISMATCH'
-        exit 0
-    }
-}
-try {
-    $process = [System.Diagnostics.Process]::GetProcessById($TargetProcessId)
-    if ($process.HasExited) {
-        Write-Output 'ABSENT'
-        exit 0
-    }
-    $process.Kill()
-    if (-not $process.WaitForExit(2000)) {
-        Write-Output 'TERMINATION_TIMEOUT'
-        exit 0
-    }
-    Write-Output 'TERMINATED'
-} catch [System.ArgumentException] {
-    Write-Output 'ABSENT'
-}
-POWERSHELL;
-            $result = $this->runProcess([
-                'powershell.exe',
-                '-NoProfile',
-                '-NonInteractive',
-                '-Command',
-                $script,
-            ], null, 4.0);
-            if ($result['timed_out']) {
-                return 'termination-tool-timeout';
-            }
-
-            return strtolower(trim($result['stdout']));
-        }
-
-        if (function_exists('posix_kill')) {
-            $signal = defined('SIGKILL') ? SIGKILL : 9;
-            if (! @posix_kill($pid, $signal)) {
-                return $this->inspectExactProbe($pid, $expectedFragments) === 'absent'
-                    ? 'absent'
-                    : 'termination-failed';
-            }
-        } else {
-            $result = $this->runProcess(['kill', '-9', (string) $pid], null, 2.0);
-            if ($result['timed_out']) {
-                return 'termination-tool-timeout';
-            }
-        }
-
-        $deadline = hrtime(true) + 2_000_000_000;
-        do {
-            if ($this->inspectExactProbe($pid, $expectedFragments) === 'absent') {
-                return 'terminated';
-            }
-            usleep(25_000);
-        } while (hrtime(true) < $deadline);
-
-        return 'termination-timeout';
-    }
-
     private function waitForLeaseInactive(string $identity, string $base, float $timeoutSeconds): bool
     {
         $deadline = hrtime(true) + max(1, (int) round($timeoutSeconds * 1_000_000_000));
@@ -1385,13 +1317,11 @@ POWERSHELL;
 
     /**
      * @param  array{process: resource, pipes: array<int, resource>}  $entry
-     * @param  (callable(): string)|null  $onTimeout
      * @return array{exit_code: int, stdout: string, stderr: string, timed_out: bool, timeout_cleanup: ?string}
      */
     private function finishProcess(
         array $entry,
         float $timeoutSeconds = 15.0,
-        ?callable $onTimeout = null,
     ): array {
         $deadline = hrtime(true) + max(1, (int) round($timeoutSeconds * 1_000_000_000));
         $timedOut = false;
@@ -1417,21 +1347,13 @@ POWERSHELL;
             usleep(25_000);
         } while (true);
 
-        if ($timedOut && $onTimeout !== null) {
-            try {
-                $timeoutCleanup = $onTimeout();
-            } catch (\Throwable $error) {
-                $timeoutCleanup = 'cleanup-error:'.$error->getMessage();
-            }
+        if ($timedOut) {
+            $timeoutCleanup = $this->terminateOwnedProcessInstance($entry['process']);
         }
 
         $status = proc_get_status($entry['process']);
         if (is_array($status) && ($status['running'] ?? false)) {
-            @proc_terminate($entry['process']);
-            if (! $this->waitForProcessExit($entry['process'], 1)) {
-                @proc_terminate($entry['process'], 9);
-                $this->waitForProcessExit($entry['process'], 1);
-            }
+            $this->terminateOwnedProcessInstance($entry['process']);
         }
 
         foreach ($entry['pipes'] as $pipe) {
@@ -1457,6 +1379,26 @@ POWERSHELL;
             'timed_out' => $timedOut,
             'timeout_cleanup' => $timeoutCleanup,
         ];
+    }
+
+    /** @param resource $process */
+    private function terminateOwnedProcessInstance($process): string
+    {
+        $status = proc_get_status($process);
+        if (! is_array($status) || ! ($status['running'] ?? false)) {
+            return 'absent';
+        }
+
+        @proc_terminate($process);
+        if ($this->waitForProcessExit($process, 1)) {
+            return 'terminated';
+        }
+
+        @proc_terminate($process, 9);
+
+        return $this->waitForProcessExit($process, 1)
+            ? 'terminated'
+            : 'termination-timeout';
     }
 
     /** @param array{process: resource, pipes: array<int, resource>}|null $entry */
