@@ -85,13 +85,11 @@ class ReadingUnfamiliarTargetSnapshotConflictTest extends TestCase
 
     private function snapshotVersion(array $payload): string
     {
-        foreach (['snapshot_version', 'snapshot_token', 'version', 'etag', 'snapshot_hash'] as $key) {
-            if (isset($payload[$key]) && is_scalar($payload[$key]) && (string) $payload[$key] !== '') {
-                return (string) $payload[$key];
-            }
-        }
+        $this->assertArrayHasKey('snapshot_version', $payload);
+        $this->assertIsString($payload['snapshot_version']);
+        $this->assertNotSame('', $payload['snapshot_version']);
 
-        $this->fail('R3 whole-snapshot contract must expose a server-issued optimistic-concurrency version/token.');
+        return $payload['snapshot_version'];
     }
 
     private function syncWithExpectedVersion(
