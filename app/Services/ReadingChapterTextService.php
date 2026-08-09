@@ -37,10 +37,6 @@ class ReadingChapterTextService
         return $chapter;
     }
 
-    public function resolveChapter(int $userId, string $language, int $chapterId): Chapter
-    {
-        return $this->chapterForUser($userId, $language, $chapterId);
-    }
 
     public function sourceRevision(Chapter $chapter): string
     {
