@@ -90,7 +90,7 @@ export function buildReaderExplicitRatingActionCommand(
 }
 
 export function readerExplicitActionConflictCode(responseData = {}) {
-    const code = text(responseData && (responseData.error_code || responseData.code));
+    const code = text(responseData && responseData.error_code);
     return ['READING_EXPLICIT_ACTION_UNDONE', 'READING_EXPLICIT_ACTION_ACTIVE'].includes(code) ? code : '';
 }
 

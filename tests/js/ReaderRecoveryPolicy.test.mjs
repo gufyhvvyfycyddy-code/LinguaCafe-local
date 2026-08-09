@@ -336,9 +336,10 @@ test('explicit rating action preparation binds identity, reuses retries, and min
     assert.equal(buildReaderExplicitRatingActionCommand(base, 'predictable-id', cryptoSource), null);
 });
 
-test('explicit action conflict parser recognizes only the two frozen fail-closed codes', () => {
+test('explicit action conflict parser recognizes only the two server error_code values', () => {
     assert.equal(readerExplicitActionConflictCode({ error_code: 'READING_EXPLICIT_ACTION_UNDONE' }), 'READING_EXPLICIT_ACTION_UNDONE');
-    assert.equal(readerExplicitActionConflictCode({ code: 'READING_EXPLICIT_ACTION_ACTIVE' }), 'READING_EXPLICIT_ACTION_ACTIVE');
+    assert.equal(readerExplicitActionConflictCode({ error_code: 'READING_EXPLICIT_ACTION_ACTIVE' }), 'READING_EXPLICIT_ACTION_ACTIVE');
+    assert.equal(readerExplicitActionConflictCode({ code: 'READING_EXPLICIT_ACTION_ACTIVE' }), '');
     assert.equal(readerExplicitActionConflictCode({ error_code: 'READING_SESSION_STALE_SOURCE' }), '');
     assert.equal(readerExplicitActionConflictCode({}), '');
 });
