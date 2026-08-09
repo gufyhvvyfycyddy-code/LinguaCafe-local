@@ -153,6 +153,13 @@ test('Finish request supports only preflight/commit and consumes server completi
     assert.equal(result.passiveGoodCount, 4);
     assert.equal(result.unresolvedCount, 2);
     assert.equal(result.canCommit, false);
+    assert.equal(normalizeReaderFinishResult({
+        passive_good_count: 0,
+        planned_passive_good_count: 4,
+    }).passiveGoodCount, 0);
+    assert.equal(normalizeReaderFinishResult({
+        planned_passive_good_count: 4,
+    }).passiveGoodCount, 4);
 });
 
 test('production Reader wires recovery, explicit interaction, manual continuation, undo and two-stage Finish without client session minting', () => {

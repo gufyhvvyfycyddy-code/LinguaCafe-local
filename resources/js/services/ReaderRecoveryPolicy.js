@@ -442,7 +442,9 @@ export function normalizeReaderFinishResult(payload = {}) {
         canCommit: payload.can_commit === true,
         alreadyCompleted: payload.already_completed === true,
         settlementMode: payload.settlement_mode || '',
-        passiveGoodCount: Math.max(0, Number(payload.passive_good_count || payload.planned_passive_good_count || 0) || 0),
+        passiveGoodCount: Math.max(0, Number(
+            payload.passive_good_count ?? payload.planned_passive_good_count ?? 0,
+        ) || 0),
         unresolvedCount,
         excludedCount: Math.max(0, Number(payload.excluded_count || 0) || 0),
         alreadySettledCount: Math.max(0, Number(payload.already_settled_count || 0) || 0),
