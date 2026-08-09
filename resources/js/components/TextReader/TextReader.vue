@@ -42,14 +42,18 @@
             v-model="inlineReviewDialog"
             :occurrence="inlineReviewOccurrence"
             :candidates="inlineReviewCandidates"
-            :reading-session-id="readingSessionId"
+            :reading-session-id="inlineReviewIntent ? inlineReviewIntent.readingSessionId : ''"
+            :frozen-rating="inlineReviewIntent ? (inlineReviewIntent.rating || '') : ''"
+            :manual-create-blocked="manualSenseCreateBlocked"
             :busy="inlineReviewBusy"
             :error="inlineReviewError"
             :outcome-unknown="Boolean(inlineOutcomeUnknownCommand)"
             @reveal="onInlineReviewReveal"
+            @rating-intent="onInlineReviewRatingIntent"
             @submit="submitInlineOfficialRating"
             @retry-outcome-unknown="retryInlineOutcomeUnknownRating"
             @create-sense-and-submit="createManualSenseAndSubmitRating"
+            @cancel="clearInlineReviewIntent"
         />
 
         <v-snackbar v-model="readerNotice.show" :color="readerNotice.color" :timeout="5000" top>
@@ -364,6 +368,9 @@
     import {
         awaitReaderInlineOpenedBarrier,
         createReaderInlineReviewIntent,
+        freezeReaderInlineRatingIntent,
+        readerInlineRatingIntentMatches,
+        readerInlineReviewIntentMatches,
         readerInlineOpenedFailureMessage,
         resolveReaderInteractionAttempt,
     } from './../../services/ReaderInlineSenseReviewPolicy';
@@ -504,6 +511,7 @@
                 readingSenseVerificationError: '',
                 readingSenseVerificationBusyId: '',
                 inlineReviewDialog: false,
+                inlineReviewIntent: null,
                 inlineReviewOccurrence: null,
                 inlineReviewCandidates: [],
                 inlineReviewCandidatesLoading: false,
@@ -641,6 +649,18 @@
             markedUnfamiliarWordIndexes() {
                 return readerUnfamiliarWordIndexes(this.markedUnfamiliarTargets);
             },
+            manualSenseCreateBlocked() {
+                const continuation = this.pendingManualSenseContinuation;
+                const intent = this.inlineReviewIntent;
+                return Boolean(
+                    continuation
+                    && continuation.outcomeUnknown
+                    && intent
+                    && continuation.occurrenceId === intent.occurrenceId
+                    && continuation.readingSessionId === intent.readingSessionId
+                    && continuation.sourceRevision === intent.sourceRevision,
+                );
+            },
         },
         methods: {
             setReaderNotice(text, color = 'info') {
@@ -648,11 +668,11 @@
             },
             setPendingManualSenseContinuation(continuation) {
                 this.pendingManualSenseContinuation = continuation;
-                if (!this.chapterId) return;
+                if (!this.chapterId) return false;
                 if (continuation) {
-                    saveReaderManualSenseContinuation(this.chapterId, continuation);
+                    return saveReaderManualSenseContinuation(this.chapterId, continuation);
                 } else {
-                    clearReaderManualSenseContinuation(this.chapterId);
+                    return clearReaderManualSenseContinuation(this.chapterId);
                 }
             },
             setInlineOutcomeUnknownCommand(command) {
@@ -674,12 +694,19 @@
                 return true;
             },
             prepareInlineOfficialRatingCommand(command, readingActionId = '') {
-                if (!command || !command.reviewCardId || !command.payload || !this.readingSessionId || !this.readingSourceRevision) return null;
-                const identifiedCommand = { ...command, sourceRevision: this.readingSourceRevision };
-                if (!readerExplicitRatingCommandMatchesSession(
-                    identifiedCommand,
+                const intent = this.inlineReviewIntent;
+                const current = createReaderInlineReviewIntent(
                     this.readingSessionId,
                     this.readingSourceRevision,
+                    this.inlineReviewOccurrence,
+                );
+                if (!command || !command.reviewCardId || !command.payload || !intent
+                    || !readerInlineRatingIntentMatches(intent, current, command.payload.rating)) return null;
+                const identifiedCommand = { ...command, sourceRevision: intent.sourceRevision };
+                if (!readerExplicitRatingCommandMatchesSession(
+                    identifiedCommand,
+                    intent.readingSessionId,
+                    intent.sourceRevision,
                 )) {
                     this.inlineReviewError = '正式评分身份与当前服务器阅读会话不一致。已停止提交，请刷新当前词后重新选择。';
                     return null;
@@ -694,10 +721,16 @@
             },
             clearManualContinuationForRatingCommand(command) {
                 const continuation = this.pendingManualSenseContinuation;
-                const actionId = command && command.payload ? command.payload.reading_action_id : '';
-                if (continuation && continuation.readingActionId && continuation.readingActionId === actionId) {
-                    this.setPendingManualSenseContinuation(null);
-                }
+                const payload = command && command.payload ? command.payload : {};
+                if (!continuation) return;
+                const sameAction = continuation.readingActionId
+                    && continuation.readingActionId === payload.reading_action_id;
+                const samePendingIntent = !continuation.readingActionId
+                    && continuation.occurrenceId === command.occurrenceId
+                    && continuation.rating === payload.rating
+                    && continuation.readingSessionId === payload.reading_session_id
+                    && continuation.sourceRevision === command.sourceRevision;
+                if (sameAction || samePendingIntent) this.setPendingManualSenseContinuation(null);
             },
             releaseManualContinuationActionForRatingCommand(command) {
                 const continuation = this.pendingManualSenseContinuation;
@@ -706,7 +739,6 @@
                     this.setPendingManualSenseContinuation({
                         ...continuation,
                         readingActionId: '',
-                        readingSessionId: '',
                     });
                 }
             },
@@ -720,6 +752,8 @@
                         this.$set(this.readingInteractionEntries, key, { ...entry, status: 'failed' });
                     }
                     this.readingInteractionPromises = {};
+                    this.inlineReviewIntent = null;
+                    this.inlineReviewDialog = false;
                 }
                 this.readingSessionId = normalized.readingSessionId;
                 this.readingSourceRevision = normalized.sourceRevision;
@@ -735,11 +769,9 @@
                     }
                 }
                 if (this.pendingManualSenseContinuation
-                    && this.pendingManualSenseContinuation.readingActionId
                     && (this.pendingManualSenseContinuation.readingSessionId !== normalized.readingSessionId
                         || this.pendingManualSenseContinuation.sourceRevision !== normalized.sourceRevision)) {
-                    this.setPendingManualSenseContinuation(null);
-                    this.setReaderNotice('上一次新增词义后的正式评分动作不属于当前服务器阅读会话，已停止续接。新词义仍由服务器保留，可重新打开后评分。', 'warning');
+                    this.setReaderNotice('上一次新增词义动作不属于当前服务器阅读会话，已锁定且不会迁移或重复创建。请回到原阅读会话核对。', 'warning');
                 }
                 this.mergeReadingVerificationState();
                 return true;
@@ -756,6 +788,7 @@
                 this.inlineReviewOccurrence = null;
                 this.inlineReviewCandidates = [];
                 this.inlineReviewDialog = false;
+                this.inlineReviewIntent = null;
                 this.setInlineOutcomeUnknownCommand(null);
                 if (this.pendingManualSenseContinuation && this.pendingManualSenseContinuation.readingActionId) {
                     this.setPendingManualSenseContinuation(null);
@@ -1048,6 +1081,7 @@
                 });
             },
             onReaderOccurrenceOpened(opened) {
+                this.inlineReviewIntent = null;
                 const target = findReadingTargetForOpenedSelection(this.readingTargets, opened || {});
                 if (!target || target.kind !== 'word') {
                     this.inlineReviewOccurrence = null;
@@ -1150,6 +1184,29 @@
                         this.setReaderNotice(readerInlineOpenedFailureMessage(entry), 'warning');
                         return false;
                     }
+                    const continuation = this.pendingManualSenseContinuation;
+                    if (continuation && continuation.occurrenceId === intent.occurrenceId) {
+                        if (continuation.readingSessionId !== intent.readingSessionId
+                            || continuation.sourceRevision !== intent.sourceRevision) {
+                            this.setReaderNotice('已保存的新增词义动作属于另一阅读会话或文章版本，已停止续接且不会重复创建。', 'warning');
+                            return false;
+                        }
+                        if (continuation.senseId && continuation.reviewCardId) {
+                            this.inlineReviewIntent = freezeReaderInlineRatingIntent(intent, intent, continuation.rating);
+                            if (!this.inlineReviewIntent) return false;
+                            this.inlineReviewDialog = false;
+                            return this.continueManualSenseRating(continuation);
+                        }
+                        if (continuation.outcomeUnknown) {
+                            this.inlineReviewIntent = freezeReaderInlineRatingIntent(intent, intent, continuation.rating);
+                            if (!this.inlineReviewIntent) return false;
+                            this.inlineReviewError = '上一次新增词义请求结果未知。原评分已保留；请从服务器当前候选中明确选择词义继续，新增词义按钮保持锁定，避免重复创建。';
+                            this.inlineReviewDialog = true;
+                            return true;
+                        }
+                        return false;
+                    }
+                    this.inlineReviewIntent = { ...intent, rating: '' };
                     this.inlineReviewDialog = true;
                     return true;
                 }).finally(() => {
@@ -1158,6 +1215,23 @@
             },
             onInlineReviewReveal(occurrence) {
                 if (occurrence && occurrence.occurrence_id) this.recordReadingInteraction('helped', occurrence);
+            },
+            onInlineReviewRatingIntent(rating) {
+                const current = createReaderInlineReviewIntent(
+                    this.readingSessionId,
+                    this.readingSourceRevision,
+                    this.inlineReviewOccurrence,
+                );
+                if (!readerInlineReviewIntentMatches(this.inlineReviewIntent, current)) {
+                    this.inlineReviewIntent = null;
+                    this.inlineReviewDialog = false;
+                    this.inlineReviewError = '当前阅读会话或词的位置已经变化。旧评分选择已取消，请重新打开这个词。';
+                    return;
+                }
+                this.inlineReviewIntent = freezeReaderInlineRatingIntent(this.inlineReviewIntent, current, rating);
+            },
+            clearInlineReviewIntent() {
+                this.inlineReviewIntent = null;
             },
             submitInlineOfficialRating(command) {
                 if (this.inlineOutcomeUnknownCommand) {
@@ -1187,6 +1261,7 @@
                         this.setInlineOutcomeUnknownCommand(null);
                         this.clearManualContinuationForRatingCommand(command);
                         this.inlineReviewDialog = false;
+                        this.inlineReviewIntent = null;
                         this.inlineReviewError = '';
                         if (action && action.review_log_id) {
                             this.inlineLastUndoAction = action;
@@ -1241,7 +1316,16 @@
                 const occurrence = intent && intent.occurrence;
                 const rating = intent && intent.rating;
                 const form = intent && intent.form;
-                if (!occurrence || !occurrence.occurrence_id || !rating || !form || !this.readingSessionId) return Promise.resolve(false);
+                const frozen = this.inlineReviewIntent;
+                const current = createReaderInlineReviewIntent(
+                    this.readingSessionId,
+                    this.readingSourceRevision,
+                    this.inlineReviewOccurrence,
+                );
+                if (!occurrence || !occurrence.occurrence_id || !rating || !form || !frozen
+                    || !readerInlineRatingIntentMatches(frozen, current, rating)
+                    || frozen.occurrenceId !== occurrence.occurrence_id
+                ) return Promise.resolve(false);
                 const prior = this.pendingManualSenseContinuation;
                 if (prior && prior.outcomeUnknown && prior.occurrenceId === occurrence.occurrence_id) {
                     this.inlineReviewError = '刚才的新增词义请求结果未知。为避免创建重复词义，已停止自动重试新增。请关闭窗口后重新点击这个词，先确认新词义是否已经出现。';
@@ -1252,6 +1336,18 @@
                 }
                 this.inlineReviewBusy = true;
                 this.inlineReviewError = '';
+                const pending = {
+                    occurrenceId: occurrence.occurrence_id,
+                    rating,
+                    outcomeUnknown: true,
+                    sourceRevision: frozen.sourceRevision,
+                    readingSessionId: frozen.readingSessionId,
+                };
+                if (!this.setPendingManualSenseContinuation(pending)) {
+                    this.inlineReviewBusy = false;
+                    this.inlineReviewError = '浏览器无法安全保存这次新增词义与原评分，已在发送请求前停止。请检查浏览器会话存储后重试。';
+                    return Promise.resolve(false);
+                }
                 return axios.post('/senses/manual', {
                     lemma: occurrence.lemma || occurrence.surface,
                     surface_form: occurrence.surface || occurrence.lemma,
@@ -1260,6 +1356,9 @@
                     sense_en: form.sense_en || null,
                     chapter_id: this.chapterId,
                     sentence_id: occurrence.sentence_index !== null && occurrence.sentence_index !== undefined ? String(occurrence.sentence_index) : null,
+                    reading_session_id: frozen.readingSessionId,
+                    source_revision: frozen.sourceRevision,
+                    occurrence_id: frozen.occurrenceId,
                 }).then((response) => {
                     const senseId = Number(response.data && (response.data.sense_id || response.data.word_sense_id));
                     const reviewCardId = Number(response.data && response.data.review_card_id);
@@ -1273,26 +1372,20 @@
                         rating,
                         senseId,
                         reviewCardId,
-                        sourceRevision: this.readingSourceRevision,
-                        form: { ...form },
+                        sourceRevision: frozen.sourceRevision,
+                        readingSessionId: frozen.readingSessionId,
+                        outcomeUnknown: false,
                     };
                     this.setPendingManualSenseContinuation(continuation);
                     this.inlineReviewBusy = false;
                     return this.continueManualSenseRating(continuation);
                 }).catch((error) => {
                     if (error && error.readerMalformedManualSenseResponse) {
-                        this.setPendingManualSenseContinuation(null);
-                        this.inlineReviewError = '服务器返回的新词义结果缺少词义卡身份。页面已停止续接和自动重发创建请求；请刷新这个词确认服务器状态后再继续。';
+                        this.inlineReviewError = '服务器已处理新增词义，但返回结果缺少词义卡身份。页面已保留原评分并阻止重复创建；刷新后可重新点这个词，从服务器候选中明确选择。';
                     } else if (!error || !error.response || (error.response && error.response.status >= 500)) {
-                        this.setPendingManualSenseContinuation({
-                            occurrenceId: occurrence.occurrence_id,
-                            rating,
-                            outcomeUnknown: true,
-                            sourceRevision: this.readingSourceRevision,
-                            form: { ...form },
-                        });
-                        this.inlineReviewError = '新增词义请求已经发出，但服务器结果未知。保护状态已保存在本章会话中；刷新页面后仍会阻止重复新增，请重新打开这个词核对服务器状态。';
+                        this.inlineReviewError = '新增词义请求已经发出，但服务器结果未知。原评分已保存在本章会话中；刷新后不会重复新增，只能从服务器当前候选中明确选择词义继续。';
                     } else {
+                        this.setPendingManualSenseContinuation(null);
                         this.inlineReviewError = requestErrorMessage(error, '新增词义失败，请修正后重试。');
                     }
                     return false;
@@ -1304,7 +1397,7 @@
                     this.inlineReviewError = '新增词义后的评分续接属于旧文章版本。已停止续接，请刷新本章后重新打开这个词。';
                     return Promise.resolve(false);
                 }
-                if (continuation.readingActionId && continuation.readingSessionId !== this.readingSessionId) {
+                if (!continuation.readingSessionId || continuation.readingSessionId !== this.readingSessionId) {
                     this.inlineReviewError = '新增词义后的评分动作属于另一阅读会话。已停止旧动作重试，请重新打开这个词后评分。';
                     return Promise.resolve(false);
                 }
@@ -1334,7 +1427,7 @@
                             occurrenceId: continuation.occurrenceId,
                             payload: {
                                 rating: continuation.rating,
-                                reading_session_id: this.readingSessionId,
+                                reading_session_id: continuation.readingSessionId,
                                 occurrence_id: continuation.occurrenceId,
                             },
                         }, continuation.readingActionId || '');

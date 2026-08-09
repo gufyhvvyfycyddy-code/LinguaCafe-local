@@ -10,8 +10,10 @@ import {
     clearReaderInlinePendingRating,
     createReaderInlineReviewIntent,
     createReaderInlineSenseReviewState,
+    freezeReaderInlineRatingIntent,
     normalizeReaderManualSensePos,
     readerInlineOpenedFailureMessage,
+    readerInlineRatingIntentMatches,
     replaceReaderInlineOccurrence,
     resolveReaderInteractionAttempt,
     revealReaderInlineSenseAnswer,
@@ -132,6 +134,18 @@ test('inline review must reveal before a rating can become pending', () => {
     assert.equal(chooseReaderInlineRating(revealed, 'good').pendingRating, 'good');
 });
 
+test('pending rating is frozen to one session, source revision, and occurrence identity', () => {
+    const opened = createReaderInlineReviewIntent('session-a', 'revision-a', occurrence);
+    const frozen = freezeReaderInlineRatingIntent(opened, { ...opened }, 'hard');
+    assert.deepEqual(frozen, { ...opened, rating: 'hard' });
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'hard'), true);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, readingSessionId: 'session-b' }, 'hard'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, sourceRevision: 'revision-b' }, 'hard'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, occurrenceId: 'occ2-other' }, 'hard'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'easy'), false);
+    assert.equal(freezeReaderInlineRatingIntent(opened, { ...opened, readingSessionId: 'session-b' }, 'hard'), null);
+});
+
 test('formal command requires both explicit rating and concrete WordSense with active review card', () => {
     let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
     state = chooseReaderInlineRating(state, 'hard');
@@ -230,7 +244,8 @@ test('Reader explicit action conflicts stop retry before any 5xx outcome-unknown
 
 test('deterministic 409/422 releases only the rejected manual action id and keeps created sense identity', () => {
     const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
-    assert.match(reader, /releaseManualContinuationActionForRatingCommand\(command\)[\s\S]{0,500}readingActionId: ''[\s\S]{0,120}readingSessionId: ''/);
+    assert.match(reader, /releaseManualContinuationActionForRatingCommand\(command\)[\s\S]{0,500}readingActionId: ''/);
+    assert.doesNotMatch(reader, /readingActionId: '',[\s\S]{0,120}readingSessionId: ''/);
     const conflictStart = reader.indexOf('else if (status === 409 || status === 422)');
     const conflictEnd = reader.indexOf('} else {', conflictStart);
     assert.ok(conflictStart > 0 && conflictEnd > conflictStart);
@@ -278,10 +293,13 @@ test('production Reader fails closed when known-sense card details cannot be loa
     assert.match(reader, /this\.loadInlineReviewCandidates\(target\)/);
 });
 
-test('manual-sense continuation distinguishes malformed server identity from network outcome-unknown', () => {
+test('manual-sense recovery persists before transport and never guesses the created sense', () => {
     const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+    const persistIndex = reader.indexOf('setPendingManualSenseContinuation(pending)');
+    const transportIndex = reader.indexOf("axios.post('/senses/manual'", persistIndex);
+    assert.ok(persistIndex > 0 && transportIndex > persistIndex);
     assert.match(reader, /readerMalformedManualSenseResponse/);
-    assert.match(reader, /缺少词义卡身份/);
-    assert.match(reader, /停止续接和自动重发创建请求/);
-    assert.match(reader, /setPendingManualSenseContinuation\(null\)/);
+    assert.match(reader, /manual-create-blocked="manualSenseCreateBlocked"/);
+    assert.match(reader, /:frozen-rating="inlineReviewIntent/);
+    assert.doesNotMatch(reader, /resolveReaderManualSenseCandidate|excludedSenseIds/);
 });

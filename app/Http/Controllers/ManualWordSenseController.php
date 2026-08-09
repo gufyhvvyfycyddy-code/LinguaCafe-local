@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\WordSense;
+use App\Services\ReadingSessionService;
 use App\Services\SenseOccurrencePayloadSerializerService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ManualWordSenseController extends Controller
@@ -24,6 +26,7 @@ class ManualWordSenseController extends Controller
     public function __construct(
         private WordSenseService $wordSenseService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
+        private ReadingSessionService $readingSessionService,
     )
     {
     }
@@ -40,22 +43,53 @@ class ManualWordSenseController extends Controller
             'sense_en' => ['nullable', 'string'],
             'aliases_zh' => ['nullable'],
             'collocations' => ['nullable'],
-            'chapter_id' => ['nullable', 'integer'],
+            'chapter_id' => ['nullable', 'required_with:reading_session_id', 'integer'],
             'sentence_id' => ['nullable'],
             'sentence_en' => ['nullable', 'string'],
             'sentence_zh' => ['nullable', 'string'],
             'encountered_word_id' => ['nullable', 'integer'],
             'keep_new' => ['nullable', 'boolean'],
+            'reading_session_id' => ['nullable', 'required_with:source_revision,occurrence_id', 'string', 'uuid'],
+            'source_revision' => ['nullable', 'required_with:reading_session_id,occurrence_id', 'string'],
+            'occurrence_id' => ['nullable', 'required_with:reading_session_id,source_revision', 'string'],
         ]);
 
         $data['aliases_zh'] = $this->payloadSerializer->normalizeList($request->post('aliases_zh'));
         $data['collocations'] = $this->payloadSerializer->normalizeList($request->post('collocations'));
 
-        $result = $this->wordSenseService->createManualSense(
-            Auth::user()->id,
-            Auth::user()->selected_language,
-            $data,
-        );
+        $user = Auth::user();
+        try {
+            if (!empty($data['reading_session_id'])) {
+                $result = DB::transaction(function () use ($data, $user) {
+                    $target = $this->readingSessionService->lockManualSenseCreationContext(
+                        $user->id,
+                        $user->selected_language,
+                        $data['reading_session_id'],
+                        (int) $data['chapter_id'],
+                        $data['source_revision'],
+                        $data['occurrence_id'],
+                    );
+                    if (!$this->sameText($data['lemma'], $target['lemma'] ?? '')
+                        || !$this->sameText($data['surface_form'] ?? $data['lemma'], $target['surface'] ?? '')) {
+                        throw new \InvalidArgumentException(ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
+                    }
+
+                    return $this->wordSenseService->createManualSense(
+                        $user->id,
+                        $user->selected_language,
+                        $data,
+                    );
+                });
+            } else {
+                $result = $this->wordSenseService->createManualSense(
+                    $user->id,
+                    $user->selected_language,
+                    $data,
+                );
+            }
+        } catch (\InvalidArgumentException $e) {
+            return $this->readingContractError($e);
+        }
 
         $response = $this->payloadSerializer->serializeSense($result['sense']);
         $response['updated_word'] = $result['updated_word'];
@@ -109,5 +143,32 @@ class ManualWordSenseController extends Controller
         $normalized = strtolower(trim($pos));
 
         return self::POS_ALIASES[$normalized] ?? $normalized;
+    }
+
+    private function sameText(mixed $left, mixed $right): bool
+    {
+        return mb_strtolower(trim((string) $left)) === mb_strtolower(trim((string) $right));
+    }
+
+    private function readingContractError(\InvalidArgumentException $exception)
+    {
+        $code = $exception->getMessage();
+        $statuses = [
+            ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
+            ReadingSessionService::ERROR_SESSION_NOT_ACTIVE => 409,
+            ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH => 409,
+            ReadingSessionService::ERROR_SESSION_STALE_SOURCE => 409,
+            ReadingSessionService::ERROR_OCCURRENCE_STALE => 409,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+        ];
+        if (!isset($statuses[$code])) {
+            throw $exception;
+        }
+
+        return response()->json([
+            'success' => false,
+            'error_code' => $code,
+            'message' => 'Reading request conflicts with the current server state.',
+        ], $statuses[$code]);
     }
 }

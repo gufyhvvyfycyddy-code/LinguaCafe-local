@@ -243,7 +243,7 @@ test('manual-sense continuation survives a page refresh inside the chapter sessi
         rating: 'good',
         outcomeUnknown: true,
         sourceRevision: 'rev-1',
-        form: { pos: 'noun', sense_zh: '堤岸', sense_en: 'river bank' },
+        readingSessionId: 'session-1',
     };
     assert.equal(saveReaderManualSenseContinuation(42, pending, storage), true);
     assert.deepEqual(loadReaderManualSenseContinuation(42, storage), {
@@ -254,8 +254,7 @@ test('manual-sense continuation survives a page refresh inside the chapter sessi
         outcomeUnknown: true,
         sourceRevision: 'rev-1',
         readingActionId: '',
-        readingSessionId: '',
-        form: { pos: 'noun', sense_zh: '堤岸', sense_en: 'river bank' },
+        readingSessionId: 'session-1',
     });
     assert.equal(loadReaderManualSenseContinuation(43, storage), null);
     assert.equal(clearReaderManualSenseContinuation(42, storage), true);
@@ -265,6 +264,8 @@ test('manual-sense continuation survives a page refresh inside the chapter sessi
 test('manual-sense continuation persistence rejects malformed or incomplete state', () => {
     const storage = memoryStorage();
     assert.equal(saveReaderManualSenseContinuation(42, { occurrenceId: 'occ-bank', rating: 'good' }, storage), false);
+    assert.equal(saveReaderManualSenseContinuation(42, { occurrenceId: 'occ-bank', rating: 'good', outcomeUnknown: true, sourceRevision: 'rev-1' }, storage), false);
+    assert.equal(saveReaderManualSenseContinuation(42, { occurrenceId: 'occ-bank', rating: 'good', outcomeUnknown: true, sourceRevision: 'rev-1', readingSessionId: 'session-1' }, storage), true);
     assert.equal(saveReaderManualSenseContinuation(42, { occurrenceId: 'occ-bank', rating: 'later', outcomeUnknown: true }, storage), false);
     storage.setItem('linguacafe-reader-manual-sense-continuation:42', '{not-json');
     assert.equal(loadReaderManualSenseContinuation(42, storage), null);
@@ -276,7 +277,8 @@ test('production Reader restores and persists manual-sense continuation rather t
     assert.match(reader, /setPendingManualSenseContinuation\(continuation\)/);
     assert.match(reader, /saveReaderManualSenseContinuation\(this\.chapterId, continuation\)/);
     assert.match(reader, /clearReaderManualSenseContinuation\(this\.chapterId\)/);
-    assert.match(reader, /保护状态已保存在本章会话中/);
+    assert.match(reader, /原评分已保存在本章会话中/);
+    assert.match(reader, /manual-create-blocked="manualSenseCreateBlocked"/);
     assert.doesNotMatch(reader, /pendingManualSenseContinuation\.occurrenceId !== this\.inlineReviewOccurrence\.occurrence_id\)[\s\S]{0,120}pendingManualSenseContinuation = null/);
 });
 
@@ -425,7 +427,6 @@ test('manual-sense continuation keeps the formal action id only after formal rat
         sourceRevision: 'rev-1',
         readingActionId: '7bc5f158-414d-4b94-9824-b8910ddf2a2d',
         readingSessionId: sessionPayload.reading_session_id,
-        form: { pos: 'noun', sense_zh: '河岸', sense_en: 'river bank' },
     };
     assert.equal(saveReaderManualSenseContinuation(42, continuation, storage), true);
     assert.deepEqual(loadReaderManualSenseContinuation(42, storage), continuation);

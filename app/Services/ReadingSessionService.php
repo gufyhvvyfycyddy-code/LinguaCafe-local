@@ -213,6 +213,28 @@ class ReadingSessionService
         });
     }
 
+    public function lockManualSenseCreationContext(
+        int $userId,
+        string $language,
+        string $sessionId,
+        int $chapterId,
+        string $sourceRevision,
+        string $occurrenceId,
+    ): array {
+        $context = $this->lockActiveSessionContext($userId, $language, $sessionId, $chapterId);
+        $session = $context['session'];
+        if (!hash_equals($session->source_revision, $sourceRevision)) {
+            throw new \InvalidArgumentException(self::ERROR_SESSION_STALE_SOURCE);
+        }
+
+        $target = $context['catalog']['targets_by_id'][$occurrenceId] ?? null;
+        if (!$target || ($target['kind'] ?? null) !== 'word') {
+            throw new \InvalidArgumentException(self::ERROR_OCCURRENCE_STALE);
+        }
+
+        return $target;
+    }
+
     public function lockExplicitRatingContext(
         int $userId,
         string $language,

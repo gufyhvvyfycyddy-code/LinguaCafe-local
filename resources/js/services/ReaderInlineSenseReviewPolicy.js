@@ -22,6 +22,19 @@ export function readerInlineReviewIntentMatches(expected = null, current = null)
     );
 }
 
+export function freezeReaderInlineRatingIntent(expected = null, current = null, rating = '') {
+    if (!readerInlineReviewIntentMatches(expected, current) || !READER_INLINE_RATINGS.includes(rating)) return null;
+    return { ...expected, rating };
+}
+
+export function readerInlineRatingIntentMatches(expected = null, current = null, rating = '') {
+    return Boolean(
+        readerInlineReviewIntentMatches(expected, current)
+        && READER_INLINE_RATINGS.includes(expected.rating)
+        && expected.rating === rating,
+    );
+}
+
 export function resolveReaderInteractionAttempt(existing = null, readingSessionId = '', sourceRevision = '', pendingPromise = null) {
     const sameIdentity = Boolean(
         existing

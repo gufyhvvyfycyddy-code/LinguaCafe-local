@@ -144,6 +144,188 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         ];
     }
 
+    public function test_manual_sense_continuation_keeps_formal_writes_zero_until_exact_card_is_rated_once(): void
+    {
+        $existingCardBefore = app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh());
+        $rating = 'hard';
+
+        $manual = $this->actingAs($this->user)->postJson('/senses/manual', [
+            'lemma' => 'bank',
+            'surface_form' => 'bank',
+            'pos' => 'noun',
+            'sense_zh' => '河岸',
+            'sense_en' => 'the land beside a river',
+            'chapter_id' => $this->chapter->id,
+            'sentence_id' => '0',
+            'reading_session_id' => $this->session->uuid,
+            'source_revision' => $this->session->source_revision,
+            'occurrence_id' => $this->occurrenceId,
+        ])->assertOk();
+
+        $manualSenseId = (int) $manual->json('sense_id');
+        $manualCardId = (int) $manual->json('review_card_id');
+        $this->assertGreaterThan(0, $manualSenseId);
+        $this->assertGreaterThan(0, $manualCardId);
+        $manualCard = ReviewCard::findOrFail($manualCardId);
+        $manualCardBefore = app(ReviewCardFsrsSnapshotService::class)->capture($manualCard);
+
+        $this->assertSame(0, ReviewLog::where('user_id', $this->user->id)->count());
+        $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
+        $this->assertSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
+
+        $this->postJson('/chapters/'.$this->chapter->id.'/reading-occurrence-evidence', [
+            'occurrence_id' => $this->occurrenceId,
+            'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+            'word_sense_id' => $manualSenseId,
+        ])->assertOk();
+        $this->postJson('/chapters/'.$this->chapter->id.'/reading-sessions', [
+            'resume_reading_session_id' => $this->session->uuid,
+        ])->assertOk();
+
+        $this->assertSame(0, ReviewLog::where('user_id', $this->user->id)->count());
+        $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
+        $this->assertSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
+
+        $actionId = $this->readingActionId(5);
+        $response = $this->postJson('/reviews/senses/'.$manualCardId.'/rate', [
+            'rating' => $rating,
+            'reading_session_id' => $this->session->uuid,
+            'occurrence_id' => $this->occurrenceId,
+            'reading_action_id' => $actionId,
+            'ignoreDailyLimits' => true,
+        ])->assertOk()
+            ->assertJsonPath('action.rating', $rating)
+            ->assertJsonPath('action.reading_action_id', $actionId);
+
+        $log = ReviewLog::where('user_id', $this->user->id)
+            ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
+            ->sole();
+        $this->assertSame($manualCardId, $log->review_card_id);
+        $this->assertSame($rating, $log->rating);
+        $this->assertSame($this->session->uuid, $log->review_session_id);
+        $this->assertSame($manualCardBefore, $log->before_card_snapshot);
+        $this->assertSame($log->id, $response->json('action.review_log_id'));
+        $this->assertNotSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
+        $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
+        $this->assertSame(
+            1,
+            ReadingSessionInteraction::where('reading_session_id', $this->session->id)
+                ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
+                ->where('reading_action_id', $actionId)
+                ->count(),
+        );
+    }
+
+    public function test_reader_manual_sense_rejects_invalid_scope_before_any_business_write(): void
+    {
+        $foreignUser = User::forceCreate([
+            'name' => 'PAB R3 Manual Foreign',
+            'email' => 'pab-r3-manual-foreign-'.Str::uuid().'@example.test',
+            'password' => Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $this->extraUserIds[] = $foreignUser->id;
+        $otherChapter = $this->chapter->replicate();
+        $otherChapter->name = 'PAB R3 Manual Other Chapter';
+        $otherChapter->save();
+        $inactiveSession = ReadingSession::forceCreate([
+            'uuid' => (string) Str::uuid(),
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'source_revision' => $this->session->source_revision,
+            'status' => ReadingSession::STATUS_COMPLETED,
+            'started_at' => now()->subMinute(),
+            'completed_at' => now(),
+        ]);
+        ReadingUnfamiliarTarget::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $this->chapter->id,
+            'source_revision' => $this->session->source_revision,
+            'occurrence_id' => 'occ2_phrase_manual_guard',
+            'kind' => ReadingUnfamiliarTarget::KIND_PHRASE,
+            'start_word_index' => 0,
+            'end_word_index' => 0,
+            'sentence_index' => 0,
+            'surface' => 'bank',
+            'lemma' => 'bank',
+            'pos' => 'phrase',
+            'source_sentence' => 'bank',
+        ]);
+
+        $counts = fn (): array => [
+            'senses' => WordSense::count(),
+            'cards' => ReviewCard::count(),
+            'logs' => ReviewLog::count(),
+            'interactions' => ReadingSessionInteraction::count(),
+            'completions' => ReadingSessionCompletion::count(),
+            'settlements' => ReadingSessionCardSettlement::count(),
+            'evidence' => ReadingOccurrenceSenseEvidence::count(),
+            'sessions' => ReadingSession::count(),
+        ];
+        $beforeCounts = $counts();
+        $beforeCard = app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh());
+        $payload = $this->readerManualSensePayload();
+
+        $this->actingAs($foreignUser)
+            ->postJson('/senses/manual', $payload)
+            ->assertNotFound()
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_NOT_FOUND);
+        $this->flushSession();
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'chapter_id' => $otherChapter->id,
+        ]))->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH);
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'reading_session_id' => $inactiveSession->uuid,
+        ]))->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_NOT_ACTIVE);
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'source_revision' => 'sha256:stale-client-revision',
+        ]))->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_STALE_SOURCE);
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'occurrence_id' => 'occ2_phrase_manual_guard',
+        ]))->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_OCCURRENCE_STALE);
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'occurrence_id' => 'occ2_unknown_manual_guard',
+        ]))->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_OCCURRENCE_STALE);
+
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', array_merge($payload, [
+            'lemma' => 'shore',
+        ]))->assertStatus(422)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
+
+        $this->user->forceFill(['selected_language' => 'german'])->save();
+        $this->actingAs($this->user->fresh())
+            ->postJson('/senses/manual', $payload)
+            ->assertNotFound()
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_NOT_FOUND);
+        $this->flushSession();
+        $this->user->forceFill(['selected_language' => 'english'])->save();
+        $this->actingAs($this->user->fresh());
+
+        $originalRawText = $this->chapter->raw_text;
+        $this->chapter->forceFill(['raw_text' => 'bank changed'])->save();
+        $this->actingAs($this->user->fresh())->postJson('/senses/manual', $payload)
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_SESSION_STALE_SOURCE);
+        $this->chapter->forceFill(['raw_text' => $originalRawText])->save();
+
+        $this->assertSame($beforeCounts, $counts());
+        $this->assertSame($beforeCard, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
+    }
+
     public function test_sequential_duplicate_explicit_rating_returns_same_action_and_one_formal_log(): void
     {
         $actionId = $this->readingActionId(10);
@@ -839,6 +1021,21 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             'occurrence_id' => $this->occurrenceId,
             'reading_action_id' => $actionId,
             'ignoreDailyLimits' => true,
+        ];
+    }
+
+    private function readerManualSensePayload(): array
+    {
+        return [
+            'lemma' => 'bank',
+            'surface_form' => 'bank',
+            'pos' => 'noun',
+            'sense_zh' => '河岸',
+            'chapter_id' => $this->chapter->id,
+            'sentence_id' => '0',
+            'reading_session_id' => $this->session->uuid,
+            'source_revision' => $this->session->source_revision,
+            'occurrence_id' => $this->occurrenceId,
         ];
     }
 

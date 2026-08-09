@@ -12,6 +12,7 @@
                 </v-alert>
                 <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
                 <v-alert v-if="outcomeUnknown" dense outlined type="warning">服务器结果未知期间，评分与词义选择已锁定。只能安全重试刚才那一笔正式评分。</v-alert>
+                <v-alert v-if="manualCreateBlocked" dense outlined type="warning">上一次新增词义结果未知。原评分已保留；请从服务器当前候选中明确选择词义继续，本窗口不会再次创建词义。</v-alert>
 
                 <div v-if="occurrence" class="mb-4">
                     <div class="text-h5 font-weight-medium">{{ occurrence.surface || occurrence.lemma }}</div>
@@ -26,7 +27,7 @@
                 <template v-else>
                     <div class="mb-5">
                         <div class="text-subtitle-1 font-weight-medium mb-2">1. 你刚才回想得怎么样？</div>
-                        <sense-review-rating-controls :disabled="busy || outcomeUnknown" @rating="chooseRating" />
+                        <sense-review-rating-controls :disabled="busy || outcomeUnknown || Boolean(frozenRating)" @rating="chooseRating" />
                         <div v-if="state.pendingRating" class="caption text--secondary text-center mt-1">
                             已选择 {{ ratingLabel(state.pendingRating) }}，还需要确定具体词义。
                         </div>
@@ -52,7 +53,7 @@
                         <v-alert v-if="!ratableCandidates.length" type="warning" dense text>
                             当前候选里没有可评分的词义卡。可以手动新增这个词义后，继续提交刚才选择的评分。
                         </v-alert>
-                        <v-btn text small color="primary" :disabled="busy || outcomeUnknown || !state.pendingRating" @click="openManualMode">
+                        <v-btn text small color="primary" :disabled="busy || outcomeUnknown || manualCreateBlocked || !state.pendingRating" @click="openManualMode">
                             都不是 / 新增词义
                         </v-btn>
                     </div>
@@ -67,26 +68,26 @@
                             label="词性"
                             outlined
                             dense
-                            :disabled="busy || outcomeUnknown"
+                            :disabled="busy || outcomeUnknown || manualCreateBlocked"
                         />
                         <v-text-field
                             v-model.trim="manualSense.sense_zh"
                             label="中文释义"
                             outlined
                             dense
-                            :disabled="busy || outcomeUnknown"
+                            :disabled="busy || outcomeUnknown || manualCreateBlocked"
                         />
                         <v-text-field
                             v-model.trim="manualSense.sense_en"
                             label="English（可选）"
                             outlined
                             dense
-                            :disabled="busy || outcomeUnknown"
+                            :disabled="busy || outcomeUnknown || manualCreateBlocked"
                         />
                         <v-alert dense text type="info">
                             保存成功后会把本次出现位置绑定到新词义，并沿用刚才的 {{ ratingLabel(state.pendingRating) }} 评分；不会再让你选第二次评分。
                         </v-alert>
-                        <v-btn text small :disabled="busy || outcomeUnknown" @click="manualMode = false">返回已有词义</v-btn>
+                        <v-btn text small :disabled="busy || outcomeUnknown || manualCreateBlocked" @click="manualMode = false">返回已有词义</v-btn>
                     </div>
                 </template>
             </v-card-text>
@@ -102,7 +103,7 @@
                     @click="submit"
                 >提交正式评分</v-btn>
                 <v-btn
-                    v-if="state.showAnswer && manualMode && !outcomeUnknown"
+                    v-if="state.showAnswer && manualMode && !outcomeUnknown && !manualCreateBlocked"
                     color="primary"
                     depressed
                     :loading="busy"
@@ -143,6 +144,8 @@
             occurrence: { type: Object, default: null },
             candidates: { type: Array, default: () => [] },
             readingSessionId: { type: String, default: '' },
+            frozenRating: { type: String, default: '' },
+            manualCreateBlocked: { type: Boolean, default: false },
             busy: { type: Boolean, default: false },
             error: { type: String, default: '' },
             outcomeUnknown: { type: Boolean, default: false },
@@ -193,6 +196,7 @@
                     && this.manualSense.sense_zh.trim()
                     && !this.busy
                     && !this.outcomeUnknown
+                    && !this.manualCreateBlocked
                 );
             },
         },
@@ -200,6 +204,7 @@
             occurrence(next) {
                 this.state = replaceReaderInlineOccurrence(this.state, next);
                 this.resetManualSense(next);
+                this.applyFrozenRating();
             },
             value(open) {
                 if (!open) {
@@ -208,7 +213,11 @@
                 } else {
                     this.state = replaceReaderInlineOccurrence(this.state, this.occurrence);
                     this.resetManualSense(this.occurrence);
+                    this.applyFrozenRating();
                 }
+            },
+            frozenRating() {
+                this.applyFrozenRating();
             },
         },
         methods: {
@@ -217,7 +226,13 @@
                 this.$emit('reveal', this.occurrence);
             },
             chooseRating(rating) {
+                if (this.frozenRating) return;
                 this.state = chooseReaderInlineRating(this.state, rating);
+                if (this.state.pendingRating) this.$emit('rating-intent', this.state.pendingRating);
+            },
+            applyFrozenRating() {
+                if (!this.value || !this.frozenRating || !this.occurrence) return;
+                this.state = chooseReaderInlineRating(revealReaderInlineSenseAnswer(this.state), this.frozenRating);
             },
             ratingLabel(rating) {
                 return { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' }[rating] || rating;

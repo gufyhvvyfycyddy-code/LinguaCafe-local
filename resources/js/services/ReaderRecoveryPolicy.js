@@ -148,14 +148,7 @@ function normalizeManualSenseContinuation(value = {}) {
     if (rawReadingActionId && !readingActionId) return null;
     const readingSessionId = text(value.readingSessionId);
     const sourceRevision = text(value.sourceRevision);
-    if (readingActionId && (!readingSessionId || !sourceRevision)) return null;
-    const form = value.form && typeof value.form === 'object'
-        ? {
-            pos: text(value.form.pos),
-            sense_zh: text(value.form.sense_zh),
-            sense_en: text(value.form.sense_en),
-        }
-        : null;
+    if (!readingSessionId || !sourceRevision) return null;
     return {
         occurrenceId,
         rating,
@@ -165,7 +158,6 @@ function normalizeManualSenseContinuation(value = {}) {
         sourceRevision,
         readingActionId,
         readingSessionId,
-        form,
     };
 }
 

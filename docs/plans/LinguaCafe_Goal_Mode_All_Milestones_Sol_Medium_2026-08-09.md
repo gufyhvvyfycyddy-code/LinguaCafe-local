@@ -273,8 +273,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
 | B-01 | DONE | reading-session start/resume、source revision、刷新恢复、完成恢复稳定 | PAB-R3 session candidate | fresh/refresh/duplicate/concurrent start tests；浏览器刷新不造新会话 |
-| B-02 | ACTIVE | 显式流程严格保持“显示答案 → pending rating → exact WordSense → 一次正式提交” | Reader inline review + canonical SenseReview | rating 在选 sense 前零写；manual new sense 后沿用同一 pending rating；不问第二次 |
-| B-03 | TODO | `reading_action_id` 幂等、unknown retry、undo/rerate | Backend/Reader action-id candidate | same ID replay 一 log；undo 后旧 ID 永久 409；新 ID rerate 一新 active log |
+| B-02 | DONE | 显式流程严格保持“显示答案 → pending rating → exact WordSense → 一次正式提交” | Reader inline review + canonical SenseReview | rating 在选 sense 前零写；manual new sense 后沿用同一 pending rating；不问第二次 |
+| B-03 | ACTIVE | `reading_action_id` 幂等、unknown retry、undo/rerate | Backend/Reader action-id candidate | same ID replay 一 log；undo 后旧 ID 永久 409；新 ID rerate 一新 active log |
 | B-04 | TODO | 被动 Good eligibility/去重/排除 | ReadingFinishSettlementService | opened/helped/explicit/newly-created/newly-resolved/newly-marked same-reading sense 不 passive；每卡/session ≤1 |
 | B-05 | TODO | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
 | B-06 | TODO | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
@@ -472,22 +472,22 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `B-02`
-- Last DONE: `B-01`
+- Active milestone: `B-03`
+- Last DONE: `B-02`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — B-02
+### ACTIVE MILESTONE ARCHITECTURE GATE — B-03
 
-- 目标：验证并收束 Reader 显式 Sense Review 的单一路径：用户先显示答案并选择一次 rating intent，服务器候选/人工新词义解析出 exact WordSense 后，沿用该 intent 完成一次 canonical 正式评分；不得在选定 exact sense 前写 ReviewLog/FSRS，也不得在新词义创建后再次询问 rating。
-- 不做：不改变 `reading_action_id` retry/undo/rerate 语义（B-03）、opened ACK precedence（B-05）、被动 Good/Finish settlement（B-04/B-06）或普通非 Reader Sense Review；不改 migration、AI/evidence schema、ReviewCard lifecycle 或 FSRS 算法。
-- Owner/seam：Reader inline review dialog 只收集 reveal/rating intent 与服务器候选选择；`TextReader.vue` 保存唯一 pending command。已有 exact card 提交继续进入 canonical Sense Review endpoint → `ReviewCardService` → FSRS；manual new sense 只补 exact WordSense/ReviewCard identity，再续接同一 pending command，不建立第二评分入口。
-- Architecture review：`Accepted under current goal authorization`；B-02 只展开已冻结 Phase B 显式评分依赖，并复用现有 PAB-R3/Reader candidate。实施前先做新鲜只读调用链与测试审计；只有可执行证据暴露真实缺口时才作最小修复。
-- 初始 Allowlist：`resources/js/components/TextReader/TextReader.vue`、现有 inline sense review dialog 与 `resources/js/services/ReaderRecoveryPolicy.js`、canonical Sense Review/manual sense 现有 Controller/Service seam、直接 PHP/JS tests 与本控制文件。`reading_action_id` 服务端 ledger、undo、Finish settlement、migration 与其他 Reader UI 默认禁止修改。
-- 数据/兼容边界：candidate 必须属于当前 user/language/session/source revision/occurrence 且为 exact confirmed WordSense；phrase 与未 reveal/未选 sense 保持零正式写；manual new sense 成功后沿用原 rating intent，正式提交恰好一次；失败/刷新不得静默改选 candidate 或生成第二 rating intent。
-- 最小验证：官方 testing DB lease 下 reveal 前/选 sense 前零写、四 rating exact sense、manual new sense continuation 一次提交、phrase/cross-scope/stale rejection 与 full FSRS/ReviewLog snapshot；Reader inline/recovery JS；server-bound testing 真实浏览器完成 matched-existing 与 manual-new-sense 两条可见流程，记录用户只选一次 rating、exact ReviewLog/FSRS before/after、刷新恢复、Console/Network；精确 cleanup 与独立审查。
+- 目标：验证并收束 Reader 正式评分的唯一 action ledger：第一次提交生成一个不可预测 `reading_action_id`；网络结果未知时只重放同一 ID；同一 ID 必须 exact replay 且只产生一条正式 ReviewLog；撤销后旧 ID 永久不可再次生效，新评分必须生成新 ID。
+- 不做：不改变 B-02 的 rating→exact sense 流程，不进入被动 Good/Finish settlement（B-04/B-06）、opened precedence（B-05）或普通非 Reader Sense Review；不新增第二 ledger、watchdog、后台重试、migration 或新的 FSRS/lifecycle 语义。
+- Owner/seam：服务端继续复用 `SenseReviewController` → `ReadingSessionService` → `ReadingSessionInteraction`/canonical ReviewLog 的现有 action-id candidate；Reader 只用现有 `ReaderRecoveryPolicy` 保存一笔结果未知的正式评分命令并显式重试，同一事实不再复制到第二缓存。
+- Architecture review：`Accepted under current goal authorization`；当前代码已存在 action-id replay/active/undone candidate 与 Reader sessionStorage retry candidate，B-03 先以 fresh tests/真实故障证据判断是否已有完整合同，只有实际缺口才作最小修改。
+- 初始 Allowlist：`app/Http/Controllers/SenseReviewController.php`、`app/Services/ReadingSessionService.php`、`app/Models/ReadingSessionInteraction.php`、`resources/js/components/TextReader/TextReader.vue`、`resources/js/services/ReaderRecoveryPolicy.js`、现有 Review API client、直接 PHP/JS tests 与本控制文件。Finish/passive settlement、AI/evidence schema、migration、普通 Review UI 默认禁止修改。
+- 数据/兼容边界：同一 user/language/session/occurrence/card/rating/action ID replay 返回同一已存结果且 ReviewLog/FSRS 只推进一次；不同 payload 不得借旧 ID 改写；active action 与新 action 冲突必须 fail closed；undo 后旧 ID 永久 409；用户重新评分只能用新 ID，并恰好产生一条新的 active log。
+- 最小验证：官方 testing DB lease 下 sequential/concurrent same-ID replay、payload mismatch、active conflict、undo→old-ID rejection→new-ID rerate、failure injection rollback 与 ordinary Sense Review 回归；Reader JS 覆盖 secure UUID、unknown persistence/reload/retry/clear；server-bound testing 真实浏览器至少取得一次结果未知→同 ID 安全重试及一次 undo→新 ID rerate 的 Network/DB 证据，随后精确清理。
 
 ### PROGRESS LOG
 
@@ -524,6 +524,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 14:55 | A-GATE | DONE | Goal branch tip | clean-tree Phase A PHP 103/103（619 assertions）、全量 JS 355/355、npm development 与 writer-surface audit 全绿；独立审查发现 matched_existing 可见候选改选缺口后，在 server-bound testing 正常 UI 真实完成双候选 bank→河岸、confirm、dialog refresh、full reload；user evidence 持久化到 sense36，ReviewLog0、两张卡 full FSRS snapshot 精确不变；task data、browser/port/sentinel/lease residue=0；复审 Blocker=0/Required=0/Advisory=0 | B-01`
 
 `2026-08-09 15:36 | B-01 | DONE | Goal branch tip | 新增 endpoint lifecycle contract：current fresh/explicit resume 同 UUID，cross-user/language 404、wrong chapter/source revision 409，completed result 连续两次 exact replay；PHP 52/52（387 assertions）+ final focused 8/8（97 assertions）、Reader JS 32/32、npm development 全绿。server-bound testing 正常 UI 初次 `{}`、真实标记触发 component refresh、full reload 三次均复用 UUID 12d0581e…，live DB current active session=1 且 WordSense/Card/Log/FSRS 写入为 0；失败批次与成功批次 task data、browser/port/sentinel/lease 全部精确清零；独立复审 Blocker=0/Required=0/Advisory=0 | B-02`
+
+`2026-08-09 21:05 | B-02 | DONE | Goal branch tip | Private House cleanup 删除客户端按释义/排除 ID 猜新 sense 的第二真相，并让普通 `/senses/manual` 不再承担 Reader 外锁；Reader JS 53/53、B-02/manual 回归 PHP 43/43（402 assertions）、npm development 全绿。server-bound testing 真实 UI matched-existing bank 与 marked-unknown beacon 均只选择一次 Good：bank `/rate` 1 次；beacon `/senses/manual` 1 次 + `/rate` 1 次。DB readback 两张 sense card 均 fsrs_reps=1、各恰好 1 条 `reading_explicit/good` ReviewLog 和 1 条 `explicit_rated` interaction；Pusher 连接拒绝与空 testing Anki settings 500 为非 B-02 fixture/local-service 噪声。testing user 46 及全部 user-scoped 资产、browser/port/sentinel/lease 精确清零 | B-03`
 
 ### DECISION LOG
 
