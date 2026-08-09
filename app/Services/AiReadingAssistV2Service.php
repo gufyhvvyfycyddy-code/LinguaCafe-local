@@ -60,7 +60,16 @@ class AiReadingAssistV2Service
                 $this->assertMarkedTargetSnapshot($catalog['targets'], $expectedMarkedTargets);
             }
             $targets = $catalog['targets'];
-            $chunks = empty($targets) ? [[]] : array_chunk($targets, 50);
+            $partCount = max(1, (int) ceil(count($targets) / 50));
+            $basePartSize = intdiv(count($targets), $partCount);
+            $largerPartCount = count($targets) % $partCount;
+            $chunks = [];
+            $offset = 0;
+            for ($index = 0; $index < $partCount; $index++) {
+                $partSize = $basePartSize + ($index < $largerPartCount ? 1 : 0);
+                $chunks[] = array_slice($targets, $offset, $partSize);
+                $offset += $partSize;
+            }
             $scopeHash = $this->targetScopeHash($targets);
             $sentences = $this->sourceSentences($catalog['sentences']);
             $packages = [];
@@ -1043,11 +1052,17 @@ class AiReadingAssistV2Service
 
         try {
             $decoded = json_decode($trimmed, true, 512, JSON_THROW_ON_ERROR);
+            $typed = json_decode($trimmed, false, 512, JSON_THROW_ON_ERROR);
         } catch (\Throwable $e) {
             $this->reject(self::ERROR_INVALID_JSON, 'V2 AI text is not valid JSON.');
         }
-        if (!is_array($decoded)) {
+        if (!is_array($decoded) || !$typed instanceof \stdClass) {
             $this->reject(self::ERROR_INVALID_JSON, 'V2 AI text must decode to a JSON object.');
+        }
+        foreach (['sentence_translations', 'word_results', 'phrase_results', 'warnings'] as $listField) {
+            if (property_exists($typed, $listField) && !is_array($typed->{$listField})) {
+                $this->reject(self::ERROR_SCHEMA_MISMATCH, "V2 {$listField} must be a JSON array.");
+            }
         }
 
         return $decoded;

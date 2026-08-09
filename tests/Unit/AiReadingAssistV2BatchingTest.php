@@ -30,29 +30,30 @@ class AiReadingAssistV2BatchingTest extends TestCase
     }
 
     #[\PHPUnit\Framework\Attributes\DataProvider('packageCountProvider')]
-    public function test_targets_are_split_into_exact_fifty_target_parts(int $targets, int $expectedParts): void
+    public function test_targets_are_balanced_into_twenty_to_fifty_target_parts_with_one_small_input_exemption(int $targets, array $expectedSizes): void
     {
         $service = $this->serviceForCount($targets, $catalog);
         $result = $service->buildSourcePackages(V2Harness::USER_ID, V2Harness::LANGUAGE, V2Harness::CHAPTER_ID);
 
         $this->assertTrue($result['success']);
-        $this->assertSame($expectedParts, $result['package_count']);
-        $this->assertSame($expectedParts, $result['part_count']);
+        $this->assertSame(count($expectedSizes), $result['package_count']);
+        $this->assertSame(count($expectedSizes), $result['part_count']);
         $this->assertSame($targets, $result['target_count']);
-        foreach ($result['packages'] as $package) {
-            $this->assertLessThanOrEqual(50, $package['target_count']);
-        }
+        $this->assertSame($expectedSizes, array_column($result['packages'], 'target_count'));
     }
 
     public static function packageCountProvider(): array
     {
         return [
-            '20 => 1' => [20, 1],
-            '49 => 1' => [49, 1],
-            '50 => 1' => [50, 1],
-            '51 => 2' => [51, 2],
-            '100 => 2' => [100, 2],
-            '101 => 3' => [101, 3],
+            '0 => one empty package' => [0, [0]],
+            '1 => one small package' => [1, [1]],
+            '19 => one small package' => [19, [19]],
+            '20 => 20' => [20, [20]],
+            '49 => 49' => [49, [49]],
+            '50 => 50' => [50, [50]],
+            '51 => 26 + 25' => [51, [26, 25]],
+            '100 => 50 + 50' => [100, [50, 50]],
+            '101 => 34 + 34 + 33' => [101, [34, 34, 33]],
         ];
     }
 

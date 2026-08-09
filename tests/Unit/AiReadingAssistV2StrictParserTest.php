@@ -84,6 +84,12 @@ class AiReadingAssistV2StrictParserTest extends TestCase
         $numericString = $this->payload;
         $numericString['part_index'] = '1';
         $this->assertRejected($numericString, AiReadingAssistV2Service::ERROR_SCHEMA_MISMATCH);
+
+        foreach (['sentence_translations', 'word_results', 'phrase_results', 'warnings'] as $listField) {
+            $jsonObject = $this->payload;
+            $jsonObject[$listField] = new \stdClass();
+            $this->assertRejected($jsonObject, AiReadingAssistV2Service::ERROR_SCHEMA_MISMATCH);
+        }
     }
 
     public function test_v2_rejects_invalid_result_and_confidence_enums(): void
