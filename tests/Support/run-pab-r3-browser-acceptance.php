@@ -424,19 +424,108 @@ function parsePabR3BrowserAcceptanceArguments(array $arguments): array
     ];
 }
 
-/** @param list<string> $command @param array<string, string> $environment */
-function runPabR3BrowserAcceptanceChild(array $command, array $environment, string $projectRoot): int
+/**
+ * @param  list<string>  $command
+ * @return array{command: list<string>, working_directory: string}
+ */
+function preparePabR3BrowserAcceptanceChild(array $command, string $projectRoot): array
 {
+    $artisanIndex = null;
+    $serveIndex = null;
+    foreach ($command as $index => $argument) {
+        if ($artisanIndex === null && basename(str_replace('\\', '/', $argument)) === 'artisan') {
+            $artisanIndex = $index;
+
+            continue;
+        }
+        if ($artisanIndex !== null && $argument === 'serve') {
+            $serveIndex = $index;
+            break;
+        }
+    }
+
+    if ($serveIndex === null) {
+        return ['command' => $command, 'working_directory' => $projectRoot];
+    }
+
+    $host = '127.0.0.1';
+    $port = '8000';
+    for ($index = $serveIndex + 1, $count = count($command); $index < $count; $index++) {
+        $argument = $command[$index];
+        if ($argument === '--no-reload') {
+            continue;
+        }
+        if (str_starts_with($argument, '--host=')) {
+            $host = substr($argument, strlen('--host='));
+            continue;
+        }
+        if (str_starts_with($argument, '--port=')) {
+            $port = substr($argument, strlen('--port='));
+            continue;
+        }
+        if (($argument === '--host' || $argument === '--port') && isset($command[$index + 1])) {
+            if ($argument === '--host') {
+                $host = $command[++$index];
+            } else {
+                $port = $command[++$index];
+            }
+            continue;
+        }
+
+        throw new PabR3BrowserAcceptanceFailure(
+            'PAB_R3_ARTISAN_SERVE_ARGUMENT_UNSUPPORTED',
+            PabR3BrowserAcceptanceHarness::EXIT_USAGE,
+        );
+    }
+
+    if ($host !== '127.0.0.1'
+        || ! ctype_digit($port)
+        || (int) $port < 1
+        || (int) $port > 65535
+    ) {
+        throw new PabR3BrowserAcceptanceFailure(
+            'PAB_R3_ARTISAN_SERVE_BIND_INVALID',
+            PabR3BrowserAcceptanceHarness::EXIT_USAGE,
+        );
+    }
+
+    $publicDirectory = $projectRoot.'/public';
+    $router = is_file($projectRoot.'/server.php')
+        ? $projectRoot.'/server.php'
+        : $projectRoot.'/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php';
+    if (! is_dir($publicDirectory) || ! is_file($router)) {
+        throw new PabR3BrowserAcceptanceFailure(
+            'PAB_R3_SERVER_ENTRY_MISSING',
+            PabR3BrowserAcceptanceHarness::EXIT_UNAVAILABLE,
+        );
+    }
+
+    return [
+        'command' => [PHP_BINARY, '-S', $host.':'.$port, $router],
+        'working_directory' => $publicDirectory,
+    ];
+}
+
+/** @param list<string> $command @param array<string, string> $environment */
+function runPabR3BrowserAcceptanceChild(
+    array $command,
+    array $environment,
+    string $projectRoot,
+    ?callable $cancellationRequested = null,
+): int
+{
+    $prepared = preparePabR3BrowserAcceptanceChild($command, $projectRoot);
+    $cancellationRequested ??= static fn (): bool => false;
     $descriptors = [
         0 => ['file', 'php://stdin', 'r'],
         1 => ['file', 'php://stdout', 'w'],
         2 => ['file', 'php://stderr', 'w'],
     ];
     $child = @proc_open(
-        $command,
+        $prepared['command'],
         $descriptors,
         $pipes,
-        $projectRoot,
+        $prepared['working_directory'],
         $environment,
         ['bypass_shell' => true],
     );
@@ -496,39 +585,11 @@ function runPabR3BrowserAcceptanceChild(array $command, array $environment, stri
         }
     });
 
-    if (function_exists('pcntl_async_signals') && function_exists('pcntl_signal')) {
-        pcntl_async_signals(true);
-        foreach (array_filter([
-            defined('SIGINT') ? SIGINT : null,
-            defined('SIGTERM') ? SIGTERM : null,
-            defined('SIGHUP') ? SIGHUP : null,
-            defined('SIGQUIT') ? SIGQUIT : null,
-        ]) as $signal) {
-            pcntl_signal($signal, static function () use ($terminateChild): void {
-                $terminateChild();
-            });
-        }
-    }
-
-    if (function_exists('sapi_windows_set_ctrl_handler')) {
-        sapi_windows_set_ctrl_handler(static function (int $event) use ($terminateChild): bool {
-            if (defined('PHP_WINDOWS_EVENT_CTRL_C') && $event === PHP_WINDOWS_EVENT_CTRL_C) {
-                $terminateChild();
-
-                return true;
-            }
-            if (defined('PHP_WINDOWS_EVENT_CTRL_BREAK') && $event === PHP_WINDOWS_EVENT_CTRL_BREAK) {
-                $terminateChild();
-
-                return true;
-            }
-
-            return false;
-        });
-    }
-
     $lastStatus = null;
     do {
+        if ($terminationRequestedAt === null && $cancellationRequested()) {
+            $terminateChild();
+        }
         $lastStatus = @proc_get_status($child);
         if (! is_array($lastStatus) || ! ($lastStatus['running'] ?? false)) {
             break;
@@ -689,6 +750,7 @@ function runPabR3BrowserAcceptanceCli(array $arguments): int
             $command,
             $environment,
             $projectRoot,
+            $cancellationRequested,
         ),
         cancellationRequested: $cancellationRequested,
     );

@@ -518,6 +518,110 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $this->assertSame($command, $parsed['command']);
     }
 
+    public function test_artisan_serve_is_prepared_as_one_direct_php_server_process(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pab-r3-direct-server-'.bin2hex(random_bytes(8));
+        $public = $root.DIRECTORY_SEPARATOR.'public';
+        mkdir($public, 0700, true);
+        file_put_contents($root.DIRECTORY_SEPARATOR.'server.php', "<?php\n");
+
+        try {
+            $prepared = \preparePabR3BrowserAcceptanceChild([
+                PHP_BINARY,
+                'artisan',
+                '--env=testing',
+                'serve',
+                '--no-reload',
+                '--host=127.0.0.1',
+                '--port=8765',
+            ], $root);
+
+            $this->assertSame([
+                PHP_BINARY,
+                '-S',
+                '127.0.0.1:8765',
+                $root.'/server.php',
+            ], $prepared['command']);
+            $this->assertSame($root.'/public', $prepared['working_directory']);
+            $this->assertNotContains('artisan', $prepared['command']);
+        } finally {
+            @unlink($root.DIRECTORY_SEPARATOR.'server.php');
+            @rmdir($public);
+            @rmdir($root);
+        }
+    }
+
+    public function test_real_php_server_cancellation_closes_the_owned_child_and_port(): void
+    {
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pab-r3-cancel-server-'.bin2hex(random_bytes(8));
+        $public = $root.DIRECTORY_SEPARATOR.'public';
+        mkdir($public, 0700, true);
+        file_put_contents($public.DIRECTORY_SEPARATOR.'index.html', 'ready');
+
+        $reservation = null;
+        $port = null;
+        for ($attempt = 0; $attempt < 20 && ! is_resource($reservation); $attempt++) {
+            $candidate = random_int(20000, 45000);
+            $reservation = @stream_socket_server('tcp://127.0.0.1:'.$candidate, $errorCode, $errorMessage);
+            if (is_resource($reservation)) {
+                $port = $candidate;
+            }
+        }
+        $this->assertIsResource($reservation, $errorMessage ?? 'Could not reserve a high acceptance port.');
+        $this->assertIsInt($port);
+        fclose($reservation);
+
+        $serverObserved = false;
+        $cancelDeadline = hrtime(true) + 5_000_000_000;
+        $cancellationRequested = static function () use ($port, &$serverObserved, $cancelDeadline): bool {
+            $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
+            if (is_resource($connection)) {
+                fclose($connection);
+                $serverObserved = true;
+
+                return true;
+            }
+
+            return hrtime(true) >= $cancelDeadline;
+        };
+
+        try {
+            $environment = getenv();
+            $this->assertIsArray($environment);
+            $environment['APP_ENV'] = 'testing';
+            try {
+                \runPabR3BrowserAcceptanceChild(
+                    [PHP_BINARY, '-S', '127.0.0.1:'.$port, '-t', $public],
+                    $environment,
+                    $root,
+                    $cancellationRequested,
+                );
+                $this->fail('Cancellation must stop the directly owned server process.');
+            } catch (PabR3BrowserAcceptanceFailure $error) {
+                $this->assertSame('PAB_R3_CANCELLED', $error->machineCode);
+                $this->assertSame(PabR3BrowserAcceptanceHarness::EXIT_CANCELLED, $error->exitCode);
+            }
+
+            $this->assertTrue($serverObserved, 'The real server must bind before cancellation is requested.');
+            $portClosed = false;
+            $closeDeadline = hrtime(true) + 2_000_000_000;
+            do {
+                $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
+                if (! is_resource($connection)) {
+                    $portClosed = true;
+                    break;
+                }
+                fclose($connection);
+                usleep(25_000);
+            } while (hrtime(true) < $closeDeadline);
+            $this->assertTrue($portClosed, 'Cancellation must leave no listening server on the acceptance port.');
+        } finally {
+            @unlink($public.DIRECTORY_SEPARATOR.'index.html');
+            @rmdir($public);
+            @rmdir($root);
+        }
+    }
+
     public function test_source_has_no_env_file_write_migration_destructive_notification_or_shell_expansion_path(): void
     {
         $source = file_get_contents(dirname(__DIR__).'/Support/run-pab-r3-browser-acceptance.php');
@@ -548,6 +652,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $this->assertStringNotContainsString('mt_rand(', $source);
         $this->assertStringContainsString("['bypass_shell' => true]", $source);
         $this->assertStringContainsString('proc_open(', $source);
+        $this->assertStringContainsString("PHP_BINARY, '-S'", $source);
         $this->assertStringContainsString("['LINGUACAFE_TEST_SENTINEL' => \$sentinel]", $source);
         $this->assertStringContainsString("table('migrations')->where('migration', \$value)->delete()", $source);
         $this->assertStringNotContainsString("table('migrations')->delete()", $source);
