@@ -159,7 +159,6 @@
                     const next = {};
                     for (const item of items || []) {
                         const preferred = item.evidence?.word_sense_id
-                            || item.verification?.word_sense_id
                             || item.matched_word_sense_id
                             || candidateOptions(item)[0]?.value
                             || null;

@@ -23,7 +23,7 @@ export function readingSenseConfidenceLabel(value) {
 }
 
 function normalizedEvidence(item = {}) {
-    if (item.evidence || item.verification) return item.evidence || item.verification;
+    if (item.evidence) return item.evidence;
     if (!item.resolution) return null;
     return {
         resolution: item.resolution,
@@ -67,20 +67,20 @@ export function isTrustAiVerified(item = {}) {
 }
 
 export function isReadingSenseWordTarget(item = {}) {
-    return (item.target_type || item.kind || 'word') === 'word';
+    return (item.target_type || item.kind) === 'word';
 }
 
 export function candidateOptions(item = {}) {
     if (!isReadingSenseWordTarget(item)) return [];
     return (Array.isArray(item.candidate_word_senses) ? item.candidate_word_senses : [])
         .map(candidate => {
-            const value = Number(candidate.word_sense_id ?? candidate.sense_id);
+            const value = Number(candidate.word_sense_id);
             return {
                 value,
                 text: [candidate.sense_zh, candidate.sense_en, candidate.pos]
                     .filter(Boolean)
                     .join(' · '),
-                candidate: { ...candidate, word_sense_id: value, sense_id: value },
+                candidate: { ...candidate, word_sense_id: value },
             };
         })
         .filter(option => Number.isInteger(option.value) && option.value > 0 && option.text);

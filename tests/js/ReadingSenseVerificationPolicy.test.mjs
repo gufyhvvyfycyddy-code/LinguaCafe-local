@@ -13,6 +13,7 @@ import {
 
 const item = {
     occurrence_id: 'occ2_bank',
+    target_type: 'word',
     result: 'matched_existing',
     confidence: 'high',
     candidate_word_senses: [
@@ -23,6 +24,7 @@ const item = {
 
 test('verification state is driven by server evidence, not AI confidence alone', () => {
     assert.equal(readingSenseVerificationState(item), 'pending');
+    assert.equal(readingSenseVerificationState({ ...item, verification: { resolution: 'matched_existing' } }), 'pending');
     assert.equal(readingSenseVerificationState({ ...item, evidence: { resolution: 'matched_existing' } }), 'verified');
     assert.equal(readingSenseVerificationState({ ...item, evidence: { resolution: 'new_sense' } }), 'verified');
     assert.equal(readingSenseVerificationState({ ...item, evidence: { resolution: 'excluded' } }), 'excluded');
@@ -35,13 +37,17 @@ test('trust-AI badge requires server evidence plus high matched-existing result'
     assert.equal(isTrustAiVerified({ ...trusted, result: 'ambiguous' }), false);
 });
 
-test('existing-sense resolution accepts only server-provided candidate ids', () => {
+test('existing-sense resolution accepts only server-provided V2 candidate ids', () => {
     assert.deepEqual(buildReadingSenseResolutionIntent(item, 'match_existing', 95), {
         occurrence_id: 'occ2_bank',
         resolution: 'matched_existing',
         word_sense_id: 95,
     });
     assert.equal(buildReadingSenseResolutionIntent(item, 'match_existing', 999), null);
+    assert.equal(buildReadingSenseResolutionIntent({
+        ...item,
+        candidate_word_senses: [{ sense_id: 95, sense_zh: '河岸' }],
+    }, 'match_existing', 95), null);
 });
 
 test('new sense and exclude remain non-rating evidence intents for word targets', () => {
@@ -51,6 +57,13 @@ test('new sense and exclude remain non-rating evidence intents for word targets'
     assert.deepEqual(buildReadingSenseResolutionIntent(item, 'exclude'), {
         occurrence_id: 'occ2_bank', resolution: 'excluded', word_sense_id: null,
     });
+});
+
+test('target type must come from the server target instead of defaulting to word', () => {
+    const untyped = { ...item };
+    delete untyped.target_type;
+    assert.equal(isReadingSenseWordTarget(untyped), false);
+    assert.equal(buildReadingSenseResolutionIntent(untyped, 'new_sense'), null);
 });
 
 test('phrase targets cannot create WordSense binding or evidence intents', () => {
