@@ -16,6 +16,36 @@ final class PabR3BrowserAcceptanceFailure extends RuntimeException
     }
 }
 
+/** @param list<string> $command */
+function pabR3SupportedArtisanServeIndex(array $command): ?int
+{
+    $executable = $command[0] ?? null;
+    $artisanArgument = $command[1] ?? null;
+    if (! is_string($executable) || ! is_string($artisanArgument)) {
+        return null;
+    }
+
+    $executableName = strtolower(basename(str_replace('\\', '/', $executable)));
+    $currentPhpName = strtolower(basename(str_replace('\\', '/', PHP_BINARY)));
+    if ($executable !== PHP_BINARY
+        && ! in_array($executableName, ['php', 'php.exe', $currentPhpName], true)
+    ) {
+        return null;
+    }
+    if (basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan') {
+        return null;
+    }
+
+    if (($command[2] ?? null) === 'serve') {
+        return 2;
+    }
+    if (($command[2] ?? null) === '--env=testing' && ($command[3] ?? null) === 'serve') {
+        return 3;
+    }
+
+    return null;
+}
+
 final class PabR3BrowserAcceptanceHarness
 {
     public const SENTINEL_PREFIX = '__testing_acceptance_sentinel_';
@@ -312,22 +342,10 @@ final class PabR3BrowserAcceptanceHarness
     /** @param list<string> $command */
     private static function assertSentinelSafeCommand(array $command): void
     {
-        $artisanArgument = $command[1] ?? null;
-        if (! is_string($artisanArgument)
-            || basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan'
-        ) {
+        if (pabR3SupportedArtisanServeIndex($command) === null) {
             return;
         }
-        $artisanIndex = 1;
-
-        $isServeCommand = false;
-        for ($index = $artisanIndex + 1, $count = count($command); $index < $count; $index++) {
-            if ($command[$index] === 'serve') {
-                $isServeCommand = true;
-                break;
-            }
-        }
-        if ($isServeCommand && ! in_array('--no-reload', $command, true)) {
+        if (! in_array('--no-reload', $command, true)) {
             throw new PabR3BrowserAcceptanceFailure(
                 'PAB_R3_ARTISAN_SERVE_NO_RELOAD_REQUIRED',
                 self::EXIT_USAGE,
@@ -426,21 +444,7 @@ function parsePabR3BrowserAcceptanceArguments(array $arguments): array
  */
 function preparePabR3BrowserAcceptanceChild(array $command, string $projectRoot): array
 {
-    $artisanArgument = $command[1] ?? null;
-    if (! is_string($artisanArgument)
-        || basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan'
-    ) {
-        return ['command' => $command, 'working_directory' => $projectRoot];
-    }
-
-    $serveIndex = null;
-    for ($index = 2, $count = count($command); $index < $count; $index++) {
-        if ($command[$index] === 'serve') {
-            $serveIndex = $index;
-            break;
-        }
-    }
-
+    $serveIndex = pabR3SupportedArtisanServeIndex($command);
     if ($serveIndex === null) {
         return ['command' => $command, 'working_directory' => $projectRoot];
     }

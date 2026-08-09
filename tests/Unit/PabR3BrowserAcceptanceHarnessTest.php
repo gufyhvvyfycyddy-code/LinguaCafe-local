@@ -112,29 +112,36 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         );
     }
 
-    public function test_non_artisan_child_with_artisan_and_serve_arguments_is_unchanged(): void
+    public function test_unsupported_artisan_lookalikes_are_left_unchanged(): void
     {
-        $command = [PHP_BINARY, '-r', 'echo "ok";', 'artisan', 'serve'];
         $root = dirname(__DIR__, 2);
+        $commands = [
+            [PHP_BINARY, '-r', 'echo "ok";', 'artisan', 'serve'],
+            ['node', 'artisan', 'serve', '--no-reload'],
+            [PHP_BINARY, 'artisan', 'help', 'serve'],
+            [PHP_BINARY, 'artisan', 'list', 'serve'],
+        ];
 
-        $prepared = \preparePabR3BrowserAcceptanceChild($command, $root);
-        $this->assertSame($command, $prepared['command']);
-        $this->assertSame($root, $prepared['working_directory']);
+        foreach ($commands as $command) {
+            $prepared = \preparePabR3BrowserAcceptanceChild($command, $root);
+            $this->assertSame($command, $prepared['command']);
+            $this->assertSame($root, $prepared['working_directory']);
 
-        $log = new PabR3BrowserAcceptanceEventLog();
-        $capturedCommand = null;
-        $harness = $this->harness(
-            $log,
-            runChild: static function (array $actualCommand) use ($log, &$capturedCommand): int {
-                $capturedCommand = $actualCommand;
-                $log->events[] = 'child';
+            $log = new PabR3BrowserAcceptanceEventLog();
+            $capturedCommand = null;
+            $harness = $this->harness(
+                $log,
+                runChild: static function (array $actualCommand) use ($log, &$capturedCommand): int {
+                    $capturedCommand = $actualCommand;
+                    $log->events[] = 'child';
 
-                return 0;
-            },
-        );
+                    return 0;
+                },
+            );
 
-        $this->assertSame(0, $harness->run('testing', $command));
-        $this->assertSame($command, $capturedCommand);
+            $this->assertSame(0, $harness->run('testing', $command));
+            $this->assertSame($command, $capturedCommand);
+        }
     }
 
     public function test_sentinel_has_required_prefix_and_uses_exactly_32_random_bytes(): void
