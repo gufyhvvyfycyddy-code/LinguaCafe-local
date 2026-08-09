@@ -79,6 +79,7 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $unfamiliar = Mockery::mock(ReadingUnfamiliarTargetService::class);
         $chapterTextService = new ReadingChapterTextService();
         $this->evidence = new ReadingOccurrenceSenseEvidenceService($catalogService, $chapterTextService);
+        $this->app->instance(ReadingOccurrenceSenseEvidenceService::class, $this->evidence);
         $this->service = new AiReadingAssistV2Service(
             $catalogService,
             $unfamiliar,
@@ -240,6 +241,144 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $fresh = ReadingOccurrenceSenseEvidence::firstOrFail();
         $this->assertSame(ReadingOccurrenceSenseEvidence::SOURCE_USER, $fresh->resolution_source);
         $this->assertSame($userSense->id, $fresh->word_sense_id);
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_user_can_correct_and_reload_each_evidence_resolution_through_the_api_without_rating(): void
+    {
+        $firstSense = $this->makeSense('api-first');
+        $secondSense = $this->makeSense('api-second');
+        $this->bindCandidates($firstSense, $secondSense);
+        $occurrenceId = $this->catalog['targets'][0]['occurrence_id'];
+        $firstCard = $this->cardService->ensureSenseCard($firstSense)->fresh();
+        $secondCard = $this->cardService->ensureSenseCard($secondSense)->fresh();
+        $firstCardSnapshot = $this->snapshotService->capture($firstCard);
+        $secondCardSnapshot = $this->snapshotService->capture($secondCard);
+        $beforeSenseCount = WordSense::count();
+        $beforeCardCount = ReviewCard::count();
+        $beforeLogCount = ReviewLog::count();
+
+        foreach ([
+            [ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING, $firstSense->id],
+            [ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING, $secondSense->id],
+            [ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE, null],
+            [ReadingOccurrenceSenseEvidence::RESOLUTION_EXCLUDED, null],
+        ] as [$resolution, $wordSenseId]) {
+            $this->actingAs($this->user)
+                ->postJson('/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence', [
+                    'occurrence_id' => $occurrenceId,
+                    'resolution' => $resolution,
+                    'word_sense_id' => $wordSenseId,
+                ])
+                ->assertOk()
+                ->assertJsonPath('success', true);
+
+            $this->actingAs($this->user)
+                ->getJson('/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence')
+                ->assertOk()
+                ->assertJsonPath('total', 1)
+                ->assertJsonPath('items.0.occurrence_id', $occurrenceId)
+                ->assertJsonPath('items.0.resolution', $resolution)
+                ->assertJsonPath('items.0.word_sense_id', $wordSenseId)
+                ->assertJsonPath('items.0.resolution_source', ReadingOccurrenceSenseEvidence::SOURCE_USER);
+        }
+
+        $this->assertSame(1, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame($beforeSenseCount, WordSense::count());
+        $this->assertSame($beforeCardCount, ReviewCard::count());
+        $this->assertSame($beforeLogCount, ReviewLog::count());
+        $this->assertTrue($this->snapshotService->matches($firstCard->fresh(), $firstCardSnapshot));
+        $this->assertTrue($this->snapshotService->matches($secondCard->fresh(), $secondCardSnapshot));
+    }
+
+    public function test_evidence_api_rejects_stale_user_and_language_scope_without_writes(): void
+    {
+        $sense = $this->makeSense('api-scope');
+        $this->bindCandidates($sense);
+        $occurrenceId = $this->catalog['targets'][0]['occurrence_id'];
+        $path = '/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence';
+        $beforeSenseCount = WordSense::count();
+
+        $this->actingAs($this->user)
+            ->postJson($path, [
+                'occurrence_id' => 'occ2_stale',
+                'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+                'word_sense_id' => $sense->id,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'READING_OCCURRENCE_STALE');
+
+        $otherUser = User::forceCreate([
+            'name' => 'PAB R3 Other User',
+            'email' => 'pab-r3-other-'.Str::uuid().'@example.test',
+            'password' => Hash::make('password'),
+            'selected_language' => V2Harness::LANGUAGE,
+            'password_changed' => true,
+            'uuid' => (string) Str::uuid(),
+        ]);
+        $this->actingAs($otherUser)
+            ->postJson($path, [
+                'occurrence_id' => $occurrenceId,
+                'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+                'word_sense_id' => $sense->id,
+            ])
+            ->assertUnauthorized();
+
+        $this->user->selected_language = 'english-other-scope';
+        $this->user->save();
+        $this->actingAs($this->user)
+            ->postJson($path, [
+                'occurrence_id' => $occurrenceId,
+                'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+                'word_sense_id' => $sense->id,
+            ])
+            ->assertStatus(422)
+            ->assertJsonPath('error_code', 'READING_EVIDENCE_INVALID');
+
+        $this->assertSame(0, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame($beforeSenseCount, WordSense::count());
+        $this->assertSame(0, ReviewCard::count());
+        $this->assertSame(0, ReviewLog::count());
+    }
+
+    public function test_evidence_api_hides_old_source_revision_and_reports_it_as_stale(): void
+    {
+        $occurrenceId = $this->catalog['targets'][0]['occurrence_id'];
+
+        $this->actingAs($this->user)
+            ->postJson('/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence', [
+                'occurrence_id' => $occurrenceId,
+                'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE,
+                'word_sense_id' => null,
+            ])
+            ->assertOk();
+
+        $currentTarget = $this->catalog['targets'][0];
+        $currentTarget['occurrence_id'] = 'occ2_changed_source_revision';
+        $this->catalog['source_revision'] = 'sha256:changed-source-revision';
+        $this->catalog['targets'] = [$currentTarget];
+        $this->catalog['targets_by_id'] = [$currentTarget['occurrence_id'] => $currentTarget];
+
+        $this->actingAs($this->user)
+            ->postJson('/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence', [
+                'occurrence_id' => $occurrenceId,
+                'resolution' => ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE,
+                'word_sense_id' => null,
+            ])
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', 'READING_OCCURRENCE_STALE');
+
+        $this->actingAs($this->user)
+            ->getJson('/chapters/'.V2Harness::CHAPTER_ID.'/reading-occurrence-evidence')
+            ->assertOk()
+            ->assertJsonPath('source_revision', 'sha256:changed-source-revision')
+            ->assertJsonPath('total', 0)
+            ->assertJsonPath('items', [])
+            ->assertJsonPath('stale_evidence_count', 1);
+
+        $this->assertSame(1, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame(0, WordSense::count());
+        $this->assertSame(0, ReviewCard::count());
         $this->assertSame(0, ReviewLog::count());
     }
 
