@@ -259,8 +259,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | A-01 | DONE | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
 | A-02 | DONE | AI V2 schema、稳定 occurrence ID、目标数量校验、20–50 分包完整 | 现有 V2 parser/batching/candidate ownership | strict parser/batching tests；漏项/重复/非法 ID/错 schema fail closed |
 | A-03 | DONE | occurrence→WordSense 证据、matched_existing/new_sense/ambiguous 与核对列表闭环 | Reading target/evidence、WordSenseKnownSense、现有确认服务 | 用户可修正并保存；lemma/POS 仅证据，不替代 stable IDs |
-| A-04 | ACTIVE | Trust AI 与 AI 新词义策略符合冻结规则 | 现有设置/evidence seam | 仅 strict high-confidence matched_existing 自动成为可消费证据；ambiguous/new/low 不自动正式评分；新 sense 默认确认后加入 |
-| A-05 | TODO | Phase A Finish 仍不因未核对强制阻塞，也不产生 ReviewLog/FSRS | 现有 finish preflight/commit seam | DB before/after 证明 ReviewLog/FSRS 无额外写；旧 Finish 行为兼容 |
+| A-04 | DONE | Trust AI 与 AI 新词义策略符合冻结规则 | 现有设置/evidence seam | 仅 strict high-confidence matched_existing 自动成为可消费证据；ambiguous/new/low 不自动正式评分；新 sense 默认确认后加入 |
+| A-05 | ACTIVE | Phase A Finish 仍不因未核对强制阻塞，也不产生 ReviewLog/FSRS | 现有 finish preflight/commit seam | DB before/after 证明 ReviewLog/FSRS 无额外写；旧 Finish 行为兼容 |
 | A-06 | TODO | 用一篇真实文章完成完整 AI 文件闭环 | 现有 browser/harness | 真实浏览器双 viewport + 词组触摸 + 真实 AI 文件导入；Console/Network 无 blocker |
 | A-GATE | TODO | Phase A completion audit | A-01…A-06 | 当前合同逐条证据齐全；无 blocker；可自动进入 Phase B |
 
@@ -472,22 +472,22 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `A-04`
-- Last DONE: `A-03`
+- Active milestone: `A-05`
+- Last DONE: `A-04`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — A-04
+### ACTIVE MILESTONE ARCHITECTURE GATE — A-05
 
-- 目标：核实并收束 Trust AI 与 AI 新词义策略；只有 strict V2、当前 candidate scope 内、high-confidence `matched_existing` 可在显式 opt-in 后写入可消费 evidence，AI `new_sense` 默认仍须人工确认。
-- 不做：不启用 Phase B Finish/被动 Good，不自动创建 WordSense/ReviewCard，不调用真实 AI provider，不写 ReviewLog/FSRS，不追溯改写旧 AI 结果，不开放尚未实现的自动加新词义开关。
-- Owner/seam：`LocalStorageManagerService`/`TextReaderSettings` 拥有本地 opt-in，`TextReaderAiAssist` 只把当前选择传给 confirm，`AiReadingAssistV2Service` 过滤允许的 AI match，`ReadingOccurrenceSenseEvidenceService` 持久化 evidence；用户 evidence 与 formal rating owner 不变。
-- Architecture review：`Accepted under current goal authorization`；ADR-0056 与 Phase A contract 已冻结 Trust AI 只能产生可覆盖 evidence、不能评分，现有单一路径足够，不新增设置源或自动化写入口。
-- Allowlist：`app/Services/AiReadingAssistV2Service.php`、`app/Services/ReadingOccurrenceSenseEvidenceService.php`、`resources/js/components/TextReader/TextReader.vue`、`resources/js/components/TextReader/TextReaderSettings.vue`、`resources/js/components/TextReader/TextReaderAiAssist.vue`、`resources/js/services/LocalStorageManagerService.js`、`resources/js/services/ReaderAiAssistV2Policy.js`（先复用现有实现，仅在真实缺口时最小修改）；`tests/Feature/AiReadingAssistV2WriteBoundaryTest.php`、`tests/js/ReaderPhaseASafetyGuard.test.mjs`、`tests/js/TextReaderAiAssistV2Contract.test.mjs` 与本控制面。
-- 数据/兼容边界：默认两个设置均为 false；Trust AI 只接受当前 user/language/chapter/source_revision/occurrence/candidate 的 high `matched_existing`；medium/low/ambiguous/new_sense 均不得自动 evidence/rating；已有 user evidence 绝不被覆盖；auto-add-new-sense 继续禁用。
-- 最小验证：Trust AI high match、non-auto 四类、user precedence、full ReviewCard snapshot/ReviewLog/WordSense counts；设置默认值与禁用态、confirm payload wiring、Phase A safety guard；仅在可见设置行为有改动时追加真实浏览器验收。
+- 目标：恢复 Phase A 的普通完成阅读语义：未核对 occurrence 不阻塞 Finish，且完成过程不产生 ReviewLog、ReviewCard settlement 或 FSRS 变化；继续复用既有无 `reading_session_id` 的兼容入口。
+- 不做：不删除或改写已验证的 Phase B preflight/commit、reading-session、幂等、并发或 rollback 基础设施；不启用被动 Good；不改变正式评分入口；不把 unresolved evidence 自动确认或排除。
+- Owner/seam：`TextReader` 在 Phase A 只提交既有 legacy-compatible finish payload；`ChapterController` 的无 session 分支继续进入 `ChapterService::finishChapter`。带 session 的 `ReadingFinishSettlementService` 路径保持休眠资产，留给 Phase B 激活。
+- Architecture review：`Accepted under current goal authorization`；Phase A 总计划明确冻结核对列表为可随时打开的工具且不拦截 Finish，Phase B 才正式启用 completion gate 与 passive Good。复用现有兼容分支比新增 feature flag、第二 endpoint 或 settlement mode 更小。
+- Allowlist：`resources/js/components/TextReader/TextReader.vue`、`app/Http/Controllers/ChapterController.php`（仅真实缺口时）、`tests/Feature/PhaseAFinishBoundaryTest.php`（可新增）、`tests/js/ReaderPhaseASafetyGuard.test.mjs` 与本控制面；禁止修改 `ReadingFinishSettlementService`、`ReviewCardService`、FSRS、migration 与 schema。
+- 数据/兼容边界：Phase A 请求不得携带 `reading_session_id`/`settlement_mode`，从而不会进入 formal settlement；原章节完成/词级别更新语义保持；已有 reading-session 数据不删除、不伪造 completed；Phase B 服务端安全合同原样保留。
+- 最小验证：真实 endpoint 对含 unresolved evidence 的章节仍成功完成；ReviewLog/ReadingSessionCardSettlement/ReadingSessionCompletion 计数与既有 ReviewCard full FSRS snapshot 前后完全一致；旧 Chapter finish 副作用保持；Reader contract/JS、npm build、testing server-bound 浏览器点击完成与精确 DB before/after；独立审查 false-green 与越界。
 
 ### PROGRESS LOG
 
@@ -514,6 +514,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 12:02 | A-02 | DONE | Goal branch tip | strict parser/occurrence identity/batching/candidate ownership 35/35（154 assertions）、Phase A/Reader JS 16/16、testing DB write boundary 7/7（32 assertions）全绿；补齐 JSON 原生 object/list fail-closed，稳定 ID 的七个 owner 字段回归，51→26+25 与 101→34+34+33 均衡分包，0–19 明确保留单小包；无正式评分写入且 lease clean；独立复审 Blocker=0/Required=0/Advisory=0 | A-03`
 
 `2026-08-09 12:35 | A-03 | DONE | Goal branch tip | evidence API 10/10（91 assertions）、Reader/verification JS 23/23 与 npm development 全绿；真实 server-bound testing 浏览器完成文本导入、2 个 stable occurrence、V2 preview/confirm、new_sense/excluded 修正，刷新与整页重载均保持 0 待核对/1 已核对/1 已排除；DB 证明 2 条 user evidence、0 WordSense/ReviewCard/ReviewLog，随后精确清理零残留；source revision A→B stale 隔离与既有两张卡 full FSRS snapshot 回归闭合；独立复审 Blocker=0/Required=0/Advisory=0 | A-04`
+
+`2026-08-09 12:42 | A-04 | DONE | Goal branch tip | Trust AI boundary PHP 11/11（100 assertions）、Reader policy JS 45/45 与 npm development 全绿；默认关闭、显式 opt-in、仅 current high matched_existing、user evidence precedence、auto-add-new-sense 禁用均由现有单一路径证明；medium/low/ambiguous/new_sense 对 WordSense/ReviewCard/ReviewLog/FSRS 零写且 full card snapshot 不变；独立审查 Blocker=0/Required=0/Advisory=0 | A-05`
 
 ### DECISION LOG
 

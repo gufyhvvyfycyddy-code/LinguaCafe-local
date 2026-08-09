@@ -197,6 +197,28 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $this->assertTrue($this->snapshotService->matches($card->fresh(), $snapshot));
     }
 
+    public function test_high_matched_existing_requires_explicit_trust_ai_opt_in(): void
+    {
+        $sense = $this->makeSense('trust-off');
+        $this->bindCandidates($sense);
+        $card = $this->cardService->ensureSenseCard($sense)->fresh();
+        $snapshot = $this->snapshotService->capture($card);
+        [$package, $payload] = $this->packageAndPayload('matched_existing');
+        $beforeSenses = WordSense::count();
+        $beforeCards = ReviewCard::count();
+        $beforeLogs = ReviewLog::count();
+
+        $result = $this->confirm($package, $payload, false);
+
+        $this->assertTrue($result['success']);
+        $this->assertSame(1, ChapterAiReadingAssist::count());
+        $this->assertSame(0, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame($beforeSenses, WordSense::count());
+        $this->assertSame($beforeCards, ReviewCard::count());
+        $this->assertSame($beforeLogs, ReviewLog::count());
+        $this->assertTrue($this->snapshotService->matches($card->fresh(), $snapshot));
+    }
+
     public function test_medium_low_ambiguous_and_new_sense_do_not_auto_bind_or_rate(): void
     {
         $sense = $this->makeSense('non-auto');
@@ -204,6 +226,9 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $card = $this->cardService->ensureSenseCard($sense);
         $card->refresh();
         $snapshot = $this->snapshotService->capture($card);
+        $beforeSenses = WordSense::count();
+        $beforeCards = ReviewCard::count();
+        $beforeLogs = ReviewLog::count();
 
         foreach ([['matched_existing', 'medium'], ['matched_existing', 'low'], ['ambiguous', 'high'], ['new_sense', 'high']] as [$mode, $confidence]) {
             [$package, $payload] = $this->packageAndPayload($mode);
@@ -213,7 +238,9 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         }
 
         $this->assertSame(0, ReadingOccurrenceSenseEvidence::count());
-        $this->assertSame(0, ReviewLog::count());
+        $this->assertSame($beforeSenses, WordSense::count());
+        $this->assertSame($beforeCards, ReviewCard::count());
+        $this->assertSame($beforeLogs, ReviewLog::count());
         $this->assertTrue($this->snapshotService->matches($card->fresh(), $snapshot));
     }
 
