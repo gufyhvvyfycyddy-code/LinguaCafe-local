@@ -1,0 +1,534 @@
+# LinguaCafe Goal Mode 全里程碑执行控制面（Codex Sol Medium）
+
+> 日期：2026-08-09
+> 适用模型：Codex / GPT-5.6 Sol，reasoning medium
+> 目标：从当前代码与 PAB-R3 收尾状态出发，连续完成 LinguaCafe 当前精简产品总计划 Phase A → H 的全部实现、迁移、测试、真实浏览器/设备验收与最终发布门禁。
+> 当前用户授权：本持续目标可以在一个 Phase Gate 真正通过后自动进入下一个 Phase，不再要求每个 Phase 人工确认。真实用户/非 testing 数据破坏、秘密/外发/付费、部署/签名/商店提交、不可逆第三方动作，以及最高权威内不可消解冲突仍是硬停止线。
+
+---
+
+## 0. 这份文件是什么
+
+这是 Goal Mode 的持久执行控制面，不是需求愿望清单，也不是一次性报告。
+
+Codex 每次启动、恢复、压缩上下文后都先读本文件，只处理第一个依赖已满足且未完成的 milestone。完成 milestone 后更新本文件的状态和证据摘要，再继续下一个。
+
+本文件只保存：
+
+- 当前权威与产品终局；
+- milestone 顺序与依赖；
+- 每个 milestone 的完成判据；
+- 当前 checkpoint；
+- deferred capability clusters；
+- 精简的进度/决策记录。
+
+不要把大段执行日志、命令输出、历史聊天或全部 ADR 复制进来。详细证据放既有 testing/audit/report 文档，本文只链接或记录路径 + 结论。
+
+---
+
+## 1. 权威与开始顺序
+
+每次 Goal 恢复时按以下顺序加载，禁止默认读取全部历史：
+
+1. `AGENTS.md`
+2. 本文件
+3. `docs/plans/linguacafe-slim-product-master-plan-2026-08-07.md`
+4. `docs/DOCUMENTATION_INDEX.md`
+5. 当前 ACTIVE milestone 直接相关的 ADR / contract / tests / implementation
+6. 必要时读取一个现有成功范例
+7. 历史报告只作为事实证据，不作为当前命令
+
+当前用户明确要求“完成整个 Phase A→H 大计划”，因此这份持续目标对旧文档中“每个大阶段必须人工确认后才继续”的规则构成本次执行的更高优先级特例：
+
+- Phase 内：自动连续推进 milestone；
+- Phase Gate 通过：自动进入下一 Phase；
+- Phase Gate 未通过：修当前 Phase，不跳过；
+- 真硬停止线：只暂停受影响分支；还有独立 milestone 时继续；
+- 只有所有剩余工作都依赖硬停止线时才请求用户。
+
+---
+
+## 2. Private House Code：本 Goal 的默认工程方法
+
+全局 Skill：`$private-house-code`
+
+路径：`C:\Users\Administrator\.codex\skills\private-house-code\SKILL.md`
+
+每个编码、调试、测试、重构、审查 milestone 都必须应用它。
+
+### 2.1 默认选择梯
+
+1. 先复用当前项目已有实现；
+2. 再用标准库 / 框架原生能力；
+3. 再用项目已经安装且正在使用的依赖；
+4. 再写最小直接实现；
+5. 只有当前需求、已有契约、已观察失败或可信现实风险真正需要时，才增加第二路径、状态、worker、锁、retry、fallback、cache、adapter 等机制。
+
+### 2.2 不允许用“安全感”购买复杂度
+
+普通 milestone 默认禁止为了“以后可能”新增：
+
+- 第二事实源；
+- 双读/双写；
+- 多套 parser/runtime；
+- blanket retry/backoff；
+- recovery worker/watchdog；
+- 无当前调用方的 interface/manager/factory/registry；
+- 为单个页面新增通用框架；
+- 重复 hash/checklist/全仓扫描；
+- 与当前行为无关的顺手重构。
+
+### 2.3 已经付过费的复杂度必须保留
+
+以下是 LinguaCafe 的真实边界，不能因为 Private House Code 而删弱：
+
+- 正式 ReviewLog / FSRS 唯一写入入口；
+- reading-session / Finish 幂等；
+- `reading_action_id` 幂等与 undo/rerate 语义；
+- 实际数据库事务与真实并发；
+- testing DB machine-global lease；
+- 用户/语言隔离；
+- 认证与授权；
+- migration / backup / restore / delete 的不可逆边界；
+- 发布兼容、移动同步、离线 operation ledger；
+- 真正存在的网络/外部进程 cancellation 与 cleanup；
+- 隐私、账号删除、内容版权和发布平台要求。
+
+原则：保护真实金库，不给每个抽屉装防爆门。
+
+---
+
+## 3. Goal 状态机
+
+只使用 5 个状态：
+
+- `TODO`：依赖尚未完成或尚未开始；
+- `ACTIVE`：当前唯一主 milestone；
+- `DONE`：全部 Exit Gate 有真实证据；
+- `DEFERRED`：实现/自动测试已通过，但特定设备/外部能力证据暂时不可取得；绝不等于完成；
+- `BLOCKED`：当前 milestone 本身依赖硬停止线或最高权威冲突，不能继续。
+
+同一时刻原则上只有一个 `ACTIVE` milestone。若当前 milestone 因外部 capability 进入 `DEFERRED`，可选择下一个明确不依赖该缺失行为的 milestone。
+
+不得发明更多 lifecycle 状态。
+
+---
+
+## 4. 每个 milestone 固定执行循环
+
+Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整个 Phase。
+
+### 4.1 Entry Gate
+
+1. `git fetch origin --prune`；
+2. 记录 `origin/master`、当前 branch、HEAD、worktree；
+3. 保护用户已有改动，不 reset/stash/clean/restore；
+4. 读取当前 milestone 相关代码与测试；
+5. 做一个很短的 Architecture Gate：
+   - 目标；
+   - 明确不做；
+   - 当前 owner/seam；
+   - 预计改动文件；
+   - 数据/兼容边界；
+   - 最小验证；
+6. 应用 `$private-house-code`，检查是否能复用/删除不必要设计。
+
+### 4.2 实现
+
+- 先最小正确实现；
+- 只碰当前责任范围；
+- 如果发现新增文件直接服务当前冻结责任，可把它加入当前 allowlist，不必请求用户；
+- 如果发现需要改变产品边界、评分/生命周期核心语义、数据权威或安全模型，进入硬停止线；
+- 不为“以后”造兼容路径。
+
+### 4.3 验证
+
+按风险递增，不机械全量跑：
+
+1. lint / parse / focused unit；
+2. 当前模块 Feature/contract tests；
+3. 受保护回归；
+4. frontend build（如适用）；
+5. DB-backed / concurrency（真实需要时）；
+6. 页面任务必须真实浏览器；
+7. 移动任务必须真实 emulator/device 或明确 DEFERRED；
+8. 迁移/恢复必须有 dry-run、前后数据和 rollback/recovery 证据。
+
+失败后先修当前根因。不要通过 skip、弱化断言、mock 掉真实失败、增加 fallback 或重复重跑来“绿”。
+
+### 4.4 Review
+
+完成改动后至少做一次独立新鲜上下文 review；只检查当前 milestone 的：
+
+- 行为是否满足；
+- 是否引入第二事实源/多余状态/不必要 fallback；
+- 是否破坏真实边界；
+- 测试是否能真实失败；
+- 是否越界改动。
+
+只处理 Required/Blocker；纯措辞、偏好或无行为影响建议不阻塞。
+
+### 4.5 Exit Gate
+
+只有同时满足才可 `DONE`：
+
+- 用户结果成立；
+- 所需负向路径成立；
+- 相关自动测试通过；
+- 需要页面时真实页面通过；
+- 需要 DB/并发时真实 DB/并发通过；
+- 无已知 blocker；
+- worktree 没有任务残渣；
+- 精确 commit；
+- 正常 push 到 Goal branch；
+- 本文件更新 checkpoint 和证据摘要。
+
+---
+
+## 5. 网络研究规则
+
+外部搜索是“解决当前决策”的工具，不是每个 milestone 的仪式。
+
+### 必须搜索
+
+- Phase 开始时存在未冻结 UX/产品选择；
+- 依赖、平台、Laravel/Capacitor/Android/iOS 行为可能随版本变化；
+- Phase H 成本、发布、平台规则；
+- 用户明确要求经验分享；
+- 当前实现与成熟产品差异会影响产品取舍。
+
+### 来源顺序
+
+1. LinguaCafe 当前冻结合同和代码；
+2. 官方文档 / 官方源码；
+3. 背词/复习体验：墨墨背单词官方材料优先；Anki 的调度/卡片/过滤学习等问题优先 Anki 官方手册/源码；
+4. Laravel、Capacitor、Android、Apple 等官方材料；
+5. 高质量工程文章/issue；
+6. Reddit、论坛、经验分享只用于“实际体验/坑点”，不得覆盖官方契约。
+
+### 搜索停止条件
+
+找到足够支持一个可逆、可测试的当前选择后停止。不要为了“全面”继续搜。
+
+---
+
+## 6. 当前事实基线（启动时必须 fresh verify）
+
+2026-08-09 记录：
+
+- `origin/master`：`1c9bdcd74fa793356ba3938f21c56405f3261e39`
+- Backend Action-ID candidate：`20a116703ef217d5aad4e8a165a498399902f58e`
+- Reader Active-Intent candidate：`e09569bfdb2b31c7cd8b3fd9b245c0af06905a0c`
+- Harness Active-Intent candidate：`dfd98446d8a511dc08a5e243ef86625456377750`
+- Infra process-instance-safe repair：`f1e4898e255269ad0aaf3976b40e6c9b18c389c0`
+- Browser sentinel helper candidate：`f971df50d8362daed519a9b79919ffb65ee0d2e8`
+
+已知事实：
+
+- Backend + Reader + Harness 最新 non-DB composite 已 merge-clean；357/357 JS、build 和 pure gates 绿；
+- Reader F5 outcome-unknown occurrence audit：formal-write safe，production-reachable UI path 无 blocker；
+- Infra 旧 numeric-PID kill TOCTOU 已由 `f1e4898e` 改为 retained `proc_open` process resource；47 tests / 524 assertions 绿，但仍需独立 re-audit；
+- Sentinel helper `f971df50` 独立 audit 有 blocker：`artisan serve` 可能留下 descendant `php -S`，且 cancellation probe 与 real child loop 分裂；
+- 当前最小方向优先“消除多层进程树，直接拥有实际 acceptance server process”，而不是先造 Windows Job Object/通用进程监督框架；只有真实契约要求保留 `artisan serve` 才升级方案。
+
+若启动时 remote 已变化：以 fresh remote + 当前权威代码为准，先解释 drift，再更新本节。
+
+---
+
+# 7. Milestone Ledger
+
+## Foundation / A-B 收尾前置
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| FND-01 | DONE | 建立/恢复单一 Goal branch、fresh authority map、checkpoint | 现有 master/candidate refs、AGENTS、当前计划 | refs/branch/worktree 记录；无用户资产被改；本文件 checkpoint 更新 |
+| FND-02 | ACTIVE | 独立 re-audit `f1e4898e`，确认 numeric-PID kill blocker 真关闭 | 现有 47/524 pure suite、TestingDatabaseLease contract | 新鲜代码 audit + targeted/full pure tests；无 numeric PID termination path；lease/process residue=0 |
+| FND-03 | TODO | 修复 Sentinel helper cancellation，优先把 acceptance server 变成 helper 直接拥有的单一真实 server process | `f971df50`、现有 lease/sentinel helper | process-level test 证明 cancel 后 child/server/port 全结束；sentinel cleanup 在 lease release 前；不新增第二 lease/worker/通用 supervisor |
+| FND-04 | TODO | 独立 audit 修后的 Sentinel helper | FND-03 | blocker=0；pure/process tests 真实通过；无 false-green cleanup |
+| FND-05 | TODO | 组合 Backend + Reader + Harness + Infra + Sentinel 到 Goal branch | 五个已验候选 | merge/cherry-pick provenance；无手工语义漂移；non-DB gates 全绿 |
+| FND-06 | TODO | 在官方 testing DB lease 下运行 PAB-R3 DB/concurrency integration | 现有 65 DB-backed tests、lease harness | B14/B16/action-id/undo/rerate/explicit-vs-Finish/opened precedence/rollback 等真实 DB tests 绿；lease/sentinel clean |
+
+---
+
+## Phase A — 阅读学习主流程与 AI Reading Assist V2
+
+> 目标：真实文章从首次浏览 → 标生词/词组 → 导出 AI 包 → 人工取得 AI JSON → 上传/校验 → 翻译/词义/消歧 → 核对证据完整闭环；不写被动 Good。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| A-01 | TODO | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
+| A-02 | TODO | AI V2 schema、稳定 occurrence ID、目标数量校验、20–50 分包完整 | 现有 V2 parser/batching/candidate ownership | strict parser/batching tests；漏项/重复/非法 ID/错 schema fail closed |
+| A-03 | TODO | occurrence→WordSense 证据、matched_existing/new_sense/ambiguous 与核对列表闭环 | Reading target/evidence、WordSenseKnownSense、现有确认服务 | 用户可修正并保存；lemma/POS 仅证据，不替代 stable IDs |
+| A-04 | TODO | Trust AI 与 AI 新词义策略符合冻结规则 | 现有设置/evidence seam | 仅 strict high-confidence matched_existing 自动成为可消费证据；ambiguous/new/low 不自动正式评分；新 sense 默认确认后加入 |
+| A-05 | TODO | Phase A Finish 仍不因未核对强制阻塞，也不产生 ReviewLog/FSRS | 现有 finish preflight/commit seam | DB before/after 证明 ReviewLog/FSRS 无额外写；旧 Finish 行为兼容 |
+| A-06 | TODO | 用一篇真实文章完成完整 AI 文件闭环 | 现有 browser/harness | 真实浏览器双 viewport + 词组触摸 + 真实 AI 文件导入；Console/Network 无 blocker |
+| A-GATE | TODO | Phase A completion audit | A-01…A-06 | 当前合同逐条证据齐全；无 blocker；可自动进入 Phase B |
+
+---
+
+## Phase B — 完成阅读 Good + 阅读中显式 Sense Review
+
+> 目标：Finish Reading 可把合格已认识词义按一次普通 FSRS Good 正式结算；阅读中可完成 Again/Hard/Good/Easy 的正式 Sense Review；retry/undo/并发不重复。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| B-01 | TODO | reading-session start/resume、source revision、刷新恢复、完成恢复稳定 | PAB-R3 session candidate | fresh/refresh/duplicate/concurrent start tests；浏览器刷新不造新会话 |
+| B-02 | TODO | 显式流程严格保持“显示答案 → pending rating → exact WordSense → 一次正式提交” | Reader inline review + canonical SenseReview | rating 在选 sense 前零写；manual new sense 后沿用同一 pending rating；不问第二次 |
+| B-03 | TODO | `reading_action_id` 幂等、unknown retry、undo/rerate | Backend/Reader action-id candidate | same ID replay 一 log；undo 后旧 ID 永久 409；新 ID rerate 一新 active log |
+| B-04 | TODO | 被动 Good eligibility/去重/排除 | ReadingFinishSettlementService | opened/helped/explicit/newly-created/newly-resolved/newly-marked same-reading sense 不 passive；每卡/session ≤1 |
+| B-05 | TODO | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
+| B-06 | TODO | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
+| B-07 | TODO | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
+| B-08 | TODO | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
+| B-GATE | TODO | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
+
+---
+
+## Phase C — Sense Review 瘦身 + 每日打卡首页 + 四主导航
+
+> 先审计并复用现有 SenseReview、StudyOverview、Home、Daily Progress、ReviewCard 管理，不重造第二套系统。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| C-01 | TODO | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
+| C-02 | TODO | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
+| C-03 | TODO | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `StudyOverviewQueryService`、`ReviewDailyProgressQueryService`、Home | 不建第二统计源；数据与现有正式事实一致；首页首次打开能知道今天做什么 |
+| C-04 | TODO | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 一级入口收束；移动底栏不强挤五项；首页返回入口经真实体验确定 |
+| C-05 | TODO | “生词”一级入口只面向 WordSense，提供基础列表/搜索/查看 | `VocabularyQueryService`、WordSense/ReviewCard assets | legacy word card 不成为新一级主体；已有 sense 可检索/查看 |
+| C-06 | TODO | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
+| C-07 | TODO | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
+| C-GATE | TODO | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
+
+---
+
+## Phase D — Legacy Word Card 迁移 + Sense 生词库 + 词形架构收口
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| D-01 | TODO | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
+| D-02 | TODO | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
+| D-03 | TODO | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
+| D-04 | TODO | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
+| D-05 | TODO | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
+| D-06 | TODO | per-occurrence lemma/POS 评估与必要最小实现 | WordSenseOccurrence、tokenizer、morphology assets | 新 lemma/POS 与已确认 binding 不一致时只标复核，不自动重写；词典不做 lemma oracle |
+| D-07 | TODO | legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除 | existing UI guards | 不为“代码干净”删除仍有 caller 的能力；阅读颜色正确 |
+| D-GATE | TODO | Phase D migration + product Gate | D-01…D-07 | dry-run/backup/reversibility/isolation/log preservation/queue/browser 全通过；自动进入 E |
+
+---
+
+## Phase E — 移动端日常学习 + 有限离线收束
+
+> 旧 M1–M9 是资产，不是自动完成证据。先复用审计，再按当前 A–D 语义对齐；禁止重造第二套 mobile architecture。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| E-01 | TODO | 审计旧 M1–M9：Mobile API、operation ledger、download packages、sync、Android/iOS/offline | 2026-08-01 M0–M18 audit + actual code | 每项标 `reuse / adapt / obsolete`；不因历史“Closed”自动通过 |
+| E-02 | TODO | 移动 IA 与 Phase C 首页/四导航一致 | existing Capacitor/mobile shell | 不设计第二套 IA；Web/mobile 文案/入口一致 |
+| E-03 | TODO | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
+| E-04 | TODO | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
+| E-05 | TODO | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
+| E-06 | TODO | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
+| E-07 | TODO | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
+| E-08 | TODO | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
+| E-GATE | TODO | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
+
+---
+
+## Phase F — 真题 / 我的材料产品化
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| F-01 | TODO | 定义材料元数据：CET-4/CET-6/考研、年份、套次、题型、我的材料 | Book/Chapter existing model/import | 最小字段；不先造内容采购系统 |
+| F-02 | TODO | 用户上传材料简单流程复用现有英文 import/tokenizer | `/chapters`、ProcessChapter、health assets | 正常/坏文件/失败恢复；不破坏原 import |
+| F-03 | TODO | 阅读库分类与检索 UI | existing Library/Home/Nav | 四级/六级/考研/我的材料可理解；无空壳目录提前展示 |
+| F-04 | TODO | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
+| F-05 | TODO | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
+| F-06 | TODO | 删除材料前显示来源与学习历史影响，并只执行已授权产品生命周期 | Book/Chapter deletion boundaries | preview/confirmation/拒绝路径；不直接 broad delete 学习历史 |
+| F-07 | TODO | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
+| F-GATE | TODO | Phase F Gate | F-01…F-07 | 三类真实样本 + version + delete impact 全通过；自动进入 G |
+
+---
+
+## Phase G — 旧高级功能隐藏 / 退休 / 产品减重
+
+> 原则：先隐藏，再证明无依赖，再决定删除。不得为了“清爽代码”提前删。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| G-01 | TODO | inventory 一级入口与调用方：Browser/Card Info、Custom Study、Saved Search、Tag/Marker、手动调度、FSRS 技术指标、复杂统计、apkg、备份恢复、文章健康 | routes/components/services/tests | caller/route/data dependency 清单 |
+| G-02 | TODO | 普通用户一级入口隐藏，高级能力集中“我的→高级” | Phase C advanced entry | desktop/mobile 真页面；能力仍可达 |
+| G-03 | TODO | 对每项做依赖扫描与主流程回归 | existing guards/tests | 新阅读/复习/生词/材料主流程不依赖旧一级入口 |
+| G-04 | TODO | 每项分类：保留高级 / 只读兼容 / 可删除 | G-03 evidence | 分类有当前 caller/contract 证据，不凭偏好 |
+| G-05 | TODO | 只删除已证明 orphan 的 UI/code/config/tests/docs | G-04 | 最小删除；build/tests/browser 绿；不删历史数据契约 |
+| G-06 | TODO | 明确把视频/字幕/非英文/JMDict/字体/词源/泛媒体等移出主线，不误删共享基础 | current product plan | 主导航无这些主线；共享底层若仍被核心使用则保留 |
+| G-GATE | TODO | Phase G Gate | G-01…G-06 | 普通用户产品显著减重且无主流程回归；自动进入 H |
+
+---
+
+## Phase H — 公开测试、容量、恢复、发布门禁
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| H-01 | TODO | 建立最小可读的 load/observability harness | existing logs/health/tests; standard tooling | 能观测 P95/P99、DB connections、queue backlog、errors；不先建监控平台 |
+| H-02 | TODO | 100 同时在线的阅读/查词/复习负载 | current canonical flows | 无主流程错误；记录 P95/P99 和资源曲线；评分不重复 |
+| H-03 | TODO | 只针对实际瓶颈做性能修复 | H-02 evidence | 每个 index/cache/query/batch 都有实测瓶颈付费；复测证明改善 |
+| H-04 | TODO | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
+| H-05 | TODO | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
+| H-06 | TODO | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
+| H-07 | TODO | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | ¥600–1000/月推荐假设有当日价格支持；更稳档 ¥1200–2500 重新核算，不沿用旧价格 |
+| H-08 | TODO | 公共打包内容权利检查 | Phase F material metadata | 只包含用户有权分发/已授权内容；用户自传内容不等于可公开再分发 |
+| H-09 | TODO | Android 发布准备 | existing Android M7 assets | current build、package、privacy、device smoke；不自动商店发布 |
+| H-10 | TODO | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | 若有 Mac/Xcode/Apple 授权：真实 build/install/Keychain/safe-area/offline/TestFlight；若没有保持 DEFERRED，不伪造 |
+| H-11 | TODO | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | 阅读、AI、Finish、Review、生词、材料、offline、恢复、账号边界真实证据 |
+| H-GATE | TODO | 最终 Goal completion audit | 全部 milestone + capability clusters | 所有必需 milestone DONE；所有必须 capability cluster 清零；无 blocker；只有此时允许声明“整个大计划完成” |
+
+---
+
+## 8. Phase Gate 自动推进规则
+
+本 Goal 用户已明确授权完成整个大计划，因此：
+
+- `A-GATE DONE` → 自动开始 B；
+- `B-GATE DONE` → 自动开始 C；
+- 依次到 H；
+- 不需要每个 Phase 再询问“是否继续”。
+
+但 Gate 不能靠报告标签通过，必须依据当前代码和真实证据。
+
+如果某 Phase 有 `DEFERRED`：
+
+- 若后续 milestone 不消费该未验证行为，可以继续；
+- 若后续 milestone 依赖它，则停该分支；
+- `H-GATE` 前所有“完成必需”的 capability cluster 必须清零。
+
+---
+
+## 9. 硬停止线
+
+即使 Goal 要求连续执行，也不得自行做：
+
+- 开发、预发布、生产或真实用户数据库 migration/backfill/restore/delete；
+- `migrate:fresh` / `migrate:refresh` / `migrate:reset` / `db:wipe` / drop / truncate；
+- 读取或修改 `.env*`、密钥、真实账号密码；
+- 真实 AI provider 外发、付费、提高成本上限；
+- 部署生产；
+- App Store / Play Store 真正提交；
+- Apple 签名/发布等不可逆外部动作，除非用户明确授权；
+- force push；
+- 修改目标外产品边界；
+- 同一最高有效权威中无法消解的冲突。
+
+遇到硬停止线时：记录 `BLOCKED` 或 capability `DEFERRED`，继续其他独立 milestone。只有无其他可运行节点时才请求用户。
+
+---
+
+## 10. Testing DB / Browser 规则
+
+### Testing DB
+
+- 所有学习数据写入验收只在专用 testing DB；
+- 使用现有 machine-global `TestingDatabaseLease`，不要创建第二套 lock/claim；
+- server 必须有 server-bound testing evidence + exact sentinel；
+- test 后只清理本任务创建的唯一 marker/sentinel；
+- lease/sentinel/server cleanup 失败 = 当前 milestone 不通过。
+
+### Browser
+
+- 页面任务必须真实 DOM + 用户事件；API 200 不代替；
+- 记录 Console/Network 和可观察数据变化；
+- desktop + 430/390 是 Reader/Home/Review/Nav 的基本目标；
+- 多 tab 只在真实合同需要（如 Phase B precedence）时使用，不为“更保险”制造多窗口测试；
+- 浏览器通道普通故障可切换允许的真实浏览器工具；平台明确拒绝不得绕过。
+
+### Testing identity
+
+优先使用 testing DB 中已有且最小权限的测试身份；若无法确认，创建 `codex-acceptance-<unique>@example.test` 的临时 testing 身份，通过正常注册/登录 UI 使用。随机密码只存在内存，不写仓库、报告或截图。
+
+---
+
+## 11. Git / Goal branch
+
+持续 Goal 推荐一个长期 branch，例如：
+
+`goal/linguacafe-a-h-sol-medium-20260809`
+
+规则：
+
+- 若已存在则恢复，不重复创建；
+- milestone 一个可理解 commit；复杂 milestone 可有少量中间 checkpoint commit，但最终需整洁；
+- 精确 stage；
+- 不把用户已有 dirty changes 带入；
+- 不 force；
+- 正常 push Goal branch，便于崩溃恢复；
+- 不直接把未过 Gate 的工作推 master；
+- H-GATE 后再交付最终 merge/readiness 结论，生产发布仍受硬停止线。
+
+---
+
+## 12. 进度记录格式
+
+每次只在文件顶部/本节维护短记录，不复制测试长日志。
+
+### CURRENT CHECKPOINT
+
+- Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
+- Active milestone: `FND-02`
+- Last DONE: `FND-01`
+- Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
+- Deferred capability clusters: `none yet`
+- Blocking issue: `none yet`
+
+### ACTIVE MILESTONE ARCHITECTURE GATE — FND-02
+
+- 目标：只读审计 `f1e4898e` 的 testing DB lease 进程清理，并运行其既有 pure/process 测试确认无 numeric-PID termination 与残留。
+- 不做：不改 lease 契约、不修 Sentinel helper、不接触数据库、不创建第二套 lock/supervisor。
+- Owner/seam：`TestingDatabaseLease` 及其现有进程测试；只读候选提交和直接调用方。
+- Allowlist：当前 milestone 默认无写入文件；若发现 blocker，先把 FND-02 标为未通过并在 FND-03 的独立 allowlist 内修复。
+- 数据/兼容边界：不得连接或修改 testing/development 数据库；保持 machine-global lease 单一事实源。
+- 最小验证：候选 diff/call-chain audit；既有 targeted/full pure suite；进程、端口与 lease residue 为 0 才通过。
+
+### PROGRESS LOG
+
+格式：
+
+`YYYY-MM-DD HH:mm | milestone | DONE/DEFERRED/BLOCKED | commit | proof summary | next`
+
+每个 milestone 最多 3–6 行摘要。
+
+`2026-08-09 10:15 | FND-01 | DONE | Goal branch tip | fresh origin/master=1c9bdcd7；Goal branch 从该 ref 建立；原 master 的 13 项 dirty/untracked 用户资产保持原样；authority/control files 已落入独立 linked worktree | FND-02`
+
+### DECISION LOG
+
+只记录会影响后续任务且不是显而易见实现细节的决定：
+
+`date | milestone | decision | evidence | removal/revisit condition`
+
+`2026-08-09 | FND-01 | Goal branch 使用 linked worktree D:\\Document\\lingl\\LinguaCafe-goal-a-h-sol-medium-20260809 | 原主工作树相对 origin/master 的 5 个用户修改文件重叠，直接 switch 会覆盖或冲突；Git worktree 保持原资产不变 | 原主工作树安全清理且 Goal 完成后再评估移除 linked worktree`
+
+不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
+
+---
+
+## 13. 最终 Definition of Done
+
+整个 Goal 只有在以下全部满足时结束：
+
+1. FND、A、B、C、D、E、F、G、H 的所有完成必需 milestone 均为 `DONE`；
+2. 所有 Phase Gate `DONE`；
+3. 正式评分、Finish、offline sync、migration、restore 的 idempotency/concurrency/rollback 均有真实证据；
+4. Web 主流程有真实浏览器证据；
+5. Android 必需流程有真实设备/emulator 证据；
+6. iOS 若被定义为最终完成必需，则 capability cluster 已通过真实 macOS/Xcode/device/TestFlight 证据；没有则 Goal 仍为 Not Complete；
+7. testing DB/lease/sentinel/server 最终 clean；
+8. 没有未解释的 skipped/incomplete/false-green；
+9. 无未知 blocker；
+10. 所有 Deferred capability clusters 对“最终完成必需项”清零；
+11. Goal branch 已正常 push，最终 completion audit 可复验；
+12. 未执行任何未授权生产/外部不可逆动作。
+
+达到这些条件后，才输出：
+
+`LINGUACAFE_A_H_GOAL_COMPLETE`
+
+否则必须输出当前最准确状态，而不是“基本完成”。
