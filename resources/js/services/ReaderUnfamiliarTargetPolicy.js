@@ -67,21 +67,6 @@ export function resolveReaderUnfamiliarTarget({ selection = [], words = [] } = {
     return { ok: true, target };
 }
 
-export function toggleReaderUnfamiliarTarget(targets = [], target) {
-    const key = readerUnfamiliarTargetKey(target);
-    if (!key) return Array.isArray(targets) ? [...targets] : [];
-
-    const current = Array.isArray(targets) ? targets : [];
-    const existingIndex = current.findIndex(item => readerUnfamiliarTargetKey(item) === key);
-    if (existingIndex !== -1) {
-        return current.filter((_, index) => index !== existingIndex);
-    }
-
-    return [...current, { ...target }].sort((a, b) => {
-        if (a.start_word_index !== b.start_word_index) return a.start_word_index - b.start_word_index;
-        return a.end_word_index - b.end_word_index;
-    });
-}
 
 export function readerUnfamiliarWordIndexes(targets = []) {
     const indexes = new Set();

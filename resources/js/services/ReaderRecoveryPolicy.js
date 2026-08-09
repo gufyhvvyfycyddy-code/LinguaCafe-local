@@ -454,10 +454,3 @@ export function normalizeReaderFinishResult(payload = {}) {
         raw: payload,
     };
 }
-
-export function readerOutcomeUnknown(message = '请求已发出，但服务器结果暂时无法确认。已保留本次阅读会话；恢复网络后可安全重试同一操作。') {
-    return {
-        outcomeUnknown: true,
-        message,
-    };
-}

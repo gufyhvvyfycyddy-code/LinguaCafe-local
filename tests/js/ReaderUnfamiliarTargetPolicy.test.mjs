@@ -7,7 +7,6 @@ import {
     readerUnfamiliarTargetKey,
     readerUnfamiliarWordIndexes,
     resolveReaderUnfamiliarTarget,
-    toggleReaderUnfamiliarTarget,
 } from '../../resources/js/services/ReaderUnfamiliarTargetPolicy.js';
 
 const words = [
@@ -49,14 +48,10 @@ test('cross-sentence, gaps and structure boundaries fail closed', () => {
     assert.equal(resolveReaderUnfamiliarTarget({ selection: select(1, 2), words: structureWords }).ok, false);
 });
 
-test('toggle is occurrence-position scoped and immutable', () => {
+test('target identity and marked word indexes use the current server-snapshot shape', () => {
     const target = resolveReaderUnfamiliarTarget({ selection: select(2), words }).target;
-    const original = Object.freeze([]);
-    const marked = toggleReaderUnfamiliarTarget(original, target);
-    assert.equal(marked.length, 1);
-    assert.equal(readerUnfamiliarTargetKey(marked[0]), 'word:2:2');
-    assert.deepEqual(readerUnfamiliarWordIndexes(marked), [2]);
-    assert.deepEqual(toggleReaderUnfamiliarTarget(marked, target), []);
+    assert.equal(readerUnfamiliarTargetKey(target), 'word:2:2');
+    assert.deepEqual(readerUnfamiliarWordIndexes([target]), [2]);
 });
 
 test('V2 source request sends only chapter identity and positional marked targets', () => {
