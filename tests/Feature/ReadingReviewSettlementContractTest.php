@@ -94,12 +94,6 @@ class ReadingReviewSettlementContractTest extends TestCase
         ?ChapterService $chapterService = null,
     ): ReadingFinishSettlementService {
         $sessionService = Mockery::mock(ReadingSessionService::class);
-        $sessionService->shouldReceive('resolveOwnedSession')->andReturnUsing(function (int $userId, string $language, string $uuid) {
-            $session = ReadingSession::query()
-                ->where('uuid', $uuid)->where('user_id', $userId)->where('language_id', $language)->first();
-            if (!$session) throw new \InvalidArgumentException('Reading session does not exist in the current user and language scope.');
-            return $session;
-        });
         $sessionService->shouldReceive('lockActiveSessionContext')->andReturnUsing(function (int $userId, string $language, string $uuid, ?int $chapterId = null) {
             $session = ReadingSession::query()
                 ->where('uuid', $uuid)->where('user_id', $userId)->where('language_id', $language)->first();

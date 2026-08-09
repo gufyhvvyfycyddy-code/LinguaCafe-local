@@ -113,31 +113,6 @@ class ReadingSessionService
         });
     }
 
-    public function resolveOwnedSession(int $userId, string $language, string $sessionId): ReadingSession
-    {
-        $session = ReadingSession::query()
-            ->where('uuid', $sessionId)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->first();
-
-        if (!$session) {
-            throw new \InvalidArgumentException(self::ERROR_SESSION_NOT_FOUND);
-        }
-
-        return $session;
-    }
-
-    public function requireActiveSession(int $userId, string $language, string $sessionId): ReadingSession
-    {
-        $session = $this->resolveOwnedSession($userId, $language, $sessionId);
-        if ($session->status !== ReadingSession::STATUS_ACTIVE) {
-            throw new \InvalidArgumentException(self::ERROR_SESSION_NOT_ACTIVE);
-        }
-
-        return $session;
-    }
-
     public function lockOwnedSessionForExplicitAction(
         int $userId,
         string $language,
@@ -186,17 +161,6 @@ class ReadingSessionService
         }
 
         return ['session' => $session, 'catalog' => $catalog];
-    }
-
-    public function validateOccurrenceContext(int $userId, string $language, string $sessionId, string $occurrenceId): array
-    {
-        $session = $this->requireActiveSession($userId, $language, $sessionId);
-        $target = $this->resolveCurrentOccurrenceTarget($userId, $language, $session, $occurrenceId);
-
-        return [
-            'session' => $session,
-            'target' => $target,
-        ];
     }
 
     public function recordOccurrenceInteraction(
@@ -485,24 +449,5 @@ class ReadingSessionService
                 'candidate_word_senses' => $target['kind'] === 'word' ? ($target['candidate_word_senses'] ?? []) : [],
             ];
         }, $targets));
-    }
-
-    private function resolveCurrentOccurrenceTarget(
-        int $userId,
-        string $language,
-        ReadingSession $session,
-        string $occurrenceId
-    ): array {
-        $catalog = $this->targetCatalogService->build($userId, $language, (int) $session->chapter_id);
-        if ($catalog['source_revision'] !== $session->source_revision) {
-            throw new \InvalidArgumentException(self::ERROR_SESSION_STALE_SOURCE);
-        }
-
-        $target = $catalog['targets_by_id'][$occurrenceId] ?? null;
-        if (!$target) {
-            throw new \InvalidArgumentException(self::ERROR_OCCURRENCE_STALE);
-        }
-
-        return $target;
     }
 }
