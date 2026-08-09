@@ -230,22 +230,12 @@
                 background="foreground"
             >
                 <!-- Title -->
-                <v-card-title v-if="!saving && !finishError"><v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>阅读完成</v-card-title>
+                <v-card-title v-if="!saving"><v-icon large color="success" class="mr-1">mdi-bookmark-check</v-icon>阅读完成</v-card-title>
                 <v-card-title v-if="saving">正在更新数据...</v-card-title>
                 <v-card-text v-if="saving" height="200px"></v-card-text>
-                <v-card-text v-if="!saving && finishError" height="300px">
-                    <v-alert
-                        class="my-3"
-                        border="left"
-                        type="error"
-                        v-if="finishError"
-                    >
-                        更新阅读数据时发生错误。
-                    </v-alert>
-                </v-card-text>
 
                 <!-- Text and leveled up words list -->
-                <div style="max-height: calc(100vh - 220px); overflow-y: auto;"  v-if="!saving && !finishError">
+                <div style="max-height: calc(100vh - 220px); overflow-y: auto;"  v-if="!saving">
                     <v-card-text>
                         <!-- Text -->
                         你已完成章节：<b>{{ chapterName }}</b>，本章共阅读 <b>{{ formatNumber(wordCount) }}</b> 个词。保持节奏，学习会稳步推进。
@@ -480,7 +470,6 @@
 
                 // finish / server-issued reading session
                 finished: false,
-                finishError: false,
                 finishConfirmDialog: false,
                 finishCommitDialog: false,
                 finishChecking: false,
@@ -889,7 +878,6 @@
                 this.finished = true;
                 this.saving = false;
                 this.finishChecking = false;
-                this.finishError = false;
                 this.finishConfirmDialog = false;
                 this.finishCommitDialog = false;
                 this.inlineReviewDialog = false;
@@ -1594,20 +1582,16 @@
                 const basePayload = this.buildFinishBasePayload();
                 if (!basePayload) return;
                 this.saving = true;
-                this.finishError = false;
                 return axios.post('/chapters/finish', basePayload)
                     .then((response) => {
+                        if (!response || response.status !== 200) throw new Error('Unexpected finish response.');
                         this.saving = false;
-                        this.finishError = !response || response.status !== 200;
-                        if (!this.finishError) {
-                            this.finished = true;
-                            this.setReaderNotice('本章阅读状态已保存。', 'success');
-                        }
-                        return !this.finishError;
+                        this.finished = true;
+                        this.setReaderNotice('本章阅读状态已保存。', 'success');
+                        return true;
                     })
                     .catch((error) => {
                         this.saving = false;
-                        this.finishError = true;
                         this.setReaderNotice(requestErrorMessage(error, '完成状态暂时无法保存，请重试。'), 'warning');
                         return false;
                     });
@@ -1620,7 +1604,6 @@
                 const basePayload = this.buildFinishBasePayload();
                 if (!basePayload) return;
                 this.finishChecking = true;
-                this.finishError = false;
                 return this.preFinishSafetyCheck()
                     .then(() => {
                         if (this.finished) return null;
@@ -1652,7 +1635,6 @@
                 this.finishCommitDialog = false;
                 this.saving = true;
                 this.finished = false;
-                this.finishError = false;
                 return this.preFinishSafetyCheck()
                     .then(() => {
                         if (this.finished) return null;
@@ -1672,10 +1654,8 @@
                         if (error && error.readerPreCommitBlocked) {
                             this.setReaderNotice('提交前的查词记录或词义证据没有完整确认，因此没有发送结算提交。请重试。', 'warning');
                         } else if (!error || !error.response || (error.response && error.response.status >= 500)) {
-                            this.finishError = true;
                             this.setReaderNotice('结算提交请求已经发出，但服务器结果暂时未知。阅读会话已保留；再次完成阅读会用同一会话安全对账。', 'warning');
                         } else {
-                            this.finishError = true;
                             this.setReaderNotice(requestErrorMessage(error, '服务器拒绝了完成结算。阅读会话已保留，请按提示核对后重试。'), 'warning');
                         }
                         return false;

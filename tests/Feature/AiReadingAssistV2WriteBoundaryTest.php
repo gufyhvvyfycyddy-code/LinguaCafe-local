@@ -368,7 +368,7 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $this->assertSame(0, ReviewLog::count());
     }
 
-    public function test_evidence_api_hides_old_source_revision_and_reports_it_as_stale(): void
+    public function test_evidence_api_hides_old_source_revision_without_deleting_it(): void
     {
         $occurrenceId = $this->catalog['targets'][0]['occurrence_id'];
 
@@ -400,8 +400,7 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
             ->assertOk()
             ->assertJsonPath('source_revision', 'sha256:changed-source-revision')
             ->assertJsonPath('total', 0)
-            ->assertJsonPath('items', [])
-            ->assertJsonPath('stale_evidence_count', 1);
+            ->assertJsonPath('items', []);
 
         $this->assertSame(1, ReadingOccurrenceSenseEvidence::count());
         $this->assertSame(0, WordSense::count());

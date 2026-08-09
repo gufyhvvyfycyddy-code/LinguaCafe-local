@@ -20,18 +20,8 @@ class ReadingUnfamiliarTargetService
         $sourceRevision = $this->chapterTextService->sourceRevision($chapter);
         $targets = $this->currentModels($userId, $language, $chapterId, $sourceRevision);
 
-        $staleCount = ReadingUnfamiliarTarget::query()
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('chapter_id', $chapterId)
-            ->where('source_revision', '<>', $sourceRevision)
-            ->count();
-
         return [
-            'chapter_id' => (int) $chapterId,
-            'source_revision' => $sourceRevision,
             'snapshot_version' => $this->snapshotVersion($targets, $sourceRevision),
-            'stale_count' => $staleCount,
             'targets' => $targets->map(fn (ReadingUnfamiliarTarget $target) => $this->serializeTarget($target))->all(),
         ];
     }
@@ -55,8 +45,8 @@ class ReadingUnfamiliarTargetService
         string $kind,
         int $startWordIndex,
         int $endWordIndex
-    ): array {
-        return DB::transaction(function () use (
+    ): void {
+        DB::transaction(function () use (
             $userId,
             $language,
             $chapterId,
@@ -74,7 +64,7 @@ class ReadingUnfamiliarTargetService
                 $endWordIndex
             );
 
-            $target = ReadingUnfamiliarTarget::query()->updateOrCreate(
+            ReadingUnfamiliarTarget::query()->updateOrCreate(
                 [
                     'user_id' => $canonical['user_id'],
                     'language_id' => $canonical['language_id'],
@@ -93,19 +83,12 @@ class ReadingUnfamiliarTargetService
                     'source_sentence' => $canonical['source_sentence'],
                 ]
             );
-            $currentTargets = $this->currentModels($userId, $language, $chapterId, $canonical['source_revision']);
-
-            return [
-                'created' => $target->wasRecentlyCreated,
-                'target' => $this->serializeTarget($target),
-                'snapshot_version' => $this->snapshotVersion($currentTargets, $canonical['source_revision']),
-            ];
         });
     }
 
-    public function deleteCurrentTarget(int $userId, string $language, int $chapterId, string $occurrenceId): array
+    public function deleteCurrentTarget(int $userId, string $language, int $chapterId, string $occurrenceId): void
     {
-        return DB::transaction(function () use ($userId, $language, $chapterId, $occurrenceId) {
+        DB::transaction(function () use ($userId, $language, $chapterId, $occurrenceId) {
             $chapter = $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
             $sourceRevision = $this->chapterTextService->sourceRevision($chapter);
             $target = ReadingUnfamiliarTarget::query()
@@ -123,16 +106,7 @@ class ReadingUnfamiliarTargetService
                 ]);
             }
 
-            $serialized = $this->serializeTarget($target);
             $target->delete();
-            $currentTargets = $this->currentModels($userId, $language, $chapterId, $sourceRevision);
-
-            return [
-                'deleted' => true,
-                'target' => $serialized,
-                'source_revision' => $sourceRevision,
-                'snapshot_version' => $this->snapshotVersion($currentTargets, $sourceRevision),
-            ];
         });
     }
 
@@ -159,12 +133,6 @@ class ReadingUnfamiliarTargetService
             'kind' => $target->kind,
             'start_word_index' => (int) $target->start_word_index,
             'end_word_index' => (int) $target->end_word_index,
-            'sentence_index' => (int) $target->sentence_index,
-            'surface' => $target->surface,
-            'lemma' => $target->lemma,
-            'pos' => $target->pos,
-            'source_sentence' => $target->source_sentence,
-            'source_revision' => $target->source_revision,
         ];
     }
 }

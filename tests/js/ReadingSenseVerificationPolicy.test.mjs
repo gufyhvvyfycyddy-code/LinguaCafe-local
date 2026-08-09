@@ -7,6 +7,7 @@ import {
     isTrustAiVerified,
     isReadingSenseWordTarget,
     mergeReadingSenseVerificationItems,
+    normalizeReadingSenseVerificationItems,
     readingSenseVerificationState,
     readingSenseVerificationSummary,
 } from '../../resources/js/services/ReadingSenseVerificationPolicy.js';
@@ -77,6 +78,11 @@ test('phrase targets cannot create WordSense binding or evidence intents', () =>
     assert.equal(buildReadingSenseResolutionIntent(phrase, 'match_existing', 81), null);
     assert.equal(buildReadingSenseResolutionIntent(phrase, 'new_sense'), null);
     assert.equal(buildReadingSenseResolutionIntent(phrase, 'exclude'), null);
+});
+
+test('verification normalizer accepts only the canonical verification_items field', () => {
+    assert.equal(normalizeReadingSenseVerificationItems({ verification_items: [item] }).length, 1);
+    assert.deepEqual(normalizeReadingSenseVerificationItems({ items: [item] }), []);
 });
 
 test('summary handles 20–50 bounded chapter rows without per-row network semantics', () => {

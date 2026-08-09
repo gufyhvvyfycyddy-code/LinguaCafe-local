@@ -184,7 +184,7 @@ class ReadingOccurrenceSenseEvidenceService
     }
 
     /**
-     * @return array{source_revision:string,items:array<int,array>,stale_evidence_count:int}
+     * @return array{source_revision:string,items:array<int,array>}
      */
     public function listForChapter(
         int $userId,
@@ -213,20 +213,13 @@ class ReadingOccurrenceSenseEvidenceService
             ->limit($limit)
             ->get();
 
-        $staleCount = ReadingOccurrenceSenseEvidence::query()
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('chapter_id', $chapterId)
-            ->where('source_revision', '<>', $catalog['source_revision'])
-            ->count();
-
         $senseIds = $rows->pluck('word_sense_id')->filter()->unique()->values()->all();
         $confirmed = WordSense::query()
             ->where('user_id', $userId)
             ->where('language_id', $language)
             ->where('status', WordSense::STATUS_CONFIRMED)
             ->whereIn('id', $senseIds)
-            ->get(['id', 'lemma', 'sense_zh', 'sense_en', 'pos'])
+            ->get(['id'])
             ->keyBy('id');
 
         $items = [];
@@ -235,7 +228,6 @@ class ReadingOccurrenceSenseEvidenceService
             $sense = $row->word_sense_id ? $confirmed->get($row->word_sense_id) : null;
             $items[] = [
                 'occurrence_id' => $row->occurrence_id,
-                'target_origin' => $row->target_origin,
                 'start_word_index' => $row->start_word_index,
                 'end_word_index' => $row->end_word_index,
                 'sentence_index' => $row->sentence_index,
@@ -245,19 +237,8 @@ class ReadingOccurrenceSenseEvidenceService
                 'resolution' => $row->resolution,
                 'word_sense_id' => $row->word_sense_id,
                 'resolution_source' => $row->resolution_source,
-                'ai_confidence' => $row->ai_confidence,
-                'ai_package_id' => $row->ai_package_id,
-                'updated_at' => $row->updated_at?->toIso8601String(),
                 'binding_current' => $row->resolution !== ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING || $sense !== null,
-                'review_warning' => $target !== null && !$this->sameTargetSnapshot($target, $row),
                 'candidate_word_senses' => $target['candidate_word_senses'] ?? [],
-                'matched_word_sense' => $sense ? [
-                    'word_sense_id' => (int) $sense->id,
-                    'lemma' => $sense->lemma,
-                    'sense_zh' => $sense->sense_zh,
-                    'sense_en' => $sense->sense_en,
-                    'pos' => $sense->pos,
-                ] : null,
             ];
         }
 
@@ -266,7 +247,6 @@ class ReadingOccurrenceSenseEvidenceService
         return [
             'source_revision' => $catalog['source_revision'],
             'items' => $items,
-            'stale_evidence_count' => $staleCount,
             'total' => $total,
             'offset' => $offset,
             'limit' => $limit,

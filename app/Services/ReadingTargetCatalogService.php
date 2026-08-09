@@ -125,11 +125,6 @@ class ReadingTargetCatalogService
             return strcmp($left['occurrence_id'], $right['occurrence_id']);
         });
 
-        $targetsById = [];
-        foreach ($targets as $target) {
-            $targetsById[$target['occurrence_id']] = $target;
-        }
-
         return [
             'chapter' => $chapter,
             'source_revision' => $sourceRevision,

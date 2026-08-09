@@ -1,11 +1,3 @@
-export const READING_SENSE_DECISIONS = Object.freeze([
-    'matched_existing',
-    'new_sense',
-    'ambiguous',
-]);
-
-export const READING_SENSE_CONFIDENCE = Object.freeze(['high', 'medium', 'low']);
-
 export function readingSenseDecisionLabel(value) {
     return {
         matched_existing: '匹配已学词义',
@@ -29,9 +21,7 @@ function normalizedEvidence(item = {}) {
         resolution: item.resolution,
         word_sense_id: item.word_sense_id || null,
         resolution_source: item.resolution_source || null,
-        ai_confidence: item.ai_confidence || null,
         binding_current: item.binding_current !== false,
-        updated_at: item.updated_at || null,
     };
 }
 
@@ -121,9 +111,7 @@ export function buildReadingSenseResolutionIntent(item, action, wordSenseId = nu
 }
 
 export function normalizeReadingSenseVerificationItems(payload = {}) {
-    const raw = Array.isArray(payload.verification_items)
-        ? payload.verification_items
-        : (Array.isArray(payload.items) ? payload.items : []);
+    const raw = Array.isArray(payload.verification_items) ? payload.verification_items : [];
     return raw
         .filter(item => item && item.occurrence_id)
         .map(item => ({

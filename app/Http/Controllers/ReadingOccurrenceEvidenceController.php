@@ -37,7 +37,7 @@ class ReadingOccurrenceEvidenceController extends Controller
         ]);
 
         try {
-            $evidence = $this->service->storeUserDecision(
+            $this->service->storeUserDecision(
                 Auth::user()->id,
                 Auth::user()->selected_language,
                 $chapterId,
@@ -46,7 +46,7 @@ class ReadingOccurrenceEvidenceController extends Controller
                 isset($data['word_sense_id']) ? (int) $data['word_sense_id'] : null,
             );
 
-            return response()->json(['success' => true, 'evidence_id' => $evidence->id]);
+            return response()->json(['success' => true]);
         } catch (\InvalidArgumentException $e) {
             $isStale = $e->getMessage() === 'READING_OCCURRENCE_STALE';
 

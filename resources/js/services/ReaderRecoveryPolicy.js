@@ -290,10 +290,10 @@ function normalizeCandidate(candidate = {}) {
 
 export function normalizeReadingTarget(target = {}) {
     const occurrenceId = text(target.occurrence_id);
+    const kind = ['word', 'phrase'].includes(target.kind) ? target.kind : '';
     const start = nonNegativeInteger(target.start_word_index);
     const end = nonNegativeInteger(target.end_word_index);
-    if (!occurrenceId || start === null || end === null || end < start) return null;
-    const kind = target.kind === 'phrase' ? 'phrase' : 'word';
+    if (!occurrenceId || !kind || start === null || end === null || end < start) return null;
     const candidates = (Array.isArray(target.candidate_word_senses) ? target.candidate_word_senses : [])
         .map(normalizeCandidate)
         .filter(Boolean);
@@ -378,12 +378,15 @@ export function normalizeReaderUnfamiliarSnapshot(payload = {}) {
     const snapshotVersion = text(payload.snapshot_version);
     const targets = (Array.isArray(payload.targets) ? payload.targets : [])
         .map(target => {
+            const occurrenceId = text(target.occurrence_id);
+            const kind = ['word', 'phrase'].includes(target.kind) ? target.kind : '';
             const start = nonNegativeInteger(target.start_word_index);
             const end = nonNegativeInteger(target.end_word_index);
-            if (start === null || end === null || end < start) return null;
+            if (!occurrenceId || !kind || start === null || end === null || end < start) return null;
             return {
                 ...target,
-                kind: target.kind === 'phrase' ? 'phrase' : 'word',
+                occurrence_id: occurrenceId,
+                kind,
                 start_word_index: start,
                 end_word_index: end,
             };

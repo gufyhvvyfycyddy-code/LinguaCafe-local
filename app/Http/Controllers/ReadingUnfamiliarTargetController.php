@@ -25,23 +25,27 @@ class ReadingUnfamiliarTargetController extends Controller
             'end_word_index' => ['required', 'integer', 'min:0'],
         ]);
 
-        return response()->json($this->service->createTarget(
+        $this->service->createTarget(
             Auth::user()->id,
             Auth::user()->selected_language,
             $chapterId,
             $data['kind'],
             (int) $data['start_word_index'],
             (int) $data['end_word_index'],
-        ));
+        );
+
+        return response()->json(['success' => true]);
     }
 
     public function destroy(int $chapterId, string $occurrenceId)
     {
-        return response()->json($this->service->deleteCurrentTarget(
+        $this->service->deleteCurrentTarget(
             Auth::user()->id,
             Auth::user()->selected_language,
             $chapterId,
             $occurrenceId,
-        ));
+        );
+
+        return response()->json(['success' => true]);
     }
 }

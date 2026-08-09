@@ -125,6 +125,30 @@ test('unfamiliar snapshot keeps server snapshot version for V2 freshness', () =>
     });
 });
 
+test('server target normalizers reject missing or unknown kind instead of guessing word', () => {
+    const response = normalizeReadingSessionResponse({
+        ...sessionPayload,
+        reading_targets: [
+            { occurrence_id: 'missing-kind', start_word_index: 1, end_word_index: 1 },
+            { occurrence_id: 'unknown-kind', kind: 'other', start_word_index: 2, end_word_index: 2 },
+        ],
+    }, 42);
+    assert.deepEqual(response.targets, []);
+
+    assert.deepEqual(normalizeReaderUnfamiliarSnapshot({
+        snapshot_version: 'snapshot-6',
+        targets: [
+            { occurrence_id: 'mark-1', kind: 'word', start_word_index: 3, end_word_index: 3 },
+            { occurrence_id: 'mark-2', start_word_index: 4, end_word_index: 4 },
+            { occurrence_id: 'mark-3', kind: 'other', start_word_index: 5, end_word_index: 5 },
+            { kind: 'word', start_word_index: 6, end_word_index: 6 },
+        ],
+    }), {
+        snapshotVersion: 'snapshot-6',
+        targets: [{ occurrence_id: 'mark-1', kind: 'word', start_word_index: 3, end_word_index: 3 }],
+    });
+});
+
 test('evidence completeness follows explicit pagination metadata and fails closed on malformed pages', () => {
     assert.deepEqual(normalizeReaderEvidencePage({ source_revision: 'rev-1', items: [{ occurrence_id: 'a' }], total: 2, offset: 0, limit: 1, has_more: true, next_offset: 1 }), {
         items: [{ occurrence_id: 'a' }], sourceRevision: 'rev-1', total: 2, offset: 0, limit: 1, hasMore: true, nextOffset: 1,

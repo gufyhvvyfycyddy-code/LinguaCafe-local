@@ -115,7 +115,7 @@ final class PabR3ReadingConcurrencyWorker
 
     private static function userEvidence(array $payload): array
     {
-        $row = app(ReadingOccurrenceSenseEvidenceService::class)->storeUserDecision(
+        app(ReadingOccurrenceSenseEvidenceService::class)->storeUserDecision(
             (int) $payload['user_id'],
             (string) $payload['language'],
             (int) $payload['chapter_id'],
@@ -124,7 +124,7 @@ final class PabR3ReadingConcurrencyWorker
             isset($payload['word_sense_id']) ? (int) $payload['word_sense_id'] : null,
         );
 
-        return ['success' => true, 'evidence_id' => $row->id];
+        return ['success' => true];
     }
 
     private static function chapterSourceChange(array $payload): array

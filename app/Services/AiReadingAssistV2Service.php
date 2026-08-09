@@ -177,8 +177,6 @@ class AiReadingAssistV2Service
             return [
                 'assist_stale' => true,
                 'verification_items' => [],
-                'current_source_revision' => $catalog['source_revision'],
-                'current_target_scope_hash' => $currentScopeHash,
             ];
         }
 
@@ -214,9 +212,6 @@ class AiReadingAssistV2Service
                     'resolution' => $evidence->resolution,
                     'word_sense_id' => $evidence->word_sense_id,
                     'resolution_source' => $evidence->resolution_source,
-                    'ai_confidence' => $evidence->ai_confidence,
-                    'ai_package_id' => $evidence->ai_package_id,
-                    'updated_at' => $evidence->updated_at?->toIso8601String(),
                 ] : null,
             ]);
         }
@@ -224,8 +219,6 @@ class AiReadingAssistV2Service
         return [
             'assist_stale' => false,
             'verification_items' => $items,
-            'current_source_revision' => $catalog['source_revision'],
-            'current_target_scope_hash' => $currentScopeHash,
         ];
     }
 
