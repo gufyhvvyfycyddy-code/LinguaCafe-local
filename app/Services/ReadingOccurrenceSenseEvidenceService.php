@@ -183,32 +183,6 @@ class ReadingOccurrenceSenseEvidenceService
         });
     }
 
-    public function storeTrustedAiMatch(
-        int $userId,
-        string $language,
-        int $chapterId,
-        array $target,
-        int $wordSenseId,
-        string $confidence,
-        string $packageId,
-        string $payloadHash,
-    ): ReadingOccurrenceSenseEvidence {
-        $saved = $this->storeTrustedAiMatches(
-            $userId,
-            $language,
-            $chapterId,
-            [[
-                'target' => $target,
-                'word_sense_id' => $wordSenseId,
-                'confidence' => $confidence,
-                'package_id' => $packageId,
-            ]],
-            $payloadHash,
-        );
-
-        return $saved[0];
-    }
-
     /**
      * @return array{source_revision:string,items:array<int,array>,stale_evidence_count:int}
      */

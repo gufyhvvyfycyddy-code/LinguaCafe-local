@@ -400,7 +400,7 @@ class AiReadingAssistV2Service
             if ($partIndex === 1) {
                 $sentenceTranslations = $this->normalizeSentenceTranslations(
                     $normalized['sentence_translations'],
-                    $this->expectedSentenceTranslations($catalog['sentences']),
+                    $this->sourceSentences($catalog['sentences']),
                 );
             } elseif (!empty($normalized['sentence_translations'])) {
                 $this->reject(self::ERROR_TRANSLATION_SET_MISMATCH, 'Only part 1 may contain sentence_translations in V2.');
@@ -1003,19 +1003,6 @@ class AiReadingAssistV2Service
     }
 
     private function sourceSentences(array $sentences): array
-    {
-        $result = [];
-        foreach ($sentences as $sentenceIndex => $text) {
-            $result[] = [
-                'sentence_index' => (int) $sentenceIndex,
-                'source_text' => (string) $text,
-            ];
-        }
-
-        return $result;
-    }
-
-    private function expectedSentenceTranslations(array $sentences): array
     {
         $result = [];
         foreach ($sentences as $sentenceIndex => $text) {
