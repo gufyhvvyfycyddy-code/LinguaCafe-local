@@ -688,8 +688,14 @@ final class TestingDatabaseLease
             return;
         }
         $stat = @lstat($path);
-        if (! is_array($stat)
-            || is_link($path)
+        if (! is_array($stat)) {
+            clearstatcache(true, $path);
+            if (! file_exists($path) && ! is_link($path)) {
+                return;
+            }
+            throw new TestingDatabaseLeaseException('LEASE_FILE_UNSAFE');
+        }
+        if (is_link($path)
             || (($stat['mode'] ?? 0) & 0170000) !== 0100000
             || (int) ($stat['nlink'] ?? 1) !== 1
         ) {
