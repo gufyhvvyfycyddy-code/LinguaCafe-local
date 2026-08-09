@@ -20,6 +20,7 @@ use App\Services\ReadingChapterTextService;
 use App\Services\ReadingFinishSettlementService;
 use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingSessionService;
+use App\Services\ReadingTargetCatalogService;
 use App\Services\ReviewCardFsrsSnapshotService;
 use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -125,6 +126,7 @@ class ReadingReviewSettlementContractTest extends TestCase
                 ...$rest
             ) {
                 $this->formalWriteCount++;
+                $card = ReviewCard::findOrFail($reviewCardId);
                 $log = ReviewLog::forceCreate([
                     'user_id' => $userId,
                     'language_id' => $language,
@@ -132,10 +134,11 @@ class ReadingReviewSettlementContractTest extends TestCase
                     'review_card_id' => $reviewCardId,
                     'rating' => $rating,
                     'reviewed_at' => now(),
+                    'new_state' => $card->fsrs_state,
                     'source' => $source,
                     'review_session_id' => $reviewSessionId,
                 ]);
-                return ['review_log' => $log, 'card' => ReviewCard::findOrFail($reviewCardId)];
+                return ['review_log' => $log, 'card' => $card];
             });
         }
 

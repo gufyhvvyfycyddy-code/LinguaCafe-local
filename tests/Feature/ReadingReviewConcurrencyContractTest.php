@@ -945,7 +945,7 @@ $payload = json_decode(base64_decode($argv[3]), true, 512, JSON_THROW_ON_ERROR);
 putenv('APP_ENV=testing');
 $_ENV['APP_ENV'] = 'testing';
 $_SERVER['APP_ENV'] = 'testing';
-require $basePath.'/vendor/autoload.php';
+require $basePath.'/tests/bootstrap.php';
 $app = require $basePath.'/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 fwrite(STDOUT, "READY\n");

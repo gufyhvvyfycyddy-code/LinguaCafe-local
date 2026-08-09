@@ -8,7 +8,27 @@
  * reads environment files, opens a database connection, or runs migrations.
  */
 
-require __DIR__.'/../vendor/autoload.php';
+$composer = require __DIR__.'/../vendor/autoload.php';
+$projectBasePath = dirname(__DIR__);
+$sharedProjectBasePath = dirname((new ReflectionClass(Composer\Autoload\ClassLoader::class))->getFileName(), 3);
+$sharedVendorPath = $sharedProjectBasePath.DIRECTORY_SEPARATOR.'vendor'.DIRECTORY_SEPARATOR;
+$projectClassMap = [];
+foreach ($composer->getClassMap() as $class => $path) {
+    $resolvedPath = realpath($path) ?: $path;
+    $normalizedPath = strtolower($resolvedPath);
+    if (str_starts_with($normalizedPath, strtolower($sharedProjectBasePath.DIRECTORY_SEPARATOR))
+        && ! str_starts_with($normalizedPath, strtolower($sharedVendorPath))) {
+        $projectClassMap[$class] = $projectBasePath.substr($resolvedPath, strlen($sharedProjectBasePath));
+    }
+}
+$composer->addClassMap($projectClassMap);
+$composer->setPsr4('App\\', __DIR__.'/../app/');
+$composer->setPsr4('Database\\Factories\\', __DIR__.'/../database/factories/');
+$composer->setPsr4('Database\\Seeders\\', __DIR__.'/../database/seeders/');
+$composer->setPsr4('Tests\\', __DIR__.'/');
+putenv("APP_BASE_PATH={$projectBasePath}");
+$_ENV['APP_BASE_PATH'] = $projectBasePath;
+$_SERVER['APP_BASE_PATH'] = $projectBasePath;
 require_once __DIR__.'/Support/TestingDatabaseLease.php';
 
 use Tests\Support\TestingDatabaseLease;

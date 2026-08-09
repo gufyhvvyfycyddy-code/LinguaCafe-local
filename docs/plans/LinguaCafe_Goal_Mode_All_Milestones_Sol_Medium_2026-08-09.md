@@ -246,7 +246,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | FND-03 | DONE | 修复 Sentinel helper cancellation，优先把 acceptance server 变成 helper 直接拥有的单一真实 server process | `f971df50`、现有 lease/sentinel helper | process-level test 证明 cancel 后 child/server/port 全结束；sentinel cleanup 在 lease release 前；不新增第二 lease/worker/通用 supervisor |
 | FND-04 | DONE | 独立 audit 修后的 Sentinel helper | FND-03 | blocker=0；pure/process tests 真实通过；无 false-green cleanup |
 | FND-05 | DONE | 组合 Backend + Reader + Harness + Infra + Sentinel 到 Goal branch | 五个已验候选 | merge/cherry-pick provenance；无手工语义漂移；non-DB gates 全绿 |
-| FND-06 | ACTIVE | 在官方 testing DB lease 下运行 PAB-R3 DB/concurrency integration | 现有 65 DB-backed tests、lease harness | B14/B16/action-id/undo/rerate/explicit-vs-Finish/opened precedence/rollback 等真实 DB tests 绿；lease/sentinel clean |
+| FND-06 | DONE | 在官方 testing DB lease 下运行 PAB-R3 DB/concurrency integration | 现有 65 DB-backed tests、lease harness | B14/B16/action-id/undo/rerate/explicit-vs-Finish/opened precedence/rollback 等真实 DB tests 绿；lease/sentinel clean |
 
 ---
 
@@ -256,7 +256,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| A-01 | TODO | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
+| A-01 | ACTIVE | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
 | A-02 | TODO | AI V2 schema、稳定 occurrence ID、目标数量校验、20–50 分包完整 | 现有 V2 parser/batching/candidate ownership | strict parser/batching tests；漏项/重复/非法 ID/错 schema fail closed |
 | A-03 | TODO | occurrence→WordSense 证据、matched_existing/new_sense/ambiguous 与核对列表闭环 | Reading target/evidence、WordSenseKnownSense、现有确认服务 | 用户可修正并保存；lemma/POS 仅证据，不替代 stable IDs |
 | A-04 | TODO | Trust AI 与 AI 新词义策略符合冻结规则 | 现有设置/evidence seam | 仅 strict high-confidence matched_existing 自动成为可消费证据；ambiguous/new/low 不自动正式评分；新 sense 默认确认后加入 |
@@ -472,21 +472,21 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `FND-06`
-- Last DONE: `FND-05`
+- Active milestone: `A-01`
+- Last DONE: `FND-06`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — FND-06
+### ACTIVE MILESTONE ARCHITECTURE GATE — A-01
 
-- 目标：通过唯一 machine-global `TestingDatabaseLease` 在专用 testing MySQL 上运行 PAB-R3 全部 DB/concurrency suites，证明 action-id、undo/rerate、explicit-vs-Finish、opened precedence、rollback 与隔离合同。
-- 不做：不运行任何 fresh/reset/wipe/drop/truncate，不连接开发/生产数据，不启动浏览器或 acceptance server，不修改 migration/业务代码来换绿。
-- Owner/seam：`run-with-testing-db-lease.php` 独占本轮 DB lease；`run-pab-r3-required-suites.mjs --integration` 只通过现有 PHPUnit bootstrap/正式服务链读写 testing DB。
-- Allowlist：默认仅本控制面；若测试暴露当前组合的真实 root bug，先记录失败并为该具体 owner 文件补充独立 gate/allowlist，禁止机械扩大。
-- 数据/兼容边界：必须为 `APP_ENV=testing`、数据库名含 test、health gate 通过；只允许 PHPUnit/测试 fixture 的事务性 testing 数据，lease status/sentinel/process residue 最终为 clean。
-- 最小验证：fresh fetch/status；lease preflight inactive；testing DB health；官方 lease 包裹的 PAB-R3 integration 6 个 DB suites；失败注入/真实并发不可 skip；结束后 lease/sentinel/process residue=0。
+- 目标：核实并收束首次阅读预览、标生词、桌面与 430/390 视口的长按/拖选词组，同时保持普通点词与 ECDICT 查询稳定。
+- 不做：不新建 reader 架构，不改 AI/FSRS，不做全局 UI 重设计，不扩展非英文能力。
+- Owner/seam：沿用 `TextReader` / `TextBlockGroup` 的触摸、选区与标记状态流，以及现有 ECDICT 侧栏边界；只追当前真实调用链和一个既有测试范例。
+- Allowlist：当前仅本控制面；完成 fresh reader 侦察并冻结具体组件、测试、seam 与兼容风险后，才按本切片直接责任补充精确文件。
+- 数据/兼容边界：浏览器写入只允许绑定同一 server/port/process 的 testing DB 与 testing-only sentinel；不得写开发数据库；必须保持点词、ECDICT、英文导入与 reader 状态流不回归。
+- 最小验证：fresh fetch/status；相关 JS/PHP targeted tests；`npm run development`；真实浏览器 desktop + 430/390 通过用户事件验证点词、长按/拖选词组、标记持久化，并记录 Console/Network。
 
 ### PROGRESS LOG
 
@@ -506,6 +506,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 `2026-08-09 10:43 | FND-05 | DONE | Goal branch tip | 37 个候选提交全部 patch-equivalent，组合无冲突/手工漂移；JS 357/357、npm development、PAB-R3 parallel-safe meta gate、53 PHP lint 全绿；独立审查 Blocker=0/Required=0；Goal worktree 复用现有 vendor/node_modules junction，Git 不跟踪 | FND-06`
 
+`2026-08-09 11:09 | FND-06 | DONE | Goal branch tip | linked-worktree bootstrap 已重定向 optimized classmap/PSR-4/APP_BASE_PATH；health negative proof 精确发现 4 个 pending migration，随后仅在官方 lease 下 forward migrate；PAB-R3 integration 14 gates 全绿、并发 27/27、普通 undo 回归 39/39；独立审查 Blocker=0/Required=0；lease/sentinel/process residue clean | A-01`
+
 ### DECISION LOG
 
 只记录会影响后续任务且不是显而易见实现细节的决定：
@@ -515,6 +517,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 | FND-01 | Goal branch 使用 linked worktree D:\\Document\\lingl\\LinguaCafe-goal-a-h-sol-medium-20260809 | 原主工作树相对 origin/master 的 5 个用户修改文件重叠，直接 switch 会覆盖或冲突；Git worktree 保持原资产不变 | 原主工作树安全清理且 Goal 完成后再评估移除 linked worktree`
 
 `2026-08-09 | FND-03 | Sentinel helper 对受支持的本地 artisan serve acceptance 命令先转换为 127.0.0.1 上的直接 php -S 进程，并复用唯一 cancellation probe | Laravel 当前 ServeCommand 本身只再启动一层 php -S；直接拥有实际 server resource 消除 descendant cancellation blocker，真实 process/port test 通过 | Laravel server entry/CLI contract 变化时复审转换器`
+
+`2026-08-09 | FND-06 | linked worktree 的统一 test bootstrap 重定向共享 optimized Composer classmap、项目 PSR-4 与 APP_BASE_PATH 到当前 worktree | shared vendor 原 classmap 指向主工作树，曾让 integration 测到旧代码；反射回归与全 integration 已证明当前根 | 改为本 worktree 独立 vendor 或 Composer vendor/classloader 布局变化时复审`
+
+`2026-08-09 | FND-06 | reading undo 对同 review_session_id 的 ReadingSession 先取 scoped 行锁，再锁 ReviewLog/card | 与 explicit retry/Finish 的 session-first 锁序一致，真实 retry-vs-undo 并发 27/27 通过；普通 Sense Review 无匹配 session 时语义不变 | review_session_id 或 reading settlement 锁合同变化时复审`
 
 不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
 

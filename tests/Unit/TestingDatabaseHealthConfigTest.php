@@ -49,6 +49,41 @@ class TestingDatabaseHealthConfigTest extends TestCase
         );
     }
 
+    public function test_bootstrap_uses_current_worktree_project_namespaces(): void
+    {
+        $contents = file_get_contents($this->bootstrapPath);
+
+        $this->assertStringContainsString(
+            '$composer = require __DIR__.\'/../vendor/autoload.php\';',
+            $contents,
+        );
+        foreach ([
+            '$composer->setPsr4(\'App\\\\\', __DIR__.\'/../app/\');',
+            '$composer->setPsr4(\'Database\\\\Factories\\\\\', __DIR__.\'/../database/factories/\');',
+            '$composer->setPsr4(\'Database\\\\Seeders\\\\\', __DIR__.\'/../database/seeders/\');',
+            '$composer->setPsr4(\'Tests\\\\\', __DIR__.\'/\');',
+        ] as $mapping) {
+            $this->assertStringContainsString(
+                $mapping,
+                $contents,
+                'A shared vendor autoloader must resolve project classes only from the current worktree.',
+            );
+        }
+        $this->assertStringContainsString(
+            'putenv("APP_BASE_PATH={$projectBasePath}");',
+            $contents,
+            'Laravel must discover migrations and bootstrap files from the current worktree.',
+        );
+    }
+
+    public function test_optimized_project_classmap_uses_current_worktree(): void
+    {
+        $expected = realpath(__DIR__.'/../../app/Models/ReviewLog.php');
+        $actual = realpath((new \ReflectionClass(\App\Models\ReviewLog::class))->getFileName());
+
+        $this->assertSame($expected, $actual);
+    }
+
     public function test_bootstrap_delegates_to_a_lease_implementation_that_contains_flock(): void
     {
         $this->assertFileExists($this->bootstrapPath);

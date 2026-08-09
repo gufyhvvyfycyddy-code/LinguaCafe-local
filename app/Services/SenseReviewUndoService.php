@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
+use App\Models\ReadingSession;
 use App\Models\WordSense;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -67,6 +68,13 @@ class SenseReviewUndoService
         string $source,
     ): array {
         return DB::transaction(function () use ($reviewLogId, $userId, $language, $reviewSessionId, $undoRequestId, $source) {
+            ReadingSession::query()
+                ->lockForUpdate()
+                ->where('uuid', $reviewSessionId)
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->first();
+
             // Lock the target ReviewLog.
             $targetLog = ReviewLog::lockForUpdate()
                 ->where('id', $reviewLogId)

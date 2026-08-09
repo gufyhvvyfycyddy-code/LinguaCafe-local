@@ -77,12 +77,20 @@ class TestingDatabaseHealthTest extends TestCase
             $this->markTestSkipped('Migrations table missing — skipping migration count check.');
         }
 
-        $count = DB::table('migrations')->count();
+        $ran = DB::table('migrations')->pluck('migration')->all();
+        $expected = collect(glob(database_path('migrations/*.php')) ?: [])
+            ->map(fn (string $path): string => pathinfo($path, PATHINFO_FILENAME))
+            ->all();
+        $pending = array_values(array_diff($expected, $ran));
 
-        $this->assertGreaterThan(
-            0,
-            $count,
-            'Migrations table is empty, which means no migrations have been run. '.
+        $this->assertNotEmpty(
+            $ran,
+            'Migrations table is empty. Run: php artisan migrate --env=testing',
+        );
+        $this->assertSame(
+            [],
+            $pending,
+            'Testing database has pending migrations: '.implode(', ', $pending).'. '.
             'Run: php artisan migrate --env=testing',
         );
     }

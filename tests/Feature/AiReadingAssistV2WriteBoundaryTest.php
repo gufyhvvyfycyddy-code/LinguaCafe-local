@@ -3,6 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\ChapterAiReadingAssist;
+use App\Models\Book;
+use App\Models\Chapter;
 use App\Models\EncounteredWord;
 use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\ReviewCard;
@@ -11,6 +13,7 @@ use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\AiReadingAssistV2Service;
+use App\Services\ReadingChapterTextService;
 use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingTargetCatalogService;
 use App\Services\ReadingUnfamiliarTargetService;
@@ -50,12 +53,38 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
             'password_changed' => true,
             'uuid' => (string) Str::uuid(),
         ]);
+        $book = Book::forceCreate([
+            'user_id' => $this->user->id,
+            'name' => 'PAB R3 Phase A Boundary',
+            'language' => V2Harness::LANGUAGE,
+        ]);
+        Chapter::forceCreate([
+            'id' => V2Harness::CHAPTER_ID,
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'name' => 'PAB R3 Phase A Boundary',
+            'language' => V2Harness::LANGUAGE,
+            'raw_text' => 'Harness sentence.',
+            'word_count' => 1,
+            'read_count' => 0,
+            'unique_words' => '["harness"]',
+            'unique_word_ids' => '[]',
+            'processed_text' => gzcompress(json_encode([]), 1),
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
         $this->catalog = V2Harness::catalog();
         $catalogService = Mockery::mock(ReadingTargetCatalogService::class);
         $catalogService->shouldReceive('build')->andReturnUsing(fn () => $this->catalog);
         $unfamiliar = Mockery::mock(ReadingUnfamiliarTargetService::class);
-        $this->evidence = new ReadingOccurrenceSenseEvidenceService($catalogService);
-        $this->service = new AiReadingAssistV2Service($catalogService, $unfamiliar, $this->evidence);
+        $chapterTextService = new ReadingChapterTextService();
+        $this->evidence = new ReadingOccurrenceSenseEvidenceService($catalogService, $chapterTextService);
+        $this->service = new AiReadingAssistV2Service(
+            $catalogService,
+            $unfamiliar,
+            $this->evidence,
+            $chapterTextService,
+        );
         $this->cardService = app(ReviewCardService::class);
         $this->snapshotService = app(ReviewCardFsrsSnapshotService::class);
     }
@@ -243,6 +272,8 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
             'word_sense_id' => $sense->id,
             'review_card_id' => $card->id,
             'chapter_id' => V2Harness::CHAPTER_ID,
+            'sentence_id' => 'pab-r3-legacy-sentence',
+            'sentence_en' => 'Harness sentence.',
             'type' => WordSenseOccurrence::TYPE_WORD,
             'surface' => 'legacy',
             'lemma' => $sense->lemma,
