@@ -242,8 +242,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
 | FND-01 | DONE | 建立/恢复单一 Goal branch、fresh authority map、checkpoint | 现有 master/candidate refs、AGENTS、当前计划 | refs/branch/worktree 记录；无用户资产被改；本文件 checkpoint 更新 |
-| FND-02 | ACTIVE | 独立 re-audit `f1e4898e`，确认 numeric-PID kill blocker 真关闭 | 现有 47/524 pure suite、TestingDatabaseLease contract | 新鲜代码 audit + targeted/full pure tests；无 numeric PID termination path；lease/process residue=0 |
-| FND-03 | TODO | 修复 Sentinel helper cancellation，优先把 acceptance server 变成 helper 直接拥有的单一真实 server process | `f971df50`、现有 lease/sentinel helper | process-level test 证明 cancel 后 child/server/port 全结束；sentinel cleanup 在 lease release 前；不新增第二 lease/worker/通用 supervisor |
+| FND-02 | DONE | 独立 re-audit `f1e4898e`，确认 numeric-PID kill blocker 真关闭 | 现有 47/524 pure suite、TestingDatabaseLease contract | 新鲜代码 audit + targeted/full pure tests；无 numeric PID termination path；lease/process residue=0 |
+| FND-03 | ACTIVE | 修复 Sentinel helper cancellation，优先把 acceptance server 变成 helper 直接拥有的单一真实 server process | `f971df50`、现有 lease/sentinel helper | process-level test 证明 cancel 后 child/server/port 全结束；sentinel cleanup 在 lease release 前；不新增第二 lease/worker/通用 supervisor |
 | FND-04 | TODO | 独立 audit 修后的 Sentinel helper | FND-03 | blocker=0；pure/process tests 真实通过；无 false-green cleanup |
 | FND-05 | TODO | 组合 Backend + Reader + Harness + Infra + Sentinel 到 Goal branch | 五个已验候选 | merge/cherry-pick provenance；无手工语义漂移；non-DB gates 全绿 |
 | FND-06 | TODO | 在官方 testing DB lease 下运行 PAB-R3 DB/concurrency integration | 现有 65 DB-backed tests、lease harness | B14/B16/action-id/undo/rerate/explicit-vs-Finish/opened precedence/rollback 等真实 DB tests 绿；lease/sentinel clean |
@@ -472,21 +472,21 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `FND-02`
-- Last DONE: `FND-01`
+- Active milestone: `FND-03`
+- Last DONE: `FND-02`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — FND-02
+### ACTIVE MILESTONE ARCHITECTURE GATE — FND-03
 
-- 目标：只读审计 `f1e4898e` 的 testing DB lease 进程清理，并运行其既有 pure/process 测试确认无 numeric-PID termination 与残留。
-- 不做：不改 lease 契约、不修 Sentinel helper、不接触数据库、不创建第二套 lock/supervisor。
-- Owner/seam：`TestingDatabaseLease` 及其现有进程测试；只读候选提交和直接调用方。
-- Allowlist：当前 milestone 默认无写入文件；若发现 blocker，先把 FND-02 标为未通过并在 FND-03 的独立 allowlist 内修复。
-- 数据/兼容边界：不得连接或修改 testing/development 数据库；保持 machine-global lease 单一事实源。
-- 最小验证：候选 diff/call-chain audit；既有 targeted/full pure suite；进程、端口与 lease residue 为 0 才通过。
+- 目标：让 Sentinel helper 直接 `proc_open` 并拥有实际 `php -S` acceptance server；同一个 cancellation probe 驱动该真实 child loop，取消后进程与端口均关闭。
+- 不做：不改 `TestingDatabaseLease` 契约、不创建 Job Object/worker/watchdog/supervisor、不连接数据库做本 milestone 验收、不扩大到浏览器产品流程。
+- Owner/seam：`run-pab-r3-browser-acceptance.php` 独占 lease→sentinel→server→sentinel cleanup→lease release 生命周期；测试只验证该 helper 的命令转换、取消和清理顺序。
+- Allowlist：`tests/Support/run-pab-r3-browser-acceptance.php`、`tests/Unit/PabR3BrowserAcceptanceHarnessTest.php`、本控制面。
+- 数据/兼容边界：保留 machine-global lease 和 exact sentinel 单一事实源；只把受支持的 `artisan serve --no-reload` acceptance 命令转换为等价单层 `php -S`，其他 child 命令保持原路径。
+- 最小验证：PHP parse；helper focused unit；真实 `php -S` process cancellation 证明 child/server/port 全结束；Sentinel cleanup 严格早于 lease release；相关 lease pure/process 回归。
 
 ### PROGRESS LOG
 
@@ -497,6 +497,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 每个 milestone 最多 3–6 行摘要。
 
 `2026-08-09 10:15 | FND-01 | DONE | Goal branch tip | fresh origin/master=1c9bdcd7；Goal branch 从该 ref 建立；原 master 的 13 项 dirty/untracked 用户资产保持原样；authority/control files 已落入独立 linked worktree | FND-02`
+
+`2026-08-09 10:24 | FND-02 | DONE | Goal branch tip | f1e4898e 仅保留 PID/command inspection 为只读证据，所有 termination 使用原始 proc_open resource；47/47 tests、523 assertions，1 个与改动无关的 host symlink capability skip；lease inactive、stale metadata=false、PHP probe residue=0 | FND-03`
 
 ### DECISION LOG
 
