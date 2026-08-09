@@ -6,6 +6,7 @@ import {
     buildReaderAiAssistV2ImportRequest,
     normalizeReaderAiAssistPreview,
     normalizeReaderAiAssistSourceMeta,
+    isReaderAiAssistV2,
     readerAiAssistErrorMessage,
     readerAiAssistPackageKey,
     readerAiAssistResultLabel,
@@ -84,9 +85,26 @@ test('keeps V1 preview payload readable during additive migration', () => {
     assert.equal(normalized.summary.vocabulary_item_count, 1);
 });
 
-test('maps stable V2 machine errors to user-understandable messages', () => {
-    assert.match(readerAiAssistErrorMessage({ code: 'V2_STALE_SOURCE' }), /文章内容已经变化/);
-    assert.match(readerAiAssistErrorMessage({ code: 'V2_CANDIDATE_MISMATCH' }), /当前候选/);
+test('maps only the server V2 error_code contract to user-understandable messages', () => {
+    assert.match(readerAiAssistErrorMessage({ error_code: 'V2_STALE_SOURCE' }), /文章内容已经变化/);
+    assert.match(readerAiAssistErrorMessage({ error_code: 'V2_CANDIDATE_MISMATCH' }), /当前候选/);
+    assert.equal(readerAiAssistErrorMessage({ code: 'V2_STALE_SOURCE' }, 'fallback'), 'fallback');
+});
+
+test('V2 metadata keeps real aliases but does not invent missing contract fields', () => {
+    const normalized = normalizeReaderAiAssistSourceMeta({
+        contract_version: 'linguacafe_ai_reading_assist_v2',
+        total_target_count: 99,
+        part_count: 2,
+        packages: [{ manifest_token: 'manifest-without-part-index' }],
+    });
+
+    assert.equal(normalized.targetCount, 0);
+    assert.equal(normalized.packageCount, 2);
+    assert.equal(isReaderAiAssistV2({ schemaVersion: 'linguacafe_ai_reading_assist_v2' }), true);
+    assert.equal(isReaderAiAssistV2({ contract_version: 'linguacafe_ai_reading_assist_v2' }), false);
+    assert.equal(readerAiAssistPackageKey(normalized.packages[0], 0), '');
+    assert.equal(readerAiAssistV2InputsComplete(normalized, { 1: '{"part":1}' }), false);
 });
 
 test('Reader AI Assist requests V2 source contract, wires strict V2 import, and shows new result fields', () => {

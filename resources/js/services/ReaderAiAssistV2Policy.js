@@ -16,14 +16,14 @@ const ERROR_MESSAGES = Object.freeze({
 
 export function readerAiAssistErrorMessage(error, fallback = 'AI 阅读辅助请求失败。') {
     const data = error && error.response ? error.response.data : error;
-    const code = data && (data.code || data.error_code);
+    const code = data && data.error_code;
     return ERROR_MESSAGES[code] || (data && data.message) || fallback;
 }
 
 export function normalizeReaderAiAssistSourceMeta(data = {}) {
     const packages = Array.isArray(data.packages) ? data.packages : [];
-    const packageCount = Number(data.package_count || data.part_count || packages.length || 1);
-    const targetCount = Number(data.target_count || data.total_target_count || 0);
+    const packageCount = Number(data.package_count ?? data.part_count ?? 1);
+    const targetCount = Number(data.target_count ?? 0);
     return {
         schemaVersion: data.schema_version || '',
         targetCount: Number.isFinite(targetCount) ? targetCount : 0,
@@ -35,13 +35,12 @@ export function normalizeReaderAiAssistSourceMeta(data = {}) {
 
 export function isReaderAiAssistV2(payload = {}) {
     return payload.schema_version === READER_UNFAMILIAR_SCHEMA_VERSION
-        || payload.schemaVersion === READER_UNFAMILIAR_SCHEMA_VERSION
-        || payload.contract_version === READER_UNFAMILIAR_SCHEMA_VERSION;
+        || payload.schemaVersion === READER_UNFAMILIAR_SCHEMA_VERSION;
 }
 
-export function readerAiAssistPackageKey(pkg = {}, index = 0) {
-    const partIndex = Number(pkg.part_index || index + 1);
-    return String(Number.isInteger(partIndex) && partIndex > 0 ? partIndex : index + 1);
+export function readerAiAssistPackageKey(pkg = {}) {
+    const partIndex = Number(pkg.part_index);
+    return Number.isInteger(partIndex) && partIndex > 0 ? String(partIndex) : '';
 }
 
 export function readerAiAssistV2InputsComplete(sourceMeta = {}, aiTextByPart = {}) {
