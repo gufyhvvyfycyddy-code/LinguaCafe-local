@@ -487,9 +487,7 @@ function preparePabR3BrowserAcceptanceChild(array $command, string $projectRoot)
     }
 
     $publicDirectory = $projectRoot.'/public';
-    $router = is_file($projectRoot.'/server.php')
-        ? $projectRoot.'/server.php'
-        : $projectRoot.'/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php';
+    $router = $projectRoot.'/tests/Support/pab-r3-browser-server.php';
     if (! is_dir($publicDirectory) || ! is_file($router)) {
         throw new PabR3BrowserAcceptanceFailure(
             'PAB_R3_SERVER_ENTRY_MISSING',
@@ -513,6 +511,11 @@ function runPabR3BrowserAcceptanceChild(
 {
     $prepared = preparePabR3BrowserAcceptanceChild($command, $projectRoot);
     $cancellationRequested ??= static fn (): bool => false;
+    if (($prepared['command'][0] ?? null) === PHP_BINARY
+        && ($prepared['command'][1] ?? null) === '-S'
+    ) {
+        unset($environment['PHP_CLI_SERVER_WORKERS']);
+    }
     $descriptors = [
         0 => ['file', 'php://stdin', 'r'],
         1 => ['file', 'php://stdout', 'w'],

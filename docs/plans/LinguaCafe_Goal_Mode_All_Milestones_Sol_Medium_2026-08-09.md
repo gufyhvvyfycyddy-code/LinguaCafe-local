@@ -256,8 +256,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| A-01 | ACTIVE | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
-| A-02 | TODO | AI V2 schema、稳定 occurrence ID、目标数量校验、20–50 分包完整 | 现有 V2 parser/batching/candidate ownership | strict parser/batching tests；漏项/重复/非法 ID/错 schema fail closed |
+| A-01 | DONE | 核实并收束首次阅读预览、标生词、长按/拖选词组 | TextReader/TextBlockGroup 既有触摸与标记能力 | desktop + 430/390 真实交互；不破坏普通点词/ECDICT |
+| A-02 | ACTIVE | AI V2 schema、稳定 occurrence ID、目标数量校验、20–50 分包完整 | 现有 V2 parser/batching/candidate ownership | strict parser/batching tests；漏项/重复/非法 ID/错 schema fail closed |
 | A-03 | TODO | occurrence→WordSense 证据、matched_existing/new_sense/ambiguous 与核对列表闭环 | Reading target/evidence、WordSenseKnownSense、现有确认服务 | 用户可修正并保存；lemma/POS 仅证据，不替代 stable IDs |
 | A-04 | TODO | Trust AI 与 AI 新词义策略符合冻结规则 | 现有设置/evidence seam | 仅 strict high-confidence matched_existing 自动成为可消费证据；ambiguous/new/low 不自动正式评分；新 sense 默认确认后加入 |
 | A-05 | TODO | Phase A Finish 仍不因未核对强制阻塞，也不产生 ReviewLog/FSRS | 现有 finish preflight/commit seam | DB before/after 证明 ReviewLog/FSRS 无额外写；旧 Finish 行为兼容 |
@@ -472,21 +472,21 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `A-01`
-- Last DONE: `FND-06`
+- Active milestone: `A-02`
+- Last DONE: `A-01`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — A-01
+### ACTIVE MILESTONE ARCHITECTURE GATE — A-02
 
-- 目标：核实并收束首次阅读预览、标生词、桌面与 430/390 视口的长按/拖选词组，同时保持普通点词与 ECDICT 查询稳定。
-- 不做：不新建 reader 架构，不改 AI/FSRS，不做全局 UI 重设计，不扩展非英文能力。
-- Owner/seam：沿用 `TextReader` / `TextBlockGroup` 的触摸、选区与标记状态流，以及现有 ECDICT 侧栏边界；只追当前真实调用链和一个既有测试范例。
-- Allowlist：当前仅本控制面；完成 fresh reader 侦察并冻结具体组件、测试、seam 与兼容风险后，才按本切片直接责任补充精确文件。
-- 数据/兼容边界：浏览器写入只允许绑定同一 server/port/process 的 testing DB 与 testing-only sentinel；不得写开发数据库；必须保持点词、ECDICT、英文导入与 reader 状态流不回归。
-- 最小验证：fresh fetch/status；相关 JS/PHP targeted tests；`npm run development`；真实浏览器 desktop + 430/390 通过用户事件验证点词、长按/拖选词组、标记持久化，并记录 Console/Network。
+- 目标：核实并收束 AI V2 严格 schema、稳定 occurrence ID、目标数量校验与每包 20–50 个目标的完整分包。
+- 不做：不调用真实 AI provider，不写正式学习数据，不改 ReviewLog/FSRS/WordSense，不做 UI 重设计或 migration。
+- Owner/seam：沿用现有 `AiReadingAssistV2Service`、V2 parser、batching 与 candidate ownership 边界；只追 prepare → parse/validate → preview 的真实调用链和一个既有测试范例。
+- Allowlist：当前仅本控制面；完成 fresh A-02 侦察并冻结具体 service、测试、契约与兼容风险后，才按本切片直接责任补充精确文件。
+- 数据/兼容边界：只处理本地导出/导入候选与严格校验，不外发 AI，不创建或修改 WordSense、ReviewCard、ReviewLog、FSRS；如需 DB 证据只使用官方 testing DB lease。
+- 最小验证：strict V2 parser/batching/candidate ownership targeted tests；漏项、重复、非法 occurrence ID、错 schema 与目标数量不一致必须 fail closed；同时运行 Phase A safety guard 和相关 PHP/JS 回归。
 
 ### PROGRESS LOG
 
@@ -508,6 +508,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 `2026-08-09 11:09 | FND-06 | DONE | Goal branch tip | linked-worktree bootstrap 已重定向 optimized classmap/PSR-4/APP_BASE_PATH；health negative proof 精确发现 4 个 pending migration，随后仅在官方 lease 下 forward migrate；PAB-R3 integration 14 gates 全绿、并发 27/27、普通 undo 回归 39/39；独立审查 Blocker=0/Required=0；lease/sentinel/process residue clean | A-01`
 
+`2026-08-09 11:46 | A-01 | DONE | Goal branch tip | Reader JS 45/45、harness 18/18（98 assertions，真实 checked-in wrapper/Laravel HTTP 请求、取消与端口清理）、DB 回归 34/34（201 assertions）及 npm development 全绿；官方 Browser 在 desktop/430/390 完成普通点词、真实拖选词组、持久化、单词标记切换，testing DB before/after 证明 WordSense/ReviewCard/ReviewLog 均为 0，fixture/lease/sentinel/server residue clean；空 testing 设置下既有 Anki settings 500 与未配置 ECDICT 的 graceful state 不阻断本切片；独立复审 Blocker=0/Required=0/Advisory=0 | A-02`
+
 ### DECISION LOG
 
 只记录会影响后续任务且不是显而易见实现细节的决定：
@@ -521,6 +523,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 | FND-06 | linked worktree 的统一 test bootstrap 重定向共享 optimized Composer classmap、项目 PSR-4 与 APP_BASE_PATH 到当前 worktree | shared vendor 原 classmap 指向主工作树，曾让 integration 测到旧代码；反射回归与全 integration 已证明当前根 | 改为本 worktree 独立 vendor 或 Composer vendor/classloader 布局变化时复审`
 
 `2026-08-09 | FND-06 | reading undo 对同 review_session_id 的 ReadingSession 先取 scoped 行锁，再锁 ReviewLog/card | 与 explicit retry/Finish 的 session-first 锁序一致，真实 retry-vs-undo 并发 27/27 通过；普通 Sense Review 无匹配 session 时语义不变 | review_session_id 或 reading settlement 锁合同变化时复审`
+
+`2026-08-09 | A-01 | 浏览器 acceptance 的直接 php -S 对每个请求先执行当前 worktree tests/bootstrap，再交给 Laravel vendor router，并显式移除 PHP_CLI_SERVER_WORKERS | shared optimized vendor 曾使 HTTP server 解析主工作树旧 classmap；真实 sentinel endpoint、Reader 浏览器验收、注入 worker 变量后的取消/端口回归均通过 | worktree 改为独立 vendor，或 Composer/Laravel/PHP built-in server 布局与进程合同变化时复审`
 
 不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
 

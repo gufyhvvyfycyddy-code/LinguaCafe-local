@@ -547,8 +547,10 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
     {
         $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pab-r3-direct-server-'.bin2hex(random_bytes(8));
         $public = $root.DIRECTORY_SEPARATOR.'public';
+        $support = $root.DIRECTORY_SEPARATOR.'tests'.DIRECTORY_SEPARATOR.'Support';
         mkdir($public, 0700, true);
-        file_put_contents($root.DIRECTORY_SEPARATOR.'server.php', "<?php\n");
+        mkdir($support, 0700, true);
+        file_put_contents($support.DIRECTORY_SEPARATOR.'pab-r3-browser-server.php', "<?php\n");
 
         try {
             $prepared = \preparePabR3BrowserAcceptanceChild([
@@ -565,24 +567,22 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
                 PHP_BINARY,
                 '-S',
                 '127.0.0.1:8765',
-                $root.'/server.php',
+                $root.'/tests/Support/pab-r3-browser-server.php',
             ], $prepared['command']);
             $this->assertSame($root.'/public', $prepared['working_directory']);
             $this->assertNotContains('artisan', $prepared['command']);
         } finally {
-            @unlink($root.DIRECTORY_SEPARATOR.'server.php');
+            @unlink($support.DIRECTORY_SEPARATOR.'pab-r3-browser-server.php');
+            @rmdir($support);
+            @rmdir($root.DIRECTORY_SEPARATOR.'tests');
             @rmdir($public);
             @rmdir($root);
         }
     }
 
-    public function test_real_php_server_cancellation_closes_the_owned_child_and_port(): void
+    public function test_checked_in_router_serves_laravel_before_cancellation_closes_the_owned_child_and_port(): void
     {
-        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'pab-r3-cancel-server-'.bin2hex(random_bytes(8));
-        $public = $root.DIRECTORY_SEPARATOR.'public';
-        mkdir($public, 0700, true);
-        file_put_contents($public.DIRECTORY_SEPARATOR.'index.html', 'ready');
-        file_put_contents($root.DIRECTORY_SEPARATOR.'server.php', "<?php\nreturn false;\n");
+        $root = dirname(__DIR__, 2);
 
         $reservation = null;
         $port = null;
@@ -602,59 +602,63 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $cancellationRequested = static function () use ($port, &$serverObserved, $cancelDeadline): bool {
             $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
             if (is_resource($connection)) {
+                fwrite($connection, "GET /__testing/acceptance-sentinel HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+                stream_set_timeout($connection, 1);
+                $response = stream_get_contents($connection);
                 fclose($connection);
-                $serverObserved = true;
+                $serverObserved = is_string($response)
+                    && str_contains($response, '503 Service Unavailable')
+                    && str_contains($response, '"environment":"testing"')
+                    && str_contains($response, '"database_is_testing":true')
+                    && str_contains($response, '"sentinel_present":false');
 
-                return true;
+                return $serverObserved;
             }
 
             return hrtime(true) >= $cancelDeadline;
         };
 
+        $environment = getenv();
+        $this->assertIsArray($environment);
+        $environment['APP_ENV'] = 'testing';
+        $environment['PHP_CLI_SERVER_WORKERS'] = '4';
         try {
-            $environment = getenv();
-            $this->assertIsArray($environment);
-            $environment['APP_ENV'] = 'testing';
-            try {
-                \runPabR3BrowserAcceptanceChild(
-                    [
-                        PHP_BINARY,
-                        'artisan',
-                        '--env=testing',
-                        'serve',
-                        '--no-reload',
-                        '--host=127.0.0.1',
-                        '--port='.$port,
-                    ],
-                    $environment,
-                    $root,
-                    $cancellationRequested,
-                );
-                $this->fail('Cancellation must stop the directly owned server process.');
-            } catch (PabR3BrowserAcceptanceFailure $error) {
-                $this->assertSame('PAB_R3_CANCELLED', $error->machineCode);
-                $this->assertSame(PabR3BrowserAcceptanceHarness::EXIT_CANCELLED, $error->exitCode);
-            }
-
-            $this->assertTrue($serverObserved, 'The real server must bind before cancellation is requested.');
-            $portClosed = false;
-            $closeDeadline = hrtime(true) + 2_000_000_000;
-            do {
-                $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
-                if (! is_resource($connection)) {
-                    $portClosed = true;
-                    break;
-                }
-                fclose($connection);
-                usleep(25_000);
-            } while (hrtime(true) < $closeDeadline);
-            $this->assertTrue($portClosed, 'Cancellation must leave no listening server on the acceptance port.');
-        } finally {
-            @unlink($root.DIRECTORY_SEPARATOR.'server.php');
-            @unlink($public.DIRECTORY_SEPARATOR.'index.html');
-            @rmdir($public);
-            @rmdir($root);
+            \runPabR3BrowserAcceptanceChild(
+                [
+                    PHP_BINARY,
+                    'artisan',
+                    '--env=testing',
+                    'serve',
+                    '--no-reload',
+                    '--host=127.0.0.1',
+                    '--port='.$port,
+                ],
+                $environment,
+                $root,
+                $cancellationRequested,
+            );
+            $this->fail('Cancellation must stop the directly owned server process.');
+        } catch (PabR3BrowserAcceptanceFailure $error) {
+            $this->assertSame('PAB_R3_CANCELLED', $error->machineCode);
+            $this->assertSame(PabR3BrowserAcceptanceHarness::EXIT_CANCELLED, $error->exitCode);
         }
+
+        $this->assertTrue(
+            $serverObserved,
+            'The checked-in router must bootstrap the current testing application before cancellation.',
+        );
+        $portClosed = false;
+        $closeDeadline = hrtime(true) + 2_000_000_000;
+        do {
+            $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
+            if (! is_resource($connection)) {
+                $portClosed = true;
+                break;
+            }
+            fclose($connection);
+            usleep(25_000);
+        } while (hrtime(true) < $closeDeadline);
+        $this->assertTrue($portClosed, 'Cancellation must leave no listening server on the acceptance port.');
     }
 
     public function test_source_has_no_env_file_write_migration_destructive_notification_or_shell_expansion_path(): void
@@ -688,9 +692,15 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $this->assertStringContainsString("['bypass_shell' => true]", $source);
         $this->assertStringContainsString('proc_open(', $source);
         $this->assertStringContainsString("PHP_BINARY, '-S'", $source);
+        $this->assertStringContainsString("unset(\$environment['PHP_CLI_SERVER_WORKERS'])", $source);
         $this->assertStringContainsString("['LINGUACAFE_TEST_SENTINEL' => \$sentinel]", $source);
         $this->assertStringContainsString("table('migrations')->where('migration', \$value)->delete()", $source);
         $this->assertStringNotContainsString("table('migrations')->delete()", $source);
+
+        $routerSource = file_get_contents(dirname(__DIR__).'/Support/pab-r3-browser-server.php');
+        $this->assertIsString($routerSource);
+        $this->assertStringContainsString("require \$projectRoot.'/tests/bootstrap.php'", $routerSource);
+        $this->assertStringContainsString("require \$projectRoot.'/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php'", $routerSource);
     }
 
     private function harness(
