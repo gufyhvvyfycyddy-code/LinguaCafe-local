@@ -502,8 +502,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - fixture user 71046 及 17 类 user-scoped 关联资产在 testing harness 独占 lease 下逐表精确删除，全部 after=0；未清库、未改生产代码、未运行 notification script、未 DCP。
 
 ### ACTIVE MILESTONE — C-03
-- 只做首页每日打卡 read model 与首页呈现：连续学习、今日阅读、今日复习、完成状态、继续学习；优先复用 `StudyOverviewQueryService`、`ReviewDailyProgressQueryService` 与现有 Home，不新增第二统计源。
-- 首页展示必须由现有正式阅读/复习事实派生；先完成事实源与接口/组件边界审计，再做最小实现与真实浏览器验收。
+- 只做首页每日打卡 read model 与首页呈现：连续学习、今日阅读、今日复习、打卡状态、继续学习；正式事实只复用现有 `ReviewDailyProgressQueryService` / Sense eligibility / `ReviewStudyTimezoneService` 与 ReadingSession completion，不调用完整 Study Overview，不新增第二统计源。
+- 产品语义已冻结：今日复习=有效正式 ReviewLog（undone/reset 不计）；今日阅读=正式 ReadingSessionCompletion 次数；active study day=正式阅读完成或有效正式复习；今天尚未 active 时 streak 仍显示截至昨天的连续天数；`checked_in` 只表示今天已有任一正式学习活动，不等于任务清空；继续学习按 due Sense Review → 来源仍有效的 latest-started active reading → `/books` 单一优先级。
+- 首页展示必须由上述正式事实派生；旧 GoalAchievement、Chapter.read_count、Calendar legacy due 只保留旧目标/历史用途，不作为新 dashboard authority。实现后必须做 zero-write GET 合同、focused tests、build 与真实浏览器 DOM/Network/DB 三向验收。
 
 ### PROGRESS LOG
 
@@ -580,6 +581,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 | A-02 | V2 采用最少包数的均衡分包：总数 0–19 保留单包，总数 ≥20 时每包 20–50；严格解析同时保留 typed JSON 形状检查与既有 associative normalization | 固定 50 切块会产生 51→50+1 的不合约尾包；仅 associative decode 会混淆空对象与空数组；边界回归和复审均通过 | 产品冻结的包大小或 PHP JSON 解码合同变化时复审`
 
 `2026-08-10 | B-07 | Reader 可见 Finish 只保留现有 server preflight→用户确认 commit 一条主路，legacy `finish()` 在零 caller 证明后删除 | false-green 测试真实先红；浏览器 eligible/unresolved/offline recovery 与 testing DB exact-once readback 均证明单一路径 | Finish backend contract 或产品两阶段确认语义发生明确变化时复审`
+
+`2026-08-10 | C-03 | 首页签到与任务完成分离：active day=正式 ReadingSessionCompletion 或有效正式 ReviewLog；今天未 active 时 streak 延续截至昨天；checked_in=今天已有任一正式学习活动；CTA 优先 due Sense Review，其次 current-source active reading，最后 /books | 四份 C-03 authority/UX/test/legacy audit 一致确认旧 GoalAchievement、Chapter.read_count、EncounteredWord.next_review 不能作为新首页正式事实，且现有 Review/Reading facts 足够只读派生 | 正式阅读 completion authority、formal ReviewLog 口径或用户明确产品定义变化时复审`
 
 不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
 
