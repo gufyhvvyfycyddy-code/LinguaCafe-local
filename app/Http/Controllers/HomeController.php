@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use App\Services\GoalService;
+use App\Services\HomeStudySummaryQueryService;
 
 use App\Services\SettingsService;
 use App\Services\SafeFilePathService;
@@ -21,7 +22,8 @@ class HomeController extends Controller {
         private StatisticsService $statisticsService, 
         private StatisticsExportService $statisticsExportService,
         private GoalService $goalService,
-        private SettingsService $settingsService
+        private SettingsService $settingsService,
+        private HomeStudySummaryQueryService $homeStudySummaryQueryService,
     ) {
         //
     }
@@ -61,6 +63,18 @@ class HomeController extends Controller {
             'themeSettings' => $themeSettings,
             'userUuid' => $user->uuid,
         ]);
+    }
+
+    public function studySummary(Request $request) {
+        $user = $request->user();
+
+        return response()->json(
+            $this->homeStudySummaryQueryService->build(
+                $user->id,
+                $user->selected_language,
+            ),
+            200,
+        );
     }
 
     public function getStatistics(Request $request) {

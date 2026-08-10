@@ -181,6 +181,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/mobile-sync-simulator', [App\Http\Controllers\HomeController::class, 'index']);
 
     // home
+    Route::get('/home/study-summary', [App\Http\Controllers\HomeController::class, 'studySummary']);
     Route::post('/statistics/get', [App\Http\Controllers\HomeController::class, 'getStatistics']);
     Route::post('/statistics/export/{format}', [App\Http\Controllers\HomeController::class, 'exportStatistics']);
     Route::get('/review-cards/knowledge-hygiene/preferences', [App\Http\Controllers\KnowledgeHygieneController::class, 'preferences']);

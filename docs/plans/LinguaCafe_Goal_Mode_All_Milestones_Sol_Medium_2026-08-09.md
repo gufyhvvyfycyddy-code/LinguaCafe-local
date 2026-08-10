@@ -292,8 +292,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 |---|---|---|---|---|
 | C-01 | DONE | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
 | C-02 | DONE | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
-| C-03 | ACTIVE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `StudyOverviewQueryService`、`ReviewDailyProgressQueryService`、Home | 不建第二统计源；数据与现有正式事实一致；首页首次打开能知道今天做什么 |
-| C-04 | TODO | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 一级入口收束；移动底栏不强挤五项；首页返回入口经真实体验确定 |
+| C-03 | DONE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `ReviewDailyProgressQueryService`、Sense eligibility、ReadingSession completion、Home | 单一正式事实源；summary GET zero-write；真实浏览器完成空状态→续读→复习优先→评分/撤销→Finish→full reload，DOM/JSON/DB 一致 |
+| C-04 | ACTIVE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 一级入口收束；移动底栏不强挤五项；首页返回入口经真实体验确定 |
 | C-05 | TODO | “生词”一级入口只面向 WordSense，提供基础列表/搜索/查看 | `VocabularyQueryService`、WordSense/ReviewCard assets | legacy word card 不成为新一级主体；已有 sense 可检索/查看 |
 | C-06 | TODO | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
 | C-07 | TODO | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-03`
-- Last DONE: `C-02`
+- Active milestone: `C-04`
+- Last DONE: `C-03`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -501,10 +501,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 独立 Reasonix 只读复核确认 Gate 权威定义实际为 9 类组合，且全部要求 testing DB + real browser；本轮已补齐此前缺失的 Trust AI、ambiguous、opened exclusion、Hard/Easy、新 sense、duplicate Finish、undo/refresh 组合证据。
 - fixture user 71046 及 17 类 user-scoped 关联资产在 testing harness 独占 lease 下逐表精确删除，全部 after=0；未清库、未改生产代码、未运行 notification script、未 DCP。
 
-### ACTIVE MILESTONE — C-03
-- 只做首页每日打卡 read model 与首页呈现：连续学习、今日阅读、今日复习、打卡状态、继续学习；正式事实只复用现有 `ReviewDailyProgressQueryService` / Sense eligibility / `ReviewStudyTimezoneService` 与 ReadingSession completion，不调用完整 Study Overview，不新增第二统计源。
-- 产品语义已冻结：今日复习=有效正式 ReviewLog（undone/reset 不计）；今日阅读=正式 ReadingSessionCompletion 次数；active study day=正式阅读完成或有效正式复习；今天尚未 active 时 streak 仍显示截至昨天的连续天数；`checked_in` 只表示今天已有任一正式学习活动，不等于任务清空；继续学习按 due Sense Review → 来源仍有效的 latest-started active reading → `/books` 单一优先级。
-- 首页展示必须由上述正式事实派生；旧 GoalAchievement、Chapter.read_count、Calendar legacy due 只保留旧目标/历史用途，不作为新 dashboard authority。实现后必须做 zero-write GET 合同、focused tests、build 与真实浏览器 DOM/Network/DB 三向验收。
+### ACTIVE MILESTONE — C-04
+- 只做四主导航 Architecture Gate 与后续最小实现：阅读 / 复习 / 生词 / 我的。先审计 `Layout.vue`、Vue Router、Laravel routes 与现有普通/高级入口，不先删页面、不重写路由、不进入 C-05/C-06。
+- 必须冻结桌面侧栏与移动底栏如何共享同一四主入口语义，以及首页返回入口；移动端不得为了保留“首页”再硬挤成五个主按钮。
+- “我的”必须优先复用现有真实页面/容器；高级功能本轮只分类和保留可达性边界，统一下沉留给 C-06。实现后真实浏览器验收四主入口、首页返回、desktop/mobile 导航与现有 auth/admin 边界。
 
 ### PROGRESS LOG
 
@@ -561,6 +561,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-10 | C-01 | DONE | 8dd8d7ce | Sense Review 问题面保留原文，答案面中文+英文默认，FSRS 工程信息收进“复习信息”；focused regression、build 与 desktop/900 真实浏览器通过，无第二评分路径 | C-02`
 
 `2026-08-10 | C-02 | DONE | Goal branch tip | final code audit Blocker/Required=0；Node final gate 26/26；同一冻结树 npm development + server-bound testing 真浏览器完成评分两张→返回两次→full reload→前进两次→本地返回，只有两次明确评分与两次 canonical undo 写入，forward/reload/local-back 无额外 ReviewLog/FSRS；fixture/server/browser/lease 精确清理 | C-03`
+
+`2026-08-11 | C-03 | DONE | Goal branch tip | code audit Blocker/Required=0；主窗口在正确 goal worktree 补跑 final static Gate（3 PHP syntax + 3 Node guards + diff-check）全绿；server-bound testing 真浏览器完成空状态→active reading CTA→due review priority→两次评分/一次撤销→真实两阶段 Finish→Home/full reload，最终 1 天/阅读1/有效复习1/已打卡/due1 与 JSON/DB 一致，summary GET zero-write；task data/sentinel/browser/server/lease 精确清理 | C-04`
 
 ### DECISION LOG
 

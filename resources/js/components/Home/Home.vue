@@ -34,6 +34,8 @@
                 </v-alert>
             </template>
 
+            <home-daily-check-in></home-daily-check-in>
+
             <calendar
                 ref="calendar"
                 @achievement-quantity-change="updateGoals"
@@ -99,7 +101,11 @@
     import {formatNumber} from './../../helper.js';
     const moment = require('moment');
     import { DefaultLocalStorageManager } from './../../services/LocalStorageManagerService';
+    import HomeDailyCheckIn from './HomeDailyCheckIn.vue';
     export default {
+        components: {
+            HomeDailyCheckIn,
+        },
         data: function() {
             return {
                 theme: DefaultLocalStorageManager.loadSetting('theme') || 'light',
