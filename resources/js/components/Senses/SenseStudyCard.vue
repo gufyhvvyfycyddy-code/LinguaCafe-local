@@ -40,6 +40,7 @@
                     :font-size="fontSize"
                     fallback-text="暂无例句。"
                 />
+                <div v-if="showAnswer && card.example_sentence_zh" class="text--secondary mt-2">{{ card.example_sentence_zh }}</div>
             </v-sheet>
             <div class="body-1 primary--text font-weight-medium">
                 这个句子里的 “{{ card.lemma }}” 是什么意思？
@@ -81,7 +82,7 @@
             </div>
 
             <v-row dense>
-                <v-col cols="12" md="6">
+                <v-col cols="12" :md="hasAnswerRightColumn ? 6 : 12">
                     <div class="caption text--secondary">中文释义</div>
                     <div class="sense-main mb-4">{{ card.sense_zh }}</div>
 
@@ -106,21 +107,7 @@
 
                     <slot name="answer-left-extra"></slot>
                 </v-col>
-                <v-col cols="12" md="6">
-                    <div class="caption text--secondary">例句</div>
-                    <v-sheet outlined rounded class="pa-3 mb-4">
-                        <SenseSentencePreview
-                            :tokens="card.example_sentence_tokens"
-                            :sentence-text="card.example_sentence_en"
-                            :target-surface="card.surface_form"
-                            :target-lemma="card.lemma"
-                            :language="card.language || 'english'"
-                            :font-size="fontSize"
-                            fallback-text="暂无例句。"
-                        />
-                        <div v-if="card.example_sentence_zh" class="text--secondary mt-2">{{ card.example_sentence_zh }}</div>
-                    </v-sheet>
-
+                <v-col v-if="hasAnswerRightColumn" cols="12" md="6">
                     <template v-if="supplementaryExample">
                         <div class="caption text--secondary">补充例句</div>
                         <v-sheet outlined rounded class="pa-3 mb-4 supplementary-example">
@@ -179,6 +166,9 @@
             },
             hasCollocations() {
                 return this.normalizedCollocations.length > 0;
+            },
+            hasAnswerRightColumn() {
+                return !!this.supplementaryExample || !!this.$slots['answer-right-extra'];
             },
             supplementaryExample() {
                 const example = this.card.supplementary_example || null;

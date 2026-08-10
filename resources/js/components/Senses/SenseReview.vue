@@ -122,8 +122,6 @@
                         :color="stateColor(currentCardLifecycleState)"
                         class="mr-1"
                     >{{ stateLabel(currentCardLifecycleState) }}</v-chip>
-                    <v-chip class="mr-1">{{ currentCard.fsrs_state }}</v-chip>
-                    <v-chip>{{ currentCard.fsrs_reps }} 次</v-chip>
                     <div v-if="buriedRemainingDisplay" class="caption warning--text ml-2">
                         {{ buriedRemainingDisplay }}
                     </div>
@@ -154,6 +152,10 @@
                             <v-list-item @click="startEdit">
                                 <v-list-item-icon><v-icon small>mdi-pencil</v-icon></v-list-item-icon>
                                 <v-list-item-title>编辑</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item @click="fsrsDetailOpen = true">
+                                <v-list-item-icon><v-icon small>mdi-information-outline</v-icon></v-list-item-icon>
+                                <v-list-item-title>复习信息</v-list-item-title>
                             </v-list-item>
                             <v-divider v-if="availableLifecycleActions.length" class="my-1" />
                             <v-list-item
@@ -187,6 +189,27 @@
                             </v-list-item>
                         </v-list>
                     </v-menu>
+                    <v-dialog v-model="fsrsDetailOpen" max-width="440">
+                        <v-card>
+                            <v-card-title>复习信息</v-card-title>
+                            <v-card-text v-if="currentCard">
+                                <v-simple-table dense class="no-hover border rounded-lg">
+                                    <tbody>
+                                        <tr><td>状态</td><td>{{ fsrsStateLabel(currentCard.fsrs_state) }}</td></tr>
+                                        <tr><td>已复习</td><td>{{ currentCard.fsrs_reps }} 次</td></tr>
+                                        <tr><td>下次到期</td><td>{{ currentCard.fsrs_due_at || '—' }}</td></tr>
+                                        <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '—' }}</td></tr>
+                                        <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '—' }}</td></tr>
+                                        <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
+                                    </tbody>
+                                </v-simple-table>
+                            </v-card-text>
+                            <v-card-actions>
+                                <v-spacer />
+                                <v-btn text @click="fsrsDetailOpen = false">关闭</v-btn>
+                            </v-card-actions>
+                        </v-card>
+                    </v-dialog>
                 </template>
 
                 <template #answer-left-extra>
@@ -206,24 +229,6 @@
                         @history="sessionActionDrawerOpen = true"
                         @suspend="executeLifecycleAction('suspend')"
                     />
-                </template>
-
-                <template #answer-right-extra>
-                    <div class="caption text--secondary d-flex align-center" style="cursor: pointer;" @click="fsrsDetailOpen = !fsrsDetailOpen">
-                        FSRS：到期 {{ currentCard.fsrs_due_at || '-' }}
-                        <v-icon small class="ml-1">{{ fsrsDetailOpen ? 'mdi-chevron-up' : 'mdi-chevron-down' }}</v-icon>
-                    </div>
-                    <v-expand-transition>
-                        <div v-if="fsrsDetailOpen">
-                            <v-simple-table dense class="no-hover border rounded-lg mt-2">
-                                <tbody>
-                                    <tr><td>稳定度</td><td>{{ currentCard.fsrs_stability || '-' }}</td></tr>
-                                    <tr><td>难度</td><td>{{ currentCard.fsrs_difficulty || '-' }}</td></tr>
-                                    <tr><td>遗忘次数</td><td>{{ currentCard.fsrs_lapses }}</td></tr>
-                                </tbody>
-                            </v-simple-table>
-                        </div>
-                    </v-expand-transition>
                 </template>
 
                 <template #after-answer>
@@ -746,7 +751,7 @@
                         this.fsrsStats = response.data;
                     })
                     .catch(() => {
-                        this.statsError = 'FSRS 统计加载失败。';
+                        this.statsError = '复习统计加载失败。';
                     })
                     .finally(() => {
                         this.statsLoading = false;
@@ -1136,6 +1141,14 @@
             // Vue 2 templates can only call functions registered on the instance.
             stateColor,
             stateLabel,
+            fsrsStateLabel(state) {
+                return {
+                    new: '新卡',
+                    learning: '学习中',
+                    review: '复习中',
+                    relearning: '重新学习',
+                }[state] || state || '—';
+            },
             // Map a lifecycle action to an MDI icon name.
             lifecycleActionIcon(action) {
                 const icons = {
