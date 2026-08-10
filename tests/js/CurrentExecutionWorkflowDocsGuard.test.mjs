@@ -65,6 +65,12 @@ test('current rules require FastCtx-first local work', () => {
     );
 });
 
+test('Reasonix work remains parallel with the primary task', () => {
+    assert.ok(rulesSource.includes('Reasonix 作为并行核查者运行时'));
+    assert.ok(rulesSource.includes('主执行方不得停工等待'));
+    assert.ok(rulesSource.includes('周期性检查 Reasonix'));
+});
+
 test('discontinued workflows are not active requirements', () => {
     const hits = FORBIDDEN_ACTIVE_PHRASES.filter((phrase) => rulesSource.includes(phrase));
     assert.deepEqual(hits, [], `Discontinued active workflow phrases found: ${hits.join('; ')}`);
