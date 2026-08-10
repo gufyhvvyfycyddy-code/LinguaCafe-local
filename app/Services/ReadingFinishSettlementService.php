@@ -319,16 +319,9 @@ class ReadingFinishSettlementService
     private function isQueueEligibleSenseCard(ReviewCard $card, int $userId, string $language, int $senseId): bool
     {
         return ReviewCard::query()
-            ->where('id', $card->id)
-            ->where('user_id', $userId)
-            ->where('language_id', $language)
-            ->where('target_type', ReviewCard::TARGET_SENSE)
-            ->where('target_id', $senseId)
-            ->where('fsrs_enabled', true)
-            ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
-            ->where(function ($query) {
-                $query->whereNull('buried_until')->orWhere('buried_until', '<=', Carbon::now());
-            })
+            ->senseReviewEligible($userId, $language, Carbon::now())
+            ->where('review_cards.id', $card->id)
+            ->where('review_cards.target_id', $senseId)
             ->exists();
     }
 }

@@ -294,6 +294,33 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(0, $this->legacyFinishCount);
     }
 
+    public function test_preflight_with_eligible_candidate_is_read_only_and_preserves_card_snapshot(): void
+    {
+        [, $card] = $this->addEligibleTarget('occ2_preflight_eligible');
+        $snapshotService = app(ReviewCardFsrsSnapshotService::class);
+        $beforeCard = $snapshotService->capture($card->fresh());
+        $before = [
+            'logs' => ReviewLog::count(),
+            'settlements' => ReadingSessionCardSettlement::count(),
+            'completions' => ReadingSessionCompletion::count(),
+            'read_count' => $this->chapter->read_count,
+        ];
+
+        $result = $this->finish('preflight');
+
+        $this->assertSame(1, $result['passive_good_count']);
+        $this->assertTrue($result['can_commit']);
+        $this->assertTrue($snapshotService->matches($card->fresh(), $beforeCard));
+        $this->assertSame($before, [
+            'logs' => ReviewLog::count(),
+            'settlements' => ReadingSessionCardSettlement::count(),
+            'completions' => ReadingSessionCompletion::count(),
+            'read_count' => $this->chapter->fresh()->read_count,
+        ]);
+        $this->assertSame(0, $this->formalWriteCount);
+        $this->assertSame(0, $this->legacyFinishCount);
+    }
+
     public function test_old_trust_bypass_is_rejected(): void
     {
         $this->expectException(\InvalidArgumentException::class);
@@ -413,6 +440,33 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->addEligibleTarget('occ2_same_2', 'passive_disambiguation', $sense);
         $this->finish('commit');
         $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
+    }
+
+    public function test_passive_plan_reuses_canonical_sense_review_lifecycle_eligibility(): void
+    {
+        [, $card] = $this->addEligibleTarget('occ2_lifecycle_eligibility');
+        $cases = [
+            'active' => [ReviewCard::LIFECYCLE_ACTIVE, true, null, 1],
+            'disabled' => [ReviewCard::LIFECYCLE_ACTIVE, false, null, 0],
+            'suspended' => [ReviewCard::LIFECYCLE_SUSPENDED, true, null, 0],
+            'archived' => [ReviewCard::LIFECYCLE_ARCHIVED, true, null, 0],
+            'future_buried' => [ReviewCard::LIFECYCLE_BURIED, true, now()->addHour(), 0],
+            'expired_buried' => [ReviewCard::LIFECYCLE_BURIED, true, now()->subMinute(), 1],
+        ];
+
+        foreach ($cases as $label => [$state, $enabled, $buriedUntil, $expected]) {
+            $card->forceFill([
+                'lifecycle_state' => $state,
+                'fsrs_enabled' => $enabled,
+                'buried_until' => $buriedUntil,
+            ])->save();
+
+            $result = $this->finish('preflight');
+            $this->assertSame($expected, $result['passive_good_count'], $label);
+        }
+
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
+        $this->assertSame(0, ReadingSessionCardSettlement::where('review_card_id', $card->id)->count());
     }
 
     public function test_same_reading_new_marked_unknown_learning_state_has_zero_passive_good(): void
