@@ -133,8 +133,8 @@
                 });
             },
             requestUndo(action, source) {
-                if (!action || !action.undoable || !action.review_log_id) return;
-                if (this.undoLoadingReviewLogId !== null) return;
+                if (!action || !action.undoable || !action.review_log_id) return Promise.resolve(null);
+                if (this.undoLoadingReviewLogId !== null) return Promise.resolve(null);
 
                 this.undoLoadingReviewLogId = action.review_log_id;
                 this.conflict = '';
@@ -156,6 +156,7 @@
                     this.conflict = '';
                     return Promise.resolve(this.reload()).then(() => {
                         this.$emit('undone', response.data);
+                        return response.data;
                     });
                 }).catch((error) => {
                     const status = error.response?.status;
@@ -167,6 +168,7 @@
                         this.conflict = '撤销失败，请检查网络后重试。';
                     }
                     this.reload();
+                    return null;
                 }).finally(() => {
                     this.undoLoadingReviewLogId = null;
                     this.emitState();

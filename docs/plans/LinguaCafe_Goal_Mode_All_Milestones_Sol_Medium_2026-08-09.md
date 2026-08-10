@@ -290,9 +290,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| C-01 | ACTIVE | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
-| C-02 | TODO | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
-| C-03 | TODO | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `StudyOverviewQueryService`、`ReviewDailyProgressQueryService`、Home | 不建第二统计源；数据与现有正式事实一致；首页首次打开能知道今天做什么 |
+| C-01 | DONE | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
+| C-02 | DONE | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
+| C-03 | ACTIVE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `StudyOverviewQueryService`、`ReviewDailyProgressQueryService`、Home | 不建第二统计源；数据与现有正式事实一致；首页首次打开能知道今天做什么 |
 | C-04 | TODO | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 一级入口收束；移动底栏不强挤五项；首页返回入口经真实体验确定 |
 | C-05 | TODO | “生词”一级入口只面向 WordSense，提供基础列表/搜索/查看 | `VocabularyQueryService`、WordSense/ReviewCard assets | legacy word card 不成为新一级主体；已有 sense 可检索/查看 |
 | C-06 | TODO | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-01`
-- Last DONE: `B-GATE`
+- Active milestone: `C-03`
+- Last DONE: `C-02`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -501,9 +501,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 独立 Reasonix 只读复核确认 Gate 权威定义实际为 9 类组合，且全部要求 testing DB + real browser；本轮已补齐此前缺失的 Trust AI、ambiguous、opened exclusion、Hard/Easy、新 sense、duplicate Finish、undo/refresh 组合证据。
 - fixture user 71046 及 17 类 user-scoped 关联资产在 testing harness 独占 lease 下逐表精确删除，全部 after=0；未清库、未改生产代码、未运行 notification script、未 DCP。
 
-### ACTIVE MILESTONE — C-01
-- 只做现有 Sense Review 问题面/答案面的信息瘦身与复用审计；优先删除重复展示和工程信息前置，不新增第二套复习卡组件、评分路径或 serializer。
-- 保持正式评分、FSRS、ReviewLog、快捷键、队列和撤销语义不变；页面改动完成后必须用真实浏览器检查问题面、显示答案、四评分入口与窄屏。
+### ACTIVE MILESTONE — C-03
+- 只做首页每日打卡 read model 与首页呈现：连续学习、今日阅读、今日复习、完成状态、继续学习；优先复用 `StudyOverviewQueryService`、`ReviewDailyProgressQueryService` 与现有 Home，不新增第二统计源。
+- 首页展示必须由现有正式阅读/复习事实派生；先完成事实源与接口/组件边界审计，再做最小实现与真实浏览器验收。
 
 ### PROGRESS LOG
 
@@ -556,6 +556,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-10 13:29 | B-08 | DONE | Goal branch tip | 零生产代码改动；testing DB health 绿，ordinary SenseReview/undo/analytics/FSRS 聚焦 PHP 172/172（800 assertions），stats/report 补充 112/112（861 assertions）及相关前端 guards 全绿。真实浏览器普通卡完成 Good→撤销→卡回队列→Again；DB 保留 1 undone Good + 1 active Again，FSRS=relearning/reps3/lapses1，日报只计 Again；testing 用户与全部关联资产精确清零 | B-GATE`
 
 `2026-08-10 15:38 | B-GATE | DONE | Goal branch tip | server-bound testing 组合文章真实覆盖 9 类 Gate：Again/Hard/Good/Easy 四评分、bank 多义、Trust AI、ambiguous、新 sense 同 pending Good、opened/explicit passive exclusion；Finish 第一会话仅 2 passive Good，第二会话双 commit 仅 1 completion/0 settlement；第三会话 Good→snackbar undo→full reload 同 UUID，DB undone log 与 FSRS before snapshot 精确恢复。Reasonix 独立复核后无未覆盖 Gate 类别；fixture user 71046 与 17 类关联资产全部 after=0 | C-01`
+
+`2026-08-10 | C-01 | DONE | 8dd8d7ce | Sense Review 问题面保留原文，答案面中文+英文默认，FSRS 工程信息收进“复习信息”；focused regression、build 与 desktop/900 真实浏览器通过，无第二评分路径 | C-02`
+
+`2026-08-10 | C-02 | DONE | Goal branch tip | final code audit Blocker/Required=0；Node final gate 26/26；同一冻结树 npm development + server-bound testing 真浏览器完成评分两张→返回两次→full reload→前进两次→本地返回，只有两次明确评分与两次 canonical undo 写入，forward/reload/local-back 无额外 ReviewLog/FSRS；fixture/server/browser/lease 精确清理 | C-03`
 
 ### DECISION LOG
 

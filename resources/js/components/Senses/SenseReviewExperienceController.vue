@@ -9,6 +9,7 @@
             :auto-advance-running="autoAdvanceRunning"
             :paused="snapshot.paused"
             :previous-available="previousAvailable"
+            :forward-available="forwardAvailable"
             :busy="busy"
             :font-size="preferences.fontSize"
             :high-contrast="preferences.highContrast"
@@ -16,6 +17,7 @@
             @toggle-auto-advance="toggleAutoAdvance"
             @toggle-pause="togglePause"
             @previous-card="$emit('previous-card')"
+            @next-card="$emit('next-card')"
             @view-source="$emit('view-source')"
             @bury="$emit('bury')"
             @font-delta="changeFontSize"
@@ -78,6 +80,7 @@ export default {
         busy: { type: Boolean, default: false },
         overlayOpen: { type: Boolean, default: false },
         previousAvailable: { type: Boolean, default: false },
+        forwardAvailable: { type: Boolean, default: false },
     },
     data() {
         return {

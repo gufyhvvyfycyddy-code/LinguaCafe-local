@@ -38,7 +38,10 @@
         <slot name="marker" />
         <slot name="tag" />
         <v-btn small text class="experience-action ma-1" :disabled="!previousAvailable || busy" @click="$emit('previous-card')">
-            <v-icon small left>mdi-card-search-outline</v-icon>上一张
+            <v-icon small left>mdi-arrow-left</v-icon>返回
+        </v-btn>
+        <v-btn small text class="experience-action ma-1" :disabled="!forwardAvailable || busy" @click="$emit('next-card')">
+            前进<v-icon small right>mdi-arrow-right</v-icon>
         </v-btn>
         <v-btn small text class="experience-action ma-1" :disabled="busy" @click="$emit('view-source')">
             <v-icon small left>mdi-book-open-page-variant</v-icon>原文
@@ -76,6 +79,7 @@ export default {
         autoAdvanceRunning: { type: Boolean, default: false },
         paused: { type: Boolean, default: false },
         previousAvailable: { type: Boolean, default: false },
+        forwardAvailable: { type: Boolean, default: false },
         busy: { type: Boolean, default: false },
         fontSize: { type: Number, default: 20 },
         highContrast: { type: Boolean, default: false },

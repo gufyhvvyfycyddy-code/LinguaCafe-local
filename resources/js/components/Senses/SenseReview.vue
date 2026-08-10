@@ -87,7 +87,8 @@
             :experience="reviewExperience"
             :card="currentCard"
             :show-answer="showAnswer"
-            :previous-available="!!previousCardSnapshot"
+            :previous-available="previousNavigationAvailable"
+            :forward-available="forwardNavigationAvailable"
             :busy="reviewExperienceBusy"
             :overlay-open="experienceOverlayOpen"
             @reveal-answer="showAnswer = true"
@@ -96,7 +97,8 @@
             @preferences-change="experiencePreferences = $event"
             @marker-updated="onCurrentMarkerUpdated"
             @notify="showSnackbar"
-            @previous-card="previousCardDialog = true"
+            @previous-card="goPreviousCard('sense_review_history')"
+            @next-card="goForwardCard"
             @view-source="viewSource"
             @bury="executeLifecycleAction('bury')"
         />
@@ -156,6 +158,10 @@
                             <v-list-item @click="fsrsDetailOpen = true">
                                 <v-list-item-icon><v-icon small>mdi-information-outline</v-icon></v-list-item-icon>
                                 <v-list-item-title>复习信息</v-list-item-title>
+                            </v-list-item>
+                            <v-list-item v-if="previousCardSnapshot" @click="previousCardDialog = true">
+                                <v-list-item-icon><v-icon small>mdi-card-search-outline</v-icon></v-list-item-icon>
+                                <v-list-item-title>上一张信息</v-list-item-title>
                             </v-list-item>
                             <v-divider v-if="availableLifecycleActions.length" class="my-1" />
                             <v-list-item
@@ -345,7 +351,7 @@
         <SenseReviewPreviousCardDialog
             v-model="previousCardDialog"
             :snapshot="previousCardSnapshot"
-            @undo="requestUndo($event, 'sense_review_previous_card')"
+            @undo="requestUndo($event, 'sense_review_history')"
         />
         <ReviewCardSchedulingMutationSurface
             ref="manualSchedulingSurface"
@@ -377,6 +383,15 @@
     import ReviewCardSchedulingMutationSurface from '../ReviewCards/ReviewCardSchedulingMutationSurface.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
+    import {
+        emptyReviewNavigationHistory,
+        loadReviewNavigationHistory,
+        moveNavigationBack,
+        moveNavigationForward,
+        recordRatedCard,
+        saveReviewNavigationHistory,
+        setNavigationCurrentCard,
+    } from './SenseReviewNavigationHistory.js';
     import { normalizeIntervalPreview } from './SenseReviewIntervalPresentation.js';
     import { createReviewApiClient } from '../Review/ReviewApiClient.js';
     import { createReviewRatingTransaction } from '../Review/ReviewRatingTransaction.js';
@@ -552,11 +567,13 @@
                 experiencePreferences: { fontSize: 20, highContrast: false, reduceMotion: false },
                 previousCardSnapshot: null,
                 previousCardDialog: false,
+                navigationHistory: emptyReviewNavigationHistory(''),
             }
         },
         computed: {
             reviewExperienceBusy() {
-                return this.loading || this.rating || this.deleteLoading || this.manualOperationBusy || this.lifecycleLoading;
+                return this.loading || this.rating || this.deleteLoading || this.manualOperationBusy
+                    || this.lifecycleLoading || this.undoLoadingReviewLogId !== null;
             },
             experienceOverlayOpen() {
                 return this.editDialog || this.lifecycleDialog || this.manualOperationOpen
@@ -655,6 +672,24 @@
             latestUndoableAction() {
                 return this.sessionActionProjection.latestUndoableAction;
             },
+            previousNavigationTargetId() {
+                const ids = this.navigationHistory.backCardIds || [];
+                return ids.length ? ids[ids.length - 1] : null;
+            },
+            forwardNavigationTargetId() {
+                const ids = this.navigationHistory.forwardCardIds || [];
+                return ids.length ? ids[ids.length - 1] : null;
+            },
+            previousNavigationAvailable() {
+                if (!this.previousNavigationTargetId) return false;
+                if (this.cards.some(card => card.review_card_id === this.previousNavigationTargetId)) return true;
+                return this.latestUndoableAction?.review_card_id === this.previousNavigationTargetId;
+            },
+            forwardNavigationAvailable() {
+                if (!this.currentCard || !this.forwardNavigationTargetId) return false;
+                return this.forwardNavigationTargetId !== this.currentCard.review_card_id
+                    && this.cards.some(card => card.review_card_id === this.forwardNavigationTargetId);
+            },
             activeSessionActionCount() {
                 return this.sessionActionProjection.activeCount;
             },
@@ -703,6 +738,7 @@
             // across tabs). This ID is sent with every rating POST and used
             // to scope the session-action timeline and stack-undo.
             this.reviewSessionId = getOrCreateReviewSessionId();
+            this.navigationHistory = loadReviewNavigationHistory(this.reviewSessionId);
             this.loadCards();
             this.loadFsrsStats();
             this.$nextTick(() => {
@@ -775,7 +811,20 @@
                     if (seq !== this.loadCardsRequestSequence) {
                         return;
                     }
-                    this.cards = response.data.cards;
+                    const cards = Array.isArray(response.data.cards) ? [...response.data.cards] : [];
+                    const preferredCardId = this.navigationHistory.currentCardId;
+                    if (preferredCardId) {
+                        const preferredIndex = cards.findIndex(card => card.review_card_id === preferredCardId);
+                        if (preferredIndex > 0) {
+                            const [preferredCard] = cards.splice(preferredIndex, 1);
+                            cards.unshift(preferredCard);
+                        }
+                    }
+                    this.cards = cards;
+                    this.navigationHistory = saveReviewNavigationHistory(setNavigationCurrentCard(
+                        this.navigationHistory,
+                        this.currentCard ? this.currentCard.review_card_id : null,
+                    ));
                     this.summary = response.data.summary;
                     this.reviewExperience = response.data.experience || {};
                     this.fsrsDetailOpen = false;
@@ -897,6 +946,13 @@
                         forgetting_pattern: reviewedCard?.learning_feedback?.forgetting_pattern || { trend: null },
                     };
                     this.session = SessionTracker.recordRating(this.session, entry, requestId);
+                    // A new successful rating creates a new navigation branch.
+                    // Only card IDs are remembered here; ReviewLog/FSRS remains
+                    // the learning authority.
+                    this.navigationHistory = saveReviewNavigationHistory(recordRatedCard(
+                        this.navigationHistory,
+                        cardSnapshot.review_card_id,
+                    ));
                     this.loadCards();
                     this.loadFsrsStats();
                     this.$refs.sessionActionsSurface.reload();
@@ -968,19 +1024,75 @@
             },
             requestUndo(action, source) {
                 if (this.$refs.sessionActionsSurface) {
-                    this.$refs.sessionActionsSurface.requestUndo(action, source);
+                    return this.$refs.sessionActionsSurface.requestUndo(action, source);
                 }
+                return Promise.resolve(null);
+            },
+            activateQueuedCard(cardId) {
+                const index = this.cards.findIndex(card => card.review_card_id === cardId);
+                if (index < 0) return false;
+                if (index > 0) {
+                    const [card] = this.cards.splice(index, 1);
+                    this.cards.unshift(card);
+                    this.cards = [...this.cards];
+                }
+                this.undoSnackbar.show = false;
+                this.fsrsDetailOpen = false;
+                this.showAnswer = false;
+                this.$nextTick(this.focusRevealButton);
+                return true;
+            },
+            goPreviousCard(source = 'sense_review_history') {
+                if (!this.currentCard || !this.previousNavigationAvailable || this.reviewExperienceBusy) {
+                    return Promise.resolve(null);
+                }
+                const targetCardId = this.previousNavigationTargetId;
+                const currentCardId = this.currentCard.review_card_id;
+
+                if (this.cards.some(card => card.review_card_id === targetCardId)) {
+                    this.navigationHistory = saveReviewNavigationHistory(moveNavigationBack(
+                        this.navigationHistory,
+                        targetCardId,
+                        currentCardId,
+                    ));
+                    this.activateQueuedCard(targetCardId);
+                    return Promise.resolve({ success: true, local_navigation: true });
+                }
+
+                if (this.latestUndoableAction?.review_card_id !== targetCardId) {
+                    return Promise.resolve(null);
+                }
+                return this.requestUndo(this.latestUndoableAction, source);
+            },
+            goForwardCard() {
+                if (!this.currentCard || !this.forwardNavigationAvailable || this.reviewExperienceBusy) return;
+                const targetCardId = this.forwardNavigationTargetId;
+                const currentCardId = this.currentCard.review_card_id;
+                if (!this.activateQueuedCard(targetCardId)) return;
+                this.navigationHistory = saveReviewNavigationHistory(moveNavigationForward(
+                    this.navigationHistory,
+                    targetCardId,
+                    currentCardId,
+                ));
             },
             onSessionActionStateChange(projection) {
                 this.sessionActionProjection = projection;
             },
             onSessionActionUndone(data) {
                 this.undoSnackbar.show = false;
-                if (this.previousCardSnapshot?.action?.review_log_id === data.review_log_id) {
+                const undoneReviewLogId = data.review_log_id || data.action?.review_log_id || null;
+                if (this.previousCardSnapshot?.action?.review_log_id === undoneReviewLogId) {
                     this.previousCardSnapshot.action.undoable = false;
                     this.previousCardSnapshot = { ...this.previousCardSnapshot };
                 }
                 const restoredCardId = data.restored_card ? data.restored_card.review_card_id : null;
+                if (restoredCardId) {
+                    const currentCardId = this.currentCard ? this.currentCard.review_card_id : null;
+                    const nextHistory = this.previousNavigationTargetId === restoredCardId
+                        ? moveNavigationBack(this.navigationHistory, restoredCardId, currentCardId)
+                        : setNavigationCurrentCard(this.navigationHistory, restoredCardId);
+                    this.navigationHistory = saveReviewNavigationHistory(nextHistory);
+                }
                 this.loadCards().then(() => {
                     if (restoredCardId) {
                         const idx = this.cards.findIndex((card) => card.review_card_id === restoredCardId);
@@ -1005,34 +1117,29 @@
                 this.showSnackbar('已撤销上一次评分，可以重新作答。', 'info');
             },
             handleHotkey(event) {
-                // ADR-0009: Ctrl+Z / Cmd+Z triggers undo. Checked BEFORE
-                // the other guards so it works even when no card is shown
-                // (e.g. summary view), but still respects input/dialog
-                // guards and undo-loading state.
+                // Ctrl/Cmd+Z follows the same back path as the visible
+                // 返回 button. Ctrl/Cmd+Shift+Z follows the client-only
+                // 前进 path; it never re-applies a rating.
                 if ((event.ctrlKey || event.metaKey) && (event.key === 'z' || event.key === 'Z')) {
-                    // Never trigger in input/textarea/contenteditable.
                     const tag = event.target?.tagName?.toLowerCase();
                     if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
                         return;
                     }
-                    // No dialog that might be using Ctrl+Z for its own purpose.
                     if (this.editDialog || this.lifecycleDialog || this.manualOperationOpen || this.deleteDialog || this.sourceDialog) {
                         return;
                     }
-                    // No study report open.
-                    if (this.showSessionSummary) {
+                    if (this.showSessionSummary || this.reviewExperienceBusy) {
                         return;
                     }
-                    // Not while rating or undoing.
-                    if (this.rating || this.undoLoadingReviewLogId !== null) {
+                    if (event.shiftKey) {
+                        if (!this.forwardNavigationAvailable) return;
+                        event.preventDefault();
+                        this.goForwardCard();
                         return;
                     }
-                    // Must have an undoable action.
-                    if (!this.latestUndoableAction) {
-                        return;
-                    }
+                    if (!this.previousNavigationAvailable) return;
                     event.preventDefault();
-                    this.requestUndo(this.latestUndoableAction, 'sense_review_hotkey');
+                    this.goPreviousCard('sense_review_hotkey');
                     return;
                 }
                 // When the session summary is shown, Space and 1/2/3/4
