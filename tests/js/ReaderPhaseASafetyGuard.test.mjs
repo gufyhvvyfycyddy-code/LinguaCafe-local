@@ -70,21 +70,27 @@ test('Reader recovery policy cannot mint a reading-session id', () => {
     assert.match(reader, /reading_session_id/);
 });
 
-test('Phase A Finish uses the legacy-compatible non-settlement request', () => {
-    const finishStart = reader.indexOf('finish() {');
-    const finishEnd = reader.indexOf('preflightFinishSettlement() {', finishStart);
-    const finishMethod = reader.slice(finishStart, finishEnd);
+test('visible Finish confirmation enters the two-stage settlement flow without a legacy bypass', () => {
+    assert.match(reader, /@click="preflightFinishSettlement"[^>]*>确认完成<\/v-btn>/);
+    assert.doesNotMatch(reader, /@click="finish\(\)"/);
+    assert.doesNotMatch(reader, /\n\s*finish\(\)\s*\{/);
 
-    assert.ok(finishStart >= 0 && finishEnd > finishStart);
-    assert.match(finishMethod, /const basePayload = this\.buildFinishBasePayload\(\)/);
-    assert.match(finishMethod, /axios\.post\('\/chapters\/finish', basePayload\)/);
-    const postStart = finishMethod.indexOf("axios.post('/chapters/finish', basePayload)");
-    const finishedStart = finishMethod.indexOf('this.finished = true');
-    assert.ok(postStart >= 0 && finishedStart > postStart, 'Phase A must enter finished state only after the server response succeeds.');
-    assert.doesNotMatch(finishMethod.slice(0, postStart), /this\.finished\s*=\s*true/);
-    assert.match(finishMethod, /if \(!response \|\| response\.status !== 200\) throw new Error/);
-    assert.doesNotMatch(finishMethod, /finishError/);
-    assert.doesNotMatch(finishMethod, /readingSessionId|settlement_mode|buildReaderFinishRequest|preFinishSafetyCheck/);
-    assert.match(reader, /仍待核对的词义不会阻止完成/);
-    assert.match(reader, /不会因为完成阅读而提交词义评分或改变复习计划/);
+    const preflightStart = reader.indexOf('preflightFinishSettlement() {');
+    const commitStart = reader.indexOf('commitFinish() {', preflightStart);
+    const nextMethodStart = reader.indexOf('readerWorkspaceWidth() {', commitStart);
+    const preflightMethod = reader.slice(preflightStart, commitStart);
+    const commitMethod = reader.slice(commitStart, nextMethodStart);
+
+    assert.ok(preflightStart >= 0 && commitStart > preflightStart && nextMethodStart > commitStart);
+    assert.match(preflightMethod, /return this\.preFinishSafetyCheck\(\)/);
+    assert.match(preflightMethod, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'preflight'\)/);
+    assert.match(preflightMethod, /axios\.post\('\/chapters\/finish', requestPayload\)/);
+    assert.match(preflightMethod, /handleFinishProjection\(response\.data \|\| \{\}, 'preflight'\)/);
+    assert.match(commitMethod, /return this\.preFinishSafetyCheck\(\)/);
+    assert.match(commitMethod, /buildReaderFinishRequest\(basePayload, this\.readingSessionId, 'commit'\)/);
+    assert.match(commitMethod, /axios\.post\('\/chapters\/finish', requestPayload\)/);
+    assert.match(commitMethod, /handleFinishProjection\(response\.data \|\| \{\}, 'commit'\)/);
+    assert.match(reader, /finishItemLabels\(finishPreflight\.raw\.passive_occurrence_ids\)/);
+    assert.match(reader, /finishItemLabels\(finishPreflight\.raw\.excluded_occurrence_ids\)/);
+    assert.match(reader, /将记为「记得」.*待核对.*已排除/);
 });

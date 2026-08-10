@@ -317,31 +317,39 @@
             <v-card>
                 <v-card-title>确认完成阅读？</v-card-title>
                 <v-card-text>
-                    <p>这会保存本章的普通完成状态。仍待核对的词义不会阻止完成，你之后仍可重新打开本章继续核对。</p>
-                    <p class="text--secondary text-caption">本阶段不会因为完成阅读而提交词义评分或改变复习计划。</p>
+                    <p>系统会先检查本次阅读中的词义处理情况，并告诉你哪些词会记为「记得」、哪些需要先核对、哪些不会处理。</p>
+                    <p class="text--secondary text-caption">这一步只做检查，不会直接保存完成结果。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
-                    <v-btn text :disabled="saving" @click="finishConfirmDialog = false">取消</v-btn>
-                    <v-btn color="primary" :loading="saving" @click="finish()">确认完成</v-btn>
+                    <v-btn text :disabled="saving || finishChecking" @click="finishConfirmDialog = false">取消</v-btn>
+                    <v-btn color="primary" :loading="finishChecking" :disabled="saving" @click="preflightFinishSettlement">确认完成</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
 
         <v-dialog v-model="finishCommitDialog" max-width="560" persistent>
             <v-card>
-                <v-card-title>确认提交本次阅读？</v-card-title>
+                <v-card-title>确认完成本次阅读？</v-card-title>
                 <v-card-text>
                     <v-alert v-if="finishPreflight" dense text type="info">
-                        服务器预览：将被动记 Good {{ finishPreflight.passiveGoodCount }} 项；已排除 {{ finishPreflight.excludedCount }} 项；此前已结算 {{ finishPreflight.alreadySettledCount }} 项。
+                        将记为「记得」 {{ finishPreflight.passiveGoodCount }} 项 · 待核对 {{ finishPreflight.unresolvedCount }} 项 · 已排除 {{ finishPreflight.excludedCount }} 项 · 已处理 {{ finishPreflight.alreadySettledCount }} 项
                     </v-alert>
-                    <p>点击「确认提交」后，服务器会按当前阅读会话重新核对状态并执行结算。若状态已经变化或出现待核对词义，本次提交会停止并返回核对列表。</p>
-                    <p class="text--secondary text-caption">网络中断时，页面会保留阅读会话。你可以安全重试，由服务器判断这次操作是否已经完成。</p>
+                    <div v-if="finishPreflight && finishPreflight.raw" class="body-2 mb-3">
+                        <div v-if="finishItemLabels(finishPreflight.raw.passive_occurrence_ids).length">
+                            <strong>会记为「记得」：</strong>{{ finishItemLabels(finishPreflight.raw.passive_occurrence_ids).join('、') }}
+                        </div>
+                        <div v-if="finishItemLabels(finishPreflight.raw.excluded_occurrence_ids).length" class="text--secondary mt-1">
+                            <strong>本次不处理：</strong>{{ finishItemLabels(finishPreflight.raw.excluded_occurrence_ids).join('、') }}
+                        </div>
+                    </div>
+                    <p>确认后会再次核对当前状态并完成阅读。如果还有需要确认的词义，系统会停止完成并带你回到核对列表。</p>
+                    <p class="text--secondary text-caption">如果网络中断，重新点击「完成阅读」即可继续确认，不会重复记录同一次完成。</p>
                 </v-card-text>
                 <v-card-actions>
                     <v-btn text :disabled="saving" @click="finishCommitDialog = false">继续阅读</v-btn>
                     <v-spacer />
-                    <v-btn color="primary" :loading="saving" :disabled="!finishPreflight || !finishPreflight.canCommit" @click="commitFinish">确认提交</v-btn>
+                    <v-btn color="primary" :loading="saving" :disabled="!finishPreflight || !finishPreflight.canCommit" @click="commitFinish">确认完成</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -1549,6 +1557,14 @@
                         return true;
                     });
             },
+            finishItemLabels(occurrenceIds) {
+                const ids = new Set((Array.isArray(occurrenceIds) ? occurrenceIds : []).map(id => String(id)));
+                if (!ids.size) return [];
+                return this.readingSenseVerificationItems
+                    .filter(item => ids.has(String(item.occurrence_id)))
+                    .map(item => item.surface || item.phrase || item.lemma || '')
+                    .filter((label, index, labels) => label && labels.indexOf(label) === index);
+            },
             handleFinishProjection(payload, expectedMode) {
                 const normalized = normalizeReaderFinishResult(payload || {});
                 const identityMatches = normalized.chapterId === Number(this.chapterId)
@@ -1568,37 +1584,20 @@
                     return 'completed';
                 }
                 this.finishPreflight = normalized;
+                this.finishConfirmDialog = false;
                 if (normalized.unresolvedCount > 0 || !normalized.canCommit) {
                     this.finishCommitDialog = false;
                     this.readingSenseVerificationDialog = true;
-                    this.setReaderNotice('还有 ' + normalized.unresolvedCount + ' 个词义需要服务器核对，完成阅读已停止。', 'warning');
+                    this.setReaderNotice('本次检查：将记为「记得」 ' + normalized.passiveGoodCount + ' 项，待核对 ' + normalized.unresolvedCount + ' 项，已排除 ' + normalized.excludedCount + ' 项。请先处理待核对词义。', 'warning');
                     return 'unresolved';
                 }
                 this.finishCommitDialog = true;
                 return 'ready';
             },
-            finish() {
-                this.finishConfirmDialog = false;
-                const basePayload = this.buildFinishBasePayload();
-                if (!basePayload) return;
-                this.saving = true;
-                return axios.post('/chapters/finish', basePayload)
-                    .then((response) => {
-                        if (!response || response.status !== 200) throw new Error('Unexpected finish response.');
-                        this.saving = false;
-                        this.finished = true;
-                        this.setReaderNotice('本章阅读状态已保存。', 'success');
-                        return true;
-                    })
-                    .catch((error) => {
-                        this.saving = false;
-                        this.setReaderNotice(requestErrorMessage(error, '完成状态暂时无法保存，请重试。'), 'warning');
-                        return false;
-                    });
-            },
             preflightFinishSettlement() {
+                if (this.finishChecking || this.saving) return;
                 if (!this.readingSessionId) {
-                    this.setReaderNotice('服务器阅读会话尚未就绪，无法检查完成结算。请稍后重试。', 'warning');
+                    this.setReaderNotice('完成检查还没准备好，请稍后重试。', 'warning');
                     return;
                 }
                 const basePayload = this.buildFinishBasePayload();
@@ -1618,11 +1617,11 @@
                     })
                     .catch((error) => {
                         if (error && error.readerPreCommitBlocked) {
-                            this.setReaderNotice('查词/查看答案记录或词义证据尚未得到服务器完整确认。结算预览已停止，请重试。', 'warning');
+                            this.setReaderNotice('查词、查看答案或词义核对还没有准备完整，暂时不能完成阅读。请稍后重试。', 'warning');
                         } else if (error && error.readerFinishContractInvalid) {
-                            this.setReaderNotice('服务器返回的结算预览身份或模式不一致。页面已停止进入提交步骤；请刷新本章后重试。', 'warning');
+                            this.setReaderNotice('完成检查结果与当前文章不一致。为了避免记错，本次没有继续，请刷新本章后重试。', 'warning');
                         } else {
-                            this.setReaderNotice(requestErrorMessage(error, '结算预览暂时无法确认。尚未进入提交步骤；阅读会话已保留，可重试。'), 'warning');
+                            this.setReaderNotice(requestErrorMessage(error, '完成检查暂时无法确认，尚未保存完成结果。请重试。'), 'warning');
                         }
                         return false;
                     })
@@ -1652,11 +1651,11 @@
                         this.saving = false;
                         this.finished = false;
                         if (error && error.readerPreCommitBlocked) {
-                            this.setReaderNotice('提交前的查词记录或词义证据没有完整确认，因此没有发送结算提交。请重试。', 'warning');
+                            this.setReaderNotice('查词、查看答案或词义核对还没有准备完整，因此本次没有完成阅读。请稍后重试。', 'warning');
                         } else if (!error || !error.response || (error.response && error.response.status >= 500)) {
-                            this.setReaderNotice('结算提交请求已经发出，但服务器结果暂时未知。阅读会话已保留；再次完成阅读会用同一会话安全对账。', 'warning');
+                            this.setReaderNotice('完成请求已经发出，但暂时没有收到明确结果。你的阅读进度已保留；重新点击「完成阅读」即可安全确认结果。', 'warning');
                         } else {
-                            this.setReaderNotice(requestErrorMessage(error, '服务器拒绝了完成结算。阅读会话已保留，请按提示核对后重试。'), 'warning');
+                            this.setReaderNotice(requestErrorMessage(error, '本次完成没有保存。请按页面提示核对词义后再重试。'), 'warning');
                         }
                         return false;
                     });

@@ -120,10 +120,10 @@ test('production Reader keeps Finish interaction drain ahead of preflight and co
     assert.match(safetySource, /return this\.flushReadingInteractions\(\)/);
     assert.match(safetySource, /\.then\(\(\) => this\.refreshReadingSessionTargets\(\)\)/);
 
-    const finishStart = reader.indexOf('finish()');
-    const commitStart = reader.indexOf('commitFinish()', finishStart);
-    assert.ok(finishStart > 0 && commitStart > finishStart);
-    assert.match(reader.slice(finishStart, commitStart), /return this\.preFinishSafetyCheck\(\)/);
+    const preflightStart = reader.indexOf('preflightFinishSettlement()');
+    const commitStart = reader.indexOf('commitFinish()', preflightStart);
+    assert.ok(preflightStart > 0 && commitStart > preflightStart);
+    assert.match(reader.slice(preflightStart, commitStart), /return this\.preFinishSafetyCheck\(\)/);
     assert.match(reader.slice(commitStart), /return this\.preFinishSafetyCheck\(\)/);
 });
 

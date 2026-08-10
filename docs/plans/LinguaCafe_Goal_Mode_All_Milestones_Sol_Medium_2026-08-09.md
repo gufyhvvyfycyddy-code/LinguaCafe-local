@@ -278,8 +278,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | B-04 | DONE | 被动 Good eligibility/去重/排除 | ReadingFinishSettlementService | opened/helped/explicit/newly-created/newly-resolved/newly-marked same-reading sense 不 passive；每卡/session ≤1 |
 | B-05 | DONE | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
 | B-06 | DONE | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
-| B-07 | ACTIVE | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
-| B-08 | TODO | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
+| B-07 | DONE | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
+| B-08 | ACTIVE | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
 | B-GATE | TODO | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
 
 ---
@@ -472,22 +472,24 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `B-07`
-- Last DONE: `B-06`
+- Active milestone: `B-08`
+- Last DONE: `B-07`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — B-07
+### CLOSED MILESTONE EVIDENCE — B-07
 
-- 目标：把已经存在但当前不可达的 Finish 两阶段 UI 真正接到用户可见流程：点击“完成阅读”后先走 server preflight，明确展示将被动 Good / 待核对 / 已排除，再由用户确认 commit；网络结果未知时保留同一 reading-session 并允许安全重试，不把工程术语暴露给用户。
-- 当前已确认真实 bug：`preflightFinishSettlement()`、`commitFinish()`、`finishCommitDialog` 都存在，但可见确认按钮仍 `@click="finish()"` 直走 legacy `/chapters/finish`；因此 Phase B 两阶段 Finish UI 实际不可达。现有 JS 合同只检查方法/字符串存在，属于 false-green，必须改成可达行为合同。
-- 不做：不改 B-06 已冻结的服务器事务语义，不新增第二 Finish state machine、客户端 completion truth、后台 reconciliation/watchdog；不进入 B-08 ordinary Sense Review/analytics。
-- Owner/seam：保留现有 `finishConfirmDialog` / `preflightFinishSettlement()` / `finishCommitDialog` / `commitFinish()` 与 Reader recovery；优先删/收窄 legacy `finish()` 在 Phase B 主按钮上的可达性，而不是再造新按钮/新状态。
-- Architecture review：`Accepted under current goal authorization`；Private House 要求先修“现有两套 UI 路径中错误暴露的 legacy 主路”，不新增第三路。
-- 初始 Allowlist：`resources/js/components/TextReader/TextReader.vue`、`resources/js/services/ReaderRecoveryPolicy.js`、直接 Reader JS tests、必要的 Finish response policy 与本控制文件。B-06 server services、migration、AI schema、普通 Review UI 默认禁止修改。
-- 最小验证：先把 JS contract 从“方法存在”改为“用户按钮可达 preflight→commit 且 legacy finish 不再是 Phase B 主路”；随后 npm development；最后 server-bound testing 真实浏览器 desktop/430/390 至少覆盖 eligible preflight→commit、unresolved 阻断/核对入口、网络结果未知→同 session 恢复重试，Console/Network 与 testing DB 最终 readback/精确清理。
+- 用户可见 Finish 主路已唯一接到现有 `preflightFinishSettlement()` → `finishCommitDialog` → `commitFinish()`；legacy `finish()` 在零 caller 审计后删除，没有新增第三套状态机、第二 completion truth、watchdog 或 reconciliation。
+- 原始已确认 bug（现已修复）：`preflightFinishSettlement()`、`commitFinish()`、`finishCommitDialog` 都存在，当时可见确认按钮仍 `@click="finish()"` 直走 legacy `/chapters/finish`；因此当时 Phase B 两阶段 Finish UI 实际不可达。现有 JS 合同只检查方法/字符串存在，属于 false-green，现已改成可达行为合同。
+- 自动验证：Reader 全套 JS 180/180；最终 focused 54/54；ReadingReviewSettlementContract 19/19（66 assertions）+ ReadingReviewConcurrencyContract 29/29（285 assertions）；npm development 成功。
+- server-bound testing 浏览器：eligible 明确展示 1 Good/0 待核对后第二次确认才完成；unresolved 显示 1 待核对并阻止 commit；真实核对后网络离线 commit 不假完成、同一 reading-session `a607491e…` 保留，恢复网络后安全完成；desktop/430/390 均无横向溢出，Console error/warn 为 0。
+- testing DB readback：两章各 `read_count=1`、各 1 completion/1 settlement/1 `reading_passive` Good；无重复写。task user/data、owned sentinel、browser、port、lease 与临时脚本均精确清理，最终 lease `active=false / stale_metadata=false`。
+### ACTIVE MILESTONE ARCHITECTURE GATE — B-08
+- 状态：仅切换控制面为下一 ACTIVE，本轮没有启动 B-08 代码、测试或浏览器工作。
+- Outcome/reuse/exit evidence 继续以 Phase B 表中的 B-08 定义为准；下次开始前重新 fresh 核 branch、HEAD、lease、控制面和相关 SenseReview suite。
+- 本轮停止线：B-07 commit/push 与控制面更新完成后停止，不进入 B-08 实施。
 
 ### PROGRESS LOG
 
@@ -535,6 +537,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 `2026-08-10 | B-06 | DONE | Goal branch tip | 服务器两阶段 Finish 无需新增机制：ReadingSettlement + ReadingConcurrency fresh 48/48（350 assertions）证明 eligible preflight 零 ReviewLog/settlement/completion/read_count/FSRS 写、unresolved commit 零写、成功 commit exact completion replay、late finish failure 全事务回滚、true concurrent Finish 仅 1 completion/1 read effect/1 passive Good，source-change race 仅 serialized success 或 stale。侦察同时发现 B-07 真 bug：Reader 可见确认按钮仍直调 legacy `finish()`，已有 preflight/commit UI 方法不可达；现有 JS 仅断言方法存在形成 false-green | B-07`
 
+`2026-08-10 12:05 | B-07 | DONE | Goal branch tip | false-green TDD 先红后绿；可见 Finish 已唯一走现有 preflight→commit，legacy `finish()` 零 caller 后删除。Reader JS 180/180、最终 focused 54/54、Finish PHP 48/48（351 assertions）、npm development 全绿；server-bound testing 浏览器覆盖 eligible、unresolved、离线 unknown→同 reading-session 恢复、desktop/430/390 与 Console；DB 最终两章各 exact 1 completion/1 settlement/1 passive Good，task data/sentinel/browser/port/lease/临时脚本精确清零 | B-08（仅控制面 ACTIVE，本轮未启动）`
+
 ### DECISION LOG
 
 只记录会影响后续任务且不是显而易见实现细节的决定：
@@ -552,6 +556,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-09 | A-01 | 浏览器 acceptance 的直接 php -S 对每个请求先执行当前 worktree tests/bootstrap，再交给 Laravel vendor router，并显式移除 PHP_CLI_SERVER_WORKERS | shared optimized vendor 曾使 HTTP server 解析主工作树旧 classmap；真实 sentinel endpoint、Reader 浏览器验收、注入 worker 变量后的取消/端口回归均通过 | worktree 改为独立 vendor，或 Composer/Laravel/PHP built-in server 布局与进程合同变化时复审`
 
 `2026-08-09 | A-02 | V2 采用最少包数的均衡分包：总数 0–19 保留单包，总数 ≥20 时每包 20–50；严格解析同时保留 typed JSON 形状检查与既有 associative normalization | 固定 50 切块会产生 51→50+1 的不合约尾包；仅 associative decode 会混淆空对象与空数组；边界回归和复审均通过 | 产品冻结的包大小或 PHP JSON 解码合同变化时复审`
+
+`2026-08-10 | B-07 | Reader 可见 Finish 只保留现有 server preflight→用户确认 commit 一条主路，legacy `finish()` 在零 caller 证明后删除 | false-green 测试真实先红；浏览器 eligible/unresolved/offline recovery 与 testing DB exact-once readback 均证明单一路径 | Finish backend contract 或产品两阶段确认语义发生明确变化时复审`
 
 不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
 
