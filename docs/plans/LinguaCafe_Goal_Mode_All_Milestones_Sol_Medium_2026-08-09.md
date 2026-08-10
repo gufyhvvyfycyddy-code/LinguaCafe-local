@@ -279,8 +279,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | B-05 | DONE | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
 | B-06 | DONE | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
 | B-07 | DONE | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
-| B-08 | ACTIVE | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
-| B-GATE | TODO | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
+| B-08 | DONE | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
+| B-GATE | ACTIVE | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
 
 ---
 
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `B-08`
-- Last DONE: `B-07`
+- Active milestone: `B-GATE`
+- Last DONE: `B-08`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -486,10 +486,18 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 自动验证：Reader 全套 JS 180/180；最终 focused 54/54；ReadingReviewSettlementContract 19/19（66 assertions）+ ReadingReviewConcurrencyContract 29/29（285 assertions）；npm development 成功。
 - server-bound testing 浏览器：eligible 明确展示 1 Good/0 待核对后第二次确认才完成；unresolved 显示 1 待核对并阻止 commit；真实核对后网络离线 commit 不假完成、同一 reading-session `a607491e…` 保留，恢复网络后安全完成；desktop/430/390 均无横向溢出，Console error/warn 为 0。
 - testing DB readback：两章各 `read_count=1`、各 1 completion/1 settlement/1 `reading_passive` Good；无重复写。task user/data、owned sentinel、browser、port、lease 与临时脚本均精确清理，最终 lease `active=false / stale_metadata=false`。
-### ACTIVE MILESTONE ARCHITECTURE GATE — B-08
-- 状态：仅切换控制面为下一 ACTIVE，本轮没有启动 B-08 代码、测试或浏览器工作。
-- Outcome/reuse/exit evidence 继续以 Phase B 表中的 B-08 定义为准；下次开始前重新 fresh 核 branch、HEAD、lease、控制面和相关 SenseReview suite。
-- 本轮停止线：B-07 commit/push 与控制面更新完成后停止，不进入 B-08 实施。
+### CLOSED MILESTONE EVIDENCE — B-08
+- B-08 按验证型 milestone 收口，没有新增第二套普通评分、undo、analytics 或 FSRS 机制；普通 `/reviews/senses` 继续走既有 `sense_review` 正式评分与既有 stack undo。
+- testing DB 健康门禁通过；聚焦回归 `ReviewFsrs + SenseReviewActionTransaction + SenseReviewStackUndo + SenseReviewUndoneAnalytics + SenseReviewAnalyticsQueryService + ReadingReviewSourceUndoAnalytics + SenseReviewSessionActions + SenseReviewRatingContract + SenseReviewIntervalPreview` 共 172/172（800 assertions）全绿；补充 `ReviewStats + DailyReport + SevenDayTrend + ThirtyDayCalendar + Statistics V3/Card Info` 共 116/116（893 assertions）全绿；9 个相关前端 guard 文件全绿。
+- server-bound testing 真实浏览器使用当前任务本地测试账号完成普通 Sense Review：`Good → 本次操作撤销 → 卡片重新回到到期队列 → Again`。撤销后页面即时恢复为到期数量 1 / 已复习 0；rerate 后总结只计 1 次“忘了”。四种评分的代码/FSRS 合同已由自动测试覆盖；Again/Hard/Good/Easy 全部真实浏览器组合留给紧接着的 B-GATE final acceptance，不在 B-08 重造第二套 fixture。
+- testing DB 最终读回：同卡保留 2 条 `sense_review` 审计日志，旧 Good `undone=true / undo_source=sense_review_history`，新 Again 为唯一 active log；卡片为 `relearning / fsrs_reps=3 / fsrs_lapses=1`；今日 analytics 为 total=1、again=1、good=0，证明 undone 不污染有效统计。
+- Reasonix 只读复核未发现功能性 bug；确认 reading 三件套与普通评分路径隔离，普通 undo 前置 `ReadingSession` scoped lock 在无匹配 reading session 时为空锁，其锁序意图已有 FND-06/B-03 决策记录并由普通 undo 回归与真实页面撤销证明语义不变。
+- 本轮新建 testing 用户与其 ReviewLog/ReviewCard/WordSense/preset/binding/settings 已精确删除，最终计数全 0；browser server 已停止，testing DB lease 最终 `active=false / stale_metadata=false`。生产代码零修改。
+
+### ACTIVE MILESTONE ARCHITECTURE GATE — B-GATE
+- Phase B 的 B-01…B-08 均已关闭；下一步只做 Phase B final testing DB + real browser acceptance，不借 Gate 新增机制。
+- B-GATE 必须覆盖单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 的组合真实证据；任何未覆盖项都不能靠前序报告标签替代。
+- Gate 通过后才自动进入 Phase C；失败则留在 B-GATE 修当前真实缺口。
 
 ### PROGRESS LOG
 
@@ -537,7 +545,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 `2026-08-10 | B-06 | DONE | Goal branch tip | 服务器两阶段 Finish 无需新增机制：ReadingSettlement + ReadingConcurrency fresh 48/48（350 assertions）证明 eligible preflight 零 ReviewLog/settlement/completion/read_count/FSRS 写、unresolved commit 零写、成功 commit exact completion replay、late finish failure 全事务回滚、true concurrent Finish 仅 1 completion/1 read effect/1 passive Good，source-change race 仅 serialized success 或 stale。侦察同时发现 B-07 真 bug：Reader 可见确认按钮仍直调 legacy `finish()`，已有 preflight/commit UI 方法不可达；现有 JS 仅断言方法存在形成 false-green | B-07`
 
-`2026-08-10 12:05 | B-07 | DONE | Goal branch tip | false-green TDD 先红后绿；可见 Finish 已唯一走现有 preflight→commit，legacy `finish()` 零 caller 后删除。Reader JS 180/180、最终 focused 54/54、Finish PHP 48/48（351 assertions）、npm development 全绿；server-bound testing 浏览器覆盖 eligible、unresolved、离线 unknown→同 reading-session 恢复、desktop/430/390 与 Console；DB 最终两章各 exact 1 completion/1 settlement/1 passive Good，task data/sentinel/browser/port/lease/临时脚本精确清零 | B-08（仅控制面 ACTIVE，本轮未启动）`
+`2026-08-10 12:05 | B-07 | DONE | Goal branch tip | false-green TDD 先红后绿；可见 Finish 已唯一走现有 preflight→commit，legacy `finish()` 零 caller 后删除。Reader JS 180/180、最终 focused 54/54、Finish PHP 48/48（351 assertions）、npm development 全绿；server-bound testing 浏览器覆盖 eligible、unresolved、离线 unknown→同 reading-session 恢复、desktop/430/390 与 Console；DB 最终两章各 exact 1 completion/1 settlement/1 passive Good，task data/sentinel/browser/port/lease/临时脚本精确清零 | B-08`
+
+`2026-08-10 13:29 | B-08 | DONE | Goal branch tip | 零生产代码改动；testing DB health 绿，ordinary SenseReview/undo/analytics/FSRS 聚焦 PHP 172/172（800 assertions），stats/report 补充 112/112（861 assertions）及相关前端 guards 全绿。真实浏览器普通卡完成 Good→撤销→卡回队列→Again；DB 保留 1 undone Good + 1 active Again，FSRS=relearning/reps3/lapses1，日报只计 Again；testing 用户与全部关联资产精确清零 | B-GATE`
 
 ### DECISION LOG
 
