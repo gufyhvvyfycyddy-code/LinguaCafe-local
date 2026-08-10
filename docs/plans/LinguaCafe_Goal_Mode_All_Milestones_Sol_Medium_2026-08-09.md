@@ -277,8 +277,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | B-03 | DONE | `reading_action_id` 幂等、unknown retry、undo/rerate | Backend/Reader action-id candidate | same ID replay 一 log；undo 后旧 ID 永久 409；新 ID rerate 一新 active log |
 | B-04 | DONE | 被动 Good eligibility/去重/排除 | ReadingFinishSettlementService | opened/helped/explicit/newly-created/newly-resolved/newly-marked same-reading sense 不 passive；每卡/session ≤1 |
 | B-05 | DONE | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
-| B-06 | ACTIVE | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
-| B-07 | TODO | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
+| B-06 | DONE | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
+| B-07 | ACTIVE | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
 | B-08 | TODO | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
 | B-GATE | TODO | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
 
@@ -472,22 +472,22 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `B-06`
-- Last DONE: `B-05`
+- Active milestone: `B-07`
+- Last DONE: `B-06`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — B-06
+### ACTIVE MILESTONE ARCHITECTURE GATE — B-07
 
-- 目标：收束 Finish 为服务器权威的两阶段事务：preflight 只计算 current plan、绝不写 ReviewLog/FSRS/settlement/completion/阅读完成状态；commit 必须重新读取当前权威状态，存在 unresolved 时零写停止；可提交时完成 passive Good + legacy finish + session completion，并对重试/并发只产生一次结果；任一后期失败整笔回滚。
-- 不做：不改 B-07 UI 文案/布局，不新增第二 completion ledger、客户端 commit token、后台 reconciliation/watchdog，不把 preflight 结果当 commit 权威，也不进入普通 Sense Review/analytics 回归 B-08。
-- Owner/seam：继续以 `ReadingFinishSettlementService::finishChapterWithSession()` 的单一 transaction + `ReadingSessionCompletion` exact result 为 completion truth；`ReadingSessionCardSettlement` 只承担每卡/session passive 去重，不再新增其他幂等表。
-- Architecture review：`Accepted under current goal authorization`；现有 contract 已覆盖 eligible/unresolved preflight、commit、retry、late failure rollback 与 true concurrent Finish candidate。B-06 先 fresh 反驳这些合同，并检查 preflight/commit 是否存在重复真相或部分写路径；仅真实缺口才修改。
-- 初始 Allowlist：`app/Services/ReadingFinishSettlementService.php`、`app/Services/ChapterService.php`、ReadingSession/Settlement/Completion models、Finish controller seam、`tests/Feature/ReadingReviewSettlementContractTest.php`、`tests/Feature/ReadingReviewConcurrencyContractTest.php`、直接相关 tests 与本控制文件。Reader UI、migration、AI schema、普通 Review UI 默认禁止修改。
-- 数据/兼容边界：preflight 零业务写；commit unresolved 零写；commit 成功后 stored completion exact replay；并发 Finish 最多 1 completion/1 legacy read effect/每 eligible card 1 passive log；failure injection 后 card snapshot/log/settlement/completion/read_count/goals/session status 全回原样。
-- 最小验证：官方 testing DB lease 下 focused settlement + true concurrent Finish，检查 preflight eligible/unresolved 双分支、commit unresolved、successful retry exact result、late failure rollback、source-change concurrency；如现有测试已完整且绿，不制造第二套 Finish harness。
+- 目标：把已经存在但当前不可达的 Finish 两阶段 UI 真正接到用户可见流程：点击“完成阅读”后先走 server preflight，明确展示将被动 Good / 待核对 / 已排除，再由用户确认 commit；网络结果未知时保留同一 reading-session 并允许安全重试，不把工程术语暴露给用户。
+- 当前已确认真实 bug：`preflightFinishSettlement()`、`commitFinish()`、`finishCommitDialog` 都存在，但可见确认按钮仍 `@click="finish()"` 直走 legacy `/chapters/finish`；因此 Phase B 两阶段 Finish UI 实际不可达。现有 JS 合同只检查方法/字符串存在，属于 false-green，必须改成可达行为合同。
+- 不做：不改 B-06 已冻结的服务器事务语义，不新增第二 Finish state machine、客户端 completion truth、后台 reconciliation/watchdog；不进入 B-08 ordinary Sense Review/analytics。
+- Owner/seam：保留现有 `finishConfirmDialog` / `preflightFinishSettlement()` / `finishCommitDialog` / `commitFinish()` 与 Reader recovery；优先删/收窄 legacy `finish()` 在 Phase B 主按钮上的可达性，而不是再造新按钮/新状态。
+- Architecture review：`Accepted under current goal authorization`；Private House 要求先修“现有两套 UI 路径中错误暴露的 legacy 主路”，不新增第三路。
+- 初始 Allowlist：`resources/js/components/TextReader/TextReader.vue`、`resources/js/services/ReaderRecoveryPolicy.js`、直接 Reader JS tests、必要的 Finish response policy 与本控制文件。B-06 server services、migration、AI schema、普通 Review UI 默认禁止修改。
+- 最小验证：先把 JS contract 从“方法存在”改为“用户按钮可达 preflight→commit 且 legacy finish 不再是 Phase B 主路”；随后 npm development；最后 server-bound testing 真实浏览器 desktop/430/390 至少覆盖 eligible preflight→commit、unresolved 阻断/核对入口、网络结果未知→同 session 恢复重试，Console/Network 与 testing DB 最终 readback/精确清理。
 
 ### PROGRESS LOG
 
@@ -532,6 +532,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-10 10:49 | B-04 | DONE | Goal branch tip | Private House 发现 Finish 私有 lifecycle eligibility 与 canonical `ReviewCard::senseReviewEligible()` 漂移：旧副本会错误排除已到期 buried 卡；删除 7 行重复判定并复用唯一 queue scope。补 2 个承重合同：eligible preflight 对 ReviewLog/settlement/completion/read_count/FSRS 全零写，以及 active/disabled/suspended/archived/future-buried/expired-buried 与 canonical queue 一致。focused 19/19（66 assertions），Settlement + LifecycleQueue + ReadingConcurrency 61/61（367 assertions）；same-session marked/resolved、opened/helped/explicit、same-card dedupe、Trust AI high existing binding 与 later-session eligibility 全保留 | B-05`
 
 `2026-08-10 10:54 | B-05 | DONE | Goal branch tip | Private House 判定现有 session-first lock + `ReadingSessionInteraction` 单一 intent ledger 已足够，零生产代码/零新增测试。fresh ReadingConcurrency 29/29（284 assertions）：裸 explicit-vs-Finish 无预确认 marker 时 first-lock-wins 且 formal log 恰好 1；opened 先获服务器 ACK 后 passive 永远 0 且 settlement 0；true opened-vs-Finish、helped-vs-Finish 均无 acknowledged+passive 不可能终态；retry/undo/evidence/source-change 并发回归同时全绿 | B-06`
+
+`2026-08-10 | B-06 | DONE | Goal branch tip | 服务器两阶段 Finish 无需新增机制：ReadingSettlement + ReadingConcurrency fresh 48/48（350 assertions）证明 eligible preflight 零 ReviewLog/settlement/completion/read_count/FSRS 写、unresolved commit 零写、成功 commit exact completion replay、late finish failure 全事务回滚、true concurrent Finish 仅 1 completion/1 read effect/1 passive Good，source-change race 仅 serialized success 或 stale。侦察同时发现 B-07 真 bug：Reader 可见确认按钮仍直调 legacy `finish()`，已有 preflight/commit UI 方法不可达；现有 JS 仅断言方法存在形成 false-green | B-07`
 
 ### DECISION LOG
 
