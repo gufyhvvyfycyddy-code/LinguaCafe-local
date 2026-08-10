@@ -293,8 +293,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | C-01 | DONE | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
 | C-02 | DONE | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
 | C-03 | DONE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `ReviewDailyProgressQueryService`、Sense eligibility、ReadingSession completion、Home | 单一正式事实源；summary GET zero-write；真实浏览器完成空状态→续读→复习优先→评分/撤销→Finish→full reload，DOM/JSON/DB 一致 |
-| C-04 | ACTIVE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 一级入口收束；移动底栏不强挤五项；首页返回入口经真实体验确定 |
-| C-05 | TODO | “生词”一级入口只面向 WordSense，提供基础列表/搜索/查看 | `VocabularyQueryService`、WordSense/ReviewCard assets | legacy word card 不成为新一级主体；已有 sense 可检索/查看 |
+| C-04 | WAITING C-05 | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 阅读=/books、复习=/reviews/senses、我的=/user-settings 已冻结；最终“生词”必须等待 C-05 canonical WordSense route；移动底栏最终仅四主入口，Home/secondary 仍可达 |
+| C-05 | ACTIVE | “生词”一级入口只面向 WordSense，提供只读基础列表/搜索/查看 | `WordSense`、`WordSenseKnownSenseService`、现有 sense serializer/ReviewCard relation | current user/current language 的 confirmed WordSense 可检索/查看；ReviewCard 仅附属且不得决定 sense 是否可见；legacy Vocabulary 不成为新一级主体 |
 | C-06 | TODO | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
 | C-07 | TODO | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
 | C-GATE | TODO | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
@@ -472,12 +472,12 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-04`
+- Active milestone: `C-05`（C-04 Architecture Gate 已证明最终导航依赖 C-05 canonical WordSense route，C-04 保持 WAITING C-05）
 - Last DONE: `C-03`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
-- Blocking issue: `none yet`
+- Blocking issue: `C-04 final wiring waits for C-05 canonical WordSense-only 生词 route; this is a sequencing dependency, not an external blocker`
 
 ### CLOSED MILESTONE EVIDENCE — B-07
 
@@ -501,10 +501,15 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 独立 Reasonix 只读复核确认 Gate 权威定义实际为 9 类组合，且全部要求 testing DB + real browser；本轮已补齐此前缺失的 Trust AI、ambiguous、opened exclusion、Hard/Easy、新 sense、duplicate Finish、undo/refresh 组合证据。
 - fixture user 71046 及 17 类 user-scoped 关联资产在 testing harness 独占 lease 下逐表精确删除，全部 after=0；未清库、未改生产代码、未运行 notification script、未 DCP。
 
-### ACTIVE MILESTONE — C-04
-- 只做四主导航 Architecture Gate 与后续最小实现：阅读 / 复习 / 生词 / 我的。先审计 `Layout.vue`、Vue Router、Laravel routes 与现有普通/高级入口，不先删页面、不重写路由、不进入 C-05/C-06。
-- 必须冻结桌面侧栏与移动底栏如何共享同一四主入口语义，以及首页返回入口；移动端不得为了保留“首页”再硬挤成五个主按钮。
-- “我的”必须优先复用现有真实页面/容器；高级功能本轮只分类和保留可达性边界，统一下沉留给 C-06。实现后真实浏览器验收四主入口、首页返回、desktop/mobile 导航与现有 auth/admin 边界。
+### SEQUENCING GATE — C-04 WAITING C-05
+- C-04 Route/Authority 与 Permission Gate 已证明：阅读复用 `/books`，正式复习复用 `/reviews/senses`，“我的”复用 `/user-settings`；`/vocabulary/search` 仍是 EncounteredWord/Phrase legacy surface，不能换名冒充 WordSense-only“生词”。因此 C-04 不做临时错误接线，等待 C-05 产生 canonical WordSense route 后一次完成最终四主导航。
+- 移动底栏最终只有“阅读 / 复习 / 生词 / 我的”四项；首页 `/` 保留为真实次级入口。现有 drawer 继续承担 Home 与 secondary capabilities，`更多` 不得成为第五个 bottom item；最小方向是在 `Layout.vue` 复用现有 `drawer` 状态提供 mobile-only secondary trigger，不新建导航 store/service、AppBar 或浮动 Home。
+- legacy `/vocabulary/search`、Custom Study、ReviewCardManage、StudyOverview、Backup、Article Health、User Manual 等在 C-06 前继续保持可达；特别是 `/admin/{page?}` backup 对普通 authenticated user 可达，不能按 URL 前缀误当管理员专属。
+
+### ACTIVE MILESTONE — C-05
+- C-05 V1 只做“我已经保存的词义”的基础只读页面：current user + current selected language + `WordSense.status=confirmed`。内容事实以 WordSense 为主体；ReviewCard 是可选附属状态，confirmed sense 即使缺 ReviewCard 也不能从生词库消失，GET 更不得偷偷创建/修复 ReviewCard。
+- 第一版只做基础列表、普通文本搜索和查看；不复制 `/review-cards/manage` 的 FSRS/Leech/lifecycle/批量治理，不复制 `/vocabulary/search` 的 stage/phrase/CSV/legacy word 语义，不进入编辑/删除/来源总览（D-05 后续完善）。
+- 优先复用 `WordSenseKnownSenseService` 已验证的 confirmed/user/language 语义、现有 sense payload 字段和 ReviewCard relation；若需要全局分页查询，只新增一个责任清楚的只读 query owner，不为本页增加 Repository/DTO/store/第二搜索系统。实现后必须有 zero-write GET、user/language/status 隔离、search/no-result/full-reload 与 desktop/430 真实浏览器证据。
 
 ### PROGRESS LOG
 
@@ -585,6 +590,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-10 | B-07 | Reader 可见 Finish 只保留现有 server preflight→用户确认 commit 一条主路，legacy `finish()` 在零 caller 证明后删除 | false-green 测试真实先红；浏览器 eligible/unresolved/offline recovery 与 testing DB exact-once readback 均证明单一路径 | Finish backend contract 或产品两阶段确认语义发生明确变化时复审`
 
 `2026-08-10 | C-03 | 首页签到与任务完成分离：active day=正式 ReadingSessionCompletion 或有效正式 ReviewLog；今天未 active 时 streak 延续截至昨天；checked_in=今天已有任一正式学习活动；CTA 优先 due Sense Review，其次 current-source active reading，最后 /books | 四份 C-03 authority/UX/test/legacy audit 一致确认旧 GoalAchievement、Chapter.read_count、EncounteredWord.next_review 不能作为新首页正式事实，且现有 Review/Reading facts 足够只读派生 | 正式阅读 completion authority、formal ReviewLog 口径或用户明确产品定义变化时复审`
+
+`2026-08-11 | C-04/C-05 | 四主导航最终“生词”不得指向 legacy /vocabulary/search；先完成 current-user/current-language confirmed WordSense 的基础只读 C-05 页面，再回到 C-04 原子接线。移动 bottom 最终仅四主入口，Home/secondary 继续复用现有 drawer；“我的”复用 /user-settings | C-04 Route/Authority、Test、Permission reports + 主窗口实际读取 Layout/Vocabulary/UserSettings/routes；confirmed WordSense 无 ReviewCard 的状态被现有 Reader/FSRS doctor tests 明确覆盖 | 若发现现成 canonical WordSense library route，或用户改变四主导航/生词定义时复审`
 
 不要记录“用了哪个变量名”“跑了哪条普通 lint”之类噪声。
 
