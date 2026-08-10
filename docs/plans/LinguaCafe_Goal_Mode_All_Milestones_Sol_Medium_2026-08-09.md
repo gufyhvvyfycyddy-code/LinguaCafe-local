@@ -276,8 +276,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | B-02 | DONE | 显式流程严格保持“显示答案 → pending rating → exact WordSense → 一次正式提交” | Reader inline review + canonical SenseReview | rating 在选 sense 前零写；manual new sense 后沿用同一 pending rating；不问第二次 |
 | B-03 | DONE | `reading_action_id` 幂等、unknown retry、undo/rerate | Backend/Reader action-id candidate | same ID replay 一 log；undo 后旧 ID 永久 409；新 ID rerate 一新 active log |
 | B-04 | DONE | 被动 Good eligibility/去重/排除 | ReadingFinishSettlementService | opened/helped/explicit/newly-created/newly-resolved/newly-marked same-reading sense 不 passive；每卡/session ≤1 |
-| B-05 | ACTIVE | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
-| B-06 | TODO | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
+| B-05 | DONE | 产品级 explicit > passive = server-acknowledged active intent | Reader opened barrier + Harness precedence | opened ACK 后后续 Finish passive=0；裸 API 无 marker race 允许 first-lock-wins 但绝不双写 |
+| B-06 | ACTIVE | Finish preflight/commit、unresolved gate、幂等与 rollback | PAB-R3 finish contract | preflight 零业务写；commit unresolved 零写；重复/并发 Finish 一次；failure injection 全事务回滚 |
 | B-07 | TODO | Finish UI 明确显示将 Good/待确认/排除，并能正常继续 | 当前 Reader UI | desktop/430/390；刷新/网络未知恢复；用户文案不暴露工程术语 |
 | B-08 | TODO | 普通 Sense Review、undo、analytics、FSRS 回归 | 现有 SenseReview suite | ordinary Sense Review 不回归；ReviewLog/FSRS/analytics 与 undo 正确 |
 | B-GATE | TODO | Phase B final testing DB + real browser acceptance | B-01…B-08 | 单义、多义、Trust AI、ambiguous、opened exclusion、4 ratings、新 sense、duplicate Finish、undo/refresh 全真实通过；自动进入 C |
@@ -472,22 +472,22 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `B-05`
-- Last DONE: `B-04`
+- Active milestone: `B-06`
+- Last DONE: `B-05`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none yet`
 
-### ACTIVE MILESTONE ARCHITECTURE GATE — B-05
+### ACTIVE MILESTONE ARCHITECTURE GATE — B-06
 
-- 目标：冻结产品级 explicit > passive precedence 的唯一含义：只要 opened/helped/explicit intent 已被服务器在当前 reading-session 中确认并提交，之后的 Finish 就必须看到该事实并保持 passive=0；没有任何已确认 marker 的裸 API 同时竞争允许 first-lock-wins，但绝不能同时写 explicit 与 passive。
-- 不做：不新增客户端“正在点开”推测、第二 intent ledger、浏览器时间戳、watchdog 或补偿 worker；不进入 B-06 Finish unresolved/commit/rollback，也不改 B-07 Finish UI。
-- Owner/seam：`ReadingSessionInteraction` 是唯一 intent ledger；`ReadingSessionService::recordInteraction()` / explicit rating 与 `ReadingFinishSettlementService` 复用同一 reading-session 行锁顺序。Finish 只读取提交后的 `interactionSummary()`，不接受客户端声称“我本来想点开”。
-- Architecture review：`Accepted under current goal authorization`；当前并发合同已存在 raw API first-lock-wins、pre-acknowledged opened、opened-vs-Finish、helped-vs-Finish tests，B-05 先 fresh 验证这些现实锁语义；只有观察到双写或 acknowledged intent 丢失才作最小修改。
-- 初始 Allowlist：`app/Services/ReadingSessionService.php`、`app/Services/ReadingFinishSettlementService.php`、`app/Models/ReadingSessionInteraction.php`、`tests/Feature/ReadingReviewConcurrencyContractTest.php`、直接相关 tests 与本控制文件。Reader UI、B-06 Finish 产品合同、migration、AI/evidence schema 默认禁止修改。
-- 数据/兼容边界：acknowledged opened/helped/explicit 与随后 Finish 必须串行到同一 session 权威状态；没有 pre-ack marker 的裸 race 可以由先拿锁者决定唯一正式结果，但 `reading_explicit + reading_passive` 绝不能同时存在；失败方不得留下部分 ledger/ReviewLog/FSRS。
-- 最小验证：官方 testing DB lease 下 fresh 跑 raw explicit-vs-Finish first-lock-wins、preack opened-vs-Finish、true opened-vs-Finish、true helped-vs-Finish，以及 action-id/Finish 相关并发回归；若现有并发测试已给出稳定证据，不为 B-05 再造第二 harness。
+- 目标：收束 Finish 为服务器权威的两阶段事务：preflight 只计算 current plan、绝不写 ReviewLog/FSRS/settlement/completion/阅读完成状态；commit 必须重新读取当前权威状态，存在 unresolved 时零写停止；可提交时完成 passive Good + legacy finish + session completion，并对重试/并发只产生一次结果；任一后期失败整笔回滚。
+- 不做：不改 B-07 UI 文案/布局，不新增第二 completion ledger、客户端 commit token、后台 reconciliation/watchdog，不把 preflight 结果当 commit 权威，也不进入普通 Sense Review/analytics 回归 B-08。
+- Owner/seam：继续以 `ReadingFinishSettlementService::finishChapterWithSession()` 的单一 transaction + `ReadingSessionCompletion` exact result 为 completion truth；`ReadingSessionCardSettlement` 只承担每卡/session passive 去重，不再新增其他幂等表。
+- Architecture review：`Accepted under current goal authorization`；现有 contract 已覆盖 eligible/unresolved preflight、commit、retry、late failure rollback 与 true concurrent Finish candidate。B-06 先 fresh 反驳这些合同，并检查 preflight/commit 是否存在重复真相或部分写路径；仅真实缺口才修改。
+- 初始 Allowlist：`app/Services/ReadingFinishSettlementService.php`、`app/Services/ChapterService.php`、ReadingSession/Settlement/Completion models、Finish controller seam、`tests/Feature/ReadingReviewSettlementContractTest.php`、`tests/Feature/ReadingReviewConcurrencyContractTest.php`、直接相关 tests 与本控制文件。Reader UI、migration、AI schema、普通 Review UI 默认禁止修改。
+- 数据/兼容边界：preflight 零业务写；commit unresolved 零写；commit 成功后 stored completion exact replay；并发 Finish 最多 1 completion/1 legacy read effect/每 eligible card 1 passive log；failure injection 后 card snapshot/log/settlement/completion/read_count/goals/session status 全回原样。
+- 最小验证：官方 testing DB lease 下 focused settlement + true concurrent Finish，检查 preflight eligible/unresolved 双分支、commit unresolved、successful retry exact result、late failure rollback、source-change concurrency；如现有测试已完整且绿，不制造第二套 Finish harness。
 
 ### PROGRESS LOG
 
@@ -530,6 +530,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-10 10:38 | B-03 | DONE | Goal branch tip | Private House 复核确认现有 action ledger 已足够，无生产代码改动：Reader recovery 25/25、并发/action-id PHP 29/29（284 assertions）。真实 testing 浏览器制造“服务器已 200、页面 ERR_FAILED”，bank action `58ae…8718` 跨刷新保留并由安全重试复用同 ID、同 review_log_id=38，最终 fsrs_reps=1；river 首次 action `b665…9cd6` rate=200→undo=200，随后新 action `8953…11d9` rerate=200。DB 最终为 bank 1 条 active Good；river 1 条 undone + 1 条 active Good、fsrs_reps=1；testing user/关联引用/owned sentinel/browser/port/lease 全部精确清零 | B-04`
 
 `2026-08-10 10:49 | B-04 | DONE | Goal branch tip | Private House 发现 Finish 私有 lifecycle eligibility 与 canonical `ReviewCard::senseReviewEligible()` 漂移：旧副本会错误排除已到期 buried 卡；删除 7 行重复判定并复用唯一 queue scope。补 2 个承重合同：eligible preflight 对 ReviewLog/settlement/completion/read_count/FSRS 全零写，以及 active/disabled/suspended/archived/future-buried/expired-buried 与 canonical queue 一致。focused 19/19（66 assertions），Settlement + LifecycleQueue + ReadingConcurrency 61/61（367 assertions）；same-session marked/resolved、opened/helped/explicit、same-card dedupe、Trust AI high existing binding 与 later-session eligibility 全保留 | B-05`
+
+`2026-08-10 10:54 | B-05 | DONE | Goal branch tip | Private House 判定现有 session-first lock + `ReadingSessionInteraction` 单一 intent ledger 已足够，零生产代码/零新增测试。fresh ReadingConcurrency 29/29（284 assertions）：裸 explicit-vs-Finish 无预确认 marker 时 first-lock-wins 且 formal log 恰好 1；opened 先获服务器 ACK 后 passive 永远 0 且 settlement 0；true opened-vs-Finish、helped-vs-Finish 均无 acknowledged+passive 不可能终态；retry/undo/evidence/source-change 并发回归同时全绿 | B-06`
 
 ### DECISION LOG
 
