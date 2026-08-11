@@ -307,8 +307,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 |---|---|---|---|---|
 | D-01 | DONE | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
 | D-02 | DONE | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
-| D-03 | ACTIVE | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
-| D-04 | TODO | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
+| D-03 | DONE | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
+| D-04 | ACTIVE | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
 | D-05 | TODO | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
 | D-06 | TODO | per-occurrence lemma/POS 评估与必要最小实现 | WordSenseOccurrence、tokenizer、morphology assets | 新 lemma/POS 与已确认 binding 不一致时只标复核，不自动重写；词典不做 lemma oracle |
 | D-07 | TODO | legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除 | existing UI guards | 不为“代码干净”删除仍有 caller 的能力；阅读颜色正确 |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `D-03`（legacy word-card 迁移、备份与可逆/可追溯策略）
-- Last DONE: `D-02`
+- Active milestone: `D-04`（专用 testing DB 的 legacy word-card 迁移闭环与写入围栏）
+- Last DONE: `D-03`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -542,6 +542,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 分类优先级覆盖 target 缺失/越界、occurrence 或 WordSense 越界、未解析 evidence、冲突/竞争 candidate、唯一 confirmed mapping 与只读保留；跨作用域 occurrence 即使绑定了 sense 也不会被当作 resolved/conflicting evidence。operation 同时按 card ID 与 captured ReviewLog ID 收集并去重。
 - testing DB health 6/69、聚焦 4/80、最终受保护回归 96/535 全绿；PHP lint、命令注册、固定 JSON/LF、过滤器、重复性、零写 fingerprint 与 diff-check 通过。lease final `active=false / stale_metadata=false`。
 - 两份独立 fresh review 均为 Blocker=0/Required=0；shared worktree 的外部未提交服务、Vue 与测试资产全部排除并保持原样。
+
+### CLOSED MILESTONE EVIDENCE — D-03
+
+- ADR-0057 冻结身份边界：legacy word card 永不原地 retarget，旧 ReviewLog 与全部历史依赖永不搬移/重标；无 Sense 卡时只复制当前 FSRS/lifecycle/marker 状态，有既存同 scope Sense 卡时完全保留其调度权威。
+- 新增 dormant `LegacyWordCardMigrationRecoveryService` 与专用 run/item ledger；无 command/route/UI。apply 在既有 BackupService 独占锁内完成备份、inspection、全证据行锁、fresh classifier revalidation、单事务建卡/归档/ledger；应用前后完整 classifier row、完整卡片身份/状态/raw timestamps 与递归 canonical fingerprints 均持久化。
+- rollback 重新分类并比对 after evidence，只在完整 after-state 未漂移时整批恢复；created Sense 卡获得任何依赖后拒绝删除，reused Sense 卡从不覆写。普通 rollback 不依赖备份仍在线；全备份只作灾难恢复。跨 scope 损坏卡不阻断本 scope，备份 retention IDs 在锁内 fresh 读取。
+- testing health 6/69、classifier+recovery focused 10/141、Backup/ReviewFsrs/WordSense 最终保护回归 289/1481 全绿；Pint/lint/diff-check 通过，lease final false/false。两份 fresh review 最终 Blocker=0/Required=0；外部 dirty assets 全部保持原样。
 
 ### PROGRESS LOG
 
@@ -614,6 +621,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | D-01 | DONE | Goal branch tip | legacy word-card 创建/评分/词汇/Finish/语言删除/统计/历史依赖与 sense-only barriers 全量 inventory；冻结 persisted-ID-only D-02 分类优先级/reason codes；health 6/69、focused 10/108、lease final false/false；fresh review Blocker=0/Required=0；零数据/产品代码修改 | D-02`
 
 `2026-08-12 | D-02 | DONE | Goal branch tip | persisted-ID-only 只读分类器与稳定 JSON 报告完成；跨域/缺失/冲突/唯一映射优先级及完整依赖可追溯；health 6/69、focused 4/80、protected regression 96/535、lint/command/diff/lease 全绿；双 fresh review Blocker=0/Required=0 | D-03`
+
+`2026-08-12 | D-03 | DONE | Goal branch tip | ADR-0057 + dormant run/item ledger + classifier-authoritative apply/rollback recovery owner；backup lock/fresh retention、完整 pre/post evidence、exact raw timestamp restore、dependency drift refusal 与 scope 隔离闭合；health 6/69、focused 10/141、protected regression 289/1481；双 fresh review Blocker=0/Required=0 | D-04`
 
 ### DECISION LOG
 
