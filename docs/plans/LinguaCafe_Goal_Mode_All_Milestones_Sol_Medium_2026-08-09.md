@@ -306,8 +306,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
 | D-01 | DONE | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
-| D-02 | ACTIVE | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
-| D-03 | TODO | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
+| D-02 | DONE | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
+| D-03 | ACTIVE | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
 | D-04 | TODO | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
 | D-05 | TODO | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
 | D-06 | TODO | per-occurrence lemma/POS 评估与必要最小实现 | WordSenseOccurrence、tokenizer、morphology assets | 新 lemma/POS 与已确认 binding 不一致时只标复核，不自动重写；词典不做 lemma oracle |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `D-02`（只读、可重复的 legacy word-card 映射分类器）
-- Last DONE: `D-01`
+- Active milestone: `D-03`（legacy word-card 迁移、备份与可逆/可追溯策略）
+- Last DONE: `D-02`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -535,6 +535,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - `docs/audits/d-01-legacy-word-card-inventory-2026-08-12.md` 完整列出 legacy word-card 的唯一创建 owner、评分/CLI/词汇/Finish/语言数据删除写入口、路由/UI、legacy Goal 写读链、全部 `review_card_id` 历史依赖与现有 sense-only barriers；未修改产品数据或代码。
 - D-02 合同已冻结 persisted-ID-only candidate、固定分类优先级与 reason codes；明确禁止 lemma/POS/翻译猜测、one-to-many 复制和用 `ReviewLog.source` 伪造历史 sense identity。health 6/69、legacy focused 10/108 通过，lease final false/false。
 - fresh review 首轮发现 Finish/shared settlement 与语言数据删除漏项、分类谓词不确定；补齐后复审 Blocker=0/Required=0。外部未提交 Vue/JS 用户资产均排除并保持原样。
+
+### CLOSED MILESTONE EVIDENCE — D-02
+
+- 新增只读 `reviews:classify-legacy-word-cards` 与单一分类服务，以 persisted IDs 收集 legacy word card、encountered target、occurrence、WordSense/Sense ReviewCard 和完整历史依赖；输出固定 schema/order/reason codes，且不写数据库、不猜 lemma/POS/翻译、不做一对多复制。
+- 分类优先级覆盖 target 缺失/越界、occurrence 或 WordSense 越界、未解析 evidence、冲突/竞争 candidate、唯一 confirmed mapping 与只读保留；跨作用域 occurrence 即使绑定了 sense 也不会被当作 resolved/conflicting evidence。operation 同时按 card ID 与 captured ReviewLog ID 收集并去重。
+- testing DB health 6/69、聚焦 4/80、最终受保护回归 96/535 全绿；PHP lint、命令注册、固定 JSON/LF、过滤器、重复性、零写 fingerprint 与 diff-check 通过。lease final `active=false / stale_metadata=false`。
+- 两份独立 fresh review 均为 Blocker=0/Required=0；shared worktree 的外部未提交服务、Vue 与测试资产全部排除并保持原样。
 
 ### PROGRESS LOG
 
@@ -605,6 +612,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | C-GATE | DONE | Goal branch tip | committed HEAD 9a4d0a8e 上 Node 41/41、PHP 114/626、build、health 与 desktop/430/390 官方 Browser 产品矩阵通过；admin exact one real click 进入 /admin；task identity/sentinel/browser/server/lease clean；未提交 Layout.vue 外部资产排除并保留 | D-01`
 
 `2026-08-12 | D-01 | DONE | Goal branch tip | legacy word-card 创建/评分/词汇/Finish/语言删除/统计/历史依赖与 sense-only barriers 全量 inventory；冻结 persisted-ID-only D-02 分类优先级/reason codes；health 6/69、focused 10/108、lease final false/false；fresh review Blocker=0/Required=0；零数据/产品代码修改 | D-02`
+
+`2026-08-12 | D-02 | DONE | Goal branch tip | persisted-ID-only 只读分类器与稳定 JSON 报告完成；跨域/缺失/冲突/唯一映射优先级及完整依赖可追溯；health 6/69、focused 4/80、protected regression 96/535、lint/command/diff/lease 全绿；双 fresh review Blocker=0/Required=0 | D-03`
 
 ### DECISION LOG
 

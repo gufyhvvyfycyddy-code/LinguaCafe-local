@@ -127,7 +127,7 @@ All modern review analytics and management statistics inspected below are sense-
 | `review_logs.review_card_id` | Indexed scalar, no FK and no stored target type/sense ID. Deleting the card removes the only target-identity join unless logs are separately preserved. | Legacy `/reviews/rate` can create word-card logs labeled `source=sense_review`; hard delete explicitly deletes them. | Count and classify every log per card, including source, rating, undo fields, and before/after snapshots. Never treat `source` as target identity or relabel a log as a sense review without proved identity. |
 | `review_card_state_events.review_card_id` | Indexed scalar, no FK; ADR-0010 declares rows append-only. | Current lifecycle command rejects non-sense cards, so expected legacy count is zero but historical/inconsistent rows must be audited. | Report count and preserve any row found; absence must be data evidence, not source inference. |
 | `reschedule_snapshot_items.review_card_id` | FK with cascade delete. | Current preview/confirm/undo paths exclude word cards. | Audit historical rows before any card mutation; card deletion could cascade them. |
-| `operations.review_card_id` | Nullable FK with `nullOnDelete`; `review_log_id` is also nullable/unique with `nullOnDelete`. | Current mobile/manual operation paths are sense-only. | Audit and preserve operation history; deletion would erase the card pointer even if the operation row remains. |
+| `operations.review_card_id` | Nullable FK with `nullOnDelete`; `review_log_id` is also nullable/unique with `nullOnDelete`. | Current mobile/manual operation paths are sense-only. | Audit operations matching either the legacy card ID or any captured ReviewLog ID, deduplicate by operation ID, and preserve them; deletion can erase the card pointer even when the log pointer remains. |
 | `reading_session_interactions.review_card_id` and `reading_session_card_settlements.review_card_id` | Indexed/scalar references without a ReviewCard FK in their migration. | Current reading explicit/passive paths are sense-only. | Audit for legacy rows and preserve any found; do not assume impossible history from current code alone. |
 | `word_sense_occurrences.review_card_id` | Nullable indexed scalar without a ReviewCard FK. | Current occurrence binding resolves sense cards. | Audit as possible mapping evidence, but validate its user/language/WordSense ownership before use. |
 | `word_senses.encountered_word_id` | Nullable, not unique; multiple senses may refer to one EncounteredWord. | Vocabulary bridge may create an AI-suggested sense; manual enrollment creates confirmed sense/card without a word card. | Strong candidate link but never sufficient for uniqueness by itself; status and all competing candidates must be classified. |
@@ -172,6 +172,20 @@ D-02 must produce a stable, repeatable, read-only list ordered by `user_id`, `la
 - counts and IDs for every history/dependency table in §6;
 - one classification and machine-readable reason code.
 
+The production interface is the read-only Artisan command `reviews:classify-legacy-word-cards` with optional `--user_id` and `--language` filters. A supplied user ID must be a positive base-10 integer; a supplied language must be a non-empty lower-case identifier matching `[a-z][a-z0-9_-]*`. Invalid filters return non-zero and no JSON payload; an omitted filter means all scopes.
+
+The JSON object key order is fixed as `schema_version`, `filters`, `counts`, `cards`. `schema_version` is exactly `legacy_word_card_classification_v1`. `filters` uses `user_id`, `language`; `counts` uses `total`, `unique_mapping`, `needs_user_confirmation`, `unmapped_read_only`. Each card row uses `review_card`, `encountered_word`, `target`, `candidates`, `occurrences`, `dependencies`, `classification`, `selected_word_sense_id`, `primary_reason_code`, `reason_codes` in that order.
+
+Nested structures are also fixed:
+
+- `target`: `exists`, `in_scope`, `stage_is_learning`, `card_enabled`, `reason_codes`;
+- candidate entry: `word_sense`, `evidence_sources`, `sense_review_card_ids`, `in_scope`, `confirmed`, `reason_codes`;
+- occurrence entry: `occurrence`, `word_sense`, `in_scope`, `resolved`, `reason_codes`;
+- `dependencies`, in order: `review_logs`, `review_card_state_events`, `reschedule_snapshot_items`, `operations`, `reading_session_interactions`, `reading_session_card_settlements`, `word_sense_occurrences`;
+- each dependency entry: `count`, `ids`, `rows`; `ids` are the numeric database row primary keys, including `operations.id`, while complete operation rows still expose the public UUID `operation_id`.
+
+Persisted database rows retain all columns with their keys sorted lexically; raw JSON/date/decimal database scalars are not reinterpreted. Candidate entries are ordered by `word_sense.id`; occurrence entries and dependency rows by numeric row `id`; evidence-source, sense-card-ID, dependency-ID, and per-entry reason-code arrays are sorted. The card-level `reason_codes` array starts with the primary reason and then contains applicable secondary codes in lexical order. The command uses `JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRESERVE_ZERO_FRACTION | JSON_THROW_ON_ERROR` and writes exactly one literal LF (`"\n"`) after the JSON object, independent of the host platform. Two command executions against unchanged data must have identical stdout bytes.
+
 ### Exact candidate and evidence rules
 
 A `direct candidate` is a WordSense reached by at least one of these persisted ID links; no text field participates:
@@ -179,7 +193,7 @@ A `direct candidate` is a WordSense reached by at least one of these persisted I
 1. `word_senses.encountered_word_id = review_cards.target_id`; or
 2. a `word_sense_occurrences` row whose `review_card_id` is the legacy word-card ID and whose non-null `word_sense_id` points to that WordSense.
 
-A candidate is `in scope` only when its `user_id` and effective language (`language_id`, with the existing `language` compatibility column reported separately) equal the card scope. A candidate is `confirmed` only when `word_senses.status=confirmed`. Rejected and AI-suggested senses remain visible in the report but never qualify as a unique migration target. An occurrence is `resolved direct evidence` only when its `word_sense_id` exists, is in scope, and the occurrence itself has the same user/language scope. Lemma, POS, surface, translation, source string, ReviewLog source, and approximate text equality never create or strengthen a candidate.
+A candidate is `in scope` only when its `user_id` and canonical `language_id` equal the card scope; the existing `language` compatibility column is still reported. A candidate is `confirmed` only when `word_senses.status=confirmed`. Rejected, AI-suggested, out-of-scope, and otherwise invalid direct candidates remain visible in the report but never qualify as a unique migration target. EncounteredWord, WordSense, and occurrence rows are fetched first by persisted ID/link without a user/language pre-filter; scope is checked only afterward so a mismatch cannot be disguised as a missing row. An occurrence is `resolved direct evidence` only when its `word_sense_id` exists, is in scope, and the occurrence itself has the same user/language scope. Lemma, POS, surface, translation, source string, ReviewLog source, and approximate text equality never create or strengthen a candidate.
 
 The classifier applies the following ordered rules; the first matching rule supplies the classification and primary machine-readable reason code:
 
@@ -187,14 +201,13 @@ The classifier applies the following ordered rules; the first matching rule supp
 |---|---|---|---|
 | 1 | EncounteredWord target is missing | `unmapped_read_only` | `target_missing` |
 | 2 | EncounteredWord user/language differs from the card | `unmapped_read_only` | `target_scope_mismatch` |
-| 3 | An occurrence attached to the legacy card points to a missing WordSense or has cross-user/language scope | `unmapped_read_only` | `occurrence_binding_invalid_scope_or_target` |
+| 3 | An occurrence attached to the legacy card points to a missing WordSense, the occurrence row has cross-user/language scope, or its referenced WordSense has cross-user/language scope | `unmapped_read_only` | `occurrence_binding_invalid_scope_or_target` |
 | 4 | No direct candidate exists | `unmapped_read_only` | `no_direct_candidate` |
 | 5 | Direct candidates exist but none is confirmed and in scope | `unmapped_read_only` | `no_confirmed_direct_candidate` |
 | 6 | An occurrence attached to the legacy card is unresolved (`word_sense_id` null) while at least one confirmed in-scope direct candidate exists | `needs_user_confirmation` | `unresolved_occurrence_binding` |
 | 7 | More than one non-rejected in-scope direct candidate exists, including a confirmed/AI-suggested mix | `needs_user_confirmation` | `competing_direct_candidates` |
 | 8 | Resolved occurrence evidence names a different candidate from the sole confirmed EncounteredWord-linked candidate, or resolved occurrences name more than one candidate | `needs_user_confirmation` | `conflicting_direct_bindings` |
 | 9 | Exactly one in-scope confirmed direct candidate remains, every resolved occurrence attached to the card either names that candidate or none exists, and there is no other non-rejected in-scope direct candidate | `unique_mapping` | `unique_confirmed_direct_candidate` |
-| 10 | Any residual shape not covered above | `unmapped_read_only` | `insufficient_direct_evidence` |
 
 Secondary reason codes are also fixed. Card/target annotations use `target_stage_not_learning` and `card_disabled`. Rejected candidate entries use only `candidate_user_mismatch`, `candidate_language_mismatch`, `candidate_status_ai_suggested`, `candidate_status_rejected`, and `candidate_competes_with_selected`. Occurrence entries use only `occurrence_user_mismatch`, `occurrence_language_mismatch`, `occurrence_word_sense_missing`, `occurrence_unresolved`, and `occurrence_conflicts_with_selected`. Emit only applicable codes, sorted lexically after the primary code. Candidate IDs, occurrence IDs, and dependency IDs are sorted numerically. This fixed precedence plus the stable row order makes unchanged input byte-for-byte repeatable after canonical JSON encoding.
 
@@ -207,6 +220,20 @@ Required invariants:
 - every rejected candidate records why it was rejected;
 - any row with history that cannot be safely mapped remains `unmapped_read_only` or `needs_user_confirmation`, never silently dropped.
 - a `unique_mapping` describes only the current card target candidate; it does not relabel old ReviewLogs as historical sense reviews. D-03 owns that preservation decision.
+- output must include complete ReviewCard state; target stage/surface/lemma/study-base fields; occurrence status/source; dependency counts and IDs; and full ReviewLog source/rating/undo/before/after snapshot fields. A misleading `ReviewLog.source=sense_review` remains only history metadata.
+
+### D-02 executable acceptance matrix
+
+Focused tests must prove:
+
+- one persisted fixture for each ordered priority 1–9, including that a higher-priority condition wins when lower-priority evidence is also present; these predicates exhaust the normalized persisted evidence shape;
+- every fixed candidate/occurrence/card secondary reason code and lexical secondary ordering;
+- rejected and AI-suggested candidates remain visible, and lemma/POS/translation equality alone creates no candidate;
+- a misleading `ReviewLog.source=sense_review` remains unchanged with its complete before/after and undo metadata;
+- dependencies are captured with full rows/counts/IDs, with `operations` found both by `review_card_id` and by captured `review_log_id`, without duplicates;
+- positive `--user_id` and `--language` filters narrow output; invalid filters return non-zero and emit no JSON object to stdout;
+- two independent command executions against unchanged data have byte-identical stdout with exactly one literal trailing LF;
+- a before/after database fingerprint over every queried table is unchanged.
 
 ## 9. Required follow-up fences
 
