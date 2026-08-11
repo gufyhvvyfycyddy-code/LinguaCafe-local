@@ -297,7 +297,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | C-05 | DONE | “生词”一级入口只面向 WordSense，提供只读基础列表/搜索/查看 | `WordSense`、`WordSenseKnownSenseService`、现有 sense serializer/ReviewCard relation | current user/current language 的 confirmed WordSense 可检索/查看；ReviewCard 仅附属且不得决定 sense 是否可见；legacy Vocabulary 不成为新一级主体 |
 | C-06 | DONE | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
 | C-07 | DONE | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
-| C-GATE | ACTIVE | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
+| C-GATE | DONE | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
 
 ---
 
@@ -305,7 +305,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| D-01 | TODO | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
+| D-01 | ACTIVE | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
 | D-02 | TODO | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
 | D-03 | TODO | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
 | D-04 | TODO | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-GATE`（C-07 已完成四 viewport、键盘、返回、弹窗、Console/Network 收口）
-- Last DONE: `C-07`
+- Active milestone: `D-01`（只读盘点 `target_type=word` 使用者、路由、统计、历史与写入口）
+- Last DONE: `C-GATE`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -523,6 +523,12 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 当前 build 的 1920/900/430/390 真页面均无横向 overflow；1920 Home→我的→浏览器返回成立，900 设置弹窗真实打开/焦点保持/显式取消成立，430 底栏四项 56px 且“更多”44px，390 WordSense 输入槽 56px/搜索按钮 44px、高级六项完整可达。
 - 官方 Browser Console 只有 Vue development info；备用受控 Playwright 证明原生链接 Enter 导航与弹窗 Tab 焦点，目标页面 HTTP ≥400 为 0，唯一 Console error 是本地 Pusher 未启动的既有降级噪声。Node 40/40、M17 PHP 2/11、build 与 health 6/69 通过。
 - task identity 与全部 user_id 资产精确清零；owned sentinel=0、port closed、lease false/false。Reasonix 因 D: workspace policy 未启动；本地五轴 fresh review Blocker=0/Required=0。
+
+### CLOSED MILESTONE EVIDENCE — C-GATE
+
+- Gate 验证绑定已提交 HEAD `9a4d0a8ec2a1a3f384cf76b12806aead86a29d0a`：C-01…C-07 均为 DONE；Node 41/41、Phase C 聚焦 PHP 114/626、`npm run development` 与 testing health 6/69 全绿。
+- 官方 Browser 顺序完成 desktop 四主入口及 reload、六个高级入口、exact 430 四主与同一 drawer、exact 390 触达/溢出检查；管理员入口 exact 1、真实一次 click 进入 `/admin` 并见 `#admin-tab-items`/“概览”。Console/Network 补充检查无目标页面失败。
+- task admin 与 user-scoped 数据、owned sentinel、browser/server/port/lease 已精确清理；fresh 五轴审查 Blocker=0/Required=0。验收后出现的未提交 `Layout.vue` 外部用户改动未纳入 Gate 证据、roadmap commit 或后续精确 stage，并保持原样。
 
 ### PROGRESS LOG
 
@@ -589,6 +595,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | C-06 | DONE | Goal branch tip | “我的→高级”复用现有 settings layout 集中 6 个既有能力，desktop secondary 与 role-gated admin 仍可达；C04+C06 guard 11/11、build、desktop 六路真实点击、exact430 可见/点击/无横溢与 Console 全通过；server/port/browser/lease clean，health 6/69；fresh review Blocker=0/Required=0 | C-07`
 
 `2026-08-12 | C-07 | DONE | Goal branch tip | 真实修复并复验复习摘要、WordSense 搜索和“更多”44px 触达；1920/900/430/390、Enter、返回、persistent 弹窗焦点/取消、Console/Network 全闭合；Node 40/40、M17 2/11、build、health 6/69 全绿，identity/sentinel/browser/server/lease 精确清理；fresh review Blocker=0/Required=0 | C-GATE`
+
+`2026-08-12 | C-GATE | DONE | Goal branch tip | committed HEAD 9a4d0a8e 上 Node 41/41、PHP 114/626、build、health 与 desktop/430/390 官方 Browser 产品矩阵通过；admin exact one real click 进入 /admin；task identity/sentinel/browser/server/lease clean；未提交 Layout.vue 外部资产排除并保留 | D-01`
 
 ### DECISION LOG
 
