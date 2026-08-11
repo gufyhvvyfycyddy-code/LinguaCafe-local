@@ -13,7 +13,6 @@
         <div class="word-sense-search mb-5">
             <v-text-field
                 v-model="queryInput"
-                dense
                 outlined
                 hide-details
                 label="搜索生词或释义"
@@ -258,6 +257,10 @@
 
         .word-sense-search .v-btn {
             width: 100%;
+        }
+
+        .word-sense-search .v-btn {
+            min-height: 44px;
         }
 
         .word-sense-item {

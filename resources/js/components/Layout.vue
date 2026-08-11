@@ -95,6 +95,7 @@
                 id="mobile-more-trigger"
                 class="d-flex d-sm-flex d-md-none"
                 small
+                height="44"
                 title="更多"
                 aria-label="更多"
                 style="position: fixed; left: 8px; bottom: 64px; z-index: 7;"

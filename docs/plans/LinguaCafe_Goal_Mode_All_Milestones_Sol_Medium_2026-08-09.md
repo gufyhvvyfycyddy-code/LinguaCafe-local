@@ -296,8 +296,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | C-04 | DONE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 阅读=/books、复习=/reviews/senses、我的=/user-settings 已冻结；“生词”使用 C-05 canonical WordSense route；移动底栏最终仅四主入口，Home/secondary 仍可达 |
 | C-05 | DONE | “生词”一级入口只面向 WordSense，提供只读基础列表/搜索/查看 | `WordSense`、`WordSenseKnownSenseService`、现有 sense serializer/ReviewCard relation | current user/current language 的 confirmed WordSense 可检索/查看；ReviewCard 仅附属且不得决定 sense 是否可见；legacy Vocabulary 不成为新一级主体 |
 | C-06 | DONE | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
-| C-07 | ACTIVE | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
-| C-GATE | TODO | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
+| C-07 | DONE | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
+| C-GATE | ACTIVE | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
 
 ---
 
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-07`（C-06 已把既有高级能力集中到“我的→高级”并保留桌面 secondary 可达）
-- Last DONE: `C-06`
+- Active milestone: `C-GATE`（C-07 已完成四 viewport、键盘、返回、弹窗、Console/Network 收口）
+- Last DONE: `C-07`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -516,6 +516,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - “我的”复用现有 `UserSettingsLayout.vue` 增加唯一“高级”页签，集中链接既有词汇搜索、自定义学习、复习卡管理、学习总览、备份与恢复、文章检查；未新增 route、store、service、权限或数据写入路径，管理员设置继续只由原 role-gated drawer 入口承担。
 - C04+C06 前端合同 11/11、`npm run development` 与 diff-check 全绿。官方 Browser 在 desktop 逐项真实点击六个入口；exact 430 为 6 项全部可见、无横向 overflow，并真实进入复习卡管理；用户可见内容不含 FSRS/Leech/ReviewCard/target_type/lifecycle 工程词。
 - Console 仅 Vue development info、无 error/warn；管理员入口仍 exact 1、`href=/admin`、240×40。browser/server/port 已关闭，TestingDatabaseLease final false/false，TestingDatabaseHealthTest 6/69 通过；fresh review Blocker=0/Required=0。
+
+### CLOSED MILESTONE EVIDENCE — C-07
+
+- 现有 M17/Web 路径只补足真实观察到的触达缺口：移动复习摘要四个操作、WordSense 搜索控件与底栏外“更多”均达到 44px；未新增评分、FSRS、ReviewLog、route、store、backend payload 或第二导航状态。
+- 当前 build 的 1920/900/430/390 真页面均无横向 overflow；1920 Home→我的→浏览器返回成立，900 设置弹窗真实打开/焦点保持/显式取消成立，430 底栏四项 56px 且“更多”44px，390 WordSense 输入槽 56px/搜索按钮 44px、高级六项完整可达。
+- 官方 Browser Console 只有 Vue development info；备用受控 Playwright 证明原生链接 Enter 导航与弹窗 Tab 焦点，目标页面 HTTP ≥400 为 0，唯一 Console error 是本地 Pusher 未启动的既有降级噪声。Node 40/40、M17 PHP 2/11、build 与 health 6/69 通过。
+- task identity 与全部 user_id 资产精确清零；owned sentinel=0、port closed、lease false/false。Reasonix 因 D: workspace policy 未启动；本地五轴 fresh review Blocker=0/Required=0。
 
 ### PROGRESS LOG
 
@@ -580,6 +587,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | C-04 | DONE | Goal branch tip | 单一 `mainNavigation` 驱动 desktop/mobile；guard 7/7、npm development 与 diff-check 全绿。官方 Browser 顺序真实点击四主入口并逐页 reload；Home/legacy Vocabulary/Backup secondary 可达；exact430 四等宽、More 在 bottom 外且 drawer 可达，document 无横溢；admin link exactly1/240×40/href=/admin/real click 成功，ordinary user adminCount=0；task ordinary identity、sentinel/browser/server/lease 精确清理 | C-06`
 
 `2026-08-12 | C-06 | DONE | Goal branch tip | “我的→高级”复用现有 settings layout 集中 6 个既有能力，desktop secondary 与 role-gated admin 仍可达；C04+C06 guard 11/11、build、desktop 六路真实点击、exact430 可见/点击/无横溢与 Console 全通过；server/port/browser/lease clean，health 6/69；fresh review Blocker=0/Required=0 | C-07`
+
+`2026-08-12 | C-07 | DONE | Goal branch tip | 真实修复并复验复习摘要、WordSense 搜索和“更多”44px 触达；1920/900/430/390、Enter、返回、persistent 弹窗焦点/取消、Console/Network 全闭合；Node 40/40、M17 2/11、build、health 6/69 全绿，identity/sentinel/browser/server/lease 精确清理；fresh review Blocker=0/Required=0 | C-GATE`
 
 ### DECISION LOG
 

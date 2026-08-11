@@ -1497,6 +1497,10 @@
         .sense-review-summary-bar .v-chip {
             margin: 2px !important;
         }
+        .sense-review-summary .v-btn {
+            min-height: 44px;
+            min-width: 44px;
+        }
         .sense-review-card {
             padding: 14px 12px calc(14px + env(safe-area-inset-bottom, 0px)) !important;
             overflow: visible;
