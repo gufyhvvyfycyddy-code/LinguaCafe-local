@@ -24,11 +24,25 @@
                     <span class="text--text">Lingua Cafe</span>
                 </div>
 
-                <v-list nav shaped dense class="pl-0">
-                    <!-- Navigation buttons -->
+                <v-list nav shaped dense class="pl-0 main-navigation-list">
                     <v-list-item
                         class="navigation-button"
-                        v-for="(item, index) in navigation"
+                        v-for="(item, index) in mainNavigation"
+                        :key="index"
+                        :to="item.url"
+                        @click="navigationClick(item.name, $event)"
+                    >
+                        <v-icon> {{ item.icon }} </v-icon>
+                        <span class="pl-6"> {{ item.name }} </span>
+                    </v-list-item>
+                </v-list>
+
+                <v-divider></v-divider>
+
+                <v-list nav shaped dense class="pl-0 secondary-navigation-list">
+                    <v-list-item
+                        class="navigation-button"
+                        v-for="(item, index) in secondaryNavigation"
                         :key="index"
                         :to="item.url"
                         @click="navigationClick(item.name, $event)"
@@ -77,19 +91,27 @@
                 </template>
             </v-navigation-drawer>
 
+            <v-btn
+                id="mobile-more-trigger"
+                class="d-flex d-sm-flex d-md-none"
+                small
+                title="更多"
+                aria-label="更多"
+                style="position: fixed; left: 8px; bottom: 64px; z-index: 7;"
+                @click="drawer = true"
+            >
+                <v-icon small left>mdi-menu</v-icon>
+                <span>更多</span>
+            </v-btn>
+
             <!-- Bottom navigation -->
-            <v-bottom-navigation dense grow shift class="d-flex d-sm-flex d-md-none" dark background-color="primary">
-                <v-btn class="text-decoration-none" width="60" style="float: left;" @click="drawer = true;">
-                    <span>更多</span>
-                    <v-icon>mdi-menu</v-icon>
-                </v-btn><v-spacer></v-spacer>
+            <v-bottom-navigation id="mobile-main-navigation" dense grow shift class="d-flex d-sm-flex d-md-none" dark background-color="primary">
                 <v-btn
                     class="text-decoration-none"
                     grow
-                    v-for="(item, index) in navigation"
+                    v-for="(item, index) in mainNavigation"
                     :key="index"
                     :to="item.url"
-                    v-if="item.bottomNav"
                 >
                     <span>{{ item.name }}</span>
                     <v-icon>{{ item.icon }}</v-icon>
@@ -123,70 +145,76 @@
                 navbarCollapsed: false,
                 navigation: [
                     {
-                        name: '首页',
-                        url: '/',
-                        icon: 'mdi-home',
-                        bottomNav: true,
-                    },
-                    {
-                        name: '阅读材料',
+                        name: '阅读',
                         url: '/books',
                         icon: 'mdi-bookshelf',
-                        bottomNav: true,
-                    },
-                    {
-                        name: '词汇',
-                        url: '/vocabulary/search',
-                        icon: 'mdi-translate',
-                        bottomNav: true,
+                        mainNav: true,
                     },
                     {
                         name: '复习',
                         url: '/reviews/senses',
                         icon: 'mdi-brain',
-                        bottomNav: false,
+                        mainNav: true,
+                    },
+                    {
+                        name: '生词',
+                        url: '/word-senses',
+                        icon: 'mdi-translate',
+                        mainNav: true,
+                    },
+                    {
+                        name: '我的',
+                        url: '/user-settings',
+                        icon: 'mdi-account-cog',
+                        mainNav: true,
+                    },
+                    {
+                        name: '首页',
+                        url: '/',
+                        icon: 'mdi-home',
+                        mainNav: false,
+                    },
+                    {
+                        name: '词汇',
+                        url: '/vocabulary/search',
+                        icon: 'mdi-translate',
+                        mainNav: false,
                     },
                     {
                         name: '自定义学习',
                         url: '/custom-study',
                         icon: 'mdi-tune-variant',
-                        bottomNav: false,
+                        mainNav: false,
                     },
                     {
                         name: '高级复习卡管理',
                         url: '/review-cards/manage',
                         icon: 'mdi-card-account-details',
-                        bottomNav: false,
+                        mainNav: false,
                     },
                     {
                         name: '学习总览',
                         url: '/study-overview',
                         icon: 'mdi-view-dashboard-outline',
-                        bottomNav: false,
+                        mainNav: false,
                     },
                     {
                         name: '备份',
                         url: '/admin/dashboard',
                         icon: 'mdi-database',
-                        bottomNav: false,
+                        mainNav: false,
                     },
                     {
                         name: '内容健康',
                         url: '/article-health',
                         icon: 'mdi-heart-pulse',
-                        bottomNav: false,
-                    },
-                    {
-                        name: '设置',
-                        url: '/user-settings',
-                        icon: 'mdi-account-cog',
-                        bottomNav: false,
+                        mainNav: false,
                     },
                     {
                         name: '用户手册',
                         url: '/user-manual',
                         icon: 'mdi-account-question',
-                        bottomNav: false,
+                        mainNav: false,
                     }
                 ],
             }
@@ -204,6 +232,12 @@
             },
             selectedLanguageName: function() {
                 return languageName(this.selectedLanguage);
+            },
+            mainNavigation: function() {
+                return this.navigation.filter(item => item.mainNav);
+            },
+            secondaryNavigation: function() {
+                return this.navigation.filter(item => !item.mainNav);
             }
         },
         props: {
@@ -238,11 +272,11 @@
             this.$store.commit('shared/setUserAdmin', this.$props._isAdmin);
 
             if (this.$props._selectedLanguage == 'japanese') {
-                this.navigation.splice(3, 0, {
+                this.navigation.push({
                     name: '汉字',
                     url: '/kanji/search',
                     icon: 'mdi-ideogram-cjk',
-                    bottomNav: false,
+                    mainNav: false,
                 });
             }
 
@@ -251,7 +285,7 @@
                     name: '管理员设置',
                     url: '/admin',
                     icon: 'mdi-shield-lock',
-                    bottomNav: false,
+                    mainNav: false,
                 });
             }
 
@@ -321,6 +355,11 @@
                 if (itemName === 'Review') {
                     this.startReviewDialog = true;
                     event.preventDefault();
+                }
+
+                if (itemName === '管理员设置' && this.$router.currentRoute.path !== '/admin') {
+                    event.preventDefault();
+                    this.$router.push('/admin');
                 }
 
                 // clicked on user manual

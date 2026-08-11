@@ -293,9 +293,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | C-01 | DONE | Sense Review 问题面/答案面瘦身 | `SenseReview.vue`、`SenseStudyCard.vue`、现有 serializer | 问题面保留原文；答案中文+英文默认；不重复例句；FSRS 工程信息退入更多 |
 | C-02 | DONE | 返回/前进成为稳定普通操作 | 现有 previous/session action 能力 | 浏览器真实前进/返回；不重复评分；跨刷新状态正确 |
 | C-03 | DONE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `ReviewDailyProgressQueryService`、Sense eligibility、ReadingSession completion、Home | 单一正式事实源；summary GET zero-write；真实浏览器完成空状态→续读→复习优先→评分/撤销→Finish→full reload，DOM/JSON/DB 一致 |
-| C-04 | ACTIVE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 阅读=/books、复习=/reviews/senses、我的=/user-settings 已冻结；“生词”使用 C-05 canonical WordSense route；移动底栏最终仅四主入口，Home/secondary 仍可达 |
+| C-04 | DONE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 阅读=/books、复习=/reviews/senses、我的=/user-settings 已冻结；“生词”使用 C-05 canonical WordSense route；移动底栏最终仅四主入口，Home/secondary 仍可达 |
 | C-05 | DONE | “生词”一级入口只面向 WordSense，提供只读基础列表/搜索/查看 | `WordSense`、`WordSenseKnownSenseService`、现有 sense serializer/ReviewCard relation | current user/current language 的 confirmed WordSense 可检索/查看；ReviewCard 仅附属且不得决定 sense 是否可见；legacy Vocabulary 不成为新一级主体 |
-| C-06 | TODO | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
+| C-06 | ACTIVE | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
 | C-07 | TODO | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
 | C-GATE | TODO | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
 
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-04`（C-05 canonical WordSense-only `/word-senses` 已完成并通过 Exit Gate；顺序执行四主导航真实验收）
-- Last DONE: `C-05`
+- Active milestone: `C-06`（C-04 四主导航已通过 Desktop/exact430/ordinary/admin 顺序真实验收）
+- Last DONE: `C-04`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -501,7 +501,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 独立 Reasonix 只读复核确认 Gate 权威定义实际为 9 类组合，且全部要求 testing DB + real browser；本轮已补齐此前缺失的 Trust AI、ambiguous、opened exclusion、Hard/Easy、新 sense、duplicate Finish、undo/refresh 组合证据。
 - fixture user 71046 及 17 类 user-scoped 关联资产在 testing harness 独占 lease 下逐表精确删除，全部 after=0；未清库、未改生产代码、未运行 notification script、未 DCP。
 
-### ACTIVE MILESTONE — C-04
+### CLOSED MILESTONE EVIDENCE — C-04
 - C-04 Route/Authority 与 Permission Gate 已证明：阅读复用 `/books`，正式复习复用 `/reviews/senses`，“我的”复用 `/user-settings`；C-05 已提供 canonical WordSense-only `/word-senses`，四主导航现在按冻结映射做顺序真实验收。
 - 移动底栏最终只有“阅读 / 复习 / 生词 / 我的”四项；首页 `/` 保留为真实次级入口。现有 drawer 继续承担 Home 与 secondary capabilities，`更多` 不得成为第五个 bottom item；最小方向是在 `Layout.vue` 复用现有 `drawer` 状态提供 mobile-only secondary trigger，不新建导航 store/service、AppBar 或浮动 Home。
 - legacy `/vocabulary/search`、Custom Study、ReviewCardManage、StudyOverview、Backup、Article Health、User Manual 等在 C-06 前继续保持可达；特别是 `/admin/{page?}` backup 对普通 authenticated user 可达，不能按 URL 前缀误当管理员专属。
@@ -570,6 +570,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-11 | C-03 | DONE | Goal branch tip | code audit Blocker/Required=0；主窗口在正确 goal worktree 补跑 final static Gate（3 PHP syntax + 3 Node guards + diff-check）全绿；server-bound testing 真浏览器完成空状态→active reading CTA→due review priority→两次评分/一次撤销→真实两阶段 Finish→Home/full reload，最终 1 天/阅读1/有效复习1/已打卡/due1 与 JSON/DB 一致，summary GET zero-write；task data/sentinel/browser/server/lease 精确清理 | C-04`
 
 `2026-08-12 | C-05 | DONE | Goal branch tip | canonical `/word-senses` + read-only data owner；Feature 5/44、WordSense 210/926、UI guard 5/5、testing health 6/69 与 npm development 全绿。官方 Browser 真实覆盖 cardless confirmed、lemma/中/英字面搜索、查看/reload/loading/error/retry/empty、desktop/exact430 无横溢；Reasonix 首轮 Required 的 LIKE 通配符与超界分页已修复并回归，复审无未清 Blocker/Required；ReviewCard/ReviewLog=0，fixture/sentinel/browser/server/lease 精确清理 | C-04`
+
+`2026-08-12 | C-04 | DONE | Goal branch tip | 单一 `mainNavigation` 驱动 desktop/mobile；guard 7/7、npm development 与 diff-check 全绿。官方 Browser 顺序真实点击四主入口并逐页 reload；Home/legacy Vocabulary/Backup secondary 可达；exact430 四等宽、More 在 bottom 外且 drawer 可达，document 无横溢；admin link exactly1/240×40/href=/admin/real click 成功，ordinary user adminCount=0；task ordinary identity、sentinel/browser/server/lease 精确清理 | C-06`
 
 ### DECISION LOG
 
