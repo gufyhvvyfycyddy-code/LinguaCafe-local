@@ -229,6 +229,7 @@ const TextReader = require('./components/TextReader/TextReader.vue').default;
 const Review = require('./components/Review/Review.vue').default;
 const SenseMappingReview = require('./components/Senses/SenseMappingReview.vue').default;
 const SenseReview = require('./components/Senses/SenseReview.vue').default;
+const WordSenseLibrary = require('./components/Senses/WordSenseLibrary.vue').default;
 const CustomStudy = require('./components/CustomStudy/CustomStudy.vue').default;
 const ReadingInlineConfirmationManage = require('./components/Senses/ReadingInlineConfirmationManage.vue').default;
 const ReviewCardManage = require('./components/ReviewCards/ReviewCardManage.vue').default;
@@ -257,6 +258,7 @@ const router = new VueRouter({
         { path: '/chapters/read/:chapterId', component: TextReader },
         { path: '/review/:practiceMode?/:bookId?/:chapterId?', component: Review },
         { path: '/reviews/senses', component: SenseReview },
+        { path: '/word-senses', component: WordSenseLibrary },
         { path: '/custom-study', component: CustomStudy },
         { path: '/senses/review', component: SenseMappingReview },
         { path: '/senses/inline-confirmations/manage', component: ReadingInlineConfirmationManage },

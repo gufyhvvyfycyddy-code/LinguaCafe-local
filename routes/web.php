@@ -159,6 +159,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/article-health', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/article-health/data', [App\Http\Controllers\ArticleHealthController::class, 'show']);
     Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);
+    Route::get('/word-senses', [App\Http\Controllers\HomeController::class, 'index']);
+    Route::get('/word-senses/data', [App\Http\Controllers\WordSenseLibraryController::class, 'data']);
     Route::post('/word-senses/{wordSense}/media', [App\Http\Controllers\MediaController::class, 'store'])->whereNumber('wordSense');
     Route::delete('/media/references/{referenceId}', [App\Http\Controllers\MediaController::class, 'destroy']);
     Route::get('/media/assets/{assetId}', [App\Http\Controllers\MediaController::class, 'download'])->name('media.download');
