@@ -187,7 +187,7 @@
                         mainNav: false,
                     },
                     {
-                        name: '高级复习卡管理',
+                        name: '复习卡管理',
                         url: '/review-cards/manage',
                         icon: 'mdi-card-account-details',
                         mainNav: false,

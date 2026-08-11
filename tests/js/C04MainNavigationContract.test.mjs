@@ -19,7 +19,7 @@ const expectedSecondary = [
     ['首页', '/'],
     ['词汇', '/vocabulary/search'],
     ['自定义学习', '/custom-study'],
-    ['高级复习卡管理', '/review-cards/manage'],
+    ['复习卡管理', '/review-cards/manage'],
     ['学习总览', '/study-overview'],
     ['备份', '/admin/dashboard'],
     ['内容健康', '/article-health'],

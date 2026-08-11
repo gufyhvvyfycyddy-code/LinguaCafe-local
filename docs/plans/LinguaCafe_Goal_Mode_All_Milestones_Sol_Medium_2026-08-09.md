@@ -295,8 +295,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | C-03 | DONE | 首页每日打卡 read model：连续学习、今日阅读、今日复习、完成状态、继续学习 | `ReviewDailyProgressQueryService`、Sense eligibility、ReadingSession completion、Home | 单一正式事实源；summary GET zero-write；真实浏览器完成空状态→续读→复习优先→评分/撤销→Finish→full reload，DOM/JSON/DB 一致 |
 | C-04 | DONE | 四主导航：阅读 / 复习 / 生词 / 我的 | `Layout.vue`、现有 routes/app.js | 阅读=/books、复习=/reviews/senses、我的=/user-settings 已冻结；“生词”使用 C-05 canonical WordSense route；移动底栏最终仅四主入口，Home/secondary 仍可达 |
 | C-05 | DONE | “生词”一级入口只面向 WordSense，提供只读基础列表/搜索/查看 | `WordSense`、`WordSenseKnownSenseService`、现有 sense serializer/ReviewCard relation | current user/current language 的 confirmed WordSense 可检索/查看；ReviewCard 仅附属且不得决定 sense 是否可见；legacy Vocabulary 不成为新一级主体 |
-| C-06 | ACTIVE | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
-| C-07 | TODO | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
+| C-06 | DONE | 高级功能统一降到“我的→高级”或桌面高级区域 | Admin/ReviewCard/CustomStudy 等既有页面 | 功能未误删；普通用户不见内部工程名 |
+| C-07 | ACTIVE | 响应式/可访问性真实页面收口 | 既有 M17/Web 资产 | 1920/900/430/390；键盘/返回/弹窗/Console/Network 通过 |
 | C-GATE | TODO | Phase C 产品 Gate | C-01…C-07 | 首页/Review/Nav/生词/高级入口全真实验收；自动进入 D |
 
 ---
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `C-06`（C-04 四主导航已通过 Desktop/exact430/ordinary/admin 顺序真实验收）
-- Last DONE: `C-04`
+- Active milestone: `C-07`（C-06 已把既有高级能力集中到“我的→高级”并保留桌面 secondary 可达）
+- Last DONE: `C-06`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -510,6 +510,12 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - C-05 V1 只做“我已经保存的词义”的基础只读页面：current user + current selected language + `WordSense.status=confirmed`。内容事实以 WordSense 为主体；ReviewCard 是可选附属状态，confirmed sense 即使缺 ReviewCard 也不能从生词库消失，GET 更不得偷偷创建/修复 ReviewCard。
 - 第一版只做基础列表、普通文本搜索和查看；不复制 `/review-cards/manage` 的 FSRS/Leech/lifecycle/批量治理，不复制 `/vocabulary/search` 的 stage/phrase/CSV/legacy word 语义，不进入编辑/删除/来源总览（D-05 后续完善）。
 - 优先复用 `WordSenseKnownSenseService` 已验证的 confirmed/user/language 语义、现有 sense payload 字段和 ReviewCard relation；若需要全局分页查询，只新增一个责任清楚的只读 query owner，不为本页增加 Repository/DTO/store/第二搜索系统。实现后必须有 zero-write GET、user/language/status 隔离、search/no-result/full-reload 与 desktop/430 真实浏览器证据。
+
+### CLOSED MILESTONE EVIDENCE — C-06
+
+- “我的”复用现有 `UserSettingsLayout.vue` 增加唯一“高级”页签，集中链接既有词汇搜索、自定义学习、复习卡管理、学习总览、备份与恢复、文章检查；未新增 route、store、service、权限或数据写入路径，管理员设置继续只由原 role-gated drawer 入口承担。
+- C04+C06 前端合同 11/11、`npm run development` 与 diff-check 全绿。官方 Browser 在 desktop 逐项真实点击六个入口；exact 430 为 6 项全部可见、无横向 overflow，并真实进入复习卡管理；用户可见内容不含 FSRS/Leech/ReviewCard/target_type/lifecycle 工程词。
+- Console 仅 Vue development info、无 error/warn；管理员入口仍 exact 1、`href=/admin`、240×40。browser/server/port 已关闭，TestingDatabaseLease final false/false，TestingDatabaseHealthTest 6/69 通过；fresh review Blocker=0/Required=0。
 
 ### PROGRESS LOG
 
@@ -572,6 +578,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | C-05 | DONE | Goal branch tip | canonical `/word-senses` + read-only data owner；Feature 5/44、WordSense 210/926、UI guard 5/5、testing health 6/69 与 npm development 全绿。官方 Browser 真实覆盖 cardless confirmed、lemma/中/英字面搜索、查看/reload/loading/error/retry/empty、desktop/exact430 无横溢；Reasonix 首轮 Required 的 LIKE 通配符与超界分页已修复并回归，复审无未清 Blocker/Required；ReviewCard/ReviewLog=0，fixture/sentinel/browser/server/lease 精确清理 | C-04`
 
 `2026-08-12 | C-04 | DONE | Goal branch tip | 单一 `mainNavigation` 驱动 desktop/mobile；guard 7/7、npm development 与 diff-check 全绿。官方 Browser 顺序真实点击四主入口并逐页 reload；Home/legacy Vocabulary/Backup secondary 可达；exact430 四等宽、More 在 bottom 外且 drawer 可达，document 无横溢；admin link exactly1/240×40/href=/admin/real click 成功，ordinary user adminCount=0；task ordinary identity、sentinel/browser/server/lease 精确清理 | C-06`
+
+`2026-08-12 | C-06 | DONE | Goal branch tip | “我的→高级”复用现有 settings layout 集中 6 个既有能力，desktop secondary 与 role-gated admin 仍可达；C04+C06 guard 11/11、build、desktop 六路真实点击、exact430 可见/点击/无横溢与 Console 全通过；server/port/browser/lease clean，health 6/69；fresh review Blocker=0/Required=0 | C-07`
 
 ### DECISION LOG
 
