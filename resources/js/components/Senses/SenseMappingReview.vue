@@ -57,7 +57,7 @@
             outlined
             class="rounded-lg pa-4 mb-3"
         >
-            <div class="d-flex align-center mb-2">
+            <div class="d-flex align-center flex-wrap mb-2">
                 <v-checkbox dense hide-details class="mr-3" v-model="selected" :value="occurrence.occurrence_id"></v-checkbox>
                 <div>
                     <v-chip small class="mr-2">{{ statusLabel(occurrence.status) }}</v-chip>
@@ -93,6 +93,11 @@
                         <div class="font-weight-medium">{{ occurrence.sense.sense_zh }}</div>
                         <div class="text--secondary">{{ occurrence.sense.sense_en }}</div>
                         <div class="caption mt-2">{{ occurrence.sense.sense_key }}</div>
+                        <div class="caption mt-2 text--secondary">词元：{{ occurrence.sense.lemma || '—' }} / 词性：{{ occurrence.sense.pos || 'no pos' }}</div>
+                        <div
+                            v-if="occurrence.status === 'pending' && occurrence.decision === 'match_existing_sense' && occurrence.sense"
+                            class="caption mt-2"
+                        >请核对本次词元/词性与当前词义后再确认。</div>
                         <v-chip small class="mt-2 mr-1">{{ occurrence.sense.status }}</v-chip>
                         <v-chip small class="mt-2" v-if="occurrence.sense.fsrs_state">FSRS {{ occurrence.sense.fsrs_state }}</v-chip>
                     </v-sheet>

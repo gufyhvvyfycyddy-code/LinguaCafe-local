@@ -74,7 +74,13 @@ class SenseMappingImportService
             return;
         }
 
-        $isBound = $confidence >= 0.90;
+        $morphologyConflict = $this->occurrenceService->hasMorphologyConflict(
+            $this->lemma($item, $match),
+            Arr::get($match, 'pos'),
+            $sense->lemma,
+            $sense->pos,
+        );
+        $isBound = $confidence >= 0.90 && !$morphologyConflict;
         $canAutoFsrs = $isBound
             && ($match['auto_fsrs_allowed'] ?? false) === true
             && $sense->status === WordSense::STATUS_CONFIRMED;

@@ -16,6 +16,10 @@ class SenseMappingValidationService
         'phrase_match',
     ];
 
+    public function __construct(private WordSenseOccurrenceService $occurrenceService)
+    {
+    }
+
     public function validateFile(string $path, int $userId, string $language): array
     {
         $resolvedPath = $this->resolvePath($path);
@@ -100,13 +104,13 @@ class SenseMappingValidationService
         }
 
         foreach ($item['matches'] as $matchIndex => $match) {
-            $errors = array_merge($errors, $this->validateMatch($match, $itemIndex, $matchIndex, $userId, $language, $autoBindCandidates, $needsConfirmation));
+            $errors = array_merge($errors, $this->validateMatch($item, $match, $itemIndex, $matchIndex, $userId, $language, $autoBindCandidates, $needsConfirmation));
         }
 
         return $errors;
     }
 
-    private function validateMatch(mixed $match, int $itemIndex, int $matchIndex, int $userId, string $language, int &$autoBindCandidates, int &$needsConfirmation): array
+    private function validateMatch(array $item, mixed $match, int $itemIndex, int $matchIndex, int $userId, string $language, int &$autoBindCandidates, int &$needsConfirmation): array
     {
         $prefix = "Item {$itemIndex} match {$matchIndex}";
         if (!is_array($match)) {
@@ -117,6 +121,7 @@ class SenseMappingValidationService
         $decision = $match['decision'] ?? null;
         $confidence = $match['confidence'] ?? null;
         $autoFsrsAllowed = $match['auto_fsrs_allowed'] ?? null;
+        $matchedSense = null;
 
         if (!in_array($decision, self::DECISIONS, true)) {
             $errors[] = "{$prefix}: decision is invalid.";
@@ -137,8 +142,11 @@ class SenseMappingValidationService
         if ($decision === 'match_existing_sense') {
             if (!isset($match['matched_sense_id'])) {
                 $errors[] = "{$prefix}: matched_sense_id is required for match_existing_sense.";
-            } elseif (!$this->senseExistsForUserAndLanguage((int) $match['matched_sense_id'], $userId, $language)) {
-                $errors[] = "{$prefix}: matched_sense_id does not belong to the current user and language.";
+            } else {
+                $matchedSense = $this->senseForUserAndLanguage((int) $match['matched_sense_id'], $userId, $language);
+                if (!$matchedSense) {
+                    $errors[] = "{$prefix}: matched_sense_id does not belong to the current user and language.";
+                }
             }
         }
 
@@ -146,23 +154,43 @@ class SenseMappingValidationService
             $errors[] = "{$prefix}: new_sense requires sense_zh or sense_en.";
         }
 
-        if ($autoFsrsAllowed === true && $errors === []) {
+        $morphologyConflict = $matchedSense !== null
+            && $this->occurrenceService->hasMorphologyConflict(
+                $this->occurrenceLemma($item, $match),
+                $match['pos'] ?? null,
+                $matchedSense->lemma,
+                $matchedSense->pos,
+            );
+
+        if ($autoFsrsAllowed === true && $errors === [] && !$morphologyConflict) {
             $autoBindCandidates++;
         }
 
-        if ($autoFsrsAllowed !== true || $decision === 'uncertain') {
+        if ($autoFsrsAllowed !== true || $decision === 'uncertain' || $morphologyConflict) {
             $needsConfirmation++;
         }
 
         return $errors;
     }
 
-    private function senseExistsForUserAndLanguage(int $senseId, int $userId, string $language): bool
+    private function senseForUserAndLanguage(int $senseId, int $userId, string $language): ?WordSense
     {
         return WordSense::where('id', $senseId)
             ->where('user_id', $userId)
             ->where('language_id', $language)
-            ->exists();
+            ->first();
+    }
+
+    private function occurrenceLemma(array $item, array $match): string
+    {
+        return (string) ($match['lemma']
+            ?? $match['surface']
+            ?? $match['text']
+            ?? $match['word']
+            ?? $item['surface']
+            ?? $item['word']
+            ?? $item['en']
+            ?? '');
     }
 
     private function summary(int $totalItems, int $validItems, int $autoBindCandidates, int $needsConfirmation, array $errors): array

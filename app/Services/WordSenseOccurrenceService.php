@@ -100,10 +100,33 @@ class WordSenseOccurrenceService
         $summary = $this->emptyBulkSummary($occurrences->count());
 
         foreach ($occurrences as $occurrence) {
+            $sense = $occurrence->wordSense;
+            if ($sense && $this->hasMorphologyConflict($occurrence->lemma, $occurrence->pos, $sense->lemma, $sense->pos)) {
+                $this->skip($summary, "Occurrence {$occurrence->id}: morphology conflict requires manual confirmation.");
+                continue;
+            }
+
             $this->confirmExistingBinding($occurrence, $occurrence->auto_fsrs_allowed, $summary);
         }
 
         return $summary;
+    }
+
+    public function hasMorphologyConflict(?string $occurrenceLemma, ?string $occurrencePos, ?string $senseLemma, ?string $sensePos): bool
+    {
+        $normalizedOccurrenceLemma = $this->normalize($occurrenceLemma);
+        $normalizedSenseLemma = $this->normalize($senseLemma);
+        $lemmaConflict = $normalizedOccurrenceLemma !== ''
+            && $normalizedSenseLemma !== ''
+            && $normalizedOccurrenceLemma !== $normalizedSenseLemma;
+
+        $normalizedOccurrencePos = $this->normalizeMorphologyPos($occurrencePos);
+        $normalizedSensePos = $this->normalizeMorphologyPos($sensePos);
+        $posConflict = $normalizedOccurrencePos !== ''
+            && $normalizedSensePos !== ''
+            && $normalizedOccurrencePos !== $normalizedSensePos;
+
+        return $lemmaConflict || $posConflict;
     }
 
     public function possibleDuplicates(int $userId, string $language, ?string $lemma = null): array
@@ -407,6 +430,25 @@ class WordSenseOccurrenceService
     private function sameOrEmptyPos(?string $first, ?string $second): bool
     {
         return $first === $second || $first === null || $first === '' || $second === null || $second === '';
+    }
+
+    private function normalizeMorphologyPos(?string $value): string
+    {
+        $normalized = $this->normalize($value);
+        if ($normalized === '' || $normalized === 'other') {
+            return '';
+        }
+
+        return match ($normalized) {
+            'n', 'noun' => 'noun',
+            'v', 'verb' => 'verb',
+            'adj', 'adjective' => 'adjective',
+            'adv', 'adverb' => 'adverb',
+            'prep', 'preposition' => 'preposition',
+            'conj', 'conjunction' => 'conjunction',
+            'phrase' => 'phrase',
+            default => $normalized,
+        };
     }
 
     private function normalize(?string $value): string
