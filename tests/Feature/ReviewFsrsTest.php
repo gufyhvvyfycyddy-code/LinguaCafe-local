@@ -60,7 +60,7 @@ class ReviewFsrsTest extends TestCase
         }
     }
 
-    public function test_initialize_cards_creates_only_reviewable_word_cards(): void
+    public function test_initialize_cards_is_diagnostic_only_and_refuses_legacy_creation(): void
     {
         $this->createWord($this->user->id, 'english', -1, 'apple');
         $this->createWord($this->user->id, 'english', -3, 'banana');
@@ -71,22 +71,15 @@ class ReviewFsrsTest extends TestCase
         $this->createWord($this->otherUser->id, 'english', -1, 'orange');
 
         $this->artisan('reviews:initialize-cards --dry-run')
-            ->expectsOutput('Dry run: 4 review cards would be created.')
+            ->expectsOutput('Dry run: 4 legacy word card(s) are missing (diagnostic only).')
             ->assertSuccessful();
         $this->assertSame(0, ReviewCard::count());
 
         $this->artisan('reviews:initialize-cards')
-            ->expectsOutput('Created 4 review cards.')
-            ->assertSuccessful();
+            ->expectsOutput('Legacy word-card creation is disabled after the D-04 cutover.')
+            ->assertExitCode(1);
 
-        $this->assertSame(4, ReviewCard::count());
-        $this->assertSame(2, ReviewCard::where('user_id', $this->user->id)->where('language', 'english')->count());
-        $this->assertSame(1, ReviewCard::where('user_id', $this->user->id)->where('language', 'spanish')->count());
-        $this->assertSame(1, ReviewCard::where('user_id', $this->otherUser->id)->where('language', 'english')->count());
-
-        $this->artisan('reviews:initialize-cards --dry-run')
-            ->expectsOutput('Dry run: 0 review cards would be created.')
-            ->assertSuccessful();
+        $this->assertSame(0, ReviewCard::count());
     }
 
     public function test_review_queue_returns_only_due_enabled_cards_for_current_user_and_language(): void
@@ -101,9 +94,9 @@ class ReviewFsrsTest extends TestCase
         $this->createWord($this->otherUser->id, 'english', -1, 'orange');
 
         $service = app(ReviewCardService::class);
-        $dueCard = $service->ensureWordCard($dueWord);
-        $disabledCard = $service->ensureWordCard($disabledWord);
-        $futureCard = $service->ensureWordCard($futureWord);
+        $dueCard = $this->createLegacyWordCard($dueWord);
+        $disabledCard = $this->createLegacyWordCard($disabledWord);
+        $futureCard = $this->createLegacyWordCard($futureWord);
 
         $disabledCard->update(['fsrs_enabled' => false]);
         $futureCard->update(['fsrs_due_at' => now()->addDays(2)]);
@@ -121,49 +114,33 @@ class ReviewFsrsTest extends TestCase
         $this->assertCount(0, $reviews, 'Word cards should no longer appear in review queue');
     }
 
-    public function test_each_rating_updates_card_and_writes_log(): void
+    public function test_word_rating_refuses_before_fsrs_or_review_log_mutation(): void
     {
-        foreach (['again', 'hard', 'good', 'easy'] as $rating) {
-            ReviewLog::query()->delete();
-            ReviewCard::query()->delete();
-            EncounteredWord::query()->delete();
+        $word = $this->createWord($this->user->id, 'english', -1, 'legacy-word-rating');
+        $card = $this->createLegacyWordCard($word);
+        $before = $card->only([
+            'fsrs_state',
+            'fsrs_due_at',
+            'fsrs_stability',
+            'fsrs_difficulty',
+            'fsrs_reps',
+            'fsrs_lapses',
+            'fsrs_last_reviewed_at',
+        ]);
 
-            $word = $this->createWord($this->user->id, 'english', -1, "word-{$rating}");
-            $card = app(ReviewCardService::class)->ensureWordCard($word);
+        $this->actingAs($this->user)->post('/reviews/rate', [
+            'reviewCardId' => $card->id,
+            'rating' => 'good',
+        ])->assertStatus(422);
 
-            $response = $this->actingAs($this->user)->post('/reviews/rate', [
-                'reviewCardId' => $card->id,
-                'rating' => $rating,
-            ]);
-
-            $response->assertOk();
-            $card->refresh();
-            $this->assertSame(1, $card->fsrs_reps);
-            $this->assertNotNull($card->fsrs_due_at);
-            $this->assertNotNull($card->fsrs_last_reviewed_at);
-            $this->assertNotNull($card->fsrs_stability);
-            $this->assertNotNull($card->fsrs_difficulty);
-            $this->assertSame(0, $card->fsrs_lapses, 'A new-card Again is a learning step, not a lapse.');
-
-            $log = ReviewLog::first();
-            $this->assertNotNull($log);
-            $this->assertSame($this->user->id, $log->user_id);
-            $this->assertSame('english', $log->language);
-            $this->assertSame($card->id, $log->review_card_id);
-            $this->assertSame($rating, $log->rating);
-            $this->assertSame('new', $log->previous_state);
-            $this->assertSame($card->fsrs_state, $log->new_state);
-            $this->assertNotNull($log->previous_due_at);
-            $this->assertNotNull($log->new_due_at);
-            $this->assertNotNull($log->new_stability);
-            $this->assertNotNull($log->new_difficulty);
-        }
+        $this->assertEquals($before, $card->fresh()->only(array_keys($before)));
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
     }
 
     public function test_rating_cannot_cross_user_or_language(): void
     {
         $otherWord = $this->createWord($this->otherUser->id, 'english', -1, 'orange');
-        $otherCard = app(ReviewCardService::class)->ensureWordCard($otherWord);
+        $otherCard = $this->createLegacyWordCard($otherWord);
 
         $this->actingAs($this->user)->post('/reviews/rate', [
             'reviewCardId' => $otherCard->id,
@@ -171,7 +148,7 @@ class ReviewFsrsTest extends TestCase
         ])->assertStatus(500);
 
         $spanishWord = $this->createWord($this->user->id, 'spanish', -1, 'manzana');
-        $spanishCard = app(ReviewCardService::class)->ensureWordCard($spanishWord);
+        $spanishCard = $this->createLegacyWordCard($spanishWord);
 
         $this->actingAs($this->user)->post('/reviews/rate', [
             'reviewCardId' => $spanishCard->id,
@@ -234,7 +211,7 @@ class ReviewFsrsTest extends TestCase
     public function test_review_queue_returns_word_and_sense_cards_mixed(): void
     {
         $dueWord = $this->createWord($this->user->id, 'english', -1, 'apple');
-        app(ReviewCardService::class)->ensureWordCard($dueWord);
+        $this->createLegacyWordCard($dueWord);
 
         $sense = $this->createSense($this->user->id, 'english', 'test', 'noun', '测试', 'test');
         app(ReviewCardService::class)->ensureSenseCard($sense);
@@ -465,7 +442,7 @@ class ReviewFsrsTest extends TestCase
     public function test_word_card_not_in_queue_even_when_due(): void
     {
         $dueWord = $this->createWord($this->user->id, 'english', -1, 'apple');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($dueWord);
+        $wordCard = $this->createLegacyWordCard($dueWord);
 
         $response = $this->actingAs($this->user)->post('/reviews', [
             'bookId' => -1,
@@ -483,7 +460,7 @@ class ReviewFsrsTest extends TestCase
     public function test_old_word_card_not_deleted_after_sense_only_switch(): void
     {
         $dueWord = $this->createWord($this->user->id, 'english', -1, 'oldword');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($dueWord);
+        $wordCard = $this->createLegacyWordCard($dueWord);
 
         // Trigger review queue (sense-only)
         $this->actingAs($this->user)->post('/reviews', [
@@ -1756,7 +1733,7 @@ class ReviewFsrsTest extends TestCase
     public function test_reset_card_not_applicable_to_word_card(): void
     {
         $word = $this->createWord($this->user->id, 'english', -1, 'wordcard');
-        $card = app(ReviewCardService::class)->ensureWordCard($word);
+        $card = $this->createLegacyWordCard($word);
         $this->assertNotNull($card);
         $this->assertSame(ReviewCard::TARGET_WORD, $card->target_type);
 
@@ -1810,6 +1787,21 @@ class ReviewFsrsTest extends TestCase
             'status' => WordSense::STATUS_CONFIRMED,
             'is_context_specific' => true,
             'sense_key' => hash('sha256', strtolower("{$language}|{$lemma}|{$pos}|{$senseZh}|{$senseEn}")),
+        ]);
+    }
+
+    private function createLegacyWordCard(EncounteredWord $word): ReviewCard
+    {
+        return ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
         ]);
     }
 

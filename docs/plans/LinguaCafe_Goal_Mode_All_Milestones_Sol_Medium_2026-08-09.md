@@ -308,8 +308,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | D-01 | DONE | 全量 inventory：`target_type=word` 使用者、路由、统计、历史、写入口 | git/code search + 既有 migration/audit tests | 形成可执行分类清单，不修改数据 |
 | D-02 | DONE | dry-run 分类器：唯一映射 / 需用户确认 / 无法安全映射 | WordSense/Occurrence/ReviewCard/SenseSourceContext | dry-run 可重复；不猜测 sense；无强制一对多复制 |
 | D-03 | DONE | 设计并验证迁移、备份、可逆/可追溯策略 | 既有 backup/operation/review-log infrastructure | testing DB migration 前后快照；ReviewLog 历史不伪造 sense identity |
-| D-04 | ACTIVE | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
-| D-05 | TODO | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
+| D-04 | DONE | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
+| D-05 | ACTIVE | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
 | D-06 | TODO | per-occurrence lemma/POS 评估与必要最小实现 | WordSenseOccurrence、tokenizer、morphology assets | 新 lemma/POS 与已确认 binding 不一致时只标复核，不自动重写；词典不做 lemma oracle |
 | D-07 | TODO | legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除 | existing UI guards | 不为“代码干净”删除仍有 caller 的能力；阅读颜色正确 |
 | D-GATE | TODO | Phase D migration + product Gate | D-01…D-07 | dry-run/backup/reversibility/isolation/log preservation/queue/browser 全通过；自动进入 E |
@@ -472,10 +472,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `D-04`（专用 testing DB 的 legacy word-card 迁移闭环与写入围栏）
-- Last DONE: `D-03`
+- Active milestone: `D-05`（WordSense 生词页搜索、编辑、来源总览与 legacy 历史说明）
+- Last DONE: `D-04`
 - Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
-- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-09 10:15 +08:00 fresh fetch）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-12 20:19 +08:00 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none`
 
@@ -623,6 +623,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | D-02 | DONE | Goal branch tip | persisted-ID-only 只读分类器与稳定 JSON 报告完成；跨域/缺失/冲突/唯一映射优先级及完整依赖可追溯；health 6/69、focused 4/80、protected regression 96/535、lint/command/diff/lease 全绿；双 fresh review Blocker=0/Required=0 | D-03`
 
 `2026-08-12 | D-03 | DONE | Goal branch tip | ADR-0057 + dormant run/item ledger + classifier-authoritative apply/rollback recovery owner；backup lock/fresh retention、完整 pre/post evidence、exact raw timestamp restore、dependency drift refusal 与 scope 隔离闭合；health 6/69、focused 10/141、protected regression 289/1481；双 fresh review Blocker=0/Required=0 | D-04`
+
+`2026-08-12 | D-04 | DONE | Goal branch tip | testing-only controlled migration command 复用 D-03 plan/apply/rollback；legacy word-card 新建与正式评分切断，applied-ledger 写入围栏覆盖 stage/CSV/Finish/hard-delete/language-delete，Goal 改为 Sense-only authority；mandatory PHP 102/623 + static 12/12、broader 633/2865、health 6/69 全绿，lease final inactive，fresh review Blocker=0/Required=0；无 UI 改动故 browser N/A | D-05`
 
 ### DECISION LOG
 

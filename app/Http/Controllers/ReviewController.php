@@ -74,6 +74,8 @@ class ReviewController extends Controller {
 
         try {
             $card = $this->reviewCardService->recordReview($userId, $language, $reviewCardId, $rating, 'sense_review', null, $reviewDurationMs);
+        } catch (\DomainException $e) {
+            abort(422, $e->getMessage());
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

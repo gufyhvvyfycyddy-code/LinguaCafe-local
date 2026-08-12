@@ -17,8 +17,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class UserService {
-    
-    public function __construct() {
+    private LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService;
+
+    public function __construct(?LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService = null) {
+        $this->legacyWordCardMigrationProtectionService = $legacyWordCardMigrationProtectionService
+            ?? app(LegacyWordCardMigrationProtectionService::class);
     }
 
     public function getUsers($userId) {
@@ -112,6 +115,8 @@ class UserService {
 
     public function deleteUserLanguageData($userId, $language): void
     {
+        $this->legacyWordCardMigrationProtectionService->assertScopeMutable((int) $userId, (string) $language);
+
         DB::transaction(function() use($userId, $language) {
             Phrase::query()
                 ->where('user_id', $userId)

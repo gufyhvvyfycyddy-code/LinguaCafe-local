@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Log;
 class ChapterService {
     private $bookService;
     private $goalService;
+    private LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService;
 
     /**
      * Safe DI optimization (GLM-ArchitectureFirst1000-SafeStability-1).
@@ -33,10 +34,13 @@ class ChapterService {
      */
     public function __construct(
         BookService $bookService,
-        GoalService $goalService
+        GoalService $goalService,
+        ?LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService = null,
     ) {
         $this->bookService = $bookService;
         $this->goalService = $goalService;
+        $this->legacyWordCardMigrationProtectionService = $legacyWordCardMigrationProtectionService
+            ?? app(LegacyWordCardMigrationProtectionService::class);
     }
 
     public function getChaptersForBook($userId, $language, $bookId) {
@@ -236,6 +240,56 @@ class ChapterService {
         if (!$chapterInScope) {
             throw new \Exception('Chapter does not exist in the selected language.');
         }
+
+        $stageChangeIds = [];
+        if ($autoMoveWordsToKnown) {
+            $autoMoveIds = collect($uniqueWords)
+                ->filter(fn ($word) => isset($word->id, $word->stage) && (int) $word->stage === 2)
+                ->pluck('id')
+                ->map(fn ($id): int => (int) $id)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($autoMoveIds !== []) {
+                $stageChangeIds = EncounteredWord::query()
+                    ->where('user_id', $userId)
+                    ->where('language', $language)
+                    ->whereIn('id', $autoMoveIds)
+                    ->where('stage', '<>', 0)
+                    ->pluck('id')
+                    ->map(fn ($id): int => (int) $id)
+                    ->all();
+            }
+        }
+
+        if ($autoLevelUpWords) {
+            $levelUpIds = collect($leveledUpWords)
+                ->map(fn ($id): int => (int) $id)
+                ->filter(fn (int $id): bool => $id > 0)
+                ->unique()
+                ->values()
+                ->all();
+
+            if ($levelUpIds !== []) {
+                $stageChangeIds = array_merge(
+                    $stageChangeIds,
+                    EncounteredWord::query()
+                        ->where('user_id', $userId)
+                        ->where('language', $language)
+                        ->whereIn('id', $levelUpIds)
+                        ->pluck('id')
+                        ->map(fn ($id): int => (int) $id)
+                        ->all(),
+                );
+            }
+        }
+
+        $this->legacyWordCardMigrationProtectionService->assertEncounteredWordIdsMutable(
+            $userId,
+            $language,
+            array_values(array_unique($stageChangeIds)),
+        );
 
         // automove words that the user sees the first time,
         // but they already know it to learned stage.

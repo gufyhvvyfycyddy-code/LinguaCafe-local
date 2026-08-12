@@ -9,7 +9,7 @@ class InitializeReviewCards extends Command
 {
     protected $signature = 'reviews:initialize-cards {--user_id=} {--language=} {--dry-run}';
 
-    protected $description = 'Create FSRS review cards for existing reviewable vocabulary.';
+    protected $description = 'Diagnose missing legacy word review cards after the D-04 cutover.';
 
     public function handle(ReviewCardService $reviewCardService): int
     {
@@ -18,15 +18,13 @@ class InitializeReviewCards extends Command
 
         if ($this->option('dry-run')) {
             $count = $reviewCardService->countInitializableWords($userId, $language);
-            $this->info("Dry run: {$count} review cards would be created.");
+            $this->info("Dry run: {$count} legacy word card(s) are missing (diagnostic only).");
 
             return self::SUCCESS;
         }
 
-        $created = $reviewCardService->initializeExistingWords($userId, $language);
+        $this->error('Legacy word-card creation is disabled after the D-04 cutover.');
 
-        $this->info("Created {$created} review cards.");
-
-        return self::SUCCESS;
+        return self::FAILURE;
     }
 }

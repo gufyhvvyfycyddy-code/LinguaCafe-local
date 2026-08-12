@@ -114,7 +114,7 @@ class WordSenseTest extends TestCase
     public function test_sense_card_rating_does_not_affect_word_card_or_other_sense(): void
     {
         $word = $this->createWord('charge');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $wordCard = $this->createLegacyWordCard($word);
         $senseA = $this->createSense(['sense_key' => 'charge-money', 'sense_zh' => '收费；要价']);
         $senseB = $this->createSense(['sense_key' => 'charge-battery', 'sense_zh' => '充电']);
         $senseCardA = $this->wordSenseService->createReviewCardForSense($senseA);
@@ -442,7 +442,7 @@ class WordSenseTest extends TestCase
     public function test_word_review_queue_stays_word_only_when_sense_cards_exist(): void
     {
         $word = $this->createWord('charge');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $this->createLegacyWordCard($word);
         $sense = $this->createSense(['sense_key' => 'charge-money', 'sense_en' => 'to ask for money']);
         $senseCard = $this->wordSenseService->createReviewCardForSense($sense);
 
@@ -940,7 +940,7 @@ class WordSenseTest extends TestCase
         $confirmed = $this->createSense(['sense_key' => 'charge-money']);
         $dueSenseCard = $this->wordSenseService->createReviewCardForSense($confirmed);
         $word = $this->createWord('charge');
-        app(ReviewCardService::class)->ensureWordCard($word);
+        $this->createLegacyWordCard($word);
 
         $otherUserSense = $this->createSense([
             'user_id' => $this->otherUser->id,
@@ -992,7 +992,7 @@ class WordSenseTest extends TestCase
             $sense = $this->createSense(['sense_key' => "charge-{$rating}"]);
             $senseCard = $this->wordSenseService->createReviewCardForSense($sense);
             $word = $this->createWord("word-{$rating}");
-            $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+            $wordCard = $this->createLegacyWordCard($word);
 
             $response = $this->actingAs($this->user)->postJson("/reviews/senses/{$senseCard->id}/rate", [
                 'rating' => $rating,
@@ -1018,7 +1018,7 @@ class WordSenseTest extends TestCase
     public function test_sense_review_rating_rejects_word_card_and_cross_scope_sense_card(): void
     {
         $word = $this->createWord('charge');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $wordCard = $this->createLegacyWordCard($word);
         $otherSense = $this->createSense([
             'user_id' => $this->otherUser->id,
             'sense_key' => 'other-sense',
@@ -1054,7 +1054,7 @@ class WordSenseTest extends TestCase
         $otherCard = $this->wordSenseService->createReviewCardForSense($otherSense);
         $otherCard->update(['fsrs_due_at' => now()->addDay()]);
         $word = $this->createWord('standalone-word');
-        $wordCard = app(ReviewCardService::class)->ensureWordCard($word);
+        $wordCard = $this->createLegacyWordCard($word);
 
         // Simulate the V5 generation result: a brand-new confirmed sense + sense card.
         $targetSense = $this->createSense(['sense_key' => 'mediation-loop', 'sense_zh' => '调解；斡旋']);
@@ -1753,10 +1753,10 @@ class WordSenseTest extends TestCase
         $this->assertNotNull($senseCard);
         $this->assertTrue($senseCard->fsrs_enabled);
 
-        // word card should still exist and be enabled
-        $wordCard = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->first();
-        $this->assertNotNull($wordCard);
-        $this->assertTrue($wordCard->fsrs_enabled);
+        // D-04 cutover: confirming the Sense must not create a new legacy word card.
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)
+            ->exists());
     }
 
     // ─── FSRS Doctor ───
@@ -1773,7 +1773,7 @@ class WordSenseTest extends TestCase
             ->assertExitCode(1); // missing cards → non-zero
     }
 
-    public function test_fsrs_doctor_fix_creates_missing_word_card(): void
+    public function test_fsrs_doctor_fix_does_not_create_missing_word_card(): void
     {
         $word = $this->createWord('doctor-fix');
         $word->update(['stage' => -7]);
@@ -1785,7 +1785,7 @@ class WordSenseTest extends TestCase
             '--language' => 'english',
         ])->assertSuccessful();
 
-        $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
             ->where('target_id', $word->id)->exists());
     }
 
@@ -1793,8 +1793,18 @@ class WordSenseTest extends TestCase
     {
         $word = $this->createWord('doctor-existing');
         $word->update(['stage' => -7]);
-        // explicitly create the card first
-        $card = app(ReviewCardService::class)->ensureWordCard($word);
+        // Seed a pre-cutover legacy card directly; D-04 no longer creates one.
+        $card = ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
         $cardId = $card->id;
 
         $this->artisan('fsrs:doctor', [
@@ -1840,7 +1850,17 @@ class WordSenseTest extends TestCase
     {
         $word = $this->createWord('doctor-healthy');
         $word->update(['stage' => -7]);
-        app(ReviewCardService::class)->ensureWordCard($word);
+        ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
 
         $sense = $this->createSense(['sense_key' => 'doctor-healthy-sense', 'sense_zh' => '医生']);
         app(ReviewCardService::class)->ensureSenseCard($sense);
@@ -2572,6 +2592,21 @@ class WordSenseTest extends TestCase
         ]);
     }
 
+    private function createLegacyWordCard(EncounteredWord $word): ReviewCard
+    {
+        return ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+            'fsrs_state' => 'new',
+            'fsrs_due_at' => now(),
+            'fsrs_enabled' => true,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
+    }
+
     private function createSense(array $overrides): WordSense
     {
         return $this->wordSenseService->createSense($this->senseData($overrides));
@@ -3023,7 +3058,7 @@ class WordSenseTest extends TestCase
     {
         $word = $this->createWord('learning');
         $word->update(['stage' => -7]); // Learning 7
-        app(ReviewCardService::class)->ensureWordCard($word);
+        $this->createLegacyWordCard($word);
 
         $beforeCardCount = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->count();
         $this->assertSame(1, $beforeCardCount);

@@ -186,15 +186,21 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
     public function test_content_only_edit_does_not_change_existing_legacy_card(): void
     {
         $word = $this->word('content-card', -7, ['translation' => 'before']);
-        $card = app(ReviewCardService::class)->ensureWordCard($word);
-        $card->forceFill([
+        $card = ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
             'fsrs_state' => 'review',
+            'fsrs_due_at' => now(),
             'fsrs_stability' => 4.2,
             'fsrs_difficulty' => 6.1,
             'fsrs_reps' => 3,
             'fsrs_lapses' => 1,
             'fsrs_enabled' => false,
-        ])->save();
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
         $snapshot = $card->fresh()->only(['fsrs_state', 'fsrs_stability', 'fsrs_difficulty', 'fsrs_reps', 'fsrs_lapses', 'fsrs_enabled', 'fsrs_due_at']);
 
         app(VocabularyService::class)->updateWord(
@@ -209,18 +215,21 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
         $this->assertSame(0, WordSenseOccurrence::count());
     }
 
-    public function test_explicit_negative_and_non_negative_stage_requests_keep_legacy_card_behavior(): void
+    public function test_explicit_negative_and_non_negative_stage_requests_do_not_create_legacy_card(): void
     {
         $word = $this->word('explicit-stage', 2, ['translation' => '旧翻译']);
         $service = app(VocabularyService::class);
 
         $service->updateWord($this->user->id, 'english', $word->id, [], -7);
-        $card = ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->where('target_id', $word->id)->firstOrFail();
-        $this->assertTrue((bool) $card->fsrs_enabled);
+        $this->assertSame(-7, $word->fresh()->stage);
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)->exists());
         $this->assertSame(1, WordSense::where('encountered_word_id', $word->id)->count());
 
         $service->updateWord($this->user->id, 'english', $word->id, [], 0);
-        $this->assertFalse((bool) $card->fresh()->fsrs_enabled);
+        $this->assertSame(0, $word->fresh()->stage);
+        $this->assertFalse(ReviewCard::where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)->exists());
     }
 
     private function addSense(EncounteredWord $word, array $overrides = []): \Illuminate\Testing\TestResponse

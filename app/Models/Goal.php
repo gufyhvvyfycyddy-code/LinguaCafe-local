@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\GoalAchievement;
+use App\Services\SenseReviewQueryService;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
@@ -52,17 +53,14 @@ class Goal extends Model
     }
 
     public function getTodaysReviewGoalQuantity() {
+        $userId = Auth::user()->id;
         $selectedLanguage = Auth::user()->selected_language;
-        return ReviewCard::query()
-            ->join('encountered_words', function ($join) {
-                $join->on('encountered_words.id', '=', 'review_cards.target_id')
-                    ->where('review_cards.target_type', ReviewCard::TARGET_WORD);
-            })
-            ->where('review_cards.user_id', Auth::user()->id)
-            ->where('review_cards.language_id', $selectedLanguage)
-            ->where('review_cards.fsrs_enabled', true)
-            ->where('review_cards.fsrs_due_at', '<=', Carbon::now())
-            ->where('encountered_words.stage', '<', 0)
-            ->count();
+        $now = Carbon::now();
+
+        return app(SenseReviewQueryService::class)
+            ->confirmedSenseCardQuery($userId, $selectedLanguage)
+            ->senseReviewEligible($userId, $selectedLanguage, $now)
+            ->where('review_cards.fsrs_due_at', '<=', $now)
+            ->count('review_cards.id');
     }
 }

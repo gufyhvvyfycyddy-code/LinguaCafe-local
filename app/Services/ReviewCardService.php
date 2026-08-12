@@ -23,20 +23,13 @@ class ReviewCardService
             return null;
         }
 
-        return ReviewCard::firstOrCreate(
-            [
-                'user_id' => $word->user_id,
-                'language_id' => $word->language,
-                'language' => $word->language,
-                'target_type' => ReviewCard::TARGET_WORD,
-                'target_id' => $word->id,
-            ],
-            [
-                'fsrs_state' => 'new',
-                'fsrs_due_at' => Carbon::now(),
-                'fsrs_enabled' => true,
-            ]
-        );
+        return ReviewCard::query()
+            ->where('user_id', $word->user_id)
+            ->where('language_id', $word->language)
+            ->where('language', $word->language)
+            ->where('target_type', ReviewCard::TARGET_WORD)
+            ->where('target_id', $word->id)
+            ->first();
     }
 
     public function ensureSenseCard(WordSense $sense): ?ReviewCard
@@ -250,6 +243,16 @@ class ReviewCardService
         ?Carbon $reviewedAt = null,
     ): array {
         return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs, $reviewedAt) {
+            $targetCard = ReviewCard::lockForUpdate()
+                ->where('user_id', $userId)
+                ->where('language_id', $language)
+                ->where('id', $reviewCardId)
+                ->first();
+
+            if ($targetCard?->target_type === ReviewCard::TARGET_WORD) {
+                throw new \DomainException('Legacy word review cards are read-only and cannot be rated.');
+            }
+
             // ADR-0010: Only queue-eligible cards can be rated.
             // - lifecycle_state = 'active'
             // - buried_until IS NULL OR buried_until <= now
@@ -268,6 +271,10 @@ class ReviewCardService
 
             if (!$card) {
                 throw new \Exception('Review card does not exist, is not queue-eligible, or belongs to another user.');
+            }
+
+            if ($card->target_type !== ReviewCard::TARGET_SENSE) {
+                throw new \Exception('Formal review ratings require a Sense review card.');
             }
 
             if (!$this->isReviewableTarget($card, $language)) {
@@ -330,18 +337,6 @@ class ReviewCardService
         });
     }
 
-    private function wordForCard(ReviewCard $card): ?EncounteredWord
-    {
-        if ($card->target_type !== ReviewCard::TARGET_WORD) {
-            return null;
-        }
-
-        return EncounteredWord::where('user_id', $card->user_id)
-            ->where('language', $card->language_id)
-            ->where('id', $card->target_id)
-            ->first();
-    }
-
     private function senseForCard(ReviewCard $card): ?WordSense
     {
         if ($card->target_type !== ReviewCard::TARGET_SENSE) {
@@ -356,19 +351,13 @@ class ReviewCardService
 
     private function isReviewableTarget(ReviewCard $card, string $language): bool
     {
-        if ($card->target_type === ReviewCard::TARGET_WORD) {
-            $word = $this->wordForCard($card);
-
-            return $word !== null && $word->language === $language && $this->isReviewableWord($word);
+        if ($card->target_type !== ReviewCard::TARGET_SENSE) {
+            return false;
         }
 
-        if ($card->target_type === ReviewCard::TARGET_SENSE) {
-            $sense = $this->senseForCard($card);
+        $sense = $this->senseForCard($card);
 
-            return $sense !== null && $sense->language_id === $language && $this->isReviewableSense($sense);
-        }
-
-        return false;
+        return $sense !== null && $sense->language_id === $language && $this->isReviewableSense($sense);
     }
 
     private function isReviewableWord(EncounteredWord $word): bool

@@ -11,13 +11,12 @@ use Illuminate\Console\Command;
 class FsrsDoctor extends Command
 {
     protected $signature = 'fsrs:doctor
-                            {--fix : Create missing review cards}
+                            {--fix : Create missing confirmed Sense review cards}
                             {--user_id= : Filter by user ID}
                             {--language= : Filter by language}';
 
-    protected $description = 'Check and repair FSRS review card consistency.
-Finds Learning words and confirmed senses that are missing review cards.
-Use --fix to create missing cards.';
+    protected $description = 'Check FSRS review card consistency and repair missing confirmed Sense cards.
+Missing legacy word cards remain diagnostic-only after the D-04 cutover.';
 
     public function handle(ReviewCardService $reviewCardService): int
     {
@@ -28,7 +27,7 @@ Use --fix to create missing cards.';
         $this->info('=== FSRS Review Card Doctor ===');
         $this->newLine();
 
-        $wordStats = $this->checkWordCards($userId, $language, $fix, $reviewCardService);
+        $wordStats = $this->checkWordCards($userId, $language, $fix);
         $senseStats = $this->checkSenseCards($userId, $language, $fix, $reviewCardService);
 
         $this->newLine();
@@ -36,22 +35,22 @@ Use --fix to create missing cards.';
 
         $totalChecked = $wordStats['checked'] + $senseStats['checked'];
         $totalMissing = $wordStats['missing'] + $senseStats['missing'];
-        $totalCreated = $wordStats['created'] + $senseStats['created'];
-
         $this->info("  Word cards:  {$wordStats['checked']} checked, {$wordStats['missing']} missing" . ($fix ? ", {$wordStats['created']} created" : ''));
         $this->info("  Sense cards: {$senseStats['checked']} checked, {$senseStats['missing']} missing" . ($fix ? ", {$senseStats['created']} created" : ''));
 
         if ($totalMissing > 0 && !$fix) {
             $this->newLine();
-            $this->warn("{$totalMissing} review card(s) missing. Run with --fix to create them.");
+            $this->warn("{$totalMissing} review card(s) missing. --fix repairs confirmed Sense cards only.");
         } elseif ($totalMissing === 0) {
             $this->info('All review cards are present.');
+        } elseif ($wordStats['missing'] > 0) {
+            $this->warn("{$wordStats['missing']} legacy word card(s) remain missing by design after the D-04 cutover.");
         }
 
         return $totalMissing > 0 && !$fix ? 1 : 0;
     }
 
-    private function checkWordCards(?int $userId, ?string $language, bool $fix, ReviewCardService $service): array
+    private function checkWordCards(?int $userId, ?string $language, bool $fix): array
     {
         $this->info('── Word Review Cards ──');
 
@@ -84,25 +83,13 @@ Use --fix to create missing cards.';
         $this->line("  Learning words (stage < 0): {$checked}");
         $this->line("  Missing word cards: {$missing}");
 
-        if ($missing > 0 && $fix) {
-            $this->info("  → Creating word review cards...");
-            $bar = $this->output->createProgressBar($missing);
-            $bar->start();
-
-            foreach ($missingWords as $word) {
-                $card = $service->ensureWordCard($word);
-                if ($card !== null && $card->wasRecentlyCreated) {
-                    $created++;
-                }
-                $bar->advance();
-            }
-
-            $bar->finish();
-            $this->newLine();
-            $this->info("  → Created {$created} word card(s).");
-        } elseif ($missing > 0 && !$fix) {
+        if ($missing > 0) {
             $examples = $missingWords->take(5)->map(fn ($w) => "{$w->word} (id={$w->id}, user={$w->user_id})")->implode(', ');
             $this->line("  Examples: {$examples}");
+
+            if ($fix) {
+                $this->warn('  → Legacy word-card creation is disabled; no word cards were created.');
+            }
         }
 
         $this->newLine();

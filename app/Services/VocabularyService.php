@@ -23,13 +23,17 @@ use App\Services\VocabularyTokenFilter;
 
 class VocabularyService {
     private $itemsPerPage;
+    private LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService;
 
     public function __construct(
         private ReviewCardService $reviewCardService,
         private WordSenseService $wordSenseService,
         private VocabularyQueryService $vocabularyQueryService,
+        ?LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService = null,
     ) {
         $this->itemsPerPage = 30;
+        $this->legacyWordCardMigrationProtectionService = $legacyWordCardMigrationProtectionService
+            ?? app(LegacyWordCardMigrationProtectionService::class);
     }
 
     /**
@@ -63,6 +67,7 @@ class VocabularyService {
         }
 
         if ($wordStage !== null) {
+            $this->legacyWordCardMigrationProtectionService->assertEncounteredWordMutable($word);
             $word->setStage($wordStage);
         }
 
@@ -305,6 +310,8 @@ class VocabularyService {
             if (empty($ids)) {
                 return 0;
             }
+
+            $this->legacyWordCardMigrationProtectionService->assertEncounteredWordIdsMutable($userId, $language, $ids);
 
             // Reject WordSenses linked via encountered_word_id before deleting words.
             // Only senses with status != rejected are processed to avoid redundant work.
@@ -734,7 +741,8 @@ class VocabularyService {
 
         // collect data from csv file
         DB::beginTransaction();
-        foreach($records as $index => $record) {
+        try {
+            foreach($records as $index => $record) {
             $lowerCaseWord = mb_strtolower($record[0]);
 
             // skip header if option is enabled
@@ -797,6 +805,10 @@ class VocabularyService {
 
                 $createdWords ++;
             } else {
+                if (isset($record[5])) {
+                    $this->legacyWordCardMigrationProtectionService->assertEncounteredWordMutable($encounteredWord);
+                }
+
                 $updatedWords ++;
             }
 
@@ -829,11 +841,15 @@ class VocabularyService {
             $encounteredWord->save();
             $this->reviewCardService->ensureWordCard($encounteredWord);
 
-            // add word to accepted words list
-            $acceptedWords[] = $lowerCaseWord;
-        }
+                // add word to accepted words list
+                $acceptedWords[] = $lowerCaseWord;
+            }
 
-        DB::commit();
+            DB::commit();
+        } catch (\Throwable $exception) {
+            DB::rollBack();
+            throw $exception;
+        }
 
         $responseData = new \StdClass();
         $responseData->createdWords = $createdWords;
