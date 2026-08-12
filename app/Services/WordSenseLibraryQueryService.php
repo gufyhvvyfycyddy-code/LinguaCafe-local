@@ -20,6 +20,8 @@ class WordSenseLibraryQueryService
 
             $query->where(function ($query) use ($likeQuery) {
                 $query->where('lemma', 'like', "%{$likeQuery}%")
+                    ->orWhere('surface_form', 'like', "%{$likeQuery}%")
+                    ->orWhere('pos', 'like', "%{$likeQuery}%")
                     ->orWhere('sense_zh', 'like', "%{$likeQuery}%")
                     ->orWhere('sense_en', 'like', "%{$likeQuery}%");
             });
@@ -28,12 +30,12 @@ class WordSenseLibraryQueryService
         $paginator = $query
             ->orderBy('lemma')
             ->orderBy('id')
-            ->paginate($perPage, ['id', 'lemma', 'pos', 'sense_zh', 'sense_en'], 'page', $page);
+            ->paginate($perPage, ['id', 'lemma', 'pos', 'sense_zh', 'sense_en', 'aliases_zh', 'collocations'], 'page', $page);
 
         if ($page > $paginator->lastPage()) {
             $paginator = $query->paginate(
                 $perPage,
-                ['id', 'lemma', 'pos', 'sense_zh', 'sense_en'],
+                ['id', 'lemma', 'pos', 'sense_zh', 'sense_en', 'aliases_zh', 'collocations'],
                 'page',
                 $paginator->lastPage(),
             );
@@ -45,6 +47,8 @@ class WordSenseLibraryQueryService
             'pos' => $sense->pos,
             'sense_zh' => $sense->sense_zh,
             'sense_en' => $sense->sense_en,
+            'aliases_zh' => $sense->aliases_zh ?? [],
+            'collocations' => $sense->collocations ?? [],
         ], $paginator->items());
 
         return [

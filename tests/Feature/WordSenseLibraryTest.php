@@ -33,6 +33,8 @@ class WordSenseLibraryTest extends TestCase
         $beta = $this->makeSense($user, [
             'lemma' => 'beta',
             'sense_zh' => '贝塔义',
+            'aliases_zh' => ['贝塔', 'β'],
+            'collocations' => ['beta test', 'beta release'],
         ]);
         $alphaFirst = $this->makeSense($user, [
             'lemma' => 'alpha',
@@ -76,10 +78,14 @@ class WordSenseLibraryTest extends TestCase
             $keys = array_keys($item);
             sort($keys);
             $this->assertSame(
-                ['lemma', 'pos', 'sense_en', 'sense_id', 'sense_zh'],
+                ['aliases_zh', 'collocations', 'lemma', 'pos', 'sense_en', 'sense_id', 'sense_zh'],
                 $keys,
             );
         }
+
+        $betaItem = $items[2];
+        $this->assertSame(['贝塔', 'β'], $betaItem['aliases_zh']);
+        $this->assertSame(['beta test', 'beta release'], $betaItem['collocations']);
 
         $this->assertSame([
             'current_page' => 1,
@@ -89,7 +95,7 @@ class WordSenseLibraryTest extends TestCase
         ], $response->json('pagination'));
     }
 
-    public function test_search_only_matches_lemma_and_zh_or_en_sense_text(): void
+    public function test_search_matches_all_d05_text_fields_and_escapes_wildcards(): void
     {
         $user = $this->makeUser();
 
@@ -108,9 +114,15 @@ class WordSenseLibraryTest extends TestCase
             'sense_zh' => '普通中文释义',
             'sense_en' => 'contains english-hit-token here',
         ]);
-        $surfaceOnly = $this->makeSense($user, [
+        $surfaceMatch = $this->makeSense($user, [
             'lemma' => 'surface-entry',
             'surface_form' => 'surface-only-token',
+            'sense_zh' => '普通中文释义',
+            'sense_en' => 'ordinary English meaning',
+        ]);
+        $posMatch = $this->makeSense($user, [
+            'lemma' => 'pos-entry',
+            'pos' => 'd05-pos-hit-token',
             'sense_zh' => '普通中文释义',
             'sense_en' => 'ordinary English meaning',
         ]);
@@ -138,14 +150,16 @@ class WordSenseLibraryTest extends TestCase
         $this->assertSearchIds($user, 'lemma-hit-token', [$lemmaMatch->id]);
         $this->assertSearchIds($user, '中文命中词', [$zhMatch->id]);
         $this->assertSearchIds($user, 'english-hit-token', [$enMatch->id]);
-        $this->assertSearchIds($user, 'surface-only-token', []);
+        $this->assertSearchIds($user, 'surface-only-token', [$surfaceMatch->id]);
+        $this->assertSearchIds($user, 'd05-pos-hit-token', [$posMatch->id]);
         $this->assertSearchIds($user, '100%', [$percentMatch->id]);
         $this->assertSearchIds($user, 'literal_under', [$underscoreMatch->id]);
 
         $emptyQuery = $this->actingAs($user)->getJson('/word-senses/data?q=');
         $emptyQuery->assertOk();
-        $this->assertCount(8, $emptyQuery->json('data'));
-        $this->assertContains($surfaceOnly->id, array_column($emptyQuery->json('data'), 'sense_id'));
+        $this->assertCount(9, $emptyQuery->json('data'));
+        $this->assertContains($surfaceMatch->id, array_column($emptyQuery->json('data'), 'sense_id'));
+        $this->assertContains($posMatch->id, array_column($emptyQuery->json('data'), 'sense_id'));
 
         $noResult = $this->actingAs($user)->getJson('/word-senses/data?q=missing-search-token');
         $noResult->assertOk()->assertJson(['data' => []]);

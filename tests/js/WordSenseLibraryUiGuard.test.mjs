@@ -68,15 +68,11 @@ test('router owns canonical /word-senses page', () => {
     assert.notEqual(route[1], 'ReviewCardManage');
 });
 
-test('page identity and read-only data path match the frozen contract', () => {
+test('page stays WordSense-first and keeps the canonical list request', () => {
     assert.match(pageSource, />\s*生词\s*</);
     assert.ok(pageSource.includes('这里是你已经保存并确认的词义。同一个词可以有多个词义。'));
-    assert.ok(pageSource.includes('搜索生词或释义'));
-
-    const axiosGets = [...pageSource.matchAll(/axios\.get\s*\(/g)];
-    const canonicalGets = [...pageSource.matchAll(/axios\.get\s*\(\s*['"]\/word-senses\/data['"]/g)];
-    assert.ok(axiosGets.length > 0, 'Expected an axios GET for the WordSense library');
-    assert.equal(canonicalGets.length, axiosGets.length, 'Every axios GET must use /word-senses/data');
+    assert.ok(pageSource.includes('搜索单词、词性或释义'));
+    assert.match(pageSource, /axios\.get\(\s*['"]\/word-senses\/data['"]/);
 
     assertTemplateBinding('lemma');
     assertTemplateBinding('pos');
@@ -96,7 +92,7 @@ test('page identity and read-only data path match the frozen contract', () => {
 });
 
 test('search Enter and visible action share one real request path', () => {
-    const placeholderIndex = pageSource.indexOf('搜索生词或释义');
+    const placeholderIndex = pageSource.indexOf('搜索单词、词性或释义');
     assert.notEqual(placeholderIndex, -1);
     const searchArea = pageSource.slice(
         Math.max(0, placeholderIndex - 1200),
@@ -140,7 +136,73 @@ test('loading, empty, error, no-result, and clear-search branches stay visible',
     );
 });
 
-test('page stays inside the basic WordSense boundary', () => {
+test('D-05 reuses the shared edit form and only the manual sense mutation', () => {
+    assert.match(pageSource, /import ManualSenseForm from ['"]\.\.\/Text\/ManualSenseForm\.vue['"]/);
+    assert.match(pageSource, /components:\s*\{[\s\S]*\bManualSenseForm\b[\s\S]*\}/);
+    assert.match(pageSource, /<manual-sense-form\b[\s\S]{0,1000}?mode="edit"/);
+    assert.match(pageSource, /manualSenseValidationState/);
+    assert.match(pageSource, /normalizeWordSensePos/);
+    assert.match(pageSource, /validateManualSenseForm/);
+
+    assert.equal((pageSource.match(/axios\.put\s*\(/g) || []).length, 1, 'Only one PUT call is allowed');
+    assert.match(pageSource, /axios\.put\(\s*`\/senses\/\$\{item\.sense_id\}\/manual`/);
+    assert.doesNotMatch(pageSource, /axios\.(?:post|patch|delete)\s*\(/i);
+
+    const payload = pageSource.match(
+        /axios\.put\(\s*`\/senses\/\$\{item\.sense_id\}\/manual`,\s*\{([\s\S]*?)\}\)\.then/,
+    );
+    assert.ok(payload, 'Manual edit PUT payload must be statically visible');
+    for (const field of ['pos', 'sense_zh', 'sense_en', 'aliases_zh', 'collocations']) {
+        assert.match(payload[1], new RegExp(`\\b${field}\\s*:`), `PUT payload must include ${field}`);
+    }
+    for (const forbidden of ['lemma', 'review_card_id', 'fsrs_state', 'lifecycle']) {
+        assert.doesNotMatch(payload[1], new RegExp(`\\b${forbidden}\\s*:`), `PUT payload must not include ${forbidden}`);
+    }
+
+    assert.match(pageSource, /pos:\s*normalizeWordSensePos\(item\.pos\)\s*\|\|\s*['"]other['"]/);
+    assert.match(pageSource, /aliases_zh:\s*this\.listValue\(item\.aliases_zh\)/);
+    assert.match(pageSource, /collocations:\s*this\.listValue\(item\.collocations\)/);
+    assert.match(pageSource, /aliases_zh:\s*this\.splitList\(this\.editForm\.aliases_zh\)/);
+    assert.match(pageSource, /collocations:\s*this\.splitList\(this\.editForm\.collocations\)/);
+    assert.match(pageSource, /this\.loadPage\(currentPage\)/, 'Successful edit must reload from canonical server list');
+});
+
+test('aliases and collocations render in expanded details', () => {
+    assert.match(pageSource, /v-if="item\.aliases_zh\s*&&\s*item\.aliases_zh\.length"/);
+    assert.match(pageSource, /v-for="\(alias,\s*aliasIndex\) in item\.aliases_zh"/);
+    assert.ok(pageSource.includes('近义译法：'));
+
+    assert.match(pageSource, /v-if="item\.collocations\s*&&\s*item\.collocations\.length"/);
+    assert.match(pageSource, /v-for="\(collocation,\s*collocationIndex\) in item\.collocations"/);
+    assert.ok(pageSource.includes('搭配：'));
+});
+
+test('source overview is read-only, compact, and re-fetches from the canonical endpoint', () => {
+    assert.equal((pageSource.match(/axios\.get\s*\(/g) || []).length, 2, 'Only list GET and source GET are allowed');
+    assert.match(
+        pageSource,
+        /axios\.get\(\s*`\/senses\/\$\{senseId\}\/source-context-list`,\s*\{[\s\S]{0,200}?params:\s*\{\s*read_only:\s*1\s*\}/,
+    );
+    assert.match(pageSource, /sourceOverview:\s*\{[\s\S]{0,160}?senseId:\s*null[\s\S]{0,160}?status:\s*['"]unloaded['"]/);
+    assert.match(pageSource, /status:\s*['"]loading['"]/);
+    assert.match(pageSource, /status:\s*['"]success['"]/);
+    assert.match(pageSource, /status:\s*['"]error['"]/);
+    assert.doesNotMatch(pageSource, /sourceStates|cached per sense/i);
+    assert.doesNotMatch(pageSource, /current\.status\s*===\s*['"]success['"]/);
+    assert.match(pageSource, /!Array\.isArray\(response\.data\.sources\)/, 'Malformed source payload must be treated as an error');
+    assert.match(pageSource, /source\.chapter_title/);
+    assert.match(pageSource, /sourceKindLabel\(source\.source_kind\)/);
+    assert.match(pageSource, /source\.fallback_message/);
+    assert.ok(pageSource.includes('暂无可用原文位置'));
+});
+
+test('legacy history explanation stays ordinary-user facing', () => {
+    assert.ok(pageSource.includes('旧版按单词保存的复习历史会继续保留为只读历史'));
+    assert.ok(pageSource.includes('当前正式复习以词义为单位'));
+    assert.doesNotMatch(pageSource, /migration|ledger|classifier|ReviewLog|run_id/i);
+});
+
+test('page stays inside the frozen WordSense product boundary', () => {
     assert.doesNotMatch(
         pageSource,
         /(?:import|require)[^\n]*(?:Vocabulary|ReviewCardManage)|<\/?(?:Vocabulary|ReviewCardManage)\b/,
@@ -161,11 +223,10 @@ test('page stays inside the basic WordSense boundary', () => {
         'Leech',
     ];
     for (const field of forbiddenFields) {
-        assert.doesNotMatch(pageSource, new RegExp(`\\b${escapeRegex(field)}\\b`, 'i'), `${field} is outside C-05`);
+        assert.doesNotMatch(pageSource, new RegExp(`\\b${escapeRegex(field)}\\b`, 'i'), `${field} is outside D-05`);
     }
 
-    assert.doesNotMatch(pageSource, /\bstage\b|\bphrase\b|\bcsv\b|batch.{0,30}delete|delete.{0,30}batch|批量删除/i);
-    assert.doesNotMatch(pageSource, /axios\.(?:post|put|patch|delete)\s*\(/i);
+    assert.doesNotMatch(pageSource, /\/review-cards\/manage|\/archive\b|批量删除|删除释义|归档/i);
     assert.doesNotMatch(pageSource, /\$http\.(?:get|post|put|patch|delete)\s*\(/i);
     assert.doesNotMatch(pageSource, /\bfetch\s*\(/i);
     assert.doesNotMatch(pageSource, /method\s*:\s*['"](?:POST|PUT|PATCH|DELETE)['"]/i);
