@@ -8,7 +8,6 @@ const settings = fs.readFileSync(path.join(root, 'resources/js/components/UserSe
 const layout = fs.readFileSync(path.join(root, 'resources/js/components/Layout.vue'), 'utf8');
 
 const advancedRoutes = [
-    ['词汇搜索', '/vocabulary/search'],
     ['自定义学习', '/custom-study'],
     ['复习卡管理', '/review-cards/manage'],
     ['学习总览', '/study-overview'],
@@ -28,6 +27,8 @@ test('advanced entry reuses the existing route families without engineering labe
         assert.match(settings, new RegExp(`title:\\s*['"]${title}['"][\\s\\S]*?url:\\s*['"]${url.replaceAll('/', '\\/')}['"]`));
     }
 
+    assert.doesNotMatch(settings, /词汇搜索/);
+    assert.doesNotMatch(settings, /url:\s*['"]\/vocabulary\/search['"]/);
     assert.doesNotMatch(settings, /FSRS|Leech|ReviewCard|target_type|生命周期/);
     assert.doesNotMatch(layout, /高级复习卡管理/);
     assert.match(layout, /name:\s*['"]复习卡管理['"][\s\S]*?url:\s*['"]\/review-cards\/manage['"]/);

@@ -176,12 +176,6 @@
                         mainNav: false,
                     },
                     {
-                        name: '词汇',
-                        url: '/vocabulary/search',
-                        icon: 'mdi-translate',
-                        mainNav: false,
-                    },
-                    {
                         name: '自定义学习',
                         url: '/custom-study',
                         icon: 'mdi-tune-variant',

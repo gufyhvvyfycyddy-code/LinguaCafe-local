@@ -17,7 +17,6 @@ const expectedMain = [
 
 const expectedSecondary = [
     ['首页', '/'],
-    ['词汇', '/vocabulary/search'],
     ['自定义学习', '/custom-study'],
     ['复习卡管理', '/review-cards/manage'],
     ['学习总览', '/study-overview'],
@@ -136,6 +135,7 @@ test('secondary navigation compatibility remains explicit', () => {
     const secondaryEntries = entries.filter((entry) => entry.mainNav === 'false');
 
     assert.deepEqual(secondaryEntries.map(({ name, url }) => [name, url]), expectedSecondary);
+    assert.equal(entries.filter((entry) => entry.url === '/vocabulary/search').length, 0);
     assert.equal(entries.filter((entry) => entry.url === '/user-settings').length, 1);
     assert.equal(entries.find((entry) => entry.url === '/user-settings')?.name, '我的');
 });

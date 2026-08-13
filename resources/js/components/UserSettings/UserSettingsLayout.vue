@@ -50,12 +50,6 @@
                 tab: 0,
                 advancedItems: [
                     {
-                        title: '词汇搜索',
-                        description: '搜索阅读中记录的词和短语。',
-                        url: '/vocabulary/search',
-                        icon: 'mdi-translate',
-                    },
-                    {
                         title: '自定义学习',
                         description: '按范围创建一次性的复习练习。',
                         url: '/custom-study',
