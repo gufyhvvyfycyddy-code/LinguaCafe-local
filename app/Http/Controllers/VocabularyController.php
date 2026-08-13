@@ -197,28 +197,6 @@ class VocabularyController extends Controller {
         return response()->json(['ignored' => $ignored, 'total' => count($request->post('ids'))], 200);
     }
 
-    public function batchDeleteWords(Request $request) {
-        $request->validate([
-            'ids' => ['required', 'array'],
-            'ids.*' => ['integer'],
-        ]);
-
-        $userId = Auth::user()->id;
-        $deleted = 0;
-
-        foreach ($request->post('ids') as $wordId) {
-            try {
-                if ($this->vocabularyService->softDeleteWord($userId, (int) $wordId)) {
-                    $deleted++;
-                }
-            } catch (\Exception $e) {
-                // skip individual failures, continue with remaining
-            }
-        }
-
-        return response()->json(['deleted' => $deleted, 'total' => count($request->post('ids'))], 200);
-    }
-
     public function batchHardDeleteWords(Request $request) {
         $request->validate([
             'ids' => ['required', 'array'],
