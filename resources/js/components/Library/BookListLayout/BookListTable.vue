@@ -74,7 +74,6 @@
                             </v-btn>
                         </template>
                         <v-btn class="menu-button" tile color="white" @click="showEditBookDialog(item)">编辑</v-btn>
-                        <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog(item)">复习</v-btn>
                         <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog(item)">删除</v-btn>
                     </v-menu>
                 </template>
@@ -107,9 +106,6 @@
             },
             showDeleteBookDialog(book) {
                 this.$emit('show-delete-book-dialog', book);
-            },
-            showStartReviewDialog(book) {
-                this.$emit('show-start-review-dialog', book.id, book.name);
             },
             formatNumber: formatNumber
         }

@@ -42,7 +42,6 @@
                                 @click="retryFailedImports()"
                             >重试失败导入</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showEditBookDialog()">编辑</v-btn>
-                            <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog()">复习</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog()">删除</v-btn>
                         </v-menu>
                         <v-btn icon @click.stop="closeBook"><v-icon>mdi-close</v-icon></v-btn>
@@ -265,9 +264,6 @@
             },
             showDeleteBookDialog() {
                 this.$emit('show-delete-book-dialog', this.book);
-            },
-            showStartReviewDialog() {
-                this.$emit('show-start-review-dialog', this.book.id, this.book.name);
             },
             closeBook() {
                 this.$emit('close-book');

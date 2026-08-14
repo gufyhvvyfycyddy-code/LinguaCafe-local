@@ -2,7 +2,6 @@
    <v-app :class="{'eink': theme == 'eink', 'dark': theme == 'dark'}">
 
         <!-- Dialogs -->
-        <start-review-dialog v-model="startReviewDialog" />
         <logout-dialog v-model="logoutDialog"/>
 
         <template v-if="!['/login', '/setup', '/register'].includes($router.currentRoute.path)">
@@ -140,7 +139,6 @@
                 logoutDialog: false,
                 themeSelectionDialog: false,
                 languageSelectionDialog: false,
-                startReviewDialog: false,
                 drawer: false,
                 navbarVisible: true,
                 navbarCollapsed: false,
@@ -347,11 +345,6 @@
                 DefaultLocalStorageManager.saveSetting('navbar-collapsed', this.navbarCollapsed);
             },
             navigationClick(itemName, event) {
-                if (itemName === 'Review') {
-                    this.startReviewDialog = true;
-                    event.preventDefault();
-                }
-
                 if (itemName === '管理员设置' && this.$router.currentRoute.path !== '/admin') {
                     event.preventDefault();
                     this.$router.push('/admin');

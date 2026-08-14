@@ -22,14 +22,6 @@
             @confirm="deleteChapter"
         ></delete-book-chapter-dialog>
 
-        <start-review-dialog
-            v-model="startReviewDialog.active"
-            :book-id="startReviewDialog.bookId"
-            :book-name="startReviewDialog.bookName"
-            :chapter-id="startReviewDialog.chapterId"
-            :chapter-name="startReviewDialog.chapterName"
-        ></start-review-dialog>
-
         <v-data-table
             class="my-4 mb-0 no-hover"
             :headers="[
@@ -141,9 +133,6 @@
                             <v-btn width="100" class="menu-button" tile color="white" @click="showEditChapterDialog(item.id)">
                                 编辑
                             </v-btn>
-                            <v-btn width="100" class="menu-button" tile color="white" @click="showStartReviewDialog(book.id, book.name, item.id, item.name)">
-                                复习
-                            </v-btn>
                             <v-btn width="100" class="menu-button" tile color="white" @click="showDeleteChapterDialog(item)">
                                 删除
                             </v-btn>
@@ -187,13 +176,6 @@
                     active: false,
                     chapterId: -1,
                 },
-                startReviewDialog: {
-                    active: false,
-                    bookId: -1,
-                    bookName: '',
-                    chapterId: -1,
-                    chapterName: '',
-                }
             }
         },
         props: {
@@ -298,13 +280,6 @@
                     this.errorDialog.active = true;
                     this.chaptersLoading = false;
                 });
-            },
-            showStartReviewDialog(bookId, bookName, chapterId, chapterName) {
-                this.startReviewDialog.bookName = bookName;
-                this.startReviewDialog.bookId = bookId;
-                this.startReviewDialog.chapterName = chapterName;
-                this.startReviewDialog.chapterId = chapterId;
-                this.startReviewDialog.active = true;
             },
             isWordCountReady(chapter) {
                 return chapter.processing_status === 'processed' && chapter.wordCountsLoaded && chapter.wordCount;

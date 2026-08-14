@@ -7,13 +7,6 @@
             :content="errorDialog.content"
         ></error-dialog>
 
-        <!-- Review dialog -->
-        <start-review-dialog
-            v-model="startReviewDialog.visible"
-            :book-id="startReviewDialog.bookId"
-            :book-name="startReviewDialog.bookName"
-        ></start-review-dialog>
-
         <!-- Import dialog -->
         <import-dialog
             v-if="importDialog.active"
@@ -133,7 +126,6 @@
             :books="books"
             @show-edit-book-dialog="showEditBookDialog"
             @show-delete-book-dialog="showDeleteBookDialog"
-            @show-start-review-dialog="showStartReviewDialog"
             @open-book="openBook"
         />
 
@@ -143,7 +135,6 @@
             :books="books"
             @show-edit-book-dialog="showEditBookDialog"
             @show-delete-book-dialog="showDeleteBookDialog"
-            @show-start-review-dialog="showStartReviewDialog"
             @open-book="openBook"
         />
 
@@ -159,7 +150,6 @@
             :book="books[openedBook]"
             @show-edit-book-dialog="showEditBookDialog"
             @show-delete-book-dialog="showDeleteBookDialog"
-            @show-start-review-dialog="showStartReviewDialog"
             @close-book="closeBook"
         />
     </v-container>
@@ -192,11 +182,6 @@
                     bookId: -1,
                     bookName: '',
                 },
-                startReviewDialog: {
-                    visible: false,
-                    bookId: -1,
-                    bookName: '',
-                }
             }
         },
         props: {
@@ -276,11 +261,6 @@
                 if (this.$router.currentRoute.fullPath !== ('/books')) {
                     this.$router.push('/books');
                 }
-            },
-            showStartReviewDialog(bookId, bookName) {
-                this.startReviewDialog.bookName = bookName;
-                this.startReviewDialog.bookId = bookId;
-                this.startReviewDialog.visible = true;
             },
             importFinished() {
                 this.loadBooks();

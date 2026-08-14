@@ -30,7 +30,6 @@
                             </template>
                             <v-btn class="menu-button" tile color="white" @click="loadBookWordCounts(index)">加载词数</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showEditBookDialog(book)">编辑</v-btn>
-                            <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog(book)">复习</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog(book)">删除</v-btn>
                         </v-menu>
                     </v-card-title>
@@ -110,9 +109,6 @@
             },
             openBook(bookId) {
                 this.$emit('open-book', bookId);
-            },
-            showStartReviewDialog(book) {
-                this.$emit('show-start-review-dialog', book.id, book.name);
             },
             formatNumber: formatNumber
         }
