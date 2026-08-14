@@ -930,21 +930,6 @@
                 this.sourceFallbackContext = null;
                 this.sourceError = '';
 
-                // sense 卡片已在 payload 中自带例句，无需 API 加载
-                if (this.reviews[this.currentReviewIndex].type !== 'sense') {
-                    axios.get('/vocabulary/example-sentence/' + this.reviews[this.currentReviewIndex].type + '/' + this.reviews[this.currentReviewIndex].id).then((response) => {
-                        if (response.data.words !== undefined) {
-                            this.exampleSentence = {
-                                id: 0,
-                                words: response.data.words,
-                                phrases: response.data.phrases,
-                                uniqueWords: response.data.uniqueWords,
-                            };
-                        }
-
-                        this.textBlockKey++;
-                    }).catch(() => {});
-                }
 
             },
             finish() {
