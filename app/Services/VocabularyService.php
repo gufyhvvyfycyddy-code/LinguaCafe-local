@@ -644,15 +644,6 @@ class VocabularyService {
         return true;
     }
 
-    public function getExampleSentence($userId, $language, $targetType, $targetId) {
-        return $this->vocabularyQueryService->getExampleSentence(
-            $userId,
-            $language,
-            $targetType,
-            $targetId
-        );
-    }
-
     public function createOrUpdateExampleSentence($userId, $language, $targetType, $targetId, $exampleSentenceWords) {
         $targetExists = $targetType === 'word'
             ? EncounteredWord::where('id', $targetId)

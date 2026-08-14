@@ -23,10 +23,5 @@ test('dead vocabulary batch-delete entry stays removed while supported vocabular
     assert.ok(routesSource.includes("Route::post('/vocabulary/word/delete'"));
     assert.ok(routesSource.includes("Route::post('/vocabulary/search'"));
     assert.ok(routesSource.includes("Route::post('/vocabulary/example-sentence/create-or-update'"));
-    assert.match(
-        routesSource,
-        /Route::get\s*\(\s*'\/vocabulary\/example-sentence\/\{targetType\}\/\{targetId\}'/,
-    );
-
     assert.ok(serviceSource.includes('function softDeleteWord('));
 });

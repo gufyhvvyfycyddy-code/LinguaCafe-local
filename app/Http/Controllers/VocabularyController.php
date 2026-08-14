@@ -16,7 +16,6 @@ use App\Http\Requests\Vocabulary\CreatePhraseRequest;
 use App\Http\Requests\Vocabulary\UpdatePhraseRequest;
 use App\Http\Requests\Vocabulary\GetPhraseRequest;
 use App\Http\Requests\Vocabulary\DeletePhraseRequest;
-use App\Http\Requests\Vocabulary\GetExampleSentenceRequest;
 use App\Http\Requests\Vocabulary\CreateOrUpdateExampleSentenceRequest;
 use App\Http\Requests\Vocabulary\SearchVocabularyRequest;
 use App\Http\Requests\Vocabulary\ExportToCsvRequest;
@@ -344,24 +343,6 @@ class VocabularyController extends Controller {
         }
 
         return response()->json('Phrase has been successfully deleted.', 200);
-    }
-
-    public function getExampleSentence($targetType, $targetId, GetExampleSentenceRequest $request) {
-        $userId = Auth::user()->id;
-        $language = Auth::user()->selected_language;
-        
-        try {
-            $exampleSentence = $this->vocabularyService->getExampleSentence(
-                $userId,
-                $language,
-                $targetType,
-                $targetId
-            );
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
-        }
-
-        return response()->json($exampleSentence, 200);
     }
 
     public function createOrUpdateExampleSentence(CreateOrUpdateExampleSentenceRequest $request) {

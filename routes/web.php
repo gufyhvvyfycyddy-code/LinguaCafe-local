@@ -245,7 +245,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/vocabulary/search', [App\Http\Controllers\VocabularyController::class, 'searchVocabulary']);
     Route::post('/vocabulary/export-to-csv', [App\Http\Controllers\VocabularyController::class, 'exportToCsv']);
     Route::post('/vocabulary/import-from-csv', [App\Http\Controllers\VocabularyController::class, 'importFromCsv']);
-    Route::get ('/vocabulary/example-sentence/{targetType}/{targetId}', [App\Http\Controllers\VocabularyController::class, 'getExampleSentence']);
     Route::post('/kanji/search', [App\Http\Controllers\VocabularyController::class, 'searchKanji']);
     Route::post('/kanji/details', [App\Http\Controllers\VocabularyController::class, 'getKanjiDetails']);
 

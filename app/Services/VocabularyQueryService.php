@@ -11,7 +11,6 @@ use League\Csv\Writer;
 use App\Models\Chapter;
 use App\Models\Radical;
 use App\Models\EncounteredWord;
-use App\Models\ExampleSentence;
 use App\Enums\ChapterProcessingStatusEnum;
 
 // services
@@ -69,27 +68,6 @@ class VocabularyQueryService {
         }
 
         return $phrase;
-    }
-
-    public function getExampleSentence($userId, $language, $targetType, $targetId) {
-        $exampleSentence = ExampleSentence
-            ::where('user_id', $userId)
-            ->where('language', $language)
-            ->where('target_type', $targetType)
-            ->where('target_id', $targetId)
-            ->first();
-
-        if (!$exampleSentence) {
-            return null;
-        }
-
-        $textBlock = new TextBlockService($userId, $exampleSentence->language);
-        $textBlock->setProcessedWords(json_decode($exampleSentence->words));
-        $textBlock->uniqueWords = json_decode($exampleSentence->unique_words);
-        $textBlock->prepareTextForReader();
-        $textBlock->indexPhrases();
-
-        return $textBlock->getReaderData();
     }
 
     public function searchVocabulary($userId, $language, $text, $bookId, $chapterId, $stage, $phrases, $orderBy, $translation, $page, $languagesWithoutSpaces) {
