@@ -252,7 +252,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // review
     Route::post('/reviews', [App\Http\Controllers\ReviewController::class, 'getReviewItems']);
     Route::post('/reviews/rate', [App\Http\Controllers\ReviewController::class, 'rateReviewCard']);
-    Route::post('/reviews/update', [App\Http\Controllers\ReviewController::class, 'updateReadWordsGoal']);
     Route::post('/reviews/senses/{reviewCardId}/rate', [App\Http\Controllers\SenseReviewController::class, 'rate']);
 
     // Custom Study preview sessions (Task 2000-22 — Phase 4B).
