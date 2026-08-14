@@ -13,7 +13,7 @@
 //     2.  rateReview catch calls runAuthoritativeRatingRecovery
 //     3.  catch does NOT set finished=true
 //     4.  correctReviews++ is inside .then(), not before the request
-//     5.  countReadWords() is inside .then(), not before the request
+//     5.  stale legacy read-word goal writes are absent from the sense-only queue UI
 //     6.  loadReviews() returns a Promise (return axios.post)
 //     7.  .then() clears reviewError on success
 //     8.  has persistent error alert for !finished state
@@ -203,15 +203,11 @@ test('Review.vue correctReviews++ is inside .then() success path', () => {
     );
 });
 
-test('Review.vue countReadWords() is inside .then() success path', () => {
-    const beforeRequest = reviewRateMethod.split('reviewApi.rateLegacyCard')[0];
+test('Review.vue does not keep the obsolete legacy read-word goal write path', () => {
     assert.ok(
-        !beforeRequest.includes('this.countReadWords()'),
-        'countReadWords() must NOT be before the formal rating request'
-    );
-    assert.ok(
-        reviewRateThen.includes('this.countReadWords()'),
-        'countReadWords() must be inside .then() success path'
+        !reviewSource.includes('countReadWords') &&
+        !reviewSource.includes("/reviews/update"),
+        'sense-only Review.vue must not maintain the obsolete legacy read-word goal write path'
     );
 });
 

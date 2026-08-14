@@ -573,7 +573,6 @@
                 correctReviews: 0,
                 language: '',
                 languageSpaces: false,
-                readWords: 0,
                 finishedReviews: -1,
                 reviewError: '',
                 finished: false,
@@ -778,32 +777,6 @@
                 this.revealed = true;
                 this.newCardAnimation = false;
             },
-            countReadWords() {
-                // sense 卡片无单词统计，跳过
-                if (this.reviews[this.currentReviewIndex].type == 'sense') {
-                    return;
-                }
-
-                var wordsToSkip = ['。', '、', ':', '？', '！', '＜', '＞', '：', ' ', '「', '」', '（', '）', '｛', '｝', '≪', '≫', '〈', '〉',
-                        '《', '》','【', '】', '『', '』', '〔', '〕', '［', '］', '・', '?', '(', ')', ' ', ' NEWLINE ', '.', '%', '-',
-                        '«', '»', "'", '’', '–', 'NEWLINE'];
-
-                if (this.settings.reviewSentenceMode === 'disabled' || this.exampleSentence === null) {
-                    if (this.reviews[this.currentReviewIndex].type == 'word') {
-                        this.readWords ++;
-                    } else {
-                        this.readWords += JSON.parse(this.reviews[this.currentReviewIndex].words).length;
-                    }
-                } else {
-                    for (var i = 0; i < this.exampleSentence.words.length; i++) {
-                        if (wordsToSkip.includes(this.exampleSentence.words[i].word)) {
-                            continue;
-                        }
-
-                        this.readWords ++;
-                    }
-                }
-            },
             rateReview(rating) {
                 if (this.reviews[this.currentReviewIndex] === undefined) {
                     return;
@@ -825,11 +798,8 @@
                     ? this.$vuetify.theme.currentTheme.error
                     : this.$vuetify.theme.currentTheme.success;
 
-                // DEV-QO-2 (Task 2000-12): Do NOT increment correctReviews
-                // or countReadWords() before the server confirms the rating.
-                // If the request fails, these statistics must not have been
-                // permanently increased. They are now incremented inside the
-                // .then() success path only.
+                // DEV-QO-2 (Task 2000-12): Do not increment local success
+                // counters before the server confirms the rating.
 
                 if (!this.practiceMode) {
                     this.ratingLoading = true;
@@ -850,12 +820,9 @@
                         }
 
                         // DEV-QO-2 (Task 2000-12): Server has confirmed the
-                        // rating. NOW it is safe to increment success counters
-                        // and count read words for the just-rated card. These
-                        // MUST NOT happen before server confirmation — if the
-                        // request failed, they must not have been increased.
+                        // rating. NOW it is safe to increment the local success
+                        // counter. This must not happen before server confirmation.
                         this.correctReviews ++;
-                        this.countReadWords();
                         // Clear any persistent rating error from a previous
                         // failed attempt — the user has now completed a
                         // successful rating.
@@ -979,12 +946,6 @@
                     }).catch(() => {});
                 }
 
-                // update reviewed and read words data
-                axios.post('/reviews/update', {
-                    readWords: this.readWords,
-                }).then(() => {
-                    this.readWords = 0;
-                }).catch(() => {});
             },
             finish() {
                 this.finished = true;
