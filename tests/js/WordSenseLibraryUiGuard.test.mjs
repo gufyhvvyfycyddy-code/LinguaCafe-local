@@ -197,8 +197,10 @@ test('source overview is read-only, compact, and re-fetches from the canonical e
 });
 
 test('legacy history explanation stays ordinary-user facing', () => {
-    assert.ok(pageSource.includes('旧版按单词保存的复习历史会继续保留为只读历史'));
+    assert.ok(pageSource.includes('旧版复习记录会继续保留'));
+    assert.ok(pageSource.includes('用于保持学习记录的连续性'));
     assert.ok(pageSource.includes('当前正式复习以词义为单位'));
+    assert.doesNotMatch(pageSource, /只读历史/);
     assert.doesNotMatch(pageSource, /migration|ledger|classifier|ReviewLog|run_id/i);
 });
 

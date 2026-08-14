@@ -11,7 +11,7 @@
         </div>
 
         <v-alert dense text type="info" class="mb-5 word-sense-history-note">
-            旧版按单词保存的复习历史会继续保留为只读历史；当前正式复习以词义为单位。
+            旧版复习记录会继续保留，用于保持学习记录的连续性；当前正式复习以词义为单位。
         </v-alert>
 
         <div class="word-sense-search mb-5">
