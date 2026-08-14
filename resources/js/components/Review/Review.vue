@@ -178,48 +178,6 @@
                     <v-icon>mdi-bullhorn</v-icon>
                 </v-btn>
 
-                <v-menu offset-y left class="rounded-lg">
-                    <template v-slot:activator="{ on, attrs }">
-                        <v-btn
-                            icon
-                            title="例句模式"
-                            class="my-2"
-                            v-bind="attrs"
-                            v-on="on"
-                        >
-                            <v-icon>mdi-text-long</v-icon>
-                        </v-btn>
-                    </template>
-                    <v-btn
-                        class="menu-button justify-start"
-                        tile
-                        color="white"
-                        @click="settings.reviewSentenceMode = 'disabled'; saveSettings();"
-                    >
-                        <v-icon class="mr-1">mdi-close</v-icon>
-                        关闭
-
-                    </v-btn>
-                    <v-btn
-                        class="menu-button justify-start"
-                        tile
-                        color="white"
-                        @click="settings.reviewSentenceMode = 'plain-text'; saveSettings();"
-                    >
-                        <v-icon class="mr-1">mdi-text-long</v-icon>
-                        纯文本
-                    </v-btn>
-                    <v-btn
-                        class="menu-button justify-start"
-                        tile
-                        color="white"
-                        @click="settings.reviewSentenceMode = 'interactive-text'; saveSettings();"
-                    >
-                        <v-icon class="mr-1">mdi-comment-text-outline</v-icon>
-                        交互文本
-                    </v-btn>
-                </v-menu>
-
                 <v-btn title="增大字号" icon class="my-2" @click="increaseFontSize"><v-icon>mdi-magnify-plus</v-icon></v-btn>
                 <v-btn title="减小字号" icon class="my-2" @click="decreaseFontSize"><v-icon>mdi-magnify-minus</v-icon></v-btn>
                 <v-btn title="查看快捷键" icon class="my-2" @click="hotkeyDialog = !hotkeyDialog;"><v-icon>mdi-keyboard-outline</v-icon></v-btn>
@@ -253,95 +211,6 @@
                     <div id="review-card-content">
                         <!-- Review card front -->
                         <div id="review-card-front" class="rounded-lg border">
-                            <!-- Word review -->
-                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'word'">
-                                <!-- Example sentence mode -->
-                                <div :style="{'font-size': (settings.fontSize) + 'px'}" class="selected-font">
-                                    <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                    {{ reviews[currentReviewIndex].word }}<hr>
-
-                                    <!-- Example sentence interactive text mode -->
-                                    <text-block-group
-                                        v-if="!revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
-                                        ref="textBlock"
-                                        :key="'text-block-1' + textBlockKey"
-                                        :theme="theme"
-                                        :fullscreen="fullscreen"
-                                        :_text="exampleSentence"
-                                        :language="language"
-                                        :highlight-words="true"
-                                        :plain-text-mode="false"
-                                        :line-spacing="0"
-                                        :font-size="settings.fontSize"
-                                        :vocabulary-hover-box="settings.vocabularyHoverBox"
-                                        :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
-                                        :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
-                                        :vocabulary-hover-box-preferred-position="settings.vocabularyHoverBoxPreferredPosition"
-                                        :vocabulary-hover-box-position-corrections="false"
-                                        :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
-                                    />
-
-                                    <!-- Example sentence plain text mode -->
-                                    <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
-                                        <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                            <span
-                                                v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                                :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
-                                            >{{ word.word }}</span>
-                                        </div>
-                                    </template>
-                                </div>
-
-                                <!-- Single word  mode -->
-                                <div class="single-word selected-font" v-if="!settings.reviewSentenceMode" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                    {{ reviews[currentReviewIndex].word }}
-                                </div>
-                            </template>
-
-                            <!-- Phrase review -->
-                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'phrase'">
-                                <!-- Phrase only mode -->
-                                <div class="phrase-words selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <template v-if="languageSpaces">
-                                        {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
-                                    </template>
-                                    <template v-else>
-                                        {{ JSON.parse(reviews[currentReviewIndex].words).join('') }}
-                                    </template>
-
-                                    <!-- Example sentence interactive text mode -->
-                                    <hr v-if="settings.reviewSentenceMode !== 'disabled'">
-                                    <text-block-group
-                                        v-if="!revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
-                                        ref="textBlock"
-                                        :key="'text-block-2' + textBlockKey"
-                                        :theme="theme"
-                                        :fullscreen="fullscreen"
-                                        :_text="exampleSentence"
-                                        :language="language"
-                                        :highlight-words="true"
-                                        :plain-text-mode="false"
-                                        :line-spacing="0"
-                                        :font-size="settings.fontSize"
-                                        :vocabulary-hover-box="settings.vocabularyHoverBox"
-                                        :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
-                                        :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
-                                        :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
-                                    />
-
-                                    <!-- Example sentence plain text mode -->
-                                    <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text' && reviews[currentReviewIndex] !== undefined">
-                                        <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                            <span
-                                                v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                                :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
-                                            >{{ word.word }}</span>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-
                             <!-- Sense review -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'">
                                 <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
@@ -385,73 +254,6 @@
 
                         <!-- Review card back -->
                         <div id="review-card-back" class="rounded-lg border" :style="{'background-color': backgroundColor}">
-                            <!-- Word / Phrase review back (non-sense) -->
-                            <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type != 'sense'">
-                                <!-- Word review -->
-                                <template v-if="reviews[currentReviewIndex].type == 'word'">
-                                    <!-- Single word  mode -->
-                                    <div class="word selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                        <template v-if="reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                        {{ reviews[currentReviewIndex].word }}
-                                    </div>
-                                </template>
-
-                                <!-- Phrase review -->
-                                <template v-if="reviews[currentReviewIndex].type == 'phrase'">
-                                    <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                        <template v-if="languageSpaces">
-                                            {{ JSON.parse(reviews[currentReviewIndex].words).join(' ') }}
-                                        </template>
-                                        <template v-else>
-                                            {{ JSON.parse(reviews[currentReviewIndex].words).join('') }}
-                                        </template>
-                                    </div>
-                                </template>
-
-                                <!-- Reading -->
-                                <div class="reading selected-font" v-if="(language == 'japanese' || language == 'chinese')" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    <hr>
-                                    <template v-if="reviews[currentReviewIndex].type == 'word' && reviews[currentReviewIndex].base_word !== ''">{{ reviews[currentReviewIndex].base_word_reading }} <v-icon>mdi-arrow-right-thick</v-icon> </template>
-                                    {{ reviews[currentReviewIndex].reading }}
-                                </div>
-
-                                <!-- Example sentence interactive text mode -->
-                                <hr v-if="settings.reviewSentenceMode !== 'disabled'">
-                                <text-block-group
-                                    v-if="revealed && exampleSentence !== null && settings.reviewSentenceMode === 'interactive-text'"
-                                    ref="textBlock"
-                                    :key="'text-block-3' + textBlockKey"
-                                    :theme="theme"
-                                    :fullscreen="fullscreen"
-                                    :_text="exampleSentence"
-                                    :language="language"
-                                    :highlight-words="true"
-                                    :plain-text-mode="false"
-                                    :line-spacing="0"
-                                    :font-size="settings.fontSize"
-                                    :vocabulary-hover-box="settings.vocabularyHoverBox"
-                                    :vocabulary-hover-box-search="settings.vocabularyHoverBoxSearch"
-                                    :vocabulary-hover-box-delay="settings.vocabularyHoverBoxDelay"
-                                    :vocabulary-bottom-sheet="settings.vocabularyBottomSheet"
-                                />
-
-                                <!-- Example sentence plain text mode -->
-                                <template v-if="exampleSentence !== null && settings.reviewSentenceMode === 'plain-text'">
-                                    <div class="phrase-words" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                        <span
-                                            v-for="(word, wordIndex) in exampleSentence.words" :key="wordIndex"
-                                            :class="{'selected-font': true, 'mr-2': word.spaceAfter}"
-                                        >{{ word.word }}</span>
-                                    </div>
-                                </template>
-
-                                <!-- Translation -->
-                                <hr>
-                                <div id="translation" :style="{'font-size': (settings.fontSize) + 'px'}">
-                                    {{ reviews[currentReviewIndex].translation }}
-                                </div>
-                            </template>
-
                             <!-- Sense review back -->
                             <template v-if="reviews[currentReviewIndex] !== undefined && reviews[currentReviewIndex].type == 'sense'">
                                 <div class="selected-font" :style="{'font-size': (settings.fontSize) + 'px'}">
@@ -534,17 +336,7 @@
             return {
                 textToSpeechService: null,
                 textToSpeechAvailable: false,
-                theme: DefaultLocalStorageManager.loadSetting('theme') || 'light',
                 hotkeyDialog: false,
-                textBlockKey: 0,
-                exampleSentence: [
-                    {
-                        id: -1,
-                        words: [],
-                        phrases: [],
-                        uniqueWords: [],
-                    }
-                ],
                 practiceMode: false,
                 revealed: false,
                 backToDeckAnimation: false,
@@ -554,12 +346,6 @@
                 settingsDialog: false,
                 settings: {
                     fontSize: DefaultLocalStorageManager.loadSetting('fontSize') || 20,
-                    reviewSentenceMode: DefaultLocalStorageManager.loadSetting('reviewSentenceMode') || 'plain-text',
-                    vocabularyHoverBox: DefaultLocalStorageManager.loadSetting('vocabularyHoverBox') || true,
-                    vocabularyHoverBoxSearch: DefaultLocalStorageManager.loadSetting('vocabularyHoverBoxSearch') || true,
-                    vocabularyHoverBoxDelay: DefaultLocalStorageManager.loadSetting('vocabularyHoverBoxDelay') || 300,
-                    vocabularyHoverBoxPreferredPosition: DefaultLocalStorageManager.loadSetting('vocabularyHoverBoxPreferredPosition') || 'bottom',
-                    vocabularyBottomSheet: DefaultLocalStorageManager.loadSetting('vocabularyBottomSheet') || true,
                 },
                 transitionDuration: DefaultLocalStorageManager.loadSetting('theme') === 'eink' ? 0 : 400,
                 fullscreen: false,
@@ -572,7 +358,6 @@
                 sourceError: '',
                 correctReviews: 0,
                 language: '',
-                languageSpaces: false,
                 finishedReviews: -1,
                 reviewError: '',
                 finished: false,
@@ -656,7 +441,6 @@
                     this.reviews = data.reviews;
                     this.totalReviews = data.reviews.length;
                     this.language = data.language;
-                    this.languageSpaces = data.languageSpaces;
                     this.dailyLimitSummary = data.summary || null;
 
                     if (this.reviews.length) {
@@ -686,25 +470,7 @@
                 });
             },
             textToSpeech() {
-                var text = '';
-                var joinSeparator = this.languageSpaces ? ' ' : '';
-
-                if (this.reviews[this.currentReviewIndex].type == 'sense') {
-                    text = this.reviews[this.currentReviewIndex].lemma || '';
-                } else if (this.reviews[this.currentReviewIndex].type == 'phrase') {
-                    if (this.reviews[this.currentReviewIndex].reading.length) {
-                        text = this.reviews[this.currentReviewIndex].reading;
-                    } else {
-                        text = JSON.parse(this.reviews[this.currentReviewIndex].words).join(joinSeparator);
-                    }
-                } else {
-                    if (this.reviews[this.currentReviewIndex].reading.length) {
-                        text = this.reviews[this.currentReviewIndex].reading;
-                    } else {
-                        text = this.reviews[this.currentReviewIndex].word;
-                    }
-                }
-
+                const text = this.reviews[this.currentReviewIndex]?.lemma || '';
                 this.textToSpeechService.speak(text);
             },
             updateTextToSpeechState() {
@@ -750,12 +516,6 @@
             },
             saveSettings() {
                 DefaultLocalStorageManager.saveSetting('fontSize', this.settings.fontSize);
-                DefaultLocalStorageManager.saveSetting('reviewSentenceMode', this.settings.reviewSentenceMode);
-                DefaultLocalStorageManager.saveSetting('vocabularyHoverBox', this.settings.vocabularyHoverBox);
-                DefaultLocalStorageManager.saveSetting('vocabularyHoverBoxSearch', this.settings.vocabularyHoverBoxSearch);
-                DefaultLocalStorageManager.saveSetting('vocabularyHoverBoxDelay', this.settings.vocabularyHoverBoxDelay);
-                DefaultLocalStorageManager.saveSetting('vocabularyHoverBoxPreferredPosition', this.settings.vocabularyHoverBoxPreferredPosition);
-                DefaultLocalStorageManager.saveSetting('vocabularyBottomSheet', this.settings.vocabularyBottomSheet);
             },
             increaseFontSize() {
                 this.settings.fontSize ++;
@@ -768,10 +528,6 @@
             reveal() {
                 if (this.intoTheCorrectDeckAnimation || this.backToDeckAnimation || this.newCardAnimation) {
                     return;
-                }
-
-                if (this.$refs.textBlock !== undefined && this.settings.reviewSentenceMode === 'interactive-text') {
-                    this.$refs.textBlock.unselectAllWords(true);
                 }
 
                 this.revealed = true;
@@ -908,10 +664,6 @@
                 this.newCardAnimation = true;
                 this.backgroundColor = this.$vuetify.theme.currentTheme.foreground;
 
-                if (this.$refs.textBlock !== undefined && this.settings.reviewSentenceMode === 'interactive-text') {
-                    this.$refs.textBlock.unselectAllWords(true);
-                }
-
                 setTimeout(() => {
                     this.newCardAnimation = false;
                 }, this.transitionDuration);
@@ -925,7 +677,6 @@
                 this.currentReviewIndex = 0;
                 this.reviewDurationTracker = createTracker(undefined, document.visibilityState !== 'hidden');
 
-                this.exampleSentence = null;
                 this.sourceFallbackDialog = false;
                 this.sourceFallbackContext = null;
                 this.sourceError = '';
