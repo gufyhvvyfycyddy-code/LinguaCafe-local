@@ -132,6 +132,32 @@ export interface DailySummary {
   generated_at: string;
 }
 
+export interface ArticleSentenceTranslation {
+  sentence_index: number | string;
+  source_text: string;
+  translation_zh: string;
+}
+
+export interface ArticleSenseSummary {
+  occurrence_id: number;
+  word_sense_id: number;
+  word_sense_version: string | null;
+  source_sentence_identity: number | string | null;
+  lemma: string;
+  pos: string | null;
+  sense_zh: string;
+  sense_en: string | null;
+}
+
+export interface ChapterPackage {
+  content_version: string;
+  dictionary_version: string;
+  tokens: ReaderToken[];
+  sentence_translations: ArticleSentenceTranslation[];
+  sense_summaries: ArticleSenseSummary[];
+  dictionary_summaries: Record<string, string[]>;
+}
+
 export interface WordSenseSummary {
   sense_id: number;
   lemma: string;

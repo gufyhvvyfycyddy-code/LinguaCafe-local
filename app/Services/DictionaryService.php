@@ -187,6 +187,70 @@ class DictionaryService {
 
         return $result;
     }
+
+    public function localContentVersion(string $language): string
+    {
+        $sources = $this->localDictionaries($language)
+            ->map(fn (Dictionary $dictionary): array => [
+                'id' => $dictionary->id,
+                'name' => $dictionary->name,
+                'type' => $dictionary->type,
+                'table' => $dictionary->database_table_name,
+                'updated_at' => $dictionary->updated_at?->toIso8601String(),
+                'content_max_id' => DB::table($dictionary->database_table_name)->max('id'),
+            ])
+            ->values()
+            ->all();
+
+        return 'sha256:'.hash('sha256', json_encode(
+            $sources,
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
+        ));
+    }
+
+    public function localDefinitionSummaries(
+        string $language,
+        array $terms,
+        int $definitionsPerTerm = 3,
+    ): array {
+        $definitionsPerTerm = max(1, min(10, $definitionsPerTerm));
+        $normalizedTerms = [];
+        foreach ($terms as $term) {
+            $normalized = mb_strtolower(trim((string) $term), 'UTF-8');
+            if ($normalized !== '' && preg_match('/[a-z]/', $normalized) === 1) {
+                $normalizedTerms[$normalized] = true;
+            }
+        }
+        $summaries = array_fill_keys(array_keys($normalizedTerms), []);
+        if ($summaries === []) {
+            return [];
+        }
+
+        foreach ($this->localDictionaries($language) as $dictionary) {
+            foreach (array_chunk(array_keys($summaries), 500) as $chunk) {
+                $records = ImportedDictionary::fromTable($dictionary->database_table_name)
+                    ->whereIn('word', $chunk)
+                    ->get(['word', 'definitions']);
+                foreach ($records as $record) {
+                    $term = mb_strtolower(trim((string) $record->word), 'UTF-8');
+                    if (!array_key_exists($term, $summaries)) {
+                        continue;
+                    }
+                    foreach (explode(';', (string) $record->definitions) as $definition) {
+                        if (count($summaries[$term]) >= $definitionsPerTerm) {
+                            break;
+                        }
+                        $definition = trim($definition);
+                        if ($definition !== '' && !in_array($definition, $summaries[$term], true)) {
+                            $summaries[$term][] = $definition;
+                        }
+                    }
+                }
+            }
+        }
+
+        return $summaries;
+    }
     
     public function searchApiDictionaries(string $sourceLanguage, string $term): array
     {
@@ -541,6 +605,17 @@ class DictionaryService {
         }
 
         return $records;
+    }
+
+    private function localDictionaries(string $language)
+    {
+        return Dictionary::query()
+            ->where('enabled', true)
+            ->where('source_language', $language)
+            ->where('database_table_name', '!=', 'API')
+            ->where('name', '!=', 'JMDict')
+            ->orderBy('id')
+            ->get();
     }
 
     private function searchJmDict($term, $strict = false) {

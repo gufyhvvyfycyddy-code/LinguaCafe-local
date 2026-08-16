@@ -1,9 +1,9 @@
 import type {
   ArticleSummary,
+  ChapterPackage,
   ChapterSummary,
   OfflineSyncIssue,
   QueuedAction,
-  ReaderToken,
   ReviewItem,
   ReviewRating,
   SyncActionResult,
@@ -23,7 +23,7 @@ interface CachedValue<T> {
 export interface OfflineState {
   articles?: CachedValue<ArticleSummary[]>;
   chapters: Record<string, CachedValue<ChapterSummary[]>>;
-  chapter_tokens: Record<string, CachedValue<ReaderToken[]>>;
+  chapter_packages: Record<string, CachedValue<ChapterPackage>>;
   reviews?: CachedValue<ReviewItem[]>;
   queue: QueuedAction[];
   next_sequence: number;
@@ -32,7 +32,7 @@ export interface OfflineState {
 
 const EMPTY_STATE = (): OfflineState => ({
   chapters: {},
-  chapter_tokens: {},
+  chapter_packages: {},
   queue: [],
   next_sequence: 1,
   issues: [],
@@ -112,12 +112,15 @@ export class OfflineRepository {
     await this.update(state => { state.chapters[String(bookId)] = this.cached(value); });
   }
 
-  async chapterTokens(bookId: number, chapterId: number): Promise<ReaderToken[] | null> {
-    return (await this.state()).chapter_tokens[`${bookId}:${chapterId}`]?.value ?? null;
+  async chapterPackage(bookId: number, chapterId: number): Promise<ChapterPackage | null> {
+    return (await this.state()).chapter_packages?.[`${bookId}:${chapterId}`]?.value ?? null;
   }
 
-  async saveChapterTokens(bookId: number, chapterId: number, value: ReaderToken[]): Promise<void> {
-    await this.update(state => { state.chapter_tokens[`${bookId}:${chapterId}`] = this.cached(value); });
+  async saveChapterPackage(bookId: number, chapterId: number, value: ChapterPackage): Promise<void> {
+    await this.update(state => {
+      state.chapter_packages ??= {};
+      state.chapter_packages[`${bookId}:${chapterId}`] = this.cached(value);
+    });
   }
 
   async reviews(): Promise<ReviewItem[] | null> {

@@ -21,6 +21,7 @@ import {
 import type {
   ArticleSummary,
   Bootstrap,
+  ChapterPackage,
   ChapterSummary,
   DailySummary,
   ReaderToken,
@@ -94,6 +95,7 @@ export class LinguaCafeApp {
   private articles: ArticleSummary[] = [];
   private chapters: ChapterSummary[] = [];
   private readerTokens: ReaderToken[] = [];
+  private readerPackage: ChapterPackage | null = null;
   private selectedBook: ArticleSummary | null = null;
   private selectedChapter: ChapterSummary | null = null;
   private lookupToken: ReaderToken | null = null;
@@ -431,21 +433,23 @@ export class LinguaCafeApp {
     this.selectedChapter = chapter;
     this.setBusy('正在打开阅读器…');
     try {
-      this.readerTokens = await this.api.chapterTokens(bookId, chapter.chapter_id);
+      this.readerPackage = await this.api.chapterPackage(bookId, chapter.chapter_id);
+      this.readerTokens = this.readerPackage.tokens;
       this.setServerReachable(true);
-      await this.saveOffline(() => this.offlineRepository?.saveChapterTokens(
+      await this.saveOffline(() => this.offlineRepository?.saveChapterPackage(
         bookId,
         chapter.chapter_id,
-        this.readerTokens,
+        this.readerPackage!,
       ));
       this.usingOfflineSnapshot = false;
       this.renderReader();
     } catch (error) {
       const cached = this.noteNetworkFailure(error)
-        ? await this.offlineRepository?.chapterTokens(bookId, chapter.chapter_id)
+        ? await this.offlineRepository?.chapterPackage(bookId, chapter.chapter_id)
         : null;
       if (cached) {
-        this.readerTokens = cached;
+        this.readerPackage = cached;
+        this.readerTokens = cached.tokens;
         this.usingOfflineSnapshot = true;
         this.renderReader();
       } else {
@@ -470,7 +474,7 @@ export class LinguaCafeApp {
         </header>
         ${this.usingOfflineSnapshot ? '<div class="offline-banner reader-offline">离线文章包</div>' : ''}
         <article class="reader-copy">${tokens}</article>
-        <p class="reader-hint">轻点单词查本地词典并可创建词义。</p>
+        <p class="reader-hint">轻点单词查本地词典；离线时使用文章包摘要。</p>
       </section>`;
     this.screenElement().querySelector('#back-chapters')?.addEventListener('click', () => {
       if (this.selectedBook) void this.openBook(this.selectedBook);
@@ -486,20 +490,32 @@ export class LinguaCafeApp {
   private async openLookup(token: ReaderToken): Promise<void> {
     if (!this.api) return;
     this.lookupToken = token;
+    const term = (token.lemma || token.word).trim().toLocaleLowerCase('en-US');
     this.lookupDefinitions = [];
+
+    if (this.usingOfflineSnapshot) {
+      this.lookupDefinitions = this.readerPackage?.dictionary_summaries[term] ?? [];
+      this.renderLookup(false, '', true);
+      return;
+    }
+
     this.renderLookup(true);
     try {
-      const result = await this.api.dictionary(token.lemma || token.word);
+      const result = await this.api.dictionary(term);
       this.setServerReachable(true);
       this.lookupDefinitions = result.definitions;
       this.renderLookup(false);
     } catch (error) {
-      this.noteNetworkFailure(error);
+      if (this.noteNetworkFailure(error)) {
+        this.lookupDefinitions = this.readerPackage?.dictionary_summaries[term] ?? [];
+        this.renderLookup(false, '', true);
+        return;
+      }
       this.renderLookup(false, message(error));
     }
   }
 
-  private renderLookup(busy: boolean, lookupError = ''): void {
+  private renderLookup(busy: boolean, lookupError = '', usingPackageSummary = false): void {
     const token = this.lookupToken;
     if (!token) return;
     const firstDefinition = this.lookupDefinitions[0] ?? '';
@@ -515,9 +531,12 @@ export class LinguaCafeApp {
         </header>
         ${busy ? '<div class="inline-loading">正在查词…</div>' : ''}
         ${lookupError ? `<div class="alert error">${escapeHtml(lookupError)}</div>` : ''}
+        ${usingPackageSummary ? '<div class="offline-banner">离线词典摘要</div>' : ''}
         ${this.lookupDefinitions.length ? `<ul class="definitions">${this.lookupDefinitions
           .map(definition => `<li>${escapeHtml(definition)}</li>`).join('')}</ul>` :
-          (!busy && !lookupError ? '<p class="muted">本地词典没有找到释义。</p>' : '')}
+          (!busy && !lookupError ? `<p class="muted">${usingPackageSummary
+            ? '文章包内没有找到词典摘要。'
+            : '本地词典没有找到释义。'}</p>` : '')}
         <form id="create-sense-form">
           <h3>创建学习词义</h3>
           <label>词性<select name="pos">${[

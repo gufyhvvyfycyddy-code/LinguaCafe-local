@@ -23,8 +23,10 @@ class MobileArticlePackageService
     public const DEFAULT_CHAPTERS_PER_PAGE = 50;
     public const MAX_CHAPTERS_PER_PAGE = 100;
 
-    public function __construct(private WordSenseContentVersionService $wordSenseVersion)
-    {
+    public function __construct(
+        private WordSenseContentVersionService $wordSenseVersion,
+        private DictionaryService $dictionaryService,
+    ) {
     }
 
     public function listForUser(int $userId, string $language, int $page, int $perPage): array
@@ -97,7 +99,8 @@ class MobileArticlePackageService
 
         $assist = $this->assistForChapter($chapter, $userId, $language);
         $summaries = $this->senseSummaries(collect([$chapter]), $userId, $language)[$chapter->id] ?? [];
-        $descriptor = $this->chapterDescriptor($chapter, $assist, $summaries);
+        $dictionaryVersion = $this->dictionaryService->localContentVersion($language);
+        $descriptor = $this->chapterDescriptor($chapter, $assist, $summaries, $dictionaryVersion);
         $offset = $this->decodeArticleCursor(
             $cursor,
             $book->id,
@@ -111,6 +114,10 @@ class MobileArticlePackageService
 
         $limit = min($tokenLimit, self::MAX_TOKEN_LIMIT);
         $count = min($limit, count($tokens) - $offset);
+        $dictionarySummaries = $this->dictionaryService->localDefinitionSummaries(
+            $language,
+            $this->dictionaryTerms(array_slice($tokens, $offset, $count)),
+        );
         $payload = null;
 
         while ($count >= 0) {
@@ -121,6 +128,8 @@ class MobileArticlePackageService
                 $descriptor,
                 $assist,
                 $summaries,
+                $dictionaryVersion,
+                $dictionarySummaries,
                 $slice,
                 $offset,
                 count($tokens),
@@ -178,11 +187,13 @@ class MobileArticlePackageService
             ->get()
             ->keyBy('chapter_id');
         $summaries = $this->senseSummaries($chapters, $userId, $language);
+        $dictionaryVersion = $this->dictionaryService->localContentVersion($language);
         $descriptors = $chapters->map(
             fn (Chapter $chapter) => $this->chapterDescriptor(
                 $chapter,
                 $assists->get($chapter->id),
                 $summaries[$chapter->id] ?? [],
+                $dictionaryVersion,
             ),
         )->values()->all();
 
@@ -241,6 +252,7 @@ class MobileArticlePackageService
         Chapter $chapter,
         ?ChapterAiReadingAssist $assist,
         array $summaries,
+        string $dictionaryVersion,
     ): array {
         $checksum = $this->checksum([
             'chapter' => [
@@ -258,6 +270,7 @@ class MobileArticlePackageService
                 'sentence_translations' => $assist->sentence_translations ?? [],
             ] : null,
             'sense_summaries' => $summaries,
+            'dictionary_version' => $dictionaryVersion,
         ]);
 
         return [
@@ -267,6 +280,7 @@ class MobileArticlePackageService
             'token_count' => count($this->tokens($chapter)),
             'content_version' => 'sha256:' . $checksum,
             'content_checksum' => $checksum,
+            'dictionary_version' => $dictionaryVersion,
             'token_endpoint' => "/api/v1/mobile/article-packages/{$chapter->book_id}/chapters/{$chapter->id}",
         ];
     }
@@ -277,6 +291,8 @@ class MobileArticlePackageService
         array $descriptor,
         ?ChapterAiReadingAssist $assist,
         array $summaries,
+        string $dictionaryVersion,
+        array $dictionarySummaries,
         array $tokens,
         int $offset,
         int $totalTokens,
@@ -302,6 +318,10 @@ class MobileArticlePackageService
                     : isset($sentenceKeys[(string) $summary['source_sentence_identity']])
             ),
         ));
+        $shardDictionarySummaries = array_intersect_key(
+            $dictionarySummaries,
+            array_fill_keys($this->dictionaryTerms($tokens), true),
+        );
 
         return [
             'schema_version' => self::SCHEMA_VERSION,
@@ -325,7 +345,25 @@ class MobileArticlePackageService
             'tokens' => $tokens,
             'sentence_translations' => $translations,
             'sense_summaries' => $shardSummaries,
+            'dictionary_version' => $dictionaryVersion,
+            'dictionary_summaries' => $shardDictionarySummaries,
         ];
+    }
+
+    private function dictionaryTerms(array $tokens): array
+    {
+        $terms = [];
+        foreach ($tokens as $token) {
+            if ($token['is_structure']) {
+                continue;
+            }
+            $term = mb_strtolower(trim((string) ($token['lemma'] ?: $token['word'])), 'UTF-8');
+            if ($term !== '' && preg_match('/[a-z]/', $term) === 1) {
+                $terms[$term] = true;
+            }
+        }
+
+        return array_keys($terms);
     }
 
     private function tokens(Chapter $chapter): array

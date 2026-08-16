@@ -151,16 +151,61 @@ describe('MobileApiClient', () => {
     expect(body.actions).toEqual([action]);
   });
 
-  it('walks every article token cursor without local persistence', async () => {
+  it('assembles every article shard into one offline package', async () => {
     const fetcher = vi
       .fn()
-      .mockResolvedValueOnce(envelope({ tokens: [{ word: 'one' }], next_cursor: 'next' }))
-      .mockResolvedValueOnce(envelope({ tokens: [{ word: 'two' }], next_cursor: null }));
+      .mockResolvedValueOnce(envelope({
+        chapter: { content_version: 'sha256:chapter' },
+        tokens: [{ word: 'one' }],
+        sentence_translations: [{ sentence_index: 1, source_text: 'One.', translation_zh: '一。' }],
+        sense_summaries: [{ occurrence_id: 7, word_sense_id: 8 }],
+        dictionary_version: 'sha256:dictionary',
+        dictionary_summaries: { one: ['一'] },
+        next_cursor: 'next',
+      }))
+      .mockResolvedValueOnce(envelope({
+        chapter: { content_version: 'sha256:chapter' },
+        tokens: [{ word: 'two' }],
+        sentence_translations: [{ sentence_index: 2, source_text: 'Two.', translation_zh: '二。' }],
+        sense_summaries: [],
+        dictionary_version: 'sha256:dictionary',
+        dictionary_summaries: { two: ['二'] },
+        next_cursor: null,
+      }));
     const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
     client.setToken('secret');
-    const tokens = await client.chapterTokens(1, 2);
-    expect(tokens.map(token => token.word)).toEqual(['one', 'two']);
+    const article = await client.chapterPackage(1, 2);
+    expect(article.tokens.map(token => token.word)).toEqual(['one', 'two']);
+    expect(article.dictionary_summaries).toEqual({ one: ['一'], two: ['二'] });
+    expect(article.sense_summaries).toEqual([{ occurrence_id: 7, word_sense_id: 8 }]);
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('requests a genuinely short-term Sense review horizon', async () => {
+    const fetcher = vi.fn(async () => envelope({ items: [] }));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await client.reviews();
+
+    expect(fetcher.mock.calls[0][0]).toBe(
+      'https://example.com/api/v1/mobile/review-packages/short-term?horizon_days=7&limit=50',
+    );
+  });
+
+  it('keeps the connected local-dictionary lookup endpoint', async () => {
+    const fetcher = vi.fn(async () => envelope({
+      term: 'hello',
+      definitions: ['你好'],
+      local_only: true,
+    }));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await expect(client.dictionary('hello world')).resolves.toMatchObject({ definitions: ['你好'] });
+    expect(fetcher.mock.calls[0][0]).toBe(
+      'https://example.com/api/v1/mobile/dictionary/lookup?term=hello%20world',
+    );
   });
 
   it('loads every saved WordSense page in server order', async () => {

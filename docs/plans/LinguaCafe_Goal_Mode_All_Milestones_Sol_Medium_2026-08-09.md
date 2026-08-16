@@ -324,8 +324,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 |---|---|---|---|---|
 | E-01 | DONE | 审计旧 M1–M9：Mobile API、operation ledger、download packages、sync、Android/iOS/offline | 2026-08-01 M0–M18 audit + actual code | 每项标 `reuse / adapt / obsolete`；不因历史“Closed”自动通过 |
 | E-02 | DONE | 移动 IA 与 Phase C 首页/四导航一致 | existing Capacitor/mobile shell | 不设计第二套 IA；Web/mobile 文案/入口一致 |
-| E-03 | ACTIVE | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
-| E-04 | TODO | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
+| E-03 | DONE | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
+| E-04 | ACTIVE | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
 | E-05 | TODO | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
 | E-06 | TODO | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
 | E-07 | TODO | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `E-03`（文章下载包与 sense-only review package 对齐）
-- Last DONE: `E-02`
+- Active milestone: `E-04`（离线显式 rating / passive Good / operation-idempotency 边界统一）
+- Last DONE: `E-03`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -572,6 +572,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - fresh Mobile Vitest 30/30、PHP 12/12（100 assertions）、E-02/M7/WordSense static guards 11/11、Mobile TypeScript/Vite build、root `npm run development` 与 diff-check 全绿；fresh code review Blocker=0/Required=0。
 - testing-bound 真实 390px 浏览器通过正常 setup/mobile login，依次真实到达 Home、阅读、复习、生词、我的并从顶部返回 Home；目标 Mobile API 全 2xx、无横向溢出或相关 Console error，设备 token 正常撤销，未评分/导入/创建学习数据；server/browser/artifacts/ports/lease clean。
 
+### CLOSED MILESTONE EVIDENCE — E-03
+
+- 文章 shard 在既有 `MobileArticlePackageService` 中补齐 bounded 本地词典摘要与 dictionary version；Mobile 只保存新的 `chapter_packages` disposable cache，聚合并保留 token/sentence/lemma/POS、translation、相关 WordSense 与摘要，没有恢复永久 `chapter_tokens` 双缓存，也未下载完整词典。
+- 既有联网 `MobileApiClient.dictionary()` 与完整本地词典查询继续是主路径；仅在已加载 offline snapshot 或真实网络失败时读取 package summary。fallback 不触发 WordSense、ReviewCard、ReviewLog 或 FSRS 写入；short-term Sense review horizon 为 7 天。
+- M3 focused 7/7（103 assertions）、Mobile Vitest 32/32、TypeScript/Vite build、E-03/M7 guards、lint 与 diff-check 全绿；fresh review Blocker=0/Required=0。
+- testing-bound 真实浏览器证明联网 lookup 实际命中现有 dictionary API 200；精确停止同一 server 后，从 IndexedDB 重开已下载文章显示离线 package summary，离线点击新增 dictionary request 为 0。目标联网 API 全 2xx；两条 Console error 仅为停止 server 后预期的 article/chapter `ERR_CONNECTION_REFUSED`。fixture、3 个任务设备 token、browser artifacts、ports 与 lease 均精确清理，最终 lease false/false。
+
 ### PROGRESS LOG
 
 格式：
@@ -659,6 +666,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | E-01 | DONE | Goal branch tip | fresh actual-code audit 将 M1–M9 分类为 reuse/adapt/obsolete；唯一 mobile API/package/ledger/sync/Capacitor/IndexedDB 主路保留，E-02…E-08 gap 精确路由；PHP 60/589、Vitest 29/29、mobile build、static guards 5/5 全绿；零产品代码/数据修改 | E-02`
 
 `2026-08-16 | E-02 | DONE | Goal branch tip | Private House 复用 existing mobile shell + canonical WordSense query owner；Home + exact 四导航对齐 Phase C，cardless confirmed sense 可见；PHP 12/100、Vitest 30/30、static 11/11、mobile/root builds 绿；390px testing browser 全目标 2xx、无横溢/相关 Console error，token/server/browser/lease clean | E-03`
+
+`2026-08-16 | E-03 | DONE | Goal branch tip | 既有 online dictionary lookup 保留为主路径，bounded package summaries 仅作 offline/network fallback；chapter_packages 单缓存 + 7-day Sense horizon；M3 7/103、Vitest 32/32、mobile build/guards 绿；真实 server-stop browser 证明 online API 200、offline summary 0 dictionary request，fixture/tokens/browser/ports/lease clean | E-04`
 
 ### DECISION LOG
 

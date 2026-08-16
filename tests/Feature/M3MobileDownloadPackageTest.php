@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
 use App\Services\MobileArticlePackageService;
+use App\Services\DictionaryService;
 use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -44,6 +45,16 @@ class M3MobileDownloadPackageTest extends TestCase
 
     public function test_article_manifest_and_shards_are_deterministic_bounded_and_source_complete(): void
     {
+        $dictionary = $this->mock(DictionaryService::class);
+        $dictionary->shouldReceive('localContentVersion')->andReturn('sha256:dictionary-v1');
+        $dictionary->shouldReceive('localDefinitionSummaries')
+            ->once()
+            ->with('english', ['hello', 'world'])
+            ->andReturn(['hello' => ['你好'], 'world' => ['世界']]);
+        $dictionary->shouldReceive('localDefinitionSummaries')
+            ->once()
+            ->with('english', ['again'])
+            ->andReturn(['again' => ['再次']]);
         [$token] = $this->issueToken($this->user);
         [$book, $chapter] = $this->createArticle($this->user, [
             $this->token('Hello', 0, false),
@@ -113,6 +124,9 @@ class M3MobileDownloadPackageTest extends TestCase
             ->assertJsonPath('data.tokens.0.section_identity', "chapter:{$chapter->id}:section:0")
             ->assertJsonPath('data.sentence_translations.0.translation_zh', '你好，世界。')
             ->assertJsonPath('data.sense_summaries.0.word_sense_id', $sense->id)
+            ->assertJsonPath('data.dictionary_version', 'sha256:dictionary-v1')
+            ->assertJsonPath('data.dictionary_summaries.hello.0', '你好')
+            ->assertJsonPath('data.dictionary_summaries.world.0', '世界')
             ->assertJsonPath('data.has_more', true);
         $this->assertLessThanOrEqual(
             MobileArticlePackageService::MAX_SHARD_BYTES,
@@ -128,10 +142,37 @@ class M3MobileDownloadPackageTest extends TestCase
             ->assertJsonPath('data.offset', 4)
             ->assertJsonPath('data.tokens.0.token_identity', "chapter:{$chapter->id}:token:4")
             ->assertJsonPath('data.tokens.0.section_identity', "chapter:{$chapter->id}:section:1")
+            ->assertJsonPath('data.dictionary_summaries.again.0', '再次')
             ->assertJsonPath('data.has_more', false);
         $this->assertSame($version, $manifest->json('data.content_version'));
         $this->assertNotEmpty($second->json('data.sentence_translations'));
         $this->assertSame($before, $this->writeBoundarySnapshot());
+    }
+
+    public function test_dictionary_source_version_invalidates_article_manifest(): void
+    {
+        $dictionary = $this->mock(DictionaryService::class);
+        $dictionary->shouldReceive('localContentVersion')
+            ->twice()
+            ->andReturn('sha256:dictionary-v1', 'sha256:dictionary-v2');
+        [$token] = $this->issueToken($this->user);
+        [$book] = $this->createArticle($this->user, [$this->token('Hello', 0)]);
+
+        $first = $this->withToken($token)
+            ->getJson("/api/v1/mobile/article-packages/{$book->id}")
+            ->assertOk();
+        $second = $this->withToken($token)
+            ->getJson("/api/v1/mobile/article-packages/{$book->id}")
+            ->assertOk();
+
+        $this->assertNotSame(
+            $first->json('data.content_version'),
+            $second->json('data.content_version'),
+        );
+        $this->assertSame(
+            'sha256:dictionary-v2',
+            $second->json('data.chapters.0.dictionary_version'),
+        );
     }
 
     public function test_article_change_invalidates_version_and_old_cursor(): void

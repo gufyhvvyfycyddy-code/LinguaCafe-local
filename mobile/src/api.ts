@@ -1,6 +1,7 @@
 import type {
   ArticleSummary,
   Bootstrap,
+  ChapterPackage,
   ChapterSummary,
   DailySummary,
   MobileApiFailure,
@@ -202,27 +203,45 @@ export class MobileApiClient {
     throw invalidPagination();
   }
 
-  async chapterTokens(bookId: number, chapterId: number): Promise<ReaderToken[]> {
+  async chapterPackage(bookId: number, chapterId: number): Promise<ChapterPackage> {
     const tokens: ReaderToken[] = [];
+    const sentenceTranslations = new Map<string, ChapterPackage['sentence_translations'][number]>();
+    const senseSummaries = new Map<number, ChapterPackage['sense_summaries'][number]>();
+    const dictionarySummaries: Record<string, string[]> = {};
+    let contentVersion = '';
+    let dictionaryVersion = '';
     let cursor = '';
     do {
       const query = new URLSearchParams({ token_limit: '1000' });
       if (cursor) query.set('cursor', cursor);
       const data = await this.request<{
+        chapter: { content_version: string };
         tokens: ReaderToken[];
+        sentence_translations: ChapterPackage['sentence_translations'];
+        sense_summaries: ChapterPackage['sense_summaries'];
+        dictionary_version: string;
+        dictionary_summaries: Record<string, string[]>;
         next_cursor: string | null;
       }>(`/article-packages/${bookId}/chapters/${chapterId}?${query}`);
+      contentVersion ||= data.chapter.content_version;
+      dictionaryVersion ||= data.dictionary_version;
       tokens.push(...data.tokens);
+      data.sentence_translations.forEach(item => sentenceTranslations.set(String(item.sentence_index), item));
+      data.sense_summaries.forEach(item => senseSummaries.set(item.occurrence_id, item));
+      Object.assign(dictionarySummaries, data.dictionary_summaries);
       cursor = data.next_cursor ?? '';
     } while (cursor);
-    return tokens;
+    return {
+      content_version: contentVersion,
+      dictionary_version: dictionaryVersion,
+      tokens,
+      sentence_translations: [...sentenceTranslations.values()],
+      sense_summaries: [...senseSummaries.values()],
+      dictionary_summaries: dictionarySummaries,
+    };
   }
 
-  dictionary(term: string): Promise<{
-    term: string;
-    definitions: string[];
-    local_only: true;
-  }> {
+  dictionary(term: string): Promise<{ term: string; definitions: string[]; local_only: true }> {
     return this.request(`/dictionary/lookup?term=${encodeURIComponent(term)}`);
   }
 
@@ -274,7 +293,7 @@ export class MobileApiClient {
 
   async reviews(): Promise<ReviewItem[]> {
     const data = await this.request<{ items: ReviewItem[] }>(
-      '/review-packages/short-term?horizon_days=0&limit=50',
+      '/review-packages/short-term?horizon_days=7&limit=50',
     );
     return data.items;
   }

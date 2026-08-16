@@ -36,20 +36,28 @@ describe('OfflineRepository', () => {
     const store = new MemoryStore();
     const repository = new OfflineRepository(7, 'English', store);
     await repository.saveChapters(3, [{ chapter_id: 9, name: 'One', token_count: 2 }]);
-    await repository.saveChapterTokens(3, 9, [{
-      position: 1,
-      word: 'Hello',
-      lemma: 'hello',
-      pos: 'noun',
-      source_sentence_identity: 1,
-      is_structure: false,
-      space_after: true,
-    }]);
+    await repository.saveChapterPackage(3, 9, {
+      content_version: 'sha256:chapter',
+      dictionary_version: 'sha256:dictionary',
+      tokens: [{
+        position: 1,
+        word: 'Hello',
+        lemma: 'hello',
+        pos: 'noun',
+        source_sentence_identity: 1,
+        is_structure: false,
+        space_after: true,
+      }],
+      sentence_translations: [],
+      sense_summaries: [],
+      dictionary_summaries: { hello: ['你好'] },
+    });
     const first = await repository.enqueueRating(10, 'good', 1200, new Date('2026-08-01T00:00:00Z'));
     const second = await repository.enqueueRating(11, 'again', 900, new Date('2026-08-01T00:00:01Z'));
 
     expect((await repository.chapters(3))?.[0].chapter_id).toBe(9);
-    expect((await repository.chapterTokens(3, 9))?.[0].lemma).toBe('hello');
+    expect((await repository.chapterPackage(3, 9))?.tokens[0].lemma).toBe('hello');
+    expect((await repository.chapterPackage(3, 9))?.dictionary_summaries.hello).toEqual(['你好']);
     expect([first.sequence, second.sequence]).toEqual([1, 2]);
     expect(await repository.pendingCardIds()).toEqual(new Set([10, 11]));
   });
