@@ -48,6 +48,7 @@ class MobileBootstrapController extends Controller
                 'local_dictionary_lookup' => true,
                 'manual_word_sense_creation' => true,
                 'daily_summary' => true,
+                'reading_sessions' => true,
             ],
             'readiness' => [
                 // Authentication and device lookup already proved the

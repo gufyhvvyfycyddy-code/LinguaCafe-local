@@ -181,6 +181,32 @@ describe('MobileApiClient', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
+  it('starts and finishes reading only through the server reading contracts', async () => {
+    const fetcher = vi.fn(async () => envelope({
+      reading_session_id: 'session-id',
+      completed: false,
+      can_commit: true,
+      settlement_mode: 'preflight',
+      passive_good_count: 1,
+      unresolved_count: 0,
+      excluded_count: 0,
+    }));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await client.startReadingSession(9, 'resume-id');
+    await client.finishReadingSession(9, 'session-id', 'preflight');
+
+    expect(fetcher.mock.calls[0][0]).toBe('https://example.com/api/v1/mobile/chapters/9/reading-sessions');
+    expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toEqual({
+      resume_reading_session_id: 'resume-id',
+    });
+    expect(fetcher.mock.calls[1][0]).toBe(
+      'https://example.com/api/v1/mobile/chapters/9/reading-sessions/session-id/finish',
+    );
+    expect(JSON.parse(String(fetcher.mock.calls[1][1].body))).toEqual({ settlement_mode: 'preflight' });
+  });
+
   it('requests a genuinely short-term Sense review horizon', async () => {
     const fetcher = vi.fn(async () => envelope({ items: [] }));
     const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);

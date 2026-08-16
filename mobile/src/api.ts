@@ -9,6 +9,8 @@ import type {
   ReaderToken,
   ReviewItem,
   ReviewRating,
+  ReadingFinishProjection,
+  ReadingSessionProjection,
   QueuedAction,
   SyncBatchResult,
   WordSenseSummary,
@@ -243,6 +245,24 @@ export class MobileApiClient {
 
   dictionary(term: string): Promise<{ term: string; definitions: string[]; local_only: true }> {
     return this.request(`/dictionary/lookup?term=${encodeURIComponent(term)}`);
+  }
+
+  startReadingSession(chapterId: number, resumeReadingSessionId?: string): Promise<ReadingSessionProjection> {
+    return this.request(`/chapters/${chapterId}/reading-sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ resume_reading_session_id: resumeReadingSessionId }),
+    });
+  }
+
+  finishReadingSession(
+    chapterId: number,
+    readingSessionId: string,
+    settlementMode: 'preflight' | 'commit',
+  ): Promise<ReadingFinishProjection> {
+    return this.request(`/chapters/${chapterId}/reading-sessions/${readingSessionId}/finish`, {
+      method: 'POST',
+      body: JSON.stringify({ settlement_mode: settlementMode }),
+    });
   }
 
   createSense(payload: {

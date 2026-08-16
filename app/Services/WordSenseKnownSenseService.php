@@ -154,6 +154,20 @@ class WordSenseKnownSenseService
             ->whereIn('lemma', $normalized)
             ->orderBy('id')
             ->get(['id', 'lemma', 'sense_zh', 'sense_en', 'pos']);
+        $reviewCards = ReviewCard::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereIn('target_id', $rows->pluck('id'))
+            ->where('fsrs_enabled', true)
+            ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+            ->where(function ($query) {
+                $query->whereNull('buried_until')
+                    ->orWhere('buried_until', '<=', now());
+            })
+            ->orderBy('id')
+            ->get(['id', 'target_id'])
+            ->keyBy('target_id');
 
         $result = [];
         foreach ($normalized as $lemma) {
@@ -164,6 +178,7 @@ class WordSenseKnownSenseService
             $result[$lemma] ??= [];
             $result[$lemma][] = [
                 'word_sense_id' => (int) $sense->id,
+                'review_card_id' => $reviewCards->get($sense->id)?->id,
                 'sense_zh' => $sense->sense_zh,
                 'sense_en' => $sense->sense_en,
                 'pos' => $sense->pos,

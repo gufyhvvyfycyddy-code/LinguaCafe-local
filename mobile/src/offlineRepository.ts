@@ -136,6 +136,7 @@ export class OfflineRepository {
     rating: ReviewRating,
     reviewDurationMs: number,
     now = new Date(),
+    readingContext?: { readingSessionId: string; occurrenceId: string },
   ): Promise<QueuedAction> {
     let queued!: QueuedAction;
     await this.update(state => {
@@ -148,6 +149,34 @@ export class OfflineRepository {
           review_card_id: reviewCardId,
           rating,
           review_duration_ms: Math.min(600000, Math.max(0, reviewDurationMs)),
+          ...(readingContext ? {
+            reading_session_id: readingContext.readingSessionId,
+            occurrence_id: readingContext.occurrenceId,
+          } : {}),
+        },
+      };
+      state.queue.push(queued);
+    });
+    return queued;
+  }
+
+  async enqueueReadingInteraction(
+    readingSessionId: string,
+    occurrenceId: string,
+    interactionType: 'opened' | 'helped' = 'opened',
+    now = new Date(),
+  ): Promise<QueuedAction> {
+    let queued!: QueuedAction;
+    await this.update(state => {
+      queued = {
+        client_action_id: crypto.randomUUID(),
+        type: 'reading_session.interaction',
+        occurred_at: now.toISOString(),
+        sequence: state.next_sequence++,
+        payload: {
+          reading_session_id: readingSessionId,
+          interaction_type: interactionType,
+          occurrence_id: occurrenceId,
         },
       };
       state.queue.push(queued);
@@ -160,7 +189,9 @@ export class OfflineRepository {
   }
 
   async pendingCardIds(): Promise<Set<number>> {
-    return new Set((await this.state()).queue.map(action => action.payload.review_card_id));
+    return new Set((await this.state()).queue.flatMap(action => (
+      action.type === 'sense_review.rating' ? [action.payload.review_card_id] : []
+    )));
   }
 
   async issues(): Promise<OfflineSyncIssue[]> {

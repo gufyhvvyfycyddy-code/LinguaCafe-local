@@ -7,6 +7,7 @@ use App\Exceptions\MobileReviewCardUnavailableException;
 use App\Models\MobileDevice;
 use App\Models\Operation;
 use App\Models\ReviewCard;
+use App\Models\ReviewLog;
 use App\Models\WordSense;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,7 @@ class MobileSenseReviewMutationService
     public function __construct(
         private ReviewCardService $reviewCardService,
         private MobileOperationLedgerService $operationLedger,
+        private ReadingSessionService $readingSessionService,
     ) {
     }
 
@@ -24,13 +26,22 @@ class MobileSenseReviewMutationService
         string $rating,
         ?string $reviewSessionId,
         ?int $reviewDurationMs,
+        ?string $readingSessionId = null,
+        ?string $occurrenceId = null,
     ): array {
-        return [
+        $payload = [
             'review_card_id' => $reviewCardId,
             'rating' => $rating,
             'review_session_id' => $reviewSessionId,
             'review_duration_ms' => $reviewDurationMs,
         ];
+
+        if ($readingSessionId !== null) {
+            $payload['reading_session_id'] = $readingSessionId;
+            $payload['occurrence_id'] = $occurrenceId;
+        }
+
+        return $payload;
     }
 
     public function apply(
@@ -45,6 +56,9 @@ class MobileSenseReviewMutationService
         Carbon $occurredAt,
         ?int $clientSequence = null,
         ?string $batchId = null,
+        ?string $readingSessionId = null,
+        ?string $occurrenceId = null,
+        ?string $readingActionId = null,
     ): array {
         return DB::transaction(function () use (
             $operationId,
@@ -58,25 +72,46 @@ class MobileSenseReviewMutationService
             $occurredAt,
             $clientSequence,
             $batchId,
+            $readingSessionId,
+            $occurrenceId,
+            $readingActionId,
         ) {
-            $card = ReviewCard::query()
-                ->lockForUpdate()
-                ->whereKey($reviewCardId)
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->where('target_type', ReviewCard::TARGET_SENSE)
-                ->where('fsrs_enabled', true)
-                ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
-                ->where(function ($query) {
-                    $query->whereNull('buried_until')
-                        ->orWhere('buried_until', '<=', Carbon::now());
-                })
-                ->whereHas('sense', function ($query) use ($userId, $language) {
-                    $query->where('user_id', $userId)
-                        ->where('language_id', $language)
-                        ->where('status', WordSense::STATUS_CONFIRMED);
-                })
-                ->first();
+            $readingContext = null;
+            if ($readingSessionId !== null && $occurrenceId !== null && $readingActionId !== null) {
+                $session = $this->readingSessionService->lockOwnedSessionForExplicitAction(
+                    $userId,
+                    $language,
+                    $readingSessionId,
+                );
+                $this->readingSessionService->assertNoActiveExplicitRating($session, $reviewCardId);
+                $readingContext = $this->readingSessionService->lockExplicitRatingContext(
+                    $userId,
+                    $language,
+                    $readingSessionId,
+                    $occurrenceId,
+                    $reviewCardId,
+                );
+                $card = $readingContext['review_card'];
+            } else {
+                $card = ReviewCard::query()
+                    ->lockForUpdate()
+                    ->whereKey($reviewCardId)
+                    ->where('user_id', $userId)
+                    ->where('language_id', $language)
+                    ->where('target_type', ReviewCard::TARGET_SENSE)
+                    ->where('fsrs_enabled', true)
+                    ->where('lifecycle_state', ReviewCard::LIFECYCLE_ACTIVE)
+                    ->where(function ($query) {
+                        $query->whereNull('buried_until')
+                            ->orWhere('buried_until', '<=', Carbon::now());
+                    })
+                    ->whereHas('sense', function ($query) use ($userId, $language) {
+                        $query->where('user_id', $userId)
+                            ->where('language_id', $language)
+                            ->where('status', WordSense::STATUS_CONFIRMED);
+                    })
+                    ->first();
+            }
 
             if (!$card) {
                 throw new MobileReviewCardUnavailableException();
@@ -105,8 +140,8 @@ class MobileSenseReviewMutationService
                 $language,
                 $card->id,
                 $rating,
-                'sense_review',
-                $reviewSessionId,
+                $readingContext ? ReviewLog::SOURCE_READING_EXPLICIT : ReviewLog::SOURCE_SENSE_REVIEW,
+                $readingContext ? $readingSessionId : $reviewSessionId,
                 $reviewDurationMs,
                 $occurredAt,
             );
@@ -119,13 +154,23 @@ class MobileSenseReviewMutationService
                 'sequence' => $clientSequence,
                 'batch_id' => $batchId,
             ];
+            if ($readingContext) {
+                $actionPayload['reading_session_id'] = $readingSessionId;
+                $actionPayload['occurrence_id'] = $occurrenceId;
+            }
+
+            $response = [
+                'operation_id' => $operationId,
+                'review_log_id' => $outcome['review_log']->id,
+                'card' => $this->serializeCard($outcome['card']),
+            ];
 
             $this->operationLedger->registerRating(
                 $operationId,
                 $userId,
                 $language,
                 $device,
-                $reviewSessionId,
+                $readingContext ? $readingSessionId : $reviewSessionId,
                 $outcome['review_log'],
                 $occurredAt,
                 $clientSequence,
@@ -133,11 +178,19 @@ class MobileSenseReviewMutationService
                 $actionPayload,
             );
 
-            return [
-                'operation_id' => $operationId,
-                'review_log_id' => $outcome['review_log']->id,
-                'card' => $this->serializeCard($outcome['card']),
-            ];
+            if ($readingContext) {
+                $this->readingSessionService->recordExplicitRatingLocked(
+                    $readingContext['session'],
+                    $readingContext['target'],
+                    (int) $readingContext['review_card']->id,
+                    (int) $readingContext['sense']->id,
+                    (int) $outcome['review_log']->id,
+                    $readingActionId,
+                    $response,
+                );
+            }
+
+            return $response;
         });
     }
 

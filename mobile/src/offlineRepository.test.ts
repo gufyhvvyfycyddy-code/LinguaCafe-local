@@ -90,6 +90,39 @@ describe('OfflineRepository', () => {
     })]);
   });
 
+  it('queues reading interactions and explicit ratings in the existing ordered queue', async () => {
+    const repository = new OfflineRepository(7, 'English', new MemoryStore());
+    const opened = await repository.enqueueReadingInteraction(
+      '11111111-1111-4111-8111-111111111111',
+      'word:0',
+    );
+    const rating = await repository.enqueueRating(
+      10,
+      'good',
+      250,
+      new Date('2026-08-01T00:00:01Z'),
+      {
+        readingSessionId: '11111111-1111-4111-8111-111111111111',
+        occurrenceId: 'word:0',
+      },
+    );
+
+    expect(opened.type).toBe('reading_session.interaction');
+    expect(opened.payload).toEqual({
+      reading_session_id: '11111111-1111-4111-8111-111111111111',
+      interaction_type: 'opened',
+      occurrence_id: 'word:0',
+    });
+    expect(rating.type).toBe('sense_review.rating');
+    expect(rating.payload).toMatchObject({
+      review_card_id: 10,
+      reading_session_id: '11111111-1111-4111-8111-111111111111',
+      occurrence_id: 'word:0',
+    });
+    expect((await repository.queuedActions()).map(action => action.sequence)).toEqual([1, 2]);
+    expect(await repository.pendingCardIds()).toEqual(new Set([10]));
+  });
+
   it('deletes only the active user-language scope during local sign-out cleanup', async () => {
     const store = new MemoryStore();
     const current = new OfflineRepository(7, 'English', store);

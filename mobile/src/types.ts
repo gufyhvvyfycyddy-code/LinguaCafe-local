@@ -63,19 +63,36 @@ export interface ReviewItem {
 
 export type ReviewRating = 'again' | 'hard' | 'good' | 'easy';
 
-export type QueuedActionType = 'sense_review.rating';
+export type QueuedActionType = 'sense_review.rating' | 'reading_session.interaction';
 
-export interface QueuedAction {
+interface QueuedActionBase {
   client_action_id: string;
   type: QueuedActionType;
   occurred_at: string;
   sequence: number;
+}
+
+export interface QueuedRatingAction extends QueuedActionBase {
+  type: 'sense_review.rating';
   payload: {
     review_card_id: number;
     rating: ReviewRating;
     review_duration_ms: number;
+    reading_session_id?: string;
+    occurrence_id?: string;
   };
 }
+
+export interface QueuedReadingInteractionAction extends QueuedActionBase {
+  type: 'reading_session.interaction';
+  payload: {
+    reading_session_id: string;
+    interaction_type: 'opened' | 'helped';
+    occurrence_id: string;
+  };
+}
+
+export type QueuedAction = QueuedRatingAction | QueuedReadingInteractionAction;
 
 export interface SyncActionResult {
   client_action_id: string;
@@ -156,6 +173,41 @@ export interface ChapterPackage {
   sentence_translations: ArticleSentenceTranslation[];
   sense_summaries: ArticleSenseSummary[];
   dictionary_summaries: Record<string, string[]>;
+  reading_session?: ReadingSessionProjection;
+}
+
+export interface ReadingSenseCandidate {
+  word_sense_id: number;
+  review_card_id: number | null;
+  sense_zh: string | null;
+  sense_en: string | null;
+  pos: string | null;
+}
+
+export interface ReadingTarget {
+  occurrence_id: string;
+  kind: string;
+  start_word_index: number;
+  end_word_index: number;
+  candidate_word_senses: ReadingSenseCandidate[];
+}
+
+export interface ReadingSessionProjection {
+  reading_session_id: string;
+  chapter_id: number;
+  source_revision: string;
+  status: string;
+  completed: boolean;
+  reading_targets: ReadingTarget[];
+}
+
+export interface ReadingFinishProjection {
+  completed: boolean;
+  can_commit: boolean;
+  settlement_mode: 'preflight' | 'commit';
+  passive_good_count: number;
+  unresolved_count: number;
+  excluded_count: number;
 }
 
 export interface WordSenseSummary {

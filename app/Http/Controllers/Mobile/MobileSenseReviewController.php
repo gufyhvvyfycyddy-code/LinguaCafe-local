@@ -10,6 +10,7 @@ use App\Http\Responses\MobileApiResponse;
 use App\Models\MobileDevice;
 use App\Services\MobileIdempotencyService;
 use App\Services\MobileSenseReviewMutationService;
+use App\Services\ReadingSessionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -27,6 +28,8 @@ class MobileSenseReviewController extends Controller
             'client_action_id' => ['required', 'uuid'],
             'review_session_id' => ['nullable', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'reading_session_id' => ['nullable', 'required_with:occurrence_id', 'uuid'],
+            'occurrence_id' => ['nullable', 'required_with:reading_session_id', 'string', 'max:255'],
         ]);
 
         $user = $request->user();
@@ -40,12 +43,20 @@ class MobileSenseReviewController extends Controller
         $reviewDurationMs = isset($validated['review_duration_ms'])
             ? (int) $validated['review_duration_ms']
             : null;
+        $readingSessionId = isset($validated['reading_session_id'])
+            ? (string) $validated['reading_session_id']
+            : null;
+        $occurrenceId = isset($validated['occurrence_id'])
+            ? (string) $validated['occurrence_id']
+            : null;
 
         $requestPayload = MobileSenseReviewMutationService::idempotencyPayload(
             $reviewCard,
             $rating,
             $reviewSessionId,
             $reviewDurationMs,
+            $readingSessionId,
+            $occurrenceId,
         );
         $occurredAt = Carbon::now();
 
@@ -65,6 +76,8 @@ class MobileSenseReviewController extends Controller
                     $reviewSessionId,
                     $reviewDurationMs,
                     $occurredAt,
+                    $readingSessionId,
+                    $occurrenceId,
                 ) {
                     $body = $this->mutationService->apply(
                         $operationId,
@@ -76,6 +89,11 @@ class MobileSenseReviewController extends Controller
                         $reviewSessionId,
                         $reviewDurationMs,
                         $occurredAt,
+                        null,
+                        null,
+                        $readingSessionId,
+                        $occurrenceId,
+                        $readingSessionId ? $clientActionId : null,
                     );
                     $body['client_action_id'] = $clientActionId;
 
@@ -103,6 +121,12 @@ class MobileSenseReviewController extends Controller
                 $exception->getMessage(),
                 $exception->status,
             );
+        } catch (\InvalidArgumentException $exception) {
+            if ($readingSessionId === null) {
+                throw $exception;
+            }
+
+            return $this->readingContractError($exception);
         }
 
         $body = $result['body']['data'];
@@ -110,6 +134,24 @@ class MobileSenseReviewController extends Controller
         $body['replayed'] = $result['replayed'];
 
         return MobileApiResponse::success($body, $result['status']);
+    }
+
+    private function readingContractError(\InvalidArgumentException $exception)
+    {
+        $code = $exception->getMessage();
+        $status = match ($code) {
+            ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+            ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+            ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH,
+            ReadingSessionService::ERROR_SESSION_STALE_SOURCE,
+            ReadingSessionService::ERROR_OCCURRENCE_STALE,
+            ReadingSessionService::ERROR_EXPLICIT_ACTION_UNDONE,
+            ReadingSessionService::ERROR_EXPLICIT_ACTION_ACTIVE => 409,
+            default => 422,
+        };
+
+        return MobileApiResponse::error($code, 'The reading action could not be applied.', $status);
     }
 
 }

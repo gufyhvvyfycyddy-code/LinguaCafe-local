@@ -433,7 +433,14 @@ export class LinguaCafeApp {
     this.selectedChapter = chapter;
     this.setBusy('正在打开阅读器…');
     try {
+      const cached = await this.offlineRepository?.chapterPackage(bookId, chapter.chapter_id);
       this.readerPackage = await this.api.chapterPackage(bookId, chapter.chapter_id);
+      this.readerPackage.reading_session = await this.api.startReadingSession(
+        chapter.chapter_id,
+        cached?.reading_session?.status === 'active'
+          ? cached.reading_session.reading_session_id
+          : undefined,
+      );
       this.readerTokens = this.readerPackage.tokens;
       this.setServerReachable(true);
       await this.saveOffline(() => this.offlineRepository?.saveChapterPackage(
@@ -475,6 +482,7 @@ export class LinguaCafeApp {
         ${this.usingOfflineSnapshot ? '<div class="offline-banner reader-offline">离线文章包</div>' : ''}
         <article class="reader-copy">${tokens}</article>
         <p class="reader-hint">轻点单词查本地词典；离线时使用文章包摘要。</p>
+        <button class="primary large" id="finish-reading">完成阅读</button>
       </section>`;
     this.screenElement().querySelector('#back-chapters')?.addEventListener('click', () => {
       if (this.selectedBook) void this.openBook(this.selectedBook);
@@ -485,6 +493,8 @@ export class LinguaCafeApp {
         if (token) void this.openLookup(token);
       });
     });
+    this.screenElement().querySelector('#finish-reading')
+      ?.addEventListener('click', () => void this.finishReading());
   }
 
   private async openLookup(token: ReaderToken): Promise<void> {
@@ -492,6 +502,7 @@ export class LinguaCafeApp {
     this.lookupToken = token;
     const term = (token.lemma || token.word).trim().toLocaleLowerCase('en-US');
     this.lookupDefinitions = [];
+    await this.recordLookupOpened(token);
 
     if (this.usingOfflineSnapshot) {
       this.lookupDefinitions = this.readerPackage?.dictionary_summaries[term] ?? [];
@@ -519,6 +530,8 @@ export class LinguaCafeApp {
     const token = this.lookupToken;
     if (!token) return;
     const firstDefinition = this.lookupDefinitions[0] ?? '';
+    const target = this.readingTargetForToken(token);
+    const reviewCandidates = target?.candidate_word_senses.filter(candidate => candidate.review_card_id) ?? [];
     const panel = document.createElement('div');
     panel.className = 'sheet-backdrop';
     panel.innerHTML = `
@@ -537,6 +550,13 @@ export class LinguaCafeApp {
           (!busy && !lookupError ? `<p class="muted">${usingPackageSummary
             ? '文章包内没有找到词典摘要。'
             : '本地词典没有找到释义。'}</p>` : '')}
+        ${reviewCandidates.map(candidate => `
+          <section class="card">
+            <strong>${escapeHtml(candidate.sense_zh || candidate.sense_en || token.word)}</strong>
+            <div class="rating-grid">${(['again', 'hard', 'good', 'easy'] as ReviewRating[]).map(rating => `
+              <button type="button" data-reading-rating="${rating}"
+                data-review-card="${candidate.review_card_id}">${rating}</button>`).join('')}</div>
+          </section>`).join('')}
         <form id="create-sense-form">
           <h3>创建学习词义</h3>
           <label>词性<select name="pos">${[
@@ -558,6 +578,114 @@ export class LinguaCafeApp {
       event.preventDefault();
       void this.createSense(new FormData(event.currentTarget as HTMLFormElement), panel);
     });
+    panel.querySelectorAll<HTMLButtonElement>('[data-reading-rating]').forEach(button => {
+      button.addEventListener('click', () => {
+        const rating = button.dataset.readingRating;
+        const reviewCardId = Number(button.dataset.reviewCard);
+        if (target && isReviewRating(rating) && reviewCardId > 0) {
+          void this.rateReadingTarget(target.occurrence_id, reviewCardId, rating, panel);
+        }
+      });
+    });
+  }
+
+  private readingTargetForToken(token: ReaderToken) {
+    return this.readerPackage?.reading_session?.reading_targets.find(target => (
+      token.position >= target.start_word_index && token.position <= target.end_word_index
+    ));
+  }
+
+  private async recordLookupOpened(token: ReaderToken): Promise<void> {
+    const session = this.readerPackage?.reading_session;
+    const target = this.readingTargetForToken(token);
+    if (!session || !target || !this.offlineRepository) return;
+    await this.offlineRepository.enqueueReadingInteraction(
+      session.reading_session_id,
+      target.occurrence_id,
+    );
+    if (!this.usingOfflineSnapshot) await this.flushQueue();
+  }
+
+  private async rateReadingTarget(
+    occurrenceId: string,
+    reviewCardId: number,
+    rating: ReviewRating,
+    panel: HTMLElement,
+  ): Promise<void> {
+    const session = this.readerPackage?.reading_session;
+    if (!session || !this.offlineRepository) return;
+    await this.offlineRepository.enqueueRating(
+      reviewCardId,
+      rating,
+      0,
+      new Date(),
+      { readingSessionId: session.reading_session_id, occurrenceId },
+    );
+    panel.remove();
+    this.showToast(this.usingOfflineSnapshot ? '阅读评分已离线排队' : '阅读评分已记录');
+    await this.flushQueue();
+  }
+
+  private async finishReading(): Promise<void> {
+    const session = this.readerPackage?.reading_session;
+    const chapterId = this.selectedChapter?.chapter_id;
+    if (!this.api || !this.offlineRepository || !session || !chapterId) return;
+    if (this.usingOfflineSnapshot || !navigator.onLine) {
+      this.showToast('完成阅读需要联网，以便服务器确认最终结算。', true);
+      return;
+    }
+
+    await this.flushQueue();
+    if ((await this.offlineRepository.queuedActions()).length > 0) {
+      this.showToast('仍有离线操作尚未同步，暂不能完成阅读。', true);
+      return;
+    }
+
+    try {
+      const preflight = await this.api.finishReadingSession(chapterId, session.reading_session_id, 'preflight');
+      this.renderFinishConfirmation(preflight);
+    } catch (error) {
+      this.noteNetworkFailure(error);
+      this.showToast(message(error), true);
+    }
+  }
+
+  private renderFinishConfirmation(preflight: import('./types').ReadingFinishProjection): void {
+    const panel = document.createElement('div');
+    panel.className = 'sheet-backdrop';
+    panel.innerHTML = `
+      <section class="lookup-sheet" role="dialog" aria-modal="true" aria-labelledby="finish-title">
+        <header><h2 id="finish-title">确认完成阅读</h2>
+          <button class="icon-button" id="close-finish" aria-label="关闭">×</button></header>
+        <p>服务器计划记录 ${preflight.passive_good_count} 张被动 Good 卡片。</p>
+        ${preflight.unresolved_count > 0
+          ? `<div class="alert error">仍有 ${preflight.unresolved_count} 个词义未解决，暂不能完成。</div>`
+          : ''}
+        <button class="primary large" id="commit-finish" ${preflight.can_commit ? '' : 'disabled'}>确认完成</button>
+      </section>`;
+    this.root.append(panel);
+    panel.querySelector('#close-finish')?.addEventListener('click', () => panel.remove());
+    panel.querySelector('#commit-finish')?.addEventListener('click', () => void this.commitReadingFinish(panel));
+  }
+
+  private async commitReadingFinish(panel: HTMLElement): Promise<void> {
+    const session = this.readerPackage?.reading_session;
+    const chapterId = this.selectedChapter?.chapter_id;
+    if (!this.api || !session || !chapterId) return;
+    try {
+      const result = await this.api.finishReadingSession(chapterId, session.reading_session_id, 'commit');
+      if (!result.completed) {
+        this.showToast('服务器未完成阅读结算。', true);
+        return;
+      }
+      session.status = 'completed';
+      session.completed = true;
+      panel.remove();
+      this.showToast(`阅读已完成；服务器记录 ${result.passive_good_count} 张被动 Good 卡片。`);
+    } catch (error) {
+      this.noteNetworkFailure(error);
+      this.showToast(message(error), true);
+    }
   }
 
   private async createSense(form: FormData, panel: HTMLElement): Promise<void> {

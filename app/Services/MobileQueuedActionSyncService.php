@@ -18,6 +18,7 @@ class MobileQueuedActionSyncService
     public const TYPE_RATING = 'sense_review.rating';
     public const TYPE_SENSE_UPDATE = 'word_sense.update';
     public const TYPE_SENSE_DELETE = 'word_sense.delete';
+    public const TYPE_READING_INTERACTION = 'reading_session.interaction';
 
     public const MAX_ACTIONS = 100;
     public const MAX_REQUEST_BYTES = 1048576;
@@ -30,6 +31,7 @@ class MobileQueuedActionSyncService
         private WordSenseContentVersionService $wordSenseVersion,
         private ReviewCardManageMutationService $senseMutation,
         private WordSenseService $wordSenseService,
+        private ReadingSessionService $readingSessionService,
     ) {
     }
 
@@ -133,6 +135,8 @@ class MobileQueuedActionSyncService
                 $normalized['payload']['rating'],
                 $normalized['payload']['review_session_id'] ?? null,
                 $normalized['payload']['review_duration_ms'] ?? null,
+                $normalized['payload']['reading_session_id'] ?? null,
+                $normalized['payload']['occurrence_id'] ?? null,
             )
             : [
                 'occurred_at' => $normalized['occurred_at']->toIso8601String(),
@@ -261,6 +265,11 @@ class MobileQueuedActionSyncService
                             $action['occurred_at'],
                             $action['sequence'],
                             $batchId,
+                            $action['payload']['reading_session_id'] ?? null,
+                            $action['payload']['occurrence_id'] ?? null,
+                            isset($action['payload']['reading_session_id'])
+                                ? $action['client_action_id']
+                                : null,
                         ),
                     ],
                 ],
@@ -274,6 +283,18 @@ class MobileQueuedActionSyncService
                     $language,
                     $action['payload'],
                 ),
+                self::TYPE_READING_INTERACTION => [
+                    'status' => 200,
+                    'body' => [
+                        'data' => $this->readingSessionService->recordOccurrenceInteraction(
+                            $userId,
+                            $language,
+                            $action['payload']['reading_session_id'],
+                            $action['payload']['interaction_type'],
+                            $action['payload']['occurrence_id'],
+                        ),
+                    ],
+                ],
             };
         } catch (MobileReviewCardUnavailableException) {
             return $this->domainFailure(
@@ -289,6 +310,15 @@ class MobileQueuedActionSyncService
                 $exception->retryable,
                 $exception->retryAfterMs,
             );
+        } catch (\InvalidArgumentException $exception) {
+            $hasReadingContext = $action['type'] === self::TYPE_READING_INTERACTION
+                || ($action['type'] === self::TYPE_RATING
+                    && isset($action['payload']['reading_session_id']));
+            if (!$hasReadingContext) {
+                throw $exception;
+            }
+
+            return $this->readingContractFailure($exception);
         }
     }
 
@@ -402,6 +432,7 @@ class MobileQueuedActionSyncService
                 self::TYPE_RATING,
                 self::TYPE_SENSE_UPDATE,
                 self::TYPE_SENSE_DELETE,
+                self::TYPE_READING_INTERACTION,
             ])],
             'occurred_at' => ['required', 'string', 'max:40'],
             'sequence' => ['required', 'integer', 'min:1', 'max:9223372036854775807'],
@@ -430,6 +461,7 @@ class MobileQueuedActionSyncService
             self::TYPE_RATING => $this->validateRatingPayload($validated['payload']),
             self::TYPE_SENSE_UPDATE => $this->validateSenseUpdatePayload($validated['payload']),
             self::TYPE_SENSE_DELETE => $this->validateSenseDeletePayload($validated['payload']),
+            self::TYPE_READING_INTERACTION => $this->validateReadingInteractionPayload($validated['payload']),
         };
 
         return [
@@ -448,6 +480,8 @@ class MobileQueuedActionSyncService
             'rating' => ['required', 'in:again,hard,good,easy'],
             'review_session_id' => ['nullable', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'reading_session_id' => ['nullable', 'required_with:occurrence_id', 'uuid'],
+            'occurrence_id' => ['nullable', 'required_with:reading_session_id', 'string', 'max:255'],
         ])->validate();
 
         return [
@@ -459,7 +493,34 @@ class MobileQueuedActionSyncService
             'review_duration_ms' => isset($validated['review_duration_ms'])
                 ? (int) $validated['review_duration_ms']
                 : null,
+            'reading_session_id' => isset($validated['reading_session_id'])
+                ? (string) $validated['reading_session_id']
+                : null,
+            'occurrence_id' => isset($validated['occurrence_id'])
+                ? (string) $validated['occurrence_id']
+                : null,
         ];
+    }
+
+    private function validateReadingInteractionPayload(array $payload): array
+    {
+        return Validator::make($payload, [
+            'reading_session_id' => ['required', 'uuid'],
+            'interaction_type' => ['required', 'in:opened,helped'],
+            'occurrence_id' => ['required', 'string', 'max:255'],
+        ])->validate();
+    }
+
+    private function readingContractFailure(\InvalidArgumentException $exception): array
+    {
+        $code = $exception->getMessage();
+        $status = match ($code) {
+            ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+            default => 409,
+        };
+
+        return $this->domainFailure($status, $code, 'The reading action could not be applied.');
     }
 
     private function validateSenseUpdatePayload(array $payload): array

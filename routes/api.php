@@ -59,6 +59,14 @@ Route::prefix('v1/mobile')->group(function () {
             '/sync/actions',
             [App\Http\Controllers\Mobile\MobileSyncController::class, 'store'],
         );
+        Route::post(
+            '/chapters/{chapter}/reading-sessions',
+            [App\Http\Controllers\Mobile\MobileReadingSessionController::class, 'store'],
+        )->whereNumber('chapter');
+        Route::post(
+            '/chapters/{chapter}/reading-sessions/{readingSession}/finish',
+            [App\Http\Controllers\Mobile\MobileReadingSessionController::class, 'finish'],
+        )->whereNumber('chapter');
         Route::delete('/devices/{deviceUuid}', [App\Http\Controllers\Mobile\MobileDeviceController::class, 'destroy']);
         Route::post(
             '/review-cards/{reviewCard}/ratings',
