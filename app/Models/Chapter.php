@@ -12,10 +12,20 @@ class Chapter extends Model
 {
     use HasFactory;
 
+    public const QUESTION_TYPES = [
+        'reading_comprehension',
+        'cloze',
+        'translation',
+        'writing',
+        'listening',
+        'other',
+    ];
+
     protected $fillable = [
         'user_id',
         'book_id',
         'name',
+        'question_type',
         'read_count',
         'word_count',
         'language',

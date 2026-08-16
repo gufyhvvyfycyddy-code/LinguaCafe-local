@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Chapters;
 
+use App\Models\Chapter;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CreateChapterRequest extends FormRequest
 {
@@ -27,6 +29,7 @@ class CreateChapterRequest extends FormRequest
             'chapterName' => 'required|string|max:128',
             'chapterText' => 'string|nullable',
             'bookId' => 'required|numeric|gte:0',
+            'questionType' => ['sometimes', 'nullable', 'string', Rule::in(Chapter::QUESTION_TYPES)],
         ];
     }
 }

@@ -47,9 +47,10 @@ class BookController extends Controller {
         $language = Auth::user()->selected_language;
         $bookName = $request->post('bookName');
         $bookCoverFile = $request->file('bookCover');
+        $metadata = $request->safe()->only(['materialType', 'examYear', 'examSet']);
         
         try {
-            $this->bookService->createBook($userId, $language, $bookName, $bookCoverFile);
+            $this->bookService->createBook($userId, $language, $bookName, $bookCoverFile, $metadata);
         } catch (\Throwable $e) {
             abort(500, $e->getMessage());
         } catch (\Exception $e) {
@@ -65,9 +66,10 @@ class BookController extends Controller {
         $bookId = $request->post('bookId');
         $bookName = $request->post('bookName');
         $bookCoverFile = $request->file('bookCover');
+        $metadata = $request->safe()->only(['materialType', 'examYear', 'examSet']);
         
         try {
-            $this->bookService->updateBook($userId, $language, $bookId, $bookName, $bookCoverFile);
+            $this->bookService->updateBook($userId, $language, $bookId, $bookName, $bookCoverFile, $metadata);
         } catch (\Throwable $e) {
             abort(500, $e->getMessage());
         } catch (\Exception $e) {

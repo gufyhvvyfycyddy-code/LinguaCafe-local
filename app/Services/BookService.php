@@ -79,13 +79,16 @@ class BookService {
             ->update(['word_count' => $bookWordCount]);
     }
 
-    public function createBook($userId, $selectedLanguage, $bookName, $bookCoverFile) {
+    public function createBook($userId, $selectedLanguage, $bookName, $bookCoverFile, array $metadata = []) {
         // create book model
         $book = new Book();
         $book->user_id = $userId;
         $book->cover_image = null;
         $book->language = $selectedLanguage;
         $book->name = $bookName;
+        $book->material_type = $metadata['materialType'] ?? 'personal';
+        $book->exam_year = $metadata['examYear'] ?? null;
+        $book->exam_set = $metadata['examSet'] ?? null;
 
         // save new book
         $book->save();
@@ -98,7 +101,7 @@ class BookService {
         return true;
     }
 
-    public function updateBook($userId, $language, $bookId, $bookName, $bookCoverFile) {
+    public function updateBook($userId, $language, $bookId, $bookName, $bookCoverFile, array $metadata = []) {
         $book = Book
             ::where('user_id', $userId)
             ->where('language', $language)
@@ -111,6 +114,11 @@ class BookService {
 
         // update and save book
         $book->name = $bookName;
+        if (isset($metadata['materialType'])) {
+            $book->material_type = $metadata['materialType'];
+            $book->exam_year = $metadata['examYear'] ?? null;
+            $book->exam_set = $metadata['examSet'] ?? null;
+        }
         $book->save();
         
         // update image

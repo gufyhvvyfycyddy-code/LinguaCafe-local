@@ -338,8 +338,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| F-01 | ACTIVE | 定义材料元数据：CET-4/CET-6/考研、年份、套次、题型、我的材料 | Book/Chapter existing model/import | 最小字段；不先造内容采购系统 |
-| F-02 | TODO | 用户上传材料简单流程复用现有英文 import/tokenizer | `/chapters`、ProcessChapter、health assets | 正常/坏文件/失败恢复；不破坏原 import |
+| F-01 | DONE | 定义材料元数据：CET-4/CET-6/考研、年份、套次、题型、我的材料 | Book/Chapter existing model/import | 最小字段；不先造内容采购系统 |
+| F-02 | ACTIVE | 用户上传材料简单流程复用现有英文 import/tokenizer | `/chapters`、ProcessChapter、health assets | 正常/坏文件/失败恢复；不破坏原 import |
 | F-03 | TODO | 阅读库分类与检索 UI | existing Library/Home/Nav | 四级/六级/考研/我的材料可理解；无空壳目录提前展示 |
 | F-04 | TODO | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
 | F-05 | TODO | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `F-01`（material metadata）
-- Last DONE: `E-GATE`
+- Active milestone: `F-02`（user material upload flow）
+- Last DONE: `F-01`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
@@ -711,6 +711,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | E-07 | DEFERRED | Goal branch tip | current Capacitor sync/Gradle debug APK、67/687 backend contracts、Android unit task与guards全绿；两个现有 AVD 均因宿主能力不可运行且 adb 无设备，真实 online/offline/reconnect 留在 Android capability cluster；build/daemon/lease clean | E-08`
 `2026-08-16 | E-08 | DEFERRED | Goal branch tip | Windows-local build/sync/integrity、38 Mobile tests、26/241 PHP、5 guards、XML 与 audit 0 vulnerabilities 全绿；Xcode/simulator/device/Keychain/signing/TestFlight 留在 iOS capability cluster；generated output 未暂存 | E-GATE`
 `2026-08-16 | E-GATE | DONE | Goal branch tip | Phase E local gate: Mobile 38/38、build、audit 0、testing DB health 6/69、E02–E06/M5/M6/M7/M9 guards 9/9；E02 guard 限定为生词页 IA 可见边界，避免内部同步错误码误报；Android/iOS deferred capability clusters 保留 | F-01`
+`2026-08-16 | F-01 | DONE | Goal branch tip | Book 单一拥有 personal/cet4/cet6/postgraduate_exam + year/set，Chapter 单一拥有 canonical question_type；旧 create/import 默认 personal、旧 update 省略/null 保留；F01 5/34、M6 isolation 11/50、health 6/69 与 PHP syntax/diff 绿。流程事件：首次 testing migrate 错误使用了明确禁止的 --force；随后在 lease 内精确普通 rollback --step=1，核列撤销且旧行保留，再以不带该 flag 的普通 migrate 重放，核旧行 default personal，并清除精确 fixture；后续全 Goal 禁止再次使用该 flag | F-02`
 
 ### DECISION LOG
 

@@ -153,9 +153,10 @@ class ChapterController extends Controller {
         $chapterName = $request->chapterName;
         $bookId = $request->bookId;
         $chapterText = is_null($request->chapterText) ? '' : $request->chapterText;
+        $metadata = $request->safe()->only(['questionType']);
 
         try {
-            $this->chapterService->createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText);
+            $this->chapterService->createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText, $metadata);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }
@@ -170,9 +171,10 @@ class ChapterController extends Controller {
         $chapterName = $request->chapterName;
         $chapterId = $request->chapterId;
         $chapterText = $request->chapterText;
+        $metadata = $request->safe()->only(['questionType']);
 
         try {
-            $this->chapterService->updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText);
+            $this->chapterService->updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, $metadata);
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

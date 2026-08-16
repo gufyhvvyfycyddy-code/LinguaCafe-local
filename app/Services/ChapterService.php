@@ -55,7 +55,7 @@ class ChapterService {
         }
 
         $chapters = Chapter
-            ::select(['id', 'name', 'read_count', 'word_count', 'unique_word_ids', 'processing_status'])
+            ::select(['id', 'name', 'question_type', 'read_count', 'word_count', 'unique_word_ids', 'processing_status'])
             ->where('book_id', $bookId)
             ->where('user_id', $userId)
             ->where('language', $language)
@@ -144,7 +144,7 @@ class ChapterService {
     
     public function getChapterForEditor($userId, $language, $chapterId) {
         $chapter = Chapter::
-            select(['name', 'raw_text', 'type'])
+            select(['name', 'question_type', 'raw_text', 'type'])
             ->where('id', $chapterId)
             ->where('user_id', $userId)
             ->where('language', $language)
@@ -369,7 +369,7 @@ class ChapterService {
         return true;
     }
 
-    public function createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText) {
+    public function createChapter($userId, $userUuid, $language, $bookId, $chapterName, $chapterText, array $metadata = []) {
 
         // retrieve book
         $book = Book
@@ -386,6 +386,7 @@ class ChapterService {
         $chapter->user_id = $userId;
         $chapter->processing_status = ChapterProcessingStatusEnum::UNPROCESSED->value;
         $chapter->name = $chapterName;
+        $chapter->question_type = $metadata['questionType'] ?? null;
         $chapter->type = 'text';
         $chapter->subtitle_timestamps = '';
         $chapter->read_count = 0;
@@ -408,7 +409,7 @@ class ChapterService {
     }
 
     // updates the name and text of a chapter
-    public function updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText) {
+    public function updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, array $metadata = []) {
         DB::disableQueryLog();
         
         // retrieve chapter
@@ -425,6 +426,9 @@ class ChapterService {
         // update chapter data
         $chapter->raw_text = $chapterText;
         $chapter->name = $chapterName;
+        if (array_key_exists('questionType', $metadata)) {
+            $chapter->question_type = $metadata['questionType'];
+        }
         $chapter->processing_status = ChapterProcessingStatusEnum::UNPROCESSED->value;
         $chapter->save();
         

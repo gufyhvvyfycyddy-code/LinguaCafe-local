@@ -10,12 +10,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 class Book extends Model
 {
     use HasFactory;
+
+    public const MATERIAL_TYPES = ['personal', 'cet4', 'cet6', 'postgraduate_exam'];
     
     protected $fillable = [
         'user_id',
         'name',
         'cover_image',
         'language',
+        'material_type',
+        'exam_year',
+        'exam_set',
+    ];
+
+    protected $casts = [
+        'exam_year' => 'integer',
+        'exam_set' => 'integer',
     ];
 
     function getWordCounts($userId, $words) {
