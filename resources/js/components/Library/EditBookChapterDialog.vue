@@ -55,7 +55,7 @@
                         type="error"
                         v-if="saveResult == 'error'"
                     >
-                        保存时发生错误。
+                        {{ saveError || '保存时发生错误。' }}
                     </v-alert>
 
                     <v-alert
@@ -107,6 +107,7 @@
                 loading: true,
                 saving: false,
                 saveResult: '',
+                saveError: '',
                 rules: {
                     chapterName: (value) => {
                         if (!value.length) {
@@ -126,6 +127,7 @@
                 name: '',
                 text: '',
                 type: 'text',
+                sourceRevision: '',
             }
         },
         props: {
@@ -145,6 +147,7 @@
             },
             save() {
                 this.saveResult = '';
+                this.saveError = '';
                 if (!this.$refs.editChapterForm.validate()) {
                     return;
                 }
@@ -158,6 +161,7 @@
 
                 if (this.$props.chapterId !== -1) {
                     data.chapterId = this.$props.chapterId;
+                    data.sourceRevision = this.sourceRevision;
                 } else {
                     data.bookId = this.$props.bookId;
                     url = '/chapters/create';
@@ -178,6 +182,9 @@
                 }).catch((error) => {
                     this.saving = false;
                     this.saveResult = 'error';
+                    if (error.response?.status === 409 && error.response?.data?.error?.code === 'CHAPTER_SOURCE_REVISION_CONFLICT') {
+                        this.saveError = '章节已在其他位置更新，请关闭后重新打开再编辑。';
+                    }
                 });
             },
             loadChapter() {
@@ -188,6 +195,7 @@
                         this.name = response.data.name;
                         this.text = response.data.raw_text;
                         this.type = response.data.type;
+                        this.sourceRevision = response.data.source_revision;
                         this.loading = false;
                         this.$nextTick(() => {
                             this.$refs.editChapterForm.validate();

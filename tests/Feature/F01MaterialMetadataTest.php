@@ -6,6 +6,7 @@ use App\Jobs\ProcessChapter;
 use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\User;
+use App\Services\ReadingChapterTextService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
@@ -139,6 +140,7 @@ class F01MaterialMetadataTest extends TestCase
             'chapterId' => $chapter->id,
             'chapterName' => $chapter->name,
             'chapterText' => 'Translate this passage.',
+            'sourceRevision' => app(ReadingChapterTextService::class)->sourceRevision($chapter),
             'questionType' => 'translation',
         ])->assertOk();
 

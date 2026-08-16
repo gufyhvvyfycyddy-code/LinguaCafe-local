@@ -341,8 +341,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | F-01 | DONE | 定义材料元数据：CET-4/CET-6/考研、年份、套次、题型、我的材料 | Book/Chapter existing model/import | 最小字段；不先造内容采购系统 |
 | F-02 | DONE | 用户上传材料简单流程复用现有英文 import/tokenizer | `/chapters`、ProcessChapter、health assets | 正常/坏文件/失败恢复；不破坏原 import |
 | F-03 | DONE | 阅读库分类与检索 UI | existing Library/Home/Nav | 四级/六级/考研/我的材料可理解；无空壳目录提前展示 |
-| F-04 | ACTIVE | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
-| F-05 | TODO | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
+| F-04 | DONE | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
+| F-05 | ACTIVE | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
 | F-06 | TODO | 删除材料前显示来源与学习历史影响，并只执行已授权产品生命周期 | Book/Chapter deletion boundaries | preview/confirmation/拒绝路径；不直接 broad delete 学习历史 |
 | F-07 | TODO | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
 | F-GATE | TODO | Phase F Gate | F-01…F-07 | 三类真实样本 + version + delete impact 全通过；自动进入 G |
@@ -716,6 +716,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | F-02 | DONE | Goal branch tip | 现有 ImportRequest→Controller→ImportService→Book/Chapter→ProcessChapter 单一路径接入 F-01 metadata；旧 payload/Mobile 8 参数调用保留，新建 Book 才写分类，已有 Book 只新增题型章节。F02 + Web error + Mobile import 12/91、Node guard 3/3、build/diff 全绿；testing 浏览器证明坏 PDF 阻断、CET-4 synthetic text 正式导入 200 与 fallback 成功 DOM。额外 Jellyfin settings 500 已定位为首次安装 testing DB 缺旧全局设置，既有 catch 隐藏该可选入口且不影响主导入；task Book/Chapter/account/sentinel/artifacts 精确清零，port closed、lease false/false；fresh review Blocker=0/Required=0 | F-03`
 
 `2026-08-16 | F-03 | DONE | Goal branch tip | existing /books 数组派生单一分类/搜索结果并复用三种布局；只展示有真实材料的四级/六级/考研/我的材料分类，无 endpoint/store/第二搜索路径。F01 5/34、Node guard 3/3、build/diff 全绿；desktop 与 430px testing 浏览器证明分类、年份/套次搜索、三布局一致、空分类隐藏且无横溢；task books/account/artifacts/sentinel 精确清零，port closed、lease false/false；fresh review Blocker=0/Required=0 | F-04`
+
+`2026-08-16 | F-04 | DONE | Goal branch tip | existing ReadingChapterTextService source revision + Chapter row lock 为唯一 stale-write gate，既有 WordSenseOccurrence source snapshot 不改写；F-01 material metadata 进入既有 Mobile package/checksum。PHP 86/543、focused 8/53、Node 9/9、Mobile 38/38、root/mobile builds 与 diff 全绿；testing 浏览器证明 stale editor 收到 409 明确提示、胜出文本保留并可 fresh reopen，目标批次无 Console error；task book/account/artifacts/sentinel 精确清零，port closed、lease false/false；fresh review Blocker=0/Required=0 | F-05`
 
 ### DECISION LOG
 

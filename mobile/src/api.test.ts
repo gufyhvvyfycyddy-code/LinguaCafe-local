@@ -264,7 +264,7 @@ describe('MobileApiClient', () => {
       if (page === 1) {
         return envelope({
           items: [
-            { book: { book_id: 1, name: 'One', language: 'english' }, chapter_count: 2 },
+            { book: { book_id: 1, name: 'One', language: 'english', material_type: 'cet4', exam_year: 2025, exam_set: 1 }, chapter_count: 2 },
             { book: { book_id: 2, name: 'Two', language: 'english' }, chapter_count: 3 },
           ],
           pagination: { current_page: 1, last_page: 2, per_page: 20, total: 3 },
@@ -282,7 +282,7 @@ describe('MobileApiClient', () => {
     client.setToken('secret');
 
     await expect(client.articles()).resolves.toEqual([
-      { book_id: 1, name: 'One', language: 'english', chapter_count: 2 },
+      { book_id: 1, name: 'One', language: 'english', material_type: 'cet4', exam_year: 2025, exam_set: 1, chapter_count: 2 },
       { book_id: 2, name: 'Two', language: 'english', chapter_count: 3 },
       { book_id: 3, name: 'Three', language: 'english', chapter_count: 4 },
     ]);

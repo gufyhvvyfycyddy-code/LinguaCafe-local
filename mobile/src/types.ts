@@ -29,6 +29,9 @@ export interface ArticleSummary {
   name: string;
   language: string;
   chapter_count: number;
+  material_type?: 'personal' | 'cet4' | 'cet6' | 'postgraduate_exam';
+  exam_year?: number | null;
+  exam_set?: number | null;
 }
 
 export interface ChapterSummary {

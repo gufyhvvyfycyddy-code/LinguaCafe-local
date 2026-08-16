@@ -169,6 +169,7 @@ class M6IsolationAuditTest extends TestCase
                     'chapterId' => $chapter->id,
                     'chapterName' => 'tampered',
                     'chapterText' => 'tampered',
+                    'sourceRevision' => app(\App\Services\ReadingChapterTextService::class)->sourceRevision($chapter),
                 ])
                 ->assertStatus(500);
 

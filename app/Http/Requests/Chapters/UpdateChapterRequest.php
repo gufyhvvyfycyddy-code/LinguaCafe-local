@@ -29,6 +29,7 @@ class UpdateChapterRequest extends FormRequest
             'chapterName' => 'required|string|max:128',
             'chapterText' => 'string|nullable',
             'chapterId' => 'required|numeric|gte:0',
+            'sourceRevision' => ['required', 'string', 'regex:/^sha256:[a-f0-9]{64}$/'],
             'questionType' => ['sometimes', 'nullable', 'string', Rule::in(Chapter::QUESTION_TYPES)],
         ];
     }

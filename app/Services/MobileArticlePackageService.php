@@ -204,6 +204,9 @@ class MobileArticlePackageService
                 'name' => $book->name,
                 'language' => $book->language,
                 'cover_image' => $book->cover_image,
+                'material_type' => $book->material_type,
+                'exam_year' => $book->exam_year,
+                'exam_set' => $book->exam_set,
             ],
             'chapters' => array_map(
                 fn (array $chapter) => [
@@ -230,6 +233,9 @@ class MobileArticlePackageService
                 'name' => $book->name,
                 'language' => $book->language,
                 'cover_image' => $book->cover_image,
+                'material_type' => $book->material_type,
+                'exam_year' => $book->exam_year,
+                'exam_set' => $book->exam_set,
             ],
             'content_version' => 'sha256:' . $checksum,
             'content_checksum' => $checksum,

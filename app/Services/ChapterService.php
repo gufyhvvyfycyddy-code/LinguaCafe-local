@@ -17,9 +17,12 @@ use Illuminate\Support\Facades\Log;
 
 
 class ChapterService {
+    public const ERROR_SOURCE_REVISION_CONFLICT = 'CHAPTER_SOURCE_REVISION_CONFLICT';
+
     private $bookService;
     private $goalService;
     private LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService;
+    private ReadingChapterTextService $readingChapterTextService;
 
     /**
      * Safe DI optimization (GLM-ArchitectureFirst1000-SafeStability-1).
@@ -35,10 +38,12 @@ class ChapterService {
     public function __construct(
         BookService $bookService,
         GoalService $goalService,
+        ReadingChapterTextService $readingChapterTextService,
         ?LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService = null,
     ) {
         $this->bookService = $bookService;
         $this->goalService = $goalService;
+        $this->readingChapterTextService = $readingChapterTextService;
         $this->legacyWordCardMigrationProtectionService = $legacyWordCardMigrationProtectionService
             ?? app(LegacyWordCardMigrationProtectionService::class);
     }
@@ -144,7 +149,7 @@ class ChapterService {
     
     public function getChapterForEditor($userId, $language, $chapterId) {
         $chapter = Chapter::
-            select(['name', 'question_type', 'raw_text', 'type'])
+            select(['id', 'name', 'question_type', 'raw_text', 'processed_text', 'type'])
             ->where('id', $chapterId)
             ->where('user_id', $userId)
             ->where('language', $language)
@@ -154,7 +159,9 @@ class ChapterService {
             throw new \Exception('Chapter does not exist, or it belongs to a different user.');
         }
 
+        $chapter->source_revision = $this->readingChapterTextService->sourceRevision($chapter);
         $chapter->raw_text = str_replace(" NEWLINE \r\n", "\r\n", $chapter->raw_text);
+        $chapter->makeHidden(['id', 'processed_text']);
         
         return $chapter;
     }
@@ -396,41 +403,50 @@ class ChapterService {
         $chapter->unique_words = '';
         $chapter->save();
 
+        $sourceRevision = $this->readingChapterTextService->sourceRevision($chapter);
+
         $this->updateChapter(
             $userId,
             $userUuid,
             $language,
             $chapter->id,
             $chapter->name,
-            $chapterText
+            $chapterText,
+            $sourceRevision,
         );
         
         return true;
     }
 
     // updates the name and text of a chapter
-    public function updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, array $metadata = []) {
+    public function updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, string $sourceRevision, array $metadata = []) {
         DB::disableQueryLog();
-        
-        // retrieve chapter
-        $chapter = Chapter
-            ::where('id', $chapterId)
-            ->where('user_id', $userId)
-            ->where('language', $language)
-            ->first();
 
-        if (!$chapter) {
-            throw new \Exception('Chapter does not exist, or it belongs to a different user.');
-        }
-        
-        // update chapter data
-        $chapter->raw_text = $chapterText;
-        $chapter->name = $chapterName;
-        if (array_key_exists('questionType', $metadata)) {
-            $chapter->question_type = $metadata['questionType'];
-        }
-        $chapter->processing_status = ChapterProcessingStatusEnum::UNPROCESSED->value;
-        $chapter->save();
+        $chapter = DB::transaction(function () use ($userId, $language, $chapterId, $chapterName, $chapterText, $sourceRevision, $metadata) {
+            $chapter = Chapter
+                ::lockForUpdate()
+                ->where('id', $chapterId)
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->first();
+
+            if (!$chapter) {
+                throw new \Exception('Chapter does not exist, or it belongs to a different user.');
+            }
+            if (!hash_equals($this->readingChapterTextService->sourceRevision($chapter), $sourceRevision)) {
+                throw new \InvalidArgumentException(self::ERROR_SOURCE_REVISION_CONFLICT);
+            }
+
+            $chapter->raw_text = $chapterText;
+            $chapter->name = $chapterName;
+            if (array_key_exists('questionType', $metadata)) {
+                $chapter->question_type = $metadata['questionType'];
+            }
+            $chapter->processing_status = ChapterProcessingStatusEnum::UNPROCESSED->value;
+            $chapter->save();
+
+            return $chapter;
+        });
         
         \App\Jobs\ProcessChapter::dispatch($userId, $userUuid, $chapter->id, $chapter->language);
         

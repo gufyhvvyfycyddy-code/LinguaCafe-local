@@ -171,10 +171,22 @@ class ChapterController extends Controller {
         $chapterName = $request->chapterName;
         $chapterId = $request->chapterId;
         $chapterText = $request->chapterText;
+        $sourceRevision = $request->sourceRevision;
         $metadata = $request->safe()->only(['questionType']);
 
         try {
-            $this->chapterService->updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, $metadata);
+            $this->chapterService->updateChapter($userId, $userUuid, $language, $chapterId, $chapterName, $chapterText, $sourceRevision, $metadata);
+        } catch (\InvalidArgumentException $e) {
+            if ($e->getMessage() === ChapterService::ERROR_SOURCE_REVISION_CONFLICT) {
+                return response()->json([
+                    'error' => [
+                        'code' => ChapterService::ERROR_SOURCE_REVISION_CONFLICT,
+                        'message' => '章节已在其他位置更新，请重新打开后再编辑。',
+                    ],
+                ], 409);
+            }
+
+            abort(500, 'Chapter update failed.');
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

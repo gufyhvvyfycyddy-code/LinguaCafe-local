@@ -175,6 +175,36 @@ class M3MobileDownloadPackageTest extends TestCase
         );
     }
 
+    public function test_material_metadata_is_packaged_and_invalidates_manifest_version(): void
+    {
+        [$token] = $this->issueToken($this->user);
+        [$book] = $this->createArticle($this->user, [$this->token('Material', 0)]);
+        $first = $this->withToken($token)
+            ->getJson("/api/v1/mobile/article-packages/{$book->id}")
+            ->assertOk()
+            ->assertJsonPath('data.book.material_type', 'personal')
+            ->assertJsonPath('data.book.exam_year', null)
+            ->assertJsonPath('data.book.exam_set', null);
+
+        $book->forceFill([
+            'material_type' => 'cet6',
+            'exam_year' => 2025,
+            'exam_set' => 2,
+        ])->save();
+
+        $second = $this->withToken($token)
+            ->getJson("/api/v1/mobile/article-packages/{$book->id}")
+            ->assertOk()
+            ->assertJsonPath('data.book.material_type', 'cet6')
+            ->assertJsonPath('data.book.exam_year', 2025)
+            ->assertJsonPath('data.book.exam_set', 2);
+
+        $this->assertNotSame(
+            $first->json('data.content_version'),
+            $second->json('data.content_version'),
+        );
+    }
+
     public function test_article_change_invalidates_version_and_old_cursor(): void
     {
         [$token] = $this->issueToken($this->user);

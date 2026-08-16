@@ -151,7 +151,14 @@ export class MobileApiClient {
       const query = new URLSearchParams({ page: String(page), per_page: '20' });
       const data = await this.request<{
         items: Array<{
-          book: { book_id: number; name: string; language: string };
+          book: {
+            book_id: number;
+            name: string;
+            language: string;
+            material_type?: 'personal' | 'cet4' | 'cet6' | 'postgraduate_exam';
+            exam_year?: number | null;
+            exam_set?: number | null;
+          };
           chapter_count: number;
         }>;
         pagination?: unknown;
