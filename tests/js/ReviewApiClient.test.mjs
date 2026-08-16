@@ -3,7 +3,7 @@ import test from 'node:test';
 
 import { createReviewApiClient } from '../../resources/js/components/Review/ReviewApiClient.js';
 
-test('formal review client preserves every existing request contract', async () => {
+test('formal review client preserves every modern Sense request contract', async () => {
     const calls = [];
     const response = { data: { ok: true } };
     const http = {
@@ -18,8 +18,6 @@ test('formal review client preserves every existing request contract', async () 
     };
     const client = createReviewApiClient(http);
 
-    assert.equal(await client.loadLegacyQueue({ bookId: 7 }), response);
-    assert.equal(await client.rateLegacyCard({ reviewCardId: 9, rating: 'good' }), response);
     assert.equal(await client.loadSenseQueue({ ignoreDailyLimits: true }), response);
     assert.equal(await client.rateSenseCard(11, { rating: 'hard' }), response);
     assert.equal(await client.loadSenseIntervalPreview(11), response);
@@ -30,8 +28,6 @@ test('formal review client preserves every existing request contract', async () 
     );
 
     assert.deepEqual(calls, [
-        ['post', '/reviews', { bookId: 7 }],
-        ['post', '/reviews/rate', { reviewCardId: 9, rating: 'good' }],
         ['get', '/reviews/senses', { params: { ignoreDailyLimits: true } }],
         ['post', '/reviews/senses/11/rate', { rating: 'hard' }],
         ['get', '/reviews/senses/11/interval-preview', undefined],
@@ -54,7 +50,7 @@ test('numeric path ids fail before the client can issue a request', () => {
     assert.equal(called, false);
 });
 
-test('http rejections remain unchanged', async () => {
+test('http rejections remain unchanged for modern GET and POST requests', async () => {
     const failure = new Error('network failure');
     const client = createReviewApiClient({
         get() { return Promise.reject(failure); },
@@ -62,5 +58,5 @@ test('http rejections remain unchanged', async () => {
     });
 
     await assert.rejects(client.loadSenseQueue({}), error => error === failure);
-    await assert.rejects(client.rateLegacyCard({}), error => error === failure);
+    await assert.rejects(client.rateSenseCard(11, {}), error => error === failure);
 });

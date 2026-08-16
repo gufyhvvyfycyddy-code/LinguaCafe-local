@@ -57,12 +57,12 @@ test('canonical review navigation remains /reviews/senses', () => {
     );
 });
 
-test('deferred legacy Vue Review route and import remain present', () => {
-    assert.match(
+test('legacy Vue Review route and import are retired', () => {
+    assert.doesNotMatch(
         appSource,
         /const\s+Review\s*=\s*require\(\s*['"]\.\/components\/Review\/Review\.vue['"]\s*\)\.default;/,
     );
-    assert.match(
+    assert.doesNotMatch(
         appSource,
         /\{\s*path\s*:\s*['"]\/review\/:practiceMode\?\/:bookId\?\/:chapterId\?['"]\s*,\s*component\s*:\s*Review\b[^}]*\}/,
     );

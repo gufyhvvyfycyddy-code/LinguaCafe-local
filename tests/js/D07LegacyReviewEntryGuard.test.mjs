@@ -62,24 +62,36 @@ test('canonical server GET /reviews/senses remains present', () => {
     assert.match(route, /['"]index['"]/);
 });
 
-test('legacy Review source files remain present', () => {
-    assert.ok(
-        fs.existsSync(path.join(repoRoot, 'resources/js/components/Review/Review.vue')),
-        'Review.vue must remain present during D-07 R1',
+test('legacy Vue Review frontend is fully retired', () => {
+    assert.doesNotMatch(
+        appSource,
+        new RegExp(`path:\\s*['"]${escapeRegex(legacyVuePath)}['"]`),
+        'legacy Vue /review route must stay absent',
     );
+    assert.doesNotMatch(
+        appSource,
+        /components\/Review\/Review\.vue/,
+        'Review.vue require must stay absent',
+    );
+    assert.doesNotMatch(appSource, /ReviewHotkeyInformationDialog/);
+    assert.doesNotMatch(
+        appSource,
+        /import\s+ReviewSettings\s+from\s+['"]\.\/components\/Review\/ReviewSettings['"]/,
+    );
+    assert.doesNotMatch(appSource, /review-hotkey-information-dialog/);
+    assert.doesNotMatch(appSource, /Vue\.component\(\s*['"]review-settings['"]/);
+
+    for (const relativePath of [
+        'resources/js/components/Review/Review.vue',
+        'resources/js/components/Review/ReviewSettings.vue',
+        'resources/js/components/Review/ReviewHotkeyInformationDialog.vue',
+    ]) {
+        assert.equal(fs.existsSync(path.join(repoRoot, relativePath)), false, `${relativePath} must stay retired`);
+    }
+
     assert.ok(
         fs.existsSync(path.join(repoRoot, 'resources/js/components/Review/ReviewApiClient.js')),
-        'ReviewApiClient.js must remain present during D-07 R1',
-    );
-});
-
-test('dirty app.js keeps the deferred legacy Vue review route for R2', () => {
-    const route = vueRoute(legacyVuePath);
-    assert.match(route, /component:\s*Review\b/);
-    assert.match(
-        appSource,
-        /const\s+Review\s*=\s*require\(\s*['"]\.\/components\/Review\/Review\.vue['"]\s*\)\.default;/,
-        'Review import must remain while the Vue legacy route is intentionally deferred',
+        'shared ReviewApiClient.js must remain present',
     );
 });
 

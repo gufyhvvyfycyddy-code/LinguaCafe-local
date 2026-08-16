@@ -15,10 +15,6 @@ const queryServiceSource = readFileSync(
     new URL('../../app/Services/VocabularyQueryService.php', import.meta.url),
     'utf8',
 );
-const reviewSource = readFileSync(
-    new URL('../../resources/js/components/Review/Review.vue', import.meta.url),
-    'utf8',
-);
 const textBlockGroupSource = readFileSync(
     new URL('../../resources/js/components/Text/TextBlockGroup.vue', import.meta.url),
     'utf8',
@@ -38,8 +34,6 @@ test('legacy example-sentence GET chain stays retired while the POST writer rema
     assert.equal(existsSync(requestUrl), false);
     assert.doesNotMatch(serviceSource, /function\s+getExampleSentence\s*\(/);
     assert.doesNotMatch(queryServiceSource, /function\s+getExampleSentence\s*\(/);
-
-    assert.equal(reviewSource.includes('/vocabulary/example-sentence/'), false);
 
     assert.match(
         routesSource,

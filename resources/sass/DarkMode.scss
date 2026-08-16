@@ -427,30 +427,6 @@
 }
 
 
-// review
-#review-box {
-    hr {
-        background-color: var(--v-gray3-base);
-    }
-
-    #review-card {
-        &.back-to-deck-animation #review-card-content,
-        &.into-the-correct-deck-animation #review-card-content {
-            #review-card-front,
-            #review-card-back {
-                color: var(--v-textDark-base) !important;
-            }
-        }
-
-        &.draw-new-card-animation #review-card-content {
-            #review-card-front,
-            #review-card-back {
-                color: var(--v-text-base) !important;
-            }
-        }
-    }
-}
-
 // admin api settings
 #app.dark #admin-api-settings {
     #deepl-api-card,

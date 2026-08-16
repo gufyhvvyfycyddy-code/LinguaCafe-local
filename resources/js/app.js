@@ -125,12 +125,6 @@ Vue.component('vocabulary-edit-dialog', VocabularyEditDialog);
 Vue.component('vocabulary-export-dialog', VocabularyExportDialog);
 Vue.component('vocabulary-import-dialog', VocabularyImportDialog);
 
-// review
-import ReviewHotkeyInformationDialog from './components/Review/ReviewHotkeyInformationDialog';
-import ReviewSettings from './components/Review/ReviewSettings';
-Vue.component('review-hotkey-information-dialog', ReviewHotkeyInformationDialog);
-Vue.component('review-settings', ReviewSettings);
-
 // dialogs
 import LogoutDialog from './components/Dialogs/LogoutDialog';
 import ErrorDialog from './components/Dialogs/ErrorDialog';
@@ -224,7 +218,6 @@ const Attributions = require('./components/Home/Attributions.vue').default;
 const ArticleHealth = require('./components/Health/ArticleHealth.vue').default;
 const Library = require('./components/Library/Library.vue').default;
 const TextReader = require('./components/TextReader/TextReader.vue').default;
-const Review = require('./components/Review/Review.vue').default;
 const SenseMappingReview = require('./components/Senses/SenseMappingReview.vue').default;
 const SenseReview = require('./components/Senses/SenseReview.vue').default;
 const WordSenseLibrary = require('./components/Senses/WordSenseLibrary.vue').default;
@@ -254,7 +247,6 @@ const router = new VueRouter({
         { path: '/register', component: LoginForm },
         { path: '/books/:bookId?', component: Library },
         { path: '/chapters/read/:chapterId', component: TextReader },
-        { path: '/review/:practiceMode?/:bookId?/:chapterId?', component: Review },
         { path: '/reviews/senses', component: SenseReview },
         { path: '/word-senses', component: WordSenseLibrary },
         { path: '/custom-study', component: CustomStudy },

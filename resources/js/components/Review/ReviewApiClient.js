@@ -10,12 +10,6 @@ function positiveId(value, name) {
 
 export function createReviewApiClient(http = axios) {
     return Object.freeze({
-        loadLegacyQueue(payload) {
-            return http.post('/reviews', payload);
-        },
-        rateLegacyCard(payload) {
-            return http.post('/reviews/rate', payload);
-        },
         loadSenseQueue(params) {
             return http.get('/reviews/senses', { params });
         },

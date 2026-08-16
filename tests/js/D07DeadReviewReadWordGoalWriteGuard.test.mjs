@@ -7,10 +7,6 @@ const controllerSource = readFileSync(
     new URL('../../app/Http/Controllers/ReviewController.php', import.meta.url),
     'utf8',
 );
-const reviewSource = readFileSync(
-    new URL('../../resources/js/components/Review/Review.vue', import.meta.url),
-    'utf8',
-);
 const chapterServiceSource = readFileSync(
     new URL('../../app/Services/ChapterService.php', import.meta.url),
     'utf8',
@@ -29,9 +25,6 @@ test('dead review read-word goal write stays removed while supported review and 
     assert.equal(controllerSource.includes('updateReadWordsGoal'), false);
     assert.equal(controllerSource.includes('UpdateReviewGoalRequest'), false);
     assert.equal(existsSync(requestUrl), false);
-    assert.equal(reviewSource.includes('/reviews/update'), false);
-    assert.equal(reviewSource.includes('countReadWords'), false);
-
     assert.match(
         routesSource,
         /Route::post\s*\(\s*['"]\/reviews['"][\s\S]*?ReviewController::class\s*,\s*['"]getReviewItems['"]/,
