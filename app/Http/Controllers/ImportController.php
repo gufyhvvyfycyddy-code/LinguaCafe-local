@@ -45,6 +45,7 @@ class ImportController extends Controller {
         $bookName = $request->post('bookName');
         $chapterName = $request->post('chapterName');
         $chunkSize = intval($request->post('maximumCharactersPerChapter'));
+        $metadata = $request->only(['materialType', 'examYear', 'examSet', 'questionType']);
         $importMethod = $this->importMethods[$importType];
         $fileName = null;
 
@@ -73,13 +74,13 @@ class ImportController extends Controller {
         try {
             if ($importMethod === 'e-book') {
                 // e-book
-                $processingMode = $this->importService->importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, storage_path('app/temp') . '/' . $fileName, $bookId, $bookName, $chapterName, $metadata);
             } else if ($importMethod === 'text') {
                 // text
-                $processingMode = $this->importService->importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName, $metadata);
             } else if ($importMethod === 'subtitle') {
                 // text
-                $processingMode = $this->importService->importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName);
+                $processingMode = $this->importService->importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName, $metadata);
             }
         } catch (\Exception $exception) {
             $this->deleteContentImportTempFileQuietly($fileName);

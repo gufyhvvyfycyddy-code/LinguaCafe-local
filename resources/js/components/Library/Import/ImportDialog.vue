@@ -253,6 +253,10 @@
                 bookId: -1,
                 bookName: '',
                 chapterName: '',
+                materialType: 'personal',
+                examYear: null,
+                examSet: null,
+                questionType: null,
             }
         },
         props: {
@@ -292,6 +296,10 @@
                 this.isLibraryValid = data.isFormValid;
                 this.newOrExistingBook = data.newOrExistingBook;
                 this.chapterName = data.chapterName;
+                this.materialType = data.materialType;
+                this.examYear = data.examYear;
+                this.examSet = data.examSet;
+                this.questionType = data.questionType;
 
                 if(data.newOrExistingBook == 'new') {
                     this.bookId = -1;
@@ -354,6 +362,12 @@
                 data.set('bookName', this.bookName);
                 data.set('chapterName', this.chapterName);
                 data.set('maximumCharactersPerChapter', this.maximumCharactersPerChapter);
+                if (this.bookId === -1) {
+                    data.set('materialType', this.materialType);
+                    if (this.examYear !== null) data.set('examYear', this.examYear);
+                    if (this.examSet !== null) data.set('examSet', this.examSet);
+                }
+                if (this.questionType !== null) data.set('questionType', this.questionType);
 
                 this.importLoading = true;
                 this.stepperPage = 5;

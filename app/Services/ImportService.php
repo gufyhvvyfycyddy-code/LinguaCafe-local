@@ -24,7 +24,7 @@ class ImportService {
         $this->pythonService = env('PYTHON_CONTAINER_NAME', 'http://127.0.0.1:8678');
     }
 
-    public function importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, $file, $bookId, $bookName, $chapterName) {
+    public function importBook($userId, $userUuid, $chunkSize, $eBookChapterSortMethod, $textProcessingMethod, $file, $bookId, $bookName, $chapterName, array $metadata = []) {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
@@ -35,12 +35,12 @@ class ImportService {
             'chunkSize' => $chunkSize
         ]);
 
-        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName);        
+        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, false, 'tokenizer', $metadata);
         
         return 'tokenizer';
     }
 
-    public function importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName) {
+    public function importText($userId, $userUuid, $chunkSize, $textProcessingMethod, $importText, $bookId, $bookName, $chapterName, array $metadata = []) {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
@@ -63,12 +63,12 @@ class ImportService {
             $this->lastImportUsedFallback = true;
         }
 
-        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, false, $this->lastImportUsedFallback ? 'fallback' : 'tokenizer');        
+        $this->importChunks($chunks, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, false, $this->lastImportUsedFallback ? 'fallback' : 'tokenizer', $metadata);
 
         return $this->lastImportUsedFallback ? 'fallback' : 'tokenizer';
     }
 
-    public function importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName) {
+    public function importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName, array $metadata = []) {
         DB::disableQueryLog();
         $selectedLanguage = Auth::user()->selected_language;
 
@@ -78,7 +78,7 @@ class ImportService {
             'chunkSize' => $chunkSize
         ]);
 
-        $this->importChunks($subtitles, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, true);
+        $this->importChunks($subtitles, $userId, $userUuid, $selectedLanguage, $bookName, $bookId, $chapterName, true, 'tokenizer', $metadata);
 
         return 'tokenizer';
     }
@@ -88,7 +88,7 @@ class ImportService {
         Imports chunks fo raw and tokenized texts. This function
         is used by other import functions to avoid code dupication.
     */
-    private function importChunks($chunks, $userId, $userUuid, $language, $bookName, $bookId, $chapterName, $isSubtitle = false, $processingMode = 'tokenizer') {
+    private function importChunks($chunks, $userId, $userUuid, $language, $bookName, $bookId, $chapterName, $isSubtitle = false, $processingMode = 'tokenizer', array $metadata = []) {
         if (!is_array($chunks) || count($chunks) === 0) {
             throw new \Exception('文本处理服务没有返回可导入的章节内容。');
         }
@@ -100,6 +100,9 @@ class ImportService {
             $book->cover_image = null;
             $book->language = $language;
             $book->name = $bookName;
+            $book->material_type = $metadata['materialType'] ?? 'personal';
+            $book->exam_year = $metadata['examYear'] ?? null;
+            $book->exam_set = $metadata['examSet'] ?? null;
             $book->save();
         } else {
             $book = Book
@@ -119,6 +122,7 @@ class ImportService {
             $chapter = new Chapter();
             $chapter->user_id = $userId;
             $chapter->name = $chapterNameCalculated;
+            $chapter->question_type = $metadata['questionType'] ?? null;
             $chapter->processing_status = ChapterProcessingStatusEnum::UNPROCESSED->value;
             $chapter->read_count = 0;
             $chapter->word_count = 0;
