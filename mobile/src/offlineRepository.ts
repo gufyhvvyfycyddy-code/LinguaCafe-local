@@ -24,6 +24,7 @@ export interface OfflineState {
   articles?: CachedValue<ArticleSummary[]>;
   chapters: Record<string, CachedValue<ChapterSummary[]>>;
   chapter_packages: Record<string, CachedValue<ChapterPackage>>;
+  downloaded_books?: Record<string, string>;
   reviews?: CachedValue<ReviewItem[]>;
   queue: QueuedAction[];
   next_sequence: number;
@@ -33,6 +34,7 @@ export interface OfflineState {
 const EMPTY_STATE = (): OfflineState => ({
   chapters: {},
   chapter_packages: {},
+  downloaded_books: {},
   queue: [],
   next_sequence: 1,
   issues: [],
@@ -158,6 +160,27 @@ export class OfflineRepository {
       state.queue.push(queued);
     });
     return queued;
+  }
+
+  async bookDownloadState(bookId: number): Promise<{ chapterIds: number[]; contentVersion: string | null }> {
+    const state = await this.state();
+    const prefix = `${bookId}:`;
+    const chapterIds = Object.keys(state.chapter_packages ?? {})
+      .filter(key => key.startsWith(prefix))
+      .map(key => Number(key.slice(prefix.length)))
+      .filter(Number.isInteger)
+      .sort((a, b) => a - b);
+    return {
+      chapterIds,
+      contentVersion: state.downloaded_books?.[String(bookId)] ?? null,
+    };
+  }
+
+  async markBookDownloaded(bookId: number, contentVersion: string): Promise<void> {
+    await this.update(state => {
+      state.downloaded_books ??= {};
+      state.downloaded_books[String(bookId)] = contentVersion;
+    });
   }
 
   async enqueueReadingInteraction(

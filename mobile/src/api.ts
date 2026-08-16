@@ -160,6 +160,7 @@ export class MobileApiClient {
             exam_set?: number | null;
           };
           chapter_count: number;
+          content_version?: string;
         }>;
         pagination?: unknown;
       }>(`/article-packages?${query}`);
@@ -167,7 +168,11 @@ export class MobileApiClient {
       data.items.forEach(item => {
         if (seenBookIds.has(item.book.book_id)) return;
         seenBookIds.add(item.book.book_id);
-        articles.push({ ...item.book, chapter_count: item.chapter_count });
+        articles.push({
+          ...item.book,
+          chapter_count: item.chapter_count,
+          ...(item.content_version ? { content_version: item.content_version } : {}),
+        });
       });
 
       if (data.pagination === undefined) {

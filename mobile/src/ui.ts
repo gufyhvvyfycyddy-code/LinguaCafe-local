@@ -84,6 +84,18 @@ function message(error: unknown): string {
   return '操作失败，请重试';
 }
 
+function materialLabel(article: ArticleSummary): string {
+  const type = {
+    cet4: '四级真题',
+    cet6: '六级真题',
+    postgraduate_exam: '考研真题',
+    personal: '我的材料',
+  }[article.material_type ?? 'personal'];
+  return [type, article.exam_year, article.exam_set ? `第 ${article.exam_set} 套` : null]
+    .filter(value => value !== null && value !== undefined)
+    .join(' · ');
+}
+
 function isScreen(value: unknown): value is Screen {
   return value === 'home' || value === 'library' || value === 'review'
     || value === 'vocabulary' || value === 'settings';
@@ -411,7 +423,8 @@ export class LinguaCafeApp {
           <button class="list-card article-card" data-book="${article.book_id}">
             <span class="book-icon">Aa</span>
             <span><strong>${escapeHtml(article.name)}</strong>
-              <small>${article.chapter_count} 个章节</small></span>
+              <small>${escapeHtml(materialLabel(article))} · ${article.chapter_count} 个章节</small>
+              <small data-book-offline="${article.book_id}">正在检查离线状态…</small></span>
             <span class="chevron">›</span>
           </button>`).join('')
       : '<div class="empty"><span>⌁</span><h2>暂无可读文章</h2><p>先在网页端导入并处理英文材料。</p></div>';
@@ -430,6 +443,23 @@ export class LinguaCafeApp {
         if (book) void this.openBook(book);
       });
     });
+    void this.refreshLibraryOfflineStatus();
+  }
+
+  private async refreshLibraryOfflineStatus(): Promise<void> {
+    if (!this.offlineRepository) return;
+    await Promise.all(this.articles.map(async article => {
+      const state = await this.offlineRepository!.bookDownloadState(article.book_id);
+      const downloaded = Math.min(article.chapter_count, state.chapterIds.length);
+      let copy = downloaded ? `已下载 ${downloaded}/${article.chapter_count} 章` : '未下载';
+      if (state.contentVersion && article.content_version && state.contentVersion !== article.content_version) {
+        copy = `有更新 · ${copy}`;
+      } else if (state.contentVersion) {
+        copy = '已下载整套 · 可离线打开';
+      }
+      const element = this.screenElement().querySelector<HTMLElement>(`[data-book-offline="${article.book_id}"]`);
+      if (element) element.textContent = copy;
+    }));
   }
 
   private async openBook(book: ArticleSummary): Promise<void> {
@@ -462,22 +492,88 @@ export class LinguaCafeApp {
           <button class="text-button" id="back-library">← 全部文章</button>
           <p class="eyebrow">ARTICLE</p>
           <h1>${escapeHtml(book.name)}</h1>
+          <p class="muted">${escapeHtml(materialLabel(book))}</p>
           ${this.usingOfflineSnapshot ? '<div class="offline-banner">离线文章包</div>' : ''}
+          <p class="muted" id="book-download-status">正在检查离线状态…</p>
+          <button class="secondary large" id="download-book">下载整套</button>
           <div class="stack">${this.chapters.map(chapter => `
             <button class="list-card" data-chapter="${chapter.chapter_id}">
               <span class="chapter-number">${chapter.chapter_id}</span>
               <span><strong>${escapeHtml(chapter.name)}</strong>
-                <small>${chapter.token_count} tokens</small></span>
+                <small>${chapter.token_count} tokens</small>
+                <small data-chapter-offline="${chapter.chapter_id}">正在检查离线状态…</small></span>
               <span class="chevron">›</span>
             </button>`).join('')}</div>
         </section>`;
       this.screenElement().querySelector('#back-library')?.addEventListener('click', () => this.renderLibrary());
+      this.screenElement().querySelector('#download-book')?.addEventListener('click', () => void this.downloadBook(book));
       this.screenElement().querySelectorAll<HTMLButtonElement>('[data-chapter]').forEach(button => {
         button.addEventListener('click', () => {
           const chapter = this.chapters.find(item => item.chapter_id === Number(button.dataset.chapter));
           if (chapter) void this.openChapter(chapter);
         });
       });
+      void this.refreshChapterOfflineStatus(book);
+  }
+
+  private async refreshChapterOfflineStatus(book: ArticleSummary): Promise<void> {
+    if (!this.offlineRepository) return;
+    const state = await this.offlineRepository.bookDownloadState(book.book_id);
+    const downloaded = new Set(state.chapterIds);
+    this.chapters.forEach(chapter => {
+      const element = this.screenElement().querySelector<HTMLElement>(`[data-chapter-offline="${chapter.chapter_id}"]`);
+      if (element) element.textContent = downloaded.has(chapter.chapter_id) ? '已下载 · 可离线' : '未下载';
+    });
+    const status = this.screenElement().querySelector<HTMLElement>('#book-download-status');
+    if (!status) return;
+    if (state.contentVersion && book.content_version && state.contentVersion !== book.content_version) {
+      status.textContent = '本机整套已有新版本可更新';
+    } else if (state.contentVersion) {
+      status.textContent = '整套已下载，可离线打开';
+    } else if (downloaded.size) {
+      status.textContent = `已下载 ${Math.min(downloaded.size, this.chapters.length)}/${this.chapters.length} 章`;
+    } else {
+      status.textContent = '整套尚未下载';
+    }
+  }
+
+  private async downloadBook(book: ArticleSummary): Promise<void> {
+    if (!this.api || !this.offlineRepository) return;
+    if (!book.content_version) {
+      this.showToast('服务器未提供可下载的材料版本', true);
+      return;
+    }
+    if (!this.chapters.length) {
+      this.showToast('这套材料还没有可下载的章节', true);
+      return;
+    }
+    if (!navigator.onLine || this.usingOfflineSnapshot) {
+      this.showToast('下载整套需要联网', true);
+      return;
+    }
+    const button = this.screenElement().querySelector<HTMLButtonElement>('#download-book');
+    if (button) button.disabled = true;
+    try {
+      for (let index = 0; index < this.chapters.length; index++) {
+        if (button) button.textContent = `正在下载 ${index + 1}/${this.chapters.length}`;
+        const chapter = this.chapters[index];
+        const articlePackage = await this.api.chapterPackage(book.book_id, chapter.chapter_id);
+        await this.offlineRepository.saveChapterPackage(book.book_id, chapter.chapter_id, articlePackage);
+      }
+      await this.offlineRepository.markBookDownloaded(book.book_id, book.content_version);
+      this.setServerReachable(true);
+      await this.refreshChapterOfflineStatus(book);
+      this.showToast('整套已下载，可离线打开');
+    } catch (error) {
+      this.noteNetworkFailure(error);
+      this.showToast(message(error), true);
+      await this.refreshChapterOfflineStatus(book);
+    } finally {
+      if (button) {
+        button.disabled = false;
+        button.textContent = '下载整套';
+      }
+    }
   }
 
   private async openChapter(chapter: ChapterSummary): Promise<void> {

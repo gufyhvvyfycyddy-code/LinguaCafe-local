@@ -62,6 +62,32 @@ describe('OfflineRepository', () => {
     expect(await repository.pendingCardIds()).toEqual(new Set([10, 11]));
   });
 
+  it('derives downloaded chapters and records the completed server manifest version', async () => {
+    const store = new MemoryStore();
+    const repository = new OfflineRepository(7, 'English', store);
+    const articlePackage = {
+      content_version: 'sha256:chapter',
+      dictionary_version: 'sha256:dictionary',
+      tokens: [],
+      sentence_translations: [],
+      sense_summaries: [],
+      dictionary_summaries: {},
+    };
+
+    await repository.saveChapterPackage(3, 10, articlePackage);
+    await repository.saveChapterPackage(3, 9, articlePackage);
+    expect(await repository.bookDownloadState(3)).toEqual({
+      chapterIds: [9, 10],
+      contentVersion: null,
+    });
+
+    await repository.markBookDownloaded(3, 'sha256:manifest');
+    expect(await new OfflineRepository(7, 'English', store).bookDownloadState(3)).toEqual({
+      chapterIds: [9, 10],
+      contentVersion: 'sha256:manifest',
+    });
+  });
+
   it('removes successes, retains retryable actions and records terminal issues', async () => {
     const repository = new OfflineRepository(7, 'English', new MemoryStore());
     const applied = await repository.enqueueRating(10, 'good', 100);
