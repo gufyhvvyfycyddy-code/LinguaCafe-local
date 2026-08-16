@@ -311,8 +311,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | D-04 | DONE | 在专用 testing DB 执行迁移闭环 | D-02/D-03 | user/language 隔离；旧 log 不丢；无法判断项保留 legacy/read-only；正式队列只出 sense cards |
 | D-05 | DONE | WordSense 生词页完善搜索、编辑、来源总览、legacy 历史说明 | Phase C 生词入口 + existing services | 正常/拒绝/权限/语言 tests + browser |
 | D-06 | DONE | per-occurrence lemma/POS 评估与必要最小实现 | WordSenseOccurrence、tokenizer、morphology assets | 新 lemma/POS 与已确认 binding 不一致时只标复核，不自动重写；词典不做 lemma oracle |
-| D-07 | ACTIVE | legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除 | existing UI guards | 不为“代码干净”删除仍有 caller 的能力；阅读颜色正确 |
-| D-GATE | TODO | Phase D migration + product Gate | D-01…D-07 | dry-run/backup/reversibility/isolation/log preservation/queue/browser 全通过；自动进入 E |
+| D-07 | DONE | legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除 | existing UI guards | 不为“代码干净”删除仍有 caller 的能力；阅读颜色正确 |
+| D-GATE | DONE | Phase D migration + product Gate | D-01…D-07 | dry-run/backup/reversibility/isolation/log preservation/queue/browser 全通过；自动进入 E |
 
 ---
 
@@ -472,10 +472,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `D-07`（legacy 页面/路由先隐藏→依赖审计→分类保留/只读/删除）
-- Last DONE: `D-06`
-- Current HEAD at FND-01 Entry Gate: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（checkpoint commit 见 Goal branch tip）
-- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-12 20:19 +08:00 fresh fetch）
+- Active milestone: `E-01`（审计旧 M1–M9 mobile 资产并分类 reuse / adapt / obsolete）
+- Last DONE: `D-GATE`
+- Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `none yet`
 - Blocking issue: `none`
 
@@ -549,6 +549,14 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - 新增 dormant `LegacyWordCardMigrationRecoveryService` 与专用 run/item ledger；无 command/route/UI。apply 在既有 BackupService 独占锁内完成备份、inspection、全证据行锁、fresh classifier revalidation、单事务建卡/归档/ledger；应用前后完整 classifier row、完整卡片身份/状态/raw timestamps 与递归 canonical fingerprints 均持久化。
 - rollback 重新分类并比对 after evidence，只在完整 after-state 未漂移时整批恢复；created Sense 卡获得任何依赖后拒绝删除，reused Sense 卡从不覆写。普通 rollback 不依赖备份仍在线；全备份只作灾难恢复。跨 scope 损坏卡不阻断本 scope，备份 retention IDs 在锁内 fresh 读取。
 - testing health 6/69、classifier+recovery focused 10/141、Backup/ReviewFsrs/WordSense 最终保护回归 289/1481 全绿；Pint/lint/diff-check 通过，lease final false/false。两份 fresh review 最终 Blocker=0/Required=0；外部 dirty assets 全部保持原样。
+
+### CLOSED MILESTONE EVIDENCE — D-07 / D-GATE
+
+- D-07 在 corrected exact-19 allowlist 内退休 ordinary legacy Review Vue route、三个 orphaned components、legacy API methods 与只依赖旧页面的 guards；保留 `/reviews`、`/reviews/rate`、ReviewController/ReviewService、Laravel `/review` compatibility redirect、现代 Sense API 与 `.sense-source-dialog` / `.sense-example-dialog`。
+- D-07 commit `107c881566b6aaf39ac01c3a1065b5dae209084c` 已正常推送并与 tracking/live remote 一致；Node 27/27、backend compatibility 74/74（380 assertions）、build、search、diff-check 与 fresh review Blocker=0/Required=0 全绿。
+- server-bound testing 真实浏览器通过正常 setup/login 使用本地 testing 验收账号；`/review/practice/7/9` 真实 302 后落到 `/reviews/senses`，直接现代页面与 `#sense-review` 均为 200/可见。登录后目标请求无 HTTP >=400；Console 仅既有本地 Pusher WebSocket 拒绝噪声；未评分或写学习数据。
+- D-GATE fresh aggregate：migration classifier/recovery/cutover、D-06 morphology、D-07 redirect、WordSense Library、Review FSRS 与 testing health 共 105/105（712 assertions）；Phase D Node/static 42/42、build 与 diff-check 全绿。D-01…D-07 的 dry-run、backup、reversibility、scope isolation、log preservation、sense-only queue 与 browser 证据闭合。
+- browser/server/task-owned artifacts 已清理，port 8017 closed，TestingDatabaseLease final `active=false / stale_metadata=false`；无 deferred capability cluster，自动进入 E-01。
 
 ### PROGRESS LOG
 
@@ -629,6 +637,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-12 | D-05 | DONE | Goal branch tip | WordSense Library 继续以 current-user/current-language confirmed Sense 为唯一主体；搜索扩展 lemma/surface/POS/中英释义，列表补 aliases/collocations；编辑复用 ManualSenseForm + existing PUT，来源复用 read_only source-context-list，无 ReviewCard/FSRS/delete 第二系统；PHP/JS/build 全绿，desktop 1280 与 exact430 真实搜索/展开/验证/保存-reload/来源通过，Network 三条 canonical 请求与 Console 0 error/warn；source cache Required 已闭合，lease final active=false | D-06`
 
 `2026-08-13 | D-06 | DONE | Goal branch tip | occurrence/Sense lemma+POS 自动兼容判断收敛到单一 policy；import 冲突降 pending、validation summary 同源、bulk-high-confidence 不可绕过，显式人工确认/改绑仍保留；不改 tokenizer/词典/schema/route/FSRS。PHP D06 10/73 + protected regressions、JS guard 5/5、build 全绿；原 exact430 action-row 699px 横溢由 flex-wrap 最小修复后真实 DOM 为 inner/client/html/body width 全 430、最大按钮右边界约401，双方 morphology 与复核提示仍可见；PAB sentinel_cleanup=ok，lease final active=false/stale=false。01 曾违规启动中央外 Reasonix，记流程 Required，不影响产品代码验收 | D-07`
+
+`2026-08-16 | D-07 | DONE | 107c881566b6aaf39ac01c3a1065b5dae209084c | corrected exact 19 paths；legacy Review Vue frontend/API/CSS/guards 退休，Laravel compatibility 与现代 Sense 路径保留；Node 27/27、PHP 74/380、build/search/diff 全绿；authenticated testing 浏览器证明 legacy 302→modern 200 与现代 DOM，cleanup lease false/false | D-GATE`
+
+`2026-08-16 | D-GATE | DONE | Goal branch tip | Phase D aggregate PHP 105/105（712 assertions）、Node/static 42/42、build/diff 全绿；D-01…D-07 dry-run/backup/reversibility/isolation/log/queue/browser 门禁闭合，无 deferred；server/browser/artifacts/port/lease clean | E-01`
 
 ### DECISION LOG
 
