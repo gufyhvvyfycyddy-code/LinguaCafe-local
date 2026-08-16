@@ -322,8 +322,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| E-01 | TODO | 审计旧 M1–M9：Mobile API、operation ledger、download packages、sync、Android/iOS/offline | 2026-08-01 M0–M18 audit + actual code | 每项标 `reuse / adapt / obsolete`；不因历史“Closed”自动通过 |
-| E-02 | TODO | 移动 IA 与 Phase C 首页/四导航一致 | existing Capacitor/mobile shell | 不设计第二套 IA；Web/mobile 文案/入口一致 |
+| E-01 | DONE | 审计旧 M1–M9：Mobile API、operation ledger、download packages、sync、Android/iOS/offline | 2026-08-01 M0–M18 audit + actual code | 每项标 `reuse / adapt / obsolete`；不因历史“Closed”自动通过 |
+| E-02 | ACTIVE | 移动 IA 与 Phase C 首页/四导航一致 | existing Capacitor/mobile shell | 不设计第二套 IA；Web/mobile 文案/入口一致 |
 | E-03 | TODO | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
 | E-04 | TODO | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
 | E-05 | TODO | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `E-01`（审计旧 M1–M9 mobile 资产并分类 reuse / adapt / obsolete）
-- Last DONE: `D-GATE`
+- Active milestone: `E-02`（移动 IA 与 Phase C 首页/四导航一致）
+- Last DONE: `E-01`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -558,6 +558,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - D-GATE fresh aggregate：migration classifier/recovery/cutover、D-06 morphology、D-07 redirect、WordSense Library、Review FSRS 与 testing health 共 105/105（712 assertions）；Phase D Node/static 42/42、build 与 diff-check 全绿。D-01…D-07 的 dry-run、backup、reversibility、scope isolation、log preservation、sense-only queue 与 browser 证据闭合。
 - browser/server/task-owned artifacts 已清理，port 8017 closed，TestingDatabaseLease final `active=false / stale_metadata=false`；无 deferred capability cluster，自动进入 E-01。
 
+### CLOSED MILESTONE EVIDENCE — E-01
+
+- `docs/audits/e-01-mobile-assets-audit-2026-08-16.md` 对当前 M1–M9 实现逐项完成 `reuse / adapt / obsolete` 分类；旧 Closed 状态仅作历史证据，实际 source/tests/build 才是当前基线。
+- 唯一复用主路保持为 `/api/v1/mobile` + existing Capacitor/Vite shell + M3 packages + user/language-scoped IndexedDB + M4 sync + ReviewCardService/FSRS；没有新 API、store、sync engine、local FSRS authority 或 background worker。
+- fresh PHP Mobile matrix 60/60（589 assertions）、Mobile Vitest 29/29、TypeScript/Vite production build 与 M5/M6/M7/M9/static guards 5/5 全绿。
+- E-02…E-08 的真实 gap 已命名：IA、离线词典/short-term horizon、Phase B reading operation boundary、普通用户冲突文案、native gesture/navigation、current Android artifact/device evidence、Windows-local iOS static work与 Apple capability cluster。
+
 ### PROGRESS LOG
 
 格式：
@@ -641,6 +648,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | D-07 | DONE | 107c881566b6aaf39ac01c3a1065b5dae209084c | corrected exact 19 paths；legacy Review Vue frontend/API/CSS/guards 退休，Laravel compatibility 与现代 Sense 路径保留；Node 27/27、PHP 74/380、build/search/diff 全绿；authenticated testing 浏览器证明 legacy 302→modern 200 与现代 DOM，cleanup lease false/false | D-GATE`
 
 `2026-08-16 | D-GATE | DONE | Goal branch tip | Phase D aggregate PHP 105/105（712 assertions）、Node/static 42/42、build/diff 全绿；D-01…D-07 dry-run/backup/reversibility/isolation/log/queue/browser 门禁闭合，无 deferred；server/browser/artifacts/port/lease clean | E-01`
+
+`2026-08-16 | E-01 | DONE | Goal branch tip | fresh actual-code audit 将 M1–M9 分类为 reuse/adapt/obsolete；唯一 mobile API/package/ledger/sync/Capacitor/IndexedDB 主路保留，E-02…E-08 gap 精确路由；PHP 60/589、Vitest 29/29、mobile build、static guards 5/5 全绿；零产品代码/数据修改 | E-02`
 
 ### DECISION LOG
 
