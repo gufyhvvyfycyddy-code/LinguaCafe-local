@@ -327,8 +327,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | E-03 | DONE | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
 | E-04 | DONE | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
 | E-05 | DONE | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
-| E-06 | ACTIVE | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
-| E-07 | TODO | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
+| E-06 | DEFERRED | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
+| E-07 | ACTIVE | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
 | E-08 | TODO | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
 | E-GATE | TODO | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
 
@@ -472,11 +472,11 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `E-06`（移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进）
+- Active milestone: `E-07`（Android 联网 + 有限离线真实闭环）
 - Last DONE: `E-05`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
-- Deferred capability clusters: `none yet`
+- Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow`
 - Blocking issue: `none`
 
 ### CLOSED MILESTONE EVIDENCE — B-07
@@ -593,6 +593,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - testing-bound 真实 Mobile build 浏览器证明同一 `bank` rating 离线排队后整页重载仍为 1 待同步/0 需处理；第二设备较晚评分后第一设备重连 sync HTTP 200，显示“服务器已有更新”且 raw `OUT_OF_ORDER_ACTION` 不可见，清除后归零。目标 API 无 HTTP >=400；Console 仅两条刻意断网请求错误。
 - English fixture 经用户 UI 删除；15 个任务 Mobile device token 与残留 task learning objects 在独占 testing lease 下精确清理，browser/temp artifacts 与 ports 关闭，最终 lease `active=false / stale_metadata=false`。
 
+### DEFERRED MILESTONE EVIDENCE — E-06
+
+- 复用现有 Mobile Reader、lookup Bottom Sheet、Reviewer 与 History API；450ms 长按、10px 滚动取消和同 source sentence 拖选词组只翻译到既有 `openLookup()`，未新增 router/store/plugin、第二同步账本、本地 FSRS 或评分路径。
+- Mobile Vitest 38/38、TypeScript/Vite production build、E-03…E-06/M5/M7 guards 6/6、M7/testing health 13/13（120 assertions）与 diff-check 全绿；fresh review 修复 structure token 选区索引 Required 后 Blocker=0/Required=0。
+- testing-bound 390×844 真实浏览器以 touch 事件完成约 520ms 长按拖选 `bank account`、Bottom Sheet/48px close/输入聚焦、Back 先关 sheet、主页面 Back/Forward review→settings，以及一次既有正式 Mobile Good；目标 API 无 HTTP >=400，Console 为空。
+- task-owned 书、session、词义/卡/日志/operation、device/token 与临时脚本均精确清零；port 8024/3000 closed，lease final `active=false / stale_metadata=false`。标准 x86_64 AVD 缺宿主硬件加速，arm64 AVD 与 x86_64 QEMU2 host 不兼容，故 Android 原生 E-06 验收进入 capability cluster，绝不记 DONE。
+
 ### PROGRESS LOG
 
 格式：
@@ -686,6 +693,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | E-04 | DONE | Goal branch tip | existing M4 queue/idempotency + Phase B ReadingSession/Finish 单一路径；backend 159/1137 + package/health 20/223 + review-fix 18/189、Vitest 34/34、build/guards/lint/diff 绿；真实浏览器 offline rating→sync、online dictionary、offline summary 0 request、Finish preflight/commit 2xx，fixture/tokens/artifacts/ports/lease clean；fresh review Blocker=0/Required=0 | E-05`
 
 `2026-08-16 | E-05 | DONE | Goal branch tip | existing IndexedDB queue/issue 单一 owner；Vitest 35/35、M4/health 23/236、build/guards/diff 绿；真实浏览器证明 offline pending 跨整页重载保留，双设备 later-rating conflict sync 200，仅展示普通用户文案且 raw code 不可见，清除后归零；task data/tokens/artifacts/ports/lease clean；fresh review Blocker=0/Required=0 | E-06`
+`2026-08-16 | E-06 | DEFERRED | Goal branch tip | 实现/浏览器/自动测试完成且 Blocker=0/Required=0；Android 原生 UI 因本机无可运行 emulator/device 进入 capability cluster；task data/artifacts/ports/lease clean | E-07`
 
 ### DECISION LOG
 

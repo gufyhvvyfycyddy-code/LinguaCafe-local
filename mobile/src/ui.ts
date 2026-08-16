@@ -32,6 +32,11 @@ import type {
 } from './types';
 import { MediaCache } from './mediaCache';
 import { OfflineRepository } from './offlineRepository';
+import {
+  movedBeyondReaderTap,
+  readerPhrase,
+  READER_LONG_PRESS_MS,
+} from './readerTouchSelection';
 
 type Screen = 'home' | 'library' | 'review' | 'vocabulary' | 'settings';
 
@@ -77,6 +82,11 @@ function escapeHtml(value: unknown): string {
 function message(error: unknown): string {
   if (error instanceof MobileApiError || error instanceof Error) return error.message;
   return '操作失败，请重试';
+}
+
+function isScreen(value: unknown): value is Screen {
+  return value === 'home' || value === 'library' || value === 'review'
+    || value === 'vocabulary' || value === 'settings';
 }
 
 function syncIssueCopy(issue: OfflineSyncIssue): { title: string; message: string } {
@@ -138,11 +148,26 @@ export class LinguaCafeApp {
   private notice = '';
   private error = '';
   private pendingTextImport: { key: string; actionId: string } | null = null;
+  private lookupHistoryOpen = false;
 
   constructor(private readonly root: HTMLElement) {
     window.addEventListener('online', () => void this.flushQueue(true));
     window.addEventListener('offline', () => {
       this.setServerReachable(false);
+    });
+    window.addEventListener('popstate', event => {
+      if (this.lookupHistoryOpen) {
+        this.lookupHistoryOpen = false;
+        this.root.querySelector('.sheet-backdrop')?.remove();
+        return;
+      }
+      if (event.state?.linguacafeLookup) {
+        history.back();
+        return;
+      }
+      if (isScreen(event.state?.linguacafeScreen) && this.root.querySelector('.app-shell')) {
+        void this.openScreen(event.state.linguacafeScreen, false);
+      }
     });
   }
 
@@ -293,6 +318,9 @@ export class LinguaCafeApp {
 
   private renderShell(): void {
     const connected = navigator.onLine && this.serverReachable;
+    if (history.state?.linguacafeScreen !== this.screen || history.state?.linguacafeLookup) {
+      history.replaceState({ linguacafeScreen: this.screen }, '');
+    }
     this.root.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
@@ -328,7 +356,10 @@ export class LinguaCafeApp {
     </button>`;
   }
 
-  private async openScreen(screen: Screen): Promise<void> {
+  private async openScreen(screen: Screen, recordHistory = true): Promise<void> {
+    if (recordHistory && history.state?.linguacafeScreen !== screen) {
+      history.pushState({ linguacafeScreen: screen }, '');
+    }
     this.screen = screen;
     this.renderShell();
     if (screen === 'home') await this.openHome();
@@ -509,8 +540,90 @@ export class LinguaCafeApp {
     this.screenElement().querySelector('#back-chapters')?.addEventListener('click', () => {
       if (this.selectedBook) void this.openBook(this.selectedBook);
     });
-    this.screenElement().querySelectorAll<HTMLButtonElement>('[data-token]').forEach(button => {
+    const readerCopy = this.screenElement().querySelector<HTMLElement>('.reader-copy');
+    if (readerCopy) readerCopy.style.touchAction = 'pan-y';
+    const tokenButtons = [...(readerCopy?.querySelectorAll<HTMLButtonElement>('[data-token]') ?? [])];
+    let suppressNextClick = false;
+    let gesture: {
+      pointerId: number;
+      startIndex: number;
+      endIndex: number;
+      originX: number;
+      originY: number;
+      active: boolean;
+      timer: number;
+    } | null = null;
+    const paintSelection = (startIndex?: number, endIndex?: number) => {
+      tokenButtons.forEach(button => {
+        const index = Number(button.dataset.token);
+        const selected = startIndex !== undefined && endIndex !== undefined
+          && index >= Math.min(startIndex, endIndex)
+          && index <= Math.max(startIndex, endIndex);
+        button.toggleAttribute('aria-pressed', selected);
+        button.style.background = selected ? 'var(--green-soft)' : '';
+        button.style.color = selected ? 'var(--green-deep)' : '';
+      });
+    };
+    const cancelGesture = () => {
+      if (gesture) window.clearTimeout(gesture.timer);
+      gesture = null;
+      paintSelection();
+    };
+    readerCopy?.addEventListener('pointerdown', event => {
+      const button = (event.target as Element).closest<HTMLButtonElement>('[data-token]');
+      if (!button || event.pointerType === 'mouse') return;
+      readerCopy?.setPointerCapture(event.pointerId);
+      const index = Number(button.dataset.token);
+      gesture = {
+        pointerId: event.pointerId,
+        startIndex: index,
+        endIndex: index,
+        originX: event.clientX,
+        originY: event.clientY,
+        active: false,
+        timer: window.setTimeout(() => {
+          if (!gesture) return;
+          gesture.active = true;
+          paintSelection(gesture.startIndex, gesture.endIndex);
+        }, READER_LONG_PRESS_MS),
+      };
+    });
+    readerCopy?.addEventListener('pointermove', event => {
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      if (!gesture.active) {
+        if (movedBeyondReaderTap(gesture.originX, gesture.originY, event.clientX, event.clientY)) {
+          suppressNextClick = true;
+          window.setTimeout(() => { suppressNextClick = false; }, 500);
+          cancelGesture();
+        }
+        return;
+      }
+      event.preventDefault();
+      const button = document.elementFromPoint(event.clientX, event.clientY)
+        ?.closest<HTMLButtonElement>('[data-token]');
+      const index = Number(button?.dataset.token);
+      if (button && readerPhrase(this.readerTokens, gesture.startIndex, index)) {
+        gesture.endIndex = index;
+        paintSelection(gesture.startIndex, gesture.endIndex);
+      }
+    });
+    readerCopy?.addEventListener('pointerup', event => {
+      if (!gesture || gesture.pointerId !== event.pointerId) return;
+      const selected = gesture.active
+        ? readerPhrase(this.readerTokens, gesture.startIndex, gesture.endIndex)
+        : null;
+      if (gesture.active) {
+        event.preventDefault();
+        suppressNextClick = true;
+        window.setTimeout(() => { suppressNextClick = false; }, 0);
+      }
+      cancelGesture();
+      if (selected) void this.openLookup(selected);
+    });
+    readerCopy?.addEventListener('pointercancel', cancelGesture);
+    tokenButtons.forEach(button => {
       button.addEventListener('click', () => {
+        if (suppressNextClick) return;
         const token = this.readerTokens[Number(button.dataset.token)];
         if (token) void this.openLookup(token);
       });
@@ -525,6 +638,10 @@ export class LinguaCafeApp {
     const term = (token.lemma || token.word).trim().toLocaleLowerCase('en-US');
     this.lookupDefinitions = [];
     await this.recordLookupOpened(token);
+    if (!this.lookupHistoryOpen) {
+      history.pushState({ linguacafeScreen: this.screen, linguacafeLookup: true }, '');
+      this.lookupHistoryOpen = true;
+    }
 
     if (this.usingOfflineSnapshot) {
       this.lookupDefinitions = this.readerPackage?.dictionary_summaries[term] ?? [];
@@ -592,9 +709,9 @@ export class LinguaCafeApp {
       </section>`;
     this.root.querySelector('.sheet-backdrop')?.remove();
     this.root.append(panel);
-    panel.querySelector('#close-lookup')?.addEventListener('click', () => panel.remove());
+    panel.querySelector('#close-lookup')?.addEventListener('click', () => this.closeLookupSheet(panel));
     panel.addEventListener('click', event => {
-      if (event.target === panel) panel.remove();
+      if (event.target === panel) this.closeLookupSheet(panel);
     });
     panel.querySelector<HTMLFormElement>('#create-sense-form')?.addEventListener('submit', event => {
       event.preventDefault();
@@ -609,6 +726,11 @@ export class LinguaCafeApp {
         }
       });
     });
+  }
+
+  private closeLookupSheet(panel: HTMLElement): void {
+    if (this.lookupHistoryOpen) history.back();
+    else panel.remove();
   }
 
   private readingTargetForToken(token: ReaderToken) {
@@ -643,7 +765,7 @@ export class LinguaCafeApp {
       new Date(),
       { readingSessionId: session.reading_session_id, occurrenceId },
     );
-    panel.remove();
+    this.closeLookupSheet(panel);
     this.showToast(this.usingOfflineSnapshot || !navigator.onLine
       ? '阅读评分已离线排队'
       : '阅读评分已记录');
@@ -730,7 +852,7 @@ export class LinguaCafeApp {
         sentence_en: this.sentenceForToken(this.lookupToken),
       });
       this.setServerReachable(true);
-      panel.remove();
+      this.closeLookupSheet(panel);
       this.showToast('词义已创建，将进入正式复习队列');
     } catch (error) {
       this.noteNetworkFailure(error);
