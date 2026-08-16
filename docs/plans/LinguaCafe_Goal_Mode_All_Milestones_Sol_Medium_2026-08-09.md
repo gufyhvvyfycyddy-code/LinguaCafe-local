@@ -329,8 +329,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | E-05 | DONE | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
 | E-06 | DEFERRED | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
 | E-07 | DEFERRED | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
-| E-08 | ACTIVE | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
-| E-GATE | TODO | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
+| E-08 | DEFERRED | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
+| E-GATE | ACTIVE | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
 
 ---
 
@@ -472,11 +472,11 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `E-08`（iOS Windows-local static/build-contract）
+- Active milestone: `E-GATE`（Phase E local completion/capability audit）
 - Last DONE: `E-05`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
-- Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow`
+- Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
 
 ### CLOSED MILESTONE EVIDENCE — B-07
@@ -607,6 +607,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - x86_64 AVD 明确因 Android Emulator hypervisor driver 未安装退出；arm64 AVD 明确因 x86_64 QEMU2 host 架构不兼容退出，`adb devices` 无设备。因此 current APK 的 Android online/download/offline/reconnect/recent-review/sync/cached-assets UI 证据进入既有 Android capability cluster，绝不由浏览器或源码替代。
 - APK/build 已由 Gradle clean 删除，adb/Gradle daemon 停止，lease final `active=false / stale_metadata=false`；Capacitor generated Gradle 文件只有 line-ending metadata、semantic diff 为空且未暂存。
 
+### DEFERRED MILESTONE EVIDENCE — E-08
+
+- Windows-local current Web build + `cap sync ios` 通过；post-sync integrity 证明 dist/public 引用同一 `index-BQ4fE1l-.js` 与 CSS、index/JS/CSS byte-identical、sourcemap=0、HTTPS/pagination/local-debug safeguards=3。ignored generated public/config 未暂存。
+- Mobile Vitest 38/38、M9/E-03…E-06 guards 5/5、M9 import/auth/health 26/26（241 assertions）、四个 storyboard/plist/privacy XML parse 与 diff-check 全绿。Windows sync 对 tracked SwiftPM 路径的反斜杠改写已精确撤销，tracked iOS source semantic diff=0。
+- official npm audit fresh 发现两个 high transitive advisory 后，只在 lockfile 更新 `brace-expansion 5.0.8→5.0.9` 与 `nanoid 3.3.16→3.3.18`；direct dependencies/Capacitor 仍 8.4.2，最终 audit 为 0 vulnerabilities。
+- Capacitor Doctor 明确报告 `Xcode is not installed`；本机也无 macOS、iOS simulator/device、Apple signing/TestFlight capability。unsigned Xcode compile、真机共享流程、Keychain at-rest、签名/archive/store 均进入 iOS capability cluster，绝不记 DONE。
+
 ### PROGRESS LOG
 
 格式：
@@ -702,6 +709,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | E-05 | DONE | Goal branch tip | existing IndexedDB queue/issue 单一 owner；Vitest 35/35、M4/health 23/236、build/guards/diff 绿；真实浏览器证明 offline pending 跨整页重载保留，双设备 later-rating conflict sync 200，仅展示普通用户文案且 raw code 不可见，清除后归零；task data/tokens/artifacts/ports/lease clean；fresh review Blocker=0/Required=0 | E-06`
 `2026-08-16 | E-06 | DEFERRED | Goal branch tip | 实现/浏览器/自动测试完成且 Blocker=0/Required=0；Android 原生 UI 因本机无可运行 emulator/device 进入 capability cluster；task data/artifacts/ports/lease clean | E-07`
 `2026-08-16 | E-07 | DEFERRED | Goal branch tip | current Capacitor sync/Gradle debug APK、67/687 backend contracts、Android unit task与guards全绿；两个现有 AVD 均因宿主能力不可运行且 adb 无设备，真实 online/offline/reconnect 留在 Android capability cluster；build/daemon/lease clean | E-08`
+`2026-08-16 | E-08 | DEFERRED | Goal branch tip | Windows-local build/sync/integrity、38 Mobile tests、26/241 PHP、5 guards、XML 与 audit 0 vulnerabilities 全绿；Xcode/simulator/device/Keychain/signing/TestFlight 留在 iOS capability cluster；generated output 未暂存 | E-GATE`
 
 ### DECISION LOG
 
