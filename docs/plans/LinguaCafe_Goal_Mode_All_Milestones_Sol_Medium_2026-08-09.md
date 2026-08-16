@@ -344,8 +344,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | F-04 | DONE | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
 | F-05 | DONE | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
 | F-06 | DONE | 删除材料前显示来源与学习历史影响，并只执行已授权产品生命周期 | Book/Chapter deletion boundaries | preview/confirmation/拒绝路径；不直接 broad delete 学习历史 |
-| F-07 | ACTIVE | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
-| F-GATE | TODO | Phase F Gate | F-01…F-07 | 三类真实样本 + version + delete impact 全通过；自动进入 G |
+| F-07 | DONE | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
+| F-GATE | DONE | Phase F Gate | F-01…F-07 | 三类真实样本 + version + delete impact 全通过；自动进入 G |
 
 ---
 
@@ -355,7 +355,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| G-01 | TODO | inventory 一级入口与调用方：Browser/Card Info、Custom Study、Saved Search、Tag/Marker、手动调度、FSRS 技术指标、复杂统计、apkg、备份恢复、文章健康 | routes/components/services/tests | caller/route/data dependency 清单 |
+| G-01 | ACTIVE | inventory 一级入口与调用方：Browser/Card Info、Custom Study、Saved Search、Tag/Marker、手动调度、FSRS 技术指标、复杂统计、apkg、备份恢复、文章健康 | routes/components/services/tests | caller/route/data dependency 清单 |
 | G-02 | TODO | 普通用户一级入口隐藏，高级能力集中“我的→高级” | Phase C advanced entry | desktop/mobile 真页面；能力仍可达 |
 | G-03 | TODO | 对每项做依赖扫描与主流程回归 | existing guards/tests | 新阅读/复习/生词/材料主流程不依赖旧一级入口 |
 | G-04 | TODO | 每项分类：保留高级 / 只读兼容 / 可删除 | G-03 evidence | 分类有当前 caller/contract 证据，不凭偏好 |
@@ -472,9 +472,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `F-07`（real sample end-to-end closure）
-- Last DONE: `F-06`
-- Current verified Goal code HEAD: current Goal branch tip（F-06 completion commit；以 `git rev-parse HEAD` 为准）
+- Active milestone: `G-01`（advanced-entry/caller inventory）
+- Last DONE: `F-GATE`
+- Current verified Goal code HEAD: current Goal branch tip（Phase F closure；以 `git rev-parse HEAD` 为准）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
@@ -722,6 +722,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | F-05 | DONE | Goal branch tip | existing article manifest/content_version + chapter_packages 为唯一下载与离线内容路径，仅在同一 IndexedDB scope 记录完整下载的 server manifest version；整套下载不创建 ReadingSession/学习数据。Mobile 39/39、E03/E04/E05/F05 guards 7/7、build/diff 全绿；testing 浏览器证明 CET-6 年份/套次目录、整套/逐章状态、停服后缓存正文真实打开、同端口恢复在线、server version 变化显示更新并可重下；task token/device/book/account/IndexedDB/browser/ports/sentinel/lease 精确清零；fresh review Blocker=0/Required=0 | F-06`
 
 `2026-08-16 | F-06 | DONE | Goal branch tip | existing /books/delete 扩展为 preview/delete 两模式；preview 只读显示章节、来源、词义、Sense card/log 与 reading session 影响，delete 必须显式确认且事务内只删当前用户/语言 Book+Chapters，学习历史保留。F06 Feature 4/22、Node guard 2/2、相邻 F04/M3/F05/E03 回归与 root build 全绿；server-bound testing + Playwright 真页面完成操作菜单→影响预览→勾选确认→最终删除，两个 delete POST 均 200，列表变“没有数据”，DB 回读 Book/Chapters=0 且 occurrence/Sense/Card/Log/ReadingSession 各=1；Console 目标噪声仅本地 Pusher 拒绝。task user/history/settings/sentinel 精确清零，port/server/lease clean；fresh review Blocker=0/Required=0 | F-07`
+
+`2026-08-16 | F-07 | DONE | Goal branch tip | 使用 task-authored、可合法使用的三份英文样本，但全部真实走用户上传 UI：四级 2026/1、六级 2026/2、考研 2026/3；各自真实 Reader 标记 1 个词，服务器 V2 AI source 均生成 1 target/1 package，按固定 simulated-external-AI 契约回填 exact package/source/occurrence IDs，页面解析/确认后分别保存 cultivate/accelerates/scrutinize 新词义并创建 Sense ReviewCard。Mobile 同一用户看到三套材料，逐套“下载整套”后均显示可离线；真实停止 backend 后三套分别打开章节正文且显示“离线文章包”。最终 DB 为 Books3/Chapters3/AI assists3/unfamiliar targets3/WordSenses3/ReviewCards3/Occurrences3，材料分类与年份套次精确；browser scope/token/bootstrap、task user/device/material/learning rows、sentinel、ports、lease 全精确清零 | F-GATE`
+
+`2026-08-16 | F-GATE | DONE | Goal branch tip | F-01…F-07 ledger/evidence 全为 DONE；最终 fresh gate：F01/F02/F04/F06/M3 PHP 25/25（215 assertions）、F02…F06+E03 Node 16/16、Mobile Vitest 39/39、Mobile build、root development build 与 diff-check 全绿；三类上传→阅读→AI包→学词→下载→离线打开真实闭环已完成，version conflict 与 deletion impact 也有独立真实证据；无新 blocker，既有 Android/iOS capability clusters 继续真实 DEFERRED | G-01`
 
 ### DECISION LOG
 
