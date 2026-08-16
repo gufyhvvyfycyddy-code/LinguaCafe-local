@@ -326,8 +326,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | E-02 | DONE | 移动 IA 与 Phase C 首页/四导航一致 | existing Capacitor/mobile shell | 不设计第二套 IA；Web/mobile 文案/入口一致 |
 | E-03 | DONE | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
 | E-04 | DONE | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
-| E-05 | ACTIVE | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
-| E-06 | TODO | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
+| E-05 | DONE | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
+| E-06 | ACTIVE | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
 | E-07 | TODO | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
 | E-08 | TODO | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
 | E-GATE | TODO | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
@@ -472,8 +472,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `E-05`（conflict / retry / app-kill 恢复与普通用户文案）
-- Last DONE: `E-04`
+- Active milestone: `E-06`（移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进）
+- Last DONE: `E-05`
 - Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `none yet`
@@ -586,6 +586,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 - testing-bound 真实 Mobile build 浏览器证明 online dictionary API 200、offline downloaded package 非空摘要且 lookup 新增 dictionary request=0；断网显式 Good 排队并重连 sync 200；Finish start/preflight/commit 均 200、服务器计划与提交均为 0 passive Good，目标请求无 HTTP >=400。
 - 仅 Pusher/未认证静态资源与预期断网请求产生既有本地噪声；任务词典经管理 UI 删除、English fixture 经用户 UI 删除、23 个任务 Mobile device token 在独占 testing lease 下撤销，浏览器/CLI artifacts、ports、sentinel metadata 与 lease 最终 clean（false/false）。
 
+### CLOSED MILESTONE EVIDENCE — E-05
+
+- 既有 `OfflineRepository` 继续是唯一持久 queue/issue owner；新 repository instance 恢复原 action identity/sequence/payload，retryable 仍留队，terminal 只转为可见 issue。UI 按稳定 code 映射普通用户文案，不渲染 raw server code/message，未新增 worker、watchdog、store、endpoint 或合并规则。
+- Mobile Vitest 35/35、M4/health 23/23（236 assertions）、production build、E-03/E-04/E-05/M5 guards 与 diff-check 全绿；提交前五轴复核 Blocker=0/Required=0。
+- testing-bound 真实 Mobile build 浏览器证明同一 `bank` rating 离线排队后整页重载仍为 1 待同步/0 需处理；第二设备较晚评分后第一设备重连 sync HTTP 200，显示“服务器已有更新”且 raw `OUT_OF_ORDER_ACTION` 不可见，清除后归零。目标 API 无 HTTP >=400；Console 仅两条刻意断网请求错误。
+- English fixture 经用户 UI 删除；15 个任务 Mobile device token 与残留 task learning objects 在独占 testing lease 下精确清理，browser/temp artifacts 与 ports 关闭，最终 lease `active=false / stale_metadata=false`。
+
 ### PROGRESS LOG
 
 格式：
@@ -677,6 +684,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | E-03 | DONE | Goal branch tip | 既有 online dictionary lookup 保留为主路径，bounded package summaries 仅作 offline/network fallback；chapter_packages 单缓存 + 7-day Sense horizon；M3 7/103、Vitest 32/32、mobile build/guards 绿；真实 server-stop browser 证明 online API 200、offline summary 0 dictionary request，fixture/tokens/browser/ports/lease clean | E-04`
 
 `2026-08-16 | E-04 | DONE | Goal branch tip | existing M4 queue/idempotency + Phase B ReadingSession/Finish 单一路径；backend 159/1137 + package/health 20/223 + review-fix 18/189、Vitest 34/34、build/guards/lint/diff 绿；真实浏览器 offline rating→sync、online dictionary、offline summary 0 request、Finish preflight/commit 2xx，fixture/tokens/artifacts/ports/lease clean；fresh review Blocker=0/Required=0 | E-05`
+
+`2026-08-16 | E-05 | DONE | Goal branch tip | existing IndexedDB queue/issue 单一 owner；Vitest 35/35、M4/health 23/236、build/guards/diff 绿；真实浏览器证明 offline pending 跨整页重载保留，双设备 later-rating conflict sync 200，仅展示普通用户文案且 raw code 不可见，清除后归零；task data/tokens/artifacts/ports/lease clean；fresh review Blocker=0/Required=0 | E-06`
 
 ### DECISION LOG
 

@@ -90,6 +90,22 @@ describe('OfflineRepository', () => {
     })]);
   });
 
+  it('recovers the same pending action identity after the app repository restarts', async () => {
+    const store = new MemoryStore();
+    const beforeRestart = new OfflineRepository(7, 'English', store);
+    const queued = await beforeRestart.enqueueRating(10, 'good', 100);
+
+    const afterRestart = new OfflineRepository(7, 'English', store);
+    expect(await afterRestart.queuedActions()).toEqual([queued]);
+
+    await afterRestart.applySyncResults([{
+      client_action_id: queued.client_action_id,
+      outcome: 'retryable',
+      error: { code: 'INTERNAL_ERROR', message: 'retry', retryable: true },
+    }]);
+    expect(await afterRestart.queuedActions()).toEqual([queued]);
+  });
+
   it('queues reading interactions and explicit ratings in the existing ordered queue', async () => {
     const repository = new OfflineRepository(7, 'English', new MemoryStore());
     const opened = await repository.enqueueReadingInteraction(

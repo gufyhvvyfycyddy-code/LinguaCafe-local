@@ -79,6 +79,28 @@ function message(error: unknown): string {
   return '操作失败，请重试';
 }
 
+function syncIssueCopy(issue: OfflineSyncIssue): { title: string; message: string } {
+  switch (issue.code) {
+    case 'OUT_OF_ORDER_ACTION':
+      return { title: '服务器已有更新', message: '这次离线操作早于服务器上的最新记录，因此没有覆盖新结果。' };
+    case 'STALE_WORD_SENSE':
+      return { title: '词义已经更新', message: '本机保存的是较早版本，因此没有覆盖服务器上的新内容。' };
+    case 'WORD_SENSE_DELETED':
+    case 'WORD_SENSE_NOT_FOUND':
+    case 'REVIEW_CARD_NOT_FOUND':
+      return { title: '内容已不可用', message: '相关词义或复习卡已发生变化，这次离线操作没有应用。' };
+    case 'READING_SESSION_NOT_FOUND':
+    case 'READING_SESSION_NOT_ACTIVE':
+    case 'READING_SESSION_STALE_SOURCE':
+    case 'READING_OCCURRENCE_STALE':
+      return { title: '阅读内容已经变化', message: '这次离线阅读操作不再适用于当前文章，服务器现有记录保持不变。' };
+    case 'IDEMPOTENCY_KEY_REUSED':
+      return { title: '操作内容不一致', message: '同一次重试包含了不同内容，因此没有重复提交。' };
+    default:
+      return { title: '操作未能应用', message: '服务器没有接受这次离线操作，现有数据保持不变。' };
+  }
+}
+
 function usesLocalDevelopmentHttp(value: string): boolean {
   try {
     return classifyServerConnection(value).kind === 'local-http-development';
@@ -281,7 +303,7 @@ export class LinguaCafeApp {
             <span class="connection-pill ${connected ? 'online' : 'offline'}">
               ${connected ? (this.syncing ? '同步中' : '在线') : (navigator.onLine ? '服务器不可达' : '离线')}
               ${this.pendingSyncCount ? ` · ${this.pendingSyncCount} 待同步` : ''}
-              ${this.syncIssueCount ? ` · ${this.syncIssueCount} 冲突` : ''}
+              ${this.syncIssueCount ? ` · ${this.syncIssueCount} 需处理` : ''}
             </span>
             <span class="language-pill">${escapeHtml(this.bootstrap?.current_language)}</span>
           </div>
@@ -622,7 +644,9 @@ export class LinguaCafeApp {
       { readingSessionId: session.reading_session_id, occurrenceId },
     );
     panel.remove();
-    this.showToast(this.usingOfflineSnapshot ? '阅读评分已离线排队' : '阅读评分已记录');
+    this.showToast(this.usingOfflineSnapshot || !navigator.onLine
+      ? '阅读评分已离线排队'
+      : '阅读评分已记录');
     await this.flushQueue();
   }
 
@@ -988,13 +1012,14 @@ export class LinguaCafeApp {
         </form>
         <div class="settings-card">
           <h2>离线同步</h2>
-          <p>${this.pendingSyncCount} 个操作待同步；${this.syncIssueCount} 个操作需要查看。</p>
-          <p class="muted">恢复联网后自动同步。冲突不会静默重试或改写服务器的新状态。</p>
-          ${this.syncIssues.length ? `<ul class="sync-issues">${this.syncIssues.map(issue => (
-            `<li><strong>${escapeHtml(issue.code)}</strong><span>${escapeHtml(issue.message)}</span></li>`
-          )).join('')}</ul>` : ''}
+          <p>${this.pendingSyncCount} 个操作待同步；${this.syncIssueCount} 个操作需要处理。</p>
+          <p class="muted">恢复联网后自动同步。暂时失败的操作会保留在本机；无法应用的操作不会覆盖服务器的新状态。</p>
+          ${this.syncIssues.length ? `<ul class="sync-issues">${this.syncIssues.map(issue => {
+            const copy = syncIssueCopy(issue);
+            return `<li><strong>${escapeHtml(copy.title)}</strong><span>${escapeHtml(copy.message)}</span></li>`;
+          }).join('')}</ul>` : ''}
           <button class="secondary" id="sync-now" ${this.syncing ? 'disabled' : ''}>立即同步</button>
-          ${this.syncIssueCount ? '<button class="text-button" id="clear-sync-issues">已了解并清除冲突提示</button>' : ''}
+          ${this.syncIssueCount ? '<button class="text-button" id="clear-sync-issues">已了解并清除提示</button>' : ''}
         </div>
         ${Capacitor.getPlatform() === 'ios' ? `
         <form id="text-import-form" class="settings-card">
@@ -1196,11 +1221,13 @@ export class LinguaCafeApp {
       const terminal = result.results.filter(item => (
         item.outcome !== 'applied' && item.outcome !== 'replayed' && item.outcome !== 'retryable'
       )).length;
-      if (terminal) this.showToast(`${terminal} 个离线操作发生冲突，请在设置中查看`, true);
+      const retryable = result.results.filter(item => item.outcome === 'retryable').length;
+      if (terminal) this.showToast(`${terminal} 个离线操作未能应用，请在“我的”中查看处理建议`, true);
+      else if (announce && retryable) this.showToast('暂时无法同步；待同步操作仍保留在本机，请稍后重试', true);
       else if (announce) this.showToast(`已同步 ${result.counts.succeeded} 个操作`);
     } catch (error) {
       this.noteNetworkFailure(error);
-      if (announce && !this.isNetworkFailure(error)) this.showToast(message(error), true);
+      if (announce) this.showToast('暂时无法同步；待同步操作仍保留在本机，请稍后重试', true);
     } finally {
       this.syncing = false;
       if (this.root.querySelector('.app-shell')) this.renderShellAndCurrentScreen();
@@ -1235,7 +1262,7 @@ export class LinguaCafeApp {
     pill.className = `connection-pill ${connected ? 'online' : 'offline'}`;
     pill.textContent = `${connected ? (this.syncing ? '同步中' : '在线') : (navigator.onLine ? '服务器不可达' : '离线')}`
       + `${this.pendingSyncCount ? ` · ${this.pendingSyncCount} 待同步` : ''}`
-      + `${this.syncIssueCount ? ` · ${this.syncIssueCount} 冲突` : ''}`;
+      + `${this.syncIssueCount ? ` · ${this.syncIssueCount} 需处理` : ''}`;
   }
 
   private async saveOffline(operation: () => Promise<void> | undefined): Promise<void> {
