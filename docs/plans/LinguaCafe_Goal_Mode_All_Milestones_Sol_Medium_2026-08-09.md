@@ -343,8 +343,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | F-03 | DONE | 阅读库分类与检索 UI | existing Library/Home/Nav | 四级/六级/考研/我的材料可理解；无空壳目录提前展示 |
 | F-04 | DONE | material/article version 与 occurrence/source preservation | existing source revision/WordSenseOccurrence | 更新文本版本不破坏历史绑定；冲突 fail closed |
 | F-05 | DONE | 目录 + 按套下载 + offline status 对齐 Phase E | existing package/sync | 下载、离线打开、恢复在线真实验证 |
-| F-06 | ACTIVE | 删除材料前显示来源与学习历史影响，并只执行已授权产品生命周期 | Book/Chapter deletion boundaries | preview/confirmation/拒绝路径；不直接 broad delete 学习历史 |
-| F-07 | TODO | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
+| F-06 | DONE | 删除材料前显示来源与学习历史影响，并只执行已授权产品生命周期 | Book/Chapter deletion boundaries | preview/confirmation/拒绝路径；不直接 broad delete 学习历史 |
+| F-07 | ACTIVE | 真实样本闭环 | 用户可合法使用的样本 | CET-4、CET-6、考研各至少一套：上传→阅读→AI包→学词→下载→离线打开 |
 | F-GATE | TODO | Phase F Gate | F-01…F-07 | 三类真实样本 + version + delete impact 全通过；自动进入 G |
 
 ---
@@ -472,9 +472,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `F-02`（user material upload flow）
-- Last DONE: `F-01`
-- Current verified D-07 code HEAD: `107c881566b6aaf39ac01c3a1065b5dae209084c`（D-GATE ledger checkpoint 见 Goal branch tip）
+- Active milestone: `F-07`（real sample end-to-end closure）
+- Last DONE: `F-06`
+- Current verified Goal code HEAD: current Goal branch tip（F-06 completion commit；以 `git rev-parse HEAD` 为准）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
@@ -720,6 +720,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 `2026-08-16 | F-04 | DONE | Goal branch tip | existing ReadingChapterTextService source revision + Chapter row lock 为唯一 stale-write gate，既有 WordSenseOccurrence source snapshot 不改写；F-01 material metadata 进入既有 Mobile package/checksum。PHP 86/543、focused 8/53、Node 9/9、Mobile 38/38、root/mobile builds 与 diff 全绿；testing 浏览器证明 stale editor 收到 409 明确提示、胜出文本保留并可 fresh reopen，目标批次无 Console error；task book/account/artifacts/sentinel 精确清零，port closed、lease false/false；fresh review Blocker=0/Required=0 | F-05`
 
 `2026-08-16 | F-05 | DONE | Goal branch tip | existing article manifest/content_version + chapter_packages 为唯一下载与离线内容路径，仅在同一 IndexedDB scope 记录完整下载的 server manifest version；整套下载不创建 ReadingSession/学习数据。Mobile 39/39、E03/E04/E05/F05 guards 7/7、build/diff 全绿；testing 浏览器证明 CET-6 年份/套次目录、整套/逐章状态、停服后缓存正文真实打开、同端口恢复在线、server version 变化显示更新并可重下；task token/device/book/account/IndexedDB/browser/ports/sentinel/lease 精确清零；fresh review Blocker=0/Required=0 | F-06`
+
+`2026-08-16 | F-06 | DONE | Goal branch tip | existing /books/delete 扩展为 preview/delete 两模式；preview 只读显示章节、来源、词义、Sense card/log 与 reading session 影响，delete 必须显式确认且事务内只删当前用户/语言 Book+Chapters，学习历史保留。F06 Feature 4/22、Node guard 2/2、相邻 F04/M3/F05/E03 回归与 root build 全绿；server-bound testing + Playwright 真页面完成操作菜单→影响预览→勾选确认→最终删除，两个 delete POST 均 200，列表变“没有数据”，DB 回读 Book/Chapters=0 且 occurrence/Sense/Card/Log/ReadingSession 各=1；Console 目标噪声仅本地 Pusher 拒绝。task user/history/settings/sentinel 精确清零，port/server/lease clean；fresh review Blocker=0/Required=0 | F-07`
 
 ### DECISION LOG
 

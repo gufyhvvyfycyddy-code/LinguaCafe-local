@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Books;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class DeleteBookRequest extends FormRequest
 {
@@ -25,6 +26,8 @@ class DeleteBookRequest extends FormRequest
     {
         return [
             'bookId' => 'required|numeric|gte:0',
+            'mode' => ['required', Rule::in(['preview', 'delete'])],
+            'confirmImpact' => 'exclude_unless:mode,delete|required|accepted',
         ];
     }
 }

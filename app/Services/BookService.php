@@ -4,10 +4,15 @@ namespace App\Services;
 
 use Carbon\Carbon;
 use App\Models\Book;
-
 use App\Models\Chapter;
 use App\Models\EncounteredWord;
+use App\Models\ReadingSession;
+use App\Models\ReviewCard;
+use App\Models\ReviewLog;
+use App\Models\WordSense;
+use App\Models\WordSenseOccurrence;
 use App\Enums\ChapterProcessingStatusEnum;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class BookService {
@@ -145,7 +150,7 @@ class BookService {
         $book->save();
     }
 
-    public function deleteBook($userId, $language, $bookId) {
+    public function getDeletionImpact($userId, $language, $bookId) {
         $book = Book
             ::where('user_id', $userId)
             ->where('language', $language)
@@ -156,17 +161,70 @@ class BookService {
             throw new \Exception('Book does not exist, or it belongs to a different user.');
         }
 
-        Chapter
+        $chapterIds = Chapter
             ::where('user_id', $userId)
             ->where('language', $language)
             ->where('book_id', $bookId)
-            ->delete();
-            
-        if ($book->cover_image !== '' && $book->cover_image !== null) {
-            Storage::delete('/images/book_images/' . $book->cover_image);
-        }
+            ->pluck('id');
+        $occurrences = WordSenseOccurrence
+            ::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->whereIn('chapter_id', $chapterIds);
+        $senseIds = WordSense
+            ::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->whereIn('id', (clone $occurrences)->whereNotNull('word_sense_id')->pluck('word_sense_id'))
+            ->pluck('id');
+        $cardIds = ReviewCard
+            ::where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('target_type', ReviewCard::TARGET_SENSE)
+            ->whereIn('target_id', $senseIds)
+            ->pluck('id');
 
-        $book->delete();
+        return [
+            'book_name' => $book->name,
+            'chapter_count' => $chapterIds->count(),
+            'source_occurrence_count' => (clone $occurrences)->count(),
+            'word_sense_count' => $senseIds->count(),
+            'review_card_count' => $cardIds->count(),
+            'review_log_count' => ReviewLog::where('user_id', $userId)->whereIn('review_card_id', $cardIds)->count(),
+            'reading_session_count' => ReadingSession
+                ::where('user_id', $userId)
+                ->where('language_id', $language)
+                ->whereIn('chapter_id', $chapterIds)
+                ->count(),
+        ];
+    }
+
+    public function deleteBook($userId, $language, $bookId) {
+        $coverImage = DB::transaction(function () use ($userId, $language, $bookId) {
+            $book = Book
+                ::where('user_id', $userId)
+                ->where('language', $language)
+                ->where('id', $bookId)
+                ->lockForUpdate()
+                ->first();
+
+            if (!$book) {
+                throw new \Exception('Book does not exist, or it belongs to a different user.');
+            }
+
+            Chapter
+                ::where('user_id', $userId)
+                ->where('language', $language)
+                ->where('book_id', $bookId)
+                ->delete();
+
+            $coverImage = $book->cover_image;
+            $book->delete();
+
+            return $coverImage;
+        });
+
+        if ($coverImage !== '' && $coverImage !== null) {
+            Storage::delete('/images/book_images/' . $coverImage);
+        }
 
         return true;
     }

@@ -85,6 +85,10 @@ class BookController extends Controller {
         $language = Auth::user()->selected_language;
 
         try {
+            if ($request->post('mode') === 'preview') {
+                return response()->json($this->bookService->getDeletionImpact($userId, $language, $bookId), 200);
+            }
+
             $this->bookService->deleteBook($userId, $language, $bookId);
         } catch (\Throwable $e) {
             abort(500, $e->getMessage());

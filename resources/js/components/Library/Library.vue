@@ -299,6 +299,8 @@
             deleteBook() {
                 axios.post('/books/delete', {
                     'bookId': this.deleteBookDialog.bookId,
+                    'mode': 'delete',
+                    'confirmImpact': true,
                 }).then((response) => {
                     if (response.status === 200) {
                         this.loadBooks();
