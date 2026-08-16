@@ -120,10 +120,44 @@
                 </v-btn>
         </div>
 
+        <v-card
+            v-if="openedBook === -1 && books.length > 0"
+            id="material-library-filters"
+            outlined
+            class="border rounded-lg mt-4 pa-4"
+        >
+            <v-text-field
+                v-model="materialSearch"
+                append-icon="mdi-magnify"
+                label="搜索阅读材料"
+                filled
+                dense
+                hide-details
+                single-line
+                rounded
+            ></v-text-field>
+            <v-chip-group
+                v-model="materialTypeFilter"
+                class="mt-3"
+                mandatory
+                column
+                aria-label="材料分类"
+            >
+                <v-chip
+                    v-for="type in availableMaterialTypes"
+                    :key="type.value"
+                    :value="type.value"
+                    filter
+                >
+                    {{ type.label }} ({{ type.count }})
+                </v-chip>
+            </v-chip-group>
+        </v-card>
+
         <!-- Book list table -->
         <book-list-table
             v-if="openedBook === -1 && layout === 'table'"
-            :books="books"
+            :books="filteredBooks"
             @show-edit-book-dialog="showEditBookDialog"
             @show-delete-book-dialog="showDeleteBookDialog"
             @open-book="openBook"
@@ -132,7 +166,7 @@
         <!-- Book list detailed -->
         <book-list-detailed
             v-if="openedBook === -1 && layout === 'detailed'"
-            :books="books"
+            :books="filteredBooks"
             @show-edit-book-dialog="showEditBookDialog"
             @show-delete-book-dialog="showDeleteBookDialog"
             @open-book="openBook"
@@ -141,7 +175,7 @@
         <!-- Book list cover only -->
         <book-list-cover-only
             v-if="openedBook === -1 && layout === 'cover-only'"
-            :books="books"
+            :books="filteredBooks"
             @open-book="openBook"
         />
 
@@ -165,6 +199,14 @@
                 layout: DefaultLocalStorageManager.loadSetting('library-layout') || 'table',
                 theme: DefaultLocalStorageManager.loadSetting('theme') || 'light',
                 books: [],
+                materialSearch: '',
+                materialTypeFilter: 'all',
+                materialTypes: [
+                    {value: 'cet4', label: '四级真题'},
+                    {value: 'cet6', label: '六级真题'},
+                    {value: 'postgraduate_exam', label: '考研真题'},
+                    {value: 'personal', label: '我的材料'},
+                ],
                 openedBook: -1,
                 errorDialog: {
                     active: false,
@@ -186,6 +228,37 @@
         },
         props: {
             language: String
+        },
+        computed: {
+            availableMaterialTypes() {
+                const types = this.materialTypes.filter((type) => {
+                    return this.books.some((book) => book.material_type === type.value);
+                }).map((type) => ({
+                    ...type,
+                    count: this.books.filter((book) => book.material_type === type.value).length,
+                }));
+
+                return [{value: 'all', label: '全部', count: this.books.length}, ...types];
+            },
+            filteredBooks() {
+                const search = this.materialSearch.trim().toLocaleLowerCase();
+
+                return this.books.filter((book) => {
+                    if (this.materialTypeFilter !== 'all' && book.material_type !== this.materialTypeFilter) {
+                        return false;
+                    }
+
+                    const type = this.materialTypes.find((candidate) => candidate.value === book.material_type);
+                    const searchableText = [
+                        book.name,
+                        type ? type.label : '',
+                        book.exam_year,
+                        book.exam_set,
+                    ].filter((value) => value !== null && value !== undefined).join(' ').toLocaleLowerCase();
+
+                    return searchableText.includes(search);
+                });
+            },
         },
         mounted() {
             this.loadBooks();
@@ -274,6 +347,10 @@
                     }
 
                     this.books = response.data;
+
+                    if (!this.availableMaterialTypes.some((type) => type.value === this.materialTypeFilter)) {
+                        this.materialTypeFilter = 'all';
+                    }
 
                     // open book from url param
                     if (this.$route.params.bookId !== undefined) {

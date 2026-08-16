@@ -2,19 +2,6 @@
     <div id="book-list" class="table-layout">
         <!-- Book list detailed -->
         <v-card outlined class="border rounded-lg mt-4">
-            <v-card-title>
-                <v-text-field
-                    v-model="booksTextFilter"
-                    append-icon="mdi-magnify"
-                    label="搜索"
-                    filled
-                    dense
-                    hide-details
-                    single-line
-                    rounded
-                ></v-text-field>
-            </v-card-title>
-
             <v-data-table
                 class="ma-4 mb-0 no-hover"
                 :headers="[
@@ -45,7 +32,6 @@
                     },
                 ]"
                 :items="books"
-                :search="booksTextFilter"
             >
                 <!-- Cover image -->
                 <template v-slot:item.cover_image="{ item }">
@@ -86,11 +72,6 @@
 <script>
     import {formatNumber} from './../../../helper.js';
     export default {
-        data: function() {
-            return {
-                booksTextFilter: '',
-            }
-        },
         props: {
             books: Array
         },
