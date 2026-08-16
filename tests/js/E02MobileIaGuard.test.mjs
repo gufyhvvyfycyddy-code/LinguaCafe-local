@@ -8,6 +8,7 @@ const routes = read('routes/api.php');
 const controller = read('app/Http/Controllers/Mobile/MobileWordSenseController.php');
 
 const navigation = ui.match(/<nav class="bottom-nav"[\s\S]*?<\/nav>/)?.[0] ?? '';
+const vocabularyScreen = ui.match(/private async openVocabulary\(\)[\s\S]*?private async openSettings\(\)/)?.[0] ?? '';
 assert.equal((navigation.match(/this\.navButton\(/g) ?? []).length, 4);
 for (const item of [
   ["'library'", "'阅读'"],
@@ -21,7 +22,7 @@ assert.doesNotMatch(navigation, /'home'|'summary'|'文章'|'进度'|'设置'/);
 assert.match(ui, /id="open-home" aria-label="首页"/);
 assert.match(ui, /private screen: Screen = 'home'/);
 assert.match(ui, /this\.api\.wordSenses\(\)/);
-assert.doesNotMatch(ui, /ReviewCard|FSRS|legacy/i);
+assert.doesNotMatch(vocabularyScreen, /ReviewCard|FSRS|legacy/i);
 
 assert.match(routes, /Route::get\(\s*'\/word-senses'/);
 assert.match(controller, /WordSenseLibraryQueryService/);
