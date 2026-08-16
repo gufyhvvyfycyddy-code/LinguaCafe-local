@@ -22,6 +22,10 @@ Route::prefix('v1/mobile')->group(function () {
             [App\Http\Controllers\Mobile\MobileWordSenseController::class, 'store'],
         );
         Route::get(
+            '/word-senses',
+            [App\Http\Controllers\Mobile\MobileWordSenseController::class, 'index'],
+        );
+        Route::get(
             '/summary',
             [App\Http\Controllers\Mobile\MobileSummaryController::class, 'show'],
         );

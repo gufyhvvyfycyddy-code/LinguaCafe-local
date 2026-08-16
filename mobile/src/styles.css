@@ -89,6 +89,7 @@ input:focus, select:focus, button:focus-visible { outline: 3px solid rgba(49,91,
   border-bottom: 1px solid rgba(222,216,202,.8);
 }
 .topbar > div { display: flex; align-items: center; }
+.topbar-home { display: flex; align-items: center; min-height: 44px; padding: 0; border: 0; color: var(--ink); background: transparent; }
 .connection-summary { gap: 6px; }
 .connection-pill { padding: 5px 8px; border-radius: 99px; font-size: 10px; font-weight: 800; }
 .connection-pill.online { color: var(--green); background: var(--green-soft); }
@@ -123,6 +124,7 @@ input:focus, select:focus, button:focus-visible { outline: 3px solid rgba(49,91,
 }
 .list-card strong, .list-card small { display: block; }
 .list-card small { margin-top: 5px; color: var(--muted); }
+.vocabulary-card { grid-template-columns: 45px 1fr; }
 .book-icon, .chapter-number { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 12px 5px 12px 5px; color: var(--green); background: var(--green-soft); font-family: Georgia, serif; font-weight: 700; }
 .chevron { color: var(--green); font-size: 28px; }
 .text-button { min-height: 44px; padding: 0 5px; border: 0; color: var(--green); background: transparent; font-weight: 800; }

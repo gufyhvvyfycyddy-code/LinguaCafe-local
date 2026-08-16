@@ -27,11 +27,12 @@ import type {
   ReviewItem,
   ReviewRating,
   OfflineSyncIssue,
+  WordSenseSummary,
 } from './types';
 import { MediaCache } from './mediaCache';
 import { OfflineRepository } from './offlineRepository';
 
-type Screen = 'library' | 'review' | 'summary' | 'settings';
+type Screen = 'home' | 'library' | 'review' | 'vocabulary' | 'settings';
 
 const REVIEW_RATINGS = ['again', 'hard', 'good', 'easy'] as const satisfies readonly ReviewRating[];
 const LOCAL_HTTP_WARNING = '仅用于本地调试；Android/iOS 正式版可能拒绝明文连接；正式使用应配置 HTTPS。';
@@ -88,7 +89,7 @@ function usesLocalDevelopmentHttp(value: string): boolean {
 export class LinguaCafeApp {
   private api: MobileApiClient | null = null;
   private bootstrap: Bootstrap | null = null;
-  private screen: Screen = 'library';
+  private screen: Screen = 'home';
   private loading = false;
   private articles: ArticleSummary[] = [];
   private chapters: ChapterSummary[] = [];
@@ -98,6 +99,7 @@ export class LinguaCafeApp {
   private lookupToken: ReaderToken | null = null;
   private lookupDefinitions: string[] = [];
   private reviews: ReviewItem[] = [];
+  private wordSenses: WordSenseSummary[] = [];
   private reviewRevealed = false;
   private reviewStartedAt = Date.now();
   private readonly mediaCache = new MediaCache();
@@ -137,7 +139,7 @@ export class LinguaCafeApp {
       await this.activateOfflineRepository();
       await this.flushQueue();
       this.renderShell();
-      await this.openLibrary();
+      await this.openHome();
     } catch (startError) {
       this.noteNetworkFailure(startError);
       if (
@@ -153,7 +155,7 @@ export class LinguaCafeApp {
         this.bootstrap = cachedBootstrap;
         await this.activateOfflineRepository();
         this.renderShell();
-        await this.openLibrary();
+        await this.openHome();
         return;
       }
       this.renderReconnect(serverUrl, message(startError));
@@ -258,7 +260,7 @@ export class LinguaCafeApp {
       await this.activateOfflineRepository();
       await this.flushQueue();
       this.renderShell();
-      await this.openLibrary();
+      await this.openHome();
     } catch (loginError) {
       this.noteNetworkFailure(loginError);
       this.renderLogin(server, message(loginError));
@@ -270,7 +272,9 @@ export class LinguaCafeApp {
     this.root.innerHTML = `
       <div class="app-shell">
         <header class="topbar">
-          <div><span class="mini-mark">L</span><strong>LinguaCafe</strong></div>
+          <button class="topbar-home" id="open-home" aria-label="首页">
+            <span class="mini-mark">L</span><strong>LinguaCafe</strong>
+          </button>
           <div class="connection-summary">
             <span class="connection-pill ${connected ? 'online' : 'offline'}">
               ${connected ? (this.syncing ? '同步中' : '在线') : (navigator.onLine ? '服务器不可达' : '离线')}
@@ -282,15 +286,16 @@ export class LinguaCafeApp {
         </header>
         <main id="screen" tabindex="-1"></main>
         <nav class="bottom-nav" aria-label="主要导航">
-          ${this.navButton('library', '文章', '⌁')}
+          ${this.navButton('library', '阅读', '⌁')}
           ${this.navButton('review', '复习', '◈')}
-          ${this.navButton('summary', '进度', '◒')}
-          ${this.navButton('settings', '设置', '⚙')}
+          ${this.navButton('vocabulary', '生词', 'Aa')}
+          ${this.navButton('settings', '我的', '○')}
         </nav>
       </div>`;
     this.root.querySelectorAll<HTMLButtonElement>('[data-screen]').forEach(button => {
       button.addEventListener('click', () => void this.openScreen(button.dataset.screen as Screen));
     });
+    this.root.querySelector('#open-home')?.addEventListener('click', () => void this.openScreen('home'));
   }
 
   private navButton(screen: Screen, label: string, icon: string): string {
@@ -302,9 +307,10 @@ export class LinguaCafeApp {
   private async openScreen(screen: Screen): Promise<void> {
     this.screen = screen;
     this.renderShell();
+    if (screen === 'home') await this.openHome();
     if (screen === 'library') await this.openLibrary();
     if (screen === 'review') await this.openReview();
-    if (screen === 'summary') await this.openSummary();
+    if (screen === 'vocabulary') await this.openVocabulary();
     if (screen === 'settings') await this.openSettings();
   }
 
@@ -620,7 +626,7 @@ export class LinguaCafeApp {
           <button class="secondary" id="review-summary">查看今日进度</button>
         </div></section>`;
       this.screenElement().querySelector('#review-summary')
-        ?.addEventListener('click', () => void this.openScreen('summary'));
+        ?.addEventListener('click', () => void this.openScreen('home'));
       return;
     }
     const display = item.display;
@@ -757,9 +763,9 @@ export class LinguaCafeApp {
     }
   }
 
-  private async openSummary(): Promise<void> {
+  private async openHome(): Promise<void> {
     if (!this.api) return;
-    this.screen = 'summary';
+    this.screen = 'home';
     this.setBusy('正在汇总今日进度…');
     try {
       this.summary = await this.api.summary();
@@ -767,7 +773,7 @@ export class LinguaCafeApp {
       const data = this.summary;
       this.screenElement().innerHTML = `
         <section class="screen">
-          <p class="eyebrow">TODAY</p><h1>学习进度</h1>
+          <p class="eyebrow">TODAY</p><h1>首页</h1>
           <div class="hero-stat"><strong>${data.today.reviewed_today_count}</strong><span>今日复习</span></div>
           <div class="stats-grid">
             <article><strong>${data.due_now_count}</strong><span>当前到期</span></article>
@@ -781,7 +787,35 @@ export class LinguaCafeApp {
         ?.addEventListener('click', () => void this.openScreen('review'));
     } catch (error) {
       this.noteNetworkFailure(error);
-      this.renderError('无法读取今日进度', error, () => this.openSummary());
+      this.renderError('无法读取今日进度', error, () => this.openHome());
+    }
+  }
+
+  private async openVocabulary(): Promise<void> {
+    if (!this.api) return;
+    this.screen = 'vocabulary';
+    this.setBusy('正在读取生词…');
+    try {
+      this.wordSenses = await this.api.wordSenses();
+      this.setServerReachable(true);
+      const content = this.wordSenses.length
+        ? this.wordSenses.map(sense => `
+            <article class="list-card vocabulary-card">
+              <span class="book-icon">Aa</span>
+              <span><strong>${escapeHtml(sense.lemma)}</strong>
+                <small>${escapeHtml([sense.pos, sense.sense_zh || sense.sense_en].filter(Boolean).join(' · '))}</small>
+              </span>
+            </article>`).join('')
+        : '<div class="empty"><span>Aa</span><h2>还没有生词</h2><p>阅读时保存的已确认词义会出现在这里。</p></div>';
+      this.screenElement().innerHTML = `
+        <section class="screen">
+          <p class="eyebrow">VOCABULARY</p><h1>生词</h1>
+          <p class="muted">按英文词形浏览已保存的词义。</p>
+          <div class="stack">${content}</div>
+        </section>`;
+    } catch (error) {
+      this.noteNetworkFailure(error);
+      this.renderError('无法读取生词', error, () => this.openVocabulary());
     }
   }
 
@@ -790,7 +824,7 @@ export class LinguaCafeApp {
     const [serverUrl, reminderHour] = await Promise.all([loadServerUrl(), loadReminderHour()]);
     this.screenElement().innerHTML = `
       <section class="screen">
-        <p class="eyebrow">DEVICE</p><h1>设置</h1>
+        <p class="eyebrow">ACCOUNT</p><h1>我的</h1>
         <div class="settings-card">
           <h2>${escapeHtml(this.bootstrap?.user.name)}</h2>
           <p>${escapeHtml(this.bootstrap?.user.email)}</p>
@@ -1031,7 +1065,8 @@ export class LinguaCafeApp {
     this.renderShell();
     if (screen === 'library') this.renderLibrary();
     if (screen === 'review') this.renderReview();
-    if (screen === 'summary' && this.summary) void this.openSummary();
+    if (screen === 'home' && this.summary) void this.openHome();
+    if (screen === 'vocabulary') void this.openVocabulary();
     if (screen === 'settings') void this.openSettings();
   }
 

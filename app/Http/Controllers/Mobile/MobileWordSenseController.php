@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
 use App\Models\Chapter;
 use App\Services\SenseOccurrencePayloadSerializerService;
+use App\Services\WordSenseLibraryQueryService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -27,7 +28,41 @@ class MobileWordSenseController extends Controller
     public function __construct(
         private WordSenseService $wordSenseService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
+        private WordSenseLibraryQueryService $queryService,
     ) {
+    }
+
+    public function index(Request $request)
+    {
+        $validator = Validator::make($request->only(['q', 'page', 'per_page']), [
+            'q' => ['nullable', 'string', 'max:200'],
+            'page' => ['sometimes', 'integer', 'min:1'],
+            'per_page' => ['sometimes', 'integer', 'min:1', 'max:100'],
+        ]);
+        if ($validator->fails()) {
+            return MobileApiResponse::error(
+                'VALIDATION_ERROR',
+                'The WordSense library request is invalid.',
+                422,
+                $validator->errors()->toArray(),
+            );
+        }
+
+        $data = $validator->validated();
+        $user = $request->user();
+        $page = $this->queryService->page(
+            $user->id,
+            $user->selected_language,
+            $data['q'] ?? null,
+            $data['page'] ?? 1,
+            $data['per_page'] ?? 20,
+        );
+
+        return MobileApiResponse::success([
+            'items' => $page['data'],
+            'pagination' => $page['pagination'],
+            'read_only' => true,
+        ]);
     }
 
     public function store(Request $request)

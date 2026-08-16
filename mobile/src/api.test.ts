@@ -163,6 +163,30 @@ describe('MobileApiClient', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
+  it('loads every saved WordSense page in server order', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(envelope({
+        items: [{ sense_id: 1, lemma: 'apple' }],
+        pagination: { current_page: 1, last_page: 2, per_page: 100, total: 2 },
+      }))
+      .mockResolvedValueOnce(envelope({
+        items: [{ sense_id: 2, lemma: 'banana' }],
+        pagination: { current_page: 2, last_page: 2, per_page: 100, total: 2 },
+      }));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await expect(client.wordSenses()).resolves.toEqual([
+      { sense_id: 1, lemma: 'apple' },
+      { sense_id: 2, lemma: 'banana' },
+    ]);
+    expect(fetcher.mock.calls.map(call => String(call[0]))).toEqual([
+      'https://example.com/api/v1/mobile/word-senses?page=1&per_page=100',
+      'https://example.com/api/v1/mobile/word-senses?page=2&per_page=100',
+    ]);
+  });
+
   it('aggregates every article page in server order and keeps the first duplicate id', async () => {
     const fetcher = vi.fn(async (input: RequestInfo | URL) => {
       const page = Number(new URL(String(input)).searchParams.get('page'));

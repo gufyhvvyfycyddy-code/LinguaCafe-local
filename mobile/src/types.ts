@@ -131,3 +131,13 @@ export interface DailySummary {
   due_now_count: number;
   generated_at: string;
 }
+
+export interface WordSenseSummary {
+  sense_id: number;
+  lemma: string;
+  pos: string | null;
+  sense_zh: string;
+  sense_en: string | null;
+  aliases_zh: string[];
+  collocations: string[];
+}

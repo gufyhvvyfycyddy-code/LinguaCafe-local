@@ -99,6 +99,30 @@ class M7MobileConnectedApiTest extends TestCase
         $this->assertSame(0, ReviewLog::count());
     }
 
+    public function test_mobile_word_sense_library_is_read_only_and_scoped_to_confirmed_senses(): void
+    {
+        [$token] = $this->issueToken($this->user);
+        $ownSense = $this->createWordSense($this->user, 'apple');
+        $other = $this->createUser('library-other@example.com', 'english');
+        $this->createWordSense($other, 'banana');
+        $this->createWordSense($this->user, 'suggested', 'english', WordSense::STATUS_AI_SUGGESTED);
+        $this->createWordSense($this->user, 'bonjour', 'french');
+        $beforeUpdated = $ownSense->updated_at?->toIso8601String();
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/mobile/word-senses?per_page=100')
+            ->assertOk()
+            ->assertJsonPath('data.read_only', true)
+            ->assertJsonPath('data.pagination.total', 1)
+            ->assertJsonPath('data.items.0.sense_id', $ownSense->id)
+            ->assertJsonPath('data.items.0.lemma', 'apple');
+
+        $this->assertCount(1, $response->json('data.items'));
+        $this->assertSame(0, ReviewCard::count());
+        $this->assertSame(0, ReviewLog::count());
+        $this->assertSame($beforeUpdated, $ownSense->fresh()->updated_at?->toIso8601String());
+    }
+
     public function test_manual_sense_cannot_submit_server_owned_fields(): void
     {
         [$token] = $this->issueToken($this->user);
@@ -192,6 +216,9 @@ class M7MobileConnectedApiTest extends TestCase
         $this->postJson('/api/v1/mobile/word-senses', [])
             ->assertUnauthorized()
             ->assertJsonPath('error.code', 'UNAUTHENTICATED');
+        $this->getJson('/api/v1/mobile/word-senses')
+            ->assertUnauthorized()
+            ->assertJsonPath('error.code', 'UNAUTHENTICATED');
         $this->getJson('/api/v1/mobile/summary')
             ->assertUnauthorized()
             ->assertJsonPath('error.code', 'UNAUTHENTICATED');
@@ -231,10 +258,21 @@ class M7MobileConnectedApiTest extends TestCase
 
     private function createSenseCard(User $user, string $lemma): ReviewCard
     {
-        $sense = WordSense::forceCreate([
+        return app(ReviewCardService::class)->ensureSenseCard($this->createWordSense($user, $lemma));
+    }
+
+    private function createWordSense(
+        User $user,
+        string $lemma,
+        ?string $language = null,
+        string $status = WordSense::STATUS_CONFIRMED,
+    ): WordSense {
+        $language ??= $user->selected_language;
+
+        return WordSense::forceCreate([
             'user_id' => $user->id,
-            'language' => $user->selected_language,
-            'language_id' => $user->selected_language,
+            'language' => $language,
+            'language_id' => $language,
             'lemma' => $lemma,
             'surface_form' => $lemma,
             'pos' => 'noun',
@@ -242,11 +280,9 @@ class M7MobileConnectedApiTest extends TestCase
             'sense_en' => 'test',
             'aliases_zh' => [],
             'collocations' => [],
-            'status' => WordSense::STATUS_CONFIRMED,
+            'status' => $status,
             'is_context_specific' => true,
-            'sense_key' => hash('sha256', "{$user->id}|{$user->selected_language}|{$lemma}"),
+            'sense_key' => hash('sha256', "{$user->id}|{$language}|{$lemma}"),
         ]);
-
-        return app(ReviewCardService::class)->ensureSenseCard($sense);
     }
 }

@@ -10,6 +10,7 @@ import type {
   ReviewRating,
   QueuedAction,
   SyncBatchResult,
+  WordSenseSummary,
 } from './types';
 
 export class MobileApiError extends Error {
@@ -238,6 +239,20 @@ export class MobileApiClient {
       method: 'POST',
       body: JSON.stringify({ ...payload, keep_new: true }),
     });
+  }
+
+  async wordSenses(): Promise<WordSenseSummary[]> {
+    const senses: WordSenseSummary[] = [];
+    for (let page = 1; page <= MAX_PAGINATION_PAGES; page++) {
+      const query = new URLSearchParams({ page: String(page), per_page: '100' });
+      const data = await this.request<{ items: WordSenseSummary[]; pagination: unknown }>(
+        `/word-senses?${query}`,
+      );
+      senses.push(...data.items);
+      const pagination = paginationPage(data.pagination, page);
+      if (pagination.currentPage >= pagination.lastPage) return senses;
+    }
+    throw invalidPagination();
   }
 
   importText(payload: {
