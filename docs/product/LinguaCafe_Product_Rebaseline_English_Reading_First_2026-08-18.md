@@ -78,9 +78,28 @@ Wording differences alone never justify a new WordSense.
 
 Current code already validates package identity, candidate IDs, target completeness, stale packages, and the three result types. It does not yet enforce the new semantic anti-duplicate instruction. The later implementation must close that gap without inventing a second semantic truth source. When an AI still returns `new_sense` despite existing candidates, the product must expose those candidates during confirmation so a redundant Sense is not silently created.
 
-High-confidence trusted `matched_existing` evidence may continue to feed the existing passive-reading Good path when all current safety rules are satisfied. `new_sense`, `ambiguous`, and low/medium-confidence results do not automatically create passive Good.
+High-confidence trusted `matched_existing` evidence may feed passive-reading reinforcement only when the separate spacing rules below are also satisfied. `new_sense`, `ambiguous`, low/medium-confidence results, assisted/opened occurrences, not-yet-due cards, and same-session unfamiliar failures do not create passive Good.
 
-## 4. Stable translation layout
+## 4. Reading reinforcement and spacing boundary
+
+Reading reduces unnecessary flashcard work, but it must not become a way to defeat spaced repetition.
+
+The current product rule is:
+
+- natural recognition may produce at most one passive `Good` for a ReviewCard in one ReadingSession;
+- passive `Good` is allowed only when that card is already due under the same canonical Sense Review due semantics used by the external review queue;
+- repeated occurrences, immediate rereading, refresh, or starting another reading session before the next due time do not stack positive familiarity;
+- opening a word for help/answer inspection suppresses passive success for that reading;
+- when the user explicitly marks an occurrence as `不认识` and it later resolves to an **already learned existing WordSense**, that failure blocks every later Hard/Good/Easy/passive-success attempt for the same ReviewCard in that ReadingSession;
+- after exact WordSense resolution, that existing learned Sense may receive at most one formal `Again` through the existing canonical rating writer; the Reader must not create a second scheduler or short-interval relearning loop;
+- the next successful positive review after that failure must happen in the external Sense Review page when FSRS makes the card eligible;
+- if the unfamiliar occurrence is a genuinely `new_sense`, first enrollment is not a lapse and must not manufacture an `Again`.
+
+The older generic “Reader itself is a normal Again/Hard/Good/Easy review surface” direction is no longer a forward product requirement. Existing historical `reading_explicit` ReviewLogs remain valid data.
+
+The architecture authority for this boundary is `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`.
+
+## 5. Stable translation layout
 
 When saved AI sentence translations exist, translation visibility must not change the geometry of the English reading text.
 
@@ -94,11 +113,11 @@ The rule is:
 
 The current committed Reader inserts/removes translation blocks with visibility and therefore does not satisfy this contract yet.
 
-## 5. Reading continuity: progress, resume, bookmarks
+## 6. Reading continuity: progress, resume, bookmarks
 
 Reading continuity uses stable text anchors, not scroll pixels.
 
-### 5.1 Automatic latest position
+### 6.1 Automatic latest position
 
 The product stores one latest meaningful reading position per user/material context. Reopening an unfinished article continues at that position.
 
@@ -106,17 +125,17 @@ The anchor must be tied to the current source revision and a canonical text/toke
 
 The existing ReadingSession remains session/lifecycle identity; it is not itself a text-position store.
 
-### 5.2 External progress
+### 6.2 External progress
 
 Library/material views show real reading progress for unfinished material. Progress is derived from completed content plus the latest canonical reading position; it is not a second independently editable percentage.
 
-### 5.3 Manual bookmarks
+### 6.3 Manual bookmarks
 
 Users can create multiple manual bookmarks in a text and jump back to them later. Manual bookmarks and the automatic latest position have separate user meanings, but they reuse the same canonical text-anchor contract.
 
 This feature is a small bookmark capability, not a general annotation/highlight system.
 
-## 6. Daily reading-new-Sense goal
+## 7. Daily reading-new-Sense goal
 
 The daily learning target means:
 
@@ -136,11 +155,11 @@ Reaching the target never blocks continued reading or creation of additional leg
 
 The existing numeric Goal UI may be reused, but its old `learn_words` semantics must be rebased onto the canonical WordSense learning-entry event before it is treated as this product metric.
 
-## 7. Learning record and history
+## 8. Learning record and history
 
 Home check-in and calendar become an entry into actual learning history.
 
-### 7.1 Day and date range
+### 8.1 Day and date range
 
 The user can open:
 
@@ -152,19 +171,19 @@ The result is centered on concrete WordSenses and their learning/review events, 
 At minimum the history distinguishes:
 
 - newly learned through reading;
-- `reading_passive`;
-- `reading_explicit`;
-- `sense_review`.
+- due-only natural reinforcement (`reading_passive`);
+- explicit reading failure/history (`reading_explicit`, including historical rows; forward positive four-rating Reader UI is not required);
+- external formal Sense Review (`sense_review`).
 
-Where available, rows show the Sense, source/article context, relevant sentence, rating/event type, and current memory state.
+Where available, rows show the Sense, source/article context, relevant sentence, rating/event type, and current memory state. A same-reading later “认识/记得” after an unfamiliar failure must not appear as a successful learning event.
 
-### 7.2 One reliable learning-entry time
+### 8.2 One reliable learning-entry time
 
 The current system lacks a reliable semantic timestamp for “this WordSense first entered learning”. `created_at`, `updated_at`, legacy word stage, and first ReviewLog each mean something different.
 
 A later implementation must establish exactly one canonical WordSense learning-entry time/event at the existing confirmed-Sense enrollment path. This fact feeds daily goal counting, history, date filtering, and exports. It must not become a second learning-card or rating system.
 
-### 7.3 Unified exports
+### 8.3 Unified exports
 
 The same learning-history query/result feeds:
 
@@ -174,11 +193,11 @@ The same learning-history query/result feeds:
 
 Format renderers must not implement three different history queries. Existing PDF/CSV rendering patterns can be reused, while Browser/card inventory export remains a separate advanced/portable-data concern.
 
-## 8. Memory durability and future review pressure
+## 9. Memory durability and future review pressure
 
 The ordinary product exposes understandable memory state without requiring users to read raw FSRS parameter vectors.
 
-### 8.1 Memory durability
+### 9.1 Memory durability
 
 Users can filter learned WordSenses by date range and inspect states such as:
 
@@ -190,7 +209,7 @@ Existing ReviewLog/FSRS/leech-policy evidence should be reused before adding ano
 
 The page may show understandable facts such as recent rating history, retrievability, stability, difficulty, and lapse tendency. Raw model vectors stay in diagnostics/advanced views.
 
-### 8.2 Future pressure
+### 9.2 Future pressure
 
 Future workload is a forecast based on current scheduling/history. Ordinary users can understand:
 
@@ -202,19 +221,19 @@ Future workload is a forecast based on current scheduling/history. Ordinary user
 
 Forecasts do not prescribe a daily new-Sense target and do not silently mutate scheduling.
 
-## 9. FSRS product contract
+## 10. FSRS product contract
 
 The existing canonical FSRS scheduler remains the scheduling authority.
 
-### 9.1 Ordinary presentation
+### 10.1 Ordinary presentation
 
 All users can access basic learning analytics and model state in understandable language. Raw engineering parameter vectors move behind diagnostic/advanced presentation.
 
-### 9.2 Manual optimization
+### 10.2 Manual optimization
 
 Users can explicitly choose “现在优化记忆模型”. The existing historical ReviewLog → optimization path remains the single optimization engine and keeps its current eligibility/safety checks.
 
-### 9.3 Configurable interval optimization
+### 10.3 Configurable interval optimization
 
 Users can choose:
 
@@ -225,13 +244,13 @@ Automatic interval mode defaults to **30 days** and the interval is user-configu
 
 Automatic optimization uses the same optimizer as manual optimization.
 
-### 9.4 Optimization and rescheduling remain separate
+### 10.4 Optimization and rescheduling remain separate
 
 Parameter optimization changes the parameters used by future scheduling decisions. It does not silently reschedule existing cards.
 
 Rescheduling existing cards remains a separate user-triggered action with impact preview and explicit confirmation. Automatic parameter optimization must never call that reschedule action implicitly.
 
-## 10. Premium boundary
+## 11. Premium boundary
 
 This rebaseline does not introduce a paywall around the user's basic learning truth.
 
@@ -244,7 +263,7 @@ At minimum, all users retain access to:
 
 No new premium feature set is frozen here. Future commercial packaging must be decided separately and cannot change the semantic truth of learning history, WordSense identity, ReviewLog/FSRS scheduling, or make the product hide the basic model state that this rebaseline explicitly opens to all users.
 
-## 11. Reclassification of engineering-style user surfaces
+## 12. Reclassification of engineering-style user surfaces
 
 The following decisions apply to **user-facing product surfaces**. Shared lower owners, persisted rows, compatibility readers, safety ledgers, migration/recovery duties, and current callers stay protected until a later implementation proves their transition.
 
@@ -278,30 +297,31 @@ Article Health becomes a **material diagnostic / anomaly** entry associated with
 
 The old blanket conclusion that every one of the 11 families must keep its previous user-facing form is superseded. Families not explicitly reclassified above are not automatically deleted; they continue under their current contracts until a fresh product/caller/safety decision addresses them.
 
-## 12. Phase G forward execution boundary
+## 13. Phase G forward execution boundary
 
 This document authorizes product direction and roadmap rewriting only. It does not authorize implementation by itself.
 
 The next Phase G implementation work is split in the Goal ledger into:
 
 - G-06A English-only convergence;
-- G-06B AI anti-duplicate + stable translation layout;
-- G-06C reading progress/resume/bookmarks;
-- G-06D daily new-Sense goal + learning history/date-range exports;
-- G-06E memory analytics/future workload/FSRS productization;
-- G-06F engineering-surface retirement/rehome;
+- G-06B reading reinforcement spacing + Reader/external-review boundary;
+- G-06C AI anti-duplicate + stable translation layout;
+- G-06D reading progress/resume/bookmarks;
+- G-06E daily new-Sense goal + learning history/date-range exports;
+- G-06F memory analytics/future workload/FSRS productization;
+- G-06G engineering-surface retirement/rehome;
 - G-GATE final product/browser regression and slim-product acceptance.
 
-G-06F must occur after the replacement destinations it depends on exist. Physical deletion remains evidence-driven.
+G-06G must occur after the replacement destinations it depends on exist. Physical deletion remains evidence-driven.
 
 No production implementation, database mutation, external AI call, restore, destructive data operation, or automatic transition into the next task occurs as part of this rebaseline document.
 
-## 13. Supersession map
+## 14. Supersession map
 
 The following older forward statements remain useful as history but no longer control conflicting current product behavior:
 
 - `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md` PD-002 / PD-003 / PD-009 / relevant PD-013 user-surface retention language, where they require Tag/Saved Search/Browser-style concepts to remain current user features;
-- the same document's PD-012 / DISC-004 statement that overall translation layout stability was still unfrozen;
+- the same document's PD-012 generic Reader four-rating workflow and DISC-004 statement that overall translation layout stability was still unfrozen;
 - `docs/plans/LinguaCafe_Phase_G_Advanced_Capability_Classification_2026-08-18.md` as a forward guarantee that all 11 families must keep their then-current user-facing classification;
 - the former single G-06 scope limited to non-English/media cleanup.
 

@@ -2,18 +2,18 @@
 
 > **最小上下文提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md`。本文保留被既有文档 guard 引用的当前表和历史证据；只在选择产品任务时读取 Open Work Registry 和相关阶段，不默认加载全文。
 
-> **Current authority — 2026-08-06**
+> **Current authority — 2026-08-18**
 >
-> Product and architecture order is governed by `docs/plans/anki-aligned-product-and-architecture-roadmap.md`.
+> 当前产品方向先读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`；当前执行顺序读 `docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`。`anki-aligned-product-and-architecture-roadmap.md`、旧 PD-012 和下方历史阶段表继续保留用于追溯，但不能覆盖 2026-08-18 的 English-only / reading-first / spaced-review 决定。
 >
 > | State | Work |
 > |---|---|
-> | Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E; provider Environment Gate (default-off) |
-> | Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Recovery/publication is closed. Existing authorized repository milestones are closed; the Open Work Registry contains five operational or externally deferred items. Frozen product decisions are tracked separately and are not active tasks. |
-> | Closed Sequence | Browser/ReviewCardManage Phase 3A–3D → Card Marker + Custom Study 1B → Reviewer convergence → Reader architecture → AI Study Card service convergence |
-> | Environment Gate | Default-off provider implementation gate is closed; runtime external activation remains separately gated |
-> | Frozen Product Gate | PD-012 阅读中直接刷词义卡 V1 is Product Frozen / Architecture Spec Allowed / Product Code Not Authorized; it is not an active task |
+> | Historical Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E; provider Environment Gate (default-off) |
+> | Historical Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
+> | Current Phase | Goal Phase G product rebase：G-01…G-05 historical DONE；G-06A…G-06G + G-GATE are current forward milestones. |
+> | Current Product Boundary | English-only；reading-first；Sense-first；自然阅读只能在正式 due 间隔成立且无需帮助时产生一次 passive Good；已学 Sense 在阅读内标记“不认识”后，同次阅读后续认识不算正向复习，下一次成功复习回到外部 Sense Review。 |
+> | Current Reader Review ADR | `ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md` |
+> | Environment Gate | Default-off provider implementation gate remains closed; runtime external activation remains separately gated |
 >
 > Custom Study 1A and Card Marker + Custom Study 1B are Accepted / Production Closed. `/custom-study` now includes the five frozen criteria, including `marked`; Marker remains ReviewCard metadata and the session remains preview-only. Phase 4 evidence is in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`; earlier 1A history remains archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
 >
@@ -29,7 +29,7 @@
 
 > **Historical Phase 5A update (superseded 2026-07-14)**: this earlier slice added the authenticated read-only `GET /custom-study/chapter-options` endpoint and aligned sentence/token/translation identity before the frontend existed. The production frontend and browser closure described in the authoritative status above now supersede that interim state.
 
-> **最后更新**：2026-08-06。恢复发布程序已关闭；当前运行/维护事项已收敛到 Open Work Registry 的五项。PD-012 等已冻结但尚未获得业务代码授权的产品决定由产品决定文档单独持有，不冒充 active task；已完成里程碑不再重复列入待办。详见 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`。
+> **最后更新**：2026-08-18。恢复发布程序历史已关闭；当前 active product roadmap 已转入 Goal Phase G 的 English-only / reading-first rebase。Open Work Registry 继续保存运维/外部能力账本，但不再冒充唯一产品待办。旧 PD-012 generic Reader four-rating forward 要求已由 Product Rebaseline + ADR-0059 supersede。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -222,7 +222,7 @@
 | 4 | Reasonix / DevSpace / 浏览器监督工具链可靠性 | `Workaround Active / Root Fix Open` | 继续使用唯一 marker、会话对账和失败留证；在根治验收前不得把 workaround 称为稳定能力 | `reasonix-supervision-toolchain-bug-ledger-2026-08-05.md` |
 | 5 | 旧电脑或其他仓库复现 | `Deferred / Unverified` | 只有用户提供目标设备或明确切换仓库时再执行 | 当前 checkout 与 remote 事实 |
 
-> **冻结产品决定路由**：PD-012“阅读中直接刷词义卡 V1”已完成产品冻结，当前只允许 Architecture Spec / ADR / Harness 迁移设计；`product_code_authorized=false` 时不得修改业务代码。PD-013 的 M1“下一里程碑”措辞只属于 2026-07-28 历史路线基线，已被后续 M1–M18 实现链消费，不构成当前下一任务授权。
+> **当前产品决定路由**：2026-08-18 Product Rebaseline + Goal Phase G 是 forward 产品权威。PD-012 generic Reader four-rating 只保留历史来源；当前阅读强化/失败后外部复习边界由 ADR-0059 控制。PD-013 的 M1“下一里程碑”措辞也只属于 2026-07-28 历史路线基线，不构成当前下一任务授权。
 
 当前仓库内 M1–M8、M10–M16、M17 Web slice、M18 共享实现与 Web/Android 证据，以及 Settings/Browser/Reader/Reviewer/AI Study Card default-off 路线均已有关闭证据。M17 的 Android Haptics/Local Notifications 事实由 M7 平台验收持有，不属于第二套 M17 Android 实现。它们不是开放任务；出现真实回归时按 Bug 切片重新进入，而不是复跑整个里程碑。
 
@@ -245,7 +245,7 @@
 |---|---|---|
 | AI-Reading-Assist-6 词组与单词双路径 | Partial | 已有 phrase 识别与用户选择能力，完整产品流程需要按真实材料复核后再决定，不阻塞当前路线 |
 | Lemma per-occurrence override | Deferred | 当前单 lemma 模型仍有词性歧义残留；改数据模型会影响阅读、查词和 WordSense 绑定，放在 Reader 架构阶段重新评估 |
-| WordSense Tag / Note Tag | Planned / Product Accepted | 内容级自由标签已接受；保持与 Card Marker 分离，实施前冻结标签结构和批量语义 |
+| WordSense Tag / Note Tag | Historical accepted / forward user surface under reclassification | 旧内容级标签能力与数据继续作为历史/兼容事实；2026-08-18 rebaseline 不再假定 Tag 必须作为用户功能保留，是否退休由 G-06G fresh caller/data audit 决定 |
 | Mobile / BottomSheet | Superseded by M1–M9 roadmap | 路线基线已在 2026-07-28 冻结为云端权威、有限离线；具体页面与商业细节按对应里程碑继续冻结 |
 
 ---

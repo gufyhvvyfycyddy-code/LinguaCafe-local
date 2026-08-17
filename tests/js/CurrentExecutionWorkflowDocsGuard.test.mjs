@@ -1,7 +1,6 @@
 // CurrentExecutionWorkflowDocsGuard.test.mjs
-//
-// Current documentation guard for the active LinguaCafe execution workflow.
-// It replaces the discontinued GLM single-agent guard.
+// Protect the current LinguaCafe fixed-DIRECT execution contract without
+// freezing obsolete tool chains, dates, or model-independent prose.
 
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -10,85 +9,55 @@ import { dirname, join } from 'node:path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
+const root = join(__dirname, '..', '..');
+const rulesPath = join(root, 'docs', 'plans', 'vibe-coding-collaboration-rules.md');
+const archivePath = join(root, 'docs', 'history', 'codebuddy-workbuddy-workflow-archive-2026-07-13.md');
 
-const RULES_PATH = join(
-    __dirname, '..', '..',
-    'docs', 'plans', 'vibe-coding-collaboration-rules.md'
-);
-const ARCHIVE_PATH = join(
-    __dirname, '..', '..',
-    'docs', 'history',
-    'codebuddy-workbuddy-workflow-archive-2026-07-13.md'
-);
+const rules = existsSync(rulesPath) ? readFileSync(rulesPath, 'utf-8') : '';
+const archive = existsSync(archivePath) ? readFileSync(archivePath, 'utf-8') : '';
 
-const rulesSource = existsSync(RULES_PATH)
-    ? readFileSync(RULES_PATH, 'utf-8')
-    : '';
-const archiveSource = existsSync(ARCHIVE_PATH)
-    ? readFileSync(ARCHIVE_PATH, 'utf-8')
-    : '';
+const required = [
+    'fixed DIRECT',
+    'GPT-5.6 Sol',
+    'opencode/deepseek-v4-flash-free',
+    'opencode/mimo-v2.5-free',
+    'opencode-go/mimo-v2.5',
+    'FastCtx',
+    '用户启动下一批次后才进入下一实现任务',
+    'Codex 新任务只有用户当前明确点名授权时才能创建',
+];
 
-let passed = 0;
-function test(name, fn) {
-    try {
-        fn();
-        passed++;
-        console.log(`  √ ${name}`);
-    } catch (error) {
-        console.error('FAIL: ' + name);
-        console.error(error.message);
-        process.exitCode = 1;
-    }
+assert.ok(rules.length > 0, 'current collaboration rules are missing');
+for (const phrase of required) {
+    assert.ok(rules.includes(phrase), `current workflow contract missing: ${phrase}`);
 }
 
-const FORBIDDEN_ACTIVE_PHRASES = [
-    '当前任务由一个主执行 Agent 对结果负责',
+assert.ok(
+    rules.includes('只有真实 predecessor 才等待') || rules.includes('只有真实 predecessor 才等待。'),
+    'fixed DIRECT windows must wait only on real dependencies',
+);
+assert.ok(
+    rules.includes('两个 OpenCode free') && rules.includes('Reasonix'),
+    'paid Reasonix must remain behind both free OpenCode routes',
+);
+assert.ok(
+    rules.includes('CodeBuddy / WorkBuddy 旧接力式“必须出现”规则不再作为当前默认流程'),
+    'old mandatory CodeBuddy/WorkBuddy relay must not remain current',
+);
+
+for (const forbidden of [
     '只要安排 OpenCode，就必须同时安排 CodeBuddy',
     '仍然必须后置 CodeBuddy',
     '仍然必须后置 WorkBuddy',
-    '给出 OpenCode / CodeBuddy / WorkBuddy 提示词',
-];
+    '当前任务由一个主执行 Agent 对结果负责',
+]) {
+    assert.ok(!rules.includes(forbidden), `obsolete workflow requirement remains active: ${forbidden}`);
+}
 
-test('current rules file exists', () => {
-    assert.ok(rulesSource.length > 0, 'rules file is missing or empty');
-});
+assert.ok(archive.length > 0, 'historical workflow archive is missing');
+assert.ok(
+    archive.includes('已停用') || archive.includes('Discontinued'),
+    'historical workflow archive must remain clearly non-current',
+);
 
-test('current rules name both active execution paths', () => {
-    assert.ok(rulesSource.includes('本地 Codex 直接处理'));
-    assert.ok(rulesSource.includes('网页端 GPT 通过 DevSpace 直接处理'));
-});
-
-test('current rules require FastCtx-first local work', () => {
-    assert.ok(
-        rulesSource.includes('优先使用 FastCtx'),
-        'Current rules must require FastCtx-first file and command work'
-    );
-});
-
-test('Reasonix work remains parallel with the primary task', () => {
-    assert.ok(rulesSource.includes('Reasonix 作为并行核查者运行时'));
-    assert.ok(rulesSource.includes('主执行方不得停工等待'));
-    assert.ok(rulesSource.includes('周期性检查 Reasonix'));
-});
-
-test('discontinued workflows are not active requirements', () => {
-    const hits = FORBIDDEN_ACTIVE_PHRASES.filter((phrase) => rulesSource.includes(phrase));
-    assert.deepEqual(hits, [], `Discontinued active workflow phrases found: ${hits.join('; ')}`);
-});
-
-test('parallel Codex++ workflow is clearly future-only', () => {
-    assert.ok(rulesSource.includes('Codex++'));
-    assert.ok(rulesSource.includes('未来方向'));
-    assert.ok(rulesSource.includes('尚未完整实现'));
-});
-
-test('historical workflow archive remains available', () => {
-    assert.ok(archiveSource.length > 0, 'archive file is missing or empty');
-    assert.ok(
-        archiveSource.includes('已停用') || archiveSource.includes('Discontinued'),
-        'Archive must remain marked as discontinued'
-    );
-});
-
-console.log(`
-${passed} tests passed.`);
+console.log('Current execution workflow docs guard passed.');

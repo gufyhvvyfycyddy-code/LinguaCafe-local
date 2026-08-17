@@ -1,6 +1,6 @@
 # LinguaCafe AI 协作与交付规则
 
-> 当前权威版本：2026-08-06。
+> 当前权威版本：2026-08-18。
 > 根级硬规则见 `AGENTS.md`；本文件解释任务如何落位、执行和验收。业务状态见 `docs/DOCUMENTATION_INDEX.md`。Git 历史保留旧版长文，不在当前上下文继续携带已停用工作流。
 
 ## 0. 权威、目标与阅读方式
@@ -19,14 +19,16 @@
 
 ### 1.5 当前执行方式
 
-当前有效方式只有两种：
+当前 LinguaCafe 采用“网页端总设计师 + fixed DIRECT 并行窗口 + DevSpace 本地核验”的受控闭环。具体本地 Agent / 模型白名单以 `D:\Document\lingl\parallel-tasks\LinguaCafe_CURRENT_LOCAL_AGENT_MODEL_AND_PARALLEL_AUTHORITY_2026-08-17.md` 为唯一当前执行 overlay：
 
-1. 本地 Codex 直接处理；
-2. 网页端 GPT 通过 DevSpace 直接处理。
+1. 四个 GPT-5.6 Sol 窗口是主要 owner；无依赖切片立即并行，只有真实 predecessor 才等待。
+2. OpenCode 是免费辅助层，只允许 `opencode/deepseek-v4-flash-free` → `opencode/mimo-v2.5-free`。
+3. 两个 OpenCode free 都无法完成且确实需要更强独立审查时，才允许 Reasonix `opencode-go/mimo-v2.5`。
+4. Codex 新任务只有用户当前明确点名授权时才能创建；已授权运行中的 Codex 可以继续监督/复核。
+5. CodeBuddy / WorkBuddy 旧接力式“必须出现”规则不再作为当前默认流程；若用户以后重新明确启用，再按当轮授权处理。
+6. 本地 Agent 结论只是证据，不能替代当前 GPT owner 的 Git、diff、测试和真实页面核验。
 
-两种方式在文件发现、搜索、读取、替换和命令执行中都优先使用 FastCtx。旧“一个主执行 Agent”规则以及 OpenCode / CodeBuddy / WorkBuddy / GLM 接力流程均已停用，不得重新写成当前要求。
-
-Reasonix 作为并行核查者运行时，主执行方不得停工等待。主执行方必须继续做可以独立推进的侦察、测试、验收或实现，并周期性检查 Reasonix 的阶段结果，把已完成结论及时吸收到当前判断。只有下一步客观上只能依赖 Reasonix 返回时，才允许短暂等待。
+所有本地文件发现、搜索、读取、替换和命令执行优先 FastCtx/DevSpace。Reasonix/OpenCode 运行时，主 owner 继续做能够独立推进的工作；只有下一步客观依赖其结果时才等待。
 
 当前允许多个网页端 GPT / 本地执行窗口并行，但只能使用有边界的并行闭环：
 
@@ -34,7 +36,7 @@ Reasonix 作为并行核查者运行时，主执行方不得停工等待。主�
 2. 共享 testing DB 的 PHPUnit 必须串行执行并持有同一测试锁；不得用并行 Feature 测试争用共享状态。
 3. Node guard、前端构建和纯文档工作只有在不争用文件、输出目录或构建资源时才可并行。
 4. 长任务必须使用 FastCtx 持久后台 job；任务断线后通过原 job ID 恢复和读取结果，不得重复启动同一工作。
-5. 最终只由一个主窗口统一复核、精确暂存、commit 和 push；并行窗口不得各自在同一 working tree 上提交。
+5. 同一批次如涉及共享 working tree / 同一集成提交，只设一个 Git integration owner 统一复核、精确暂存、commit 和 push；独立 worktree 可以产出各自 task-only commit/patch，但最终合入仍由 DIRECT 明确的唯一 integration owner 负责。
 6. 发现其他窗口正在修改同一文件时，当前窗口立即停止该文件的写入，保留现有改动并重新分配 owner，不得覆盖、回退或抢占。
 
 历史兼容说明：旧规则曾把“网页端 GPT 与本地 Codex++ 并行”写成“未来方向、尚未完整实现”。该旧判断已失效，只保留这句话用于说明 guard 的历史迁移背景，不得据此否定本节已经生效的有边界并行闭环。
@@ -117,7 +119,7 @@ Harness 必须能独立完成：准备条件、执行真实路径、输出明确
 
 ### 5.1 目标模式 roadmap 执行授权
 
-用户明确创建或恢复一个指向权威 roadmap 或有序里程碑的持续目标时，目标授权依赖顺序内的全部切片。架构审查必须在目标点名范围内冻结当前切片的具体范围，并用计划、ADR、契约和测试约束其数据、接口和兼容语义；只忠实展开已接受 roadmap 的切片文档按 ADR-0037 视为 `Accepted under current goal authorization`，不再形成逐份人工闸门。执行 Agent 完成相称验证和逐项完成审计后可自动进入下一命名里程碑；当前里程碑锁若明确写有 `auto_advance: false`、`supervisor_unlock_required: true` 或等价停止条件，则该局部锁优先，必须停止等待验收或新授权。
+用户明确创建或恢复一个指向权威 roadmap 或有序里程碑的持续目标时，目标授权用于**规划和界定**顺序内切片，但当前 LinguaCafe fixed-DIRECT 工作流不允许执行窗口自动进入下一命名里程碑。架构审查必须在目标点名范围内冻结当前切片的具体范围，并用计划、ADR、契约和测试约束其数据、接口和兼容语义。当前 DIRECT 完成后停止；由主窗口验收后生成下一轮 DIRECT，用户启动下一批次后才进入下一实现任务。只有用户当前明确要求主窗口直接连续执行时，才允许在该明确授权范围内连续实施。
 
 目标授权可覆盖冻结里程碑明确需要的 additive migration 文件、testing 专用数据库 schema、新表、新 Controller/Service/model/middleware/store module、已审查的多个 seam 和已冻结的高风险领域语义。计划未写死的可逆选择按 ADR-0034 的“当前用户决定 → 已接受 ADR/契约/roadmap → 经核实稳定先例 → Anki 官方行为及 LinguaCafe 映射 → 最小可逆推荐”处理。保留停止条件为：开发/预发布/生产或真实用户数据上的 migration、回填、恢复、删除和破坏性操作；真实 AI provider、密钥、外发、付费、模型或成本上限；部署、签名、商店提交等不可逆第三方动作；未被委托的实质产品边界变化、同一最高有效权威冲突或目标外扩张。保留停止线只暂停受影响依赖分支；仍有独立切片时继续执行。完整语义以 ADR-0031、ADR-0034、ADR-0037 和 `AGENTS.md` 为准。
 
@@ -151,10 +153,11 @@ API、源码阅读、截图或 Agent 自述不能代替真实页面操作。所�
 
 LinguaCafe 本地浏览器验收统一使用“当前任务提示词提供的固定本地验收身份”。仓库文档、日志、截图和报告不得写入其明文账号或密码。
 
-- 不修改或删除该固定身份，不创建随机邮箱、替代账号或批量本地用户来绕过登录问题。
-- 登录失败时停止写入验收，诊断同一个固定身份的认证、数据库归属和权限状态；不得因自动化方便制造新的本地用户。
-- 修复同一个固定身份的数据属于独立授权的数据操作，只有用户明确授权后才能执行；不得自动修改账号、密码或权限。
-- 固定身份未能登录时，不得以 API、直接数据库写入或另建账号冒充真实页面验收通过。
+- 只有在 server-bound sentinel 已证明当前 HTTP 进程连接专用 testing DB 后，才允许使用该身份。
+- 若 testing DB 中该固定身份不存在，任务提示词明确允许时，可以在**同一 testing DB** 创建同名本地测试身份后继续；不得改成随机替代邮箱来绕过登录问题。
+- 若同名 testing 身份仍无法正常登录，停止写入验收并报告真实原因；不得用 API、直接数据库写值或另一个账号冒充真实页面通过。
+- 是否新建、是否登录成功、最终测试数据/lease/server cleanup 都必须写进报告。
+- 不修改 `.env*`，不借登录问题清库或修改开发/真实用户数据。
 
 验收证据仅因平台允许范围外的工具/环境原因缺失时，可使用 `Acceptance Deferred — Not Complete`。按 ADR-0052，Architecture Gate 证明下游只依赖已执行验证的契约、不触及缺失行为且没有已知产品缺陷时，可继续可逆、独立可测试的下游实现；缺失检查按 Android 设备、iOS 签名设备、商店提交等能力簇累计，不再用单个 deferred 的机械路径预算冻结实现。该里程碑和最终目标仍未完成，最终审计必须逐项清零能力簇。
 
@@ -244,7 +247,7 @@ php artisan test --filter=TestingDatabaseHealthConfigTest
 
 ### 28.6 下一任务
 
-普通任务完成后停止；不得把建议、future work 或报告中的 follow-up 自动实施。明确持续目标按 ADR-0031/ADR-0034/ADR-0037/ADR-0052 依有序里程碑继续；deferred 检查按能力簇追踪，保留停止线只暂停受影响动作。仅当没有任何可运行切片或最终审计需要人工清零时等待用户决定；最终完成审计必须清零全部 deferred 能力簇及命名检查。
+任何 fixed DIRECT / 副窗口完成后都必须停止，不自动领取下一任务。主窗口完成 Accept / Refuse / 阶段性 Accept / Incomplete 后，可以继续做下一阶段判断并生成下一轮 4 个 DIRECT，但默认只**交付提示词**，不替用户启动下一实现批次。普通建议、future work 或报告中的 follow-up 不能自动实施。deferred 检查继续按能力簇追踪；最终完成审计必须清零全部必需 deferred 能力簇及命名检查。
 
 ## 29. 规则收敛检查
 

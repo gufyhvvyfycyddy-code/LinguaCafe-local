@@ -364,12 +364,13 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | G-04 | DONE | 按当时 authority 完成保留高级 / 只读兼容 / 可删除分类 | G-03 evidence | 历史分类有 caller/contract 证据；作为后续迁移/安全证据保留 |
 | G-05 | DONE | 按 G-04 authority 只删除已证明 orphan 的项；最终合法 zero-delete 收口 | G-04 | `34ac0a2c` 历史验收有效；不改写旧报告/提交 |
 | G-06A | TODO | English-only convergence：普通用户不再选择学习语言，不再进入 Japanese/JMDict/其它非英文主线；共享 language isolation/legacy data 只按证据退休 | 2026-08-18 rebaseline + existing language ownership | Desktop/Mobile/材料/AI 主流程只呈现英文；无误删跨用户/兼容数据；旧语言入口有 caller/data 证明后再退役 |
-| G-06B | TODO | AI Reading Assist 语义防重复 + saved translation 固定占位：同义/实质近义只能 `matched_existing`，全文译文/标记词/已学 candidates/paste-back 保持单一 V2 契约；译文显隐不移动英文 | current AI Reading Assist V2 + current Reader/TextBlockGroup | anti-duplicate prompt/preview contract 受测；strict paste-back 保持；有译文时 hidden/hover/show 几何一致、无译文时无空白占位；真实 Reader 双 viewport |
-| G-06C | TODO | 阅读连续性：Library 真实阅读进度、退出后自动继续到稳定文本位置、多个手动书签，Desktop/Mobile 共用 canonical text anchor | ReadingSession + ReadingChapterTextService + existing token positions | progress 不是 read_count/词汇百分比；resume/bookmark 不依赖 scroll pixel；source revision stale fail closed；Desktop/Mobile 同锚点语义 |
-| G-06D | TODO | 每日阅读中新 WordSense 目标 + 学习记录：日历点日、任意日期范围、来源区分、PDF/TXT/CSV 同源导出 | existing Goal UI + WordSense enrollment + ReviewLog sources + occurrence context | 一次性 WordSense learning-entry truth；目标只数阅读中新 Sense 且达标不阻止阅读；单日/范围可查；三种导出同一 history row set |
-| G-06E | TODO | 记忆持久度 / 未来复习压力 / FSRS 产品化：普通用户理解记忆状态与 tomorrow/7/30/90 预测；手动优化；每 N 天自动优化默认 30；已有卡重排独立预览确认 | existing Statistics/FSRS/leech/workload/optimization/reschedule owners | 基础分析/模型状态所有用户可见；预测不替用户定学习量；interval/manual-only 可配置；自动优化不自动重排旧卡；reschedule 独立且可预览 |
-| G-06F | TODO | 旧工程 user surface rehome/retirement：Saved Search→学习记录/历史回顾；Tag/Marker generic 用户功能倾向退休；Manual Scheduling 离开普通流程；generic Browser 拆到生词详情/历史/诊断；Knowledge Hygiene 内部维护；Article Health→材料异常诊断 | G-06D/E replacement surfaces + G-03/G-04/G-05 dependency evidence + existing shared lower owners | 普通用户不再依赖旧工程概念；必要 lower owner/data/compat 保留；每个真正删除项都有 fresh caller/data/safety 证明和回归 |
-| G-GATE | TODO | Phase G whole-product acceptance | G-06A…G-06F + existing main-flow guards | English-only、阅读优先、Sense 优先的普通用户主流程真实浏览器通过；Reader/Review/WordSense/Material/Mobile 无回归；旧 surface 无误删共享能力 |
+| G-06B | TODO | 阅读强化间隔与失败后外部复习：natural reading 只有卡片按正式 Sense Review due 语义到期且无需帮助时才能一次 passive Good；existing Sense 被标记“不认识”后，同次阅读后续认识不计分，最多 exact-Sense Again 一次，下一次正向复习只在外部 Sense Review | ADR-0059 + ReadingSession/interaction evidence + canonical ReviewCard/ReviewLog/FSRS writer | not-due exposure 0 FSRS；同卡同 session 最多一次 positive；unfamiliar→existing 抑制后续 positive；new_sense 不伪造 lapse；Reader 不新增 cooldown/第二调度器；真实 Reader→外部 Review 间隔闭环 |
+| G-06C | TODO | AI Reading Assist 语义防重复 + saved translation 固定占位：同义/实质近义只能 `matched_existing`，全文译文/标记词/已学 candidates/paste-back 保持单一 V2 契约；译文显隐不移动英文 | current AI Reading Assist V2 + current Reader/TextBlockGroup | anti-duplicate prompt/preview contract 受测；strict paste-back 保持；有译文时 hidden/hover/show 几何一致、无译文时无空白占位；真实 Reader 双 viewport |
+| G-06D | TODO | 阅读连续性：Library 真实阅读进度、退出后自动继续到稳定文本位置、多个手动书签，Desktop/Mobile 共用 canonical text anchor | ReadingSession + ReadingChapterTextService + existing token positions | progress 不是 read_count/词汇百分比；resume/bookmark 不依赖 scroll pixel；source revision stale fail closed；Desktop/Mobile 同锚点语义 |
+| G-06E | TODO | 每日阅读中新 WordSense 目标 + 学习记录：日历点日、任意日期范围、来源区分、PDF/TXT/CSV 同源导出 | existing Goal UI + WordSense enrollment + ReviewLog sources + occurrence context | 一次性 WordSense learning-entry truth；目标只数阅读中新 Sense 且达标不阻止阅读；单日/范围可查；三种导出同一 history row set；历史 reading_explicit 可读但不要求保留旧 Reader four-rating surface |
+| G-06F | TODO | 记忆持久度 / 未来复习压力 / FSRS 产品化：普通用户理解记忆状态与 tomorrow/7/30/90 预测；手动优化；每 N 天自动优化默认 30；已有卡重排独立预览确认 | existing Statistics/FSRS/leech/workload/optimization/reschedule owners | 基础分析/模型状态所有用户可见；预测不替用户定学习量；interval/manual-only 可配置；自动优化不自动重排旧卡；reschedule 独立且可预览 |
+| G-06G | TODO | 旧工程 user surface rehome/retirement：Saved Search→学习记录/历史回顾；Tag/Marker generic 用户功能倾向退休；Manual Scheduling 离开普通流程；generic Browser 拆到生词详情/历史/诊断；Knowledge Hygiene 内部维护；Article Health→材料异常诊断 | G-06E/F replacement surfaces + G-03/G-04/G-05 dependency evidence + existing shared lower owners | 普通用户不再依赖旧工程概念；必要 lower owner/data/compat 保留；每个真正删除项都有 fresh caller/data/safety 证明和回归 |
+| G-GATE | TODO | Phase G whole-product acceptance | G-06A…G-06G + existing main-flow guards | English-only、阅读优先、Sense 优先且遵守 spaced-review 的普通用户主流程真实浏览器通过；Reader/Review/WordSense/Material/Mobile 无回归；旧 surface 无误删共享能力 |
 
 ---
 
@@ -392,16 +393,19 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 ---
 
-## 8. Phase Gate 自动推进规则
+## 8. Phase Gate 与人工调度规则
 
-本 Goal 用户已明确授权完成整个大计划，因此：
+当前 LinguaCafe 使用“主窗口验收 → 生成下一轮 DIRECT → 用户启动并行窗口”的受控推进方式。
 
-- `A-GATE DONE` → 自动开始 B；
-- `B-GATE DONE` → 自动开始 C；
-- 依次到 H；
-- 不需要每个 Phase 再询问“是否继续”。
+因此：
 
-但 Gate 不能靠报告标签通过，必须依据当前代码和真实证据。
+- Gate DONE 后，主窗口可以自动规划并生成下一阶段提示词；
+- 执行窗口完成当前 DIRECT 后必须停止，不得自动领取或进入下一任务；
+- 主窗口也不在同一轮偷偷启动下一实现任务，除非用户当前明确要求直接执行；
+- 用户把下一轮提示词发给新窗口后，下一实施批次才真正开始；
+- 这样保持持续 roadmap，又保留用户对每一批并行执行的明确控制。
+
+Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和真实页面证据。
 
 如果某 Phase 有 `DEFERRED`：
 
@@ -741,7 +745,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 `date | milestone | decision | evidence | removal/revisit condition`
 
-`2026-08-18 | G-06 product rebase | 保留 G-01…G-05 历史 DONE；2026-08-18 English-only / reading-first / Sense-first authority supersede G-04 的 blanket forward user-surface retention，并把未进入实现的旧 G-06 拆为 G-06A…G-06F + G-GATE | G-06 01/02/03 canonical reports + fresh committed-HEAD cross-check + docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md | 只有新的明确用户产品决定或后续真实 caller/data/safety 证据才复审；不得据此篡改 G-04/G-05 历史`
+`2026-08-18 | G-06 product rebase | 保留 G-01…G-05 历史 DONE；2026-08-18 English-only / reading-first / Sense-first authority supersede G-04 的 blanket forward user-surface retention，并把未进入实现的旧 G-06 拆为 G-06A…G-06G + G-GATE | G-06 01/02/03 canonical reports + fresh committed-HEAD cross-check + docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md | 只有新的明确用户产品决定或后续真实 caller/data/safety 证据才复审；不得据此篡改 G-04/G-05 历史`
 
 `2026-08-09 | FND-01 | Goal branch 使用 linked worktree D:\\Document\\lingl\\LinguaCafe-goal-a-h-sol-medium-20260809 | 原主工作树相对 origin/master 的 5 个用户修改文件重叠，直接 switch 会覆盖或冲突；Git worktree 保持原资产不变 | 原主工作树安全清理且 Goal 完成后再评估移除 linked worktree`
 

@@ -1,6 +1,6 @@
 # LinguaCafe Documentation Index
 
-> 当前入口：2026-08-06。本文只负责路由，不保存任务历史、长篇状态或重复契约。
+> 当前入口：2026-08-18。本文只负责路由，不保存任务历史、长篇状态或重复契约。
 
 ## 1. 新任务读取顺序
 
@@ -8,7 +8,8 @@
 2. `docs/CURRENT_AI_CONTEXT.md` — 当前事实、计划完成度、开放维护项和停止点；默认只加载这份状态文档。
 3. 先判断任务类型，再按需加载：
    - 继续一个已明确的当前任务：只读 `docs/plans/current-working-handoff.md` 顶部权威区和该任务相关段落，不默认加载全文。
-   - 选择、插入或调整产品任务：只读 master plan 的 Open Work Registry，再读 Anki-aligned roadmap 的相关 Phase。
+   - 选择、插入或调整当前产品任务：先读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，再读 Goal ledger 当前 Phase；只有需要历史来源时才读旧 master plan / Anki-aligned roadmap。
+   - Reader 评分、阅读强化、被动 Good、阅读内“不认识”或外部 Sense Review 间隔：同时读 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`。
    - 已明确的模块任务：直接读对应 ADR、模块契约、源码、测试和一个既有范例。
 4. 不默认读取全部计划、全部 ADR、全部历史或全部字幕。
 
@@ -19,9 +20,11 @@
 - AI 最小当前上下文：`docs/CURRENT_AI_CONTEXT.md`
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
-- 长期工作登记：`docs/plans/linguacafe-master-plan.md`
-- 已确认产品方向与讨论路线：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
-- 产品/架构顺序：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`
+- 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
+- 当前 Goal / Phase G 执行顺序：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 长期历史总账与运维登记：`docs/plans/linguacafe-master-plan.md`
+- 已确认产品方向与讨论历史：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
+- 历史 Anki-aligned 产品/架构路线：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`
 - 2026-07-23 历史代码、文档与 Bug 架构快照：`docs/architecture/code-documentation-and-bug-architecture-audit-2026-07-23.md`
 - 2026-07-23 Anki 功能与架构历史通俗对比：`docs/architecture/anki-function-and-architecture-sales-comparison-2026-07-23.md`
 - 云端主导移动化路线、成本与技术里程碑：`docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`
@@ -68,7 +71,9 @@
 | 本地真实浏览器验收、localhost、测试身份与工具降级 | `docs/plans/mcp-chrome-local-smoke-playbook.md`、`docs/adr/ADR-0033-real-browser-acceptance-channel-fallback.md`、`docs/adr/ADR-0034-goal-mode-autonomous-decisions-and-deferred-acceptance.md`、`docs/adr/ADR-0037-goal-mode-nonblocking-execution-frontier.md` |
 | Text reader smoke | `docs/testing/text-reader-smoke-guard.md` |
 | Spec → harness | `docs/plans/spec-to-harness-candidates.md` |
-| 产品讨论：阅读内评分 / AI 阅读 / 翻译布局 | `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md` §4–5 |
+| 当前产品总方向 | `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` + Goal Phase G |
+| Reader 阅读强化 / 间隔 / 不认识后外部复习 | `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md` |
+| 历史产品讨论：阅读内评分 / AI 阅读 / 翻译布局 | `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`（与当前 rebaseline 冲突处仅作历史） |
 | 云端主导移动端、有限离线、成本和下一技术里程碑 | `docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`、`docs/plans/mobile-api-v1-contract.md`、`docs/adr/ADR-0031-goal-mode-roadmap-execution-authorization.md`、`docs/adr/ADR-0032-mobile-api-foundation-and-idempotent-rating.md`、`docs/adr/ADR-0034-goal-mode-autonomous-decisions-and-deferred-acceptance.md`、`docs/adr/ADR-0037-goal-mode-nonblocking-execution-frontier.md`、`docs/adr/ADR-0035-mobile-operation-ledger-and-linear-undo-redo.md`、`docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/adr/ADR-0038-m10-unified-search-and-word-sense-tags.md`、`docs/plans/m6-resilience-health-isolation-implementation-plan.md`、`docs/plans/m10-unified-search-tags-browser-foundation-plan.md`、`docs/testing/mobile-api-foundation-acceptance-2026-07-28.md`、`docs/testing/mobile-operation-ledger-acceptance-2026-07-28.md`、`docs/testing/m5-mobile-reader-reviewer-touch-acceptance-2026-07-29.md`、`docs/testing/m6a-safe-backup-acceptance-2026-07-28.md`、`docs/testing/m6b-restore-safety-acceptance-2026-07-28.md`、`docs/testing/m6c-article-health-acceptance-2026-07-28.md`、`docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md` |
 | 恢复与发布程序（CFH-01/02；已关闭，当前无 active task） | `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`、`docs/execution/CURRENT_MILESTONE.json`、`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`、`docs/plans/cfh-02-m6-publication-plan.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/testing/cfh-02b-m6a-publication-acceptance-2026-08-05.md`、`docs/testing/cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md` |
 | M10 统一查询、WordSense Tag、Browser 与移动搜索验收 | `docs/testing/m10-unified-search-tags-browser-foundation-acceptance-2026-07-28.md` |

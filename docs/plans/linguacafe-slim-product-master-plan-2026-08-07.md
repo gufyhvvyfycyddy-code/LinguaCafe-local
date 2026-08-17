@@ -1,8 +1,8 @@
 # LinguaCafe 精简版产品总大计划
 
-> 日期：2026-08-07
-> 状态：Product Plan Frozen / Development Not Automatically Authorized
-> 性质：新的产品总计划。它不覆盖旧 `docs/plans/linguacafe-master-plan.md`，旧文件继续作为历史总账与既有实现追溯材料。
+> 日期：2026-08-07；2026-08-18 按 English-only / reading-first rebaseline 更新
+> 状态：Current supporting product plan；与 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` 冲突时以后者为准
+> 性质：精简产品大计划。旧 `docs/plans/linguacafe-master-plan.md` 只继续作为历史总账与既有实现追溯材料。当前 Phase G 执行顺序以 Goal ledger 为准。
 > 当前仓库事实在创建本计划时重新核查：`origin/master = 1c9bdcd74fa793356ba3938f21c56405f3261e39`，本地 `master` 与远端存在分叉，工作区存在用户已有改动。后续任何开发仍必须重新 fetch 并保护用户资产。
 > 执行规则：每个大阶段可以包含多轮并行任务；阶段内部可以持续推进，但每个大阶段完成后必须停下来由用户确认，不能自动跨入下一大阶段。
 
@@ -28,7 +28,7 @@ LinguaCafe 保留自己的差异：
 - 正式学习对象是具体 `WordSense`；
 - 原文语境和 `WordSenseOccurrence` 是学习证据；
 - 同一个 lemma 可以有多个独立学习词义；
-- 阅读中的显式复习与完成阅读后的被动复习都最终落到具体 Sense ReviewCard；
+- 阅读中的自然巩固只在正式间隔到期且无需帮助时落到具体 Sense ReviewCard；阅读内失败后的正向复习必须回到外部 Sense Review，不能靠同次阅读反复曝光提高熟练度；
 - AI 主要帮助文章翻译、词义生成和 occurrence→WordSense 消歧，不替用户决定所有学习内容。
 
 ---
@@ -91,7 +91,12 @@ LinguaCafe 保留自己的差异：
 
 这里的“确认后加入”只回答一件事：**要不要创建新的 WordSense + Sense ReviewCard**。它与后面的“阅读词义核对”是两个不同动作：后者回答的是“当前文章里的这个 occurrence 到底对应哪一个具体词义”。两种确认在界面、数据和报告中必须使用不同名称，禁止合并成一个模糊的“确认”。
 
-用户自己标记为“不认识”后由 AI 生成的 `new_sense`，即使开启“自动加入学习”并自动建卡，也**不能在同一次阅读里再获得被动 Good**。用户已经明确表示自己不认识它，所以不满足“自然阅读中顺利认出”的被动复习条件。
+用户自己标记为“不认识”后，当前 ReadingSession 进入严格失败边界：
+
+- 若 AI/人工最终确认这是一个 `new_sense`，即使开启“自动加入学习”并自动建卡，也**不能在同一次阅读里获得被动 Good，也不能伪造 Again**；它只是第一次进入学习，后续在外部 Sense Review 中开始正式复习。
+- 若最终确认它其实对应一个**已经学过的 existing WordSense**，则这次“不认识”是对该已学 Sense 的失败证据；同一 ReadingSession 后面即使再次遇到、点击“认识/记得”，也不能写 Hard/Good/Easy 或被动 Good。精确 WordSense 确定后，最多允许通过正式评分唯一写入链记录一次 `Again`，之后必须等 FSRS 间隔，在外部 `/reviews/senses` 继续复习。
+
+详细间隔边界见 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`。
 
 ### 3.3 阅读颜色
 
@@ -195,69 +200,64 @@ AI 还可以带很短的理由，但理由只用于预览，不参与机器绑�
 
 ---
 
-## 5. 完成阅读后的被动复习：冻结为 Good
+## 5. 阅读自然巩固：只在间隔成立时记为 Good
 
-用户已经明确决定：
-
-> 被动阅读自动复习直接等价于一次普通 Good。
+阅读可以替代一部分机械刷卡，但不能绕过 FSRS 间隔。
 
 ### 5.1 触发条件
 
-完成一次文章阅读时，某个 sense card 同时满足以下条件才可产生被动 Good：
+完成一次文章阅读时，某个 sense card 同时满足以下条件才可产生一次被动 `Good`：
 
-1. 当前文章确实出现了该 sense 对应 occurrence；
-2. 该 WordSense 在本次阅读中属于“此前已经学习过、现在自然再次遇到”的对象；本次因用户标记“不认识”而新建的 sense 排除；
-3. occurrence 有可靠绑定：用户已完成“阅读词义核对”，或“信任 AI”模式下满足 `matched_existing + confidence=high` 条件；
-4. 用户这次阅读从未点开这个 occurrence；
-5. 用户没有在这次阅读中对这张具体 sense card 做过显式评分；
-6. 该文章完成动作尚未对这张卡结算过。
+1. 当前文章确实出现了该 Sense 对应 occurrence；
+2. 该 WordSense 是此前已经学习过的 existing Sense，不是本次阅读刚建立的新 Sense；
+3. 该 ReviewCard **已经按照正式 Sense Review 的同一 due 规则到期**；提前再次看到不算一次新的正向复习；
+4. occurrence 有可靠具体 Sense 绑定；
+5. 用户本次阅读没有点开答案、请求帮助或把该 Sense 标记为“不认识”；
+6. 同一 ReadingSession 中这张 ReviewCard 尚未获得任何正向阅读结算。
 
-### 5.2 强度
+### 5.2 强度与来源
 
-FSRS 的 rating 就是 `Good`，不创建第二套“半个 Good”算法。
+满足上述条件时，FSRS rating 仍使用 `Good`，不创建“半个 Good”或 Reader 专属熟练度算法。ReviewLog 继续用 `reading_passive` 区分来源。
 
-为后续统计和诊断，ReviewLog 的来源应能区分：
-
-- 普通 Sense Review Good；
-- 阅读中显式 Good；
-- 完成阅读被动 Good。
-
-来源不同，FSRS rating 语义相同。
+尚未到期的自然遇见可以保留为阅读证据，但**不改变 FSRS、不提高熟练度**。
 
 ### 5.3 去重、预览与幂等
 
-- 同一阅读完成动作，同一 ReviewCard 最多一次被动 Good。
-- 一篇文章里同一个 sense 出现多次，也只对该卡结算一次。
-- 显式评分优先，被动 Good 不重复补分。
-- 用户点开一个 occurrence，就不再把它解释成“整篇阅读中自然认出而完全无需帮助”。
-- Finish Reading 必须是“**只读预览 → 用户确认提交**”两步：预览无论是否还有未核对项，都不能写 ReviewLog、FSRS、阅读完成状态、阅读次数或 Goal；正式提交时服务器重新按当前权威状态核对后再结算。
-- 如果还有会影响被动 Good 的未核对 occurrence，正式提交必须停止；用户需要逐项绑定到现有词义、明确选择“本次不计入”，或按既有手动流程新增词义后再绑定。不能用一个全局客户端开关直接跳过。
-- “信任 AI”只表示此前已经由服务器重新校验并持久化的 `high + matched_existing` 绑定证据；它不是 Finish Reading 的 `trust`/绕过模式。未持久化、medium/low、ambiguous、new_sense 或错误候选不能因为完成按钮参数而被视为已核对。
-- Finish Reading 重试或网络重发必须幂等，不能多写 ReviewLog，也不能重复增加阅读次数或今日目标。
-- reading-session identity 由服务器生成。浏览器可以临时记住这个服务器 ID 作为恢复指针，但不能自己生成权威 session ID。
-- 页面刷新、Finish 响应丢失或网络重试时，应恢复并重试**同一次**服务器 reading session；只有明确收到完成结果后才清掉恢复指针。这样同一次阅读里已经发生的点开、不认识、显式评分等抑制证据不会因为刷新丢失。
-- 用户以后真正重新阅读同一文章，属于新的阅读会话时，可以再次产生一次符合条件的 Good；必须由新的 reading-session identity 区分，而不是靠按钮重复点击或页面刷新。
+- 同一 ReadingSession，同一 ReviewCard 最多一次正向 reading reinforcement；同一文章出现十次也不能叠加十次。
+- 重新打开、刷新或立即另开阅读会话都不能绕过正式 due 时间。
+- 用户点开答案、求助或标记“不认识”后，本次阅读对该卡的 passive Good 资格立即失效。
+- Finish Reading 继续保持“只读预览 → 用户确认提交”，retry 必须幂等。
+- `matched_existing + high` 只解决“这是哪个 Sense”的证据问题，它本身不能绕过 due、帮助状态或失败状态。
 
 ---
 
-## 6. 阅读中显式复习：冻结流程
+## 6. 阅读失败与外部复习边界
 
-当前正文已经提供语境，因此弹层不重复当前句子。
+Reader 不再承担“失败后马上刷到认识”的短间隔复习循环。
 
-流程：
+### 6.1 已学 Sense 被标记为“不认识”
 
-1. 用户点一个已学色单词。
-2. 弹层显示当前词形、lemma、POS 和“显示答案”。
-3. 用户先回想。
-4. 点击“显示答案”。
-5. 显示该 lemma 已学过的 WordSense 列表。
-6. 用户选择记忆反馈：Again / Hard / Good / Easy。
-7. 用户再选择“刚才想到的具体词义”。
-8. 只有确定具体 WordSense 后，待定评分才写入正式 ReviewCard / ReviewLog / FSRS。
-9. 如果没有匹配词义，用户进入添加新词义；成功建卡后，待定评分可以落到新卡。
-10. 用户取消、换词或关闭流程，尚未落库的评分全部清空。
+当用户在阅读里明确点击“不认识”，随后 AI/人工确认它其实对应一个已经学习过的 existing WordSense：
 
-显式评分必须复用正式评分唯一写入链和既有撤销/幂等能力，不能把旧 inline-confirmation 接口直接升级成第二个评分系统。
+1. 这次操作成为该 ReadingSession 对该 ReviewCard 的失败边界。
+2. 同一阅读里后续再次出现这个词义，即使用户此时感觉“认识了”，也不能写 Hard/Good/Easy 或 passive Good。
+3. 只有在具体 WordSense 已确定后，才允许通过现有正式评分唯一写入链至多记录一次 `Again`；不能只按 lemma 猜卡。
+4. `Again` 之后的下一次成功复习必须由外部 `/reviews/senses` 按 FSRS 到期时间呈现。
+5. Reader 不实现 1 分钟/10 分钟等短学习步骤，不实现自己的 cooldown，也不因重复曝光提前升级熟练度。
+
+### 6.2 真正的新 Sense
+
+若“不认识”最终对应 `new_sense`：
+
+- 创建/确认 WordSense + Sense ReviewCard 属于第一次进入学习；
+- 本次阅读不写 `Again`，也不写 Good；
+- 后续正式学习在外部 Sense Review 中开始。
+
+### 6.3 历史 `reading_explicit`
+
+已有 `reading_explicit` ReviewLog 和历史验收继续保留，不篡改历史。旧“Reader 作为普通 Again/Hard/Good/Easy 四按钮复习页”的 forward 产品要求已由 2026-08-18 间隔规则取代，不再要求维持为普通用户功能。
+
+正式边界见 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`。
 
 ---
 
@@ -457,61 +457,52 @@ FSRS 技术字段、历史日志、稳定度、难度、到期时间、复杂诊
 
 ---
 
-## Phase B — 完成阅读 Good + 阅读中显式 Sense Review
+## Phase B — 阅读自然巩固 + 失败后外部复习
 
 ### 用户最终获得
 
-自然读完一篇文章可以真正强化已经认识的词义；遇到想主动复习的已学词，也能在正文中直接完成一次正式 Sense 评分。
+自然阅读在真正到期、无需帮助时可以替代一次机械 Good；但阅读不会让用户通过短时间反复看到同一个词来刷高熟练度。遇到“不认识”的已学 Sense 后，下一次成功复习必须回到外部复习页按 FSRS 间隔完成。
 
 ### 范围
 
-1. 建立 reading-session identity 与 Finish Reading 幂等结算。
-2. 正式启用“词义核对列表模式 / 信任 AI 模式”的完成阅读门，并消费 Phase A 已保存的 occurrence→sense 核对/信任证据。
-3. 被动阅读 = `Good`：
-   - 正式进入同一 FSRS 调度；
-   - ReviewLog 保留独立 source；
-   - 每卡每阅读会话最多一次；
-   - 用户点开该 occurrence 后不再被动 Good；
-   - 显式评分覆盖被动信号。
-4. 阅读中显式复习：
-   - 回想；
-   - 显示答案；
-   - 选择评分；
-   - 选择具体 WordSense；
-   - 正式写入；
-   - “都不是”可进入新增词义后继续落分。
-5. 撤销/重做复用 operation/ReviewLog 基础。
-6. Finish Reading 页面明确显示：
-   - 本次将被动 Good 多少张；
-   - 有多少个待确认义项；
-   - 有多少项被排除。
+1. 建立 ReadingSession identity 与 Finish Reading 幂等结算。
+2. 正式消费 occurrence→Sense 核对/信任证据，但证据只回答“是哪一个 Sense”，不自动等于可评分。
+3. 被动阅读 `Good` 增加正式 due 门：
+   - 复用外部 Sense Review 的 canonical due 语义；
+   - 未到期仅记录 exposure，不写 ReviewLog/FSRS；
+   - 同一 ReviewCard/ReadingSession 最多一次；
+   - 打开答案、求助、不认识都排除。
+4. 已学 existing Sense 在阅读中被标记“不认识”时：
+   - exact Sense 确定后至多通过正式 writer 写一次 `Again`；
+   - 同次阅读后续任何“认识/记得”都不能变成 Hard/Good/Easy/passive Good；
+   - 下一次正向评分只从外部 `/reviews/senses` 到期队列发生。
+5. `new_sense` 第一次建卡不制造 Again，后续从外部复习开始。
+6. 旧 generic Reader four-rating UI 不再是 forward 产品要求；历史 `reading_explicit` 数据保留。
+7. Finish Reading 页面只展示真正会结算的 due passive Good、失败/待外部复习、待确认和排除数量。
 
 ### 高风险门禁
 
-这是全计划最高风险阶段之一。必须证明：
+必须证明：
 
-- 正式评分仍只有统一写入入口；
-- 一次动作最多一个 ReviewLog；
-- retry 不重复；
-- 其他用户/语言不受影响；
-- explicit > passive；
-- AI ambiguous/new/low-confidence 永远不自动写 FSRS；
-- 同文章多 occurrence 不重复加分；
-- 现有普通 Sense Review 不回归。
+- passive Good 使用与外部 Sense Review 一致的 due 事实，不能只检查 enabled/lifecycle；
+- 同一 ReadingSession 的 unfamiliar failure 能压住所有后续正向 Reader credit；
+- existing Sense 的 Again 只有 exact WordSense 确定后才能写，且只走唯一正式评分链；
+- new Sense 不被错误记 lapse；
+- retry/延迟 AI 导回不重复写 Again；
+- 普通 Sense Review 的 Again/Hard/Good/Easy 和 FSRS 间隔不回归。
 
 ### 阶段验收
 
-必须使用专用 testing 数据库和真实页面完成：
+专用 testing DB + 真实 Reader + 真实外部 Sense Review 必须覆盖：
 
-- 单义词被动 Good；
-- 多义词人工确认后 Good；
-- 信任 AI 高置信 Good；
-- ambiguous 不写；
-- 用户点开词后不写被动 Good；
-- 显式 Again/Hard/Good/Easy；
-- 新建词义后将待定评分落到新卡；
-- 重复 Finish Reading 幂等；
-- 撤销与刷新恢复。
+- due 已学 Sense 自然阅读 → 一次 passive Good；
+- not-due 已学 Sense 自然阅读 → 0 ReviewLog/FSRS 变化；
+- 同一 Sense 多 occurrence → 最多一次 passive Good；
+- 阅读中标记 existing Sense 不认识 → exact resolve 后至多一次 Again；
+- 同次阅读稍后再次遇到并点击认识 → 0 正向评分；
+- 到 FSRS 允许的下一次时点后，只从外部 `/reviews/senses` 完成下一次正向复习；
+- `new_sense` 建卡 → 0 Again / 0 passive Good；
+- Finish retry / AI paste-back retry 幂等。
 
 ---
 
@@ -602,7 +593,7 @@ Android/iOS 的日常使用只围绕首页、阅读、复习、生词、我的�
 2. 下载文章包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense。
 3. 短期复习包包含未来几天必要 Sense cards。
 4. 离线评分和操作进入幂等队列。
-5. 阅读中的被动 Good / 显式 rating 使用既有 operation/同步边界。
+5. 阅读中的 due-only passive Good 与 existing-Sense unfamiliar→Again 使用既有 operation/同步边界；失败后的正向复习只在外部 Sense Review 执行，不在移动 Reader 内做短间隔重学。
 6. 冲突提示用普通用户能理解的文案。
 7. 长按拖选词组、Bottom Sheet、返回/前进、键盘/安全区完成移动验收。
 8. 完整 ECDICT 保留服务器，端侧只缓存文章相关摘要。
@@ -650,45 +641,21 @@ Android/iOS 的日常使用只围绕首页、阅读、复习、生词、我的�
 
 ---
 
-## Phase G — 旧高级功能隐藏/退休与产品减重
+## Phase G — English-only / reading-first 产品重基线与减重
 
-### 用户最终获得
+当前 Phase G 不再只是“把高级菜单藏起来”。2026-08-18 的实际执行顺序以 Goal ledger 的 G-06A…G-06G 为准，本节只保留产品层摘要：
 
-普通用户看不到大量工程化菜单，但原有高级能力在真正确认不再依赖前不会被粗暴删除。
+1. **English-only**：普通用户不再选择学习语言，不再进入 Japanese/JMDict/其它非英文主线；共享 user/language isolation 与历史数据不能因为 UI 收敛被误删。
+2. **阅读间隔边界**：自然阅读只有在正式 due 间隔成立且无需帮助时才产生一次 passive Good；已学 Sense 在阅读内标记“不认识”后，同次阅读后续认识不算，下一次成功复习回到外部 Sense Review。
+3. **AI 阅读**：全文翻译 + 用户标记词 + 已学 WordSense candidates 一次导出；相同/实质近义必须 `matched_existing`，不能制造重复 Sense；导回严格识别。
+4. **稳定 Reader**：翻译显示/隐藏不移动英文；材料外显示真实进度；支持自动继续阅读和多个书签。
+5. **学习记录**：首页日历点某天看到实际 WordSense；支持日期范围和 PDF/TXT/CSV 同源导出；每日目标是“在阅读中新学多少个 Sense”。
+6. **记忆分析 / FSRS**：所有用户都能看懂容易遗忘/正在巩固/掌握稳定、未来复习压力；手动优化 + 默认每 30 天自动优化；参数优化与旧卡重排严格分开。
+7. **工程型 surface 退役**：Saved Search 被学习记录替代；Tag/Marker generic 用户功能倾向退休；Manual Scheduling 离开普通流程；generic Browser 能力拆到生词详情/历史/诊断/数据迁移；Knowledge Hygiene 后台化；Article Health 变成材料异常诊断。
 
-### 首批降级/隐藏
+退休步骤仍然坚持“先有替代路径 → fresh caller/data/safety 审计 → 再隐藏/删除”。禁止为了代码干净先删共享 lower owner。
 
-- Browser / Card Info；
-- Custom Study；
-- Saved Search；
-- Tag / Marker；
-- 手动调度；
-- 大量 FSRS 技术指标；
-- 复杂统计；
-- `.apkg` 高级导入导出；
-- 备份恢复工程界面；
-- 高级文章健康和管理工具。
-
-### 退休步骤固定
-
-1. 隐藏一级入口；
-2. 依赖扫描；
-3. 路由/调用/数据统计；
-4. 真实页面回归；
-5. 确认新主流程完全不依赖；
-6. 再决定保留“高级入口”、只读兼容或删除代码。
-
-禁止“为了代码干净”直接删除功能。
-
-### 明确离开产品主线
-
-- 视频/YouTube/Jellyfin 学习流；
-- 字幕作为核心学习产品；
-- 非英文/JMDict 主线；
-- 字体管理；
-- 历史词源；
-- 用户管理复杂词典导入；
-- 泛媒体管理。
+明确离开产品主线的内容仍包括：视频/YouTube/Jellyfin 学习流、字幕核心学习产品、非英文/JMDict、字体管理、历史词源、复杂词典管理和泛媒体管理。
 
 ---
 
@@ -748,14 +715,14 @@ Android/iOS 的日常使用只围绕首页、阅读、复习、生词、我的�
 
 `D:\Document\lingl\parallel-tasks\LinguaCafe_Parallel_Working_Schemes_2026-08-07.md`
 
-当前“总设计师写本地 `PROMPT-*.md` → 并行窗口原子认领执行”的模式，固定按 **GPT-5.6 Sol High（用户口径 GPT-sol high）** 的能力规划任务，不再按 DeepSeek Flash/Pro 的能力人为切碎。Sol High 可以承担更完整的自然闭环，甚至在用户明确授权且阶段 Gate 清楚时连续完成两个相邻阶段；但正式评分/ReviewLog/FSRS、Finish Reading、legacy migration、sync/idempotency、共享 testing DB 和高冲突文件的单-owner规则不变。
+当前执行方式以 `LinguaCafe_CURRENT_LOCAL_AGENT_MODEL_AND_PARALLEL_AUTHORITY_2026-08-17.md` 和 `docs/plans/vibe-coding-collaboration-rules.md` 为准：4 个 GPT-5.6 Sol fixed DIRECT 窗口按真实依赖图并行；OpenCode free 只作辅助，DeepSeek V4 Flash Free → MiMo V2.5 Free；两个 free 都不足时才允许 Reasonix paid MiMo。Codex 新任务只有用户当前明确点名才允许。执行窗口完成当前 DIRECT 后必须停止，不能自动跨入下一任务；主窗口验收后再生成下一轮提示词。正式评分/ReviewLog/FSRS、Finish Reading、legacy migration、sync/idempotency、共享 testing DB 和高冲突文件继续保持单-owner。
 
 架构拆分时必须先结合当前产品权威、最新代码、适用的架构技能与用户提供的架构/Vibe Coding 字幕，再以 MaiMemo 官方材料作为背词产品第一外部参考，其他成熟付费学习产品用于交叉检查。字幕和外部产品只能提供设计方法/模式，不能覆盖 LinguaCafe 已冻结的 WordSense、统一正式评分内核和服务器最终权威。
 
 本计划只冻结以下原则：
 
-1. 默认总共保持 4 个窗口：1 个总设计师主窗口 + 3 个执行窗口。
-2. 高度独立时最多 5 个窗口：1 个主窗口 + 4 个执行窗口。
+1. 当前用户工作方式是 1 个总设计师主窗口负责验收/设计，另开最多 4 个 fixed DIRECT 执行窗口；每轮给用户的并行提示词固定为 4 份独立文本框。
+2. 四个执行窗口不按编号强制线性等待；无依赖立即并行，只有真实 predecessor 才等待。
 3. 主窗口在执行窗口工作时继续做产品设计、报告验收、下一批切片设计和无冲突的只读工作。
 4. 并行任务提示词都保存为本地文件。
 5. 执行窗口完整读取提示词并建立自己的 To-do 后，删除**自己的那一个提示词文件**，不得删除其他任务文件。
@@ -767,6 +734,6 @@ Android/iOS 的日常使用只围绕首页、阅读、复习、生词、我的�
 
 # 14. 当前下一步
 
-本文件创建后只完成“产品总计划冻结”，不自动开始 Phase A 开发。
+Phase A–F 已有历史实现/验收证据；当前 forward 工作从 Goal Phase G 继续。下一实现批次不能从旧 Phase A 重新开始。
 
-用户下一次要求进入开发时，先根据 Phase A 的内部依赖和当前最新 `origin/master` 生成第一组并行提示词。默认使用 4 窗口工作方案，并优先把“AI Reading Assist schema/contract”“词义确认列表/设置”“真实材料验收与 harness”拆成互不抢文件的并行 owner，再决定哪个窗口承担主实现。
+当前 next executable 是 G-06A，同时允许与其文件/数据不冲突的 G-06B Architecture Gate、G-06C 独立实现切片提前并行 prestage。每轮仍由主窗口先 fresh 验收当前 HEAD/REPORT，再给出 4 份 fixed DIRECT；执行窗口完成后停止，不能自行进入下一 milestone。

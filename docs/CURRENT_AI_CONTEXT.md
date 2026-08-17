@@ -1,27 +1,28 @@
 # LinguaCafe 当前 AI 最小上下文
 
 > 状态：Current / Minimal Context
-> 日期：2026-08-06
+> 日期：2026-08-18
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
+>
+> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 评分/被动 Good/“不认识”后的复习间隔以 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md` 为准。
 
 ## 1. 当前代码事实
 
 - 当前仓库：LinguaCafe 主开发 checkout；实际本机路径由执行环境解析，不写入仓库文档。
-- 当前分支：`master`。
-- 2026-08-06 已推送的提交链：Android 原生工程 `f243a9c` → iOS 原生工程 `4be6c39` → 移动端治理文档 `9229639d` → M7/M9 验收 Guard 纠偏 `550f5116`。
-- 本文件更新前，本地 `master`、`origin/master` 与远端 `master` 对齐到 `550f51168256ee065c9323af998d0a741c79d21f`，ahead/behind 为 0/0，暂存区与冲突均为 0。执行新任务仍必须重新运行 Git preflight，不得把本段 SHA 当作永久实时值。
+- 当前 Goal 工作分支：`goal/linguacafe-a-h-sol-medium-20260809`；执行新任务仍必须 fresh Git preflight，不把文档 SHA 当永久实时值。
+- 2026-08-18 已推送产品重基线 commit：`5bf4b8659904de2eaa73109f75cec5c4c5a654eb`（`docs: rebaseline phase g product direction`）。后续本文件中的 2026-08-06 `master` / M0–M18 SHA 记录仅用于历史追溯。
 - 当前工作树仍包含多组未提交用户资产，覆盖测试、文档和生成材料；不得批量删除、整体忽略、reset、stash、checkout、clean 或自动纳入提交。精确数量与类别以 `node scripts/workspace-inventory.mjs` 和 `git status --short` 的实时结果为准。
 - 2026-08-06 提交前 PHP 最终质量基线：Unit 727 tests / 1778 assertions / 0 failures；Feature 2811 tests / 13306 assertions / 0 failures / 14 skipped / 64 PHPUnit 12 metadata deprecations。Feature 必须直接使用 `php -d memory_limit=512M vendor/bin/phpunit tests/Feature`；`php -d memory_limit=512M artisan test` 的父进程参数不能可靠约束其 PHPUnit 子进程。
 - Feature 全套曾因 `ReviewCardMarkerMigrationTest` 的 MySQL DDL 隐式提交留下 1 条 ReviewCard，导致后续 11 项顺序依赖失败；测试已增加显式清理，完整共享进程回归已恢复为 0 failures。
 - 2026-08-03 已把 `.playwright-cli/`、`output/`、截图目录、临时登录页面、Cookie 捕获、根目录一次性 PHP/Python 调试脚本等本地产物加入 `.gitignore`。这一步只降低 Git 噪声，不删除任何已有文件。
 - 后续收口必须先运行只读工作区盘点，再按一个功能切片一组地核对代码、测试、迁移和验收文档；不得自动清理、覆盖或把无关改动混入同一提交。
-- 历史 roadmap 曾授权按云端主导移动化路线推进 M0–M18，并由 ADR-0031/ADR-0034/ADR-0037/ADR-0052 约束架构、验证和 deferred evidence。该历史授权不等于当前任务授权：`docs/execution/CURRENT_MILESTONE.json` 当前为 `active_task=NONE`、`allowed_work=[]`、`product_code_authorized=false`、`auto_advance=false`，因此不得自动进入新的产品切片。
+- 历史 recovery roadmap / `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Phase G 授权入口。当前 fixed DIRECT 批次必须由主窗口依据 Goal + Product Rebaseline 生成；每个执行窗口完成后停止，用户启动下一批次后才进入下一实现任务。
 
 本文件记录的是本地工作树事实。远端 GitHub、Agent 报告或旧交接与本地不一致时，先说明差异，不能擅自 reset、merge 或把任一方冒充唯一事实。
 
 ## 2. 产品主线
 
-LinguaCafe 是阅读优先的 sense-only 学习系统：
+LinguaCafe 当前是 **English-only、reading-first、Sense-first** 学习系统：
 
 - `WordSense` 是正式学习内容。
 - `ReviewCard.target_type=sense` 是正式 FSRS 调度对象。
@@ -29,7 +30,10 @@ LinguaCafe 是阅读优先的 sense-only 学习系统：
 - `EncounteredWord` 负责阅读颜色、词形出现和兼容状态。
 - `WordSenseOccurrence` 保存来源和例句证据。
 - `target_type=word` 是 legacy 兼容层，不进入新功能主线，也不得未经独立决策删除。
+- AI Reading Assist 首版继续是“导出提示词/包 → 用户自己的外部 AI → 粘贴 strict result”；相同或实质相同的已有 WordSense 必须 `matched_existing`，不能只因措辞不同制造新 Sense。
 - AI 推荐默认不选，中文释义必须由用户确认；默认不得自动建卡、写 ReviewLog 或改变 FSRS。
+- 自然阅读只有在卡片按正式 Sense Review due 语义已经到期、且用户没有打开答案/求助/标记不认识时，才可对具体 WordSense 产生一次 passive Good。
+- 已学 existing Sense 在本次阅读被明确标记“不认识”后，同一 ReadingSession 之后再遇到并点“认识/记得”不算成功复习；exact Sense 确定后最多写一次 Again，下一次正向复习必须在外部 `/reviews/senses` 按 FSRS 间隔完成。`new_sense` 第一次建立不伪造 Again。
 
 ### 2.1 云端主导移动化路线
 
@@ -79,7 +83,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 
 ## 3. 大计划完成情况
 
-当前 Anki 对齐的已授权仓库里程碑已经完成：
+历史 Anki 对齐的仓库里程碑已经完成；当前 forward 产品工作转入 Goal Phase G：
 
 1. Settings 架构收敛：Production Closed。
 2. Preset V1A–V1D：Production Closed。
@@ -90,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“里程碑完成”不代表代码没有 Bug，也不代表 runtime 外部 AI 已获授权。当前进入的是维护、真实体验修复和产品 Gate 阶段。
+“历史里程碑完成”不代表全产品完成。当前 Phase G 已完成 G-01…G-05 历史阶段和 2026-08-18 Product Rebase 文档；下一 forward milestones 为 G-06A English-only、G-06B spaced-reading、G-06C AI/translation、G-06D continuity、G-06E history/export、G-06F memory/FSRS、G-06G engineering-surface retirement，最后 G-GATE。
 
 ## 4. 当前本地维护账本
 
@@ -109,10 +113,10 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. P1：普通阅读模式 DOM 必须包含真实空格。
 8. P1/P2：Jellyfin 等可选集成缺失时返回安全默认值，不抛 500。
 9. P2：重复查词请求、WebSocket 失败重连和其他控制台噪声收敛。
-10. Product Accepted / Planning Required：自动备份恢复、WordSense Tag、统一搜索、统计 V2、`.apkg` 导出、文章健康检查、Browser V2、兼容的复习设置和受控插件接口。
+10. Historical Product Accepted：自动备份恢复、WordSense Tag、统一搜索、统计 V2、`.apkg`、文章健康、Browser V2 等能力已有历史实现/验收；2026-08-18 forward user-surface 是否继续保留由 Product Rebaseline / G-06G 重新分类，不再把旧“已接受”直接等同于当前用户功能。
 11. P0 工具链：Reasonix 监督发送、排队与直接引导尚未具备事务性可靠性。当前 Playwright 监督台 + WinApp UIA + 会话日志只属于 `Workaround Active`；超时后必须按唯一 marker 对账，未在当前轮次找到 `role=user` 消息时不得宣称引导成功。所有 workaround 必须保留根治任务和退出验收。详见 `docs/plans/reasonix-supervision-toolchain-bug-ledger-2026-08-05.md`。
 
-用户已确认的产品方向与待讨论议题见 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`。已接受：备份恢复、WordSense Tag、统一搜索、统计、指定格式 `.apkg`、文章健康检查、Browser 增强、兼容的复习设置、AI 重复词义文件闭环、受控插件接口和六项架构优化。通用 Note Type/Card Template、任意 Deck/Subdeck 和 sibling cards 不进入计划。
+旧产品决定与讨论来源仍可从 `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md` 追溯；其 Tag/Saved Search/Browser/Manual Scheduling/Reader four-rating 等与 2026-08-18 Product Rebaseline 冲突的 forward 结论已经 supersede。通用 Note Type/Card Template、任意 Deck/Subdeck 和 sibling cards 仍不进入当前产品计划。
 
 账号治理规则已登记：保留一个永久本地主管理员，开发数据库用户总数不超过 10；临时测试用户完成后清理。具体账号信息只留在本地任务上下文，不复制到公开文档或报告。
 
@@ -180,20 +184,17 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 
 ## 8. 当前执行方式与 Guard 收敛状态
 
-当前实际执行方式已经明确：
+当前 LinguaCafe 使用 fixed DIRECT 并行闭环：
 
-1. 使用本地 Codex 直接处理；或
-2. 网页端 GPT 通过 DevSpace 直接处理；
-3. 两种方式在文件发现、搜索、读取、替换和命令执行中都优先使用 FastCtx；
-4. 调用 Reasonix 时必须并行继续主任务，禁止停工等待 Reasonix。主执行方继续做独立侦察、测试、验收或实现，并周期性检查 Reasonix 结果，把已完成结论及时吸收到当前判断；只有下一步客观上只能依赖 Reasonix 返回时，才允许短暂等待。
+1. 主窗口负责 fresh Git/报告验收、产品/架构判断和下一批 4 份 DIRECT。
+2. 四个 GPT-5.6 Sol 执行窗口按真实依赖图并行；无依赖立即工作，只有真实 predecessor 才等待。
+3. OpenCode 是免费辅助层：`opencode/deepseek-v4-flash-free` → `opencode/mimo-v2.5-free`；两个 free 都不足且确需更强独立审查时，才允许 Reasonix `opencode-go/mimo-v2.5`。
+4. Codex 新任务只有用户当前明确点名授权才可创建；已授权运行中的 Codex 可以监督/复核。
+5. FastCtx/DevSpace 是本地文件/Git/命令首选；本地 Agent 运行时 owner 继续做独立工作，不空等。
+6. 每个执行窗口完成当前 DIRECT 后停止，不自动领取下一任务；主窗口验收后只生成下一批提示词，用户启动后才进入下一实现批次。
+7. 同文件 writer、正式 ReviewLog/FSRS 写链、shared testing DB writer、Git integration owner 仍必须事实串行。
 
-以下旧流程均已停用，不再作为当前规则：
-
-- “一个主执行 Agent 对全部结果负责”；
-- OpenCode → CodeBuddy → WorkBuddy 接力；
-- CodeBuddy / WorkBuddy 固定复核链。
-
-旧“单主 Agent”正文已从当前协作规则删除，`GlmSingleAgentWorkflowDocsGuard.test.mjs` 已由 `CurrentExecutionWorkflowDocsGuard.test.mjs` 取代。新 guard 只保护当前两种执行路径、FastCtx-first 和“未来并行能力不得冒充已实现”。
+CodeBuddy / WorkBuddy 旧固定接力不是当前默认流程；只有用户以后明确重新启用时才按当轮授权处理。
 
 文档 guard 收敛：
 
@@ -218,8 +219,8 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 
 ## 10. 历史 roadmap 状态与当前停止点
 
-- 历史持续目标按云端主导、有限离线路线推进全部里程碑；这是已完成工作的路线记录，不是当前新的代码授权。
-- 当前里程碑锁为 `active_task=NONE`、`allowed_work=[]`、`product_code_authorized=false`、`auto_advance=false`。当前只允许完成已明确授权的提交前收口，不得自动进入新的产品功能切片。
+- 历史持续目标按云端主导、有限离线路线推进 M0–M18；这是已完成工作的路线记录，不是当前 Phase G 的执行顺序。
+- 当前执行边界以 Goal Phase G + fixed DIRECT 为准。主窗口可以规划下一 milestone，但执行窗口不能自行 auto-advance；任何新实现批次都由用户实际启动对应 DIRECT。
 - M1–M8、M10–M16 已 Accepted / Closed；M17 Web slice 已关闭，Android Haptics/Local Notifications 证据由 M7 平台验收持有；M18 共享实现与 Web/Android 离线音频证据已关闭。M9 source/config 与发布材料为 Implementation Accepted。
 - M5 testing-bound 真实 `/reviews/senses` 页面评分已清零 M1 deferred seam。
 - 2026-08-01 booted Android 12 模拟器完成了 M7/M8 以及相关 Haptics/Notifications/离线音频平台证据；2026-08-06 最新重建 debug APK 没有设备复验。当前唯一未完成的产品能力簇仍是 M9 iOS sync/Xcode/签名/模拟器/真机/TestFlight/App Store，且 sync 前必须清除旧 generated bundle 与 sourcemap。

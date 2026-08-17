@@ -2,11 +2,16 @@
 
 > **历史追溯提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md` 和 `docs/execution/CURRENT_MILESTONE.json`。本文包含被既有文档 guard 锁定的历史正文，只在追溯某个任务时读取顶部状态区和相关段落，不是当前任务授权入口，不默认加载全文。
 
-> **Current authority — 2026-08-06**
+> **Current authority — 2026-08-18**
+>
+> - **Forward product authority**：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。
+> - **Current execution roadmap**：Goal Phase G，G-01…G-05 historical DONE；G-06A…G-06G + G-GATE current TODO。
+> - **Reader spaced-review boundary**：`docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`。Reader 不是失败后的短间隔刷卡页；existing Sense 被标记“不认识”后，同次阅读后续认识不计正向复习，下一次成功复习回到外部 Sense Review。
+> - 下方 2026-08-06 / 2026-07 历史状态继续保留用于追溯；与上述三条冲突时不再作为 current authority。
 >
 > - Historical roadmap authority (2026-08-01): M1–M8、M10–M16，以及 M17/M18 的 Web + Android slices 均 **Accepted / Closed**。M9 本地实现与发布材料已 **Implementation Accepted**；iOS Xcode/签名/设备/TestFlight/App Store 能力簇的真实证据仍未完成，整体状态仍为 **Not Complete**。该历史路线不授权当前自动推进；当前锁以 `docs/execution/CURRENT_MILESTONE.json` 为准。
 > - Manual Sense POS + shared create/edit form + inline validation: **Accepted / Production Closed** on master `a0916784951be69b411066446a03be940373589f`.
-> - Current product and architecture route: `docs/plans/anki-aligned-product-and-architecture-roadmap.md`.
+> - Historical product/architecture route: `docs/plans/anki-aligned-product-and-architecture-roadmap.md`（2026-08-18 forward 已被 Product Rebaseline + Goal Phase G supersede）。
 > - Settings architecture convergence: **Accepted / Production Closed** (ADR-0023).
 > - Preset V1A — Default Preset Foundation and Transparent Binding: **Accepted / Production Closed** (ADR-0024; web-side DevSpace5 + Chrome verification on 2026-07-15).
 > - Preset V1B — Management Operations and UI: **Accepted / Production Closed** (ADR-0025; direct DevSpace5 + Chrome execution on 2026-07-15).
@@ -14,7 +19,7 @@
 > - Preset V1D — Settings UX and Production Closure: **Accepted / Production Closed**. Settings UX-1 is accepted under ADR-0027; the final matrix covered two local users, English/French, create/clone/rename/switch/shared edit/delete-rebind/refresh persistence, local-only Network, clean Console, database delta, and unchanged ReviewCard due checksum.
 > - ReaderSidebar-Boundary-Fix-1: **Accepted**. Wide sidebar widths are now 540/500/460px, the reader reserves an additional 24px visible outer boundary, and the narrow fallback remains 400px. This was a scoped defect fix, not authorization to enter the Reader architecture phase.
 > - Browser architecture verification: Phase 3A–3D is Accepted / Production Closed. Search, table, Card Info, scheduling, lifecycle, deletion and leech governance retain separate owners; current measurements belong in `docs/CURRENT_AI_CONTEXT.md`, not this authority block.
-> - Current phase status: **Existing authorized repository milestones are closed.** The newly accepted product directions are planning entries only and do not authorize code implementation. See `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`.
+> - Historical phase status: previous authorized repository milestones were closed. Current forward implementation is now organized by Goal Phase G fixed DIRECT batches; old product-decisions document is history where it conflicts with the 2026-08-18 Product Rebaseline.
 > - The former statement “overall architecture closure 100%” is historical. Domain boundaries are identified, while measurable structural debt remains under active governance.
 > - Current code and architecture measurements are maintained in `docs/CURRENT_AI_CONTEXT.md` and the architecture audits. This handoff does not freeze file line counts or a permanent numeric debt score.
 > - Phase 7A lifecycle through Phase 7E generation: **Accepted / Production Closed** (`7214c3a`, `8f2b078`, `c76c0fe`, `8f2a70c`, `7cf7de9`). The Phase 7E protected matrix passed 1,093 tests / 6,124 assertions, the build succeeded in 6.21 seconds, and official Browser acceptance created one confirmed sense card with a bound synthetic source, zero ReviewLog rows, unchanged new-card FSRS state, and complete fixture cleanup.
@@ -22,7 +27,7 @@
 > - PHP / PHPUnit final regression uses the testing DB lock and direct PHPUnit execution. Unit may run as `php -d memory_limit=512M artisan test tests/Unit --compact`; Feature must run as `php -d memory_limit=512M vendor/bin/phpunit tests/Feature --colors=never` because the parent `artisan test` memory override does not reliably constrain its PHPUnit child process.
 > - 2026-08-06 final dirty-worktree PHP split evidence: Unit 727 tests / 1778 assertions / 0 failures; Feature 2811 tests / 13306 assertions / 0 failures / 14 skipped / 64 PHPUnit 12 metadata deprecations. `ReviewCardMarkerMigrationTest` now explicitly removes its DDL-backfill fixture so MySQL implicit commits cannot pollute later tests.
 > - 2026-08-06 final aggregate suite evidence: 3538 tests / 15447 assertions / 0 failures / 2 skipped / 64 PHPUnit 12 metadata deprecations, with the direct PHPUnit process limited to 512MB. This ordered aggregate suite is the final evidence for sequence pollution and shared-state safety. Skipped tests and metadata deprecations are not failures, but skipped tests were not executed and must not be described as passed. The split runs above remain historical component evidence; the aggregate run is the final cross-suite result.
-> - LinguaCafe 本地浏览器验收必须使用“当前任务提示词提供的固定本地验收身份”。仓库文档和报告不得写入其明文账号或密码；不得创建替代账号。登录失败时停止并诊断同一个固定身份，不得自动修改其账号、密码、权限或已存数据；修复该身份需要用户另行明确授权。
+> - LinguaCafe 本地浏览器验收使用“当前任务提示词提供的固定本地验收身份”。仓库文档和报告不得写入明文账号或密码。只有 server-bound sentinel 已证明当前 HTTP 进程连接专用 testing DB 后才允许使用；若该 testing DB 中固定身份不存在且当轮 DIRECT 明确允许，可创建同名本地测试身份；仍无法登录则停止写入验收，不得换随机替代账号或用 API/DB 写入冒充页面通过。
 >
 > **Authoritative Custom Study status (2026-07-15)**
 > Production closure: complete
@@ -42,13 +47,13 @@
 > - Tool facts: DevSpace 5 and Chrome DevTools 1 were used directly. Chrome snapshot IDs drifted during real-page interaction, so DOM events were dispatched inside the loaded page; no API/fetch substitute was used. Ponytail 4.8.4 is installed as an enabled Codex plugin and its minimal-solution/reuse review rules were applied manually; it exposes no standalone command here. CodeRabbit CLI/plugin and Codex Security plugin/subcommand are absent. Create State is not exposed as a callable tool in this conversation. Formal reports from unavailable engines must not be fabricated.
 
 
-> **最后更新**：2026-08-06。本文已明确降级为历史追溯文档；当前任务、允许范围和自动推进状态以 `docs/CURRENT_AI_CONTEXT.md` 与 `docs/execution/CURRENT_MILESTONE.json` 为准。
+> **最后更新**：2026-08-18。本文继续是历史追溯文档；当前任务和产品方向以 `docs/CURRENT_AI_CONTEXT.md`、Product Rebaseline、Goal Phase G 与当轮 fixed DIRECT 为准。旧 recovery `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Phase G 授权入口。
 > **Custom Study frontend update (2026-07-14)**：`/custom-study` 已接入 setup 与 preview session UI；四种 criteria、章节选择器、card limit、sessionStorage 临时 token、等待倒计时、会话过期清理、查看原文和四个 preview rating 操作均已实现。仅调用既有 Custom Study POST 路由和原文上下文 GET；不调用正式评分端点，不写 ReviewLog/FSRS/lifecycle。
 >
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
-> **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。当前执行方式是本地 Codex 或网页端 GPT + DevSpace；OpenCode / CodeBuddy / WorkBuddy 固定接力和 GLM 单 Agent 当前流程均已停用。
+> **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。当前执行方式是主窗口 + 4 个 GPT-5.6 Sol fixed DIRECT + DevSpace；OpenCode free 只作辅助，Reasonix 只在两个 free 不足时强化，Codex 新任务仅用户当前明确授权。CodeBuddy / WorkBuddy 固定接力不是当前默认流程。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
-> **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
+> **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`；Reader rating/passive Good/unfamiliar spacing 同时必须读 ADR-0059。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
 > **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/plans/ai-study-card-v6-real-provider-implementation-plan.md` 与 `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`。V6 provider-preview backend transport、显式 UI trigger、真实浏览器 Network 验收已完成；V6 推荐结果现在只能导入到现有 V4 AI 推荐词列表，默认不勾选，仍需用户手动勾选、生成最终候选包、再走 V5 人工释义确认制卡路径。禁止 provider 输出自动创建 WordSense / ReviewCard、写 ReviewLog、改 FSRS 或暴露 secret。
 
 ---
