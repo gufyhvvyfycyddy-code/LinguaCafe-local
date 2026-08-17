@@ -355,9 +355,9 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
-| G-01 | ACTIVE | inventory 一级入口与调用方：Browser/Card Info、Custom Study、Saved Search、Tag/Marker、手动调度、FSRS 技术指标、复杂统计、apkg、备份恢复、文章健康 | routes/components/services/tests | caller/route/data dependency 清单 |
-| G-02 | TODO | 普通用户一级入口隐藏，高级能力集中“我的→高级” | Phase C advanced entry | desktop/mobile 真页面；能力仍可达 |
-| G-03 | TODO | 对每项做依赖扫描与主流程回归 | existing guards/tests | 新阅读/复习/生词/材料主流程不依赖旧一级入口 |
+| G-01 | DONE | inventory 一级入口与调用方：Browser/Card Info、Custom Study、Saved Search、Tag/Marker、手动调度、FSRS 技术指标、复杂统计、apkg、备份恢复、文章健康 | routes/components/services/tests | caller/route/data dependency 清单 |
+| G-02 | DONE | 普通用户一级入口隐藏，高级能力集中“我的→高级” | Phase C advanced entry | desktop/mobile 真页面；能力仍可达 |
+| G-03 | DONE | 对每项做依赖扫描与主流程回归 | existing guards/tests | 新阅读/复习/生词/材料主流程不依赖旧一级入口 |
 | G-04 | TODO | 每项分类：保留高级 / 只读兼容 / 可删除 | G-03 evidence | 分类有当前 caller/contract 证据，不凭偏好 |
 | G-05 | TODO | 只删除已证明 orphan 的 UI/code/config/tests/docs | G-04 | 最小删除；build/tests/browser 绿；不删历史数据契约 |
 | G-06 | TODO | 明确把视频/字幕/非英文/JMDict/字体/词源/泛媒体等移出主线，不误删共享基础 | current product plan | 主导航无这些主线；共享底层若仍被核心使用则保留 |
