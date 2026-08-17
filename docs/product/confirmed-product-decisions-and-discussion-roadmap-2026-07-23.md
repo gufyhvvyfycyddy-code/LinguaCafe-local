@@ -3,6 +3,8 @@
 > 状态：Current / Product Decisions
 > 日期：2026-07-28
 > 用途：只记录用户已经明确接受的产品方向，以及尚未冻结、必须继续讨论的议题。本文不代表任何代码实现已经授权。
+>
+> **2026-08-18 supersession note**：当前 English-only / reading-first 产品方向以 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` 为准。本文继续保留历史决定与来源；其中与 Tag/Marker、Saved Search、generic Browser、Manual Scheduling 等旧用户 surface 保留要求，以及“translation overall layout 尚未冻结”相冲突的 forward 结论，已由 2026-08-18 rebaseline supersede。底层数据、兼容、caller 与安全责任仍需后续逐项证明后才能删除。
 
 ## 1. 产品定位
 
