@@ -174,36 +174,6 @@
                         mainNav: false,
                     },
                     {
-                        name: '自定义学习',
-                        url: '/custom-study',
-                        icon: 'mdi-tune-variant',
-                        mainNav: false,
-                    },
-                    {
-                        name: '复习卡管理',
-                        url: '/review-cards/manage',
-                        icon: 'mdi-card-account-details',
-                        mainNav: false,
-                    },
-                    {
-                        name: '学习总览',
-                        url: '/study-overview',
-                        icon: 'mdi-view-dashboard-outline',
-                        mainNav: false,
-                    },
-                    {
-                        name: '备份',
-                        url: '/admin/dashboard',
-                        icon: 'mdi-database',
-                        mainNav: false,
-                    },
-                    {
-                        name: '内容健康',
-                        url: '/article-health',
-                        icon: 'mdi-heart-pulse',
-                        mainNav: false,
-                    },
-                    {
                         name: '用户手册',
                         url: '/user-manual',
                         icon: 'mdi-account-question',

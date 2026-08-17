@@ -14,7 +14,6 @@ const legacySession = readFileSync(
     'utf8',
 );
 const app = readFileSync(new URL('../../resources/js/app.js', import.meta.url), 'utf8');
-const layout = readFileSync(new URL('../../resources/js/components/Layout.vue', import.meta.url), 'utf8');
 
 for (const scenario of ['today_forgotten', 'backlog', 'review_ahead', 'recent_new', 'filtered']) {
     assert.match(page, new RegExp(scenario));
@@ -53,6 +52,5 @@ assert.match(legacySession, /\/custom-study\/sessions\/answer/);
 assert.match(legacySession, /\/custom-study\/sessions\/resume/);
 
 assert.match(app, /path: '\/custom-study', component: CustomStudy/);
-assert.match(layout, /url: '\/custom-study'/);
 
 console.log('CustomStudy page guard passed.');

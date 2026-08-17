@@ -15,6 +15,9 @@ const advancedRoutes = [
     ['文章检查', '/article-health'],
 ];
 
+const layoutNavigation = layout.match(/navigation:\s*\[([\s\S]*?)\]\s*,/)?.[1];
+assert.ok(layoutNavigation, 'Missing Layout navigation array');
+
 test('My settings owns one user-facing advanced entry', () => {
     assert.match(settings, /<v-tab>高级<\/v-tab>/);
     assert.match(settings, /高级功能/);
@@ -31,7 +34,13 @@ test('advanced entry reuses the existing route families without engineering labe
     assert.doesNotMatch(settings, /url:\s*['"]\/vocabulary\/search['"]/);
     assert.doesNotMatch(settings, /FSRS|Leech|ReviewCard|target_type|生命周期/);
     assert.doesNotMatch(layout, /高级复习卡管理/);
-    assert.match(layout, /name:\s*['"]复习卡管理['"][\s\S]*?url:\s*['"]\/review-cards\/manage['"]/);
+    for (const [title, url] of advancedRoutes) {
+        assert.doesNotMatch(
+            layoutNavigation,
+            new RegExp(`\\burl:\\s*['"]${url.replaceAll('/', '\\/')}['"]`),
+            `${title} must not be duplicated in Layout navigation`,
+        );
+    }
 });
 
 test('admin settings remains a single role-gated drawer entry', () => {
