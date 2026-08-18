@@ -318,6 +318,26 @@
                                 <div v-if="vi.result" class="caption mb-1">
                                     AI 判断：<strong>{{ resultLabel(vi.result) }}</strong>
                                 </div>
+                                <v-alert
+                                    v-if="vi.result === 'new_sense' && existingCandidatesFor(vi).length"
+                                    dense
+                                    outlined
+                                    type="warning"
+                                    class="mt-2 mb-2"
+                                >
+                                    <div class="caption font-weight-medium mb-2">
+                                        AI 判断为新词义，但你已经学过这个词的其它词义。请先比较已有词义；如果意思相同或十分接近，不应新增。
+                                    </div>
+                                    <div
+                                        v-for="candidate in existingCandidatesFor(vi)"
+                                        :key="'existing-sense-' + candidate.word_sense_id"
+                                        class="caption mb-2"
+                                    >
+                                        <div>已有词义中文：{{ candidate.sense_zh || '—' }}</div>
+                                        <div v-if="candidate.sense_en">English：{{ candidate.sense_en }}</div>
+                                        <div v-if="candidate.pos">词性：{{ candidate.pos }}</div>
+                                    </div>
+                                </v-alert>
                                 <div class="body-2 mb-1">
                                     中文释义：<span v-html="hl(vi.meaning_zh, detailSearchQuery)"></span>
                                 </div>
@@ -442,6 +462,7 @@
         isReaderAiAssistV2,
         normalizeReaderAiAssistPreview,
         normalizeReaderAiAssistSourceMeta,
+        readerAiAssistCandidatesForOccurrence,
         readerAiAssistErrorMessage,
         readerAiAssistPackageKey,
         readerAiAssistResultLabel,
@@ -582,6 +603,10 @@
         methods: {
             resultLabel: readerAiAssistResultLabel,
             readerAiAssistPackageKey,
+            existingCandidatesFor(item) {
+                if (!item || item.result !== 'new_sense') return [];
+                return readerAiAssistCandidatesForOccurrence(this.sourceMeta, item.occurrence_id);
+            },
             confidenceColor(level) {
                 const map = {
                     high: 'green',

@@ -52,6 +52,24 @@ export function readerAiAssistV2InputsComplete(sourceMeta = {}, aiTextByPart = {
     });
 }
 
+export function readerAiAssistCandidatesForOccurrence(sourceMeta = {}, occurrenceId = '') {
+    const targetId = typeof occurrenceId === 'string' ? occurrenceId.trim() : '';
+    if (!targetId) return [];
+
+    const packages = Array.isArray(sourceMeta.packages) ? sourceMeta.packages : [];
+    for (const pkg of packages) {
+        const wordTargets = Array.isArray(pkg?.source_payload?.word_targets)
+            ? pkg.source_payload.word_targets
+            : [];
+        const target = wordTargets.find(item => item && item.occurrence_id === targetId);
+        if (target) {
+            return Array.isArray(target.candidate_word_senses) ? target.candidate_word_senses : [];
+        }
+    }
+
+    return [];
+}
+
 export function buildReaderAiAssistV2ImportRequest(
     chapterId,
     sourceMeta = {},

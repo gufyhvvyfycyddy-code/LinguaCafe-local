@@ -8,6 +8,7 @@ import {
     normalizeReaderAiAssistSourceMeta,
     isReaderAiAssistV2,
     readerAiAssistErrorMessage,
+    readerAiAssistCandidatesForOccurrence,
     readerAiAssistPackageKey,
     readerAiAssistResultLabel,
     readerAiAssistV2InputsComplete,
@@ -55,6 +56,41 @@ test('builds V2 multi-part import body from server-issued manifests and fails cl
         ],
         apply_trust_ai: true,
     });
+});
+
+test('resolves server-issued candidate senses by occurrence identity without a second source', () => {
+    const sourceMeta = normalizeReaderAiAssistSourceMeta({
+        schema_version: 'linguacafe_ai_reading_assist_v2',
+        packages: [
+            {
+                part_index: 1,
+                source_payload: {
+                    word_targets: [{
+                        occurrence_id: 'occ2-bank',
+                        candidate_word_senses: [
+                            { word_sense_id: 95, sense_zh: '河岸', sense_en: 'land along a river', pos: 'NOUN' },
+                        ],
+                    }],
+                },
+            },
+            {
+                part_index: 2,
+                source_payload: {
+                    word_targets: [{
+                        occurrence_id: 'occ2-run',
+                        candidate_word_senses: [
+                            { word_sense_id: 96, sense_zh: '运行', sense_en: 'operate', pos: 'VERB' },
+                        ],
+                    }],
+                },
+            },
+        ],
+    });
+
+    assert.deepEqual(readerAiAssistCandidatesForOccurrence(sourceMeta, 'occ2-run'), [
+        { word_sense_id: 96, sense_zh: '运行', sense_en: 'operate', pos: 'VERB' },
+    ]);
+    assert.deepEqual(readerAiAssistCandidatesForOccurrence(sourceMeta, 'occ2-missing'), []);
 });
 
 test('normalizes V2 word results while preserving V1-compatible detail aliases', () => {
@@ -121,6 +157,12 @@ test('Reader AI Assist requests V2 source contract, wires strict V2 import, and 
     assert.doesNotMatch(source, /axios\.post\('\/chapters\/ai-assist\/preview', \{\s*chapterId: this\.chapterId,\s*aiText:/s);
     assert.match(source, /resultLabel\(vi\.result\)/);
     assert.match(source, /vi\.sense_en/);
+    assert.match(source, /vi\.result === 'new_sense' && existingCandidatesFor\(vi\)\.length/);
+    assert.match(source, /AI 判断为新词义，但你已经学过这个词的其它词义。请先比较已有词义；如果意思相同或十分接近，不应新增。/);
+    assert.match(source, /candidate\.sense_zh/);
+    assert.match(source, /candidate\.sense_en/);
+    assert.match(source, /candidate\.pos/);
+    assert.match(source, /readerAiAssistCandidatesForOccurrence\(this\.sourceMeta, item\.occurrence_id\)/);
 });
 
 test('Reader AI V2 source sends the server unfamiliar-target snapshot version and fails closed before freshness is known', () => {

@@ -42,6 +42,22 @@ class AiReadingAssistV2BatchingTest extends TestCase
         $this->assertSame($expectedSizes, array_column($result['packages'], 'target_count'));
     }
 
+    public function test_prompt_requires_semantic_reuse_before_new_sense(): void
+    {
+        $catalog = V2Harness::catalog(1, [0 => [111]]);
+        $service = V2Harness::service(fn () => $catalog);
+        $prompt = V2Harness::packages($service)[0]['prompt'];
+
+        $this->assertStringContainsString('compare the current contextual learnable meaning against all supplied candidate_word_senses', $prompt);
+        $this->assertStringContainsString('same or substantially the same learnable meaning', $prompt);
+        $this->assertStringContainsString('Wording, paraphrase, Chinese translation phrasing, English definition wording, or example style differences alone never justify new_sense', $prompt);
+        $this->assertStringContainsString('new_sense only when the contextual meaning is genuinely distinct from every supplied candidate', $prompt);
+        $this->assertStringContainsString('If you cannot determine the comparison reliably, return ambiguous', $prompt);
+        $this->assertStringContainsString('result is matched_existing, new_sense, or ambiguous', $prompt);
+        $this->assertStringContainsString('matched_word_sense_id must be one supplied candidate', $prompt);
+        $this->assertStringContainsString('Do not add, remove, merge, split, or select targets', $prompt);
+    }
+
     public static function packageCountProvider(): array
     {
         return [
