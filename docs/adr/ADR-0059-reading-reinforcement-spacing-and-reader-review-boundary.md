@@ -1,8 +1,10 @@
 # ADR-0059 — Reading Reinforcement Spacing and Reader Review Boundary
 
-- Status: Accepted product/architecture direction; implementation pending
+- Status: Superseded for forward implementation by ADR-0060 on 2026-08-18
 - Date: 2026-08-18
-- Scope: English Reader → WordSense → ReviewCard / ReviewLog / FSRS interaction
+- Scope: Historical reading-spacing decision; retained for rationale and evidence
+
+> Supersession note: the user subsequently clarified that a genuine reading recall may count as a formal **early review even when the current `fsrs_due_at` is still in the future**. Therefore this ADR's `due-only` positive-reading rule must not be implemented. Current forward authority is `ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`. The same-session no-stacking, existing-Sense failure, new-Sense-not-lapse, and no-second-scheduler principles remain historical inputs where ADR-0060 retains them.
 
 ## Context
 

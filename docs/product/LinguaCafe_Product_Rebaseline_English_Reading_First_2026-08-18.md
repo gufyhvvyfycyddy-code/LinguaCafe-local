@@ -78,26 +78,29 @@ Wording differences alone never justify a new WordSense.
 
 Current code already validates package identity, candidate IDs, target completeness, stale packages, and the three result types. It does not yet enforce the new semantic anti-duplicate instruction. The later implementation must close that gap without inventing a second semantic truth source. When an AI still returns `new_sense` despite existing candidates, the product must expose those candidates during confirmation so a redundant Sense is not silently created.
 
-High-confidence trusted `matched_existing` evidence may feed passive-reading reinforcement only when the separate spacing rules below are also satisfied. `new_sense`, `ambiguous`, low/medium-confidence results, assisted/opened occurrences, not-yet-due cards, and same-session unfamiliar failures do not create passive Good.
+High-confidence trusted `matched_existing` evidence may support a reading-derived review only when the reading-review rules below are satisfied. `new_sense`, `ambiguous`, low/medium-confidence results, unresolved identity, or same-session unfamiliar failures do not create a positive review merely because AI returned data.
 
-## 4. Reading reinforcement and spacing boundary
+## 4. Reading reinforcement, early review, and single-credit boundary
 
-Reading reduces unnecessary flashcard work, but it must not become a way to defeat spaced repetition.
+Reading is a real memory event. It may move a formal review **earlier** than the card's current scheduled due time, but repeated exposure must not be allowed to manufacture many reviews.
 
 The current product rule is:
 
-- natural recognition may produce at most one passive `Good` for a ReviewCard in one ReadingSession;
-- passive `Good` is allowed only when that card is already due under the same canonical Sense Review due semantics used by the external review queue;
-- repeated occurrences, immediate rereading, refresh, or starting another reading session before the next due time do not stack positive familiarity;
-- opening a word for help/answer inspection suppresses passive success for that reading;
-- when the user explicitly marks an occurrence as `不认识` and it later resolves to an **already learned existing WordSense**, that failure blocks every later Hard/Good/Easy/passive-success attempt for the same ReviewCard in that ReadingSession;
-- after exact WordSense resolution, that existing learned Sense may receive at most one formal `Again` through the existing canonical rating writer; the Reader must not create a second scheduler or short-interval relearning loop;
-- the next successful positive review after that failure must happen in the external Sense Review page when FSRS makes the card eligible;
-- if the unfamiliar occurrence is a genuinely `new_sense`, first enrollment is not a lapse and must not manufacture an `Again`.
+- a learned existing WordSense can receive one formal reading-derived review even when its current `fsrs_due_at` is still in the future;
+- natural, unassisted recognition with reliable exact-Sense evidence may settle as one `Good` at Finish Reading (`reading_passive`);
+- when the learner deliberately opens the recognition flow, recalls the meaning, confirms the exact existing Sense, and chooses “认识 / 记得”, that may settle immediately as one `Good` (`reading_explicit`); clicking the word is not itself disqualifying when the action is a self-recognition confirmation rather than help;
+- opening/revealing help because the learner needs the answer prevents that occurrence from being treated as **passive** recognition;
+- the same ReviewCard may receive at most one formal reading-derived rating in one ReadingSession; ten occurrences of the same Sense still count as at most one review;
+- after a formal reading Good/Again is written, FSRS recalculates memory state and the next due from the actual review time; Reader must not create a second interval or familiarity system;
+- when the user explicitly marks an occurrence as `不认识` and it later resolves to an **already learned existing WordSense**, that failure may create at most one formal `Again` and blocks every later positive reading rating for the same ReviewCard in that ReadingSession;
+- the Reader does not run the short-step relearning loop after Again; follow-up learning remains owned by the existing formal Sense Review / FSRS system;
+- if the unfamiliar occurrence is a genuinely `new_sense`, first enrollment is not a lapse and must not manufacture an `Again` or same-reading Good.
 
-The older generic “Reader itself is a normal Again/Hard/Good/Easy review surface” direction is no longer a forward product requirement. Existing historical `reading_explicit` ReviewLogs remain valid data.
+The forward Reader experience therefore centers on the reading decisions `认识/记得 → Good` and `不认识 → Again` after exact existing-Sense confirmation. The external Sense Review keeps the full Again/Hard/Good/Easy controls. Existing historical `reading_explicit` four-rating ReviewLogs remain valid data.
 
-The architecture authority for this boundary is `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`.
+Cross-session anti-farming still requires a corrected G-06B Architecture Gate: it must allow meaningful early review such as a day-7 encounter of a card whose prior forecast was day 30, while preventing immediate repeated reading sessions from stacking credit. It must derive that rule from existing ReviewLog/ReviewCard/FSRS facts rather than inventing a Reader cooldown or second due truth.
+
+The current architecture authority for this boundary is `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`. ADR-0059 is historical and its `due-only` rule must not be implemented.
 
 ## 5. Stable translation layout
 
@@ -171,8 +174,8 @@ The result is centered on concrete WordSenses and their learning/review events, 
 At minimum the history distinguishes:
 
 - newly learned through reading;
-- due-only natural reinforcement (`reading_passive`);
-- explicit reading failure/history (`reading_explicit`, including historical rows; forward positive four-rating Reader UI is not required);
+- natural reading review (`reading_passive`), including a legitimate early Good;
+- explicit reading review (`reading_explicit`), including current Good/Again intent and historical four-rating rows;
 - external formal Sense Review (`sense_review`).
 
 Where available, rows show the Sense, source/article context, relevant sentence, rating/event type, and current memory state. A same-reading later “认识/记得” after an unfamiliar failure must not appear as a successful learning event.
@@ -304,7 +307,7 @@ This document authorizes product direction and roadmap rewriting only. It does n
 The next Phase G implementation work is split in the Goal ledger into:
 
 - G-06A English-only convergence;
-- G-06B reading reinforcement spacing + Reader/external-review boundary;
+- G-06B opportunistic early reading review + same-session single-credit + failure/short-step boundary;
 - G-06C AI anti-duplicate + stable translation layout;
 - G-06D reading progress/resume/bookmarks;
 - G-06E daily new-Sense goal + learning history/date-range exports;

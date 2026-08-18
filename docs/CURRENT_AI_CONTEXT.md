@@ -4,7 +4,7 @@
 > 日期：2026-08-18
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 评分/被动 Good/“不认识”后的复习间隔以 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md` 为准。
+> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 的机会式提前 Good、同 session/card 单次计分、existing-Sense“不认识”→Again 与短间隔边界以 `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md` 为准；ADR-0059 due-only 规则已 supersede。
 
 ## 1. 当前代码事实
 
@@ -32,8 +32,8 @@ LinguaCafe 当前是 **English-only、reading-first、Sense-first** 学习系统
 - `target_type=word` 是 legacy 兼容层，不进入新功能主线，也不得未经独立决策删除。
 - AI Reading Assist 首版继续是“导出提示词/包 → 用户自己的外部 AI → 粘贴 strict result”；相同或实质相同的已有 WordSense 必须 `matched_existing`，不能只因措辞不同制造新 Sense。
 - AI 推荐默认不选，中文释义必须由用户确认；默认不得自动建卡、写 ReviewLog 或改变 FSRS。
-- 自然阅读只有在卡片按正式 Sense Review due 语义已经到期、且用户没有打开答案/求助/标记不认识时，才可对具体 WordSense 产生一次 passive Good。
-- 已学 existing Sense 在本次阅读被明确标记“不认识”后，同一 ReadingSession 之后再遇到并点“认识/记得”不算成功复习；exact Sense 确定后最多写一次 Again，下一次正向复习必须在外部 `/reviews/senses` 按 FSRS 间隔完成。`new_sense` 第一次建立不伪造 Again。
+- 已学 exact Sense 可以在当前 `fsrs_due_at` 之前因真实阅读回忆提前完成一次正式 Good：自然且无需帮助的 reliable binding 可在 Finish 记 `reading_passive Good`；用户主动点开、自己认出并确认 exact Sense 后选择“认识/记得”可记 `reading_explicit Good`。同一 ReadingSession / ReviewCard 最多一笔正式 reading rating，同篇 10 个 occurrence 也不能叠加。
+- 已学 existing Sense 在本次阅读被明确标记“不认识”后，exact Sense 确定时最多写一次 `Again`；同一 ReadingSession 后续再遇到并点“认识/记得”不能翻成正向评分。`new_sense` 第一次建立不伪造 Again/Good。跨 ReadingSession 防刷必须允许有意义的 early review，同时不得另造 Reader cooldown/第二 scheduler，精确 predicate 由 G-06B R2 冻结。
 
 ### 2.1 云端主导移动化路线
 

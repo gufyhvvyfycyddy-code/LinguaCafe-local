@@ -54,22 +54,25 @@ for (const source of [agents, adr31, adr37]) {
 }
 assert.match(adr37, /不是 Agent 自行批准新的产品\s*边界/);
 
-// Local acceptance identity is testing-only, least-privilege, and credential-safe.
+// Local acceptance identity is testing-only and credential-safe. Current fixed-DIRECT identity
+// overrides the older generic least-privilege fallback only inside a proven dedicated testing DB.
 for (const source of [agents, adr33, adr34, browserPlaybook]) {
   assert.match(source, /专用 testing 数据库/);
-  assert.match(source, /最小权限/);
-  assert.match(source, /正常.*登录|正常 UI|正常认证入口/);
+  assert.match(source, /正常.*登录|正常 UI|正常认证入口|正常首次设置|正常首次设置\/注册流程/);
   assert.match(source, /不得在\s*普通开发数据库创建[\s\S]{0,40}(?:直接删号|直接数据库删除)/);
 }
+assert.match(adr34, /最小权限/);
 assert.match(adr34, /codex-acceptance-<task-marker>@example\.test/);
 assert.match(adr34, /密码不得进入仓库、shell 参数、命令输出/);
+assert.match(agents, /fixed DIRECT[\s\S]{0,220}固定本地测试身份/);
+assert.match(agents, /同名[\s\S]{0,180}testing-only 首管理员/);
+assert.match(agents, /只有当前 DIRECT 未提供固定身份[\s\S]{0,100}最小权限/);
+assert.match(browserPlaybook, /固定本地测试身份[\s\S]{0,260}同名[\s\S]{0,180}首管理员/);
+assert.match(browserPlaybook, /禁止为了绕过固定身份创建随机替代邮箱/);
 assert.match(agents, /ADR-0053[\s\S]{0,240}scoped ADB/);
 assert.match(adr53, /no full password literal appears in the command source or a process argument/);
 assert.match(adr53, /ordinary UI key events one character at a time/);
 assert.match(adr53, /does not authorize existing credentials/);
-for (const source of [agents, adr33, adr34, browserPlaybook]) {
-  assert.match(source, /提供的.*测试账号[\s\S]{0,120}(?:专用 testing 数据库|testing 数据库)[\s\S]{0,80}权限/);
-}
 assert.match(fsrsRoadmap, /具体账号和临时密码已从仓库文档移除/);
 assert.match(fsrsRoadmap, /具体 session 值已从仓库文档移除/);
 assert.match(fsrsRoadmap, /专用 testing 数据库[\s\S]{0,120}最小权限/);

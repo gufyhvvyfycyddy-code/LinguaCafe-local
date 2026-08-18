@@ -11,8 +11,8 @@
 > | Historical Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E; provider Environment Gate (default-off) |
 > | Historical Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
 > | Current Phase | Goal Phase G product rebase：G-01…G-05 historical DONE；G-06A…G-06G + G-GATE are current forward milestones. |
-> | Current Product Boundary | English-only；reading-first；Sense-first；自然阅读只能在正式 due 间隔成立且无需帮助时产生一次 passive Good；已学 Sense 在阅读内标记“不认识”后，同次阅读后续认识不算正向复习，下一次成功复习回到外部 Sense Review。 |
-> | Current Reader Review ADR | `ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md` |
+> | Current Product Boundary | English-only；reading-first；Sense-first；已学 exact Sense 可以在当前 due 之前因真实阅读回忆提前完成一次 Good；自然 passive 与主动确认“认识/记得”的 explicit Good 都复用正式 FSRS writer；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”则 exact resolve 后最多一次 Again，且同 session 后续认识不能翻盘。 |
+> | Current Reader Review ADR | `ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`（ADR-0059 due-only 历史已 supersede） |
 > | Environment Gate | Default-off provider implementation gate remains closed; runtime external activation remains separately gated |
 >
 > Custom Study 1A and Card Marker + Custom Study 1B are Accepted / Production Closed. `/custom-study` now includes the five frozen criteria, including `marked`; Marker remains ReviewCard metadata and the session remains preview-only. Phase 4 evidence is in `docs/testing/card-marker-custom-study-1b-browser-acceptance-2026-07-18.md`; earlier 1A history remains archived in `docs/history/custom-study-1a-production-closure-history-2026-07-14.md`.
@@ -29,7 +29,7 @@
 
 > **Historical Phase 5A update (superseded 2026-07-14)**: this earlier slice added the authenticated read-only `GET /custom-study/chapter-options` endpoint and aligned sentence/token/translation identity before the frontend existed. The production frontend and browser closure described in the authoritative status above now supersede that interim state.
 
-> **最后更新**：2026-08-18。恢复发布程序历史已关闭；当前 active product roadmap 已转入 Goal Phase G 的 English-only / reading-first rebase。Open Work Registry 继续保存运维/外部能力账本，但不再冒充唯一产品待办。旧 PD-012 generic Reader four-rating forward 要求已由 Product Rebaseline + ADR-0059 supersede。
+> **最后更新**：2026-08-18。恢复发布程序历史已关闭；当前 active product roadmap 已转入 Goal Phase G 的 English-only / reading-first rebase。Open Work Registry 继续保存运维/外部能力账本，但不再冒充唯一产品待办。旧 PD-012 generic Reader four-rating forward 要求已由 Product Rebaseline + ADR-0060 收束为 Reader `认识/记得=Good` / `不认识=Again` 的机会式提前复习；ADR-0059 due-only 规则只保留历史。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。
@@ -222,7 +222,7 @@
 | 4 | Reasonix / DevSpace / 浏览器监督工具链可靠性 | `Workaround Active / Root Fix Open` | 继续使用唯一 marker、会话对账和失败留证；在根治验收前不得把 workaround 称为稳定能力 | `reasonix-supervision-toolchain-bug-ledger-2026-08-05.md` |
 | 5 | 旧电脑或其他仓库复现 | `Deferred / Unverified` | 只有用户提供目标设备或明确切换仓库时再执行 | 当前 checkout 与 remote 事实 |
 
-> **当前产品决定路由**：2026-08-18 Product Rebaseline + Goal Phase G 是 forward 产品权威。PD-012 generic Reader four-rating 只保留历史来源；当前阅读强化/失败后外部复习边界由 ADR-0059 控制。PD-013 的 M1“下一里程碑”措辞也只属于 2026-07-28 历史路线基线，不构成当前下一任务授权。
+> **当前产品决定路由**：2026-08-18 Product Rebaseline + Goal Phase G 是 forward 产品权威。PD-012 generic Reader four-rating 只保留历史来源；当前机会式提前复习、单次计分、existing-Sense failure Again 边界由 ADR-0060 控制。PD-013 的 M1“下一里程碑”措辞也只属于 2026-07-28 历史路线基线，不构成当前下一任务授权。
 
 当前仓库内 M1–M8、M10–M16、M17 Web slice、M18 共享实现与 Web/Android 证据，以及 Settings/Browser/Reader/Reviewer/AI Study Card default-off 路线均已有关闭证据。M17 的 Android Haptics/Local Notifications 事实由 M7 平台验收持有，不属于第二套 M17 Android 实现。它们不是开放任务；出现真实回归时按 Bug 切片重新进入，而不是复跑整个里程碑。
 

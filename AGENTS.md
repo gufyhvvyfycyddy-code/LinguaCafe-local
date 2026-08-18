@@ -54,6 +54,12 @@ GPT sense-mapping 自动化边界固定为：导出 GPT 包 → 人工取得 GPT
 
 普通任务的文件范围扩大前停止并取得用户确认。明确持续目标中，若新增文件直接服务已冻结切片责任，且架构审查补充了具体文件、seam、数据流、兼容风险和验证，则可更新当前切片 allowlist，无需重复确认；不得借此把整个里程碑变成开放范围。超出切片或权威 roadmap 仍须停止。工作区已有改动均视为用户资产：不得覆盖、回退、清理或纳入提交；但脏工作区本身不构成阻断。修改重叠文件前先读当前文件和 diff，以最小补丁保留既有语义与无关改动。若同一行或同一契约的用户改动与当前切片实质互斥且无法同时保留，必须保持该用户改动原样并只暂停受影响文件/切片；仍有独立切片时先继续，只有没有可运行切片或最终审计需要该冲突文件时才请求具体决定。不得把未提交用户资产放进权威层级自动消解。依据见 ADR-0037。
 
+### 本地 Agent、模型白名单与弹性并行规则
+
+2026-08-17 当前规则以 `D:\Document\lingl\parallel-tasks\LinguaCafe_CURRENT_LOCAL_AGENT_MODEL_AND_PARALLEL_AUTHORITY_2026-08-17.md` 为准。本地 Agent 采用工具级隔离：OpenCode 是免费层，只允许 `opencode/deepseek-v4-flash-free` → `opencode/mimo-v2.5-free`；Reasonix 是付费强化层，只允许 `opencode-go/mimo-v2.5`。正常任务必须优先使用 OpenCode free；只有两个 OpenCode free 都不能完成且确实需要更强独立 Agent 时才允许启动 Reasonix。Reasonix 不得再尝试任何 free 模型；OpenCode 不得使用 paid 模型。禁止其它模型，尤其禁止 paid DeepSeek Flash/Pro。任何本地 Agent 结论都不能取代当前 GPT 窗口 owner 的独立核验。
+
+Codex 新任务通常不得由网页端主动创建；只有用户当前明确要求“使用 Codex 完成某项工作”才获得新任务授权。已经由用户或既有授权启动的 Codex 可以被网页端持续跟踪、steer、复核和收尾。四窗口 fixed DIRECT 不再默认形成 01→02→03→04 线性流水线；必须按真实依赖图安排。无依赖切片立即并行；一个窗口只有后半段依赖 predecessor 时，先完成全部 independent prework，再等待 canonical gate，最后执行 post-gate work。真正同文件 writer、同数据写链、shared testing DB 写入和 Git integration owner 仍按事实串行。
+
 ## 5. Architecture Gate
 
 风险分级和审批语义以 `docs/adr/ADR-0001-architecture-gate-workflow.md` 为准：
@@ -130,7 +136,7 @@ GPT sense-mapping 自动化边界固定为：导出 GPT 包 → 人工取得 GPT
 - “真实浏览器验收”按结果定义，不绑定某一个工具。允许依次使用当前可用的 Chrome DevTools/MCP、受控 Playwright、Computer Use/系统浏览器或项目批准的其他浏览器自动化通道。必须真实渲染目标页面、使用 DOM/用户事件完成操作，并保留登录、Console、Network 与可观察数据变化证据。
 - 浏览器验收优先使用官方 OpenAI Browser/Chrome 插件；其普通失败后才按 ADR-0033 切换下一平台允许的真实浏览器通道，不必等待用户再次批准。单一工具失败不构成 `Incomplete`。所有允许通道均失败或操作必须由人完成时，在持续目标中先记录 deferred 并继续独立切片；只有没有任何可运行切片或最终完成审计需要该动作时才请求用户。
 - 若 system、developer 或工具输出明确禁止同一结果的 workaround、间接执行、原始命令或 alternate surface，该安全拒绝高于本规则，不得换通道规避；只把普通连接/会话/进程失败按 ADR-0033 自动降级。含义不清时按更严格类别处理。
-- 为本地验收，执行 Agent 可以启动或重启任务需要的 Laravel、前端、队列、tokenizer 与浏览器进程。任何会产生写入的页面操作前，必须取得绑定同一监听 host/port 和进程的 server-bound 证据，确认该实际 HTTP 进程为 `APP_ENV=testing`、连接专用 testing 数据库并能读取 testing-only sentinel；单独运行的 PHPUnit/testing DB 健康检查只是前置条件，不能证明当前服务器。证据可由 testing-only 本地健康端点，或绑定 PID/端口的启动证明加同源 sentinel 请求提供，不得暴露凭据。默认 `php artisan serve` 或无法证明数据库指向的服务器只允许只读诊断。任务提示词提供的本地测试账号只有在确认其位于同一 testing 数据库且权限不高于当前切片所需时才能复用；否则只在该 testing 数据库建立一个最小权限、任务专属身份。随机密码只在内存中直接填入正常 UI，不进入仓库、完整 shell 参数、输出、截图、Network 报告或浏览器密码库。若本地 Android emulator 已真实渲染 UI、官方 Computer Use 无法激活其键盘且 sentinel 已绑定，可按 ADR-0053 在单一不记录日志的临时进程中生成密码，并通过 scoped ADB 逐字符 UI key event 输入；命令源码和进程参数不得出现完整密码，登录后立即清空，且不得用于现有身份、远端设备或非 testing 数据。可以创建唯一 marker 的任务数据，并执行当前切片已授权且可由 testing harness 或产品入口收口的页面动作。必须记录前后数据、token/session 和间接写入并复核清理；不得在普通开发数据库创建临时账号后直接删号，不得对普通开发数据库执行评分、Tag、Marker、导入、fixture 或其他验收写入，不得借此清库、绕过认证、修改其他用户数据或扩大到任务外写入。依据见 ADR-0034、ADR-0037、ADR-0053。
+- 为本地验收，执行 Agent 可以启动或重启任务需要的 Laravel、前端、队列、tokenizer 与浏览器进程。任何会产生写入的页面操作前，必须取得绑定同一监听 host/port 和进程的 server-bound 证据，确认该实际 HTTP 进程为 `APP_ENV=testing`、连接专用 testing 数据库并能读取 testing-only sentinel；单独运行的 PHPUnit/testing DB 健康检查只是前置条件，不能证明当前服务器。证据可由 testing-only 本地健康端点，或绑定 PID/端口的启动证明加同源 sentinel 请求提供，不得暴露凭据。默认 `php artisan serve` 或无法证明数据库指向的服务器只允许只读诊断。当前 fixed DIRECT 明确提供的固定本地测试身份，在 server-bound evidence 已证明实际 HTTP 进程连接专用 testing 数据库后，优先于泛化的临时最小权限身份规则。若该固定身份在同一 testing 数据库中不存在，且当前 DIRECT 明确允许创建同名本地测试身份，则按应用正常首次设置流程创建**同名** testing 身份；如果应用强制第一个本地用户成为管理员，这个 testing-only 首管理员身份允许用于当前 DIRECT 的真实页面验收，但不代表生产权限模型，也不得扩大到任务外管理员操作。禁止改用随机替代邮箱绕过固定身份。只有当前 DIRECT 未提供固定身份，才创建最小权限、任务专属 testing 身份。随机密码只在内存中直接填入正常 UI，不进入仓库、完整 shell 参数、输出、截图、Network 报告或浏览器密码库。若本地 Android emulator 已真实渲染 UI、官方 Computer Use 无法激活其键盘且 sentinel 已绑定，可按 ADR-0053 在单一不记录日志的临时进程中生成密码，并通过 scoped ADB 逐字符 UI key event 输入；命令源码和进程参数不得出现完整密码，登录后立即清空，且不得用于现有身份、远端设备或非 testing 数据。可以创建唯一 marker 的任务数据，并执行当前切片已授权且可由 testing harness 或产品入口收口的页面动作。必须记录前后数据、token/session 和间接写入并复核清理；不得在普通开发数据库创建临时账号后直接删号，不得对普通开发数据库执行评分、Tag、Marker、导入、fixture 或其他验收写入，不得借此清库、绕过认证、修改其他用户数据或扩大到任务外写入。依据见 ADR-0034、ADR-0037、ADR-0053。
 - API、数据库查询、日志与截图可以补强真实页面证据，但不能替代页面操作。禁止用 fetch/axios 直接调用写接口后声称完成了按钮验收，也禁止用数据库手工改值伪造页面结果。
 
 同时触及多个受保护模块时合并运行对应检查。失败必须如实归因；不得删测试、弱化断言、隐藏失败或扩大范围来换取通过。

@@ -3,7 +3,7 @@
 > **状态**：Historical reference / forward authority superseded on 2026-08-18
 > **日期**：2026-07-23；supersession 2026-08-18
 > **基线 commit**：`18c8208073029cfadf89f86634b8f4cad68f4854`
-> **当前用途**：保留 Anki 官方能力映射、已完成架构历史和技术参考。当前产品优先级与下一阶段授权改读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` + Goal Phase G；Reader spaced-review 读 ADR-0059。本文与这些 current authority 冲突时仅作历史来源。
+> **当前用途**：保留 Anki 官方能力映射、已完成架构历史和技术参考。当前产品优先级与下一阶段授权改读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` + Goal Phase G；Reader opportunistic early review / single-credit 读 ADR-0060。ADR-0059 due-only 已 supersede。本文与这些 current authority 冲突时仅作历史来源。
 
 ## 1. 一句话结论
 

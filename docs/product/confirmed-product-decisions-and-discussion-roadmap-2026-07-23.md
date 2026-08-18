@@ -4,7 +4,7 @@
 > 日期：2026-07-28
 > 用途：只记录用户已经明确接受的产品方向，以及尚未冻结、必须继续讨论的议题。本文不代表任何代码实现已经授权。
 >
-> **2026-08-18 supersession note**：当前 English-only / reading-first 产品方向以 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` 为准。本文继续保留历史决定与来源；其中与 Tag/Marker、Saved Search、generic Browser、Manual Scheduling 等旧用户 surface 保留要求、“translation overall layout 尚未冻结”，以及 PD-012 把 Reader 作为普通四档正式复习 surface 的 forward 结论，已被 2026-08-18 rebaseline 与 `ADR-0059` supersede。底层数据、历史 ReviewLog、兼容、caller 与安全责任仍需后续逐项证明后才能删除。
+> **2026-08-18 supersession note**：当前 English-only / reading-first 产品方向以 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` 为准。本文继续保留历史决定与来源；其中与 Tag/Marker、Saved Search、generic Browser、Manual Scheduling 等旧用户 surface 保留要求、“translation overall layout 尚未冻结”，以及 PD-012 把 Reader 作为普通四档正式复习 surface 的 forward 结论，已被 2026-08-18 rebaseline 与 `ADR-0060` supersede。ADR-0059 的 due-only reading rule 也已被 ADR-0060 取代。底层数据、历史 ReviewLog、兼容、caller 与安全责任仍需后续逐项证明后才能删除。
 
 ## 1. 产品定位
 
@@ -188,7 +188,7 @@ Browser 可继续增加：
 > 产品语义冻结日期：2026-07-24。
 > 当前状态：**Historical / Superseded for forward product behavior on 2026-08-18**。
 >
-> 2026-08-18 新规则：Reader 不能通过同次阅读的重复曝光绕过 FSRS 间隔。自然阅读只有在卡片按正式 Sense Review due 语义已经到期、且用户无需帮助时才可产生一次 passive Good；若用户把已学 existing Sense 标记为“不认识”，同次阅读后续“认识/记得”不能再产生 Hard/Good/Easy/passive Good，下一次正向复习必须在外部 `/reviews/senses` 按 FSRS 间隔完成。精确边界见 `docs/adr/ADR-0059-reading-reinforcement-spacing-and-reader-review-boundary.md`。
+> 2026-08-18 最新规则：Reader 允许**机会式提前复习**。已学 exact Sense 即使当前 due 仍在未来，只要本次阅读真实认出，也可以正式记一次 Good；自然无帮助的 reliable binding 可在 Finish 记 passive Good，主动点开后自己认出并确认 exact Sense、选择“认识/记得”可记 explicit Good。同一 ReadingSession / ReviewCard 最多一笔 reading rating，同篇出现十次也不能叠加。若已学 existing Sense 被明确标记“不认识”，exact resolve 后最多一次 Again，且同 session 后续认识不能翻成正向评分。精确边界见 `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`。
 >
 > 以下正文仅保留 2026-07-24 历史来源，不再作为当前实现要求。
 
@@ -290,7 +290,7 @@ Browser 可继续增加：
 
 ### DISC-002 阅读中直接刷卡（历史已关闭；2026-08-18 forward 重新定向）
 
-2026-07-24 的讨论曾冻结到 PD-012；2026-08-18 用户进一步明确 spaced-review 边界，PD-012 的 generic Reader four-rating forward 要求被 supersede。当前 forward 语义以 Product Rebaseline + ADR-0059 为准：Reader 负责 due-only 自然巩固与失败发现，失败后的成功复习回到外部 Sense Review。
+2026-07-24 的讨论曾冻结到 PD-012；2026-08-18 用户进一步明确 reading-review 边界，PD-012 的 generic Reader four-rating forward 要求被 supersede。当前 forward 语义以 Product Rebaseline + ADR-0060 为准：Reader 允许真实的提前 Good，但同一 ReadingSession / ReviewCard 只结算一次；existing Sense “不认识”是一次 Again 并压住同 session 后续正向评分；Hard/Easy 继续留在完整 Sense Review。
 
 ### DISC-003 新文章的 AI 生词建议流程
 
@@ -337,7 +337,7 @@ Browser 可继续增加：
 
 ### 第 1 轮：阅读内评分（历史完成；当前由 spaced-review 规则取代）
 
-2026-07-24 的待确认评分设计保留为历史来源。2026-08-18 当前产品不再要求 Reader 作为普通四档复习 surface：due-only passive Good 可以替代一次自然复习；existing Sense 被明确标记“不认识”后，同次阅读不得再正向加熟练度，下一次成功复习必须在外部 Sense Review。新实现必须先以 ADR-0059 做 Architecture Gate / Harness 迁移，不能把旧 inline-confirmation 接口直接改成第二个调度系统。
+2026-07-24 的待确认评分设计保留为历史来源。2026-08-18 当前产品不再要求 Reader 作为普通四档复习 surface：真实阅读可以在当前 due 之前提前完成一次 Good；同 session/card 多 occurrence 仍最多一笔；existing Sense 被明确标记“不认识”后，同次阅读不得再正向加熟练度，exact resolve 后最多一次 Again。新实现必须先以 ADR-0060 做 Architecture Gate / Harness 迁移，不能把旧 inline-confirmation 接口改成第二个调度系统。
 
 ### 第 2 轮：AI 阅读入口与翻译排版
 
