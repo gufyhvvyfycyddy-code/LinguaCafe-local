@@ -155,7 +155,7 @@ LinguaCafe 保留自己的差异：
 
 AI 还可以带很短的理由，但理由只用于预览，不参与机器绑定。
 
-`matched_existing` 一旦被用户确认，或在“信任 AI”模式下通过 high-confidence + strict identity 校验正式接受，当前真实 Reader occurrence 不只是一条临时判断证据：它还必须通过现有 `WordSenseOccurrence` owner 绑定到该 WordSense。English sentence 必须来自当前文章的 canonical source，而不是 AI 自己改写/生成的 `source_sentence`。绑定成功后，现有 `WordSenseExamplePoolService` 自动把这条真实句子纳入复习例句轮换；重复导回不得制造重复例句，用户改绑时旧 Sense 不得继续保留这条 active source。这个来源绑定本身不写 ReviewLog、不改变 FSRS。详细见 ADR-0062。
+`matched_existing` 一旦被用户确认，或在“信任 AI”模式下通过 high-confidence + strict identity 校验正式接受，当前真实 Reader occurrence 不只是一条临时判断证据：它还必须通过现有 `WordSenseOccurrence` owner 绑定到该 WordSense。English sentence 必须来自当前文章的 canonical source，而不是 AI 自己改写/生成的 `source_sentence`。绑定成功后，现有 `WordSenseExamplePoolService` 自动把这条真实句子纳入**唯一**复习例句池；全部去重后的真实来源例句长期参与，不设 10/20/30 等 top-N 上限，正式复习从完整池随机轮换，多例句时不得连续重复同一 question example。重复导回不得制造重复例句，用户改绑时旧 Sense 不得继续保留这条 active source。这个来源绑定与例句选择本身不写 ReviewLog、不改变 FSRS。来源绑定见 ADR-0062，完整池随机轮换见 ADR-0064。
 
 ### 4.4 两种用户模式
 
@@ -231,7 +231,7 @@ Reader 不自己计算“第 7 天应该加多少”，不维护第二套熟练�
 - 外部 Sense Review 刚 Good 后立刻去阅读，也不能再补一笔 Reader Good；
 - 以真实 elapsed time 为准，不用“跨过午夜就算第二天”的日历边界。
 
-这 24h 是 LinguaCafe 的防刷产品门，不是第二套 FSRS。它只限制正向 Good；如果用户真实“不认识”并 exact resolve 到已学 Sense，Again 仍然可以记录。new/learning/relearning 的同日短步骤继续由外部 Sense Review / FSRS 负责。
+这 24h 是 LinguaCafe 的防刷产品门，不是第二套 FSRS。它只限制正向 Good；如果用户真实“不认识”并 exact resolve 到已学 Sense，Again 仍然可以记录。new/learning/relearning 的同日短步骤继续由外部 Sense Review / FSRS 负责。**当 24h floor 仅仅阻止一次正向 Good 时，普通 Reader 完全静默：不弹窗、不 snackbar、不 inline 提示、不 badge、不倒计时，也不显示“本次不计复习”。**规则由用户引导统一说明，页面不为每次 non-scoring exposure 打断阅读。详细见 ADR-0063。
 
 ### 5.4 同一阅读只记一次
 
@@ -669,8 +669,8 @@ Android/iOS 的日常使用只围绕首页、阅读、复习、生词、我的�
 当前 Phase G 不再只是“把高级菜单藏起来”。2026-08-18 的实际执行顺序以 Goal ledger 的 G-06A…G-06G 为准，本节只保留产品层摘要：
 
 1. **English-only**：普通用户不再选择学习语言，不再进入 Japanese/JMDict/其它非英文主线；共享 user/language isolation 与历史数据不能因为 UI 收敛被误删。
-2. **阅读机会式复习边界**：已学 review-state exact Sense 可以在当前 due 之前因真实回忆提前 Good，但距上一笔有效正式评分必须满 24 个实际小时；不足 24h 无论同篇/跨篇/换 session 都只记 exposure；同 session/card 最多一次；existing Sense “不认识”仍可真实记一次 Again 且压住同 session 后续正向评分。
-3. **AI 阅读**：全文翻译 + 用户标记词 + 已学 WordSense candidates 一次导出；相同/实质近义必须 `matched_existing`，不能制造重复 Sense；权威确认 matched-existing 后真实 Reader 句子进入现有 WordSenseOccurrence / 例句轮换池，AI 不生成虚构例句；导回严格识别。
+2. **阅读机会式复习边界**：已学 review-state exact Sense 可以在当前 due 之前因真实回忆提前 Good，但距上一笔有效正式评分必须满 24 个实际小时；不足 24h 无论同篇/跨篇/换 session 都只记 exposure，而且普通 Reader 完全静默，不显示 block/cooldown 提示；同 session/card 最多一次；existing Sense “不认识”仍可真实记一次 Again 且压住同 session 后续正向评分。
+3. **AI 阅读**：全文翻译 + 用户标记词 + 已学 WordSense candidates 一次导出；相同/实质近义必须 `matched_existing`，不能制造重复 Sense；权威确认 matched-existing 后真实 Reader 句子进入现有 WordSenseOccurrence / 唯一例句池；全部真实例句无 top-N 上限并从完整池随机轮换，多例句时不连续重复；AI 不生成虚构例句；导回严格识别。
 4. **稳定 Reader**：翻译显示/隐藏不移动英文；材料外显示真实进度；支持自动继续阅读和多个书签。
 5. **学习记录**：首页日历点某天看到实际 WordSense；支持日期范围和 PDF/TXT/CSV 同源导出；每日目标是“在阅读中新学多少个 Sense”。
 6. **记忆分析 / FSRS**：所有用户都能看懂容易遗忘/正在巩固/掌握稳定、未来复习压力；手动优化 + 默认每 30 天自动优化；参数优化与旧卡重排严格分开。

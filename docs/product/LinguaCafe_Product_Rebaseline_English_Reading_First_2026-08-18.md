@@ -88,13 +88,13 @@ The product reuses the existing `WordSenseOccurrence` + `WordSenseExamplePoolSer
 
 - the English example sentence comes from the canonical Reader chapter/source revision, never from AI-generated prose;
 - the accepted occurrence is idempotently bound/upserted to the existing WordSense;
-- after binding, the existing Sense Review example pool automatically includes that sentence and its existing rotation rules apply;
+- after binding, the existing Sense Review example pool automatically includes that sentence; all distinct real-source examples remain eligible with no top-N cap, and formal review randomizes across the complete pool while avoiding immediate repetition when multiple examples exist;
 - correcting the occurrence to another Sense moves the active source association instead of leaving the sentence active in two Sense pools;
 - repeated paste-back/retry must not create duplicate example rows;
 - preview/ambiguous/medium/low results do not create source binding;
 - source/example binding alone never writes ReviewLog or changes FSRS.
 
-This closes the current gap where Reading occurrence evidence can know `sentence B → existing Sense X` while the review example pool still sees only sentence A. The architecture authority is `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`.
+This closes the current gap where Reading occurrence evidence can know `sentence B → existing Sense X` while the review example pool still sees only sentence A. Source binding authority is `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`; full-pool/no-cap randomized rotation authority is `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md`.
 
 ## 4. Reading reinforcement, early review, and single-credit boundary
 
@@ -114,11 +114,11 @@ The current product rule is:
 
 The forward Reader experience therefore centers on the reading decisions `认识/记得 → Good` and `不认识 → Again` after exact existing-Sense confirmation. The external Sense Review keeps the full Again/Hard/Good/Easy controls. Existing historical `reading_explicit` four-rating ReviewLogs remain valid data.
 
-Cross-session and cross-article anti-farming now has one explicit minimum rule: a positive Reader `Good` is eligible only after **24 full elapsed hours** since the card's latest effective non-undone formal rating. This is not a local-calendar-day reset. Before 24 hours, the encounter remains reading evidence/exposure but produces no positive Reader rating; at or after 24 hours, a genuine exact-Sense recall may count as an early Good even if `fsrs_due_at` is still farther away. The 24-hour floor applies regardless of whether the previous formal rating came from external Sense Review, Reader, or another canonical formal rating source.
+Cross-session and cross-article anti-farming now has one explicit minimum rule: a positive Reader `Good` is eligible only after **24 full elapsed hours** since the card's latest effective non-undone formal rating. This is not a local-calendar-day reset. Before 24 hours, the encounter remains reading evidence/exposure but produces no positive Reader rating, and ordinary Reader presentation is completely silent: no popup, snackbar, inline warning, badge, countdown, or “this encounter does not count” message. At or after 24 hours, a genuine exact-Sense recall may count as an early Good even if `fsrs_due_at` is still farther away. The 24-hour floor applies regardless of whether the previous formal rating came from external Sense Review, Reader, or another canonical formal rating source.
 
 The 24-hour rule gates positive Good only. A truthful exact-existing-Sense `不认识` may still record one Again even inside 24 hours; Reader does not then run the short-step relearning loop.
 
-The current architecture authority for this boundary is `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`. ADR-0060 and ADR-0059 are superseded historical stages and must not be implemented as current cross-session policy.
+The current timing/data authority is `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`; the silent non-scoring Reader UX is `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md`. ADR-0060 and ADR-0059 are superseded historical stages and must not be implemented as current cross-session policy.
 
 ## 5. Stable translation layout
 

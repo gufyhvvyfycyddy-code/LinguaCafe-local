@@ -18,6 +18,8 @@ const supersededDueAdr = read('docs/adr/ADR-0059-reading-reinforcement-spacing-a
 const supersededEarlyAdr = read('docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md');
 const readingReviewAdr = read('docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md');
 const sourceExampleAdr = read('docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md');
+const silentSpacingAdr = read('docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md');
+const fullExamplePoolAdr = read('docs/adr/ADR-0064-unbounded-real-example-random-rotation.md');
 const recoveryMilestone = JSON.parse(read('docs/execution/CURRENT_MILESTONE.json'));
 
 // Current authority must be explicit and must not make the old Anki roadmap current again.
@@ -26,6 +28,8 @@ assert.match(master, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-0
 assert.match(master, /Goal Phase G/);
 assert.match(master, /ADR-0061-reading-early-review-minimum-spacing-boundary\.md/);
 assert.match(master, /ADR-0062-reading-ai-matched-existing-source-example-binding\.md/);
+assert.match(master, /ADR-0063-reading-24h-silent-nonscoring-ux\.md/);
+assert.match(master, /ADR-0064-unbounded-real-example-random-rotation\.md/);
 assert.match(oldAnkiRoadmap, /Historical reference \/ forward authority superseded on 2026-08-18/);
 
 // The forward roadmap is the seven-slice Phase G rebase, in dependency order.
@@ -35,8 +39,9 @@ for (const id of ['G-06A', 'G-06B', 'G-06C', 'G-06D', 'G-06E', 'G-06F', 'G-06G',
     assert.ok(current > previous, `Goal Phase G milestone missing or out of order: ${id}`);
     previous = current;
 }
-assert.match(goal, /G-06B[\s\S]*24h[\s\S]*提前[\s\S]*Good[\s\S]*Again/);
-assert.match(goal, /G-06C[\s\S]*matched_existing[\s\S]*WordSenseOccurrence[\s\S]*例句轮换[\s\S]*译文显隐不移动英文/);
+assert.match(goal, /G-06B[\s\S]*24h[\s\S]*静默[\s\S]*Good[\s\S]*Again/);
+assert.match(goal, /G-06C[\s\S]*matched_existing[\s\S]*WordSenseOccurrence[\s\S]*译文显隐不移动英文/);
+assert.match(goal, /G-06C[\s\S]*无上限真实例句随机轮换[\s\S]*top-N 上限[\s\S]*不得连续重复/);
 assert.match(goal, /G-06D[\s\S]*阅读进度[\s\S]*手动书签/);
 assert.match(goal, /G-06E[\s\S]*PDF\/TXT\/CSV/);
 assert.match(goal, /G-06F[\s\S]*自动优化默认 30/);
@@ -60,6 +65,8 @@ assert.match(rebaseline, /substantially the same meaning[\s\S]*matched_existing/
 assert.match(rebaseline, /fsrs_due_at[\s\S]*future[\s\S]*Good/);
 assert.match(rebaseline, /24 full elapsed hours|24 full elapsed|24 full|24-hour|24 full/i);
 assert.match(rebaseline, /real Reader occurrence[\s\S]*WordSenseOccurrence[\s\S]*example pool/i);
+assert.match(rebaseline, /completely silent[\s\S]*no popup[\s\S]*snackbar/i);
+assert.match(rebaseline, /no top-N cap[\s\S]*randomizes across the complete pool[\s\S]*avoiding immediate repetition/i);
 assert.match(rebaseline, /ten occurrences[\s\S]*at most one review/);
 assert.match(rebaseline, /标记.*不认识|`不认识`/);
 assert.match(rebaseline, /认识\s*\/\s*记得.*Good/);
@@ -81,6 +88,18 @@ assert.match(sourceExampleAdr, /English example sentence must come from the real
 assert.match(sourceExampleAdr, /Retry\/reimport must be idempotent/);
 assert.match(sourceExampleAdr, /Example binding has zero rating side effect/);
 
+// A 24h-positive block is invisible in ordinary Reader UX; onboarding owns the explanation.
+assert.match(silentSpacingAdr, /A 24h-blocked positive encounter is silent/);
+assert.match(silentSpacingAdr, /show no popup/);
+assert.match(silentSpacingAdr, /show no snackbar/);
+assert.match(silentSpacingAdr, /do not ask the user to acknowledge the block/);
+
+// Every real example remains eligible; selection uses the complete pool without immediate repetition.
+assert.match(fullExamplePoolAdr, /All distinct real source examples remain eligible/);
+assert.match(fullExamplePoolAdr, /Do not cap the pool at 10, 20, 30/);
+assert.match(fullExamplePoolAdr, /Selection is randomized across the full eligible pool/);
+assert.match(fullExamplePoolAdr, /same example must not be shown on two consecutive formal reviews/);
+
 // Historical product documents stay readable but no longer control conflicting forward behavior.
 assert.match(productHistory, /PD-012 阅读中直接刷词义卡 V1（历史决定，forward 已 supersede）/);
 assert.match(productHistory, /ADR-0061/);
@@ -91,10 +110,12 @@ assert.match(currentContext, /2026-08-18 current overlay/);
 assert.match(currentContext, /G-06A…G-06G \+ G-GATE/);
 assert.match(currentContext, /ADR-0061/);
 assert.match(currentContext, /ADR-0062/);
+assert.match(currentContext, /ADR-0063/);
+assert.match(currentContext, /ADR-0064/);
 assert.match(index, /当前产品权威/);
 assert.match(index, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18\.md/);
-assert.match(index, /Reader 提前复习 \/ 24h 最小正向间隔 \/ 单次计分 \/ 不认识→Again/);
-assert.match(index, /AI 阅读 matched-existing 真实来源例句绑定 \/ 例句轮换/);
+assert.match(index, /Reader 提前复习 \/ 24h 最小正向间隔 \/ 静默 non-scoring \/ 单次计分 \/ 不认识→Again/);
+assert.match(index, /AI 阅读 matched-existing 真实来源例句绑定 \/ 无上限真实例句池 \/ 随机不连续重复轮换/);
 
 // The old recovery milestone remains valid history, but it must not be advertised as current Phase G authority.
 assert.equal(recoveryMilestone.active_task, 'NONE');

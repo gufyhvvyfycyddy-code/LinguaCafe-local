@@ -4,7 +4,7 @@
 > 日期：2026-08-18
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 以 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` 为准；AI/用户确认 `matched_existing` 后把真实 Reader 句子绑定进现有 WordSenseOccurrence/例句轮换池以 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` 为准。ADR-0060/0059 均为 superseded 历史。
+> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 以 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` 为准；24h floor 阻止正向 Good 时普通 Reader 必须完全静默，以 `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md` 为准。AI/用户确认 `matched_existing` 后把真实 Reader 句子绑定进现有 WordSenseOccurrence/例句池以 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` 为准；全部真实来源例句无 top-N 上限、随机参与轮换且多例句时不得连续重复，以 `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md` 为准。ADR-0060/0059 均为 superseded 历史。
 
 ## 1. 当前代码事实
 
@@ -31,8 +31,8 @@ LinguaCafe 当前是 **English-only、reading-first、Sense-first** 学习系统
 - `WordSenseOccurrence` 保存来源和例句证据。
 - `target_type=word` 是 legacy 兼容层，不进入新功能主线，也不得未经独立决策删除。
 - AI Reading Assist 首版继续是“导出提示词/包 → 用户自己的外部 AI → 粘贴 strict result”；相同或实质相同的已有 WordSense 必须 `matched_existing`，不能只因措辞不同制造新 Sense。
-- AI 推荐默认不选，中文释义必须由用户确认；默认不得自动建卡、写 ReviewLog 或改变 FSRS。用户确认或 Trust-AI high-confidence 权威接受 `matched_existing` 后，当前**真实 Reader 句子**必须通过现有 WordSenseOccurrence owner 成为该 Sense 的来源例句，继而自动进入现有 A/B/C 轮换；AI 不得生成虚构例句，retry/correction 不得把同一来源留在两个 Sense 池。
-- 已学 review-state exact Sense 可以在当前 `fsrs_due_at` 之前因真实阅读回忆提前完成一次正式 Good，但距上一笔有效 non-undone 正式评分必须先满 **24 个实际小时**。不足 24h 无论同篇、跨篇还是新 ReadingSession 都只记 exposure；满 24h 后自然且无需帮助的 reliable binding 可在 Finish 记 `reading_passive Good`，用户主动点开、自己认出并确认 exact Sense 后选择“认识/记得”可记 `reading_explicit Good`。同一 ReadingSession / ReviewCard 最多一笔正式 reading rating，同篇 10 个 occurrence 也不能叠加。
+- AI 推荐默认不选，中文释义必须由用户确认；默认不得自动建卡、写 ReviewLog 或改变 FSRS。用户确认或 Trust-AI high-confidence 权威接受 `matched_existing` 后，当前**真实 Reader 句子**必须通过现有 WordSenseOccurrence owner 成为该 Sense 的来源例句。所有去重后的真实来源例句都长期进入同一个例句池，不设 10 条/20 条等 top-N 上限；正式复习从完整池随机轮换，多例句时不得连续出现同一 question example。AI 不得生成虚构例句，retry/correction 不得把同一来源留在两个 Sense 池。
+- 已学 review-state exact Sense 可以在当前 `fsrs_due_at` 之前因真实阅读回忆提前完成一次正式 Good，但距上一笔有效 non-undone 正式评分必须先满 **24 个实际小时**。不足 24h 无论同篇、跨篇还是新 ReadingSession 都只记 exposure，并且普通 Reader **完全静默**：不弹窗、不 snackbar、不 inline 提示、不 badge、不显示“本次不计复习”或倒计时。满 24h 后自然且无需帮助的 reliable binding 可在 Finish 记 `reading_passive Good`，用户主动点开、自己认出并确认 exact Sense 后选择“认识/记得”可记 `reading_explicit Good`。同一 ReadingSession / ReviewCard 最多一笔正式 reading rating，同篇 10 个 occurrence 也不能叠加。
 - 已学 existing Sense 在本次阅读被明确标记“不认识”后，exact Sense 确定时最多写一次 `Again`；真实 failure 不受正向 24h floor 阻止。同一 ReadingSession 后续再遇到并点“认识/记得”不能翻成正向评分。`new_sense` 第一次建立不伪造 Again/Good。Reader 不承担同日 learning/relearning 短步骤，也不新增第二 scheduler/reader_due。
 
 ### 2.1 云端主导移动化路线
