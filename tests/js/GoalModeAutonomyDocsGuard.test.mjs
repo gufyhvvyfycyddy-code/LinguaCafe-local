@@ -81,7 +81,10 @@ for (const source of [queueOrderPlan, understandingPlaybook]) {
   assert.match(source, /dedicated testing database[\s\S]{0,80}least privilege/);
   assert.doesNotMatch(source, /1816529781@qq\.com/);
 }
-assert.match(inlineReviewPlan, /PD-012.*已经完成产品冻结[\s\S]{0,120}业务代码尚未授权/);
+assert.match(inlineReviewPlan, /ADR-0061[\s\S]{0,220}24h positive floor/);
+assert.match(inlineReviewPlan, /ADR-0062[\s\S]{0,260}WordSenseOccurrence/);
+assert.match(inlineReviewPlan, /AI may help bind a real Reader sentence[\s\S]{0,180}never invent the English source sentence/);
+assert.match(inlineReviewPlan, /source-provenance binding itself does not write ReviewLog|来源绑定本身不写 ReviewLog/);
 assert.doesNotMatch(inlineReviewPlan, /该方案尚未冻结|product semantics reopened|Reading inline review scoring still frozen/);
 
 // Repository rules must never launder an explicit platform safety refusal.

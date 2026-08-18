@@ -6,7 +6,8 @@
 >
 > - **Forward product authority**：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。
 > - **Current execution roadmap**：Goal Phase G，G-01…G-05 historical DONE；G-06A…G-06G + G-GATE current TODO。
-> - **Reader opportunistic early-review boundary**：`docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`。已学 exact Sense 即使当前 due 在未来，也可因真实阅读回忆提前 Good；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”则 exact resolve 后最多一次 Again，并压住同 session 后续正向评分。ADR-0059 due-only 只保留历史。
+> - **Reader opportunistic early-review boundary**：`docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`。已学 review-state exact Sense 即使当前 due 在未来，也只有距上一笔有效正式评分满 24 个实际小时后才可因真实阅读回忆提前 Good；不足 24h 跨篇/跨 session 都只记 exposure；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”则 exact resolve 后最多一次 Again，并压住同 session 后续正向评分。ADR-0060/0059 只保留历史。
+> - **AI matched-existing source examples**：`docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`。用户/Trust-AI 权威确认真实 Reader occurrence 属于 existing Sense 后，该真实句子必须通过 WordSenseOccurrence 进入现有例句池；AI 不生成虚构 source sentence，绑定本身不写 ReviewLog/FSRS。
 > - 下方 2026-08-06 / 2026-07 历史状态继续保留用于追溯；与上述三条冲突时不再作为 current authority。
 >
 > - Historical roadmap authority (2026-08-01): M1–M8、M10–M16，以及 M17/M18 的 Web + Android slices 均 **Accepted / Closed**。M9 本地实现与发布材料已 **Implementation Accepted**；iOS Xcode/签名/设备/TestFlight/App Store 能力簇的真实证据仍未完成，整体状态仍为 **Not Complete**。该历史路线不授权当前自动推进；当前锁以 `docs/execution/CURRENT_MILESTONE.json` 为准。
@@ -53,7 +54,7 @@
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
 > **旧交接文档**：`docs/CODEX_HANDOFF.md`（2026-06-23）和 `docs/handovers/2026-06-24-c12-c-handoff.md` — 这些是历史交接文档。当前执行方式是主窗口 + 4 个 GPT-5.6 Sol fixed DIRECT + DevSpace；OpenCode free 只作辅助，Reasonix 只在两个 free 不足时强化，Codex 新任务仅用户当前明确授权。CodeBuddy / WorkBuddy 固定接力不是当前默认流程。
 > **历史索引**：`docs/HISTORY_INDEX.md` 记录旧 status / next task / FSRS phase 文档，避免上下文污染。
-> **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`；Reader early Good / passive-vs-explicit / unfamiliar Again / single-credit 同时必须读 ADR-0060。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
+> **当前架构硬规则**：sense / review-adjacent HTTP 功能必须先查 `docs/architecture/sense-http-controller-boundaries.md`；Reader early Good / 24h floor / passive-vs-explicit / unfamiliar Again / single-credit 同时必须读 ADR-0061；AI matched-existing source example binding 同时读 ADR-0062。如果新功能没有清晰 Controller / Service 归属，先建架构再实现。
 > **AI V6 硬规则**：真实 AI 推荐 / 自动释义 / provider / API key 相关任务必须先查 `docs/adr/ADR-0004-ai-study-card-v6-real-ai-boundary.md`、`docs/adr/ADR-0005-ai-study-card-v6-real-provider-implementation-plan.md`、`docs/plans/ai-study-card-v6-real-provider-implementation-plan.md` 与 `docs/testing/ai-study-card-v6-real-provider-network-smoke-playbook.md`。V6 provider-preview backend transport、显式 UI trigger、真实浏览器 Network 验收已完成；V6 推荐结果现在只能导入到现有 V4 AI 推荐词列表，默认不勾选，仍需用户手动勾选、生成最终候选包、再走 V5 人工释义确认制卡路径。禁止 provider 输出自动创建 WordSense / ReviewCard、写 ReviewLog、改 FSRS 或暴露 secret。
 
 ---

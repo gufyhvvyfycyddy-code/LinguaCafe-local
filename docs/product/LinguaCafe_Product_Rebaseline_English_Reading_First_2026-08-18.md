@@ -80,6 +80,22 @@ Current code already validates package identity, candidate IDs, target completen
 
 High-confidence trusted `matched_existing` evidence may support a reading-derived review only when the reading-review rules below are satisfied. `new_sense`, `ambiguous`, low/medium-confidence results, unresolved identity, or same-session unfamiliar failures do not create a positive review merely because AI returned data.
 
+### 3.4 Matched-existing real-source example binding
+
+When a real Reader occurrence is authoritatively confirmed as `matched_existing` — either by the user or by the existing Trust-AI high-confidence path — the real source sentence must become source provenance for that WordSense.
+
+The product reuses the existing `WordSenseOccurrence` + `WordSenseExamplePoolService` path:
+
+- the English example sentence comes from the canonical Reader chapter/source revision, never from AI-generated prose;
+- the accepted occurrence is idempotently bound/upserted to the existing WordSense;
+- after binding, the existing Sense Review example pool automatically includes that sentence and its existing rotation rules apply;
+- correcting the occurrence to another Sense moves the active source association instead of leaving the sentence active in two Sense pools;
+- repeated paste-back/retry must not create duplicate example rows;
+- preview/ambiguous/medium/low results do not create source binding;
+- source/example binding alone never writes ReviewLog or changes FSRS.
+
+This closes the current gap where Reading occurrence evidence can know `sentence B → existing Sense X` while the review example pool still sees only sentence A. The architecture authority is `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`.
+
 ## 4. Reading reinforcement, early review, and single-credit boundary
 
 Reading is a real memory event. It may move a formal review **earlier** than the card's current scheduled due time, but repeated exposure must not be allowed to manufacture many reviews.
@@ -98,9 +114,11 @@ The current product rule is:
 
 The forward Reader experience therefore centers on the reading decisions `认识/记得 → Good` and `不认识 → Again` after exact existing-Sense confirmation. The external Sense Review keeps the full Again/Hard/Good/Easy controls. Existing historical `reading_explicit` four-rating ReviewLogs remain valid data.
 
-Cross-session anti-farming still requires a corrected G-06B Architecture Gate: it must allow meaningful early review such as a day-7 encounter of a card whose prior forecast was day 30, while preventing immediate repeated reading sessions from stacking credit. It must derive that rule from existing ReviewLog/ReviewCard/FSRS facts rather than inventing a Reader cooldown or second due truth.
+Cross-session and cross-article anti-farming now has one explicit minimum rule: a positive Reader `Good` is eligible only after **24 full elapsed hours** since the card's latest effective non-undone formal rating. This is not a local-calendar-day reset. Before 24 hours, the encounter remains reading evidence/exposure but produces no positive Reader rating; at or after 24 hours, a genuine exact-Sense recall may count as an early Good even if `fsrs_due_at` is still farther away. The 24-hour floor applies regardless of whether the previous formal rating came from external Sense Review, Reader, or another canonical formal rating source.
 
-The current architecture authority for this boundary is `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`. ADR-0059 is historical and its `due-only` rule must not be implemented.
+The 24-hour rule gates positive Good only. A truthful exact-existing-Sense `不认识` may still record one Again even inside 24 hours; Reader does not then run the short-step relearning loop.
+
+The current architecture authority for this boundary is `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`. ADR-0060 and ADR-0059 are superseded historical stages and must not be implemented as current cross-session policy.
 
 ## 5. Stable translation layout
 
@@ -307,8 +325,8 @@ This document authorizes product direction and roadmap rewriting only. It does n
 The next Phase G implementation work is split in the Goal ledger into:
 
 - G-06A English-only convergence;
-- G-06B opportunistic early reading review + same-session single-credit + failure/short-step boundary;
-- G-06C AI anti-duplicate + stable translation layout;
+- G-06B opportunistic early reading review + full-24-hour minimum positive spacing + same-session single-credit + failure/short-step boundary;
+- G-06C AI anti-duplicate + authoritative matched-existing real-source example binding + stable translation layout;
 - G-06D reading progress/resume/bookmarks;
 - G-06E daily new-Sense goal + learning history/date-range exports;
 - G-06F memory analytics/future workload/FSRS productization;

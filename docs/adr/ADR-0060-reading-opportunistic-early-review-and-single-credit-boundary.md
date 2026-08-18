@@ -1,9 +1,12 @@
 # ADR-0060 — Reading Opportunistic Early Review and Single-Credit Boundary
 
-- Status: Accepted product/architecture direction; implementation pending
+- Status: Superseded for forward Reader spacing by ADR-0061
 - Date: 2026-08-18
 - Scope: English Reader → exact WordSense → ReviewCard / ReviewLog / FSRS interaction
 - Supersedes: ADR-0059 forward `due-only` positive-reading rule
+- Superseded by: ADR-0061 full-24-hour minimum positive Reader spacing rule
+
+> Historical note: this ADR correctly introduced opportunistic not-due review and same-session single-credit, but deliberately left the cross-ReadingSession minimum interval unresolved. The later R2 proposal allowed an immediate Reader Good after an external positive rating; the user rejected that behavior. Current forward authority is `ADR-0061-reading-early-review-minimum-spacing-boundary.md`. Do not implement this ADR's unresolved/no-fixed-threshold cross-session section as current policy.
 
 ## Context
 
@@ -73,7 +76,7 @@ ADR-0059's rule “not due = exposure only” is superseded.
 
 The original scheduled due is an FSRS forecast, not a prohibition against a genuine earlier review. If reading creates an early formal Good/Again, the canonical scheduler recalculates the card from the actual event time and persists a new `fsrs_due_at`.
 
-No Reader-specific “7 days”, “half the interval”, fixed cooldown, or retrievability threshold is frozen here.
+Historical decision at this point: no Reader-specific “7 days”, “half the interval”, fixed cooldown, or retrievability threshold was frozen here. ADR-0061 later freezes a full 24-hour elapsed positive-rating floor as product anti-farming policy.
 
 ### 7. Cross-session anti-farming must reuse existing review/FSRS facts
 
@@ -86,7 +89,7 @@ The exact minimal cross-session eligibility predicate is an implementation Archi
 - derive the decision from existing ReviewLog / ReviewCard / FSRS facts where possible;
 - avoid a second scheduler, second due truth, arbitrary Reader cooldown table, or new persisted “reading eligibility date” unless current facts prove insufficient.
 
-Until G-06B R2 freezes that predicate, no new cross-session positive-reading gate should be implemented from the superseded due-only design.
+This unresolved Architecture Gate question has now been superseded by ADR-0061: positive Reader Good requires a full 24 elapsed hours since the latest effective formal rating, across articles and ReadingSessions.
 
 ### 8. Reader ordinary rating UX is narrower than formal Sense Review
 

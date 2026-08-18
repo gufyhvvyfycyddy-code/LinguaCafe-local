@@ -9,7 +9,8 @@
 3. 先判断任务类型，再按需加载：
    - 继续一个已明确的当前任务：只读 `docs/plans/current-working-handoff.md` 顶部权威区和该任务相关段落，不默认加载全文。
    - 选择、插入或调整当前产品任务：先读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，再读 Goal ledger 当前 Phase；只有需要历史来源时才读旧 master plan / Anki-aligned roadmap。
-   - Reader 提前 Good、被动/主动认识、同 session/card 单次计分、阅读内“不认识”→Again：同时读 `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`。`ADR-0059` 仅保留 superseded 历史。
+   - Reader 提前 Good、跨文章/跨 session 的 24h 正向最小间隔、被动/主动认识、同 session/card 单次计分、阅读内“不认识”→Again：同时读 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`。`ADR-0060/0059` 仅保留 superseded 历史。
+   - AI Reading Assist `matched_existing` → 真实 Reader 句子 → WordSenseOccurrence / Sense Review 例句轮换：同时读 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`。
    - 已明确的模块任务：直接读对应 ADR、模块契约、源码、测试和一个既有范例。
 4. 不默认读取全部计划、全部 ADR、全部历史或全部字幕。
 
@@ -72,7 +73,8 @@
 | Text reader smoke | `docs/testing/text-reader-smoke-guard.md` |
 | Spec → harness | `docs/plans/spec-to-harness-candidates.md` |
 | 当前产品总方向 | `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md` + Goal Phase G |
-| Reader 机会式提前复习 / 单次计分 / 不认识→Again | `docs/adr/ADR-0060-reading-opportunistic-early-review-and-single-credit-boundary.md`；`ADR-0059` 历史 |
+| Reader 提前复习 / 24h 最小正向间隔 / 单次计分 / 不认识→Again | `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md`；`ADR-0060/0059` 历史 |
+| AI 阅读 matched-existing 真实来源例句绑定 / 例句轮换 | `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md`、`docs/plans/reading-inline-review-and-example-pool-plan.md` |
 | 历史产品讨论：阅读内评分 / AI 阅读 / 翻译布局 | `docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`（与当前 rebaseline 冲突处仅作历史） |
 | 云端主导移动端、有限离线、成本和下一技术里程碑 | `docs/plans/cloud-first-mobile-product-and-technical-milestones-2026-07-28.md`、`docs/plans/mobile-api-v1-contract.md`、`docs/adr/ADR-0031-goal-mode-roadmap-execution-authorization.md`、`docs/adr/ADR-0032-mobile-api-foundation-and-idempotent-rating.md`、`docs/adr/ADR-0034-goal-mode-autonomous-decisions-and-deferred-acceptance.md`、`docs/adr/ADR-0037-goal-mode-nonblocking-execution-frontier.md`、`docs/adr/ADR-0035-mobile-operation-ledger-and-linear-undo-redo.md`、`docs/adr/ADR-0036-m6-resilience-health-and-isolation-boundaries.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/adr/ADR-0038-m10-unified-search-and-word-sense-tags.md`、`docs/plans/m6-resilience-health-isolation-implementation-plan.md`、`docs/plans/m10-unified-search-tags-browser-foundation-plan.md`、`docs/testing/mobile-api-foundation-acceptance-2026-07-28.md`、`docs/testing/mobile-operation-ledger-acceptance-2026-07-28.md`、`docs/testing/m5-mobile-reader-reviewer-touch-acceptance-2026-07-29.md`、`docs/testing/m6a-safe-backup-acceptance-2026-07-28.md`、`docs/testing/m6b-restore-safety-acceptance-2026-07-28.md`、`docs/testing/m6c-article-health-acceptance-2026-07-28.md`、`docs/testing/m6d-isolation-closeout-acceptance-2026-07-28.md` |
 | 恢复与发布程序（CFH-01/02；已关闭，当前无 active task） | `docs/plans/linguacafe-recovery-publication-master-plan-2026-08.md`、`docs/execution/CURRENT_MILESTONE.json`、`docs/audits/cfh-02-m6-exact-slice-manifest-2026-08-05.json`、`docs/plans/cfh-02-m6-publication-plan.md`、`docs/adr/ADR-0055-single-owner-restore-without-user-visible-preview.md`、`docs/testing/cfh-02b-m6a-publication-acceptance-2026-08-05.md`、`docs/testing/cfh-02b-m6b-responsive-restore-acceptance-2026-08-05.md` |
