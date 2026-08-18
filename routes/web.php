@@ -177,8 +177,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/senses/review', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/vocabulary/search/{text}/{stage}/{book}/{chapter}/{translation}/{phrases}/{orderBy}/{page}', [App\Http\Controllers\HomeController::class, 'index']);
-    Route::get('/kanji/search', [App\Http\Controllers\HomeController::class, 'index']);
-    Route::get('/kanji/{character}', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/review-cards/manage', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/mobile-sync-simulator', [App\Http\Controllers\HomeController::class, 'index']);
 

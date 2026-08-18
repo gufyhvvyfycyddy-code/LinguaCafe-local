@@ -5,15 +5,21 @@ namespace App\Http\Controllers\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
 use App\Models\MobileDevice;
+use App\Services\LanguageService;
 use Illuminate\Http\Request;
 
 class MobileBootstrapController extends Controller
 {
+    public function __construct(private LanguageService $languageService)
+    {
+    }
+
     public function show(Request $request)
     {
         /** @var MobileDevice $device */
         $device = $request->attributes->get('mobile_device');
         $user = $request->user();
+        $currentLanguage = $this->languageService->ensureEnglishMainlineSelection($user);
 
         return MobileApiResponse::success([
             'user' => [
@@ -22,7 +28,7 @@ class MobileBootstrapController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
             ],
-            'current_language' => $user->selected_language,
+            'current_language' => $currentLanguage,
             'api_version' => 'v1',
             'schema_version' => MobileApiResponse::SCHEMA_VERSION,
             'device' => [
@@ -54,8 +60,7 @@ class MobileBootstrapController extends Controller
                 // Authentication and device lookup already proved the
                 // authoritative database is reachable for this request.
                 'database' => true,
-                'selected_language' => is_string($user->selected_language)
-                    && $user->selected_language !== '',
+                'selected_language' => $currentLanguage === 'english',
             ],
         ]);
     }

@@ -2,9 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\HomeController;
+use App\Models\Book;
 use App\Models\Goal;
 use App\Models\User;
-use App\Services\GoalService;
 use App\Services\LanguageService;
 use App\Services\RestoreWriteFence;
 use Illuminate\Foundation\Testing\DatabaseTransactions;
@@ -12,8 +13,6 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use Mockery;
-use RuntimeException;
 use Tests\TestCase;
 
 class LanguageSelectionTest extends TestCase
@@ -30,34 +29,20 @@ class LanguageSelectionTest extends TestCase
         ]);
     }
 
-    public function test_language_selection_api_returns_study_languages_for_current_user(): void
+    public function test_ordinary_language_dialog_exposes_english_only_without_python_lookup(): void
     {
-        Http::fake([
-            '*' => Http::response(['Japanese'], 200),
-        ]);
-
+        Http::fake();
         $user = $this->createUser();
 
-        $response = $this->actingAs($user)->getJson('/languages/get-language-selection-dialog-data');
+        $this->actingAs($user)
+            ->getJson('/languages/get-language-selection-dialog-data')
+            ->assertOk()
+            ->assertExactJson([
+                'languages' => ['English'],
+                'notInstalledLanguages' => 0,
+            ]);
 
-        $response->assertOk();
-        $this->assertContains('English', $response->json('languages'));
-        $this->assertContains('Japanese', $response->json('languages'));
-    }
-
-    public function test_language_selection_api_falls_back_when_python_service_is_unavailable(): void
-    {
-        Http::fake(function () {
-            throw new RuntimeException('Python service unavailable.');
-        });
-
-        $user = $this->createUser();
-
-        $response = $this->actingAs($user)->getJson('/languages/get-language-selection-dialog-data');
-
-        $response->assertOk();
-        $this->assertContains('English', $response->json('languages'));
-        $this->assertNotContains('Japanese', $response->json('languages'));
+        Http::assertNothingSent();
     }
 
     public function test_route_contract_registers_only_put_for_language_selection(): void
@@ -70,240 +55,159 @@ class LanguageSelectionTest extends TestCase
         $this->assertSame(['PUT'], $routes->first()->methods());
     }
 
-    public function test_get_language_selection_is_method_not_allowed_and_has_no_side_effects(): void
+    public function test_ordinary_english_selection_converges_legacy_context_and_preserves_legacy_goals(): void
     {
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)
-            ->getJson('/languages/select/french')
-            ->assertMethodNotAllowed();
-
-        $this->assertSame('english', $user->refresh()->selected_language);
-        $this->assertSame(0, $this->goalCount($user, 'french'));
-    }
-
-    public function test_head_language_selection_is_method_not_allowed_and_has_no_side_effects(): void
-    {
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)
-            ->call('HEAD', '/languages/select/french')
-            ->assertMethodNotAllowed();
-
-        $this->assertSame('english', $user->refresh()->selected_language);
-        $this->assertSame(0, $this->goalCount($user, 'french'));
-    }
-
-    public function test_put_switches_language_and_ensures_all_default_goals(): void
-    {
-        Http::fake([
-            '*' => Http::response([], 200),
-        ]);
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)
-            ->putJson('/languages/select/french')
-            ->assertOk()
-            ->assertJsonPath('language', 'french');
-
-        $this->assertSame('french', $user->refresh()->selected_language);
-        $this->assertDefaultGoals($user, 'french');
-    }
-
-    public function test_put_normalizes_language_id_and_accepts_installed_required_language(): void
-    {
-        Http::fake([
-            '*' => Http::response(['Japanese'], 200),
-        ]);
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)
-            ->putJson('/languages/select/JAPANESE')
-            ->assertOk()
-            ->assertJsonPath('language', 'japanese');
-
-        $this->assertSame('japanese', $user->refresh()->selected_language);
-        $this->assertDefaultGoals($user, 'japanese');
-    }
-
-    public function test_repeated_put_is_idempotent_and_does_not_duplicate_goals(): void
-    {
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)->putJson('/languages/select/french')->assertOk();
-        $this->actingAs($user)->putJson('/languages/select/french')->assertOk();
-
-        $this->assertSame('french', $user->refresh()->selected_language);
-        $this->assertDefaultGoals($user, 'french');
-        $this->assertSame(3, $this->goalCount($user, 'french'));
-    }
-
-    public function test_partial_default_goals_are_completed_without_overwriting_custom_quantity(): void
-    {
-        $user = $this->createUser('english');
+        $user = $this->createUser('french');
         Goal::forceCreate([
             'user_id' => $user->id,
-            'language' => 'french',
-            'name' => 'Reviews',
-            'type' => 'review',
-            'quantity' => 37,
-        ]);
-
-        $this->actingAs($user)->putJson('/languages/select/french')->assertOk();
-
-        $this->assertDefaultGoals($user, 'french');
-        $this->assertSame(
-            37,
-            (int) Goal::query()
-                ->where('user_id', $user->id)
-                ->where('language', 'french')
-                ->where('type', 'review')
-                ->value('quantity'),
-        );
-    }
-
-    public function test_switch_does_not_change_other_user_or_other_language_goals(): void
-    {
-        $user = $this->createUser('english');
-        $other = $this->createUser('english');
-        Goal::forceCreate([
-            'user_id' => $other->id,
             'language' => 'french',
             'name' => 'Reading',
             'type' => 'read_words',
-            'quantity' => 444,
+            'quantity' => 41,
         ]);
-        Goal::forceCreate([
-            'user_id' => $user->id,
-            'language' => 'spanish',
-            'name' => 'New words',
-            'type' => 'learn_words',
-            'quantity' => 22,
-        ]);
-
-        $this->actingAs($user)->putJson('/languages/select/french')->assertOk();
-
-        $this->assertDatabaseHas('goals', [
-            'user_id' => $other->id,
-            'language' => 'french',
-            'type' => 'read_words',
-            'quantity' => 444,
-        ]);
-        $this->assertDatabaseHas('goals', [
-            'user_id' => $user->id,
-            'language' => 'spanish',
-            'type' => 'learn_words',
-            'quantity' => 22,
-        ]);
-    }
-
-    public function test_unsupported_language_returns_structured_422_and_writes_nothing(): void
-    {
-        $user = $this->createUser('english');
 
         $this->actingAs($user)
-            ->putJson('/languages/select/klingon')
-            ->assertUnprocessable()
-            ->assertJsonPath('error.code', 'UNSUPPORTED_LANGUAGE');
-
-        $this->assertSame('english', $user->refresh()->selected_language);
-        $this->assertSame(0, $this->goalCount($user, 'klingon'));
-    }
-
-    public function test_required_language_not_installed_returns_structured_conflict_and_writes_nothing(): void
-    {
-        Http::fake([
-            '*' => Http::response([], 200),
-        ]);
-        $user = $this->createUser('english');
-
-        $this->actingAs($user)
-            ->putJson('/languages/select/japanese')
-            ->assertConflict()
-            ->assertJsonPath('error.code', 'LANGUAGE_NOT_INSTALLED');
-
-        $this->assertSame('english', $user->refresh()->selected_language);
-        $this->assertSame(0, $this->goalCount($user, 'japanese'));
-    }
-
-    public function test_python_service_failure_does_not_block_language_without_install_requirement(): void
-    {
-        Http::fake(function () {
-            throw new RuntimeException('Python service unavailable.');
-        });
-        $user = $this->createUser('spanish');
-
-        $this->actingAs($user)
-            ->putJson('/languages/select/english')
+            ->putJson('/languages/select/ENGLISH')
             ->assertOk()
             ->assertJsonPath('language', 'english');
 
         $this->assertSame('english', $user->refresh()->selected_language);
         $this->assertDefaultGoals($user, 'english');
-        Http::assertNothingSent();
+        $this->assertDatabaseHas('goals', [
+            'user_id' => $user->id,
+            'language' => 'french',
+            'type' => 'read_words',
+            'quantity' => 41,
+        ]);
     }
 
-    public function test_python_service_failure_fails_closed_for_required_language(): void
+    public function test_repeated_ordinary_english_selection_is_idempotent(): void
     {
-        Http::fake(function () {
-            throw new RuntimeException('Python service unavailable.');
-        });
+        $user = $this->createUser('english');
+
+        $this->actingAs($user)->putJson('/languages/select/english')->assertOk();
+        $this->actingAs($user)->putJson('/languages/select/english')->assertOk();
+
+        $this->assertSame('english', $user->refresh()->selected_language);
+        $this->assertDefaultGoals($user, 'english');
+        $this->assertSame(3, $this->goalCount($user, 'english'));
+    }
+
+    public function test_ordinary_non_english_selection_fails_closed_without_goal_or_pointer_change(): void
+    {
         $user = $this->createUser('english');
 
         $this->actingAs($user)
             ->putJson('/languages/select/japanese')
             ->assertConflict()
-            ->assertJsonPath('error.code', 'LANGUAGE_NOT_INSTALLED');
+            ->assertJsonPath('error.code', 'ENGLISH_ONLY_LANGUAGE_SELECTION');
 
         $this->assertSame('english', $user->refresh()->selected_language);
         $this->assertSame(0, $this->goalCount($user, 'japanese'));
     }
 
-    public function test_goal_failure_rolls_back_language_and_partial_goal_creation(): void
+    public function test_lower_language_service_keeps_legacy_non_english_selection_mechanics(): void
     {
         $user = $this->createUser('english');
-        $goalService = Mockery::mock(GoalService::class);
-        $goalService->shouldReceive('ensureDefaultGoalsForLockedUser')
-            ->once()
-            ->andReturnUsing(function (int $userId, string $language): void {
-                Goal::forceCreate([
-                    'user_id' => $userId,
-                    'language' => $language,
-                    'name' => 'Reviews',
-                    'type' => 'review',
-                    'quantity' => 0,
-                ]);
 
-                throw new RuntimeException('Simulated goal creation failure.');
-            });
+        app(LanguageService::class)->selectLanguage($user, 'french');
 
-        $service = new LanguageService($goalService);
-
-        try {
-            $service->selectLanguage($user, 'french');
-            $this->fail('Expected language selection to fail.');
-        } catch (RuntimeException $exception) {
-            $this->assertSame('Simulated goal creation failure.', $exception->getMessage());
-        }
-
-        $this->assertSame('english', $user->refresh()->selected_language);
-        $this->assertSame(0, $this->goalCount($user, 'french'));
+        $this->assertSame('french', $user->refresh()->selected_language);
+        $this->assertDefaultGoals($user, 'french');
     }
 
-    public function test_restore_write_fence_rejects_put_before_language_or_goals_change(): void
+    public function test_authenticated_web_entry_converges_to_english_without_deleting_legacy_rows(): void
+    {
+        $user = $this->createUser('japanese');
+        $legacyBook = Book::forceCreate([
+            'user_id' => $user->id,
+            'name' => 'Legacy Japanese Book',
+            'language' => 'japanese',
+        ]);
+
+        $this->actingAs($user);
+        app(HomeController::class)->index();
+
+        $this->assertSame('english', $user->refresh()->selected_language);
+        $this->assertDefaultGoals($user, 'english');
+        $this->assertDatabaseHas('books', [
+            'id' => $legacyBook->id,
+            'user_id' => $user->id,
+            'language' => 'japanese',
+        ]);
+    }
+
+    public function test_ordinary_non_english_delete_is_rejected_and_legacy_data_survives(): void
     {
         $user = $this->createUser('english');
+        $legacyBook = Book::forceCreate([
+            'user_id' => $user->id,
+            'name' => 'Protected Japanese Book',
+            'language' => 'japanese',
+        ]);
+
+        $this->actingAs($user)
+            ->deleteJson('/users/delete-language-data/japanese')
+            ->assertConflict()
+            ->assertJsonPath('error.code', 'ENGLISH_ONLY_LANGUAGE_DATA');
+
+        $this->assertDatabaseHas('books', [
+            'id' => $legacyBook->id,
+            'language' => 'japanese',
+        ]);
+    }
+
+    public function test_ordinary_english_delete_removes_english_data_only(): void
+    {
+        $user = $this->createUser('english');
+        $englishBook = Book::forceCreate([
+            'user_id' => $user->id,
+            'name' => 'English Book',
+            'language' => 'english',
+        ]);
+        $legacyBook = Book::forceCreate([
+            'user_id' => $user->id,
+            'name' => 'Legacy French Book',
+            'language' => 'french',
+        ]);
+
+        $this->actingAs($user)
+            ->deleteJson('/users/delete-language-data/english')
+            ->assertOk();
+
+        $this->assertDatabaseMissing('books', ['id' => $englishBook->id]);
+        $this->assertDatabaseHas('books', [
+            'id' => $legacyBook->id,
+            'language' => 'french',
+        ]);
+    }
+
+    public function test_kanji_spa_get_surface_is_retired_while_lower_compat_routes_remain(): void
+    {
+        $routes = collect(Route::getRoutes()->getRoutes());
+
+        $this->assertFalse($routes->contains(fn ($route) => $route->uri() === 'kanji/search' && in_array('GET', $route->methods(), true)));
+        $this->assertFalse($routes->contains(fn ($route) => $route->uri() === 'kanji/{character}' && in_array('GET', $route->methods(), true)));
+        $this->assertTrue($routes->contains(fn ($route) => $route->uri() === 'kanji/search' && in_array('POST', $route->methods(), true)));
+        $this->assertTrue($routes->contains(fn ($route) => $route->uri() === 'kanji/details' && in_array('POST', $route->methods(), true)));
+        $this->assertTrue($routes->contains(fn ($route) => $route->uri() === 'images/kanji/{fileName}' && in_array('GET', $route->methods(), true)));
+        $this->assertTrue($routes->contains(fn ($route) => $route->uri() === 'jmdict/xml-to-text'));
+    }
+
+    public function test_restore_write_fence_rejects_english_selection_before_language_or_goals_change(): void
+    {
+        $user = $this->createUser('french');
         $operationId = (string) Str::uuid();
         app(RestoreWriteFence::class)->activate($operationId);
 
         try {
             $this->actingAs($user)
-                ->putJson('/languages/select/french')
+                ->putJson('/languages/select/english')
                 ->assertServiceUnavailable()
                 ->assertJsonPath('error.code', 'RESTORE_WRITE_FENCE_ACTIVE');
 
-            $this->assertSame('english', $user->refresh()->selected_language);
-            $this->assertSame(0, $this->goalCount($user, 'french'));
+            $this->assertSame('french', $user->refresh()->selected_language);
+            $this->assertSame(0, $this->goalCount($user, 'english'));
         } finally {
             app(RestoreWriteFence::class)->deactivate($operationId);
         }

@@ -21,16 +21,10 @@ class LanguageController extends Controller
 
     public function getLanguageSelectionDialogData()
     {
-        $supportedSourceLanguages = config('linguacafe.languages.supported_languages');
-        $installableLanguages = config('linguacafe.languages.supported_languages_with_required_install');
-
-        try {
-            $languageData = $this->languageService->getLanguageSelectionDialogData($supportedSourceLanguages, $installableLanguages);
-        } catch (\Exception $e) {
-            return response()->json($e->getMessage(), 500);
-        }
-
-        return response()->json($languageData, 200);
+        return response()->json([
+            'languages' => ['English'],
+            'notInstalledLanguages' => 0,
+        ], 200);
     }
 
     public function getAdminLanguageSettingsData()
@@ -56,7 +50,15 @@ class LanguageController extends Controller
         $language = $request->validated('language');
 
         try {
-            $selectedLanguage = $this->languageService->selectLanguage($user, $language);
+            if ($language !== 'english') {
+                throw new LanguageSelectionException(
+                    'ENGLISH_ONLY_LANGUAGE_SELECTION',
+                    'The ordinary study context is English only.',
+                    409,
+                );
+            }
+
+            $selectedLanguage = $this->languageService->ensureEnglishMainlineSelection($user);
         } catch (LanguageSelectionException $exception) {
             return response()->json([
                 'message' => $exception->getMessage(),

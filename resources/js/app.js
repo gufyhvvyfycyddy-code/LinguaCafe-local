@@ -129,11 +129,9 @@ Vue.component('vocabulary-import-dialog', VocabularyImportDialog);
 import LogoutDialog from './components/Dialogs/LogoutDialog';
 import ErrorDialog from './components/Dialogs/ErrorDialog';
 import ThemeSelectionDialog from './components/Dialogs/ThemeSelectionDialog';
-import LanguageSelectionDialog from './components/Dialogs/LanguageSelectionDialog';
 Vue.component('logout-dialog', LogoutDialog);
 Vue.component('error-dialog', ErrorDialog);
 Vue.component('theme-selection-dialog', ThemeSelectionDialog);
-Vue.component('language-selection-dialog', LanguageSelectionDialog);
 
 // user settings
 import UserSettingsAccount from './components/UserSettings/UserSettingsAccount';
@@ -227,8 +225,6 @@ const ReviewCardManage = require('./components/ReviewCards/ReviewCardManage.vue'
 const StudyOverview = require('./components/StudyOverview/StudyOverview.vue').default;
 const MobileSyncSimulator = require('./components/Mobile/MobileSyncSimulator.vue').default;
 const Vocabulary = require('./components/Vocabulary/Vocabulary.vue').default;
-const KanjiList = require('./components/Kanji/KanjiList.vue').default;
-const KanjiDetails = require('./components/Kanji/KanjiDetails.vue').default;
 Vue.component('attributions', Attributions);
 
 const router = new VueRouter({
@@ -257,8 +253,6 @@ const router = new VueRouter({
         { path: '/mobile-sync-simulator', component: MobileSyncSimulator },
         { path: '/vocabulary/search', component: Vocabulary },
         { path: '/vocabulary/search/:text/:stage/:book/:chapter/:translation/:phrases/:orderBy/:page', component: Vocabulary },
-        { path: '/kanji/search', component: KanjiList },
-        { path: '/kanji/:character', component: KanjiDetails },
     ]
 })
 

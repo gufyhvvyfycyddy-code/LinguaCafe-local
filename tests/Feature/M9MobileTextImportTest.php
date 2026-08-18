@@ -81,6 +81,7 @@ class M9MobileTextImportTest extends TestCase
 
         $user = $this->createUser('m9-non-english@example.test', 'spanish');
         $token = $this->issueToken($user);
+        $user->refresh()->forceFill(['selected_language' => 'spanish'])->save();
         $this->mock(ImportService::class)->shouldNotReceive('importText');
 
         $this->withToken($token)

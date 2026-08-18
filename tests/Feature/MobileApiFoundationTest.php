@@ -41,8 +41,9 @@ class MobileApiFoundationTest extends TestCase
         $this->user = $this->createUser('mobile@example.com', 'english');
     }
 
-    public function test_token_creation_returns_stable_envelope_and_binds_an_active_device(): void
+    public function test_token_creation_converges_legacy_language_and_returns_stable_device_envelope(): void
     {
+        $this->user->forceFill(['selected_language' => 'japanese'])->save();
         $deviceUuid = (string) Str::uuid();
 
         $response = $this->postJson('/api/v1/mobile/auth/tokens', [
@@ -73,6 +74,7 @@ class MobileApiFoundationTest extends TestCase
         ]);
         $this->assertNotNull(MobileDevice::first()->personal_access_token_id);
         $this->assertSame(1, $this->user->tokens()->count());
+        $this->assertSame('english', $this->user->refresh()->selected_language);
     }
 
     public function test_invalid_credentials_use_safe_mobile_error_envelope(): void
@@ -106,9 +108,10 @@ class MobileApiFoundationTest extends TestCase
             ->assertJsonStructure(['error' => ['details']]);
     }
 
-    public function test_bootstrap_returns_current_user_language_capabilities_and_readiness(): void
+    public function test_bootstrap_catches_up_stale_language_and_keeps_current_language_contract(): void
     {
         [$token, $device] = $this->issueToken($this->user);
+        $this->user->forceFill(['selected_language' => 'japanese'])->save();
 
         $this->withToken($token)
             ->getJson('/api/v1/mobile/bootstrap')
@@ -125,7 +128,10 @@ class MobileApiFoundationTest extends TestCase
             ->assertJsonPath('data.capabilities.unified_read_only_search', true)
             ->assertJsonPath('data.capabilities.offline_queue', true)
             ->assertJsonPath('data.readiness.database', true)
+            ->assertJsonPath('data.readiness.selected_language', true)
             ->assertJsonMissingPath('data.user.password');
+
+        $this->assertSame('english', $this->user->refresh()->selected_language);
     }
 
     public function test_reissuing_a_device_token_revokes_the_prior_token_binding(): void

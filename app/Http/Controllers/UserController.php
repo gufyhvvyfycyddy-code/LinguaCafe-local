@@ -177,13 +177,23 @@ class UserController extends Controller {
     public function deleteUserLanguageData($language) 
     {
         $userId = Auth::user()->id;
+        $language = mb_strtolower(trim((string) $language), 'UTF-8');
+
+        if ($language !== 'english') {
+            return response()->json([
+                'error' => [
+                    'code' => 'ENGLISH_ONLY_LANGUAGE_DATA',
+                    'message' => 'Ordinary study-data deletion is limited to English.',
+                ],
+            ], 409);
+        }
 
         try {
-            $this->userService->deleteUserLanguageData($userId, $language);
+            $this->userService->deleteUserLanguageData($userId, 'english');
         } catch(\Exception $e) {
             abort(500, $e->getMessage());
         }
         
-        return response()->json('User has been deleted successfully.', 200);
+        return response()->json('English study data has been deleted successfully.', 200);
     }
 }

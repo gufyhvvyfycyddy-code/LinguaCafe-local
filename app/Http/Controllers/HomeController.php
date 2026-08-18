@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Services\GoalService;
 use App\Services\HomeStudySummaryQueryService;
+use App\Services\LanguageService;
 
 use App\Services\SettingsService;
 use App\Services\SafeFilePathService;
@@ -22,6 +23,7 @@ class HomeController extends Controller {
         private StatisticsService $statisticsService, 
         private StatisticsExportService $statisticsExportService,
         private GoalService $goalService,
+        private LanguageService $languageService,
         private SettingsService $settingsService,
         private HomeStudySummaryQueryService $homeStudySummaryQueryService,
     ) {
@@ -30,10 +32,7 @@ class HomeController extends Controller {
 
     public function index() {
         $user = Auth::user();
-        if (!$user->selected_language) {
-            $user->selected_language = 'english';
-            $user->save();
-        }
+        $selectedLanguage = $this->languageService->ensureEnglishMainlineSelection($user);
 
         $uiLanguage = $this->settingsService->getUserSettingsByName($user->id, ['uiLanguage']);
         if (!$uiLanguage || !$uiLanguage->has('uiLanguage')) {
@@ -42,7 +41,6 @@ class HomeController extends Controller {
             ]);
         }
 
-        $selectedLanguage = $user->selected_language;
         $userCount = User::count();
         $userName = $user->name;
         $userEmail = $user->email;

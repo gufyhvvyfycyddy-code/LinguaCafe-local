@@ -5,52 +5,58 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const selectionDialog = fs.readFileSync(
-    path.join(root, 'resources/js/components/Dialogs/LanguageSelectionDialog.vue'),
-    'utf8',
-);
-const installDialog = fs.readFileSync(
-    path.join(root, 'resources/js/components/Admin/AdminInstallLanguageDialog.vue'),
-    'utf8',
-);
+const read = relativePath => fs.readFileSync(path.join(root, relativePath), 'utf8');
+const layout = read('resources/js/components/Layout.vue');
+const account = read('resources/js/components/UserSettings/UserSettingsAccount.vue');
+const installDialog = read('resources/js/components/Admin/AdminInstallLanguageDialog.vue');
+const app = read('resources/js/app.js');
+const webRoutes = read('routes/web.php');
+const mobileUi = read('mobile/src/ui.ts');
+const offlineRepository = read('mobile/src/offlineRepository.ts');
 
-function methodBlock(source, startMarker, endMarker) {
-    const start = source.indexOf(startMarker);
-    const end = source.indexOf(endMarker, start);
-
-    assert.notEqual(start, -1, `${startMarker} must exist`);
-    assert.notEqual(end, -1, `${endMarker} must follow ${startMarker}`);
-
-    return source.slice(start, end);
-}
-
-test('both language selection callers use PUT and no GET mutation remains', () => {
-    assert.equal(selectionDialog.includes("axios.put('/languages/select/' + language)"), true);
-    assert.equal(installDialog.includes("axios.put('/languages/select/' + language)"), true);
-    assert.equal(selectionDialog.includes("axios.get('/languages/select/'"), false);
-    assert.equal(installDialog.includes("axios.get('/languages/select/'"), false);
+test('ordinary web layout has no language switcher or Japanese Kanji navigation', () => {
+    assert.equal(layout.includes('<language-selection-dialog'), false);
+    assert.equal(layout.includes('languageSelectionDialog'), false);
+    assert.equal(layout.includes('id="language"'), false);
+    assert.equal(layout.includes('学习语言：'), false);
+    assert.equal(layout.includes("this.$props._selectedLanguage == 'japanese'"), false);
+    assert.equal(layout.includes("url: '/kanji/search'"), false);
+    assert.equal(layout.includes(':language="selectedLanguage"'), true);
 });
 
-test('main language dialog blocks duplicate requests and keeps failures visible', () => {
-    const source = methodBlock(selectionDialog, 'selectLanguage(newLanguage)', '            languageName,');
-
-    assert.equal(source.includes('if (this.loading)'), true);
-    assert.equal(source.includes("this.error = requestErrorMessage(error"), true);
-    assert.equal(source.indexOf("document.location.href = '/';") < source.indexOf('.catch('), true);
-    assert.equal(selectionDialog.includes(':disabled="loading"'), true);
-    assert.equal(selectionDialog.includes('v-if="error"'), true);
+test('ordinary account deletion surface is fixed to English', () => {
+    assert.equal(account.includes('删除英语学习数据'), true);
+    assert.equal(account.includes('delete all my english data'), true);
+    assert.equal(account.includes("axios.delete('/users/delete-language-data/english')"), true);
+    assert.equal(account.includes('/images/flags/'), false);
+    assert.equal(account.includes('其他学习语言'), false);
 });
 
-test('admin install dialog exposes selection loading, retryable errors, and success-only redirect', () => {
-    const source = methodBlock(installDialog, 'selectNewLanguage()', '            close()');
+test('admin language package install no longer auto-selects the installed language', () => {
+    assert.equal(installDialog.includes("axios.post('/languages/install'"), true);
+    assert.equal(installDialog.includes('/languages/select/'), false);
+    assert.equal(installDialog.includes('selectNewLanguage'), false);
+    assert.equal(installDialog.includes('切换到'), false);
+});
 
-    assert.equal(installDialog.includes('selecting: false'), true);
-    assert.equal(installDialog.includes('selectionError'), true);
-    assert.equal(installDialog.includes(':loading="selecting"'), true);
-    assert.equal(installDialog.includes(':disabled="selecting || installing"'), true);
-    assert.equal(source.includes('if (this.selecting)'), true);
-    assert.equal(source.includes("this.selectionError = requestErrorMessage(error"), true);
-    assert.equal(source.includes('catch(function (error) {})'), false);
-    assert.equal(source.indexOf("document.location.href = '/admin/languages';") < source.indexOf('.catch('), true);
-    assert.equal(source.includes('this.selecting = false'), true);
+test('ordinary Kanji SPA routes retire while lower Kanji and JMDict owners remain', () => {
+    assert.equal(app.includes("./components/Kanji/KanjiList.vue"), false);
+    assert.equal(app.includes("./components/Kanji/KanjiDetails.vue"), false);
+    assert.equal(app.includes("path: '/kanji/search'"), false);
+    assert.equal(app.includes("path: '/kanji/:character'"), false);
+    assert.equal(webRoutes.includes("Route::get('/kanji/search'"), false);
+    assert.equal(webRoutes.includes("Route::get('/kanji/{character}'"), false);
+    assert.equal(webRoutes.includes("Route::post('/kanji/search'"), true);
+    assert.equal(webRoutes.includes("Route::post('/kanji/details'"), true);
+    assert.equal(webRoutes.includes("Route::get('/images/kanji/{fileName}'"), true);
+    assert.equal(webRoutes.includes("Route::get('/jmdict/xml-to-text'"), true);
+    assert.equal(fs.existsSync(path.join(root, 'app/Models/Kanji.php')), true);
+    assert.equal(fs.existsSync(path.join(root, 'app/Models/VocabularyJmdict.php')), true);
+});
+
+test('mobile hides visible language identity but keeps current-language offline scope', () => {
+    assert.equal(mobileUi.includes('class="language-pill"'), false);
+    assert.equal(mobileUi.includes('${escapeHtml(this.bootstrap?.current_language)} · 已连接'), false);
+    assert.equal(mobileUi.includes('this.bootstrap.current_language'), true);
+    assert.equal(offlineRepository.includes('this.scope = `user:${userId}:language:${language}`'), true);
 });

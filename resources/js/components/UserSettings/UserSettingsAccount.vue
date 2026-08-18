@@ -51,19 +51,12 @@
                 mdi-alert
             </v-icon>
                 
-            删除学习语言数据
+            删除英语学习数据
             <v-spacer />
-            <v-img 
-                eager
-                class="border my-2 rounded" 
-                :src="'/images/flags/' + $props.language.toLowerCase() + '.png'" 
-                max-width="43" 
-                height="28"
-            ></v-img> 
         </div>
         <v-card outlined class="rounded-lg pb-0 mb-32" :loading="deleting">
             <v-card-text>
-                此操作会删除你在 {{ formattedLanguageText }} 中的<b>全部</b>学习数据，其他学习语言的数据不会受影响。
+                此操作会删除你的<b>全部英语学习数据</b>。
 
                 <div class="mt-4">
                     将删除的数据：
@@ -78,7 +71,7 @@
                 </div>
 
                 <div id="delete-confirm-text" class="mt-6">
-                    <label class="font-weight-bold">请输入“delete all my {{ $props.language }} data”确认删除</label>
+                    <label class="font-weight-bold">请输入“delete all my english data”确认删除</label>
                     <v-text-field 
                         v-model="confirmText"
                         filled
@@ -99,7 +92,7 @@
                     border="left"
                     dark
                 >
-                    删除 {{ formattedLanguageText }} 数据时发生错误。
+                    删除英语学习数据时发生错误。
                 </v-alert>
 
                 <!-- Success message -->
@@ -111,7 +104,7 @@
                     border="left"
                     dark
                 >
-                    {{ formattedLanguageText }} 数据已删除。
+                    英语学习数据已删除。
                 </v-alert>
                 
             </v-card-text>
@@ -121,7 +114,7 @@
                     rounded 
                     depressed 
                     color="error" 
-                    :disabled="deleting || confirmText !== `delete all my ${$props.language} data`"
+                    :disabled="deleting || confirmText !== 'delete all my english data'"
                     @click="deleteLanguageData"
                 >
                     <v-icon class="mr-2">mdi-delete</v-icon>
@@ -139,7 +132,6 @@
                 passwordChangeDialog: false,
                 passwordChangeSuccess: false,
                 confirmText: '',
-                formattedLanguageText: this.$props.language.charAt(0).toUpperCase() + this.$props.language.slice(1),
                 deleting: false,
                 deletionError: false,
                 deletionSuccess: false,
@@ -161,7 +153,7 @@
                 this.deletionSuccess = false;
                 this.deletionError = false;
 
-                axios.delete(`/users/delete-language-data/${this.$props.language}`).then((response) => {
+                axios.delete('/users/delete-language-data/english').then((response) => {
                     this.deletionSuccess = true;
                     this.deleting = false;
                 }).catch((error) => {

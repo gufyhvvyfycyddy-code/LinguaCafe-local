@@ -72,6 +72,28 @@ class LanguageService
         }, 3);
     }
 
+    public function ensureEnglishMainlineSelection(User $user): string
+    {
+        return DB::transaction(function () use ($user): string {
+            $lockedUser = User::query()
+                ->whereKey($user->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->goalService->ensureDefaultGoalsForLockedUser(
+                (int) $lockedUser->id,
+                'english',
+            );
+
+            if ($lockedUser->selected_language !== 'english') {
+                $lockedUser->selected_language = 'english';
+                $lockedUser->save();
+            }
+
+            return 'english';
+        }, 3);
+    }
+
     public function getLanguageSelectionDialogData($supportedSourceLanguages, $installableLanguages)
     {
         $installedLanguages = $this->getInstalledLanguages();

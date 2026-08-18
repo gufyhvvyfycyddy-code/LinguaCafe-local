@@ -6,7 +6,6 @@
 
         <template v-if="!['/login', '/setup', '/register'].includes($router.currentRoute.path)">
             <theme-selection-dialog v-model="themeSelectionDialog" @input="updateTheme"></theme-selection-dialog>
-            <language-selection-dialog v-model="languageSelectionDialog"></language-selection-dialog>
             <v-navigation-drawer
                 id="navigation-drawer"
                 app
@@ -68,10 +67,6 @@
                                 <v-icon> mdi-palette </v-icon>
                                 <span class="pl-6"> 主题</span>
                             </v-list-item>
-                            <v-list-item class="navigation-button" @click="languageSelectionDialog = true;">
-                                <v-img class="border" :src="'/images/flags/' + selectedLanguage.toLowerCase() + '.png'" max-width="26" height="17"></v-img>
-                                <span class="pl-5"> 学习语言：{{ selectedLanguageName }}</span>
-                            </v-list-item>
                         </v-list>
                     </template>
 
@@ -82,9 +77,6 @@
                         </v-btn>
                         <v-btn id="theme" rounded text class="mini-drawer-button" @click="themeSelectionDialog = true" title="主题">
                             <v-icon>mdi-palette</v-icon>
-                        </v-btn>
-                        <v-btn id="language" rounded text class="mini-drawer-button" @click="languageSelectionDialog = true" :title="'学习语言：' + selectedLanguageName">
-                            <v-img :src="'/images/flags/' + selectedLanguage.toLowerCase() + '.png'" max-width="31" height="20"></v-img>
                         </v-btn>
                     </template>
                 </template>
@@ -129,7 +121,6 @@
     import TextStylingService from './../services/TextStylingService';
     import FontTypeService from './../services/FontTypeService';
     import { DefaultLocalStorageManager } from './../services/LocalStorageManagerService';
-    import { languageName } from './../services/UiTextService';
     
     export default {
         data: function() {
@@ -138,7 +129,6 @@
                 theme: DefaultLocalStorageManager.loadSetting("theme") || 'light',
                 logoutDialog: false,
                 themeSelectionDialog: false,
-                languageSelectionDialog: false,
                 drawer: false,
                 navbarVisible: true,
                 navbarCollapsed: false,
@@ -193,9 +183,6 @@
                 const settingsCssObject = TextStylingService.getTextStylingSettingsObject(settingsObject)
                 return settingsCssObject[this.theme]
             },
-            selectedLanguageName: function() {
-                return languageName(this.selectedLanguage);
-            },
             mainNavigation: function() {
                 return this.navigation.filter(item => item.mainNav);
             },
@@ -234,14 +221,6 @@
             this.$store.commit('shared/setUserEmail', this.$props._userEmail);
             this.$store.commit('shared/setUserAdmin', this.$props._isAdmin);
 
-            if (this.$props._selectedLanguage == 'japanese') {
-                this.navigation.push({
-                    name: '汉字',
-                    url: '/kanji/search',
-                    icon: 'mdi-ideogram-cjk',
-                    mainNav: false,
-                });
-            }
 
             if(this.$store.getters['shared/userAdmin']) {
                 this.navigation.push({

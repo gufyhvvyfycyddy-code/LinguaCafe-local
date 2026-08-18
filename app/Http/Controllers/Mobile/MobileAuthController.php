@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
 use App\Models\MobileDevice;
 use App\Models\User;
+use App\Services\LanguageService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -13,6 +14,10 @@ use Laravel\Sanctum\PersonalAccessToken;
 
 class MobileAuthController extends Controller
 {
+    public function __construct(private LanguageService $languageService)
+    {
+    }
+
     public function storeToken(Request $request)
     {
         $validated = $request->validate([
@@ -33,6 +38,8 @@ class MobileAuthController extends Controller
                 401,
             );
         }
+
+        $this->languageService->ensureEnglishMainlineSelection($user);
 
         [$plainTextToken, $device] = DB::transaction(function () use ($user, $validated) {
             MobileDevice::query()->insertOrIgnore([

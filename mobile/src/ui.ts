@@ -345,7 +345,6 @@ export class LinguaCafeApp {
               ${this.pendingSyncCount ? ` · ${this.pendingSyncCount} 待同步` : ''}
               ${this.syncIssueCount ? ` · ${this.syncIssueCount} 需处理` : ''}
             </span>
-            <span class="language-pill">${escapeHtml(this.bootstrap?.current_language)}</span>
           </div>
         </header>
         <main id="screen" tabindex="-1"></main>
@@ -1217,7 +1216,7 @@ export class LinguaCafeApp {
         <div class="settings-card">
           <h2>${escapeHtml(this.bootstrap?.user.name)}</h2>
           <p>${escapeHtml(this.bootstrap?.user.email)}</p>
-          <p class="muted">${escapeHtml(this.bootstrap?.current_language)} · 已连接</p>
+          <p class="muted">已连接</p>
         </div>
         <form id="reminder-form" class="settings-card">
           <h2>本地复习提醒</h2>
