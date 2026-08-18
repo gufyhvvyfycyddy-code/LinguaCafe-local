@@ -363,7 +363,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | G-03 | DONE | 对每项做依赖扫描与主流程回归 | existing guards/tests | 新阅读/复习/生词/材料主流程不依赖旧一级入口 |
 | G-04 | DONE | 按当时 authority 完成保留高级 / 只读兼容 / 可删除分类 | G-03 evidence | 历史分类有 caller/contract 证据；作为后续迁移/安全证据保留 |
 | G-05 | DONE | 按 G-04 authority 只删除已证明 orphan 的项；最终合法 zero-delete 收口 | G-04 | `34ac0a2c` 历史验收有效；不改写旧报告/提交 |
-| G-06A | TODO | English-only convergence：普通用户不再选择学习语言，不再进入 Japanese/JMDict/其它非英文主线；共享 language isolation/legacy data 只按证据退休 | 2026-08-18 rebaseline + existing language ownership | Desktop/Mobile/材料/AI 主流程只呈现英文；无误删跨用户/兼容数据；旧语言入口有 caller/data 证明后再退役 |
+| G-06A | DONE | English-only convergence：普通用户不再选择学习语言，不再进入 Japanese/JMDict/其它非英文主线；共享 language isolation/legacy data 只按证据退休 | `1c2a8711` canonical integration + prior Desktop/430px real-browser evidence | 17-file English-only semantics 已 selective integration 并 normal push；普通 Desktop/Mobile 主线收束到 English；`language_id`、legacy non-English data、JMDict/Kanji lower readers、Mobile language scope 与 import/export/backup compatibility 保留；`Layout.vue` 两段 pre-existing user dirty 未纳入提交 |
 | G-06B | TODO | 阅读机会式提前复习 + 24h 最小正向间隔 + 静默 non-scoring + 单次计分：已学 review-state exact Sense 即使 due 尚未来到，在距上一笔有效正式评分满 24 个实际小时后也可因真实阅读回忆提前 Good；不足 24h 无论同篇/跨篇/换 ReadingSession 都只记 exposure，普通 Reader 不弹窗、不 snackbar、不 inline 提示、不 badge/倒计时；自然识别可 passive Good，主动确认“认识/记得”可 explicit Good；existing Sense 明确“不认识”仍可 exact resolve 后最多一次 Again；同一 ReadingSession/ReviewCard 所有 occurrence 合并为最多一次正式 reading rating | ADR-0061 + ADR-0063 + existing ReadingSession/settlement + canonical ReviewCard/ReviewLog/FSRS writer | 23h59m positive=0 且 UI 静默、24h/25h early Good 可成立；external Good→30 秒 Reader Good=0 且无提示；day-7 / prior day-30 forecast early Good 可成立；同篇同 Sense 10 次最多 1 rating；求助不冒充 positive；unfamiliar→existing 同 session 后续 positive=0；new_sense 不伪造 lapse；无第二 scheduler/reader_due/cooldown UI；Web + Mobile offline + concurrency 真验收 |
 | G-06C | TODO | AI Reading Assist 语义防重复 + matched-existing 真实来源例句绑定 + 无上限真实例句随机轮换 + saved translation 固定占位：同义/实质近义只能 `matched_existing`；权威确认的真实 Reader occurrence 必须进入该 WordSense 的 `WordSenseOccurrence`/唯一例句池；全部去重后的真实来源例句长期参与，不设 10/20/30 等 top-N 上限，多例句正式复习随机轮换且不得连续重复同一 question example；全文译文/标记词/已学 candidates/paste-back 保持单一 V2 契约；译文显隐不移动英文 | ADR-0062 + ADR-0064 + current AI Reading Assist V2 + WordSenseOccurrence/ExamplePool + current Reader/TextBlockGroup | anti-duplicate prompt/preview contract 受测；sentence B matched existing 后进入唯一真实例句池且 retry/correction 不重复；>10 条真实例句仍全部可选；随机轮换无 immediate repeat；AI 不生成虚构例句、绑定/选例句不写 ReviewLog/FSRS；strict paste-back 保持；有译文时 hidden/hover/show 几何一致、无译文时无空白占位；真实 Reader→Sense Review + 双 viewport |
 | G-06D | TODO | 阅读连续性：Library 真实阅读进度、退出后自动继续到稳定文本位置、多个手动书签，Desktop/Mobile 共用 canonical text anchor | ReadingSession + ReadingChapterTextService + existing token positions | progress 不是 read_count/词汇百分比；resume/bookmark 不依赖 scroll pixel；source revision stale fail closed；Desktop/Mobile 同锚点语义 |
@@ -484,9 +484,9 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `none`（2026-08-18 docs-only product rebaseline 已冻结 roadmap；next executable=`G-06A`，本轮未进入 implementation）
-- Last DONE: `G-05`
-- Current verified production/code baseline HEAD: `34ac0a2ca56822b4898bf5b391f13becfb583164`（G-05 zero-delete closure；本轮只改产品/Goal 文档）
+- Active milestone: `G-06B / G-06C`（G-06B 24h silent early-review 已完成 prestage，等待 canonical integration；G-06C anti-duplicate 已关闭，source-example/full-pool/translation 继续）
+- Last DONE: `G-06A`
+- Current verified production/code baseline HEAD: `1c2a8711a34b77650ccb40160b3e5ce896a2a13d`（G-06A English-only canonical integration；其 predecessor `325c68ac` 已关闭 G-06C AI semantic anti-duplicate 子切片）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`

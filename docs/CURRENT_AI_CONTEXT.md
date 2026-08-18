@@ -1,10 +1,10 @@
 # LinguaCafe 当前 AI 最小上下文
 
 > 状态：Current / Minimal Context
-> 日期：2026-08-18
+> 日期：2026-08-19
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-18 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 保留历史 DONE；当前 TODO 为 G-06A…G-06G + G-GATE。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 以 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` 为准；24h floor 阻止正向 Good 时普通 Reader 必须完全静默，以 `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md` 为准。AI/用户确认 `matched_existing` 后把真实 Reader 句子绑定进现有 WordSenseOccurrence/例句池以 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` 为准；全部真实来源例句无 top-N 上限、随机参与轮换且多例句时不得连续重复，以 `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md` 为准。ADR-0060/0059 均为 superseded 历史。
+> **2026-08-19 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 与 G-06A 已 DONE；G-06C 的 AI semantic anti-duplicate 子切片已由 commit `325c68ac` 关闭，但 G-06C 整体仍需 source-example binding / full-pool rotation / translation layout；当前 forward TODO 为 G-06B、G-06C、G-06D、G-06E、G-06F、G-06G + G-GATE。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 以 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` 为准；24h floor 阻止正向 Good 时普通 Reader 必须完全静默，以 `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md` 为准。AI/用户确认 `matched_existing` 后把真实 Reader 句子绑定进现有 WordSenseOccurrence/例句池以 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` 为准；全部真实来源例句无 top-N 上限、随机参与轮换且多例句时不得连续重复，以 `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md` 为准。ADR-0060/0059 均为 superseded 历史。
 
 ## 1. 当前代码事实
 
@@ -94,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。当前 Phase G 已完成 G-01…G-05 历史阶段和 2026-08-18 Product Rebase 文档；下一 forward milestones 为 G-06A English-only、G-06B spaced-reading、G-06C AI/translation、G-06D continuity、G-06E history/export、G-06F memory/FSRS、G-06G engineering-surface retirement，最后 G-GATE。
+“历史里程碑完成”不代表全产品完成。当前 Phase G 已完成 G-01…G-05、G-06A English-only，以及 G-06C 的 AI semantic anti-duplicate 子切片；下一 forward milestones 为 G-06B spaced-reading canonical integration、G-06C source-example/full-pool/translation closure、G-06D continuity、G-06E history/export、G-06F memory/FSRS、G-06G engineering-surface retirement，最后 G-GATE。
 
 ## 4. 当前本地维护账本
 
