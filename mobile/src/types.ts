@@ -91,7 +91,7 @@ export interface QueuedReadingInteractionAction extends QueuedActionBase {
   type: 'reading_session.interaction';
   payload: {
     reading_session_id: string;
-    interaction_type: 'opened' | 'helped';
+    interaction_type: 'opened' | 'helped' | 'marked_unknown';
     occurrence_id: string;
   };
 }

@@ -43,6 +43,24 @@ class M4QueuedActionSyncTest extends TestCase
         [$this->token, $this->device] = $this->issueToken($this->user);
     }
 
+    public function test_external_mobile_sense_review_keeps_all_four_ratings(): void
+    {
+        foreach (['again', 'hard', 'good', 'easy'] as $sequence => $rating) {
+            [, $card] = $this->createSenseCard($this->user, 'external-'.$rating);
+            $occurredAt = Carbon::now('UTC')->subMinutes(10 - $sequence)->startOfSecond();
+            $this->sync([
+                $this->ratingAction($card, $rating, $occurredAt, $sequence + 1),
+            ])->assertOk()
+                ->assertJsonPath('data.status', 'completed')
+                ->assertJsonPath('data.results.0.outcome', 'applied');
+
+            $log = ReviewLog::where('review_card_id', $card->id)->sole();
+            $this->assertSame(ReviewLog::SOURCE_SENSE_REVIEW, $log->source);
+            $this->assertSame($rating, $log->rating);
+            $this->assertSame($occurredAt->toIso8601String(), $log->reviewed_at->utc()->toIso8601String());
+        }
+    }
+
     public function test_batch_sorts_same_card_ratings_by_occurrence_time_and_merges_other_cards(): void
     {
         [$firstSense, $firstCard] = $this->createSenseCard($this->user, 'alpha');

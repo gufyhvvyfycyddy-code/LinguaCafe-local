@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\DB;
 
 class ReviewCardService
 {
+    public const READING_POSITIVE_MINIMUM_SPACING_SECONDS = 86400;
+    public const ERROR_READING_POSITIVE_SPACING_BLOCKED = 'READING_POSITIVE_SPACING_BLOCKED';
+
     public function __construct(
         private FsrsSchedulingService $fsrsSchedulingService,
         private ReviewCardFsrsSnapshotService $snapshotService,
@@ -243,6 +246,7 @@ class ReviewCardService
         ?Carbon $reviewedAt = null,
     ): array {
         return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs, $reviewedAt) {
+            $eventAt = ($reviewedAt ?? Carbon::now())->copy();
             $targetCard = ReviewCard::lockForUpdate()
                 ->where('user_id', $userId)
                 ->where('language_id', $language)
@@ -281,6 +285,11 @@ class ReviewCardService
                 throw new \Exception('Review card target is no longer reviewable.');
             }
 
+            if ($this->isReadingPositiveGood($source, $rating)
+                && !$this->readingPositiveEligibleForCard($card, $eventAt)) {
+                throw new \InvalidArgumentException(self::ERROR_READING_POSITIVE_SPACING_BLOCKED);
+            }
+
             // Capture complete FSRS state before the rating (ADR-0009).
             $beforeSnapshot = $this->snapshotService->capture($card);
 
@@ -292,7 +301,7 @@ class ReviewCardService
                 'difficulty' => $card->fsrs_difficulty,
             ];
 
-            $schedule = $this->fsrsSchedulingService->schedule($card, $rating, $reviewedAt);
+            $schedule = $this->fsrsSchedulingService->schedule($card, $rating, $eventAt);
 
             $card->fsrs_state = $schedule['state'];
             $card->fsrs_step_index = $schedule['step_index'];
@@ -335,6 +344,46 @@ class ReviewCardService
                 'review_log' => $reviewLog,
             ];
         });
+    }
+
+    public function canApplyReadingPositiveGood(ReviewCard $card, ?Carbon $eventAt = null): bool
+    {
+        return $this->readingPositiveEligibleForCard($card, ($eventAt ?? Carbon::now())->copy());
+    }
+
+    private function isReadingPositiveGood(string $source, string $rating): bool
+    {
+        return $rating === 'good'
+            && in_array($source, [ReviewLog::SOURCE_READING_PASSIVE, ReviewLog::SOURCE_READING_EXPLICIT], true);
+    }
+
+    private function readingPositiveEligibleForCard(ReviewCard $card, Carbon $eventAt): bool
+    {
+        if ($card->target_type !== ReviewCard::TARGET_SENSE || $card->fsrs_state !== 'review') {
+            return false;
+        }
+
+        $anchor = ReviewLog::query()
+            ->where('user_id', $card->user_id)
+            ->where('language_id', $card->language_id)
+            ->where('review_card_id', $card->id)
+            ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)
+            ->whereIn('rating', ['again', 'hard', 'good', 'easy'])
+            ->whereNull('undone_at')
+            ->orderByDesc('reviewed_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if (!$anchor?->reviewed_at || !$card->fsrs_last_reviewed_at) {
+            return false;
+        }
+        if (!$card->fsrs_last_reviewed_at->equalTo($anchor->reviewed_at)) {
+            return false;
+        }
+
+        return !$eventAt->lt(
+            $anchor->reviewed_at->copy()->addSeconds(self::READING_POSITIVE_MINIMUM_SPACING_SECONDS),
+        );
     }
 
     private function senseForCard(ReviewCard $card): ?WordSense

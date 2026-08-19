@@ -920,7 +920,8 @@
                 const key = readerUnfamiliarTargetKey(target);
                 const existing = this.markedUnfamiliarTargets.find(item => readerUnfamiliarTargetKey(item) === key);
                 this.unfamiliarMarkSaving = true;
-                const request = existing && existing.occurrence_id
+                const isAdding = !(existing && existing.occurrence_id);
+                const request = !isAdding
                     ? axios.delete('/chapters/' + this.chapterId + '/reading-unfamiliar-targets/' + encodeURIComponent(existing.occurrence_id))
                     : axios.post('/chapters/' + this.chapterId + '/reading-unfamiliar-targets', {
                         kind: target.kind,
@@ -929,10 +930,11 @@
                     });
 
                 return request.then(() => Promise.all([
+                    isAdding ? this.recordReadingInteraction('marked_unknown', target) : Promise.resolve(true),
                     this.loadUnfamiliarTargets(),
                     this.refreshReadingSessionTargets(),
-                ])).then(([snapshotOk, sessionOk]) => {
-                    if (!snapshotOk || !sessionOk) {
+                ])).then(([interactionOk, snapshotOk, sessionOk]) => {
+                    if (!interactionOk || !snapshotOk || !sessionOk) {
                         this.setReaderNotice('服务器已收到标记操作，但页面状态没有完整刷新。请稍后刷新本章再继续 AI 或完成结算。', 'warning');
                         return false;
                     }
@@ -1259,6 +1261,12 @@
                         this.inlineReviewDialog = false;
                         this.inlineReviewIntent = null;
                         this.inlineReviewError = '';
+                        if (action && action.scored === false) {
+                            this.inlineLastUndoAction = null;
+                            this.inlineUndoRequestId = '';
+                            this.inlineUndoSnackbar = { show: false, text: '' };
+                            return true;
+                        }
                         if (action && action.review_log_id) {
                             this.inlineLastUndoAction = action;
                             this.inlineUndoRequestId = '';
@@ -1390,11 +1398,11 @@
             continueManualSenseRating(continuation) {
                 if (!continuation || !continuation.senseId || !continuation.reviewCardId || !this.readingSessionId) return Promise.resolve(false);
                 if (continuation.sourceRevision && continuation.sourceRevision !== this.readingSourceRevision) {
-                    this.inlineReviewError = '新增词义后的评分续接属于旧文章版本。已停止续接，请刷新本章后重新打开这个词。';
+                    this.inlineReviewError = '新增词义后的绑定属于旧文章版本。已停止继续，请刷新本章后重新打开这个词。';
                     return Promise.resolve(false);
                 }
                 if (!continuation.readingSessionId || continuation.readingSessionId !== this.readingSessionId) {
-                    this.inlineReviewError = '新增词义后的评分动作属于另一阅读会话。已停止旧动作重试，请重新打开这个词后评分。';
+                    this.inlineReviewError = '新增词义后的绑定属于另一阅读会话。已停止旧动作重试，请重新打开这个词。';
                     return Promise.resolve(false);
                 }
                 this.inlineReviewBusy = true;
@@ -1418,28 +1426,19 @@
                             error.readerContinuationBlocked = true;
                             throw error;
                         }
-                        const actionCommand = this.prepareInlineOfficialRatingCommand({
-                            reviewCardId: continuation.reviewCardId,
-                            occurrenceId: continuation.occurrenceId,
-                            payload: {
-                                rating: continuation.rating,
-                                reading_session_id: continuation.readingSessionId,
-                                occurrence_id: continuation.occurrenceId,
-                            },
-                        }, continuation.readingActionId || '');
-                        if (!actionCommand) return false;
-                        this.setPendingManualSenseContinuation({
-                            ...continuation,
-                            readingActionId: actionCommand.payload.reading_action_id,
-                            readingSessionId: actionCommand.payload.reading_session_id,
-                        });
-                        return this.performInlineOfficialRating(actionCommand, false);
+                        this.setPendingManualSenseContinuation(null);
+                        this.setInlineOutcomeUnknownCommand(null);
+                        this.inlineReviewDialog = false;
+                        this.inlineReviewIntent = null;
+                        this.inlineReviewError = '';
+                        this.setReaderNotice('新词义已保存并绑定到当前句子。', 'success');
+                        return true;
                     })
                     .catch((error) => {
                         if (error && error.readerContinuationBlocked) {
-                            this.inlineReviewError = '新词义已经创建，但绑定后的服务器状态没有完整刷新。已保留同一评分；可以安全重试“新增并提交评分”，页面不会再次创建词义。';
+                            this.inlineReviewError = '新词义已经创建，但绑定后的服务器状态没有完整刷新。可以安全重试继续绑定，页面不会再次创建词义。';
                         } else if (!error || !error.response || (error.response && error.response.status >= 500)) {
-                            this.inlineReviewError = '新词义已经创建，但本次出现位置的绑定结果暂时未知。已保留新词义和同一评分；重试时只会继续绑定与评分，不会重复创建词义。';
+                            this.inlineReviewError = '新词义已经创建，但本次出现位置的绑定结果暂时未知。已保留新词义；重试时只会继续绑定，不会重复创建词义。';
                         } else {
                             this.inlineReviewError = requestErrorMessage(error, '新词义已创建，但绑定当前出现位置失败。请重试继续步骤。');
                         }

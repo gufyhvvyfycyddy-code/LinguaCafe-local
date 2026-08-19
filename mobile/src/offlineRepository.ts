@@ -186,7 +186,7 @@ export class OfflineRepository {
   async enqueueReadingInteraction(
     readingSessionId: string,
     occurrenceId: string,
-    interactionType: 'opened' | 'helped' = 'opened',
+    interactionType: 'opened' | 'helped' | 'marked_unknown' = 'opened',
     now = new Date(),
   ): Promise<QueuedAction> {
     let queued!: QueuedAction;

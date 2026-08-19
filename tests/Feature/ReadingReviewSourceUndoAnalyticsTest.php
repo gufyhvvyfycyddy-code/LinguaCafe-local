@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\User;
@@ -65,6 +66,7 @@ class ReadingReviewSourceUndoAnalyticsTest extends TestCase
         $this->assertContains('reading_passive', SenseReviewUndoPolicy::SUPPORTED_SOURCES);
 
         $card = $this->createSenseCard('passive-source');
+        $this->anchorCardForReaderGood($card, Carbon::now()->subDays(2)->startOfSecond());
         $card->refresh();
         $before = $this->snapshotService->capture($card);
         $sessionId = (string) Str::uuid();
@@ -81,7 +83,7 @@ class ReadingReviewSourceUndoAnalyticsTest extends TestCase
         $log = $result['review_log'];
         $this->assertSame('reading_passive', $log->source);
         $this->assertSame('good', $log->rating);
-        $this->assertSame($before, $log->before_card_snapshot);
+        $this->assertEquals($before, $log->before_card_snapshot);
         $rawCount = ReviewLog::count();
 
         $undo = app(SenseReviewUndoService::class)->undo(
@@ -137,6 +139,7 @@ class ReadingReviewSourceUndoAnalyticsTest extends TestCase
     public function test_reading_sources_are_included_in_analytics_while_active_and_excluded_after_undo(): void
     {
         $passive = $this->createSenseCard('analytics-passive');
+        $this->anchorCardForReaderGood($passive, Carbon::now()->subDays(2)->startOfSecond());
         $explicit = $this->createSenseCard('analytics-explicit');
         $passiveSession = (string) Str::uuid();
         $explicitSession = (string) Str::uuid();
@@ -174,7 +177,11 @@ class ReadingReviewSourceUndoAnalyticsTest extends TestCase
 
         $effective = $analytics->reviewsForPeriod($this->user->id, 'english', $start, $end);
         $this->assertCount(0, $effective, 'notUndone analytics must exclude undone reading ratings.');
-        $this->assertSame(2, ReviewLog::count(), 'Audit history must retain both reading ratings.');
+        $this->assertSame(
+            2,
+            ReviewLog::whereIn('source', [ReviewLog::SOURCE_READING_PASSIVE, ReviewLog::SOURCE_READING_EXPLICIT])->count(),
+            'Audit history must retain both reading ratings.',
+        );
     }
 
     public function test_undo_never_creates_a_fake_redo_rating(): void
@@ -204,6 +211,33 @@ class ReadingReviewSourceUndoAnalyticsTest extends TestCase
             ReviewLog::where('review_card_id', $card->id)->count(),
             'Undo marks the original log undone; it must not manufacture a compensating redo log.',
         );
+    }
+
+    private function anchorCardForReaderGood(ReviewCard $card, Carbon $anchor): void
+    {
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => $anchor->copy()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => $anchor,
+        ])->save();
+        ReviewLog::forceCreate([
+            'user_id' => $card->user_id,
+            'language_id' => $card->language_id,
+            'language' => $card->language_id,
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => $anchor,
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
     }
 
     private function createSenseCard(string $lemma)

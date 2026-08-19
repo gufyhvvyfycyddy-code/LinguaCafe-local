@@ -8,7 +8,7 @@
             </v-card-title>
             <v-card-text>
                 <v-alert dense text type="info">
-                    这是一次明确评分。显示答案、选择 Again / Hard / Good / Easy，再选定具体词义后才会提交正式复习。
+                    先按你刚才的真实回想选择“认识 / 记得”或“不认识”，再确认这里对应的具体词义。
                 </v-alert>
                 <v-alert v-if="error" dense outlined type="error">{{ error }}</v-alert>
                 <v-alert v-if="outcomeUnknown" dense outlined type="warning">服务器结果未知期间，评分与词义选择已锁定。只能安全重试刚才那一笔正式评分。</v-alert>
@@ -21,15 +21,21 @@
 
                 <div v-if="!state.showAnswer" class="text-center py-6">
                     <div class="body-1 mb-4">先回想：这个词在这里是什么意思？</div>
-                    <v-btn color="primary" depressed large :disabled="busy || !occurrence" @click="reveal">显示答案</v-btn>
+                    <div class="d-flex flex-wrap justify-center">
+                        <v-btn class="ma-1" color="primary" depressed large :disabled="busy || !occurrence" @click="chooseRating('good')">认识 / 记得</v-btn>
+                        <v-btn class="ma-1" outlined large :disabled="busy || !occurrence" @click="chooseRating('again')">不认识</v-btn>
+                        <v-btn class="ma-1" text large :disabled="busy || !occurrence" @click="reveal">查看答案</v-btn>
+                    </div>
                 </div>
 
                 <template v-else>
                     <div class="mb-5">
-                        <div class="text-subtitle-1 font-weight-medium mb-2">1. 你刚才回想得怎么样？</div>
-                        <sense-review-rating-controls :disabled="busy || outcomeUnknown || Boolean(frozenRating)" @rating="chooseRating" />
                         <div v-if="state.pendingRating" class="caption text--secondary text-center mt-1">
                             已选择 {{ ratingLabel(state.pendingRating) }}，还需要确定具体词义。
+                        </div>
+                        <div v-else-if="state.wasHelped" class="text-center">
+                            <div class="body-2 text--secondary mb-2">你已经查看了答案。如果这个已学词义没有认出来，可以记录“不认识”。</div>
+                            <v-btn outlined :disabled="busy || outcomeUnknown" @click="chooseRating('again')">不认识</v-btn>
                         </div>
                     </div>
 
@@ -51,7 +57,7 @@
                             </v-radio>
                         </v-radio-group>
                         <v-alert v-if="!ratableCandidates.length" type="warning" dense text>
-                            当前候选里没有可评分的词义卡。可以手动新增这个词义后，继续提交刚才选择的评分。
+                            当前候选里没有可评分的已学词义。可以手动新增这个词义；新增属于首次学习，本次不会记正式复习。
                         </v-alert>
                         <v-btn text small color="primary" :disabled="busy || outcomeUnknown || manualCreateBlocked || !state.pendingRating" @click="openManualMode">
                             都不是 / 新增词义
@@ -85,7 +91,7 @@
                             :disabled="busy || outcomeUnknown || manualCreateBlocked"
                         />
                         <v-alert dense text type="info">
-                            保存成功后会把本次出现位置绑定到新词义，并沿用刚才的 {{ ratingLabel(state.pendingRating) }} 评分；不会再让你选第二次评分。
+                            保存成功后会把本次出现位置绑定到新词义。本次属于首次学习，不会写入正式复习评分。
                         </v-alert>
                         <v-btn text small :disabled="busy || outcomeUnknown || manualCreateBlocked" @click="manualMode = false">返回已有词义</v-btn>
                     </div>
@@ -109,7 +115,7 @@
                     :loading="busy"
                     :disabled="!canCreateSense"
                     @click="createSenseAndSubmit"
-                >新增并提交评分</v-btn>
+                >新增并保存词义</v-btn>
                 <v-btn
                     v-if="outcomeUnknown"
                     color="warning"
@@ -124,7 +130,6 @@
 </template>
 
 <script>
-    import SenseReviewRatingControls from '../Senses/SenseReviewRatingControls.vue';
     import {
         buildReaderInlineOfficialRatingCommand,
         chooseReaderInlineRating,
@@ -138,7 +143,6 @@
 
     export default {
         name: 'ReaderInlineSenseReviewDialog',
-        components: { SenseReviewRatingControls },
         props: {
             value: { type: Boolean, default: false },
             occurrence: { type: Object, default: null },
@@ -232,10 +236,10 @@
             },
             applyFrozenRating() {
                 if (!this.value || !this.frozenRating || !this.occurrence) return;
-                this.state = chooseReaderInlineRating(revealReaderInlineSenseAnswer(this.state), this.frozenRating);
+                this.state = chooseReaderInlineRating(this.state, this.frozenRating);
             },
             ratingLabel(rating) {
-                return { again: 'Again', hard: 'Hard', good: 'Good', easy: 'Easy' }[rating] || rating;
+                return { again: '不认识', good: '认识 / 记得' }[rating] || rating;
             },
             submit() {
                 if (this.command) this.$emit('submit', this.command);

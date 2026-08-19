@@ -341,7 +341,7 @@ test('explicit rating action preparation binds identity, reuses retries, and min
         occurrenceId: 'occ-bank',
         sourceRevision: 'rev-1',
         payload: {
-            rating: 'hard',
+            rating: 'good',
             reading_session_id: sessionPayload.reading_session_id,
             occurrence_id: 'occ-bank',
         },
@@ -389,7 +389,7 @@ test('outcome-unknown explicit rating recovery preserves the exact action and se
         occurrenceId: 'occ-bank',
         sourceRevision: 'rev-1',
         payload: {
-            rating: 'hard',
+            rating: 'good',
             reading_session_id: sessionPayload.reading_session_id,
             occurrence_id: 'occ-bank',
             reading_action_id: '23cb8132-11db-43f7-a5c7-a5a52ae14d19',
@@ -408,7 +408,7 @@ test('explicit retry storage fails closed when sessionStorage writes or clears t
         occurrenceId: 'occ-bank',
         sourceRevision: 'rev-1',
         payload: {
-            rating: 'hard',
+            rating: 'good',
             reading_session_id: sessionPayload.reading_session_id,
             occurrence_id: 'occ-bank',
             reading_action_id: '23cb8132-11db-43f7-a5c7-a5a52ae14d19',
@@ -430,7 +430,7 @@ test('explicit rating recovery rejects missing or malformed action identity inst
         occurrenceId: 'occ-bank',
         sourceRevision: 'rev-1',
         payload: {
-            rating: 'hard',
+            rating: 'good',
             reading_session_id: sessionPayload.reading_session_id,
             occurrence_id: 'occ-bank',
         },

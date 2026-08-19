@@ -138,7 +138,7 @@ export function readerManualSenseContinuationStorageKey(chapterId) {
 function normalizeManualSenseContinuation(value = {}) {
     const occurrenceId = text(value.occurrenceId);
     const rating = text(value.rating);
-    if (!occurrenceId || !['again', 'hard', 'good', 'easy'].includes(rating)) return null;
+    if (!occurrenceId || !['again', 'good'].includes(rating)) return null;
     const senseId = positiveInteger(value.senseId);
     const reviewCardId = positiveInteger(value.reviewCardId);
     const outcomeUnknown = value.outcomeUnknown === true;
@@ -214,7 +214,7 @@ function normalizeExplicitRatingRetry(command = {}) {
     const payloadOccurrenceId = text(payload.occurrence_id);
     const readingActionId = normalizeUuid(payload.reading_action_id);
     if (!reviewCardId || !occurrenceId || !sourceRevision || !readingSessionId || payloadOccurrenceId !== occurrenceId
-        || !['again', 'hard', 'good', 'easy'].includes(rating) || !readingActionId) {
+        || !['again', 'good'].includes(rating) || !readingActionId) {
         return null;
     }
     return {

@@ -11,6 +11,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class ReadingFinishSettlementService
@@ -38,8 +39,9 @@ class ReadingFinishSettlementService
         if (!in_array($settlementMode, ['preflight', 'commit'], true)) {
             throw new \InvalidArgumentException('READING_FINISH_MODE_INVALID');
         }
+        $eventAt = Carbon::now();
 
-        return DB::transaction(function () use (
+        return $this->runConcurrencySafeTransaction(function () use (
             $userId,
             $language,
             $chapterId,
@@ -49,7 +51,8 @@ class ReadingFinishSettlementService
             $autoLevelUpWords,
             $leveledUpWords,
             $leveledUpPhrases,
-            $settlementMode
+            $settlementMode,
+            $eventAt
         ) {
             $lockedSession = ReadingSession::query()
                 ->lockForUpdate()
@@ -80,7 +83,7 @@ class ReadingFinishSettlementService
             );
             $lockedSession = $context['session'];
             $currentCatalog = $context['catalog'];
-            $currentPlan = $this->buildPlan($userId, $language, $lockedSession, $currentCatalog);
+            $currentPlan = $this->buildPlan($userId, $language, $lockedSession, $currentCatalog, $eventAt);
             $alreadySettledCount = ReadingSessionCardSettlement::query()
                 ->where('reading_session_id', $lockedSession->id)
                 ->count();
@@ -106,16 +109,23 @@ class ReadingFinishSettlementService
                     continue;
                 }
 
-                $reviewed = $this->reviewCardService->recordReviewWithLog(
-                    $userId,
-                    $language,
-                    $candidate['review_card_id'],
-                    'good',
-                    ReviewLog::SOURCE_READING_PASSIVE,
-                    $lockedSession->uuid,
-                    null,
-                    Carbon::now(),
-                );
+                try {
+                    $reviewed = $this->reviewCardService->recordReviewWithLog(
+                        $userId,
+                        $language,
+                        $candidate['review_card_id'],
+                        'good',
+                        ReviewLog::SOURCE_READING_PASSIVE,
+                        $lockedSession->uuid,
+                        null,
+                        $eventAt,
+                    );
+                } catch (\InvalidArgumentException $e) {
+                    if ($e->getMessage() === ReviewCardService::ERROR_READING_POSITIVE_SPACING_BLOCKED) {
+                        continue;
+                    }
+                    throw $e;
+                }
 
                 ReadingSessionCardSettlement::create([
                     'reading_session_id' => $lockedSession->id,
@@ -178,11 +188,27 @@ class ReadingFinishSettlementService
         });
     }
 
+    private function runConcurrencySafeTransaction(callable $callback): mixed
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return DB::transaction($callback, 3);
+            } catch (QueryException $e) {
+                if ($attempt === 3 || !str_contains($e->getMessage(), 'Record has changed since last read')) {
+                    throw $e;
+                }
+            }
+        }
+
+        throw new \LogicException('Reading finish transaction retry loop exhausted unexpectedly.');
+    }
+
     private function buildPlan(
         int $userId,
         string $language,
         ReadingSession $session,
         array $catalog,
+        Carbon $eventAt,
     ): array {
         $evidenceMap = $this->evidenceService->currentEvidenceMap(
             $userId,
@@ -235,8 +261,9 @@ class ReadingFinishSettlementService
             }
             $wasOpened = isset($interactionSummary['opened_occurrence_ids'][$occurrenceId]);
             $wasHelped = isset($interactionSummary['helped_occurrence_ids'][$occurrenceId]);
+            $wasMarkedUnknown = isset($interactionSummary['marked_unknown_occurrence_ids'][$occurrenceId]);
 
-            if ($wasOpened || $wasHelped) {
+            if ($wasOpened || $wasHelped || $wasMarkedUnknown) {
                 $excludedOccurrenceIds[] = $occurrenceId;
                 continue;
             }
@@ -264,8 +291,14 @@ class ReadingFinishSettlementService
                 ->where('status', WordSense::STATUS_CONFIRMED)
                 ->first();
             $card = $sense?->reviewCard;
-            if (!$sense || !$card || !$this->isQueueEligibleSenseCard($card, $userId, $language, $sense->id)) {
+            if (!$sense || !$card || !$this->isQueueEligibleSenseCard($card, $userId, $language, $sense->id, $eventAt)) {
                 $excludedOccurrenceIds[] = $occurrenceId;
+                continue;
+            }
+            if (!$this->reviewCardService->canApplyReadingPositiveGood($card, $eventAt)) {
+                // ADR-0063: a 24h-blocked positive opportunity remains silent.
+                // It is omitted from visible eligible/excluded/unresolved counts;
+                // the canonical writer still rechecks under the ReviewCard lock.
                 continue;
             }
             if (isset($interactionSummary['explicit_review_card_ids'][$card->id])
@@ -316,10 +349,10 @@ class ReadingFinishSettlementService
         ] + $plan;
     }
 
-    private function isQueueEligibleSenseCard(ReviewCard $card, int $userId, string $language, int $senseId): bool
+    private function isQueueEligibleSenseCard(ReviewCard $card, int $userId, string $language, int $senseId, Carbon $eventAt): bool
     {
         return ReviewCard::query()
-            ->senseReviewEligible($userId, $language, Carbon::now())
+            ->senseReviewEligible($userId, $language, $eventAt)
             ->where('review_cards.id', $card->id)
             ->where('review_cards.target_id', $senseId)
             ->exists();

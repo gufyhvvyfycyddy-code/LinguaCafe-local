@@ -10,6 +10,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 
 class MobileSenseReviewMutationService
@@ -60,7 +61,7 @@ class MobileSenseReviewMutationService
         ?string $occurrenceId = null,
         ?string $readingActionId = null,
     ): array {
-        return DB::transaction(function () use (
+        return $this->runConcurrencySafeTransaction(function () use (
             $operationId,
             $userId,
             $language,
@@ -78,18 +79,31 @@ class MobileSenseReviewMutationService
         ) {
             $readingContext = null;
             if ($readingSessionId !== null && $occurrenceId !== null && $readingActionId !== null) {
+                if (!in_array($rating, ['again', 'good'], true)) {
+                    throw new MobileQueuedActionDomainException(
+                        ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID,
+                        'Reader ratings only accept Again or Good.',
+                    );
+                }
                 $session = $this->readingSessionService->lockOwnedSessionForExplicitAction(
                     $userId,
                     $language,
                     $readingSessionId,
                 );
-                $this->readingSessionService->assertNoActiveExplicitRating($session, $reviewCardId);
                 $readingContext = $this->readingSessionService->lockExplicitRatingContext(
                     $userId,
                     $language,
                     $readingSessionId,
                     $occurrenceId,
                     $reviewCardId,
+                );
+                // Match Web lock order so two offline Reader actions on one card
+                // cannot deadlock through absent settlement-row gap locks.
+                $this->readingSessionService->assertNoActiveExplicitRating($session, $reviewCardId);
+                $this->readingSessionService->assertExplicitRatingEvidenceAllowed(
+                    $readingContext['session'],
+                    $readingContext['target'],
+                    $rating,
                 );
                 $card = $readingContext['review_card'];
             } else {
@@ -135,16 +149,41 @@ class MobileSenseReviewMutationService
                 );
             }
 
-            $outcome = $this->reviewCardService->recordReviewWithLog(
-                $userId,
-                $language,
-                $card->id,
-                $rating,
-                $readingContext ? ReviewLog::SOURCE_READING_EXPLICIT : ReviewLog::SOURCE_SENSE_REVIEW,
-                $readingContext ? $readingSessionId : $reviewSessionId,
-                $reviewDurationMs,
-                $occurredAt,
-            );
+            try {
+                $outcome = $this->reviewCardService->recordReviewWithLog(
+                    $userId,
+                    $language,
+                    $card->id,
+                    $rating,
+                    $readingContext ? ReviewLog::SOURCE_READING_EXPLICIT : ReviewLog::SOURCE_SENSE_REVIEW,
+                    $readingContext ? $readingSessionId : $reviewSessionId,
+                    $reviewDurationMs,
+                    $occurredAt,
+                );
+            } catch (\InvalidArgumentException $e) {
+                if (!$readingContext
+                    || $e->getMessage() !== ReviewCardService::ERROR_READING_POSITIVE_SPACING_BLOCKED) {
+                    throw $e;
+                }
+
+                $response = [
+                    'operation_id' => $operationId,
+                    'review_log_id' => null,
+                    'card' => $this->serializeCard($card->fresh()),
+                    'scored' => false,
+                    'non_scoring_reason' => ReviewCardService::ERROR_READING_POSITIVE_SPACING_BLOCKED,
+                ];
+                $this->readingSessionService->recordExplicitNonScoringLocked(
+                    $readingContext['session'],
+                    $readingContext['target'],
+                    (int) $readingContext['review_card']->id,
+                    (int) $readingContext['sense']->id,
+                    $readingActionId,
+                    $response,
+                );
+
+                return $response;
+            }
             $actionPayload = [
                 'review_card_id' => $card->id,
                 'rating' => $rating,
@@ -179,6 +218,13 @@ class MobileSenseReviewMutationService
             );
 
             if ($readingContext) {
+                $this->readingSessionService->recordReadingSettlementLocked(
+                    $readingContext['session'],
+                    (int) $readingContext['review_card']->id,
+                    (int) $readingContext['sense']->id,
+                    (int) $outcome['review_log']->id,
+                    $rating,
+                );
                 $this->readingSessionService->recordExplicitRatingLocked(
                     $readingContext['session'],
                     $readingContext['target'],
@@ -192,6 +238,21 @@ class MobileSenseReviewMutationService
 
             return $response;
         });
+    }
+
+    private function runConcurrencySafeTransaction(callable $callback): mixed
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return DB::transaction($callback, 3);
+            } catch (QueryException $e) {
+                if ($attempt === 3 || !str_contains($e->getMessage(), 'Record has changed since last read')) {
+                    throw $e;
+                }
+            }
+        }
+
+        throw new \LogicException('Mobile Reader transaction retry loop exhausted unexpectedly.');
     }
 
     private function hasLaterRating(

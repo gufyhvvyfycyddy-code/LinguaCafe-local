@@ -1,4 +1,4 @@
-export const READER_INLINE_RATINGS = Object.freeze(['again', 'hard', 'good', 'easy']);
+export const READER_INLINE_RATINGS = Object.freeze(['again', 'good']);
 
 function readerIntentText(value) {
     return typeof value === 'string' ? value.trim() : '';
@@ -92,6 +92,7 @@ export function createReaderInlineSenseReviewState(occurrence = null) {
         showAnswer: false,
         pendingRating: null,
         selectedWordSenseId: null,
+        wasHelped: false,
         busy: false,
         error: '',
     };
@@ -99,14 +100,15 @@ export function createReaderInlineSenseReviewState(occurrence = null) {
 
 export function revealReaderInlineSenseAnswer(state) {
     if (!state || !state.occurrence) return createReaderInlineSenseReviewState();
-    return { ...state, showAnswer: true, pendingRating: null };
+    return { ...state, showAnswer: true, pendingRating: null, wasHelped: true };
 }
 
 export function chooseReaderInlineRating(state, rating) {
-    if (!state || !state.occurrence || !state.showAnswer || !READER_INLINE_RATINGS.includes(rating)) {
+    if (!state || !state.occurrence || !READER_INLINE_RATINGS.includes(rating)) {
         return state;
     }
-    return { ...state, pendingRating: rating };
+    if (rating === 'good' && state.wasHelped) return state;
+    return { ...state, showAnswer: true, pendingRating: rating };
 }
 
 export function chooseReaderInlineSense(state, wordSenseId) {
@@ -118,7 +120,7 @@ export function chooseReaderInlineSense(state, wordSenseId) {
 
 export function clearReaderInlinePendingRating(state) {
     if (!state) return createReaderInlineSenseReviewState();
-    return { ...state, showAnswer: false, pendingRating: null, selectedWordSenseId: null, busy: false, error: '' };
+    return { ...state, showAnswer: false, pendingRating: null, selectedWordSenseId: null, wasHelped: false, busy: false, error: '' };
 }
 
 export function replaceReaderInlineOccurrence(state, occurrence) {

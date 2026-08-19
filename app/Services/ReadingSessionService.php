@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ReadingSession;
 use App\Models\ReadingSessionCompletion;
 use App\Models\ReadingSessionInteraction;
+use App\Models\ReadingSessionCardSettlement;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\WordSense;
@@ -170,7 +171,7 @@ class ReadingSessionService
         string $interactionType,
         string $occurrenceId
     ): array {
-        if (!in_array($interactionType, [ReadingSessionInteraction::TYPE_OPENED, ReadingSessionInteraction::TYPE_HELPED], true)) {
+        if (!in_array($interactionType, [ReadingSessionInteraction::TYPE_OPENED, ReadingSessionInteraction::TYPE_HELPED, ReadingSessionInteraction::TYPE_MARKED_UNKNOWN], true)) {
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
         }
 
@@ -274,6 +275,18 @@ class ReadingSessionService
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
         }
 
+        $hasFormalHistory = ReviewLog::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where('review_card_id', $reviewCard->id)
+            ->whereIn('source', ReviewLog::FORMAL_RATING_SOURCES)
+            ->whereIn('rating', ['again', 'hard', 'good', 'easy'])
+            ->whereNull('undone_at')
+            ->exists();
+        if (!$hasFormalHistory) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+
         $candidateIds = array_map(
             fn (array $candidate) => (int) $candidate['word_sense_id'],
             $target['candidate_word_senses'] ?? [],
@@ -300,6 +313,13 @@ class ReadingSessionService
         if (!$interaction) {
             return null;
         }
+        $metadata = is_array($interaction->metadata) ? $interaction->metadata : [];
+        if ($interaction->interaction_type === ReadingSessionInteraction::TYPE_EXPLICIT_NONSCORED) {
+            if (!is_array($metadata['response_payload'] ?? null)) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+            }
+            return $metadata['response_payload'];
+        }
         if ($interaction->interaction_type !== ReadingSessionInteraction::TYPE_EXPLICIT_RATED
             || !$interaction->review_log_id) {
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
@@ -310,7 +330,6 @@ class ReadingSessionService
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_UNDONE);
         }
 
-        $metadata = is_array($interaction->metadata) ? $interaction->metadata : [];
         if (!is_array($metadata['response_payload'] ?? null)) {
             throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
         }
@@ -322,6 +341,21 @@ class ReadingSessionService
         ReadingSession $session,
         int $reviewCardId,
     ): void {
+        $settlement = ReadingSessionCardSettlement::query()
+            ->lockForUpdate()
+            ->where('reading_session_id', $session->id)
+            ->where('review_card_id', $reviewCardId)
+            ->first();
+        if ($settlement?->review_log_id) {
+            $settlementLog = ReviewLog::query()->lockForUpdate()->find($settlement->review_log_id);
+            if (!$settlementLog) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+            }
+            if ($settlementLog->undone_at === null) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_ACTIVE);
+            }
+        }
+
         $previousActions = ReadingSessionInteraction::query()
             ->where('reading_session_id', $session->id)
             ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
@@ -339,6 +373,102 @@ class ReadingSessionService
                 throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_ACTIVE);
             }
         }
+    }
+
+    public function assertExplicitRatingEvidenceAllowed(
+        ReadingSession $session,
+        array $target,
+        string $rating,
+    ): void {
+        if (!in_array($rating, ['again', 'good'], true)) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+        if ($rating !== 'good') {
+            return;
+        }
+
+        $blocked = ReadingSessionInteraction::query()
+            ->where('reading_session_id', $session->id)
+            ->where('occurrence_id', $target['occurrence_id'])
+            ->whereIn('interaction_type', [
+                ReadingSessionInteraction::TYPE_HELPED,
+                ReadingSessionInteraction::TYPE_MARKED_UNKNOWN,
+            ])
+            ->exists();
+        if ($blocked) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+    }
+
+    public function recordReadingSettlementLocked(
+        ReadingSession $session,
+        int $reviewCardId,
+        int $wordSenseId,
+        int $reviewLogId,
+        string $rating,
+    ): ReadingSessionCardSettlement {
+        $settlement = ReadingSessionCardSettlement::query()
+            ->lockForUpdate()
+            ->where('reading_session_id', $session->id)
+            ->where('review_card_id', $reviewCardId)
+            ->first();
+
+        if ($settlement?->review_log_id) {
+            $previous = ReviewLog::query()->lockForUpdate()->find($settlement->review_log_id);
+            if (!$previous || $previous->undone_at === null) {
+                throw new \InvalidArgumentException(self::ERROR_EXPLICIT_ACTION_ACTIVE);
+            }
+        }
+
+        $settlement ??= new ReadingSessionCardSettlement();
+        $settlement->fill([
+            'reading_session_id' => $session->id,
+            'user_id' => $session->user_id,
+            'language_id' => $session->language_id,
+            'review_card_id' => $reviewCardId,
+            'word_sense_id' => $wordSenseId,
+            'review_log_id' => $reviewLogId,
+            'rating' => $rating,
+        ]);
+        $settlement->save();
+
+        return $settlement;
+    }
+
+    public function recordExplicitNonScoringLocked(
+        ReadingSession $session,
+        array $target,
+        int $reviewCardId,
+        int $wordSenseId,
+        string $readingActionId,
+        array $responsePayload,
+    ): ReadingSessionInteraction {
+        if (ReadingSessionInteraction::query()
+            ->where('reading_session_id', $session->id)
+            ->where('reading_action_id', $readingActionId)
+            ->exists()) {
+            throw new \InvalidArgumentException(self::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+
+        return ReadingSessionInteraction::create([
+            'reading_session_id' => $session->id,
+            'user_id' => $session->user_id,
+            'language_id' => $session->language_id,
+            'interaction_key' => ReadingSessionInteraction::TYPE_EXPLICIT_NONSCORED . ':action:' . $readingActionId,
+            'reading_action_id' => $readingActionId,
+            'occurrence_id' => $target['occurrence_id'],
+            'interaction_type' => ReadingSessionInteraction::TYPE_EXPLICIT_NONSCORED,
+            'word_sense_id' => $wordSenseId,
+            'review_card_id' => $reviewCardId,
+            'review_log_id' => null,
+            'metadata' => [
+                'chapter_id' => $session->chapter_id,
+                'source_revision' => $session->source_revision,
+                'sentence_index' => $target['sentence_index'],
+                'reading_action_id' => $readingActionId,
+                'response_payload' => $responsePayload,
+            ],
+        ]);
     }
 
     public function recordExplicitRatingLocked(
@@ -412,6 +542,7 @@ class ReadingSessionService
         $summary = [
             'opened_occurrence_ids' => [],
             'helped_occurrence_ids' => [],
+            'marked_unknown_occurrence_ids' => [],
             'explicit_review_card_ids' => [],
             'explicit_word_sense_ids' => [],
         ];
@@ -422,6 +553,9 @@ class ReadingSessionService
             }
             if ($row->interaction_type === ReadingSessionInteraction::TYPE_HELPED && $row->occurrence_id) {
                 $summary['helped_occurrence_ids'][$row->occurrence_id] = true;
+            }
+            if ($row->interaction_type === ReadingSessionInteraction::TYPE_MARKED_UNKNOWN && $row->occurrence_id) {
+                $summary['marked_unknown_occurrence_ids'][$row->occurrence_id] = true;
             }
             if ($row->interaction_type === ReadingSessionInteraction::TYPE_EXPLICIT_RATED) {
                 if ($row->review_card_id) {

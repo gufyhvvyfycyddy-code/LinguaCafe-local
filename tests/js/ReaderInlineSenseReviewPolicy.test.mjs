@@ -127,28 +127,34 @@ test('production Reader keeps Finish interaction drain ahead of preflight and co
     assert.match(reader.slice(commitStart), /return this\.preFinishSafetyCheck\(\)/);
 });
 
-test('inline review must reveal before a rating can become pending', () => {
+test('inline review freezes recognition before answer help and help blocks positive Good', () => {
     const initial = createReaderInlineSenseReviewState(occurrence);
-    assert.equal(chooseReaderInlineRating(initial, 'good').pendingRating, null);
-    const revealed = revealReaderInlineSenseAnswer(initial);
-    assert.equal(chooseReaderInlineRating(revealed, 'good').pendingRating, 'good');
+    const recognized = chooseReaderInlineRating(initial, 'good');
+    assert.equal(recognized.pendingRating, 'good');
+    assert.equal(recognized.showAnswer, true);
+    assert.equal(recognized.wasHelped, false);
+
+    const helped = revealReaderInlineSenseAnswer(initial);
+    assert.equal(helped.wasHelped, true);
+    assert.equal(chooseReaderInlineRating(helped, 'good').pendingRating, null);
+    assert.equal(chooseReaderInlineRating(helped, 'again').pendingRating, 'again');
 });
 
 test('pending rating is frozen to one session, source revision, and occurrence identity', () => {
     const opened = createReaderInlineReviewIntent('session-a', 'revision-a', occurrence);
-    const frozen = freezeReaderInlineRatingIntent(opened, { ...opened }, 'hard');
-    assert.deepEqual(frozen, { ...opened, rating: 'hard' });
-    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'hard'), true);
-    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, readingSessionId: 'session-b' }, 'hard'), false);
-    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, sourceRevision: 'revision-b' }, 'hard'), false);
-    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, occurrenceId: 'occ2-other' }, 'hard'), false);
-    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'easy'), false);
-    assert.equal(freezeReaderInlineRatingIntent(opened, { ...opened, readingSessionId: 'session-b' }, 'hard'), null);
+    const frozen = freezeReaderInlineRatingIntent(opened, { ...opened }, 'good');
+    assert.deepEqual(frozen, { ...opened, rating: 'good' });
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'good'), true);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, readingSessionId: 'session-b' }, 'good'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, sourceRevision: 'revision-b' }, 'good'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened, occurrenceId: 'occ2-other' }, 'good'), false);
+    assert.equal(readerInlineRatingIntentMatches(frozen, { ...opened }, 'again'), false);
+    assert.equal(freezeReaderInlineRatingIntent(opened, { ...opened, readingSessionId: 'session-b' }, 'good'), null);
+    assert.equal(freezeReaderInlineRatingIntent(opened, { ...opened }, 'hard'), null);
 });
 
-test('formal command requires both explicit rating and concrete WordSense with active review card', () => {
-    let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
-    state = chooseReaderInlineRating(state, 'hard');
+test('formal command requires recognition intent and concrete WordSense with active review card', () => {
+    let state = chooseReaderInlineRating(createReaderInlineSenseReviewState(occurrence), 'good');
     assert.equal(buildReaderInlineOfficialRatingCommand(state, candidates, 'session-1'), null);
     state = chooseReaderInlineSense(state, 95);
     const command = buildReaderInlineOfficialRatingCommand(state, candidates, 'session-1');
@@ -156,7 +162,7 @@ test('formal command requires both explicit rating and concrete WordSense with a
         reviewCardId: 195,
         wordSenseId: 95,
         payload: {
-            rating: 'hard',
+            rating: 'good',
             reading_session_id: 'session-1',
             occurrence_id: 'occ2-bank',
         },
@@ -166,8 +172,7 @@ test('formal command requires both explicit rating and concrete WordSense with a
 });
 
 test('Reader explicit rating refuses to build without reading-session and occurrence identity', () => {
-    let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
-    state = chooseReaderInlineRating(state, 'good');
+    let state = chooseReaderInlineRating(createReaderInlineSenseReviewState(occurrence), 'good');
     state = chooseReaderInlineSense(state, 81);
     assert.equal(buildReaderInlineOfficialRatingCommand(state, candidates, ''), null);
 
@@ -176,15 +181,13 @@ test('Reader explicit rating refuses to build without reading-session and occurr
 });
 
 test('candidate without official ReviewCard cannot be rated by the Reader', () => {
-    let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
-    state = chooseReaderInlineRating(state, 'good');
+    let state = chooseReaderInlineRating(createReaderInlineSenseReviewState(occurrence), 'good');
     state = chooseReaderInlineSense(state, 81);
     assert.equal(buildReaderInlineOfficialRatingCommand(state, [{ word_sense_id: 81, review_card_id: null }]), null);
 });
 
 test('cancel/close and occurrence change clear pending rating and selected sense', () => {
-    let state = revealReaderInlineSenseAnswer(createReaderInlineSenseReviewState(occurrence));
-    state = chooseReaderInlineRating(state, 'easy');
+    let state = chooseReaderInlineRating(createReaderInlineSenseReviewState(occurrence), 'again');
     state = chooseReaderInlineSense(state, 95);
     const cleared = clearReaderInlinePendingRating(state);
     assert.equal(cleared.pendingRating, null);
@@ -196,11 +199,11 @@ test('cancel/close and occurrence change clear pending rating and selected sense
     assert.equal(changed.selectedWordSenseId, null);
 });
 
-test('production inline dialog preserves pending rating through manual new-sense continuation', () => {
+test('production inline dialog keeps new-sense creation non-scoring', () => {
     const source = fs.readFileSync('resources/js/components/TextReader/ReaderInlineSenseReviewDialog.vue', 'utf8');
     assert.match(source, /create-sense-and-submit/);
-    assert.match(source, /rating:\s*this\.state\.pendingRating/);
-    assert.match(source, /不会再让你选第二次评分/);
+    assert.match(source, /首次学习，本次不会记正式复习/);
+    assert.match(source, /不会写入正式复习评分/);
 });
 
 test('manual sense form normalizes common token POS tags to backend canonical values', () => {
@@ -254,12 +257,15 @@ test('deterministic 409/422 releases only the rejected manual action id and keep
     assert.doesNotMatch(conflictSource, /clearManualContinuationForRatingCommand\(command\)/);
 });
 
-test('manual new-sense continuation binds and persists one action id only when formal rating is about to send', () => {
+test('manual new-sense continuation binds the occurrence and stops before formal rating', () => {
     const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
-    assert.match(reader, /prepareInlineOfficialRatingCommand\([\s\S]{0,500}continuation\.readingActionId \|\| ''\)/);
-    assert.match(reader, /readingActionId: actionCommand\.payload\.reading_action_id/);
-    assert.match(reader, /readingSessionId: actionCommand\.payload\.reading_session_id/);
-    assert.doesNotMatch(reader, /axios\.post\('\/senses\/manual'[\s\S]{0,600}buildReaderExplicitRatingActionCommand\(/);
+    const continuationStart = reader.indexOf('continueManualSenseRating(continuation) {');
+    const continuationEnd = reader.indexOf('undoLastInlineRating()', continuationStart);
+    assert.ok(continuationStart > 0 && continuationEnd > continuationStart);
+    const continuationSource = reader.slice(continuationStart, continuationEnd);
+    assert.match(continuationSource, /reading-occurrence-evidence/);
+    assert.match(continuationSource, /setPendingManualSenseContinuation\(null\)/);
+    assert.doesNotMatch(continuationSource, /performInlineOfficialRating|prepareInlineOfficialRatingCommand/);
 });
 
 test('successful rating and undo leave no reusable reading action id for a later rerating intent', () => {
@@ -302,4 +308,21 @@ test('manual-sense recovery persists before transport and never guesses the crea
     assert.match(reader, /manual-create-blocked="manualSenseCreateBlocked"/);
     assert.match(reader, /:frozen-rating="inlineReviewIntent/);
     assert.doesNotMatch(reader, /resolveReaderManualSenseCandidate|excludedSenseIds/);
+});
+
+test('24h non-scoring stays silent and Reader exposes only Good or Again intent', () => {
+    const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+    const dialog = fs.readFileSync('resources/js/components/TextReader/ReaderInlineSenseReviewDialog.vue', 'utf8');
+    const policy = fs.readFileSync('resources/js/services/ReaderInlineSenseReviewPolicy.js', 'utf8');
+    const mobile = fs.readFileSync('mobile/src/ui.ts', 'utf8');
+    const readerSurface = [reader, dialog, policy, mobile].join('\n');
+
+    assert.match(policy, /READER_INLINE_RATINGS = Object\.freeze\(\['again', 'good'\]\)/);
+    assert.doesNotMatch(dialog, /SenseReviewRatingControls|Again \/ Hard \/ Good \/ Easy/);
+    assert.match(dialog, /认识 \/ 记得/);
+    assert.match(dialog, /不认识/);
+    assert.match(reader, /action && action\.scored === false/);
+    assert.doesNotMatch(readerSurface, /本次只记录阅读遇见|24h|24 小时|冷却|cooldown|倒计时/iu);
+    assert.doesNotMatch(mobile, /阅读评分已离线排队|阅读评分已记录/);
+    assert.match(mobile, /rating === 'again'[\s\S]*enqueueReadingInteraction\([\s\S]*'marked_unknown'/);
 });

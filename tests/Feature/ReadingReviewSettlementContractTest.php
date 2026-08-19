@@ -23,6 +23,7 @@ use App\Services\ReadingSessionService;
 use App\Services\ReadingTargetCatalogService;
 use App\Services\ReviewCardFsrsSnapshotService;
 use App\Services\ReviewCardService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -110,6 +111,7 @@ class ReadingReviewSettlementContractTest extends TestCase
 
         if ($cardService === null) {
             $cardService = Mockery::mock(ReviewCardService::class);
+            $cardService->shouldReceive('canApplyReadingPositiveGood')->andReturn(true);
             $cardService->shouldReceive('recordReviewWithLog')->andReturnUsing(function (
                 int $userId,
                 string $language,
@@ -153,6 +155,7 @@ class ReadingReviewSettlementContractTest extends TestCase
         return [
             'opened_occurrence_ids' => [],
             'helped_occurrence_ids' => [],
+            'marked_unknown_occurrence_ids' => [],
             'explicit_review_card_ids' => [],
             'explicit_word_sense_ids' => [],
         ];
@@ -241,6 +244,35 @@ class ReadingReviewSettlementContractTest extends TestCase
             'is_context_specific' => true,
             'sense_key' => hash('sha256', $lemma.'|'.Str::uuid()),
         ]);
+    }
+
+    private function anchorCardForReaderGood(ReviewCard $card, Carbon $anchor): ReviewCard
+    {
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => $anchor->copy()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => $anchor,
+        ])->save();
+        ReviewLog::forceCreate([
+            'user_id' => $card->user_id,
+            'language_id' => $card->language_id,
+            'language' => $card->language_id,
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => $anchor,
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
+
+        return $card->fresh();
     }
 
     private function finish(string $mode): array
@@ -341,6 +373,51 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame($beforeReadCount, $this->chapter->fresh()->read_count);
     }
 
+    public function test_passive_finish_at_86399_seconds_completes_silently_without_good(): void
+    {
+        $eventAt = Carbon::parse('2026-08-18T08:00:00Z');
+        [, $card] = $this->addEligibleTarget('occ2_passive_86399');
+        $this->anchorCardForReaderGood($card, $eventAt->copy()->subSeconds(86399));
+        $before = app(ReviewCardFsrsSnapshotService::class)->capture($card->fresh());
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class));
+        Carbon::setTestNow($eventAt);
+
+        try {
+            $result = $this->finish('commit');
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertTrue($result['completed']);
+        $this->assertSame(0, $result['passive_good_count']);
+        $this->assertSame(0, $result['unresolved_count']);
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
+        $this->assertSame(0, ReadingSessionCardSettlement::where('review_card_id', $card->id)->count());
+        $this->assertTrue(app(ReviewCardFsrsSnapshotService::class)->matches($card->fresh(), $before));
+    }
+
+    public function test_passive_finish_at_exactly_86400_seconds_writes_one_good(): void
+    {
+        $eventAt = Carbon::parse('2026-08-18T08:00:00Z');
+        [, $card] = $this->addEligibleTarget('occ2_passive_86400');
+        $this->anchorCardForReaderGood($card, $eventAt->copy()->subSeconds(86400));
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class));
+        Carbon::setTestNow($eventAt);
+
+        try {
+            $result = $this->finish('commit');
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertTrue($result['completed']);
+        $this->assertSame(1, $result['passive_good_count']);
+        $log = ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->sole();
+        $this->assertSame('good', $log->rating);
+        $this->assertSame($eventAt->toIso8601String(), $log->reviewed_at->utc()->toIso8601String());
+        $this->assertSame(1, ReadingSessionCardSettlement::where('review_card_id', $card->id)->where('review_log_id', $log->id)->count());
+    }
+
     public function test_reliable_binding_settles_good_once_and_finish_retry_is_idempotent(): void
     {
         [, $card] = $this->addEligibleTarget();
@@ -366,6 +443,7 @@ class ReadingReviewSettlementContractTest extends TestCase
             'fsrs_due_at' => now(),
         ])->save();
         $this->addEligibleTarget('occ2_finish_rollback', 'passive_disambiguation', $sense);
+        $this->anchorCardForReaderGood($card, now()->subDays(2)->startOfSecond());
 
         $snapshotService = app(ReviewCardFsrsSnapshotService::class);
         $beforeSnapshot = $snapshotService->capture($card->fresh());
@@ -414,6 +492,16 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
     }
 
+    public function test_marked_unknown_interaction_creates_zero_passive_rating(): void
+    {
+        [, $card, $target] = $this->addEligibleTarget('occ2_marked_unknown_interaction');
+        $this->interactionSummary['marked_unknown_occurrence_ids'][$target['occurrence_id']] = true;
+
+        $this->finish('commit');
+
+        $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
+    }
+
     public function test_opened_occurrence_alone_creates_zero_passive_rating(): void
     {
         [, $card, $target] = $this->addEligibleTarget();
@@ -433,12 +521,18 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
-    public function test_multiple_occurrences_of_same_sense_create_one_passive_log_per_session(): void
+    public function test_ten_occurrences_of_same_sense_create_one_passive_log_per_session(): void
     {
         $sense = $this->makeSense('same-sense');
-        [, $card] = $this->addEligibleTarget('occ2_same_1', 'passive_disambiguation', $sense);
-        $this->addEligibleTarget('occ2_same_2', 'passive_disambiguation', $sense);
+        $card = null;
+        for ($index = 1; $index <= 10; $index++) {
+            [, $candidateCard] = $this->addEligibleTarget('occ2_same_'.$index, 'passive_disambiguation', $sense);
+            $card ??= $candidateCard;
+        }
+
         $this->finish('commit');
+
+        $this->assertNotNull($card);
         $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
@@ -507,6 +601,8 @@ class ReadingReviewSettlementContractTest extends TestCase
     public function test_recent_trust_ai_high_matched_existing_passive_disambiguation_remains_eligible(): void
     {
         [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_trust_recent', 'passive_disambiguation');
+        $this->anchorCardForReaderGood($card, now()->subDays(2)->startOfSecond());
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class));
         $evidence->resolution_source = ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI;
         $evidence->updated_at = $this->session->started_at->copy()->addSecond();
         $this->evidenceMap[$target['occurrence_id']] = $evidence;
@@ -530,9 +626,11 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(0, ReviewLog::where('review_card_id', $card->id)->count());
     }
 
-    public function test_marked_unknown_binding_resolved_in_one_reading_becomes_eligible_in_a_later_session(): void
+    public function test_marked_unknown_binding_resolved_in_one_reading_becomes_eligible_in_a_later_session_when_formal_history_is_spaced(): void
     {
         [, $card, $target, $evidence] = $this->addEligibleTarget('occ2_marked_later', 'marked_unknown');
+        $this->anchorCardForReaderGood($card, now()->subDays(2)->startOfSecond());
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class));
         $evidence->updated_at = $this->session->started_at->copy()->addSecond();
         $this->evidenceMap[$target['occurrence_id']] = $evidence;
 
@@ -551,17 +649,30 @@ class ReadingReviewSettlementContractTest extends TestCase
         $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
-    public function test_later_new_reading_session_can_rate_same_sense_again(): void
+    public function test_new_reading_session_cannot_bypass_24h_after_passive_good(): void
     {
-        [, $card] = $this->addEligibleTarget();
-        $this->finish('commit');
-        $this->session = ReadingSession::forceCreate([
-            'uuid' => (string) Str::uuid(), 'user_id' => $this->user->id, 'language_id' => 'english',
-            'chapter_id' => $this->chapter->id, 'source_revision' => V2Harness::SOURCE_REVISION,
-            'status' => ReadingSession::STATUS_ACTIVE, 'started_at' => now(),
-        ]);
-        $this->finish('commit');
-        $this->assertSame(2, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
+        $firstAt = Carbon::parse('2026-08-18T08:00:00Z');
+        [, $card] = $this->addEligibleTarget('occ2_later_session_floor');
+        $this->anchorCardForReaderGood($card, $firstAt->copy()->subDays(2));
+        $this->service = $this->makeSettlementService(app(ReviewCardService::class));
+        Carbon::setTestNow($firstAt);
+
+        try {
+            $this->finish('commit');
+            $this->session = ReadingSession::forceCreate([
+                'uuid' => (string) Str::uuid(), 'user_id' => $this->user->id, 'language_id' => 'english',
+                'chapter_id' => $this->chapter->id, 'source_revision' => V2Harness::SOURCE_REVISION,
+                'status' => ReadingSession::STATUS_ACTIVE, 'started_at' => $firstAt->copy()->addSeconds(30),
+            ]);
+            Carbon::setTestNow($firstAt->copy()->addSeconds(30));
+            $second = $this->finish('commit');
+        } finally {
+            Carbon::setTestNow();
+        }
+
+        $this->assertTrue($second['completed']);
+        $this->assertSame(0, $second['passive_good_count']);
+        $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
     }
 
     public function test_cross_user_language_or_session_replay_is_rejected_without_rating(): void

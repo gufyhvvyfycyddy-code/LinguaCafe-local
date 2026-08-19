@@ -144,6 +144,8 @@ export class LinguaCafeApp {
   private selectedChapter: ChapterSummary | null = null;
   private lookupToken: ReaderToken | null = null;
   private lookupDefinitions: string[] = [];
+  private lookupReadingRating: 'again' | 'good' | null = null;
+  private lookupHelpRevealed = false;
   private reviews: ReviewItem[] = [];
   private wordSenses: WordSenseSummary[] = [];
   private reviewRevealed = false;
@@ -732,12 +734,26 @@ export class LinguaCafeApp {
     this.lookupToken = token;
     const term = (token.lemma || token.word).trim().toLocaleLowerCase('en-US');
     this.lookupDefinitions = [];
+    this.lookupReadingRating = null;
+    this.lookupHelpRevealed = false;
     await this.recordLookupOpened(token);
     if (!this.lookupHistoryOpen) {
       history.pushState({ linguacafeScreen: this.screen, linguacafeLookup: true }, '');
       this.lookupHistoryOpen = true;
     }
 
+    const target = this.readingTargetForToken(token);
+    const hasReviewCandidates = Boolean(target?.candidate_word_senses.some(candidate => candidate.review_card_id));
+    if (hasReviewCandidates) {
+      this.renderLookup(false);
+      return;
+    }
+
+    await this.loadLookupAnswer(term);
+  }
+
+  private async loadLookupAnswer(term: string): Promise<void> {
+    if (!this.api) return;
     if (this.usingOfflineSnapshot) {
       this.lookupDefinitions = this.readerPackage?.dictionary_summaries[term] ?? [];
       this.renderLookup(false, '', true);
@@ -760,12 +776,47 @@ export class LinguaCafeApp {
     }
   }
 
+  private async revealReadingLookup(rating: 'again' | 'good' | null): Promise<void> {
+    const token = this.lookupToken;
+    const session = this.readerPackage?.reading_session;
+    const target = token ? this.readingTargetForToken(token) : null;
+    if (!token || !target || !session || !this.offlineRepository) return;
+
+    if (rating) {
+      this.lookupReadingRating = rating;
+      if (rating === 'again') {
+        await this.offlineRepository.enqueueReadingInteraction(
+          session.reading_session_id,
+          target.occurrence_id,
+          'marked_unknown',
+        );
+        if (!this.usingOfflineSnapshot) await this.flushQueue();
+      }
+    } else {
+      this.lookupHelpRevealed = true;
+      await this.offlineRepository.enqueueReadingInteraction(
+        session.reading_session_id,
+        target.occurrence_id,
+        'helped',
+      );
+      if (!this.usingOfflineSnapshot) await this.flushQueue();
+    }
+
+    const term = (token.lemma || token.word).trim().toLocaleLowerCase('en-US');
+    await this.loadLookupAnswer(term);
+  }
+
   private renderLookup(busy: boolean, lookupError = '', usingPackageSummary = false): void {
     const token = this.lookupToken;
     if (!token) return;
     const firstDefinition = this.lookupDefinitions[0] ?? '';
     const target = this.readingTargetForToken(token);
     const reviewCandidates = target?.candidate_word_senses.filter(candidate => candidate.review_card_id) ?? [];
+    const awaitingRecognition = reviewCandidates.length > 0
+      && this.lookupReadingRating === null
+      && !this.lookupHelpRevealed;
+    const activeReadingRating: 'again' | 'good' | null = this.lookupReadingRating
+      ?? (this.lookupHelpRevealed ? 'again' : null);
     const panel = document.createElement('div');
     panel.className = 'sheet-backdrop';
     panel.innerHTML = `
@@ -776,31 +827,40 @@ export class LinguaCafeApp {
           <small>${escapeHtml(token.lemma || token.word)} · ${escapeHtml(token.pos || 'other')}</small></div>
           <button class="icon-button" id="close-lookup" aria-label="关闭">×</button>
         </header>
-        ${busy ? '<div class="inline-loading">正在查词…</div>' : ''}
-        ${lookupError ? `<div class="alert error">${escapeHtml(lookupError)}</div>` : ''}
-        ${usingPackageSummary ? '<div class="offline-banner">离线词典摘要</div>' : ''}
-        ${this.lookupDefinitions.length ? `<ul class="definitions">${this.lookupDefinitions
-          .map(definition => `<li>${escapeHtml(definition)}</li>`).join('')}</ul>` :
-          (!busy && !lookupError ? `<p class="muted">${usingPackageSummary
-            ? '文章包内没有找到词典摘要。'
-            : '本地词典没有找到释义。'}</p>` : '')}
-        ${reviewCandidates.map(candidate => `
-          <section class="card">
-            <strong>${escapeHtml(candidate.sense_zh || candidate.sense_en || token.word)}</strong>
-            <div class="rating-grid">${(['again', 'hard', 'good', 'easy'] as ReviewRating[]).map(rating => `
-              <button type="button" data-reading-rating="${rating}"
-                data-review-card="${candidate.review_card_id}">${rating}</button>`).join('')}</div>
-          </section>`).join('')}
-        <form id="create-sense-form">
-          <h3>创建学习词义</h3>
-          <label>词性<select name="pos">${[
-            'noun', 'verb', 'adjective', 'adverb', 'preposition',
-            'conjunction', 'phrase', 'other',
-          ].map(pos => `<option ${pos === token.pos ? 'selected' : ''}>${pos}</option>`).join('')}</select></label>
-          <label>中文词义<input name="sense_zh" required maxlength="1000"
-            value="${escapeHtml(firstDefinition)}" placeholder="输入你确认的中文词义" /></label>
-          <button class="primary" type="submit">确认并创建</button>
-        </form>
+        ${awaitingRecognition ? `
+          <div class="card">
+            <p>先回想这个词在这里的意思，再选择你的真实情况。</p>
+            <div class="rating-grid">
+              <button type="button" data-reading-intent="good">认识 / 记得</button>
+              <button type="button" data-reading-intent="again">不认识</button>
+            </div>
+            <button type="button" class="text-button" data-reading-help="true">查看答案</button>
+          </div>` : `
+          ${busy ? '<div class="inline-loading">正在查词…</div>' : ''}
+          ${lookupError ? `<div class="alert error">${escapeHtml(lookupError)}</div>` : ''}
+          ${usingPackageSummary ? '<div class="offline-banner">离线词典摘要</div>' : ''}
+          ${this.lookupDefinitions.length ? `<ul class="definitions">${this.lookupDefinitions
+            .map(definition => `<li>${escapeHtml(definition)}</li>`).join('')}</ul>` :
+            (!busy && !lookupError ? `<p class="muted">${usingPackageSummary
+              ? '文章包内没有找到词典摘要。'
+              : '本地词典没有找到释义。'}</p>` : '')}
+          ${reviewCandidates.map(candidate => `
+            <section class="card">
+              <strong>${escapeHtml(candidate.sense_zh || candidate.sense_en || token.word)}</strong>
+              ${activeReadingRating ? `<button type="button" data-reading-card="${candidate.review_card_id}">
+                ${activeReadingRating === 'good' ? '认识 / 记得' : '不认识'} · 确认这个词义
+              </button>` : ''}
+            </section>`).join('')}
+          <form id="create-sense-form">
+            <h3>创建学习词义</h3>
+            <label>词性<select name="pos">${[
+              'noun', 'verb', 'adjective', 'adverb', 'preposition',
+              'conjunction', 'phrase', 'other',
+            ].map(pos => `<option ${pos === token.pos ? 'selected' : ''}>${pos}</option>`).join('')}</select></label>
+            <label>中文词义<input name="sense_zh" required maxlength="1000"
+              value="${escapeHtml(firstDefinition)}" placeholder="输入你确认的中文词义" /></label>
+            <button class="primary" type="submit">确认并创建</button>
+          </form>`}
       </section>`;
     this.root.querySelector('.sheet-backdrop')?.remove();
     this.root.append(panel);
@@ -812,12 +872,20 @@ export class LinguaCafeApp {
       event.preventDefault();
       void this.createSense(new FormData(event.currentTarget as HTMLFormElement), panel);
     });
-    panel.querySelectorAll<HTMLButtonElement>('[data-reading-rating]').forEach(button => {
+    panel.querySelectorAll<HTMLButtonElement>('[data-reading-intent]').forEach(button => {
       button.addEventListener('click', () => {
-        const rating = button.dataset.readingRating;
-        const reviewCardId = Number(button.dataset.reviewCard);
-        if (target && isReviewRating(rating) && reviewCardId > 0) {
-          void this.rateReadingTarget(target.occurrence_id, reviewCardId, rating, panel);
+        const rating = button.dataset.readingIntent;
+        if (rating === 'again' || rating === 'good') void this.revealReadingLookup(rating);
+      });
+    });
+    panel.querySelector<HTMLButtonElement>('[data-reading-help]')?.addEventListener('click', () => {
+      void this.revealReadingLookup(null);
+    });
+    panel.querySelectorAll<HTMLButtonElement>('[data-reading-card]').forEach(button => {
+      button.addEventListener('click', () => {
+        const reviewCardId = Number(button.dataset.readingCard);
+        if (target && activeReadingRating && reviewCardId > 0) {
+          void this.rateReadingTarget(target.occurrence_id, reviewCardId, activeReadingRating, panel);
         }
       });
     });
@@ -848,7 +916,7 @@ export class LinguaCafeApp {
   private async rateReadingTarget(
     occurrenceId: string,
     reviewCardId: number,
-    rating: ReviewRating,
+    rating: 'again' | 'good',
     panel: HTMLElement,
   ): Promise<void> {
     const session = this.readerPackage?.reading_session;
@@ -861,9 +929,6 @@ export class LinguaCafeApp {
       { readingSessionId: session.reading_session_id, occurrenceId },
     );
     this.closeLookupSheet(panel);
-    this.showToast(this.usingOfflineSnapshot || !navigator.onLine
-      ? '阅读评分已离线排队'
-      : '阅读评分已记录');
     await this.flushQueue();
   }
 

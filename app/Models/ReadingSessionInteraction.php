@@ -11,7 +11,9 @@ class ReadingSessionInteraction extends Model
 
     public const TYPE_OPENED = 'opened';
     public const TYPE_HELPED = 'helped';
+    public const TYPE_MARKED_UNKNOWN = 'marked_unknown';
     public const TYPE_EXPLICIT_RATED = 'explicit_rated';
+    public const TYPE_EXPLICIT_NONSCORED = 'explicit_nonscored';
 
     protected $fillable = [
         'reading_session_id',

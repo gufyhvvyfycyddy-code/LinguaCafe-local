@@ -36,7 +36,7 @@ class ReadingSessionController extends Controller
     {
         $data = $request->validate([
             'reading_session_id' => ['required', 'string', 'uuid'],
-            'interaction_type' => ['required', 'in:opened,helped'],
+            'interaction_type' => ['required', 'in:opened,helped,marked_unknown'],
             'occurrence_id' => ['required', 'string'],
         ]);
 

@@ -506,7 +506,7 @@ class MobileQueuedActionSyncService
     {
         return Validator::make($payload, [
             'reading_session_id' => ['required', 'uuid'],
-            'interaction_type' => ['required', 'in:opened,helped'],
+            'interaction_type' => ['required', 'in:opened,helped,marked_unknown'],
             'occurrence_id' => ['required', 'string', 'max:255'],
         ])->validate();
     }

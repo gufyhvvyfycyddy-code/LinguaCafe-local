@@ -15,6 +15,8 @@ use App\Services\SenseReviewSevenDayTrendService;
 use App\Services\SenseReviewThirtyDayCalendarService;
 use App\Services\SenseReviewUndoService;
 use App\Services\Settings\Presets\ReviewSettingsResolver;
+use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -93,7 +95,6 @@ class SenseReviewController extends Controller
             && ($readingSessionId === null || $occurrenceId === null || $readingActionId === null)) {
             abort(422, 'reading_session_id, occurrence_id, and reading_action_id must be provided together.');
         }
-
         $card = null;
         if (!$readingSessionId) {
             $card = ReviewCard::where('id', $reviewCardId)
@@ -108,8 +109,9 @@ class SenseReviewController extends Controller
 
         $rating = $request->post('rating');
         if ($readingSessionId && $occurrenceId) {
+            $readingAcceptedAt = Carbon::now();
             try {
-                $payload = DB::transaction(function () use (
+                $payload = $this->runConcurrencySafeTransaction(function () use (
                     $userId,
                     $language,
                     $readingSessionId,
@@ -118,7 +120,8 @@ class SenseReviewController extends Controller
                     $rating,
                     $reviewDurationMs,
                     $ignoreDailyLimits,
-                    $readingActionId
+                    $readingActionId,
+                    $readingAcceptedAt
                 ) {
                     $session = $this->readingSessionService->lockOwnedSessionForExplicitAction(
                         $userId,
@@ -133,10 +136,6 @@ class SenseReviewController extends Controller
                         return $replay;
                     }
 
-                    $this->readingSessionService->assertNoActiveExplicitRating(
-                        $session,
-                        $reviewCardId,
-                    );
                     $context = $this->readingSessionService->lockExplicitRatingContext(
                         $userId,
                         $language,
@@ -144,16 +143,54 @@ class SenseReviewController extends Controller
                         $occurrenceId,
                         $reviewCardId,
                     );
-
-                    $reviewed = $this->reviewCardService->recordReviewWithLog(
-                        $userId,
-                        $language,
-                        $context['review_card']->id,
-                        $rating,
-                        ReviewLog::SOURCE_READING_EXPLICIT,
-                        $readingSessionId,
-                        $reviewDurationMs,
+                    // One lock order across concurrent Reader writers:
+                    // session/chapter -> ReviewCard -> settlement/action rows.
+                    $this->readingSessionService->assertNoActiveExplicitRating(
+                        $session,
+                        $reviewCardId,
                     );
+                    $this->readingSessionService->assertExplicitRatingEvidenceAllowed(
+                        $context['session'],
+                        $context['target'],
+                        $rating,
+                    );
+
+                    try {
+                        $reviewed = $this->reviewCardService->recordReviewWithLog(
+                            $userId,
+                            $language,
+                            $context['review_card']->id,
+                            $rating,
+                            ReviewLog::SOURCE_READING_EXPLICIT,
+                            $readingSessionId,
+                            $reviewDurationMs,
+                            $readingAcceptedAt,
+                        );
+                    } catch (\InvalidArgumentException $e) {
+                        if ($e->getMessage() !== ReviewCardService::ERROR_READING_POSITIVE_SPACING_BLOCKED) {
+                            throw $e;
+                        }
+
+                        $payload = $this->buildReadingNonScoringPayload(
+                            $userId,
+                            $language,
+                            $context['review_card']->fresh(),
+                            $ignoreDailyLimits,
+                            $readingSessionId,
+                            $readingActionId,
+                        );
+                        $this->readingSessionService->recordExplicitNonScoringLocked(
+                            $context['session'],
+                            $context['target'],
+                            (int) $context['review_card']->id,
+                            (int) $context['sense']->id,
+                            $readingActionId,
+                            $payload,
+                        );
+
+                        return $payload;
+                    }
+
                     $payload = $this->buildRatePayload(
                         $userId,
                         $language,
@@ -161,6 +198,13 @@ class SenseReviewController extends Controller
                         $reviewed['review_log'],
                         $ignoreDailyLimits,
                         $readingActionId,
+                    );
+                    $this->readingSessionService->recordReadingSettlementLocked(
+                        $context['session'],
+                        (int) $context['review_card']->id,
+                        (int) $context['sense']->id,
+                        (int) $reviewed['review_log']->id,
+                        $rating,
                     );
                     $this->readingSessionService->recordExplicitRatingLocked(
                         $context['session'],
@@ -247,6 +291,48 @@ class SenseReviewController extends Controller
             'next_card' => $nextCard ? $this->senseReviewCardSerializerService->serialize($nextCard) : null,
             'summary' => $result['summary'],
             'action' => $action,
+        ];
+    }
+
+    private function runConcurrencySafeTransaction(callable $callback): mixed
+    {
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            try {
+                return DB::transaction($callback, 3);
+            } catch (QueryException $e) {
+                if ($attempt === 3 || !str_contains($e->getMessage(), 'Record has changed since last read')) {
+                    throw $e;
+                }
+            }
+        }
+
+        throw new \LogicException('Reader transaction retry loop exhausted unexpectedly.');
+    }
+
+    private function buildReadingNonScoringPayload(
+        int $userId,
+        string $language,
+        ReviewCard $card,
+        bool $ignoreDailyLimits,
+        string $readingSessionId,
+        string $readingActionId,
+    ): array {
+        $result = $this->senseReviewService->dueCardsWithLimits($userId, $language, $ignoreDailyLimits);
+        $nextCard = $result['cards']->first();
+
+        return [
+            'reviewed_card' => $this->senseReviewCardSerializerService->serialize($card->load('sense')),
+            'next_card' => $nextCard ? $this->senseReviewCardSerializerService->serialize($nextCard) : null,
+            'summary' => $result['summary'],
+            'action' => [
+                'review_log_id' => null,
+                'review_session_id' => $readingSessionId,
+                'rating' => 'good',
+                'reading_action_id' => $readingActionId,
+                'undoable' => false,
+                'scored' => false,
+                'non_scoring_reason' => ReviewCardService::ERROR_READING_POSITIVE_SPACING_BLOCKED,
+            ],
         ];
     }
 

@@ -22,6 +22,7 @@ use App\Services\ReadingSessionService;
 use App\Services\ReadingTargetCatalogService;
 use App\Services\ReviewCardFsrsSnapshotService;
 use App\Services\ReviewCardService;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Mockery;
@@ -86,13 +87,30 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         ]);
         $this->sense = $this->makeSense('bank', '银行');
         $this->card = app(ReviewCardService::class)->ensureSenseCard($this->sense);
+        $anchor = now()->subDays(2)->startOfSecond();
         $this->card->forceFill([
             'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
             'fsrs_enabled' => true,
-            'fsrs_due_at' => now(),
-            'fsrs_reps' => 0,
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => now()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
             'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => $anchor,
         ])->save();
+        ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $this->card->id,
+            'rating' => 'good',
+            'reviewed_at' => $anchor,
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
 
         $catalog = app(ReadingTargetCatalogService::class)->build($this->user->id, 'english', $this->chapter->id);
         $this->assertCount(1, $catalog['targets']);
@@ -130,7 +148,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $log = ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->sole();
         $this->assertSame($rating, $log->rating);
         $this->assertSame($this->session->uuid, $log->review_session_id);
-        $this->assertSame($before, $log->before_card_snapshot);
+        $this->assertEquals($before, $log->before_card_snapshot);
         $this->assertSame($log->id, $response->json('action.review_log_id'));
     }
 
@@ -138,16 +156,26 @@ class ReadingReviewConcurrencyContractTest extends TestCase
     {
         return [
             ['again', 1],
-            ['hard', 2],
-            ['good', 3],
-            ['easy', 4],
+            ['good', 2],
         ];
     }
 
-    public function test_manual_sense_continuation_keeps_formal_writes_zero_until_exact_card_is_rated_once(): void
+    public function test_new_reader_actions_reject_hard_and_easy_without_formal_write(): void
+    {
+        foreach (['hard', 'easy'] as $rating) {
+            $this->actingAs($this->user)->postJson(
+                '/reviews/senses/'.$this->card->id.'/rate',
+                $this->explicitRequestPayload($rating, $this->readingActionId($rating === 'hard' ? 3 : 4)),
+            )->assertStatus(422)
+                ->assertJsonPath('error_code', ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
+        }
+
+        $this->assertSame(0, $this->explicitLogs()->count());
+    }
+
+    public function test_manual_new_sense_binding_remains_first_learning_and_cannot_write_reader_rating(): void
     {
         $existingCardBefore = app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh());
-        $rating = 'hard';
 
         $manual = $this->actingAs($this->user)->postJson('/senses/manual', [
             'lemma' => 'bank',
@@ -168,10 +196,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $this->assertGreaterThan(0, $manualCardId);
         $manualCard = ReviewCard::findOrFail($manualCardId);
         $manualCardBefore = app(ReviewCardFsrsSnapshotService::class)->capture($manualCard);
-
-        $this->assertSame(0, ReviewLog::where('user_id', $this->user->id)->count());
-        $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
-        $this->assertSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
+        $this->assertSame(0, $this->explicitLogs()->count());
 
         $this->postJson('/chapters/'.$this->chapter->id.'/reading-occurrence-evidence', [
             'occurrence_id' => $this->occurrenceId,
@@ -182,38 +207,22 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             'resume_reading_session_id' => $this->session->uuid,
         ])->assertOk();
 
-        $this->assertSame(0, ReviewLog::where('user_id', $this->user->id)->count());
+        foreach (['good', 'again'] as $offset => $rating) {
+            $actionId = $this->readingActionId(5 + $offset);
+            $this->postJson('/reviews/senses/'.$manualCardId.'/rate', [
+                'rating' => $rating,
+                'reading_session_id' => $this->session->uuid,
+                'occurrence_id' => $this->occurrenceId,
+                'reading_action_id' => $actionId,
+                'ignoreDailyLimits' => true,
+            ])->assertStatus(422)
+                ->assertJsonPath('error_code', ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
+            $this->assertSame(0, $this->explicitActionCount($actionId));
+        }
+
+        $this->assertSame(0, $this->explicitLogs()->count());
         $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
         $this->assertSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
-
-        $actionId = $this->readingActionId(5);
-        $response = $this->postJson('/reviews/senses/'.$manualCardId.'/rate', [
-            'rating' => $rating,
-            'reading_session_id' => $this->session->uuid,
-            'occurrence_id' => $this->occurrenceId,
-            'reading_action_id' => $actionId,
-            'ignoreDailyLimits' => true,
-        ])->assertOk()
-            ->assertJsonPath('action.rating', $rating)
-            ->assertJsonPath('action.reading_action_id', $actionId);
-
-        $log = ReviewLog::where('user_id', $this->user->id)
-            ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
-            ->sole();
-        $this->assertSame($manualCardId, $log->review_card_id);
-        $this->assertSame($rating, $log->rating);
-        $this->assertSame($this->session->uuid, $log->review_session_id);
-        $this->assertSame($manualCardBefore, $log->before_card_snapshot);
-        $this->assertSame($log->id, $response->json('action.review_log_id'));
-        $this->assertNotSame($manualCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($manualCard->fresh()));
-        $this->assertSame($existingCardBefore, app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh()));
-        $this->assertSame(
-            1,
-            ReadingSessionInteraction::where('reading_session_id', $this->session->id)
-                ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_RATED)
-                ->where('reading_action_id', $actionId)
-                ->count(),
-        );
     }
 
     public function test_reader_manual_sense_rejects_invalid_scope_before_any_business_write(): void
@@ -360,6 +369,24 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $this->assertSame(1, $this->explicitActionCount($actionId));
     }
 
+    public function test_again_then_later_same_session_good_keeps_positive_zero(): void
+    {
+        $againActionId = $this->readingActionId(94);
+        $goodActionId = $this->readingActionId(95);
+        $this->actingAs($this->user)
+            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('again', $againActionId))
+            ->assertOk()
+            ->assertJsonPath('action.rating', 'again');
+
+        $this->actingAs($this->user)
+            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('good', $goodActionId))
+            ->assertStatus(409)
+            ->assertJsonPath('error_code', ReadingSessionService::ERROR_EXPLICIT_ACTION_ACTIVE);
+
+        $this->assertSame(1, ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->where('rating', 'again')->count());
+        $this->assertSame(0, ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->where('rating', 'good')->count());
+    }
+
     public function test_different_action_uuid_is_rejected_while_previous_explicit_rating_is_active(): void
     {
         $firstActionId = $this->readingActionId(11);
@@ -388,14 +415,14 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $before = $snapshotService->capture($this->card->fresh());
         $oldActionId = $this->readingActionId(13);
         $rate = $this->actingAs($this->user)
-            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('easy', $oldActionId))
+            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('good', $oldActionId))
             ->assertOk();
         $reviewLogId = (int) $rate->json('action.review_log_id');
         $this->undoExplicit($reviewLogId, $this->readingActionId(14))->assertOk();
         $this->assertTrue($snapshotService->matches($this->card->fresh(), $before));
 
         $replay = $this->actingAs($this->user)
-            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('easy', $oldActionId));
+            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('good', $oldActionId));
 
         $replay->assertStatus(409)
             ->assertJsonPath('success', false)
@@ -412,7 +439,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $oldActionId = $this->readingActionId(15);
         $newActionId = $this->readingActionId(16);
         $first = $this->actingAs($this->user)
-            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('hard', $oldActionId))
+            ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('good', $oldActionId))
             ->assertOk();
         $this->undoExplicit((int) $first->json('action.review_log_id'), $this->readingActionId(17))->assertOk();
 
@@ -453,7 +480,10 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         ]);
 
         $response->assertOk();
-        $log = ReviewLog::where('review_card_id', $this->card->id)->sole();
+        $log = ReviewLog::where('review_card_id', $this->card->id)
+            ->where('source', ReviewLog::SOURCE_SENSE_REVIEW)
+            ->where('review_session_id', $reviewSessionId)
+            ->sole();
         $this->assertSame(ReviewLog::SOURCE_SENSE_REVIEW, $log->source);
         $this->assertSame($reviewSessionId, $log->review_session_id);
         $this->assertSame(
@@ -545,8 +575,14 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         $sessionService->shouldReceive('lockExplicitRatingContext')->once()->andReturnUsing(
             fn (...$arguments) => $realSessionService->lockExplicitRatingContext(...$arguments),
         );
+        $sessionService->shouldReceive('assertExplicitRatingEvidenceAllowed')->once()->andReturnUsing(
+            fn (...$arguments) => $realSessionService->assertExplicitRatingEvidenceAllowed(...$arguments),
+        );
         $sessionService->shouldReceive('assertNoActiveExplicitRating')->once()->andReturnUsing(
             fn (...$arguments) => $realSessionService->assertNoActiveExplicitRating(...$arguments),
+        );
+        $sessionService->shouldReceive('recordReadingSettlementLocked')->once()->andReturnUsing(
+            fn (...$arguments) => $realSessionService->recordReadingSettlementLocked(...$arguments),
         );
         $sessionService->shouldReceive('recordExplicitRatingLocked')->once()->andReturnUsing(
             function (...$arguments) use ($realSessionService, $actionId, &$ledgerWriteReached) {
@@ -575,7 +611,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         try {
             $this->actingAs($this->user)->postJson(
                 '/reviews/senses/'.$this->card->id.'/rate',
-                $this->explicitRequestPayload('hard', $actionId),
+                $this->explicitRequestPayload('good', $actionId),
             );
             $this->fail('Injected post-ledger failure must escape the request and roll back the outer transaction.');
         } catch (RuntimeException $e) {
@@ -612,6 +648,76 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         );
         $this->assertWorkerOutcome($result, [ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID]);
         $this->assertSame(0, ReviewLog::where('review_card_id', $unrelatedCard->id)->count());
+    }
+
+    public function test_cross_article_session_good_inside_24_hours_is_silent_non_scoring(): void
+    {
+        [$secondChapter, $secondSession, $secondOccurrenceId] = $this->createSecondReadingSessionForSense('Cross Session Silent');
+        $firstAt = Carbon::parse('2026-08-18T08:00:00Z');
+        $this->setMainCardAnchor($firstAt->copy()->subDays(2));
+        Carbon::setTestNow($firstAt);
+
+        try {
+            $first = $this->actingAs($this->user)
+                ->postJson('/reviews/senses/'.$this->card->id.'/rate', $this->explicitRequestPayload('good', $this->readingActionId(90)))
+                ->assertOk();
+            $this->assertIsInt($first->json('action.review_log_id'));
+
+            $afterFirst = app(ReviewCardFsrsSnapshotService::class)->capture($this->card->fresh());
+            Carbon::setTestNow($firstAt->copy()->addSeconds(30));
+            $secondActionId = $this->readingActionId(91);
+            $second = $this->actingAs($this->user)->postJson('/reviews/senses/'.$this->card->id.'/rate', [
+                'rating' => 'good',
+                'reading_session_id' => $secondSession->uuid,
+                'occurrence_id' => $secondOccurrenceId,
+                'reading_action_id' => $secondActionId,
+                'ignoreDailyLimits' => true,
+            ])->assertOk()
+                ->assertJsonPath('action.review_log_id', null)
+                ->assertJsonPath('action.scored', false);
+
+            $this->assertSame(1, $this->activeExplicitLogs()->count());
+            $this->assertTrue(app(ReviewCardFsrsSnapshotService::class)->matches($this->card->fresh(), $afterFirst));
+            $this->assertSame(0, ReadingSessionCardSettlement::where('reading_session_id', $secondSession->id)->where('review_card_id', $this->card->id)->count());
+            $this->assertSame(1, ReadingSessionInteraction::where('reading_session_id', $secondSession->id)
+                ->where('interaction_type', ReadingSessionInteraction::TYPE_EXPLICIT_NONSCORED)
+                ->where('reading_action_id', $secondActionId)
+                ->count());
+
+            $retry = $this->actingAs($this->user)->postJson('/reviews/senses/'.$this->card->id.'/rate', [
+                'rating' => 'hard',
+                'reading_session_id' => $secondSession->uuid,
+                'occurrence_id' => 'retry-input-drift',
+                'reading_action_id' => $secondActionId,
+                'ignoreDailyLimits' => true,
+            ])->assertOk();
+            $this->assertSame($second->json(), $retry->json(), 'Silent non-scoring action replay must win before retry input drift is revalidated.');
+            $this->assertSame(1, $this->activeExplicitLogs()->count());
+        } finally {
+            Carbon::setTestNow();
+        }
+    }
+
+    public function test_two_reading_sessions_concurrent_good_create_at_most_one_positive(): void
+    {
+        [, $secondSession, $secondOccurrenceId] = $this->createSecondReadingSessionForSense('Concurrent Cross Session');
+        $this->setMainCardAnchor(now()->subDays(2)->startOfSecond());
+        $results = $this->runConcurrent([
+            ['explicit-rate', $this->explicitWorkerPayload('good', $this->readingActionId(92))],
+            ['explicit-rate', $this->explicitWorkerPayloadFor($secondSession, $secondOccurrenceId, 'good', $this->readingActionId(93))],
+        ]);
+
+        $this->assertAllWorkersSucceeded($results);
+        $positive = ReviewLog::query()
+            ->where('review_card_id', $this->card->id)
+            ->where('source', ReviewLog::SOURCE_READING_EXPLICIT)
+            ->where('rating', 'good')
+            ->whereNull('undone_at')
+            ->get();
+        $this->assertCount(1, $positive, $this->workerDiagnostics($results));
+        $reviewLogIds = array_map(fn (array $result) => $result['json']['body']['action']['review_log_id'] ?? null, $results);
+        $this->assertSame(1, count(array_filter($reviewLogIds, fn ($value) => is_int($value))), $this->workerDiagnostics($results));
+        $this->assertSame(1, count(array_filter($results, fn (array $result) => ($result['json']['body']['action']['scored'] ?? null) === false)), $this->workerDiagnostics($results));
     }
 
     public function test_true_concurrent_duplicate_explicit_rating_creates_one_formal_log(): void
@@ -702,11 +808,14 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         );
 
         $results = $this->runConcurrent([
-            ['explicit-rate', $this->explicitWorkerPayload('hard', $this->readingActionId(34))],
+            ['explicit-rate', $this->explicitWorkerPayload('good', $this->readingActionId(34))],
             ['finish-commit', $this->finishWorkerPayload()],
         ]);
 
-        $this->assertWorkerOutcome($results[0], [ReadingSessionService::ERROR_SESSION_NOT_ACTIVE]);
+        $this->assertWorkerOutcome($results[0], [
+            ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+            ReadingSessionService::ERROR_EXPLICIT_ACTION_ACTIVE,
+        ]);
         $this->assertWorkerOutcome($results[1]);
         $logs = ReviewLog::where('review_card_id', $this->card->id)
             ->whereIn('source', [ReviewLog::SOURCE_READING_EXPLICIT, ReviewLog::SOURCE_READING_PASSIVE])
@@ -727,9 +836,9 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             $this->assertSame($logs[0]->id, $results[0]['json']['body']['action']['review_log_id']);
         } else {
             $this->assertSame(409, $explicitStatus, $this->workerDiagnostics($results));
-            $this->assertSame(
-                ReadingSessionService::ERROR_SESSION_NOT_ACTIVE,
+            $this->assertContains(
                 $results[0]['json']['body']['error_code'] ?? null,
+                [ReadingSessionService::ERROR_SESSION_NOT_ACTIVE, ReadingSessionService::ERROR_EXPLICIT_ACTION_ACTIVE],
                 $this->workerDiagnostics($results),
             );
             $this->assertSame(0, $explicitCount, $this->workerDiagnostics($results));
@@ -762,7 +871,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         );
 
         $results = $this->runConcurrent([
-            ['explicit-rate', $this->explicitWorkerPayload('hard', $this->readingActionId(36))],
+            ['explicit-rate', $this->explicitWorkerPayload('good', $this->readingActionId(36))],
             ['finish-commit', $this->finishWorkerPayload()],
         ]);
 
@@ -849,7 +958,7 @@ class ReadingReviewConcurrencyContractTest extends TestCase
     {
         $alternate = $this->makeSense('bank', '河岸');
         $alternateCard = app(ReviewCardService::class)->ensureSenseCard($alternate);
-        $alternateCard->forceFill(['lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE, 'fsrs_enabled' => true, 'fsrs_due_at' => now()])->save();
+        $this->anchorCardForReaderGood($alternateCard, now()->subDays(2)->startOfSecond());
         $catalog = app(ReadingTargetCatalogService::class)->build($this->user->id, 'english', $this->chapter->id);
         $this->occurrenceId = $catalog['targets'][0]['occurrence_id'];
         $this->bindCurrentOccurrenceTo($this->sense);
@@ -1008,6 +1117,105 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         );
     }
 
+    /** @return array{Chapter, ReadingSession, string} */
+    private function createSecondReadingSessionForSense(string $label): array
+    {
+        $processed = [[
+            'word_index' => 0,
+            'word' => 'bank',
+            'lemma' => 'bank',
+            'pos' => 'NOUN',
+            'sentence_index' => 0,
+            'spaceAfter' => false,
+        ]];
+        $chapter = Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => $this->chapter->book_id,
+            'name' => 'PAB R4 '.$label.' '.Str::lower(Str::random(6)),
+            'language' => 'english',
+            'raw_text' => 'bank',
+            'word_count' => 1,
+            'read_count' => 0,
+            'unique_words' => '["bank"]',
+            'unique_word_ids' => '[]',
+            'processed_text' => gzcompress(json_encode($processed), 1),
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
+        $catalog = app(ReadingTargetCatalogService::class)->build($this->user->id, 'english', $chapter->id);
+        $this->assertCount(1, $catalog['targets']);
+        $occurrenceId = $catalog['targets'][0]['occurrence_id'];
+        $candidateIds = array_map(
+            fn (array $candidate): int => (int) ($candidate['word_sense_id'] ?? $candidate['sense_id'] ?? $candidate['id'] ?? 0),
+            $catalog['targets'][0]['candidate_word_senses'] ?? [],
+        );
+        $this->assertContains($this->sense->id, $candidateIds);
+        $started = app(ReadingSessionService::class)->startSession($this->user->id, 'english', $chapter->id);
+        $session = ReadingSession::where('uuid', $started['reading_session_id'])->firstOrFail();
+        app(ReadingOccurrenceSenseEvidenceService::class)->storeUserDecision(
+            $this->user->id,
+            'english',
+            $chapter->id,
+            $occurrenceId,
+            ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING,
+            $this->sense->id,
+        );
+
+        return [$chapter, $session, $occurrenceId];
+    }
+
+    private function setMainCardAnchor(Carbon $anchor): void
+    {
+        $log = ReviewLog::query()
+            ->where('review_card_id', $this->card->id)
+            ->where('source', ReviewLog::SOURCE_SENSE_REVIEW)
+            ->orderByDesc('id')
+            ->firstOrFail();
+        $log->reviewed_at = $anchor;
+        $log->save();
+        $this->card->forceFill([
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => $anchor->copy()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
+            'fsrs_last_reviewed_at' => $anchor,
+            'fsrs_enabled' => true,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ])->save();
+        $this->card = $this->card->fresh();
+    }
+
+    private function anchorCardForReaderGood(ReviewCard $card, Carbon $anchor): ReviewCard
+    {
+        $card->forceFill([
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+            'fsrs_enabled' => true,
+            'fsrs_state' => 'review',
+            'fsrs_step_index' => null,
+            'fsrs_due_at' => $anchor->copy()->addDays(30),
+            'fsrs_stability' => 10.0,
+            'fsrs_difficulty' => 5.0,
+            'fsrs_reps' => 4,
+            'fsrs_lapses' => 0,
+            'fsrs_last_reviewed_at' => $anchor,
+        ])->save();
+        ReviewLog::forceCreate([
+            'user_id' => $card->user_id,
+            'language_id' => $card->language_id,
+            'language' => $card->language_id,
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => $anchor,
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
+
+        return $card->fresh();
+    }
+
     private function readingActionId(int $sequence): string
     {
         return sprintf('00000000-0000-4000-8000-%012d', $sequence);
@@ -1090,6 +1298,22 @@ class ReadingReviewConcurrencyContractTest extends TestCase
             'rating' => $rating,
             'reading_session_id' => $this->session->uuid,
             'occurrence_id' => $this->occurrenceId,
+            'reading_action_id' => $actionId,
+        ];
+    }
+
+    private function explicitWorkerPayloadFor(
+        ReadingSession $session,
+        string $occurrenceId,
+        string $rating,
+        string $actionId,
+    ): array {
+        return [
+            'user_id' => $this->user->id,
+            'review_card_id' => $this->card->id,
+            'rating' => $rating,
+            'reading_session_id' => $session->uuid,
+            'occurrence_id' => $occurrenceId,
             'reading_action_id' => $actionId,
         ];
     }
