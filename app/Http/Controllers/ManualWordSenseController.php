@@ -2,9 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\WordSense;
+use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingSessionService;
 use App\Services\SenseOccurrencePayloadSerializerService;
+use App\Services\WordSenseOccurrenceService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,6 +30,8 @@ class ManualWordSenseController extends Controller
         private WordSenseService $wordSenseService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
         private ReadingSessionService $readingSessionService,
+        private ReadingOccurrenceSenseEvidenceService $readingEvidenceService,
+        private WordSenseOccurrenceService $wordSenseOccurrenceService,
     )
     {
     }
@@ -74,11 +79,26 @@ class ManualWordSenseController extends Controller
                         throw new \InvalidArgumentException(ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
                     }
 
-                    return $this->wordSenseService->createManualSense(
+                    $data['sentence_id'] = (string) $target['sentence_index'];
+                    $data['sentence_en'] = $target['source_sentence'];
+                    $data['sentence_zh'] = null;
+                    $evidence = $this->readingEvidenceService->storeUserDecision(
+                        $user->id,
+                        $user->selected_language,
+                        (int) $data['chapter_id'],
+                        $data['occurrence_id'],
+                        ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE,
+                        null,
+                    );
+                    $result = $this->wordSenseService->createManualSense(
                         $user->id,
                         $user->selected_language,
                         $data,
+                        false,
                     );
+                    $this->wordSenseOccurrenceService->bindReadingEvidenceToSense($evidence, $result['sense']);
+
+                    return $result;
                 });
             } else {
                 $result = $this->wordSenseService->createManualSense(

@@ -227,9 +227,13 @@ class WordSenseService
         return $sense;
     }
 
-    public function createManualSense(int $userId, string $language, array $data): array
-    {
-        return DB::transaction(function () use ($userId, $language, $data) {
+    public function createManualSense(
+        int $userId,
+        string $language,
+        array $data,
+        bool $createManualOccurrence = true,
+    ): array {
+        return DB::transaction(function () use ($userId, $language, $data, $createManualOccurrence) {
             // 0. Validate encountered_word_id ownership BEFORE any writes
             $encounteredWordId = Arr::get($data, 'encountered_word_id');
             $encounteredWord = null;
@@ -263,7 +267,9 @@ class WordSenseService
             ]);
 
             $card = $this->createReviewCardForSense($sense);
-            $this->createManualOccurrence($sense, $card, $data);
+            if ($createManualOccurrence) {
+                $this->createManualOccurrence($sense, $card, $data);
+            }
 
             $updatedWord = $encounteredWord
                 ? $this->learningEnrollmentService->enrollFromConfirmedSense(

@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Models\ChapterAiReadingAssist;
+use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\ReviewCard;
 use App\Models\WordSense;
 use App\Models\WordSenseOccurrence;
@@ -14,6 +16,7 @@ class WordSenseOccurrenceService
     public function __construct(
         private WordSenseService $wordSenseService,
         private ReviewCardService $reviewCardService,
+        private SenseExampleIdentityResolver $exampleIdentityResolver,
     ) {
     }
 
@@ -269,6 +272,97 @@ class WordSenseOccurrenceService
         return $occurrence->refresh();
     }
 
+    public function projectReadingEvidence(
+        ReadingOccurrenceSenseEvidence $evidence,
+        array $target,
+    ): ?WordSenseOccurrence {
+        $this->assertReadingTargetMatchesEvidence($evidence, $target);
+
+        $sentenceEn = trim((string) ($target['source_sentence'] ?? ''));
+        if ($sentenceEn === '') {
+            throw new \InvalidArgumentException('READING_OCCURRENCE_STALE');
+        }
+
+        $occurrence = $this->readingOccurrenceForEvidence($evidence);
+        if ($evidence->resolution === ReadingOccurrenceSenseEvidence::RESOLUTION_EXCLUDED && !$occurrence) {
+            return null;
+        }
+        if (!$occurrence) {
+            $occurrence = new WordSenseOccurrence();
+        }
+
+        $occurrence->fill([
+            'user_id' => $evidence->user_id,
+            'language' => $evidence->language_id,
+            'language_id' => $evidence->language_id,
+            'review_card_id' => null,
+            'chapter_id' => $evidence->chapter_id,
+            'sentence_id' => (string) $evidence->sentence_index,
+            'sentence_en' => $sentenceEn,
+            'sentence_zh' => $this->readingSentenceTranslation($evidence, $sentenceEn),
+            'type' => WordSenseOccurrence::TYPE_WORD,
+            'surface' => $target['surface'],
+            'lemma' => $target['lemma'],
+            'pos' => $target['pos'],
+            'decision' => $evidence->resolution,
+            'confidence' => 1.0,
+            'evidence' => [
+                'source' => WordSenseOccurrence::SOURCE_READING_OCCURRENCE,
+                'reading_occurrence_evidence_id' => (int) $evidence->id,
+                'reading_occurrence_id' => $evidence->occurrence_id,
+                'source_revision' => $evidence->source_revision,
+                'target_origin' => $evidence->target_origin,
+                'start_word_index' => (int) $evidence->start_word_index,
+                'end_word_index' => (int) $evidence->end_word_index,
+                'sentence_index' => (int) $evidence->sentence_index,
+                'resolution_source' => $evidence->resolution_source,
+            ],
+            'auto_fsrs_allowed' => false,
+            'source' => WordSenseOccurrence::SOURCE_READING_OCCURRENCE,
+            'raw_payload' => [
+                'resolution' => $evidence->resolution,
+                'resolution_source' => $evidence->resolution_source,
+            ],
+        ]);
+
+        if ($evidence->resolution === ReadingOccurrenceSenseEvidence::RESOLUTION_MATCHED_EXISTING) {
+            $sense = WordSense::query()
+                ->where('id', $evidence->word_sense_id)
+                ->where('user_id', $evidence->user_id)
+                ->where('language_id', $evidence->language_id)
+                ->where('status', WordSense::STATUS_CONFIRMED)
+                ->first();
+            if (!$sense) {
+                throw new \InvalidArgumentException('Reading evidence no longer points to a confirmed WordSense.');
+            }
+
+            return $this->bindOccurrenceToSense($occurrence, $sense, false);
+        }
+
+        $occurrence->word_sense_id = null;
+        $occurrence->status = $evidence->resolution === ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE
+            ? WordSenseOccurrence::STATUS_PENDING
+            : WordSenseOccurrence::STATUS_IGNORED;
+        $occurrence->save();
+
+        return $occurrence->refresh();
+    }
+
+    public function bindReadingEvidenceToSense(
+        ReadingOccurrenceSenseEvidence $evidence,
+        WordSense $sense,
+    ): WordSenseOccurrence {
+        $occurrence = $this->readingOccurrenceForEvidence($evidence);
+        if (!$occurrence) {
+            throw new \InvalidArgumentException('Reading source occurrence does not exist.');
+        }
+
+        $occurrence->review_card_id = null;
+        $occurrence->auto_fsrs_allowed = false;
+
+        return $this->bindOccurrenceToSense($occurrence, $sense, false);
+    }
+
     public function createSenseFromOccurrence(WordSenseOccurrence $occurrence, array $overrides = []): WordSense
     {
         if ($occurrence->type !== WordSenseOccurrence::TYPE_WORD) {
@@ -347,6 +441,68 @@ class WordSenseOccurrenceService
                 'sense' => 'The sense does not belong to the occurrence user and language.',
             ]);
         }
+    }
+
+    private function readingOccurrenceForEvidence(ReadingOccurrenceSenseEvidence $evidence): ?WordSenseOccurrence
+    {
+        return WordSenseOccurrence::query()
+            ->lockForUpdate()
+            ->where('user_id', $evidence->user_id)
+            ->where('language_id', $evidence->language_id)
+            ->where('chapter_id', $evidence->chapter_id)
+            ->where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)
+            ->where('evidence->reading_occurrence_evidence_id', (int) $evidence->id)
+            ->first();
+    }
+
+    private function assertReadingTargetMatchesEvidence(ReadingOccurrenceSenseEvidence $evidence, array $target): void
+    {
+        $same = (string) ($target['occurrence_id'] ?? '') === (string) $evidence->occurrence_id
+            && (int) ($target['start_word_index'] ?? -1) === (int) $evidence->start_word_index
+            && (int) ($target['end_word_index'] ?? -1) === (int) $evidence->end_word_index
+            && (int) ($target['sentence_index'] ?? -1) === (int) $evidence->sentence_index
+            && (string) ($target['surface'] ?? '') === (string) $evidence->surface
+            && mb_strtolower(trim((string) ($target['lemma'] ?? ''))) === mb_strtolower(trim((string) $evidence->lemma))
+            && (string) ($target['pos'] ?? '') === (string) ($evidence->pos ?? '');
+
+        if (!$same || ($target['kind'] ?? null) !== WordSenseOccurrence::TYPE_WORD) {
+            throw new \InvalidArgumentException('READING_OCCURRENCE_STALE');
+        }
+    }
+
+    private function readingSentenceTranslation(
+        ReadingOccurrenceSenseEvidence $evidence,
+        string $sentenceEn,
+    ): ?string {
+        $assist = ChapterAiReadingAssist::query()
+            ->where('user_id', $evidence->user_id)
+            ->where('language', $evidence->language_id)
+            ->where('chapter_id', $evidence->chapter_id)
+            ->where('source_revision', $evidence->source_revision)
+            ->first();
+        if (!$assist) {
+            return null;
+        }
+
+        $candidate = [
+            'chapter_id' => (int) $evidence->chapter_id,
+            'sentence_id' => (string) $evidence->sentence_index,
+            'sentence_en' => $sentenceEn,
+            'sentence_zh' => null,
+            'is_card_fallback' => false,
+        ];
+        $identity = $this->exampleIdentityResolver->resolve(
+            $candidate,
+            (int) $evidence->user_id,
+            (string) $evidence->language_id,
+        );
+        [$translation] = $this->exampleIdentityResolver->translationFor(
+            $candidate,
+            $identity,
+            $assist->sentence_translations ?? [],
+        );
+
+        return $translation;
     }
 
     private function bulkByIds(int $userId, string $language, array $occurrenceIds, callable $callback): array

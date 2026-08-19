@@ -11,6 +11,7 @@ class ReadingOccurrenceSenseEvidenceService
     public function __construct(
         private ReadingTargetCatalogService $targetCatalogService,
         private ReadingChapterTextService $chapterTextService,
+        private WordSenseOccurrenceService $wordSenseOccurrenceService,
     ) {
     }
 
@@ -77,6 +78,7 @@ class ReadingOccurrenceSenseEvidenceService
                 ],
             ]);
             $evidence->save();
+            $this->wordSenseOccurrenceService->projectReadingEvidence($evidence, $target);
 
             return $evidence;
         });
@@ -150,6 +152,7 @@ class ReadingOccurrenceSenseEvidenceService
                     ->first();
 
                 if ($evidence && $evidence->resolution_source === ReadingOccurrenceSenseEvidence::SOURCE_USER) {
+                    $this->wordSenseOccurrenceService->projectReadingEvidence($evidence, $current);
                     $saved[] = $evidence;
                     continue;
                 }
@@ -176,6 +179,7 @@ class ReadingOccurrenceSenseEvidenceService
                     ],
                 ]);
                 $evidence->save();
+                $this->wordSenseOccurrenceService->projectReadingEvidence($evidence, $current);
                 $saved[] = $evidence;
             }
 

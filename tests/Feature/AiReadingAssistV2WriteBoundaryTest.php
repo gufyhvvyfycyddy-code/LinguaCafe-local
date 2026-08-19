@@ -18,6 +18,7 @@ use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingTargetCatalogService;
 use App\Services\ReadingUnfamiliarTargetService;
 use App\Services\ReviewCardFsrsSnapshotService;
+use App\Services\WordSenseOccurrenceService;
 use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
@@ -78,7 +79,11 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $catalogService->shouldReceive('build')->andReturnUsing(fn () => $this->catalog);
         $unfamiliar = Mockery::mock(ReadingUnfamiliarTargetService::class);
         $chapterTextService = new ReadingChapterTextService();
-        $this->evidence = new ReadingOccurrenceSenseEvidenceService($catalogService, $chapterTextService);
+        $this->evidence = new ReadingOccurrenceSenseEvidenceService(
+            $catalogService,
+            $chapterTextService,
+            app(WordSenseOccurrenceService::class),
+        );
         $this->app->instance(ReadingOccurrenceSenseEvidenceService::class, $this->evidence);
         $this->service = new AiReadingAssistV2Service(
             $catalogService,
@@ -141,6 +146,7 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
             'card' => ReviewCard::count(),
             'log' => ReviewLog::count(),
             'encountered' => EncounteredWord::count(),
+            'occurrence' => WordSenseOccurrence::count(),
         ];
     }
 
@@ -192,6 +198,12 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $evidence = ReadingOccurrenceSenseEvidence::firstOrFail();
         $this->assertSame(ReadingOccurrenceSenseEvidence::SOURCE_TRUST_AI, $evidence->resolution_source);
         $this->assertSame($sense->id, $evidence->word_sense_id);
+        $source = WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->firstOrFail();
+        $this->assertSame($sense->id, $source->word_sense_id);
+        $this->assertSame('Harness sentence.', $source->sentence_en);
+        $this->assertSame('测试翻译', $source->sentence_zh);
+        $this->assertNull($source->review_card_id);
+        $this->assertFalse($source->auto_fsrs_allowed);
         $this->assertSame($beforeLogs, ReviewLog::count());
         $this->assertSame($beforeSenses, WordSense::count());
         $this->assertTrue($this->snapshotService->matches($card->fresh(), $snapshot));
@@ -268,6 +280,11 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         $fresh = ReadingOccurrenceSenseEvidence::firstOrFail();
         $this->assertSame(ReadingOccurrenceSenseEvidence::SOURCE_USER, $fresh->resolution_source);
         $this->assertSame($userSense->id, $fresh->word_sense_id);
+        $this->assertSame(1, WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->count());
+        $this->assertSame(
+            $userSense->id,
+            WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->firstOrFail()->word_sense_id,
+        );
         $this->assertSame(0, ReviewLog::count());
     }
 
@@ -311,6 +328,12 @@ class AiReadingAssistV2WriteBoundaryTest extends TestCase
         }
 
         $this->assertSame(1, ReadingOccurrenceSenseEvidence::count());
+        $this->assertSame(1, WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->count());
+        $source = WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->firstOrFail();
+        $this->assertSame(WordSenseOccurrence::STATUS_IGNORED, $source->status);
+        $this->assertNull($source->word_sense_id);
+        $this->assertNull($source->review_card_id);
+        $this->assertFalse($source->auto_fsrs_allowed);
         $this->assertSame($beforeSenseCount, WordSense::count());
         $this->assertSame($beforeCardCount, ReviewCard::count());
         $this->assertSame($beforeLogCount, ReviewLog::count());

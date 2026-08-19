@@ -20,6 +20,7 @@ class WordSenseOccurrence extends Model
     public const SOURCE_SENSE_MAPPING_IMPORT = 'sense_mapping_import';
     public const SOURCE_MANUAL_VOCAB_BRIDGE = 'manual_vocab_bridge';
     public const SOURCE_MANUAL_SENSE_ADD = 'manual_sense_add';
+    public const SOURCE_READING_OCCURRENCE = 'reading_occurrence';
 
     protected $fillable = [
         'user_id',
