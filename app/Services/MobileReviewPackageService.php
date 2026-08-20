@@ -148,6 +148,7 @@ class MobileReviewPackageService
             'example_sentence_translation_source' => $payload['example_sentence_translation_source'] ?? null,
             'example_sentence_tokens' => $payload['example_sentence_tokens'] ?? null,
             'displayed_occurrence_id' => $payload['displayed_occurrence_id'] ?? null,
+            'question_example_key' => $payload['question_example_key'] ?? null,
             'occurrence_count' => $payload['occurrence_count'] ?? 0,
             'example_source_status' => $payload['example_source_status'] ?? 'empty',
             'media' => $media,

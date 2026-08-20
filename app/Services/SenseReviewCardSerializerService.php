@@ -12,9 +12,9 @@ use Illuminate\Support\Collection;
  * SenseReview-Serializer-1000-1 (refactored)
  *
  * Responsibilities (after SenseReview-LearningFeedbackService extraction):
- *  - Pick the question/supplementary examples from the sense's occurrence
- *    pool using linear sequence rotation (card_id + reps + lapses) and an
- *    optional preferred_occurrence_id override.
+ *  - Pick question/supplementary examples from the full real-source pool
+ *    using deterministic shuffled cycles driven by completed keyed reviews,
+ *    with an optional preferred_occurrence_id override for direct callers.
  *  - Normalize the sense-level understanding_aid and merge occurrence-level
  *    evidence (context_hint / judgment_basis / related_collocations).
  *  - Assemble the final review-card payload (lemma, sense_zh, FSRS fields,
@@ -39,6 +39,7 @@ class SenseReviewCardSerializerService
     public function __construct(
         private SenseTokenPayloadService $senseTokenPayloadService,
         private WordSenseExamplePoolService $examplePoolService,
+        private SenseReviewExampleRotationStateService $rotationStateService,
         private SenseReviewLearningFeedbackService $feedbackService,
         private SenseExampleIdentityResolver $exampleIdentityResolver,
         private MediaManifestService $mediaManifest,
@@ -49,28 +50,18 @@ class SenseReviewCardSerializerService
      * Serialize a ReviewCard (with loaded 'sense' relation) into the
      * frontend review card payload.
      *
-     * The question example is rotated across the sense's real-source example
-     * pool using linear sequence rotation (review_card_id + fsrs_reps +
-     * fsrs_lapses) so consecutive reviews cycle through examples in order
-     * (A -> B -> C -> A ...) and a failed review (lapses increment) shifts
-     * to a different example. A supplementary example (different from the
-     * question) is also included for the answer side; it is null when the
-     * pool has only one example.
-     *
-     * Rotation does NOT persist a "last shown occurrence id": the linear
-     * sequence is deterministic from (card_id, reps, lapses) and shifts
-     * naturally after each review (reps increments on success, lapses
-     * increments on failure). This avoids any new migration / write path
-     * while satisfying "first A, second B, third C" and "failed review
-     * shows a different example".
+     * The question example uses a deterministic shuffled cycle over the full
+     * candidate set. Rotation state comes from non-undone ReviewLogs carrying
+     * question_example_key, so reading-context ratings do not advance the
+     * example cycle and undo naturally rolls it back. When at least two
+     * candidates exist, the latest completed question key is excluded from
+     * the next selection. Supplementary always differs from question.
      *
      * Smart selection (GM52-SenseReviewContextualUnderstanding-1000-10):
      * When a preferred_occurrence_id is supplied via $options, the serializer
-     * prefers that occurrence as the question example (priority 1). This lets
-     * the caller keep the currently-displayed occurrence stable across page
-     * reloads without persisting state. When the preferred id is not in the
-     * candidate pool, linear rotation is used as fallback. This is read-only
-     * and never writes to ReviewLog or touches FSRS.
+     * prefers that occurrence as the question example for that explicit
+     * caller. Normal formal review does not supply this override; it uses the
+     * shuffled rotation state. Serialization remains read-only.
      *
      * Contextual understanding aid: when the selected occurrence has evidence
      * JSON with context_hint / judgment_basis / related_collocations, those
@@ -98,22 +89,24 @@ class SenseReviewCardSerializerService
         $candidates = $options['example_candidates'] ?? $this->examplePoolService->exampleCandidates($sense);
 
         $preferredOccurrenceId = $options['preferred_occurrence_id'] ?? null;
+        $rotationState = $options['rotation_state'] ?? $this->rotationStateService->stateForCard($card->id);
+        $formalQuestionOrdinal = (int) ($rotationState['formal_question_ordinal'] ?? 0);
+        $previousQuestionExampleKey = $rotationState['latest_question_example_key'] ?? null;
 
         $questionIndex = $this->examplePoolService->pickQuestionIndexWithContext(
             $candidates,
             $card->id,
-            (int) ($card->fsrs_reps ?? 0),
-            (int) ($card->fsrs_lapses ?? 0),
+            $formalQuestionOrdinal,
+            $previousQuestionExampleKey,
             $preferredOccurrenceId,
         );
 
         $questionExample = $candidates[$questionIndex] ?? null;
         $supplementaryIndex = $this->examplePoolService->pickSupplementaryIndex(
-            count($candidates),
+            $candidates,
             $questionIndex,
             $card->id,
-            (int) ($card->fsrs_reps ?? 0),
-            (int) ($card->fsrs_lapses ?? 0),
+            $formalQuestionOrdinal,
         );
         $supplementaryExample = $supplementaryIndex !== null ? $candidates[$supplementaryIndex] ?? null : null;
 
@@ -204,6 +197,7 @@ class SenseReviewCardSerializerService
             // occurrence_count is the distinct source-example count.
             // example_source_status signals 'occurrence' / 'card_fallback' / 'empty'.
             'displayed_occurrence_id' => $displayedOccurrenceId,
+            'question_example_key' => $questionExample['candidate_key'] ?? null,
             'occurrence_count' => $occurrenceCount,
             'example_source_status' => $exampleSourceStatus,
             'media' => $options['media'] ?? $this->mediaManifest->forSense(
@@ -267,6 +261,7 @@ class SenseReviewCardSerializerService
 
         $cardIds = $cards->map(fn (ReviewCard $card) => $card->id)->all();
         $feedbackMap = $this->feedbackService->buildForCards($cardIds);
+        $rotationStateMap = $this->rotationStateService->stateForCards($cardIds);
         $exampleBatch = $this->examplePoolService->exampleCandidateBatch(
             $cards->map(fn (ReviewCard $card) => $card->sense),
         );
@@ -293,9 +288,10 @@ class SenseReviewCardSerializerService
             $cards->map(fn (ReviewCard $card) => (int) $card->sense->id)->all(),
         );
 
-        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $candidateMap, $translationAssists, $exampleBatch, $mediaBySense, $options) {
+        return $cards->map(function (ReviewCard $card) use ($feedbackMap, $rotationStateMap, $candidateMap, $translationAssists, $exampleBatch, $mediaBySense, $options) {
             $perCardOptions = $options;
             $perCardOptions['learning_feedback'] = $feedbackMap[$card->id] ?? null;
+            $perCardOptions['rotation_state'] = $rotationStateMap[$card->id] ?? null;
             $perCardOptions['example_candidates'] = $candidateMap[$card->id];
             $perCardOptions['translation_assists'] = $translationAssists;
             $perCardOptions['token_chapters'] = $exampleBatch['chapters'];

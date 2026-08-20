@@ -1140,6 +1140,9 @@ export class LinguaCafeApp {
         card.review_card_id,
         rating,
         Date.now() - this.reviewStartedAt,
+        new Date(),
+        undefined,
+        card.display.question_example_key ?? null,
       );
       await this.pulseRatingHaptic();
       this.reviews.shift();

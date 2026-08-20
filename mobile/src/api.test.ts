@@ -102,10 +102,12 @@ describe('MobileApiClient', () => {
     const fetcher = vi.fn(async () => envelope({ operation_id: 'op', card: {}, replayed: false }));
     const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
     client.setToken('secret');
-    await client.rate(12, 'good', 'fixed-action-id', Date.now());
+    const questionKey = 'a'.repeat(64);
+    await client.rate(12, 'good', 'fixed-action-id', Date.now(), questionKey);
     const body = JSON.parse(String(fetcher.mock.calls[0][1].body));
     expect(body.client_action_id).toBe('fixed-action-id');
     expect(body.rating).toBe('good');
+    expect(body.question_example_key).toBe(questionKey);
   });
 
   it('uses the supplied action identity for a text import without client retries', async () => {
@@ -139,7 +141,7 @@ describe('MobileApiClient', () => {
       type: 'sense_review.rating' as const,
       occurred_at: '2026-08-01T00:00:00.000Z',
       sequence: 9,
-      payload: { review_card_id: 12, rating: 'good', review_duration_ms: 800 },
+      payload: { review_card_id: 12, rating: 'good', review_duration_ms: 800, question_example_key: 'b'.repeat(64) },
     };
 
     await client.syncActions([action]);

@@ -180,6 +180,9 @@
                         rating,
                         revision,
                         duration: Math.max(0, Date.now() - (this.answerStartedAt || Date.now())),
+                        questionExampleKey: this.localSession.current_card
+                            ? (this.localSession.current_card.question_example_key || null)
+                            : null,
                     };
                 }
                 try {
@@ -190,6 +193,7 @@
                             client_action_id: this.pendingAction.id,
                             expected_revision: this.pendingAction.revision,
                             review_duration_ms: this.pendingAction.duration,
+                            question_example_key: this.pendingAction.questionExampleKey,
                         },
                     );
                     this.pendingAction = null;

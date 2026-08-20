@@ -28,6 +28,7 @@ class MobileSenseReviewController extends Controller
             'client_action_id' => ['required', 'uuid'],
             'review_session_id' => ['nullable', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'question_example_key' => ['nullable', 'regex:/^[a-f0-9]{64}$/'],
             'reading_session_id' => ['nullable', 'required_with:occurrence_id', 'uuid'],
             'occurrence_id' => ['nullable', 'required_with:reading_session_id', 'string', 'max:255'],
         ]);
@@ -49,6 +50,9 @@ class MobileSenseReviewController extends Controller
         $occurrenceId = isset($validated['occurrence_id'])
             ? (string) $validated['occurrence_id']
             : null;
+        $questionExampleKey = $readingSessionId === null && isset($validated['question_example_key'])
+            ? (string) $validated['question_example_key']
+            : null;
 
         $requestPayload = MobileSenseReviewMutationService::idempotencyPayload(
             $reviewCard,
@@ -57,6 +61,7 @@ class MobileSenseReviewController extends Controller
             $reviewDurationMs,
             $readingSessionId,
             $occurrenceId,
+            $questionExampleKey,
         );
         $occurredAt = Carbon::now();
 
@@ -78,6 +83,7 @@ class MobileSenseReviewController extends Controller
                     $occurredAt,
                     $readingSessionId,
                     $occurrenceId,
+                    $questionExampleKey,
                 ) {
                     $body = $this->mutationService->apply(
                         $operationId,
@@ -94,6 +100,7 @@ class MobileSenseReviewController extends Controller
                         $readingSessionId,
                         $occurrenceId,
                         $readingSessionId ? $clientActionId : null,
+                        $questionExampleKey,
                     );
                     $body['client_action_id'] = $clientActionId;
 

@@ -91,7 +91,6 @@ class WordSenseExamplePoolService
         foreach ($senses as $sense) {
             $senseOccurrences = $occurrences
                 ->where('word_sense_id', $sense->id)
-                ->take(10)
                 ->values();
             $candidateMap[$sense->id] = $this->buildCandidates($sense, $senseOccurrences, $chaptersById);
         }
@@ -144,6 +143,7 @@ class WordSenseExamplePoolService
             $seenSentences[$this->sentenceKey($sentenceEn)] = true;
 
             $candidates[] = [
+                'candidate_key' => $this->candidateKey($occurrence->chapter_id, $sentenceEn),
                 'occurrence_id' => $occurrence->id,
                 'sentence_en' => $sentenceEn,
                 'sentence_zh' => $occurrence->sentence_zh ?: null,
@@ -161,6 +161,7 @@ class WordSenseExamplePoolService
             $cardSentenceKey = $this->sentenceKey($sense->example_sentence_en);
             if (!isset($seenSentences[$cardSentenceKey])) {
                 $candidates[] = [
+                    'candidate_key' => $this->candidateKey($sense->source_chapter_id, $sense->example_sentence_en),
                     'occurrence_id' => null,
                     'sentence_en' => $sense->example_sentence_en,
                     'sentence_zh' => $sense->example_sentence_zh ?: null,
@@ -177,69 +178,55 @@ class WordSenseExamplePoolService
     }
 
     /**
-     * Pick the question example index using linear sequence rotation.
+     * Select the formal question from a deterministic shuffled full-pool cycle.
      *
-     * Strategy (GM52-SenseReviewExampleRotationMemory-1000-8):
-     *  - reviewCardId provides a per-card offset so different cards start
-     *    at different examples (avoids all cards syncing to the same one).
-     *  - fsrsReps increments move through the pool in order (A -> B -> C ->
-     *    A ...), satisfying the "first A, second B, third C" contract.
-     *  - fsrsLapses increments shift the starting offset so a failed review
-     *    shows a different example (lapse → different example next time).
-     *
-     * This is a deterministic linear rotation, not a hash. The same
-     * (cardId, reps, lapses) always yields the same index, but incrementing
-     * reps or lapses always shifts to the next example in the pool.
-     *
-     * The $dayOfYear parameter is retained for backward compatibility but
-     * is no longer used: linear rotation does not need date-based shifting
-     * because reps/lapses already change across reviews.
+     * The ordinal counts completed, non-undone formal questions carrying a
+     * question_example_key. A stable pool therefore yields one complete
+     * permutation per cycle. The latest completed key is excluded when at
+     * least two candidates exist, including across cycle boundaries.
      */
-    public function pickQuestionIndex(int $total, int $reviewCardId, int $fsrsReps, int $fsrsLapses = 0, ?int $dayOfYear = null): int
-    {
-        if ($total <= 0) {
-            return 0;
-        }
-        if ($total === 1) {
+    public function pickQuestionIndex(
+        array $candidates,
+        int $reviewCardId,
+        int $formalQuestionOrdinal,
+        ?string $previousQuestionExampleKey = null,
+    ): int {
+        $total = count($candidates);
+        if ($total <= 1) {
             return 0;
         }
 
-        return ($reviewCardId + $fsrsReps + $fsrsLapses) % $total;
+        $order = $this->shuffledIndexes($candidates, $reviewCardId, $formalQuestionOrdinal);
+        $position = $formalQuestionOrdinal % $total;
+        $questionIndex = $order[$position];
+
+        if ($previousQuestionExampleKey === null
+            || ($candidates[$questionIndex]['candidate_key'] ?? null) !== $previousQuestionExampleKey) {
+            return $questionIndex;
+        }
+
+        for ($offset = 1; $offset < $total; $offset++) {
+            $candidateIndex = $order[($position + $offset) % $total];
+            if (($candidates[$candidateIndex]['candidate_key'] ?? null) !== $previousQuestionExampleKey) {
+                return $candidateIndex;
+            }
+        }
+
+        return $questionIndex;
     }
 
     /**
-     * Pick the question example index with an optional preferred occurrence.
-     *
-     * Smart selection priority (GM52-SenseReviewContextualUnderstanding-1000-10):
-     *  1. If a preferred occurrence id is supplied AND that occurrence exists
-     *     in the candidate pool, return its index. This supports "keep the
-     *     currently displayed occurrence" and "prefer the most-recently-used
-     *     occurrence" without persisting any state.
-     *  2. Otherwise, fall back to the linear rotation (pickQuestionIndex).
-     *
-     * This method is read-only and never writes to the database. The
-     * preferred occurrence id is typically the displayed_occurrence_id from
-     * the previous serialization, passed back by the caller — it does NOT
-     * come from ReviewLog (which only records user ratings).
-     *
-     * @param  array  $candidates  The candidate array from exampleCandidates().
-     * @param  int|null  $preferredOccurrenceId  Optional occurrence id to prefer.
-     * @return int  The index into $candidates.
+     * Explicit preferred occurrence support remains available for direct
+     * serializer callers. The normal formal review path does not pass a
+     * preference and therefore always uses the shuffled rotation above.
      */
     public function pickQuestionIndexWithContext(
         array $candidates,
         int $reviewCardId,
-        int $fsrsReps,
-        int $fsrsLapses = 0,
+        int $formalQuestionOrdinal,
+        ?string $previousQuestionExampleKey = null,
         ?int $preferredOccurrenceId = null,
     ): int {
-        $total = count($candidates);
-
-        if ($total <= 0) {
-            return 0;
-        }
-
-        // Priority 1: preferred occurrence exists in the pool.
         if ($preferredOccurrenceId !== null) {
             foreach ($candidates as $index => $candidate) {
                 if (($candidate['occurrence_id'] ?? null) === $preferredOccurrenceId) {
@@ -248,33 +235,87 @@ class WordSenseExamplePoolService
             }
         }
 
-        // Priority 2: linear rotation fallback.
-        return $this->pickQuestionIndex($total, $reviewCardId, $fsrsReps, $fsrsLapses);
+        return $this->pickQuestionIndex(
+            $candidates,
+            $reviewCardId,
+            $formalQuestionOrdinal,
+            $previousQuestionExampleKey,
+        );
     }
 
     /**
-     * Deterministically pick a supplementary example index that differs from
-     * the question index. Returns null when there is only one candidate.
+     * Pick a deterministic supplementary example from the same shuffled pool.
      */
-    public function pickSupplementaryIndex(int $total, int $questionIndex, int $reviewCardId, int $fsrsReps, int $fsrsLapses = 0, ?int $dayOfYear = null): ?int
-    {
+    public function pickSupplementaryIndex(
+        array $candidates,
+        int $questionIndex,
+        int $reviewCardId,
+        int $formalQuestionOrdinal,
+    ): ?int {
+        $total = count($candidates);
         if ($total < 2) {
             return null;
         }
 
-        $dayOfYear = $dayOfYear ?? (int) now()->format('z');
-        // Offset seed so supplementary selection is independent of question
-        // selection while still stable for the day.
-        $seed = ($reviewCardId * 17) + ($fsrsReps * 13) + ($fsrsLapses * 5) + $dayOfYear + 1009;
-        $hash = abs(crc32((string) $seed));
-        $candidate = $hash % $total;
-
-        if ($candidate === $questionIndex) {
-            // Roll forward by one to avoid the question example.
-            $candidate = ($candidate + 1) % $total;
+        $order = $this->shuffledIndexes($candidates, $reviewCardId, $formalQuestionOrdinal);
+        $questionPosition = array_search($questionIndex, $order, true);
+        if ($questionPosition === false) {
+            $questionPosition = 0;
         }
 
-        return $candidate;
+        for ($offset = 1; $offset < $total; $offset++) {
+            $candidateIndex = $order[($questionPosition + $offset) % $total];
+            if ($candidateIndex !== $questionIndex) {
+                return $candidateIndex;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return list<int> */
+    private function shuffledIndexes(array $candidates, int $reviewCardId, int $formalQuestionOrdinal): array
+    {
+        $total = count($candidates);
+        $indexes = array_keys($candidates);
+        if ($total <= 1) {
+            return $indexes;
+        }
+
+        $keys = array_map(
+            fn (array $candidate) => (string) ($candidate['candidate_key'] ?? ''),
+            $candidates,
+        );
+        $canonicalKeys = $keys;
+        sort($canonicalKeys, SORT_STRING);
+        $poolFingerprint = hash('sha256', implode('|', $canonicalKeys));
+        $cycle = intdiv($formalQuestionOrdinal, $total);
+        $ranks = [];
+
+        foreach ($indexes as $index) {
+            $ranks[$index] = hash('sha256', implode('|', [
+                'sense-example-v2',
+                $reviewCardId,
+                $poolFingerprint,
+                $cycle,
+                $keys[$index],
+            ]));
+        }
+
+        usort($indexes, function (int $left, int $right) use ($ranks, $keys): int {
+            $rankComparison = strcmp($ranks[$left], $ranks[$right]);
+
+            return $rankComparison !== 0
+                ? $rankComparison
+                : strcmp($keys[$left], $keys[$right]);
+        });
+
+        return $indexes;
+    }
+
+    private function candidateKey(?int $chapterId, string $sentenceEn): string
+    {
+        return hash('sha256', 'sense-example-v2|' . $this->dedupeKey($chapterId, $sentenceEn));
     }
 
     /**

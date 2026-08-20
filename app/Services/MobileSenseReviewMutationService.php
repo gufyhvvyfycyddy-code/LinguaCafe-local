@@ -29,6 +29,7 @@ class MobileSenseReviewMutationService
         ?int $reviewDurationMs,
         ?string $readingSessionId = null,
         ?string $occurrenceId = null,
+        ?string $questionExampleKey = null,
     ): array {
         $payload = [
             'review_card_id' => $reviewCardId,
@@ -40,6 +41,8 @@ class MobileSenseReviewMutationService
         if ($readingSessionId !== null) {
             $payload['reading_session_id'] = $readingSessionId;
             $payload['occurrence_id'] = $occurrenceId;
+        } elseif ($questionExampleKey !== null) {
+            $payload['question_example_key'] = $questionExampleKey;
         }
 
         return $payload;
@@ -60,6 +63,7 @@ class MobileSenseReviewMutationService
         ?string $readingSessionId = null,
         ?string $occurrenceId = null,
         ?string $readingActionId = null,
+        ?string $questionExampleKey = null,
     ): array {
         return $this->runConcurrencySafeTransaction(function () use (
             $operationId,
@@ -76,6 +80,7 @@ class MobileSenseReviewMutationService
             $readingSessionId,
             $occurrenceId,
             $readingActionId,
+            $questionExampleKey,
         ) {
             $readingContext = null;
             if ($readingSessionId !== null && $occurrenceId !== null && $readingActionId !== null) {
@@ -159,6 +164,7 @@ class MobileSenseReviewMutationService
                     $readingContext ? $readingSessionId : $reviewSessionId,
                     $reviewDurationMs,
                     $occurredAt,
+                    $readingContext ? null : $questionExampleKey,
                 );
             } catch (\InvalidArgumentException $e) {
                 if (!$readingContext
@@ -196,6 +202,8 @@ class MobileSenseReviewMutationService
             if ($readingContext) {
                 $actionPayload['reading_session_id'] = $readingSessionId;
                 $actionPayload['occurrence_id'] = $occurrenceId;
+            } elseif ($questionExampleKey !== null) {
+                $actionPayload['question_example_key'] = $questionExampleKey;
             }
 
             $response = [

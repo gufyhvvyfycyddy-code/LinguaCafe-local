@@ -330,7 +330,7 @@ export class MobileApiClient {
     return data.items;
   }
 
-  rate(cardId: number, rating: ReviewRating, actionId: string, startedAt: number) {
+  rate(cardId: number, rating: ReviewRating, actionId: string, startedAt: number, questionExampleKey?: string | null) {
     return this.request<{
       operation_id: string;
       card: Record<string, unknown>;
@@ -341,6 +341,7 @@ export class MobileApiClient {
         rating,
         client_action_id: actionId,
         review_duration_ms: Math.min(600000, Math.max(0, Date.now() - startedAt)),
+        ...(questionExampleKey ? { question_example_key: questionExampleKey } : {}),
       }),
     });
   }

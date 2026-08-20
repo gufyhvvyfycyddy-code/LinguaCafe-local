@@ -78,11 +78,13 @@ class M12SpecialStudyExecutionTest extends TestCase
             'filters' => ['markers' => [ReviewCard::MARKER_RED]],
         ])->assertCreated();
         $actionId = (string) Str::uuid();
+        $questionKey = hash('sha256', 'm12-formal-question');
         $payload = [
             'rating' => 'good',
             'client_action_id' => $actionId,
             'expected_revision' => $created->json('revision'),
             'review_duration_ms' => 1200,
+            'question_example_key' => $questionKey,
         ];
 
         $first = $this->actingAs($user)->postJson(
@@ -101,6 +103,7 @@ class M12SpecialStudyExecutionTest extends TestCase
             'source' => 'special_study',
             'review_session_id' => $created->json('id'),
             'review_duration_ms' => 1200,
+            'question_example_key' => $questionKey,
         ]);
         $this->assertDatabaseHas('operations', [
             'operation_id' => $operationId,

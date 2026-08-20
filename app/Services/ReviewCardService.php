@@ -217,6 +217,7 @@ class ReviewCardService
         string $source = 'review',
         ?string $reviewSessionId = null,
         ?int $reviewDurationMs = null,
+        ?string $questionExampleKey = null,
     ): ReviewCard {
         return $this->recordReviewWithLog(
             $userId,
@@ -226,6 +227,8 @@ class ReviewCardService
             $source,
             $reviewSessionId,
             $reviewDurationMs,
+            null,
+            $questionExampleKey,
         )['card'];
     }
 
@@ -244,8 +247,9 @@ class ReviewCardService
         ?string $reviewSessionId = null,
         ?int $reviewDurationMs = null,
         ?Carbon $reviewedAt = null,
+        ?string $questionExampleKey = null,
     ): array {
-        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs, $reviewedAt) {
+        return DB::transaction(function () use ($userId, $language, $reviewCardId, $rating, $source, $reviewSessionId, $reviewDurationMs, $reviewedAt, $questionExampleKey) {
             $eventAt = ($reviewedAt ?? Carbon::now())->copy();
             $targetCard = ReviewCard::lockForUpdate()
                 ->where('user_id', $userId)
@@ -333,6 +337,7 @@ class ReviewCardService
                 'previous_difficulty' => $previous['difficulty'],
                 'new_difficulty' => $card->fsrs_difficulty,
                 'source' => $source,
+                'question_example_key' => $this->formalQuestionExampleKey($source, $questionExampleKey),
                 // Undo ledger fields (ADR-0009)
                 'review_session_id' => $reviewSessionId,
                 'before_card_snapshot' => $beforeSnapshot,
@@ -344,6 +349,16 @@ class ReviewCardService
                 'review_log' => $reviewLog,
             ];
         });
+    }
+
+    private function formalQuestionExampleKey(string $source, ?string $questionExampleKey): ?string
+    {
+        return in_array($source, [
+            ReviewLog::SOURCE_SENSE_REVIEW,
+            ReviewLog::SOURCE_SPECIAL_STUDY,
+        ], true)
+            ? $questionExampleKey
+            : null;
     }
 
     public function canApplyReadingPositiveGood(ReviewCard $card, ?Carbon $eventAt = null): bool

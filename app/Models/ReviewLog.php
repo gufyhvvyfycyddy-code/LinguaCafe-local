@@ -38,6 +38,7 @@ class ReviewLog extends Model
         'previous_difficulty',
         'new_difficulty',
         'source',
+        'question_example_key',
         // Undo ledger fields (ADR-0009)
         'review_session_id',
         'before_card_snapshot',

@@ -61,6 +61,7 @@ export interface ReviewItem {
     sense_en?: string;
     example_sentence_en?: string;
     example_sentence_zh?: string;
+    question_example_key?: string | null;
     media?: MediaReference[];
   };
 }
@@ -82,6 +83,7 @@ export interface QueuedRatingAction extends QueuedActionBase {
     review_card_id: number;
     rating: ReviewRating;
     review_duration_ms: number;
+    question_example_key?: string;
     reading_session_id?: string;
     occurrence_id?: string;
   };

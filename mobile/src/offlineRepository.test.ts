@@ -52,13 +52,15 @@ describe('OfflineRepository', () => {
       sense_summaries: [],
       dictionary_summaries: { hello: ['你好'] },
     });
-    const first = await repository.enqueueRating(10, 'good', 1200, new Date('2026-08-01T00:00:00Z'));
+    const questionKey = 'a'.repeat(64);
+    const first = await repository.enqueueRating(10, 'good', 1200, new Date('2026-08-01T00:00:00Z'), undefined, questionKey);
     const second = await repository.enqueueRating(11, 'again', 900, new Date('2026-08-01T00:00:01Z'));
 
     expect((await repository.chapters(3))?.[0].chapter_id).toBe(9);
     expect((await repository.chapterPackage(3, 9))?.tokens[0].lemma).toBe('hello');
     expect((await repository.chapterPackage(3, 9))?.dictionary_summaries.hello).toEqual(['你好']);
     expect([first.sequence, second.sequence]).toEqual([1, 2]);
+    expect(first.payload.question_example_key).toBe(questionKey);
     expect(await repository.pendingCardIds()).toEqual(new Set([10, 11]));
   });
 
@@ -161,6 +163,7 @@ describe('OfflineRepository', () => {
       reading_session_id: '11111111-1111-4111-8111-111111111111',
       occurrence_id: 'word:0',
     });
+    expect(rating.payload.question_example_key).toBeUndefined();
     expect((await repository.queuedActions()).map(action => action.sequence)).toEqual([1, 2]);
     expect(await repository.pendingCardIds()).toEqual(new Set([10]));
   });

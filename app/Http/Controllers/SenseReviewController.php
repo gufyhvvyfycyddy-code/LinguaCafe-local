@@ -74,6 +74,7 @@ class SenseReviewController extends Controller
             'rating' => ['required', 'in:again,hard,good,easy'],
             'review_session_id' => ['nullable', 'string', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'question_example_key' => ['nullable', 'regex:/^[a-f0-9]{64}$/'],
             'reading_session_id' => ['nullable', 'string', 'uuid'],
             'occurrence_id' => ['nullable', 'string'],
             'reading_action_id' => ['nullable', 'string', 'uuid'],
@@ -84,6 +85,7 @@ class SenseReviewController extends Controller
         $ignoreDailyLimits = $request->input('ignoreDailyLimits', $request->input('ignore_daily_limits', false));
         $reviewSessionId = $request->post('review_session_id');
         $reviewDurationMs = $request->post('review_duration_ms');
+        $questionExampleKey = $request->post('question_example_key');
         $readingSessionId = $request->post('reading_session_id');
         $occurrenceId = $request->post('occurrence_id');
         $readingActionId = $request->post('reading_action_id');
@@ -233,6 +235,7 @@ class SenseReviewController extends Controller
             ReviewLog::SOURCE_SENSE_REVIEW,
             $reviewSessionId,
             $reviewDurationMs,
+            $questionExampleKey,
         );
         $latestLog = ReviewLog::where('review_card_id', $card->id)
             ->where('user_id', $userId)

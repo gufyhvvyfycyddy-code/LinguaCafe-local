@@ -139,6 +139,7 @@ export class OfflineRepository {
     reviewDurationMs: number,
     now = new Date(),
     readingContext?: { readingSessionId: string; occurrenceId: string },
+    questionExampleKey?: string | null,
   ): Promise<QueuedAction> {
     let queued!: QueuedAction;
     await this.update(state => {
@@ -154,7 +155,7 @@ export class OfflineRepository {
           ...(readingContext ? {
             reading_session_id: readingContext.readingSessionId,
             occurrence_id: readingContext.occurrenceId,
-          } : {}),
+          } : (questionExampleKey ? { question_example_key: questionExampleKey } : {})),
         },
       };
       state.queue.push(queued);

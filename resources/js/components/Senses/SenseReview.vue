@@ -912,6 +912,9 @@
                 this.loadCardsRequestSequence++;
                 const payload = { rating: rating };
                 payload.review_duration_ms = durationMs(this.reviewDurationTracker);
+                if (this.currentCard.question_example_key) {
+                    payload.question_example_key = this.currentCard.question_example_key;
+                }
                 if (this.ignoreDailyLimits) {
                     payload.ignoreDailyLimits = true;
                 }

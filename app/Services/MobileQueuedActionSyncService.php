@@ -137,6 +137,7 @@ class MobileQueuedActionSyncService
                 $normalized['payload']['review_duration_ms'] ?? null,
                 $normalized['payload']['reading_session_id'] ?? null,
                 $normalized['payload']['occurrence_id'] ?? null,
+                $normalized['payload']['question_example_key'] ?? null,
             )
             : [
                 'occurred_at' => $normalized['occurred_at']->toIso8601String(),
@@ -270,6 +271,7 @@ class MobileQueuedActionSyncService
                             isset($action['payload']['reading_session_id'])
                                 ? $action['client_action_id']
                                 : null,
+                            $action['payload']['question_example_key'] ?? null,
                         ),
                     ],
                 ],
@@ -480,6 +482,7 @@ class MobileQueuedActionSyncService
             'rating' => ['required', 'in:again,hard,good,easy'],
             'review_session_id' => ['nullable', 'uuid'],
             'review_duration_ms' => ['nullable', 'integer', 'min:0', 'max:600000'],
+            'question_example_key' => ['nullable', 'regex:/^[a-f0-9]{64}$/'],
             'reading_session_id' => ['nullable', 'required_with:occurrence_id', 'uuid'],
             'occurrence_id' => ['nullable', 'required_with:reading_session_id', 'string', 'max:255'],
         ])->validate();
@@ -498,6 +501,9 @@ class MobileQueuedActionSyncService
                 : null,
             'occurrence_id' => isset($validated['occurrence_id'])
                 ? (string) $validated['occurrence_id']
+                : null,
+            'question_example_key' => !isset($validated['reading_session_id']) && isset($validated['question_example_key'])
+                ? (string) $validated['question_example_key']
                 : null,
         ];
     }

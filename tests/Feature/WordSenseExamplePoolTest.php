@@ -81,7 +81,7 @@ class WordSenseExamplePoolTest extends TestCase
         $chapter = $this->createTestChapter([], ['name' => 'Same Chapter']);
 
         $this->createOccurrence($sense, $chapter, 'The Census Bureau released data.');
-        $this->createOccurrence($sense, $chapter, 'The Census Bureau released data.');
+        $this->createOccurrence($sense, $chapter, '  the   census bureau released DATA.  ');
 
         $candidates = $this->poolService->exampleCandidates($sense);
 
@@ -111,57 +111,63 @@ class WordSenseExamplePoolTest extends TestCase
         $this->assertFalse($candidates[0]['is_card_fallback']);
     }
 
-    public function test_question_rotation_is_not_always_first(): void
+    public function test_shuffle_cycle_is_deterministic_complete_and_not_source_order(): void
     {
-        // With 5 candidates and varying review_card_id, the rotated index
-        // must NOT be 0 for every card. Otherwise rotation is broken.
-        $indices = [];
-        for ($cardId = 1; $cardId <= 30; $cardId++) {
-            $indices[] = $this->poolService->pickQuestionIndex(5, $cardId, 0, 100);
+        $candidates = $this->rotationCandidates(5);
+        $selected = [];
+        $previous = null;
+        for ($ordinal = 0; $ordinal < 5; $ordinal++) {
+            $index = $this->poolService->pickQuestionIndex($candidates, 42, $ordinal, $previous);
+            $selected[] = $candidates[$index]['candidate_key'];
+            $previous = $candidates[$index]['candidate_key'];
         }
-        $unique = array_unique($indices);
-        $this->assertGreaterThan(1, count($unique), 'rotation must produce more than one distinct index across cards');
-        $this->assertContains(0, $unique, 'index 0 should appear sometimes (sanity)');
-    }
+        $this->assertEqualsCanonicalizing(array_column($candidates, 'candidate_key'), $selected);
+        $this->assertCount(5, array_unique($selected));
+        $this->assertNotSame(array_column($candidates, 'candidate_key'), $selected);
 
-    public function test_question_rotation_is_stable_for_same_seed(): void
-    {
-        $i1 = $this->poolService->pickQuestionIndex(5, 42, 3, 100);
-        $i2 = $this->poolService->pickQuestionIndex(5, 42, 3, 100);
-        $this->assertSame($i1, $i2, 'same seed must produce same index');
-    }
-
-    public function test_question_rotation_changes_with_reps(): void
-    {
-        // fsrs_reps incrementing should shift the index for at least one
-        // card across a reasonable sample. Otherwise the seed is broken.
-        $changed = false;
-        for ($cardId = 1; $cardId <= 20; $cardId++) {
-            $before = $this->poolService->pickQuestionIndex(5, $cardId, 0, 100);
-            $after = $this->poolService->pickQuestionIndex(5, $cardId, 1, 100);
-            if ($before !== $after) {
-                $changed = true;
-                break;
-            }
+        $again = [];
+        $previous = null;
+        for ($ordinal = 0; $ordinal < 5; $ordinal++) {
+            $index = $this->poolService->pickQuestionIndex($candidates, 42, $ordinal, $previous);
+            $again[] = $candidates[$index]['candidate_key'];
+            $previous = $candidates[$index]['candidate_key'];
         }
-        $this->assertTrue($changed, 'incrementing fsrs_reps should shift question index for at least one card');
+        $this->assertSame($selected, $again);
     }
 
-    public function test_supplementary_example_is_different_from_question(): void
+    public function test_next_cycle_changes_seed_and_never_immediately_repeats(): void
     {
-        for ($cardId = 1; $cardId <= 30; $cardId++) {
-            $q = $this->poolService->pickQuestionIndex(4, $cardId, 0, 100);
-            $s = $this->poolService->pickSupplementaryIndex(4, $q, $cardId, 0, 100);
-            $this->assertNotNull($s, 'supplementary must be non-null when total >= 2');
-            $this->assertNotSame($q, $s, "supplementary must differ from question (cardId=$cardId, q=$q, s=$s)");
+        $candidates = $this->rotationCandidates(5);
+        $cycle0 = [];
+        $previous = null;
+        for ($ordinal = 0; $ordinal < 5; $ordinal++) {
+            $index = $this->poolService->pickQuestionIndex($candidates, 42, $ordinal, $previous);
+            $previous = $candidates[$index]['candidate_key'];
+            $cycle0[] = $previous;
         }
+        $cycle1 = [];
+        for ($ordinal = 5; $ordinal < 10; $ordinal++) {
+            $index = $this->poolService->pickQuestionIndex($candidates, 42, $ordinal, $previous);
+            $current = $candidates[$index]['candidate_key'];
+            $this->assertNotSame($previous, $current);
+            $cycle1[] = $current;
+            $previous = $current;
+        }
+        $this->assertEqualsCanonicalizing(array_column($candidates, 'candidate_key'), $cycle1);
+        $this->assertNotSame($cycle0, $cycle1);
     }
 
-    public function test_supplementary_is_null_when_only_one_candidate(): void
+    public function test_supplementary_example_is_different_and_single_is_stable(): void
     {
-        $q = $this->poolService->pickQuestionIndex(1, 42, 0, 100);
-        $s = $this->poolService->pickSupplementaryIndex(1, $q, 42, 0, 100);
-        $this->assertNull($s, 'supplementary must be null when total < 2');
+        $candidates = $this->rotationCandidates(4);
+        $question = $this->poolService->pickQuestionIndex($candidates, 42, 0);
+        $supplementary = $this->poolService->pickSupplementaryIndex($candidates, $question, 42, 0);
+        $this->assertNotNull($supplementary);
+        $this->assertNotSame($question, $supplementary);
+
+        $single = $this->rotationCandidates(1);
+        $this->assertSame(0, $this->poolService->pickQuestionIndex($single, 42, 8, $single[0]['candidate_key']));
+        $this->assertNull($this->poolService->pickSupplementaryIndex($single, 0, 42, 8));
     }
 
     public function test_pool_does_not_write_reviewlog_or_create_senses_or_cards(): void
@@ -369,20 +375,27 @@ class WordSenseExamplePoolTest extends TestCase
         $this->assertSame('Bound occurrence.', $candidates[0]['sentence_en']);
     }
 
-    public function test_pool_caps_at_most_10_candidates(): void
+    public function test_pool_keeps_all_12_20_and_30_distinct_real_sources(): void
     {
-        // Sub-stage 5 edge case: the limit(10) guard inside exampleCandidates
-        // must cap the raw fetch. With 15 distinct-chapter occurrences, the
-        // pool must not return more than 10 candidates.
-        $sense = $this->createConfirmedSense('bureau', 'Bureau');
-        for ($i = 1; $i <= 15; $i++) {
-            $chapter = $this->createTestChapter([], ['name' => "Chapter {$i}"]);
-            $this->createOccurrence($sense, $chapter, "Sentence number {$i}.");
+        foreach ([12, 20, 30] as $count) {
+            $sense = $this->createConfirmedSense("bureau-{$count}", 'Bureau');
+            for ($i = 1; $i <= $count; $i++) {
+                $chapter = $this->createTestChapter([], ['name' => "Pool {$count} Chapter {$i}"]);
+                $this->createOccurrence($sense, $chapter, "Pool {$count} sentence {$i}.");
+            }
+            $candidates = $this->poolService->exampleCandidates($sense);
+            $this->assertCount($count, $candidates);
+            $selected = [];
+            $previous = null;
+            for ($ordinal = 0; $ordinal < $count; $ordinal++) {
+                $index = $this->poolService->pickQuestionIndex($candidates, 77, $ordinal, $previous);
+                $selected[] = $candidates[$index]['sentence_en'];
+                $previous = $candidates[$index]['candidate_key'];
+            }
+            $this->assertContains("Pool {$count} sentence 11.", $selected);
+            $this->assertContains("Pool {$count} sentence {$count}.", $selected);
+            $this->assertCount($count, array_unique($selected));
         }
-
-        $candidates = $this->poolService->exampleCandidates($sense);
-
-        $this->assertLessThanOrEqual(10, count($candidates), 'pool must be capped at 10 candidates');
     }
 
     public function test_pool_chapter_title_resolves_null_when_chapter_belongs_to_other_user(): void
@@ -654,9 +667,9 @@ class WordSenseExamplePoolTest extends TestCase
             'fsrs_enabled' => $card->fsrs_enabled,
         ];
 
-        $this->poolService->exampleCandidates($sense);
-        $this->poolService->pickQuestionIndex(5, $card->id, $card->fsrs_reps, 100);
-        $this->poolService->pickSupplementaryIndex(5, 0, $card->id, $card->fsrs_reps, 100);
+        $candidates = $this->poolService->exampleCandidates($sense);
+        $question = $this->poolService->pickQuestionIndex($candidates, $card->id, 0);
+        $this->poolService->pickSupplementaryIndex($candidates, $question, $card->id, 0);
 
         $card->refresh();
         $this->assertSame($before['fsrs_state'], $card->fsrs_state);
@@ -667,23 +680,34 @@ class WordSenseExamplePoolTest extends TestCase
         $this->assertSame($before['fsrs_enabled'], $card->fsrs_enabled);
     }
 
-    public function test_pool_dedup_across_different_chapters_keeps_both_when_sentences_differ(): void
+    public function test_same_normalized_sentence_in_different_chapters_remains_distinct(): void
     {
-        // Sub-stage 5 edge case: the dedup key is (chapter_id, sentence).
-        // Two occurrences with different sentences in different chapters
-        // must both be kept (no over-aggressive dedup).
         $sense = $this->createConfirmedSense('bureau', 'Bureau');
         $chapter1 = $this->createTestChapter([], ['name' => 'Chapter A']);
         $chapter2 = $this->createTestChapter([], ['name' => 'Chapter B']);
         $this->createOccurrence($sense, $chapter1, 'Bureau opened today.');
-        $this->createOccurrence($sense, $chapter2, 'Bureau will close tomorrow.');
+        $this->createOccurrence($sense, $chapter2, '  bureau   OPENED today.  ');
 
         $candidates = $this->poolService->exampleCandidates($sense);
 
-        $this->assertCount(2, $candidates, 'distinct sentences in distinct chapters must both be kept');
+        $this->assertCount(2, $candidates, 'cross-chapter normalized duplicates remain distinct examples');
+        $this->assertCount(2, array_unique(array_column($candidates, 'candidate_key')));
     }
 
     // ==================== Helpers ====================
+
+    private function rotationCandidates(int $count): array
+    {
+        $candidates = [];
+        for ($i = 1; $i <= $count; $i++) {
+            $candidates[] = [
+                'candidate_key' => sprintf('key-%02d', $i),
+                'occurrence_id' => $i,
+                'sentence_en' => "Example {$i}.",
+            ];
+        }
+        return $candidates;
+    }
 
     private function createConfirmedSense(string $lemma, string $surfaceForm, string $exampleEn = '', string $exampleZh = ''): WordSense
     {
@@ -726,13 +750,16 @@ class WordSenseExamplePoolTest extends TestCase
 
     private function createOccurrence(WordSense $sense, Chapter $chapter, string $sentenceEn): WordSenseOccurrence
     {
+        static $sentenceId = 0;
+        $sentenceId++;
+
         return WordSenseOccurrence::forceCreate([
             'user_id' => $this->user->id,
             'language' => 'english',
             'language_id' => 'english',
             'word_sense_id' => $sense->id,
             'chapter_id' => $chapter->id,
-            'sentence_id' => (string) rand(1, 1000),
+            'sentence_id' => (string) $sentenceId,
             'sentence_en' => $sentenceEn,
             'sentence_zh' => '',
             'type' => WordSenseOccurrence::TYPE_WORD,

@@ -36,6 +36,7 @@ final class SpecialStudyAnswerService
         int $expectedRevision,
         ?int $reviewDurationMs = null,
         ?Carbon $now = null,
+        ?string $questionExampleKey = null,
     ): array {
         $now ??= Carbon::now();
         if (! in_array($rating, self::RATINGS, true)) {
@@ -69,6 +70,9 @@ final class SpecialStudyAnswerService
             'rating' => $rating,
             'review_duration_ms' => $reviewDurationMs,
         ];
+        if ($questionExampleKey !== null) {
+            $payload['question_example_key'] = $questionExampleKey;
+        }
         $requestHash = $this->requestHash($payload);
 
         return DB::transaction(function () use (
@@ -79,6 +83,7 @@ final class SpecialStudyAnswerService
             $clientActionId,
             $expectedRevision,
             $reviewDurationMs,
+            $questionExampleKey,
             $now,
             $payload,
             $requestHash,
@@ -168,6 +173,8 @@ final class SpecialStudyAnswerService
                         ReviewLog::SOURCE_SPECIAL_STUDY,
                         $session->id,
                         $reviewDurationMs,
+                        null,
+                        $questionExampleKey,
                     );
                     $this->operationLedgerService->registerWebRating(
                         $operationId,

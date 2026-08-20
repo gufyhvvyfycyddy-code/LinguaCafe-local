@@ -53,9 +53,19 @@ class ReviewController extends Controller {
         $rating = $request->post('rating');
         $ignoreDailyLimits = $request->post('ignoreDailyLimits', $request->post('ignore_daily_limits', false));
         $reviewDurationMs = $request->post('review_duration_ms');
+        $questionExampleKey = $request->post('question_example_key');
 
         try {
-            $card = $this->reviewCardService->recordReview($userId, $language, $reviewCardId, $rating, 'sense_review', null, $reviewDurationMs);
+            $card = $this->reviewCardService->recordReview(
+                $userId,
+                $language,
+                $reviewCardId,
+                $rating,
+                'sense_review',
+                null,
+                $reviewDurationMs,
+                $questionExampleKey,
+            );
         } catch (\DomainException $e) {
             abort(422, $e->getMessage());
         } catch (\Exception $e) {

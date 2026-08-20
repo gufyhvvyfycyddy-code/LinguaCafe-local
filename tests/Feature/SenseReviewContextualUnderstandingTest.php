@@ -25,14 +25,14 @@ use Tests\TestCase;
  * Verifies the smart example selection + occurrence-level understanding aid:
  *  - When a preferred occurrence id is supplied (e.g. the currently displayed
  *    one), the serializer selects that occurrence as the question example.
- *  - When no preference is given, the linear rotation is used as fallback.
+ *  - When no preference is given, the deterministic full-pool rotation is used.
  *  - Occurrence-level evidence (context_hint / judgment_basis) is merged into
  *    the payload's understanding_aid, overriding sense-level values when both
  *    exist and falling back to sense-level when occurrence evidence is empty.
  *  - The smart selection + contextual understanding does NOT write ReviewLog
  *    or modify any FSRS field.
  *  - When the preferred occurrence id is not in the candidate pool, the
- *    serializer falls back to linear rotation without error.
+ *    serializer falls back to deterministic full-pool rotation without error.
  *  - When occurrence evidence is null/empty, sense-level understanding_aid
  *    is used as before (backward compatible).
  */
@@ -75,9 +75,8 @@ class SenseReviewContextualUnderstandingTest extends TestCase
         $occ2 = $this->createOccurrence($sense, $chapter, 's2', 'Second example sentence.');
         $card = $this->createSenseCard($sense);
 
-        // Without preference, reps=0 picks the linear-rotation index, which
-        // lands on occ2 (candidates[0] due to id DESC ordering). With an
-        // explicit preference for occ2, the serializer must still pick occ2.
+        // An explicit preferred occurrence remains authoritative for this
+        // contextual caller regardless of the normal formal rotation order.
         $payload = $this->serializerService->serialize(
             $card->fresh()->load('sense'),
             ['preferred_occurrence_id' => $occ2->id]
@@ -89,10 +88,10 @@ class SenseReviewContextualUnderstandingTest extends TestCase
     }
 
     /**
-     * When no preferred occurrence id is supplied, the serializer falls back
-     * to the linear rotation (backward compatible with previous behavior).
+     * When no preferred occurrence id is supplied, the serializer uses the
+     * deterministic full-pool rotation. FSRS reps do not own that rotation.
      */
-    public function test_falls_back_to_linear_rotation_when_no_preference(): void
+    public function test_falls_back_to_full_pool_rotation_when_no_preference(): void
     {
         $sense = $this->createConfirmedSense('bank');
         $chapter = $this->createTestChapter('Chapter A');
@@ -100,14 +99,14 @@ class SenseReviewContextualUnderstandingTest extends TestCase
         $occ2 = $this->createOccurrence($sense, $chapter, 's2', 'Second example sentence.');
         $card = $this->createSenseCard($sense, ['fsrs_reps' => 1]);
 
-        // No preferred_occurrence_id → linear rotation: (cardId + 1 + 0) % 2.
-        // exampleCandidates orders by id DESC, so candidates[0] = occ2 (higher
-        // id, created later) and candidates[1] = occ1.
+        $poolService = app(\App\Services\WordSenseExamplePoolService::class);
+        $candidates = $poolService->exampleCandidates($sense);
+        $expectedIndex = $poolService->pickQuestionIndex($candidates, $card->id, 0, null);
+
         $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
 
-        $linearIndex = ($card->id + 1) % 2;
-        $expectedOccId = $linearIndex === 0 ? $occ2->id : $occ1->id;
-        $this->assertSame($expectedOccId, $payload['displayed_occurrence_id']);
+        $this->assertSame($candidates[$expectedIndex]['occurrence_id'], $payload['displayed_occurrence_id']);
+        $this->assertSame($candidates[$expectedIndex]['candidate_key'], $payload['question_example_key']);
     }
 
     /**
@@ -279,27 +278,25 @@ class SenseReviewContextualUnderstandingTest extends TestCase
     }
 
     /**
-     * When source context is available (chapter_id set), the occurrence is
-     * considered "source-context-complete" and preferred over occurrences
-     * without source context, even without an explicit preferred_occurrence_id.
+     * Source-context-complete candidates still participate in the same
+     * deterministic full-pool rotation when no explicit preference exists.
      */
-    public function test_source_context_complete_occurrence_preferred_when_no_preference(): void
+    public function test_source_context_complete_candidates_use_full_pool_rotation_without_preference(): void
     {
         $sense = $this->createConfirmedSense('bank');
         $chapter = $this->createTestChapter('Chapter A');
         // occ1 has source context (chapter_id set)
         $occ1 = $this->createOccurrence($sense, $chapter, 's1', 'First with context.');
-        // occ2 also has source context — both complete, so linear rotation decides
+        // occ2 also has source context — both complete, so full-pool rotation decides
         $occ2 = $this->createOccurrence($sense, $chapter, 's2', 'Second with context.');
         $card = $this->createSenseCard($sense);
 
         $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
 
-        // Both have source context, so linear rotation applies.
-        // exampleCandidates orders by id DESC, so candidates[0] = occ2.
-        $linearIndex = ($card->id + 0 + 0) % 2;
-        $expectedOccId = $linearIndex === 0 ? $occ2->id : $occ1->id;
-        $this->assertSame($expectedOccId, $payload['displayed_occurrence_id']);
+        $poolService = app(\App\Services\WordSenseExamplePoolService::class);
+        $candidates = $poolService->exampleCandidates($sense);
+        $expectedIndex = $poolService->pickQuestionIndex($candidates, $card->id, 0, null);
+        $this->assertSame($candidates[$expectedIndex]['occurrence_id'], $payload['displayed_occurrence_id']);
         $this->assertSame('occurrence', $payload['example_source_status']);
     }
 

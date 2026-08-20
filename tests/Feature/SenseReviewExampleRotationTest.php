@@ -25,10 +25,8 @@ use Tests\TestCase;
  *
  * Verifies the sense review page example rotation contract:
  *  - With 1 occurrence the displayed example is that occurrence.
- *  - With 3 occurrences consecutive serialization does not always
- *    show the first candidate.
- *  - After a rating (fsrs_reps increment) the displayed occurrence
- *    shifts for at least one card.
+ *  - Completed keyed formal reviews drive deterministic full-pool rotation.
+ *  - Adjacent completed formal reviews never repeat when multiple examples exist.
  *  - Payload includes displayed_occurrence_id and occurrence_count.
  *  - Without occurrences, the card example_sentence_en fallback is
  *    used (example_source_status = 'card_fallback').
@@ -37,9 +35,9 @@ use Tests\TestCase;
  *  - Rotation does not change FSRS due_at / stability / difficulty.
  *  - Rotation does not affect the daily limit summary.
  *
- * The rotation is deterministic (stable seed: review_card_id +
- * fsrs_reps + day-of-year), so these tests assert structural
- * invariants rather than a specific sequence.
+ * Rotation uses a deterministic seed derived from review card, current pool,
+ * cycle ordinal, and stable candidate keys, so no probability-based assertion
+ * is required.
  */
 class SenseReviewExampleRotationTest extends TestCase
 {
@@ -86,74 +84,61 @@ class SenseReviewExampleRotationTest extends TestCase
         $this->assertSame(1, $payload['occurrence_count']);
     }
 
-    public function test_three_occurrences_do_not_always_show_first(): void
+    public function test_three_formal_reviews_cover_full_cycle_and_persist_question_keys(): void
     {
         $sense = $this->createConfirmedSense('bureau');
-        $chapter1 = $this->createTestChapter('Chapter A');
-        $chapter2 = $this->createTestChapter('Chapter B');
-        $chapter3 = $this->createTestChapter('Chapter C');
-
+        $chapters = [
+            $this->createTestChapter('Chapter A'),
+            $this->createTestChapter('Chapter B'),
+            $this->createTestChapter('Chapter C'),
+        ];
         $sentences = [
             'The Census Bureau released data.',
             'A federal bureau handled the case.',
             'The bureau is closed today.',
         ];
-        $this->createOccurrence($sense, $chapter1, 's1', $sentences[0]);
-        $this->createOccurrence($sense, $chapter2, 's2', $sentences[1]);
-        $this->createOccurrence($sense, $chapter3, 's3', $sentences[2]);
-
-        // A single sense can only have one ReviewCard (unique constraint).
-        // The rotation seed depends on review_card_id + fsrs_reps + day-of-year,
-        // so we simulate "consecutive reviews" by incrementing fsrs_reps on the
-        // same card. Across reps 0..29 the displayed example must not always be
-        // the first candidate.
+        foreach ($sentences as $index => $sentence) {
+            $this->createOccurrence($sense, $chapters[$index], 's' . ($index + 1), $sentence);
+        }
         $card = $this->createSenseCard($sense);
 
-        $shownSentences = [];
-        for ($reps = 0; $reps <= 29; $reps++) {
-            $card->fsrs_reps = $reps;
-            $card->save();
+        $shown = [];
+        $keys = [];
+        for ($review = 0; $review < 3; $review++) {
             $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
-            $shownSentences[] = $payload['example_sentence_en'];
+            $shown[] = $payload['example_sentence_en'];
+            $keys[] = $payload['question_example_key'];
+            $this->actingAs($this->user)->postJson("/reviews/senses/{$card->id}/rate", [
+                'rating' => 'good',
+                'question_example_key' => $payload['question_example_key'],
+            ])->assertOk();
         }
 
-        $unique = array_unique($shownSentences);
-        $this->assertGreaterThan(1, count($unique), 'rotation must produce more than one distinct example across reps');
-        $this->assertContains($sentences[0], $unique, 'first sentence should appear sometimes (sanity)');
+        $this->assertEqualsCanonicalizing($sentences, $shown);
+        $this->assertCount(3, array_unique($shown));
+        $this->assertSame($keys, ReviewLog::query()->where('review_card_id', $card->id)->orderBy('id')->pluck('question_example_key')->all());
     }
 
-    public function test_rating_changes_displayed_occurrence(): void
+    public function test_reading_context_rating_forces_question_key_null(): void
     {
-        // With 3 occurrences, incrementing fsrs_reps must shift the
-        // displayed_occurrence_id for at least one reps value on the same card.
-        // The rotation seed depends on review_card_id + fsrs_reps + day-of-year,
-        // so changing reps on the same card is the correct way to simulate
-        // "the next review shows a different example".
-        $sense = $this->createConfirmedSense('bureau');
-        $chapter1 = $this->createTestChapter('Chapter A');
-        $chapter2 = $this->createTestChapter('Chapter B');
-        $chapter3 = $this->createTestChapter('Chapter C');
+        $sense = $this->createConfirmedSense('reading-key-null');
+        $chapter = $this->createTestChapter('Reading Chapter');
+        $this->createOccurrence($sense, $chapter, 's1', 'Reading example.');
+        $card = $this->createSenseCard($sense);
+        $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
 
-        $this->createOccurrence($sense, $chapter1, 's1', 'The Census Bureau released data.');
-        $this->createOccurrence($sense, $chapter2, 's2', 'A federal bureau handled the case.');
-        $this->createOccurrence($sense, $chapter3, 's3', 'The bureau is closed today.');
+        app(\App\Services\ReviewCardService::class)->recordReview(
+            $this->user->id,
+            'english',
+            $card->id,
+            'again',
+            ReviewLog::SOURCE_READING_EXPLICIT,
+            null,
+            null,
+            $payload['question_example_key'],
+        );
 
-        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0]);
-
-        $changed = false;
-        $previousOccurrenceId = null;
-        for ($reps = 0; $reps <= 29; $reps++) {
-            $card->fsrs_reps = $reps;
-            $card->save();
-            $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
-            $currentOccurrenceId = $payload['displayed_occurrence_id'];
-            if ($previousOccurrenceId !== null && $previousOccurrenceId !== $currentOccurrenceId) {
-                $changed = true;
-                break;
-            }
-            $previousOccurrenceId = $currentOccurrenceId;
-        }
-        $this->assertTrue($changed, 'incrementing fsrs_reps should shift displayed_occurrence_id at least once across 30 reps');
+        $this->assertNull(ReviewLog::query()->latest('id')->value('question_example_key'));
     }
 
     public function test_displayed_occurrence_id_in_payload(): void
@@ -333,108 +318,86 @@ class SenseReviewExampleRotationTest extends TestCase
         );
     }
 
-    // ===== Linear sequence rotation tests (GM52-SenseReviewExampleRotationMemory-1000-8) =====
-    //
-    // These tests lock the "first A, second B, third C" sequence contract:
-    // fsrs_reps increments MUST move through the example pool in order rather
-    // than hashing to an unpredictable index. fsrs_lapses increments MUST
-    // shift the starting offset so a failed review shows a different example.
+    // ===== ADR-0064 deterministic full-pool rotation tests =====
 
-    public function test_linear_rotation_cycles_through_all_examples_with_reps(): void
+    public function test_undo_ignores_undone_question_key_and_restores_rotation_history(): void
     {
-        // With 3 occurrences, reps 0/1/2 must show 3 distinct sentences
-        // (in pool order, offset by card_id). This is the core "first A,
-        // second B, third C" contract.
-        $sense = $this->createConfirmedSense('rotation');
-        $chapter1 = $this->createTestChapter('Chapter A');
-        $chapter2 = $this->createTestChapter('Chapter B');
-        $chapter3 = $this->createTestChapter('Chapter C');
+        $sense = $this->createConfirmedSense('undo-rotation');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter A'), 's1', 'First example sentence.');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter B'), 's2', 'Second example sentence.');
+        $card = $this->createSenseCard($sense);
+        $sessionId = (string) Str::uuid();
 
-        $sentences = [
-            'First example sentence.',
-            'Second example sentence.',
-            'Third example sentence.',
-        ];
-        $this->createOccurrence($sense, $chapter1, 's1', $sentences[0]);
-        $this->createOccurrence($sense, $chapter2, 's2', $sentences[1]);
-        $this->createOccurrence($sense, $chapter3, 's3', $sentences[2]);
+        $first = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$card->id}/rate", [
+            'rating' => 'good',
+            'review_session_id' => $sessionId,
+            'question_example_key' => $first['question_example_key'],
+        ])->assertOk();
+        $second = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$card->id}/rate", [
+            'rating' => 'hard',
+            'review_session_id' => $sessionId,
+            'question_example_key' => $second['question_example_key'],
+        ])->assertOk();
 
-        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
+        $latest = ReviewLog::query()->where('review_card_id', $card->id)->latest('id')->firstOrFail();
+        $this->actingAs($this->user)->postJson("/reviews/senses/review-actions/{$latest->id}/undo", [
+            'review_session_id' => $sessionId,
+            'undo_request_id' => (string) Str::uuid(),
+            'source' => 'sense_review_history',
+        ])->assertOk();
 
-        $shown = [];
-        for ($reps = 0; $reps <= 2; $reps++) {
-            $card->fsrs_reps = $reps;
-            $card->save();
-            $payload = $this->serializerService->serialize($card->fresh()->load('sense'));
-            $shown[] = $payload['example_sentence_en'];
-        }
-
-        $unique = array_unique($shown);
-        $this->assertSame(3, count($unique), 'reps 0/1/2 must show 3 distinct examples, got: ' . implode(' | ', $shown));
-        $this->assertContains($sentences[0], $shown);
-        $this->assertContains($sentences[1], $shown);
-        $this->assertContains($sentences[2], $shown);
+        $state = app(\App\Services\SenseReviewExampleRotationStateService::class)->stateForCard($card->id);
+        $this->assertSame(1, $state['formal_question_ordinal']);
+        $this->assertSame($first['question_example_key'], $state['latest_question_example_key']);
+        $next = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->assertNotSame($first['question_example_key'], $next['question_example_key']);
     }
 
-    public function test_linear_rotation_wraps_around_after_pool_size(): void
+    public function test_pool_add_and_remove_keep_strict_previous_question_guard(): void
     {
-        // With 3 occurrences, reps 3 should wrap back to the same example
-        // as reps 0 (circular rotation).
-        $sense = $this->createConfirmedSense('rotation');
-        $chapter1 = $this->createTestChapter('Chapter A');
-        $chapter2 = $this->createTestChapter('Chapter B');
-        $chapter3 = $this->createTestChapter('Chapter C');
+        $sense = $this->createConfirmedSense('pool-mutation');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter A'), 's1', 'First example sentence.');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter B'), 's2', 'Second example sentence.');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter C'), 's3', 'Third example sentence.');
+        $card = $this->createSenseCard($sense);
 
-        $this->createOccurrence($sense, $chapter1, 's1', 'First example sentence.');
-        $this->createOccurrence($sense, $chapter2, 's2', 'Second example sentence.');
-        $this->createOccurrence($sense, $chapter3, 's3', 'Third example sentence.');
+        $first = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$card->id}/rate", [
+            'rating' => 'good',
+            'question_example_key' => $first['question_example_key'],
+        ])->assertOk();
 
-        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter D'), 's4', 'Fourth example sentence.');
+        $afterAdd = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->assertSame(4, $afterAdd['occurrence_count']);
+        $this->assertNotSame($first['question_example_key'], $afterAdd['question_example_key']);
+        $this->actingAs($this->user)->postJson("/reviews/senses/{$card->id}/rate", [
+            'rating' => 'hard',
+            'question_example_key' => $afterAdd['question_example_key'],
+        ])->assertOk();
 
-        $card->fsrs_reps = 0;
-        $card->save();
-        $payload0 = $this->serializerService->serialize($card->fresh()->load('sense'));
-
-        $card->fsrs_reps = 3;
-        $card->save();
-        $payload3 = $this->serializerService->serialize($card->fresh()->load('sense'));
-
-        $this->assertSame(
-            $payload0['example_sentence_en'],
-            $payload3['example_sentence_en'],
-            'reps 3 must wrap back to the same example as reps 0 (circular rotation)'
-        );
+        WordSenseOccurrence::query()->whereKey($afterAdd['displayed_occurrence_id'])->update([
+            'status' => WordSenseOccurrence::STATUS_IGNORED,
+        ]);
+        $afterRemove = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $this->assertSame(3, $afterRemove['occurrence_count']);
+        $this->assertNotSame($afterAdd['question_example_key'], $afterRemove['question_example_key']);
     }
 
-    public function test_lapses_increment_shifts_example(): void
+    public function test_fsrs_reps_and_lapses_do_not_own_example_rotation(): void
     {
-        // With 3 occurrences, holding reps constant but incrementing lapses
-        // must shift the displayed example. This is the "failed review shows
-        // a different example" contract.
-        $sense = $this->createConfirmedSense('rotation');
-        $chapter1 = $this->createTestChapter('Chapter A');
-        $chapter2 = $this->createTestChapter('Chapter B');
-        $chapter3 = $this->createTestChapter('Chapter C');
+        $sense = $this->createConfirmedSense('rotation-owner');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter A'), 's1', 'First example sentence.');
+        $this->createOccurrence($sense, $this->createTestChapter('Chapter B'), 's2', 'Second example sentence.');
+        $card = $this->createSenseCard($sense, ['fsrs_reps' => 0, 'fsrs_lapses' => 0]);
 
-        $this->createOccurrence($sense, $chapter1, 's1', 'First example sentence.');
-        $this->createOccurrence($sense, $chapter2, 's2', 'Second example sentence.');
-        $this->createOccurrence($sense, $chapter3, 's3', 'Third example sentence.');
+        $before = $this->serializerService->serialize($card->fresh()->load('sense'));
+        $card->forceFill(['fsrs_reps' => 99, 'fsrs_lapses' => 17])->save();
+        $after = $this->serializerService->serialize($card->fresh()->load('sense'));
 
-        $card = $this->createSenseCard($sense, ['fsrs_reps' => 5, 'fsrs_lapses' => 0]);
-
-        $card->fsrs_lapses = 0;
-        $card->save();
-        $payloadLapses0 = $this->serializerService->serialize($card->fresh()->load('sense'));
-
-        $card->fsrs_lapses = 1;
-        $card->save();
-        $payloadLapses1 = $this->serializerService->serialize($card->fresh()->load('sense'));
-
-        $this->assertNotSame(
-            $payloadLapses0['example_sentence_en'],
-            $payloadLapses1['example_sentence_en'],
-            'incrementing fsrs_lapses must shift the displayed example (failed review contract)'
-        );
+        $this->assertSame($before['question_example_key'], $after['question_example_key']);
     }
 
     public function test_single_example_stable_across_reps_and_lapses(): void

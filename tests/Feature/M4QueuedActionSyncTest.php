@@ -149,12 +149,14 @@ class M4QueuedActionSyncTest extends TestCase
     {
         [, $card] = $this->createSenseCard($this->user, 'online-to-sync');
         $clientActionId = (string) Str::uuid();
+        $questionKey = hash('sha256', 'online-to-sync-question');
 
         $online = $this->withToken($this->token)
             ->postJson("/api/v1/mobile/review-cards/{$card->id}/ratings", [
                 'rating' => 'good',
                 'client_action_id' => $clientActionId,
                 'review_duration_ms' => 1250,
+                'question_example_key' => $questionKey,
             ])
             ->assertOk()
             ->assertJsonPath('data.replayed', false);
@@ -165,6 +167,7 @@ class M4QueuedActionSyncTest extends TestCase
             Carbon::now('UTC')->subMinute(),
             1,
             $clientActionId,
+            $questionKey,
         );
         $sync = $this->sync([$action])
             ->assertOk()
@@ -177,6 +180,7 @@ class M4QueuedActionSyncTest extends TestCase
             $sync->json('data.results.0.operation_id'),
         );
         $this->assertSame(1, ReviewLog::query()->where('review_card_id', $card->id)->count());
+        $this->assertSame($questionKey, ReviewLog::query()->where('review_card_id', $card->id)->value('question_example_key'));
         $this->assertSame(1, Operation::query()->count());
         $this->assertSame(1, $card->fresh()->fsrs_reps);
     }
@@ -563,17 +567,19 @@ class M4QueuedActionSyncTest extends TestCase
         Carbon $occurredAt,
         int $sequence,
         ?string $clientActionId = null,
+        ?string $questionExampleKey = null,
     ): array {
         return [
             'client_action_id' => $clientActionId ?? (string) Str::uuid(),
             'type' => 'sense_review.rating',
             'occurred_at' => $occurredAt->toIso8601String(),
             'sequence' => $sequence,
-            'payload' => [
+            'payload' => array_filter([
                 'review_card_id' => $card->id,
                 'rating' => $rating,
                 'review_duration_ms' => 1250,
-            ],
+                'question_example_key' => $questionExampleKey,
+            ], fn ($value) => $value !== null),
         ];
     }
 

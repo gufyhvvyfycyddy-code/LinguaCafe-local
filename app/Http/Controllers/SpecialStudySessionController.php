@@ -112,6 +112,7 @@ class SpecialStudySessionController extends Controller
                 'integer',
                 'between:0,3600000',
             ],
+            'question_example_key' => ['nullable', 'regex:/^[a-f0-9]{64}$/'],
         ]);
 
         return $this->respond(fn () => $this->answerService->answer(
@@ -122,6 +123,8 @@ class SpecialStudySessionController extends Controller
             $validated['client_action_id'],
             $validated['expected_revision'],
             $validated['review_duration_ms'] ?? null,
+            null,
+            $validated['question_example_key'] ?? null,
         ));
     }
 
