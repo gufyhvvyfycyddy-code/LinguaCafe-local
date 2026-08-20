@@ -108,11 +108,11 @@
                     <v-btn title="AI 阅读辅助" icon :disabled="readingSourceStale" @click="openAiAssistDialog"><v-icon>mdi-robot</v-icon></v-btn>
                     <v-btn
                         v-if="hasSavedAiAssist"
-                        :title="showAiTranslations ? '隐藏 AI 译文' : '显示 AI 译文'"
+                        :title="aiTranslationMode === 'hidden' ? '悬停或聚焦显示 AI 译文' : (aiTranslationMode === 'hover' ? '持续显示 AI 译文' : '隐藏 AI 译文')"
                         icon
                         @click="toggleAiTranslations"
                     >
-                        <v-icon :color="showAiTranslations ? 'primary' : ''">mdi-translate</v-icon>
+                        <v-icon :color="aiTranslationMode !== 'hidden' ? 'primary' : ''">mdi-translate</v-icon>
                     </v-btn>
                     <v-btn v-else-if="chapterId !== null" icon disabled title="暂无已保存 AI 译文">
                         <v-icon color="grey lighten-1">mdi-translate-off</v-icon>
@@ -198,7 +198,7 @@
                         :space-between-subtitles="settings.spaceBetweenSubtitles"
                         :vocabulary-sidebar-fits="vocabularySidebarFits"
                         :hotkeys-enabled="true"
-                        :show-ai-translations="showAiTranslations"
+                        :ai-translation-mode="aiTranslationMode"
                         :ai-sentence-translations="aiSentenceTranslations"
                         :unfamiliar-mark-mode="unfamiliarMarkMode"
                         :unfamiliar-word-indexes="markedUnfamiliarWordIndexes"
@@ -494,7 +494,7 @@
                 readingEvidenceItems: [],
 
                 // AI reading assist / explicit unfamiliar targets
-                showAiTranslations: false,
+                aiTranslationMode: 'hidden',
                 hasSavedAiAssist: false,
                 aiSentenceTranslations: [],
                 assistVerificationItems: [],
@@ -1676,7 +1676,7 @@
                         this.aiSentenceTranslations = data.sentence_translations || [];
                         this.assistVerificationItems = normalizeReadingSenseVerificationItems(data);
                         this.mergeReadingVerificationState();
-                        if (!data.has_saved_assist) this.showAiTranslations = false;
+                        if (!data.has_saved_assist) this.aiTranslationMode = 'hidden';
                     }
                     return true;
                 }).catch(() => {
@@ -1828,7 +1828,13 @@
                 this.aiAssistDialog = true;
             },
             toggleAiTranslations() {
-                this.showAiTranslations = !this.showAiTranslations;
+                if (this.aiTranslationMode === 'hidden') {
+                    this.aiTranslationMode = 'hover';
+                } else if (this.aiTranslationMode === 'hover') {
+                    this.aiTranslationMode = 'visible';
+                } else {
+                    this.aiTranslationMode = 'hidden';
+                }
             },
             openFinishConfirmDialog() {
                 // UX guard against accidental clicks on "完成阅读". The

@@ -107,10 +107,15 @@
                     --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
                 --></span><!--
                 --><div
-                    v-if="showAiTranslations && !word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
+                    v-if="!word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
                     :key="'ai-t-' + wordIndex"
-                    class="lc-ai-sentence-translation"
-                >{{ getAiTranslation(word.sentence_index) }}</div><!--
+                    :class="['lc-ai-sentence-translation', 'lc-ai-sentence-translation--' + aiTranslationMode]"
+                    :tabindex="aiTranslationMode === 'hover' ? 0 : null"
+                    :aria-label="aiTranslationMode === 'hover' ? getAiTranslation(word.sentence_index) : null"
+                ><span
+                    class="lc-ai-sentence-translation__text"
+                    :aria-hidden="aiTranslationMode === 'visible' ? null : 'true'"
+                >{{ getAiTranslation(word.sentence_index) }}</span></div><!--
             --></template>
         </div>
 
@@ -358,9 +363,9 @@
                 type: Number,
                 default: 20
             },
-            showAiTranslations: {
-                type: Boolean,
-                default: false,
+            aiTranslationMode: {
+                type: String,
+                default: 'hidden',
             },
             aiSentenceTranslations: {
                 type: Array,

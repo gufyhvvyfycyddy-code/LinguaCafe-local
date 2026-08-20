@@ -331,6 +331,16 @@
     letter-spacing: 0.01em;
 }
 
+.lc-ai-sentence-translation__text {
+    visibility: hidden;
+}
+
+.lc-ai-sentence-translation--hover:hover .lc-ai-sentence-translation__text,
+.lc-ai-sentence-translation--hover:focus .lc-ai-sentence-translation__text,
+.lc-ai-sentence-translation--visible .lc-ai-sentence-translation__text {
+    visibility: visible;
+}
+
 /* Dark mode: ensure readability */
 .theme--dark .lc-ai-sentence-translation {
     color: rgba(255, 255, 255, 0.68);

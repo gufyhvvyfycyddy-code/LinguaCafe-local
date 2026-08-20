@@ -15,7 +15,9 @@ import {
 } from '../../resources/js/services/ReaderTokenPresentationPolicy.js';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const textReaderSource = fs.readFileSync(path.join(root, 'resources/js/components/TextReader/TextReader.vue'), 'utf8');
 const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
+const textBlockScss = fs.readFileSync(path.join(root, 'resources/sass/Text/TextBlockGroup.scss'), 'utf8');
 
 test('applies spaceless layout only to the established languages', () => {
     assert.equal(usesReaderSpacelessLanguage('chinese'), true);
@@ -252,7 +254,7 @@ test('TextBlockGroup delegates presentation while retaining the token DOM bounda
 
     assert.equal((textBlockSource.match(/<rt v-if=/g) || []).length, 2);
     assert.equal((textBlockSource.match(/<ruby class="rubyword selected-font"/g) || []).length, 1);
-    assert.equal((textBlockSource.match(/class="lc-ai-sentence-translation"/g) || []).length, 1);
+    assert.equal((textBlockSource.match(/\['lc-ai-sentence-translation'/g) || []).length, 1);
     assert.equal(textBlockSource.includes('<br v-if="word.is_structure && word.word === \'NEWLINE\'" />'), true);
     assert.equal(textBlockSource.includes('v-else-if="word.is_structure && isSectionMarker(word.word)"'), true);
     assert.equal(textBlockSource.includes(':wordindex="wordIndex"'), true);
@@ -260,4 +262,29 @@ test('TextBlockGroup delegates presentation while retaining the token DOM bounda
     assert.equal(textBlockSource.includes('@mousedown.stop="startSelectionMouseEvent"'), true);
     assert.equal(textBlockSource.includes('@mouseup.stop="finishSelection"'), true);
     assert.equal(textBlockSource.includes('<template v-for="(word, wordIndex) in words"><!--'), true);
+});
+
+test('Reader owns one hidden-hover-visible AI translation mode', () => {
+    assert.equal(textReaderSource.includes("aiTranslationMode: 'hidden'"), true);
+    assert.equal(textReaderSource.includes(':ai-translation-mode="aiTranslationMode"'), true);
+    assert.equal(textReaderSource.includes("this.aiTranslationMode = 'hover'"), true);
+    assert.equal(textReaderSource.includes("this.aiTranslationMode = 'visible'"), true);
+    assert.equal(textReaderSource.includes("this.aiTranslationMode = 'hidden'"), true);
+    assert.equal(textReaderSource.includes('showAiTranslations'), false);
+});
+
+test('saved AI translations keep one stable slot while presentation changes', () => {
+    assert.equal(textBlockSource.includes('v-if="!word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"'), true);
+    assert.equal(textBlockSource.includes('v-if="showAiTranslations'), false);
+    assert.equal(textBlockSource.includes("'lc-ai-sentence-translation--' + aiTranslationMode"), true);
+    assert.equal(textBlockSource.includes(':tabindex="aiTranslationMode === \'hover\' ? 0 : null"'), true);
+    assert.equal(textBlockSource.includes(':aria-label="aiTranslationMode === \'hover\' ? getAiTranslation(word.sentence_index) : null"'), true);
+    assert.equal((textBlockSource.match(/lc-ai-sentence-translation__text/g) || []).length, 1);
+    assert.equal(textBlockSource.includes(':aria-hidden="aiTranslationMode === \'visible\' ? null : \'true\'"'), true);
+
+    assert.match(textBlockScss, /\.lc-ai-sentence-translation__text\s*\{[^}]*visibility:\s*hidden;/s);
+    assert.match(textBlockScss, /\.lc-ai-sentence-translation--hover:hover \.lc-ai-sentence-translation__text,/);
+    assert.match(textBlockScss, /\.lc-ai-sentence-translation--hover:focus \.lc-ai-sentence-translation__text,/);
+    assert.match(textBlockScss, /\.lc-ai-sentence-translation--visible \.lc-ai-sentence-translation__text\s*\{[^}]*visibility:\s*visible;/s);
+    assert.equal(textBlockScss.includes('display: none'), false);
 });
