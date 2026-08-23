@@ -93,4 +93,26 @@ class ReviewStudyTimezoneService
             'next_day_start' => $dayStart->copy()->addDay()->startOfDay(),
         ];
     }
+
+    /** @return array{timezone:string,date_from:string,date_to:string,range_start:Carbon,range_end:Carbon} */
+    public function inclusiveDateRangeBounds(string $dateFrom, string $dateTo): array
+    {
+        $timezone = $this->getStudyTimezone();
+        $rangeStart = Carbon::createFromFormat('!Y-m-d', $dateFrom, $timezone);
+        $rangeEndDay = Carbon::createFromFormat('!Y-m-d', $dateTo, $timezone);
+        if (!$rangeStart || !$rangeEndDay
+            || $rangeStart->format('Y-m-d') !== $dateFrom
+            || $rangeEndDay->format('Y-m-d') !== $dateTo
+            || $rangeEndDay->lt($rangeStart)) {
+            throw new InvalidArgumentException('Invalid study date range.');
+        }
+
+        return [
+            'timezone' => $timezone,
+            'date_from' => $dateFrom,
+            'date_to' => $dateTo,
+            'range_start' => $rangeStart,
+            'range_end' => $rangeEndDay->copy()->addDay()->startOfDay(),
+        ];
+    }
 }

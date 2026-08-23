@@ -146,4 +146,15 @@ class ReviewStudyTimezoneServiceTest extends TestCase
         $this->assertSame('2026-03-09T00:00:00-04:00', $bounds['next_day_start']->toIso8601String());
         $this->assertSame(23.0, $bounds['day_start']->diffInHours($bounds['next_day_start']));
     }
+
+    public function test_inclusive_date_range_uses_half_open_local_boundaries(): void
+    {
+        config(['app.timezone' => 'America/New_York']);
+
+        $bounds = (new ReviewStudyTimezoneService())->inclusiveDateRangeBounds('2026-03-08', '2026-03-09');
+
+        $this->assertSame('2026-03-08T00:00:00-05:00', $bounds['range_start']->toIso8601String());
+        $this->assertSame('2026-03-10T00:00:00-04:00', $bounds['range_end']->toIso8601String());
+        $this->assertSame(47.0, $bounds['range_start']->diffInHours($bounds['range_end']));
+    }
 }

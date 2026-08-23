@@ -56,7 +56,10 @@
         </div>
 
         <!-- calendar -->
-        <v-card outlined id="calendar" class="rounded-lg pa-4 pt-0" :loading="popupMenu.saving">
+        <v-alert v-if="selectedGoal === 'learn_words' && learningCountsError" dense outlined type="error" class="mt-3 mb-0">
+            {{ learningCountsError }}
+        </v-alert>
+        <v-card outlined id="calendar" class="rounded-lg pa-4 pt-0" :loading="popupMenu.saving || learningCountsLoading">
             <!-- Calendar popup -->
             <v-menu
                 content-class="calendar-popup-menu rounded-lg"
@@ -188,6 +191,11 @@
                 selectedMonths: [],
                 selectedGoal: 'read_words',
                 showDatePicker: false,
+                learningCounts: {},
+                learningGoalTarget: 0,
+                learningCountsLoading: false,
+                learningCountsError: '',
+                learningCountsRequestId: 0,
 
                 popupMenu: {
                     achievements: [],
@@ -228,6 +236,14 @@
                 });
             },
             openCalendarDayPopup(event, day) {
+                if (event !== null && this.selectedGoal === 'learn_words') {
+                    this.$router.push({
+                        path: '/learning-history',
+                        query: { date_from: day.fullDate, date_to: day.fullDate },
+                    });
+                    return;
+                }
+
                 if (event !== null) {
                     var position = event.target.getBoundingClientRect();
                 }
@@ -290,6 +306,7 @@
                 this.pickerDateFormated = formatChineseMonth(new moment(this.pickerDate));
                 this.currentMonth = moment(this.pickerDate).startOf('month');
                 this.updateCalendar();
+                this.loadLearningCounts();
                 this.showDatePicker = false;
             },
             nextMonth() {
@@ -297,12 +314,14 @@
                 this.pickerDate = new moment(this.currentMonth).format('YYYY-MM');
                 this.pickerDateFormated = formatChineseMonth(moment(this.pickerDate));
                 this.updateCalendar();
+                this.loadLearningCounts();
             },
             previousMonth() {
                 this.currentMonth.subtract(1, 'month').startOf('month');
                 this.pickerDate = new moment(this.currentMonth).format('YYYY-MM');
                 this.pickerDateFormated = formatChineseMonth(moment(this.pickerDate));
                 this.updateCalendar();
+                this.loadLearningCounts();
             },
             loadCalendarData() {
                 axios.post('/goals/get-calendar-data').then((response) => {
@@ -311,6 +330,29 @@
                 }).catch(() => {
                     this.calendarData = [];
                     this.updateCalendar();
+                });
+            },
+            loadLearningCounts() {
+                const requestId = ++this.learningCountsRequestId;
+                const dateFrom = moment(this.currentMonth).startOf('month').subtract(4, 'months').format('YYYY-MM-DD');
+                const dateTo = moment(this.currentMonth).endOf('month').format('YYYY-MM-DD');
+                this.learningCountsLoading = true;
+                this.learningCountsError = '';
+                axios.get('/learning-history/data', {
+                    params: { date_from: dateFrom, date_to: dateTo, filter: 'new_learning', page: 1, per_page: 1 },
+                }).then(({ data }) => {
+                    if (requestId !== this.learningCountsRequestId) return;
+                    this.learningCounts = data.meta.daily_reading_counts || {};
+                    this.learningGoalTarget = Number(data.meta.reading_goal_target || 0);
+                    this.updateCalendar();
+                }).catch(() => {
+                    if (requestId !== this.learningCountsRequestId) return;
+                    this.learningCounts = {};
+                    this.learningGoalTarget = 0;
+                    this.learningCountsError = '新词学习数据加载失败，请稍后重试。';
+                    this.updateCalendar();
+                }).finally(() => {
+                    if (requestId === this.learningCountsRequestId) this.learningCountsLoading = false;
                 });
             },
             updateCalendar () {
@@ -354,6 +396,15 @@
                                 }
                             }
                         }
+                    }
+
+                    if (this.selectedGoal === 'learn_words') {
+                        day.achievement = {
+                            name: 'New words',
+                            type: 'learn_words',
+                            achievedQuantity: Number(this.learningCounts[day.fullDate] || 0),
+                            goalQuantity: this.learningGoalTarget,
+                        };
                     }
 
                     this.selectedMonths[this.selectedMonths.length - 1].days.push(day);
