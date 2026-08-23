@@ -88,6 +88,46 @@
                 <v-alert v-for="warning in report.future_pressure.warnings" :key="warning" dense text type="info" class="mt-3 mb-0">{{ warning }}</v-alert>
             </v-card>
 
+            <v-card outlined class="pa-4 mb-4 rounded-lg">
+                <div class="d-flex align-center flex-wrap mb-1">
+                    <div class="font-weight-medium">优化记忆模型</div>
+                    <v-spacer></v-spacer>
+                    <v-btn
+                        color="primary"
+                        :disabled="optimizationBusy !== '' || !optimizationStatus || !optimizationStatus.can_optimize"
+                        :loading="optimizationBusy === 'preview'"
+                        @click="previewMemoryOptimization"
+                    >现在优化记忆模型</v-btn>
+                </div>
+                <div class="text-caption text--secondary mb-3">
+                    使用你的正式词义复习记录改善之后的间隔计算。优化不会重排已有卡片。
+                </div>
+                <v-skeleton-loader v-if="optimizationBusy === 'status' && !optimizationStatus" type="text, text"></v-skeleton-loader>
+                <template v-else-if="optimizationStatus">
+                    <div>{{ optimizationStatus.parameters_source_label }}</div>
+                    <div class="text-caption text--secondary">
+                        已有 {{ optimizationStatus.review_count }} / {{ optimizationStatus.min_required }} 条可用复习记录。
+                    </div>
+                    <v-alert v-if="!optimizationStatus.can_optimize" dense text type="info" class="mt-3 mb-0">
+                        {{ optimizationStatus.message }}
+                    </v-alert>
+                </template>
+                <v-alert v-if="optimizationError" dense text type="error" class="mt-3 mb-0">{{ optimizationError }}</v-alert>
+                <v-alert v-if="optimizationResult" dense text :type="optimizationResult.applied ? 'success' : 'info'" class="mt-3 mb-0">
+                    {{ optimizationResult.message }}
+                </v-alert>
+                <v-sheet v-if="optimizationPreview && optimizationPreview.preview_available" outlined rounded class="pa-3 mt-3">
+                    <div class="font-weight-medium">优化结果已准备好</div>
+                    <div class="text-caption text--secondary mt-1">{{ optimizationPreview.message }}</div>
+                    <div class="d-flex justify-end flex-wrap mt-3">
+                        <v-btn text :disabled="optimizationBusy === 'apply'" @click="optimizationPreview = null">取消</v-btn>
+                        <v-btn color="primary" :loading="optimizationBusy === 'apply'" @click="applyMemoryOptimization">
+                            确认保存优化结果
+                        </v-btn>
+                    </div>
+                </v-sheet>
+            </v-card>
+
             <v-row>
                 <v-col cols="12" md="6">
                     <statistics-mini-chart title="未来 30 天到期" :rows="futureRows" color="#42a5f5" />
@@ -157,6 +197,7 @@
 
 <script>
 import StatisticsMiniChart from './StatisticsMiniChart.vue';
+import { applyOptimization, getOptimizationStatus, previewOptimization } from '../../services/AdminReviewSettingsApi';
 
 export default {
     components: { StatisticsMiniChart },
@@ -168,6 +209,11 @@ export default {
             error: '',
             periodDays: 30,
             query: '',
+            optimizationStatus: null,
+            optimizationPreview: null,
+            optimizationResult: null,
+            optimizationBusy: '',
+            optimizationError: '',
             periodOptions: [
                 { label: '最近 7 天', value: 7 },
                 { label: '最近 30 天', value: 30 },
@@ -208,6 +254,7 @@ export default {
     },
     mounted() {
         this.loadStatistics();
+        this.loadOptimizationStatus();
     },
     methods: {
         async loadStatistics() {
@@ -237,6 +284,46 @@ export default {
                 this.error = '导出失败，请稍后重试。';
             } finally {
                 this.exporting = null;
+            }
+        },
+        async loadOptimizationStatus() {
+            this.optimizationBusy = 'status';
+            this.optimizationError = '';
+            try {
+                const response = await getOptimizationStatus();
+                this.optimizationStatus = response.data;
+            } catch (error) {
+                this.optimizationError = error.response?.data?.message || '记忆模型状态加载失败，请稍后重试。';
+            } finally {
+                this.optimizationBusy = '';
+            }
+        },
+        async previewMemoryOptimization() {
+            this.optimizationBusy = 'preview';
+            this.optimizationError = '';
+            this.optimizationResult = null;
+            try {
+                const response = await previewOptimization();
+                this.optimizationPreview = response.data.preview_available ? response.data : null;
+                if (!response.data.preview_available) this.optimizationResult = response.data;
+            } catch (error) {
+                this.optimizationError = error.response?.data?.message || '记忆模型优化失败，请稍后重试。';
+            } finally {
+                this.optimizationBusy = '';
+            }
+        },
+        async applyMemoryOptimization() {
+            this.optimizationBusy = 'apply';
+            this.optimizationError = '';
+            try {
+                const response = await applyOptimization();
+                this.optimizationResult = response.data;
+                this.optimizationPreview = null;
+                await this.loadOptimizationStatus();
+            } catch (error) {
+                this.optimizationError = error.response?.data?.message || '优化结果保存失败，请稍后重试。';
+            } finally {
+                this.optimizationBusy = '';
             }
         },
         display(value) {

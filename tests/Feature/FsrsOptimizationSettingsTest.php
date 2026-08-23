@@ -48,6 +48,32 @@ class FsrsOptimizationSettingsTest extends TestCase
         ]);
     }
 
+    public function test_ordinary_authenticated_user_can_read_status_and_preview_without_admin_tools(): void
+    {
+        $this->user->forceFill(['is_admin' => false])->save();
+
+        $this->actingAs($this->user)
+            ->getJson('/settings/fsrs/optimization-status')
+            ->assertOk()
+            ->assertJsonPath('can_optimize', false);
+
+        $this->actingAs($this->user)
+            ->postJson('/settings/fsrs/optimize')
+            ->assertOk()
+            ->assertJsonPath('preview_available', false)
+            ->assertJsonPath('applied', false);
+
+        $this->actingAs($this->user)
+            ->postJson('/settings/fsrs/restore-default')
+            ->assertForbidden();
+    }
+
+    public function test_optimization_entry_still_requires_authentication(): void
+    {
+        $this->getJson('/settings/fsrs/optimization-status')->assertUnauthorized();
+        $this->postJson('/settings/fsrs/optimize')->assertUnauthorized();
+    }
+
     public function test_optimization_status_returns_review_count_threshold_and_message(): void
     {
         $card = $this->createSenseCard($this->createSense($this->user->id, 'english'));

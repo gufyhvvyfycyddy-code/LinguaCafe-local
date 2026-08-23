@@ -94,8 +94,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/fonts/delete', [App\Http\Controllers\FontTypeController::class, 'deleteFontType']);
 
         // settings
-        Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
-        Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
         Route::post('/settings/fsrs/reschedule-preview', [App\Http\Controllers\SettingsController::class, 'reschedulePreview']);
         Route::post('/settings/fsrs/reschedule-confirm', [App\Http\Controllers\SettingsController::class, 'rescheduleConfirm'])->name('settings.fsrs.reschedule-confirm');
         Route::post('/settings/fsrs/reschedule-undo', [App\Http\Controllers\SettingsController::class, 'rescheduleUndo'])->name('settings.fsrs.reschedule-undo');
@@ -127,6 +125,10 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::delete('/dictionaries/delete/{dictionaryId}', [App\Http\Controllers\DictionaryController::class, 'deleteDictionary']);
         Route::get('/jmdict/xml-to-text', [App\Http\Controllers\DictionaryController::class, 'jmdictXmlToText']);
     });
+
+    // Basic FSRS optimization belongs to each authenticated user's own language data.
+    Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
+    Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
 
     // languages
     Route::get('/languages/get-language-selection-dialog-data', [App\Http\Controllers\LanguageController::class, 'getLanguageSelectionDialogData']);
