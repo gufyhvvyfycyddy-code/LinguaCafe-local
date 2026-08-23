@@ -5,7 +5,7 @@
                 <v-card-title class="error--text review-card-manage-delete-title">将这张词义复习卡移入最近删除？</v-card-title>
                 <v-card-text>
                     <p class="review-card-manage-delete-body">这会移除这张词义复习卡，并让该释义不再作为已确认词义出现在阅读页候选中。</p>
-                    <p class="review-card-manage-delete-note text--secondary">复习历史和阅读来源记录会保留；30 天内可从“知识库整理 → 最近删除”恢复同一张卡。</p>
+                    <p class="review-card-manage-delete-note text--secondary">复习历史和阅读来源记录会保留；30 天内可从“我的 → 高级 → 最近删除”恢复同一张卡。</p>
                     <p class="review-card-manage-delete-last-sense text--secondary">如果这是该单词最后一个已确认词义，该单词会回到"新词"状态。</p>
                 </v-card-text>
                 <v-card-actions>

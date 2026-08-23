@@ -68,6 +68,7 @@
 
         <knowledge-hygiene-panel
             ref="knowledgeHygienePanel"
+            class="d-none"
             :preferences="hygienePreferences"
             :filter-state="currentFilterState"
             @preferences-updated="onHygienePreferencesUpdated"

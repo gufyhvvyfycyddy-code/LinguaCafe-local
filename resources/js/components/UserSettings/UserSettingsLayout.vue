@@ -38,13 +38,17 @@
                         </v-list-item-icon>
                     </v-list-item>
                 </v-list>
+                <review-card-recent-deletes-panel />
             </v-tab-item>
         </v-tabs-items>
     </v-container>
 </template>
 
 <script>
+    import ReviewCardRecentDeletesPanel from '../ReviewCards/ReviewCardRecentDeletesPanel.vue';
+
     export default {
+        components: { ReviewCardRecentDeletesPanel },
         data: function() {
             return {
                 tab: 0,

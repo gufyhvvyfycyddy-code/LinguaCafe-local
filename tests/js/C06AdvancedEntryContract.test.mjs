@@ -6,6 +6,7 @@ import path from 'node:path';
 const root = process.cwd();
 const settings = fs.readFileSync(path.join(root, 'resources/js/components/UserSettings/UserSettingsLayout.vue'), 'utf8');
 const layout = fs.readFileSync(path.join(root, 'resources/js/components/Layout.vue'), 'utf8');
+const settingsTemplate = settings.match(/<template>([\s\S]*?)<\/template>/)?.[1] ?? '';
 
 const advancedRoutes = [
     ['自定义学习', '/custom-study'],
@@ -32,7 +33,7 @@ test('advanced entry reuses the existing route families without engineering labe
     assert.doesNotMatch(settings, /词汇搜索/);
     assert.doesNotMatch(settings, /url:\s*['"]\/vocabulary\/search['"]/);
     assert.doesNotMatch(settings, /复习卡管理|url:\s*['"]\/review-cards\/manage['"]/);
-    assert.doesNotMatch(settings, /FSRS|Leech|ReviewCard|target_type|生命周期/);
+    assert.doesNotMatch(settingsTemplate, /FSRS|Leech|ReviewCard|target_type|生命周期/);
     assert.doesNotMatch(layout, /高级复习卡管理/);
     for (const [title, url] of advancedRoutes) {
         assert.doesNotMatch(

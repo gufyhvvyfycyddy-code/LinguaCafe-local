@@ -249,12 +249,12 @@
             <v-card>
                 <v-card-title>确认删除</v-card-title>
                 <v-card-text>
-                    这会删除这张词义复习卡，并让该释义不再出现在阅读页点词结果中。阅读材料、原文位置和复习历史会保留。此操作不可恢复。确定删除吗？
+                    这会将词义复习卡移入最近删除，并让该释义不再出现在阅读页点词结果中。阅读材料、原文位置和复习历史会保留；30 天内可从“我的 → 高级 → 最近删除”恢复。确定继续吗？
                 </v-card-text>
                 <v-card-actions>
                     <v-spacer />
                     <v-btn text @click="deleteDialog = false" :disabled="deleteLoading">取消</v-btn>
-                    <v-btn color="error" :loading="deleteLoading" @click="deleteCard">确认删除</v-btn>
+                    <v-btn color="error" :loading="deleteLoading" @click="deleteCard">移入最近删除</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -1176,7 +1176,7 @@
                 axios.delete(`/review-cards/manage/${this.currentCard.review_card_id}`)
                     .then((response) => {
                         this.deleteDialog = false;
-                        const message = response.data?.message || '已彻底删除词义复习卡，复习历史已保留。';
+                        const message = response.data?.message || '已移入最近删除，30 天内可以恢复。';
                         this.showSnackbar(message, 'success');
                         this.loadCards();
                         this.loadFsrsStats();
