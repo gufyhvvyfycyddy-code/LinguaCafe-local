@@ -6,7 +6,7 @@ use Tests\TestCase;
 
 class M11ManualOperationUiGuardTest extends TestCase
 {
-    public function test_browser_and_reviewer_use_server_preview_and_apply(): void
+    public function test_advanced_browser_keeps_server_preview_and_apply_out_of_ordinary_review(): void
     {
         $scheduling = file_get_contents(resource_path(
             'js/components/ReviewCards/ReviewCardSchedulingMutationSurface.vue',
@@ -27,8 +27,10 @@ class M11ManualOperationUiGuardTest extends TestCase
         $this->assertStringContainsString('resetCounts', $scheduling);
         $this->assertStringContainsString('type="date"', $scheduling);
         $this->assertStringContainsString('@set-due="confirmSetDue"', $manage);
-        $this->assertStringContainsString('ReviewCardSchedulingMutationSurface', $reviewer);
-        $this->assertStringContainsString('openSetDueDialog', $reviewer);
+        $this->assertStringNotContainsString('ReviewCardSchedulingMutationSurface', $reviewer);
+        $this->assertStringNotContainsString('openSetDueDialog', $reviewer);
+        $this->assertStringNotContainsString('/manual-operations/preview', $reviewer);
+        $this->assertStringNotContainsString('/manual-operations/apply', $reviewer);
         $this->assertStringNotContainsString(
             'axios.post(`/review-cards/manage/${this.currentCard.review_card_id}/reset`)',
             $reviewer,
@@ -46,7 +48,7 @@ class M11ManualOperationUiGuardTest extends TestCase
 
         foreach (['bury_next_day', "suspend: 'suspend'", "resume: 'resume'"] as $needle) {
             $this->assertStringContainsString($needle, $browserLifecycle);
-            $this->assertStringContainsString($needle, $reviewer);
+            $this->assertStringNotContainsString($needle, $reviewer);
         }
         $this->assertStringContainsString('/manual-operations/preview', $browserLifecycle);
         $this->assertStringContainsString('/manual-operations/apply', $browserLifecycle);

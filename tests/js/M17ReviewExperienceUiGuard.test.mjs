@@ -13,9 +13,9 @@ assert.match(experienceController, /normalizeExperienceConfig\(this\.experience\
 assert.match(experienceController, /action === 'reveal_answer'/);
 assert.match(experienceController, /action === 'wait_for_rating'/);
 assert.doesNotMatch(experienceController, /\brate\s*\(/, 'auto advance must never select a rating');
-assert.match(experienceController, /ReviewCardMarkerPicker/);
-assert.match(experienceController, /WordSenseTagBulkPicker/);
-assert.match(page, /executeLifecycleAction\('bury'\)/);
+assert.doesNotMatch(experienceController, /ReviewCardMarkerPicker|WordSenseTagBulkPicker|\/review-cards\/manage\/tags/);
+assert.doesNotMatch(bar, /slot name="(?:marker|tag)"|\$emit\('bury'\)|mdi-alarm-snooze/);
+assert.doesNotMatch(page, /executeLifecycleAction|ReviewCardSchedulingMutationSurface|manual-operations\/(?:preview|apply)/);
 assert.match(page, /previousCardSnapshot/);
 assert.match(bar, /aria-label="复习体验工具条"/);
 assert.match(bar, /min-height:\s*44px/);

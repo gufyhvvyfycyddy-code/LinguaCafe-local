@@ -19,41 +19,16 @@
             @previous-card="$emit('previous-card')"
             @next-card="$emit('next-card')"
             @view-source="$emit('view-source')"
-            @bury="$emit('bury')"
             @font-delta="changeFontSize"
             @toggle-high-contrast="toggleHighContrast"
             @toggle-reduce-motion="toggleReduceMotion"
-        >
-            <template #marker>
-                <ReviewCardMarkerPicker
-                    v-if="cardId"
-                    dense
-                    :card-id="cardId"
-                    :marker="card.marker"
-                    :disabled="busy"
-                    @updated="$emit('marker-updated', $event)"
-                    @notify="notify"
-                />
-            </template>
-            <template #tag>
-                <WordSenseTagBulkPicker
-                    v-if="cardId"
-                    :review-card-ids="[cardId]"
-                    :tags="availableTags"
-                    button-label="标签"
-                    title="修改当前卡内容标签"
-                    @notify="notify"
-                />
-            </template>
-        </SenseReviewExperienceBar>
+        />
         <div class="sr-only" aria-live="polite" aria-atomic="true">{{ announcement }}</div>
     </div>
 </template>
 
 <script>
 import SenseReviewExperienceBar from './SenseReviewExperienceBar.vue';
-import ReviewCardMarkerPicker from '../ReviewCards/ReviewCardMarkerPicker.vue';
-import WordSenseTagBulkPicker from '../ReviewCards/WordSenseTagBulkPicker.vue';
 import {
     autoAdvanceAction,
     createExperienceSession,
@@ -72,7 +47,7 @@ import {
 
 export default {
     name: 'SenseReviewExperienceController',
-    components: { SenseReviewExperienceBar, ReviewCardMarkerPicker, WordSenseTagBulkPicker },
+    components: { SenseReviewExperienceBar },
     props: {
         experience: { type: Object, default: null },
         card: { type: Object, default: null },
@@ -92,7 +67,6 @@ export default {
             tickId: null,
             autoAdvanceRunning: false,
             announcement: '',
-            availableTags: [],
             preferences: loadReviewExperiencePreferences(
                 window.localStorage,
                 window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
@@ -159,7 +133,6 @@ export default {
     },
     mounted() {
         this.$emit('preferences-change', { ...this.preferences });
-        this.loadAvailableTags();
         document.addEventListener('visibilitychange', this.onVisibilityChange);
         this.tickId = window.setInterval(this.tick, 250);
     },
@@ -168,14 +141,6 @@ export default {
         if (this.tickId !== null) window.clearInterval(this.tickId);
     },
     methods: {
-        notify(text, color) { this.$emit('notify', text, color); },
-        loadAvailableTags() {
-            axios.get('/review-cards/manage/tags').then((response) => {
-                this.availableTags = Array.isArray(response.data?.items) ? response.data.items : [];
-            }).catch(() => {
-                this.availableTags = [];
-            });
-        },
         refresh() { this.snapshot = experienceSnapshot(this.timer); },
         tick() {
             this.refresh();

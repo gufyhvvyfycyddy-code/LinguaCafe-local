@@ -9,8 +9,8 @@
 //   - Template hides when status === 'stable'.
 //   - Template shows struggling hint when status === 'struggling'.
 //   - Template shows leech governance card only when showAnswer is true.
-//   - Four action buttons emit rewrite / edit / history / suspend.
-//   - Suspend button disabled when blocked_actions contains suspend_temporarily.
+//   - Three ordinary-flow actions emit rewrite / edit / history.
+//   - Engineering lifecycle mutation is absent from ordinary review.
 //   - Fetches GET /reviews/senses/{reviewCardId}/leech.
 //   - No provider-preview, no auto-creation, no FSRS, no rating block.
 //
@@ -28,12 +28,12 @@
 //  11.  Has '生成重写提示包' action button.
 //  12.  Has '编辑词义' action button.
 //  13.  Has '查看历史' action button.
-//  14.  Has '暂停复习' action button.
-//  15.  Suspend button is disabled when suspend_temporarily is blocked.
+//  14.  Has no '暂停复习' action button.
+//  15.  Has no suspend lifecycle state or blocked-action handling.
 //  16.  Emits 'rewrite' event.
 //  17.  Emits 'edit' event.
 //  18.  Emits 'history' event.
-//  19.  Emits 'suspend' event.
+//  19.  Does not emit 'suspend' event.
 //  20.  Fetches GET /reviews/senses/{id}/leech endpoint.
 //  21.  Source does NOT call provider-preview.
 //  22.  Source does NOT create ReviewLog / WordSense / ReviewCard.
@@ -132,18 +132,15 @@ test("Has '查看历史' action button", () => {
     assert.ok(source.includes('查看历史'), "Must have '查看历史' action button");
 });
 
-// 14. Has '暂停复习' action button
-test("Has '暂停复习' action button", () => {
-    assert.ok(source.includes('暂停复习'), "Must have '暂停复习' action button");
+// 14. Has no '暂停复习' action button
+test("Has no '暂停复习' action button", () => {
+    assert.ok(!source.includes('暂停复习'), "Ordinary review must not have a '暂停复习' action button");
 });
 
-// 15. Suspend button is disabled when suspend_temporarily is blocked
-test('Suspend button is disabled when suspend_temporarily is blocked', () => {
-    assert.ok(
-        source.includes('suspend_temporarily') || source.includes('isSuspendBlocked') || source.includes('blocked_actions'),
-        'Suspend button must be disabled when blocked_actions contains suspend_temporarily'
-    );
-    assert.ok(source.includes('disabled') || source.includes('blocked'), 'Suspend button must use a disabled / blocked guard');
+// 15. No suspend lifecycle state or blocked-action handling
+test('Has no suspend lifecycle state or blocked-action handling', () => {
+    assert.ok(!source.includes('isSuspendBlocked'), 'Ordinary panel must not own suspend lifecycle state');
+    assert.ok(!source.includes('blocked_actions'), 'Ordinary panel must not inspect lifecycle mutation blocks');
 });
 
 // 16. Emits 'rewrite' event
@@ -161,9 +158,9 @@ test("Emits 'history' event", () => {
     assert.ok(source.includes("$emit('history')") || source.includes('$emit("history")'), "Must emit 'history' event");
 });
 
-// 19. Emits 'suspend' event
-test("Emits 'suspend' event", () => {
-    assert.ok(source.includes("$emit('suspend')") || source.includes('$emit("suspend")'), "Must emit 'suspend' event");
+// 19. Does not emit 'suspend' event
+test("Does not emit 'suspend' event", () => {
+    assert.ok(!source.includes("$emit('suspend')") && !source.includes('$emit("suspend")'), "Must not emit 'suspend' event");
 });
 
 // 20. Fetches GET /reviews/senses/{id}/leech endpoint

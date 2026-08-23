@@ -35,8 +35,6 @@
         </v-btn>
 
         <v-spacer />
-        <slot name="marker" />
-        <slot name="tag" />
         <v-btn small text class="experience-action ma-1" :disabled="!previousAvailable || busy" @click="$emit('previous-card')">
             <v-icon small left>mdi-arrow-left</v-icon>返回
         </v-btn>
@@ -46,10 +44,6 @@
         <v-btn small text class="experience-action ma-1" :disabled="busy" @click="$emit('view-source')">
             <v-icon small left>mdi-book-open-page-variant</v-icon>原文
         </v-btn>
-        <v-btn small text class="experience-action ma-1" :disabled="busy" @click="$emit('bury')">
-            <v-icon small left>mdi-alarm-snooze</v-icon>搁置
-        </v-btn>
-
         <v-divider vertical class="mx-1 d-none d-sm-block" />
         <v-btn icon small class="experience-icon ma-1" :disabled="fontSize <= 16" aria-label="减小复习字号" @click="$emit('font-delta', -2)">
             <v-icon small>mdi-format-font-size-decrease</v-icon>

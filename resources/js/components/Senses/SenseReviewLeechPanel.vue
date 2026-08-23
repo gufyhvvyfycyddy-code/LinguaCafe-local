@@ -10,11 +10,11 @@
          - struggling → a light warning alert, visible even before the
                        answer is revealed
          - leech    → a governance card shown ONLY when showAnswer is true,
-                       with severity badge, reason chips, and four action
+                       with severity badge, reason chips, and three action
                        buttons that emit events to the parent.
 
         Contract:
-         - Emits 'rewrite' | 'edit' | 'history' | 'suspend' (parent owns
+         - Emits 'rewrite' | 'edit' | 'history' (parent owns
            the actual API calls).
          - Does NOT block rating. Does NOT change hotkeys.
          - Does NOT call AI. Does NOT auto-suspend.
@@ -89,16 +89,6 @@
                         <v-icon x-small left>mdi-history</v-icon>
                         查看历史
                     </v-btn>
-                    <v-btn
-                        x-small
-                        text
-                        color="warning"
-                        :disabled="isSuspendBlocked"
-                        @click="$emit('suspend')"
-                    >
-                        <v-icon x-small left>mdi-pause-circle-outline</v-icon>
-                        暂停复习
-                    </v-btn>
                 </div>
             </v-card-text>
         </v-card>
@@ -139,16 +129,6 @@ export default {
             // responses are discarded.
             requestSequence: 0,
         };
-    },
-    computed: {
-        // Whether suspend is blocked by governance (e.g. already suspended).
-        isSuspendBlocked() {
-            if (!this.descriptor) {
-                return false;
-            }
-            const blocked = this.descriptor.blocked_actions || [];
-            return blocked.indexOf('suspend_temporarily') !== -1;
-        },
     },
     watch: {
         // Re-fetch when the card changes. Bumps the sequence so any

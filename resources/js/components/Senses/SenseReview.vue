@@ -95,12 +95,9 @@
             @focus-rating="focusRatingControls"
             @card-started="onExperienceCardStarted"
             @preferences-change="experiencePreferences = $event"
-            @marker-updated="onCurrentMarkerUpdated"
-            @notify="showSnackbar"
             @previous-card="goPreviousCard('sense_review_history')"
             @next-card="goForwardCard"
             @view-source="viewSource"
-            @bury="executeLifecycleAction('bury')"
         />
 
         <v-card v-if="currentCard && !showSummaryView" outlined class="sense-review-card rounded-lg pa-5">
@@ -138,7 +135,7 @@
                         large
                         class="mobile-reveal-button"
                         data-testid="show-sense-answer"
-                        :disabled="rating || deleteLoading || manualOperationBusy || lifecycleLoading"
+                        :disabled="rating || deleteLoading"
                         @click="showAnswer = true"
                     >显示答案</v-btn>
                 </template>
@@ -162,31 +159,6 @@
                             <v-list-item v-if="previousCardSnapshot" @click="previousCardDialog = true">
                                 <v-list-item-icon><v-icon small>mdi-card-search-outline</v-icon></v-list-item-icon>
                                 <v-list-item-title>上一张信息</v-list-item-title>
-                            </v-list-item>
-                            <v-divider v-if="availableLifecycleActions.length" class="my-1" />
-                            <v-list-item
-                                v-for="lifecycleAction in availableLifecycleActions"
-                                :key="lifecycleAction"
-                                :disabled="lifecycleLoading"
-                                @click="onLifecycleMenuClick(lifecycleAction)"
-                            >
-                                <v-list-item-icon>
-                                    <v-icon small :color="lifecycleActionColor(lifecycleAction)">{{ lifecycleActionIcon(lifecycleAction) }}</v-icon>
-                                </v-list-item-icon>
-                                <v-list-item-title>{{ lifecycleActionLabel(lifecycleAction) }}</v-list-item-title>
-                            </v-list-item>
-                            <v-divider class="my-1" />
-                            <v-list-item @click="openResetDialog">
-                                <v-list-item-icon><v-icon small>mdi-restore</v-icon></v-list-item-icon>
-                                <v-list-item-title>重置学习进度</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="openDueNowDialog">
-                                <v-list-item-icon><v-icon small>mdi-clock-fast</v-icon></v-list-item-icon>
-                                <v-list-item-title>立即到期</v-list-item-title>
-                            </v-list-item>
-                            <v-list-item @click="openSetDueDialog">
-                                <v-list-item-icon><v-icon small>mdi-calendar-clock</v-icon></v-list-item-icon>
-                                <v-list-item-title>设置到期日</v-list-item-title>
                             </v-list-item>
                             <v-divider class="my-1" />
                             <v-list-item @click="openDeleteDialog">
@@ -233,14 +205,13 @@
                         @rewrite="leechRewriteDialog = true"
                         @edit="editDialog = true"
                         @history="sessionActionDrawerOpen = true"
-                        @suspend="executeLifecycleAction('suspend')"
                     />
                 </template>
 
                 <template #after-answer>
                     <SenseReviewRatingControls
                         ref="ratingControls"
-                        :disabled="rating || deleteLoading || manualOperationBusy || lifecycleLoading"
+                        :disabled="rating || deleteLoading"
                         :interval-previews="intervalPreviews"
                         :preview-loading="intervalPreviewLoading"
                         :preview-error="intervalPreviewError"
@@ -272,26 +243,6 @@
             :review-card-id="currentCard ? currentCard.review_card_id : 0"
             :lemma="currentCard ? currentCard.lemma : ''"
         />
-
-        <!-- Lifecycle confirmation dialog (ADR-0010)
-             Generic dialog for moderate lifecycle actions (suspend/archive/restore).
-             Safe actions (bury/unbury/resume) execute immediately without this dialog. -->
-        <v-dialog v-model="lifecycleDialog" max-width="480">
-            <v-card>
-                <v-card-title>{{ lifecycleDialogTitle }}</v-card-title>
-                <v-card-text>
-                    <p>{{ lifecycleDialogHint }}</p>
-                    <v-alert v-if="lifecycleConflict" type="error" dense text class="mt-2 mb-0">
-                        {{ lifecycleConflict }}
-                    </v-alert>
-                </v-card-text>
-                <v-card-actions>
-                    <v-spacer />
-                    <v-btn text @click="lifecycleDialog = false" :disabled="lifecycleLoading">取消</v-btn>
-                    <v-btn :color="lifecycleDialogColor" :loading="lifecycleLoading" @click="performLifecycleAction">确认</v-btn>
-                </v-card-actions>
-            </v-card>
-        </v-dialog>
 
         <!-- Delete confirmation dialog -->
         <v-dialog v-model="deleteDialog" max-width="480">
@@ -353,14 +304,6 @@
             :snapshot="previousCardSnapshot"
             @undo="requestUndo($event, 'sense_review_history')"
         />
-        <ReviewCardSchedulingMutationSurface
-            ref="manualSchedulingSurface"
-            @refresh-list="loadCards"
-            @refresh-stats="loadFsrsStats"
-            @notify="showSnackbar"
-            @error="showSnackbar($event, 'error')"
-            @state-change="onManualOperationStateChange"
-        />
     </v-container>
 </template>
 
@@ -380,7 +323,6 @@
     import SenseReviewPreviousCardDialog from './SenseReviewPreviousCardDialog.vue';
     import SenseMediaControls from './SenseMediaControls.vue';
     import SenseStudyCard from './SenseStudyCard.vue';
-    import ReviewCardSchedulingMutationSurface from '../ReviewCards/ReviewCardSchedulingMutationSurface.vue';
     import * as SessionTracker from './SenseReviewSessionTracker.js';
     import { getOrCreateReviewSessionId } from './SenseReviewSessionIdentity.js';
     import {
@@ -397,11 +339,6 @@
     import { createReviewRatingTransaction } from '../Review/ReviewRatingTransaction.js';
     import { createTracker, pause as pauseDuration, resume as resumeDuration, durationMs } from '../Review/ReviewDurationTracker.js';
     import {
-        MORE_MENU_ITEMS,
-        actionLabel,
-        actionHint,
-        actionDangerLevel,
-        actionColor,
         stateLabel,
         stateColor,
         buriedRemainingText,
@@ -416,7 +353,7 @@
      *  - Load the due-card queue and FSRS stats.
      *  - Track the current card index and show-answer state.
      *  - Call the rating API and record ratings into the page session.
-     *  - Coordinate dialogs (edit / archive / reset / delete / source).
+     *  - Coordinate dialogs (edit / delete / source).
      *  - Maintain page-level session summary state.
      *  - Handle keyboard shortcuts and snackbar.
      *
@@ -448,7 +385,6 @@
             SenseReviewPreviousCardDialog,
             SenseMediaControls,
             SenseStudyCard,
-            ReviewCardSchedulingMutationSurface,
         },
         data: function() {
             return {
@@ -461,23 +397,13 @@
                 // Edit dialog (state reduced to visibility only; form + save
                 // logic live in SenseReviewEditDialog).
                 editDialog: false,
-                manualOperationOpen: false,
-                manualOperationBusy: false,
                 // Delete dialog
                 deleteDialog: false,
                 deleteLoading: false,
-                // Lifecycle state machine (ADR-0010)
+                // Read-only lifecycle descriptor (ADR-0010).
                 // lifecycleDescriptor: cached descriptor from GET /review-cards/{id}/lifecycle.
-                //   Contains available_actions, effective_state, version, buried_until, etc.
-                // lifecycleLoading: true while a lifecycle POST is in flight.
-                // lifecycleDialog: generic confirmation dialog for moderate actions.
-                // lifecycleDialogAction: which action is being confirmed.
-                // lifecycleConflict: 409/422 error message shown inside the dialog.
+                //   Ordinary review consumes only effective_state and buried_until.
                 lifecycleDescriptor: null,
-                lifecycleLoading: false,
-                lifecycleDialog: false,
-                lifecycleDialogAction: null,
-                lifecycleConflict: '',
                 // Source context dialog
                 sourceDialog: false,
                 sourcePayload: {},
@@ -572,26 +498,16 @@
         },
         computed: {
             reviewExperienceBusy() {
-                return this.loading || this.rating || this.deleteLoading || this.manualOperationBusy
-                    || this.lifecycleLoading || this.undoLoadingReviewLogId !== null;
+                return this.loading || this.rating || this.deleteLoading
+                    || this.undoLoadingReviewLogId !== null;
             },
             experienceOverlayOpen() {
-                return this.editDialog || this.lifecycleDialog || this.manualOperationOpen
-                    || this.deleteDialog || this.sourceDialog || this.reportCenterOpen
+                return this.editDialog || this.deleteDialog || this.sourceDialog || this.reportCenterOpen
                     || this.todayLimitsOpen || this.sessionActionDrawerOpen
                     || this.previousCardDialog || this.showSessionSummary || this.leechRewriteDialog;
             },
             currentCard() {
                 return this.cards.length ? this.cards[0] : null;
-            },
-            // ADR-0010: Available lifecycle actions for the current card,
-            // derived from the backend descriptor. Empty when descriptor
-            // is not loaded yet — the menu gracefully hides lifecycle items.
-            availableLifecycleActions() {
-                if (!this.lifecycleDescriptor) {
-                    return [];
-                }
-                return this.lifecycleDescriptor.available_actions || [];
             },
             // The effective lifecycle state of the current card.
             currentCardLifecycleState() {
@@ -610,27 +526,6 @@
                     return '';
                 }
                 return buriedRemainingText(this.lifecycleDescriptor.buried_until);
-            },
-            // Generic lifecycle dialog title.
-            lifecycleDialogTitle() {
-                if (!this.lifecycleDialogAction) {
-                    return '';
-                }
-                return '确认' + actionLabel(this.lifecycleDialogAction);
-            },
-            // Generic lifecycle dialog hint text.
-            lifecycleDialogHint() {
-                if (!this.lifecycleDialogAction) {
-                    return '';
-                }
-                return actionHint(this.lifecycleDialogAction);
-            },
-            // Generic lifecycle dialog button color.
-            lifecycleDialogColor() {
-                if (!this.lifecycleDialogAction) {
-                    return 'primary';
-                }
-                return actionColor(this.lifecycleDialogAction);
             },
             remainingCount() {
                 return this.cards.length;
@@ -720,10 +615,8 @@
                     this.intervalPreviewError = '';
                     this.intervalPreviewLoading = false;
                     this.intervalPreviewRequestSequence++;
-                    // ADR-0010: invalidate lifecycle descriptor cache on
-                    // card change so stale available_actions are never shown.
+                    // Invalidate the read-only lifecycle descriptor on card change.
                     this.lifecycleDescriptor = null;
-                    this.lifecycleConflict = '';
                 }
             },
         },
@@ -763,11 +656,6 @@
             },
             onExperienceCardStarted() {
                 this.$nextTick(this.focusRevealButton);
-            },
-            onCurrentMarkerUpdated(payload) {
-                if (!this.currentCard || !payload) return;
-                this.currentCard.marker = Number(payload.marker || 0);
-                this.cards = [...this.cards];
             },
             onCurrentMediaUpdated(media) {
                 if (!this.currentCard) return;
@@ -1128,7 +1016,7 @@
                     if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
                         return;
                     }
-                    if (this.editDialog || this.lifecycleDialog || this.manualOperationOpen || this.deleteDialog || this.sourceDialog) {
+                    if (this.editDialog || this.deleteDialog || this.sourceDialog) {
                         return;
                     }
                     if (this.showSessionSummary || this.reviewExperienceBusy) {
@@ -1154,10 +1042,10 @@
                 if (['input', 'textarea', 'select'].includes(tag) || event.target?.isContentEditable) {
                     return;
                 }
-                if (this.editDialog || this.lifecycleDialog || this.manualOperationOpen || this.deleteDialog || this.sourceDialog) {
+                if (this.editDialog || this.deleteDialog || this.sourceDialog) {
                     return;
                 }
-                if (!this.currentCard || this.loading || this.rating || this.lifecycleLoading || this.manualOperationBusy || this.deleteLoading) {
+                if (!this.currentCard || this.loading || this.rating || this.deleteLoading) {
                     return;
                 }
                 switch (event.key) {
@@ -1243,10 +1131,8 @@
                         this.sourceDialog = true;
                     });
             },
-            // ==================== Lifecycle (ADR-0010) ====================
-            // Lifecycle actions go through POST /review-cards/{id}/lifecycle-actions
-            // with { action, request_id, expected_version, source }.
-            // Reset and Delete keep their own dedicated endpoints.
+            // ==================== Lifecycle state (ADR-0010) ====================
+            // Ordinary review keeps only the read-only lifecycle indicator.
             // Thin wrappers exposing the pure presentation helpers to the template.
             // Vue 2 templates can only call functions registered on the instance.
             stateColor,
@@ -1259,29 +1145,9 @@
                     relearning: '重新学习',
                 }[state] || state || '—';
             },
-            // Map a lifecycle action to an MDI icon name.
-            lifecycleActionIcon(action) {
-                const icons = {
-                    bury: 'mdi-alarm-snooze',
-                    unbury: 'mdi-alarm-check',
-                    suspend: 'mdi-pause-circle-outline',
-                    resume: 'mdi-play-circle-outline',
-                    archive: 'mdi-archive',
-                    restore: 'mdi-archive-arrow-up',
-                };
-                return icons[action] || 'mdi-circle-medium';
-            },
-            // Label for a lifecycle action (delegates to presentation helper).
-            lifecycleActionLabel(action) {
-                return actionLabel(action);
-            },
-            // Color for a lifecycle action icon (delegates to presentation helper).
-            lifecycleActionColor(action) {
-                return actionColor(action);
-            },
             // Fetch the lifecycle descriptor for the current card.
             // Called when the answer is revealed. Non-blocking: on failure,
-            // the menu simply hides lifecycle items.
+            // the read-only state indicator simply stays hidden.
             fetchLifecycleDescriptor() {
                 if (!this.currentCard) {
                     return;
@@ -1289,138 +1155,10 @@
                 axios.get(`/review-cards/${this.currentCard.review_card_id}/lifecycle`)
                     .then((response) => {
                         this.lifecycleDescriptor = response.data.lifecycle || null;
-                        this.lifecycleConflict = '';
                     })
                     .catch(() => {
                         this.lifecycleDescriptor = null;
                     });
-            },
-            // Menu click handler: safe actions execute immediately,
-            // moderate actions open the confirmation dialog.
-            onLifecycleMenuClick(action) {
-                if (!this.currentCard) {
-                    return;
-                }
-                const dangerLevel = actionDangerLevel(action);
-                if (dangerLevel === 'safe') {
-                    this.executeLifecycleAction(action);
-                } else {
-                    this.openLifecycleDialog(action);
-                }
-            },
-            openLifecycleDialog(action) {
-                this.lifecycleDialogAction = action;
-                this.lifecycleConflict = '';
-                this.lifecycleDialog = true;
-            },
-            // Execute a lifecycle action via POST. Used by both the
-            // immediate path (safe actions) and the dialog confirm button.
-            executeLifecycleAction(action) {
-                if (!this.currentCard) {
-                    return;
-                }
-                const expectedVersion = this.lifecycleDescriptor
-                    ? this.lifecycleDescriptor.version
-                    : null;
-                const requestId = this.createManualOperationId();
-                const manualAction = {
-                    bury: 'bury_next_day',
-                    suspend: 'suspend',
-                    resume: 'resume',
-                }[action];
-
-                this.lifecycleLoading = true;
-                const request = manualAction
-                    ? axios.post(
-                        `/review-cards/${this.currentCard.review_card_id}/manual-operations/preview`,
-                        { action: manualAction, options: {} },
-                    ).then((previewResponse) => axios.post(
-                        `/review-cards/${this.currentCard.review_card_id}/manual-operations/apply`,
-                        {
-                            operation_id: requestId,
-                            action: manualAction,
-                            options: {},
-                            expected_state_fingerprint: previewResponse.data.expected_state_fingerprint,
-                        },
-                    ))
-                    : axios.post(`/review-cards/${this.currentCard.review_card_id}/lifecycle-actions`, {
-                        action: action,
-                        request_id: requestId,
-                        expected_version: expectedVersion,
-                        source: 'sense_review',
-                    });
-                request.then((response) => {
-                    this.lifecycleDialog = false;
-                    const label = actionLabel(action);
-                    const alreadyApplied = response.data?.already_applied;
-                    this.showSnackbar(
-                        alreadyApplied ? `${label}：该操作已应用过。` : `已${label}。`,
-                        'success'
-                    );
-                    this.loadCards();
-                    this.loadFsrsStats();
-                    // Refresh descriptor after the queue reloads so the
-                    // next card's available_actions are correct.
-                    this.$nextTick(() => {
-                        this.fetchLifecycleDescriptor();
-                    });
-                }).catch((err) => {
-                    const status = err.response?.status;
-                    if (status === 409) {
-                        // Version conflict: card state changed elsewhere.
-                        this.lifecycleConflict = '卡片状态已在其他页面发生变化，已刷新最新状态。';
-                        this.fetchLifecycleDescriptor();
-                    } else if (status === 422) {
-                        // Illegal transition or validation error.
-                        this.lifecycleConflict = err.response?.data?.message || '该操作在当前状态下不可用。';
-                        this.fetchLifecycleDescriptor();
-                    } else if (!err.response) {
-                        // Network error — keep dialog open for retry.
-                        this.showSnackbar('网络错误，请检查连接后重试。', 'error');
-                    } else {
-                        this.showSnackbar(err.response?.data?.message || '操作失败。', 'error');
-                        this.lifecycleDialog = false;
-                    }
-                }).finally(() => {
-                    this.lifecycleLoading = false;
-                });
-            },
-            // Dialog confirm handler — calls executeLifecycleAction with
-            // the action currently selected in the dialog.
-            performLifecycleAction() {
-                if (!this.lifecycleDialogAction) {
-                    return;
-                }
-                this.executeLifecycleAction(this.lifecycleDialogAction);
-            },
-            // ==================== Reset ====================
-            openResetDialog() {
-                if (!this.currentCard) {
-                    return;
-                }
-                this.$refs.manualSchedulingSurface?.confirmReset(this.currentCard);
-            },
-            openDueNowDialog() {
-                if (!this.currentCard) return;
-                this.$refs.manualSchedulingSurface?.confirmDueNow(this.currentCard);
-            },
-            openSetDueDialog() {
-                if (!this.currentCard) return;
-                this.$refs.manualSchedulingSurface?.confirmSetDue(this.currentCard);
-            },
-            onManualOperationStateChange(state) {
-                this.manualOperationOpen = !!state?.open;
-                this.manualOperationBusy = !!state?.busy;
-            },
-            createManualOperationId() {
-                if (window.crypto && typeof window.crypto.randomUUID === 'function') {
-                    return window.crypto.randomUUID();
-                }
-                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-                    const r = Math.random() * 16 | 0;
-                    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-                    return v.toString(16);
-                });
             },
             // ==================== Delete ====================
             openDeleteDialog() {
