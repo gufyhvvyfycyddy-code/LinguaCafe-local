@@ -24,6 +24,23 @@
                         {{book.name}}
                     </div>
                 </div>
+                <div class="px-2 py-2">
+                    <template v-if="book.readingProgress && book.readingProgress.available">
+                        <div class="d-flex align-center text-caption font-weight-medium mb-1">
+                            <span>阅读</span>
+                            <v-spacer></v-spacer>
+                            <span>{{ Number(book.readingProgress.percentage).toFixed(1) }}%</span>
+                        </div>
+                        <v-progress-linear
+                            :value="book.readingProgress.percentage"
+                            color="primary"
+                            height="6"
+                            rounded
+                            :aria-label="book.name + '阅读进度'"
+                        ></v-progress-linear>
+                    </template>
+                    <div v-else class="text-caption text--secondary">暂无进度</div>
+                </div>
             </div>
         </v-card>
     </div>

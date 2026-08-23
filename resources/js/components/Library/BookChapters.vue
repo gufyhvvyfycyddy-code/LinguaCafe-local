@@ -26,6 +26,7 @@
             class="my-4 mb-0 no-hover"
             :headers="[
                 { text: '章节', value: 'name'},
+                { text: '阅读进度', value: 'readingProgress.percentage', align: 'center' },
                 { text: '总词数', value: 'wordCount.total', align: 'center' },
                 { text: '唯一词', value: 'wordCount.unique', align: 'center' },
                 { text: '已知词', value: 'wordCount.known', align: 'center' },
@@ -38,6 +39,22 @@
             :items-per-page="-1"
             hide-default-footer
         >
+            <template v-slot:item.readingProgress.percentage="{ item }">
+                <div v-if="item.readingProgress && item.readingProgress.available" class="mx-auto" style="min-width: 110px; max-width: 150px;">
+                    <div class="text-caption font-weight-medium mb-1">
+                        {{ Number(item.readingProgress.percentage).toFixed(1) }}%
+                    </div>
+                    <v-progress-linear
+                        :value="item.readingProgress.percentage"
+                        color="primary"
+                        height="6"
+                        rounded
+                        :aria-label="item.name + '阅读进度'"
+                    ></v-progress-linear>
+                </div>
+                <span v-else class="text--secondary">暂无</span>
+            </template>
+
             <template v-slot:item.wordCount.total="{ item }">
                 <template v-if="isWordCountReady(item)">
                     {{ formatNumber(item.wordCount.total) }}

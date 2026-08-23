@@ -47,6 +47,24 @@
                         <v-btn icon @click.stop="closeBook"><v-icon>mdi-close</v-icon></v-btn>
                     </v-card-title>
 
+                    <div class="px-3 pb-3">
+                        <template v-if="book.readingProgress && book.readingProgress.available">
+                            <div class="d-flex align-center text-caption font-weight-medium mb-1">
+                                <span>材料阅读进度</span>
+                                <v-spacer></v-spacer>
+                                <span>{{ Number(book.readingProgress.percentage).toFixed(1) }}%</span>
+                            </div>
+                            <v-progress-linear
+                                :value="book.readingProgress.percentage"
+                                color="primary"
+                                height="7"
+                                rounded
+                                :aria-label="book.name + '材料阅读进度'"
+                            ></v-progress-linear>
+                        </template>
+                        <div v-else class="text-caption text--secondary">暂无可用阅读进度</div>
+                    </div>
+
                     <!-- Word counts loading animation -->
                     <div class="book-info-not-loaded-box mb-1" v-if="book.wordCount === null">
                         <template v-if="book.wordCountLoading">

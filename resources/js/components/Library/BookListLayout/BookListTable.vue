@@ -24,6 +24,12 @@
                         width: '140px',
                     },
                     {
+                        text: '阅读进度',
+                        value: 'readingProgress.percentage',
+                        align: 'center',
+                        width: '170px',
+                    },
+                    {
                         text: '操作',
                         value: 'actions',
                         align: 'center',
@@ -48,6 +54,22 @@
                 <!-- Length -->
                 <template v-slot:item.word_count="{ item }">
                     {{ formatNumber(item.word_count) }}
+                </template>
+
+                <template v-slot:item.readingProgress.percentage="{ item }">
+                    <div v-if="item.readingProgress && item.readingProgress.available" class="px-2">
+                        <div class="text-caption font-weight-medium mb-1">
+                            {{ Number(item.readingProgress.percentage).toFixed(1) }}%
+                        </div>
+                        <v-progress-linear
+                            :value="item.readingProgress.percentage"
+                            color="primary"
+                            height="6"
+                            rounded
+                            :aria-label="item.name + '阅读进度'"
+                        ></v-progress-linear>
+                    </div>
+                    <span v-else class="text--secondary">暂无</span>
                 </template>
                 
                 <!-- Actions -->
