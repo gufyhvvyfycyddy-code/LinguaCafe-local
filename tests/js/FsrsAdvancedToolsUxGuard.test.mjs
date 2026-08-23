@@ -28,6 +28,7 @@ assert.match(reschedule, /previewReschedule/);
 assert.match(reschedule, /confirmReschedule/);
 assert.match(reschedule, /undoReschedule/);
 assert.match(reschedule, /我知道风险，仍然重排/);
+assert.doesNotMatch(reschedule, /前往复习卡管理页|goToManagePage|['"]\/review-cards\/manage['"]/);
 assert.doesNotMatch(component, /axios\./);
 assert.doesNotMatch(reschedule, /axios\./);
 assert.doesNotMatch(helper, /axios|from ['"]vue['"]|document\.|window\.|\bReviewLog\b|fsrs_stability|fsrs_difficulty|lifecycle/i);

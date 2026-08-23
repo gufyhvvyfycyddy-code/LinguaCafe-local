@@ -47,6 +47,7 @@ test('Card Info reuses the picker and emits canonical Marker updates', () => {
 
     assert.match(source, /import ReviewCardMarkerPicker/);
     assert.match(source, /<review-card-marker-picker/);
+    assert.match(source, /v-if="!deepLinkSource" class="detail-row"[\s\S]*<review-card-marker-picker/);
     assert.match(source, /detailTarget\.marker/);
     assert.match(source, /marker-updated/);
     assert.match(source, /@saving-change="onMarkerSavingChange"/);
@@ -55,6 +56,7 @@ test('Card Info reuses the picker and emits canonical Marker updates', () => {
     assert.match(source, /:disabled="markerSaving" @click="\$emit\('study-marked'\)"/);
     assert.match(source, /:disabled="markerSaving" @click="openSource"/);
     assert.match(source, /学习已标记卡片/);
+    assert.match(source, /v-if="!deepLinkSource"[^>]+@click="\$emit\('study-marked'\)"/);
     assert.match(source, /study-marked/);
 });
 

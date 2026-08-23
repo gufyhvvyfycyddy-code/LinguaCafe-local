@@ -30,6 +30,8 @@ assert.match(child, /const seq = \+\+this\.detailRequestSeq/);
 assert.match(child, /seq !== this\.detailRequestSeq/);
 assert.match(child, /this\.detailRequestSeq\+\+/);
 assert.match(child, /ReviewCardMarkerPicker/);
+assert.match(child, /v-if="!deepLinkSource" class="detail-row"[\s\S]*<review-card-marker-picker/);
+assert.match(child, /v-if="!deepLinkSource"[^>]+@click="\$emit\('study-marked'\)"/);
 
 // Card Info is read-mostly. Its only direct write is an explicit user-triggered
 // undo/redo transition for an already-created manual operation.

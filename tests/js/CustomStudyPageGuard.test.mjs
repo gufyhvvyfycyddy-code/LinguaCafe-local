@@ -24,6 +24,9 @@ for (const sort of ['most_overdue', 'most_lapses', 'lowest_retrievability', 'ran
 for (const filter of ['tag_ids', 'markers', 'article_ids', 'chapter_ids', 'lifecycle_states', 'fsrs_states']) {
     assert.match(page, new RegExp(filter));
 }
+assert.doesNotMatch(page, /v-model="filters\.(tag_ids|markers)"/);
+assert.doesNotMatch(page, /WordSense 标签|Card Marker/);
+assert.match(page, /options:\s*\{\s*tags:\s*\[\],\s*markers:\s*\[\]/);
 
 assert.match(page, /\/special-study\/options/);
 assert.match(page, /\/special-study\/sessions/);

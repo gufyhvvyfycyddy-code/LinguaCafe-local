@@ -64,7 +64,7 @@
                                     <span class="detail-value"><v-chip x-small :color="stateColor(detailTarget.lifecycle_state)">{{ stateLabel(detailTarget.lifecycle_state) }}</v-chip></span>
                                 </div>
                                 <detail-row label="FSRS State" :value="displayValue(detailTarget.fsrs_state)" />
-                                <div class="detail-row">
+                                <div v-if="!deepLinkSource" class="detail-row">
                                     <span class="detail-label">卡片标记</span>
                                     <span class="detail-value">
                                         <review-card-marker-picker
@@ -239,7 +239,7 @@
                     <v-btn text :disabled="markerSaving" @click="closeDetail">关闭</v-btn>
                     <v-btn v-if="deepLinkSource" text color="primary" :disabled="markerSaving" @click="$emit('return-to-report')"><v-icon left small>mdi-arrow-left</v-icon>返回学习报告</v-btn>
                     <v-spacer />
-                    <v-btn text color="primary" :disabled="markerSaving" @click="$emit('study-marked')">学习已标记卡片</v-btn>
+                    <v-btn v-if="!deepLinkSource" text color="primary" :disabled="markerSaving" @click="$emit('study-marked')">学习已标记卡片</v-btn>
                     <v-btn text color="primary" :disabled="markerSaving" @click="openSource">查看原文</v-btn>
                 </v-card-actions>
             </v-card>

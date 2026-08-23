@@ -50,8 +50,6 @@
             </v-card-text>
         </v-card>
 
-        <v-card-actions class="px-0 mt-2"><v-btn small outlined color="primary" @click="goToManagePage">前往复习卡管理页</v-btn></v-card-actions>
-
         <v-dialog v-model="confirmDialog" max-width="480" persistent>
             <v-card>
                 <v-card-title class="warning--text"><v-icon left color="warning">mdi-alert-circle-outline</v-icon>确认重排卡片</v-card-title>
@@ -269,9 +267,6 @@ export default {
             if (days < 0) return `提前 ${Math.abs(days)} 天`;
             if (days > 0) return `延后 ${days} 天`;
             return '不变';
-        },
-        goToManagePage() {
-            window.location.href = '/review-cards/manage';
         },
     },
 };

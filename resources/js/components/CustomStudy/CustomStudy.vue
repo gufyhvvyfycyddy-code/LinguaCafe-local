@@ -97,30 +97,6 @@
                                 <v-expansion-panel-header>进一步筛选（可选）</v-expansion-panel-header>
                                 <v-expansion-panel-content>
                                     <v-select
-                                        v-model="filters.tag_ids"
-                                        :items="options.tags"
-                                        item-text="name"
-                                        item-value="id"
-                                        label="WordSense 标签（同时满足）"
-                                        multiple
-                                        chips
-                                        small-chips
-                                        outlined
-                                        dense
-                                    ></v-select>
-                                    <v-select
-                                        v-model="filters.markers"
-                                        :items="options.markers"
-                                        item-text="label"
-                                        item-value="value"
-                                        label="Card Marker"
-                                        multiple
-                                        chips
-                                        small-chips
-                                        outlined
-                                        dense
-                                    ></v-select>
-                                    <v-select
                                         v-model="filters.article_ids"
                                         :items="options.articles"
                                         item-text="name"
