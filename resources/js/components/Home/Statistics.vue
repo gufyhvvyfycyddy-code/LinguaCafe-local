@@ -33,7 +33,12 @@
                     hide-details
                     @keyup.enter="loadStatistics"
                 ></v-text-field>
+                <v-text-field v-model="dateFrom" type="date" label="开始学习日期（起）" dense outlined clearable hide-details></v-text-field>
+                <v-text-field v-model="dateTo" type="date" label="开始学习日期（止）" dense outlined clearable hide-details></v-text-field>
                 <v-btn color="primary" :loading="loading" @click="loadStatistics">应用</v-btn>
+            </div>
+            <div v-if="report && report.scope.learning_date_range" class="text-caption text--secondary mt-2">
+                开始学习日期按学习时区 {{ report.scope.learning_date_range.timezone }} 计算。
             </div>
         </v-card>
 
@@ -209,6 +214,8 @@ export default {
             error: '',
             periodDays: 30,
             query: '',
+            dateFrom: '',
+            dateTo: '',
             optimizationStatus: null,
             optimizationPreview: null,
             optimizationResult: null,
@@ -224,7 +231,12 @@ export default {
     },
     computed: {
         requestPayload() {
-            return { period_days: this.periodDays, q: this.query || '' };
+            const payload = { period_days: this.periodDays, q: this.query || '' };
+            if (this.dateFrom && this.dateTo) {
+                payload.date_from = this.dateFrom;
+                payload.date_to = this.dateTo;
+            }
+            return payload;
         },
         futureRows() {
             return (this.report?.future_due?.daily || []).slice(0, 30)
@@ -258,6 +270,7 @@ export default {
     },
     methods: {
         async loadStatistics() {
+            if (!this.validateLearningDateRange()) return;
             this.loading = true;
             this.error = '';
             try {
@@ -269,7 +282,19 @@ export default {
                 this.loading = false;
             }
         },
+        validateLearningDateRange() {
+            if ((this.dateFrom && !this.dateTo) || (!this.dateFrom && this.dateTo)) {
+                this.error = '请选择完整的开始学习日期范围。';
+                return false;
+            }
+            if (this.dateFrom && this.dateTo && this.dateFrom > this.dateTo) {
+                this.error = '开始学习日期的起始日不能晚于结束日。';
+                return false;
+            }
+            return true;
+        },
         async download(format) {
+            if (!this.validateLearningDateRange()) return;
             this.exporting = format;
             this.error = '';
             try {
@@ -354,7 +379,7 @@ export default {
 }
 .scope-controls {
     display: grid;
-    grid-template-columns: 180px minmax(240px, 1fr) auto;
+    grid-template-columns: 150px minmax(220px, 1fr) 170px 170px auto;
     gap: 12px;
     align-items: center;
 }
@@ -393,5 +418,8 @@ export default {
     .memory-grid, .pressure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .heatmap { grid-template-columns: repeat(15, minmax(6px, 1fr)); }
     .statistics-v3 { padding-left: 0; padding-right: 0; }
+}
+@media (min-width: 701px) and (max-width: 1100px) {
+    .scope-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

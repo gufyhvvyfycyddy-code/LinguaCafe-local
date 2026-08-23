@@ -6,6 +6,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -105,6 +106,45 @@ class M14StatisticsCardInfoTest extends TestCase
         $this->assertStringContainsString('不会被标为掌握稳定', $response->json('memory_durability.criteria.evidence_poor'));
     }
 
+    public function test_learning_entry_date_range_is_the_common_card_scope_for_durability_and_pressure(): void
+    {
+        config()->set('app.timezone', 'Asia/Shanghai');
+        $this->card('before-range', now()->addDay(), null, [], [
+            'learning_started_at' => Carbon::create(2026, 7, 13, 12, 0, 0, 'Asia/Shanghai'),
+        ]);
+        $this->card('inside-range', now()->addDay(), null, [], [
+            'learning_started_at' => Carbon::create(2026, 7, 14, 12, 0, 0, 'Asia/Shanghai'),
+        ]);
+        $this->card('after-range', now()->addDay(), null, [], [
+            'learning_started_at' => Carbon::create(2026, 7, 15, 12, 0, 0, 'Asia/Shanghai'),
+        ]);
+        $this->card('missing-learning-entry', now()->addDay());
+
+        $response = $this->actingAs($this->user)->postJson('/statistics/get', [
+            'date_from' => '2026-07-14',
+            'date_to' => '2026-07-14',
+        ])->assertOk();
+
+        $response->assertJsonPath('scope.card_count', 1)
+            ->assertJsonPath('scope.learning_date_range.date_from', '2026-07-14')
+            ->assertJsonPath('scope.learning_date_range.date_to', '2026-07-14')
+            ->assertJsonPath('scope.learning_date_range.timezone', 'Asia/Shanghai')
+            ->assertJsonPath('memory_durability.coverage.total', 1)
+            ->assertJsonPath('future_pressure.assumptions.candidate_cards', 1);
+    }
+
+    public function test_learning_entry_date_range_requires_a_valid_pair(): void
+    {
+        $this->actingAs($this->user)->postJson('/statistics/get', [
+            'date_from' => '2026-07-14',
+        ])->assertUnprocessable()->assertJsonValidationErrors('date_to');
+
+        $this->actingAs($this->user)->postJson('/statistics/get', [
+            'date_from' => '2026-07-15',
+            'date_to' => '2026-07-14',
+        ])->assertUnprocessable()->assertJsonValidationErrors('date_to');
+    }
+
     public function test_unified_query_can_produce_a_truthful_empty_report(): void
     {
         $this->card('present', now()->addDay());
@@ -146,10 +186,16 @@ class M14StatisticsCardInfoTest extends TestCase
             ->assertJsonPath('card_info.statistics.review_time.total_seconds', 70);
     }
 
-    private function card(string $lemma, $dueAt, ?User $user = null, array $overrides = []): ReviewCard
+    private function card(
+        string $lemma,
+        $dueAt,
+        ?User $user = null,
+        array $overrides = [],
+        array $senseOverrides = [],
+    ): ReviewCard
     {
         $user ??= $this->user;
-        $sense = WordSense::forceCreate([
+        $sense = WordSense::forceCreate(array_merge([
             'user_id' => $user->id,
             'language' => 'english',
             'language_id' => 'english',
@@ -165,7 +211,7 @@ class M14StatisticsCardInfoTest extends TestCase
             'status' => WordSense::STATUS_CONFIRMED,
             'is_context_specific' => false,
             'sense_key' => hash('sha256', "{$user->id}|{$lemma}"),
-        ]);
+        ], $senseOverrides));
         return ReviewCard::forceCreate(array_merge([
             'user_id' => $user->id,
             'language' => 'english',

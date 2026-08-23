@@ -21,6 +21,7 @@ class StatisticsService
     public function __construct(
         private ReviewCardManageQueryService $cardQueries,
         private FsrsRetentionWorkloadSimulationService $workloadPlanner,
+        private ReviewStudyTimezoneService $studyTimezone,
     ) {
     }
 
@@ -43,6 +44,17 @@ class StatisticsService
             $userId,
             $language,
         );
+        $learningDateRange = null;
+        $dateFrom = $request->input('date_from');
+        $dateTo = $request->input('date_to');
+        if (is_string($dateFrom) && is_string($dateTo) && $dateFrom !== '' && $dateTo !== '') {
+            $learningDateRange = $this->studyTimezone->inclusiveDateRangeBounds($dateFrom, $dateTo);
+            $cardQuery->whereHas('sense', function ($senseQuery) use ($learningDateRange): void {
+                $senseQuery->whereNotNull('learning_started_at')
+                    ->where('learning_started_at', '>=', $learningDateRange['range_start'])
+                    ->where('learning_started_at', '<', $learningDateRange['range_end']);
+            });
+        }
         $cards = $cardQuery
             ->reorder('review_cards.id')
             ->get([
@@ -91,6 +103,11 @@ class StatisticsService
                 'query' => $criteria->toSearchMeta(),
                 'card_count' => $cards->count(),
                 'timezone' => $timezone,
+                'learning_date_range' => $learningDateRange === null ? null : [
+                    'date_from' => $learningDateRange['date_from'],
+                    'date_to' => $learningDateRange['date_to'],
+                    'timezone' => $learningDateRange['timezone'],
+                ],
             ],
             'summary_cards' => [
                 ['key' => 'due_today', 'label' => '今日到期', 'value' => $futureDue['today']],

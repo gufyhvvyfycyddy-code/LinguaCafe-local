@@ -79,6 +79,8 @@ class HomeController extends Controller {
         $user = Auth::user();
         $request->validate([
             'period_days' => 'sometimes|integer|in:7,30,90,365',
+            'date_from' => ['nullable', 'required_with:date_to', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'required_with:date_from', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
 
         try {
@@ -100,6 +102,8 @@ class HomeController extends Controller {
         $user = Auth::user();
         $request->validate([
             'period_days' => 'sometimes|integer|in:7,30,90,365',
+            'date_from' => ['nullable', 'required_with:date_to', 'date_format:Y-m-d'],
+            'date_to' => ['nullable', 'required_with:date_from', 'date_format:Y-m-d', 'after_or_equal:date_from'],
         ]);
         $report = $this->statisticsService->getStatistics(
             $user->id,
