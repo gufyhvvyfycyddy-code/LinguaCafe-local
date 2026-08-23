@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
 use App\Services\ReadingFinishSettlementService;
+use App\Services\ReadingContinuityService;
 use App\Services\ReadingSessionService;
 use Illuminate\Http\Request;
 
@@ -13,6 +14,7 @@ class MobileReadingSessionController extends Controller
     public function __construct(
         private ReadingSessionService $readingSessionService,
         private ReadingFinishSettlementService $finishSettlementService,
+        private ReadingContinuityService $readingContinuityService,
     ) {
     }
 
@@ -28,6 +30,11 @@ class MobileReadingSessionController extends Controller
                 $request->user()->selected_language,
                 $chapter,
                 $validated['resume_reading_session_id'] ?? null,
+            );
+            $data['continuity'] = $this->readingContinuityService->current(
+                $request->user()->id,
+                $request->user()->selected_language,
+                $chapter,
             );
         } catch (\InvalidArgumentException $exception) {
             return $this->contractError($exception);

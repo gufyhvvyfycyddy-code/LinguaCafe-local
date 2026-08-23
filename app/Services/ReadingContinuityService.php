@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\ReadingProgress;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class ReadingContinuityService
@@ -160,12 +161,63 @@ class ReadingContinuityService
         string $sourceRevision,
         int $canonicalTokenIndex,
     ): array {
+        $progress = $this->savePosition(
+            $userId,
+            $language,
+            $chapterId,
+            $sourceRevision,
+            $canonicalTokenIndex,
+            now(),
+            null,
+            null,
+        );
+
+        return $this->serializeProgress($progress);
+    }
+
+    public function saveMobilePosition(
+        int $userId,
+        string $language,
+        int $chapterId,
+        string $sourceRevision,
+        int $canonicalTokenIndex,
+        CarbonInterface $occurredAt,
+        int $mobileDeviceId,
+        int $clientSequence,
+    ): array {
+        $progress = $this->savePosition(
+            $userId,
+            $language,
+            $chapterId,
+            $sourceRevision,
+            $canonicalTokenIndex,
+            $occurredAt,
+            $mobileDeviceId,
+            $clientSequence,
+        );
+
+        return $this->serializeContinuity($progress);
+    }
+
+    private function savePosition(
+        int $userId,
+        string $language,
+        int $chapterId,
+        string $sourceRevision,
+        int $canonicalTokenIndex,
+        CarbonInterface $occurredAt,
+        ?int $mobileDeviceId,
+        ?int $clientSequence,
+    ): ReadingProgress {
         return DB::transaction(function () use (
             $userId,
             $language,
             $chapterId,
             $sourceRevision,
             $canonicalTokenIndex,
+            $occurredAt,
+            $mobileDeviceId,
+            $clientSequence,
         ) {
             try {
                 $chapter = $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
@@ -193,14 +245,17 @@ class ReadingContinuityService
                 'chapter_id' => $chapterId,
                 'source_revision' => $currentRevision,
             ];
-            $progress = ReadingProgress::query()->where($scope)->first();
+            $progress = ReadingProgress::query()->where($scope)->lockForUpdate()->first();
             $furthestCanonicalTokenIndex = $canonicalTokenIndex;
 
             if ($progress) {
+                $existingLatest = (int) $progress->canonical_token_index;
                 $existingFurthest = $progress->furthest_canonical_token_index === null
                     ? null
                     : (int) $progress->furthest_canonical_token_index;
-                if ($existingFurthest === null || !array_key_exists($existingFurthest, $ranks)) {
+                if (!array_key_exists($existingLatest, $ranks)
+                    || $existingFurthest === null
+                    || !array_key_exists($existingFurthest, $ranks)) {
                     throw new \InvalidArgumentException(self::ERROR_INVALID_TOKEN);
                 }
                 if ($ranks[$existingFurthest] > $ranks[$canonicalTokenIndex]) {
@@ -208,22 +263,60 @@ class ReadingContinuityService
                 }
             }
 
-            $values = [
-                'canonical_token_index' => $canonicalTokenIndex,
-                'furthest_canonical_token_index' => $furthestCanonicalTokenIndex,
-                'position_occurred_at' => now(),
-                'last_mobile_device_id' => null,
-                'client_sequence' => null,
-            ];
+            if (!$progress) {
+                $progress = ReadingProgress::query()->create($scope + [
+                    'canonical_token_index' => $canonicalTokenIndex,
+                    'furthest_canonical_token_index' => $canonicalTokenIndex,
+                    'position_occurred_at' => $occurredAt,
+                    'last_mobile_device_id' => $mobileDeviceId,
+                    'client_sequence' => $clientSequence,
+                ]);
 
-            if ($progress) {
-                $progress->fill($values)->save();
-            } else {
-                $progress = ReadingProgress::query()->create($scope + $values);
+                return $progress;
             }
 
-            return $this->serializeProgress($progress);
+            $values = [
+                'furthest_canonical_token_index' => $furthestCanonicalTokenIndex,
+            ];
+            if ($this->incomingPositionIsLatest(
+                $progress,
+                $occurredAt,
+                $mobileDeviceId,
+                $clientSequence,
+            )) {
+                $values += [
+                    'canonical_token_index' => $canonicalTokenIndex,
+                    'position_occurred_at' => $occurredAt,
+                    'last_mobile_device_id' => $mobileDeviceId,
+                    'client_sequence' => $clientSequence,
+                ];
+            }
+            $progress->fill($values)->save();
+
+            return $progress;
         });
+    }
+
+    private function incomingPositionIsLatest(
+        ReadingProgress $progress,
+        CarbonInterface $occurredAt,
+        ?int $mobileDeviceId,
+        ?int $clientSequence,
+    ): bool {
+        if (!$progress->position_occurred_at || $occurredAt->gt($progress->position_occurred_at)) {
+            return true;
+        }
+        if ($occurredAt->lt($progress->position_occurred_at)) {
+            return false;
+        }
+
+        if ($mobileDeviceId !== null
+            && (int) $progress->last_mobile_device_id === $mobileDeviceId) {
+            return $clientSequence !== null
+                && $clientSequence > (int) ($progress->client_sequence ?? 0);
+        }
+
+        return true;
     }
 
     private function serializeProgress(ReadingProgress $progress): array
@@ -240,6 +333,15 @@ class ReadingContinuityService
         return [
             'source_revision' => (string) $progress->source_revision,
             'canonical_token_index' => (int) $progress->furthest_canonical_token_index,
+        ];
+    }
+
+    private function serializeContinuity(ReadingProgress $progress): array
+    {
+        return [
+            'source_revision' => (string) $progress->source_revision,
+            'resume' => $this->serializeProgress($progress),
+            'furthest' => $this->serializeFurthest($progress),
         ];
     }
 

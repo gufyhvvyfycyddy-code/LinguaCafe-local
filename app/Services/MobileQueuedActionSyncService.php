@@ -19,6 +19,7 @@ class MobileQueuedActionSyncService
     public const TYPE_SENSE_UPDATE = 'word_sense.update';
     public const TYPE_SENSE_DELETE = 'word_sense.delete';
     public const TYPE_READING_INTERACTION = 'reading_session.interaction';
+    public const TYPE_READING_POSITION = 'reading_position.update';
 
     public const MAX_ACTIONS = 100;
     public const MAX_REQUEST_BYTES = 1048576;
@@ -32,6 +33,7 @@ class MobileQueuedActionSyncService
         private ReviewCardManageMutationService $senseMutation,
         private WordSenseService $wordSenseService,
         private ReadingSessionService $readingSessionService,
+        private ReadingContinuityService $readingContinuityService,
     ) {
     }
 
@@ -297,6 +299,24 @@ class MobileQueuedActionSyncService
                         ),
                     ],
                 ],
+                self::TYPE_READING_POSITION => [
+                    'status' => 200,
+                    'body' => [
+                        'data' => [
+                            'chapter_id' => $action['payload']['chapter_id'],
+                            'continuity' => $this->readingContinuityService->saveMobilePosition(
+                                $userId,
+                                $language,
+                                $action['payload']['chapter_id'],
+                                $action['payload']['source_revision'],
+                                $action['payload']['canonical_token_index'],
+                                $action['occurred_at'],
+                                (int) $device->id,
+                                $action['sequence'],
+                            ),
+                        ],
+                    ],
+                ],
             };
         } catch (MobileReviewCardUnavailableException) {
             return $this->domainFailure(
@@ -314,6 +334,7 @@ class MobileQueuedActionSyncService
             );
         } catch (\InvalidArgumentException $exception) {
             $hasReadingContext = $action['type'] === self::TYPE_READING_INTERACTION
+                || $action['type'] === self::TYPE_READING_POSITION
                 || ($action['type'] === self::TYPE_RATING
                     && isset($action['payload']['reading_session_id']));
             if (!$hasReadingContext) {
@@ -435,6 +456,7 @@ class MobileQueuedActionSyncService
                 self::TYPE_SENSE_UPDATE,
                 self::TYPE_SENSE_DELETE,
                 self::TYPE_READING_INTERACTION,
+                self::TYPE_READING_POSITION,
             ])],
             'occurred_at' => ['required', 'string', 'max:40'],
             'sequence' => ['required', 'integer', 'min:1', 'max:9223372036854775807'],
@@ -464,6 +486,7 @@ class MobileQueuedActionSyncService
             self::TYPE_SENSE_UPDATE => $this->validateSenseUpdatePayload($validated['payload']),
             self::TYPE_SENSE_DELETE => $this->validateSenseDeletePayload($validated['payload']),
             self::TYPE_READING_INTERACTION => $this->validateReadingInteractionPayload($validated['payload']),
+            self::TYPE_READING_POSITION => $this->validateReadingPositionPayload($validated['payload']),
         };
 
         return [
@@ -517,12 +540,29 @@ class MobileQueuedActionSyncService
         ])->validate();
     }
 
+    private function validateReadingPositionPayload(array $payload): array
+    {
+        $validated = Validator::make($payload, [
+            'chapter_id' => ['required', 'integer', 'min:1'],
+            'source_revision' => ['required', 'regex:/^sha256:[a-f0-9]{64}$/'],
+            'canonical_token_index' => ['required', 'integer', 'min:0'],
+        ])->validate();
+
+        return [
+            'chapter_id' => (int) $validated['chapter_id'],
+            'source_revision' => (string) $validated['source_revision'],
+            'canonical_token_index' => (int) $validated['canonical_token_index'],
+        ];
+    }
+
     private function readingContractFailure(\InvalidArgumentException $exception): array
     {
         $code = $exception->getMessage();
         $status = match ($code) {
             ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
             ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+            ReadingContinuityService::ERROR_CHAPTER_NOT_FOUND => 404,
+            ReadingContinuityService::ERROR_INVALID_TOKEN => 422,
             default => 409,
         };
 

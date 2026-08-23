@@ -26,6 +26,7 @@ class MobileArticlePackageService
     public function __construct(
         private WordSenseContentVersionService $wordSenseVersion,
         private DictionaryService $dictionaryService,
+        private ReadingChapterTextService $chapterTextService,
     ) {
     }
 
@@ -277,11 +278,13 @@ class MobileArticlePackageService
             ] : null,
             'sense_summaries' => $summaries,
             'dictionary_version' => $dictionaryVersion,
+            'source_revision' => $this->chapterTextService->sourceRevision($chapter),
         ]);
 
         return [
             'chapter_id' => $chapter->id,
             'name' => $chapter->name,
+            'source_revision' => $this->chapterTextService->sourceRevision($chapter),
             'word_count' => (int) $chapter->word_count,
             'token_count' => count($this->tokens($chapter)),
             'content_version' => 'sha256:' . $checksum,
@@ -340,6 +343,7 @@ class MobileArticlePackageService
             'chapter' => [
                 'chapter_id' => $chapter->id,
                 'name' => $chapter->name,
+                'source_revision' => $descriptor['source_revision'],
                 'word_count' => (int) $chapter->word_count,
                 'content_version' => $descriptor['content_version'],
                 'content_checksum' => $descriptor['content_checksum'],
@@ -399,6 +403,7 @@ class MobileArticlePackageService
                 || in_array(($word->word ?? ''), ['NEWLINE', 'PARAGRAPH_BREAK'], true);
             $tokens[] = [
                 'position' => $index,
+                'canonical_token_index' => isset($word->word_index) ? (int) $word->word_index : null,
                 'token_identity' => "chapter:{$chapter->id}:token:{$index}",
                 'source_sentence_identity' => $sourceSentence,
                 'sentence_identity' => "chapter:{$chapter->id}:sentence:{$sourceSentence}",

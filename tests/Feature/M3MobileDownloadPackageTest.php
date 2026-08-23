@@ -57,12 +57,12 @@ class M3MobileDownloadPackageTest extends TestCase
             ->andReturn(['again' => ['再次']]);
         [$token] = $this->issueToken($this->user);
         [$book, $chapter] = $this->createArticle($this->user, [
-            $this->token('Hello', 0, false),
-            $this->token('world', 0, false),
-            $this->token('.', 0, false),
-            $this->token('PARAGRAPH_BREAK', 0, true),
-            $this->token('Again', 1, false),
-            $this->token('.', 1, false),
+            $this->token('Hello', 0, false, 10),
+            $this->token('world', 0, false, 20),
+            $this->token('.', 0),
+            $this->token('PARAGRAPH_BREAK', 0, true, 50),
+            $this->token('Again', 1, false, 100),
+            $this->token('.', 1, false, 110),
         ]);
         ChapterAiReadingAssist::forceCreate([
             'user_id' => $this->user->id,
@@ -106,8 +106,10 @@ class M3MobileDownloadPackageTest extends TestCase
             ->assertJsonPath('data.schema_version', 'mobile_download_package_v1')
             ->assertJsonPath('data.package_type', 'article')
             ->assertJsonPath('data.chapter_count', 1)
+            ->assertJsonPath('data.chapters.0.source_revision', fn ($value) => is_string($value) && str_starts_with($value, 'sha256:'))
             ->assertJsonPath('data.invalidation.strategy', 'replace_when_version_differs');
         $version = $manifest->json('data.content_version');
+        $sourceRevision = $manifest->json('data.chapters.0.source_revision');
 
         $this->withToken($token)
             ->getJson('/api/v1/mobile/article-packages?per_page=1')
@@ -119,6 +121,11 @@ class M3MobileDownloadPackageTest extends TestCase
             ->getJson("/api/v1/mobile/article-packages/{$book->id}/chapters/{$chapter->id}?token_limit=4")
             ->assertOk()
             ->assertJsonCount(4, 'data.tokens')
+            ->assertJsonPath('data.chapter.source_revision', $sourceRevision)
+            ->assertJsonPath('data.tokens.0.canonical_token_index', 10)
+            ->assertJsonPath('data.tokens.1.canonical_token_index', 20)
+            ->assertJsonPath('data.tokens.2.canonical_token_index', null)
+            ->assertJsonPath('data.tokens.3.canonical_token_index', 50)
             ->assertJsonPath('data.tokens.0.token_identity', "chapter:{$chapter->id}:token:0")
             ->assertJsonPath('data.tokens.0.sentence_identity', "chapter:{$chapter->id}:sentence:0")
             ->assertJsonPath('data.tokens.0.section_identity', "chapter:{$chapter->id}:section:0")
@@ -140,6 +147,9 @@ class M3MobileDownloadPackageTest extends TestCase
             ]))
             ->assertOk()
             ->assertJsonPath('data.offset', 4)
+            ->assertJsonPath('data.chapter.source_revision', $sourceRevision)
+            ->assertJsonPath('data.tokens.0.canonical_token_index', 100)
+            ->assertJsonPath('data.tokens.1.canonical_token_index', 110)
             ->assertJsonPath('data.tokens.0.token_identity', "chapter:{$chapter->id}:token:4")
             ->assertJsonPath('data.tokens.0.section_identity', "chapter:{$chapter->id}:section:1")
             ->assertJsonPath('data.dictionary_summaries.again.0', '再次')
@@ -431,8 +441,10 @@ class M3MobileDownloadPackageTest extends TestCase
         string $word,
         int $sentenceIndex,
         bool $structure = false,
+        ?int $wordIndex = null,
     ): object {
-        return (object) [
+        return (object) array_filter([
+            'word_index' => $wordIndex,
             'word' => $word,
             'lemma' => strtolower($word),
             'pos' => $structure ? 'STRUCT' : 'NOUN',
@@ -440,7 +452,7 @@ class M3MobileDownloadPackageTest extends TestCase
             'is_structure' => $structure,
             'spaceAfter' => !$structure,
             'phrase_ids' => [],
-        ];
+        ], fn ($value) => $value !== null);
     }
 
     private function createCard(User $user, string $lemma, $dueAt): ReviewCard

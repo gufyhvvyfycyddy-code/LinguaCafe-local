@@ -2,15 +2,19 @@
 
 namespace Tests\Feature;
 
+use App\Models\Book;
+use App\Models\Chapter;
 use App\Models\MobileClientAction;
 use App\Models\MobileDevice;
 use App\Models\Operation;
+use App\Models\ReadingProgress;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WordSense;
 use App\Services\MobileSenseReviewMutationService;
+use App\Services\ReadingChapterTextService;
 use App\Services\ReviewCardService;
 use App\Services\WordSenseContentVersionService;
 use Carbon\Carbon;
@@ -439,6 +443,81 @@ class M4QueuedActionSyncTest extends TestCase
         $this->assertSame(0, ReviewLog::query()->count());
     }
 
+    public function test_reading_position_sync_merges_latest_and_furthest_replays_and_rejects_stale_revision(): void
+    {
+        $book = Book::forceCreate([
+            'user_id' => $this->user->id,
+            'name' => 'M4 continuity book',
+            'language' => 'english',
+        ]);
+        $chapter = Chapter::forceCreate([
+            'user_id' => $this->user->id,
+            'book_id' => $book->id,
+            'name' => 'M4 continuity chapter',
+            'language' => 'english',
+            'raw_text' => 'first last',
+            'word_count' => 2,
+            'read_count' => 0,
+            'unique_words' => '[]',
+            'unique_word_ids' => '[]',
+            'processed_text' => gzcompress(json_encode([
+                ['word_index' => 10, 'word' => 'first', 'sentence_index' => 0],
+                ['word_index' => 100, 'word' => 'last', 'sentence_index' => 0],
+            ]), 1),
+            'subtitle_timestamps' => '[]',
+            'processing_status' => 'processed',
+        ]);
+        $revision = app(ReadingChapterTextService::class)->sourceRevision($chapter);
+        $latestAt = Carbon::now('UTC')->subMinutes(2)->startOfSecond();
+        $olderAt = $latestAt->copy()->subMinute();
+
+        $first = $this->readingPositionAction($chapter, $revision, 10, $latestAt, 1);
+        $olderFarther = $this->readingPositionAction($chapter, $revision, 100, $olderAt, 2);
+        $this->sync([$first, $olderFarther])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'completed')
+            ->assertJsonPath('data.results.0.data.continuity.resume.canonical_token_index', 10)
+            ->assertJsonPath('data.results.1.data.continuity.resume.canonical_token_index', 100);
+
+        $progress = ReadingProgress::query()->where([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'chapter_id' => $chapter->id,
+            'source_revision' => $revision,
+        ])->sole();
+        $this->assertSame(10, $progress->canonical_token_index);
+        $this->assertSame(100, $progress->furthest_canonical_token_index);
+
+        $sameTimeHigherSequence = $this->readingPositionAction($chapter, $revision, 100, $latestAt, 3);
+        $this->sync([$sameTimeHigherSequence])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.data.continuity.resume.canonical_token_index', 100)
+            ->assertJsonPath('data.results.0.data.continuity.furthest.canonical_token_index', 100);
+        $this->sync([$sameTimeHigherSequence])
+            ->assertOk()
+            ->assertJsonPath('data.results.0.outcome', 'replayed');
+
+        $this->withToken($this->token)
+            ->postJson("/api/v1/mobile/chapters/{$chapter->id}/reading-sessions", [])
+            ->assertOk()
+            ->assertJsonPath('data.continuity.source_revision', $revision)
+            ->assertJsonPath('data.continuity.resume.canonical_token_index', 100)
+            ->assertJsonPath('data.continuity.furthest.canonical_token_index', 100);
+
+        $chapter->forceFill(['raw_text' => 'changed first last'])->save();
+        $this->sync([
+            $this->readingPositionAction($chapter, $revision, 10, $latestAt->copy()->addMinute(), 4),
+        ])->assertOk()
+            ->assertJsonPath('data.status', 'failed')
+            ->assertJsonPath('data.results.0.error.code', 'READING_CONTINUITY_STALE_SOURCE')
+            ->assertJsonPath('data.results.0.error.retryable', false);
+
+        $progress->refresh();
+        $this->assertSame(100, $progress->canonical_token_index);
+        $this->assertSame(100, $progress->furthest_canonical_token_index);
+        $this->assertSame(1, ReadingProgress::query()->count());
+    }
+
     public function test_non_iso_and_invalid_calendar_timestamps_are_rejected_without_claims(): void
     {
         [, $card] = $this->createSenseCard($this->user, 'strict-time');
@@ -580,6 +659,26 @@ class M4QueuedActionSyncTest extends TestCase
                 'review_duration_ms' => 1250,
                 'question_example_key' => $questionExampleKey,
             ], fn ($value) => $value !== null),
+        ];
+    }
+
+    private function readingPositionAction(
+        Chapter $chapter,
+        string $sourceRevision,
+        int $canonicalTokenIndex,
+        Carbon $occurredAt,
+        int $sequence,
+    ): array {
+        return [
+            'client_action_id' => (string) Str::uuid(),
+            'type' => 'reading_position.update',
+            'occurred_at' => $occurredAt->toIso8601String(),
+            'sequence' => $sequence,
+            'payload' => [
+                'chapter_id' => $chapter->id,
+                'source_revision' => $sourceRevision,
+                'canonical_token_index' => $canonicalTokenIndex,
+            ],
         ];
     }
 
