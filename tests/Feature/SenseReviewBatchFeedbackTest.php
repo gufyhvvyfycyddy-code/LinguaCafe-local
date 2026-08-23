@@ -563,9 +563,8 @@ class SenseReviewBatchFeedbackTest extends TestCase
      * 19. serializeMany() also keeps ReviewLog queries constant.
      *
      * This validates the full controller-level batch path (serializer →
-     * feedbackService::buildForCards). The serializer must NOT issue its
-     * own per-card ReviewLog queries when a precomputed feedback map is
-     * supplied.
+     * feedbackService::buildForCards plus the keyed example-rotation batch).
+     * The two owners must remain constant and must NOT issue per-card queries.
      */
     public function test_serialize_many_review_log_query_count_constant(): void
     {
@@ -591,8 +590,8 @@ class SenseReviewBatchFeedbackTest extends TestCase
         $queries20 = $this->countReviewLogQueries(DB::getQueryLog());
         DB::disableQueryLog();
 
-        $this->assertSame(1, $queries1,  "serializeMany 1 card: expected 1 review_logs query, got $queries1");
-        $this->assertSame(1, $queries20, "serializeMany 20 cards: expected 1 review_logs query, got $queries20");
+        $this->assertSame(2, $queries1,  "serializeMany 1 card: expected 2 review_logs queries, got $queries1");
+        $this->assertSame(2, $queries20, "serializeMany 20 cards: expected 2 review_logs queries, got $queries20");
     }
 
     // ==================== Helpers ====================

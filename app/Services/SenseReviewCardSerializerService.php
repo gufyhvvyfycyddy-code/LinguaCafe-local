@@ -245,9 +245,10 @@ class SenseReviewCardSerializerService
      * 'learning_feedback' option so the serializer never re-queries
      * ReviewLog.
      *
-     * Query profile: exactly 1 ReviewLog query regardless of card count
-     * (0 when the collection is empty). This is a constant-time improvement
-     * over the old N-query pattern.
+     * Query profile: exactly 2 ReviewLog queries regardless of card count
+     * (0 when the collection is empty): one batch for learning feedback and
+     * one batch for keyed example-rotation state. This remains constant-size
+     * and avoids the old per-card query pattern.
      *
      * @param  Collection  $cards   ReviewCards with loaded 'sense' relation.
      * @param  array       $options Optional: ['preferred_occurrence_id' => int|null]
