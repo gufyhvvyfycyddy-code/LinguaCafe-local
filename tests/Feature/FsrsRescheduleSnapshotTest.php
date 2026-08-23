@@ -31,7 +31,7 @@ class FsrsRescheduleSnapshotTest extends TestCase
             'password' => Hash::make('password'),
             'selected_language' => 'english',
             'password_changed' => true,
-            'is_admin' => true,
+            'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
@@ -41,7 +41,7 @@ class FsrsRescheduleSnapshotTest extends TestCase
             'password' => Hash::make('password'),
             'selected_language' => 'english',
             'password_changed' => true,
-            'is_admin' => true,
+            'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
     }

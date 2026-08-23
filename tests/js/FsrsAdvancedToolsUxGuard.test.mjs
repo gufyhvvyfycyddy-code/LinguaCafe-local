@@ -5,8 +5,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const componentPath = join(__dirname, '..', '..', 'resources', 'js', 'components', 'Admin', 'ReviewSettings', 'FsrsAdvancedToolsPanel.vue');
+const reschedulePath = join(__dirname, '..', '..', 'resources', 'js', 'components', 'FsrsReschedulePanel.vue');
 const helperPath = join(__dirname, '..', '..', 'resources', 'js', 'services', 'FsrsAdvancedToolsPresentation.js');
 const component = readFileSync(componentPath, 'utf8');
+const reschedule = readFileSync(reschedulePath, 'utf8');
 const helper = readFileSync(helperPath, 'utf8');
 
 assert.match(component, /FsrsAdvancedToolsPresentation/);
@@ -20,8 +22,14 @@ assert.match(component, /:disabled="[^\"]*!advancedToolsView\.canRestoreDefaults
 assert.match(component, /if \(!this\.advancedToolsView\.canPreviewOptimization\) return;/);
 assert.match(component, /if \(!this\.advancedToolsView\.canRestoreDefaults\) return;/);
 assert.match(component, /重新加载诊断/);
-assert.match(component, /重排已有卡片/);
+assert.match(component, /FsrsReschedulePanel/);
+assert.match(reschedule, /重排已有卡片/);
+assert.match(reschedule, /previewReschedule/);
+assert.match(reschedule, /confirmReschedule/);
+assert.match(reschedule, /undoReschedule/);
+assert.match(reschedule, /我知道风险，仍然重排/);
 assert.doesNotMatch(component, /axios\./);
+assert.doesNotMatch(reschedule, /axios\./);
 assert.doesNotMatch(helper, /axios|from ['"]vue['"]|document\.|window\.|\bReviewLog\b|fsrs_stability|fsrs_difficulty|lifecycle/i);
 assert.match(component, /aria-live="polite"/);
 assert.match(helper, /当前已是默认参数/);

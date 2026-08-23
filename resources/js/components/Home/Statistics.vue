@@ -174,6 +174,8 @@
                 </v-sheet>
             </v-card>
 
+            <fsrs-reschedule-panel class="mb-4" @stats-changed="loadStatistics" />
+
             <v-row>
                 <v-col cols="12" md="6">
                     <statistics-mini-chart title="未来 30 天到期" :rows="futureRows" color="#42a5f5" />
@@ -243,10 +245,11 @@
 
 <script>
 import StatisticsMiniChart from './StatisticsMiniChart.vue';
+import FsrsReschedulePanel from '../FsrsReschedulePanel.vue';
 import { applyOptimization, getOptimizationStatus, previewOptimization, updateOptimizationPolicy } from '../../services/AdminReviewSettingsApi';
 
 export default {
-    components: { StatisticsMiniChart },
+    components: { FsrsReschedulePanel, StatisticsMiniChart },
     data() {
         return {
             report: null,

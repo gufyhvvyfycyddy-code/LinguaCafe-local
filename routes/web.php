@@ -94,9 +94,6 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
         Route::post('/fonts/delete', [App\Http\Controllers\FontTypeController::class, 'deleteFontType']);
 
         // settings
-        Route::post('/settings/fsrs/reschedule-preview', [App\Http\Controllers\SettingsController::class, 'reschedulePreview']);
-        Route::post('/settings/fsrs/reschedule-confirm', [App\Http\Controllers\SettingsController::class, 'rescheduleConfirm'])->name('settings.fsrs.reschedule-confirm');
-        Route::post('/settings/fsrs/reschedule-undo', [App\Http\Controllers\SettingsController::class, 'rescheduleUndo'])->name('settings.fsrs.reschedule-undo');
         Route::post('/settings/fsrs/restore-default', [App\Http\Controllers\SettingsController::class, 'restoreFsrsDefaultParameters']);
         Route::get('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'getFsrsDailyLimits']);
         Route::post('/settings/fsrs/daily-limits', [App\Http\Controllers\SettingsController::class, 'updateFsrsDailyLimits']);
@@ -130,6 +127,9 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
     Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
     Route::put('/settings/fsrs/optimization-policy', [App\Http\Controllers\SettingsController::class, 'updateFsrsOptimizationPolicy']);
+    Route::post('/settings/fsrs/reschedule-preview', [App\Http\Controllers\SettingsController::class, 'reschedulePreview']);
+    Route::post('/settings/fsrs/reschedule-confirm', [App\Http\Controllers\SettingsController::class, 'rescheduleConfirm'])->name('settings.fsrs.reschedule-confirm');
+    Route::post('/settings/fsrs/reschedule-undo', [App\Http\Controllers\SettingsController::class, 'rescheduleUndo'])->name('settings.fsrs.reschedule-undo');
 
     // languages
     Route::get('/languages/get-language-selection-dialog-data', [App\Http\Controllers\LanguageController::class, 'getLanguageSelectionDialogData']);

@@ -3,6 +3,7 @@ import fs from 'node:fs';
 
 const statistics = fs.readFileSync('resources/js/components/Home/Statistics.vue', 'utf8');
 const chart = fs.readFileSync('resources/js/components/Home/StatisticsMiniChart.vue', 'utf8');
+const reschedule = fs.readFileSync('resources/js/components/FsrsReschedulePanel.vue', 'utf8');
 
 assert.match(statistics, /axios\.post\('\/statistics\/get'/);
 assert.match(statistics, /statistics\/export\/\$\{format\}/);
@@ -37,6 +38,10 @@ assert.match(statistics, /保存自动优化设置/);
 assert.match(statistics, /updateOptimizationPolicy/);
 assert.match(statistics, /自动优化也不会重排已有卡片/);
 assert.match(statistics, /interval_days/);
+assert.match(statistics, /FsrsReschedulePanel/);
+assert.match(reschedule, /优化参数不会自动改变旧卡片/);
+assert.match(reschedule, /确认重排这些卡片/);
+assert.match(reschedule, /撤销上次重排/);
 assert.doesNotMatch(statistics, /optimized_parameters|current_parameters/);
 assert.match(statistics, /@media \(max-width: 700px\)/);
 assert.doesNotMatch(statistics, /ReviewLog|fsrs_due_at|review_duration_ms/);

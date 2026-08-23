@@ -33,7 +33,7 @@ class FsrsRescheduleUndoTest extends TestCase
             'password' => Hash::make('password'),
             'selected_language' => 'english',
             'password_changed' => true,
-            'is_admin' => true,
+            'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
@@ -43,7 +43,7 @@ class FsrsRescheduleUndoTest extends TestCase
             'password' => Hash::make('password'),
             'selected_language' => 'english',
             'password_changed' => true,
-            'is_admin' => true,
+            'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
         // Create a non-admin user for auth tests
@@ -384,7 +384,7 @@ class FsrsRescheduleUndoTest extends TestCase
             'password' => Hash::make('password'),
             'selected_language' => 'japanese',
             'password_changed' => true,
-            'is_admin' => true,
+            'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
 
