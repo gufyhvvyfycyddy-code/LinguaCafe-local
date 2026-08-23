@@ -13,6 +13,10 @@ class WordSense extends Model
     public const STATUS_CONFIRMED = 'confirmed';
     public const STATUS_REJECTED = 'rejected';
 
+    public const LEARNING_ORIGIN_READING = 'reading';
+    public const LEARNING_ORIGIN_NON_READING = 'non_reading';
+    public const LEARNING_ORIGIN_LEGACY_UNKNOWN = 'legacy_unknown';
+
     protected $fillable = [
         'user_id',
         'language',
@@ -45,6 +49,7 @@ class WordSense extends Model
             'collocations' => 'array',
             'understanding_aid' => 'array',
             'is_context_specific' => 'boolean',
+            'learning_started_at' => 'datetime',
         ];
     }
 
@@ -52,6 +57,11 @@ class WordSense extends Model
     {
         return $this->hasOne(ReviewCard::class, 'target_id')
             ->where('target_type', ReviewCard::TARGET_SENSE);
+    }
+
+    public function learningStartedSourceOccurrence()
+    {
+        return $this->belongsTo(WordSenseOccurrence::class, 'learning_started_source_occurrence_id');
     }
 
     public function tags()

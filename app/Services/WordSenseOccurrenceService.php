@@ -15,7 +15,6 @@ class WordSenseOccurrenceService
 {
     public function __construct(
         private WordSenseService $wordSenseService,
-        private ReviewCardService $reviewCardService,
         private SenseExampleIdentityResolver $exampleIdentityResolver,
     ) {
     }
@@ -262,7 +261,7 @@ class WordSenseOccurrenceService
         ]);
 
         if ($enableFsrs) {
-            $card = $this->enableFsrsForSense($sense);
+            $card = $this->enableFsrsForSense($sense, $occurrence);
             $occurrence->review_card_id = $card->id;
             $occurrence->auto_fsrs_allowed = true;
         }
@@ -413,7 +412,7 @@ class WordSenseOccurrenceService
             return null;
         }
 
-        $card = $this->enableFsrsForSense($sense);
+        $card = $this->enableFsrsForSense($sense, $occurrence);
         $occurrence->fill([
             'review_card_id' => $card->id,
             'auto_fsrs_allowed' => true,
@@ -423,7 +422,10 @@ class WordSenseOccurrenceService
         return $card;
     }
 
-    private function enableFsrsForSense(WordSense $sense): ReviewCard
+    private function enableFsrsForSense(
+        WordSense $sense,
+        WordSenseOccurrence $occurrence,
+    ): ReviewCard
     {
         if ($sense->status !== WordSense::STATUS_CONFIRMED) {
             throw ValidationException::withMessages([
@@ -431,7 +433,7 @@ class WordSenseOccurrenceService
             ]);
         }
 
-        return $this->reviewCardService->ensureSenseCard($sense);
+        return $this->wordSenseService->enrollConfirmedSenseFromOccurrence($sense, $occurrence);
     }
 
     private function assertSameScope(WordSenseOccurrence $occurrence, WordSense $sense): void
@@ -443,7 +445,7 @@ class WordSenseOccurrenceService
         }
     }
 
-    private function readingOccurrenceForEvidence(ReadingOccurrenceSenseEvidence $evidence): ?WordSenseOccurrence
+    public function readingOccurrenceForEvidence(ReadingOccurrenceSenseEvidence $evidence): ?WordSenseOccurrence
     {
         return WordSenseOccurrence::query()
             ->lockForUpdate()

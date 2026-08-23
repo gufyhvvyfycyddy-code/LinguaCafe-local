@@ -78,6 +78,8 @@ class GoalController extends Controller
         
         try {
             $this->goalService->updateCalendarData($userId, $language, $achievementGoalId, $achievementType, $day, $newValue);
+        } catch (\InvalidArgumentException $e) {
+            abort(422, $e->getMessage());
         } catch (\Exception $e) {
             abort(500, $e->getMessage());
         }

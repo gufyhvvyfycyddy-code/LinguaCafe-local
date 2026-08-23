@@ -90,11 +90,17 @@ class ManualWordSenseController extends Controller
                         ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE,
                         null,
                     );
+                    $sourceOccurrence = $this->wordSenseOccurrenceService->readingOccurrenceForEvidence($evidence);
+                    if (!$sourceOccurrence) {
+                        throw new \InvalidArgumentException('Reading source occurrence does not exist.');
+                    }
                     $result = $this->wordSenseService->createManualSense(
                         $user->id,
                         $user->selected_language,
                         $data,
                         false,
+                        WordSense::LEARNING_ORIGIN_READING,
+                        $sourceOccurrence,
                     );
                     $this->wordSenseOccurrenceService->bindReadingEvidenceToSense($evidence, $result['sense']);
 

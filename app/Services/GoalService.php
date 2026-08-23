@@ -17,7 +17,7 @@ class GoalService
         'learn_words' => ['name' => 'New words', 'quantity' => 10],
     ];
 
-    public function __construct() {}
+    public function __construct(private ?LearningHistoryQueryService $learningHistoryQueryService = null) {}
 
     public function createGoalsForLanguage($userId, $language)
     {
@@ -64,6 +64,10 @@ class GoalService
     */
     public function updateGoalAchievement($userId, $language, $type, $achievedQuantity)
     {
+        if ($type === 'learn_words') {
+            throw new \InvalidArgumentException('The learn_words achievement is derived and cannot be updated.');
+        }
+
         $goal = Goal::where('user_id', $userId)
             ->where('language', $language)
             ->where('type', $type)
@@ -118,7 +122,9 @@ class GoalService
             ->get();
 
         foreach ($goals as $goal) {
-            $goal->todaysQuantity = $goal->getTodaysQuantity();
+            $goal->todaysQuantity = $goal->type === 'learn_words'
+                ? $this->learningHistoryQueryService()->countReadingSensesStartedToday((int) $userId, (string) $language)
+                : $goal->getTodaysQuantity();
         }
 
         return $goals;
@@ -136,6 +142,10 @@ class GoalService
 
         $goal->quantity = $newGoalQuantity;
         $goal->save();
+
+        if ($goal->type === 'learn_words') {
+            return true;
+        }
 
         // also update today's goal achievement
         $achievement = GoalAchievement::where('user_id', $userId)
@@ -229,6 +239,10 @@ class GoalService
 
     public function updateCalendarData($userId, $language, $achievementGoalId, $achievementType, $day, $newValue)
     {
+        if ($achievementType === 'learn_words') {
+            throw new \InvalidArgumentException('The learn_words achievement is derived and cannot be edited.');
+        }
+
         if ($achievementGoalId === -1) {
             $goal = Goal::where('user_id', $userId)
                 ->where('language', $language)
@@ -248,11 +262,28 @@ class GoalService
             $achievement->day = $day;
             $achievement->save();
         } else {
-            GoalAchievement::where('user_id', $userId)
+            $achievement = GoalAchievement::where('user_id', $userId)
+                ->where('language', $language)
                 ->where('id', $achievementGoalId)
-                ->update(['achieved_quantity' => $newValue]);
+                ->firstOrFail();
+            $goal = Goal::where('id', $achievement->goal_id)
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->firstOrFail();
+            if ($goal->type === 'learn_words') {
+                throw new \InvalidArgumentException('The learn_words achievement is derived and cannot be edited.');
+            }
+
+            $achievement->achieved_quantity = $newValue;
+            $achievement->save();
         }
 
         return true;
+    }
+
+    private function learningHistoryQueryService(): LearningHistoryQueryService
+    {
+        return $this->learningHistoryQueryService
+            ?? app(LearningHistoryQueryService::class);
     }
 }

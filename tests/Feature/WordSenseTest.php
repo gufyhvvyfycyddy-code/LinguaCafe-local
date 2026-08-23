@@ -282,6 +282,9 @@ class WordSenseTest extends TestCase
         $this->assertTrue($occurrence->auto_fsrs_allowed);
         $this->assertNotNull($occurrence->review_card_id);
         $this->assertTrue(ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->exists());
+        $sense->refresh();
+        $this->assertSame(WordSense::LEARNING_ORIGIN_NON_READING, $sense->learning_started_origin);
+        $this->assertNull($sense->learning_started_source_occurrence_id);
     }
 
     public function test_import_mapping_keeps_low_confidence_existing_sense_pending(): void
@@ -619,6 +622,8 @@ class WordSenseTest extends TestCase
         $this->assertSame(WordSense::STATUS_CONFIRMED, $sense->status);
         $this->assertSame('verb', $sense->pos);
         $this->assertSame('激增', $sense->sense_zh);
+        $this->assertSame(WordSense::LEARNING_ORIGIN_NON_READING, $sense->learning_started_origin);
+        $this->assertNull($sense->learning_started_source_occurrence_id);
 
         $this->assertDatabaseHas('review_cards', [
             'user_id' => $this->user->id,

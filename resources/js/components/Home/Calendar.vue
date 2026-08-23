@@ -120,7 +120,7 @@
                                                 filled
                                                 dense
                                                 rounded
-                                                :disabled="popupMenu.saving"
+                                                :disabled="popupMenu.saving || achievement.type === 'learn_words'"
                                                 @change="updateAchievement(popupMenu.achievements[index], index, popupMenu.achievements[index].id, popupMenu.achievements[index].achievedQuantity)"
                                             >
                                             </v-text-field>

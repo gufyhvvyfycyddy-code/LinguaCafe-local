@@ -331,6 +331,9 @@ class ReadingOccurrenceSenseExampleBindingTest extends TestCase
         $this->assertSame('The bank reopened.', $source->sentence_en);
         $this->assertSame('The bank reopened.', $sense->example_sentence_en);
         $this->assertNull($sense->example_sentence_zh);
+        $this->assertSame(WordSense::LEARNING_ORIGIN_READING, $sense->learning_started_origin);
+        $this->assertSame($source->id, $sense->learning_started_source_occurrence_id);
+        $this->assertNotNull($sense->learning_started_at);
         $this->assertNull($source->review_card_id);
         $this->assertFalse($source->auto_fsrs_allowed);
         $this->assertSame(1, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->where('target_id', $sense->id)->count());

@@ -9,9 +9,6 @@ use Carbon\Carbon;
 // models
 use App\Models\Setting;
 
-// services
-use App\Services\GoalService;
-
 class EncounteredWord extends Model
 {
     use HasFactory;
@@ -37,11 +34,6 @@ class EncounteredWord extends Model
 
     public function setStage($stage, $ignoreAchivement = false) {
        
-        // if it's a newly saved word, update today's achievement
-        if ($this->stage >= 0 && $stage < 0 && !$ignoreAchivement) {
-            (new GoalService())->updateGoalAchievement($this->user_id, $this->language, 'learn_words', 1);
-        }
-        
         if ($this->stage >= 0 && $stage < 0 && $stage !== -7) {
             $this->relearning = true;
         }

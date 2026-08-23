@@ -25,7 +25,7 @@ class UpdateCalendarDataRequest extends FormRequest
     {
         return [
             'achievementGoalId' => 'required|numeric|gte:-1',
-            'achievementType' => 'required|string',
+            'achievementType' => 'required|string|not_in:learn_words',
             'day' => 'required|string',
             'newValue' => 'required',
         ];

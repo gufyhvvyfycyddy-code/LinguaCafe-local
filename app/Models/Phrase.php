@@ -6,9 +6,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Carbon\Carbon;
 
-// services
-use App\Services\GoalService;
-
 class Phrase extends Model
 {
     use HasFactory;
@@ -24,11 +21,6 @@ class Phrase extends Model
     ];
 
     public function setStage($stage) {       
-        // if it's a newly saved phrase, update today's achievement
-        if ($this->stage >= 0 && $stage < 0) {
-            (new GoalService())->updateGoalAchievement($this->user_id, $this->language, 'learn_words', 1);
-        }
-
         if ($this->stage >= 0 && $stage < 0 && $stage !== -7) {
             $this->relearning = true;
         }

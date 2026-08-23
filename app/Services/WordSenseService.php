@@ -75,7 +75,80 @@ class WordSenseService
 
     public function createReviewCardForSense(WordSense $sense): ?ReviewCard
     {
-        return $this->reviewCardService->ensureSenseCard($sense);
+        return $this->enrollConfirmedSense(
+            $sense,
+            WordSense::LEARNING_ORIGIN_NON_READING,
+        );
+    }
+
+    public function enrollConfirmedSenseFromOccurrence(
+        WordSense $sense,
+        WordSenseOccurrence $occurrence,
+    ): ?ReviewCard {
+        return match ($occurrence->source) {
+            WordSenseOccurrence::SOURCE_READING_OCCURRENCE => $this->enrollConfirmedSense(
+                $sense,
+                WordSense::LEARNING_ORIGIN_READING,
+                $occurrence,
+            ),
+            WordSenseOccurrence::SOURCE_MANUAL_VOCAB_BRIDGE,
+            WordSenseOccurrence::SOURCE_MANUAL_SENSE_ADD,
+            WordSenseOccurrence::SOURCE_SENSE_MAPPING_IMPORT => $this->enrollConfirmedSense(
+                $sense,
+                WordSense::LEARNING_ORIGIN_NON_READING,
+            ),
+            default => throw new \InvalidArgumentException('Unsupported learning-entry occurrence source.'),
+        };
+    }
+
+    public function enrollConfirmedSense(
+        WordSense $sense,
+        string $origin,
+        ?WordSenseOccurrence $sourceOccurrence = null,
+    ): ?ReviewCard {
+        return DB::transaction(function () use ($sense, $origin, $sourceOccurrence) {
+            $lockedSense = WordSense::query()
+                ->where('id', $sense->id)
+                ->where('user_id', $sense->user_id)
+                ->where('language_id', $sense->language_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($lockedSense->status !== WordSense::STATUS_CONFIRMED) {
+                return null;
+            }
+
+            $sourceOccurrence = $this->validatedLearningEntrySource(
+                $lockedSense,
+                $origin,
+                $sourceOccurrence,
+            );
+
+            $cardAlreadyExisted = ReviewCard::query()
+                ->where('user_id', $lockedSense->user_id)
+                ->where('language_id', $lockedSense->language_id)
+                ->where('target_type', ReviewCard::TARGET_SENSE)
+                ->where('target_id', $lockedSense->id)
+                ->exists();
+            $card = $this->reviewCardService->ensureSenseCard($lockedSense);
+
+            if ($card === null || $lockedSense->learning_started_at !== null
+                || $lockedSense->learning_started_origin !== null
+                || $lockedSense->learning_started_source_occurrence_id !== null) {
+                return $card;
+            }
+
+            if ($cardAlreadyExisted) {
+                $lockedSense->learning_started_origin = WordSense::LEARNING_ORIGIN_LEGACY_UNKNOWN;
+            } else {
+                $lockedSense->learning_started_at = now();
+                $lockedSense->learning_started_origin = $origin;
+                $lockedSense->learning_started_source_occurrence_id = $sourceOccurrence?->id;
+            }
+            $lockedSense->save();
+
+            return $card;
+        }, 3);
     }
 
     public function rejectSense(WordSense $sense): WordSense
@@ -232,8 +305,17 @@ class WordSenseService
         string $language,
         array $data,
         bool $createManualOccurrence = true,
+        string $learningOrigin = WordSense::LEARNING_ORIGIN_NON_READING,
+        ?WordSenseOccurrence $learningSourceOccurrence = null,
     ): array {
-        return DB::transaction(function () use ($userId, $language, $data, $createManualOccurrence) {
+        return DB::transaction(function () use (
+            $userId,
+            $language,
+            $data,
+            $createManualOccurrence,
+            $learningOrigin,
+            $learningSourceOccurrence,
+        ) {
             // 0. Validate encountered_word_id ownership BEFORE any writes
             $encounteredWordId = Arr::get($data, 'encountered_word_id');
             $encounteredWord = null;
@@ -266,7 +348,7 @@ class WordSenseService
                 'encountered_word_id' => $encounteredWord ? $encounteredWord->id : null,
             ]);
 
-            $card = $this->createReviewCardForSense($sense);
+            $card = $this->enrollConfirmedSense($sense, $learningOrigin, $learningSourceOccurrence);
             if ($createManualOccurrence) {
                 $this->createManualOccurrence($sense, $card, $data);
             }
@@ -349,6 +431,48 @@ class WordSenseService
                 ],
             ]
         );
+    }
+
+    private function validatedLearningEntrySource(
+        WordSense $sense,
+        string $origin,
+        ?WordSenseOccurrence $sourceOccurrence,
+    ): ?WordSenseOccurrence {
+        if (!in_array($origin, [
+            WordSense::LEARNING_ORIGIN_READING,
+            WordSense::LEARNING_ORIGIN_NON_READING,
+        ], true)) {
+            throw new \InvalidArgumentException('Unsupported learning-entry origin.');
+        }
+
+        if ($origin === WordSense::LEARNING_ORIGIN_NON_READING) {
+            if ($sourceOccurrence !== null) {
+                throw new \InvalidArgumentException('Non-reading learning entry cannot reference a reading occurrence.');
+            }
+
+            return null;
+        }
+
+        if ($sourceOccurrence === null || !$sourceOccurrence->exists) {
+            throw new \InvalidArgumentException('Reading learning entry requires a same-scope canonical reading occurrence.');
+        }
+
+        $sourceOccurrence = WordSenseOccurrence::query()
+            ->where('id', $sourceOccurrence->id)
+            ->where('user_id', $sense->user_id)
+            ->where('language_id', $sense->language_id)
+            ->where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)
+            ->where(function ($query) use ($sense) {
+                $query->whereNull('word_sense_id')
+                    ->orWhere('word_sense_id', $sense->id);
+            })
+            ->lockForUpdate()
+            ->first();
+        if (!$sourceOccurrence) {
+            throw new \InvalidArgumentException('Reading learning entry requires a same-scope canonical reading occurrence.');
+        }
+
+        return $sourceOccurrence;
     }
 
     private function normalizeSenseData(array $data): array

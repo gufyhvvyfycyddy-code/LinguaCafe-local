@@ -6,6 +6,7 @@ use App\Models\AiStudyCardPendingItem;
 use App\Models\Book;
 use App\Models\Chapter;
 use App\Models\User;
+use App\Models\WordSense;
 use App\Services\AiStudyCardCandidateValidationService;
 use App\Services\AiStudyCardGenerationService;
 use App\Services\AiStudyCardPendingLifecycleService;
@@ -45,6 +46,9 @@ class AiStudyCardGenerationServiceTest extends TestCase
         $this->assertDatabaseCount('review_cards', 1);
         $this->assertDatabaseCount('word_sense_occurrences', 1);
         $this->assertDatabaseCount('review_logs', 0);
+        $sense = WordSense::firstOrFail();
+        $this->assertSame(WordSense::LEARNING_ORIGIN_NON_READING, $sense->learning_started_origin);
+        $this->assertNull($sense->learning_started_source_occurrence_id);
         $this->assertTrue($result['safety_flags']['no_fsrs_rescheduled']);
         $this->assertTrue($result['safety_flags']['user_confirmation_received']);
     }

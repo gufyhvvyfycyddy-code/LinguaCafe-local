@@ -61,7 +61,7 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
         $this->assertSame(1, ReviewCard::where('target_type', ReviewCard::TARGET_SENSE)->count());
         $this->assertSame(0, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count());
         $this->assertSame(0, ReviewLog::count());
-        $this->assertSame(1, $this->learnedToday());
+        $this->assertSame(0, $this->learnedToday());
     }
 
     public function test_keep_new_creates_sense_card_but_keeps_yellow_stage_and_goal(): void
@@ -126,7 +126,7 @@ class EncounteredWordLearningEnrollmentTest extends TestCase
         $this->addSense($word, ['sense_zh' => '第二释义'])->assertOk();
 
         $this->assertSame(-1, $word->fresh()->stage);
-        $this->assertSame(1, $this->learnedToday());
+        $this->assertSame(0, $this->learnedToday());
         $this->assertSame(0, ReviewCard::where('target_type', ReviewCard::TARGET_WORD)->count());
         $this->assertSame(0, ReviewLog::count());
     }

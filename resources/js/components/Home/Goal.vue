@@ -31,7 +31,7 @@
             </div>
 
             <div v-if="name == 'New words'">
-                高亮并保存 {{ goalQuantity }} 个新词用于复习。
+                今天阅读新学 {{ todaysAchievedQuantity }} / {{ goalQuantity }} 个词义
             </div>
         </v-card-text>
         <v-spacer></v-spacer>

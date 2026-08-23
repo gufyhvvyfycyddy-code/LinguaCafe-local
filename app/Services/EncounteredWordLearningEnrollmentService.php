@@ -6,10 +6,6 @@ use App\Models\EncounteredWord;
 
 class EncounteredWordLearningEnrollmentService
 {
-    public function __construct(private GoalService $goalService)
-    {
-    }
-
     public function enrollFromConfirmedSense(EncounteredWord $word, bool $keepNew): ?array
     {
         if ($word->stage === 0 || $word->stage === 1) {
@@ -24,12 +20,6 @@ class EncounteredWordLearningEnrollmentService
             $word->added_to_srs = null;
             $word->save();
 
-            $this->goalService->updateGoalAchievement(
-                $word->user_id,
-                $word->language,
-                'learn_words',
-                1,
-            );
             $stageChanged = true;
         }
 
