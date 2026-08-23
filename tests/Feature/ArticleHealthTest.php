@@ -382,7 +382,7 @@ class ArticleHealthTest extends TestCase
             'lemma' => 'health',
             'surface_form' => 'health',
             'pos' => 'noun',
-            'sense_key' => hash('sha256', $user->id . ':' . ($overrides['lemma'] ?? 'health') . ':' . Str::uuid()),
+            'sense_key' => hash('sha256', $user->id.':'.($overrides['lemma'] ?? 'health').':'.Str::uuid()),
             'sense_zh' => '健康',
             'sense_en' => 'health',
             'aliases_zh' => [],

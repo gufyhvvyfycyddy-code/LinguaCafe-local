@@ -9,9 +9,7 @@ use Illuminate\Support\Facades\Auth;
 
 class ArticleHealthController extends Controller
 {
-    public function __construct(private readonly ArticleHealthService $articleHealthService)
-    {
-    }
+    public function __construct(private readonly ArticleHealthService $articleHealthService) {}
 
     public function show(Request $request): JsonResponse
     {

@@ -110,7 +110,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      * @return array{status: string}
      */
     private function tokenizerCheck(array &$findings): array
@@ -134,13 +134,13 @@ class ArticleHealthService
         $baseUrl = str_starts_with($configured, 'http://')
             || str_starts_with($configured, 'https://')
             ? rtrim($configured, '/')
-            : 'http://' . rtrim($configured, '/') . ':8678';
+            : 'http://'.rtrim($configured, '/').':8678';
 
         try {
             $response = Http::timeout(max(
                 1,
                 min(10, (int) config('article_health.tokenizer_timeout_seconds', 3)),
-            ))->get($baseUrl . '/tokenizer/health');
+            ))->get($baseUrl.'/tokenizer/health');
             $payload = $response->json();
             if ($response->successful()
                 && is_array($payload)
@@ -186,7 +186,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      */
     private function inspectBooks(
         int $userId,
@@ -231,8 +231,8 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
-     * @param array<string, array{status: string}> $checks
+     * @param  list<array<string, mixed>>  $findings
+     * @param  array<string, array{status: string}>  $checks
      */
     private function inspectChapters(
         int $userId,
@@ -291,6 +291,7 @@ class ArticleHealthService
                     '章节的 tokenizer 处理状态为失败。',
                     ['book_id' => (int) $chapter->book_id],
                 );
+
                 continue;
             }
             if ($chapter->processing_status !== 'processed') {
@@ -305,6 +306,7 @@ class ArticleHealthService
                     '章节尚未完成 tokenizer 处理。',
                     ['book_id' => (int) $chapter->book_id],
                 );
+
                 continue;
             }
 
@@ -369,7 +371,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      */
     private function inspectReferences(
         int $userId,
@@ -381,19 +383,19 @@ class ArticleHealthService
         if ($bookId === null) {
             $this->invalidReferenceFinding(
                 DB::table('word_sense_occurrences as occurrences')
-                ->where('occurrences.user_id', $userId)
-                ->where('occurrences.language', $language)
-                ->whereNotNull('occurrences.chapter_id')
-                ->whereNotExists(function (Builder $query) use ($userId, $language): void {
-                    $query->selectRaw('1')
-                        ->from('chapters')
-                        ->whereColumn('chapters.id', 'occurrences.chapter_id')
-                        ->where('chapters.user_id', $userId)
-                        ->where('chapters.language', $language);
-                }),
-            'ARTICLE_OCCURRENCE_CHAPTER_INVALID',
-            '发生记录引用的章节不存在或不属于当前用户/语言。',
-            $sampleLimit,
+                    ->where('occurrences.user_id', $userId)
+                    ->where('occurrences.language', $language)
+                    ->whereNotNull('occurrences.chapter_id')
+                    ->whereNotExists(function (Builder $query) use ($userId, $language): void {
+                        $query->selectRaw('1')
+                            ->from('chapters')
+                            ->whereColumn('chapters.id', 'occurrences.chapter_id')
+                            ->where('chapters.user_id', $userId)
+                            ->where('chapters.language', $language);
+                    }),
+                'ARTICLE_OCCURRENCE_CHAPTER_INVALID',
+                '发生记录引用的章节不存在或不属于当前用户/语言。',
+                $sampleLimit,
                 $findings,
             );
         }
@@ -490,7 +492,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      */
     private function invalidReferenceFinding(
         Builder $query,
@@ -525,7 +527,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      */
     private function inspectFallbackRatio(int $userId, string $language, array &$findings): void
     {
@@ -586,7 +588,7 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
+     * @param  list<array<string, mixed>>  $findings
      */
     private function inspectVocabulary(
         int $userId,
@@ -692,8 +694,8 @@ class ArticleHealthService
     }
 
     /**
-     * @param list<array<string, mixed>> $findings
-     * @param array<string, mixed> $metadata
+     * @param  list<array<string, mixed>>  $findings
+     * @param  array<string, mixed>  $metadata
      */
     private function addFinding(
         array &$findings,
