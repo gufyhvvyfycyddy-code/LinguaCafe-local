@@ -381,6 +381,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/{chapterId}/reading-occurrence-evidence', [App\Http\Controllers\ReadingOccurrenceEvidenceController::class, 'store']);
     Route::post('/chapters/{chapterId}/reading-sessions', [App\Http\Controllers\ReadingSessionController::class, 'store']);
     Route::post('/chapters/reading-sessions/interactions', [App\Http\Controllers\ReadingSessionController::class, 'recordInteraction']);
+    Route::get('/chapters/{chapter}/reading-continuity', [App\Http\Controllers\ReadingContinuityController::class, 'show']);
+    Route::put('/chapters/{chapter}/reading-progress', [App\Http\Controllers\ReadingContinuityController::class, 'update']);
 
     // AI study card pending markers
     Route::get('/ai-study-card/pending-items', [App\Http\Controllers\AiStudyCardPendingItemController::class, 'index']);

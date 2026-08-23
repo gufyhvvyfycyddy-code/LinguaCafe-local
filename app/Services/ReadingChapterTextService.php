@@ -81,6 +81,44 @@ class ReadingChapterTextService
     }
 
     /**
+     * @return array<int, int>
+     */
+    public function positionableCanonicalTokenRanks(Chapter $chapter): array
+    {
+        $ranks = [];
+        $rank = 0;
+
+        foreach ($this->tokenMap($chapter) as $canonicalTokenIndex => $token) {
+            if (!isset($token->word_index) || (int) $token->word_index !== (int) $canonicalTokenIndex) {
+                continue;
+            }
+            if ($this->isStructure($token)) {
+                continue;
+            }
+            if (preg_match('/\S/u', (string) ($token->word ?? '')) !== 1) {
+                continue;
+            }
+
+            $ranks[(int) $canonicalTokenIndex] = $rank;
+            $rank++;
+        }
+
+        return $ranks;
+    }
+
+    public function isCanonicalPositionToken(Chapter $chapter, int $canonicalTokenIndex): bool
+    {
+        if ($canonicalTokenIndex < 0) {
+            return false;
+        }
+
+        return array_key_exists(
+            $canonicalTokenIndex,
+            $this->positionableCanonicalTokenRanks($chapter),
+        );
+    }
+
+    /**
      * @return array<int, string>
      */
     public function sentenceMap(Chapter $chapter): array
