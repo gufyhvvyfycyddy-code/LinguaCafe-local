@@ -73,6 +73,66 @@ class ArticleHealthTest extends TestCase
             ]);
     }
 
+    public function test_book_scope_is_exact_and_foreign_or_wrong_language_books_are_hidden(): void
+    {
+        $user = $this->user('health-book-scope@example.test');
+        $other = $this->user('health-book-scope-other@example.test');
+        $emptyBook = $this->book($user, 'Empty scoped book');
+        $healthyBook = $this->book($user, 'Healthy scoped book');
+        $this->chapter($user, $healthyBook);
+        $foreignBook = $this->book($other, 'Foreign book');
+        $wrongLanguageBook = $this->book($user, 'Wrong language book');
+        $wrongLanguageBook->forceFill(['language' => 'japanese'])->save();
+
+        $this->actingAs($user)
+            ->getJson("/article-health/data?book_id={$emptyBook->id}")
+            ->assertOk()
+            ->assertJsonPath('article_health.scope.book_id', $emptyBook->id)
+            ->assertJsonPath('article_health.scope.book_name', 'Empty scoped book')
+            ->assertJsonFragment(['code' => 'ARTICLE_BOOK_EMPTY']);
+
+        $this->actingAs($user)
+            ->getJson("/article-health/data?book_id={$healthyBook->id}")
+            ->assertOk()
+            ->assertJsonPath('article_health.scope.book_id', $healthyBook->id)
+            ->assertJsonPath('article_health.summary.total', 0)
+            ->assertJsonMissing(['code' => 'ARTICLE_BOOK_EMPTY']);
+
+        $this->actingAs($user)->getJson("/article-health/data?book_id={$foreignBook->id}")->assertNotFound();
+        $this->actingAs($user)->getJson("/article-health/data?book_id={$wrongLanguageBook->id}")->assertNotFound();
+        $this->actingAs($user)->getJson('/article-health/data?book_id=0')->assertUnprocessable();
+    }
+
+    public function test_book_scope_limits_reference_findings_to_occurrences_in_that_book(): void
+    {
+        $user = $this->user('health-book-reference@example.test');
+        $selectedBook = $this->book($user, 'Selected book');
+        $selectedChapter = $this->chapter($user, $selectedBook);
+        $otherBook = $this->book($user, 'Other book');
+        $otherChapter = $this->chapter($user, $otherBook);
+        $selectedOccurrence = $this->occurrence($user, [
+            'chapter_id' => $selectedChapter->id,
+            'word_sense_id' => 930001,
+            'review_card_id' => 930002,
+        ]);
+        $otherOccurrence = $this->occurrence($user, [
+            'chapter_id' => $otherChapter->id,
+            'word_sense_id' => 940001,
+            'review_card_id' => 940002,
+        ]);
+
+        $findings = $this->actingAs($user)
+            ->getJson("/article-health/data?book_id={$selectedBook->id}")
+            ->assertOk()
+            ->json('article_health.findings');
+        $byCode = collect($findings)->keyBy('code');
+
+        $this->assertSame([$selectedOccurrence->id], $byCode['ARTICLE_OCCURRENCE_SENSE_INVALID']['metadata']['sample_ids']);
+        $this->assertSame([$selectedOccurrence->id], $byCode['ARTICLE_OCCURRENCE_CARD_INVALID']['metadata']['sample_ids']);
+        $this->assertNotContains($otherOccurrence->id, $byCode['ARTICLE_OCCURRENCE_SENSE_INVALID']['metadata']['sample_ids']);
+        $this->assertArrayNotHasKey('ARTICLE_OCCURRENCE_CHAPTER_INVALID', $byCode->all());
+    }
+
     public function test_content_readiness_findings_cover_empty_invalid_pending_and_failed_chapters(): void
     {
         $user = $this->user('health-content@example.test');
@@ -257,6 +317,7 @@ class ArticleHealthTest extends TestCase
         $senseBefore = DB::table('word_senses')->where('user_id', $user->id)->first();
 
         $this->actingAs($user)->getJson('/article-health/data')->assertOk();
+        $this->actingAs($user)->getJson("/article-health/data?book_id={$book->id}")->assertOk();
 
         $after = collect($tables)->mapWithKeys(
             fn (string $table): array => [$table => DB::table($table)->count()],

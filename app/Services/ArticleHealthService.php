@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -13,8 +14,20 @@ class ArticleHealthService
     /**
      * @return array<string, mixed>
      */
-    public function report(int $userId, string $language): array
+    public function report(int $userId, string $language, ?int $bookId = null): array
     {
+        $book = null;
+        if ($bookId !== null) {
+            $book = DB::table('books')
+                ->where('id', $bookId)
+                ->where('user_id', $userId)
+                ->where('language', $language)
+                ->first(['id', 'name']);
+            if ($book === null) {
+                throw (new ModelNotFoundException())->setModel('Book', [$bookId]);
+            }
+        }
+
         $findings = [];
         $checks = [
             'tokenizer' => $this->tokenizerCheck($findings),
@@ -24,25 +37,28 @@ class ArticleHealthService
         $sampleLimit = max(1, min(100, (int) config('article_health.sample_limit', 20)));
         $truncated = false;
 
-        $this->inspectBooks($userId, $language, $scanLimit, $findings, $truncated);
+        $this->inspectBooks($userId, $language, $bookId, $scanLimit, $findings, $truncated);
         $this->inspectChapters(
             $userId,
             $language,
+            $bookId,
             $scanLimit,
             $findings,
             $checks,
             $truncated,
         );
-        $this->inspectReferences($userId, $language, $sampleLimit, $findings);
-        $this->inspectFallbackRatio($userId, $language, $findings);
-        $this->inspectVocabulary(
-            $userId,
-            $language,
-            $scanLimit,
-            $sampleLimit,
-            $findings,
-            $truncated,
-        );
+        $this->inspectReferences($userId, $language, $bookId, $sampleLimit, $findings);
+        if ($bookId === null) {
+            $this->inspectFallbackRatio($userId, $language, $findings);
+            $this->inspectVocabulary(
+                $userId,
+                $language,
+                $scanLimit,
+                $sampleLimit,
+                $findings,
+                $truncated,
+            );
+        }
 
         if ($truncated) {
             $this->addFinding(
@@ -75,7 +91,11 @@ class ArticleHealthService
 
         return [
             'generated_at' => now('UTC')->toIso8601String(),
-            'scope' => ['language' => $language],
+            'scope' => array_filter([
+                'language' => $language,
+                'book_id' => $bookId,
+                'book_name' => $book?->name,
+            ], fn (mixed $value): bool => $value !== null),
             'status' => $summary['critical'] > 0
                 ? 'critical'
                 : ($summary['warning'] > 0 ? 'warning' : 'healthy'),
@@ -145,12 +165,33 @@ class ArticleHealthService
         return ['status' => 'unavailable'];
     }
 
+    private function scopeOccurrenceQuery(
+        Builder $query,
+        int $userId,
+        string $language,
+        ?int $bookId,
+    ): Builder {
+        if ($bookId === null) {
+            return $query;
+        }
+
+        return $query->whereExists(function (Builder $scope) use ($userId, $language, $bookId): void {
+            $scope->selectRaw('1')
+                ->from('chapters as scoped_chapters')
+                ->whereColumn('scoped_chapters.id', 'occurrences.chapter_id')
+                ->where('scoped_chapters.user_id', $userId)
+                ->where('scoped_chapters.language', $language)
+                ->where('scoped_chapters.book_id', $bookId);
+        });
+    }
+
     /**
      * @param list<array<string, mixed>> $findings
      */
     private function inspectBooks(
         int $userId,
         string $language,
+        ?int $bookId,
         int $limit,
         array &$findings,
         bool &$truncated,
@@ -158,6 +199,7 @@ class ArticleHealthService
         $books = DB::table('books as books')
             ->where('books.user_id', $userId)
             ->where('books.language', $language)
+            ->when($bookId !== null, fn (Builder $query) => $query->where('books.id', $bookId))
             ->whereNotExists(function (Builder $query) use ($userId, $language): void {
                 $query->selectRaw('1')
                     ->from('chapters')
@@ -195,6 +237,7 @@ class ArticleHealthService
     private function inspectChapters(
         int $userId,
         string $language,
+        ?int $bookId,
         int $limit,
         array &$findings,
         array &$checks,
@@ -203,6 +246,7 @@ class ArticleHealthService
         $chapters = DB::table('chapters')
             ->where('user_id', $userId)
             ->where('language', $language)
+            ->when($bookId !== null, fn (Builder $query) => $query->where('book_id', $bookId))
             ->orderBy('id')
             ->limit($limit + 1)
             ->get([
@@ -300,6 +344,7 @@ class ArticleHealthService
         $duplicates = DB::table('chapters')
             ->where('user_id', $userId)
             ->where('language', $language)
+            ->when($bookId !== null, fn (Builder $query) => $query->where('book_id', $bookId))
             ->select(['book_id', 'position'])
             ->selectRaw('COUNT(*) as duplicate_count')
             ->groupBy(['book_id', 'position'])
@@ -329,11 +374,13 @@ class ArticleHealthService
     private function inspectReferences(
         int $userId,
         string $language,
+        ?int $bookId,
         int $sampleLimit,
         array &$findings,
     ): void {
-        $this->invalidReferenceFinding(
-            DB::table('word_sense_occurrences as occurrences')
+        if ($bookId === null) {
+            $this->invalidReferenceFinding(
+                DB::table('word_sense_occurrences as occurrences')
                 ->where('occurrences.user_id', $userId)
                 ->where('occurrences.language', $language)
                 ->whereNotNull('occurrences.chapter_id')
@@ -347,37 +394,48 @@ class ArticleHealthService
             'ARTICLE_OCCURRENCE_CHAPTER_INVALID',
             '发生记录引用的章节不存在或不属于当前用户/语言。',
             $sampleLimit,
-            $findings,
-        );
+                $findings,
+            );
+        }
         $this->invalidReferenceFinding(
-            DB::table('word_sense_occurrences as occurrences')
-                ->where('occurrences.user_id', $userId)
-                ->where('occurrences.language', $language)
-                ->whereNotNull('occurrences.word_sense_id')
-                ->whereNotExists(function (Builder $query) use ($userId, $language): void {
-                    $query->selectRaw('1')
-                        ->from('word_senses')
-                        ->whereColumn('word_senses.id', 'occurrences.word_sense_id')
-                        ->where('word_senses.user_id', $userId)
-                        ->where('word_senses.language', $language);
-                }),
+            $this->scopeOccurrenceQuery(
+                DB::table('word_sense_occurrences as occurrences')
+                    ->where('occurrences.user_id', $userId)
+                    ->where('occurrences.language', $language)
+                    ->whereNotNull('occurrences.word_sense_id')
+                    ->whereNotExists(function (Builder $query) use ($userId, $language): void {
+                        $query->selectRaw('1')
+                            ->from('word_senses')
+                            ->whereColumn('word_senses.id', 'occurrences.word_sense_id')
+                            ->where('word_senses.user_id', $userId)
+                            ->where('word_senses.language', $language);
+                    }),
+                $userId,
+                $language,
+                $bookId,
+            ),
             'ARTICLE_OCCURRENCE_SENSE_INVALID',
             '发生记录引用的词义不存在或不属于当前用户/语言。',
             $sampleLimit,
             $findings,
         );
         $this->invalidReferenceFinding(
-            DB::table('word_sense_occurrences as occurrences')
-                ->where('occurrences.user_id', $userId)
-                ->where('occurrences.language', $language)
-                ->whereNotNull('occurrences.review_card_id')
-                ->whereNotExists(function (Builder $query) use ($userId, $language): void {
-                    $query->selectRaw('1')
-                        ->from('review_cards')
-                        ->whereColumn('review_cards.id', 'occurrences.review_card_id')
-                        ->where('review_cards.user_id', $userId)
-                        ->where('review_cards.language', $language);
-                }),
+            $this->scopeOccurrenceQuery(
+                DB::table('word_sense_occurrences as occurrences')
+                    ->where('occurrences.user_id', $userId)
+                    ->where('occurrences.language', $language)
+                    ->whereNotNull('occurrences.review_card_id')
+                    ->whereNotExists(function (Builder $query) use ($userId, $language): void {
+                        $query->selectRaw('1')
+                            ->from('review_cards')
+                            ->whereColumn('review_cards.id', 'occurrences.review_card_id')
+                            ->where('review_cards.user_id', $userId)
+                            ->where('review_cards.language', $language);
+                    }),
+                $userId,
+                $language,
+                $bookId,
+            ),
             'ARTICLE_OCCURRENCE_CARD_INVALID',
             '发生记录引用的复习卡不存在或不属于当前用户/语言。',
             $sampleLimit,
@@ -395,6 +453,19 @@ class ArticleHealthService
                     ->where('chapters.user_id', $userId)
                     ->where('chapters.language', $language);
             });
+        if ($bookId !== null) {
+            $invalidSenseSources->whereExists(function (Builder $query) use ($userId, $language, $bookId): void {
+                $query->selectRaw('1')
+                    ->from('word_sense_occurrences as scoped_occurrences')
+                    ->join('chapters as scoped_chapters', 'scoped_chapters.id', '=', 'scoped_occurrences.chapter_id')
+                    ->whereColumn('scoped_occurrences.word_sense_id', 'senses.id')
+                    ->where('scoped_occurrences.user_id', $userId)
+                    ->where('scoped_occurrences.language', $language)
+                    ->where('scoped_chapters.user_id', $userId)
+                    ->where('scoped_chapters.language', $language)
+                    ->where('scoped_chapters.book_id', $bookId);
+            });
+        }
         $count = (clone $invalidSenseSources)->count();
         if ($count > 0) {
             $this->addFinding(

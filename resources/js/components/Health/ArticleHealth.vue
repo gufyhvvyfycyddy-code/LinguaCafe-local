@@ -6,7 +6,7 @@
                     <div>
                         <h1 class="text-h4 font-weight-bold mb-1">内容健康</h1>
                         <p class="text-body-2 text--secondary mb-0">
-                            只读检查当前英语学习资料、来源引用与 tokenizer 就绪状态。
+                            只读检查{{ report && report.scope.book_name ? `“${report.scope.book_name}”` : '当前英语学习资料' }}、来源引用与 tokenizer 就绪状态。
                         </p>
                     </div>
                     <v-spacer />
@@ -44,7 +44,7 @@
                                 <div>
                                     <div class="text-overline">当前范围</div>
                                     <div class="text-h6">
-                                        {{ report.scope.language === 'english' ? '英语' : report.scope.language }}
+                                        {{ report.scope.book_name || (report.scope.language === 'english' ? '英语' : report.scope.language) }}
                                     </div>
                                 </div>
                                 <v-spacer />
@@ -192,7 +192,9 @@ export default {
             this.loading = true
             this.error = ''
 
-            axios.get('/article-health/data')
+            const requestedBookId = this.$route?.query?.book_id
+            const params = requestedBookId === undefined ? {} : { book_id: requestedBookId }
+            axios.get('/article-health/data', { params })
                 .then((response) => {
                     this.report = response.data.article_health
                 })

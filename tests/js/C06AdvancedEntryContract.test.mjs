@@ -12,7 +12,6 @@ const advancedRoutes = [
     ['自定义学习', '/custom-study'],
     ['学习总览', '/study-overview'],
     ['备份与恢复', '/admin/dashboard'],
-    ['文章检查', '/article-health'],
 ];
 
 const layoutNavigation = layout.match(/navigation:\s*\[([\s\S]*?)\]\s*,/)?.[1];
@@ -33,6 +32,7 @@ test('advanced entry reuses the existing route families without engineering labe
     assert.doesNotMatch(settings, /词汇搜索/);
     assert.doesNotMatch(settings, /url:\s*['"]\/vocabulary\/search['"]/);
     assert.doesNotMatch(settings, /复习卡管理|url:\s*['"]\/review-cards\/manage['"]/);
+    assert.doesNotMatch(settings, /文章检查|url:\s*['"]\/article-health['"]/);
     assert.doesNotMatch(settingsTemplate, /FSRS|Leech|ReviewCard|target_type|生命周期/);
     assert.doesNotMatch(layout, /高级复习卡管理/);
     for (const [title, url] of advancedRoutes) {

@@ -41,6 +41,12 @@
                                 :loading="retryFailedImportsLoading"
                                 @click="retryFailedImports()"
                             >重试失败导入</v-btn>
+                            <v-btn
+                                class="menu-button"
+                                tile
+                                color="white"
+                                :to="{ path: '/article-health', query: { book_id: book.id } }"
+                            >检查内容</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showEditBookDialog()">编辑</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog()">删除</v-btn>
                         </v-menu>

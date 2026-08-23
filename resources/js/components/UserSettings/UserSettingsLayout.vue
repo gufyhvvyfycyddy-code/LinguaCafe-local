@@ -71,12 +71,6 @@
                         url: '/admin/dashboard',
                         icon: 'mdi-database',
                     },
-                    {
-                        title: '文章检查',
-                        description: '检查阅读材料中的内容问题。',
-                        url: '/article-health',
-                        icon: 'mdi-heart-pulse',
-                    },
                 ],
             }
         },
