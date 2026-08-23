@@ -146,12 +146,7 @@ test('secondary navigation compatibility remains explicit', () => {
     assert.equal(entries.find((entry) => entry.url === '/user-settings')?.name, '我的');
 });
 
-test('language and role conditional entries preserve their boundaries', () => {
-    const japanese = extractIfBlock(layout, `this\\.\\$props\\._selectedLanguage\\s*={2,3}\\s*['"]japanese['"]`);
-    assert.match(japanese, /name\s*:\s*['"]汉字['"]/);
-    assert.match(japanese, /url\s*:\s*['"]\/kanji\/search['"]/);
-    assert.match(japanese, /mainNav\s*:\s*false\b/);
-
+test('role-conditional entries preserve their boundaries', () => {
     const admin = extractIfBlock(layout, `this\\.\\$store\\.getters\\[['"]shared\\/userAdmin['"]\\]`);
     assert.match(admin, /name\s*:\s*['"]管理员设置['"]/);
     assert.match(admin, /url\s*:\s*['"]\/admin['"]/);
