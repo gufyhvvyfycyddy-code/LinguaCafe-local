@@ -8,15 +8,17 @@ const root = join(__dirname, '..', '..');
 const parentPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardManage.vue');
 const surfacePath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSearchSurface.vue');
 const savedSearchPath = join(root, 'resources', 'js', 'components', 'ReviewCards', 'ReviewCardSavedSearchPanel.vue');
+const overviewPath = join(root, 'resources', 'js', 'components', 'StudyOverview', 'StudyOverview.vue');
 const filterStatePath = join(root, 'resources', 'js', 'services', 'ReviewCardManageFilterState.js');
 
 assert.ok(existsSync(surfacePath), 'ReviewCardSearchSurface.vue must exist');
-assert.ok(existsSync(savedSearchPath), 'ReviewCardSavedSearchPanel.vue must remain the Saved Search CRUD owner');
+assert.ok(existsSync(savedSearchPath), 'ReviewCardSavedSearchPanel.vue must preserve legacy deep-link reads');
 assert.ok(existsSync(filterStatePath), 'ReviewCardManageFilterState.js must remain the canonical filter-state helper');
 
 const parent = readFileSync(parentPath, 'utf8');
 const surface = readFileSync(surfacePath, 'utf8');
 const savedSearch = readFileSync(savedSearchPath, 'utf8');
+const overview = readFileSync(overviewPath, 'utf8');
 
 assert.match(parent, /import ReviewCardSearchSurface from ['"]\.\/ReviewCardSearchSurface\.vue['"]/);
 assert.match(parent, /<review-card-search-surface/);
@@ -48,7 +50,14 @@ assert.doesNotMatch(surface, /new RegExp/);
 assert.doesNotMatch(surface, /governanceStatus|lifecycleStatus/);
 
 assert.match(savedSearch, /axios\.get\(['"]\/review-cards\/manage\/saved-searches['"]\)/);
-assert.match(savedSearch, /axios\.(?:post|patch|delete)|axios\[method\]/);
+assert.match(savedSearch, /initialSavedSearchId/);
+assert.match(savedSearch, /\$emit\(['"]apply['"]/);
+assert.match(savedSearch, /render\(createElement\)/);
+assert.doesNotMatch(savedSearch, /<template>|保存的搜索|搜索名称|保存当前|axios\.(?:post|patch|delete)|axios\[method\]/);
+
+assert.doesNotMatch(overview, /savedSearchId|savedSearchOptions|saved_search_id|保存的搜索|统计范围|查看范围内卡片/);
+assert.match(overview, /全部已确认词义卡/);
+assert.match(overview, /axios\.get\(['"]\/study-overview\/data['"],\{params:\{period:this\.period\}\}\)/);
 
 const parentLineCount = (parent.match(/\n/g) || []).length;
 assert.ok(parentLineCount < 2500, `ReviewCardManage.vue must fall below 2,500 lines after Phase 3B-1 extraction; got ${parentLineCount}`);

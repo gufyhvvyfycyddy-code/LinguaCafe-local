@@ -1,7 +1,6 @@
 <template>
     <div class="review-card-search-surface">
         <review-card-saved-search-panel
-            :filter-state="currentFilterState"
             :language="language"
             :initial-saved-search-id="initialSavedSearchId"
             @apply="applySavedSearch"
