@@ -56,12 +56,6 @@
                         icon: 'mdi-tune-variant',
                     },
                     {
-                        title: '复习卡管理',
-                        description: '查看和调整已保存词义的复习卡。',
-                        url: '/review-cards/manage',
-                        icon: 'mdi-card-account-details',
-                    },
-                    {
                         title: '学习总览',
                         description: '查看学习内容和进度概况。',
                         url: '/study-overview',

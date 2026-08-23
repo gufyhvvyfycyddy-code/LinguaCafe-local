@@ -1199,7 +1199,7 @@
                 this.showSessionSummary = false;
             },
             exitReview() {
-                window.location.href = '/review-cards/manage';
+                window.location.href = '/learning-history';
             },
             // ==================== Report dialogs ====================
             // All reports are orchestrated by SenseReviewReportCenter.

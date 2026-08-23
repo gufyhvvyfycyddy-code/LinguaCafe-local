@@ -16,6 +16,8 @@ assert.doesNotMatch(experienceController, /\brate\s*\(/, 'auto advance must neve
 assert.doesNotMatch(experienceController, /ReviewCardMarkerPicker|WordSenseTagBulkPicker|\/review-cards\/manage\/tags/);
 assert.doesNotMatch(bar, /slot name="(?:marker|tag)"|\$emit\('bury'\)|mdi-alarm-snooze/);
 assert.doesNotMatch(page, /executeLifecycleAction|ReviewCardSchedulingMutationSurface|manual-operations\/(?:preview|apply)/);
+assert.match(page, /exitReview\(\)\s*\{\s*window\.location\.href\s*=\s*['"]\/learning-history['"]/);
+assert.doesNotMatch(page, /exitReview\(\)\s*\{\s*window\.location\.href\s*=\s*['"]\/review-cards\/manage['"]/);
 assert.match(page, /previousCardSnapshot/);
 assert.match(bar, /aria-label="复习体验工具条"/);
 assert.match(bar, /min-height:\s*44px/);
