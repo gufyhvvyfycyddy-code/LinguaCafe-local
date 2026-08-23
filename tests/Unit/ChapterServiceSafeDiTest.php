@@ -5,6 +5,9 @@ namespace Tests\Unit;
 use App\Services\BookService;
 use App\Services\ChapterService;
 use App\Services\GoalService;
+use App\Services\LegacyWordCardMigrationProtectionService;
+use App\Services\ReadingChapterTextService;
+use App\Services\ReadingContinuityService;
 use ReflectionClass;
 use ReflectionMethod;
 use Tests\TestCase;
@@ -42,7 +45,7 @@ class ChapterServiceSafeDiTest extends TestCase
         $this->assertNotNull($constructor, 'ChapterService must have a constructor.');
 
         $parameters = $constructor->getParameters();
-        $this->assertCount(2, $parameters, 'ChapterService constructor must declare exactly two dependencies.');
+        $this->assertCount(5, $parameters, 'ChapterService constructor must declare exactly five dependencies.');
 
         $this->assertSame(
             BookService::class,
@@ -54,6 +57,10 @@ class ChapterServiceSafeDiTest extends TestCase
             $parameters[1]->getType()->getName(),
             'Second constructor parameter must be GoalService.'
         );
+        $this->assertSame(ReadingChapterTextService::class, $parameters[2]->getType()->getName());
+        $this->assertSame(ReadingContinuityService::class, $parameters[3]->getType()->getName());
+        $this->assertSame(LegacyWordCardMigrationProtectionService::class, $parameters[4]->getType()->getName());
+        $this->assertTrue($parameters[4]->allowsNull());
     }
 
     public function test_container_resolves_chapter_service_with_dependencies_injected(): void
@@ -67,6 +74,8 @@ class ChapterServiceSafeDiTest extends TestCase
         $bookProp->setAccessible(true);
         $goalProp = $reflection->getProperty('goalService');
         $goalProp->setAccessible(true);
+        $continuityProp = $reflection->getProperty('readingContinuityService');
+        $continuityProp->setAccessible(true);
 
         $this->assertInstanceOf(
             BookService::class,
@@ -77,6 +86,11 @@ class ChapterServiceSafeDiTest extends TestCase
             GoalService::class,
             $goalProp->getValue($service),
             'goalService must be injected by the container, not instantiated inline.'
+        );
+        $this->assertInstanceOf(
+            ReadingContinuityService::class,
+            $continuityProp->getValue($service),
+            'readingContinuityService must be injected by the container.'
         );
     }
 

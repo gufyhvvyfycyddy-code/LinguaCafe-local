@@ -23,6 +23,7 @@ class ChapterService {
     private $goalService;
     private LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService;
     private ReadingChapterTextService $readingChapterTextService;
+    private ReadingContinuityService $readingContinuityService;
 
     /**
      * Safe DI optimization (GLM-ArchitectureFirst1000-SafeStability-1).
@@ -32,18 +33,19 @@ class ChapterService {
      * through the Laravel container so tests and jobs that resolve
      * ChapterService via `app(ChapterService::class)` (or constructor
      * injection in ProcessChapter / ChapterController) can substitute
-     * mocks/bindings if needed. Behavior is unchanged: both services
-     * have empty constructors and no internal state.
+     * mocks/bindings if needed.
      */
     public function __construct(
         BookService $bookService,
         GoalService $goalService,
         ReadingChapterTextService $readingChapterTextService,
+        ReadingContinuityService $readingContinuityService,
         ?LegacyWordCardMigrationProtectionService $legacyWordCardMigrationProtectionService = null,
     ) {
         $this->bookService = $bookService;
         $this->goalService = $goalService;
         $this->readingChapterTextService = $readingChapterTextService;
+        $this->readingContinuityService = $readingContinuityService;
         $this->legacyWordCardMigrationProtectionService = $legacyWordCardMigrationProtectionService
             ?? app(LegacyWordCardMigrationProtectionService::class);
     }
@@ -60,11 +62,17 @@ class ChapterService {
         }
 
         $chapters = Chapter
-            ::select(['id', 'name', 'question_type', 'read_count', 'word_count', 'unique_word_ids', 'processing_status'])
+            ::select(['id', 'name', 'question_type', 'read_count', 'word_count', 'unique_word_ids', 'processing_status', 'raw_text', 'processed_text'])
             ->where('book_id', $bookId)
             ->where('user_id', $userId)
             ->where('language', $language)
             ->get();
+
+        $chapterProgress = $this->readingContinuityService->projectChapterProgress(
+            $userId,
+            $language,
+            $chapters,
+        );
 
         $words = EncounteredWord
             ::select(['id', 'word', 'stage'])
@@ -81,6 +89,8 @@ class ChapterService {
             $chapters[$i]->wordCount->known = -1;
             $chapters[$i]->wordCount->highlighted = -1;
             $chapters[$i]->wordCount->new = -1;
+            $chapters[$i]->readingProgress = $chapterProgress[(int) $chapters[$i]->id];
+            $chapters[$i]->makeHidden(['raw_text', 'processed_text']);
         }
         
         $data = new \stdClass();

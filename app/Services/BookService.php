@@ -16,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 
 class BookService {
-    
-    public function __construct() {
+
+    public function __construct(private ReadingContinuityService $readingContinuityService) {
     }
     
     public function getBooks($userId, $language) {
@@ -27,9 +27,29 @@ class BookService {
             ->orderBy('updated_at', 'DESC')
             ->get();
 
-        // sets initial value used by vue in the library
+        $chapters = Chapter::query()
+            ->select(['id', 'book_id', 'raw_text', 'processed_text'])
+            ->where('user_id', $userId)
+            ->where('language', $language)
+            ->where('processing_status', ChapterProcessingStatusEnum::PROCESSED->value)
+            ->whereIn('book_id', $books->pluck('id'))
+            ->get();
+        $chapterProgress = $this->readingContinuityService->projectChapterProgress(
+            $userId,
+            $language,
+            $chapters,
+        );
+        $chapterIdsByBook = $chapters
+            ->groupBy('book_id')
+            ->map(fn ($bookChapters) => $bookChapters->pluck('id'));
+
+        // sets initial values used by Vue in the library
         foreach ($books as $book) {
             $book->wordCount = null;
+            $bookChapterIds = $chapterIdsByBook->get($book->id, collect());
+            $book->readingProgress = $this->readingContinuityService->aggregateProgress(
+                $bookChapterIds->map(fn ($chapterId) => $chapterProgress[(int) $chapterId]),
+            );
         }
 
         return $books;

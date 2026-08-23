@@ -61,6 +61,98 @@ class ReadingContinuityService
         ];
     }
 
+    /**
+     * @param iterable<int, \App\Models\Chapter> $chapters
+     * @return array<int, array{available:bool, percentage:?float, reachedTokens:int, totalTokens:int}>
+     */
+    public function projectChapterProgress(int $userId, string $language, iterable $chapters): array
+    {
+        $projections = [];
+        $revisionByChapter = [];
+        $ranksByChapter = [];
+
+        foreach ($chapters as $chapter) {
+            $chapterId = (int) $chapter->id;
+            $projections[$chapterId] = $this->unavailableProgressProjection();
+
+            try {
+                $ranks = $this->chapterTextService->positionableCanonicalTokenRanks($chapter);
+            } catch (\InvalidArgumentException $e) {
+                continue;
+            }
+            if ($ranks === []) {
+                continue;
+            }
+
+            $revisionByChapter[$chapterId] = $this->chapterTextService->sourceRevision($chapter);
+            $ranksByChapter[$chapterId] = $ranks;
+            $projections[$chapterId] = $this->progressProjection(0, count($ranks));
+        }
+
+        if ($revisionByChapter === []) {
+            return $projections;
+        }
+
+        $progressRows = ReadingProgress::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->where(function ($query) use ($revisionByChapter) {
+                foreach ($revisionByChapter as $chapterId => $sourceRevision) {
+                    $query->orWhere(function ($scope) use ($chapterId, $sourceRevision) {
+                        $scope->where('chapter_id', $chapterId)
+                            ->where('source_revision', $sourceRevision);
+                    });
+                }
+            })
+            ->get()
+            ->keyBy(fn (ReadingProgress $progress): string => $this->progressScopeKey(
+                (int) $progress->chapter_id,
+                (string) $progress->source_revision,
+            ));
+
+        foreach ($revisionByChapter as $chapterId => $sourceRevision) {
+            $ranks = $ranksByChapter[$chapterId];
+            $progress = $progressRows->get($this->progressScopeKey($chapterId, $sourceRevision));
+            if (!$progress) {
+                continue;
+            }
+
+            $furthest = (int) $progress->furthest_canonical_token_index;
+            if (!array_key_exists($furthest, $ranks)) {
+                continue;
+            }
+
+            $projections[$chapterId] = $this->progressProjection(
+                $ranks[$furthest] + 1,
+                count($ranks),
+            );
+        }
+
+        return $projections;
+    }
+
+    /**
+     * @param iterable<int, array{available:bool, percentage:?float, reachedTokens:int, totalTokens:int}> $projections
+     * @return array{available:bool, percentage:?float, reachedTokens:int, totalTokens:int}
+     */
+    public function aggregateProgress(iterable $projections): array
+    {
+        $reachedTokens = 0;
+        $totalTokens = 0;
+
+        foreach ($projections as $projection) {
+            if (($projection['available'] ?? false) !== true) {
+                continue;
+            }
+            $reachedTokens += (int) $projection['reachedTokens'];
+            $totalTokens += (int) $projection['totalTokens'];
+        }
+
+        return $totalTokens === 0
+            ? $this->unavailableProgressProjection()
+            : $this->progressProjection($reachedTokens, $totalTokens);
+    }
+
     public function saveWebPosition(
         int $userId,
         string $language,
@@ -149,5 +241,36 @@ class ReadingContinuityService
             'source_revision' => (string) $progress->source_revision,
             'canonical_token_index' => (int) $progress->furthest_canonical_token_index,
         ];
+    }
+
+    /**
+     * @return array{available:bool, percentage:?float, reachedTokens:int, totalTokens:int}
+     */
+    private function unavailableProgressProjection(): array
+    {
+        return [
+            'available' => false,
+            'percentage' => null,
+            'reachedTokens' => 0,
+            'totalTokens' => 0,
+        ];
+    }
+
+    /**
+     * @return array{available:bool, percentage:float, reachedTokens:int, totalTokens:int}
+     */
+    private function progressProjection(int $reachedTokens, int $totalTokens): array
+    {
+        return [
+            'available' => true,
+            'percentage' => round($reachedTokens / $totalTokens * 100, 1),
+            'reachedTokens' => $reachedTokens,
+            'totalTokens' => $totalTokens,
+        ];
+    }
+
+    private function progressScopeKey(int $chapterId, string $sourceRevision): string
+    {
+        return $chapterId.'|'.$sourceRevision;
     }
 }
