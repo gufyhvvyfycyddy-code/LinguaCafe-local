@@ -157,8 +157,8 @@ describe('MobileApiClient', () => {
     const fetcher = vi
       .fn()
       .mockResolvedValueOnce(envelope({
-        chapter: { content_version: 'sha256:chapter' },
-        tokens: [{ word: 'one' }],
+        chapter: { content_version: 'sha256:chapter', source_revision: 'sha256:revision' },
+        tokens: [{ word: 'one', canonical_token_index: 10 }],
         sentence_translations: [{ sentence_index: 1, source_text: 'One.', translation_zh: '一。' }],
         sense_summaries: [{ occurrence_id: 7, word_sense_id: 8 }],
         dictionary_version: 'sha256:dictionary',
@@ -166,8 +166,8 @@ describe('MobileApiClient', () => {
         next_cursor: 'next',
       }))
       .mockResolvedValueOnce(envelope({
-        chapter: { content_version: 'sha256:chapter' },
-        tokens: [{ word: 'two' }],
+        chapter: { content_version: 'sha256:chapter', source_revision: 'sha256:revision' },
+        tokens: [{ word: 'two', canonical_token_index: 100 }],
         sentence_translations: [{ sentence_index: 2, source_text: 'Two.', translation_zh: '二。' }],
         sense_summaries: [],
         dictionary_version: 'sha256:dictionary',
@@ -178,9 +178,33 @@ describe('MobileApiClient', () => {
     client.setToken('secret');
     const article = await client.chapterPackage(1, 2);
     expect(article.tokens.map(token => token.word)).toEqual(['one', 'two']);
+    expect(article.tokens.map(token => token.canonical_token_index)).toEqual([10, 100]);
+    expect(article.source_revision).toBe('sha256:revision');
     expect(article.dictionary_summaries).toEqual({ one: ['一'], two: ['二'] });
     expect(article.sense_summaries).toEqual([{ occurrence_id: 7, word_sense_id: 8 }]);
     expect(fetcher).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails closed when article shards disagree about source revision', async () => {
+    const shard = (sourceRevision: string, nextCursor: string | null) => envelope({
+      chapter: { content_version: 'sha256:chapter', source_revision: sourceRevision },
+      tokens: [],
+      sentence_translations: [],
+      sense_summaries: [],
+      dictionary_version: 'sha256:dictionary',
+      dictionary_summaries: {},
+      next_cursor: nextCursor,
+    });
+    const fetcher = vi.fn()
+      .mockResolvedValueOnce(shard('sha256:first', 'next'))
+      .mockResolvedValueOnce(shard('sha256:changed', null));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await expect(client.chapterPackage(1, 2)).rejects.toMatchObject({
+      code: 'ARTICLE_PACKAGE_CHANGED',
+      status: 409,
+    });
   });
 
   it('starts and finishes reading only through the server reading contracts', async () => {

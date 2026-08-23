@@ -4,6 +4,8 @@ import type {
   ChapterSummary,
   OfflineSyncIssue,
   QueuedAction,
+  QueuedReadingPositionAction,
+  ReadingContinuity,
   ReviewItem,
   ReviewRating,
   SyncActionResult,
@@ -208,6 +210,44 @@ export class OfflineRepository {
     return queued;
   }
 
+  async enqueueReadingPosition(
+    chapterId: number,
+    sourceRevision: string,
+    canonicalTokenIndex: number,
+    now = new Date(),
+  ): Promise<QueuedReadingPositionAction> {
+    let queued!: QueuedReadingPositionAction;
+    await this.update(state => {
+      queued = {
+        client_action_id: crypto.randomUUID(),
+        type: 'reading_position.update',
+        occurred_at: now.toISOString(),
+        sequence: state.next_sequence++,
+        payload: {
+          chapter_id: chapterId,
+          source_revision: sourceRevision,
+          canonical_token_index: canonicalTokenIndex,
+        },
+      };
+      state.queue.push(queued);
+    });
+    return queued;
+  }
+
+  async pendingReadingPosition(
+    chapterId: number,
+    sourceRevision: string,
+  ): Promise<QueuedReadingPositionAction | null> {
+    const actions = (await this.state()).queue.filter((action): action is QueuedReadingPositionAction => (
+      action.type === 'reading_position.update'
+      && action.payload.chapter_id === chapterId
+      && action.payload.source_revision === sourceRevision
+    ));
+    return actions.sort((a, b) => (
+      b.occurred_at.localeCompare(a.occurred_at) || b.sequence - a.sequence
+    ))[0] ?? null;
+  }
+
   async queuedActions(): Promise<QueuedAction[]> {
     return [...(await this.state()).queue].sort((a, b) => a.sequence - b.sequence);
   }
@@ -228,6 +268,18 @@ export class OfflineRepository {
       state.queue = state.queue.filter(action => {
         const result = byId.get(action.client_action_id);
         if (!result || result.outcome === 'retryable') return true;
+        if (
+          action.type === 'reading_position.update'
+          && (result.outcome === 'applied' || result.outcome === 'replayed')
+          && result.data?.chapter_id === action.payload.chapter_id
+          && result.data.continuity?.source_revision === action.payload.source_revision
+        ) {
+          this.applyReadingContinuityToCachedPackage(
+            state,
+            action.payload.chapter_id,
+            result.data.continuity,
+          );
+        }
         if (result.outcome !== 'applied' && result.outcome !== 'replayed') {
           state.issues.unshift({
             client_action_id: action.client_action_id,
@@ -253,6 +305,23 @@ export class OfflineRepository {
 
   private cached<T>(value: T): CachedValue<T> {
     return { value, cached_at: new Date().toISOString() };
+  }
+
+  private applyReadingContinuityToCachedPackage(
+    state: OfflineState,
+    chapterId: number,
+    continuity: ReadingContinuity,
+  ): void {
+    Object.entries(state.chapter_packages ?? {}).forEach(([key, cached]) => {
+      if (
+        key.endsWith(`:${chapterId}`)
+        && cached.value.source_revision === continuity.source_revision
+        && cached.value.reading_session
+      ) {
+        cached.value.reading_session.continuity = continuity;
+        cached.cached_at = new Date().toISOString();
+      }
+    });
   }
 
   private async state(): Promise<OfflineState> {

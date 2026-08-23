@@ -115,6 +115,9 @@ function syncIssueCopy(issue: OfflineSyncIssue): { title: string; message: strin
     case 'READING_SESSION_NOT_ACTIVE':
     case 'READING_SESSION_STALE_SOURCE':
     case 'READING_OCCURRENCE_STALE':
+    case 'READING_CONTINUITY_CHAPTER_NOT_FOUND':
+    case 'READING_CONTINUITY_STALE_SOURCE':
+    case 'READING_CONTINUITY_INVALID_TOKEN':
       return { title: '阅读内容已经变化', message: '这次离线阅读操作不再适用于当前文章，服务器现有记录保持不变。' };
     case 'IDEMPOTENCY_KEY_REUSED':
       return { title: '操作内容不一致', message: '同一次重试包含了不同内容，因此没有重复提交。' };
@@ -163,6 +166,10 @@ export class LinguaCafeApp {
   private error = '';
   private pendingTextImport: { key: string; actionId: string } | null = null;
   private lookupHistoryOpen = false;
+  private currentReaderCanonicalIndex: number | null = null;
+  private lastQueuedReaderCanonicalIndex: number | null = null;
+  private readerPositionTimer: number | null = null;
+  private readerPositionCleanup: (() => void) | null = null;
 
   constructor(private readonly root: HTMLElement) {
     window.addEventListener('online', () => void this.flushQueue(true));
@@ -370,6 +377,8 @@ export class LinguaCafeApp {
   }
 
   private async openScreen(screen: Screen, recordHistory = true): Promise<void> {
+    await this.queueCurrentReaderPosition();
+    this.stopReaderPositionTracking();
     if (recordHistory && history.state?.linguacafeScreen !== screen) {
       history.pushState({ linguacafeScreen: screen }, '');
     }
@@ -465,6 +474,11 @@ export class LinguaCafeApp {
 
   private async openBook(book: ArticleSummary): Promise<void> {
     if (!this.api) return;
+    await this.queueCurrentReaderPosition();
+    this.stopReaderPositionTracking();
+    this.selectedChapter = null;
+    this.readerPackage = null;
+    this.readerTokens = [];
     this.selectedBook = book;
     this.setBusy('正在读取章节…');
     try {
@@ -580,6 +594,7 @@ export class LinguaCafeApp {
   private async openChapter(chapter: ChapterSummary): Promise<void> {
     if (!this.api || !this.selectedBook) return;
     const bookId = this.selectedBook.book_id;
+    await this.flushQueue();
     this.selectedChapter = chapter;
     this.setBusy('正在打开阅读器…');
     try {
@@ -591,7 +606,18 @@ export class LinguaCafeApp {
           ? cached.reading_session.reading_session_id
           : undefined,
       );
+      if (!this.packageHasCurrentContinuity(this.readerPackage)) {
+        throw new Error('文章包与阅读进度版本不一致，请重新打开章节。');
+      }
       this.readerTokens = this.readerPackage.tokens;
+      const pending = await this.offlineRepository?.pendingReadingPosition(
+        chapter.chapter_id,
+        this.readerPackage.source_revision,
+      );
+      this.currentReaderCanonicalIndex = pending?.payload.canonical_token_index
+        ?? this.readerPackage.reading_session.continuity.resume?.canonical_token_index
+        ?? null;
+      this.lastQueuedReaderCanonicalIndex = this.currentReaderCanonicalIndex;
       this.setServerReachable(true);
       await this.saveOffline(() => this.offlineRepository?.saveChapterPackage(
         bookId,
@@ -605,8 +631,20 @@ export class LinguaCafeApp {
         ? await this.offlineRepository?.chapterPackage(bookId, chapter.chapter_id)
         : null;
       if (cached) {
+        if (!this.packageHasCurrentContinuity(cached)) {
+          this.renderError('无法打开离线章节', new Error('离线文章包与阅读进度版本不一致，请联网更新。'), () => this.openChapter(chapter));
+          return;
+        }
         this.readerPackage = cached;
         this.readerTokens = cached.tokens;
+        const pending = await this.offlineRepository?.pendingReadingPosition(
+          chapter.chapter_id,
+          cached.source_revision,
+        );
+        this.currentReaderCanonicalIndex = pending?.payload.canonical_token_index
+          ?? cached.reading_session.continuity.resume?.canonical_token_index
+          ?? null;
+        this.lastQueuedReaderCanonicalIndex = this.currentReaderCanonicalIndex;
         this.usingOfflineSnapshot = true;
         this.renderReader();
       } else {
@@ -616,11 +654,15 @@ export class LinguaCafeApp {
   }
 
   private renderReader(): void {
+    this.stopReaderPositionTracking();
     const tokens = this.readerTokens.map((token, index) => {
       if (token.is_structure) {
         return token.word === 'PARAGRAPH_BREAK' ? '<span class="paragraph-break"></span>' : '<br />';
       }
-      return `<button class="reader-token" data-token="${index}">${escapeHtml(token.word)}</button>${token.space_after ? ' ' : ''}`;
+      const canonical = token.canonical_token_index === null
+        ? ''
+        : ` data-canonical-token="${token.canonical_token_index}"`;
+      return `<button class="reader-token" data-token="${index}"${canonical}>${escapeHtml(token.word)}</button>${token.space_after ? ' ' : ''}`;
     }).join('');
     this.screenElement().innerHTML = `
       <section class="reader-screen">
@@ -635,7 +677,10 @@ export class LinguaCafeApp {
         <button class="primary large" id="finish-reading">完成阅读</button>
       </section>`;
     this.screenElement().querySelector('#back-chapters')?.addEventListener('click', () => {
-      if (this.selectedBook) void this.openBook(this.selectedBook);
+      if (this.selectedBook) void (async () => {
+        await this.queueCurrentReaderPosition();
+        await this.openBook(this.selectedBook!);
+      })();
     });
     const readerCopy = this.screenElement().querySelector<HTMLElement>('.reader-copy');
     if (readerCopy) readerCopy.style.touchAction = 'pan-y';
@@ -727,6 +772,7 @@ export class LinguaCafeApp {
     });
     this.screenElement().querySelector('#finish-reading')
       ?.addEventListener('click', () => void this.finishReading());
+    this.startReaderPositionTracking();
   }
 
   private async openLookup(token: ReaderToken): Promise<void> {
@@ -897,8 +943,10 @@ export class LinguaCafeApp {
   }
 
   private readingTargetForToken(token: ReaderToken) {
+    if (token.canonical_token_index === null) return undefined;
     return this.readerPackage?.reading_session?.reading_targets.find(target => (
-      token.position >= target.start_word_index && token.position <= target.end_word_index
+      token.canonical_token_index! >= target.start_word_index
+      && token.canonical_token_index! <= target.end_word_index
     ));
   }
 
@@ -941,6 +989,7 @@ export class LinguaCafeApp {
       return;
     }
 
+    await this.queueCurrentReaderPosition();
     await this.flushQueue();
     if ((await this.offlineRepository.queuedActions()).length > 0) {
       this.showToast('仍有离线操作尚未同步，暂不能完成阅读。', true);
@@ -1522,7 +1571,8 @@ export class LinguaCafeApp {
   private renderShellAndCurrentScreen(): void {
     const screen = this.screen;
     this.renderShell();
-    if (screen === 'library') this.renderLibrary();
+    if (screen === 'library' && this.selectedChapter && this.readerPackage) this.renderReader();
+    else if (screen === 'library') this.renderLibrary();
     if (screen === 'review') this.renderReview();
     if (screen === 'home' && this.summary) void this.openHome();
     if (screen === 'vocabulary') void this.openVocabulary();
@@ -1555,6 +1605,109 @@ export class LinguaCafeApp {
       await operation();
     } catch {
       this.showToast('无法更新本机离线包；在线内容仍可使用', true);
+    }
+  }
+
+  private packageHasCurrentContinuity(value: ChapterPackage): value is ChapterPackage & {
+    reading_session: NonNullable<ChapterPackage['reading_session']>;
+  } {
+    const continuity = value.reading_session?.continuity;
+    return Boolean(
+      value.source_revision
+      && value.reading_session
+      && value.reading_session.source_revision === value.source_revision
+      && continuity?.source_revision === value.source_revision
+      && (!continuity.resume || continuity.resume.source_revision === value.source_revision)
+      && (!continuity.furthest || continuity.furthest.source_revision === value.source_revision),
+    );
+  }
+
+  private startReaderPositionTracking(): void {
+    const buttons = [...this.screenElement().querySelectorAll<HTMLButtonElement>('[data-canonical-token]')];
+    if (!buttons.length) return;
+
+    const updateVisiblePosition = () => {
+      const threshold = window.innerHeight * 0.35;
+      const visible = buttons.filter(button => {
+        const rect = button.getBoundingClientRect();
+        return rect.bottom > 0 && rect.top <= threshold;
+      });
+      const button = visible.at(-1) ?? buttons.find(candidate => candidate.getBoundingClientRect().bottom > 0);
+      const canonical = Number(button?.dataset.canonicalToken);
+      if (button && Number.isInteger(canonical)) this.currentReaderCanonicalIndex = canonical;
+    };
+    const schedule = () => {
+      updateVisiblePosition();
+      if (this.readerPositionTimer !== null) window.clearTimeout(this.readerPositionTimer);
+      this.readerPositionTimer = window.setTimeout(() => {
+        this.readerPositionTimer = null;
+        void this.queueCurrentReaderPosition();
+      }, 500);
+    };
+    const persistOnLifecycle = () => {
+      updateVisiblePosition();
+      void this.queueCurrentReaderPosition();
+    };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') persistOnLifecycle();
+    };
+
+    window.addEventListener('scroll', schedule, { passive: true });
+    window.addEventListener('pagehide', persistOnLifecycle);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    let restoreFrame: number | null = null;
+    this.readerPositionCleanup = () => {
+      window.removeEventListener('scroll', schedule);
+      window.removeEventListener('pagehide', persistOnLifecycle);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (this.readerPositionTimer !== null) window.clearTimeout(this.readerPositionTimer);
+      if (restoreFrame !== null) cancelAnimationFrame(restoreFrame);
+      this.readerPositionTimer = null;
+    };
+
+    const resume = this.currentReaderCanonicalIndex;
+    if (resume !== null) {
+      restoreFrame = requestAnimationFrame(() => {
+        restoreFrame = null;
+        this.screenElement().querySelector<HTMLElement>(`[data-canonical-token="${resume}"]`)
+          ?.scrollIntoView({ block: 'center' });
+        updateVisiblePosition();
+      });
+    } else {
+      updateVisiblePosition();
+    }
+  }
+
+  private stopReaderPositionTracking(): void {
+    this.readerPositionCleanup?.();
+    this.readerPositionCleanup = null;
+  }
+
+  private async queueCurrentReaderPosition(): Promise<void> {
+    const chapterId = this.selectedChapter?.chapter_id;
+    const sourceRevision = this.readerPackage?.source_revision;
+    const canonicalTokenIndex = this.currentReaderCanonicalIndex;
+    if (
+      !this.offlineRepository
+      || !chapterId
+      || !sourceRevision
+      || canonicalTokenIndex === null
+      || canonicalTokenIndex === this.lastQueuedReaderCanonicalIndex
+    ) return;
+
+    this.lastQueuedReaderCanonicalIndex = canonicalTokenIndex;
+    try {
+      await this.offlineRepository.enqueueReadingPosition(
+        chapterId,
+        sourceRevision,
+        canonicalTokenIndex,
+      );
+      await this.refreshSyncStatus();
+    } catch {
+      if (this.lastQueuedReaderCanonicalIndex === canonicalTokenIndex) {
+        this.lastQueuedReaderCanonicalIndex = null;
+      }
+      this.showToast('无法保存本机阅读位置；请保持页面打开后重试', true);
     }
   }
 }

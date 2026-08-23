@@ -38,11 +38,13 @@ export interface ArticleSummary {
 export interface ChapterSummary {
   chapter_id: number;
   name: string;
+  source_revision: string;
   token_count: number;
 }
 
 export interface ReaderToken {
   position: number;
+  canonical_token_index: number | null;
   word: string;
   lemma: string | null;
   pos: string | null;
@@ -68,7 +70,7 @@ export interface ReviewItem {
 
 export type ReviewRating = 'again' | 'hard' | 'good' | 'easy';
 
-export type QueuedActionType = 'sense_review.rating' | 'reading_session.interaction';
+export type QueuedActionType = 'sense_review.rating' | 'reading_session.interaction' | 'reading_position.update';
 
 interface QueuedActionBase {
   client_action_id: string;
@@ -98,7 +100,16 @@ export interface QueuedReadingInteractionAction extends QueuedActionBase {
   };
 }
 
-export type QueuedAction = QueuedRatingAction | QueuedReadingInteractionAction;
+export interface QueuedReadingPositionAction extends QueuedActionBase {
+  type: 'reading_position.update';
+  payload: {
+    chapter_id: number;
+    source_revision: string;
+    canonical_token_index: number;
+  };
+}
+
+export type QueuedAction = QueuedRatingAction | QueuedReadingInteractionAction | QueuedReadingPositionAction;
 
 export interface SyncActionResult {
   client_action_id: string;
@@ -108,6 +119,10 @@ export interface SyncActionResult {
     message: string;
     retryable?: boolean;
   };
+  data?: {
+    chapter_id?: number;
+    continuity?: ReadingContinuity;
+  } | null;
 }
 
 export interface SyncBatchResult {
@@ -173,6 +188,7 @@ export interface ArticleSenseSummary {
 }
 
 export interface ChapterPackage {
+  source_revision: string;
   content_version: string;
   dictionary_version: string;
   tokens: ReaderToken[];
@@ -180,6 +196,18 @@ export interface ChapterPackage {
   sense_summaries: ArticleSenseSummary[];
   dictionary_summaries: Record<string, string[]>;
   reading_session?: ReadingSessionProjection;
+}
+
+export interface ReadingProgressAnchor {
+  source_revision: string;
+  canonical_token_index: number;
+  position_occurred_at?: string | null;
+}
+
+export interface ReadingContinuity {
+  source_revision: string;
+  resume: ReadingProgressAnchor | null;
+  furthest: ReadingProgressAnchor | null;
 }
 
 export interface ReadingSenseCandidate {
@@ -205,6 +233,7 @@ export interface ReadingSessionProjection {
   status: string;
   completed: boolean;
   reading_targets: ReadingTarget[];
+  continuity: ReadingContinuity;
 }
 
 export interface ReadingFinishProjection {

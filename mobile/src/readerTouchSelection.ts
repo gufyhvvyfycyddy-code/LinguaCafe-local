@@ -26,6 +26,7 @@ export function readerPhrase(tokens: ReaderToken[], startIndex: number, endIndex
 
   return {
     position: first.position,
+    canonical_token_index: first.canonical_token_index,
     word: join(token => token.word),
     lemma: join(token => token.lemma || token.word),
     pos: 'phrase',

@@ -37,10 +37,12 @@ describe('OfflineRepository', () => {
     const repository = new OfflineRepository(7, 'English', store);
     await repository.saveChapters(3, [{ chapter_id: 9, name: 'One', token_count: 2 }]);
     await repository.saveChapterPackage(3, 9, {
+      source_revision: 'sha256:revision',
       content_version: 'sha256:chapter',
       dictionary_version: 'sha256:dictionary',
       tokens: [{
         position: 1,
+        canonical_token_index: 10,
         word: 'Hello',
         lemma: 'hello',
         pos: 'noun',
@@ -68,6 +70,7 @@ describe('OfflineRepository', () => {
     const store = new MemoryStore();
     const repository = new OfflineRepository(7, 'English', store);
     const articlePackage = {
+      source_revision: 'sha256:revision',
       content_version: 'sha256:chapter',
       dictionary_version: 'sha256:dictionary',
       tokens: [],
@@ -166,6 +169,77 @@ describe('OfflineRepository', () => {
     expect(rating.payload.question_example_key).toBeUndefined();
     expect((await repository.queuedActions()).map(action => action.sequence)).toEqual([1, 2]);
     expect(await repository.pendingCardIds()).toEqual(new Set([10]));
+  });
+
+  it('keeps every reading position event and folds successful server continuity into the cached package', async () => {
+    const store = new MemoryStore();
+    const repository = new OfflineRepository(7, 'English', store);
+    const continuity = {
+      source_revision: 'sha256:revision',
+      resume: {
+        source_revision: 'sha256:revision',
+        canonical_token_index: 100,
+        position_occurred_at: '2026-08-01T00:00:02.000Z',
+      },
+      furthest: { source_revision: 'sha256:revision', canonical_token_index: 100 },
+    };
+    await repository.saveChapterPackage(3, 9, {
+      source_revision: 'sha256:revision',
+      content_version: 'sha256:chapter',
+      dictionary_version: 'sha256:dictionary',
+      tokens: [],
+      sentence_translations: [],
+      sense_summaries: [],
+      dictionary_summaries: {},
+      reading_session: {
+        reading_session_id: '11111111-1111-4111-8111-111111111111',
+        chapter_id: 9,
+        source_revision: 'sha256:revision',
+        status: 'active',
+        completed: false,
+        reading_targets: [],
+        continuity: {
+          source_revision: 'sha256:revision',
+          resume: null,
+          furthest: null,
+        },
+      },
+    });
+
+    const first = await repository.enqueueReadingPosition(9, 'sha256:revision', 10, new Date('2026-08-01T00:00:01Z'));
+    const second = await repository.enqueueReadingPosition(9, 'sha256:revision', 100, new Date('2026-08-01T00:00:02Z'));
+    expect((await repository.queuedActions()).filter(action => action.type === 'reading_position.update')).toHaveLength(2);
+    expect(await repository.pendingReadingPosition(9, 'sha256:revision')).toEqual(second);
+
+    await repository.applySyncResults([
+      {
+        client_action_id: first.client_action_id,
+        outcome: 'applied',
+        error: null,
+        data: { chapter_id: 9, continuity },
+      },
+    ]);
+
+    expect(await repository.pendingReadingPosition(9, 'sha256:revision')).toEqual(second);
+    expect((await repository.chapterPackage(3, 9))?.reading_session?.continuity).toEqual(continuity);
+  });
+
+  it('chooses a pending resume by occurred time before same-device sequence', async () => {
+    const repository = new OfflineRepository(7, 'English', new MemoryStore());
+    const newer = await repository.enqueueReadingPosition(
+      9,
+      'sha256:revision',
+      100,
+      new Date('2026-08-01T00:00:02Z'),
+    );
+    await repository.enqueueReadingPosition(
+      9,
+      'sha256:revision',
+      10,
+      new Date('2026-08-01T00:00:01Z'),
+    );
+
+    expect(await repository.pendingReadingPosition(9, 'sha256:revision')).toEqual(newer);
   });
 
   it('deletes only the active user-language scope during local sign-out cleanup', async () => {

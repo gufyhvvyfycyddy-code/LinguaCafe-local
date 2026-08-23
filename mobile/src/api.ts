@@ -224,12 +224,13 @@ export class MobileApiClient {
     const dictionarySummaries: Record<string, string[]> = {};
     let contentVersion = '';
     let dictionaryVersion = '';
+    let sourceRevision = '';
     let cursor = '';
     do {
       const query = new URLSearchParams({ token_limit: '1000' });
       if (cursor) query.set('cursor', cursor);
       const data = await this.request<{
-        chapter: { content_version: string };
+        chapter: { content_version: string; source_revision: string };
         tokens: ReaderToken[];
         sentence_translations: ChapterPackage['sentence_translations'];
         sense_summaries: ChapterPackage['sense_summaries'];
@@ -239,6 +240,14 @@ export class MobileApiClient {
       }>(`/article-packages/${bookId}/chapters/${chapterId}?${query}`);
       contentVersion ||= data.chapter.content_version;
       dictionaryVersion ||= data.dictionary_version;
+      sourceRevision ||= data.chapter.source_revision;
+      if (!sourceRevision || data.chapter.source_revision !== sourceRevision) {
+        throw new MobileApiError(
+          'ARTICLE_PACKAGE_CHANGED',
+          '文章版本在下载过程中发生变化，请重新打开章节。',
+          409,
+        );
+      }
       tokens.push(...data.tokens);
       data.sentence_translations.forEach(item => sentenceTranslations.set(String(item.sentence_index), item));
       data.sense_summaries.forEach(item => senseSummaries.set(item.occurrence_id, item));
@@ -246,6 +255,7 @@ export class MobileApiClient {
       cursor = data.next_cursor ?? '';
     } while (cursor);
     return {
+      source_revision: sourceRevision,
       content_version: contentVersion,
       dictionary_version: dictionaryVersion,
       tokens,
