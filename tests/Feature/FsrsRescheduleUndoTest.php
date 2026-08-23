@@ -46,16 +46,6 @@ class FsrsRescheduleUndoTest extends TestCase
             'is_admin' => false,
             'uuid' => (string) \Illuminate\Support\Str::uuid(),
         ]);
-        // Create a non-admin user for auth tests
-        $this->nonAdminUser = User::forceCreate([
-            'name' => 'Non Admin',
-            'email' => '__VG_EMAIL_na1__',
-            'password' => Hash::make('password'),
-            'selected_language' => 'english',
-            'password_changed' => true,
-            'is_admin' => false,
-            'uuid' => (string) \Illuminate\Support\Str::uuid(),
-        ]);
     }
 
     // ═══════════════════════════════════════════════
@@ -209,15 +199,24 @@ class FsrsRescheduleUndoTest extends TestCase
     public function test_other_user_cannot_undo(): void
     {
         $this->injectThresholdService(10, 10);
-        $this->createEligibleReviewCard();
+        $card = $this->createEligibleReviewCard();
         $this->runReschedule();
+        $card->refresh();
+        $dueBefore = $card->fsrs_due_at->toIso8601String();
+        $stabilityBefore = $card->fsrs_stability;
+        $difficultyBefore = $card->fsrs_difficulty;
+        $snapshot = RescheduleSnapshot::firstOrFail();
 
-        // A different admin user has no snapshot, so undo_available is false
+        $this->app['session']->flush();
         $response = $this->actingAs($this->otherUser)->postJson('/settings/fsrs/reschedule-undo', ['confirm' => true]);
-        $this->assertTrue(in_array($response->status(), [401, 403, 422]), 'Expected 401, 403, or 422, got ' . $response->status());
-        if ($response->status() === 422) {
-            $response->assertJsonFragment(['undo_available' => false]);
-        }
+        $response->assertStatus(422)->assertJsonPath('undo_available', false);
+
+        $card->refresh();
+        $snapshot->refresh();
+        $this->assertSame($dueBefore, $card->fsrs_due_at->toIso8601String());
+        $this->assertSame($stabilityBefore, $card->fsrs_stability);
+        $this->assertSame($difficultyBefore, $card->fsrs_difficulty);
+        $this->assertNull($snapshot->undone_at);
     }
 
     public function test_word_cards_skipped(): void

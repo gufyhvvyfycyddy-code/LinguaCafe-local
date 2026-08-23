@@ -49,6 +49,20 @@ class FsrsRescheduleConfirmTest extends TestCase
     //  Validation / rejection
     // ════════════════════════════════════════════════════════════════
 
+    public function test_unauthenticated_user_cannot_confirm_or_apply(): void
+    {
+        $this->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => 'guest-hash',
+            'confirm' => true,
+        ])->assertUnauthorized();
+
+        $this->postJson('/settings/fsrs/reschedule-confirm', [
+            'preview_hash' => 'guest-hash',
+            'confirm' => true,
+            'apply' => true,
+        ])->assertUnauthorized();
+    }
+
     public function test_confirm_rejects_missing_preview_hash_with_422(): void
     {
         $response = $this->actingAs($this->user)->postJson('/settings/fsrs/reschedule-confirm', [
