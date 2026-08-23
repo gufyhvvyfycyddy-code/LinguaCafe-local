@@ -43,7 +43,7 @@ class FsrsRetentionWorkloadSimulationService
      */
     public function simulate(int $userId, string $language): array
     {
-        $planner = $this->buildPlanner($userId, $language);
+        $planner = $this->planner($userId, $language);
         if (!$this->extensionAvailable()) {
             return [
                 'success' => true,
@@ -139,8 +139,14 @@ class FsrsRetentionWorkloadSimulationService
         ];
     }
 
-    private function buildPlanner(int $userId, string $language): array
+    public function planner(
+        int $userId,
+        string $language,
+        ?array $reviewCardIds = null,
+        int $projectionDays = 365,
+    ): array
     {
+        $projectionDays = min(365, max(91, $projectionDays));
         $config = $this->reviewSettings->resolve($userId, $language);
         $scheduling = $config->scheduling();
         $limits = $config->dailyLimitsForApi();
@@ -149,11 +155,11 @@ class FsrsRetentionWorkloadSimulationService
             : PHP_INT_MAX;
         $retention = $config->fsrsDesiredRetention();
         $now = Carbon::now();
-        $planningQuery = $this->planningCardsQuery($userId, $language, $now);
+        $planningQuery = $this->planningCardsQuery($userId, $language, $now, $reviewCardIds);
         $totalCandidates = (clone $planningQuery)->count('review_cards.id');
         $cards = $planningQuery->limit(10000)->get();
         $sampleScale = $cards->isEmpty() ? 1.0 : max(1.0, $totalCandidates / $cards->count());
-        $daily = array_fill(0, 365, 0);
+        $daily = array_fill(0, $projectionDays, 0);
         $retrievabilitySum = 0.0;
         $retrievabilityCount = 0;
         $difficultySum = 0.0;
@@ -165,9 +171,9 @@ class FsrsRetentionWorkloadSimulationService
             $dueAt = Carbon::parse($card->fsrs_due_at);
             $lastReviewedAt = Carbon::parse($card->fsrs_last_reviewed_at);
 
-            for ($guard = 0; $guard < 366; $guard++) {
+            for ($guard = 0; $guard <= $projectionDays; $guard++) {
                 $day = max(0, (int) floor($now->diffInSeconds($dueAt, false) / 86400));
-                if ($day >= 365) {
+                if ($day >= $projectionDays) {
                     break;
                 }
                 $daily[$day] += $sampleScale;
@@ -240,7 +246,15 @@ class FsrsRetentionWorkloadSimulationService
             'available' => $cards->isNotEmpty(),
             'horizons' => array_values($summary),
             'daily' => $rows,
+            'ordinary_horizons' => [
+                'tomorrow' => (int) ($rows[1]['reviews'] ?? 0),
+                '7' => (int) collect(array_slice($rows, 1, 7))->sum('reviews'),
+                '30' => (int) collect(array_slice($rows, 1, 30))->sum('reviews'),
+                '90' => (int) collect(array_slice($rows, 1, 90))->sum('reviews'),
+            ],
+            'ordinary_curve' => array_slice($rows, 1, 90),
             'assumptions' => [
+                'projection_days' => $projectionDays,
                 'candidate_cards' => $totalCandidates,
                 'simulated_cards' => $cards->count(),
                 'desired_retention' => $retention,
@@ -389,9 +403,9 @@ class FsrsRetentionWorkloadSimulationService
             ]);
     }
 
-    private function planningCardsQuery(int $userId, string $language, Carbon $now)
+    private function planningCardsQuery(int $userId, string $language, Carbon $now, ?array $reviewCardIds = null)
     {
-        return ReviewCard::query()
+        $query = ReviewCard::query()
             ->join('word_senses', function ($join) {
                 $join->on('word_senses.id', '=', 'review_cards.target_id')
                     ->where('review_cards.target_type', ReviewCard::TARGET_SENSE);
@@ -404,8 +418,12 @@ class FsrsRetentionWorkloadSimulationService
             ->whereNotNull('review_cards.fsrs_stability')
             ->whereNotNull('review_cards.fsrs_difficulty')
             ->whereNotNull('review_cards.fsrs_last_reviewed_at')
-            ->whereNotNull('review_cards.fsrs_due_at')
-            ->orderBy('review_cards.id')
+            ->whereNotNull('review_cards.fsrs_due_at');
+        if ($reviewCardIds !== null) {
+            $query->whereIn('review_cards.id', $reviewCardIds);
+        }
+
+        return $query->orderBy('review_cards.id')
             ->select([
                 'review_cards.id as review_card_id',
                 'review_cards.fsrs_due_at',

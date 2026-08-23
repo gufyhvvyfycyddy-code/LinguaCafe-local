@@ -20,6 +20,7 @@ class StatisticsService
 
     public function __construct(
         private ReviewCardManageQueryService $cardQueries,
+        private FsrsRetentionWorkloadSimulationService $workloadPlanner,
     ) {
     }
 
@@ -80,6 +81,7 @@ class StatisticsService
         $duration = $this->reviewDuration($logs);
         $trueRetention = $this->trueRetention($logs, $timezone);
         $retrievability = $this->retrievability($cards, $now);
+        $planner = $this->workloadPlanner->planner($userId, $language, $cardIds, 91);
 
         return [
             'schema_version' => 3,
@@ -105,6 +107,14 @@ class StatisticsService
                 'stability' => $this->numericDistribution($cards->pluck('fsrs_stability'), [1, 7, 30, 90, 365], '天'),
                 'difficulty' => $this->numericDistribution($cards->pluck('fsrs_difficulty'), [2, 4, 6, 8, 10], ''),
                 'retrievability' => $retrievability,
+            ],
+            'memory_durability' => $this->memoryDurability($cards, $now),
+            'future_pressure' => [
+                'available' => $planner['available'],
+                'horizons' => $planner['ordinary_horizons'],
+                'curve' => $planner['ordinary_curve'],
+                'assumptions' => $planner['assumptions'],
+                'warnings' => $planner['warnings'],
             ],
             'ratings' => $ratingDistribution,
             'true_retention' => $trueRetention,
@@ -259,17 +269,63 @@ class StatisticsService
     private function retrievability(Collection $cards, Carbon $now): array
     {
         $values = $cards->filter(fn ($card) => $card->fsrs_stability !== null && $card->fsrs_last_reviewed_at)
-            ->map(function ($card) use ($now) {
-                $elapsed = max(0.0, Carbon::parse($card->fsrs_last_reviewed_at)
-                    ->diffInSeconds($now, false) / 86400);
-                return pow(1.0 + ($elapsed / (9.0 * max(0.01, (float) $card->fsrs_stability))), -1);
-            });
+            ->map(fn ($card) => $this->cardRetrievability($card, $now));
         $distribution = $this->numericDistribution($values, [0.5, 0.7, 0.8, 0.9, 1.0], '');
         $distribution['coverage'] = [
             'included' => $values->count(),
             'total' => $cards->count(),
         ];
         return $distribution;
+    }
+
+    private function memoryDurability(Collection $cards, Carbon $now): array
+    {
+        $counts = array_fill_keys(['fragile', 'consolidating', 'stable', 'evidence_poor'], 0);
+        foreach ($cards as $card) {
+            $reps = (int) ($card->fsrs_reps ?? 0);
+            if ($reps < 2 || $card->fsrs_stability === null || !$card->fsrs_last_reviewed_at) {
+                $counts['evidence_poor']++;
+                continue;
+            }
+
+            $retrievability = $this->cardRetrievability($card, $now);
+            $lapses = (int) ($card->fsrs_lapses ?? 0);
+            if ($retrievability < 0.70 || $lapses >= 3) {
+                $counts['fragile']++;
+            } elseif ($reps >= 3 && $lapses < 3
+                && (float) $card->fsrs_stability >= 30.0 && $retrievability >= 0.90) {
+                $counts['stable']++;
+            } else {
+                $counts['consolidating']++;
+            }
+        }
+
+        return [
+            'states' => [
+                ['key' => 'fragile', 'label' => '容易遗忘', 'count' => $counts['fragile']],
+                ['key' => 'consolidating', 'label' => '正在巩固', 'count' => $counts['consolidating']],
+                ['key' => 'stable', 'label' => '掌握稳定', 'count' => $counts['stable']],
+                ['key' => 'evidence_poor', 'label' => '证据不足', 'count' => $counts['evidence_poor']],
+            ],
+            'coverage' => [
+                'sufficient' => $cards->count() - $counts['evidence_poor'],
+                'total' => $cards->count(),
+            ],
+            'criteria' => [
+                'fragile' => '有足够复习证据，且当前可回忆概率低于 70%，或已出现至少 3 次遗忘。',
+                'consolidating' => '已有复习证据，但稳定度或当前可回忆概率尚未达到稳定标准。',
+                'stable' => '至少 3 次复习、稳定度至少 30 天、当前可回忆概率至少 90%，且未达到易遗忘阈值。',
+                'evidence_poor' => '少于 2 次复习，或缺少稳定度/上次复习时间；不会被标为掌握稳定。',
+            ],
+        ];
+    }
+
+    private function cardRetrievability($card, Carbon $now): float
+    {
+        $elapsed = max(0.0, Carbon::parse($card->fsrs_last_reviewed_at)
+            ->diffInSeconds($now, false) / 86400);
+
+        return pow(1.0 + ($elapsed / (9.0 * max(0.01, (float) $card->fsrs_stability))), -1);
     }
 
     private function hardestSenses(Collection $cards, Collection $logs): array

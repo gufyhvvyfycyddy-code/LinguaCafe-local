@@ -62,8 +62,47 @@ class M14StatisticsCardInfoTest extends TestCase
             ->assertJsonPath('ratings.0.count', 1)
             ->assertJsonPath('ratings.1.count', 0)
             ->assertJsonPath('ratings.2.count', 1)
-            ->assertJsonPath('ratings.3.count', 1);
+            ->assertJsonPath('ratings.3.count', 1)
+            ->assertJsonPath('memory_durability.states.1.key', 'consolidating')
+            ->assertJsonPath('memory_durability.states.1.count', 1)
+            ->assertJsonPath('future_pressure.assumptions.candidate_cards', 1)
+            ->assertJsonPath('future_pressure.assumptions.projection_days', 91);
+        $this->assertSame(['tomorrow', 7, 30, 90], array_keys($response->json('future_pressure.horizons')));
+        $this->assertCount(90, $response->json('future_pressure.curve'));
         $this->assertSame($before, [ReviewCard::count(), ReviewLog::count(), WordSense::count()]);
+    }
+
+    public function test_memory_durability_keeps_evidence_poor_cards_out_of_stable(): void
+    {
+        $this->card('poor', now()->addDay(), null, [
+            'fsrs_reps' => 1, 'fsrs_stability' => null, 'fsrs_last_reviewed_at' => null,
+        ]);
+        $this->card('fragile', now()->addDay(), null, [
+            'fsrs_reps' => 5, 'fsrs_lapses' => 3, 'fsrs_stability' => 40,
+        ]);
+        $this->card('consolidating', now()->addDay(), null, [
+            'fsrs_reps' => 4, 'fsrs_lapses' => 0, 'fsrs_stability' => 10,
+        ]);
+        $this->card('stable', now()->addDay(), null, [
+            'fsrs_reps' => 5, 'fsrs_lapses' => 0, 'fsrs_stability' => 60,
+            'fsrs_last_reviewed_at' => now()->subDay(),
+        ]);
+
+        $response = $this->actingAs($this->user)->postJson('/statistics/get')->assertOk();
+
+        $this->assertSame([
+            'fragile' => 1,
+            'consolidating' => 1,
+            'stable' => 1,
+            'evidence_poor' => 1,
+        ], collect($response->json('memory_durability.states'))->pluck('count', 'key')->all());
+        $this->assertSame(
+            ['容易遗忘', '正在巩固', '掌握稳定', '证据不足'],
+            array_column($response->json('memory_durability.states'), 'label'),
+        );
+        $response->assertJsonPath('memory_durability.coverage.sufficient', 3)
+            ->assertJsonPath('memory_durability.coverage.total', 4);
+        $this->assertStringContainsString('不会被标为掌握稳定', $response->json('memory_durability.criteria.evidence_poor'));
     }
 
     public function test_unified_query_can_produce_a_truthful_empty_report(): void
@@ -107,7 +146,7 @@ class M14StatisticsCardInfoTest extends TestCase
             ->assertJsonPath('card_info.statistics.review_time.total_seconds', 70);
     }
 
-    private function card(string $lemma, $dueAt, ?User $user = null): ReviewCard
+    private function card(string $lemma, $dueAt, ?User $user = null, array $overrides = []): ReviewCard
     {
         $user ??= $this->user;
         $sense = WordSense::forceCreate([
@@ -127,7 +166,7 @@ class M14StatisticsCardInfoTest extends TestCase
             'is_context_specific' => false,
             'sense_key' => hash('sha256', "{$user->id}|{$lemma}"),
         ]);
-        return ReviewCard::forceCreate([
+        return ReviewCard::forceCreate(array_merge([
             'user_id' => $user->id,
             'language' => 'english',
             'language_id' => 'english',
@@ -142,7 +181,7 @@ class M14StatisticsCardInfoTest extends TestCase
             'fsrs_lapses' => 1,
             'fsrs_enabled' => true,
             'lifecycle_state' => 'active',
-        ]);
+        ], $overrides));
     }
 
     private function log(ReviewCard $card, string $rating, $reviewedAt, int $duration, array $overrides = []): ReviewLog

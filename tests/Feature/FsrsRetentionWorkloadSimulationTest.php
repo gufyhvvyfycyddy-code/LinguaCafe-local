@@ -90,6 +90,8 @@ class FsrsRetentionWorkloadSimulationTest extends TestCase
         $response->assertJsonPath('planner.available', true);
         $this->assertSame([30, 90, 365], array_column($response->json('planner.horizons'), 'days'));
         $this->assertCount(365, $response->json('planner.daily'));
+        $this->assertSame(['tomorrow', 7, 30, 90], array_keys($response->json('planner.ordinary_horizons')));
+        $this->assertCount(90, $response->json('planner.ordinary_curve'));
         $this->assertSame(1, $response->json('planner.assumptions.candidate_cards'));
     }
 

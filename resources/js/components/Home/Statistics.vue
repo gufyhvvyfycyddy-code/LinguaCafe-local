@@ -57,6 +57,37 @@
                 当前查询范围没有可统计的确认词义卡片。
             </v-alert>
 
+            <v-card outlined class="pa-4 mb-4 rounded-lg">
+                <div class="font-weight-medium mb-1">记忆持久度</div>
+                <div class="text-caption text--secondary mb-3">
+                    用当前复习证据解释词义记忆状态；证据不足的词义不会被标为“掌握稳定”。
+                </div>
+                <div class="memory-grid">
+                    <v-sheet v-for="state in report.memory_durability.states" :key="state.key" outlined rounded class="pa-3">
+                        <div class="text-caption text--secondary">{{ state.label }}</div>
+                        <div class="memory-value">{{ state.count }}</div>
+                    </v-sheet>
+                </div>
+                <div class="text-caption text--secondary mt-3">
+                    {{ report.memory_durability.coverage.sufficient }} / {{ report.memory_durability.coverage.total }} 个词义有足够模型证据。
+                </div>
+            </v-card>
+
+            <v-card outlined class="pa-4 mb-4 rounded-lg">
+                <div class="font-weight-medium mb-1">未来复习压力</div>
+                <div class="text-caption text--secondary mb-3">
+                    这是只读预测，不会替你设定每日新学量，也不会修改卡片安排。
+                </div>
+                <div class="pressure-grid mb-4">
+                    <v-sheet v-for="metric in pressureHorizonCards" :key="metric.key" outlined rounded class="pa-3">
+                        <div class="text-caption text--secondary">{{ metric.label }}</div>
+                        <div class="memory-value">{{ metric.value }}</div>
+                    </v-sheet>
+                </div>
+                <statistics-mini-chart title="未来 90 天预计复习" :rows="pressureRows" color="#5468e7" />
+                <v-alert v-for="warning in report.future_pressure.warnings" :key="warning" dense text type="info" class="mt-3 mb-0">{{ warning }}</v-alert>
+            </v-card>
+
             <v-row>
                 <v-col cols="12" md="6">
                     <statistics-mini-chart title="未来 30 天到期" :rows="futureRows" color="#42a5f5" />
@@ -161,6 +192,19 @@ export default {
             const labels = { new: '新卡', learning: '学习中', review: '复习', relearning: '重学' };
             return Object.keys(labels).map(key => ({ label: labels[key], value: this.report.card_states[key] || 0 }));
         },
+        pressureHorizonCards() {
+            const horizons = this.report?.future_pressure?.horizons || {};
+            return [
+                { key: 'tomorrow', label: '明天', value: horizons.tomorrow || 0 },
+                { key: '7', label: '未来 7 天', value: horizons['7'] || 0 },
+                { key: '30', label: '未来 30 天', value: horizons['30'] || 0 },
+                { key: '90', label: '未来 90 天', value: horizons['90'] || 0 },
+            ];
+        },
+        pressureRows() {
+            return (this.report?.future_pressure?.curve || [])
+                .map(day => ({ label: day.date.slice(5), value: day.reviews }));
+        },
     },
     mounted() {
         this.loadStatistics();
@@ -232,6 +276,12 @@ export default {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
 }
+.memory-grid, .pressure-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+.memory-value { margin-top: 4px; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .summary-value {
     margin-top: 6px;
     font-size: 28px;
@@ -253,6 +303,7 @@ export default {
 @media (max-width: 700px) {
     .scope-controls { grid-template-columns: 1fr; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .memory-grid, .pressure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .heatmap { grid-template-columns: repeat(15, minmax(6px, 1fr)); }
     .statistics-v3 { padding-left: 0; padding-right: 0; }
 }
