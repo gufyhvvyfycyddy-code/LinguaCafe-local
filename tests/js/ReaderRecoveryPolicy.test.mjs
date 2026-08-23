@@ -6,6 +6,7 @@ import {
     buildReaderExplicitRatingActionCommand,
     buildReaderFinishRequest,
     buildReadingInteractionRequest,
+    buildReadingProgressRequest,
     clearReaderExplicitRatingRetry,
     clearReaderManualSenseContinuation,
     clearReadingSessionRecoveryId,
@@ -18,9 +19,12 @@ import {
     normalizeReaderEvidencePage,
     normalizeReaderFinishResult,
     normalizeReaderUnfamiliarSnapshot,
+    normalizeReadingContinuity,
     normalizeReadingSessionResponse,
     readerExplicitActionConflictCode,
     readerExplicitRatingCommandMatchesSession,
+    readingCanonicalTokenIndexAtRenderedIndex,
+    readingRenderedIndexForCanonicalToken,
     saveReaderExplicitRatingRetry,
     saveReaderManualSenseContinuation,
     saveReadingSessionRecoveryId,
@@ -70,6 +74,98 @@ const sessionPayload = {
         },
     ],
 };
+
+test('reading continuity maps rendered indexes only through explicit canonical word_index values', () => {
+    const words = [
+        { word: 'Alpha', word_index: 10 },
+        { word: 'NEWLINE', word_index: 11, is_structure: true },
+        { word: 'beta', word_index: 20 },
+        { word: 'missing-explicit-index' },
+    ];
+
+    assert.equal(readingCanonicalTokenIndexAtRenderedIndex(words, 0), 10);
+    assert.equal(readingCanonicalTokenIndexAtRenderedIndex(words, 1), null);
+    assert.equal(readingCanonicalTokenIndexAtRenderedIndex(words, 2), 20);
+    assert.equal(readingCanonicalTokenIndexAtRenderedIndex(words, 3), null);
+    assert.equal(readingRenderedIndexForCanonicalToken(words, 20), 2);
+    assert.equal(readingRenderedIndexForCanonicalToken(words, 11), -1);
+    assert.equal(readingRenderedIndexForCanonicalToken(words, 3), -1);
+});
+
+test('reading continuity accepts only current-revision resume data and writes the frozen two-field payload', () => {
+    assert.deepEqual(normalizeReadingContinuity({ source_revision: 'rev-2', resume: null }), {
+        sourceRevision: 'rev-2',
+        canonicalTokenIndex: null,
+    });
+    assert.deepEqual(normalizeReadingContinuity({
+        source_revision: 'rev-2',
+        resume: { source_revision: 'rev-2', canonical_token_index: 20 },
+        furthest: { source_revision: 'rev-2', canonical_token_index: 80 },
+    }), {
+        sourceRevision: 'rev-2',
+        canonicalTokenIndex: 20,
+    });
+    assert.deepEqual(normalizeReadingContinuity({
+        source_revision: 'rev-2',
+        resume: { source_revision: 'rev-1', canonical_token_index: 20 },
+    }), {
+        sourceRevision: 'rev-2',
+        canonicalTokenIndex: null,
+    });
+    assert.deepEqual(buildReadingProgressRequest('rev-2', 20), {
+        source_revision: 'rev-2',
+        canonical_token_index: 20,
+    });
+    assert.deepEqual(Object.keys(buildReadingProgressRequest('rev-2', 20)).sort(), [
+        'canonical_token_index',
+        'source_revision',
+    ]);
+    assert.equal(buildReadingProgressRequest('', 20), null);
+    assert.equal(buildReadingProgressRequest('rev-2', -1), null);
+});
+
+test('server owns monotonic furthest by canonical rank while Reader remains latest-only', () => {
+    const service = fs.readFileSync('app/Services/ReadingContinuityService.php', 'utf8');
+    const chapterText = fs.readFileSync('app/Services/ReadingChapterTextService.php', 'utf8');
+    const migration = fs.readFileSync('database/migrations/2026_08_19_000002_create_reading_progress_table.php', 'utf8');
+    const model = fs.readFileSync('app/Models/ReadingProgress.php', 'utf8');
+    const controller = fs.readFileSync('app/Http/Controllers/ReadingContinuityController.php', 'utf8');
+    const routes = fs.readFileSync('routes/web.php', 'utf8');
+    const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+
+    assert.match(migration, /furthest_canonical_token_index/);
+    assert.match(migration, /\['user_id', 'language_id', 'chapter_id', 'source_revision'\]/);
+    assert.match(model, /furthest_canonical_token_index/);
+    assert.match(chapterText, /positionableCanonicalTokenRanks\(Chapter \$chapter\)/);
+    assert.match(service, /positionableCanonicalTokenRanks\(\$chapter\)/);
+    assert.match(service, /'source_revision' => \$currentRevision/);
+    assert.match(service, /\$ranks\[\$existingFurthest\] > \$ranks\[\$canonicalTokenIndex\]/);
+    assert.doesNotMatch(service, /\bmax\s*\(/);
+    assert.doesNotMatch(controller, /furthest_canonical_token_index/);
+    assert.doesNotMatch(reader, /furthest_canonical_token_index/);
+
+    const exactSurface = [migration, model, service, controller, routes, reader].join('\n');
+    assert.doesNotMatch(exactSurface, /reading_bookmarks|reading-bookmarks|bookmark_uuid/);
+});
+
+test('production Reader restores canonical continuity and persists only after rendered-to-canonical mapping', () => {
+    const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
+    assert.match(reader, /\/reading-continuity/);
+    assert.match(reader, /\/reading-progress/);
+    assert.match(reader, /readingCanonicalTokenIndexAtRenderedIndex\(/);
+    assert.match(reader, /readingRenderedIndexForCanonicalToken\(/);
+    assert.match(reader, /document\.addEventListener\('visibilitychange'/);
+    assert.match(reader, /beforeRouteLeave\(to, from, next\)/);
+    assert.match(reader, /handleReaderResize\(\)[\s\S]*preserveReadingContinuityAcrossLayoutChange\(\)/);
+    assert.match(reader, /increaseFontSize\(\)[\s\S]*preserveReadingContinuityAcrossLayoutChange\(\)/);
+    assert.match(reader, /toggleAiTranslations\(\)[\s\S]*preserveReadingContinuityAcrossLayoutChange\(\)/);
+    assert.match(reader, /preserveReadingContinuityAcrossLayoutChange\(\)[\s\S]*currentReadingCanonicalTokenIndex\(\)/);
+    assert.match(reader, /preserveReadingContinuityAcrossLayoutChange\(\)[\s\S]*queueReadingContinuityWrite\(anchor\)/);
+    assert.match(reader, /Date\.now\(\) < this\.readingContinuityLayoutSuppressUntil/);
+    assert.match(reader, /scrollIntoView\(\{ behavior: 'instant', block: 'start' \}\)/);
+    assert.match(reader, /canonicalTokenIndex === this\.readingContinuityLastSavedIndex/);
+    assert.doesNotMatch(reader, /linguacafe-reading-(progress|continuity)/);
+});
 
 test('server-issued reading-session id is stored only as a chapter recovery pointer', () => {
     const storage = memoryStorage();

@@ -396,9 +396,13 @@
         normalizeReaderEvidencePage,
         normalizeReaderFinishResult,
         normalizeReaderUnfamiliarSnapshot,
+        normalizeReadingContinuity,
         normalizeReadingSessionResponse,
         readerExplicitActionConflictCode,
         readerExplicitRatingCommandMatchesSession,
+        readingCanonicalTokenIndexAtRenderedIndex,
+        readingRenderedIndexForCanonicalToken,
+        buildReadingProgressRequest,
         saveReaderExplicitRatingRetry,
         saveReaderManualSenseContinuation,
         saveReadingSessionRecoveryId,
@@ -492,6 +496,17 @@
                 readingInteractionEntries: {},
                 readingInteractionPromises: {},
                 readingEvidenceItems: [],
+
+                // canonical reading continuity
+                readingContinuitySourceRevision: '',
+                readingContinuityLastSavedIndex: null,
+                readingContinuityPendingIndex: null,
+                readingContinuityInFlightIndex: null,
+                readingContinuitySaveTimer: null,
+                readingContinuityWriteInFlight: false,
+                readingContinuityScrollElement: null,
+                readingContinuityLayoutSuppressUntil: 0,
+                readingContinuityLayoutRestoreTimer: null,
 
                 // AI reading assist / explicit unfamiliar targets
                 aiTranslationMode: 'hidden',
@@ -607,7 +622,9 @@
                     this.applySourceHighlightFromQuery();
                     this.updateToolbarPosition();
                 });
-                this.initializeReadingSession();
+                this.initializeReadingSession().finally(() => {
+                    this.initializeReadingContinuity();
+                });
                 this.loadUnfamiliarTargets();
                 this.loadAiAssistCurrent();
                 this.vocabularySidebarTest();
@@ -618,7 +635,13 @@
                 this.readerLoading = false;
             });
         },
+        beforeRouteLeave(to, from, next) {
+            this.flushReadingContinuityPosition();
+            next();
+        },
         beforeDestroy() {
+            this.flushReadingContinuityPosition();
+            this.detachReadingContinuityListeners();
             if (this.sourceHighlightTimer) {
                 clearTimeout(this.sourceHighlightTimer);
             }
@@ -660,6 +683,183 @@
             },
         },
         methods: {
+            initializeReadingContinuity() {
+                if (!this.chapterId) return Promise.resolve(false);
+                return axios.get('/chapters/' + this.chapterId + '/reading-continuity')
+                    .then((response) => {
+                        const continuity = normalizeReadingContinuity(response.data || {});
+                        if (!continuity) return false;
+                        if (this.readingSourceRevision && continuity.sourceRevision !== this.readingSourceRevision) {
+                            return false;
+                        }
+
+                        this.readingContinuitySourceRevision = continuity.sourceRevision;
+                        this.readingContinuityLastSavedIndex = continuity.canonicalTokenIndex;
+                        this.$nextTick(() => {
+                            if (this._isBeingDestroyed || this._isDestroyed) return;
+                            this.attachReadingContinuityListeners();
+                            const hasExplicitSourceTarget = Boolean(
+                                this.$route.query.source_word || this.$route.query.source_lemma,
+                            );
+                            if (!hasExplicitSourceTarget && continuity.canonicalTokenIndex !== null) {
+                                this.restoreReadingContinuityPosition(continuity.canonicalTokenIndex);
+                            }
+                        });
+                        return true;
+                    })
+                    .catch(() => false);
+            },
+            attachReadingContinuityListeners() {
+                if (this.readingContinuityScrollElement) return;
+                const readerContent = document.getElementById('reader-content');
+                if (!readerContent) return;
+                this.readingContinuityScrollElement = readerContent;
+                readerContent.addEventListener('scroll', this.onReadingContinuityScroll, { passive: true });
+                document.addEventListener('visibilitychange', this.onReadingContinuityVisibilityChange);
+            },
+            detachReadingContinuityListeners() {
+                if (this.readingContinuitySaveTimer) {
+                    clearTimeout(this.readingContinuitySaveTimer);
+                    this.readingContinuitySaveTimer = null;
+                }
+                if (this.readingContinuityLayoutRestoreTimer) {
+                    clearTimeout(this.readingContinuityLayoutRestoreTimer);
+                    this.readingContinuityLayoutRestoreTimer = null;
+                }
+                if (this.readingContinuityScrollElement) {
+                    this.readingContinuityScrollElement.removeEventListener('scroll', this.onReadingContinuityScroll);
+                    this.readingContinuityScrollElement = null;
+                }
+                document.removeEventListener('visibilitychange', this.onReadingContinuityVisibilityChange);
+            },
+            onReadingContinuityScroll() {
+                if (!this.readingContinuitySourceRevision) return;
+                if (Date.now() < this.readingContinuityLayoutSuppressUntil) return;
+                if (this.readingContinuitySaveTimer) clearTimeout(this.readingContinuitySaveTimer);
+                this.readingContinuitySaveTimer = setTimeout(() => {
+                    this.readingContinuitySaveTimer = null;
+                    this.flushReadingContinuityPosition();
+                }, 300);
+            },
+            onReadingContinuityVisibilityChange() {
+                if (document.visibilityState === 'hidden') this.flushReadingContinuityPosition();
+            },
+            preserveReadingContinuityAcrossLayoutChange() {
+                const anchor = this.currentReadingCanonicalTokenIndex()
+                    ?? this.readingContinuityPendingIndex
+                    ?? this.readingContinuityInFlightIndex
+                    ?? this.readingContinuityLastSavedIndex;
+                if (anchor === null || anchor === undefined) return;
+                if (this.readingContinuitySaveTimer) {
+                    clearTimeout(this.readingContinuitySaveTimer);
+                    this.readingContinuitySaveTimer = null;
+                }
+                this.queueReadingContinuityWrite(anchor);
+                this.readingContinuityLayoutSuppressUntil = Date.now() + 1200;
+                if (this.readingContinuityLayoutRestoreTimer) {
+                    clearTimeout(this.readingContinuityLayoutRestoreTimer);
+                }
+                this.readingContinuityLayoutRestoreTimer = setTimeout(() => {
+                    this.readingContinuityLayoutRestoreTimer = null;
+                    if (!this.readingContinuitySourceRevision) return;
+                    this.restoreReadingContinuityPosition(anchor);
+                }, 80);
+            },
+            currentReadingCanonicalTokenIndex() {
+                const readerContent = this.readingContinuityScrollElement || document.getElementById('reader-content');
+                const renderedWords = this.$refs.interactiveText && Array.isArray(this.$refs.interactiveText.words)
+                    ? this.$refs.interactiveText.words
+                    : [];
+                if (!readerContent || !renderedWords.length) return null;
+
+                const readerRect = readerContent.getBoundingClientRect();
+                const elements = readerContent.querySelectorAll('.word[wordindex]');
+                for (const element of elements) {
+                    const rect = element.getBoundingClientRect();
+                    if (rect.bottom <= readerRect.top || rect.top >= readerRect.bottom) continue;
+                    const renderedIndex = Number(element.getAttribute('wordindex'));
+                    const canonicalTokenIndex = readingCanonicalTokenIndexAtRenderedIndex(
+                        renderedWords,
+                        renderedIndex,
+                    );
+                    if (canonicalTokenIndex !== null) return canonicalTokenIndex;
+                }
+                return null;
+            },
+            restoreReadingContinuityPosition(canonicalTokenIndex) {
+                const renderedWords = this.$refs.interactiveText && Array.isArray(this.$refs.interactiveText.words)
+                    ? this.$refs.interactiveText.words
+                    : [];
+                const renderedIndex = readingRenderedIndexForCanonicalToken(renderedWords, canonicalTokenIndex);
+                if (renderedIndex < 0) return false;
+                const element = document.querySelector('#reader-content .word[wordindex="' + renderedIndex + '"]');
+                if (!element || !element.scrollIntoView) return false;
+                element.scrollIntoView({ behavior: 'instant', block: 'start' });
+                return true;
+            },
+            flushReadingContinuityPosition() {
+                if (this.readingContinuitySaveTimer) {
+                    clearTimeout(this.readingContinuitySaveTimer);
+                    this.readingContinuitySaveTimer = null;
+                }
+                const canonicalTokenIndex = this.currentReadingCanonicalTokenIndex();
+                if (canonicalTokenIndex === null) return false;
+                return this.queueReadingContinuityWrite(canonicalTokenIndex);
+            },
+            queueReadingContinuityWrite(canonicalTokenIndex) {
+                if (!this.readingContinuitySourceRevision) return false;
+                if (this.readingContinuityPendingIndex === null
+                    && (canonicalTokenIndex === this.readingContinuityLastSavedIndex
+                        || canonicalTokenIndex === this.readingContinuityInFlightIndex)) return true;
+                this.readingContinuityPendingIndex = canonicalTokenIndex;
+                this.writePendingReadingContinuityPosition();
+                return true;
+            },
+            writePendingReadingContinuityPosition() {
+                if (this.readingContinuityWriteInFlight || this.readingContinuityPendingIndex === null) return;
+                const canonicalTokenIndex = this.readingContinuityPendingIndex;
+                this.readingContinuityPendingIndex = null;
+                if (canonicalTokenIndex === this.readingContinuityLastSavedIndex) return;
+                const payload = buildReadingProgressRequest(
+                    this.readingContinuitySourceRevision,
+                    canonicalTokenIndex,
+                );
+                if (!payload || !this.chapterId) return;
+
+                const sourceRevision = this.readingContinuitySourceRevision;
+                this.readingContinuityInFlightIndex = canonicalTokenIndex;
+                this.readingContinuityWriteInFlight = true;
+                axios.put('/chapters/' + this.chapterId + '/reading-progress', payload)
+                    .then((response) => {
+                        const data = response.data || {};
+                        if (data.source_revision === sourceRevision
+                            && Number(data.canonical_token_index) === canonicalTokenIndex) {
+                            this.readingContinuityLastSavedIndex = canonicalTokenIndex;
+                        }
+                    })
+                    .catch((error) => {
+                        const responseData = error && error.response && error.response.data ? error.response.data : {};
+                        if (responseData.error_code === 'READING_CONTINUITY_STALE_SOURCE') {
+                            this.readingContinuitySourceRevision = '';
+                            this.readingContinuityPendingIndex = null;
+                            this.detachReadingContinuityListeners();
+                            this.invalidateStaleReadingSession();
+                        } else if (responseData.error_code === 'READING_CONTINUITY_INVALID_TOKEN') {
+                            this.readingContinuitySourceRevision = '';
+                            this.readingContinuityPendingIndex = null;
+                            this.detachReadingContinuityListeners();
+                            this.setReaderNotice('当前阅读位置无法映射到文章的稳定词位置。已停止保存阅读位置，请刷新本章后重试。', 'warning');
+                        }
+                    })
+                    .finally(() => {
+                        this.readingContinuityInFlightIndex = null;
+                        this.readingContinuityWriteInFlight = false;
+                        if (this.readingContinuityPendingIndex !== null
+                            && this.readingContinuityPendingIndex !== this.readingContinuityLastSavedIndex) {
+                            this.writePendingReadingContinuityPosition();
+                        }
+                    });
+            },
             setReaderNotice(text, color = 'info') {
                 this.readerNotice = { show: true, text, color };
             },
@@ -1714,6 +1914,7 @@
                 this.fullscreenMode = document.fullscreenElement !== null;
             },
             handleReaderResize() {
+                this.preserveReadingContinuityAcrossLayoutChange();
                 this.updateToolbarPosition();
                 this.vocabularySidebarTest();
             },
@@ -1794,10 +1995,12 @@
                 });
             },
             increaseFontSize() {
+                this.preserveReadingContinuityAcrossLayoutChange();
                 this.settings.fontSize ++;
                 this.toolbarSettingChanged();
             },
             decreaseFontSize() {
+                this.preserveReadingContinuityAcrossLayoutChange();
                 this.settings.fontSize --;
                 this.toolbarSettingChanged();
             },
@@ -1828,6 +2031,7 @@
                 this.aiAssistDialog = true;
             },
             toggleAiTranslations() {
+                this.preserveReadingContinuityAcrossLayoutChange();
                 if (this.aiTranslationMode === 'hidden') {
                     this.aiTranslationMode = 'hover';
                 } else if (this.aiTranslationMode === 'hover') {

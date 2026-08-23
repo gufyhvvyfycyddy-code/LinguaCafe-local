@@ -54,6 +54,54 @@ export function createReaderRequestId(cryptoSource = defaultCryptoSource()) {
     return createReaderActionId(cryptoSource);
 }
 
+function isPositionableReaderToken(token) {
+    if (!token || typeof token !== 'object') return false;
+    if (token.is_structure === true || token.pos === 'STRUCT') return false;
+    if (['NEWLINE', 'PARAGRAPH_BREAK'].includes(String(token.word || ''))) return false;
+    return /\S/u.test(String(token.word || ''));
+}
+
+export function readingCanonicalTokenIndexAtRenderedIndex(words = [], renderedIndex) {
+    const index = nonNegativeInteger(renderedIndex);
+    if (index === null || !Array.isArray(words) || !words[index]) return null;
+    const token = words[index];
+    const canonicalTokenIndex = nonNegativeInteger(token.word_index);
+    if (canonicalTokenIndex === null || !isPositionableReaderToken(token)) return null;
+    return canonicalTokenIndex;
+}
+
+export function readingRenderedIndexForCanonicalToken(words = [], canonicalTokenIndex) {
+    const canonical = nonNegativeInteger(canonicalTokenIndex);
+    if (canonical === null || !Array.isArray(words)) return -1;
+    return words.findIndex(token => (
+        isPositionableReaderToken(token)
+        && nonNegativeInteger(token.word_index) === canonical
+    ));
+}
+
+export function normalizeReadingContinuity(payload = {}) {
+    const sourceRevision = text(payload.source_revision);
+    if (!sourceRevision) return null;
+    const resume = payload.resume && typeof payload.resume === 'object' ? payload.resume : null;
+    if (!resume) return { sourceRevision, canonicalTokenIndex: null };
+    const canonicalTokenIndex = nonNegativeInteger(resume.canonical_token_index);
+    const resumeRevision = text(resume.source_revision);
+    if (canonicalTokenIndex === null || resumeRevision !== sourceRevision) {
+        return { sourceRevision, canonicalTokenIndex: null };
+    }
+    return { sourceRevision, canonicalTokenIndex };
+}
+
+export function buildReadingProgressRequest(sourceRevision, canonicalTokenIndex) {
+    const revision = text(sourceRevision);
+    const index = nonNegativeInteger(canonicalTokenIndex);
+    if (!revision || index === null) return null;
+    return {
+        source_revision: revision,
+        canonical_token_index: index,
+    };
+}
+
 export function readerExplicitRatingCommandMatchesSession(command = {}, readingSessionId = '', sourceRevision = '') {
     const payload = command.payload && typeof command.payload === 'object' ? command.payload : {};
     return Boolean(
