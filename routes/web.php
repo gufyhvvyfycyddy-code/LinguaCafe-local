@@ -158,6 +158,8 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::get('/study-overview/data', [App\Http\Controllers\StudyOverviewController::class, 'data']);
     Route::get('/learning-history', [App\Http\Controllers\LearningHistoryController::class, 'index']);
     Route::get('/learning-history/data', [App\Http\Controllers\LearningHistoryController::class, 'data']);
+    Route::get('/learning-history/export/{format}', [App\Http\Controllers\LearningHistoryController::class, 'export'])
+        ->whereIn('format', App\Services\LearningHistoryExportService::FORMATS);
     Route::get('/article-health', [App\Http\Controllers\HomeController::class, 'index']);
     Route::get('/article-health/data', [App\Http\Controllers\ArticleHealthController::class, 'show']);
     Route::get('/reviews/senses', [App\Http\Controllers\SenseReviewController::class, 'index']);

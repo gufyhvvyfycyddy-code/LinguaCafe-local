@@ -1,9 +1,17 @@
 <template>
     <v-container id="learning-history" fluid class="history-shell py-6">
-        <header class="history-header mb-6">
-            <div class="overline primary--text mb-1">LEARNING TIMELINE</div>
-            <h1 class="text-h4 font-weight-bold mb-2">学习历史</h1>
-            <p class="text--secondary mb-0">新词进入学习与正式复习共用一条时间线；来源证据和当前记忆状态分开呈现。</p>
+        <header class="history-header d-flex flex-wrap align-end mb-6">
+            <div class="header-copy">
+                <div class="overline primary--text mb-1">LEARNING TIMELINE</div>
+                <h1 class="text-h4 font-weight-bold mb-2">学习历史</h1>
+                <p class="text--secondary mb-0">词义进入学习与正式复习共用一条时间线；来源证据和当前记忆状态分开呈现。</p>
+            </div>
+            <v-spacer />
+            <div class="export-actions mt-3 mt-md-0" aria-label="导出当前学习历史范围">
+                <v-btn v-for="format in ['csv', 'txt', 'pdf']" :key="format" small outlined color="primary" class="ml-2" :href="exportUrl(format)" :disabled="!dateFrom || !dateTo">
+                    <v-icon left small>mdi-download</v-icon>{{ format.toUpperCase() }}
+                </v-btn>
+            </div>
         </header>
 
         <v-card outlined class="filter-card rounded-lg pa-4 mb-6">
@@ -109,8 +117,8 @@ export default {
         meta: {},
         filterOptions: [
             { value: 'all', label: '全部' },
-            { value: 'new_learning', label: '新词进入学习' },
-            { value: 'reading_review', label: '阅读中复习' },
+            { value: 'new_learning', label: '新学' },
+            { value: 'reading_review', label: '阅读复习' },
             { value: 'formal_review', label: '正式复习' },
         ],
     }),
@@ -213,10 +221,18 @@ export default {
             if (!value) return '—';
             return new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(value));
         },
+        exportUrl(format) {
+            const params = [
+                `date_from=${encodeURIComponent(this.dateFrom)}`,
+                `date_to=${encodeURIComponent(this.dateTo)}`,
+            ];
+            if (this.filter !== 'all') params.push(`filter=${encodeURIComponent(this.filter)}`);
+            return `/learning-history/export/${format}?${params.join('&')}`;
+        },
     },
 };
 </script>
 
 <style scoped>
-.history-shell{max-width:1120px;overflow-x:hidden}.history-header{border-left:4px solid var(--v-primary-base);padding-left:18px}.history-header p{max-width:720px}.filter-card{background:linear-gradient(135deg,rgba(127,127,127,.045),transparent)}.filter-strip{white-space:normal}.timeline{position:relative;padding-left:32px}.timeline:before{content:"";position:absolute;left:9px;top:10px;bottom:10px;width:2px;background:rgba(127,127,127,.2)}.timeline-item{position:relative}.timeline-marker{position:absolute;left:-30px;top:24px;width:16px;height:16px;border:3px solid var(--v-background-base,#fff);border-radius:50%;background:var(--v-primary-base);box-shadow:0 0 0 2px var(--v-primary-base)}.timeline-marker.review{background:#673ab7;box-shadow:0 0 0 2px #673ab7}.event-card{border-left-width:3px!important;transition:border-color .2s ease}.event-card:hover{border-left-color:var(--v-primary-base)!important}.event-copy{min-width:0}.sense-line{font-size:1rem;line-height:1.55}.event-time{font-size:.82rem;white-space:nowrap}.detail-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--v-primary-base)}.source-title{font-weight:600}.source-sentence{border-left:3px solid rgba(127,127,127,.25);padding:8px 12px;color:rgba(0,0,0,.68);font-style:normal}.event-card.theme--dark .source-sentence{color:rgba(255,255,255,.72)}.current-state{border-left:1px solid rgba(127,127,127,.18);padding-left:20px!important}.state-grid{display:grid;grid-template-columns:minmax(80px,1fr) auto;gap:6px 16px;font-size:.86rem}.state-grid span{color:rgba(127,127,127,.95)}.state-grid strong{text-align:right}.empty-state{border-style:dashed!important}@media(max-width:959px){.history-shell{padding-left:12px!important;padding-right:12px!important}.current-state{border-left:0;border-top:1px solid rgba(127,127,127,.18);padding-left:4px!important;padding-top:16px!important;margin-top:8px}}@media(max-width:430px){.history-shell{padding-left:8px!important;padding-right:8px!important}.history-header{padding-left:12px}.history-header h1{font-size:1.75rem!important}.filter-card{padding:12px!important}.timeline{padding-left:24px}.timeline-marker{left:-22px;width:13px;height:13px}.timeline:before{left:8px}.event-card{padding:14px!important}.event-heading{display:block!important}.event-time{display:block;margin-top:8px}.filter-strip .v-btn{margin-right:4px!important}.source-sentence{padding-left:9px}}
+.history-shell{max-width:1120px;overflow-x:hidden}.history-header{border-left:4px solid var(--v-primary-base);padding-left:18px}.history-header p{max-width:720px}.header-copy{min-width:0}.export-actions{white-space:nowrap}.filter-card{background:linear-gradient(135deg,rgba(127,127,127,.045),transparent)}.filter-strip{white-space:normal}.timeline{position:relative;padding-left:32px}.timeline:before{content:"";position:absolute;left:9px;top:10px;bottom:10px;width:2px;background:rgba(127,127,127,.2)}.timeline-item{position:relative}.timeline-marker{position:absolute;left:-30px;top:24px;width:16px;height:16px;border:3px solid var(--v-background-base,#fff);border-radius:50%;background:var(--v-primary-base);box-shadow:0 0 0 2px var(--v-primary-base)}.timeline-marker.review{background:#673ab7;box-shadow:0 0 0 2px #673ab7}.event-card{border-left-width:3px!important;transition:border-color .2s ease}.event-card:hover{border-left-color:var(--v-primary-base)!important}.event-copy{min-width:0}.sense-line{font-size:1rem;line-height:1.55}.event-time{font-size:.82rem;white-space:nowrap}.detail-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--v-primary-base)}.source-title{font-weight:600}.source-sentence{border-left:3px solid rgba(127,127,127,.25);padding:8px 12px;color:rgba(0,0,0,.68);font-style:normal}.event-card.theme--dark .source-sentence{color:rgba(255,255,255,.72)}.current-state{border-left:1px solid rgba(127,127,127,.18);padding-left:20px!important}.state-grid{display:grid;grid-template-columns:minmax(80px,1fr) auto;gap:6px 16px;font-size:.86rem}.state-grid span{color:rgba(127,127,127,.95)}.state-grid strong{text-align:right}.empty-state{border-style:dashed!important}@media(max-width:959px){.history-shell{padding-left:12px!important;padding-right:12px!important}.current-state{border-left:0;border-top:1px solid rgba(127,127,127,.18);padding-left:4px!important;padding-top:16px!important;margin-top:8px}}@media(max-width:430px){.history-shell{padding-left:8px!important;padding-right:8px!important}.history-header{padding-left:12px}.history-header h1{font-size:1.75rem!important}.export-actions{display:flex;width:100%;margin-left:-8px}.export-actions .v-btn{flex:1;min-width:0!important}.filter-card{padding:12px!important}.timeline{padding-left:24px}.timeline-marker{left:-22px;width:13px;height:13px}.timeline:before{left:8px}.event-card{padding:14px!important}.event-heading{display:block!important}.event-time{display:block;margin-top:8px}.filter-strip .v-btn{margin-right:4px!important}.source-sentence{padding-left:9px}}
 </style>

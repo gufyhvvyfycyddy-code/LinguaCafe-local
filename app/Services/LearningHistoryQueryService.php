@@ -57,10 +57,7 @@ class LearningHistoryQueryService
         $perPage = min(max(1, $perPage), 100);
         $events = $this->eventIdentifiersQuery($userId, $language, $bounds, $filter);
         $total = (clone $events)->count();
-        $identifiers = $events
-            ->orderByDesc('occurred_at')
-            ->orderBy('event_rank')
-            ->orderByDesc('source_id')
+        $identifiers = $this->orderEventIdentifiers($events)
             ->forPage($page, $perPage)
             ->get();
         $currentStateAsOf = Carbon::now();
@@ -73,12 +70,7 @@ class LearningHistoryQueryService
                 'total' => $total,
                 'last_page' => max(1, (int) ceil($total / $perPage)),
             ],
-            'meta' => [
-                'date_from' => $bounds['date_from'],
-                'date_to' => $bounds['date_to'],
-                'study_timezone' => $bounds['timezone'],
-                'filter' => $filter,
-                'current_state_as_of' => $currentStateAsOf->toIso8601String(),
+            'meta' => $this->historyMeta($bounds, $filter, $currentStateAsOf) + [
                 'daily_reading_counts' => $this->dailyReadingCounts(
                     $userId,
                     $language,
@@ -86,6 +78,26 @@ class LearningHistoryQueryService
                     $bounds['range_end'],
                 ),
             ],
+        ];
+    }
+
+    /** @return array{data:array<int,array>,meta:array} */
+    public function all(
+        int $userId,
+        string $language,
+        string $dateFrom,
+        string $dateTo,
+        string $filter = self::FILTER_ALL,
+    ): array {
+        $bounds = $this->timezoneService->inclusiveDateRangeBounds($dateFrom, $dateTo);
+        $identifiers = $this->orderEventIdentifiers(
+            $this->eventIdentifiersQuery($userId, $language, $bounds, $filter)
+        )->get();
+        $currentStateAsOf = Carbon::now();
+
+        return [
+            'data' => $this->hydrateRows($identifiers, $userId, $language, $currentStateAsOf),
+            'meta' => $this->historyMeta($bounds, $filter, $currentStateAsOf),
         ];
     }
 
@@ -169,6 +181,25 @@ class LearningHistoryQueryService
         }
 
         return DB::query()->fromSub($learning->unionAll($reviews), 'learning_history_events');
+    }
+
+    private function orderEventIdentifiers($query)
+    {
+        return $query
+            ->orderByDesc('occurred_at')
+            ->orderBy('event_rank')
+            ->orderByDesc('source_id');
+    }
+
+    private function historyMeta(array $bounds, string $filter, Carbon $currentStateAsOf): array
+    {
+        return [
+            'date_from' => $bounds['date_from'],
+            'date_to' => $bounds['date_to'],
+            'study_timezone' => $bounds['timezone'],
+            'filter' => $filter,
+            'current_state_as_of' => $currentStateAsOf->toIso8601String(),
+        ];
     }
 
     /** @return array<int,array> */

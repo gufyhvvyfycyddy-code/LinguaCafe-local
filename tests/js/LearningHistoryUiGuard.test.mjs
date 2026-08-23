@@ -12,6 +12,11 @@ assert.match(page, /v-skeleton-loader/, 'The page must expose a loading state.')
 assert.match(page, /v-if="error"/, 'The page must expose an error state.');
 assert.match(page, /这个范围内还没有学习记录/, 'The page must expose an empty state.');
 assert.match(page, /当前记忆状态/, 'Current card state must be labelled as a present-day snapshot.');
+assert.match(page, /\['csv',\s*'txt',\s*'pdf'\]/, 'The page must expose all frozen export formats.');
+assert.match(page, /\/learning-history\/export\/\$\{format\}/, 'Exports must preserve the current canonical date/filter scope.');
+assert.match(page, /value: 'new_learning', label: '新学'/, 'The frozen new-learning label must remain exact.');
+assert.match(page, /value: 'reading_review', label: '阅读复习'/, 'The frozen reading-review label must remain exact.');
+assert.doesNotMatch(page, /新词进入学习|阅读中复习/, 'Superseded filter copy must not return.');
 
 assert.match(calendar, /axios\.get\(['"]\/learning-history\/data['"]/, 'Calendar must derive new-learning counts from the canonical timeline endpoint.');
 assert.match(calendar, /daily_reading_counts/, 'Calendar must consume canonical daily counts from timeline metadata.');
