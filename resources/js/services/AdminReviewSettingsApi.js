@@ -78,6 +78,10 @@ export function applyOptimization() {
     return axios.post('/settings/fsrs/optimize', { confirm: true });
 }
 
+export function updateOptimizationPolicy(payload) {
+    return axios.put('/settings/fsrs/optimization-policy', payload);
+}
+
 export function restoreDefaultParameters() {
     return axios.post('/settings/fsrs/restore-default');
 }

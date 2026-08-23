@@ -21,19 +21,63 @@ class FsrsOptimizationSettingsService
     {
     }
 
-    public function getStatus(int $userId, string $language): array
+    public function getStatus(int $userId, string $language, ?Carbon $now = null): array
     {
         $reviewCount = $this->eligibleReviewLogs($userId, $language)->count('review_logs.id');
         $canOptimize = $reviewCount >= self::MIN_REQUIRED;
+        $config = $this->reviewSettings->resolve($userId, $language);
 
         return array_merge([
             'review_count' => $reviewCount,
             'min_required' => self::MIN_REQUIRED,
             'can_optimize' => $canOptimize,
             'message' => $canOptimize ? self::PENDING_MESSAGE : self::INSUFFICIENT_MESSAGE,
-        ], $this->parameterSource($userId, $language), [
+        ], $this->parameterSource($config), [
+            'optimization_policy' => $this->optimizationPolicyStatus($config, $canOptimize, $now),
             'diagnostics' => $this->diagnostics($userId, $language),
         ]);
+    }
+
+    public function updatePolicy(int $userId, string $language, string $mode, int $intervalDays): array
+    {
+        $this->reviewSettings->mutate($userId, $language, ['fsrs' => [
+            'optimization_mode' => $mode,
+            'optimization_interval_days' => $intervalDays,
+        ]]);
+        $policy = $this->getStatus($userId, $language)['optimization_policy'];
+
+        return [
+            'success' => true,
+            'message' => $mode === 'interval'
+                ? "已设置为每 {$intervalDays} 天自动优化一次。"
+                : '已设置为仅手动优化。',
+            'optimization_policy' => $policy,
+        ];
+    }
+
+    public function applyAutomaticallyIfDue(int $userId, string $language, ?Carbon $now = null): array
+    {
+        $config = $this->reviewSettings->resolve($userId, $language);
+        $policy = $this->optimizationPolicyStatus($config, false, $now);
+        if ($policy['mode'] !== 'interval') {
+            return ['attempted' => false, 'applied' => false, 'reason' => 'manual_mode'];
+        }
+        if (!$policy['time_due']) {
+            return ['attempted' => false, 'applied' => false, 'reason' => 'not_due'];
+        }
+        $status = $this->getStatus($userId, $language, $now);
+        if (!$status['can_optimize']) {
+            return ['attempted' => false, 'applied' => false, 'reason' => 'insufficient_reviews'];
+        }
+
+        $result = $this->apply($userId, $language);
+
+        return [
+            'attempted' => true,
+            'applied' => (bool) ($result['applied'] ?? false),
+            'reason' => ($result['applied'] ?? false) ? 'applied' : 'optimization_failed',
+            'error_code' => $result['error_code'] ?? null,
+        ];
     }
 
     public function preflight(int $userId, string $language): array
@@ -166,8 +210,18 @@ class FsrsOptimizationSettingsService
             'fsrs_parameters_source',
             'fsrs_parameters_optimized_at',
         ];
-        $defaults = ReviewSettingsPresetConfig::defaults()->toArray()['fsrs'];
-        $before = $this->reviewSettings->resolve($userId, $language)->toArray()['fsrs'];
+        $defaultFsrs = ReviewSettingsPresetConfig::defaults()->toArray()['fsrs'];
+        $defaults = [
+            'parameters' => $defaultFsrs['parameters'],
+            'parameters_source' => $defaultFsrs['parameters_source'],
+            'parameters_optimized_at' => $defaultFsrs['parameters_optimized_at'],
+        ];
+        $currentFsrs = $this->reviewSettings->resolve($userId, $language)->toArray()['fsrs'];
+        $before = [
+            'parameters' => $currentFsrs['parameters'],
+            'parameters_source' => $currentFsrs['parameters_source'],
+            'parameters_optimized_at' => $currentFsrs['parameters_optimized_at'],
+        ];
         $this->reviewSettings->mutate($userId, $language, ['fsrs' => $defaults]);
         $changed = $before !== $defaults;
 
@@ -304,9 +358,8 @@ class FsrsOptimizationSettingsService
         ];
     }
 
-    private function parameterSource(int $userId, string $language): array
+    private function parameterSource(ReviewSettingsPresetConfig $config): array
     {
-        $config = $this->reviewSettings->resolve($userId, $language);
         $parameters = $config->fsrsParameters();
         $metadata = $config->fsrsMetadata();
         $source = $metadata['parameters_source'];
@@ -330,6 +383,34 @@ class FsrsOptimizationSettingsService
             'last_optimized_at' => $lastOptimizedAt,
             'parameters_count' => count($parameters),
             'has_optimized_parameters' => false,
+        ];
+    }
+
+    private function optimizationPolicyStatus(
+        ReviewSettingsPresetConfig $config,
+        bool $canOptimize = false,
+        ?Carbon $now = null,
+    ): array {
+        $now ??= Carbon::now();
+        $policy = $config->fsrsOptimizationPolicy();
+        $lastOptimizedAt = $config->fsrsMetadata()['parameters_optimized_at'];
+        $nextEligibleAt = null;
+        if (is_string($lastOptimizedAt) && $lastOptimizedAt !== '') {
+            try {
+                $nextEligibleAt = Carbon::parse($lastOptimizedAt)->addDays($policy['interval_days']);
+            } catch (\Throwable) {
+                $nextEligibleAt = null;
+            }
+        }
+        $timeDue = $nextEligibleAt === null || $now->greaterThanOrEqualTo($nextEligibleAt);
+
+        return [
+            'mode' => $policy['mode'],
+            'interval_days' => $policy['interval_days'],
+            'last_success_at' => $lastOptimizedAt,
+            'next_eligible_at' => $nextEligibleAt?->toIso8601String(),
+            'time_due' => $policy['mode'] === 'interval' && $timeDue,
+            'automatic_eligible' => $policy['mode'] === 'interval' && $timeDue && $canOptimize,
         ];
     }
 

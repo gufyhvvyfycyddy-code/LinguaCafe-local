@@ -10,3 +10,7 @@ if ($backupSchedule !== null) {
         ->cron($backupSchedule)
         ->withoutOverlapping();
 }
+
+Schedule::command('fsrs:optimize-due')
+    ->dailyAt('03:00')
+    ->withoutOverlapping();

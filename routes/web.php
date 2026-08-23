@@ -129,6 +129,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // Basic FSRS optimization belongs to each authenticated user's own language data.
     Route::get('/settings/fsrs/optimization-status', [App\Http\Controllers\SettingsController::class, 'getFsrsOptimizationStatus']);
     Route::post('/settings/fsrs/optimize', [App\Http\Controllers\SettingsController::class, 'optimizeFsrsParameters']);
+    Route::put('/settings/fsrs/optimization-policy', [App\Http\Controllers\SettingsController::class, 'updateFsrsOptimizationPolicy']);
 
     // languages
     Route::get('/languages/get-language-selection-dialog-data', [App\Http\Controllers\LanguageController::class, 'getLanguageSelectionDialogData']);

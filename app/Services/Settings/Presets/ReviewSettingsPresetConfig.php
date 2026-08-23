@@ -6,9 +6,10 @@ use App\Services\ReviewQueueOrderOptions;
 
 final class ReviewSettingsPresetConfig
 {
-    public const SCHEMA_VERSION = 2;
-    private const LEGACY_SCHEMA_VERSION = 1;
+    public const SCHEMA_VERSION = 3;
+    private const LEGACY_SCHEMA_VERSIONS = [1, 2];
     private const EASY_DAY_MODES = ['normal', 'reduced', 'minimum'];
+    private const OPTIMIZATION_MODES = ['manual', 'interval'];
 
     private const FALLBACK_PARAMETERS = [
         0.40255, 1.18385, 3.173, 15.69105, 7.1949, 0.5345, 1.4604,
@@ -33,6 +34,8 @@ final class ReviewSettingsPresetConfig
                 'parameters' => $parameters,
                 'parameters_source' => 'default',
                 'parameters_optimized_at' => null,
+                'optimization_mode' => 'manual',
+                'optimization_interval_days' => 30,
             ],
             'daily_limits' => [
                 'new_cards_enabled' => true,
@@ -50,7 +53,7 @@ final class ReviewSettingsPresetConfig
     public static function fromArray(array $input): self
     {
         $version = $input['schema_version'] ?? null;
-        if (!in_array($version, [self::LEGACY_SCHEMA_VERSION, self::SCHEMA_VERSION], true)) {
+        if (!in_array($version, [...self::LEGACY_SCHEMA_VERSIONS, self::SCHEMA_VERSION], true)) {
             throw new \InvalidArgumentException('Unsupported review settings preset schema.');
         }
 
@@ -69,6 +72,13 @@ final class ReviewSettingsPresetConfig
         if ($optimizedAt !== null && !is_string($optimizedAt)) {
             throw new \InvalidArgumentException('Invalid FSRS optimized timestamp.');
         }
+        $optimizationMode = $fsrs['optimization_mode'] ?? 'manual';
+        if (!is_string($optimizationMode) || !in_array($optimizationMode, self::OPTIMIZATION_MODES, true)) {
+            throw new \InvalidArgumentException('Invalid FSRS optimization mode.');
+        }
+        $optimizationIntervalDays = self::integer([
+            'optimization_interval_days' => $fsrs['optimization_interval_days'] ?? 30,
+        ], 'optimization_interval_days', 1, 365);
 
         $limits = $input['daily_limits'] ?? [];
         $normalizedLimits = [
@@ -121,6 +131,8 @@ final class ReviewSettingsPresetConfig
                 'parameters' => $parameters,
                 'parameters_source' => $source,
                 'parameters_optimized_at' => $optimizedAt,
+                'optimization_mode' => $optimizationMode,
+                'optimization_interval_days' => $optimizationIntervalDays,
             ],
             'daily_limits' => $normalizedLimits,
             'queue_order' => $queue,
@@ -174,6 +186,14 @@ final class ReviewSettingsPresetConfig
         return [
             'parameters_source' => $this->config['fsrs']['parameters_source'],
             'parameters_optimized_at' => $this->config['fsrs']['parameters_optimized_at'],
+        ];
+    }
+
+    public function fsrsOptimizationPolicy(): array
+    {
+        return [
+            'mode' => $this->config['fsrs']['optimization_mode'],
+            'interval_days' => $this->config['fsrs']['optimization_interval_days'],
         ];
     }
 

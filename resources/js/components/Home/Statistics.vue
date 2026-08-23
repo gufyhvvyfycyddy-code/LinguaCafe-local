@@ -117,8 +117,49 @@
                         {{ optimizationStatus.message }}
                     </v-alert>
                 </template>
+                <v-divider class="my-4"></v-divider>
+                <div class="optimization-policy-grid">
+                    <v-select
+                        v-model="optimizationPolicyMode"
+                        :items="optimizationPolicyOptions"
+                        item-text="label"
+                        item-value="value"
+                        label="自动优化方式"
+                        dense
+                        outlined
+                        hide-details
+                        :disabled="!optimizationStatus"
+                    ></v-select>
+                    <v-text-field
+                        v-if="optimizationPolicyMode === 'interval'"
+                        v-model.number="optimizationIntervalDays"
+                        type="number"
+                        min="1"
+                        max="365"
+                        label="间隔天数"
+                        dense
+                        outlined
+                        hide-details
+                        :disabled="!optimizationStatus"
+                    ></v-text-field>
+                    <v-btn
+                        outlined
+                        color="primary"
+                        :loading="optimizationBusy === 'policy'"
+                        :disabled="optimizationBusy !== '' || !optimizationStatus"
+                        @click="saveOptimizationPolicy"
+                    >保存自动优化设置</v-btn>
+                </div>
+                <div v-if="optimizationStatus && optimizationStatus.optimization_policy" class="text-caption text--secondary mt-2">
+                    <template v-if="optimizationStatus.optimization_policy.mode === 'manual'">当前仅在你明确操作时优化。</template>
+                    <template v-else-if="optimizationStatus.optimization_policy.next_eligible_at">
+                        下次最早自动优化：{{ formatOptimizationDate(optimizationStatus.optimization_policy.next_eligible_at) }}。
+                    </template>
+                    <template v-else>达到记录要求后，将在下一次每日检查时优化。</template>
+                    自动优化也不会重排已有卡片。
+                </div>
                 <v-alert v-if="optimizationError" dense text type="error" class="mt-3 mb-0">{{ optimizationError }}</v-alert>
-                <v-alert v-if="optimizationResult" dense text :type="optimizationResult.applied ? 'success' : 'info'" class="mt-3 mb-0">
+                <v-alert v-if="optimizationResult" dense text :type="optimizationResult.applied || optimizationResult.success ? 'success' : 'info'" class="mt-3 mb-0">
                     {{ optimizationResult.message }}
                 </v-alert>
                 <v-sheet v-if="optimizationPreview && optimizationPreview.preview_available" outlined rounded class="pa-3 mt-3">
@@ -202,7 +243,7 @@
 
 <script>
 import StatisticsMiniChart from './StatisticsMiniChart.vue';
-import { applyOptimization, getOptimizationStatus, previewOptimization } from '../../services/AdminReviewSettingsApi';
+import { applyOptimization, getOptimizationStatus, previewOptimization, updateOptimizationPolicy } from '../../services/AdminReviewSettingsApi';
 
 export default {
     components: { StatisticsMiniChart },
@@ -221,6 +262,12 @@ export default {
             optimizationResult: null,
             optimizationBusy: '',
             optimizationError: '',
+            optimizationPolicyMode: 'manual',
+            optimizationIntervalDays: 30,
+            optimizationPolicyOptions: [
+                { value: 'manual', label: '仅手动优化' },
+                { value: 'interval', label: '每隔 N 天自动优化' },
+            ],
             periodOptions: [
                 { label: '最近 7 天', value: 7 },
                 { label: '最近 30 天', value: 30 },
@@ -317,6 +364,8 @@ export default {
             try {
                 const response = await getOptimizationStatus();
                 this.optimizationStatus = response.data;
+                this.optimizationPolicyMode = response.data.optimization_policy.mode;
+                this.optimizationIntervalDays = response.data.optimization_policy.interval_days;
             } catch (error) {
                 this.optimizationError = error.response?.data?.message || '记忆模型状态加载失败，请稍后重试。';
             } finally {
@@ -350,6 +399,31 @@ export default {
             } finally {
                 this.optimizationBusy = '';
             }
+        },
+        async saveOptimizationPolicy() {
+            const intervalDays = Number(this.optimizationIntervalDays);
+            if (!Number.isInteger(intervalDays) || intervalDays < 1 || intervalDays > 365) {
+                this.optimizationError = '自动优化间隔必须是 1 到 365 天的整数。';
+                return;
+            }
+            this.optimizationBusy = 'policy';
+            this.optimizationError = '';
+            this.optimizationResult = null;
+            try {
+                const response = await updateOptimizationPolicy({
+                    mode: this.optimizationPolicyMode,
+                    interval_days: intervalDays,
+                });
+                this.optimizationResult = { success: true, applied: false, message: response.data.message };
+                await this.loadOptimizationStatus();
+            } catch (error) {
+                this.optimizationError = error.response?.data?.message || '自动优化设置保存失败，请稍后重试。';
+            } finally {
+                this.optimizationBusy = '';
+            }
+        },
+        formatOptimizationDate(value) {
+            return value ? new Date(value).toLocaleString() : '—';
         },
         display(value) {
             return value === null || value === undefined ? '—' : value;
@@ -393,6 +467,12 @@ export default {
     grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
 }
+.optimization-policy-grid {
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) auto;
+    gap: 12px;
+    align-items: center;
+}
 .memory-value { margin-top: 4px; font-size: 24px; font-weight: 600; font-variant-numeric: tabular-nums; }
 .summary-value {
     margin-top: 6px;
@@ -416,6 +496,7 @@ export default {
     .scope-controls { grid-template-columns: 1fr; }
     .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .memory-grid, .pressure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .optimization-policy-grid { grid-template-columns: 1fr; }
     .heatmap { grid-template-columns: repeat(15, minmax(6px, 1fr)); }
     .statistics-v3 { padding-left: 0; padding-right: 0; }
 }

@@ -114,6 +114,22 @@ class SettingsController extends Controller
         return response()->json($result, 200);
     }
 
+    public function updateFsrsOptimizationPolicy(Request $request)
+    {
+        $validated = $request->validate([
+            'mode' => 'required|string|in:manual,interval',
+            'interval_days' => 'required|integer|min:1|max:365',
+        ]);
+        $user = Auth::user();
+
+        return response()->json($this->settingsService->updateFsrsOptimizationPolicy(
+            $user->id,
+            $user->selected_language,
+            $validated['mode'],
+            (int) $validated['interval_days'],
+        ));
+    }
+
     /**
      * D.4-a: Read-only preview of FSRS reschedule impact.
      *

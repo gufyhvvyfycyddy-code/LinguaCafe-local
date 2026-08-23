@@ -50,7 +50,7 @@ class M13ReviewSettingsTest extends TestCase
         $this->actingAs($this->user)
             ->getJson('/settings/fsrs/advanced-settings')
             ->assertOk()
-            ->assertJsonPath('schema_version', 2)
+            ->assertJsonPath('schema_version', 3)
             ->assertJsonPath('scheduling.learning_steps_minutes.0', 10)
             ->assertJsonPath('scheduling.learning_steps_minutes.1', 30)
             ->assertJsonPath('experience.auto_advance_enabled', false)

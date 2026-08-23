@@ -72,6 +72,47 @@ class FsrsOptimizationSettingsTest extends TestCase
     {
         $this->getJson('/settings/fsrs/optimization-status')->assertUnauthorized();
         $this->postJson('/settings/fsrs/optimize')->assertUnauthorized();
+        $this->putJson('/settings/fsrs/optimization-policy', [])->assertUnauthorized();
+    }
+
+    public function test_ordinary_user_can_update_bounded_optimization_policy_in_own_preset(): void
+    {
+        $this->user->forceFill(['is_admin' => false])->save();
+
+        $this->actingAs($this->user)
+            ->getJson('/settings/fsrs/optimization-status')
+            ->assertOk()
+            ->assertJsonPath('optimization_policy.mode', 'manual')
+            ->assertJsonPath('optimization_policy.interval_days', 30)
+            ->assertJsonPath('optimization_policy.automatic_eligible', false);
+
+        $this->actingAs($this->user)
+            ->putJson('/settings/fsrs/optimization-policy', [
+                'mode' => 'interval',
+                'interval_days' => 14,
+            ])->assertOk()
+            ->assertJsonPath('optimization_policy.mode', 'interval')
+            ->assertJsonPath('optimization_policy.interval_days', 14);
+
+        $preset = ReviewSettingPreset::where('user_id', $this->user->id)->firstOrFail();
+        $this->assertSame('interval', $preset->config['fsrs']['optimization_mode']);
+        $this->assertSame(14, $preset->config['fsrs']['optimization_interval_days']);
+        $this->assertDatabaseMissing('review_setting_presets', ['user_id' => $this->otherUser->id]);
+    }
+
+    public function test_optimization_policy_rejects_invalid_mode_and_interval(): void
+    {
+        $this->actingAs($this->user)
+            ->putJson('/settings/fsrs/optimization-policy', [
+                'mode' => 'weekly',
+                'interval_days' => 30,
+            ])->assertUnprocessable()->assertJsonValidationErrors('mode');
+
+        $this->actingAs($this->user)
+            ->putJson('/settings/fsrs/optimization-policy', [
+                'mode' => 'interval',
+                'interval_days' => 366,
+            ])->assertUnprocessable()->assertJsonValidationErrors('interval_days');
     }
 
     public function test_optimization_status_returns_review_count_threshold_and_message(): void
@@ -565,6 +606,22 @@ class FsrsOptimizationSettingsTest extends TestCase
         $this->assertEquals('default', $status['parameters_source']);
         $this->assertFalse($status['has_optimized_parameters']);
         $this->assertEquals(19, $status['parameters_count']);
+    }
+
+    public function test_restore_default_parameters_preserves_automatic_optimization_policy(): void
+    {
+        $this->actingAs($this->user)->putJson('/settings/fsrs/optimization-policy', [
+            'mode' => 'interval',
+            'interval_days' => 45,
+        ])->assertOk();
+
+        $this->actingAs($this->user)->postJson('/settings/fsrs/restore-default')->assertOk();
+
+        $this->actingAs($this->user)
+            ->getJson('/settings/fsrs/optimization-status')
+            ->assertOk()
+            ->assertJsonPath('optimization_policy.mode', 'interval')
+            ->assertJsonPath('optimization_policy.interval_days', 45);
     }
 
     public function test_restore_default_makes_scheduling_service_return_default_parameters(): void

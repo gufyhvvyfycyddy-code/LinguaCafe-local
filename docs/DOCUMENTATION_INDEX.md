@@ -83,6 +83,7 @@
 | M12 Special Study Sessions / Custom Study V2 | `docs/adr/ADR-0040-m12-special-study-sessions.md`、`docs/plans/m12-special-study-sessions-plan.md`、`docs/testing/m12-special-study-sessions-acceptance-2026-07-29.md` |
 | M13 Review Settings 与 Workload Planner V2 | `docs/adr/ADR-0045-m13-review-settings-workload-planner.md`、`docs/plans/m13-review-settings-workload-planner-plan.md`、`docs/testing/m13-review-settings-workload-planner-acceptance-2026-07-29.md` |
 | M14 Statistics 与 Card Info V3 | `docs/adr/ADR-0046-m14-statistics-card-info-v3.md`、`docs/plans/m14-statistics-card-info-v3-plan.md`、`docs/testing/m14-statistics-card-info-v3-acceptance-2026-07-29.md` |
+| G-06F FSRS 参数优化策略与定时命令 | `docs/adr/ADR-0065-fsrs-optimization-policy-and-scheduled-command.md` |
 | M15 Browser Knowledge Hygiene V3 | `docs/adr/ADR-0047-m15-browser-knowledge-hygiene-v3.md`、`docs/plans/m15-browser-knowledge-hygiene-v3-plan.md`、`docs/testing/m15-browser-knowledge-hygiene-v3-acceptance-2026-07-29.md` |
 | M16 Portable Data 与 Anki Interoperability V1 | `docs/adr/ADR-0048-m16-portable-data-and-anki-interoperability-v1.md`、`docs/plans/m16-portable-data-and-anki-interoperability-v1-plan.md`、`docs/testing/m16-portable-data-and-anki-interoperability-v1-acceptance-2026-07-29.md` |
 | M17 Review Experience 与 Accessibility V2（Web；Android 平台证据归 M7） | `docs/adr/ADR-0049-m17-review-experience-accessibility-web-v2.md`、`docs/plans/m17-review-experience-accessibility-web-v2-plan.md`、`docs/testing/m17-review-experience-accessibility-web-v2-acceptance-2026-08-01.md` |

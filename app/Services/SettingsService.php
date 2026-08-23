@@ -80,6 +80,15 @@ class SettingsService
         return $this->fsrsOptimization->apply($userId, $language);
     }
 
+    public function updateFsrsOptimizationPolicy(
+        int $userId,
+        string $language,
+        string $mode,
+        int $intervalDays,
+    ): array {
+        return $this->fsrsOptimization->updatePolicy($userId, $language, $mode, $intervalDays);
+    }
+
     public function getFsrsDailyLimits(int $userId, string $language): array
     {
         return $this->fsrsDailyLimits->get($userId, $language);
