@@ -34,6 +34,8 @@ final class TestingDatabaseLease
 
     private const DATABASE_ID_ENV = 'TESTING_DB_LEASE_DATABASE_ID';
 
+    private const DATABASE_ID_OVERRIDE_ENV = 'LINGUACAFE_TEST_DB_LEASE_DATABASE_ID_OVERRIDE';
+
     private const TOKEN_ENV = 'LINGUACAFE_TEST_DB_LEASE_TOKEN';
 
     private const OWNER_PID_ENV = 'LINGUACAFE_TEST_DB_LEASE_OWNER_PID';
@@ -249,7 +251,12 @@ final class TestingDatabaseLease
             $remote = 'no-origin-remote';
         }
 
-        $databaseIdentifier ??= self::databaseIdentifierFromPhpunitXml($root.'/phpunit.xml');
+        if ($databaseIdentifier === null) {
+            $runtimeDatabaseIdentifier = trim((string) (getenv(self::DATABASE_ID_OVERRIDE_ENV) ?: ''));
+            $databaseIdentifier = $runtimeDatabaseIdentifier !== ''
+                ? $runtimeDatabaseIdentifier
+                : self::databaseIdentifierFromPhpunitXml($root.'/phpunit.xml');
+        }
 
         return self::identityFromInputs($commonDirReal, $remote, $databaseIdentifier);
     }
