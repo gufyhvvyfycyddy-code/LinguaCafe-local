@@ -19,7 +19,7 @@
 
             <v-alert v-if="error" type="error" dense outlined>{{ error }}</v-alert>
 
-            <v-row>
+            <v-row no-gutters>
                 <v-col cols="12" lg="8">
                     <v-card outlined class="rounded-lg pa-5">
                         <div class="text-h6 mb-4">新建会话</div>

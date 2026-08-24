@@ -1,6 +1,6 @@
 <template>
     <v-container class="article-health-page py-6" fluid>
-        <v-row justify="center">
+        <v-row no-gutters justify="center">
             <v-col cols="12" lg="10" xl="8">
                 <div class="d-flex flex-wrap align-center mb-5">
                     <div>
