@@ -225,10 +225,10 @@ class WordSenseKnownSenseService
      *  - does NOT perform any DB write.
      *  - DOES read from `reading_inline_sense_confirmations` (read-only).
      *
-     * The returned safety_flags are a hard contract that the frontend and
-     * tests can rely on. If a future round wants to turn "是这个意思" into a
-     * real FSRS write, it MUST remove the corresponding safety flag and
-     * pass an Architecture Gate + ADR first (see ADR-0003).
+     * These no-write rules are behavioral invariants enforced by this module
+     * and its regression tests; they are not duplicated into response metadata.
+     * A future round that turns "是这个意思" into a real FSRS write still
+     * requires a separate Architecture Gate + ADR (see ADR-0003).
      *
      * @param string $surface The surface form clicked by the user (e.g. "geese").
      * @param string $sentence The sentence the token appears in (display only).
@@ -314,14 +314,6 @@ class WordSenseKnownSenseService
                 'match_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === 'match')),
                 'not_match_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === 'not_match')),
                 'pending_count' => count(array_filter($candidates, fn ($c) => ($c['persisted_choice'] ?? null) === null)),
-            ],
-            'safety_flags' => [
-                'read_only' => true,
-                'no_review_log_created' => true,
-                'no_fsrs_changed' => true,
-                'no_review_card_created' => true,
-                'no_word_sense_created' => true,
-                'no_ai_called' => true,
             ],
             'ui_hint' => '「是这个意思 / 不是这个意思」按钮会保存为阅读位置级别的确认，不是复习评分，不会写入复习记录，不会改变复习进度（FSRS），不会创建词义或复习卡。',
         ];

@@ -36,7 +36,7 @@ use Tests\TestCase;
  *   13. saving confirmation does NOT change FSRS fields;
  *   14. saving confirmation does NOT create WordSense;
  *   15. saving confirmation does NOT create ReviewCard;
- *   16. saving confirmation does NOT call AI (safety_flags.no_ai_called === true);
+ *   16. saving confirmation keeps AI outside this writer module;
  *   17. (regression) ReviewFsrsTest remains green — covered by that test file;
  *   18. (regression) FsrsSchedulingServiceTest remains green — covered by that test file.
  */
@@ -88,12 +88,7 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('choice', 'match');
         $response->assertJsonPath('persisted', true);
-        $response->assertJsonPath('safety_flags.not_a_review_rating', true);
-        $response->assertJsonPath('safety_flags.no_review_log_created', true);
-        $response->assertJsonPath('safety_flags.no_fsrs_changed', true);
-        $response->assertJsonPath('safety_flags.no_review_card_created', true);
-        $response->assertJsonPath('safety_flags.no_word_sense_created', true);
-        $response->assertJsonPath('safety_flags.no_ai_called', true);
+        $this->assertArrayNotHasKey('safety_flags', $response->json());
 
         $this->assertSame(1, ReadingInlineSenseConfirmation::count(), 'exactly one row should exist');
         $row = ReadingInlineSenseConfirmation::first();
@@ -483,9 +478,9 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         $this->assertSame($before, ReviewCard::count(), 'confirmation must not create ReviewCard');
     }
 
-    // ==================== 16. Does NOT call AI ====================
+    // ==================== 16. Response interface stays minimal ====================
 
-    public function test_post_confirmation_safety_flags_assert_no_ai_called(): void
+    public function test_post_confirmation_does_not_duplicate_internal_safety_invariants(): void
     {
         $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
 
@@ -497,8 +492,7 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         ]);
 
         $response->assertOk();
-        $this->assertTrue($response->json('safety_flags.no_ai_called'));
-        $this->assertTrue($response->json('safety_flags.not_a_review_rating'));
+        $this->assertArrayNotHasKey('safety_flags', $response->json());
     }
 
     // ==================== Language mismatch returns 403 ====================
@@ -1245,9 +1239,9 @@ class ReadingInlineSenseConfirmationTest extends TestCase
     }
 
     /**
-     * Revoke returns safety_flags proving the safety contract.
+     * Revoke response keeps only consumer-visible outcome/undo data.
      */
-    public function test_revoke_returns_safety_flags(): void
+    public function test_revoke_response_does_not_duplicate_internal_safety_invariants(): void
     {
         $sense = $this->createConfirmedSense('goose', 'geese', '鹅');
         $chapter = $this->createChapter($this->user->id);
@@ -1261,13 +1255,8 @@ class ReadingInlineSenseConfirmationTest extends TestCase
             ->deleteJson('/senses/inline-confirmations/' . $confirmationId)
             ->assertOk();
 
-        $flags = $response->json('safety_flags');
-        $this->assertTrue($flags['no_review_log_created'] ?? false);
-        $this->assertTrue($flags['no_fsrs_changed'] ?? false);
-        $this->assertTrue($flags['no_review_card_changed'] ?? false);
-        $this->assertTrue($flags['no_word_sense_deleted'] ?? false);
-        $this->assertTrue($flags['no_review_card_deleted'] ?? false);
-        $this->assertTrue($flags['not_a_review_rating'] ?? false);
+        $response->assertJsonPath('revoked', true);
+        $this->assertArrayNotHasKey('safety_flags', $response->json());
     }
 
     /**
@@ -1406,6 +1395,7 @@ class ReadingInlineSenseConfirmationTest extends TestCase
         $undoResp->assertJsonPath('confirmation_id', $confirmationId);
         $undoResp->assertJsonPath('restored_choice', null);
         $undoResp->assertJsonPath('persisted_choice', null);
+        $this->assertArrayNotHasKey('safety_flags', $undoResp->json());
         $this->assertSame(0, ReadingInlineSenseConfirmation::count(), 'row deleted by undo');
     }
 

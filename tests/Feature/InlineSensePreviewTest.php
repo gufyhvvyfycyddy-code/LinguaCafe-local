@@ -26,7 +26,7 @@ use Tests\TestCase;
  *  2.  preview endpoint does not change FSRS fields;
  *  3.  preview endpoint does not create WordSense;
  *  4.  preview endpoint does not create ReviewCard;
- *  5.  preview endpoint does not call AI (safety_flags.no_ai_called === true);
+ *  5.  preview endpoint keeps AI outside this read-only module;
  *  6.  preview endpoint only returns current user + language confirmed senses;
  *  7.  pending / ignored / rejected senses are not returned;
  *  8.  cross-user isolation;
@@ -34,8 +34,8 @@ use Tests\TestCase;
  *  10. empty lemma / unknown lemma returns safe empty state.
  *
  * Also covers:
- *  - safety_flags hard contract (all 6 flags true);
- *  - payload shape (surface/sentence/candidates/candidate_count/safety_flags/ui_hint);
+ *  - no duplicate safety metadata in the response interface;
+ *  - payload shape (surface/sentence/candidates/candidate_count/ui_hint);
  *  - 422 for empty lemma;
  *  - 403 for language mismatch;
  *  - read_only === true.
@@ -157,9 +157,9 @@ class InlineSensePreviewTest extends TestCase
         $this->assertSame($reviewCardBefore, ReviewCard::count(), 'inline preview must not create ReviewCard');
     }
 
-    // ==================== 5. No AI called (safety flag) ====================
+    // ==================== 5. Read-only interface stays minimal ====================
 
-    public function test_inline_preview_safety_flags_include_no_ai_called(): void
+    public function test_inline_preview_response_does_not_duplicate_internal_safety_invariants(): void
     {
         $this->createConfirmedSense('goose', 'geese', '鹅');
 
@@ -167,32 +167,7 @@ class InlineSensePreviewTest extends TestCase
             ->get('/senses/inline-preview?lemma=goose&language=english')
             ->assertOk();
 
-        $flags = $response->json('safety_flags');
-        $this->assertIsArray($flags);
-        $this->assertTrue($flags['no_ai_called'] ?? false, 'safety_flags.no_ai_called must be true');
-    }
-
-    public function test_inline_preview_safety_flags_all_six_present_and_true(): void
-    {
-        $this->createConfirmedSense('goose', 'geese', '鹅');
-
-        $response = $this->actingAs($this->user)
-            ->get('/senses/inline-preview?lemma=goose&language=english')
-            ->assertOk();
-
-        $flags = $response->json('safety_flags');
-        $expected = [
-            'read_only',
-            'no_review_log_created',
-            'no_fsrs_changed',
-            'no_review_card_created',
-            'no_word_sense_created',
-            'no_ai_called',
-        ];
-        foreach ($expected as $key) {
-            $this->assertArrayHasKey($key, $flags, "safety_flags must contain [{$key}]");
-            $this->assertTrue($flags[$key], "safety_flags[{$key}] must be true");
-        }
+        $this->assertArrayNotHasKey('safety_flags', $response->json());
     }
 
     // ==================== 6. Only current user + language confirmed senses ====================
@@ -312,8 +287,7 @@ class InlineSensePreviewTest extends TestCase
         $this->assertFalse($json['has_confirmed_senses']);
         $this->assertSame(0, $json['candidate_count']);
         $this->assertSame([], $json['candidates']);
-        $this->assertTrue($json['safety_flags']['read_only']);
-        $this->assertTrue($json['safety_flags']['no_review_log_created']);
+        $this->assertArrayNotHasKey('safety_flags', $json);
     }
 
     public function test_inline_preview_service_returns_empty_for_empty_lemma(): void
@@ -345,7 +319,7 @@ class InlineSensePreviewTest extends TestCase
         $this->assertArrayHasKey('has_confirmed_senses', $json);
         $this->assertArrayHasKey('candidates', $json);
         $this->assertArrayHasKey('candidate_count', $json);
-        $this->assertArrayHasKey('safety_flags', $json);
+        $this->assertArrayNotHasKey('safety_flags', $json);
         $this->assertArrayHasKey('ui_hint', $json);
     }
 
@@ -418,17 +392,6 @@ class InlineSensePreviewTest extends TestCase
 
         $this->assertSame('goose', $response->json('lemma'));
         $this->assertTrue($response->json('has_confirmed_senses'));
-    }
-
-    public function test_inline_preview_read_only_flag_is_true(): void
-    {
-        $this->createConfirmedSense('goose', 'geese', '鹅');
-
-        $response = $this->actingAs($this->user)
-            ->get('/senses/inline-preview?lemma=goose&language=english')
-            ->assertOk();
-
-        $this->assertTrue($response->json('safety_flags.read_only'));
     }
 
     // ==================== Echo persisted confirmations (GLM-ReadingInlineConfirmationPersistence-1000-1) ====================

@@ -77,7 +77,6 @@ class ReadingInlineSenseConfirmationController extends Controller
             'choice' => $result['choice'],
             'persisted' => $result['persisted'],
             'updated_at' => $result['updated_at'],
-            'safety_flags' => $result['safety_flags'],
             'updated_preview' => $previewPayload,
             'undo_token' => $result['undo_token'],
             'undo_expires_at' => $result['undo_expires_at'],

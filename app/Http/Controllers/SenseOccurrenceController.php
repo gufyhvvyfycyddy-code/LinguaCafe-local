@@ -105,12 +105,12 @@ class SenseOccurrenceController extends Controller
      *  - the lemma / surface / sentence passed through for display;
      *  - confirmed WordSense candidates for this lemma (with read-only FSRS
      *    status summary per candidate);
-     *  - a hard safety_flags contract proving nothing is written.
+     *  - no write side effects; that invariant is verified by behavior tests rather than response metadata.
      *
-     * The "是这个意思 / 不是这个意思" buttons on the frontend are FRONT-END
-     * ONLY this round — they do not call any POST endpoint, do not record
-     * the user's choice, do not write ReviewLog / FSRS / WordSense /
-     * ReviewCard. This GET endpoint is the only backend call involved.
+     * This GET endpoint remains read-only. Persisting "是这个意思 / 不是这个意思"
+     * is owned by the separate `/senses/inline-confirmation` write endpoint;
+     * the preview path itself does not write ReviewLog / FSRS / WordSense /
+     * ReviewCard.
      */
     public function inlinePreview(Request $request)
     {

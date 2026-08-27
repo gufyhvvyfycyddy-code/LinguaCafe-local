@@ -39,22 +39,6 @@ class ReadingInlineSenseConfirmationService
      */
     public const UNDO_TTL_SECONDS = 120;
 
-    /**
-     * Symmetric safety flags returned by every undo operation. The
-     * frontend / tests treat these as a hard contract: undo MUST NOT
-     * touch ReviewLog / FSRS / ReviewCard / WordSense.
-     */
-    private const UNDO_SAFETY_FLAGS = [
-        'no_review_log_created' => true,
-        'no_fsrs_changed' => true,
-        'no_review_card_changed' => true,
-        'no_word_sense_deleted' => true,
-        'no_review_card_deleted' => true,
-        'no_word_sense_created' => true,
-        'no_review_card_created' => true,
-        'not_a_review_rating' => true,
-    ];
-
     /** Hint shown after a store action. */
     public const UNDO_HINT_STORE = '按 Ctrl+Z 可撤销刚才的阅读判断。';
 
@@ -82,7 +66,6 @@ class ReadingInlineSenseConfirmationService
      *     confirmation_id:int,
      *     choice:string,
      *     persisted:bool,
-     *     safety_flags:array<string,bool>,
      *     updated_at:string|null
      * }
      */
@@ -194,14 +177,6 @@ class ReadingInlineSenseConfirmationService
             'choice' => $confirmation->choice,
             'persisted' => true,
             'updated_at' => $confirmation->updated_at?->toISOString(),
-            'safety_flags' => [
-                'no_review_log_created' => true,
-                'no_fsrs_changed' => true,
-                'no_review_card_created' => true,
-                'no_word_sense_created' => true,
-                'no_ai_called' => true,
-                'not_a_review_rating' => true,
-            ],
             'undo_token' => $undoToken,
             'undo_expires_at' => now()->addSeconds(self::UNDO_TTL_SECONDS)->toISOString(),
             'undo_hint' => self::UNDO_HINT_STORE,
@@ -501,12 +476,11 @@ class ReadingInlineSenseConfirmationService
      *  - Does NOT delete WordSense / ReviewCard / ReviewLog / EncounteredWord.
      *  - Does NOT call ReviewLog::create / FSRS / AI.
      *  - Does NOT modify any ReviewCard FSRS field.
-     *  - Returns safety_flags proving the above.
+     *  - Keeps those no-write rules as implementation/test invariants rather than response metadata.
      *
      * @return array{
      *     revoked:bool,
      *     confirmation_id:int,
-     *     safety_flags:array<string,bool>,
      *     undo_token:string,
      *     undo_expires_at:string,
      *     undo_hint:string
@@ -553,14 +527,6 @@ class ReadingInlineSenseConfirmationService
         return [
             'revoked' => true,
             'confirmation_id' => $confirmationId,
-            'safety_flags' => [
-                'no_review_log_created' => true,
-                'no_fsrs_changed' => true,
-                'no_review_card_changed' => true,
-                'no_word_sense_deleted' => true,
-                'no_review_card_deleted' => true,
-                'not_a_review_rating' => true,
-            ],
             'undo_token' => $undoToken,
             'undo_expires_at' => now()->addSeconds(self::UNDO_TTL_SECONDS)->toISOString(),
             'undo_hint' => self::UNDO_HINT_REVOKE,
@@ -655,15 +621,14 @@ class ReadingInlineSenseConfirmationService
      *  - Does NOT delete ReviewLog.
      *  - Enforces user + language ownership, WordSense STATUS_CONFIRMED,
      *    and Chapter ownership.
-     *  - Returns safety_flags proving the above.
+     *  - Keeps those no-write rules as implementation/test invariants rather than response metadata.
      *
      * @return array{
      *     undone:bool,
      *     action_type:string,
      *     confirmation_id:int,
      *     restored_choice:string|null,
-     *     persisted_choice:string|null,
-     *     safety_flags:array<string,bool>
+     *     persisted_choice:string|null
      * }
      * @throws \Illuminate\Validation\ValidationException when the token is invalid / expired / cross-user / cross-language
      */
@@ -732,15 +697,14 @@ class ReadingInlineSenseConfirmationService
             ->first();
 
         if ($confirmation === null) {
-            // The row is already gone — treat as idempotent success but
-            // still return safety_flags so the frontend can clear the token.
+            // The row is already gone — treat as idempotent success so the
+            // frontend can clear the token without replaying the action.
             return [
                 'undone' => true,
                 'action_type' => 'store',
                 'confirmation_id' => $confirmationId,
                 'restored_choice' => null,
                 'persisted_choice' => null,
-                'safety_flags' => self::UNDO_SAFETY_FLAGS,
             ];
         }
 
@@ -753,7 +717,6 @@ class ReadingInlineSenseConfirmationService
                 'confirmation_id' => $confirmationId,
                 'restored_choice' => null,
                 'persisted_choice' => null,
-                'safety_flags' => self::UNDO_SAFETY_FLAGS,
             ];
         }
 
@@ -771,7 +734,6 @@ class ReadingInlineSenseConfirmationService
             'confirmation_id' => $confirmationId,
             'restored_choice' => $beforeState,
             'persisted_choice' => $beforeState,
-            'safety_flags' => self::UNDO_SAFETY_FLAGS,
         ];
     }
 
@@ -848,7 +810,6 @@ class ReadingInlineSenseConfirmationService
             'confirmation_id' => (int) $reinserted->id,
             'restored_choice' => $choice,
             'persisted_choice' => $choice,
-            'safety_flags' => self::UNDO_SAFETY_FLAGS,
         ];
     }
 }

@@ -234,16 +234,8 @@ This section freezes the **Anki-style Ctrl+Z undo** rules for inline confirmatio
    - reject tokens whose Chapter (if present) no longer belongs to the current user / current language,
    - enforce `choice ∈ {match, not_match}` on any restore,
    - perform the undo atomically (DELETE for store undo, UPDATE for choice-switch undo, INSERT for revoke undo),
-   - return `undone: true`, `action_type`, `restored_choice` or `persisted_choice`, `confirmation_id`, optional `updated_preview`, and `safety_flags`.
-7. The undo safety_flags MUST include all of:
-   - `no_review_log_created: true`,
-   - `no_fsrs_changed: true`,
-   - `no_review_card_changed: true`,
-   - `no_word_sense_deleted: true`,
-   - `no_review_card_deleted: true`,
-   - `no_word_sense_created: true`,
-   - `no_review_card_created: true`,
-   - `not_a_review_rating: true`.
+   - return `undone: true`, `action_type`, `restored_choice` or `persisted_choice`, `confirmation_id`, and optional `updated_preview`.
+7. The no-review/no-FSRS/no-AI rules are behavioral invariants, not response metadata. The inline preview/store/revoke/undo interfaces do not duplicate those invariants as `safety_flags`; regression tests must prove the actual side effects remain absent.
 8. The undo layer MUST NOT write `ReviewLog`. MUST NOT change any `ReviewCard` FSRS field. MUST NOT call `ReviewCardService::recordReview` or `FsrsSchedulingService::schedule`. MUST NOT call AI. MUST NOT auto-create `WordSense`. MUST NOT auto-create `ReviewCard`. MUST NOT delete `WordSense` / `ReviewCard` / `ReviewLog` / `EncounteredWord`.
 9. The undo layer MUST NOT introduce any new migration, any new column, any new table, any new Redis/cache dependency. The undo token is stateless and self-contained (signed payload only).
 10. **Frontend Ctrl+Z behavior**:

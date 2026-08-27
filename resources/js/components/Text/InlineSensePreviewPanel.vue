@@ -229,7 +229,7 @@ import axios from 'axios';
  * Safety contract enforced by the backend:
  *  - `POST /senses/inline-confirmation` validates user / language / chapter /
  *    sense ownership and WordSense STATUS_CONFIRMED.
- *  - The backend returns `safety_flags` with `not_a_review_rating: true`.
+ *  - The confirmation remains outside ReviewLog / FSRS / AI write paths.
  *
  * This component does NOT emit events to the parent for the choice buttons.
  * The choice is persisted in the backend and echoed via the GET preview
