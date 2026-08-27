@@ -379,7 +379,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
 | H-00 | DONE | deletion-first caller/data/compat convergence：只删 proven-dead dual path / duplicate proof metadata / unreachable implementation；保留仍承担 caller、persisted data、recovery、deep-link、import/export、legacy-language 或 released-interface 义务的 lower owner | Phase G architecture reports + current callers/tests + Private House/codebase-design deletion test | `a4629de` 移除 Reader AI Assist V1 write path；`c27af0e` 移除 inline Sense duplicate safety metadata；`98a1200` 移除 TextBlockService 不可达 ReaderData fallback；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard endpoints 与 non-English lower mechanics 均有 fresh keep evidence；累计 JS/PHP/build/diff gate PASS |
-| H-01 | TODO | 建立最小可读的 load/observability harness | existing logs/health/tests; standard tooling | 能观测 P95/P99、DB connections、queue backlog、errors；不先建监控平台 |
+| H-01 | DONE | 建立最小可读的 load/observability harness | existing logs/health/tests; k6 + MySQL status + Laravel queue size | `h01-load-observability-harness-acceptance-2026-08-27.md`：testing-only 单 JSON contract；57 tests / 270 assertions；Lane04+PAB+k6 smoke PASS；能观测 P95/P99、DB connections、queue backlog、errors；Windows `php -S` 明确 `capacity_representative=false`；不建监控平台 |
 | H-02 | TODO | 100 同时在线的阅读/查词/复习负载 | current canonical flows | 无主流程错误；记录 P95/P99 和资源曲线；评分不重复 |
 | H-03 | TODO | 只针对实际瓶颈做性能修复 | H-02 evidence | 每个 index/cache/query/batch 都有实测瓶颈付费；复测证明改善 |
 | H-04 | TODO | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
@@ -745,6 +745,8 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 只记录会影响后续任务且不是显而易见实现细节的决定：
 
 `date | milestone | decision | evidence | removal/revisit condition`
+
+`2026-08-27 | H-01 | 最小 load/observability interface 采用 machine-level k6 + testing-only PHP orchestrator：HTTP tail/error 由 k6，DB pressure 由 MySQL Threads_connected/Threads_running，queue backlog 复用 Laravel queue size，application errors 读取 lane-local 新增高严重度日志；单一 JSON schema_version=1 是 H-02/H-03 唯一 measurement interface。Windows php -S 只用于 harness smoke，capacity_representative=false | H-01 combined regression 57/57 270 assertions；Lane04 + PAB + k6 真实 smoke PASS；50 observability samples；HTTP failure=0、checks=1、Laravel errors=0；port/k6 process/lease clean；验收见 docs/testing/h01-load-observability-harness-acceptance-2026-08-27.md | k6 summary schema 或 MySQL/Laravel queue metrics contract 改变时复审 measurement adapter；只有代表性 concurrent runtime 建立后才允许 H-02 100-user capacity claim`
 
 `2026-08-27 | H-00 | deletion-first 以真实 caller / persisted data / recovery / compatibility 作为删除门槛；H-00 不以删除数量为目标。只删除三类已证明第二套 truth：Reader AI Assist V1 write path、inline Sense duplicate safety metadata、TextBlockService 不可达 ReaderData fallback；保留 Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard compatibility、non-English lower mechanics，因为它们仍有 current caller/data/recovery/released-contract 义务 | 当前 H-00 commits a4629de + c27af0e + 98a1200；AI V2 JS 9/9；PAB/lease Unit 39/39 196 assertions；H-00 Feature matrix 158/158 639 assertions；Mix build PASS；git diff --check PASS；Martin Fowler Parallel Change + Google dead-code liveness principle 与本地 deletion test 一致 | 只有 fresh caller/data/compat 证据清零后才重新打开 retained lower owner 的 physical deletion；结构拆分仍等 H-03 实测瓶颈/局部性证据`
 

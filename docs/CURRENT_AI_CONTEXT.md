@@ -4,7 +4,7 @@
 > 日期：2026-08-27
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-27 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，Goal plan 已完成 Phase G 与 G-GATE；pre-H deletion-first `H-00` 也已 DONE。H-00 只删除 fresh proof 证明为第二套 truth / duplicate proof / unreachable implementation 的路径：Reader AI Assist V1 writer (`a4629de`)、inline Sense duplicate safety metadata (`c27af0e`)、TextBlockService unreachable ReaderData fallback (`98a1200`)；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard compatibility 与 non-English lower mechanics 因仍有 caller/data/recovery/released-contract 义务而保留。当前 forward TODO 从 `H-01` 开始：建立最小 load/observability harness，再进入 H-02 100 concurrent-user load。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
+> **2026-08-27 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，Goal plan 已完成 Phase G 与 G-GATE；pre-H deletion-first `H-00` 也已 DONE。H-00 只删除 fresh proof 证明为第二套 truth / duplicate proof / unreachable implementation 的路径：Reader AI Assist V1 writer (`a4629de`)、inline Sense duplicate safety metadata (`c27af0e`)、TextBlockService unreachable ReaderData fallback (`98a1200`)；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard compatibility 与 non-English lower mechanics 因仍有 caller/data/recovery/released-contract 义务而保留。`H-01` load/observability harness 已 DONE：testing-only k6 + MySQL status + Laravel queue/log sampling 统一输出单一 JSON contract，真实 Lane04/PAB smoke 与工具回归已通过；Windows `php -S` 明确只作 measurement smoke、`capacity_representative=false`。当前 forward TODO 为 `H-02`：先建立运行当前 canonical source 的代表性并发 testing runtime，再执行 100 concurrent-user reading / lookup / Sense Review load。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
 ## 1. 当前代码事实
 
@@ -94,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE 已全部 DONE；H-00 deletion-first caller/data/compat convergence 也已 DONE。当前下一 forward milestone 是 H-01 load/observability harness；之后按 H-02→H-03…H-GATE 顺序推进。
+“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness 均已 DONE。当前下一 forward milestone 是 H-02 100 concurrent-user load；先通过代表性并发 testing runtime 环境门，再按 H-02→H-03…H-GATE 顺序推进。
 
 ## 4. 当前本地维护账本
 

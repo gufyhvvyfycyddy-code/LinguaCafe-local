@@ -22,7 +22,7 @@
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
 - 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
-- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE 与 H-00 已关闭，下一步 H-01）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00、H-01 已关闭，下一步 H-02）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
 - 长期历史总账与运维登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论历史：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 历史 Anki-aligned 产品/架构路线：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`
