@@ -4,7 +4,13 @@
 
 - H-02 remains ACTIVE（H-02 仍为 ACTIVE）。
 - H-01 is DONE at canonical `2df859129d817e53f796687948845237928a5b66`（H-01 已在该 canonical 提交完成）。
-- Current slice only establishes the representative runtime contract; no 100-user claim exists yet（当前切片只建立代表性运行时契约，尚不存在 100 用户声明）。
+- The representative runtime contract, k6 representative workloads, testing fixture lifecycle, capacity-claim gate, and real fixture lifecycle proof are implemented on this branch through HEAD `01a9340`（代表性运行时契约、k6 代表性负载、testing fixture 生命周期、容量声明闸门和真实 fixture 生命周期证明已在本分支截至该 HEAD 实现）。
+- No 100-user capacity claim exists（尚不存在 100 用户容量声明）；H-02 is not DONE。
+
+## Completed Evidence
+
+- Focused current verification through HEAD `01a9340`: **14 tests / 307 assertions PASS**, PHP lint **PASS**, and `git diff --check` **PASS**（截至该 HEAD 的当前聚焦验证为 14 个测试 / 307 个断言通过，PHP lint 通过，`git diff --check` 通过）。
+- This evidence establishes the representative runtime/load-test and fixture-lifecycle implementation only; it does not constitute a 100-user capacity claim。
 
 ## Goal
 
@@ -108,6 +114,8 @@ H-02 can become DONE only when all of the following are true：
 - cleanup leaves no H-02 runtime residue；
 - H-03 remains closed until evidence identifies a bottleneck。
 
-## Current Next Action
+## Current Next Gate
 
-Main window must complete the Windows WSL2/Docker Desktop environment gate before authorizing any container build or load run.
+Windows reboot is required to activate the already-enabled WSL and VirtualMachinePlatform features. After reboot, the main window must verify WSL2, install and verify the Docker Desktop WSL2 backend, run Compose config/build/up using the current code, and then execute staged `1 → 10 → 25 → 50 → 100` load with H-01 `schema_version=1` observability.
+
+H-02 remains ACTIVE and no 100-user capacity claim may be made until that evidence is complete. H-03 remains explicitly closed until H-02 evidence identifies a bottleneck; no H-03 work starts before H-02 evidence.
