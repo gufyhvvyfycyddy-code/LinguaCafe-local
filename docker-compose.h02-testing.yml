@@ -1,0 +1,55 @@
+name: linguacafe-h02-testing
+
+networks:
+    h02-testing:
+        driver: bridge
+
+services:
+    mysql:
+        image: mysql:8.0
+        restart: "no"
+        environment:
+            MYSQL_DATABASE: linguacafe_h02_testing
+            MYSQL_USER: linguacafe_h02
+            MYSQL_PASSWORD: h02-testing-only
+            MYSQL_ROOT_PASSWORD: h02-root-testing-only
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+            interval: 2s
+            timeout: 2s
+            retries: 30
+            start_period: 10s
+        tmpfs:
+            - /var/lib/mysql
+        networks:
+            - h02-testing
+
+    web:
+        build:
+            context: .
+            dockerfile: docker/PhpDockerfile
+        restart: "no"
+        entrypoint: []
+        command: ["apache2-foreground"]
+        depends_on:
+            mysql:
+                condition: service_healthy
+        environment:
+            APP_ENV: testing
+            APP_DEBUG: "false"
+            APP_URL: http://127.0.0.1:8892
+            APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            DB_CONNECTION: mysql
+            DB_HOST: mysql
+            DB_PORT: "3306"
+            DB_DATABASE: linguacafe_h02_testing
+            DB_USERNAME: linguacafe_h02
+            DB_PASSWORD: h02-testing-only
+            SESSION_DRIVER: file
+            CACHE_DRIVER: array
+            QUEUE_CONNECTION: sync
+            LOG_CHANNEL: stderr
+        ports:
+            - "127.0.0.1:8892:80"
+        networks:
+            - h02-testing
