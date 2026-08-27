@@ -280,6 +280,99 @@ function h02CleanupDatabaseFixtures(array $fixtureState): void
     }
 }
 
+function h02CurrentGitHead(string $projectRoot): string
+{
+    $process = @proc_open(
+        ['git', '-C', $projectRoot, 'rev-parse', 'HEAD'],
+        [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ],
+        $pipes,
+        null,
+        null,
+        ['bypass_shell' => true],
+    );
+    if (! is_resource($process)) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_GIT_HEAD_INVALID');
+    }
+
+    if (is_resource($pipes[0] ?? null)) {
+        fclose($pipes[0]);
+    }
+    $stdout = is_resource($pipes[1] ?? null) ? stream_get_contents($pipes[1]) : false;
+    if (is_resource($pipes[1] ?? null)) {
+        fclose($pipes[1]);
+    }
+    if (is_resource($pipes[2] ?? null)) {
+        stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+    }
+
+    $exitCode = proc_close($process);
+    $head = is_string($stdout) ? trim($stdout) : '';
+    if ($exitCode !== 0 || preg_match('/\A[0-9a-f]{40}\z/i', $head) !== 1) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_GIT_HEAD_INVALID');
+    }
+
+    return $head;
+}
+
+function h02ReadCapacityProof(string $proofPath, string $projectRoot, string $baseUrl): array
+{
+    if ($proofPath === '' || ! is_file($proofPath) || ! is_readable($proofPath)) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISSING');
+    }
+
+    $contents = @file_get_contents($proofPath);
+    if ($contents === false) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISSING');
+    }
+
+    try {
+        $proof = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
+    } catch (Throwable $error) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID', $error);
+    }
+    if (! is_array($proof)) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID');
+    }
+
+    if (($proof['schema_version'] ?? null) !== 1
+        || ($proof['git_head'] ?? null) !== h02CurrentGitHead($projectRoot)
+        || ($proof['base_url'] ?? null) !== $baseUrl
+        || ($proof['server_profile'] ?? null) !== 'docker_apache_testing'
+        || ($proof['capacity_representative'] ?? null) !== true
+    ) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISMATCH');
+    }
+
+    return $proof;
+}
+
+/** @return array{server_profile:string,capacity_representative:bool} */
+function h02ResolveCapacityRuntime(?string $proofPath, int $vus, string $projectRoot, string $baseUrl): array
+{
+    if ($proofPath === null || $proofPath === '') {
+        if ($vus >= 100) {
+            throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_REQUIRED');
+        }
+
+        return [
+            'server_profile' => 'external_apache_testing_runtime',
+            'capacity_representative' => false,
+        ];
+    }
+
+    $proof = h02ReadCapacityProof($proofPath, $projectRoot, $baseUrl);
+
+    return [
+        'server_profile' => $proof['server_profile'],
+        'capacity_representative' => $proof['capacity_representative'],
+    ];
+}
+
 function h02DurationMilliseconds(string $duration): int
 {
     if (preg_match('/^(\d+)(ms|s|m)$/', $duration, $matches) !== 1) {
@@ -355,7 +448,7 @@ function h02ParseRuntimeArguments(array $arguments): array
     return $options;
 }
 
-/** @return array{port:int,vus:int,duration:string,sample_ms:int,wait_ms:int,fixture_path:string} */
+/** @return array{port:int,vus:int,duration:string,sample_ms:int,wait_ms:int,fixture_path:string,capacity_proof:?string} */
 function h02ParseMeasurementArguments(array $arguments): array
 {
     if (($arguments[1] ?? null) !== '--measure') {
@@ -363,6 +456,7 @@ function h02ParseMeasurementArguments(array $arguments): array
     }
 
     $fixturePath = '';
+    $capacityProof = null;
     $runArguments = [$arguments[0] ?? 'h02-runner.php'];
     foreach (array_slice($arguments, 2) as $argument) {
         if (! is_string($argument)) {
@@ -370,6 +464,13 @@ function h02ParseMeasurementArguments(array $arguments): array
         }
         if (str_starts_with($argument, '--fixture-file=')) {
             $fixturePath = substr($argument, strlen('--fixture-file='));
+            continue;
+        }
+        if (str_starts_with($argument, '--capacity-proof=')) {
+            $capacityProof = substr($argument, strlen('--capacity-proof='));
+            if ($capacityProof === '') {
+                throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID');
+            }
             continue;
         }
         $runArguments[] = $argument;
@@ -381,7 +482,10 @@ function h02ParseMeasurementArguments(array $arguments): array
 
     return array_merge(
         h02ParseRuntimeArguments($runArguments),
-        ['fixture_path' => $fixturePath],
+        [
+            'fixture_path' => $fixturePath,
+            'capacity_proof' => $capacityProof,
+        ],
     );
 }
 
@@ -430,6 +534,7 @@ function h02RunMeasurement(array $options, array $fixtureRows): int
     $queueDriver = (string) config("queue.connections.{$queueConnection}.driver", 'unknown');
     $queueName = (string) (config("queue.connections.{$queueConnection}.queue") ?: 'default');
     $baseUrl = 'http://127.0.0.1:'.$options['port'];
+    $capacityRuntime = h02ResolveCapacityRuntime($options['capacity_proof'] ?? null, $options['vus'], $projectRoot, $baseUrl);
     $startedAt = microtime(true);
     $fixtureState = null;
     $child = null;
@@ -515,8 +620,8 @@ function h02RunMeasurement(array $options, array $fixtureRows): int
         $runtime = [
             'php' => PHP_VERSION,
             'os_family' => PHP_OS_FAMILY,
-            'server_profile' => 'external_apache_testing_runtime',
-            'capacity_representative' => false,
+            'server_profile' => $capacityRuntime['server_profile'],
+            'capacity_representative' => $capacityRuntime['capacity_representative'],
             'k6' => h01K6Version($k6Executable, $projectRoot, $environment, $tempDirectory),
             'database' => $databaseName,
             'queue_connection' => $queueConnection,
