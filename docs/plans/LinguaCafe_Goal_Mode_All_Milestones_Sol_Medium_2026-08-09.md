@@ -378,6 +378,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 | ID | 状态 | Outcome | Reuse first | Exit evidence |
 |---|---|---|---|---|
+| H-00 | DONE | deletion-first caller/data/compat convergence：只删 proven-dead dual path / duplicate proof metadata / unreachable implementation；保留仍承担 caller、persisted data、recovery、deep-link、import/export、legacy-language 或 released-interface 义务的 lower owner | Phase G architecture reports + current callers/tests + Private House/codebase-design deletion test | `a4629de` 移除 Reader AI Assist V1 write path；`c27af0e` 移除 inline Sense duplicate safety metadata；`98a1200` 移除 TextBlockService 不可达 ReaderData fallback；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard endpoints 与 non-English lower mechanics 均有 fresh keep evidence；累计 JS/PHP/build/diff gate PASS |
 | H-01 | TODO | 建立最小可读的 load/observability harness | existing logs/health/tests; standard tooling | 能观测 P95/P99、DB connections、queue backlog、errors；不先建监控平台 |
 | H-02 | TODO | 100 同时在线的阅读/查词/复习负载 | current canonical flows | 无主流程错误；记录 P95/P99 和资源曲线；评分不重复 |
 | H-03 | TODO | 只针对实际瓶颈做性能修复 | H-02 evidence | 每个 index/cache/query/batch 都有实测瓶颈付费；复测证明改善 |
@@ -744,6 +745,8 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 只记录会影响后续任务且不是显而易见实现细节的决定：
 
 `date | milestone | decision | evidence | removal/revisit condition`
+
+`2026-08-27 | H-00 | deletion-first 以真实 caller / persisted data / recovery / compatibility 作为删除门槛；H-00 不以删除数量为目标。只删除三类已证明第二套 truth：Reader AI Assist V1 write path、inline Sense duplicate safety metadata、TextBlockService 不可达 ReaderData fallback；保留 Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard compatibility、non-English lower mechanics，因为它们仍有 current caller/data/recovery/released-contract 义务 | 当前 H-00 commits a4629de + c27af0e + 98a1200；AI V2 JS 9/9；PAB/lease Unit 39/39 196 assertions；H-00 Feature matrix 158/158 639 assertions；Mix build PASS；git diff --check PASS；Martin Fowler Parallel Change + Google dead-code liveness principle 与本地 deletion test 一致 | 只有 fresh caller/data/compat 证据清零后才重新打开 retained lower owner 的 physical deletion；结构拆分仍等 H-03 实测瓶颈/局部性证据`
 
 `2026-08-18 | G-06 product rebase | 保留 G-01…G-05 历史 DONE；2026-08-18 English-only / reading-first / Sense-first authority supersede G-04 的 blanket forward user-surface retention，并把未进入实现的旧 G-06 拆为 G-06A…G-06G + G-GATE | G-06 01/02/03 canonical reports + fresh committed-HEAD cross-check + docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md | 只有新的明确用户产品决定或后续真实 caller/data/safety 证据才复审；不得据此篡改 G-04/G-05 历史`
 

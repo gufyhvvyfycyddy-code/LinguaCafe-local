@@ -1,10 +1,10 @@
 # LinguaCafe 当前 AI 最小上下文
 
 > 状态：Current / Minimal Context
-> 日期：2026-08-19
+> 日期：2026-08-27
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-19 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，当前执行顺序是 Goal plan 的 Phase G。G-01…G-05 与 G-06A 已 DONE；G-06C 的 AI semantic anti-duplicate 子切片已由 commit `325c68ac` 关闭，但 G-06C 整体仍需 source-example binding / full-pool rotation / translation layout；当前 forward TODO 为 G-06B、G-06C、G-06D、G-06E、G-06F、G-06G + G-GATE。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 以 `docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` 为准；24h floor 阻止正向 Good 时普通 Reader 必须完全静默，以 `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md` 为准。AI/用户确认 `matched_existing` 后把真实 Reader 句子绑定进现有 WordSenseOccurrence/例句池以 `docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` 为准；全部真实来源例句无 top-N 上限、随机参与轮换且多例句时不得连续重复，以 `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md` 为准。ADR-0060/0059 均为 superseded 历史。
+> **2026-08-27 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`，Goal plan 已完成 Phase G 与 G-GATE；pre-H deletion-first `H-00` 也已 DONE。H-00 只删除 fresh proof 证明为第二套 truth / duplicate proof / unreachable implementation 的路径：Reader AI Assist V1 writer (`a4629de`)、inline Sense duplicate safety metadata (`c27af0e`)、TextBlockService unreachable ReaderData fallback (`98a1200`)；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard compatibility 与 non-English lower mechanics 因仍有 caller/data/recovery/released-contract 义务而保留。当前 forward TODO 从 `H-01` 开始：建立最小 load/observability harness，再进入 H-02 100 concurrent-user load。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
 ## 1. 当前代码事实
 
@@ -16,7 +16,7 @@
 - Feature 全套曾因 `ReviewCardMarkerMigrationTest` 的 MySQL DDL 隐式提交留下 1 条 ReviewCard，导致后续 11 项顺序依赖失败；测试已增加显式清理，完整共享进程回归已恢复为 0 failures。
 - 2026-08-03 已把 `.playwright-cli/`、`output/`、截图目录、临时登录页面、Cookie 捕获、根目录一次性 PHP/Python 调试脚本等本地产物加入 `.gitignore`。这一步只降低 Git 噪声，不删除任何已有文件。
 - 后续收口必须先运行只读工作区盘点，再按一个功能切片一组地核对代码、测试、迁移和验收文档；不得自动清理、覆盖或把无关改动混入同一提交。
-- 历史 recovery roadmap / `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Phase G 授权入口。当前 fixed DIRECT 批次必须由主窗口依据 Goal + Product Rebaseline 生成；每个执行窗口完成后停止，用户启动下一批次后才进入下一实现任务。
+- 历史 recovery roadmap / `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Goal 授权入口。2026-08-27 用户明确启用单窗口直接执行；当前窗口按 Goal roadmap 连续推进已命名 milestone。若以后重新启用 fixed DIRECT/四窗口并行，再恢复“执行窗口完成当前 DIRECT 后停止”的默认并行规则。
 
 本文件记录的是本地工作树事实。远端 GitHub、Agent 报告或旧交接与本地不一致时，先说明差异，不能擅自 reset、merge 或把任一方冒充唯一事实。
 
@@ -83,7 +83,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 
 ## 3. 大计划完成情况
 
-历史 Anki 对齐的仓库里程碑已经完成；当前 forward 产品工作转入 Goal Phase G：
+历史 Anki 对齐的仓库里程碑已经完成；当前 forward 产品工作进入 Goal Phase H：
 
 1. Settings 架构收敛：Production Closed。
 2. Preset V1A–V1D：Production Closed。
@@ -94,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。当前 Phase G 已完成 G-01…G-05、G-06A English-only，以及 G-06C 的 AI semantic anti-duplicate 子切片；下一 forward milestones 为 G-06B spaced-reading canonical integration、G-06C source-example/full-pool/translation closure、G-06D continuity、G-06E history/export、G-06F memory/FSRS、G-06G engineering-surface retirement，最后 G-GATE。
+“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE 已全部 DONE；H-00 deletion-first caller/data/compat convergence 也已 DONE。当前下一 forward milestone 是 H-01 load/observability harness；之后按 H-02→H-03…H-GATE 顺序推进。
 
 ## 4. 当前本地维护账本
 
@@ -219,7 +219,7 @@ CodeBuddy / WorkBuddy 旧固定接力不是当前默认流程；只有用户以�
 
 ## 10. 历史 roadmap 状态与当前停止点
 
-- 历史持续目标按云端主导、有限离线路线推进 M0–M18；这是已完成工作的路线记录，不是当前 Phase G 的执行顺序。
+- 历史持续目标按云端主导、有限离线路线推进 M0–M18；这是已完成工作的路线记录，不是当前 Phase H 的执行顺序。
 - 当前执行边界以 Goal Phase G + fixed DIRECT 为准。主窗口可以规划下一 milestone，但执行窗口不能自行 auto-advance；任何新实现批次都由用户实际启动对应 DIRECT。
 - M1–M8、M10–M16 已 Accepted / Closed；M17 Web slice 已关闭，Android Haptics/Local Notifications 证据由 M7 平台验收持有；M18 共享实现与 Web/Android 离线音频证据已关闭。M9 source/config 与发布材料为 Implementation Accepted。
 - M5 testing-bound 真实 `/reviews/senses` 页面评分已清零 M1 deferred seam。

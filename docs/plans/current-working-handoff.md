@@ -2,10 +2,10 @@
 
 > **历史追溯提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md` 和 `docs/execution/CURRENT_MILESTONE.json`。本文包含被既有文档 guard 锁定的历史正文，只在追溯某个任务时读取顶部状态区和相关段落，不是当前任务授权入口，不默认加载全文。
 
-> **Current authority — 2026-08-18**
+> **Current authority — 2026-08-27**
 >
 > - **Forward product authority**：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。
-> - **Current execution roadmap**：Goal Phase G，G-01…G-05 historical DONE；G-06A…G-06G + G-GATE current TODO。
+> - **Current execution roadmap**：Goal Phase G + G-GATE 已 DONE；pre-H `H-00` deletion-first caller/data/compat convergence 已 DONE；当前下一 milestone 为 `H-01` load/observability harness。用户当前启用单窗口直接执行，直到重新明确切回并行模式。
 > - **Reader opportunistic early-review boundary**：`docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` + `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md`。已学 review-state exact Sense 即使当前 due 在未来，也只有距上一笔有效正式评分满 24 个实际小时后才可因真实阅读回忆提前 Good；不足 24h 跨篇/跨 session 都只记 exposure，普通 Reader 完全静默，不显示 block/cooldown 提示；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”则 exact resolve 后最多一次 Again，并压住同 session 后续正向评分。ADR-0060/0059 只保留历史。
 > - **AI matched-existing source examples**：`docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` + `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md`。用户/Trust-AI 权威确认真实 Reader occurrence 属于 existing Sense 后，该真实句子必须通过 WordSenseOccurrence 进入现有唯一例句池；全部去重真实来源例句无 top-N 上限，从完整池随机轮换，多例句时不得连续重复同一 question example；AI 不生成虚构 source sentence，绑定/例句选择本身不写 ReviewLog/FSRS。
 > - 下方 2026-08-06 / 2026-07 历史状态继续保留用于追溯；与上述三条冲突时不再作为 current authority。
@@ -48,7 +48,7 @@
 > - Tool facts: DevSpace 5 and Chrome DevTools 1 were used directly. Chrome snapshot IDs drifted during real-page interaction, so DOM events were dispatched inside the loaded page; no API/fetch substitute was used. Ponytail 4.8.4 is installed as an enabled Codex plugin and its minimal-solution/reuse review rules were applied manually; it exposes no standalone command here. CodeRabbit CLI/plugin and Codex Security plugin/subcommand are absent. Create State is not exposed as a callable tool in this conversation. Formal reports from unavailable engines must not be fabricated.
 
 
-> **最后更新**：2026-08-18。本文继续是历史追溯文档；当前任务和产品方向以 `docs/CURRENT_AI_CONTEXT.md`、Product Rebaseline、Goal Phase G 与当轮 fixed DIRECT 为准。旧 recovery `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Phase G 授权入口。
+> **最后更新**：2026-08-27。本文继续是历史追溯文档；当前任务和产品方向以 `docs/CURRENT_AI_CONTEXT.md`、Product Rebaseline 与 Goal Phase H 为准。旧 recovery `docs/execution/CURRENT_MILESTONE.json` 只描述已经关闭的 recovery-publication program，不再是当前 Goal 授权入口；fixed DIRECT 仅在用户重新启用并行模式时恢复为当前执行方式。
 > **Custom Study frontend update (2026-07-14)**：`/custom-study` 已接入 setup 与 preview session UI；四种 criteria、章节选择器、card limit、sessionStorage 临时 token、等待倒计时、会话过期清理、查看原文和四个 preview rating 操作均已实现。仅调用既有 Custom Study POST 路由和原文上下文 GET；不调用正式评分端点，不写 ReviewLog/FSRS/lifecycle。
 >
 > **文档入口**：先读 `docs/DOCUMENTATION_INDEX.md`，再读本文。
