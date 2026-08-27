@@ -525,6 +525,113 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $this->assertArrayHasKey($other, $rows);
     }
 
+    public function test_stale_sentinel_reconciliation_removes_only_exact_valid_pab_rows(): void
+    {
+        $first = PabR3BrowserAcceptanceHarness::SENTINEL_PREFIX.str_repeat('1', 64);
+        $second = PabR3BrowserAcceptanceHarness::SENTINEL_PREFIX.str_repeat('2', 64);
+        $ordinaryMigration = '2026_08_27_000001_real_migration';
+        $rows = [$ordinaryMigration => true, $first => true, $second => true];
+        $deleted = [];
+
+        $count = PabR3BrowserAcceptanceHarness::cleanupStaleSentinels(
+            array_keys($rows),
+            static function (string $value) use (&$rows, &$deleted): void {
+                $deleted[] = $value;
+                unset($rows[$value]);
+            },
+            static function (string $value) use (&$rows): bool {
+                return isset($rows[$value]);
+            },
+        );
+
+        $this->assertSame(2, $count);
+        sort($deleted);
+        $this->assertSame([$first, $second], $deleted);
+        $this->assertArrayHasKey($ordinaryMigration, $rows);
+        $this->assertArrayNotHasKey($first, $rows);
+        $this->assertArrayNotHasKey($second, $rows);
+    }
+
+    public function test_malformed_pab_prefixed_row_fails_closed_before_any_stale_delete(): void
+    {
+        $valid = PabR3BrowserAcceptanceHarness::SENTINEL_PREFIX.str_repeat('3', 64);
+        $malformed = PabR3BrowserAcceptanceHarness::SENTINEL_PREFIX.'bad';
+        $deleted = [];
+
+        try {
+            PabR3BrowserAcceptanceHarness::cleanupStaleSentinels(
+                [$valid, $malformed],
+                static function (string $value) use (&$deleted): void {
+                    $deleted[] = $value;
+                },
+                static fn (): bool => true,
+            );
+            $this->fail('Malformed PAB-prefixed rows must fail closed.');
+        } catch (PabR3BrowserAcceptanceFailure $error) {
+            $this->assertSame('PAB_R3_SENTINEL_INVALID', $error->machineCode);
+        }
+
+        $this->assertSame([], $deleted);
+    }
+
+    public function test_stale_cleanup_runs_under_the_lease_before_creating_the_new_sentinel(): void
+    {
+        $log = new PabR3BrowserAcceptanceEventLog();
+        $evidence = [];
+        $harness = $this->harness(
+            $log,
+            cleanupStaleSentinels: static function () use ($log): int {
+                $log->events[] = 'stale_sentinel_cleanup';
+
+                return 2;
+            },
+            evidence: $evidence,
+        );
+
+        $this->assertSame(0, $harness->run('testing', ['php', '-v']));
+        $this->assertSame([
+            'lease_acquire',
+            'stale_sentinel_cleanup',
+            'sentinel_create',
+            'lease_proof',
+            'child',
+            'sentinel_cleanup',
+            'lease_release',
+        ], $log->events);
+        $this->assertContains(
+            '{"event":"stale_sentinel_cleanup","removed":2}',
+            array_column($evidence, 'line'),
+        );
+    }
+
+    public function test_stale_cleanup_failure_releases_lease_without_new_sentinel_or_child(): void
+    {
+        $log = new PabR3BrowserAcceptanceEventLog();
+        $evidence = [];
+        $harness = $this->harness(
+            $log,
+            cleanupStaleSentinels: static function () use ($log): int {
+                $log->events[] = 'stale_sentinel_cleanup';
+                throw new PabR3BrowserAcceptanceFailure(
+                    'PAB_R3_STALE_SENTINEL_CLEANUP_FAILED',
+                    PabR3BrowserAcceptanceHarness::EXIT_CLEANUP_FAILED,
+                );
+            },
+            evidence: $evidence,
+        );
+
+        $this->assertSame(PabR3BrowserAcceptanceHarness::EXIT_CLEANUP_FAILED, $harness->run('testing', ['php', '-v']));
+        $this->assertSame([
+            'lease_acquire',
+            'stale_sentinel_cleanup',
+            'lease_release',
+        ], $log->events);
+        $this->assertContains(
+            '[pab-r3-browser-acceptance] PAB_R3_STALE_SENTINEL_CLEANUP_FAILED',
+            array_column($evidence, 'line'),
+        );
+    }
+
     public function test_argument_parser_preserves_every_command_argument_after_separator(): void
     {
         $command = [
@@ -610,7 +717,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
             $connection = @fsockopen('127.0.0.1', $port, $errorCode, $errorMessage, 0.05);
             if (is_resource($connection)) {
                 fwrite($connection, "GET /__testing/acceptance-sentinel HTTP/1.0\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
-                stream_set_timeout($connection, 1);
+                stream_set_timeout($connection, 5);
                 $response = stream_get_contents($connection);
                 fclose($connection);
                 $serverObserved = is_string($response)
@@ -706,6 +813,8 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
 
         $routerSource = file_get_contents(dirname(__DIR__).'/Support/pab-r3-browser-server.php');
         $this->assertIsString($routerSource);
+        $this->assertStringContainsString("\$publicRoot = \$projectRoot.'/public'", $routerSource);
+        $this->assertStringContainsString("@chdir(\$publicRoot)", $routerSource);
         $this->assertStringContainsString("require \$projectRoot.'/tests/bootstrap.php'", $routerSource);
         $this->assertStringContainsString("require \$projectRoot.'/vendor/laravel/framework/src/Illuminate/Foundation/resources/server.php'", $routerSource);
     }
@@ -715,6 +824,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         ?callable $createSentinel = null,
         ?callable $cleanupSentinel = null,
         ?callable $runChild = null,
+        ?callable $cleanupStaleSentinels = null,
         ?callable $environmentProvider = null,
         ?callable $cancellationRequested = null,
         array &$evidence = [],
@@ -740,6 +850,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
 
                 return 0;
             },
+            cleanupStaleSentinels: $cleanupStaleSentinels,
             randomBytes: static fn (int $length): string => str_repeat("\x5A", $length),
             environmentProvider: $environmentProvider ?? static fn (): array => ['APP_ENV' => 'testing'],
             evidenceWriter: static function (string $stream, string $line) use (&$evidence): void {

@@ -66,6 +66,8 @@ final class PabR3BrowserAcceptanceHarness
 
     private Closure $createSentinel;
 
+    private Closure $cleanupStaleSentinels;
+
     private Closure $cleanupSentinel;
 
     private Closure $runChild;
@@ -83,6 +85,7 @@ final class PabR3BrowserAcceptanceHarness
         callable $createSentinel,
         callable $cleanupSentinel,
         callable $runChild,
+        ?callable $cleanupStaleSentinels = null,
         ?callable $randomBytes = null,
         ?callable $environmentProvider = null,
         ?callable $evidenceWriter = null,
@@ -90,6 +93,9 @@ final class PabR3BrowserAcceptanceHarness
     ) {
         $this->acquireLease = Closure::fromCallable($acquireLease);
         $this->createSentinel = Closure::fromCallable($createSentinel);
+        $this->cleanupStaleSentinels = Closure::fromCallable(
+            $cleanupStaleSentinels ?? static fn (): int => 0,
+        );
         $this->cleanupSentinel = Closure::fromCallable($cleanupSentinel);
         $this->runChild = Closure::fromCallable($runChild);
         $this->randomBytes = Closure::fromCallable($randomBytes ?? static fn (int $length): string => random_bytes($length));
@@ -155,6 +161,19 @@ final class PabR3BrowserAcceptanceHarness
                 'mode' => is_array($metadata) && is_string($metadata['mode'] ?? null) ? $metadata['mode'] : 'unknown',
                 'label' => is_array($metadata) && is_string($metadata['label'] ?? null) ? $metadata['label'] : 'unknown',
                 'inherited' => $lease->isInherited(),
+            ]);
+            $this->throwIfCancelled();
+
+            $staleSentinelCount = ($this->cleanupStaleSentinels)();
+            if (! is_int($staleSentinelCount) || $staleSentinelCount < 0) {
+                throw new PabR3BrowserAcceptanceFailure(
+                    'PAB_R3_STALE_SENTINEL_CLEANUP_UNPROVEN',
+                    self::EXIT_CLEANUP_FAILED,
+                );
+            }
+            $this->emitEvidence([
+                'event' => 'stale_sentinel_cleanup',
+                'removed' => $staleSentinelCount,
             ]);
             $this->throwIfCancelled();
 
@@ -330,6 +349,39 @@ final class PabR3BrowserAcceptanceHarness
         $deleteExactValue($sentinel);
 
         return ! $existsByExactValue($sentinel);
+    }
+
+    /**
+     * Reconcile exact PAB sentinels left by an abruptly terminated previous
+     * owner. Call only while holding the same testing-database OS lease and
+     * before creating the next run's sentinel.
+     *
+     * @param iterable<mixed> $migrationValues
+     */
+    public static function cleanupStaleSentinels(
+        iterable $migrationValues,
+        callable $deleteExactValue,
+        callable $existsByExactValue,
+    ): int {
+        $stale = [];
+        foreach ($migrationValues as $value) {
+            if (! is_string($value) || ! str_starts_with($value, self::SENTINEL_PREFIX)) {
+                continue;
+            }
+            self::assertSentinel($value);
+            $stale[$value] = true;
+        }
+
+        foreach (array_keys($stale) as $sentinel) {
+            if (! self::cleanupExactSentinel($sentinel, $deleteExactValue, $existsByExactValue)) {
+                throw new PabR3BrowserAcceptanceFailure(
+                    'PAB_R3_STALE_SENTINEL_CLEANUP_FAILED',
+                    self::EXIT_CLEANUP_FAILED,
+                );
+            }
+        }
+
+        return count($stale);
     }
 
     private static function assertSentinel(string $sentinel): void
@@ -729,6 +781,16 @@ function runPabR3BrowserAcceptanceCli(array $arguments): int
             label: $options['label'],
             waitMs: $options['wait_ms'],
         ),
+        cleanupStaleSentinels: static function () use ($ensureTestingConnection): int {
+            $database = $ensureTestingConnection();
+            $migrationValues = $database->table('migrations')->pluck('migration')->all();
+
+            return PabR3BrowserAcceptanceHarness::cleanupStaleSentinels(
+                $migrationValues,
+                static fn (string $value): int => $database->table('migrations')->where('migration', $value)->delete(),
+                static fn (string $value): bool => $database->table('migrations')->where('migration', $value)->exists(),
+            );
+        },
         createSentinel: static function (string $sentinel) use ($ensureTestingConnection): bool {
             $database = $ensureTestingConnection();
             return PabR3BrowserAcceptanceHarness::createExactSentinel(
