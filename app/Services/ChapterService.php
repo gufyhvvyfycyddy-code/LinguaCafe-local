@@ -524,24 +524,26 @@ class ChapterService {
     }
 
     public function deleteChapter($userId, $language, $chapterId) {
-        
-        // retrieve chapter
-        $chapter = Chapter
-            ::where('user_id', $userId)
-            ->where('language', $language)
-            ->where('id', $chapterId)
-            ->first();
+        $bookId = DB::transaction(function () use ($userId, $language, $chapterId) {
+            $chapter = Chapter
+                ::where('user_id', $userId)
+                ->where('language', $language)
+                ->where('id', $chapterId)
+                ->lockForUpdate()
+                ->first();
 
-        // check if chapter is found
-        if (!$chapter) {
-            throw new \Exception('Chapter does not exist, or it belongs to a different user.');
-        }
+            if (!$chapter) {
+                throw new \Exception('Chapter does not exist, or it belongs to a different user.');
+            }
 
-        // delete chapter
-        $chapter->delete();
+            $this->readingContinuityService->deleteProgressForChapters($userId, $language, [$chapter->id]);
+            $bookId = $chapter->book_id;
+            $chapter->delete();
 
-        // update book word counts
-        $this->bookService->updateBookWordCount($userId, $language, $chapter->book_id);
+            return $bookId;
+        });
+
+        $this->bookService->updateBookWordCount($userId, $language, $bookId);
 
         return true;
     }

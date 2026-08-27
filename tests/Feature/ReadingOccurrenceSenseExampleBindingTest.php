@@ -439,12 +439,20 @@ class ReadingOccurrenceSenseExampleBindingTest extends TestCase
 
     private function readingSource(): WordSenseOccurrence
     {
-        return WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->firstOrFail();
+        return WordSenseOccurrence::query()
+            ->where('user_id', $this->user->id)
+            ->where('chapter_id', $this->chapter->id)
+            ->where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)
+            ->firstOrFail();
     }
 
     private function readingSourceCount(): int
     {
-        return WordSenseOccurrence::where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)->count();
+        return WordSenseOccurrence::query()
+            ->where('user_id', $this->user->id)
+            ->where('chapter_id', $this->chapter->id)
+            ->where('source', WordSenseOccurrence::SOURCE_READING_OCCURRENCE)
+            ->count();
     }
 
     private function poolSentences(WordSense $sense): array

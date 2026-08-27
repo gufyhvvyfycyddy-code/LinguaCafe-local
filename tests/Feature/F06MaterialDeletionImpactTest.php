@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Book;
 use App\Models\Chapter;
+use App\Models\ReadingProgress;
 use App\Models\ReadingSession;
 use App\Models\ReviewCard;
 use App\Models\ReviewLog;
@@ -66,6 +67,27 @@ class F06MaterialDeletionImpactTest extends TestCase
 
         $this->assertDatabaseMissing('books', ['id' => $fixture['book']->id]);
         $this->assertDatabaseMissing('chapters', ['book_id' => $fixture['book']->id]);
+        $this->assertDatabaseMissing('reading_progress', ['chapter_id' => $fixture['chapter']->id]);
+        $this->assertDatabaseMissing('reading_progress', ['chapter_id' => $fixture['secondChapter']->id]);
+        $this->assertDatabaseHas('word_sense_occurrences', ['id' => $fixture['occurrence']->id]);
+        $this->assertDatabaseHas('word_senses', ['id' => $fixture['sense']->id]);
+        $this->assertDatabaseHas('review_cards', ['id' => $fixture['card']->id]);
+        $this->assertDatabaseHas('review_logs', ['id' => $fixture['log']->id]);
+        $this->assertDatabaseHas('reading_sessions', ['id' => $fixture['session']->id]);
+    }
+
+    public function test_single_chapter_delete_removes_only_its_reading_progress_and_retains_history(): void
+    {
+        $fixture = $this->fixture();
+
+        $this->actingAs($fixture['user'])->postJson('/chapters/delete', [
+            'chapterId' => $fixture['chapter']->id,
+        ])->assertOk();
+
+        $this->assertDatabaseMissing('chapters', ['id' => $fixture['chapter']->id]);
+        $this->assertDatabaseHas('chapters', ['id' => $fixture['secondChapter']->id]);
+        $this->assertDatabaseMissing('reading_progress', ['id' => $fixture['firstProgress']->id]);
+        $this->assertDatabaseHas('reading_progress', ['id' => $fixture['secondProgress']->id]);
         $this->assertDatabaseHas('word_sense_occurrences', ['id' => $fixture['occurrence']->id]);
         $this->assertDatabaseHas('word_senses', ['id' => $fixture['sense']->id]);
         $this->assertDatabaseHas('review_cards', ['id' => $fixture['card']->id]);
@@ -102,7 +124,9 @@ class F06MaterialDeletionImpactTest extends TestCase
             'word_count' => 4,
         ]);
         $chapter = $this->chapter($user, $book, 'Chapter one');
-        $this->chapter($user, $book, 'Chapter two');
+        $secondChapter = $this->chapter($user, $book, 'Chapter two');
+        $firstProgress = $this->progress($user, $chapter, 'f06-revision-one');
+        $secondProgress = $this->progress($user, $secondChapter, 'f06-revision-two');
         $sense = WordSense::forceCreate([
             'user_id' => $user->id,
             'language' => 'english',
@@ -166,7 +190,32 @@ class F06MaterialDeletionImpactTest extends TestCase
             'completed_at' => now(),
         ]);
 
-        return compact('user', 'book', 'sense', 'card', 'occurrence', 'log', 'session');
+        return compact(
+            'user',
+            'book',
+            'chapter',
+            'secondChapter',
+            'firstProgress',
+            'secondProgress',
+            'sense',
+            'card',
+            'occurrence',
+            'log',
+            'session',
+        );
+    }
+
+    private function progress(User $user, Chapter $chapter, string $sourceRevision): ReadingProgress
+    {
+        return ReadingProgress::forceCreate([
+            'user_id' => $user->id,
+            'language_id' => 'english',
+            'chapter_id' => $chapter->id,
+            'source_revision' => $sourceRevision,
+            'canonical_token_index' => 0,
+            'furthest_canonical_token_index' => 0,
+            'position_occurred_at' => now(),
+        ]);
     }
 
     private function user(string $name): User

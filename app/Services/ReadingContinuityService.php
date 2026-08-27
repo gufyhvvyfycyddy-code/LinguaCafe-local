@@ -154,6 +154,26 @@ class ReadingContinuityService
             : $this->progressProjection($reachedTokens, $totalTokens);
     }
 
+    public function deleteProgressForChapters(int $userId, string $language, iterable $chapterIds): int
+    {
+        $ids = [];
+        foreach ($chapterIds as $chapterId) {
+            $id = (int) $chapterId;
+            if ($id > 0) {
+                $ids[$id] = $id;
+            }
+        }
+        if ($ids === []) {
+            return 0;
+        }
+
+        return ReadingProgress::query()
+            ->where('user_id', $userId)
+            ->where('language_id', $language)
+            ->whereIn('chapter_id', array_values($ids))
+            ->delete();
+    }
+
     public function saveWebPosition(
         int $userId,
         string $language,

@@ -281,6 +281,7 @@ export default {
             sentenceIndex: state => state.vocabularyBox.sentenceIndex,
             sentenceText: state => state.vocabularyBox.sentenceText,
             encounteredWordId: state => state.vocabularyBox.encounteredWordId,
+            readingContext: state => state.vocabularyBox.readingContext,
         }),
         effectiveLemma() {
             // Full fallback chain: studyBase → baseWord → lemma → surface → word
@@ -348,6 +349,7 @@ export default {
                 sentenceIndex: null,
                 sentenceText: '',
                 encounteredWordId: null,
+                readingContext: null,
             },
             examplesExpanded: {},
             examplesData: {},
@@ -539,6 +541,7 @@ export default {
                 sentenceIndex: this.sentenceIndex,
                 sentenceText: this.sentenceText,
                 encounteredWordId: this.encounteredWordId,
+                readingContext: this.readingContext ? { ...this.readingContext } : null,
             };
 
             if (prefill) {
@@ -604,12 +607,44 @@ export default {
             this.newForm = this.emptyForm();
             this.createValidation = this.emptyValidationState();
         },
+        resolveCreateReadingContext() {
+            const snapshotContext = this.snapshot.readingContext;
+            const hasCompleteContext = context => Boolean(
+                context
+                && context.readingSessionId
+                && context.sourceRevision
+                && context.occurrenceId,
+            );
+            const hasSelectionFingerprint = Boolean(
+                snapshotContext
+                && Number.isInteger(snapshotContext.startWordIndex)
+                && Number.isInteger(snapshotContext.endWordIndex),
+            );
+
+            if (!hasSelectionFingerprint || hasCompleteContext(snapshotContext)) {
+                return snapshotContext || null;
+            }
+
+            const currentContext = this.readingContext;
+            const sameSelection = Boolean(
+                currentContext
+                && currentContext.startWordIndex === snapshotContext.startWordIndex
+                && currentContext.endWordIndex === snapshotContext.endWordIndex,
+            );
+            return sameSelection && hasCompleteContext(currentContext)
+                ? currentContext
+                : false;
+        },
         createPayload(form) {
-            // Use snapshot as fallback in case Vuex state was reset (e.g. v-select click-outside)
+            // Use snapshot as fallback in case Vuex state was reset (e.g. v-select click-outside).
+            // A Reader form opened before session initialization may adopt the completed
+            // context only when its exact word-index fingerprint still matches.
             const chapterId = this.chapterId !== null ? this.chapterId : this.snapshot.chapterId;
             const sentenceIndex = this.sentenceIndex !== null && this.sentenceIndex !== undefined
                 ? this.sentenceIndex : this.snapshot.sentenceIndex;
             const sentenceText = this.sentenceText || this.snapshot.sentenceText;
+            const readingContext = this.resolveCreateReadingContext();
+            if (readingContext === false) return null;
 
             return {
                 lemma: this.effectiveLemma,
@@ -623,6 +658,9 @@ export default {
                 sentence_id: sentenceIndex !== null && sentenceIndex !== undefined ? String(sentenceIndex) : null,
                 sentence_en: form.example_sentence_en || sentenceText,
                 encountered_word_id: this.snapshot?.encounteredWordId ?? this.encounteredWordId ?? null,
+                reading_session_id: readingContext?.readingSessionId || null,
+                source_revision: readingContext?.sourceRevision || null,
+                occurrence_id: readingContext?.occurrenceId || null,
                 keep_new: form.keep_new === true,
             };
         },
@@ -632,11 +670,17 @@ export default {
                 return;
             }
 
+            const payload = this.createPayload(this.newForm);
+            if (!payload) {
+                this.saveError = '阅读会话仍在初始化，或当前选择已经变化。请稍后重试或重新点选这个词。';
+                return;
+            }
+
             this.saving = true;
             this.saveError = '';
             this.message = '';
 
-            axios.post('/senses/manual', this.createPayload(this.newForm))
+            axios.post('/senses/manual', payload)
                 .then((response) => {
                     this.message = '已保存新词义，并已创建词义复习卡。';
 

@@ -230,11 +230,13 @@ class BookService {
                 throw new \Exception('Book does not exist, or it belongs to a different user.');
             }
 
-            Chapter
+            $chapters = Chapter
                 ::where('user_id', $userId)
                 ->where('language', $language)
-                ->where('book_id', $bookId)
-                ->delete();
+                ->where('book_id', $bookId);
+            $chapterIds = (clone $chapters)->lockForUpdate()->pluck('id');
+            $this->readingContinuityService->deleteProgressForChapters($userId, $language, $chapterIds);
+            $chapters->delete();
 
             $coverImage = $book->cover_image;
             $book->delete();

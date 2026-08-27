@@ -33,6 +33,7 @@ export default {
         chapterId: null,
         sentenceIndex: null,
         sentenceText: '',
+        readingContext: null,
 
         // FSRS familiarity
         fsrsFamiliarityPercent: null,
@@ -67,6 +68,7 @@ export default {
             state.chapterId = null;
             state.sentenceIndex = null;
             state.sentenceText = '';
+            state.readingContext = null;
             state.word = '';
             state.phrase = [];
             state.reading = '';
@@ -128,6 +130,9 @@ export default {
         },
         setSentenceText (state, value) {
             state.sentenceText = value;
+        },
+        setReadingContext (state, value) {
+            state.readingContext = value;
         },
         setStage (state, value) {
             state.stage = value;

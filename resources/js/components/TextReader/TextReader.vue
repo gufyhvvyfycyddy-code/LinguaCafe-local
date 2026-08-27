@@ -496,6 +496,7 @@
                 readingInteractionEntries: {},
                 readingInteractionPromises: {},
                 readingEvidenceItems: [],
+                currentReadingSelectionFingerprint: null,
 
                 // canonical reading continuity
                 readingContinuitySourceRevision: '',
@@ -957,6 +958,7 @@
                 this.readingSourceStale = false;
                 this.readingTargets = normalized.targets;
                 saveReadingSessionRecoveryId(this.chapterId, normalized.readingSessionId);
+                this.syncCurrentVocabularyReadingContext();
                 if (this.inlineOutcomeUnknownCommand) {
                     const retryPayload = this.inlineOutcomeUnknownCommand.payload || {};
                     if (retryPayload.reading_session_id !== normalized.readingSessionId
@@ -979,6 +981,7 @@
                 this.readingSourceRevision = '';
                 this.readingSourceStale = true;
                 this.readingTargets = [];
+                this.currentReadingSelectionFingerprint = null;
                 this.markedUnfamiliarSnapshotVersion = '';
                 this.readingInteractionEntries = {};
                 this.readingInteractionPromises = {};
@@ -1278,14 +1281,81 @@
                     return true;
                 });
             },
+            syncCurrentVocabularyReadingContext() {
+                const currentContext = this.$store.state.vocabularyBox.readingContext;
+                let startWordIndex = Number(this.currentReadingSelectionFingerprint && this.currentReadingSelectionFingerprint.startWordIndex);
+                let endWordIndex = Number(this.currentReadingSelectionFingerprint && this.currentReadingSelectionFingerprint.endWordIndex);
+
+                if (!Number.isInteger(startWordIndex) || startWordIndex < 0
+                    || !Number.isInteger(endWordIndex) || endWordIndex < startWordIndex) {
+                    startWordIndex = Number(currentContext && currentContext.startWordIndex);
+                    endWordIndex = Number(currentContext && currentContext.endWordIndex);
+                }
+                if (!Number.isInteger(startWordIndex) || startWordIndex < 0
+                    || !Number.isInteger(endWordIndex) || endWordIndex < startWordIndex) {
+                    const selection = this.$refs.interactiveText && Array.isArray(this.$refs.interactiveText.selection)
+                        ? this.$refs.interactiveText.selection
+                        : [];
+                    if (selection.length !== 1) return false;
+                    startWordIndex = Number(selection[0] && selection[0].wordIndex);
+                    endWordIndex = startWordIndex;
+                }
+                if (!Number.isInteger(startWordIndex) || startWordIndex < 0
+                    || !Number.isInteger(endWordIndex) || endWordIndex < startWordIndex) return false;
+
+                if (currentContext
+                    && currentContext.startWordIndex === startWordIndex
+                    && currentContext.endWordIndex === endWordIndex
+                    && currentContext.readingSessionId === this.readingSessionId
+                    && currentContext.sourceRevision === this.readingSourceRevision
+                    && currentContext.occurrenceId) {
+                    return true;
+                }
+
+                this.onReaderOccurrenceOpened({
+                    start_word_index: startWordIndex,
+                    end_word_index: endWordIndex,
+                });
+                return Boolean(this.$store.state.vocabularyBox.readingContext?.occurrenceId);
+            },
             onReaderOccurrenceOpened(opened) {
                 this.inlineReviewIntent = null;
+                const startWordIndex = Number(opened && opened.start_word_index);
+                const endWordIndex = Number(opened && opened.end_word_index);
+                const hasSelectionFingerprint = Number.isInteger(startWordIndex)
+                    && startWordIndex >= 0
+                    && Number.isInteger(endWordIndex)
+                    && endWordIndex >= startWordIndex;
+                this.currentReadingSelectionFingerprint = hasSelectionFingerprint
+                    ? { startWordIndex, endWordIndex }
+                    : null;
+                const selectionContext = hasSelectionFingerprint
+                    ? {
+                        startWordIndex,
+                        endWordIndex,
+                        readingSessionId: null,
+                        sourceRevision: null,
+                        occurrenceId: null,
+                    }
+                    : null;
+                this.$store.commit('vocabularyBox/setReadingContext', selectionContext);
+
                 const target = findReadingTargetForOpenedSelection(this.readingTargets, opened || {});
                 if (!target || target.kind !== 'word') {
                     this.inlineReviewOccurrence = null;
                     this.inlineReviewCandidates = [];
                     return;
                 }
+                const readingContext = this.readingSessionId && this.readingSourceRevision && target.occurrence_id
+                    ? {
+                        startWordIndex: target.start_word_index,
+                        endWordIndex: target.end_word_index,
+                        readingSessionId: this.readingSessionId,
+                        sourceRevision: this.readingSourceRevision,
+                        occurrenceId: target.occurrence_id,
+                    }
+                    : selectionContext;
+                this.$store.commit('vocabularyBox/setReadingContext', readingContext);
                 this.inlineReviewOccurrence = target;
                 this.inlineReviewCandidates = filterCandidatesToReadingTarget(target, target.candidate_word_senses || []);
                 this.inlineReviewCandidatesError = '';
