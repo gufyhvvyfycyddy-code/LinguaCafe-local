@@ -25,17 +25,10 @@ export function normalizeReaderAiAssistSourceMeta(data = {}) {
     const packageCount = Number(data.package_count ?? data.part_count ?? 1);
     const targetCount = Number(data.target_count ?? 0);
     return {
-        schemaVersion: data.schema_version || '',
         targetCount: Number.isFinite(targetCount) ? targetCount : 0,
         packageCount: Number.isFinite(packageCount) && packageCount > 0 ? packageCount : 1,
         packages,
-        prompt: data.prompt || '',
     };
-}
-
-export function isReaderAiAssistV2(payload = {}) {
-    return payload.schema_version === READER_UNFAMILIAR_SCHEMA_VERSION
-        || payload.schemaVersion === READER_UNFAMILIAR_SCHEMA_VERSION;
 }
 
 export function readerAiAssistPackageKey(pkg = {}) {
@@ -79,7 +72,7 @@ export function buildReaderAiAssistV2ImportRequest(
     const packages = Array.isArray(sourceMeta.packages) ? sourceMeta.packages : [];
     return {
         chapterId,
-        schema_version: sourceMeta.schemaVersion || READER_UNFAMILIAR_SCHEMA_VERSION,
+        schema_version: READER_UNFAMILIAR_SCHEMA_VERSION,
         parts: packages.map((pkg) => ({
             manifest_token: pkg.manifest_token || '',
             ai_text: String(aiTextByPart[readerAiAssistPackageKey(pkg)] || ''),
@@ -88,40 +81,11 @@ export function buildReaderAiAssistV2ImportRequest(
     };
 }
 
-function legacyWordToResult(item) {
-    return {
-        ...item,
-        occurrence_id: item.occurrence_id || null,
-        surface: item.surface || '',
-        lemma: item.lemma || item.suggested_lemma || '',
-        suggested_lemma: item.suggested_lemma || item.lemma || '',
-        sense_zh: item.sense_zh || item.meaning_zh || item.new_sense?.sense_zh || '',
-        meaning_zh: item.meaning_zh || item.sense_zh || item.new_sense?.sense_zh || '',
-        sense_en: item.sense_en || item.new_sense?.sense_en || '',
-        result: item.result || null,
-    };
-}
-
-function legacyPhraseToResult(item) {
-    return {
-        ...item,
-        occurrence_id: item.occurrence_id || null,
-        phrase: item.phrase || '',
-        sense_zh: item.sense_zh || item.meaning_zh || '',
-        meaning_zh: item.meaning_zh || item.sense_zh || '',
-        sense_en: item.sense_en || '',
-    };
-}
-
 export function normalizeReaderAiAssistPreview(data = {}) {
     const items = data.items || data;
     const sentenceTranslations = Array.isArray(items.sentence_translations) ? items.sentence_translations : [];
-    const wordResults = Array.isArray(items.word_results)
-        ? items.word_results.map(legacyWordToResult)
-        : (Array.isArray(items.vocabulary_items) ? items.vocabulary_items.map(legacyWordToResult) : []);
-    const phraseResults = Array.isArray(items.phrase_results)
-        ? items.phrase_results.map(legacyPhraseToResult)
-        : (Array.isArray(items.phrase_items) ? items.phrase_items.map(legacyPhraseToResult) : []);
+    const wordResults = Array.isArray(items.word_results) ? items.word_results : [];
+    const phraseResults = Array.isArray(items.phrase_results) ? items.phrase_results : [];
     const warnings = Array.isArray(items.warnings) ? items.warnings : [];
     const sourceSummary = data.summary || {};
 
@@ -136,17 +100,12 @@ export function normalizeReaderAiAssistPreview(data = {}) {
             sentence_translations: sentenceTranslations,
             word_results: wordResults,
             phrase_results: phraseResults,
-            // Compatibility aliases keep the existing Reader detail rendering stable.
-            vocabulary_items: wordResults,
-            phrase_items: phraseResults,
             warnings,
         },
         summary: {
             sentence_translation_count: Number(sourceSummary.sentence_translation_count ?? sentenceTranslations.length),
-            word_result_count: Number(sourceSummary.word_result_count ?? sourceSummary.vocabulary_item_count ?? wordResults.length),
-            vocabulary_item_count: Number(sourceSummary.vocabulary_item_count ?? sourceSummary.word_result_count ?? wordResults.length),
-            phrase_result_count: Number(sourceSummary.phrase_result_count ?? sourceSummary.phrase_item_count ?? phraseResults.length),
-            phrase_item_count: Number(sourceSummary.phrase_item_count ?? sourceSummary.phrase_result_count ?? phraseResults.length),
+            vocabulary_item_count: Number(sourceSummary.vocabulary_item_count ?? wordResults.length),
+            phrase_item_count: Number(sourceSummary.phrase_item_count ?? phraseResults.length),
             warning_count: Number(sourceSummary.warning_count ?? warnings.length),
             target_count: Number(sourceSummary.target_count ?? data.target_count ?? (wordResults.length + phraseResults.length)),
         },

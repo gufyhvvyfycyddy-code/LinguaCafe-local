@@ -6,7 +6,6 @@ import {
     buildReaderAiAssistV2ImportRequest,
     normalizeReaderAiAssistPreview,
     normalizeReaderAiAssistSourceMeta,
-    isReaderAiAssistV2,
     readerAiAssistErrorMessage,
     readerAiAssistCandidatesForOccurrence,
     readerAiAssistPackageKey,
@@ -19,13 +18,11 @@ test('source metadata preserves server-authoritative target and package counts',
         schema_version: 'linguacafe_ai_reading_assist_v2',
         target_count: 50,
         package_count: 2,
-        prompt: 'prompt',
+        prompt: 'legacy-top-level-prompt',
     }), {
-        schemaVersion: 'linguacafe_ai_reading_assist_v2',
         targetCount: 50,
         packageCount: 2,
         packages: [],
-        prompt: 'prompt',
     });
 });
 
@@ -93,7 +90,7 @@ test('resolves server-issued candidate senses by occurrence identity without a s
     assert.deepEqual(readerAiAssistCandidatesForOccurrence(sourceMeta, 'occ2-missing'), []);
 });
 
-test('normalizes V2 word results while preserving V1-compatible detail aliases', () => {
+test('normalizes V2 preview using only the V2 result fields', () => {
     const normalized = normalizeReaderAiAssistPreview({
         schema_version: 'linguacafe_ai_reading_assist_v2',
         package_id: 'pkg-1',
@@ -106,19 +103,12 @@ test('normalizes V2 word results while preserving V1-compatible detail aliases',
         sentence_translations: [],
         warnings: [],
     });
-    assert.equal(normalized.items.vocabulary_items[0].meaning_zh, '河岸');
-    assert.equal(normalized.items.vocabulary_items[0].suggested_lemma, 'bank');
+    assert.equal(normalized.items.word_results[0].sense_zh, '河岸');
+    assert.equal(normalized.items.word_results[0].lemma, 'bank');
+    assert.equal(normalized.items.vocabulary_items, undefined);
+    assert.equal(normalized.items.phrase_items, undefined);
     assert.equal(normalized.summary.target_count, 1);
     assert.equal(readerAiAssistResultLabel('matched_existing'), '匹配已学词义');
-});
-
-test('keeps V1 preview payload readable during additive migration', () => {
-    const normalized = normalizeReaderAiAssistPreview({
-        summary: { vocabulary_item_count: 1, phrase_item_count: 0, sentence_translation_count: 0, warning_count: 0 },
-        items: { vocabulary_items: [{ surface: 'bank', suggested_lemma: 'bank', meaning_zh: '银行' }], phrase_items: [], sentence_translations: [], warnings: [] },
-    });
-    assert.equal(normalized.items.vocabulary_items[0].sense_zh, '银行');
-    assert.equal(normalized.summary.vocabulary_item_count, 1);
 });
 
 test('maps only the server V2 error_code contract to user-understandable messages', () => {
@@ -137,8 +127,6 @@ test('V2 metadata keeps real aliases but does not invent missing contract fields
 
     assert.equal(normalized.targetCount, 0);
     assert.equal(normalized.packageCount, 2);
-    assert.equal(isReaderAiAssistV2({ schemaVersion: 'linguacafe_ai_reading_assist_v2' }), true);
-    assert.equal(isReaderAiAssistV2({ contract_version: 'linguacafe_ai_reading_assist_v2' }), false);
     assert.equal(readerAiAssistPackageKey(normalized.packages[0]), '');
     assert.equal(readerAiAssistV2InputsComplete(normalized, { 1: '{"part":1}' }), false);
 });
@@ -148,12 +136,14 @@ test('Reader AI Assist requests V2 source contract, wires strict V2 import, and 
     assert.match(source, /buildReaderAiAssistV2SourceRequest\(this\.chapterId, this\.markedTargets\)/);
     assert.match(source, /sourceMeta\.targetCount/);
     assert.match(source, /sourceMeta\.packageCount/);
+    assert.doesNotMatch(source, /sourceMeta\.schemaVersion|schemaVersion:/);
     assert.match(source, /sourcePackages\.length > 1/);
     assert.match(source, /copyPackagePrompt\(pkg\)/);
     assert.doesNotMatch(source, /part_index \|\| index \+ 1|readerAiAssistPackageKey\(pkg, index\)/);
     assert.match(source, /buildReaderAiAssistV2ImportRequest/);
     assert.match(source, /this\.buildImportRequest\(false\)/);
     assert.match(source, /this\.buildImportRequest\(this\.trustAiReadingSenseBinding\)/);
+    assert.doesNotMatch(source, /usesV2PackageImport|\baiText:\s*''|v-model="aiText"|aiText:\s*this\.aiText|sourceMeta\.prompt|items\.vocabulary_items|items\.phrase_items|suggested_lemma|meaning_zh/);
     assert.doesNotMatch(source, /axios\.post\('\/chapters\/ai-assist\/preview', \{\s*chapterId: this\.chapterId,\s*aiText:/s);
     assert.match(source, /resultLabel\(vi\.result\)/);
     assert.match(source, /vi\.sense_en/);

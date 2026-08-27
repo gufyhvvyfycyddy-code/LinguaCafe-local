@@ -48,7 +48,7 @@
                             <v-icon small color="success">mdi-check-circle</v-icon>
                             已复制 AI 提示词。你可以把提示词发送给 DeepSeek Flash 或 DeepSeek Pro。两者都使用同一导入格式，系统不强制选择。
                         </div>
-                        <div v-if="sourceMeta.schemaVersion" class="caption text--secondary mt-2">
+                        <div v-if="sourcePackages.length" class="caption text--secondary mt-2">
                             V2 目标 {{ sourceMeta.targetCount }} 个 · AI 包 {{ sourceMeta.packageCount }} 份。目标数和分包数以服务器返回为准。
                         </div>
                         <div v-if="sourcePackages.length > 1" class="mt-2">
@@ -77,40 +77,26 @@
                         <div class="text-subtitle-1 font-weight-medium mb-2">
                             步骤 2：粘贴 AI 返回内容
                         </div>
-                        <template v-if="usesV2PackageImport">
-                            <div
-                                v-for="pkg in sourcePackages"
-                                :key="'ai-return-' + readerAiAssistPackageKey(pkg)"
-                                class="mb-3"
-                            >
-                                <div class="caption font-weight-medium mb-1">
-                                    第 {{ Number(pkg.part_index) || '?' }} / {{ sourcePackages.length }} 包 AI 返回 JSON
-                                    <span v-if="copiedSourcePartIndex === Number(pkg.part_index)" class="green--text ml-1">（刚复制了这一包提示词）</span>
-                                </div>
-                                <v-textarea
-                                    v-model="aiTextByPart[readerAiAssistPackageKey(pkg)]"
-                                    :label="'粘贴第 ' + (Number(pkg.part_index) || '?') + ' 包 JSON'"
-                                    rows="5"
-                                    outlined
-                                    dense
-                                    hide-details="auto"
-                                    :disabled="previewLoading"
-                                    placeholder="只粘贴这一包对应的严格 JSON..."
-                                ></v-textarea>
+                        <div
+                            v-for="pkg in sourcePackages"
+                            :key="'ai-return-' + readerAiAssistPackageKey(pkg)"
+                            class="mb-3"
+                        >
+                            <div class="caption font-weight-medium mb-1">
+                                第 {{ Number(pkg.part_index) || '?' }} / {{ sourcePackages.length }} 包 AI 返回 JSON
+                                <span v-if="copiedSourcePartIndex === Number(pkg.part_index)" class="green--text ml-1">（刚复制了这一包提示词）</span>
                             </div>
-                        </template>
-                        <v-textarea
-                            v-else
-                            v-model="aiText"
-                            label="把 AI 返回的 JSON 粘贴到这里"
-                            rows="6"
-                            outlined
-                            dense
-                            hide-details="auto"
-                            :disabled="previewLoading"
-                            placeholder="将 DeepSeek 或 GPT 返回的内容粘贴到这里..."
-                            class="mb-2"
-                        ></v-textarea>
+                            <v-textarea
+                                v-model="aiTextByPart[readerAiAssistPackageKey(pkg)]"
+                                :label="'粘贴第 ' + (Number(pkg.part_index) || '?') + ' 包 JSON'"
+                                rows="5"
+                                outlined
+                                dense
+                                hide-details="auto"
+                                :disabled="previewLoading"
+                                placeholder="只粘贴这一包对应的严格 JSON..."
+                            ></v-textarea>
+                        </div>
                         <v-btn
                             depressed
                             color="secondary"
@@ -309,8 +295,8 @@
                                         x-small
                                     >{{ vi.confidence }}</v-chip>
                                 </div>
-                                <div v-if="vi.suggested_lemma" class="caption grey--text mb-1">
-                                    AI 建议原型：<span v-html="hl(vi.suggested_lemma, detailSearchQuery)"></span>
+                                <div v-if="vi.lemma" class="caption grey--text mb-1">
+                                    原型：<span v-html="hl(vi.lemma, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.pos" class="caption grey--text mb-1">
                                     词性：<span v-html="hl(vi.pos, detailSearchQuery)"></span>
@@ -339,7 +325,7 @@
                                     </div>
                                 </v-alert>
                                 <div class="body-2 mb-1">
-                                    中文释义：<span v-html="hl(vi.meaning_zh, detailSearchQuery)"></span>
+                                    中文释义：<span v-html="hl(vi.sense_zh, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="vi.sense_en" class="body-2 mb-1 text--secondary">
                                     English：<span v-html="hl(vi.sense_en, detailSearchQuery)"></span>
@@ -385,7 +371,7 @@
                                     >{{ pi.confidence }}</v-chip>
                                 </div>
                                 <div class="body-2 mb-1">
-                                    中文释义：<span v-html="hl(pi.meaning_zh, detailSearchQuery)"></span>
+                                    中文释义：<span v-html="hl(pi.sense_zh, detailSearchQuery)"></span>
                                 </div>
                                 <div v-if="pi.sense_en" class="body-2 mb-1 text--secondary">
                                     English：<span v-html="hl(pi.sense_en, detailSearchQuery)"></span>
@@ -459,7 +445,6 @@
     import { buildReaderAiAssistV2SourceRequest } from '../../services/ReaderUnfamiliarTargetPolicy.js';
     import {
         buildReaderAiAssistV2ImportRequest,
-        isReaderAiAssistV2,
         normalizeReaderAiAssistPreview,
         normalizeReaderAiAssistSourceMeta,
         readerAiAssistCandidatesForOccurrence,
@@ -482,9 +467,8 @@
             return {
                 sourceLoading: false,
                 sourceCopied: false,
-                sourceMeta: { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' },
+                sourceMeta: { targetCount: 0, packageCount: 1, packages: [] },
                 previewLoading: false,
-                aiText: '',
                 aiTextByPart: {},
                 copiedSourcePartIndex: null,
 
@@ -515,21 +499,15 @@
             sourcePackages() {
                 return Array.isArray(this.sourceMeta.packages) ? this.sourceMeta.packages : [];
             },
-            usesV2PackageImport() {
-                return isReaderAiAssistV2(this.sourceMeta) && this.sourcePackages.length > 0;
-            },
             aiImportReady() {
-                if (this.usesV2PackageImport) {
-                    return readerAiAssistV2InputsComplete(this.sourceMeta, this.aiTextByPart);
-                }
-                return Boolean(this.aiText && this.aiText.trim());
+                return readerAiAssistV2InputsComplete(this.sourceMeta, this.aiTextByPart);
             },
             items() {
                 if (!this.previewResult || !this.previewResult.items) {
                     return {
                         sentence_translations: [],
-                        vocabulary_items: [],
-                        phrase_items: [],
+                        word_results: [],
+                        phrase_results: [],
                         warnings: [],
                     };
                 }
@@ -551,10 +529,10 @@
                 return this.filterList(this.items.sentence_translations, this.detailSearchQuery, ['source_text', 'translation_zh']);
             },
             filteredVocabularyItems() {
-                return this.filterList(this.items.vocabulary_items, this.detailSearchQuery, ['surface', 'suggested_lemma', 'lemma', 'pos', 'meaning_zh', 'sense_zh', 'sense_en', 'result', 'source_sentence', 'reason', 'confidence']);
+                return this.filterList(this.items.word_results, this.detailSearchQuery, ['surface', 'lemma', 'pos', 'sense_zh', 'sense_en', 'result', 'source_sentence', 'reason', 'confidence']);
             },
             filteredPhraseItems() {
-                return this.filterList(this.items.phrase_items, this.detailSearchQuery, ['phrase', 'meaning_zh', 'sense_zh', 'sense_en', 'trigger_words', 'source_sentence', 'reason', 'confidence']);
+                return this.filterList(this.items.phrase_results, this.detailSearchQuery, ['phrase', 'sense_zh', 'sense_en', 'source_sentence', 'reason', 'confidence']);
             },
             filteredWarnings() {
                 return this.filterList(this.items.warnings, this.detailSearchQuery, ['type', 'message']);
@@ -563,8 +541,8 @@
                 if (!this.activeDetailType) return 0;
                 const map = {
                     translations: this.items.sentence_translations.length,
-                    vocabulary: this.items.vocabulary_items.length,
-                    phrases: this.items.phrase_items.length,
+                    vocabulary: this.items.word_results.length,
+                    phrases: this.items.phrase_results.length,
                     warnings: this.items.warnings.length,
                 };
                 return map[this.activeDetailType] || 0;
@@ -631,9 +609,8 @@
             reset() {
                 this.sourceLoading = false;
                 this.sourceCopied = false;
-                this.sourceMeta = { targetCount: 0, packageCount: 1, packages: [], schemaVersion: '', prompt: '' };
+                this.sourceMeta = { targetCount: 0, packageCount: 1, packages: [] };
                 this.previewLoading = false;
-                this.aiText = '';
                 this.aiTextByPart = {};
                 this.copiedSourcePartIndex = null;
                 this.confirmLoading = false;
@@ -680,18 +657,12 @@
                 });
             },
             buildImportRequest(applyTrustAi = false) {
-                if (this.usesV2PackageImport) {
-                    return buildReaderAiAssistV2ImportRequest(
-                        this.chapterId,
-                        this.sourceMeta,
-                        this.aiTextByPart,
-                        applyTrustAi,
-                    );
-                }
-                return {
-                    chapterId: this.chapterId,
-                    aiText: this.aiText,
-                };
+                return buildReaderAiAssistV2ImportRequest(
+                    this.chapterId,
+                    this.sourceMeta,
+                    this.aiTextByPart,
+                    applyTrustAi,
+                );
             },
             loadSource() {
                 if (!this.chapterId) {
@@ -716,20 +687,13 @@
                 ).then((response) => {
                     const data = response.data;
                     this.sourceMeta = normalizeReaderAiAssistSourceMeta(data);
-                    this.aiText = '';
                     this.initializeAiPartTexts();
                     const firstPackage = this.sourcePackages[0];
-                    if (firstPackage) {
-                        this.copyPackagePrompt(firstPackage);
-                    } else if (this.sourceMeta.prompt) {
-                        this.copyTextToClipboard(this.sourceMeta.prompt).then(() => {
-                            this.sourceCopied = true;
-                        }).catch(() => {
-                            this.error = '复制 AI 提示词失败，请重试。';
-                        });
-                    } else {
-                        this.error = '服务器没有返回可复制的 AI 提示词。';
+                    if (!firstPackage) {
+                        this.error = '服务器没有返回可导入的 V2 AI 包。';
+                        return;
                     }
+                    this.copyPackagePrompt(firstPackage);
                 }).catch((error) => {
                     this.error = readerAiAssistErrorMessage(error, '加载 AI 提示词失败。');
                 }).finally(() => {
@@ -738,9 +702,7 @@
             },
             parsePreview() {
                 if (!this.aiImportReady) {
-                    this.error = this.usesV2PackageImport
-                        ? '请把每个 AI 包返回的 JSON 都粘贴完整。'
-                        : '请先粘贴 AI 返回内容。';
+                    this.error = '请把每个 AI 包返回的 JSON 都粘贴完整。';
                     return;
                 }
 
@@ -775,9 +737,7 @@
             },
             confirmSave() {
                 if (!this.aiImportReady || !this.chapterId) {
-                    this.confirmError = this.usesV2PackageImport
-                        ? 'AI 分包内容不完整，暂不能保存。'
-                        : '缺少 AI 内容或章节信息。';
+                    this.confirmError = 'AI 分包内容不完整，暂不能保存。';
                     return;
                 }
 
