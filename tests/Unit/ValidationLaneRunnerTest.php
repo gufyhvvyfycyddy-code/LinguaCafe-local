@@ -84,4 +84,65 @@ class ValidationLaneRunnerTest extends TestCase
 
         $this->assertSame('linguacafe-fsrs-testing-mysql', $identifier);
     }
+
+    public function test_windows_extensionless_phpunit_proxy_runs_through_validation_lane(): void
+    {
+        if (PHP_OS_FAMILY !== 'Windows') {
+            $this->markTestSkipped('Windows Composer proxy regression.');
+        }
+
+        $environment = getenv();
+        $this->assertIsArray($environment);
+        foreach ([
+            'LINGUACAFE_TEST_DB_LEASE_TOKEN',
+            'LINGUACAFE_TEST_DB_LEASE_OWNER_PID',
+            'LINGUACAFE_TEST_DB_LEASE_IDENTITY',
+        ] as $variable) {
+            unset($environment[$variable]);
+        }
+
+        $result = $this->runProcess([
+            PHP_BINARY,
+            $this->runnerPath,
+            '--lane=03',
+            '--',
+            'vendor/bin/phpunit',
+            '--version',
+        ], $environment);
+
+        $this->assertSame(0, $result['exit_code'], $result['stderr']);
+        $this->assertStringContainsString('PHPUnit', $result['stdout']);
+    }
+
+    /** @param list<string> $command
+     *  @return array{exit_code: int, stdout: string, stderr: string}
+     */
+    private function runProcess(array $command, ?array $environment = null): array
+    {
+        $descriptors = [
+            0 => ['file', 'php://stdin', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open(
+            $command,
+            $descriptors,
+            $pipes,
+            $this->projectRoot,
+            $environment,
+            ['bypass_shell' => true],
+        );
+        $this->assertIsResource($process, 'Could not start validation lane process.');
+
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [
+            'exit_code' => proc_close($process),
+            'stdout' => $stdout,
+            'stderr' => $stderr,
+        ];
+    }
 }

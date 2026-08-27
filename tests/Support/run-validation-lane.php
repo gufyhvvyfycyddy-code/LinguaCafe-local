@@ -77,6 +77,25 @@ function setValidationLaneEnvironment(string $name, string $value): void
     $_SERVER[$name] = $value;
 }
 
+/** @param list<string> $command
+ *  @return list<string>
+ */
+function normalizeValidationLaneCommand(array $command): array
+{
+    if (PHP_OS_FAMILY !== 'Windows' || $command === []) {
+        return $command;
+    }
+
+    $executable = strtolower(str_replace('\\', '/', $command[0]));
+    if (preg_match('~(?:^|/)vendor/bin/phpunit$~', $executable) !== 1) {
+        return $command;
+    }
+
+    array_unshift($command, PHP_BINARY);
+
+    return $command;
+}
+
 $options = parseValidationLaneArguments($argv);
 $projectRoot = realpath(dirname(__DIR__, 2));
 if ($projectRoot === false) {
@@ -183,5 +202,5 @@ $argv = array_merge([
     __DIR__.'/run-with-testing-db-lease.php',
     '--label=validation-lane-'.$lane,
     '--',
-], $options['command']);
+], normalizeValidationLaneCommand($options['command']));
 require __DIR__.'/run-with-testing-db-lease.php';
