@@ -29,17 +29,27 @@ class DatabaseRestoreProcess
             );
         }
 
+        $monitorConnection = $this->validationConnection();
         $deadline = microtime(true) + $timeout;
         $stableSince = null;
         do {
             $result = $this->run([
-                ...$this->baseCommand(),
+                ...$this->baseCommand($monitorConnection),
                 '--batch',
                 '--skip-column-names',
                 '--execute=' . $this->activeWriterCountQuery(),
-            ]);
+            ], null, $monitorConnection);
 
-            if (trim($result->output()) === '0') {
+            $writerCount = trim($result->output());
+            if (! preg_match('/^-?\d+$/', $writerCount) || $writerCount === '-1') {
+                throw new BackupException(
+                    'BACKUP_CONFIGURATION_INVALID',
+                    'Restore quiescence monitoring is unavailable.',
+                    503,
+                );
+            }
+
+            if ($writerCount === '0') {
                 $stableSince ??= microtime(true);
                 if (microtime(true) - $stableSince >= $stableSeconds) {
                     return;
@@ -411,10 +421,17 @@ class DatabaseRestoreProcess
     {
         $databaseHex = bin2hex($this->connection()['database']);
 
-        return "SELECT (SELECT COUNT(*) FROM information_schema.PROCESSLIST "
-            . "WHERE DB = CONVERT(0x{$databaseHex} USING utf8mb4) "
-            . "AND COMMAND <> 'Sleep') + "
-            . "(SELECT COUNT(*) FROM information_schema.INNODB_TRX)";
+        return "SELECT IF("
+            . "(SELECT ENABLED FROM performance_schema.setup_consumers "
+            . "WHERE NAME = 'events_transactions_current') = 'YES' "
+            . "AND (SELECT ENABLED FROM performance_schema.setup_instruments "
+            . "WHERE NAME = 'transaction') = 'YES', "
+            . "(SELECT COUNT(*) FROM performance_schema.threads "
+            . "WHERE PROCESSLIST_DB = CONVERT(0x{$databaseHex} USING utf8mb4) "
+            . "AND TYPE = 'FOREGROUND' "
+            . "AND COALESCE(PROCESSLIST_COMMAND, '') <> 'Sleep') + "
+            . "(SELECT COUNT(*) FROM performance_schema.events_transactions_current "
+            . "WHERE STATE = 'ACTIVE' AND ACCESS_MODE = 'READ WRITE'), -1)";
     }
 
     private function requiredString(array $connection, string $key): string

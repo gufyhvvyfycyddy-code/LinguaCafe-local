@@ -1,0 +1,88 @@
+name: linguacafe-h04-testing
+
+networks:
+    h04-testing:
+        driver: bridge
+
+services:
+    mysql:
+        image: mysql:8.0
+        restart: "no"
+        environment:
+            MYSQL_DATABASE: linguacafe_h04_testing
+            MYSQL_USER: linguacafe_h04
+            MYSQL_PASSWORD: h04-testing-only
+            MYSQL_ROOT_PASSWORD: h04-root-testing-only
+        healthcheck:
+            test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+            interval: 2s
+            timeout: 2s
+            retries: 30
+            start_period: 10s
+        tmpfs:
+            - /var/lib/mysql
+        networks:
+            - h04-testing
+
+    redis:
+        image: redis:7.2-alpine
+        restart: "no"
+        command: ["redis-server", "--save", "", "--appendonly", "no"]
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 2s
+            timeout: 2s
+            retries: 30
+        networks:
+            - h04-testing
+
+    web:
+        build:
+            context: .
+            dockerfile: docker/PhpDockerfile
+        restart: "no"
+        entrypoint: []
+        command: ["apache2-foreground"]
+        depends_on:
+            mysql:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
+        environment:
+            APP_ENV: testing
+            APP_DEBUG: "false"
+            APP_URL: http://127.0.0.1:8894
+            APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+            APP_MAINTENANCE_DRIVER: cache
+            APP_MAINTENANCE_STORE: redis
+            DB_CONNECTION: mysql
+            DB_HOST: mysql
+            DB_PORT: "3306"
+            DB_DATABASE: linguacafe_h04_testing
+            DB_USERNAME: linguacafe_h04
+            DB_PASSWORD: h04-testing-only
+            SESSION_DRIVER: file
+            CACHE_STORE: array
+            QUEUE_CONNECTION: sync
+            REDIS_CLIENT: predis
+            REDIS_HOST: redis
+            REDIS_PORT: "6379"
+            REDIS_DB: "0"
+            REDIS_CACHE_DB: "1"
+            BACKUP_RESTORE_COORDINATION_STORE: redis
+            BACKUP_RESTORE_QUEUE_CONNECTION: redis-restore
+            BACKUP_RESTORE_REDIS_CONNECTION: default
+            BACKUP_RESTORE_QUEUE: maintenance
+            BACKUP_RESTORE_RETRY_AFTER: "22200"
+            BACKUP_RESTORE_LOCK_SECONDS: "25200"
+            BACKUP_RESTORE_QUIESCE_TIMEOUT_SECONDS: "30"
+            BACKUP_RESTORE_QUIESCE_STABLE_SECONDS: "5"
+            BACKUP_RESTORE_VALIDATION_HOST: mysql
+            BACKUP_RESTORE_VALIDATION_PORT: "3306"
+            BACKUP_RESTORE_VALIDATION_USERNAME: root
+            BACKUP_RESTORE_VALIDATION_PASSWORD: h04-root-testing-only
+            LOG_CHANNEL: stderr
+        ports:
+            - "127.0.0.1:8894:80"
+        networks:
+            - h04-testing

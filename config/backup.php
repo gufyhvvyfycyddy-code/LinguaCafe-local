@@ -42,10 +42,8 @@ return [
     'restore_required_tables' => [
         'migrations',
         'users',
-        'languages',
         'books',
         'chapters',
-        'texts',
         'encountered_words',
         'word_senses',
         'review_cards',

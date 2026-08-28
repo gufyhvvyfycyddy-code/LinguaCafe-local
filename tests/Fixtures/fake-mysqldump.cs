@@ -8,10 +8,8 @@ public static class FakeMysqldump
         string[] tables = {
             "migrations",
             "users",
-            "languages",
             "books",
             "chapters",
-            "texts",
             "encountered_words",
             "word_senses",
             "review_cards",

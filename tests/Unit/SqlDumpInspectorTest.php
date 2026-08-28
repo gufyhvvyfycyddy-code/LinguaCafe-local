@@ -13,6 +13,9 @@ class SqlDumpInspectorTest extends TestCase
     {
         $path = $this->gzip(<<<'SQL'
 /*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+/*!40101 SET character_set_client = @saved_cs_client */;
 CREATE TABLE `migrations` (`id` bigint);
 CREATE TABLE `users` (`id` bigint);
 SQL);
@@ -56,6 +59,9 @@ SQL);
             ],
             'extra executable comment assignment' => [
                 "/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO', SQL_NOTES=0 */;",
+            ],
+            'extra charset executable assignment' => [
+                "/*!40101 SET character_set_client = utf8mb4, SQL_NOTES=0 */;",
             ],
             'cross database foreign key' => [
                 'CREATE TABLE `unsafe_fk` (`id` bigint, CONSTRAINT `fk` FOREIGN KEY (`id`) REFERENCES `other`.`users` (`id`));',

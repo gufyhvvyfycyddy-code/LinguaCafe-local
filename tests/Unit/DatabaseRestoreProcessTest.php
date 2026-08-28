@@ -186,7 +186,7 @@ class DatabaseRestoreProcessTest extends TestCase
         }
     }
 
-    public function test_quiescence_check_uses_hex_database_literal(): void
+    public function test_quiescence_check_uses_dedicated_monitor_and_performance_schema(): void
     {
         Process::fake(['*' => Process::result(output: "0\n")]);
 
@@ -195,10 +195,33 @@ class DatabaseRestoreProcessTest extends TestCase
         Process::assertRan(function (PendingProcess $process) {
             $command = implode(' ', $process->command);
 
-            return str_contains($command, 'information_schema.PROCESSLIST')
+            return in_array('--host=validation.example', $process->command, true)
+                && in_array('--port=3308', $process->command, true)
+                && in_array('--user=validation-user', $process->command, true)
+                && ($process->environment['MYSQL_PWD'] ?? null) === 'validation-secret'
+                && str_contains($command, 'performance_schema.setup_consumers')
+                && str_contains($command, 'performance_schema.setup_instruments')
+                && str_contains($command, 'performance_schema.threads')
+                && str_contains($command, 'performance_schema.events_transactions_current')
                 && str_contains($command, bin2hex('linguacafe_testing'))
-                && ! str_contains($command, "'linguacafe_testing'");
+                && ! str_contains($command, 'information_schema.INNODB_TRX')
+                && ! str_contains($command, 'information_schema.PROCESSLIST')
+                && ! str_contains($command, "'linguacafe_testing'")
+                && ! str_contains($command, 'secret ; value');
         });
+    }
+
+    public function test_quiescence_fails_closed_when_transaction_monitoring_is_disabled(): void
+    {
+        Process::fake(['*' => Process::result(output: "-1\n")]);
+
+        try {
+            app(DatabaseRestoreProcess::class)->waitForQuiescence();
+            $this->fail('Expected unavailable quiescence monitoring failure.');
+        } catch (BackupException $exception) {
+            $this->assertSame('BACKUP_CONFIGURATION_INVALID', $exception->errorCode);
+            $this->assertSame(503, $exception->httpStatus);
+        }
     }
 
     private function gzip(string $contents): string

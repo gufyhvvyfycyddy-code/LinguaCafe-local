@@ -226,6 +226,9 @@ class SqlDumpInspector
         $statement = trim($matches[2]);
         $allowed = [
             '/^SET\s+@OLD_CHARACTER_SET_CLIENT\s*=\s*@@CHARACTER_SET_CLIENT$/i',
+            '/^SET\s+@saved_cs_client\s*=\s*@@character_set_client$/i',
+            '/^SET\s+character_set_client\s*=\s*[A-Za-z0-9_]+$/i',
+            '/^SET\s+character_set_client\s*=\s*@saved_cs_client$/i',
             '/^SET\s+@OLD_CHARACTER_SET_RESULTS\s*=\s*@@CHARACTER_SET_RESULTS$/i',
             '/^SET\s+@OLD_COLLATION_CONNECTION\s*=\s*@@COLLATION_CONNECTION$/i',
             '/^SET\s+NAMES\s+[A-Za-z0-9_]+$/i',
