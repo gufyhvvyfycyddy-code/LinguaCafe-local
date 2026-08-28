@@ -17,7 +17,7 @@ const H02_ENVIRONMENT_GATE_BLOCKED_EXIT_CODE = 78;
 /**
  * @return array{started:bool,timed_out:bool,exit_code:int,stdout:string,stderr:string}
  */
-function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, int $timeoutMs): array
+function h02EnvironmentGateRunProcess(array|string $command, string $workingDirectory, int $timeoutMs): array
 {
     $process = @proc_open(
         $command,
@@ -49,6 +49,7 @@ function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, 
     $timedOut = false;
     $processExited = false;
     $lastStatus = null;
+    $cachedExitCode = null;
     $deadline = microtime(true) + ($timeoutMs / 1000);
 
     while (true) {
@@ -59,6 +60,9 @@ function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, 
         }
         if (($lastStatus['running'] ?? false) !== true) {
             $processExited = true;
+            if (is_int($lastStatus['exitcode'] ?? null) && $lastStatus['exitcode'] !== -1) {
+                $cachedExitCode = $lastStatus['exitcode'];
+            }
             break;
         }
         if (microtime(true) >= $deadline) {
@@ -78,6 +82,12 @@ function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, 
         do {
             $lastStatus = @proc_get_status($process);
             if (! is_array($lastStatus) || ! ($lastStatus['running'] ?? false)) {
+                if (is_array($lastStatus)
+                    && is_int($lastStatus['exitcode'] ?? null)
+                    && $lastStatus['exitcode'] !== -1
+                ) {
+                    $cachedExitCode ??= $lastStatus['exitcode'];
+                }
                 break;
             }
             usleep(20_000);
@@ -87,6 +97,13 @@ function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, 
             @proc_terminate($process, 9);
         }
         $lastStatus = @proc_get_status($process);
+        if (is_array($lastStatus)
+            && ! ($lastStatus['running'] ?? false)
+            && is_int($lastStatus['exitcode'] ?? null)
+            && $lastStatus['exitcode'] !== -1
+        ) {
+            $cachedExitCode ??= $lastStatus['exitcode'];
+        }
         $processExited = is_array($lastStatus) && ! ($lastStatus['running'] ?? false);
     }
 
@@ -113,8 +130,8 @@ function h02EnvironmentGateRunProcess(array $command, string $workingDirectory, 
     }
 
     $exitCode = @proc_close($process);
-    if ($exitCode === -1 && is_array($lastStatus) && is_int($lastStatus['exitcode'] ?? null)) {
-        $exitCode = $lastStatus['exitcode'];
+    if ($cachedExitCode !== null) {
+        $exitCode = $cachedExitCode;
     }
 
     return [
@@ -148,7 +165,7 @@ function h02EnvironmentGateDrainPipe(mixed $pipe, string &$buffer): void
 function h02EnvironmentGateLaunchEnvironment(): array
 {
     $environment = [];
-    foreach (['PATH', 'SystemRoot'] as $name) {
+    foreach (['PATH', 'SystemRoot', 'USERPROFILE'] as $name) {
         $value = getenv($name);
         if (is_string($value) && $value !== '') {
             $environment[$name] = $value;
@@ -312,8 +329,9 @@ function h02EnvironmentGateDecodeObject(string $text): ?array
  *
  * The command runner receives an argument array, repository-root working
  * directory, and a 10-second timeout. It returns started, timed_out,
- * exit_code, stdout, and stderr fields. The default runner never inherits
- * repository or user environment values beyond PATH and SystemRoot.
+ * exit_code, stdout, and stderr fields. The default runner only inherits
+ * PATH, SystemRoot, and USERPROFILE; Docker Desktop uses USERPROFILE to
+ * discover its per-user CLI plugins such as Compose.
  *
  * @return array{schema_version:int,ready:bool,platform:string,checks:array<string,bool>,details:array<string,mixed>}
  */
@@ -346,10 +364,10 @@ function h02RunEnvironmentGate(
 
     $checks['platform_windows'] = true;
     $projectRoot ??= dirname(__DIR__, 2);
-    $commandRunner ??= static function (array $command, string $workingDirectory, int $timeoutMs): array {
+    $commandRunner ??= static function (array|string $command, string $workingDirectory, int $timeoutMs): array {
         return h02EnvironmentGateRunProcess($command, $workingDirectory, $timeoutMs);
     };
-    $run = static function (array $command) use ($commandRunner, $projectRoot): array {
+    $run = static function (array|string $command) use ($commandRunner, $projectRoot): array {
         try {
             return h02EnvironmentGateNormalizeProcessResult(
                 $commandRunner($command, $projectRoot, H02_ENVIRONMENT_GATE_TIMEOUT_MS),
@@ -362,7 +380,11 @@ function h02RunEnvironmentGate(
     };
 
     try {
-        $wslStatus = $run(['wsl.exe', '--status']);
+        // PHP's Windows array-form proc_open quoting is not parsed correctly by
+        // wsl.exe. The fixed string still launches directly with bypass_shell,
+        // and -l -v exercises the WSL service that --status can warn about while
+        // still exiting successfully.
+        $wslStatus = $run('wsl.exe -l -v');
         $details['wsl_status'] = h02EnvironmentGateProbeDetails($wslStatus);
         if ($wslStatus['timed_out']) {
             return $fail('H02_ENV_PROBE_TIMEOUT', 'wsl_status', 'The WSL status probe timed out.');
@@ -372,7 +394,7 @@ function h02RunEnvironmentGate(
         }
         $checks['wsl_status'] = true;
 
-        $wslVersion = $run(['wsl.exe', '--version']);
+        $wslVersion = $run('wsl.exe --version');
         $details['wsl_version'] = h02EnvironmentGateProbeDetails($wslVersion);
         if ($wslVersion['timed_out']) {
             return $fail('H02_ENV_PROBE_TIMEOUT', 'wsl_version', 'The WSL version probe timed out.');
@@ -420,7 +442,7 @@ function h02RunEnvironmentGate(
         }
         $checks['docker_compose'] = true;
 
-        $dockerInfo = $run(['docker.exe', 'info', '--format', '{{json .}}']);
+        $dockerInfo = $run(['docker.exe', 'info', '--format', '{{.OSType}}']);
         $details['docker_info'] = h02EnvironmentGateProbeDetails($dockerInfo);
         if ($dockerInfo['timed_out']) {
             return $fail('H02_ENV_PROBE_TIMEOUT', 'docker_linux', 'The Docker info probe timed out.');
@@ -428,13 +450,12 @@ function h02RunEnvironmentGate(
         if (! $dockerInfo['started'] || $dockerInfo['exit_code'] !== 0) {
             return $fail('H02_ENV_DOCKER_SERVER_UNAVAILABLE', 'docker_linux', 'Docker server information is unavailable.');
         }
-        $dockerInfoObject = h02EnvironmentGateDecodeObject($dockerInfo['stdout']);
-        $osType = $dockerInfoObject['OSType'] ?? null;
-        if (! is_string($osType) || trim($osType) === '') {
+        $osType = trim($dockerInfo['stdout']);
+        if ($osType === '') {
             return $fail('H02_ENV_DOCKER_SERVER_UNAVAILABLE', 'docker_linux', 'Docker server OSType was not returned.');
         }
         $details['docker_info']['ostype'] = h02EnvironmentGateSanitizeText($osType);
-        if (strtolower(trim($osType)) !== 'linux') {
+        if (strtolower($osType) !== 'linux') {
             return $fail('H02_ENV_DOCKER_NOT_LINUX', 'docker_linux', 'Docker server OSType is not linux.');
         }
         $checks['docker_linux'] = true;
@@ -462,7 +483,7 @@ function h02RunEnvironmentGate(
             '-NoProfile',
             '-NonInteractive',
             '-Command',
-            '$ErrorActionPreference = "Stop"; $listeners = @(Get-NetTCPConnection -LocalPort 8892 -State Listen -ErrorAction Stop); [Console]::Out.WriteLine($listeners.Count)',
+            '$listeners = @([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | Where-Object { $_.Port -eq 8892 }); [Console]::Out.WriteLine($listeners.Count)',
         ]);
         $details['port_8892'] = h02EnvironmentGateProbeDetails($portProbe);
         if ($portProbe['timed_out']) {

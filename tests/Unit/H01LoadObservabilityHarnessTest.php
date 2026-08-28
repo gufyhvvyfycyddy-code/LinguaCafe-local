@@ -161,6 +161,11 @@ final class H01LoadObservabilityHarnessTest extends TestCase
         $this->assertSame(5, $summary['mysql']['threads_connected']['max']);
         $this->assertSame(1, $summary['queue']['backlog']['max']);
         $this->assertSame(0, $summary['errors']['laravel_error_entries']);
+        $this->assertSame('h01_sentinel_smoke', $summary['scenario']);
+
+        $runtime['scenario'] = 'h02_representative_reading_lookup_sense_review';
+        $overridden = H01LoadObservabilityHarness::buildFinalSummary($k6, $samples, $runtime, 0, 3.25);
+        $this->assertSame('h02_representative_reading_lookup_sense_review', $overridden['scenario']);
     }
 
     public function test_final_summary_fails_closed_when_required_k6_metrics_are_missing(): void
@@ -208,6 +213,18 @@ final class H01LoadObservabilityHarnessTest extends TestCase
             @unlink($child['stderr']);
             @rmdir($tempDirectory);
         }
+    }
+
+    public function test_temp_directory_cleanup_removes_task_owned_files_and_directory(): void
+    {
+        $tempDirectory = sys_get_temp_dir().DIRECTORY_SEPARATOR.'h01-temp-cleanup-'.bin2hex(random_bytes(6));
+        mkdir($tempDirectory, 0700, true);
+        file_put_contents($tempDirectory.DIRECTORY_SEPARATOR.'stdout.log', 'done');
+        file_put_contents($tempDirectory.DIRECTORY_SEPARATOR.'stderr.log', '');
+
+        h01RemoveTempDirectory($tempDirectory);
+
+        $this->assertDirectoryDoesNotExist($tempDirectory);
     }
 
     public function test_k6_sampling_owner_has_a_finally_cleanup_boundary(): void

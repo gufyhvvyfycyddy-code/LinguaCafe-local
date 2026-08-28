@@ -348,7 +348,7 @@ class ReviewCardService
                 'card' => $card,
                 'review_log' => $reviewLog,
             ];
-        });
+        }, 3);
     }
 
     private function formalQuestionExampleKey(string $source, ?string $questionExampleKey): ?string

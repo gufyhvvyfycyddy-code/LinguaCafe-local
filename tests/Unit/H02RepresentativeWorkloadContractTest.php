@@ -8,6 +8,43 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
 {
     private const WORKLOAD_PATH = __DIR__.'/../load/h02-representative-workloads.js';
 
+    public function test_scenario_allocations_split_total_users(): void
+    {
+        $source = $this->workloadSource();
+        $functionSource = $this->splitterFunctionSource($source);
+        $inputs = range(1, 100);
+        $evaluation = $this->runSplitter($functionSource, $inputs);
+
+        $splits = $evaluation['splits'] ?? null;
+        self::assertIsArray($splits);
+        self::assertCount(count($inputs), $splits);
+
+        $expectedSplits = [
+            1 => [1, 0, 0],
+            2 => [1, 1, 0],
+            3 => [1, 1, 1],
+            4 => [2, 1, 1],
+            5 => [2, 2, 1],
+            100 => [34, 33, 33],
+        ];
+
+        foreach ($inputs as $index => $input) {
+            $split = $splits[$index] ?? null;
+            self::assertIsArray($split);
+            self::assertCount(3, $split, "H-02 must return three allocations for {$input} users.");
+            self::assertSame($input, array_sum($split), "H-02 allocations must sum to {$input} users.");
+            self::assertLessThanOrEqual(1, max($split) - min($split), "H-02 allocations must stay even for {$input} users.");
+
+            if (isset($expectedSplits[$input])) {
+                self::assertSame($expectedSplits[$input], $split, "Unexpected H-02 allocation for {$input} users.");
+            }
+        }
+
+        $invalidError = $evaluation['invalid_error'] ?? null;
+        self::assertIsString($invalidError);
+        self::assertStringContainsString('H02_INVALID_VUS', $invalidError);
+    }
+
     public function test_representative_workload_matches_the_frozen_contract(): void
     {
         $source = $this->workloadSource();
@@ -15,9 +52,9 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
         $exportedWorkloads = $this->exportedCallableNames($source);
         sort($exportedWorkloads);
         $this->assertSame(
-            ['lookup', 'reading', 'senseReview'],
+            ['handleSummary', 'lookup', 'reading', 'senseReview', 'splitScenarioVus'],
             $exportedWorkloads,
-            'H-02 must export exactly the reading, lookup, and Sense Review workload functions.'
+            'H-02 must export the three workloads, pure VU splitter, and the single H-01-compatible raw summary handoff.'
         );
 
         $scenarioExecs = [];
@@ -43,6 +80,37 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
             preg_match_all('/\bexecutor\s*:\s*[\'\"]per-vu-iterations[\'\"]/', $source),
             'Each representative scenario must use the per-vu-iterations executor.'
         );
+        $this->assertStringContainsString(
+            'const [readingVus, lookupVus, senseReviewVus] = splitScenarioVus(vus);',
+            $source,
+            'Scenario VUs must be derived from the total H02_VUS splitter output.'
+        );
+        foreach ([
+            'reading' => 'readingVus',
+            'lookup' => 'lookupVus',
+            'senseReview' => 'senseReviewVus',
+        ] as $scenario => $scenarioVus) {
+            $this->assertSame(
+                1,
+                substr_count($source, "if ({$scenarioVus} > 0) {"),
+                "A zero {$scenarioVus} allocation must omit the scenario because k6 rejects zero-VU scenarios."
+            );
+            $this->assertSame(
+                1,
+                substr_count($source, "scenarios.{$scenario} = {"),
+                "The {$scenario} scenario must be added through the zero-safe scenario map."
+            );
+            $this->assertSame(
+                1,
+                substr_count($source, "        vus: {$scenarioVus},"),
+                "Each scenario must use its deterministic {$scenarioVus} allocation."
+            );
+        }
+        $this->assertStringContainsString(
+            "export const options = {\n    scenarios,",
+            $source,
+            'k6 options must expose the zero-safe scenario map alongside fail-closed measurement settings.'
+        );
 
         $sharedArray = [];
         $this->assertSame(
@@ -54,16 +122,16 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
             ),
             'H-02 fixtures must be backed by a SharedArray.'
         );
-        $fixtureName = $sharedArray[1] ?? '';
-        $this->assertSame(
-            1,
-            preg_match(
-                '/\b'.preg_quote($fixtureName, '/').
-                '\s*(?:\[\s*vu\s*\.\s*idInTest(?:\s*[-+]\s*\d+)?\s*\]|\.\s*at\s*\(\s*vu\s*\.\s*idInTest(?:\s*[-+]\s*\d+)?\s*\))/',
-                $source
-            ),
-            'H-02 must map each VU to its fixture through vu.idInTest.'
+        $this->assertStringContainsString(
+            'const fixture = fixtures[vu.idInTest - 1];',
+            $source,
+            'H-02 must map each VU to its fixture through the global vu.idInTest index.'
         );
+        $this->assertStringContainsString("const fixturesJson = __ENV.H02_FIXTURES_JSON || '';", $source);
+        $this->assertStringContainsString("const fixturesPath = __ENV.H02_FIXTURES_PATH || '';", $source);
+        $this->assertStringContainsString("if ((fixturesJson === '') === (fixturesPath === ''))", $source);
+        $this->assertStringContainsString("open(fixturesPath)", $source);
+        $this->assertStringContainsString("const summaryPath = __ENV.H02_K6_SUMMARY_PATH", $source);
 
         foreach (['email', 'password', 'chapter_id', 'lemma', 'language', 'review_card_id'] as $key) {
             $escapedKey = preg_quote($key, '/');
@@ -112,20 +180,21 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
             'Authentication must submit credentials through the real POST /login flow.'
         );
         $this->assertStringContainsString(
-            '/<meta[^>]*name=["\']csrf-token["\'][^>]*content=["\']([^"\']+)["\']/i',
+            "loginPage.cookies['XSRF-TOKEN']",
             $source,
-            'The real login flow must extract the CSRF token from the login page meta tag.'
+            'The real login flow must use Laravel\'s XSRF-TOKEN cookie like the Axios browser path.'
         );
         $this->assertStringContainsString(
             "JSON.stringify({\n        email: fixture.email,\n        password: fixture.password,\n        remember: true,\n    })",
             $source,
             'Login must send the Vue login payload as JSON, including remember.'
         );
-        $this->assertStringContainsString(
-            "'X-CSRF-TOKEN': csrfToken",
-            $source,
-            'The extracted login-page token must be sent through the real CSRF header.'
+        $this->assertGreaterThanOrEqual(
+            2,
+            substr_count($source, "'X-XSRF-TOKEN': csrfToken"),
+            'Cookie-derived CSRF tokens must use Laravel\'s X-XSRF-TOKEN header for login and authenticated mutations.'
         );
+        $this->assertStringNotContainsString("'X-CSRF-TOKEN'", $source);
         $this->assertStringContainsString(
             "loginResponse.cookies['XSRF-TOKEN']",
             $source,
@@ -166,16 +235,107 @@ final class H02RepresentativeWorkloadContractTest extends TestCase
             preg_match('~__testing\s*/\s*(?:auth|login|authenticate)\b~i', $source),
             'H-02 must not use a __testing authentication endpoint.'
         );
+        $this->assertStringContainsString(
+            "http_req_failed: ['rate==0']",
+            $source,
+            'H-02 must fail closed when any HTTP request fails.'
+        );
+        $this->assertStringContainsString(
+            "checks: ['rate==1']",
+            $source,
+            'H-02 must fail closed when any workload check fails.'
+        );
+        $this->assertStringContainsString("'p(99)'", $source);
         $this->assertSame(
-            0,
-            preg_match('/\bhandleSummary\b/i', $source),
-            'H-02 must not introduce a new handleSummary metric truth.'
+            1,
+            substr_count($source, 'export function handleSummary(data)'),
+            'H-02 must reuse the H-01 raw k6 data handoff exactly once.'
+        );
+        $this->assertStringContainsString(
+            '[summaryPath]: JSON.stringify(data, null, 2)',
+            $source,
+            'H-02 handleSummary must only persist raw k6 data for the H-01 summary builder.'
         );
         $this->assertSame(
             0,
             preg_match('/\bschema_version\b/', $source),
             'H-02 must not introduce a new schema_version metric truth.'
         );
+    }
+
+    private function splitterFunctionSource(string $source): string
+    {
+        $functionStart = strpos($source, 'export function splitScenarioVus(totalVus)');
+        self::assertNotFalse($functionStart, 'H-02 must expose the pure splitter function.');
+        if ($functionStart === false) {
+            return '';
+        }
+
+        $functionEnd = strpos($source, "\n}\n\nconst baseUrl", $functionStart);
+        self::assertNotFalse($functionEnd, 'H-02 splitter must end before the workload configuration.');
+        if ($functionEnd === false) {
+            return '';
+        }
+
+        $functionSource = substr($source, $functionStart, $functionEnd - $functionStart + 2);
+
+        return str_replace('export function', 'function', $functionSource);
+    }
+
+    /** @param list<int> $inputs
+     *  @return array{splits: list<list<int>>, invalid_error: string}
+     */
+    private function runSplitter(string $functionSource, array $inputs): array
+    {
+        $encodedInputs = json_encode($inputs, JSON_THROW_ON_ERROR);
+        $script = $functionSource."\n"
+            ."const inputs = {$encodedInputs};\n"
+            ."const splits = inputs.map((value) => splitScenarioVus(value));\n"
+            ."let invalidError = '';\n"
+            ."try { splitScenarioVus(0); } catch (error) { invalidError = String(error.message || error); }\n"
+            ."process.stdout.write(JSON.stringify({ splits, invalid_error: invalidError }));\n";
+
+        $scriptPath = tempnam(sys_get_temp_dir(), 'h02-splitter-');
+        self::assertIsString($scriptPath);
+        self::assertSame(strlen($script), file_put_contents($scriptPath, $script));
+
+        try {
+            $process = proc_open(
+                ['node', $scriptPath],
+                [
+                    0 => ['pipe', 'r'],
+                    1 => ['pipe', 'w'],
+                    2 => ['pipe', 'w'],
+                ],
+                $pipes,
+                dirname(__DIR__, 2),
+                null,
+                ['bypass_shell' => true],
+            );
+            self::assertIsResource($process, 'Could not start Node to execute the H-02 splitter.');
+
+            fclose($pipes[0]);
+            $stdout = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            self::assertIsString($stdout);
+            self::assertIsString($stderr);
+
+            $exitCode = proc_close($process);
+            self::assertSame(0, $exitCode, "Node splitter execution failed: {$stderr}");
+
+            try {
+                $decoded = json_decode($stdout, true, flags: JSON_THROW_ON_ERROR);
+            } catch (\JsonException $error) {
+                self::fail("Node splitter output was not valid JSON: {$stdout} {$error->getMessage()}");
+            }
+            self::assertIsArray($decoded);
+
+            return $decoded;
+        } finally {
+            @unlink($scriptPath);
+        }
     }
 
     private function workloadSource(): string

@@ -83,6 +83,73 @@ final class H02RepresentativeRuntimeContractTest extends TestCase
         );
     }
 
+    public function test_clean_container_build_pins_laravel_mix_compatible_webpack(): void
+    {
+        $package = file_get_contents(dirname(__DIR__, 2).'/package.json');
+        $this->assertIsString($package, 'Root package.json must be readable for the H-02 container build.');
+        $this->assertStringContainsString(
+            '"webpack": "~5.99.9"',
+            $package,
+            'H-02 clean builds must not drift to webpack releases that removed Laravel Mix 6 internals.'
+        );
+    }
+
+    public function test_node_build_caches_dependencies_and_excludes_host_dependency_links(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $dockerfile = file_get_contents($root.'/docker/PhpDockerfile');
+        $dockerignore = file_get_contents($root.'/.dockerignore');
+        $this->assertIsString($dockerfile);
+        $this->assertIsString($dockerignore);
+
+        $packageCopy = strpos($dockerfile, 'COPY package.json /build/package.json');
+        $npmInstall = strpos($dockerfile, 'RUN npm install');
+        $sourceCopy = strpos($dockerfile, 'COPY ./ /build');
+        $npmBuild = strpos($dockerfile, 'RUN npm run prod');
+        $this->assertIsInt($packageCopy);
+        $this->assertIsInt($npmInstall);
+        $this->assertIsInt($sourceCopy);
+        $this->assertIsInt($npmBuild);
+        $this->assertLessThan($npmInstall, $packageCopy);
+        $this->assertLessThan($sourceCopy, $npmInstall);
+        $this->assertLessThan($npmBuild, $sourceCopy);
+
+        foreach ([".git\n", ".env\n", ".env.*\n", "node_modules\n", "vendor\n", "storage/logs\n"] as $ignored) {
+            $this->assertStringContainsString($ignored, $dockerignore);
+        }
+    }
+
+    public function test_clean_container_build_does_not_require_runtime_broadcast_secrets(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $broadcasting = file_get_contents($root.'/config/broadcasting.php');
+        $dockerignore = file_get_contents($root.'/.dockerignore');
+        $this->assertIsString($broadcasting);
+        $this->assertIsString($dockerignore);
+
+        $this->assertStringContainsString(
+            "'default' => env('BROADCAST_CONNECTION', env('BROADCAST_DRIVER', 'null'))",
+            $broadcasting,
+            'A clean build must use a secret-free null broadcaster unless runtime explicitly configures broadcasting.'
+        );
+        $this->assertStringNotContainsString("env('BROADCAST_DRIVER', 'pusher')", $broadcasting);
+        $this->assertStringContainsString(".env\n", $dockerignore);
+        $this->assertStringContainsString(".env.*\n", $dockerignore);
+    }
+
+    public function test_mysql_composite_index_columns_are_bounded_for_fresh_install(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $pending = file_get_contents($root.'/database/migrations/2026_07_02_000001_create_ai_study_card_pending_items_table.php');
+        $inline = file_get_contents($root.'/database/migrations/2026_07_03_000001_create_reading_inline_sense_confirmations_table.php');
+
+        $this->assertIsString($pending);
+        $this->assertIsString($inline);
+        $this->assertStringContainsString("string('language_id', 64)", $pending);
+        $this->assertStringContainsString("string('status', 32)", $pending);
+        $this->assertStringContainsString("string('language', 64)", $inline);
+    }
+
     public function test_web_clears_repository_entrypoint_and_runs_apache_only(): void
     {
         $compose = $this->compose();

@@ -62,20 +62,14 @@ class ReviewSettingsResolver
             return $this->validatedBoundPreset($existing, $userId);
         }
 
-        return DB::transaction(function () use ($userId, $language): ReviewSettingPreset {
-            $binding = ReviewSettingPresetBinding::with('preset')
-                ->where('user_id', $userId)
-                ->where('language_id', $language)
-                ->lockForUpdate()
-                ->first();
-            if ($binding) {
-                return $this->validatedBoundPreset($binding, $userId);
-            }
+        // Initialization is owned by the existing unique constraints plus
+        // createOrFirst() in the preset/binding services. Locking a missing
+        // binding row here creates an InnoDB gap lock and can deadlock
+        // unrelated first-time users under concurrent review traffic.
+        $preset = $this->presets->defaultFor($userId);
+        $binding = $this->bindings->bind($userId, $language, $preset);
 
-            $preset = $this->presets->defaultFor($userId);
-            $binding = $this->bindings->bind($userId, $language, $preset);
-            return $this->validatedBoundPreset($binding->load('preset'), $userId);
-        });
+        return $this->validatedBoundPreset($binding->load('preset'), $userId);
     }
 
     private function validatedBoundPreset(ReviewSettingPresetBinding $binding, int $userId): ReviewSettingPreset

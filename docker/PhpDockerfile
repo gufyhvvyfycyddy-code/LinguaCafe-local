@@ -1,8 +1,10 @@
 FROM node:20-alpine as node_build
 
 WORKDIR /build
+COPY package.json /build/package.json
+RUN npm install
 COPY ./ /build
-RUN npm install && npm run prod
+RUN npm run prod
 
 FROM php:8.2-apache
 

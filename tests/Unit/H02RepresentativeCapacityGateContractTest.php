@@ -9,127 +9,75 @@ use PHPUnit\Framework\TestCase;
 final class H02RepresentativeCapacityGateContractTest extends TestCase
 {
     private const RUNNER_PATH = __DIR__.'/../Support/run-h02-representative-runtime.php';
+    private const LADDER_PATH = __DIR__.'/../Support/run-h02-docker-ladder.php';
 
-    public function test_capacity_proof_seams_exist_before_capacity_execution(): void
+    public function test_host_runner_cannot_claim_representative_100_vu_capacity(): void
     {
-        $this->loadRunner();
-        $readerExists = function_exists('h02ReadCapacityProof');
-        $resolverExists = function_exists('h02ResolveCapacityRuntime');
-        self::assertTrue($readerExists, 'H-02 must expose h02ReadCapacityProof before capacity execution.');
-        self::assertTrue($resolverExists, 'H-02 must expose h02ResolveCapacityRuntime before capacity execution.');
-        if (! $readerExists || ! $resolverExists) {
-            return;
-        }
+        require_once self::RUNNER_PATH;
 
-        $projectRoot = dirname(__DIR__, 2);
-        $baseUrl = 'http://127.0.0.1:8892';
-        $head = trim((string) shell_exec('git -C '.escapeshellarg($projectRoot).' rev-parse HEAD'));
-        self::assertMatchesRegularExpression('/\A[0-9a-f]{40}\z/i', $head);
-        $validProof = [
-            'schema_version' => 1,
-            'git_head' => $head,
-            'base_url' => $baseUrl,
-            'server_profile' => 'docker_apache_testing',
-            'capacity_representative' => true,
-        ];
-        $paths = [];
+        $runtime = h02ResolveSmokeRuntime(99);
+        self::assertFalse($runtime['capacity_representative']);
+        self::assertSame('external_apache_testing_runtime', $runtime['server_profile']);
 
         try {
-            $validPath = $this->writeProof($validProof);
-            $paths[] = $validPath;
-            $accepted = h02ReadCapacityProof($validPath, $projectRoot, $baseUrl);
-            self::assertSame(1, $accepted['schema_version'] ?? null);
-            self::assertSame('docker_apache_testing', $accepted['server_profile'] ?? null);
-            self::assertTrue($accepted['capacity_representative'] ?? false);
-            self::assertFileExists($validPath, 'Proof validation must not remove the external proof.');
-
-            foreach ([
-                ['schema_version' => 2],
-                ['git_head' => str_repeat('0', 40)],
-                ['base_url' => 'http://127.0.0.1:8893'],
-                ['server_profile' => 'php_server_smoke'],
-                ['capacity_representative' => false],
-            ] as $changes) {
-                $path = $this->writeProof(array_merge($validProof, $changes));
-                $paths[] = $path;
-                $this->assertCapacityFailure(static fn () => h02ReadCapacityProof($path, $projectRoot, $baseUrl));
-            }
-
-            $malformedPath = $this->writeFile('{malformed');
-            $paths[] = $malformedPath;
-            $this->assertCapacityFailure(static fn () => h02ReadCapacityProof($malformedPath, $projectRoot, $baseUrl));
-
-            $missingPath = $this->writeFile('{}');
-            unlink($missingPath);
-            $paths[] = $missingPath;
-            $this->assertCapacityFailure(static fn () => h02ReadCapacityProof($missingPath, $projectRoot, $baseUrl));
-
-            $smokeRuntime = h02ResolveCapacityRuntime(null, 1, $projectRoot, $baseUrl);
-            self::assertFalse($smokeRuntime['capacity_representative'] ?? true);
-            self::assertNotSame('docker_apache_testing', $smokeRuntime['server_profile'] ?? null);
-            $this->assertCapacityFailure(static fn () => h02ResolveCapacityRuntime(null, 100, $projectRoot, $baseUrl));
-
-            $capacityRuntime = h02ResolveCapacityRuntime($validPath, 100, $projectRoot, $baseUrl);
-            self::assertTrue($capacityRuntime['capacity_representative'] ?? false);
-            self::assertSame('docker_apache_testing', $capacityRuntime['server_profile'] ?? null);
-        } finally {
-            foreach ($paths as $path) {
-                if (is_file($path)) {
-                    @unlink($path);
-                }
-            }
-        }
-    }
-
-    public function test_capacity_proof_option_is_measurement_only(): void
-    {
-        $this->loadRunner();
-        $readerExists = function_exists('h02ReadCapacityProof');
-        $resolverExists = function_exists('h02ResolveCapacityRuntime');
-        self::assertTrue($readerExists, 'Capacity CLI coverage waits for h02ReadCapacityProof.');
-        self::assertTrue($resolverExists, 'Capacity CLI coverage waits for h02ResolveCapacityRuntime.');
-        if (! $readerExists || ! $resolverExists) {
-            return;
+            h02ResolveSmokeRuntime(100);
+            self::fail('100 VU must be reserved for the Docker representative ladder.');
+        } catch (\H02RepresentativeRuntimeFailure $error) {
+            self::assertSame('H02_CAPACITY_REQUIRES_DOCKER_LADDER', $error->machineCode);
         }
 
-        $proofPath = $this->writeFile('{}');
-        $fixturePath = $this->writeFile('[]');
+        $fixture = tempnam(sys_get_temp_dir(), 'h02-fixture-');
+        self::assertIsString($fixture);
         try {
-            $options = h02ParseMeasurementArguments([
+            $this->assertRuntimeFailure(static fn () => h02ParseMeasurementArguments([
                 'runner.php',
                 '--measure',
-                '--fixture-file='.$fixturePath,
-                '--capacity-proof='.$proofPath,
-                '--vus=100',
-            ]);
-            self::assertSame($proofPath, $options['capacity_proof'] ?? null);
-            $this->assertCapacityFailure(static fn () => h02ParseRuntimeArguments([
-                'runner.php',
-                '--capacity-proof='.$proofPath,
+                '--fixture-file='.$fixture,
+                '--capacity-proof=legacy.json',
+                '--vus=50',
             ]));
         } finally {
-            @unlink($proofPath);
-            @unlink($fixturePath);
+            @unlink($fixture);
         }
-    }
 
-    public function test_h02_keeps_h01_summary_contract_before_docker_reboot(): void
-    {
-        $this->loadRunner();
         $runner = $this->readFile(self::RUNNER_PATH);
-        $h01 = $this->readFile(__DIR__.'/../Support/run-h01-load-observability.php');
-        self::assertSame(1, substr_count($runner, 'H01LoadObservabilityHarness::buildFinalSummary('));
-        self::assertStringContainsString('public const SCHEMA_VERSION = 1;', $h01);
-        self::assertStringContainsString("'schema_version' => self::SCHEMA_VERSION", $h01);
+        self::assertStringNotContainsString('capacity_proof', $runner);
+        self::assertStringNotContainsString('h02ReadCapacityProof', $runner);
         self::assertSame(
             0,
-            preg_match('/\bdocker(?:-compose)?\s+(?:compose|run|exec|build|inspect|ps|cp|version)\b/i', $runner),
+            preg_match('/\bdocker(?:\.exe)?\s+(?:compose|run|exec|build|inspect|ps|cp|version)\b/i', $runner),
         );
     }
 
-    private function loadRunner(): void
+    public function test_docker_ladder_is_the_single_representative_capacity_owner(): void
     {
-        require_once self::RUNNER_PATH;
+        $ladder = $this->readFile(self::LADDER_PATH);
+        $container = $this->readFile(__DIR__.'/../Support/run-h02-container-runtime.php');
+        $h01 = $this->readFile(__DIR__.'/../Support/run-h01-load-observability.php');
+
+        self::assertStringContainsString('foreach ([1, 10, 25, 50, 100] as $vus)', $ladder);
+        self::assertStringContainsString("'build', '--quiet', 'web'", $ladder);
+        self::assertStringContainsString("'up', '-d', '--no-build'", $ladder);
+        self::assertStringContainsString("'php', 'artisan', 'migrate'", $ladder);
+        self::assertStringContainsString('h02RunEnvironmentGate(', $ladder);
+        self::assertStringContainsString("'--runtime'", $ladder);
+        self::assertStringContainsString("'--provision'", $ladder);
+        self::assertStringContainsString("'--sample'", $ladder);
+        self::assertStringContainsString("'--verify'", $ladder);
+        self::assertStringContainsString('H01LoadObservabilityHarness::buildFinalSummary(', $ladder);
+        self::assertStringContainsString('($runtime[\'capacity_representative\'] ?? null) !== true', $ladder);
+        self::assertStringContainsString('finally {', $ladder);
+        self::assertStringContainsString("'down'", $ladder);
+
+        foreach (['migrate:fresh', 'migrate:refresh', 'migrate:reset', 'db:wipe', 'truncate table'] as $forbidden) {
+            self::assertStringNotContainsString($forbidden, strtolower($ladder));
+        }
+
+        self::assertStringContainsString('function h02ContainerRuntimeProof(): array', $container);
+        self::assertStringContainsString("'server_profile' => 'docker_apache_testing'", $container);
+        self::assertStringContainsString('$apacheProcesses >= 2', $container);
+        self::assertStringContainsString("'scenario' => \$runtime['scenario'] ?? 'h01_sentinel_smoke'", $h01);
+        self::assertStringContainsString('public const SCHEMA_VERSION = 1;', $h01);
     }
 
     private function readFile(string $path): string
@@ -141,25 +89,7 @@ final class H02RepresentativeCapacityGateContractTest extends TestCase
         return $contents;
     }
 
-    /** @param array<string, mixed> $proof */
-    private function writeProof(array $proof): string
-    {
-        $json = json_encode($proof, JSON_THROW_ON_ERROR);
-        self::assertIsString($json);
-
-        return $this->writeFile($json);
-    }
-
-    private function writeFile(string $contents): string
-    {
-        $path = tempnam(sys_get_temp_dir(), 'h02-capacity-');
-        self::assertIsString($path);
-        self::assertSame(strlen($contents), file_put_contents($path, $contents));
-
-        return $path;
-    }
-
-    private function assertCapacityFailure(callable $operation): void
+    private function assertRuntimeFailure(callable $operation): void
     {
         try {
             $operation();

@@ -46,7 +46,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        $responses[$this->key(['wsl.exe', '--status'])] = $this->response('', 'WSL unavailable', 1);
+        $responses[$this->key('wsl.exe -l -v')] = $this->response('', 'WSL unavailable', 1);
 
         $result = $this->runGate($responses, 'Windows', $commands);
 
@@ -74,9 +74,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        $responses[$this->key(['docker.exe', 'info', '--format', '{{json .}}'])] = $this->response(
-            json_encode(['OSType' => 'windows'], JSON_THROW_ON_ERROR),
-        );
+        $responses[$this->key(['docker.exe', 'info', '--format', '{{.OSType}}'])] = $this->response("windows\n");
 
         $result = $this->runGate($responses, 'Windows', $commands);
 
@@ -124,7 +122,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        $responses[$this->key(['wsl.exe', '--status'])] = $this->response('', '', 1, true, true);
+        $responses[$this->key('wsl.exe -l -v')] = $this->response('', '', 1, true, true);
 
         $result = $this->runGate($responses, 'Windows', $commands);
 
@@ -138,7 +136,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        unset($responses[$this->key(['wsl.exe', '--status'])]['timed_out']);
+        unset($responses[$this->key('wsl.exe -l -v')]['timed_out']);
 
         $result = $this->runGate($responses, 'Windows', $commands);
 
@@ -152,7 +150,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        $responses[$this->key(['wsl.exe', '--version'])] = $this->response();
+        $responses[$this->key('wsl.exe --version')] = $this->response();
 
         $result = $this->runGate($responses, 'Windows', $commands);
 
@@ -167,7 +165,7 @@ final class H02EnvironmentGateTest extends TestCase
         $commands = [];
         $responses = $this->greenResponses();
         $longSecretValue = str_repeat('x', 2500);
-        $responses[$this->key(['wsl.exe', '--status'])] = $this->response(
+        $responses[$this->key('wsl.exe -l -v')] = $this->response(
             str_repeat('status ', 500)."request path: /health\nPATH=C:\\private\\runtime-path\nTOKEN=secret-value\nTOKEN={$longSecretValue}\n路径",
             "request path: /stderr\nTOKEN=stderr-secret",
         );
@@ -196,7 +194,7 @@ final class H02EnvironmentGateTest extends TestCase
     {
         $commands = [];
         $responses = $this->greenResponses();
-        $responses[$this->key(['wsl.exe', '--status'])] = $this->response(
+        $responses[$this->key('wsl.exe -l -v')] = $this->response(
             "{\"Password\":\"json-secret\",\"Path\":\"C:\\\\private\\\\runtime\"}\n"
                 ."path=C:\\\\private\\\\lowercase\n"
                 ."path: C:\\\\private\\\\colon\n",
@@ -219,22 +217,68 @@ final class H02EnvironmentGateTest extends TestCase
         $mutatingVerbs = ['build', 'up', 'down', 'pull', 'run', 'start', 'stop', 'rm'];
 
         foreach ($commands as $entry) {
-            if (($entry['command'][0] ?? null) !== 'docker.exe') {
+            if (! is_array($entry['command']) || ($entry['command'][0] ?? null) !== 'docker.exe') {
                 continue;
             }
             self::assertEmpty(array_intersect($mutatingVerbs, array_map('strtolower', $entry['command'])));
         }
     }
 
+    public function test_direct_process_runner_preserves_the_first_terminal_exit_code(): void
+    {
+        $result = \h02EnvironmentGateRunProcess(
+            [PHP_BINARY, '-r', 'fwrite(STDOUT, "finished\\n"); exit(37);'],
+            dirname(__DIR__, 2),
+            H02_ENVIRONMENT_GATE_TIMEOUT_MS,
+        );
+
+        self::assertTrue($result['started']);
+        self::assertFalse($result['timed_out']);
+        self::assertSame(37, $result['exit_code']);
+        self::assertSame("finished\n", $result['stdout']);
+    }
+
+    public function test_direct_process_runner_preserves_success_exit_code(): void
+    {
+        $result = \h02EnvironmentGateRunProcess(
+            [PHP_BINARY, '-r', 'exit(0);'],
+            dirname(__DIR__, 2),
+            H02_ENVIRONMENT_GATE_TIMEOUT_MS,
+        );
+
+        self::assertTrue($result['started']);
+        self::assertFalse($result['timed_out']);
+        self::assertSame(0, $result['exit_code']);
+    }
+
+    public function test_direct_process_runner_preserves_userprofile_for_windows_cli_plugin_discovery(): void
+    {
+        $userProfile = getenv('USERPROFILE');
+        if (! is_string($userProfile) || $userProfile === '') {
+            self::markTestSkipped('USERPROFILE is only required by the Windows H-02 gate.');
+        }
+
+        $result = \h02EnvironmentGateRunProcess(
+            [PHP_BINARY, '-r', 'fwrite(STDOUT, getenv("USERPROFILE") ?: "");'],
+            dirname(__DIR__, 2),
+            H02_ENVIRONMENT_GATE_TIMEOUT_MS,
+        );
+
+        self::assertTrue($result['started']);
+        self::assertFalse($result['timed_out']);
+        self::assertSame(0, $result['exit_code']);
+        self::assertSame($userProfile, $result['stdout']);
+    }
+
     /**
      * @param array<string, array<string, mixed>> $responses
-     * @param list<array{command:list<string>,cwd:string,timeout_ms:int}> $commands
+     * @param list<array{command:list<string>|string,cwd:string,timeout_ms:int}> $commands
      * @return array<string, mixed>
      */
     private function runGate(array $responses, string $platform, array &$commands): array
     {
         $commands = [];
-        $runner = function (array $command, string $cwd, int $timeoutMs) use (&$responses, &$commands): array {
+        $runner = function (array|string $command, string $cwd, int $timeoutMs) use (&$responses, &$commands): array {
             $commands[] = [
                 'command' => $command,
                 'cwd' => $cwd,
@@ -255,8 +299,8 @@ final class H02EnvironmentGateTest extends TestCase
     private function greenResponses(): array
     {
         return [
-            $this->key(['wsl.exe', '--status']) => $this->response("Default Distribution: Ubuntu\n"),
-            $this->key(['wsl.exe', '--version']) => $this->response("WSL version: 2.7.8.0\n"),
+            $this->key('wsl.exe -l -v') => $this->response("NAME STATE VERSION\nUbuntu Stopped 2\n"),
+            $this->key('wsl.exe --version') => $this->response("WSL version: 2.7.8.0\n"),
             $this->key(['docker.exe', 'version', '--format', '{{json .}}']) => $this->response(
                 json_encode([
                     'Client' => ['Version' => '27.0.0'],
@@ -264,9 +308,7 @@ final class H02EnvironmentGateTest extends TestCase
                 ], JSON_THROW_ON_ERROR),
             ),
             $this->key(['docker.exe', 'compose', 'version']) => $this->response("Docker Compose version v2.29.0\n"),
-            $this->key(['docker.exe', 'info', '--format', '{{json .}}']) => $this->response(
-                json_encode(['OSType' => 'linux'], JSON_THROW_ON_ERROR),
-            ),
+            $this->key(['docker.exe', 'info', '--format', '{{.OSType}}']) => $this->response("linux\n"),
             $this->key([
                 'docker.exe',
                 'compose',
@@ -288,7 +330,7 @@ final class H02EnvironmentGateTest extends TestCase
             '-NoProfile',
             '-NonInteractive',
             '-Command',
-            '$ErrorActionPreference = "Stop"; $listeners = @(Get-NetTCPConnection -LocalPort 8892 -State Listen -ErrorAction Stop); [Console]::Out.WriteLine($listeners.Count)',
+            '$listeners = @([System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners() | Where-Object { $_.Port -eq 8892 }); [Console]::Out.WriteLine($listeners.Count)',
         ];
     }
 
@@ -309,8 +351,8 @@ final class H02EnvironmentGateTest extends TestCase
         ];
     }
 
-    /** @param list<string> $command */
-    private function key(array $command): string
+    /** @param list<string>|string $command */
+    private function key(array|string $command): string
     {
         return json_encode($command, JSON_THROW_ON_ERROR);
     }

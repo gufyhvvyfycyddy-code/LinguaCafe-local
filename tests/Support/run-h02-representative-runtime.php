@@ -11,6 +11,7 @@ use App\Services\WordSenseService;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 
+require_once __DIR__.'/H02RepresentativeFixtureSupport.php';
 require_once __DIR__.'/run-pab-r3-browser-acceptance.php';
 require_once __DIR__.'/run-h01-load-observability.php';
 
@@ -30,22 +31,11 @@ final class H02RepresentativeRuntimeFailure extends RuntimeException
  */
 function h02PrepareFixtureRows(int $vus): array
 {
-    if ($vus < 1 || $vus > 1000) {
-        throw new H02RepresentativeRuntimeFailure('H02_VUS_INVALID');
+    try {
+        return H02RepresentativeFixtureSupport::prepareRows($vus);
+    } catch (InvalidArgumentException $error) {
+        throw new H02RepresentativeRuntimeFailure($error->getMessage(), $error);
     }
-
-    $rows = [];
-    for ($index = 1; $index <= $vus; $index++) {
-        $suffix = sprintf('%03d', $index);
-        $rows[] = [
-            'email' => "h02-vu-{$suffix}@example.test",
-            'password' => "H02-testing-{$suffix}!",
-            'lemma' => "h02-vu-{$suffix}",
-            'language' => 'en',
-        ];
-    }
-
-    return $rows;
 }
 
 function h02CleanupFixtures(string $manifestPath): void
@@ -153,223 +143,31 @@ function h02ReadFixtureManifest(string $manifestPath, int $vus): array
  */
 function h02ProvisionDatabaseFixtures(array $fixtureRows): array
 {
-    return DB::transaction(function () use ($fixtureRows): array {
-        $fixtureState = [
-            'rows' => [],
-            'user_ids' => [],
-            'book_ids' => [],
-            'chapter_ids' => [],
-            'sense_ids' => [],
-            'review_card_ids' => [],
-        ];
-
-        foreach ($fixtureRows as $row) {
-            $user = User::factory()->create([
-                'email' => $row['email'],
-                'password' => $row['password'],
-                'selected_language' => $row['language'],
-                'is_admin' => false,
-            ]);
-
-            $book = Book::forceCreate([
-                'user_id' => $user->id,
-                'name' => "H02 {$row['lemma']} book",
-                'language' => $row['language'],
-                'word_count' => 1,
-            ]);
-
-            $chapter = Chapter::forceCreate([
-                'user_id' => $user->id,
-                'book_id' => $book->id,
-                'name' => "H02 {$row['lemma']} chapter",
-                'read_count' => 0,
-                'word_count' => 1,
-                'language' => $row['language'],
-                'raw_text' => "H02 {$row['lemma']} sentence.",
-                'unique_words' => json_encode([$row['lemma']], JSON_THROW_ON_ERROR),
-                'unique_word_ids' => '[]',
-                'processed_text' => gzcompress(json_encode([
-                    (object) [
-                        'word' => $row['lemma'],
-                        'stage' => 2,
-                        'spaceAfter' => true,
-                        'sentence_index' => 0,
-                    ],
-                ], JSON_THROW_ON_ERROR), 1),
-                'type' => 'text',
-                'subtitle_timestamps' => '[]',
-                'processing_status' => 'processed',
-            ]);
-
-            $sense = app(WordSenseService::class)->createSense([
-                'user_id' => $user->id,
-                'language' => $row['language'],
-                'language_id' => $row['language'],
-                'lemma' => $row['lemma'],
-                'surface_form' => $row['lemma'],
-                'pos' => 'noun',
-                'sense_zh' => "H02 {$row['lemma']}",
-                'sense_en' => "H02 {$row['lemma']}",
-                'example_sentence_en' => "H02 {$row['lemma']} sentence.",
-                'source_chapter_id' => $chapter->id,
-                'sentence_id' => '0',
-                'status' => WordSense::STATUS_CONFIRMED,
-            ]);
-
-            $reviewCard = app(ReviewCardService::class)->ensureSenseCard($sense);
-            if ($reviewCard === null) {
-                throw new H02RepresentativeRuntimeFailure('H02_FIXTURE_CARD_CREATE_FAILED');
-            }
-
-            $fixtureState['rows'][] = [
-                'email' => $row['email'],
-                'password' => $row['password'],
-                'chapter_id' => $chapter->id,
-                'lemma' => $row['lemma'],
-                'language' => $row['language'],
-                'review_card_id' => $reviewCard->id,
-            ];
-            $fixtureState['user_ids'][] = $user->id;
-            $fixtureState['book_ids'][] = $book->id;
-            $fixtureState['chapter_ids'][] = $chapter->id;
-            $fixtureState['sense_ids'][] = $sense->id;
-            $fixtureState['review_card_ids'][] = $reviewCard->id;
-        }
-
-        $userIds = $fixtureState['user_ids'];
-        $reviewCardIds = $fixtureState['review_card_ids'];
-        if (count($userIds) !== count(array_unique($userIds))
-            || count($reviewCardIds) !== count(array_unique($reviewCardIds))
-        ) {
-            throw new H02RepresentativeRuntimeFailure('H02_FIXTURE_IDENTITY_DUPLICATE');
-        }
-
-        return $fixtureState;
-    });
+    try {
+        return H02RepresentativeFixtureSupport::provision($fixtureRows);
+    } catch (RuntimeException $error) {
+        throw new H02RepresentativeRuntimeFailure($error->getMessage(), $error);
+    }
 }
 
 function h02CleanupDatabaseFixtures(array $fixtureState): void
 {
-    $userIds = array_values(array_unique(array_map('intval', $fixtureState['user_ids'] ?? [])));
-    $bookIds = array_values(array_unique(array_map('intval', $fixtureState['book_ids'] ?? [])));
-    $chapterIds = array_values(array_unique(array_map('intval', $fixtureState['chapter_ids'] ?? [])));
-    $senseIds = array_values(array_unique(array_map('intval', $fixtureState['sense_ids'] ?? [])));
-    $reviewCardIds = array_values(array_unique(array_map('intval', $fixtureState['review_card_ids'] ?? [])));
-
-    if ($reviewCardIds !== []) {
-        ReviewLog::whereIn('review_card_id', $reviewCardIds)->delete();
-        ReviewCard::whereIn('id', $reviewCardIds)->delete();
-    }
-    if ($senseIds !== []) {
-        WordSense::whereIn('id', $senseIds)->delete();
-    }
-    if ($chapterIds !== []) {
-        Chapter::whereIn('id', $chapterIds)->delete();
-    }
-    if ($bookIds !== []) {
-        Book::whereIn('id', $bookIds)->delete();
-    }
-    if ($userIds !== []) {
-        User::whereIn('id', $userIds)->delete();
-    }
-
-    if (($userIds !== [] && User::whereIn('id', $userIds)->exists())
-        || ($reviewCardIds !== [] && ReviewCard::whereIn('id', $reviewCardIds)->exists())
-    ) {
-        throw new H02RepresentativeRuntimeFailure('H02_FIXTURE_CLEANUP_UNPROVEN');
-    }
-}
-
-function h02CurrentGitHead(string $projectRoot): string
-{
-    $process = @proc_open(
-        ['git', '-C', $projectRoot, 'rev-parse', 'HEAD'],
-        [
-            0 => ['pipe', 'r'],
-            1 => ['pipe', 'w'],
-            2 => ['pipe', 'w'],
-        ],
-        $pipes,
-        null,
-        null,
-        ['bypass_shell' => true],
-    );
-    if (! is_resource($process)) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_GIT_HEAD_INVALID');
-    }
-
-    if (is_resource($pipes[0] ?? null)) {
-        fclose($pipes[0]);
-    }
-    $stdout = is_resource($pipes[1] ?? null) ? stream_get_contents($pipes[1]) : false;
-    if (is_resource($pipes[1] ?? null)) {
-        fclose($pipes[1]);
-    }
-    if (is_resource($pipes[2] ?? null)) {
-        stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-    }
-
-    $exitCode = proc_close($process);
-    $head = is_string($stdout) ? trim($stdout) : '';
-    if ($exitCode !== 0 || preg_match('/\A[0-9a-f]{40}\z/i', $head) !== 1) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_GIT_HEAD_INVALID');
-    }
-
-    return $head;
-}
-
-function h02ReadCapacityProof(string $proofPath, string $projectRoot, string $baseUrl): array
-{
-    if ($proofPath === '' || ! is_file($proofPath) || ! is_readable($proofPath)) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISSING');
-    }
-
-    $contents = @file_get_contents($proofPath);
-    if ($contents === false) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISSING');
-    }
-
     try {
-        $proof = json_decode($contents, true, flags: JSON_THROW_ON_ERROR);
-    } catch (Throwable $error) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID', $error);
+        H02RepresentativeFixtureSupport::cleanup($fixtureState);
+    } catch (RuntimeException $error) {
+        throw new H02RepresentativeRuntimeFailure($error->getMessage(), $error);
     }
-    if (! is_array($proof)) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID');
-    }
-
-    if (($proof['schema_version'] ?? null) !== 1
-        || ($proof['git_head'] ?? null) !== h02CurrentGitHead($projectRoot)
-        || ($proof['base_url'] ?? null) !== $baseUrl
-        || ($proof['server_profile'] ?? null) !== 'docker_apache_testing'
-        || ($proof['capacity_representative'] ?? null) !== true
-    ) {
-        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_MISMATCH');
-    }
-
-    return $proof;
 }
 
-/** @return array{server_profile:string,capacity_representative:bool} */
-function h02ResolveCapacityRuntime(?string $proofPath, int $vus, string $projectRoot, string $baseUrl): array
+function h02ResolveSmokeRuntime(int $vus): array
 {
-    if ($proofPath === null || $proofPath === '') {
-        if ($vus >= 100) {
-            throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_REQUIRED');
-        }
-
-        return [
-            'server_profile' => 'external_apache_testing_runtime',
-            'capacity_representative' => false,
-        ];
+    if ($vus >= 100) {
+        throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_REQUIRES_DOCKER_LADDER');
     }
-
-    $proof = h02ReadCapacityProof($proofPath, $projectRoot, $baseUrl);
 
     return [
-        'server_profile' => $proof['server_profile'],
-        'capacity_representative' => $proof['capacity_representative'],
+        'server_profile' => 'external_apache_testing_runtime',
+        'capacity_representative' => false,
     ];
 }
 
@@ -448,7 +246,7 @@ function h02ParseRuntimeArguments(array $arguments): array
     return $options;
 }
 
-/** @return array{port:int,vus:int,duration:string,sample_ms:int,wait_ms:int,fixture_path:string,capacity_proof:?string} */
+/** @return array{port:int,vus:int,duration:string,sample_ms:int,wait_ms:int,fixture_path:string} */
 function h02ParseMeasurementArguments(array $arguments): array
 {
     if (($arguments[1] ?? null) !== '--measure') {
@@ -456,7 +254,6 @@ function h02ParseMeasurementArguments(array $arguments): array
     }
 
     $fixturePath = '';
-    $capacityProof = null;
     $runArguments = [$arguments[0] ?? 'h02-runner.php'];
     foreach (array_slice($arguments, 2) as $argument) {
         if (! is_string($argument)) {
@@ -464,13 +261,6 @@ function h02ParseMeasurementArguments(array $arguments): array
         }
         if (str_starts_with($argument, '--fixture-file=')) {
             $fixturePath = substr($argument, strlen('--fixture-file='));
-            continue;
-        }
-        if (str_starts_with($argument, '--capacity-proof=')) {
-            $capacityProof = substr($argument, strlen('--capacity-proof='));
-            if ($capacityProof === '') {
-                throw new H02RepresentativeRuntimeFailure('H02_CAPACITY_PROOF_INVALID');
-            }
             continue;
         }
         $runArguments[] = $argument;
@@ -482,10 +272,7 @@ function h02ParseMeasurementArguments(array $arguments): array
 
     return array_merge(
         h02ParseRuntimeArguments($runArguments),
-        [
-            'fixture_path' => $fixturePath,
-            'capacity_proof' => $capacityProof,
-        ],
+        ['fixture_path' => $fixturePath],
     );
 }
 
@@ -534,7 +321,7 @@ function h02RunMeasurement(array $options, array $fixtureRows): int
     $queueDriver = (string) config("queue.connections.{$queueConnection}.driver", 'unknown');
     $queueName = (string) (config("queue.connections.{$queueConnection}.queue") ?: 'default');
     $baseUrl = 'http://127.0.0.1:'.$options['port'];
-    $capacityRuntime = h02ResolveCapacityRuntime($options['capacity_proof'] ?? null, $options['vus'], $projectRoot, $baseUrl);
+    $capacityRuntime = h02ResolveSmokeRuntime($options['vus']);
     $startedAt = microtime(true);
     $fixtureState = null;
     $child = null;

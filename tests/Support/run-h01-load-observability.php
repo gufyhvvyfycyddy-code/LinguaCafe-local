@@ -4,7 +4,8 @@ use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
 
-require_once __DIR__.'/../bootstrap.php';
+require_once dirname(__DIR__, 2).'/vendor/autoload.php';
+require_once __DIR__.'/H01ObservabilitySampleSupport.php';
 require_once __DIR__.'/run-pab-r3-browser-acceptance.php';
 
 final class H01LoadObservabilityFailure extends RuntimeException
@@ -199,7 +200,7 @@ final class H01LoadObservabilityHarness
         return [
             'schema_version' => self::SCHEMA_VERSION,
             'tool' => 'linguacafe-h01-load-observability',
-            'scenario' => 'h01_sentinel_smoke',
+            'scenario' => $runtime['scenario'] ?? 'h01_sentinel_smoke',
             'runtime' => $runtime,
             'elapsed_seconds' => round($elapsedSeconds, 3),
             'sample_count' => count($samples),
@@ -338,34 +339,11 @@ function h01ReadSentinel(string $url): array
 /** @return array{threads_connected:int,threads_running:int,queue_backlog:int,timestamp_ms:int} */
 function h01CollectSample(string $queueConnection, string $queueName): array
 {
-    $statusRows = DB::select("SHOW GLOBAL STATUS WHERE Variable_name IN ('Threads_connected', 'Threads_running')");
-    $status = [];
-    foreach ($statusRows as $row) {
-        $name = $row->Variable_name ?? $row->variable_name ?? null;
-        $value = $row->Value ?? $row->value ?? null;
-        if (is_string($name) && is_numeric($value)) {
-            $status[$name] = (int) $value;
-        }
-    }
-    if (! isset($status['Threads_connected'], $status['Threads_running'])) {
-        throw new H01LoadObservabilityFailure('H01_MYSQL_STATUS_UNAVAILABLE');
-    }
-
     try {
-        $queueBacklog = Queue::connection($queueConnection)->size($queueName);
-    } catch (Throwable $error) {
-        throw new H01LoadObservabilityFailure('H01_QUEUE_BACKLOG_UNAVAILABLE', $error);
+        return H01ObservabilitySampleSupport::collect($queueConnection, $queueName);
+    } catch (RuntimeException $error) {
+        throw new H01LoadObservabilityFailure($error->getMessage(), $error);
     }
-    if (! is_int($queueBacklog) && ! is_numeric($queueBacklog)) {
-        throw new H01LoadObservabilityFailure('H01_QUEUE_BACKLOG_INVALID');
-    }
-
-    return [
-        'timestamp_ms' => (int) round(microtime(true) * 1000),
-        'threads_connected' => $status['Threads_connected'],
-        'threads_running' => $status['Threads_running'],
-        'queue_backlog' => (int) $queueBacklog,
-    ];
 }
 
 function h01RunK6AndSample(
@@ -443,12 +421,19 @@ function h01K6Version(string $k6Executable, string $projectRoot, array $environm
 
 function h01RemoveTempDirectory(string $directory): void
 {
-    foreach (glob(rtrim($directory, '\\/').DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
-        if (is_file($path)) {
-            @unlink($path);
+    $deadline = microtime(true) + 1.0;
+    do {
+        foreach (glob(rtrim($directory, '\\/').DIRECTORY_SEPARATOR.'*') ?: [] as $path) {
+            if (is_file($path)) {
+                @unlink($path);
+            }
         }
-    }
-    @rmdir($directory);
+        clearstatcache(true, $directory);
+        if (! is_dir($directory) || @rmdir($directory)) {
+            return;
+        }
+        usleep(50_000);
+    } while (microtime(true) < $deadline);
 }
 
 function runH01LoadObservabilityCli(array $arguments): int
@@ -596,5 +581,6 @@ if (is_string($scriptPath)
     && realpath($scriptPath) !== false
     && realpath($scriptPath) === realpath(__FILE__)
 ) {
+    require_once __DIR__.'/../bootstrap.php';
     exit(runH01LoadObservabilityCli($argv));
 }

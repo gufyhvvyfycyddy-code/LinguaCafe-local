@@ -3,19 +3,34 @@ import { check } from 'k6';
 import exec from 'k6/execution';
 import { SharedArray } from 'k6/data';
 
+export function splitScenarioVus(totalVus) {
+    if (!Number.isInteger(totalVus) || totalVus < 1) {
+        throw new Error('H02_INVALID_VUS: H02_VUS must be an integer >= 1');
+    }
+
+    const perScenarioVus = Math.floor(totalVus / 3);
+    const remainder = totalVus % 3;
+
+    return [0, 1, 2].map((index) => perScenarioVus + (index < remainder ? 1 : 0));
+}
+
 const baseUrl = (__ENV.H02_BASE_URL || '').replace(/\/$/, '');
-const vus = Number.parseInt(__ENV.H02_VUS || '1', 10);
+const summaryPath = __ENV.H02_K6_SUMMARY_PATH || 'h02-k6-summary.json';
+const vus = Number(__ENV.H02_VUS || '1');
+const [readingVus, lookupVus, senseReviewVus] = splitScenarioVus(vus);
 
 if (!baseUrl) {
     throw new Error('H02_BASE_URL is required');
 }
 
 const fixtures = new SharedArray('h02-representative-fixtures', function () {
-    if (!__ENV.H02_FIXTURES_JSON) {
-        throw new Error('H02_FIXTURES_JSON is required');
+    const fixturesJson = __ENV.H02_FIXTURES_JSON || '';
+    const fixturesPath = __ENV.H02_FIXTURES_PATH || '';
+    if ((fixturesJson === '') === (fixturesPath === '')) {
+        throw new Error('Exactly one of H02_FIXTURES_JSON or H02_FIXTURES_PATH is required');
     }
 
-    return JSON.parse(__ENV.H02_FIXTURES_JSON);
+    return JSON.parse(fixturesPath !== '' ? open(fixturesPath) : fixturesJson);
 });
 
 function fixtureForCurrentVu() {
@@ -41,15 +56,12 @@ function login(fixture) {
         throw new Error(`GET /login failed with status ${loginPage.status}`);
     }
 
-    const tokenMatch = loginPage.body.match(
-        /<meta[^>]*name=["']csrf-token["'][^>]*content=["']([^"']+)["']/i
-    );
-
-    if (!tokenMatch) {
-        throw new Error('CSRF token was not found on the login page');
+    const loginXsrfCookies = loginPage.cookies['XSRF-TOKEN'] || [];
+    if (!loginXsrfCookies[0] || !loginXsrfCookies[0].value) {
+        throw new Error('XSRF-TOKEN cookie was not found on the login page');
     }
 
-    const csrfToken = tokenMatch[1];
+    const csrfToken = decodeURIComponent(loginXsrfCookies[0].value);
     const loginResponse = http.post(`${baseUrl}/login`, JSON.stringify({
         email: fixture.email,
         password: fixture.password,
@@ -59,7 +71,7 @@ function login(fixture) {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken,
+            'X-XSRF-TOKEN': csrfToken,
         },
         tags: { flow: 'h02_login' },
     });
@@ -84,16 +96,19 @@ function requestParams(flow, csrfToken) {
             Accept: 'application/json',
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRF-TOKEN': csrfToken,
+            'X-XSRF-TOKEN': csrfToken,
         },
         tags: { flow },
     };
 }
 
 function assertSuccessful(response, label) {
-    check(response, {
+    if (!check(response, {
         [label]: (result) => result.status >= 200 && result.status < 300,
-    });
+    })) {
+        const body = String(response.body || '').replace(/\s+/g, ' ').slice(0, 500);
+        throw new Error(`${label}: status ${response.status}; body ${body}`);
+    }
 }
 
 export function reading() {
@@ -129,25 +144,44 @@ export function senseReview() {
     assertSuccessful(response, 'sense review rating succeeds');
 }
 
+const scenarios = {};
+
+if (readingVus > 0) {
+    scenarios.reading = {
+        executor: 'per-vu-iterations',
+        vus: readingVus,
+        iterations: 1,
+        exec: 'reading',
+    };
+}
+if (lookupVus > 0) {
+    scenarios.lookup = {
+        executor: 'per-vu-iterations',
+        vus: lookupVus,
+        iterations: 1,
+        exec: 'lookup',
+    };
+}
+if (senseReviewVus > 0) {
+    scenarios.senseReview = {
+        executor: 'per-vu-iterations',
+        vus: senseReviewVus,
+        iterations: 1,
+        exec: 'senseReview',
+    };
+}
+
 export const options = {
-    scenarios: {
-        reading: {
-            executor: 'per-vu-iterations',
-            vus,
-            iterations: 1,
-            exec: 'reading',
-        },
-        lookup: {
-            executor: 'per-vu-iterations',
-            vus,
-            iterations: 1,
-            exec: 'lookup',
-        },
-        senseReview: {
-            executor: 'per-vu-iterations',
-            vus,
-            iterations: 1,
-            exec: 'senseReview',
-        },
+    scenarios,
+    summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(90)', 'p(95)', 'p(99)', 'count'],
+    thresholds: {
+        http_req_failed: ['rate==0'],
+        checks: ['rate==1'],
     },
 };
+
+export function handleSummary(data) {
+    return {
+        [summaryPath]: JSON.stringify(data, null, 2),
+    };
+}

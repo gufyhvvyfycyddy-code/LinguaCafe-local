@@ -28,7 +28,7 @@ return new class extends Migration
         Schema::create('reading_inline_sense_confirmations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->index();
-            $table->string('language')->index();
+            $table->string('language', 64)->index();
             $table->unsignedBigInteger('chapter_id')->nullable()->index();
             $table->integer('sentence_index')->nullable();
             $table->string('sentence_hash')->nullable();

@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->unsignedBigInteger('user_id')->index();
             $table->string('language')->index();
-            $table->string('language_id')->index();
+            $table->string('language_id', 64)->index();
             $table->unsignedBigInteger('chapter_id')->index();
             $table->unsignedInteger('text_block_index')->index();
             $table->unsignedInteger('sentence_index')->nullable()->index();
@@ -23,7 +23,7 @@ return new class extends Migration
             $table->string('lemma')->nullable()->index();
             $table->text('sentence_text')->nullable();
             $table->json('source_payload')->nullable();
-            $table->string('status')->default('pending')->index();
+            $table->string('status', 32)->default('pending')->index();
             $table->timestamps();
 
             $table->unique(
