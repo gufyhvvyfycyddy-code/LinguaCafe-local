@@ -38,12 +38,14 @@ class ReviewQueueOrderTimezoneTest extends TestCase
     private User $user;
     private string $language = 'english';
     private ?string $originalTz = null;
+    private ?string $originalPhpTz = null;
 
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->originalTz = config('app.timezone');
+        $this->originalPhpTz = date_default_timezone_get();
 
         $this->user = User::forceCreate([
             'name' => 'TZ Test',
@@ -62,6 +64,9 @@ class ReviewQueueOrderTimezoneTest extends TestCase
         if ($this->originalTz !== null) {
             config(['app.timezone' => $this->originalTz]);
         }
+        if ($this->originalPhpTz !== null) {
+            date_default_timezone_set($this->originalPhpTz);
+        }
         parent::tearDown();
     }
 
@@ -70,6 +75,7 @@ class ReviewQueueOrderTimezoneTest extends TestCase
     private function setTimezone(string $tz): void
     {
         config(['app.timezone' => $tz]);
+        date_default_timezone_set($tz);
     }
 
     private function createSense(string $lemma, string $pos = 'noun'): WordSense

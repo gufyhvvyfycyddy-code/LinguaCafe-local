@@ -7,24 +7,24 @@
     "require": {
         "php": "^8.2",
         "dompdf/dompdf": "^3.1.6",
-        "laravel/framework": "^11.9",
-        "laravel/horizon": "^5.25",
-        "laravel/reverb": "@beta",
-        "laravel/sanctum": "^4.0",
-        "laravel/tinker": "^2.9",
-        "laravel/ui": "^4.5",
+        "laravel/framework": "^12.0",
+        "laravel/horizon": "^5.48.3",
+        "laravel/reverb": "^1.11.1",
+        "laravel/sanctum": "^4.3.3",
+        "laravel/tinker": "^3.0.2",
+        "laravel/ui": "^4.6.3",
         "league/csv": "^9.16.0",
         "predis/predis": "^2.0",
         "pusher/pusher-php-server": "^7.2.4"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
-        "laravel/breeze": "^2.1",
+        "laravel/breeze": "^2.4.2",
         "laravel/pint": "^1.13",
-        "laravel/sail": "^1.26",
+        "laravel/sail": "^1.67.0",
         "mockery/mockery": "^1.6",
-        "nunomaduro/collision": "^8.0",
-        "phpunit/phpunit": "^11.0.1"
+        "nunomaduro/collision": "^8.9.5",
+        "phpunit/phpunit": "^11.5.50"
     },
     "autoload": {
         "psr-4": {
