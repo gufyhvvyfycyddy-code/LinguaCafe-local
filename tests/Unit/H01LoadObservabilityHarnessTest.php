@@ -140,6 +140,20 @@ final class H01LoadObservabilityHarnessTest extends TestCase
                     'p(99)' => 25.0,
                     'max' => 30.0,
                 ]],
+                'h03_login_page_duration' => ['values' => [
+                    'count' => 10,
+                    'avg' => 8.0,
+                    'p(95)' => 12.0,
+                    'p(99)' => 14.0,
+                    'max' => 15.0,
+                ]],
+                'h03_reading_duration' => ['values' => [
+                    'count' => 4,
+                    'avg' => 5.0,
+                    'p(95)' => 7.0,
+                    'p(99)' => 8.0,
+                    'max' => 9.0,
+                ]],
             ],
         ];
         $samples = [
@@ -158,6 +172,20 @@ final class H01LoadObservabilityHarnessTest extends TestCase
         $this->assertSame(120, $summary['http']['requests']);
         $this->assertSame(20.0, $summary['http']['duration_ms']['p95']);
         $this->assertSame(25.0, $summary['http']['duration_ms']['p99']);
+        $this->assertSame([
+            'count' => 10,
+            'avg' => 8.0,
+            'p95' => 12.0,
+            'p99' => 14.0,
+            'max' => 15.0,
+        ], $summary['http']['flow_duration_ms']['login_page']);
+        $this->assertSame([
+            'count' => 4,
+            'avg' => 5.0,
+            'p95' => 7.0,
+            'p99' => 8.0,
+            'max' => 9.0,
+        ], $summary['http']['flow_duration_ms']['reading']);
         $this->assertSame(5, $summary['mysql']['threads_connected']['max']);
         $this->assertSame(1, $summary['queue']['backlog']['max']);
         $this->assertSame(0, $summary['errors']['laravel_error_entries']);
@@ -166,6 +194,10 @@ final class H01LoadObservabilityHarnessTest extends TestCase
         $runtime['scenario'] = 'h02_representative_reading_lookup_sense_review';
         $overridden = H01LoadObservabilityHarness::buildFinalSummary($k6, $samples, $runtime, 0, 3.25);
         $this->assertSame('h02_representative_reading_lookup_sense_review', $overridden['scenario']);
+
+        unset($k6['metrics']['h03_login_page_duration'], $k6['metrics']['h03_reading_duration']);
+        $withoutFlowMetrics = H01LoadObservabilityHarness::buildFinalSummary($k6, $samples, $runtime, 0, 3.25);
+        $this->assertSame([], $withoutFlowMetrics['http']['flow_duration_ms']);
     }
 
     public function test_final_summary_fails_closed_when_required_k6_metrics_are_missing(): void

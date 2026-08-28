@@ -197,6 +197,31 @@ final class H01LoadObservabilityHarness
             throw new H01LoadObservabilityFailure('H01_K6_REQUIRED_METRIC_MISSING');
         }
 
+        $flowDurationMetrics = [
+            'login_page' => 'h03_login_page_duration',
+            'login_post' => 'h03_login_post_duration',
+            'reading' => 'h03_reading_duration',
+            'lookup' => 'h03_lookup_duration',
+            'sense_review' => 'h03_sense_review_duration',
+        ];
+        $flowDurations = [];
+        foreach ($flowDurationMetrics as $flow => $metric) {
+            if (! isset($k6Summary['metrics'][$metric])) {
+                continue;
+            }
+            $values = [
+                'count' => self::k6MetricValue($k6Summary, $metric, 'count'),
+                'avg' => self::k6MetricValue($k6Summary, $metric, 'avg'),
+                'p95' => self::k6MetricValue($k6Summary, $metric, 'p(95)'),
+                'p99' => self::k6MetricValue($k6Summary, $metric, 'p(99)'),
+                'max' => self::k6MetricValue($k6Summary, $metric, 'max'),
+            ];
+            if (in_array(null, $values, true)) {
+                throw new H01LoadObservabilityFailure('H01_K6_FLOW_METRIC_INVALID');
+            }
+            $flowDurations[$flow] = $values;
+        }
+
         return [
             'schema_version' => self::SCHEMA_VERSION,
             'tool' => 'linguacafe-h01-load-observability',
@@ -214,6 +239,7 @@ final class H01LoadObservabilityHarness
                     'p99' => $requiredMetrics['p99'],
                     'max' => $requiredMetrics['max'],
                 ],
+                'flow_duration_ms' => $flowDurations,
             ],
             'mysql' => [
                 'threads_connected' => self::summarizeSeries($samples, 'threads_connected'),

@@ -2,6 +2,7 @@ import http from 'k6/http';
 import { check } from 'k6';
 import exec from 'k6/execution';
 import { SharedArray } from 'k6/data';
+import { Trend } from 'k6/metrics';
 
 export function splitScenarioVus(totalVus) {
     if (!Number.isInteger(totalVus) || totalVus < 1) {
@@ -16,6 +17,11 @@ export function splitScenarioVus(totalVus) {
 
 const baseUrl = (__ENV.H02_BASE_URL || '').replace(/\/$/, '');
 const summaryPath = __ENV.H02_K6_SUMMARY_PATH || 'h02-k6-summary.json';
+const loginPageDuration = new Trend('h03_login_page_duration', true);
+const loginPostDuration = new Trend('h03_login_post_duration', true);
+const readingDuration = new Trend('h03_reading_duration', true);
+const lookupDuration = new Trend('h03_lookup_duration', true);
+const senseReviewDuration = new Trend('h03_sense_review_duration', true);
 const vus = Number(__ENV.H02_VUS || '1');
 const [readingVus, lookupVus, senseReviewVus] = splitScenarioVus(vus);
 
@@ -49,6 +55,7 @@ function login(fixture) {
         headers: { Accept: 'text/html' },
         tags: { flow: 'h02_login_page' },
     });
+    loginPageDuration.add(loginPage.timings.duration);
 
     if (!check(loginPage, {
         'login page loads': (response) => response.status === 200,
@@ -75,6 +82,7 @@ function login(fixture) {
         },
         tags: { flow: 'h02_login' },
     });
+    loginPostDuration.add(loginResponse.timings.duration);
 
     if (!check(loginResponse, {
         'web login succeeds': (response) => response.status >= 200 && response.status < 400,
@@ -119,6 +127,7 @@ export function reading() {
         JSON.stringify({ chapterId: fixture.chapter_id }),
         requestParams('h02_reading', csrfToken)
     );
+    readingDuration.add(response.timings.duration);
 
     assertSuccessful(response, 'reading request succeeds');
 }
@@ -128,6 +137,7 @@ export function lookup() {
     const csrfToken = login(fixture);
     const lookupUrl = `${baseUrl}/senses/known-sense-lookup?lemma=${encodeURIComponent(fixture.lemma)}&language=${encodeURIComponent(fixture.language)}`;
     const response = http.get(lookupUrl, requestParams('h02_lookup', csrfToken));
+    lookupDuration.add(response.timings.duration);
 
     assertSuccessful(response, 'lookup request succeeds');
 }
@@ -140,6 +150,7 @@ export function senseReview() {
         JSON.stringify({ rating: 'good' }),
         requestParams('h02_sense_review', csrfToken)
     );
+    senseReviewDuration.add(response.timings.duration);
 
     assertSuccessful(response, 'sense review rating succeeds');
 }
