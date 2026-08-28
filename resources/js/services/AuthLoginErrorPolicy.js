@@ -15,6 +15,10 @@ export function resolveLoginError(error) {
         return '请检查邮箱和密码格式。';
     }
 
+    if (status === 429 || code === 'LOGIN_RATE_LIMITED') {
+        return '登录尝试次数过多，请稍后再试。';
+    }
+
     if (status === 503 && code === 'RESTORE_WRITE_FENCE_ACTIVE') {
         return '系统正在恢复数据，请稍后再登录。';
     }

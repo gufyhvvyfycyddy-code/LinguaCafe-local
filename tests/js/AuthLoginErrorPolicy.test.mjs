@@ -29,6 +29,15 @@ test('validation failures use an input-specific message', () => {
     assert.equal(resolveLoginError({ response: { status: 422, data: {} } }), '请检查邮箱和密码格式。');
 });
 
+test('rate limited login has a generic retry-later message', () => {
+    assert.equal(resolveLoginError({
+        response: {
+            status: 429,
+            data: { error: { code: 'LOGIN_RATE_LIMITED' } },
+        },
+    }), '登录尝试次数过多，请稍后再试。');
+});
+
 test('database recovery has an actionable message', () => {
     assert.equal(resolveLoginError({
         response: {

@@ -13,6 +13,20 @@
             <v-card-text class="pt-4 pb-6">
                 <v-form v-model="isFormValid" ref="userForm">
                     <template>
+                        <label class="font-weight-bold">当前密码</label>
+                        <v-text-field
+                            v-model="currentPassword"
+                            type="password"
+                            filled
+                            dense
+                            rounded
+                            placeholder="当前密码"
+                            maxlength="32"
+                            :rules="[rules.currentPassword]"
+                            :disabled="saving"
+                            autocomplete="current-password"
+                        ></v-text-field>
+
                         <!-- Password -->
                         <label class="font-weight-bold">新密码</label>
                         <v-text-field
@@ -102,11 +116,13 @@
             return {
                 isFormValid: false,
                 saving: false,
+                currentPassword: '',
                 password: '',
                 passwordConfirmation: '',
                 saveResult: '',
 
                 rules: {
+                    currentPassword: value => value.length > 0 || '请输入当前密码。',
                     password: value => {
                         if (value.length < 8 || value.length > 32) {
                             return '密码长度必须在 8 到 32 个字符之间。';
@@ -130,6 +146,7 @@
 
                 this.saving = true;
                 axios.post('/users/update-password', {
+                    current_password: this.currentPassword,
                     password: this.password,
                     password_confirmation: this.passwordConfirmation
                 }).then((response) => {

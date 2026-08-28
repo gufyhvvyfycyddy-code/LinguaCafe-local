@@ -79,10 +79,10 @@
                         </v-alert>
 
                         <label class="font-weight-bold">邮箱</label>
-                        <v-text-field v-model="email" rounded filled dense name="linguacafe-email" placeholder="邮箱" :rules="[rules.email]" @keyup.enter="login" />
+                        <v-text-field v-model="email" rounded filled dense name="linguacafe-email" placeholder="邮箱" autocomplete="username" :rules="[rules.email]" @keyup.enter="login" />
 
                         <label class="font-weight-bold">密码</label>
-                        <v-text-field v-model="password" rounded filled dense type="password" name="linguacafe-password" placeholder="密码" :rules="[rules.requiredPassword]" @keyup.enter="login" />
+                        <v-text-field v-model="password" rounded filled dense type="password" name="linguacafe-password" placeholder="密码" autocomplete="current-password" :rules="[rules.requiredPassword]" @keyup.enter="login" />
                     </v-form>
                 </template>
 
@@ -138,13 +138,13 @@ const AccountForm = {
     template: `
         <v-form :value="value" @input="$emit('input', $event)">
             <label class="font-weight-bold">邮箱</label>
-            <v-text-field :value="email" @input="$emit('update:email', $event)" rounded filled dense placeholder="邮箱" :rules="[rules.email]" :disabled="disabled" />
+            <v-text-field :value="email" @input="$emit('update:email', $event)" rounded filled dense placeholder="邮箱" autocomplete="email" :rules="[rules.email]" :disabled="disabled" />
 
             <label class="font-weight-bold">密码</label>
-            <v-text-field :value="password" @input="$emit('update:password', $event)" rounded filled dense type="password" placeholder="密码" :rules="[rules.password]" :disabled="disabled" />
+            <v-text-field :value="password" @input="$emit('update:password', $event)" rounded filled dense type="password" placeholder="密码" autocomplete="new-password" :rules="[rules.password]" :disabled="disabled" />
 
             <label class="font-weight-bold">确认密码</label>
-            <v-text-field :value="passwordConfirmation" @input="$emit('update:passwordConfirmation', $event)" rounded filled dense type="password" placeholder="确认密码" :rules="[rules.passwordMatch(password)]" :disabled="disabled" @keyup.enter="$emit('submit')" />
+            <v-text-field :value="passwordConfirmation" @input="$emit('update:passwordConfirmation', $event)" rounded filled dense type="password" placeholder="确认密码" autocomplete="new-password" :rules="[rules.passwordMatch(password)]" :disabled="disabled" @keyup.enter="$emit('submit')" />
         </v-form>
     `,
     methods: {

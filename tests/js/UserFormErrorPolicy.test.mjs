@@ -63,3 +63,11 @@ test('user dialogs use the shared policy and do not render server text as HTML',
         assert.doesNotMatch(source, /v-html=/);
     }
 });
+
+test('password change visibly requires the current password and sends it to the protected endpoint', () => {
+    assert.match(changePasswordSource, /v-model="currentPassword"/);
+    assert.match(changePasswordSource, /autocomplete="current-password"/);
+    assert.match(changePasswordSource, /current_password:\s*this\.currentPassword/);
+    assert.match(changePasswordSource, /请输入当前密码/);
+
+});

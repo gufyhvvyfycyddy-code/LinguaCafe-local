@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 // request classes
+use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Users\CreateUserRequest;
 use App\Http\Requests\Users\UpdateUserRequest;
 use App\Http\Requests\Users\UpdatePasswordRequest;
-use App\Http\Requests\Users\AuthenticateUserRequest;
 
 class UserController extends Controller {
     private $userService;
@@ -80,27 +80,13 @@ class UserController extends Controller {
         ]);
     }
     
-    public function authenticateUser(AuthenticateUserRequest $request) 
+    public function authenticateUser(LoginRequest $request)
     {
-        $email = $request->post('email');
-        $password = $request->post('password');
+        $request->authenticate();
+        $request->session()->regenerate();
+        Auth::logoutOtherDevices((string) $request->input('password'));
 
-        if (Auth::attempt([
-            'email' => $email,
-            'password' => $password,
-        ])) {
-            $request->session()->regenerate();
-            Auth::logoutOtherDevices($password);
- 
-            return response()->json('User has been logged in successfully.', 200);
-        } else {
-            return response()->json([
-                'error' => [
-                    'code' => 'INVALID_CREDENTIALS',
-                    'message' => 'The email or password is incorrect.',
-                ],
-            ], 401);
-        }
+        return response()->json('User has been logged in successfully.', 200);
     }
 
     public function updatePassword(UpdatePasswordRequest $request) 
