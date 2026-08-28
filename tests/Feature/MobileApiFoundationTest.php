@@ -166,6 +166,14 @@ class MobileApiFoundationTest extends TestCase
         $this->withToken($token)
             ->getJson('/api/v1/mobile/bootstrap')
             ->assertUnauthorized();
+
+        $this->app['auth']->forgetGuards();
+        $this->withToken($token)
+            ->postJson('/api/v1/mobile/sync/actions', [
+                'batch_id' => (string) Str::uuid(),
+                'actions' => [],
+            ])
+            ->assertUnauthorized();
     }
 
     public function test_revoked_device_can_re_register_with_credentials_while_old_token_stays_invalid(): void

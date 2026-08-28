@@ -122,6 +122,66 @@
                 </v-btn>
             </v-card-actions>
         </v-card>
+
+        <div class="subheader mt-6 mb-2 d-flex">
+            <v-icon large color="red" class="mr-2">mdi-account-remove</v-icon>
+            永久删除账号
+            <v-spacer />
+        </div>
+        <v-card outlined class="rounded-lg pb-0 mb-32" :loading="accountDeleting">
+            <v-card-text>
+                此操作会永久删除当前账号的活跃服务器数据、学习记录、移动设备授权和已上传媒体，且无法撤销。
+                系统恢复备份不会在此操作中被改写，备份中的历史数据仍按服务器备份保留策略处理。
+
+                <div class="mt-4">
+                    <label class="font-weight-bold">请输入“delete my account”并输入当前密码确认</label>
+                    <v-text-field
+                        v-model="accountConfirmText"
+                        class="mt-2"
+                        filled
+                        dense
+                        rounded
+                        hide-details
+                        placeholder="delete my account"
+                    ></v-text-field>
+                    <v-text-field
+                        v-model="accountPassword"
+                        class="mt-3"
+                        filled
+                        dense
+                        rounded
+                        hide-details
+                        type="password"
+                        autocomplete="current-password"
+                        placeholder="当前密码"
+                    ></v-text-field>
+                </div>
+
+                <v-alert
+                    v-if="!accountDeleting && accountDeletionError"
+                    class="rounded-lg mt-4 mb-0"
+                    color="error"
+                    type="error"
+                    border="left"
+                    dark
+                >
+                    {{ accountDeletionError }}
+                </v-alert>
+            </v-card-text>
+            <v-card-actions>
+                <v-spacer />
+                <v-btn
+                    rounded
+                    depressed
+                    color="error"
+                    :disabled="accountDeleting || accountConfirmText !== 'delete my account' || accountPassword === ''"
+                    @click="deleteAccount"
+                >
+                    <v-icon class="mr-2">mdi-account-remove</v-icon>
+                    永久删除账号
+                </v-btn>
+            </v-card-actions>
+        </v-card>
     </div>
 </template>
 
@@ -135,6 +195,10 @@
                 deleting: false,
                 deletionError: false,
                 deletionSuccess: false,
+                accountConfirmText: '',
+                accountPassword: '',
+                accountDeleting: false,
+                accountDeletionError: '',
             }
         },
         props: {
@@ -159,6 +223,25 @@
                 }).catch((error) => {
                     this.deletionError = true;
                     this.deleting = false;
+                });
+            },
+            deleteAccount() {
+                this.accountDeleting = true;
+                this.accountDeletionError = '';
+
+                axios.delete('/users/account', {
+                    data: {
+                        confirmation: this.accountConfirmText,
+                        password: this.accountPassword,
+                    },
+                }).then(() => {
+                    window.location.assign('/login');
+                }).catch((error) => {
+                    const responseError = error.response && error.response.data && error.response.data.error;
+                    this.accountDeletionError = responseError && responseError.message
+                        ? responseError.message
+                        : '删除账号时发生错误。';
+                    this.accountDeleting = false;
                 });
             }
         }

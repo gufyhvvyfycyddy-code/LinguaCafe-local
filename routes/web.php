@@ -138,6 +138,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     // users
     Route::post('/users/update-password', [App\Http\Controllers\UserController::class, 'updatePassword']);
     Route::get ('/users/is-password-changed', [App\Http\Controllers\UserController::class, 'isUserPasswordChanged']);
+    Route::delete('/users/account', [App\Http\Controllers\UserController::class, 'deleteAccount']);
     Route::delete('/users/delete-language-data/{language}', [App\Http\Controllers\UserController::class, 'deleteUserLanguageData']);
 
     // jellyfin

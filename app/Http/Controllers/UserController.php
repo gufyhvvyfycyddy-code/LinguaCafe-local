@@ -174,6 +174,50 @@ class UserController extends Controller {
         return response()->json('User has been updated successfully.', 200);
     }
 
+    public function deleteAccount(Request $request)
+    {
+        $user = Auth::user();
+        $confirmation = trim((string) $request->input('confirmation', ''));
+        $password = (string) $request->input('password', '');
+
+        if ($confirmation !== 'delete my account') {
+            return response()->json([
+                'error' => [
+                    'code' => 'ACCOUNT_DELETE_CONFIRMATION_REQUIRED',
+                    'message' => '请输入正确的账号删除确认文本。',
+                ],
+            ], 422);
+        }
+
+        if ($password === '' || ! Hash::check($password, (string) $user->password)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'INVALID_PASSWORD',
+                    'message' => '当前密码不正确。',
+                ],
+            ], 422);
+        }
+
+        try {
+            $this->userService->deleteAccount($user);
+        } catch (\DomainException $exception) {
+            return response()->json([
+                'error' => [
+                    'code' => 'LAST_ADMIN_REQUIRED',
+                    'message' => '系统必须至少保留一个管理员账号。',
+                ],
+            ], 409);
+        } catch (\Throwable $exception) {
+            abort(500, 'Account deletion failed.');
+        }
+
+        Auth::guard('web')->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        return response()->json(['deleted' => true], 200);
+    }
+
     public function deleteUserLanguageData($language) 
     {
         $userId = Auth::user()->id;

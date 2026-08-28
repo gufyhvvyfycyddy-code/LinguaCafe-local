@@ -41,16 +41,36 @@ the local deletion.
 
 ## Server data deletion
 
-The mobile app does not silently delete the server account when signing out.
-The iOS client does not offer account creation. A user requests server-data
-deletion from the administrator of the server address shown in Settings. The
-administrator must verify the account,
-explain any legally required retention, delete or anonymize the account data,
-and confirm completion.
+The mobile app does not silently delete the server account when signing out or
+revoking a device. Server-account deletion is a separate destructive action.
+A signed-in user can open the LinguaCafe Web account settings on the selected
+server and use the permanent account-deletion control. It requires the exact
+confirmation text `delete my account` and the current account password.
 
-This administrator-request path is not a self-service deletion claim. If a
-future mobile release adds account creation, it must also add an easy-to-find
-in-app initiation path that deletes the entire account and associated data.
+Successful Web account deletion removes the current active account row, active
+learning/application rows owned by that user, Sanctum/mobile access tokens,
+registered mobile devices, password-reset state and the user's uploaded media
+from its active account path. It also invalidates the current Web session. The
+action is scoped to the signed-in account and does not delete another user's
+rows. The final administrator account cannot self-delete because the server
+must retain an administrator identity. Media is moved out of the active account
+path before database deletion so a failed database transaction can restore it;
+a rare final storage-purge failure leaves only private quarantine residue and is
+reported for operator cleanup rather than making the deleted account accessible
+again.
+
+Operational database backups are recovery artifacts and are not rewritten by
+the self-service account-deletion request. Data present in an older backup can
+therefore remain until that server's backup-retention policy removes the backup.
+A deployment operator remains responsible for the published retention policy,
+legal retention requirements, and any exceptional deletion request concerning
+retained recovery backups.
+
+The current Android and iOS clients sign in to an existing LinguaCafe server
+account and do not offer or link to account creation. If a future mobile release
+adds or links to mobile account creation, it must also add an easy-to-find
+in-app initiation path for the same server-account deletion capability rather
+than treating device revocation as account deletion.
 
 ## Permissions
 
