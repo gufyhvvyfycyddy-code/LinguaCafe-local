@@ -383,8 +383,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-02 | DONE | 100 同时在线的阅读/查词/复习负载 | current canonical flows | `bc2cb433` + `h02-representative-load-acceptance-2026-08-28.md`：Apache/MySQL representative runtime；1/10/25/50/100 全阶梯；100 VU=300 requests、HTTP failure=0、33 ratings=33 ReviewLogs、duplicate=0、invalid FSRS=0；cleanup clean |
 | H-03 | DONE | 只针对实际瓶颈做性能修复 | H-02 evidence | `a3859e2` + `h03-bottleneck-diagnostics-acceptance-2026-08-28.md`：H01 schema=1 增加可选 flow latency；100 VU Reading/lookup/Sense Review p95≈36.3/23.1/48.8ms；aggregate≈6.76s 由 fresh Apache prefork cold-burst GET `/login` 主导；无证据支持业务 query/index/cache/FSRS/session 改写，deployment runtime 决策延后 H-07 |
 | H-04 | DONE | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | `e2cfc442` + `h04-backup-restore-drill-acceptance-2026-08-28.md`：Oracle MySQL 8.4 client；真实 backup→restore succeeded；write fence 真阻断；automatic safety rollback 真恢复；75 tests / 279 assertions；Compose/8894/temp/lease residue=0；不触开发/生产数据 |
-| H-05 | ACTIVE | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
-| H-06 | TODO | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
+| H-05 | DONE | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | `013c8af` + `62fcc24` + `h05-isolation-privacy-boundary-acceptance-2026-08-28.md`：schema-backed user/language ownership guards；账号删除 confirmation+password；last-admin transaction lock；token/device/session/media cleanup；真实 Web DELETE 200→logout；focused PHP/JS/build PASS |
+| H-06 | ACTIVE | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
 | H-07 | TODO | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | ¥600–1000/月推荐假设有当日价格支持；更稳档 ¥1200–2500 重新核算，不沿用旧价格 |
 | H-08 | TODO | 公共打包内容权利检查 | Phase F material metadata | 只包含用户有权分发/已授权内容；用户自传内容不等于可公开再分发 |
 | H-09 | TODO | Android 发布准备 | existing Android M7 assets | current build、package、privacy、device smoke；不自动商店发布 |
@@ -485,12 +485,18 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-05`（用户/语言隔离、账号删除、同步设备撤销、隐私边界）
-- Last DONE: `H-04`
-- Current verified production/code baseline HEAD: `e2cfc4427fb49dd2806ad4d105100164296e998d`（H-04 real backup/restore recovery；exact success + automatic safety rollback drills on disposable MySQL/Redis/Web runtime）
+- Active milestone: `H-06`（登录与公开认证产品收束）
+- Last DONE: `H-05`
+- Current verified production/code baseline HEAD: `62fcc2432ad707a27aeee420c7bbb4470d6d8563`（H-05 user/language isolation + permanent account deletion + device/token/media privacy boundary；testing browser session owner fix=`013c8afc38140f92d6a518e68d8eba57d64936cb`）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
+
+### CLOSED MILESTONE EVIDENCE — H-05
+
+- H-05 testing-browser owner fix `013c8afc38140f92d6a518e68d8eba57d64936cb` makes supported testing browser servers use persistent file sessions while retaining PAB testing DB lease + sentinel binding; it fixes the observed CSRF 419 caused by PHPUnit's `SESSION_DRIVER=array` without weakening CSRF or changing production auth.
+- H-05 product commit `62fcc2432ad707a27aeee420c7bbb4470d6d8563` adds password-confirmed self-service account deletion, last-admin transactional locking, active user/token/device/session/media cleanup with media quarantine rollback, English-only scoped learning-data deletion, schema-backed ownership contracts, and aligned mobile privacy copy.
+- Fresh focused verification: H05 10/10 (93 assertions), MobileApiFoundation 17/17 (152 assertions), H05 JS 5/5, PAB harness 22 passed (126 assertions; one environment warning only), build PASS, diff-check PASS. Real testing-bound browser login → `/user-settings` → exact confirmation + password → real `DELETE /users/account` HTTP 200 → `/login`; following protected request 401. Lease/server/task identity cleaned. Full evidence: `docs/testing/h05-isolation-privacy-boundary-acceptance-2026-08-28.md`.
 
 ### CLOSED MILESTONE EVIDENCE — H-04
 
