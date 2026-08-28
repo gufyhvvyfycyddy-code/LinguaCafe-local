@@ -381,8 +381,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-00 | DONE | deletion-first caller/data/compat convergence：只删 proven-dead dual path / duplicate proof metadata / unreachable implementation；保留仍承担 caller、persisted data、recovery、deep-link、import/export、legacy-language 或 released-interface 义务的 lower owner | Phase G architecture reports + current callers/tests + Private House/codebase-design deletion test | `a4629de` 移除 Reader AI Assist V1 write path；`c27af0e` 移除 inline Sense duplicate safety metadata；`98a1200` 移除 TextBlockService 不可达 ReaderData fallback；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard endpoints 与 non-English lower mechanics 均有 fresh keep evidence；累计 JS/PHP/build/diff gate PASS |
 | H-01 | DONE | 建立最小可读的 load/observability harness | existing logs/health/tests; k6 + MySQL status + Laravel queue size | `h01-load-observability-harness-acceptance-2026-08-27.md`：testing-only 单 JSON contract；57 tests / 270 assertions；Lane04+PAB+k6 smoke PASS；能观测 P95/P99、DB connections、queue backlog、errors；Windows `php -S` 明确 `capacity_representative=false`；不建监控平台 |
 | H-02 | DONE | 100 同时在线的阅读/查词/复习负载 | current canonical flows | `bc2cb433` + `h02-representative-load-acceptance-2026-08-28.md`：Apache/MySQL representative runtime；1/10/25/50/100 全阶梯；100 VU=300 requests、HTTP failure=0、33 ratings=33 ReviewLogs、duplicate=0、invalid FSRS=0；cleanup clean |
-| H-03 | ACTIVE | 只针对实际瓶颈做性能修复 | H-02 evidence | aggregate p95≈6.87s 先分解 login/setup、Reading、lookup、Sense Review latency，并关联 MySQL statement digests / query counts 与 Apache concurrency；每个 index/cache/query/batch/runtime tuning 都必须由实测瓶颈付费且复测证明改善 |
-| H-04 | TODO | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
+| H-03 | DONE | 只针对实际瓶颈做性能修复 | H-02 evidence | `a3859e2` + `h03-bottleneck-diagnostics-acceptance-2026-08-28.md`：H01 schema=1 增加可选 flow latency；100 VU Reading/lookup/Sense Review p95≈36.3/23.1/48.8ms；aggregate≈6.76s 由 fresh Apache prefork cold-burst GET `/login` 主导；无证据支持业务 query/index/cache/FSRS/session 改写，deployment runtime 决策延后 H-07 |
+| H-04 | ACTIVE | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
 | H-05 | TODO | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
 | H-06 | TODO | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
 | H-07 | TODO | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | ¥600–1000/月推荐假设有当日价格支持；更稳档 ¥1200–2500 重新核算，不沿用旧价格 |
@@ -485,12 +485,19 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-03`（bottleneck-only performance repair；先分解 request/flow latency 与 MySQL/Apache pressure，不先做 speculative optimization）
-- Last DONE: `H-02`
-- Current verified production/code baseline HEAD: `bc2cb433101751e8c6922d8cc803137988bc0657`（H-02 representative runtime / load implementation；exact clean-commit 1→10→25→50→100 ladder PASS）
+- Active milestone: `H-04`（testing-only backup/restore drill；复用现有 M6 Backup/Restore owner，不建第二套备份系统）
+- Last DONE: `H-03`
+- Current verified production/code baseline HEAD: `a3859e2158a926153a5d8f7a27d3565014307fca`（H-03 flow-latency instrumentation；exact 100-VU representative proof shows Reading/lookup/Sense Review are not the aggregate p95 bottleneck）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
+
+### CLOSED MILESTONE EVIDENCE — H-03
+
+- H-03 exact instrumentation commit `a3859e2158a926153a5d8f7a27d3565014307fca` 保持 H01 `schema_version=1` 唯一 measurement truth，仅增加可选 `http.flow_duration_ms`；旧 H01 scenario 无 flow metrics 时继续兼容为空 map，不新增 metrics endpoint/store/service。
+- exact 100 VU：300 requests、failure=0、checks=1、33 ratings=33 ReviewLogs、duplicate=0、invalid FSRS=0；Reading / lookup / Sense Review p95≈36.3 / 23.1 / 48.8ms，login POST≈270.9ms，GET `/login`≈6769.6ms，aggregate p95≈6759.3ms。
+- fresh runtime 使用 Apache 2.4 prefork（StartServers/MinSpare/MaxSpare=5/5/10）；hot serial `/login` p95≈13ms，100-concurrent static asset 也呈秒级尾延迟，证明根因是 fresh prefork cold-burst admission/spawn，而不是 Laravel login、session、User::count、MySQL 或学习业务流。临时 20/20/40 prefork 实验反而恶化到 p95≈13.15s，已完全回滚，未进入仓库。
+- H-03 不修改任何生产业务代码、DB schema、query/index/cache/FSRS/session/runtime topology；event MPM/PHP-FPM 等 deployment 选择延后 H-07。focused regression 51/1018 PASS；Compose/temp residue=0。完整证据见 `docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`。
 
 ### CLOSED MILESTONE EVIDENCE — H-02
 
