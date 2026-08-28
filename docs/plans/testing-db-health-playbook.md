@@ -54,15 +54,15 @@ php artisan test --filter=TestingDatabaseHealthTest
 php artisan test --filter=ReviewFsrsTest
 ```
 
-Long-running testing servers and non-PHPUnit testing commands must use the same runner:
+Testing browser servers and non-PHPUnit testing commands use the same lease authority through their canonical owners:
 
 ```bash
-# Fail fast if another testing database owner is active
-APP_ENV=testing php tests/Support/run-with-testing-db-lease.php \
+# Browser server: PAB owns the actual php -S process and the testing lease
+APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php \
   --label=browser-acceptance -- \
-  php artisan serve --host=127.0.0.1 --port=88xx
+  php artisan serve --host=127.0.0.1 --port=88xx --no-reload
 
-# Explicit finite wait when the task contract permits waiting
+# Explicit finite wait for a non-server testing command
 APP_ENV=testing php tests/Support/run-with-testing-db-lease.php \
   --label=feature-regression --wait-ms=30000 -- \
   php artisan test --filter=ReviewFsrsTest
@@ -71,7 +71,7 @@ APP_ENV=testing php tests/Support/run-with-testing-db-lease.php \
 php tests/Support/run-with-testing-db-lease.php --status
 ```
 
-Do not run a testing server or testing database fixture command directly. The runner must acquire the lease before it starts the child process.
+Do not run a testing server or testing database fixture command directly. The generic lease runner owns non-server testing children and rejects direct `artisan serve`; browser servers must use the PAB browser harness so the actual `php -S` process has one lifecycle owner.
 
 For lease/crash diagnostics that deliberately keep a lease open, use the bounded testing-only probe instead of ad-hoc `php -r` holders:
 
@@ -105,9 +105,11 @@ php tests/Support/run-validation-lane.php --lane=01 --prepare --describe
 php tests/Support/run-validation-lane.php --lane=01 -- \
   php vendor/bin/phpunit tests/Feature/ReadingContinuityProgressTest.php
 
-# Start that lane's browser server; use the lane's documented port
+# Start that lane's browser server; the lane supplies its isolated DB/storage,
+# and PAB owns the actual server process on the documented port
 SESSION_DRIVER=file php tests/Support/run-validation-lane.php --lane=01 -- \
-  php artisan serve --host=127.0.0.1 --port=8871
+  php tests/Support/run-pab-r3-browser-acceptance.php --label=validation-lane-01-browser -- \
+  php artisan serve --host=127.0.0.1 --port=8871 --no-reload
 ```
 
 Parallel rules:
@@ -135,7 +137,7 @@ Parallel rules:
 - **Do NOT** run `php artisan migrate:fresh --env=testing` (drops all tables, then recreates — risky if DB is shared)
 - **Do NOT** run `php artisan db:wipe --env=testing` (destructive)
 - **Do NOT** edit `.env` or `.env.testing` manually unless you know what you're doing
-- **Do NOT** bypass `run-with-testing-db-lease.php` for a testing server, migration check, fixture, sentinel, or browser-acceptance server
+- **Do NOT** start a testing browser server directly or through the generic lease runner; browser servers use `run-pab-r3-browser-acceptance.php`, while non-server testing writers use `run-with-testing-db-lease.php` or an isolated validation lane
 - **Do NOT** treat a metadata PID as proof that a lease is active; only the OS lock is authoritative
 - **Do NOT** run two writers against the same testing database/lane at the same time; the second must fail fast or use an explicitly bounded wait. Different prepared validation lanes are intentionally allowed to run concurrently.
 - **Do NOT** create a live lease probe with direct `acquireForProject(...)` followed by an unbounded `while (true)` / equivalent infinite holder; use `project-probe-hold` with a finite deadline

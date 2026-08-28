@@ -185,6 +185,7 @@ class ReviewCardLifecycleMigrationTest extends TestCase
             if (!Schema::hasColumn('review_cards', 'lifecycle_state')) {
                 $migration->up();
             }
+            $this->user->delete();
         }
     }
 

@@ -16,6 +16,7 @@ use App\Models\ReviewCard;
 use App\Models\ReviewLog;
 use App\Models\User;
 use App\Models\WordSense;
+use App\Models\WordSenseOccurrence;
 use App\Services\GoalService;
 use App\Services\ReadingOccurrenceSenseEvidenceService;
 use App\Services\ReadingSessionService;
@@ -1099,7 +1100,9 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         ReviewCard::query()->where('user_id', $userId)->delete();
         GoalAchievement::query()->where('user_id', $userId)->delete();
         Goal::query()->where('user_id', $userId)->delete();
+        // learning_started_source_occurrence_id restricts deleting an occurrence while its sense still exists.
         WordSense::query()->where('user_id', $userId)->delete();
+        WordSenseOccurrence::query()->where('user_id', $userId)->delete();
         Chapter::query()->where('user_id', $userId)->delete();
         Book::query()->where('user_id', $userId)->delete();
         User::query()->where('id', $userId)->delete();

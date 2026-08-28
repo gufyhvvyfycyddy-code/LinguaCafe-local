@@ -694,6 +694,64 @@ PHP;
         }
     }
 
+    public function test_runner_rejects_artisan_serve_before_spawning_a_descendant_server_tree(): void
+    {
+        $before = TestingDatabaseLease::statusForProject($this->root);
+        foreach ([
+            ['serve'],
+            ['--env=testing', 'serve'],
+        ] as $artisanArguments) {
+            $result = $this->runProcess([
+                PHP_BINARY,
+                $this->runner,
+                '--label=browser-server-must-use-pab',
+                '--',
+                PHP_BINARY,
+                'artisan',
+                ...$artisanArguments,
+                '--host=127.0.0.1',
+                '--port=8999',
+            ], $this->runnerEnvironment());
+
+            $this->assertSame(TestingDatabaseLease::EXIT_USAGE, $result['exit_code']);
+            $this->assertStringContainsString('LEASE_RUNNER_ARTISAN_SERVE_REQUIRES_PAB', $result['stderr']);
+        }
+
+        $after = TestingDatabaseLease::statusForProject($this->root);
+        $this->assertSame($before['active'], $after['active']);
+        $this->assertSame($before['pid'], $after['pid']);
+        $this->assertSame($before['started_at'], $after['started_at']);
+    }
+
+    public function test_runner_allows_pab_child_to_own_nested_artisan_serve_arguments(): void
+    {
+        $base = $this->temporaryDirectory('lease-pab-wrapper-');
+        $fakePab = $base.'/run-pab-r3-browser-acceptance.php';
+        file_put_contents(
+            $fakePab,
+            '<?php exit(($argv[1] ?? null) === "--" && ($argv[3] ?? null) === "artisan" && ($argv[4] ?? null) === "serve" ? 0 : 1);',
+        );
+
+        try {
+            $result = $this->runProcess([
+                PHP_BINARY,
+                $this->runner,
+                '--label=pab-wrapper',
+                '--',
+                PHP_BINARY,
+                $fakePab,
+                '--',
+                PHP_BINARY,
+                'artisan',
+                'serve',
+            ], $this->runnerEnvironment());
+
+            $this->assertSame(0, $result['exit_code'], $result['stderr']);
+        } finally {
+            $this->removeDirectory($base);
+        }
+    }
+
     public function test_runner_child_proves_inheritance_without_self_deadlock(): void
     {
         $result = $this->runProcess([

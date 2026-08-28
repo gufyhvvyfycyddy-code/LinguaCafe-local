@@ -12,6 +12,30 @@ function leaseRunnerExit(int $code, string $machineCode): void
     exit($code);
 }
 
+/** @param list<string> $command */
+function leaseRunnerContainsArtisanServe(array $command): bool
+{
+    $executable = $command[0] ?? null;
+    $artisanArgument = $command[1] ?? null;
+    if (! is_string($executable) || ! is_string($artisanArgument)) {
+        return false;
+    }
+
+    $executableName = strtolower(basename(str_replace('\\', '/', $executable)));
+    $currentPhpName = strtolower(basename(str_replace('\\', '/', PHP_BINARY)));
+    if ($executable !== PHP_BINARY
+        && ! in_array($executableName, ['php', 'php.exe', $currentPhpName], true)
+    ) {
+        return false;
+    }
+    if (basename(str_replace('\\', '/', $artisanArgument)) !== 'artisan') {
+        return false;
+    }
+
+    return ($command[2] ?? null) === 'serve'
+        || (($command[2] ?? null) === '--env=testing' && ($command[3] ?? null) === 'serve');
+}
+
 /** @return array{status: bool, label: string, wait_ms: int, command: list<string>} */
 function parseLeaseRunnerArguments(array $arguments): array
 {
@@ -72,6 +96,10 @@ function parseLeaseRunnerArguments(array $arguments): array
 
 $options = parseLeaseRunnerArguments($argv);
 $projectRoot = dirname(__DIR__, 2);
+
+if (! $options['status'] && leaseRunnerContainsArtisanServe($options['command'])) {
+    leaseRunnerExit(TestingDatabaseLease::EXIT_USAGE, 'LEASE_RUNNER_ARTISAN_SERVE_REQUIRES_PAB');
+}
 
 try {
     if ($options['status']) {

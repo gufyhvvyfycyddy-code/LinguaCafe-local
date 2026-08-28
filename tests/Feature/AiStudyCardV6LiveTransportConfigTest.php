@@ -76,17 +76,21 @@ class AiStudyCardV6LiveTransportConfigTest extends TestCase
             'selected_language' => 'english',
         ]);
 
-        $response = $this->actingAs($user)->postJson('/ai-study-card/v6/recommendations/provider-preview', [
-            'request_package' => $this->validRequestPackage(),
-        ]);
+        try {
+            $response = $this->actingAs($user)->postJson('/ai-study-card/v6/recommendations/provider-preview', [
+                'request_package' => $this->validRequestPackage(),
+            ]);
 
-        $response->assertOk();
-        $response->assertJsonPath('success', true);
-        $response->assertJsonPath('package.schema_version', 'ai-study-card-v6-recommendation-package-v1');
-        $response->assertJsonPath('safety_flags.no_card_creation', true);
-        $response->assertJsonPath('safety_flags.no_review_log_created', true);
-        $response->assertJsonPath('safety_flags.no_fsrs_changed', true);
-        Http::assertSentCount(1);
+            $response->assertOk();
+            $response->assertJsonPath('success', true);
+            $response->assertJsonPath('package.schema_version', 'ai-study-card-v6-recommendation-package-v1');
+            $response->assertJsonPath('safety_flags.no_card_creation', true);
+            $response->assertJsonPath('safety_flags.no_review_log_created', true);
+            $response->assertJsonPath('safety_flags.no_fsrs_changed', true);
+            Http::assertSentCount(1);
+        } finally {
+            $user->delete();
+        }
     }
 
     public function test_quota_response_returns_detailed_failure_without_package(): void

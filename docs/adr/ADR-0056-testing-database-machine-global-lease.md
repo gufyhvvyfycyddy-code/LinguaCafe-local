@@ -64,8 +64,11 @@ active when the OS lock can be acquired.
 
 - `tests/bootstrap.php` acquires or inherits the lease when `APP_ENV=testing`.
 - `tests/Support/run-with-testing-db-lease.php` acquires the lease before
-  starting a testing server, testing Artisan command, fixture command, or
-  other child process.
+  starting testing Artisan commands, fixture commands, or other non-server
+  child processes.
+- Browser acceptance servers use `tests/Support/run-pab-r3-browser-acceptance.php`,
+  which acquires or inherits the same lease and directly owns the actual
+  `php -S` server process.
 - Status inspection is read-only and never releases or overwrites another
   owner's lease.
 
@@ -98,11 +101,16 @@ the lease; a later owner also removes only stale proof files for the same hashed
 
 ## Command contract
 
-Example:
+Examples:
 
 ```text
-php tests/Support/run-with-testing-db-lease.php --label=browser-acceptance -- php artisan serve --host=127.0.0.1 --port=88xx
+APP_ENV=testing php tests/Support/run-with-testing-db-lease.php --label=feature-regression -- php vendor/bin/phpunit tests/Feature/ReviewFsrsTest.php
+APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php --label=browser-acceptance -- php artisan serve --host=127.0.0.1 --port=88xx --no-reload
 ```
+
+The generic lease runner rejects direct `artisan serve`. Laravel's ServeCommand
+may create a descendant `php -S` process that the generic runner does not own.
+The PAB browser harness is the single owner for testing browser-server lifecycle.
 
 Stable runner exit codes:
 
@@ -126,8 +134,9 @@ Stable runner exit codes:
 
 ### Costs and limits
 
-- Every command that writes the testing database must use the runner; commands
-  that bypass it remain unsafe and are a process violation.
+- Every non-server command that writes the testing database must use the runner;
+  browser servers must use the PAB browser harness. Direct testing writers remain
+  unsafe and are a process violation.
 - Normal child exit, PHP exceptions, shutdown, handled Ctrl+C / Ctrl+Break, and catchable POSIX INT / TERM / HUP / QUIT paths are cleaned up by the runner. A child that ignores graceful termination is force-terminated after a bounded grace period. An uncatchable operating-system kill may
   release the lock before an independently running child is terminated; such
   hard-kill behavior must not be used as the normal stop mechanism. Testing-only
