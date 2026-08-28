@@ -382,8 +382,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-01 | DONE | 建立最小可读的 load/observability harness | existing logs/health/tests; k6 + MySQL status + Laravel queue size | `h01-load-observability-harness-acceptance-2026-08-27.md`：testing-only 单 JSON contract；57 tests / 270 assertions；Lane04+PAB+k6 smoke PASS；能观测 P95/P99、DB connections、queue backlog、errors；Windows `php -S` 明确 `capacity_representative=false`；不建监控平台 |
 | H-02 | DONE | 100 同时在线的阅读/查词/复习负载 | current canonical flows | `bc2cb433` + `h02-representative-load-acceptance-2026-08-28.md`：Apache/MySQL representative runtime；1/10/25/50/100 全阶梯；100 VU=300 requests、HTTP failure=0、33 ratings=33 ReviewLogs、duplicate=0、invalid FSRS=0；cleanup clean |
 | H-03 | DONE | 只针对实际瓶颈做性能修复 | H-02 evidence | `a3859e2` + `h03-bottleneck-diagnostics-acceptance-2026-08-28.md`：H01 schema=1 增加可选 flow latency；100 VU Reading/lookup/Sense Review p95≈36.3/23.1/48.8ms；aggregate≈6.76s 由 fresh Apache prefork cold-burst GET `/login` 主导；无证据支持业务 query/index/cache/FSRS/session 改写，deployment runtime 决策延后 H-07 |
-| H-04 | ACTIVE | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
-| H-05 | TODO | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
+| H-04 | DONE | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | `e2cfc442` + `h04-backup-restore-drill-acceptance-2026-08-28.md`：Oracle MySQL 8.4 client；真实 backup→restore succeeded；write fence 真阻断；automatic safety rollback 真恢复；75 tests / 279 assertions；Compose/8894/temp/lease residue=0；不触开发/生产数据 |
+| H-05 | ACTIVE | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
 | H-06 | TODO | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
 | H-07 | TODO | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | ¥600–1000/月推荐假设有当日价格支持；更稳档 ¥1200–2500 重新核算，不沿用旧价格 |
 | H-08 | TODO | 公共打包内容权利检查 | Phase F material metadata | 只包含用户有权分发/已授权内容；用户自传内容不等于可公开再分发 |
@@ -485,12 +485,18 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-04`（testing-only backup/restore drill；复用现有 M6 Backup/Restore owner，不建第二套备份系统）
-- Last DONE: `H-03`
-- Current verified production/code baseline HEAD: `a3859e2158a926153a5d8f7a27d3565014307fca`（H-03 flow-latency instrumentation；exact 100-VU representative proof shows Reading/lookup/Sense Review are not the aggregate p95 bottleneck）
+- Active milestone: `H-05`（用户/语言隔离、账号删除、同步设备撤销、隐私边界）
+- Last DONE: `H-04`
+- Current verified production/code baseline HEAD: `e2cfc4427fb49dd2806ad4d105100164296e998d`（H-04 real backup/restore recovery；exact success + automatic safety rollback drills on disposable MySQL/Redis/Web runtime）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
+
+### CLOSED MILESTONE EVIDENCE — H-04
+
+- H-04 exact implementation commit `e2cfc4427fb49dd2806ad4d105100164296e998d` repaired three failures exposed only by a real restore drill: MariaDB client drift in the Web image, missing real MySQL `mysqldump` charset directives in the strict inspector, and quiescence monitoring that incorrectly required global `PROCESS` on the application DB identity. The Web image now uses Oracle MySQL Community 8.4 client; quiescence uses the existing dedicated restore identity + fail-closed Performance Schema monitoring.
+- exact successful restore drill: real backup → post-backup mutation → Redis restore queue → isolated validation → write fence → safety snapshot → active schema replacement; operation=`succeeded`, ReviewCard reps `7→0`, post-backup user removed, fence/maintenance released, validation DB residue=0.
+- exact failure drill tampers only the operation-private pinned target after fence activation; operation=`rolled_back` with `BACKUP_RESTORE_FAILED_ROLLED_BACK`, safety snapshot restored the pre-restore mutated state, fence/maintenance released, validation DB residue=0. Focused Backup/Restore regression 75/75 tests, 279 assertions PASS; Compose/8894/H04 temp/TestingDatabaseLease residue=0. Full evidence: `docs/testing/h04-backup-restore-drill-acceptance-2026-08-28.md`.
 
 ### CLOSED MILESTONE EVIDENCE — H-03
 

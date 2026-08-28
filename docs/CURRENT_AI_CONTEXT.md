@@ -4,7 +4,7 @@
 > 日期：2026-08-28
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-28 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE、`H-00` deletion-first convergence、`H-01` load/observability harness、`H-02` representative 100-user load 与 `H-03` bottleneck diagnostics。H-03 exact instrumentation commit 为 `a3859e2158a926153a5d8f7a27d3565014307fca`，验收见 `docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`：100 VU 下 Reading / lookup / Sense Review p95 分别约 36.3 / 23.1 / 48.8ms；aggregate 约 6.76s 的 p95 被 fresh Apache prefork cold-burst GET `/login` 主导。没有实测证据支持修改业务 query/index/cache/FSRS/session；deployment runtime 选择延后到 H-07。当前 forward milestone 为 **H-04 backup/restore drill**：只复用既有 M6 Backup/Restore owners，在隔离 testing DB 中证明备份可恢复、write fence、完整性与失败路径，不触开发/生产数据。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
+> **2026-08-28 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE、`H-00` deletion-first convergence、`H-01` load/observability harness、`H-02` representative 100-user load、`H-03` bottleneck diagnostics 与 `H-04` backup/restore drill。H-04 exact implementation commit 为 `e2cfc4427fb49dd2806ad4d105100164296e998d`，验收见 `docs/testing/h04-backup-restore-drill-acceptance-2026-08-28.md`：Oracle MySQL 8.4 client、真实 backup→restore、write fence、automatic safety rollback 与 zero-residue 均通过；Web DB 用户不需要全局 `PROCESS`，专用 restore identity 使用 Performance Schema 做 fail-closed quiescence。当前 forward milestone 为 **H-05 isolation/privacy boundary**：验证用户/语言隔离、账号删除、同步设备撤销与隐私边界。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
 ## 1. 当前代码事实
 
@@ -94,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics 均已 DONE。当前 forward milestone 是 H-04：复用现有 M6 Backup/Restore owner，在专用 testing DB 中完成真实备份→受控恢复→完整性/失败路径/write fence 演练，随后按 H-04→H-05…H-GATE 顺序推进。
+“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics、H-04 backup/restore drill 均已 DONE。当前 forward milestone 是 H-05：验证用户/语言隔离、账号删除、同步设备撤销与隐私边界，随后按 H-05→H-06…H-GATE 顺序推进。
 
 ## 4. 当前本地维护账本
 
