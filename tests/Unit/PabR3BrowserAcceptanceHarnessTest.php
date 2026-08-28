@@ -228,6 +228,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
             },
             environmentProvider: static fn (): array => [
                 'APP_ENV' => 'testing',
+                'SESSION_DRIVER' => 'array',
                 'EXISTING_VALUE' => 'keep-me',
             ],
             evidence: $evidence,
@@ -247,6 +248,7 @@ final class PabR3BrowserAcceptanceHarnessTest extends TestCase
         $this->assertSame($command, $capturedCommand);
         $this->assertIsArray($capturedEnvironment);
         $this->assertSame('keep-me', $capturedEnvironment['EXISTING_VALUE'] ?? null);
+        $this->assertSame('file', $capturedEnvironment['SESSION_DRIVER'] ?? null);
         $this->assertSame('fake-token', $capturedEnvironment['LINGUACAFE_TEST_DB_LEASE_TOKEN'] ?? null);
         $this->assertSame($createdSentinel, $capturedEnvironment['LINGUACAFE_TEST_SENTINEL'] ?? null);
         $this->assertSame($createdSentinel, $cleanedSentinel);

@@ -209,6 +209,13 @@ final class PabR3BrowserAcceptanceHarness
                 $proofEnvironment,
                 ['LINGUACAFE_TEST_SENTINEL' => $sentinel],
             );
+            if (pabR3SupportedArtisanServeIndex($command) !== null) {
+                // PHPUnit uses an in-memory session driver, which cannot persist
+                // a real browser login across HTTP requests. Browser acceptance
+                // servers must keep the session while the testing DB lease and
+                // sentinel bind the server to the isolated test environment.
+                $childEnvironment['SESSION_DRIVER'] = 'file';
+            }
             $this->throwIfCancelled();
 
             $childExitCode = ($this->runChild)($command, $childEnvironment);
