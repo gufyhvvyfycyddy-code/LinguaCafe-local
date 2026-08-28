@@ -10,7 +10,6 @@ use App\Models\ReviewLog;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\WordSense;
-use App\Services\ReviewCardService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -423,8 +422,18 @@ class AiStudyCardFullLoopGuardTest extends TestCase
             'next_review' => now()->toDateString(),
             'relearning' => false,
         ]);
-        $legacyWordCard = app(ReviewCardService::class)->ensureWordCard($word);
-        $legacyWordCard->update(['fsrs_reps' => 2, 'fsrs_due_at' => now()->addDay()]);
+        $legacyWordCard = ReviewCard::forceCreate([
+            'user_id' => $word->user_id,
+            'language_id' => $word->language,
+            'language' => $word->language,
+            'target_type' => ReviewCard::TARGET_WORD,
+            'target_id' => $word->id,
+            'fsrs_state' => 'review',
+            'fsrs_due_at' => now()->addDay(),
+            'fsrs_reps' => 2,
+            'fsrs_enabled' => false,
+            'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
+        ]);
 
         // Target sense + freshly generated sense card (simulates V5 output).
         $targetSense = WordSense::forceCreate([
