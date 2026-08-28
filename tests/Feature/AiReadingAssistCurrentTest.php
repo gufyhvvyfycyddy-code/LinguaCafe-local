@@ -8,6 +8,7 @@ use App\Models\ChapterAiReadingAssist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AiReadingAssistCurrentTest extends TestCase
@@ -87,14 +88,14 @@ class AiReadingAssistCurrentTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function requires_authentication(): void
     {
         $response = $this->getJson('/chapters/ai-assist/current/' . $this->chapter->id);
         $response->assertUnauthorized();
     }
 
-    /** @test */
+    #[Test]
     public function rejects_other_users_chapter(): void
     {
         $otherChapter = Chapter::forceCreate([
@@ -116,7 +117,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function returns_has_saved_false_when_no_data(): void
     {
         $response = $this->actingAs($this->user)->getJson('/chapters/ai-assist/current/' . $this->chapter->id);
@@ -126,7 +127,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertJsonMissingPath('updated_at');
     }
 
-    /** @test */
+    #[Test]
     public function returns_has_saved_true_when_data_exists(): void
     {
         $this->createSavedAssist();
@@ -137,7 +138,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertJsonCount(2, 'sentence_translations');
     }
 
-    /** @test */
+    #[Test]
     public function returns_sentence_translations(): void
     {
         $this->createSavedAssist();
@@ -151,7 +152,7 @@ class AiReadingAssistCurrentTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function returns_summary(): void
     {
         $this->createSavedAssist();
@@ -161,7 +162,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertJsonPath('summary.vocabulary_item_count', 0);
     }
 
-    /** @test */
+    #[Test]
     public function does_not_return_other_users_data(): void
     {
         $this->createSavedAssist();
@@ -171,7 +172,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function language_isolation(): void
     {
         // User's selected_language is 'english', chapter language is 'english'
@@ -200,7 +201,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_word_sense(): void
     {
         $originalCount = \App\Models\WordSense::count();
@@ -209,7 +210,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\WordSense::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_review_card(): void
     {
         $originalCount = \App\Models\ReviewCard::count();
@@ -218,7 +219,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\ReviewCard::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_review_log(): void
     {
         $originalCount = \App\Models\ReviewLog::count();
@@ -227,7 +228,7 @@ class AiReadingAssistCurrentTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\ReviewLog::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_modify_encountered_word(): void
     {
         $originalCount = \App\Models\EncounteredWord::count();

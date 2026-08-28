@@ -8,6 +8,7 @@ use App\Models\ChapterAiReadingAssist;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AiReadingAssistLookupTest extends TestCase
@@ -90,21 +91,21 @@ class AiReadingAssistLookupTest extends TestCase
         ]));
     }
 
-    /** @test */
+    #[Test]
     public function requires_authentication(): void
     {
         $response = $this->getJson('/chapters/ai-assist/lookup/' . $this->chapter->id . '?word=landscape&lemma=landscape&sentence_index=0');
         $response->assertUnauthorized();
     }
 
-    /** @test */
+    #[Test]
     public function rejects_other_users_chapter(): void
     {
         $response = $this->actingAs($this->otherUser)->getJson('/chapters/ai-assist/lookup/' . $this->chapter->id . '?word=landscape&lemma=landscape&sentence_index=0');
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function returns_empty_when_no_data(): void
     {
         $chapter2 = Chapter::forceCreate([
@@ -128,7 +129,7 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonPath('phrase_suggestions', []);
     }
 
-    /** @test */
+    #[Test]
     public function matches_vocab_by_surface_and_sentence(): void
     {
         $response = $this->lookup('landscape', 'landscape', 0);
@@ -137,7 +138,7 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonPath('vocabulary_suggestions.0.meaning_zh', '思想图景；知识领域');
     }
 
-    /** @test */
+    #[Test]
     public function matches_vocab_by_lemma_and_sentence(): void
     {
         $response = $this->lookup('landscapes', 'landscape', 0);
@@ -145,7 +146,7 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonCount(1, 'vocabulary_suggestions');
     }
 
-    /** @test */
+    #[Test]
     public function does_not_match_wrong_sentence_index(): void
     {
         $response = $this->lookup('landscape', 'landscape', 999);
@@ -154,7 +155,7 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonCount(0, 'phrase_suggestions');
     }
 
-    /** @test */
+    #[Test]
     public function matches_phrase_by_trigger_word(): void
     {
         $response = $this->lookup('landscape', 'landscape', 0);
@@ -163,7 +164,7 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonPath('phrase_suggestions.0.phrase', 'intellectual landscape');
     }
 
-    /** @test */
+    #[Test]
     public function matches_phrase_by_word_in_phrase_text(): void
     {
         $response = $this->lookup('intellectual', 'intellectual', 0);
@@ -171,14 +172,14 @@ class AiReadingAssistLookupTest extends TestCase
         $response->assertJsonCount(1, 'phrase_suggestions');
     }
 
-    /** @test */
+    #[Test]
     public function user_isolation(): void
     {
         $response = $this->actingAs($this->otherUser)->getJson('/chapters/ai-assist/lookup/' . $this->chapter->id . '?word=landscape&lemma=landscape&sentence_index=0');
         $response->assertStatus(404);
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_learning_data(): void
     {
         $originalWordSense = \App\Models\WordSense::count();
@@ -194,7 +195,7 @@ class AiReadingAssistLookupTest extends TestCase
         $this->assertEquals($originalEncountered, \App\Models\EncounteredWord::count());
     }
 
-    /** @test */
+    #[Test]
     public function returns_safe_fields_only(): void
     {
         $response = $this->lookup('landscape', 'landscape', 0);

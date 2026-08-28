@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AiReadingAssistConfirmTest extends TestCase
@@ -92,7 +93,7 @@ class AiReadingAssistConfirmTest extends TestCase
         return $this->actingAs($this->user)->postJson('/chapters/ai-assist/confirm', $payload);
     }
 
-    /** @test */
+    #[Test]
     public function requires_authentication(): void
     {
         $response = $this->postJson('/chapters/ai-assist/confirm', [
@@ -102,7 +103,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    /** @test */
+    #[Test]
     public function rejects_other_users_chapter(): void
     {
         $otherChapter = Chapter::forceCreate([
@@ -125,7 +126,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertJsonPath('success', false);
     }
 
-    /** @test */
+    #[Test]
     public function saves_valid_payload(): void
     {
         $response = $this->confirm();
@@ -141,7 +142,7 @@ class AiReadingAssistConfirmTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function saves_sentence_translations(): void
     {
         $this->confirm()->assertOk();
@@ -152,7 +153,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals('This is a test.', $record->sentence_translations[0]['source_text']);
     }
 
-    /** @test */
+    #[Test]
     public function saves_vocabulary_items(): void
     {
         $this->confirm()->assertOk();
@@ -162,7 +163,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals('test', $record->vocabulary_items[0]['surface']);
     }
 
-    /** @test */
+    #[Test]
     public function saves_phrase_items(): void
     {
         $this->confirm()->assertOk();
@@ -172,7 +173,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals('test out', $record->phrase_items[0]['phrase']);
     }
 
-    /** @test */
+    #[Test]
     public function saves_warnings(): void
     {
         $this->confirm()->assertOk();
@@ -182,7 +183,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals('length', $record->warnings[0]['type']);
     }
 
-    /** @test */
+    #[Test]
     public function saves_summary_counts(): void
     {
         $this->confirm()->assertOk();
@@ -194,7 +195,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals(1, $record->summary['warning_count']);
     }
 
-    /** @test */
+    #[Test]
     public function overwrites_existing_same_chapter(): void
     {
         // First save
@@ -223,7 +224,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertCount(0, $record->vocabulary_items);
     }
 
-    /** @test */
+    #[Test]
     public function rejects_missing_schema_version(): void
     {
         $invalid = json_encode([
@@ -236,7 +237,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[Test]
     public function rejects_wrong_schema_version(): void
     {
         $invalid = json_encode([
@@ -250,7 +251,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertStatus(422);
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_word_sense(): void
     {
         $originalCount = \App\Models\WordSense::count();
@@ -258,7 +259,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\WordSense::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_review_card(): void
     {
         $originalCount = \App\Models\ReviewCard::count();
@@ -266,7 +267,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\ReviewCard::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_review_log(): void
     {
         $originalCount = \App\Models\ReviewLog::count();
@@ -274,7 +275,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\ReviewLog::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_modify_encountered_word(): void
     {
         $originalCount = \App\Models\EncounteredWord::count();
@@ -282,7 +283,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $this->assertEquals($originalCount, \App\Models\EncounteredWord::count());
     }
 
-    /** @test */
+    #[Test]
     public function user_isolation(): void
     {
         $response = $this->actingAs($this->otherUser)->postJson('/chapters/ai-assist/confirm', [
@@ -294,7 +295,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertJsonPath('success', false);
     }
 
-    /** @test */
+    #[Test]
     public function language_isolation(): void
     {
         // User's selected_language is 'english' and chapter language is 'english'
@@ -324,7 +325,7 @@ class AiReadingAssistConfirmTest extends TestCase
         $response->assertJsonPath('success', false);
     }
 
-    /** @test */
+    #[Test]
     public function returns_correct_summary(): void
     {
         $response = $this->confirm();
@@ -339,7 +340,7 @@ class AiReadingAssistConfirmTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function preserves_existing_preview_test_integrity(): void
     {
         // This test confirms confirm does not interfere with preview

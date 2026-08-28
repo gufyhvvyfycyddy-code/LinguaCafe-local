@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class AiReadingAssistSentenceAlignmentTest extends TestCase
@@ -74,7 +75,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         ]);
     }
 
-    /** @test */
+    #[Test]
     public function source_prompt_contains_sentence_list(): void
     {
         $response = $this->actingAs($this->user)
@@ -89,7 +90,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $this->assertStringContainsString('Here is the second one.', $prompt);
     }
 
-    /** @test */
+    #[Test]
     public function source_prompt_contains_correct_sentence_count(): void
     {
         $response = $this->actingAs($this->user)
@@ -99,7 +100,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $this->assertEquals(3, $response->json('sentence_count'));
     }
 
-    /** @test */
+    #[Test]
     public function preview_accepts_aligned_sentence_translations(): void
     {
         $payload = json_encode([
@@ -119,7 +120,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $response->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function preview_rejects_nonexistent_sentence_index(): void
     {
         $payload = json_encode([
@@ -138,7 +139,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $response->assertJsonPath('parsed', false);
     }
 
-    /** @test */
+    #[Test]
     public function confirm_rejects_nonexistent_sentence_index(): void
     {
         $payload = json_encode([
@@ -157,7 +158,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $response->assertJsonPath('success', false);
     }
 
-    /** @test */
+    #[Test]
     public function confirm_accepts_aligned_data(): void
     {
         $payload = json_encode([
@@ -177,7 +178,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $response->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function allows_missing_translations_with_warning(): void
     {
         $payload = json_encode([
@@ -199,7 +200,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $this->assertEquals(1, \App\Models\ChapterAiReadingAssist::count());
     }
 
-    /** @test */
+    #[Test]
     public function rejects_duplicate_sentence_index(): void
     {
         $payload = json_encode([
@@ -220,7 +221,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $response->assertOk();
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_learning_data_on_confirm(): void
     {
         $originalWordSense = \App\Models\WordSense::count();
@@ -250,7 +251,7 @@ class AiReadingAssistSentenceAlignmentTest extends TestCase
         $this->assertEquals($originalEncountered, \App\Models\EncounteredWord::count());
     }
 
-    /** @test */
+    #[Test]
     public function user_isolation(): void
     {
         $otherUser = User::forceCreate([

@@ -12,6 +12,7 @@ use App\Models\WordSenseOccurrence;
 use App\Services\WordSenseService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class WordSenseDestroyRestoreTest extends TestCase
@@ -382,7 +383,7 @@ class WordSenseDestroyRestoreTest extends TestCase
     //  H. permanent delete does not restore Known / Ignored / New
     // ════════════════════════════════════════════════════════════════
 
-    /** @dataProvider provideNonLearningStages */
+    #[DataProvider('provideNonLearningStages')]
     public function test_permanent_delete_does_not_restore_non_learning_stages(int $stage): void
     {
         $data = $this->createFullSenseWithCard("stage_{$stage}", $stage);

@@ -11,6 +11,7 @@ use App\Models\WordSenseOccurrence;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 class ReturnWordToNewTest extends TestCase
@@ -168,14 +169,14 @@ class ReturnWordToNewTest extends TestCase
             ->postJson('/vocabulary/word/delete', ['id' => $wordId]);
     }
 
-    /** @test */
+    #[Test]
     public function api_requires_authentication(): void
     {
         $response = $this->postJson('/vocabulary/word/delete', ['id' => 1]);
         $response->assertUnauthorized();
     }
 
-    /** @test */
+    #[Test]
     public function api_rejects_other_users_word(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7, $this->otherUser);
@@ -184,7 +185,7 @@ class ReturnWordToNewTest extends TestCase
         $response->assertStatus(500); // Word does not exist or belongs to different user
     }
 
-    /** @test */
+    #[Test]
     public function deletes_encountered_word(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
@@ -194,7 +195,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNull(EncounteredWord::find($ew->id));
     }
 
-    /** @test */
+    #[Test]
     public function rejects_sense_review_card_and_logs(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
@@ -227,7 +228,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertFalse($oc->auto_fsrs_allowed);
     }
 
-    /** @test */
+    #[Test]
     public function deletes_legacy_word_review_card_and_logs(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
@@ -243,7 +244,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNull(ReviewLog::find($log->id));
     }
 
-    /** @test */
+    #[Test]
     public function protects_other_users_data(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7, $this->user);
@@ -260,7 +261,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNotNull(EncounteredWord::find($otherEw->id));
     }
 
-    /** @test */
+    #[Test]
     public function protects_other_language_data(): void
     {
         $otherLangEw = EncounteredWord::forceCreate([
@@ -289,7 +290,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNotNull(EncounteredWord::find($otherLangEw->id));
     }
 
-    /** @test */
+    #[Test]
     public function protects_same_lemma_different_encountered_word(): void
     {
         $ew1 = $this->createEncounteredWord('phenomenology', -7);
@@ -310,7 +311,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNotNull(ReviewLog::find($log2->id));
     }
 
-    /** @test */
+    #[Test]
     public function newly_loaded_article_shows_word_as_new(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
@@ -322,7 +323,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertNull(EncounteredWord::find($ew->id));
     }
 
-    /** @test */
+    #[Test]
     public function does_not_create_review_log(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
@@ -332,7 +333,7 @@ class ReturnWordToNewTest extends TestCase
         $this->assertEquals($originalLogCount, ReviewLog::count());
     }
 
-    /** @test */
+    #[Test]
     public function does_not_modify_other_cards_due_at(): void
     {
         $ew = $this->createEncounteredWord('phenomenology', -7);
