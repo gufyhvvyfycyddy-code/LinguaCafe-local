@@ -380,8 +380,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 |---|---|---|---|---|
 | H-00 | DONE | deletion-first caller/data/compat convergence：只删 proven-dead dual path / duplicate proof metadata / unreachable implementation；保留仍承担 caller、persisted data、recovery、deep-link、import/export、legacy-language 或 released-interface 义务的 lower owner | Phase G architecture reports + current callers/tests + Private House/codebase-design deletion test | `a4629de` 移除 Reader AI Assist V1 write path；`c27af0e` 移除 inline Sense duplicate safety metadata；`98a1200` 移除 TextBlockService 不可达 ReaderData fallback；Saved Search、Tag/Marker、generic Browser、manual operation、Knowledge Hygiene、legacy ReviewCard endpoints 与 non-English lower mechanics 均有 fresh keep evidence；累计 JS/PHP/build/diff gate PASS |
 | H-01 | DONE | 建立最小可读的 load/observability harness | existing logs/health/tests; k6 + MySQL status + Laravel queue size | `h01-load-observability-harness-acceptance-2026-08-27.md`：testing-only 单 JSON contract；57 tests / 270 assertions；Lane04+PAB+k6 smoke PASS；能观测 P95/P99、DB connections、queue backlog、errors；Windows `php -S` 明确 `capacity_representative=false`；不建监控平台 |
-| H-02 | TODO | 100 同时在线的阅读/查词/复习负载 | current canonical flows | 无主流程错误；记录 P95/P99 和资源曲线；评分不重复 |
-| H-03 | TODO | 只针对实际瓶颈做性能修复 | H-02 evidence | 每个 index/cache/query/batch 都有实测瓶颈付费；复测证明改善 |
+| H-02 | DONE | 100 同时在线的阅读/查词/复习负载 | current canonical flows | `bc2cb433` + `h02-representative-load-acceptance-2026-08-28.md`：Apache/MySQL representative runtime；1/10/25/50/100 全阶梯；100 VU=300 requests、HTTP failure=0、33 ratings=33 ReviewLogs、duplicate=0、invalid FSRS=0；cleanup clean |
+| H-03 | ACTIVE | 只针对实际瓶颈做性能修复 | H-02 evidence | aggregate p95≈6.87s 先分解 login/setup、Reading、lookup、Sense Review latency，并关联 MySQL statement digests / query counts 与 Apache concurrency；每个 index/cache/query/batch/runtime tuning 都必须由实测瓶颈付费且复测证明改善 |
 | H-04 | TODO | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | backup 可恢复；write fence/完整性/失败路径；不触开发/生产数据 |
 | H-05 | TODO | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | normal + unauthorized + cross-user tests；真实页面 |
 | H-06 | TODO | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | 不引入短信成本除非当前需要；安全边界和 UX 通过 |
@@ -485,12 +485,20 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `G-06B / G-06C`（G-06B 24h silent early-review 已完成 prestage，等待 canonical integration；G-06C anti-duplicate 已关闭，source-example/full-pool/translation 继续）
-- Last DONE: `G-06A`
-- Current verified production/code baseline HEAD: `1c2a8711a34b77650ccb40160b3e5ce896a2a13d`（G-06A English-only canonical integration；其 predecessor `325c68ac` 已关闭 G-06C AI semantic anti-duplicate 子切片）
-- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-16 fresh fetch）
+- Active milestone: `H-03`（bottleneck-only performance repair；先分解 request/flow latency 与 MySQL/Apache pressure，不先做 speculative optimization）
+- Last DONE: `H-02`
+- Current verified production/code baseline HEAD: `bc2cb433101751e8c6922d8cc803137988bc0657`（H-02 representative runtime / load implementation；exact clean-commit 1→10→25→50→100 ladder PASS）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
+
+### CLOSED MILESTONE EVIDENCE — H-02
+
+- H-02 implementation commit `bc2cb433101751e8c6922d8cc803137988bc0657` 在 current-checkout `docker/PhpDockerfile` + testing-only `mysql + web` Compose 中完成 exact clean-commit 代表性容量验收；Apache process count=6，`capacity_representative=true`，MySQL 8 tmpfs，无 host MySQL port、无第二 production architecture。
+- exact commit 的 `1 → 10 → 25 → 50 → 100` total-VU ladder 全部 exit 0；100 VU 为 300 requests、failed rate=0、checks=1、33 rated cards=33 ReviewLogs、duplicate logs=0、invalid FSRS=0、queue backlog=0、new Laravel high-severity errors=0。p95 从 1 VU≈130ms 升至 100 VU≈6.87s。
+- H-02 期间修复了代表性 runtime 所必需的 Windows/WSL/Docker/Compose/8892/build/MySQL fresh migration/k6 CSRF/fail-closed/single-instance tooling defects；ReviewSettings 首次初始化收敛到既有 unique constraints + `createOrFirst()`，formal rating 保留单一 ReviewCard/ReviewLog/FSRS transaction owner并使用 Laravel native deadlock retry。真实 MySQL 多进程初始化回归连续 5/5 通过。
+- final cleanup：Compose services=0、8892 listener=0、H02 temp dirs=0、TestingDatabaseLease `active=false / stale_metadata=false`；无 destructive DB reset、`.env` 读取、notification、DCP 或 broad Docker prune。完整证据见 `docs/testing/h02-representative-load-acceptance-2026-08-28.md`。
+- H-03 已打开，但 H-02 aggregate percentile 混合 login/setup 与主流程请求；H-03 必须先做 request/flow latency decomposition + MySQL statement digest/query count + Apache concurrency diagnosis，禁止仅因 p95 高就直接加 index/cache/worker 或切换 server architecture。
 
 ### CLOSED MILESTONE EVIDENCE — B-07
 

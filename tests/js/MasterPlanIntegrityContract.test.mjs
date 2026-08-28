@@ -23,11 +23,12 @@ const fullExamplePoolAdr = read('docs/adr/ADR-0064-unbounded-real-example-random
 const recoveryMilestone = JSON.parse(read('docs/execution/CURRENT_MILESTONE.json'));
 
 // Current authority must be explicit and must not make the old Anki roadmap current again.
-assert.match(master, /Current authority — 2026-08-27/);
+assert.match(master, /Current authority — 2026-08-28/);
 assert.match(master, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18\.md/);
 assert.match(master, /Goal Phase G \+ G-GATE[\s\S]{0,200}H-01[\s\S]{0,120}DONE/);
 assert.match(master, /H-00[\s\S]*DONE/);
-assert.match(master, /H-01[\s\S]*DONE[\s\S]*H-02[\s\S]*100 concurrent-user load/);
+assert.match(master, /H-02[^\n]*DONE/);
+assert.match(master, /H-03[^\n]*bottleneck-only performance repair/);
 assert.match(master, /ADR-0061-reading-early-review-minimum-spacing-boundary\.md/);
 assert.match(master, /ADR-0062-reading-ai-matched-existing-source-example-binding\.md/);
 assert.match(master, /ADR-0063-reading-24h-silent-nonscoring-ux\.md/);
@@ -43,10 +44,12 @@ for (const id of ['G-06A', 'G-06B', 'G-06C', 'G-06D', 'G-06E', 'G-06F', 'G-06G',
 }
 const h00 = goal.indexOf('| H-00 | DONE |');
 const h01 = goal.indexOf('| H-01 | DONE |');
-const h02 = goal.indexOf('| H-02 | TODO |');
+const h02 = goal.indexOf('| H-02 | DONE |');
+const h03 = goal.indexOf('| H-03 | ACTIVE |');
 assert.ok(h00 > previous, 'H-00 must follow the completed Phase G gate');
 assert.ok(h01 > h00, 'H-01 must follow the completed H-00 deletion-first closeout');
 assert.ok(h02 > h01, 'H-02 must follow the completed H-01 load/observability harness');
+assert.ok(h03 > h02, 'H-03 must follow the completed H-02 representative load gate');
 assert.match(goal, /H-00[\s\S]*a4629de[\s\S]*c27af0e[\s\S]*98a1200/);
 assert.match(goal, /G-06B[\s\S]*24h[\s\S]*静默[\s\S]*Good[\s\S]*Again/);
 assert.match(goal, /G-06C[\s\S]*matched_existing[\s\S]*WordSenseOccurrence[\s\S]*译文显隐不移动英文/);
@@ -115,10 +118,11 @@ assert.match(productHistory, /ADR-0061/);
 assert.match(productHistory, /Historical \/ Superseded for forward product behavior on 2026-08-18/);
 
 // The minimal context and documentation router must lead new tasks to current authority first.
-assert.match(currentContext, /2026-08-27 current overlay/);
-assert.match(currentContext, /Goal plan 已完成 Phase G 与 G-GATE/);
+assert.match(currentContext, /2026-08-28 current overlay/);
+assert.match(currentContext, /Goal plan 已完成 Phase G\/G-GATE/);
 assert.match(currentContext, /H-00[\s\S]*DONE/);
-assert.match(currentContext, /H-01[\s\S]*DONE[\s\S]*H-02[\s\S]*100 concurrent-user load/);
+assert.match(currentContext, /H-02[^\n]*DONE/);
+assert.match(currentContext, /H-03[^\n]*performance repair/);
 assert.match(currentContext, /单窗口直接执行/);
 assert.match(currentContext, /ADR-0061/);
 assert.match(currentContext, /ADR-0062/);
