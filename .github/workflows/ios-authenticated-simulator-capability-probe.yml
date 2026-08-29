@@ -1,0 +1,289 @@
+name: iOS authenticated simulator capability probe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-ios:
+    runs-on: macos-26
+    timeout-minutes: 35
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8878
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: linguacafe_fsrs_test
+      DB_USERNAME: root
+      DB_PASSWORD: ''
+      APP_MAINTENANCE_DRIVER: file
+      BCRYPT_ROUNDS: '4'
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      PULSE_ENABLED: 'false'
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: file
+      TELESCOPE_ENABLED: 'false'
+      TESTING_DB_LEASE_DATABASE_ID: linguacafe-fsrs-testing-mysql
+      TESTING_DB_LEASE_WAIT_MS: '0'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Select Xcode and start simulator boot
+        run: |
+          set -euo pipefail
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$SIM_UDID"
+          echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM_UDID"
+
+      - name: Install PHP 8.4 and MySQL 8.4; pin Rust 1.98
+        run: |
+          set -euo pipefail
+          brew install php@8.4 mysql@8.4
+          PHP_PREFIX="$(brew --prefix php@8.4)"
+          MYSQL_PREFIX="$(brew --prefix mysql@8.4)"
+          printf '%s\n' "$PHP_PREFIX/bin" "$PHP_PREFIX/sbin" "$MYSQL_PREFIX/bin" >> "$GITHUB_PATH"
+          "$PHP_PREFIX/bin/php" -v
+          "$PHP_PREFIX/bin/php" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 80500 ? 0 : 1);'
+          "$PHP_PREFIX/bin/php" -r 'exit(extension_loaded("pdo_mysql") && extension_loaded("mbstring") && extension_loaded("openssl") ? 0 : 1);'
+          "$MYSQL_PREFIX/bin/mysql" --version
+          rustup toolchain install 1.98.0 --profile minimal --no-self-update
+          echo "RUSTUP_TOOLCHAIN=1.98.0" >> "$GITHUB_ENV"
+          rustup run 1.98.0 rustc --version
+
+      - name: Start MySQL and create isolated testing database
+        run: |
+          set -euo pipefail
+          brew services start mysql@8.4
+          for attempt in $(seq 1 60); do
+            if mysqladmin ping -uroot --silent; then
+              break
+            fi
+            sleep 1
+          done
+          mysqladmin ping -uroot --silent
+          mysql -uroot -e "CREATE DATABASE linguacafe_fsrs_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+      - name: Install verified Composer and project dependencies
+        run: |
+          set -euo pipefail
+          APP_KEY_VALUE="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
+          echo "::add-mask::$APP_KEY_VALUE"
+          echo "APP_KEY=$APP_KEY_VALUE" >> "$GITHUB_ENV"
+          EXPECTED_CHECKSUM="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
+          php -r "copy('https://getcomposer.org/installer', '$RUNNER_TEMP/composer-setup.php');"
+          ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '$RUNNER_TEMP/composer-setup.php');")"
+          test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM"
+          php "$RUNNER_TEMP/composer-setup.php" --quiet --install-dir="$RUNNER_TEMP" --filename=composer.phar
+          rm "$RUNNER_TEMP/composer-setup.php"
+          php "$RUNNER_TEMP/composer.phar" install --no-interaction --prefer-dist --no-progress
+
+      - name: Build and load pinned native FSRS extension
+        run: |
+          set -euo pipefail
+          FSRS_DIR="$RUNNER_TEMP/fsrs-rs-php"
+          git init "$FSRS_DIR"
+          git -C "$FSRS_DIR" remote add origin https://github.com/open-spaced-repetition/fsrs-rs-php.git
+          git -C "$FSRS_DIR" fetch --depth 1 origin 122299bc273ebecc07f5022b91939380951b5688
+          git -C "$FSRS_DIR" checkout --detach FETCH_HEAD
+          git -C "$FSRS_DIR" apply --check "$GITHUB_WORKSPACE/docker/fsrs-rs-php-php84.patch"
+          git -C "$FSRS_DIR" apply "$GITHUB_WORKSPACE/docker/fsrs-rs-php-php84.patch"
+          cargo update --manifest-path "$FSRS_DIR/Cargo.toml" -p ext-php-rs --precise 0.15.15
+          printf '%s  %s\n' '5fd0d9ce977385f4dd5039161f9568c72a9f5ee8343272648e3167a2973236c9' "$FSRS_DIR/Cargo.lock" | shasum -a 256 -c -
+          LIBCLANG_DYLIB="$(find "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/lib" -name libclang.dylib -print -quit)"
+          test -n "$LIBCLANG_DYLIB"
+          export LIBCLANG_PATH="$(dirname "$LIBCLANG_DYLIB")"
+          export RUSTFLAGS='-C link-arg=-Wl,-undefined,dynamic_lookup'
+          cargo build --manifest-path "$FSRS_DIR/Cargo.toml" --release --locked
+          FSRS_EXTENSION="$FSRS_DIR/target/release/libfsrs_rs_php.dylib"
+          test -f "$FSRS_EXTENSION"
+          PHP_SCAN_DIR="$(php --ini | awk -F': ' '/Scan for additional .ini files in:/{print $2}')"
+          mkdir -p "$RUNNER_TEMP/linguacafe-php-conf"
+          printf 'extension=%s\n' "$FSRS_EXTENSION" > "$RUNNER_TEMP/linguacafe-php-conf/99-fsrs.ini"
+          echo "PHP_INI_SCAN_DIR=$PHP_SCAN_DIR:$RUNNER_TEMP/linguacafe-php-conf" >> "$GITHUB_ENV"
+          PHP_INI_SCAN_DIR="$PHP_SCAN_DIR:$RUNNER_TEMP/linguacafe-php-conf" php -r '$p=get_default_parameters(); $f=new fsrs\FSRS($p); $s=$f->next_states(null, 0.9, 0); exit(extension_loaded("fsrs-rs-php") && class_exists("fsrs\\FSRS") && count($p) === 19 && $s->get_good()->get_interval() > 0 ? 0 : 1);'
+
+      - name: Prepare testing schema and one runtime identity
+        run: |
+          set -euo pipefail
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-ios-auth-migrate --wait-ms=0 -- \
+            php artisan migrate --env=testing --force
+          php vendor/bin/phpunit tests/Feature/TestingDatabaseHealthTest.php
+          export LC_TEST_EMAIL="ios-ci-$(uuidgen | tr '[:upper:]' '[:lower:]')@example.test"
+          export LC_TEST_PASSWORD="Aa1$(openssl rand -hex 12)"
+          echo "::add-mask::$LC_TEST_PASSWORD"
+          echo "LC_TEST_EMAIL=$LC_TEST_EMAIL" >> "$GITHUB_ENV"
+          echo "LC_TEST_PASSWORD=$LC_TEST_PASSWORD" >> "$GITHUB_ENV"
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-ios-auth-fixture --wait-ms=0 -- \
+            php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); app(App\Services\UserService::class)->createUser("iOS CI", getenv("LC_TEST_EMAIL"), getenv("LC_TEST_PASSWORD"), true, true);'
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM users WHERE email='$LC_TEST_EMAIL';")" = "1"
+
+      - name: Install mobile dependencies and verify mobile contracts
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm ci
+          npm test
+          npm run cap:sync:ios
+          npm run ios:generated-web-integrity
+
+      - name: Verify iOS source and resolve Swift packages
+        run: |
+          set -euo pipefail
+          node tests/js/M9IosMvpGuard.test.mjs
+          cd mobile/ios/App
+          xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+
+      - name: Compile unsigned iOS Simulator app
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Install pinned Maestro CLI
+        run: |
+          set -euo pipefail
+          curl -fL "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.7.0/maestro.zip" -o "$RUNNER_TEMP/maestro.zip"
+          echo "a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/maestro"
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro"
+          MAESTRO_BIN="$(find "$RUNNER_TEMP/maestro" -type f -path '*/bin/maestro' | head -1)"
+          test -n "$MAESTRO_BIN"
+          chmod +x "$MAESTRO_BIN"
+          echo "MAESTRO_BIN=$MAESTRO_BIN" >> "$GITHUB_ENV"
+          "$MAESTRO_BIN" --version
+
+      - name: Start PAB server and prove same-process testing sentinel
+        run: |
+          set -euo pipefail
+          PAB_LOG="$RUNNER_TEMP/pab-ios-auth.log"
+          APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php \
+            --label=macos-ios-auth-pab --wait-ms=0 -- \
+            php artisan serve --host=127.0.0.1 --port=8878 --no-reload \
+            > "$PAB_LOG" 2>&1 &
+          PAB_PID=$!
+          echo "PAB_PID=$PAB_PID" >> "$GITHUB_ENV"
+          SENTINEL_JSON=''
+          for attempt in $(seq 1 90); do
+            if SENTINEL_JSON="$(curl -fsS http://127.0.0.1:8878/__testing/acceptance-sentinel 2>/dev/null)"; then
+              break
+            fi
+            if ! kill -0 "$PAB_PID" 2>/dev/null; then
+              cat "$PAB_LOG"
+              exit 1
+            fi
+            sleep 1
+          done
+          printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
+
+      - name: Install and launch current iOS app
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
+          APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP_PATH"
+          xcrun simctl install "$LC_IOS_SIM_UDID" "$APP_PATH"
+          xcrun simctl launch "$LC_IOS_SIM_UDID" com.linguacafe.mobile
+          sleep 3
+
+      - name: Login through rendered iOS UI and prove relaunch persistence
+        run: |
+          set -euo pipefail
+          FLOW="$RUNNER_TEMP/ios-auth-login.yaml"
+          printf '%s\n' \
+            'appId: com.linguacafe.mobile' \
+            '---' \
+            '- launchApp:' \
+            '    clearState: true' \
+            '    clearKeychain: true' \
+            '- assertVisible: "IOS · CONNECTED MVP"' \
+            '- tapOn: "https://learn.example.com"' \
+            '- inputText: "http://127.0.0.1:8878"' \
+            '- tapOn: "邮箱"' \
+            '- inputText: ${TEST_EMAIL}' \
+            '- tapOn: "密码"' \
+            '- inputText: ${TEST_PASSWORD}' \
+            '- tapOn: "安全登录"' \
+            '- assertVisible: "在线"' \
+            '- assertVisible: "阅读"' \
+            '- assertVisible: "复习"' \
+            '- assertVisible: "生词"' \
+            '- assertVisible: "我的"' \
+            '- launchApp' \
+            '- assertVisible: "在线"' \
+            '- assertVisible: "我的"' \
+            > "$FLOW"
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
+            -e TEST_EMAIL="$LC_TEST_EMAIL" -e TEST_PASSWORD="$LC_TEST_PASSWORD" "$FLOW"
+
+      - name: Verify server token owner and ordinary Preferences boundary
+        run: |
+          set -euo pipefail
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_devices d JOIN users u ON u.id=d.user_id WHERE u.email='$LC_TEST_EMAIL' AND d.platform='ios' AND d.revoked_at IS NULL AND d.personal_access_token_id IS NOT NULL;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM personal_access_tokens p JOIN users u ON u.id=p.tokenable_id WHERE u.email='$LC_TEST_EMAIL';")" = "1"
+          DATA_CONTAINER="$(xcrun simctl get_app_container "$LC_IOS_SIM_UDID" com.linguacafe.mobile data)"
+          PREFS="$DATA_CONTAINER/Library/Preferences/com.linguacafe.mobile.plist"
+          test -f "$PREFS"
+          plutil -p "$PREFS" > "$RUNNER_TEMP/ios-preferences.txt"
+          if grep -q 'linguacafe-session-token' "$RUNNER_TEMP/ios-preferences.txt"; then
+            echo 'Web session token key leaked into ordinary iOS Preferences.' >&2
+            exit 1
+          fi
+          rm "$RUNNER_TEMP/ios-preferences.txt"
+
+      - name: Revoke device through rendered UI and prove token clearing
+        run: |
+          set -euo pipefail
+          FLOW="$RUNNER_TEMP/ios-auth-logout.yaml"
+          printf '%s\n' \
+            'appId: com.linguacafe.mobile' \
+            '---' \
+            '- launchApp' \
+            '- assertVisible: "在线"' \
+            '- tapOn: "我的"' \
+            '- assertVisible: "撤销此设备并退出"' \
+            '- tapOn: "撤销此设备并退出"' \
+            '- assertVisible: "安全登录"' \
+            '- launchApp' \
+            '- assertVisible: "安全登录"' \
+            '- assertVisible: "设备令牌由系统 Keychain 保护；应用不会保存密码。"' \
+            > "$FLOW"
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_devices d JOIN users u ON u.id=d.user_id WHERE u.email='$LC_TEST_EMAIL' AND d.platform='ios' AND d.revoked_at IS NOT NULL AND d.personal_access_token_id IS NULL;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM personal_access_tokens p JOIN users u ON u.id=p.tokenable_id WHERE u.email='$LC_TEST_EMAIL';")" = "0"
+
+      - name: Cleanup PAB, lease, database service, and simulator
+        if: always()
+        run: |
+          if [ -n "${PAB_PID:-}" ] && kill -0 "$PAB_PID" 2>/dev/null; then
+            kill "$PAB_PID" || true
+            wait "$PAB_PID" || true
+          fi
+          if [ -f vendor/autoload.php ]; then
+            php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'
+            if mysqladmin ping -uroot --silent 2>/dev/null; then
+              test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"
+            fi
+          fi
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          xcrun simctl shutdown "$LC_IOS_SIM_UDID" 2>/dev/null || true
+          brew services stop mysql@8.4 || true
