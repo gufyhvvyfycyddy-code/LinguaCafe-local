@@ -1,11 +1,11 @@
 # LinguaCafe 历史工作台与任务追溯文档
 
-> **历史追溯提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md` 和 `docs/execution/CURRENT_MILESTONE.json`。本文包含被既有文档 guard 锁定的历史正文，只在追溯某个任务时读取顶部状态区和相关段落，不是当前任务授权入口，不默认加载全文。
+> **历史追溯提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md` 和 `docs/DOCUMENTATION_INDEX.md`。`docs/execution/CURRENT_MILESTONE.json` 只保留已关闭 recovery-publication program 的历史状态，不再是当前 Goal 授权入口。本文包含被既有文档 guard 锁定的历史正文，只在追溯某个任务时读取顶部状态区和相关段落，不是当前任务授权入口，不默认加载全文。
 
-> **Current authority — 2026-08-28**
+> **Current authority — 2026-08-30**
 >
 > - **Forward product authority**：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。
-> - **Current execution roadmap**：Goal Phase G + G-GATE、pre-H `H-00`、`H-01` load/observability、`H-02` representative 100-user load、`H-03` bottleneck diagnostics、`H-04` backup/restore drill 与 `H-05` isolation/privacy boundary 均已 DONE。H-05 product commit=`62fcc2432ad707a27aeee420c7bbb4470d6d8563`，testing-browser session fix=`013c8afc38140f92d6a518e68d8eba57d64936cb`，验收见 `docs/testing/h05-isolation-privacy-boundary-acceptance-2026-08-28.md`。当前 milestone 为 `H-06` login/public authentication convergence：复用现有 email auth，收束公开登录/注册、错误语义、限流、session 与必要的账号恢复 UX；Apple/WeChat 仅作可选方案，短信无当前需求时不引入。用户当前启用单窗口直接执行，直到重新明确切回并行模式。
+> - **Current execution roadmap**：Goal Phase G + G-GATE、`H-00`–`H-09`、`H-11` 均已 DONE；E-06/E-07 Android capability 已关闭。`H-GATE` 已执行但保持 DEFERRED / Not Complete。2026-08-30 public GitHub `macos-26` continuation 已三次真实通过 Xcode 26.6、SwiftPM、unsigned Simulator build，后两轮完成 iPhone 17 Pro Simulator boot/install/launch；H-10/E-08 因 server-bound rendered iOS flow、authenticated Keychain、signed physical iPhone、signing/archive/TestFlight/App Store 仍缺证据而继续 DEFERRED。用户当前启用单窗口直接执行，直到重新明确切回并行模式。
 > - **Reader opportunistic early-review boundary**：`docs/adr/ADR-0061-reading-early-review-minimum-spacing-boundary.md` + `docs/adr/ADR-0063-reading-24h-silent-nonscoring-ux.md`。已学 review-state exact Sense 即使当前 due 在未来，也只有距上一笔有效正式评分满 24 个实际小时后才可因真实阅读回忆提前 Good；不足 24h 跨篇/跨 session 都只记 exposure，普通 Reader 完全静默，不显示 block/cooldown 提示；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”则 exact resolve 后最多一次 Again，并压住同 session 后续正向评分。ADR-0060/0059 只保留历史。
 > - **AI matched-existing source examples**：`docs/adr/ADR-0062-reading-ai-matched-existing-source-example-binding.md` + `docs/adr/ADR-0064-unbounded-real-example-random-rotation.md`。用户/Trust-AI 权威确认真实 Reader occurrence 属于 existing Sense 后，该真实句子必须通过 WordSenseOccurrence 进入现有唯一例句池；全部去重真实来源例句无 top-N 上限，从完整池随机轮换，多例句时不得连续重复同一 question example；AI 不生成虚构 source sentence，绑定/例句选择本身不写 ReviewLog/FSRS。
 > - 下方 2026-08-06 / 2026-07 历史状态继续保留用于追溯；与上述三条冲突时不再作为 current authority。

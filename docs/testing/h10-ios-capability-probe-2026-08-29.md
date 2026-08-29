@@ -223,10 +223,16 @@ H-10 did not:
 
 The Windows-generated SwiftPM backslash diff was removed precisely. The ignored generated iOS Web copy remains current local evidence and is not added to Git.
 
+## 2026-08-30 capability continuation
+
+This 2026-08-29 report remains the historical record of the Windows-only probe. On 2026-08-30, a standard GitHub-hosted `macos-26` runner became a verified, authorized read-only execution lane for the public `origin` repository. The continuation evidence is recorded in `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
+
+That continuation now provides real Xcode 26.6 compile, SwiftPM resolution, iOS Simulator boot/install/launch/terminate/shutdown evidence. It does not provide authenticated simulator main-flow, Keychain-at-rest, signed physical-device, archive, TestFlight, App Store Connect, or App Review evidence.
+
 ## H-10 state and H-11 boundary
 
-H-10 remains **DEFERRED / Not Complete** until the missing authorized macOS/Xcode/Apple/device capability exists.
+H-10 remains **DEFERRED / Not Complete** until the remaining authenticated simulator / physical-device / Apple signing and distribution capability is executed and accepted.
 
 The Goal roadmap permits the next final cross-platform regression to use **available iOS** only. H-11 may therefore proceed with full Web + Android regression while recording iOS as unavailable/deferred; doing so must not cause H-GATE to claim the iOS capability cluster is complete.
 
-If iOS capability becomes available before final Goal closure, H-10 must resume from the frozen playbook and H-11 must include the newly available iOS surface before H-GATE.
+If a **server-bound rendered iOS functional lane** becomes available before final Goal closure, H-10 must resume from the frozen playbook and H-11 must include that newly runnable iOS main-flow surface before H-GATE. The 2026-08-30 compile/basic-launch lane has already been consumed by H-10, but by itself does not make login/Reader/Review/offline/account-boundary UI runnable and therefore does not manufacture H-11 functional evidence.

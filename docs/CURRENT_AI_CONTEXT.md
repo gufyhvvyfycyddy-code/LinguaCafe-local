@@ -4,7 +4,7 @@
 > 日期：2026-08-30
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-30 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE、`H-00`–`H-09` 与当前主机可执行的 **H-11 final Web + Android regression**；H-11 backend/runtime repair commit=`eaab88a7a7d96d2c1078b4b5243210430a305970`，报告见 `docs/testing/h11-final-web-android-regression-acceptance-2026-08-29.md`。2026-08-30 又用真实 Android 16 / API 36 补齐历史 E-06/E-07 原生 capability gap，closure commit=`5448554e10fe6df093ac8fa1dd3832a35e312359`，报告见 `docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`；Reader 长按词组、Bottom Sheet/IME、Reviewer/haptics、下载文章、断网重启、离线 review、排队 Good、重连 sync、device revoke 和 Predictive Back 均有真实 Android 证据。**H-GATE final Goal completion audit 已执行，但状态为 DEFERRED / Not Complete**：fresh 当前主机仍是 Windows，无 xcodebuild/xcrun/codesign/simctl，Tailscale 在线 macOS peer=0；E-08/H-10 的真实 Xcode build、iOS simulator/device、Keychain runtime、signing/archive/TestFlight 不能由 Windows static evidence 替代。报告见 `docs/testing/h-gate-final-goal-completion-audit-2026-08-30.md`。因此当前没有可在此 Windows 主机继续执行的 A–H completion milestone；只有真实 Apple 能力可用时才重开 E-08/H-10/H-GATE。用户已明确启用单窗口直接执行；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
+> **2026-08-30 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE、`H-00`–`H-09` 与 **H-11 final Web + Android regression**；H-11 backend/runtime repair commit=`eaab88a7a7d96d2c1078b4b5243210430a305970`，报告见 `docs/testing/h11-final-web-android-regression-acceptance-2026-08-29.md`。2026-08-30 用真实 Android 16 / API 36 补齐 E-06/E-07 原生 capability gap，closure commit=`5448554e10fe6df093ac8fa1dd3832a35e312359`，报告见 `docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`。随后又通过 public `origin` 的标准 GitHub-hosted `macos-26` runner 三次真实执行 H-10 continuation：Xcode 26.6、Mobile 42/42、Capacitor iOS sync、generated-Web integrity、M9 guard、SwiftPM、`CODE_SIGNING_ALLOWED=NO` Simulator build 均 PASS；后两轮 iPhone 17 Pro Simulator boot/install/launch/terminate/shutdown PASS，见 `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`。**H-GATE 仍为 DEFERRED / Not Complete**：本地 Windows 仍无 Xcode/Tailscale Mac，但“完全没有 Xcode/simulator 能力”的旧边界已被上述 cloud macOS 证据收窄；剩余 blocker 是 server-bound rendered iOS main-flow、authenticated Keychain、signed physical iPhone、physical haptics/notification/audio/safe-area、Apple signing/archive、TestFlight/App Store/App Review。用户已明确启用单窗口直接执行；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
 ## 1. 当前代码事实
 
@@ -74,10 +74,7 @@ Android 12 模拟器范围与 M8 已 Accepted / Closed；2026-08-06 从 `f243a9c
 APK 没有最新设备复验，也不代表 release/AAB/签名/Play Store。M17 的 Web slice
 已关闭，其 Haptics/Notifications Android 事实属于 M7 平台证据；M18 的共享实现与
 Web/Android 离线音频证据已关闭。M10–M16 同样均已关闭。
-M9 的 22 个 iOS source/config 文件已在 `4be6c39` 入库并通过 Windows 静态审查，
-但 ignored iOS generated public 仍是旧 bundle、含 sourcemap，必须在授权
-macOS/Xcode 环境受控 sync 并通过资源完整性门禁后才能编译。Xcode、签名、
-iOS 模拟器/真机、TestFlight 与 App Store 能力簇仍 `Not Complete`。
+M9 的 22 个 iOS source/config 文件已在 `4be6c39` 入库。2026-08-30 continuation 已在真实 GitHub-hosted macOS/Xcode 26.6 环境重新执行 `cap sync ios`，并通过统一 generated-Web integrity、SwiftPM resolve、unsigned Simulator compile 与 iPhone 17 Pro Simulator boot/install/launch。iOS source/native compile/basic simulator capability 因而已有真实证据；server-bound rendered main-flow、authenticated Keychain、signed physical device、TestFlight 与 App Store 能力簇仍 `Not Complete`。
 
 Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动调度治理、专项学习会话、复习设置与负担模拟、Statistics/Card Info、Browser 数据治理、`.apkg` 与便携数据、自动推进/无障碍、媒体与离线音频。它们不要求等待 iOS 完成，但分别依赖 M1、M2、M6、M10 或移动端基础；旧 Tag/Statistics/Custom Study/Browser V2/Export 条目不得作为第二套重复任务执行。
 
@@ -94,7 +91,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics、H-04 backup/restore drill、H-05 isolation/privacy boundary、H-06 public authentication convergence、H-07 public runtime/cost gate、H-08 public package/content-rights gate、H-09 Android release readiness 与当前可执行的 H-11 final Web + Android regression 均已 DONE。H-10 iOS capability cluster 当前仍为 DEFERRED / Not Complete。当前 forward milestone 是 H-GATE：最终 Goal completion audit；H-GATE 必须继续保留 H-10 缺失能力，不能因 Web/Android 回归通过而声明完整跨平台 Goal 完成。
+“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics、H-04 backup/restore drill、H-05 isolation/privacy boundary、H-06 public authentication convergence、H-07 public runtime/cost gate、H-08 public package/content-rights gate、H-09 Android release readiness 与 H-11 final Web + Android regression 均已 DONE。H-10 iOS capability cluster 当前仍为 DEFERRED / Not Complete，但已从“Windows static only”推进为“真实 Xcode/SwiftPM/basic Simulator compile+launch accepted”。当前 forward boundary 仍是 H-GATE；必须继续保留 server-bound iOS main-flow、Keychain、physical device、signing/archive/TestFlight/App Store 缺失能力，不能因基础 simulator smoke 通过而声明完整跨平台 Goal 完成。
 
 ## 4. 当前本地维护账本
 

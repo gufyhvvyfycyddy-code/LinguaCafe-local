@@ -31,10 +31,10 @@
 - H-07 public runtime/cost gate 验收：`docs/testing/h07-public-runtime-and-cost-acceptance-2026-08-29.md`；架构决定见 `docs/adr/ADR-0066-h07-public-runtime-and-proxy-gate.md`，首次公开测试发布步骤见 `docs/release/h07-public-beta-deployment-runbook.md`
 - H-08 public package/content-rights gate 验收：`docs/testing/h08-public-package-rights-acceptance-2026-08-29.md`；公开 Docker/`git archive` 权利边界、SPDX/REUSE 风格第三方 notice、无来源旗帜退出公开包
 - H-09 Android release readiness 验收：`docs/testing/h09-android-release-readiness-acceptance-2026-08-29.md`；API 36、AAB/release signing、Play privacy/Data Safety 准备、Android 16 真实设备 smoke 与 cleanup
-- H-10 iOS capability probe：`docs/testing/h10-ios-capability-probe-2026-08-29.md`；Windows-static/iOS generated-Web 可复核，但无 Xcode/Apple/macOS/device 能力，真实 iOS build/Keychain/TestFlight 保持 DEFERRED
+- H-10 iOS capability probe：历史 Windows-only 边界见 `docs/testing/h10-ios-capability-probe-2026-08-29.md`；2026-08-30 macOS continuation 见 `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`，已真实证明 Xcode 26.6/SwiftPM/unsigned Simulator build + iPhone 17 Pro boot/install/launch；server-bound iOS main-flow、authenticated Keychain、physical device、signing/TestFlight/App Store 仍 DEFERRED
 - H-11 final Web + Android regression：`docs/testing/h11-final-web-android-regression-acceptance-2026-08-29.md`；PHP 8.4/native FSRS、真实 Web 主流程和 Android 16 login/offline/reconnect/device revoke 已关闭
 - E-06/E-07 Android native capability closure：`docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`；真实 Android 16 长按词组、Reviewer/haptics、下载/离线/reconnect/sync、Predictive Back 已关闭历史 Android capability cluster
-- H-GATE final audit：`docs/testing/h-gate-final-goal-completion-audit-2026-08-30.md`；当前 Windows/Web/Android 全部 stage-accepted，但 E-08/H-10 Apple/iOS capability 未清零，因此完整 A–H Goal 为 DEFERRED / Not Complete
+- H-GATE final audit：`docs/testing/h-gate-final-goal-completion-audit-2026-08-30.md`；Windows/Web/Android 已 stage-accepted，后续 cloud macOS continuation 又补齐 Xcode/SwiftPM/basic Simulator compile+launch，但 E-08/H-10 的 authenticated iOS flow、physical device/Keychain/signing/TestFlight/App Store 未清零，因此完整 A–H Goal 仍为 DEFERRED / Not Complete
 - 长期历史总账与运维登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论历史：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 历史 Anki-aligned 产品/架构路线：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`

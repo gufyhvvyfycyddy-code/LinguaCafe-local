@@ -6,9 +6,9 @@
 
 **H-GATE = DEFERRED / Not Complete.**
 
-The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires real Apple/iOS capability evidence when iOS is part of the final target, and that capability is still unavailable on the current host.
+The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires the complete Apple/iOS capability cluster when iOS is part of the final target. A 2026-08-30 continuation has since recovered real macOS/Xcode/SwiftPM/basic iOS Simulator capability through a standard GitHub-hosted `macos-26` runner, but authenticated simulator main-flow, physical-device, Keychain, signing/archive and TestFlight/App Store evidence remain unaccepted.
 
-This is an external capability boundary, not a newly discovered LinguaCafe product-code regression.
+This is a narrowed external capability boundary, not a newly discovered LinguaCafe product-code regression.
 
 Do not emit `LINGUACAFE_A_H_GOAL_COMPLETE` until the remaining iOS capability cluster has been executed and accepted.
 
@@ -120,26 +120,34 @@ The final audit reran the checks that can materially change at this stage:
 
 After the H-GATE row update, the mechanical milestone inventory is **71 DONE / 3 DEFERRED / 0 TODO**. The three DEFERRED rows are `E-08`, `H-10` and `H-GATE`; all three point to the same remaining Apple/iOS execution capability boundary rather than three independent product defects.
 
-## Fresh Apple capability probe
+## Apple capability continuation after the original H-GATE probe
 
-The current host remains Windows/x86_64. Fresh command availability check found:
+The original H-GATE probe correctly found that the local host remains Windows/x86_64, with no local `xcodebuild`, `xcrun`, `codesign` or `simctl`, and no online macOS Tailscale peer. That local-host fact remains true.
 
-- `xcodebuild`: MISSING;
-- `xcrun`: MISSING;
-- `codesign`: MISSING;
-- `simctl`: MISSING.
+After that audit, the actual `origin` repository was freshly confirmed public and a bounded standard GitHub-hosted `macos-26` lane was added. Three real macOS runs were executed. Runs `33264818165`, `33264963006` and `33265308947` all succeeded; the latter two include iOS Simulator boot/install/launch.
 
-Fresh Tailscale capability inspection found **0 online macOS peers** available for delegated Xcode/device work.
+The continuation now proves:
 
-The following evidence therefore still does not exist and must not be simulated or inferred from Windows static checks:
+- macOS 26.5.2 + Xcode 26.6 (`17F113`);
+- Mobile 42/42 and Capacitor iOS sync on macOS;
+- generated-Web integrity after sync;
+- SwiftPM resolution under the actual Xcode toolchain;
+- unsigned iOS Simulator compile with `CODE_SIGNING_ALLOWED=NO`;
+- an available iPhone 17 Pro Simulator can boot;
+- the built `App.app` installs and `com.linguacafe.mobile` launches without immediate process-start failure;
+- simulator terminate/shutdown cleanup succeeds.
 
-- real Xcode compile/archive;
-- iOS simulator or physical-device execution of the shared main flows;
-- native Keychain at-rest runtime verification;
-- Apple signing/archive validation;
-- TestFlight/App Store delivery evidence.
+The following completion-required evidence still does not exist and must not be inferred from that compile/launch smoke:
 
-M9/E-08 static source checks passing on Windows do not substitute for those platform capabilities.
+- rendered server-bound iOS simulator main-flow acceptance for login/relaunch, Reader, Review/undo, text import, offline/sync and logout scope clearing;
+- authenticated Keychain at-rest verification;
+- signed physical-iPhone installation and physical haptics/notification/audio/safe-area behavior;
+- Apple team/provisioning and signed archive validation;
+- App Store Connect processing, TestFlight install and App Review evidence.
+
+Full continuation evidence: `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
+
+This basic compile/launch capability does not retroactively create an H-11 iOS main-flow lane. H-11's iOS scope becomes runnable only when the simulator/device can be bound to the required testing server and exercised through rendered UI/user events; if that capability appears before final Goal closure, H-11 must be extended before H-GATE can pass.
 
 ## Definition of Done audit
 
@@ -152,7 +160,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **FAIL / capability unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/basic simulator compile+launch PASS; authenticated simulator flow, physical device, Keychain, signing and TestFlight remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;
@@ -182,15 +190,15 @@ It is **not a complete cross-platform A–H Goal release** and is **not App Stor
 
 ## Reopen condition
 
-H-GATE should be reopened only when a real Apple-capable environment is available, for example a local or connected macOS host with Xcode and the required signing/device access.
+H-GATE remains open only on the portion of the Apple capability cluster that the new public macOS runner cannot honestly close.
 
-At that time the minimum remaining work is:
+The minimum remaining work is:
 
-1. rerun E-08/H-10 from current Goal HEAD on macOS;
-2. real Xcode build;
-3. simulator and/or physical-device main-flow smoke as required by the existing iOS playbook;
-4. Keychain runtime verification;
-5. signing/archive validation and TestFlight evidence if the final Goal still requires store readiness;
+1. run the existing server-bound iOS functional matrix when an authorized testing backend and rendered iOS UI automation/device lane are available;
+2. perform authenticated Keychain runtime verification;
+3. repeat the critical matrix on a signed physical iPhone, including physical haptics/notification/audio/safe-area behavior;
+4. perform Apple team/provisioning and signed archive validation;
+5. obtain TestFlight/App Store Connect evidence if the final Goal still requires store readiness;
 6. rerun H-GATE and mark DONE only if the deferred cluster is fully cleared.
 
 Until then, the accurate project status is:
