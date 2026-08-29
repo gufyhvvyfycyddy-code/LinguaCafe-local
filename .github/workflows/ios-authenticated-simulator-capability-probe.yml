@@ -176,6 +176,7 @@ jobs:
         run: |
           set -euo pipefail
           PAB_LOG="$RUNNER_TEMP/pab-ios-auth.log"
+          echo "PAB_LOG=$PAB_LOG" >> "$GITHUB_ENV"
           APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php \
             --label=macos-ios-auth-pab --wait-ms=0 -- \
             php artisan serve --host=127.0.0.1 --port=8878 --no-reload \
@@ -223,6 +224,9 @@ jobs:
             '- tapOn: "密码"' \
             '- inputText: ${TEST_PASSWORD}' \
             '- tapOn: "安全登录"' \
+            '- tapOn:' \
+            '    text: "Allow"' \
+            '    optional: true' \
             '- assertVisible: "在线"' \
             '- assertVisible: "阅读"' \
             '- assertVisible: "复习"' \
@@ -232,8 +236,18 @@ jobs:
             '- assertVisible: "在线"' \
             '- assertVisible: "我的"' \
             > "$FLOW"
+          set +e
           "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
             -e TEST_EMAIL="$LC_TEST_EMAIL" -e TEST_PASSWORD="$LC_TEST_PASSWORD" "$FLOW"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            if [ -f "$PAB_LOG" ]; then
+              grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 80 || true
+            fi
+            exit "$STATUS"
+          fi
 
       - name: Verify server token owner and ordinary Preferences boundary
         run: |

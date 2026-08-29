@@ -62,6 +62,7 @@ for (const dataType of ['Name', 'EmailAddress', 'UserID', 'DeviceID', 'OtherUser
 }
 assert.match(privacy, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
 assert.match(infoPlist, /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsLocalNetworking<\/key>\s*<true\/>\s*<\/dict>/);
+assert.match(infoPlist, /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]+<\/string>/);
 assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 
 assert.match(api, /platform: 'android' \| 'ios' \| 'web'/);
