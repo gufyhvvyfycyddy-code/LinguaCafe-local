@@ -239,7 +239,7 @@ jobs:
             '- inputText: ${TEST_PASSWORD}' \
             '- tapOn: "安全登录"' \
             '- extendedWaitUntil:' \
-            '    visible: "在线"' \
+            '    visible: "首页"' \
             '    timeout: 60000' \
             '- assertVisible: "阅读"' \
             '- assertVisible: "复习"' \
@@ -247,8 +247,11 @@ jobs:
             '- assertVisible: "我的"' \
             '- launchApp' \
             '- extendedWaitUntil:' \
-            '    visible: "在线"' \
+            '    visible: "首页"' \
             '    timeout: 60000' \
+            '- assertVisible: "阅读"' \
+            '- assertVisible: "复习"' \
+            '- assertVisible: "生词"' \
             '- assertVisible: "我的"' \
             > "$FLOW"
           set +e
@@ -287,8 +290,13 @@ jobs:
             'appId: com.linguacafe.mobile' \
             '---' \
             '- launchApp' \
-            '- assertVisible: "在线"' \
+            '- extendedWaitUntil:' \
+            '    visible: "首页"' \
+            '    timeout: 60000' \
             '- tapOn: "我的"' \
+            '- extendedWaitUntil:' \
+            '    visible: "已连接"' \
+            '    timeout: 30000' \
             '- assertVisible: "撤销此设备并退出"' \
             '- tapOn: "撤销此设备并退出"' \
             '- assertVisible: "安全登录"' \
