@@ -36,10 +36,10 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v6
 
-      - name: Install PHP 8.4, MySQL 8.4, and Rust
+      - name: Install PHP 8.4 and MySQL 8.4; pin Rust 1.98
         run: |
           set -euo pipefail
-          brew install php@8.4 mysql@8.4 rust
+          brew install php@8.4 mysql@8.4
           PHP_PREFIX="$(brew --prefix php@8.4)"
           MYSQL_PREFIX="$(brew --prefix mysql@8.4)"
           printf '%s\n' "$PHP_PREFIX/bin" "$PHP_PREFIX/sbin" "$MYSQL_PREFIX/bin" >> "$GITHUB_PATH"
@@ -47,8 +47,10 @@ jobs:
           "$PHP_PREFIX/bin/php" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 80500 ? 0 : 1);'
           "$PHP_PREFIX/bin/php" -r 'exit(extension_loaded("pdo_mysql") && extension_loaded("mbstring") && extension_loaded("openssl") ? 0 : 1);'
           "$MYSQL_PREFIX/bin/mysql" --version
-          rustc --version
-          cargo --version
+          rustup toolchain install 1.98.0 --profile minimal --no-self-update
+          echo "RUSTUP_TOOLCHAIN=1.98.0" >> "$GITHUB_ENV"
+          rustup run 1.98.0 rustc --version
+          rustup run 1.98.0 cargo --version
 
       - name: Start MySQL and create isolated testing database
         run: |
