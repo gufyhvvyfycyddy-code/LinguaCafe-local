@@ -214,7 +214,10 @@ class MobileOperationLedgerTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.replayed', true);
 
-        $this->assertSame($first->json('data.operation'), $second->json('data.operation'));
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($first->json('data.operation'), JSON_THROW_ON_ERROR),
+            json_encode($second->json('data.operation'), JSON_THROW_ON_ERROR),
+        );
         $this->assertSame(2, OperationChange::count());
         $this->assertSame(1, ReviewLog::count());
         $this->assertSame(0, $card->fresh()->fsrs_reps);

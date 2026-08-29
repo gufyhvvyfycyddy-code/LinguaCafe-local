@@ -345,7 +345,11 @@ class ReadingReviewConcurrencyContractTest extends TestCase
 
         $this->assertSame(1, ReviewLog::where('review_card_id', $this->card->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->count());
         $this->assertSame(1, $this->explicitActionCount($actionId));
-        $this->assertSame($first->json(), $second->json(), 'Same reading_action_id must replay the exact stored response payload.');
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($first->json(), JSON_THROW_ON_ERROR),
+            json_encode($second->json(), JSON_THROW_ON_ERROR),
+            'Same reading_action_id must replay the same stored JSON response payload.',
+        );
         $this->assertSame($actionId, $second->json('action.reading_action_id'));
     }
 
@@ -365,7 +369,11 @@ class ReadingReviewConcurrencyContractTest extends TestCase
         ]);
 
         $retry->assertOk();
-        $this->assertSame($first->json(), $retry->json(), 'Exact action UUID replay must win before later card/rating/occurrence drift is revalidated.');
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($first->json(), JSON_THROW_ON_ERROR),
+            json_encode($retry->json(), JSON_THROW_ON_ERROR),
+            'Exact action UUID replay must win before later card/rating/occurrence drift is revalidated.',
+        );
         $this->assertSame(1, $this->explicitLogs()->count());
         $this->assertSame(1, $this->explicitActionCount($actionId));
     }
@@ -692,7 +700,11 @@ class ReadingReviewConcurrencyContractTest extends TestCase
                 'reading_action_id' => $secondActionId,
                 'ignoreDailyLimits' => true,
             ])->assertOk();
-            $this->assertSame($second->json(), $retry->json(), 'Silent non-scoring action replay must win before retry input drift is revalidated.');
+            $this->assertJsonStringEqualsJsonString(
+                json_encode($second->json(), JSON_THROW_ON_ERROR),
+                json_encode($retry->json(), JSON_THROW_ON_ERROR),
+                'Silent non-scoring action replay must win before retry input drift is revalidated.',
+            );
             $this->assertSame(1, $this->activeExplicitLogs()->count());
         } finally {
             Carbon::setTestNow();

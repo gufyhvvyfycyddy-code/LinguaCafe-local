@@ -27,6 +27,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(RejectWritesDuringRestore::class);
         $middleware->preventRequestsDuringMaintenance(['backup-restores/*']);
 
+        if ($trustedProxies = env('TRUSTED_PROXIES')) {
+            $middleware->trustProxies(at: $trustedProxies);
+        }
+
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
         ]);

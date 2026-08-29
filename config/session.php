@@ -103,6 +103,8 @@ return [
 
     'store' => env('SESSION_STORE'),
 
+    'serialization' => 'json',
+
     /*
     |--------------------------------------------------------------------------
     | Session Sweeping Lottery

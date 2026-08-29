@@ -102,7 +102,10 @@ class E04MobileReadingOperationsTest extends TestCase
             ->assertJsonPath('data.results.1.data.review_log_id', null)
             ->assertJsonPath('data.results.1.data.scored', false);
 
-        $this->assertSame($first->json('data.results.1.data'), $second->json('data.results.1.data'));
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($first->json('data.results.1.data'), JSON_THROW_ON_ERROR),
+            json_encode($second->json('data.results.1.data'), JSON_THROW_ON_ERROR),
+        );
         $this->assertSame(0, ReviewLog::where('review_card_id', $fixture['card']->id)->where('source', ReviewLog::SOURCE_READING_EXPLICIT)->count());
         $this->assertSame(0, Operation::where('review_card_id', $fixture['card']->id)->count());
         $this->assertSame(0, ReadingSessionCardSettlement::where('review_card_id', $fixture['card']->id)->count());

@@ -600,11 +600,11 @@ class CustomStudySessionTokenServiceTest extends TestCase
 
     public function test_issue_throws_when_token_exceeds_max_bytes(): void
     {
-        // Create a mock Encrypter that returns an oversized token
-        $mockEncrypter = $this->createMock(Encrypter::class);
-        $mockEncrypter->method('encrypt')->willReturn(str_repeat('X', CustomStudySessionTokenService::MAX_TOKEN_BYTES + 1));
+        // The encrypter only supplies an oversized return value; no interaction expectation is needed.
+        $encrypter = $this->createStub(Encrypter::class);
+        $encrypter->method('encrypt')->willReturn(str_repeat('X', CustomStudySessionTokenService::MAX_TOKEN_BYTES + 1));
 
-        $service = new CustomStudySessionTokenService($mockEncrypter);
+        $service = new CustomStudySessionTokenService($encrypter);
         $state = $this->createValidState();
 
         $this->expectException(CustomStudySessionStateException::class);

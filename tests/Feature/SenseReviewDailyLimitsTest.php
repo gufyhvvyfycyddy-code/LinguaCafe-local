@@ -85,7 +85,7 @@ class SenseReviewDailyLimitsTest extends TestCase
             'language' => $this->language,
             'review_card_id' => $card->id,
             'rating' => 'good',
-            'reviewed_at' => Carbon::now()->subHours(1),
+            'reviewed_at' => Carbon::now()->startOfDay(),
             'previous_state' => 'review',
             'new_state' => 'review',
             'previous_stability' => 10.0,

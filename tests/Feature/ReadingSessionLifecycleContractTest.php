@@ -213,14 +213,23 @@ class ReadingSessionLifecycleContractTest extends TestCase
 
         $first->assertOk();
         $second->assertOk();
-        $this->assertSame($stored, $first->json());
-        $this->assertSame($stored, $second->json());
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($stored, JSON_THROW_ON_ERROR),
+            json_encode($first->json(), JSON_THROW_ON_ERROR),
+        );
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($stored, JSON_THROW_ON_ERROR),
+            json_encode($second->json(), JSON_THROW_ON_ERROR),
+        );
         $this->assertSame($before, $this->scopedCounts());
         $this->assertSame($beforeSession, $this->sessionSnapshot());
         $this->assertSame($beforeCard, $this->cardSnapshot());
-        $this->assertSame(
-            $stored,
-            ReadingSessionCompletion::where('reading_session_id', $this->session->id)->firstOrFail()->result,
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($stored, JSON_THROW_ON_ERROR),
+            json_encode(
+                ReadingSessionCompletion::where('reading_session_id', $this->session->id)->firstOrFail()->result,
+                JSON_THROW_ON_ERROR,
+            ),
         );
     }
 

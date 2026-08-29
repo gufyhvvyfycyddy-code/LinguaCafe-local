@@ -11,7 +11,7 @@ class H04BackupRestoreDrillContractTest extends TestCase
         $dockerfile = file_get_contents(base_path('docker/PhpDockerfile'));
 
         $this->assertIsString($dockerfile);
-        $this->assertStringContainsString('FROM php:8.2-apache-trixie', $dockerfile);
+        $this->assertStringContainsString('FROM php:8.4-apache-trixie', $dockerfile);
         $this->assertStringContainsString('repo.mysql.com/apt/debian/ trixie mysql-8.4-lts', $dockerfile);
         $this->assertStringContainsString('mysql-community-client', $dockerfile);
         $this->assertStringNotContainsString('default-mysql-client', $dockerfile);
@@ -26,7 +26,7 @@ class H04BackupRestoreDrillContractTest extends TestCase
         $this->assertSame(1, preg_match('/^\s{4}mysql:\s*$/m', $compose));
         $this->assertSame(1, preg_match('/^\s{4}redis:\s*$/m', $compose));
         $this->assertSame(1, preg_match('/^\s{4}web:\s*$/m', $compose));
-        $this->assertStringContainsString('mysql:8.0', $compose);
+        $this->assertStringContainsString('mysql:8.4', $compose);
         $this->assertStringContainsString('redis:7.2-alpine', $compose);
         $this->assertStringContainsString('/var/lib/mysql', $compose);
         $this->assertStringContainsString('127.0.0.1:8894:80', $compose);

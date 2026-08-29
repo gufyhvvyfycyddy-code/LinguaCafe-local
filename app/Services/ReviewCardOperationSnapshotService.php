@@ -24,6 +24,12 @@ class ReviewCardOperationSnapshotService
         ];
     }
 
+    /**
+     * Wire-compatible preview/apply fingerprint.
+     *
+     * Keep capture key order here: existing clients send this exact fingerprint
+     * back on apply. JSON-store normalization is handled only by matches().
+     */
     public function fingerprint(array $snapshot): string
     {
         $this->validate($snapshot);
@@ -34,6 +40,12 @@ class ReviewCardOperationSnapshotService
         ));
     }
 
+    /**
+     * Compare persisted snapshots semantically.
+     *
+     * MySQL JSON may reorder object members, so associative keys are
+     * canonicalized here while list order remains significant.
+     */
     public function matches(ReviewCard $card, array $snapshot): bool
     {
         try {
@@ -43,9 +55,36 @@ class ReviewCardOperationSnapshotService
         }
 
         return hash_equals(
-            $this->fingerprint($snapshot),
-            $this->fingerprint($this->capture($card)),
+            $this->semanticFingerprint($snapshot),
+            $this->semanticFingerprint($this->capture($card)),
         );
+    }
+
+    private function semanticFingerprint(array $snapshot): string
+    {
+        $canonical = $this->canonicalize($snapshot);
+
+        return hash('sha256', json_encode(
+            $canonical,
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        ));
+    }
+
+    private function canonicalize(mixed $value): mixed
+    {
+        if (! is_array($value)) {
+            return $value;
+        }
+
+        if (! array_is_list($value)) {
+            ksort($value);
+        }
+
+        foreach ($value as $key => $item) {
+            $value[$key] = $this->canonicalize($item);
+        }
+
+        return $value;
     }
 
     public function restore(ReviewCard $card, array $snapshot): void

@@ -75,6 +75,66 @@ class H02ReviewSettingsInitializationConcurrencyTest extends TestCase
         }
     }
 
+    public function test_same_user_can_initialize_review_settings_concurrently_without_duplicate_preset_or_binding(): void
+    {
+        $user = User::forceCreate([
+            'name' => 'H07 Same User Preset Concurrency',
+            'email' => 'h07-same-user-preset-'.Str::uuid().'@example.test',
+            'password' => Hash::make('password'),
+            'selected_language' => 'english',
+            'password_changed' => true,
+            'is_admin' => false,
+            'uuid' => (string) Str::uuid(),
+        ]);
+
+        $workers = [];
+
+        try {
+            foreach (range(1, 8) as $_) {
+                $workers[] = $this->startResolverProcess((int) $user->id);
+            }
+
+            foreach ($workers as [, $pipes]) {
+                fwrite($pipes[0], "go\n");
+                fclose($pipes[0]);
+            }
+
+            foreach ($workers as [$process, $pipes]) {
+                $stdout = stream_get_contents($pipes[1]);
+                $stderr = stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $exitCode = proc_close($process);
+
+                $this->assertSame(
+                    0,
+                    $exitCode,
+                    "Same-user concurrent review-settings initialization failed.\nSTDOUT: {$stdout}\nSTDERR: {$stderr}",
+                );
+            }
+
+            $this->assertSame(
+                1,
+                ReviewSettingPreset::query()
+                    ->where('user_id', $user->id)
+                    ->where('name', 'Default')
+                    ->where('is_default', true)
+                    ->count(),
+            );
+            $this->assertSame(
+                1,
+                ReviewSettingPresetBinding::query()
+                    ->where('user_id', $user->id)
+                    ->where('language_id', 'english')
+                    ->count(),
+            );
+        } finally {
+            ReviewSettingPresetBinding::query()->where('user_id', $user->id)->delete();
+            ReviewSettingPreset::query()->where('user_id', $user->id)->delete();
+            $user->delete();
+        }
+    }
+
     /**
      * @return array{0: resource, 1: array<int, resource>}
      */

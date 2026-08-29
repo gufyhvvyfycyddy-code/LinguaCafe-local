@@ -5,7 +5,7 @@ namespace Tests\Unit;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Encryption\Encrypter;
-use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
+use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\Request;
 use Illuminate\Session\ArraySessionHandler;
 use Illuminate\Session\Store;
@@ -64,13 +64,13 @@ class LanguageSelectionCsrfMiddlewareTest extends TestCase
         ];
     }
 
-    private function middleware(): VerifyCsrfToken
+    private function middleware(): PreventRequestForgery
     {
         $application = Mockery::mock(Application::class);
         $application->shouldReceive('runningInConsole')->andReturn(false);
         $application->shouldReceive('runningUnitTests')->andReturn(false);
 
-        $middleware = new class($application, new Encrypter(str_repeat('r', 32), 'AES-256-CBC')) extends VerifyCsrfToken
+        $middleware = new class($application, new Encrypter(str_repeat('r', 32), 'AES-256-CBC')) extends PreventRequestForgery
         {
             public function disableResponseCookie(): self
             {

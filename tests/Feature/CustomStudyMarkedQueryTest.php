@@ -81,7 +81,7 @@ class CustomStudyMarkedQueryTest extends TestCase
             'lifecycle_state' => ReviewCard::LIFECYCLE_ACTIVE,
         ]);
 
-        $query = $this->query();
+        $query = $this->markedQuery();
         $this->assertInstanceOf(Builder::class, $query);
         $this->assertSame([$included->id], $query->pluck('review_cards.id')->all());
 
@@ -98,7 +98,7 @@ class CustomStudyMarkedQueryTest extends TestCase
             'buried_until' => $this->now->copy()->subMinute(),
         ]);
 
-        $this->assertSame([$card->id], $this->query()->pluck('review_cards.id')->all());
+        $this->assertSame([$card->id], $this->markedQuery()->pluck('review_cards.id')->all());
     }
 
     public function test_query_is_read_only(): void
@@ -109,14 +109,14 @@ class CustomStudyMarkedQueryTest extends TestCase
         $senseBefore = $sense->fresh()->getRawOriginal();
         $logsBefore = ReviewLog::count();
 
-        $this->query()->get();
+        $this->markedQuery()->get();
 
         $this->assertSame($cardBefore, $card->fresh()->getRawOriginal());
         $this->assertSame($senseBefore, $sense->fresh()->getRawOriginal());
         $this->assertSame($logsBefore, ReviewLog::count());
     }
 
-    private function query(): Builder
+    private function markedQuery(): Builder
     {
         return (new MarkedQuery(app(SenseReviewQueryService::class)))
             ->build($this->user->id, 'english', $this->now);

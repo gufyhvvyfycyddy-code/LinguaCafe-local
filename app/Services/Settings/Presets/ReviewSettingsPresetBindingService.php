@@ -4,6 +4,7 @@ namespace App\Services\Settings\Presets;
 
 use App\Models\ReviewSettingPreset;
 use App\Models\ReviewSettingPresetBinding;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 
 class ReviewSettingsPresetBindingService
@@ -25,10 +26,21 @@ class ReviewSettingsPresetBindingService
             return $existing;
         }
 
-        $binding = ReviewSettingPresetBinding::query()->createOrFirst(
-            ['user_id' => $userId, 'language_id' => $language],
-            ['preset_id' => $preset->id],
-        );
+        $attributes = ['user_id' => $userId, 'language_id' => $language];
+        try {
+            $binding = ReviewSettingPresetBinding::query()->createOrFirst(
+                $attributes,
+                ['preset_id' => $preset->id],
+            );
+        } catch (UniqueConstraintViolationException $exception) {
+            $binding = ReviewSettingPresetBinding::query()
+                ->where($attributes)
+                ->sharedLock()
+                ->first();
+            if (! $binding) {
+                throw $exception;
+            }
+        }
         if ((int) $binding->preset_id !== (int) $preset->id) {
             throw new \DomainException('The language binding changed during initialization.');
         }

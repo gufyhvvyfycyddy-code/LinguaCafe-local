@@ -2788,7 +2788,7 @@ class ReviewCardManageTest extends TestCase
     {
         $sense1 = $this->createSense($this->user->id, 'english', ['lemma' => 'today']);
         $card1 = $this->createSenseCard($sense1);
-        $card1->update(['fsrs_due_at' => now()->addHours(2)]);
+        $card1->update(['fsrs_due_at' => now()->startOfDay()->addHours(12)]);
 
         $sense2 = $this->createSense($this->user->id, 'english', ['lemma' => 'future', 'sense_key' => hash('sha256', 'english|future|noun|测试|test')]);
         $card2 = $this->createSenseCard($sense2);

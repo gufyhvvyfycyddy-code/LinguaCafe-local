@@ -309,7 +309,11 @@ class ReadingReviewSettlementContractTest extends TestCase
             'chapter_id' => $this->chapter->id, 'source_revision' => V2Harness::SOURCE_REVISION, 'result' => $stored,
         ]);
         $recovered = $sessions->startSession($this->user->id, 'english', $this->chapter->id, $row->uuid);
-        $this->assertSame($stored, $recovered, 'Completed-session resume must return the stored completion result verbatim.');
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($stored, JSON_THROW_ON_ERROR),
+            json_encode($recovered, JSON_THROW_ON_ERROR),
+            'Completed-session resume must return the same stored JSON result.',
+        );
     }
 
     public function test_preflight_with_zero_unresolved_is_always_read_only(): void
@@ -425,7 +429,11 @@ class ReadingReviewSettlementContractTest extends TestCase
         $second = $this->finish('commit');
 
         $this->assertTrue($first['completed']);
-        $this->assertSame($first, $second, 'Finish retry must return the exact stored completion result.');
+        $this->assertJsonStringEqualsJsonString(
+            json_encode($first, JSON_THROW_ON_ERROR),
+            json_encode($second, JSON_THROW_ON_ERROR),
+            'Finish retry must return the same stored JSON result.',
+        );
         $this->assertSame(1, ReviewLog::where('review_card_id', $card->id)->where('source', ReviewLog::SOURCE_READING_PASSIVE)->count());
         $this->assertSame(1, ReadingSessionCardSettlement::where('review_card_id', $card->id)->count());
         $this->assertSame(1, ReadingSessionCompletion::count());

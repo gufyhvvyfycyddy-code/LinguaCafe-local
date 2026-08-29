@@ -68,8 +68,9 @@ class ReviewSettingsResolver
         // unrelated first-time users under concurrent review traffic.
         $preset = $this->presets->defaultFor($userId);
         $binding = $this->bindings->bind($userId, $language, $preset);
+        $binding->setRelation('preset', $preset);
 
-        return $this->validatedBoundPreset($binding->load('preset'), $userId);
+        return $this->validatedBoundPreset($binding, $userId);
     }
 
     private function validatedBoundPreset(ReviewSettingPresetBinding $binding, int $userId): ReviewSettingPreset

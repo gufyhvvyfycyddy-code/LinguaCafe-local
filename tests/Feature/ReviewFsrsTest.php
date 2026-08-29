@@ -1769,6 +1769,33 @@ class ReviewFsrsTest extends TestCase
         $this->assertSame('review', $card->fsrs_state, 'Card for rejected sense should not be reset');
     }
 
+    public function test_far_future_fsrs_due_dates_persist_on_cards_and_review_logs(): void
+    {
+        $sense = $this->createSense($this->user->id, 'english', 'far-future', 'noun', '远期', 'far future');
+        $card = app(ReviewCardService::class)->ensureSenseCard($sense);
+        $farFuture = '2099-01-01 00:00:00';
+
+        $card->update(['fsrs_due_at' => $farFuture]);
+
+        $log = ReviewLog::forceCreate([
+            'user_id' => $this->user->id,
+            'language_id' => 'english',
+            'language' => 'english',
+            'review_card_id' => $card->id,
+            'rating' => 'good',
+            'reviewed_at' => now(),
+            'previous_state' => 'review',
+            'new_state' => 'review',
+            'previous_due_at' => $farFuture,
+            'new_due_at' => $farFuture,
+            'source' => ReviewLog::SOURCE_SENSE_REVIEW,
+        ]);
+
+        $this->assertSame($farFuture, $card->fresh()->fsrs_due_at->toDateTimeString());
+        $this->assertSame($farFuture, $log->fresh()->previous_due_at->toDateTimeString());
+        $this->assertSame($farFuture, $log->fresh()->new_due_at->toDateTimeString());
+    }
+
     private function createSense(int $userId, string $language, string $lemma, string $pos, string $senseZh, string $senseEn): WordSense
     {
         return WordSense::forceCreate([

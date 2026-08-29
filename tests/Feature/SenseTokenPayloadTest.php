@@ -408,7 +408,7 @@ class SenseTokenPayloadTest extends TestCase
         ]);
     }
 
-    private function createOccurrence(int $senseId, string $surface, ?int $chapterId = null, ?int $sentenceId = null, int $userId = null): WordSenseOccurrence
+    private function createOccurrence(int $senseId, string $surface, ?int $chapterId = null, ?int $sentenceId = null, ?int $userId = null): WordSenseOccurrence
     {
         $userId = $userId ?? $this->user->id;
 

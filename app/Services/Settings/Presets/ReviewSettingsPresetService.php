@@ -5,6 +5,7 @@ namespace App\Services\Settings\Presets;
 use App\Exceptions\ReviewSettingsPresetException;
 use App\Models\ReviewSettingPreset;
 use Illuminate\Database\QueryException;
+use Illuminate\Database\UniqueConstraintViolationException;
 
 class ReviewSettingsPresetService
 {
@@ -27,12 +28,28 @@ class ReviewSettingsPresetService
             'config' => $this->legacySnapshot->capture()->toArray(),
             'is_default' => true,
         ];
-        $preset = ReviewSettingPreset::query()->createOrFirst(
-            ['user_id' => $userId, 'name' => self::DEFAULT_NAME],
-            $candidate,
-        );
+        $attributes = ['user_id' => $userId, 'name' => self::DEFAULT_NAME];
+        try {
+            $preset = ReviewSettingPreset::query()->createOrFirst($attributes, $candidate);
+        } catch (UniqueConstraintViolationException $exception) {
+            // Under MySQL REPEATABLE READ, createOrFirst() can lose the race
+            // inside an existing transaction and then fail to see the winner
+            // through its original consistent-read snapshot. A locking read is
+            // a current read and therefore sees the committed unique-key winner.
+            $preset = ReviewSettingPreset::query()
+                ->where($attributes)
+                ->sharedLock()
+                ->first();
+            if (! $preset) {
+                throw $exception;
+            }
+        }
 
-        return $this->validateDefault($preset->fresh());
+        if ($preset->wasRecentlyCreated) {
+            $preset->refresh();
+        }
+
+        return $this->validateDefault($preset);
     }
 
     public function findOwnedOrFail(int $userId, int $presetId, bool $lock = false): ReviewSettingPreset
