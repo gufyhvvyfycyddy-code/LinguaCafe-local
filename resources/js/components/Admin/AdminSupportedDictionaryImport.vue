@@ -79,25 +79,11 @@
                                 </tr>
                                 <tr>
                                     <td>源语言：</td>
-                                    <td>
-                                        <v-img 
-                                            class="border" 
-                                            :src="'/images/flags/' + dictionary.source_language + '.png'" 
-                                            max-width="43" 
-                                            height="28"
-                                        ></v-img> 
-                                    </td>
+                                    <td class="text-capitalize">{{ dictionary.source_language }}</td>
                                 </tr>
                                 <tr>
                                     <td>目标语言：</td>
-                                    <td>
-                                        <v-img 
-                                            class="border" 
-                                            :src="'/images/flags/' + dictionary.target_language + '.png'" 
-                                            max-width="43" 
-                                            height="28"
-                                        ></v-img> 
-                                    </td>
+                                    <td class="text-capitalize">{{ dictionary.target_language }}</td>
                                 </tr>
                                 <tr>
                                     <td>颜色：</td>

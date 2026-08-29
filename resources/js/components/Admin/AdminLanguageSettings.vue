@@ -32,15 +32,9 @@
             </thead>
             <tbody>
                 <tr v-for="(language, languageIndex) in languages" :key="languageIndex">
-                    <!-- Flag -->
-                    <td>
-                        <v-img 
-                            eager
-                            class="border my-2" 
-                            :src="'/images/flags/' + language.name.toLowerCase() + '.png'" 
-                            max-width="43" 
-                            height="28"
-                        ></v-img> 
+                    <!-- Language marker -->
+                    <td class="text-center">
+                        <v-icon>mdi-translate</v-icon>
                     </td>
                     
                     <!-- Language -->

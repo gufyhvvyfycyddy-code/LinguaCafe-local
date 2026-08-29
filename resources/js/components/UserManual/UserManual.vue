@@ -72,8 +72,6 @@ import axios from 'axios';
                 dom = dom.replaceAll('[!WARNING]', '<admonition class="warning"><i aria-hidden="true" class="v-icon notranslate mdi mdi-alert-outline"></i> <span>警告</span></admonition>');
                 dom = dom.replaceAll('[!CAUTION]', '<admonition class="caution"><i aria-hidden="true" class="v-icon notranslate mdi mdi-alert-circle-outline"></i> <span>注意</span></admonition>');
 
-                // flag images
-                dom = dom.replaceAll('images/flags/', '/images/flags/');
                 return dom;
             },
             updateSelectedPage(event) {

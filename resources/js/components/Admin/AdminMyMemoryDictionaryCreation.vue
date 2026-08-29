@@ -55,11 +55,9 @@
                     @change="updateDictionaryName(); validateForm();"
                 >
                     <template v-slot:selection="{ item, index }">
-                        <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                         <span class="text-capitalize">{{ item.name }}</span>
                     </template>
                     <template v-slot:item="{ item }">
-                        <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                         <span class="text-capitalize">{{ item.name }}</span>
                     </template>
                 </v-select>
@@ -92,11 +90,9 @@
                     @change="updateDictionaryName(); validateForm();"
                 >
                     <template v-slot:selection="{ item, index }">
-                        <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                         <span class="text-capitalize">{{ item.name }}</span>
                     </template>
                     <template v-slot:item="{ item }">
-                        <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                         <span class="text-capitalize">{{ item.name }}</span>
                     </template>
                 </v-select>

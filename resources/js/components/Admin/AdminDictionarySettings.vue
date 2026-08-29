@@ -68,12 +68,12 @@
 
                 <!-- Source language -->
                 <template v-slot:item.source_language="{ item }">
-                    <v-img class="mx-auto border" :src="'/images/flags/' + item.source_language + '.png'" max-width="43" height="28" /> 
+                    <span class="text-capitalize">{{ item.source_language }}</span>
                 </template>
 
                 <!-- Target language -->
                 <template v-slot:item.target_language="{ item }">
-                    <v-img class="mx-auto border" :src="'/images/flags/' + item.target_language + '.png'" max-width="43" height="28" /> 
+                    <span class="text-capitalize">{{ item.target_language }}</span>
                 </template>
 
                 <!-- Enabled -->

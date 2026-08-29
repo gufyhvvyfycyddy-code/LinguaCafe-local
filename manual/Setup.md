@@ -204,35 +204,35 @@ Uninstalling languages are only possible by uninstalling all the installed langu
 
 LinguaCafe supports the following languages:
 
-| Flag                                              | Language  | DeepL   | Lemma generation | Gender tagging      | Dictionaries          |
-|:-------------------------------------------------:|:---------:|:-------:|:----------------:|:-------------------:|-----------------------|
-| <img src='images/flags/chinese.png' width='25'>   | Chinese   | &check; |                  |                     | wiktionary, cc-cedict |
-| <img src='images/flags/croatian.png' width='25'>  | Croatian  |         | &check;          |                     | dict cc               |
-| <img src='images/flags/czech.png' width='25'>     | Czech     | &check; |                  |                     | wiktionary, dict cc   |
-| <img src='images/flags/danish.png' width='25'>    | Danish    | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/dutch.png' width='25'>     | Dutch     | &check; | &check;          |                     | dict cc               |
-| <img src='images/flags/english.png' width='25'>   | English   | &check; | &check;          |                     | dict cc               |
-| <img src='images/flags/finnish.png' width='25'>   | Finnish   | &check; | inaccurate       |                     | wiktionary, dict cc   |
-| <img src='images/flags/french.png' width='25'>    | French    | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/german.png' width='25'>    | German    | &check; | &check;          | &check;             | wiktionary, dict cc   |
-| <img src='images/flags/greek.png' width='25'>     | Greek     | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/italian.png' width='25'>   | Italian   | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/japanese.png' width='25'>  | Japanese  | &check; | &check;          |                     | jmdict, wiktionary    |
-| <img src='images/flags/korean.png' width='25'>    | Korean    | &check; | &check;          |                     | wiktionary, kengdic   |
-| <img src='images/flags/latin.png' width='25'>     | Latin     |         |                  |                     | wiktionary            |
-| <img src='images/flags/macedonian.png' width='25'>| Macedonian|         | &check;          |                     | wiktionary            |
-| <img src='images/flags/norwegian.png' width='25'> | Norwegian | &check; | &check;          | &check;             | wiktionary, dict cc   |
-| <img src='images/flags/polish.png' width='25'>    | Polish    | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/portuguese.png' width='25'>| Portuguese| &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/romanian.png' width='25'>  | Romanian  | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/russian.png' width='25'>   | Russian   | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/slovenian.png' width='25'> | Slovenian | &check; | &check;          |                     | wiktionary            |
-| <img src='images/flags/spanish.png' width='25'>   | Spanish   | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/swedish.png' width='25'>   | Swedish   | &check; | &check;          |                     | dict cc               |
-| <img src='images/flags/thai.png' width='25'>      | Thai      |         |                  |                     | wiktionary            |
-| <img src='images/flags/turkish.png' width='25'>   | Turkish   | &check; | &check;          |                     | wiktionary, dict cc   |
-| <img src='images/flags/ukrainian.png' width='25'> | Ukrainian | &check; |                  |                     | wiktionary            |
-| <img src='images/flags/welsh.png' width='25'>     | Welsh     |         |                  |                     | wiktionary, eurfa     |
+| Language  | DeepL   | Lemma generation | Gender tagging      | Dictionaries          |
+|:---------:|:-------:|:----------------:|:-------------------:|-----------------------|
+| Chinese   | &check; |                  |                     | wiktionary, cc-cedict |
+| Croatian  |         | &check;          |                     | dict cc               |
+| Czech     | &check; |                  |                     | wiktionary, dict cc   |
+| Danish    | &check; | &check;          |                     | wiktionary, dict cc   |
+| Dutch     | &check; | &check;          |                     | dict cc               |
+| English   | &check; | &check;          |                     | dict cc               |
+| Finnish   | &check; | inaccurate       |                     | wiktionary, dict cc   |
+| French    | &check; | &check;          |                     | wiktionary, dict cc   |
+| German    | &check; | &check;          | &check;             | wiktionary, dict cc   |
+| Greek     | &check; | &check;          |                     | wiktionary, dict cc   |
+| Italian   | &check; | &check;          |                     | wiktionary, dict cc   |
+| Japanese  | &check; | &check;          |                     | jmdict, wiktionary    |
+| Korean    | &check; | &check;          |                     | wiktionary, kengdic   |
+| Latin     |         |                  |                     | wiktionary            |
+| Macedonian|         | &check;          |                     | wiktionary            |
+| Norwegian | &check; | &check;          | &check;             | wiktionary, dict cc   |
+| Polish    | &check; | &check;          |                     | wiktionary, dict cc   |
+| Portuguese| &check; | &check;          |                     | wiktionary, dict cc   |
+| Romanian  | &check; | &check;          |                     | wiktionary, dict cc   |
+| Russian   | &check; | &check;          |                     | wiktionary, dict cc   |
+| Slovenian | &check; | &check;          |                     | wiktionary            |
+| Spanish   | &check; | &check;          |                     | wiktionary, dict cc   |
+| Swedish   | &check; | &check;          |                     | dict cc               |
+| Thai      |         |                  |                     | wiktionary            |
+| Turkish   | &check; | &check;          |                     | wiktionary, dict cc   |
+| Ukrainian | &check; |                  |                     | wiktionary            |
+| Welsh     |         |                  |                     | wiktionary, eurfa     |
 
 > [!NOTE]  
 > For Chinese only Mandarin language is supported with simplified Chinese characters.

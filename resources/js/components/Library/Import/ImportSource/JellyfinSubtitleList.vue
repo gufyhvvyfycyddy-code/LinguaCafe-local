@@ -77,13 +77,8 @@
                     v-for="(subtitle, subtitleIndex) in session.subtitles"
                     :key="sessionIndex + '-' + subtitleIndex"
                 >
-                    <div class="subtitle-language">
-                        <v-img 
-                            class="border mx-auto" 
-                            :src="'/images/flags/' + subtitle.language.toLowerCase() + '.png'" 
-                            max-width="43" 
-                            height="28"
-                        ></v-img> 
+                    <div class="subtitle-language text-capitalize">
+                        {{ subtitle.language }}
                     </div>
                     <div class="subtitle-user">{{ session.userName }}</div>
                     <div class="subtitle-client">{{ session.client }}</div>

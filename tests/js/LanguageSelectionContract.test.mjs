@@ -28,7 +28,6 @@ test('ordinary account deletion surface is fixed to English', () => {
     assert.equal(account.includes('删除英语学习数据'), true);
     assert.equal(account.includes('delete all my english data'), true);
     assert.equal(account.includes("axios.delete('/users/delete-language-data/english')"), true);
-    assert.equal(account.includes('/images/flags/'), false);
     assert.equal(account.includes('其他学习语言'), false);
 });
 

@@ -1,9 +1,9 @@
 {
-    "name": "laravel/laravel",
+    "name": "linguacafe/linguacafe",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
-    "keywords": ["laravel", "framework"],
-    "license": "MIT",
+    "description": "LinguaCafe English reading and spaced-repetition application",
+    "keywords": ["linguacafe", "language-learning", "spaced-repetition"],
+    "license": "GPL-3.0-only",
     "require": {
         "php": "^8.4",
         "dompdf/dompdf": "^3.1.6",

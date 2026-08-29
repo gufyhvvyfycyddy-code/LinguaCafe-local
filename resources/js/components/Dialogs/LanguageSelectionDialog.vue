@@ -61,13 +61,7 @@
                         :disabled="loading"
                         @click="selectLanguage(language)" 
                     >
-                        <v-img 
-                            eager
-                            class="border" 
-                            :src="'/images/flags/' + language.toLowerCase() + '.png'" 
-                            max-width="43" 
-                            height="28"
-                        ></v-img> 
+                        <v-icon class="mr-1">mdi-translate</v-icon>
                         <span>{{ languageName(language) }}</span>
                     </v-btn>
                 </div>

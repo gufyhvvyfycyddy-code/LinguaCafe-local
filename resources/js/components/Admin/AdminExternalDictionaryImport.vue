@@ -57,11 +57,9 @@
                                 @change="updateDatabaseName"
                             >
                                 <template v-slot:selection="{ item, index }">
-                                    <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                                     <span class="text-capitalize">{{ item.name }}</span>
                                 </template>
                                 <template v-slot:item="{ item }">
-                                    <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                                     <span class="text-capitalize">{{ item.name }}</span>
                                 </template>
                             </v-select>
@@ -79,11 +77,9 @@
                                 @change="updateDatabaseName"
                             >
                                 <template v-slot:selection="{ item, index }">
-                                    <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                                     <span class="text-capitalize">{{ item.name }}</span>
                                 </template>
                                 <template v-slot:item="{ item }">
-                                    <img class="mr-2 border" :src="'/images/flags/' + item.name + '.png'" width="40" height="26">
                                     <span class="text-capitalize">{{ item.name }}</span>
                                 </template>
                             </v-select>
@@ -224,24 +220,12 @@
                                 <tr>
                                     <td class="font-weight-bold">源语言：</td>
                                     <td>
-                                        <img 
-                                            :src="'/images/flags/' + dictionary.sourceLanguage.toLowerCase() + '.png'" 
-                                            class="mr-2 border" 
-                                            width="40" 
-                                            height="26"
-                                        />
                                         {{ dictionary.sourceLanguage }}
                                     </td>
                                 </tr>
                                 <tr>
                                     <td class="font-weight-bold">目标语言：</td>
                                     <td>
-                                        <img 
-                                            :src="'/images/flags/' + dictionary.targetLanguage.toLowerCase() + '.png'" 
-                                            class="mr-2 border" 
-                                            width="40" 
-                                            height="26"
-                                        />
                                         {{ dictionary.targetLanguage }}
                                     </td>
                                 </tr>
