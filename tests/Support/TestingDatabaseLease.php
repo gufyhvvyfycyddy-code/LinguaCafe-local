@@ -20,6 +20,8 @@ final class TestingDatabaseLease
 {
     public const PROTOCOL_VERSION = 'linguacafe-testing-db-lease-v1';
 
+    public const BASE_DIRECTORY_ENV = 'LINGUACAFE_TEST_DB_LEASE_BASE_DIR';
+
     public const EXIT_USAGE = 64;
 
     public const EXIT_BUSY = 73;

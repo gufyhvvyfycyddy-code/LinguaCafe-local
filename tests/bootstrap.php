@@ -43,11 +43,15 @@ if ($appEnv === 'testing') {
     $waitMs = ctype_digit($waitValue) ? (int) $waitValue : -1;
     $label = (string) (getenv('TESTING_DB_LEASE_LABEL') ?: 'phpunit');
 
+    $leaseBaseDirectory = trim((string) (getenv(TestingDatabaseLease::BASE_DIRECTORY_ENV) ?: ''));
+    $leaseBaseDirectory = $leaseBaseDirectory !== '' ? $leaseBaseDirectory : null;
+
     try {
         $testingDatabaseLease = TestingDatabaseLease::acquireOrInheritForProject(
             dirname(__DIR__),
             label: $label,
             waitMs: $waitMs,
+            leaseBaseDirectory: $leaseBaseDirectory,
         );
     } catch (TestingDatabaseLeaseException $error) {
         fwrite(STDERR, "[testing-db-lease] LEASE_ACQUIRE_FAILED code={$error->machineCode}\n");

@@ -650,6 +650,82 @@ PHP;
         }
     }
 
+    public function test_runner_and_child_share_configured_lease_base_directory(): void
+    {
+        $base = $this->temporaryDirectory('lease-runner-shared-base-');
+        $environment = $this->environmentWithoutInheritance('testing');
+        $environment[TestingDatabaseLease::BASE_DIRECTORY_ENV] = $base;
+
+        try {
+            $result = $this->runProcess([
+                PHP_BINARY,
+                $this->runner,
+                '--label=shared-base-parent',
+                '--',
+                PHP_BINARY,
+                $this->worker,
+                'inherit',
+                $this->root,
+                $base,
+                'shared-base-child',
+            ], $environment);
+
+            $this->assertSame(0, $result['exit_code'], $result['stderr']);
+            $this->assertSame('INHERITED', trim($result['stdout']));
+        } finally {
+            $this->removeDirectory($base);
+        }
+    }
+
+    public function test_two_independent_runners_contend_on_configured_shared_base_directory(): void
+    {
+        $base = $this->temporaryDirectory('lease-runner-contention-');
+        $environment = $this->environmentWithoutInheritance('testing');
+        $environment[TestingDatabaseLease::BASE_DIRECTORY_ENV] = $base;
+        $holder = $this->startProcess([
+            PHP_BINARY,
+            $this->runner,
+            '--label=shared-base-holder',
+            '--',
+            PHP_BINARY,
+            '-r',
+            'echo "READY\\n"; flush(); usleep(1500000);',
+        ], $environment);
+
+        try {
+            $this->assertSame('READY', $this->readLine($holder['pipes'][1], 5));
+
+            $blocked = $this->runProcess([
+                PHP_BINARY,
+                $this->runner,
+                '--label=shared-base-blocked',
+                '--',
+                PHP_BINARY,
+                '-r',
+                'exit(0);',
+            ], $environment);
+            $this->assertSame(TestingDatabaseLease::EXIT_BUSY, $blocked['exit_code']);
+            $this->assertStringContainsString('LEASE_BUSY', $blocked['stderr']);
+
+            $this->assertSame(0, $this->finishProcess($holder, 3.0)['exit_code']);
+            $holder = null;
+
+            $after = $this->runProcess([
+                PHP_BINARY,
+                $this->runner,
+                '--label=shared-base-after',
+                '--',
+                PHP_BINARY,
+                '-r',
+                'exit(0);',
+            ], $environment);
+            $this->assertSame(0, $after['exit_code'], $after['stderr']);
+        } finally {
+            $this->terminateProcess($holder);
+            $this->removeDirectory($base);
+        }
+    }
+
     public function test_runner_status_is_stable_json_and_does_not_change_owner_state(): void
     {
         $before = TestingDatabaseLease::statusForProject($this->root);

@@ -96,6 +96,8 @@ function parseLeaseRunnerArguments(array $arguments): array
 
 $options = parseLeaseRunnerArguments($argv);
 $projectRoot = dirname(__DIR__, 2);
+$leaseBaseDirectory = trim((string) (getenv(TestingDatabaseLease::BASE_DIRECTORY_ENV) ?: ''));
+$leaseBaseDirectory = $leaseBaseDirectory !== '' ? $leaseBaseDirectory : null;
 
 if (! $options['status'] && leaseRunnerContainsArtisanServe($options['command'])) {
     leaseRunnerExit(TestingDatabaseLease::EXIT_USAGE, 'LEASE_RUNNER_ARTISAN_SERVE_REQUIRES_PAB');
@@ -103,7 +105,10 @@ if (! $options['status'] && leaseRunnerContainsArtisanServe($options['command'])
 
 try {
     if ($options['status']) {
-        $status = TestingDatabaseLease::statusForProject($projectRoot);
+        $status = TestingDatabaseLease::statusForProject(
+            $projectRoot,
+            leaseBaseDirectory: $leaseBaseDirectory,
+        );
         fwrite(STDOUT, json_encode($status, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
         exit(0);
     }
@@ -116,6 +121,7 @@ try {
         $projectRoot,
         label: $options['label'],
         waitMs: $options['waitMs'],
+        leaseBaseDirectory: $leaseBaseDirectory,
     );
 } catch (TestingDatabaseLeaseException $error) {
     leaseRunnerExit(TestingDatabaseLease::exitCodeFor($error), $error->machineCode);

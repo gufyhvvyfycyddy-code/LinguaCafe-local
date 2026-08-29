@@ -23,6 +23,7 @@ class TestingDatabaseLeaseContractTest extends TestCase
         $bootstrap = file_get_contents($this->root.'/tests/bootstrap.php');
 
         $this->assertStringContainsString('TestingDatabaseLease', $bootstrap);
+        $this->assertStringContainsString('TestingDatabaseLease::BASE_DIRECTORY_ENV', $bootstrap);
         $this->assertStringNotContainsString('storage/framework/testing/phpunit-db.lock', $bootstrap);
         $this->assertStringContainsString('LEASE_ACQUIRE_FAILED', $bootstrap);
         $this->assertStringNotContainsString('WARNING:', $bootstrap);
