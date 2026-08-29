@@ -1,0 +1,81 @@
+name: iOS Simulator Keychain Signing Probe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  simulator-signing:
+    runs-on: macos-26
+    timeout-minutes: 15
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Select Xcode and start simulator boot
+        run: |
+          set -euo pipefail
+          test -d "$DEVELOPER_DIR"
+          xcodebuild -version
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$SIM_UDID"
+          echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM_UDID"
+
+      - name: Build current mobile web and sync iOS
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          npm ci
+          npm run build
+          npm run cap:sync:ios
+
+      - name: Build with Xcode-generated simulated Keychain entitlements
+        working-directory: mobile/ios/App
+        run: |
+          set -euo pipefail
+          SIM_ENTITLEMENTS="$RUNNER_TEMP/linguacafe-keychain-simulator.entitlements"
+          plutil -create xml1 "$SIM_ENTITLEMENTS"
+          plutil -insert keychain-access-groups -xml '<array><string>$(AppIdentifierPrefix)com.linguacafe.mobile</string></array>' "$SIM_ENTITLEMENTS"
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/LinguaCafeSigningDerivedData" \
+            CODE_SIGN_ENTITLEMENTS="$SIM_ENTITLEMENTS" \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            ENTITLEMENTS_REQUIRED=YES \
+            build
+          APP_PATH="$RUNNER_TEMP/LinguaCafeSigningDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          SIM_XCENT="$RUNNER_TEMP/LinguaCafeSigningDerivedData/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/App.app-Simulated.xcent"
+          test -d "$APP_PATH"
+          test -f "$SIM_XCENT"
+          plutil -extract application-identifier raw "$SIM_XCENT" | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+          plutil -extract keychain-access-groups.0 raw "$SIM_XCENT" | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+          codesign --verify --deep --strict "$APP_PATH"
+          SIGNED_ENTITLEMENTS="$(codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null)"
+          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract application-identifier raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract keychain-access-groups.0 raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+
+      - name: Install and launch signed simulator app
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
+          APP_PATH="$RUNNER_TEMP/LinguaCafeSigningDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          xcrun simctl install "$LC_IOS_SIM_UDID" "$APP_PATH"
+          xcrun simctl launch "$LC_IOS_SIM_UDID" com.linguacafe.mobile
+          sleep 5
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile
+
+      - name: Cleanup simulator
+        if: always()
+        run: |
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          xcrun simctl shutdown "$LC_IOS_SIM_UDID" 2>/dev/null || true

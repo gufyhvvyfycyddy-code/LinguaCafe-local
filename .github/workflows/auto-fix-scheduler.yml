@@ -265,8 +265,8 @@ jobs:
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
 
-  ios-authenticated-simulator-probe:
+  ios-simulator-keychain-signing-probe:
     if: github.ref == 'refs/heads/temp/macos-testing-backend-probe-20260830'
-    uses: ./.github/workflows/ios-authenticated-simulator-capability-probe.yml
+    uses: ./.github/workflows/ios-simulator-keychain-signing-probe.yml
     permissions:
       contents: read
