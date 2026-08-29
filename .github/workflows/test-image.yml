@@ -31,6 +31,7 @@ env:
 jobs:
   # define the job to build and publish docker images
   build-and-push-docker-images:
+    if: github.ref_name != 'goal/linguacafe-a-h-sol-medium-20260809'
     runs-on: ubuntu-latest
 
     # steps to perform in the job
@@ -103,4 +104,8 @@ jobs:
 
       - name: Python Image digest
         run: echo ${{ steps.docker_build_python.outputs.digest }}
+
+  ios-xcode-capability-probe:
+    if: github.ref_name == 'goal/linguacafe-a-h-sol-medium-20260809'
+    uses: ./.github/workflows/ios-xcode-capability-probe.yml
 

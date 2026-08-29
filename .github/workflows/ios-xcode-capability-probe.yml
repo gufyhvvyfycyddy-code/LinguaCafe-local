@@ -2,6 +2,7 @@ name: iOS Xcode capability probe
 
 on:
   workflow_dispatch:
+  workflow_call:
 
 permissions:
   contents: read

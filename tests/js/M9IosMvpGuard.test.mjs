@@ -139,6 +139,7 @@ for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信�
 }
 
 assert.match(xcodeCapabilityWorkflow, /workflow_dispatch:/);
+assert.match(xcodeCapabilityWorkflow, /workflow_call:/);
 assert.doesNotMatch(xcodeCapabilityWorkflow, /^\s*(?:push|pull_request|schedule):/m);
 assert.match(xcodeCapabilityWorkflow, /permissions:\s*\n\s*contents: read/);
 assert.match(xcodeCapabilityWorkflow, /runs-on: macos-26/);
