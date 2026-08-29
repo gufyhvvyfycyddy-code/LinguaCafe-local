@@ -22,7 +22,7 @@
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
 - 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
-- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00–H-09 已关闭；当前 H-10 capability probe）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00–H-09 已关闭；H-10 iOS capability DEFERRED；当前 H-11）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
 - H-02 representative 100-user load 验收：`docs/testing/h02-representative-load-acceptance-2026-08-28.md`
 - H-03 bottleneck diagnostics 验收：`docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`；主流程 flow latency 已证明健康，fresh Apache prefork cold-burst deployment 问题留 H-07
 - H-04 backup/restore drill 验收：`docs/testing/h04-backup-restore-drill-acceptance-2026-08-28.md`；真实 MySQL backup→restore、write fence、automatic safety rollback 与 zero-residue 已证明
@@ -31,6 +31,7 @@
 - H-07 public runtime/cost gate 验收：`docs/testing/h07-public-runtime-and-cost-acceptance-2026-08-29.md`；架构决定见 `docs/adr/ADR-0066-h07-public-runtime-and-proxy-gate.md`，首次公开测试发布步骤见 `docs/release/h07-public-beta-deployment-runbook.md`
 - H-08 public package/content-rights gate 验收：`docs/testing/h08-public-package-rights-acceptance-2026-08-29.md`；公开 Docker/`git archive` 权利边界、SPDX/REUSE 风格第三方 notice、无来源旗帜退出公开包
 - H-09 Android release readiness 验收：`docs/testing/h09-android-release-readiness-acceptance-2026-08-29.md`；API 36、AAB/release signing、Play privacy/Data Safety 准备、Android 16 真实设备 smoke 与 cleanup
+- H-10 iOS capability probe：`docs/testing/h10-ios-capability-probe-2026-08-29.md`；Windows-static/iOS generated-Web 可复核，但无 Xcode/Apple/macOS/device 能力，真实 iOS build/Keychain/TestFlight 保持 DEFERRED
 - 长期历史总账与运维登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论历史：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 历史 Anki-aligned 产品/架构路线：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`

@@ -388,8 +388,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-07 | DONE | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | `bf8de933` + `h07-public-runtime-and-cost-acceptance-2026-08-29.md`：Laravel 13 / PHP 8.4 / MySQL 8.4；trusted proxy 默认关闭并显式信任；当前源码生产镜像；FSRS 2099 DATETIME；MySQL 8.4 成功恢复 + 自动 safety rollback；真实 login→reload→logout；DigitalOcean $54.45/月最小 base，约 ¥600–800/月 beta 预算 |
 | H-08 | DONE | 公共打包内容权利检查 | Phase F material metadata | `c65b49ad` + `h08-public-package-rights-acceptance-2026-08-29.md`：公开包未携 CET/考研等用户材料；无来源旗帜从 Docker + `git archive` 退出；运行时旗帜引用=0；SPDX/REUSE 风格第三方 notice + 5 份标准许可证正文；release rights guard；真实 430px/browser + final PHP 8.4 image + committed archive gate PASS |
 | H-09 | DONE | Android 发布准备 | existing Android M7 assets | `e3915427` + `h09-android-release-readiness-acceptance-2026-08-29.md`：API 36；AAB/release signing fail-closed；临时 RSA-2048 upload-key 签名 AAB/APK 验证；AAB native `.so`=0；应用内隐私说明；Android 16 真设备链 login→notification permission/alarm→offline/reconnect→device revoke/logout；testing/lease/emulator residue=0；未自动提交 Play |
-| H-10 | ACTIVE | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | 先 fresh capability probe；若有 Mac/Xcode/Apple 授权：真实 build/install/Keychain/safe-area/offline/TestFlight；若没有保持 DEFERRED，不伪造 |
-| H-11 | TODO | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | 阅读、AI、Finish、Review、生词、材料、offline、恢复、账号边界真实证据 |
+| H-10 | DEFERRED | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | `5f60bc95` + `h10-ios-capability-probe-2026-08-29.md`：fresh probe 仍为 Windows、无 Xcode/xcrun/codesign/Apple signing、无在线 macOS peer；42 mobile tests + current iOS generated-Web integrity PASS；修复 M9 guard 与 Windows SwiftPM path drift 防回归；真实 build/device/Keychain/TestFlight 继续 Not Complete，不伪造 |
+| H-11 | ACTIVE | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | 当前执行完整 Web + Android 回归；iOS 仅在 H-10 capability 可用时纳入。阅读、AI、Finish、Review、生词、材料、offline、恢复、账号边界真实证据 |
 | H-GATE | TODO | 最终 Goal completion audit | 全部 milestone + capability clusters | 所有必需 milestone DONE；所有必须 capability cluster 清零；无 blocker；只有此时允许声明“整个大计划完成” |
 
 ---
