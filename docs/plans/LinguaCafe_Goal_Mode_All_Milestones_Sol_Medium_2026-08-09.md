@@ -328,10 +328,10 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | E-03 | DONE | 文章下载包包含 token/sentence/lemma/POS、词典摘要、相关 WordSense；review package 对齐 sense-only | MobileArticlePackageService / MobileReviewPackageService | 包版本/来源/version tests；不塞完整 70万+ 词典 |
 | E-04 | DONE | 离线显式 rating / passive Good /操作统一复用 operation/idempotency 边界 | MobileIdempotency + queued sync + ReviewCardService | 断网重复/重放不双写；服务器最终权威 |
 | E-05 | DONE | conflict / retry / app-kill 恢复用普通用户文案 | queued action assets | kill 后待同步动作仍在；冲突可理解；不新增 speculative recovery worker |
-| E-06 | DEFERRED | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | Android emulator/device 真 UI；长按拖选词组、评分、导航通过 |
-| E-07 | DEFERRED | Android 联网 + 有限离线真实闭环 | existing Android MVP | online/offline/reconnect；下载文章；近期 review；sync；cached assets |
+| E-06 | DONE | 移动 Reader/Reviewer 触摸、Bottom Sheet、safe area、返回/前进 | M5/M7/M17 existing assets | `e06-e07-native-android-capability-closure-2026-08-30.md`：Android 16 真 UI 长按拖选词组、Bottom Sheet/IME、Reviewer reveal/rating/haptics、WebView history Back/Forward 与 root back-to-home 通过；Predictive Back 复用 AndroidX + Capacitor WebView history，无第二 router/plugin |
+| E-07 | DONE | Android 联网 + 有限离线真实闭环 | existing Android MVP | 同一 2026-08-30 原生验收：真实下载文章→断网重启→离线正文/review package→Good 排队→重连自动 sync→服务器 rating applied；device revoke/restart、task data、APK/emulator/server/lease cleanup 闭合 |
 | E-08 | DEFERRED | iOS 工程与当前语义对齐，能在 Windows 完成的 static/build-contract 全做完 | existing Capacitor iOS M9 | 无 macOS/Xcode 时把真机/签名/Keychain/device checks 记入 `iOS capability cluster`，不伪造通过 |
-| E-GATE | DONE | Phase E Gate | E-01…E-08 | 所有本地可执行项绿；能力簇诚实登记；自动进入 F，只在下游真依赖 iOS 未验行为时暂停 |
+| E-GATE | DONE | Phase E Gate | E-01…E-08 | E-01…E-07 当前均有真实可执行证据；Android capability cluster 已关闭；仅 E-08 iOS Xcode/device/signing/TestFlight capability 继续 DEFERRED |
 
 ---
 
@@ -648,19 +648,26 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 - testing-bound 真实 Mobile build 浏览器证明同一 `bank` rating 离线排队后整页重载仍为 1 待同步/0 需处理；第二设备较晚评分后第一设备重连 sync HTTP 200，显示“服务器已有更新”且 raw `OUT_OF_ORDER_ACTION` 不可见，清除后归零。目标 API 无 HTTP >=400；Console 仅两条刻意断网请求错误。
 - English fixture 经用户 UI 删除；15 个任务 Mobile device token 与残留 task learning objects 在独占 testing lease 下精确清理，browser/temp artifacts 与 ports 关闭，最终 lease `active=false / stale_metadata=false`。
 
-### DEFERRED MILESTONE EVIDENCE — E-06
+### HISTORICAL DEFERRED MILESTONE EVIDENCE — E-06
 
 - 复用现有 Mobile Reader、lookup Bottom Sheet、Reviewer 与 History API；450ms 长按、10px 滚动取消和同 source sentence 拖选词组只翻译到既有 `openLookup()`，未新增 router/store/plugin、第二同步账本、本地 FSRS 或评分路径。
 - Mobile Vitest 38/38、TypeScript/Vite production build、E-03…E-06/M5/M7 guards 6/6、M7/testing health 13/13（120 assertions）与 diff-check 全绿；fresh review 修复 structure token 选区索引 Required 后 Blocker=0/Required=0。
 - testing-bound 390×844 真实浏览器以 touch 事件完成约 520ms 长按拖选 `bank account`、Bottom Sheet/48px close/输入聚焦、Back 先关 sheet、主页面 Back/Forward review→settings，以及一次既有正式 Mobile Good；目标 API 无 HTTP >=400，Console 为空。
 - task-owned 书、session、词义/卡/日志/operation、device/token 与临时脚本均精确清零；port 8024/3000 closed，lease final `active=false / stale_metadata=false`。标准 x86_64 AVD 缺宿主硬件加速，arm64 AVD 与 x86_64 QEMU2 host 不兼容，故 Android 原生 E-06 验收进入 capability cluster，绝不记 DONE。
 
-### DEFERRED MILESTONE EVIDENCE — E-07
+### HISTORICAL DEFERRED MILESTONE EVIDENCE — E-07
 
 - 现有 Capacitor Android 单一路径完成 fresh Web build、`cap sync android` 与 Gradle debug build；APK 为 `com.linguacafe.mobile`、minSdk 24/targetSdk 36，包含 current E-06 Web asset、INTERNET 权限和 debug-only cleartext override。未改 API、native credential、package、queue 或评分架构。
 - Mobile/M3/M4/M7/reading/health 67/67（687 assertions）、Android unit task、E-03…E-06/M5/M7 guards 6/6 全绿；初次 Gradle 仅因进程缺 SDK 路径失败，随后用已有 `D:/Android/Sdk` 运行时变量成功，未写 `local.properties` 或环境配置。
 - x86_64 AVD 明确因 Android Emulator hypervisor driver 未安装退出；arm64 AVD 明确因 x86_64 QEMU2 host 架构不兼容退出，`adb devices` 无设备。因此 current APK 的 Android online/download/offline/reconnect/recent-review/sync/cached-assets UI 证据进入既有 Android capability cluster，绝不由浏览器或源码替代。
 - APK/build 已由 Gradle clean 删除，adb/Gradle daemon 停止，lease final `active=false / stale_metadata=false`；Capacitor generated Gradle 文件只有 line-ending metadata、semantic diff 为空且未暂存。
+
+### CLOSED MILESTONE EVIDENCE — E-06 / E-07 ANDROID CAPABILITY RECOVERY
+
+- 2026-08-30 current host recovered a working Android 16 / API 36 `LinguaCafeM7` AVD. E-06 real native UI now covers Reader long-press phrase selection, lookup Bottom Sheet + IME reachability, real WordSense creation, Reviewer reveal/four ratings, haptics and same-document navigation. The Android 16 Back defect was repaired with AndroidX `OnBackPressedCallback` plus Capacitor `BridgeWebViewClient.doUpdateVisitedHistory()` so the callback is enabled only when `WebView.canGoBack()`; WebView history Back stays inside LinguaCafe and root Back returns to the launcher.
+- E-07 real device chain now covers article package download, app restart with server unreachable, offline Library/chapter/Reader content, cached short-term Review, offline Good queueing, failed sync retention, ADB reverse recovery, automatic `/api/v1/mobile/sync/actions`, local pending=0 and server `sense_review.rating` applied with `reps=1`. Device revoke/logout/restart also passed.
+- Mobile Vitest 42/42, production build, Android debug assemble and E-06 guard pass. Full JS guard reaches 477/477 after repairing stale H-11/H-GATE plan expectations; task-only account/material/Sense/card data were removed through canonical lifecycle after restoring the fixed testing admin required by the last-admin invariant. Acceptance: `docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`.
+- The old 2026-08-16 E-06/E-07 DEFERRED blocks above remain historical snapshots and are not rewritten as if the emulator capability existed then. E-08/H-10 iOS capability remains DEFERRED / Not Complete.
 
 ### DEFERRED MILESTONE EVIDENCE — E-08
 
@@ -766,6 +773,10 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 `2026-08-16 | E-07 | DEFERRED | Goal branch tip | current Capacitor sync/Gradle debug APK、67/687 backend contracts、Android unit task与guards全绿；两个现有 AVD 均因宿主能力不可运行且 adb 无设备，真实 online/offline/reconnect 留在 Android capability cluster；build/daemon/lease clean | E-08`
 `2026-08-16 | E-08 | DEFERRED | Goal branch tip | Windows-local build/sync/integrity、38 Mobile tests、26/241 PHP、5 guards、XML 与 audit 0 vulnerabilities 全绿；Xcode/simulator/device/Keychain/signing/TestFlight 留在 iOS capability cluster；generated output 未暂存 | E-GATE`
 `2026-08-16 | E-GATE | DONE | Goal branch tip | Phase E local gate: Mobile 38/38、build、audit 0、testing DB health 6/69、E02–E06/M5/M6/M7/M9 guards 9/9；E02 guard 限定为生词页 IA 可见边界，避免内部同步错误码误报；Android/iOS deferred capability clusters 保留 | F-01`
+
+`2026-08-30 | E-06 | DONE | E-06/E-07 closure commit | working Android 16/API 36 AVD 补齐原生长按词组、Bottom Sheet/IME、Reviewer reveal/rating/haptics 与 WebView Back/Forward；修复 API36 Back 直接退出，并进一步让 callback 仅在 WebView history 可回退时 enabled，root Back 交回 Android launcher；42/42 mobile tests + Android debug build + guard PASS | E-07 capability recovery`
+`2026-08-30 | E-07 | DONE | E-06/E-07 closure commit | 真实下载文章→断网重启→离线 Library/章节正文/review package→Good 排队→连接失败保留→恢复 reverse→自动 sync；UI pending=0，服务器 rating operation=applied/reps=1；device revoke/restart PASS，临时 task user/material/Sense/card 精确清理 | E-GATE capability re-audit`
+`2026-08-30 | E-GATE | DONE | E-06/E-07 closure commit | Android capability cluster 已从历史 DEFERRED 关闭；E-01…E-07 现均有当前可执行证据；E-08 iOS Xcode/device/Keychain/signing/TestFlight 继续 DEFERRED / Not Complete，不因 Android 恢复而改写 | Phase H current audit`
 `2026-08-16 | F-01 | DONE | Goal branch tip | Book 单一拥有 personal/cet4/cet6/postgraduate_exam + year/set，Chapter 单一拥有 canonical question_type；旧 create/import 默认 personal、旧 update 省略/null 保留；F01 5/34、M6 isolation 11/50、health 6/69 与 PHP syntax/diff 绿。流程事件：首次 testing migrate 错误使用了明确禁止的 --force；随后在 lease 内精确普通 rollback --step=1，核列撤销且旧行保留，再以不带该 flag 的普通 migrate 重放，核旧行 default personal，并清除精确 fixture；后续全 Goal 禁止再次使用该 flag | F-02`
 
 `2026-08-16 | F-02 | DONE | Goal branch tip | 现有 ImportRequest→Controller→ImportService→Book/Chapter→ProcessChapter 单一路径接入 F-01 metadata；旧 payload/Mobile 8 参数调用保留，新建 Book 才写分类，已有 Book 只新增题型章节。F02 + Web error + Mobile import 12/91、Node guard 3/3、build/diff 全绿；testing 浏览器证明坏 PDF 阻断、CET-4 synthetic text 正式导入 200 与 fallback 成功 DOM。额外 Jellyfin settings 500 已定位为首次安装 testing DB 缺旧全局设置，既有 catch 隐藏该可选入口且不影响主导入；task Book/Chapter/account/sentinel/artifacts 精确清零，port closed、lease false/false；fresh review Blocker=0/Required=0 | F-03`

@@ -4,6 +4,8 @@ import { readFileSync } from 'node:fs';
 const ui = readFileSync(new URL('../../mobile/src/ui.ts', import.meta.url), 'utf8');
 const touch = readFileSync(new URL('../../mobile/src/readerTouchSelection.ts', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../../mobile/src/styles.css', import.meta.url), 'utf8');
+const mainActivity = readFileSync(new URL('../../mobile/android/app/src/main/java/com/linguacafe/mobile/MainActivity.java', import.meta.url), 'utf8');
+const manifest = readFileSync(new URL('../../mobile/android/app/src/main/AndroidManifest.xml', import.meta.url), 'utf8');
 
 assert.match(ui, /addEventListener\('pointerdown'/);
 assert.match(ui, /addEventListener\('pointermove'/);
@@ -18,5 +20,14 @@ assert.match(styles, /env\(safe-area-inset-bottom\)/);
 assert.match(styles, /\.lookup-sheet \{ max-height: 88dvh/);
 assert.match(styles, /\.rating-grid \{ display: grid; grid-template-columns: repeat\(2, 1fr\)/);
 assert.doesNotMatch(ui, /@capacitor\/app|backButton/);
+assert.match(mainActivity, /new OnBackPressedCallback\(false\)/);
+assert.match(mainActivity, /getOnBackPressedDispatcher\(\)\.addCallback/);
+assert.match(mainActivity, /new BridgeWebViewClient\(bridge\)/);
+assert.match(mainActivity, /doUpdateVisitedHistory\(WebView view, String url, boolean isReload\)/);
+assert.match(mainActivity, /webHistoryBack\.setEnabled\(view\.canGoBack\(\)\)/);
+assert.match(mainActivity, /webHistoryBack\.setEnabled\(bridge\.getWebView\(\)\.canGoBack\(\)\)/);
+assert.match(mainActivity, /bridge\.getWebView\(\)\.goBack\(\)/);
+assert.doesNotMatch(mainActivity, /KEYCODE_BACK|void onBackPressed\(|getOnBackPressedDispatcher\(\)\.onBackPressed\(\)/);
+assert.match(manifest, /android:enableOnBackInvokedCallback="true"/);
 
 console.log('E-06 mobile interaction guard passed.');
