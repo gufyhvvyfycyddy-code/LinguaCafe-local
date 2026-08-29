@@ -5,6 +5,7 @@ const container = fs.readFileSync('resources/js/components/Admin/AdminReviewSett
 const scheduling = fs.readFileSync('resources/js/components/Admin/ReviewSettings/FsrsSchedulingSettingsPanel.vue', 'utf8');
 const planner = fs.readFileSync('resources/js/components/Admin/ReviewSettings/FsrsWorkloadPlannerPanel.vue', 'utf8');
 const advanced = fs.readFileSync('resources/js/components/Admin/ReviewSettings/FsrsAdvancedToolsPanel.vue', 'utf8');
+const reschedule = fs.readFileSync('resources/js/components/FsrsReschedulePanel.vue', 'utf8');
 const api = fs.readFileSync('resources/js/services/AdminReviewSettingsApi.js', 'utf8');
 
 assert.match(container, /<fsrs-scheduling-settings-panel/);
@@ -20,8 +21,9 @@ assert.match(scheduling, /audio_autoplay/);
 assert.match(planner, /30 \/ 90 \/ 365/);
 assert.match(planner, /stability、difficulty、retrievability/);
 assert.match(advanced, /health_warnings/);
-assert.match(advanced, /previewReschedule/);
-assert.match(advanced, /undoReschedule/);
+assert.match(advanced, /<fsrs-reschedule-panel/);
+assert.match(reschedule, /previewReschedule/);
+assert.match(reschedule, /undoReschedule/);
 assert.match(api, /getAdvancedReviewSettings/);
 assert.match(api, /updateAdvancedReviewSettings/);
 

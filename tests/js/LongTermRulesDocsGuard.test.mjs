@@ -35,7 +35,7 @@ assert.match(rules, /纯文档、纯验证、单文件修复可以独立成任�
 assert.match(rules, /不强制每个任务同时产生架构改造和功能代码/);
 assert.match(rules, /不设最低复杂度、运行时长或百分比/);
 assert.match(rules, /字幕是经验来源，不是项目权威/);
-assert.match(rules, /普通任务完成后停止/);
+assert.match(rules, /任何 fixed DIRECT \/ 副窗口完成后都必须停止/);
 assert.doesNotMatch(rules, /所有任务的最低复杂度为 100/);
 assert.doesNotMatch(rules, /每一个正式主线任务必须[\s\S]{0,160}ARCH-/);
 assert.match(rules, /单一工具拒绝 localhost 就提前停工/);
@@ -75,10 +75,10 @@ for (const handoff of [qaHandoff0719, qaHandoff0720]) {
 }
 assert.match(qaHandoff0720, /已提交，禁止重复创建/);
 
-assert.match(currentContext, /本文件更新前，本地 `master`、`origin\/master` 与远端 `master` 对齐到/);
-assert.match(currentContext, /执行新任务仍必须重新运行 Git preflight/);
-assert.match(currentContext, /不得把本段 SHA 当作永久实时值/);
-assert.match(currentContext, /工作区收口优先于继续扩大产品范围/);
+assert.match(currentContext, /当前 Goal 工作分支/);
+assert.match(currentContext, /fresh Git preflight/);
+assert.match(currentContext, /不把文档 SHA 当永久实时值/);
+assert.match(currentContext, /后续收口必须先运行只读工作区盘点/);
 assert.ok(
     currentContext.split(/\r?\n/).length <= 320,
     'CURRENT_AI_CONTEXT.md must remain a compact default context'

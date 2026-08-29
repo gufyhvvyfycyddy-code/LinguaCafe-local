@@ -10,9 +10,9 @@ assert.match(rules, /一个任务只交付一个可陈述结果/);
 assert.match(rules, /小修不与无关架构工作捆绑/);
 assert.match(rules, /禁止为了流程形式制造抽象、拆分或文档/);
 assert.match(rules, /文件数或 seam 明显增长时拆分/);
-assert.match(rules, /普通任务完成后停止/);
-assert.match(rules, /auto_advance: false/);
-assert.match(rules, /supervisor_unlock_required: true/);
+assert.match(rules, /任何 fixed DIRECT \/ 副窗口完成后都必须停止/);
+assert.match(rules, /当前 DIRECT 完成后停止/);
+assert.match(rules, /用户当前明确要求主窗口直接连续执行时/);
 assert.doesNotMatch(rules, /最低复杂度为 100/);
 assert.doesNotMatch(rules, /每个下一步提示词都是复合型任务/);
 
