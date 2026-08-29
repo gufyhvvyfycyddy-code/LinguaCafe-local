@@ -389,8 +389,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-08 | DONE | 公共打包内容权利检查 | Phase F material metadata | `c65b49ad` + `h08-public-package-rights-acceptance-2026-08-29.md`：公开包未携 CET/考研等用户材料；无来源旗帜从 Docker + `git archive` 退出；运行时旗帜引用=0；SPDX/REUSE 风格第三方 notice + 5 份标准许可证正文；release rights guard；真实 430px/browser + final PHP 8.4 image + committed archive gate PASS |
 | H-09 | DONE | Android 发布准备 | existing Android M7 assets | `e3915427` + `h09-android-release-readiness-acceptance-2026-08-29.md`：API 36；AAB/release signing fail-closed；临时 RSA-2048 upload-key 签名 AAB/APK 验证；AAB native `.so`=0；应用内隐私说明；Android 16 真设备链 login→notification permission/alarm→offline/reconnect→device revoke/logout；testing/lease/emulator residue=0；未自动提交 Play |
 | H-10 | DEFERRED | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | `5f60bc95` + `h10-ios-capability-probe-2026-08-29.md`：fresh probe 仍为 Windows、无 Xcode/xcrun/codesign/Apple signing、无在线 macOS peer；42 mobile tests + current iOS generated-Web integrity PASS；修复 M9 guard 与 Windows SwiftPM path drift 防回归；真实 build/device/Keychain/TestFlight 继续 Not Complete，不伪造 |
-| H-11 | ACTIVE | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | 当前执行完整 Web + Android 回归；iOS 仅在 H-10 capability 可用时纳入。阅读、AI、Finish、Review、生词、材料、offline、恢复、账号边界真实证据 |
-| H-GATE | TODO | 最终 Goal completion audit | 全部 milestone + capability clusters | 所有必需 milestone DONE；所有必须 capability cluster 清零；无 blocker；只有此时允许声明“整个大计划完成” |
+| H-11 | DONE | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | `eaab88a7` + `h11-final-web-android-regression-acceptance-2026-08-29.md`：PHP 8.4 Unit+Feature 4034/19397（14 skipped）；JS 477/477；mobile 42/42 + build；生产 Docker native FSRS 真 build/load/schedule；真实 Web Reader→manual Sense→Finish→Review→WordSense + 430px 四主入口；Android 16 login→四主入口→offline/reconnect→device revoke；lease/server/emulator/account cleanup clean；H-10 iOS 仍 DEFERRED |
+| H-GATE | TODO | 最终 Goal completion audit | 全部 milestone + capability clusters | H-11 已关闭全部当前可运行 Web/Android 回归；现在 fresh 审计所有 milestone/capability。H-10 real iOS capability 仍 Not Complete，H-GATE 不得据此声明完整跨平台 Goal 已完成 |
 
 ---
 
@@ -485,12 +485,12 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-08`（公共打包内容权利检查）
-- Last DONE: `H-07`
-- Current verified production/code baseline HEAD: `bf8de933`（H-07 public runtime gate：Laravel 13 / PHP 8.4 / MySQL 8.4、trusted proxy、当前源码生产镜像、FSRS DATETIME 与 public-beta deployment boundary；完整证据见 H-07 acceptance）
-- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
-- Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
-- Blocking issue: `none`
+- Active milestone: `H-GATE`（最终 Goal completion audit）
+- Last DONE: `H-11`
+- Current verified production/code baseline HEAD: `eaab88a7a7d96d2c1078b4b5243210430a305970`（H-11：PHP 8.4 / native FSRS production runtime + Reader manual Sense identity repair + final Web/Android regression；完整证据见 H-11 acceptance）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-29 fresh fetch）
+- Deferred capability clusters: `iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest runtime, signing/archive/TestFlight/App Store evidence. H-10 remains DEFERRED / Not Complete on the current Windows host.`
+- Blocking issue: `H-GATE can audit/close every runnable Windows/Web/Android milestone, but the complete cross-platform Goal cannot be declared finished while H-10 real iOS capability remains unavailable.`
 
 ### CLOSED MILESTONE EVIDENCE — H-07
 
