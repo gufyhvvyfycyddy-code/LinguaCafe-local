@@ -224,9 +224,6 @@ jobs:
             '- tapOn: "密码"' \
             '- inputText: ${TEST_PASSWORD}' \
             '- tapOn: "安全登录"' \
-            '- tapOn:' \
-            '    text: "Allow"' \
-            '    optional: true' \
             '- assertVisible: "在线"' \
             '- assertVisible: "阅读"' \
             '- assertVisible: "复习"' \
