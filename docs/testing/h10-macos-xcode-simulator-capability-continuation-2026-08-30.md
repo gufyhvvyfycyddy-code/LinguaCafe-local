@@ -6,7 +6,7 @@
 
 The 2026-08-29 H-10 probe correctly recorded that the local Windows host had no Xcode, Apple signing or connected macOS peer. On 2026-08-30 a different, bounded capability became available: the actual `origin` repository was freshly verified as public, so LinguaCafe could use a standard GitHub-hosted `macos-26` runner without introducing a paid larger runner or Apple credential path.
 
-This continuation closes the previously missing native macOS/Xcode compile and basic iOS Simulator install/launch evidence. It does **not** close the physical-device, Keychain-with-authenticated-session, signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
+This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, and authenticated Simulator credential lifecycle evidence. It does **not** close the remaining Reader/Review/import/offline Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
 
 ## Authority and safety boundary
 
@@ -16,10 +16,10 @@ The work keeps the existing M9/H-10 architecture and release boundary:
 - no Apple password, certificate, private key, provisioning profile, App Store Connect credential or signing secret was requested or read;
 - no `.env` file was read or modified;
 - no archive, IPA, upload, TestFlight submission or App Store submission was created;
-- the Xcode build explicitly uses `CODE_SIGNING_ALLOWED=NO`;
-- the workflow has `permissions: contents: read`, a 30-minute timeout, no Apple secrets and no artifact upload;
-- no production or testing database write was performed by the macOS probe;
-- the simulator launch is therefore a native runtime capability check, not an authenticated product-flow acceptance.
+- the permanent compile/render probe keeps `CODE_SIGNING_ALLOWED=NO` and remains a no-secret, no-upload capability check;
+- the later authenticated acceptance used a separate testing-only run with a dedicated MySQL testing database, `TestingDatabaseLease`, same-process PAB sentinel and runtime-only test identity;
+- no production database, Apple password, certificate, private key, provisioning profile, App Store Connect credential or distribution signing secret was used;
+- the authenticated Simulator build used only Xcode's testing-time simulated application identifier at link/sign-to-run-locally time; that value is not a production Team ID and is not committed into the Xcode project.
 
 The permanent tooling is intentionally small:
 
@@ -176,6 +176,38 @@ GitHub Actions run `33268819125` completed **SUCCESS** on head `e9893e7e10aaa76b
 
 This optimization adds no cache, service, extra runner, signing path or second product runtime; it only overlaps an already required simulator boot with existing build work.
 
+## Authenticated iOS Simulator continuation
+
+GitHub Actions run `33279140695` completed **SUCCESS** on head `507eb50e72d431d389945f3b0cc9299c98da90a8`.
+
+This run reused the real LinguaCafe testing runtime instead of a mock or SQLite substitute:
+
+- Homebrew PHP 8.4 and MySQL 8.4;
+- verified Composer install and the repository's pinned native FSRS extension;
+- normal pending migrations on a dedicated testing database;
+- `TestingDatabaseHealth` plus `TestingDatabaseLease`;
+- same-process PAB testing sentinel before the first UI write;
+- a runtime-only testing identity whose password was masked and never committed or reported.
+
+The initial unsigned Simulator build exposed a real Keychain acceptance problem: authentication returned a token, but `SecureTokenPlugin.save()` could not use the app's default Keychain group without an application identifier. The accepted test build does **not** weaken the plugin or move the bearer token into Preferences. Instead, Xcode generates a Simulator-only `App.app-Simulated.xcent` at link time with `application-identifier` and `keychain-access-groups` equal to `FAKETEAMID.com.linguacafe.mobile`, then uses the normal local Simulator signing path. A separate fast signing probe proved that this linked entitlement, `codesign --verify`, Simulator install and launch are mutually consistent. Post-build ad-hoc re-signing was rejected because SpringBoard refused that mismatched app and is not used.
+
+The rendered authenticated run then proved, through real iPhone 17 Pro Simulator UI/user events plus server-side truth:
+
+1. enter the testing server, email and password through the rendered iOS UI and tap `安全登录`;
+2. reach the authenticated shell (`首页 / 阅读 / 复习 / 生词 / 我的`);
+3. terminate/relaunch and return to the authenticated shell without another password entry;
+4. PAB recorded the real `/api/v1/mobile/auth/tokens` and subsequent `/api/v1/mobile/bootstrap` requests;
+5. the server owned exactly one active iOS `mobile_device` with a non-null `personal_access_token_id`, and one matching personal access token;
+6. the ordinary iOS Preferences plist contained no `linguacafe-session-token` Web-session key;
+7. open `我的`, scroll to and tap `撤销此设备并退出` through rendered UI;
+8. the server device became revoked with `personal_access_token_id = null`, the personal access token count returned to zero, and the rendered app returned to `安全登录`;
+9. relaunch again still required login and showed the Keychain/password handling copy;
+10. PAB, lease/sentinel, testing database service and Simulator cleanup all completed successfully.
+
+The successful rerun also resolved two test-tool false negatives without product changes: the authenticated shell is the stable login success owner rather than the transient `在线` pill, and Maestro's existing bounded `scrollUntilVisible` can reach the bottom-of-settings revoke control on the real WKWebView page.
+
+This evidence accepts Simulator Keychain **save → load after relaunch → clear on rendered logout** without exposing the bearer token value. Physical-iPhone Keychain behavior remains a separate device gate.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -189,16 +221,21 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - current generated Web asset integrity on macOS after Capacitor sync;
 - rendered iOS login shell and WKWebView accessibility exposure;
 - real black-box tap/input on the server field;
-- visible Keychain/password-handling copy and local-HTTP safety warning.
+- visible Keychain/password-handling copy and local-HTTP safety warning;
+- same-runner testing PHP/MySQL/native-FSRS/PAB backend capability;
+- rendered authenticated login through the real Mobile API;
+- Simulator Keychain token save and relaunch load, corroborated by `/bootstrap` and server token/device ownership;
+- absence of the Web session-token key from ordinary iOS Preferences;
+- rendered device revoke/logout, server token deletion, Keychain clear, and relaunch-to-login boundary.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. authenticated simulator functional matrix with a server-bound testing environment: successful login/relaunch, Reader touch/safe-area, formal Review/undo, `.txt` import, offline package/rating/sync and logout scope clearing;
-2. authenticated Keychain runtime evidence proving the bearer token is in Keychain and absent from ordinary Web/file storage;
-3. signed physical-iPhone installation;
-4. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
+1. the remaining authenticated Simulator content matrix: Reader touch/safe-area, formal Review/undo, `.txt` import, article/review/audio package offline restart, queued rating and exactly-once reconnect sync;
+2. physical-iPhone installation with real Apple signing;
+3. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
+4. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
 5. Apple team/provisioning/bundle registration;
 6. signed archive and Organizer validation;
 7. App Store Connect upload/processing;
@@ -208,17 +245,11 @@ H-10 remains DEFERRED because the following still lack the required evidence:
 
 A cloud simulator is useful for compile/runtime capability but cannot substitute for physical-device and Apple-account distribution evidence.
 
-## Why the cloud simulator is not extended into a second backend stack now
+## Current efficient Simulator boundary
 
-The mobile client permits `http://127.0.0.1` only as an explicit local development address, so a same-runner testing server is technically possible. However, the full Review/FSRS write path requires the actual LinguaCafe testing runtime, including PHP/MySQL/native FSRS and a server-bound testing sentinel. Rebuilding an additional macOS backend solely to collect a few simulator UI checks would create another infrastructure path while the final Goal would remain blocked by physical iPhone/signing/TestFlight regardless.
+The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The current efficient boundary is therefore:
-
-- keep the permanent manual/reusable macOS/Xcode compile + rendered login-shell probe;
-- do not weaken ATS;
-- do not create an ad-hoc public tunnel;
-- do not duplicate the testing backend on macOS without a future concrete need;
-- resume the remaining M9/H-10 device/store playbook only when the deployment owner's Apple/physical-device capability is available.
+The remaining Simulator work should continue on that single testing stack for Reader/Review/import/offline/sync evidence. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -229,6 +260,6 @@ The current efficient boundary is therefore:
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM/basic simulator + rendered login-shell capability: Accepted.**
+**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle: Accepted.**
 
-**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to authenticated server-bound simulator product-flow evidence plus physical-device Keychain/runtime behavior, signing/archive, TestFlight and App Store capability described above.
+**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining authenticated Simulator content matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.
