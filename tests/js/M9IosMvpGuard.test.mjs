@@ -160,6 +160,16 @@ assert.match(xcodeCapabilityWorkflow, /xcrun simctl install/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl launch/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl terminate/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl shutdown/);
-assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|xcodebuild\s+archive/);
+assert.match(xcodeCapabilityWorkflow, /mobile-dev-inc\/Maestro\/releases\/download\/cli-2\.7\.0\/maestro\.zip/);
+assert.match(xcodeCapabilityWorkflow, /a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5/);
+assert.match(xcodeCapabilityWorkflow, /shasum -a 256 -c -/);
+assert.match(xcodeCapabilityWorkflow, /Run rendered iOS login-shell smoke/);
+assert.match(xcodeCapabilityWorkflow, /IOS · CONNECTED MVP/);
+assert.match(xcodeCapabilityWorkflow, /设备令牌由系统 Keychain 保护；应用不会保存密码。/);
+assert.match(xcodeCapabilityWorkflow, /inputText: "http:\/\/127\.0\.0\.1:8878"/);
+assert.match(xcodeCapabilityWorkflow, /仅用于本地调试；Android\/iOS 正式版可能拒绝明文连接；正式使用应配置 HTTPS。/);
+assert.ok(xcodeCapabilityWorkflow.indexOf('Start simulator boot') < xcodeCapabilityWorkflow.indexOf('Install mobile dependencies'));
+assert.ok(xcodeCapabilityWorkflow.indexOf('Install mobile dependencies') < xcodeCapabilityWorkflow.indexOf('Wait for simulator and launch app'));
+assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|xcodebuild\s+archive|maestro\s+cloud|MAESTRO_CLOUD|API_KEY/i);
 
 console.log('M9 iOS MVP source and release guard passed.');

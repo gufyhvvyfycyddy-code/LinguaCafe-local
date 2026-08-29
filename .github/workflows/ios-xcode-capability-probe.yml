@@ -28,6 +28,14 @@ jobs:
           xcodebuild -version
           xcrun --version
 
+      - name: Start simulator boot
+        run: |
+          set -euo pipefail
+          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$SIM_UDID"
+          echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+          xcrun simctl boot "$SIM_UDID"
+
       - name: Install mobile dependencies
         working-directory: mobile
         run: npm ci
@@ -66,18 +74,61 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
-      - name: Boot simulator and launch app
+      - name: Install pinned Maestro CLI for rendered smoke
         run: |
           set -euo pipefail
-          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
-          test -n "$SIM_UDID"
-          xcrun simctl boot "$SIM_UDID"
-          xcrun simctl bootstatus "$SIM_UDID" -b
+          curl -fL "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.7.0/maestro.zip" -o "$RUNNER_TEMP/maestro.zip"
+          echo "a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          mkdir -p "$RUNNER_TEMP/maestro"
+          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro"
+          MAESTRO_BIN="$(find "$RUNNER_TEMP/maestro" -type f -path '*/bin/maestro' | head -1)"
+          test -n "$MAESTRO_BIN"
+          chmod +x "$MAESTRO_BIN"
+          echo "MAESTRO_BIN=$MAESTRO_BIN" >> "$GITHUB_ENV"
+          java -version
+          "$MAESTRO_BIN" --version
+
+      - name: Wait for simulator and launch app
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
           APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
           test -d "$APP_PATH"
-          xcrun simctl install "$SIM_UDID" "$APP_PATH"
-          xcrun simctl get_app_container "$SIM_UDID" com.linguacafe.mobile app
-          xcrun simctl launch "$SIM_UDID" com.linguacafe.mobile
+          xcrun simctl install "$LC_IOS_SIM_UDID" "$APP_PATH"
+          xcrun simctl get_app_container "$LC_IOS_SIM_UDID" com.linguacafe.mobile app
+          xcrun simctl launch "$LC_IOS_SIM_UDID" com.linguacafe.mobile
           sleep 5
-          xcrun simctl terminate "$SIM_UDID" com.linguacafe.mobile
-          xcrun simctl shutdown "$SIM_UDID"
+
+      - name: Run rendered iOS login-shell smoke
+        run: |
+          set -euo pipefail
+          FLOW="$RUNNER_TEMP/ios-login-shell.yaml"
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy
+          printf '%s\n' \
+            'appId: com.linguacafe.mobile' \
+            '---' \
+            '- launchApp:' \
+            '    clearState: true' \
+            '    clearKeychain: true' \
+            '- assertVisible: "LinguaCafe"' \
+            '- assertVisible: "IOS · CONNECTED MVP"' \
+            '- assertVisible: "继续学习"' \
+            '- assertVisible: "服务器地址"' \
+            '- assertVisible: "邮箱"' \
+            '- assertVisible: "密码"' \
+            '- assertVisible: "安全登录"' \
+            '- assertVisible: "设备令牌由系统 Keychain 保护；应用不会保存密码。"' \
+            '- tapOn: "https://learn.example.com"' \
+            '- inputText: "http://127.0.0.1:8878"' \
+            '- assertVisible: "http://127.0.0.1:8878"' \
+            '- assertVisible: "仅用于本地调试；Android/iOS 正式版可能拒绝明文连接；正式使用应配置 HTTPS。"' \
+            > "$FLOW"
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
+
+      - name: Shut down simulator
+        if: always()
+        run: |
+          if [ -n "${LC_IOS_SIM_UDID:-}" ]; then
+            xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile || true
+            xcrun simctl shutdown "$LC_IOS_SIM_UDID" || true
+          fi

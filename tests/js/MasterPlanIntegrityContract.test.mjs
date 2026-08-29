@@ -28,8 +28,8 @@ assert.match(master, /Current authority — 2026-08-30/);
 assert.match(master, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18\.md/);
 assert.match(master, /Current Phase \|[^\n]*H-09[^\n]*H-11[^\n]*DONE[^\n]*H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(master, /`H-00`–`H-09`、`H-11` 均已 DONE/);
-assert.match(master, /public GitHub `macos-26` runner[^\n]*Xcode 26\.6\/SwiftPM\/basic iOS Simulator compile\+launch/);
-assert.match(master, /server-bound iOS main-flow[^\n]*physical device[^\n]*TestFlight\/App Store capability[^\n]*尚未完成/);
+assert.match(master, /public GitHub `macos-26` runner[^\n]*Xcode 26\.6\/SwiftPM\/iOS Simulator compile\+launch[^\n]*rendered login-shell/);
+assert.match(master, /authenticated server-bound iOS main-flow[^\n]*physical device[^\n]*TestFlight\/App Store capability[^\n]*尚未完成/);
 assert.match(master, /H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(master, /ADR-0061-reading-early-review-minimum-spacing-boundary\.md/);
 assert.match(master, /ADR-0062-reading-ai-matched-existing-source-example-binding\.md/);
@@ -143,7 +143,7 @@ assert.match(currentContext, /Goal plan 已完成 Phase G\/G-GATE/);
 assert.match(currentContext, /H-00[\s\S]*H-09/);
 assert.match(currentContext, /H-10 iOS capability cluster[^\n]*DEFERRED \/ Not Complete/);
 assert.match(currentContext, /Xcode 26\.6[^\n]*SwiftPM/);
-assert.match(currentContext, /basic Simulator compile\+launch accepted/);
+assert.match(currentContext, /Simulator compile\+launch \+ rendered login-shell accepted/);
 assert.match(currentContext, /H-11 final Web \+ Android regression/);
 assert.match(currentContext, /H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(index, /h04-backup-restore-drill-acceptance-2026-08-28\.md/);
@@ -162,7 +162,7 @@ assert.match(index, /Reader 提前复习 \/ 24h 最小正向间隔 \/ 静默 non
 assert.match(index, /AI 阅读 matched-existing 真实来源例句绑定 \/ 无上限真实例句池 \/ 随机不连续重复轮换/);
 assert.match(handoff, /Current authority — 2026-08-30/);
 assert.match(handoff, /CURRENT_MILESTONE\.json[^\n]*历史状态[^\n]*不再是当前 Goal 授权入口/);
-assert.match(handoff, /macos-26[^\n]*Xcode 26\.6[^\n]*Simulator boot\/install\/launch/);
+assert.match(handoff, /macos-26[^\n]*Xcode 26\.6[^\n]*Simulator boot\/install\/launch[^\n]*rendered login-shell/);
 assert.match(handoff, /H-10\/E-08[^\n]*继续 DEFERRED/);
 
 // The old recovery milestone remains valid history, but it must not be advertised as current Phase G authority.

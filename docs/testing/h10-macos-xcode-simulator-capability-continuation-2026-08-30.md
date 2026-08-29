@@ -152,6 +152,30 @@ This run used `actions/checkout@v6`, repeated all compile/integrity gates, then 
 
 The run again passed Mobile 42/42, Capacitor iOS sync, generated-Web integrity, the M9 source/release guard, SwiftPM resolution and the unsigned iOS Simulator build before launching the app. The checkout-v4 Node-20 deprecation warning seen on the earlier runner was no longer present on the new probe path.
 
+## Rendered iOS login-shell smoke
+
+GitHub Actions run `33268124499` completed **SUCCESS** on head `9fb344d6184df17205f65816fdd62efc097156be` after two bounded selector/tooling experiments established the actual WKWebView accessibility hierarchy. The final smoke used a checksum-pinned Maestro 2.7.0 CLI downloaded from its official GitHub release; no Maestro Cloud/API key was used.
+
+On a real iPhone 17 Pro Simulator, the rendered accessibility tree exposed and the black-box flow successfully asserted:
+
+- `LinguaCafe` and `IOS · CONNECTED MVP`;
+- `继续学习`;
+- server, email and password fields;
+- `安全登录`;
+- the user-facing statement `设备令牌由系统 Keychain 保护；应用不会保存密码。`;
+- a real tap on the server URL field;
+- real text input of the local testing URL;
+- the entered URL remaining visible;
+- the expected local-development HTTP safety warning becoming visible.
+
+The earlier failed experiments were not accepted as product failures: one assumed the eyebrow text was a single accessibility node, while WKWebView correctly exposed it as separate nodes; another called a redundant `hideKeyboard` action after the input event even though Maestro reported no keyboard to hide. The final flow removed those test-tool assumptions and passed without changing product UI code.
+
+## Overlapped simulator-boot stability run
+
+GitHub Actions run `33268819125` completed **SUCCESS** on head `e9893e7e10aaa76b95a11cd7b9b0f99c0387fec7` with the same rendered smoke. The simulator cold boot now starts immediately after Xcode selection while dependency installation, Mobile 42/42, Capacitor sync, integrity checks, SwiftPM, unsigned build and Maestro setup continue. After those gates completed, the remaining `bootstatus`/launch step took only 42 seconds on that runner instead of holding the whole workflow idle for the full simulator migration period.
+
+This optimization adds no cache, service, extra runner, signing path or second product runtime; it only overlaps an already required simulator boot with existing build work.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -162,13 +186,16 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - installation of the current LinguaCafe simulator app;
 - launch of `com.linguacafe.mobile` without immediate process-start failure;
 - bounded terminate/shutdown cleanup;
-- current generated Web asset integrity on macOS after Capacitor sync.
+- current generated Web asset integrity on macOS after Capacitor sync;
+- rendered iOS login shell and WKWebView accessibility exposure;
+- real black-box tap/input on the server field;
+- visible Keychain/password-handling copy and local-HTTP safety warning.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. rendered simulator functional matrix with a server-bound testing environment: login/relaunch, Reader touch/safe-area, formal Review/undo, `.txt` import, offline package/rating/sync and logout scope clearing;
+1. authenticated simulator functional matrix with a server-bound testing environment: successful login/relaunch, Reader touch/safe-area, formal Review/undo, `.txt` import, offline package/rating/sync and logout scope clearing;
 2. authenticated Keychain runtime evidence proving the bearer token is in Keychain and absent from ordinary Web/file storage;
 3. signed physical-iPhone installation;
 4. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
@@ -187,7 +214,7 @@ The mobile client permits `http://127.0.0.1` only as an explicit local developme
 
 The current efficient boundary is therefore:
 
-- keep the permanent macOS/Xcode compile + simulator launch probe;
+- keep the permanent manual/reusable macOS/Xcode compile + rendered login-shell probe;
 - do not weaken ATS;
 - do not create an ad-hoc public tunnel;
 - do not duplicate the testing backend on macOS without a future concrete need;
@@ -202,6 +229,6 @@ The current efficient boundary is therefore:
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM/basic simulator capability: Accepted.**
+**Native macOS/Xcode/SwiftPM/basic simulator + rendered login-shell capability: Accepted.**
 
-**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to authenticated simulator product-flow evidence plus the physical-device / Keychain / signing / TestFlight / App Store capability cluster described above.
+**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to authenticated server-bound simulator product-flow evidence plus physical-device Keychain/runtime behavior, signing/archive, TestFlight and App Store capability described above.
