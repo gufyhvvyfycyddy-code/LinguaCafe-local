@@ -1,0 +1,153 @@
+name: macOS testing backend capability probe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  testing-backend:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+      APP_ENV: testing
+      APP_DEBUG: 'false'
+      APP_URL: http://127.0.0.1:8878
+      DB_CONNECTION: mysql
+      DB_HOST: 127.0.0.1
+      DB_PORT: '3306'
+      DB_DATABASE: linguacafe_fsrs_test
+      DB_USERNAME: root
+      DB_PASSWORD: ''
+      APP_MAINTENANCE_DRIVER: file
+      BCRYPT_ROUNDS: '4'
+      CACHE_STORE: array
+      MAIL_MAILER: array
+      PULSE_ENABLED: 'false'
+      QUEUE_CONNECTION: sync
+      SESSION_DRIVER: file
+      TELESCOPE_ENABLED: 'false'
+      TESTING_DB_LEASE_DATABASE_ID: linguacafe-fsrs-testing-mysql
+      TESTING_DB_LEASE_WAIT_MS: '0'
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v6
+
+      - name: Install PHP 8.4, MySQL 8.4, and Rust
+        run: |
+          set -euo pipefail
+          brew install php@8.4 mysql@8.4 rust
+          PHP_PREFIX="$(brew --prefix php@8.4)"
+          MYSQL_PREFIX="$(brew --prefix mysql@8.4)"
+          printf '%s\n' "$PHP_PREFIX/bin" "$PHP_PREFIX/sbin" "$MYSQL_PREFIX/bin" >> "$GITHUB_PATH"
+          "$PHP_PREFIX/bin/php" -v
+          "$PHP_PREFIX/bin/php" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 80500 ? 0 : 1);'
+          "$PHP_PREFIX/bin/php" -r 'exit(extension_loaded("pdo_mysql") && extension_loaded("mbstring") && extension_loaded("openssl") ? 0 : 1);'
+          "$MYSQL_PREFIX/bin/mysql" --version
+          rustc --version
+          cargo --version
+
+      - name: Start MySQL and create isolated testing database
+        run: |
+          set -euo pipefail
+          brew services start mysql@8.4
+          for attempt in $(seq 1 60); do
+            if mysqladmin ping -uroot --silent; then
+              break
+            fi
+            sleep 1
+          done
+          mysqladmin ping -uroot --silent
+          mysql -uroot -e "CREATE DATABASE linguacafe_fsrs_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          test "$(mysql -N -B -uroot -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='linguacafe_fsrs_test';")" = "1"
+
+      - name: Install verified Composer and project dependencies
+        run: |
+          set -euo pipefail
+          APP_KEY_VALUE="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
+          echo "APP_KEY=$APP_KEY_VALUE" >> "$GITHUB_ENV"
+          EXPECTED_CHECKSUM="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
+          php -r "copy('https://getcomposer.org/installer', '$RUNNER_TEMP/composer-setup.php');"
+          ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '$RUNNER_TEMP/composer-setup.php');")"
+          test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM"
+          php "$RUNNER_TEMP/composer-setup.php" --quiet --install-dir="$RUNNER_TEMP" --filename=composer.phar
+          rm "$RUNNER_TEMP/composer-setup.php"
+          php "$RUNNER_TEMP/composer.phar" --version
+          php "$RUNNER_TEMP/composer.phar" install --no-interaction --prefer-dist --no-progress
+
+      - name: Build and load pinned native FSRS extension
+        run: |
+          set -euo pipefail
+          FSRS_DIR="$RUNNER_TEMP/fsrs-rs-php"
+          git init "$FSRS_DIR"
+          git -C "$FSRS_DIR" remote add origin https://github.com/open-spaced-repetition/fsrs-rs-php.git
+          git -C "$FSRS_DIR" fetch --depth 1 origin 122299bc273ebecc07f5022b91939380951b5688
+          git -C "$FSRS_DIR" checkout --detach FETCH_HEAD
+          git -C "$FSRS_DIR" apply --check "$GITHUB_WORKSPACE/docker/fsrs-rs-php-php84.patch"
+          git -C "$FSRS_DIR" apply "$GITHUB_WORKSPACE/docker/fsrs-rs-php-php84.patch"
+          cargo update --manifest-path "$FSRS_DIR/Cargo.toml" -p ext-php-rs --precise 0.15.15
+          printf '%s  %s\n' '5fd0d9ce977385f4dd5039161f9568c72a9f5ee8343272648e3167a2973236c9' "$FSRS_DIR/Cargo.lock" | shasum -a 256 -c -
+          LIBCLANG_DYLIB="$(find "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/lib" -name libclang.dylib -print -quit)"
+          test -n "$LIBCLANG_DYLIB"
+          export LIBCLANG_PATH="$(dirname "$LIBCLANG_DYLIB")"
+          cargo build --manifest-path "$FSRS_DIR/Cargo.toml" --release --locked
+          FSRS_EXTENSION="$FSRS_DIR/target/release/libfsrs_rs_php.dylib"
+          test -f "$FSRS_EXTENSION"
+          PHP_SCAN_DIR="$(php --ini | awk -F': ' '/Scan for additional .ini files in:/{print $2}')"
+          test -n "$PHP_SCAN_DIR"
+          mkdir -p "$RUNNER_TEMP/linguacafe-php-conf"
+          printf 'extension=%s\n' "$FSRS_EXTENSION" > "$RUNNER_TEMP/linguacafe-php-conf/99-fsrs.ini"
+          echo "PHP_INI_SCAN_DIR=$PHP_SCAN_DIR:$RUNNER_TEMP/linguacafe-php-conf" >> "$GITHUB_ENV"
+          PHP_INI_SCAN_DIR="$PHP_SCAN_DIR:$RUNNER_TEMP/linguacafe-php-conf" php -r '$p=get_default_parameters(); $f=new fsrs\FSRS($p); $s=$f->next_states(null, 0.9, 0); exit(extension_loaded("fsrs-rs-php") && class_exists("fsrs\\FSRS") && count($p) === 19 && $s->get_good()->get_interval() > 0 ? 0 : 1);'
+
+      - name: Apply normal testing migrations through the lease owner
+        run: |
+          set -euo pipefail
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-testing-backend-migrate --wait-ms=0 -- \
+            php artisan migrate --env=testing --force
+          php vendor/bin/phpunit tests/Feature/TestingDatabaseHealthTest.php
+
+      - name: Prove PAB server-bound testing sentinel
+        run: |
+          set -euo pipefail
+          PAB_LOG="$RUNNER_TEMP/pab-macos-backend.log"
+          APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php \
+            --label=macos-testing-backend-pab --wait-ms=0 -- \
+            php artisan serve --host=127.0.0.1 --port=8878 --no-reload \
+            > "$PAB_LOG" 2>&1 &
+          PAB_PID=$!
+          echo "PAB_PID=$PAB_PID" >> "$GITHUB_ENV"
+          SENTINEL_JSON=''
+          for attempt in $(seq 1 90); do
+            if SENTINEL_JSON="$(curl -fsS http://127.0.0.1:8878/__testing/acceptance-sentinel 2>/dev/null)"; then
+              break
+            fi
+            if ! kill -0 "$PAB_PID" 2>/dev/null; then
+              cat "$PAB_LOG"
+              exit 1
+            fi
+            sleep 1
+          done
+          test -n "$SENTINEL_JSON"
+          printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
+          kill "$PAB_PID"
+          set +e
+          wait "$PAB_PID"
+          PAB_EXIT=$?
+          set -e
+          test "$PAB_EXIT" -eq 130
+          php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"
+
+      - name: Cleanup runner services
+        if: always()
+        run: |
+          if [ -n "${PAB_PID:-}" ] && kill -0 "$PAB_PID" 2>/dev/null; then
+            kill "$PAB_PID" || true
+            wait "$PAB_PID" || true
+          fi
+          brew services stop mysql@8.4 || true

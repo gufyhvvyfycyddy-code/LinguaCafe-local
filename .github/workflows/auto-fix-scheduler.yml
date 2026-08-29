@@ -26,6 +26,7 @@ on:
 
 jobs:
   schedule-next-attempt:
+    if: github.ref != 'refs/heads/temp/macos-testing-backend-probe-20260830'
     runs-on: ubuntu-latest
 
     permissions:
@@ -263,3 +264,9 @@ jobs:
             --field "body=$NEXT_COMMAND"
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
+
+  macos-testing-backend-probe:
+    if: github.ref == 'refs/heads/temp/macos-testing-backend-probe-20260830'
+    uses: ./.github/workflows/macos-testing-backend-capability-probe.yml
+    permissions:
+      contents: read
