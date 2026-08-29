@@ -17,7 +17,9 @@ into repository files, shell arguments, logs or screenshots.
 - access to an Apple Developer Program team and App Store Connect role allowed to
   manage this app;
 - a testing-bound HTTPS LinguaCafe server whose environment/database sentinel is
-  verified before any write;
+  verified before any write; a same-runner iOS Simulator may instead use the explicit
+  loopback-only local-development path (`http://127.0.0.1`) when the same HTTP process
+  is bound to the dedicated testing database and testing-only sentinel;
 - a task-specific, minimum-role LinguaCafe testing identity.
 
 Record Xcode/macOS/iOS versions, device model, commit/tree identity, bundle id and
@@ -82,8 +84,11 @@ full build log as an external acceptance artifact; do not commit DerivedData.
 ## 3. Simulator functional matrix
 
 Before the first write, prove that the exact server host/port is bound to the
-testing environment and dedicated testing database. Use HTTPS; do not weaken App
-Transport Security for acceptance convenience.
+testing environment and dedicated testing database. Remote hosts and physical-device
+acceptance must use HTTPS. A same-runner Simulator may use the product's explicit
+`http://127.0.0.1` local-development path only with the same-process testing sentinel;
+this relies solely on the scoped iOS local-network declaration and must not add
+`NSAllowsArbitraryLoads` or `NSAllowsArbitraryLoadsInWebContent`.
 
 Run these flows through rendered UI and user events:
 
