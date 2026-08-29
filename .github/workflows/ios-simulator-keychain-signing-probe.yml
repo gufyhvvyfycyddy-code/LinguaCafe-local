@@ -57,12 +57,11 @@ jobs:
           SIM_XCENT="$RUNNER_TEMP/LinguaCafeSigningDerivedData/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/App.app-Simulated.xcent"
           test -d "$APP_PATH"
           test -f "$SIM_XCENT"
-          plutil -extract application-identifier raw "$SIM_XCENT" | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
-          plutil -extract keychain-access-groups.0 raw "$SIM_XCENT" | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIM_XCENT"
           codesign --verify --deep --strict "$APP_PATH"
-          SIGNED_ENTITLEMENTS="$(codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null)"
-          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract application-identifier raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
-          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract keychain-access-groups.0 raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
+          SIGNED_ENTITLEMENTS="$RUNNER_TEMP/linguacafe-signed-entitlements.plist"
+          codesign -d --entitlements - --xml "$APP_PATH" > "$SIGNED_ENTITLEMENTS" 2>/dev/null
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIGNED_ENTITLEMENTS"
 
       - name: Install and launch signed simulator app
         run: |
