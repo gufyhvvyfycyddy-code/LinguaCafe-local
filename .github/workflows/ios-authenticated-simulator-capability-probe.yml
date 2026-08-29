@@ -150,6 +150,9 @@ jobs:
         working-directory: mobile/ios/App
         run: |
           set -euo pipefail
+          SIM_ENTITLEMENTS="$RUNNER_TEMP/linguacafe-keychain-simulator.entitlements"
+          plutil -create xml1 "$SIM_ENTITLEMENTS"
+          plutil -insert keychain-access-groups -xml '<array><string>$(AppIdentifierPrefix)com.linguacafe.mobile</string></array>' "$SIM_ENTITLEMENTS"
           xcodebuild \
             -project App.xcodeproj \
             -scheme App \
@@ -157,18 +160,16 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
+            CODE_SIGN_ENTITLEMENTS="$SIM_ENTITLEMENTS" \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
+            ENTITLEMENTS_REQUIRED=YES \
             build
           APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
-          codesign --verify "$APP_PATH"
-          SIM_ENTITLEMENTS="$RUNNER_TEMP/linguacafe-simulator.entitlements.plist"
-          plutil -create xml1 "$SIM_ENTITLEMENTS"
-          plutil -insert application-identifier -string 'FAKETEAMID.com.linguacafe.mobile' "$SIM_ENTITLEMENTS"
-          plutil -insert keychain-access-groups -xml '<array><string>FAKETEAMID.com.linguacafe.mobile</string></array>' "$SIM_ENTITLEMENTS"
-          codesign --force --sign - --timestamp=none --entitlements "$SIM_ENTITLEMENTS" "$APP_PATH"
+          SIM_XCENT="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/App.app-Simulated.xcent"
+          test -d "$APP_PATH"
+          test -f "$SIM_XCENT"
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIM_XCENT"
           codesign --verify --deep --strict "$APP_PATH"
-          SIGNED_ENTITLEMENTS="$(codesign -d --entitlements - --xml "$APP_PATH" 2>/dev/null)"
-          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract application-identifier raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
-          printf '%s\n' "$SIGNED_ENTITLEMENTS" | plutil -extract keychain-access-groups.0 raw - | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
 
       - name: Install pinned Maestro CLI
         run: |
