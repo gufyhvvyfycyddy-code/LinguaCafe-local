@@ -95,6 +95,7 @@ jobs:
           LIBCLANG_DYLIB="$(find "$DEVELOPER_DIR/Toolchains/XcodeDefault.xctoolchain/usr/lib" -name libclang.dylib -print -quit)"
           test -n "$LIBCLANG_DYLIB"
           export LIBCLANG_PATH="$(dirname "$LIBCLANG_DYLIB")"
+          export RUSTFLAGS='-C link-arg=-Wl,-undefined,dynamic_lookup'
           cargo build --manifest-path "$FSRS_DIR/Cargo.toml" --release --locked
           FSRS_EXTENSION="$FSRS_DIR/target/release/libfsrs_rs_php.dylib"
           test -f "$FSRS_EXTENSION"
