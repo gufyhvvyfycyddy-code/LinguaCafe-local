@@ -59,9 +59,6 @@ jobs:
           test -f "$SIM_XCENT"
           python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIM_XCENT"
           codesign --verify --deep --strict "$APP_PATH"
-          SIGNED_ENTITLEMENTS="$RUNNER_TEMP/linguacafe-signed-entitlements.plist"
-          codesign -d --entitlements - --xml "$APP_PATH" > "$SIGNED_ENTITLEMENTS" 2>/dev/null
-          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIGNED_ENTITLEMENTS"
 
       - name: Install and launch signed simulator app
         run: |
