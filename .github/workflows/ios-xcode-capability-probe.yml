@@ -1,0 +1,66 @@
+name: iOS Xcode capability probe
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-ios-compile:
+    runs-on: macos-26
+    timeout-minutes: 30
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.6
+        run: |
+          test -d "$DEVELOPER_DIR"
+          sw_vers
+          node --version
+          npm --version
+          node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)"
+          xcodebuild -version
+          xcrun --version
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Run mobile tests
+        working-directory: mobile
+        run: npm test
+
+      - name: Generate iOS Web assets
+        working-directory: mobile
+        run: npm run cap:sync:ios
+
+      - name: Verify generated iOS Web assets
+        working-directory: mobile
+        run: npm run ios:generated-web-integrity
+
+      - name: Verify iOS source and release contracts
+        run: node tests/js/M9IosMvpGuard.test.mjs
+
+      - name: Resolve Swift packages and list simulators
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+          xcrun simctl list devices available
+
+      - name: Compile unsigned iOS Simulator app
+        working-directory: mobile/ios/App
+        run: |
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build

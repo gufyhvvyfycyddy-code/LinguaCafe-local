@@ -29,9 +29,12 @@ From `mobile/`:
 
 ```bash
 npm ci
-npm test -- --run
+npm test
 npm run cap:sync:ios
+npm run ios:generated-web-integrity
 ```
+
+The repository also provides `.github/workflows/ios-xcode-capability-probe.yml` as a manual-only `workflow_dispatch` lane for the same unsigned macOS/Xcode gate. It has no push/pull-request trigger, no Apple secret input, no signing/upload step, and must not be promoted to distribution evidence. Use it only when a standard GitHub-hosted macOS runner is authorized for the current repository/account.
 
 ### Post-sync Web asset integrity gate
 
@@ -48,9 +51,7 @@ and `ios/App/App/public/index.html`, then require:
 6. the generated main JS contains all three current safeguards:
    `正式移动端仅允许 HTTPS`, `服务器分页信息无效`, and `仅用于本地调试`.
 
-Record filenames and SHA-256 values as external evidence without committing the
-generated directory. Any mismatch, sourcemap or missing safeguard blocks Xcode
-compile, simulator/device testing, archive and release work.
+`npm run ios:generated-web-integrity` is the repeatable owner for checks 1–6. It also requires the generated `assets/` file set and every asset hash to match `dist/assets/`, so stale bundles left by a previous sync fail closed. Record its JSON filenames/counts/SHA-256 values as external evidence without committing the generated directory. Any mismatch, stale asset, sourcemap or missing safeguard blocks Xcode compile, simulator/device testing, archive and release work.
 
 Only after this gate passes:
 

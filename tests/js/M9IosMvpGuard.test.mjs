@@ -27,10 +27,13 @@ const devicePlaybook = read('docs', 'testing', 'm9-ios-device-and-store-acceptan
 const iosGitignore = read('mobile', 'ios', '.gitignore');
 const storeMaterials = read('docs', 'release', 'm9-ios-app-store-materials.md');
 const privacyNotice = read('docs', 'release', 'mobile-privacy-and-data-deletion.md');
+const generatedWebIntegrity = read('mobile', 'scripts', 'ios-generated-web-integrity.mjs');
+const xcodeCapabilityWorkflow = read('.github', 'workflows', 'ios-xcode-capability-probe.yml');
 
 assert.equal(pkg.dependencies['@capacitor/core'], '8.4.2');
 assert.equal(pkg.dependencies['@capacitor/ios'], '8.4.2');
 assert.match(pkg.scripts['cap:sync:ios'], /cap sync ios/);
+assert.match(pkg.scripts['ios:generated-web-integrity'], /ios-generated-web-integrity\.mjs/);
 for (const dependency of ['Capacitor', 'CapacitorHaptics', 'CapacitorLocalNotifications', 'CapacitorPreferences']) {
   assert.match(iosPackage, new RegExp(dependency));
 }
@@ -126,5 +129,29 @@ for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信�
 assert.match(devicePlaybook, /testing environment and dedicated testing database/);
 assert.match(devicePlaybook, /Never print or screenshot the bearer token itself/);
 assert.match(devicePlaybook, /Only after actual App Store Connect review/);
+
+assert.match(generatedWebIntegrity, /createHash\('sha256'\)/);
+assert.match(generatedWebIntegrity, /generated asset set differs/);
+assert.match(generatedWebIntegrity, /generated asset hashes differ/);
+assert.match(generatedWebIntegrity, /generated iOS public contains sourcemaps/);
+for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信息无效', '仅用于本地调试']) {
+  assert.match(generatedWebIntegrity, new RegExp(safeguard));
+}
+
+assert.match(xcodeCapabilityWorkflow, /workflow_dispatch:/);
+assert.doesNotMatch(xcodeCapabilityWorkflow, /^\s*(?:push|pull_request|schedule):/m);
+assert.match(xcodeCapabilityWorkflow, /permissions:\s*\n\s*contents: read/);
+assert.match(xcodeCapabilityWorkflow, /runs-on: macos-26/);
+assert.match(xcodeCapabilityWorkflow, /Xcode_26\.6\.app/);
+assert.match(xcodeCapabilityWorkflow, /npm ci/);
+assert.match(xcodeCapabilityWorkflow, /npm test/);
+assert.match(xcodeCapabilityWorkflow, /npm run cap:sync:ios/);
+assert.match(xcodeCapabilityWorkflow, /npm run ios:generated-web-integrity/);
+assert.match(xcodeCapabilityWorkflow, /M9IosMvpGuard\.test\.mjs/);
+assert.match(xcodeCapabilityWorkflow, /xcodebuild -resolvePackageDependencies/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl list devices available/);
+assert.match(xcodeCapabilityWorkflow, /generic\/platform=iOS Simulator/);
+assert.match(xcodeCapabilityWorkflow, /CODE_SIGNING_ALLOWED=NO/);
+assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|xcodebuild\s+archive/);
 
 console.log('M9 iOS MVP source and release guard passed.');

@@ -9,6 +9,7 @@
     "test": "vitest run",
     "cap:sync": "npm run build && cap sync android",
     "cap:sync:ios": "npm run build && cap sync ios",
+    "ios:generated-web-integrity": "node scripts/ios-generated-web-integrity.mjs",
     "android:debug": "npm run cap:sync && cd android && gradlew.bat assembleDebug",
     "android:release": "npm run cap:sync && cd android && gradlew.bat bundleRelease"
   },
