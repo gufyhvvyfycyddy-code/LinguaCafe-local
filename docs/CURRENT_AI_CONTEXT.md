@@ -4,7 +4,7 @@
 > 日期：2026-08-29
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
 >
-> **2026-08-29 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE 与 `H-00`–`H-07`。最新 H-07 product/test commit 为 `bf8de9339b97dfc889ca13ee6706e90bfd317108`，验收见 `docs/testing/h07-public-runtime-and-cost-acceptance-2026-08-29.md`：公开测试 runtime 已收束到 Laravel 13 + PHP 8.4 + MySQL 8.4，trusted-proxy 默认不信任 forwarded headers，生产 Compose 构建当前 checkout，FSRS 远期 due 使用 DATETIME，MySQL 8.4 restore/safety rollback 与真实 login→reload→logout 均已通过；当前成本建议以 DigitalOcean $54.45/月最小 base、约 ¥600–800/月 beta 预算为起点。当前 forward milestone 为 **H-08 public package/content-rights gate**：只核公开包内容的再分发权利与授权证据，不把用户私下导入/使用权推导成公开再分发权。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
+> **2026-08-29 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE 与 `H-00`–`H-09`。H-08 公共打包权利门已由 `c65b49ad` 关闭；H-09 Android 发布准备产品提交为 `e39154275154ce6f313d63ea0826947891f05bde`，验收见 `docs/testing/h09-android-release-readiness-acceptance-2026-08-29.md`：Android API 36、AAB/release signing fail-closed、临时 RSA-2048 测试 upload key 签名验证、AAB native `.so`=0、应用内隐私说明，以及 Android 16 真实 login→notification→offline/reconnect→device revoke/logout 均已通过，测试身份/lease/emulator 均已清理。当前 forward milestone 为 **H-10 iOS Xcode/signing/device/TestFlight capability cluster**：先做 fresh capability probe；只有存在授权 macOS/Xcode/Apple 路径时才允许声称真实 build/install/Keychain/TestFlight，否则保持 DEFERRED。用户已明确启用单窗口直接执行，因此当前窗口可连续推进已命名 milestone；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
 ## 1. 当前代码事实
 
@@ -94,7 +94,7 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 7. AI Study Card service Phase 7A–7E：Production Closed。
 8. Provider Environment Gate：以 default-off / fail-closed 形态关闭。
 
-“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics、H-04 backup/restore drill、H-05 isolation/privacy boundary、H-06 public authentication convergence 与 H-07 public runtime/cost gate 均已 DONE。当前 forward milestone 是 H-08：公共打包内容权利检查，随后按 H-08→H-09…H-GATE 顺序推进。
+“历史里程碑完成”不代表全产品完成。Phase G 与 G-GATE、H-00 deletion-first convergence、H-01 load/observability harness、H-02 representative 100-user load、H-03 bottleneck diagnostics、H-04 backup/restore drill、H-05 isolation/privacy boundary、H-06 public authentication convergence、H-07 public runtime/cost gate、H-08 public package/content-rights gate 与 H-09 Android release readiness 均已 DONE。当前 forward milestone 是 H-10：iOS Xcode/签名/设备/TestFlight capability cluster；若缺少授权 macOS/Xcode/Apple 能力则保持 DEFERRED，不伪造真实设备或商店证据。
 
 ## 4. 当前本地维护账本
 
