@@ -159,10 +159,11 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
             build
           APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
-          codesign --verify --deep --strict "$APP_PATH"
-          ENTITLEMENTS="$(codesign -d --entitlements :- "$APP_PATH" 2>&1)"
-          printf '%s\n' "$ENTITLEMENTS"
-          printf '%s\n' "$ENTITLEMENTS" | grep -q 'application-identifier'
+          codesign --verify "$APP_PATH"
+          SIM_ENTITLEMENTS="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/App.app-Simulated.xcent"
+          test -f "$SIM_ENTITLEMENTS"
+          plutil -p "$SIM_ENTITLEMENTS"
+          plutil -extract application-identifier raw "$SIM_ENTITLEMENTS" | grep -q '^FAKETEAMID\.com\.linguacafe\.mobile$'
 
       - name: Install pinned Maestro CLI
         run: |
