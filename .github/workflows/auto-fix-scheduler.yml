@@ -26,6 +26,7 @@ on:
 
 jobs:
   schedule-next-attempt:
+    if: github.ref_name != 'goal/linguacafe-a-h-sol-medium-20260809'
     runs-on: ubuntu-latest
 
     permissions:
@@ -263,3 +264,7 @@ jobs:
             --field "body=$NEXT_COMMAND"
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
+
+  ios-xcode-capability-probe:
+    if: github.ref_name == 'goal/linguacafe-a-h-sol-medium-20260809'
+    uses: ./.github/workflows/ios-xcode-capability-probe.yml
