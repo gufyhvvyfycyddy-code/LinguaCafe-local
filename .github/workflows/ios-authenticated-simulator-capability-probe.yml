@@ -324,24 +324,34 @@ jobs:
             '- assertVisible: "smoke review meaning"' \
             '- scrollUntilVisible:' \
             '    element:' \
-            '      text: "良好"' \
+            '      text: ".*良好.*"' \
             '    direction: DOWN' \
-            '- tapOn: "良好"' \
+            '    visibilityPercentage: 60' \
+            '- tapOn: ".*良好.*"' \
             '- extendedWaitUntil:' \
             '    visible: "${REVIEW_B}_review"' \
             '    timeout: 60000' \
             '- scrollUntilVisible:' \
             '    element:' \
-            '      text: "撤回上一次评分"' \
+            '      text: ".*撤回上一次评分.*"' \
             '    direction: DOWN' \
-            '- tapOn: "撤回上一次评分"' \
+            '    visibilityPercentage: 60' \
+            '- tapOn: ".*撤回上一次评分.*"' \
             '- extendedWaitUntil:' \
             '    visible: "${REVIEW_A}_review"' \
             '    timeout: 60000' \
             '- assertVisible: "显示答案"' \
             > "$FLOW"
+          set +e
           "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
             -e REVIEW_A="$LC_REVIEW_MARKER_A" -e REVIEW_B="$LC_REVIEW_MARKER_B" "$FLOW"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 80 || true
+            exit "$STATUS"
+          fi
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_A_CARD_ID AND source='sense_review';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_A_CARD_ID AND source='sense_review' AND rating='good' AND undone_at IS NOT NULL;")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_B_CARD_ID;")" = "0"
