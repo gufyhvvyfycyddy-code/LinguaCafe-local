@@ -146,9 +146,10 @@ jobs:
           cd mobile/ios/App
           xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
 
-      - name: Compile unsigned iOS Simulator app
+      - name: Compile locally signed iOS Simulator app
         working-directory: mobile/ios/App
         run: |
+          set -euo pipefail
           xcodebuild \
             -project App.xcodeproj \
             -scheme App \
@@ -156,8 +157,12 @@ jobs:
             -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
-            CODE_SIGNING_ALLOWED=NO \
             build
+          APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          codesign --verify --deep --strict "$APP_PATH"
+          ENTITLEMENTS="$(codesign -d --entitlements :- "$APP_PATH" 2>&1)"
+          printf '%s\n' "$ENTITLEMENTS"
+          printf '%s\n' "$ENTITLEMENTS" | grep -q 'application-identifier'
 
       - name: Install pinned Maestro CLI
         run: |
