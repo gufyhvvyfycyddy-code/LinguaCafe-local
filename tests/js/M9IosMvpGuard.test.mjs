@@ -34,6 +34,10 @@ assert.match(pkg.scripts['cap:sync:ios'], /cap sync ios/);
 for (const dependency of ['Capacitor', 'CapacitorHaptics', 'CapacitorLocalNotifications', 'CapacitorPreferences']) {
   assert.match(iosPackage, new RegExp(dependency));
 }
+for (const plugin of ['haptics', 'local-notifications', 'preferences']) {
+  assert.match(iosPackage, new RegExp(`\.\./\.\./\.\./node_modules/@capacitor/${plugin}`));
+}
+assert.doesNotMatch(iosPackage, /\\node_modules\\/);
 
 assert.match(storage, /platform === 'android' \|\| platform === 'ios'/);
 assert.match(swift, /kSecClassGenericPassword/);
@@ -90,9 +94,9 @@ assert.match(storeMaterials, /Status: release candidate; not submitted/);
 assert.match(storeMaterials, /Tracking: No/);
 assert.match(storeMaterials, /Required external values and evidence before submission/);
 assert.match(privacyNotice, /does not track users across apps or websites/);
-assert.match(privacyNotice, /server-data\s+deletion/);
-assert.match(privacyNotice, /does not offer account creation/);
-assert.match(privacyNotice, /future mobile release adds account creation/);
+assert.match(privacyNotice, /## Server data deletion/);
+assert.match(privacyNotice, /do not offer or link to account creation/);
+assert.match(privacyNotice, /future mobile release\s+adds or links to mobile account creation/);
 assert.match(acceptance, /2026-08-06 repository publication revalidation/);
 assert.match(acceptance, /currently stale/);
 assert.match(acceptance, /contains four sourcemaps/);
