@@ -15,6 +15,7 @@ const swift = read('mobile', 'ios', 'App', 'App', 'SecureTokenPlugin.swift');
 const viewController = read('mobile', 'ios', 'App', 'App', 'MyViewController.swift');
 const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.storyboard');
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
+const infoPlist = read('mobile', 'ios', 'App', 'App', 'Info.plist');
 const project = read('mobile', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
 const iosPackage = read('mobile', 'ios', 'App', 'CapApp-SPM', 'Package.swift');
 const route = read('routes', 'api.php');
@@ -60,6 +61,8 @@ for (const dataType of ['Name', 'EmailAddress', 'UserID', 'DeviceID', 'OtherUser
   assert.match(privacy, new RegExp(`NSPrivacyCollectedDataType${dataType}`));
 }
 assert.match(privacy, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
+assert.match(infoPlist, /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsLocalNetworking<\/key>\s*<true\/>\s*<\/dict>/);
+assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 
 assert.match(api, /platform: 'android' \| 'ios' \| 'web'/);
 assert.doesNotMatch(api, /\.\.\.payload, platform: 'android'/);
