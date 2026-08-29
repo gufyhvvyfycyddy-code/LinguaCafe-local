@@ -1,6 +1,6 @@
 # ADR-0066: H-07 public runtime, trusted proxy, and single-node deployment gate
 
-- Status: Accepted under current goal authorization; final H-07 acceptance pending verification
+- Status: Accepted
 - Date: 2026-08-29
 - Scope: public-beta runtime and deployment boundary for approximately 100 concurrent users
 
@@ -60,8 +60,10 @@ Checked 2026-08-29:
 - PHP current releases: https://www.php.net/
 - MySQL 8.0 EOL notice: https://dev.mysql.com/doc/relnotes/mysql/8.0/en/
 - MySQL 8.4 LTS release model: https://dev.mysql.com/doc/refman/8.4/en/mysql-releases.html
+- DigitalOcean Droplet pricing: https://www.digitalocean.com/pricing/droplets
+- DigitalOcean Managed Database pricing: https://www.digitalocean.com/pricing/managed-databases
 - AWS Lightsail instance/database/snapshot pricing: https://aws.amazon.com/lightsail/pricing/ and AWS Lightsail documentation
-- Laravel Cloud pricing: https://cloud.laravel.com/pricing
+- Laravel Cloud pricing: https://laravel.com/cloud/pricing
 
 ## Verification contract
 

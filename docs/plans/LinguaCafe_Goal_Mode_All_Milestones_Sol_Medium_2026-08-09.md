@@ -385,8 +385,8 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-04 | DONE | 自动备份与真实 testing 恢复演练 | existing M6 Backup/Restore assets | `e2cfc442` + `h04-backup-restore-drill-acceptance-2026-08-28.md`：Oracle MySQL 8.4 client；真实 backup→restore succeeded；write fence 真阻断；automatic safety rollback 真恢复；75 tests / 279 assertions；Compose/8894/temp/lease residue=0；不触开发/生产数据 |
 | H-05 | DONE | 用户/语言隔离、账号删除、同步设备撤销、隐私边界 | auth/mobile/device/portable data assets | `013c8af` + `62fcc24` + `h05-isolation-privacy-boundary-acceptance-2026-08-28.md`：schema-backed user/language ownership guards；账号删除 confirmation+password；last-admin transaction lock；token/device/session/media cleanup；真实 Web DELETE 200→logout；focused PHP/JS/build PASS |
 | H-06 | DONE | 登录与公开认证产品收束 | existing email auth; optional Apple/WeChat plan | `04e301f` + `h06-public-authentication-convergence-acceptance-2026-08-29.md`：单一 LoginRequest owner；generic 401；account 5/60s + IP 25/60s 双 RateLimiter；guest login gate；当前密码改密；真实浏览器 401→429→正常登录→错误/正确改密→恢复原测试密码→重新登录→退出；lease/sentinel/server clean；不引入 SMS/Apple/WeChat |
-| H-07 | ACTIVE | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | ¥600–1000/月推荐假设有当日价格支持；更稳档 ¥1200–2500 重新核算，不沿用旧价格；公开部署前同时关闭 supported Laravel/PHP runtime 与 trusted-proxy gate |
-| H-08 | TODO | 公共打包内容权利检查 | Phase F material metadata | 只包含用户有权分发/已授权内容；用户自传内容不等于可公开再分发 |
+| H-07 | DONE | 重新联网查询上线时最新基础设施与平台价格，给出成本模型 | current providers/official pricing | `bf8de933` + `h07-public-runtime-and-cost-acceptance-2026-08-29.md`：Laravel 13 / PHP 8.4 / MySQL 8.4；trusted proxy 默认关闭并显式信任；当前源码生产镜像；FSRS 2099 DATETIME；MySQL 8.4 成功恢复 + 自动 safety rollback；真实 login→reload→logout；DigitalOcean $54.45/月最小 base，约 ¥600–800/月 beta 预算 |
+| H-08 | ACTIVE | 公共打包内容权利检查 | Phase F material metadata | 只包含用户有权分发/已授权内容；用户自传内容不等于可公开再分发 |
 | H-09 | TODO | Android 发布准备 | existing Android M7 assets | current build、package、privacy、device smoke；不自动商店发布 |
 | H-10 | TODO | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | 若有 Mac/Xcode/Apple 授权：真实 build/install/Keychain/safe-area/offline/TestFlight；若没有保持 DEFERRED，不伪造 |
 | H-11 | TODO | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | 阅读、AI、Finish、Review、生词、材料、offline、恢复、账号边界真实证据 |
@@ -485,12 +485,20 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-07`（上线基础设施、当前价格与受支持运行时门）
-- Last DONE: `H-06`
-- Current verified production/code baseline HEAD: `04e301f`（H-06 public authentication convergence：单一 email/password owner、双 RateLimiter、guest login gate、当前密码改密与 dead auth owner removal；完整浏览器证据见 H-06 acceptance）
+- Active milestone: `H-08`（公共打包内容权利检查）
+- Last DONE: `H-07`
+- Current verified production/code baseline HEAD: `bf8de933`（H-07 public runtime gate：Laravel 13 / PHP 8.4 / MySQL 8.4、trusted proxy、当前源码生产镜像、FSRS DATETIME 与 public-beta deployment boundary；完整证据见 H-07 acceptance）
 - Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-28 fresh fetch）
 - Deferred capability clusters: `Android emulator/device capability cluster — E-06 native long-press phrase, lookup-sheet Back, primary Back/Forward, Reviewer rating and safe-area/keyboard checks; E-07 current APK online/offline/reconnect flow. iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest, signing/archive/TestFlight/App Store evidence`
 - Blocking issue: `none`
+
+### CLOSED MILESTONE EVIDENCE — H-07
+
+- H-07 product/test commit `bf8de9339b97dfc889ca13ee6706e90bfd317108` 将公开测试 runtime 收束到 Laravel 13 + PHP 8.4 + MySQL 8.4；生产 Compose 构建当前 checkout，密钥 fail-closed，Redis 留在内部网络，生产 restart 不再隐式 migrate/seed；`TRUSTED_PROXIES` 默认不信任 forwarded headers，仅部署显式配置后信任代理链。
+- FSRS due/log due 字段改为 MySQL `DATETIME`，2099 年真实值可保存；rollback 遇到超出 TIMESTAMP 范围的数据会拒绝缩窄。MySQL 8.4 已真实完成成功 restore 与故障 safety rollback，验证库残留 0。
+- Laravel 13 changed-file regression 496/2091（2 skipped）；最终 focused 77/398；Composer validate/audit、Compose fail-closed、Web/tokenizer production image build 均 PASS。真实 testing browser 完成 login → reload → fresh-page workaround → logout；最终 lease `active=false / stale_metadata=false`，8874 无 listener。
+- 2026-08-29 当前价格：DigitalOcean 4 GiB / 2 vCPU Basic Droplet $24/月 + 2 GiB / 1 vCPU Managed MySQL $30.45/月，最小 base $54.45/月；当前 beta 预算约 ¥600–800/月，若加同规格 DB standby 则 base 约 $84.90/月并按 ¥800–1000/月规划。完整证据：`docs/testing/h07-public-runtime-and-cost-acceptance-2026-08-29.md`；发布步骤：`docs/release/h07-public-beta-deployment-runbook.md`。
+- H-08 已打开，只处理公共打包内容的再分发权利/授权证据；不得把“用户能私下导入/使用”推导为“可随公开包再分发”。
 
 ### CLOSED MILESTONE EVIDENCE — H-06
 
