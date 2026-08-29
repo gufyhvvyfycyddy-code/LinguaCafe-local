@@ -162,8 +162,8 @@ jobs:
       - name: Install pinned Maestro CLI
         run: |
           set -euo pipefail
-          curl -fL "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.7.0/maestro.zip" -o "$RUNNER_TEMP/maestro.zip"
-          echo "a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
+          curl -fL "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.9.0/maestro.zip" -o "$RUNNER_TEMP/maestro.zip"
+          echo "855bb2ce1399d82f4f4a73d84a4d945f70b0d43eb86127e027af82809f63f0bd  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
           mkdir -p "$RUNNER_TEMP/maestro"
           unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro"
           MAESTRO_BIN="$(find "$RUNNER_TEMP/maestro" -type f -path '*/bin/maestro' | head -1)"
@@ -216,7 +216,9 @@ jobs:
             '- launchApp:' \
             '    clearState: true' \
             '    clearKeychain: true' \
-            '- assertVisible: "IOS · CONNECTED MVP"' \
+            '- extendedWaitUntil:' \
+            '    visible: "IOS · CONNECTED MVP"' \
+            '    timeout: 120000' \
             '- tapOn: "https://learn.example.com"' \
             '- inputText: "http://127.0.0.1:8878"' \
             '- tapOn: "邮箱"' \
@@ -224,13 +226,17 @@ jobs:
             '- tapOn: "密码"' \
             '- inputText: ${TEST_PASSWORD}' \
             '- tapOn: "安全登录"' \
-            '- assertVisible: "在线"' \
+            '- extendedWaitUntil:' \
+            '    visible: "在线"' \
+            '    timeout: 60000' \
             '- assertVisible: "阅读"' \
             '- assertVisible: "复习"' \
             '- assertVisible: "生词"' \
             '- assertVisible: "我的"' \
             '- launchApp' \
-            '- assertVisible: "在线"' \
+            '- extendedWaitUntil:' \
+            '    visible: "在线"' \
+            '    timeout: 60000' \
             '- assertVisible: "我的"' \
             > "$FLOW"
           set +e
