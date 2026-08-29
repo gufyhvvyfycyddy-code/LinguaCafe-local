@@ -1,6 +1,6 @@
 # LinguaCafe Documentation Index
 
-> 当前入口：2026-08-29。本文只负责路由，不保存任务历史、长篇状态或重复契约。
+> 当前入口：2026-08-30。本文只负责路由，不保存任务历史、长篇状态或重复契约。
 
 ## 1. 新任务读取顺序
 
@@ -22,7 +22,7 @@
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
 - 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
-- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00–H-09 已关闭；H-10 iOS capability DEFERRED；当前 H-11）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00–H-09、H-11 已关闭；E-06/E-07 Android capability 已于 2026-08-30 补齐；E-08/H-10 iOS capability DEFERRED；H-GATE 已审计并 DEFERRED / Not Complete）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
 - H-02 representative 100-user load 验收：`docs/testing/h02-representative-load-acceptance-2026-08-28.md`
 - H-03 bottleneck diagnostics 验收：`docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`；主流程 flow latency 已证明健康，fresh Apache prefork cold-burst deployment 问题留 H-07
 - H-04 backup/restore drill 验收：`docs/testing/h04-backup-restore-drill-acceptance-2026-08-28.md`；真实 MySQL backup→restore、write fence、automatic safety rollback 与 zero-residue 已证明
@@ -32,6 +32,9 @@
 - H-08 public package/content-rights gate 验收：`docs/testing/h08-public-package-rights-acceptance-2026-08-29.md`；公开 Docker/`git archive` 权利边界、SPDX/REUSE 风格第三方 notice、无来源旗帜退出公开包
 - H-09 Android release readiness 验收：`docs/testing/h09-android-release-readiness-acceptance-2026-08-29.md`；API 36、AAB/release signing、Play privacy/Data Safety 准备、Android 16 真实设备 smoke 与 cleanup
 - H-10 iOS capability probe：`docs/testing/h10-ios-capability-probe-2026-08-29.md`；Windows-static/iOS generated-Web 可复核，但无 Xcode/Apple/macOS/device 能力，真实 iOS build/Keychain/TestFlight 保持 DEFERRED
+- H-11 final Web + Android regression：`docs/testing/h11-final-web-android-regression-acceptance-2026-08-29.md`；PHP 8.4/native FSRS、真实 Web 主流程和 Android 16 login/offline/reconnect/device revoke 已关闭
+- E-06/E-07 Android native capability closure：`docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`；真实 Android 16 长按词组、Reviewer/haptics、下载/离线/reconnect/sync、Predictive Back 已关闭历史 Android capability cluster
+- H-GATE final audit：`docs/testing/h-gate-final-goal-completion-audit-2026-08-30.md`；当前 Windows/Web/Android 全部 stage-accepted，但 E-08/H-10 Apple/iOS capability 未清零，因此完整 A–H Goal 为 DEFERRED / Not Complete
 - 长期历史总账与运维登记：`docs/plans/linguacafe-master-plan.md`
 - 已确认产品方向与讨论历史：`docs/product/confirmed-product-decisions-and-discussion-roadmap-2026-07-23.md`
 - 历史 Anki-aligned 产品/架构路线：`docs/plans/anki-aligned-product-and-architecture-roadmap.md`

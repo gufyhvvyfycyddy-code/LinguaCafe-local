@@ -2,7 +2,7 @@
 
 > **最小上下文提示**：新任务先读 `docs/CURRENT_AI_CONTEXT.md`。本文保留被既有文档 guard 引用的当前表和历史证据；只在选择产品任务时读取 Open Work Registry 和相关阶段，不默认加载全文。
 
-> **Current authority — 2026-08-29**
+> **Current authority — 2026-08-30**
 >
 > 当前产品方向先读 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`；当前执行顺序读 `docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`。`anki-aligned-product-and-architecture-roadmap.md`、旧 PD-012 和下方历史阶段表继续保留用于追溯，但不能覆盖 2026-08-18 的 English-only / reading-first / spaced-review 决定。
 >
@@ -10,7 +10,7 @@
 > |---|---|
 > | Historical Production Closed | Queue Order; Custom Study 1A; Card Marker + Custom Study 1B; Manual Sense POS + shared form; Settings architecture convergence; Preset V1A–V1D; Browser/ReviewCardManage Phase 3A–3D; Reviewer architecture convergence; Reader Phase 6A–6M; AI Study Card service convergence Phase 7A–7E; provider Environment Gate (default-off) |
 > | Historical Accepted | Saved Search V1; Mgmt-7-b; today-only limits; Review Time; Study Overview canonical eligibility; Reader sidebar boundary correction |
-> | Current Phase | Goal Phase G + G-GATE 与 `H-00`–`H-09` 均已 DONE；`H-10` iOS Xcode/signing/device/TestFlight capability cluster 为 DEFERRED / Not Complete；当前 forward milestone 为 `H-11` final Web + Android + available-iOS regression。 |
+> | Current Phase | Goal Phase G + G-GATE、`H-00`–`H-09`、`H-11` 均已 DONE；2026-08-30 已补齐 E-06/E-07 Android 原生能力；`H-GATE` final audit 已执行但为 DEFERRED / Not Complete，因为 `E-08` / `H-10` real iOS Xcode/device/Keychain/signing/TestFlight capability 仍不可用。 |
 > | Current Product Boundary | English-only；reading-first；Sense-first；已学 review-state exact Sense 在距上一笔有效正式评分满 24 个实际小时后，即使 due 尚未来到也可以因真实阅读回忆提前 Good；不足 24h 跨篇/跨 session 都只记 exposure，普通 Reader 完全静默；同一 ReadingSession/ReviewCard 最多一笔 reading rating；existing Sense “不认识”可真实记一次 Again；AI/用户权威确认 matched-existing 后真实 Reader 句子进入现有唯一 WordSenseOccurrence 例句池；全部真实例句无 top-N 上限、完整池随机轮换且多例句时不连续重复。 |
 > | Current Reader Review ADR | `ADR-0061-reading-early-review-minimum-spacing-boundary.md` + `ADR-0063-reading-24h-silent-nonscoring-ux.md`（ADR-0060/0059 历史已 supersede） |
 > | Current AI Source Example ADR | `ADR-0062-reading-ai-matched-existing-source-example-binding.md` + `ADR-0064-unbounded-real-example-random-rotation.md` |
@@ -30,7 +30,7 @@
 
 > **Historical Phase 5A update (superseded 2026-07-14)**: this earlier slice added the authenticated read-only `GET /custom-study/chapter-options` endpoint and aligned sentence/token/translation identity before the frontend existed. The production frontend and browser closure described in the authoritative status above now supersede that interim state.
 
-> **最后更新**：2026-08-29。Goal Phase G + G-GATE 与 H-00–H-09 已完成；H-10 经 fresh capability probe 后保持 DEFERRED / Not Complete，当前 Windows 主机没有 Xcode、Apple signing 或在线 macOS 节点；当前 active milestone 为 H-11 final Web + Android + available-iOS regression。H-GATE 必须保留 H-10 缺失能力，不能把 Windows 静态证据写成 iOS 真机/TestFlight 完成。
+> **最后更新**：2026-08-30。Goal Phase G + G-GATE、H-00–H-09 与 H-11 已完成；E-06/E-07 的历史 Android capability gap 已由当前 Android 16 真机模拟器证据关闭。H-GATE final audit 已执行并保持 DEFERRED / Not Complete：当前 Windows 主机仍无 Xcode/xcrun/codesign/simctl，fresh Tailscale 检查无在线 macOS peer，E-08/H-10 的真实 iOS build/device/Keychain/signing/TestFlight 不能由 Windows 静态证据替代。
 > **Anti-Mud 规则**：参见 `docs/plans/vibe-coding-collaboration-rules.md` 第 10 节
 > **性质**：本文件是 LinguaCafe 项目的总控计划，汇总所有任务线、已完成工作、未完成任务和产品规则。
 > **文档入口**：新任务先读 `docs/DOCUMENTATION_INDEX.md` 和 `docs/plans/current-working-handoff.md`；历史文档见 `docs/HISTORY_INDEX.md`。

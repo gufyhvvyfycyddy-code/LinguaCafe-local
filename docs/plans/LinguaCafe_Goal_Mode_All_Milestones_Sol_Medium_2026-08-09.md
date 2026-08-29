@@ -390,7 +390,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | H-09 | DONE | Android 发布准备 | existing Android M7 assets | `e3915427` + `h09-android-release-readiness-acceptance-2026-08-29.md`：API 36；AAB/release signing fail-closed；临时 RSA-2048 upload-key 签名 AAB/APK 验证；AAB native `.so`=0；应用内隐私说明；Android 16 真设备链 login→notification permission/alarm→offline/reconnect→device revoke/logout；testing/lease/emulator residue=0；未自动提交 Play |
 | H-10 | DEFERRED | iOS 真机/Xcode/签名/TestFlight capability cluster | existing iOS M9 assets | `5f60bc95` + `h10-ios-capability-probe-2026-08-29.md`：fresh probe 仍为 Windows、无 Xcode/xcrun/codesign/Apple signing、无在线 macOS peer；42 mobile tests + current iOS generated-Web integrity PASS；修复 M9 guard 与 Windows SwiftPM path drift 防回归；真实 build/device/Keychain/TestFlight 继续 Not Complete，不伪造 |
 | H-11 | DONE | 最终 Web + Android + 可用 iOS 全主流程回归 | all phases | `eaab88a7` + `h11-final-web-android-regression-acceptance-2026-08-29.md`：PHP 8.4 Unit+Feature 4034/19397（14 skipped）；JS 477/477；mobile 42/42 + build；生产 Docker native FSRS 真 build/load/schedule；真实 Web Reader→manual Sense→Finish→Review→WordSense + 430px 四主入口；Android 16 login→四主入口→offline/reconnect→device revoke；lease/server/emulator/account cleanup clean；H-10 iOS 仍 DEFERRED |
-| H-GATE | TODO | 最终 Goal completion audit | 全部 milestone + capability clusters | H-11 已关闭全部当前可运行 Web/Android 回归；现在 fresh 审计所有 milestone/capability。H-10 real iOS capability 仍 Not Complete，H-GATE 不得据此声明完整跨平台 Goal 已完成 |
+| H-GATE | DEFERRED | 最终 Goal completion audit | 全部 milestone + capability clusters | `h-gate-final-goal-completion-audit-2026-08-30.md`：fresh 审计确认 Windows/Web/Android 全部当前可运行要求 Accepted；E-08/H-10 real iOS Xcode/device/Keychain/signing/TestFlight capability 仍 Not Complete，故完整跨平台 Goal 不得标 DONE |
 
 ---
 
@@ -485,12 +485,19 @@ Gate 不能靠报告标签通过，必须依据当前代码、diff、测试和�
 ### CURRENT CHECKPOINT
 
 - Goal branch: `goal/linguacafe-a-h-sol-medium-20260809`
-- Active milestone: `H-GATE`（最终 Goal completion audit）
-- Last DONE: `H-11`
-- Current verified production/code baseline HEAD: `eaab88a7a7d96d2c1078b4b5243210430a305970`（H-11：PHP 8.4 / native FSRS production runtime + Reader manual Sense identity repair + final Web/Android regression；完整证据见 H-11 acceptance）
-- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-29 fresh fetch）
-- Deferred capability clusters: `iOS capability cluster — Xcode unsigned compile, simulator/device shared flows, Keychain at-rest runtime, signing/archive/TestFlight/App Store evidence. H-10 remains DEFERRED / Not Complete on the current Windows host.`
-- Blocking issue: `H-GATE can audit/close every runnable Windows/Web/Android milestone, but the complete cross-platform Goal cannot be declared finished while H-10 real iOS capability remains unavailable.`
+- Active milestone: `none runnable on the current Windows host`; `H-GATE` audit has executed and is `DEFERRED / Not Complete` only on the Apple/iOS capability cluster.
+- Last runnable DONE closure: `E-06 / E-07 Android capability recovery` at `5448554e10fe6df093ac8fa1dd3832a35e312359`; `H-11` remains DONE for final Web/Android regression.
+- Current verified production/code baseline HEAD: `5448554e10fe6df093ac8fa1dd3832a35e312359`（H-11 backend/runtime baseline + current Android 16 E-06/E-07 native capability closure；H-GATE audit report records the exact post-H-11 delta）
+- Last verified `origin/master`: `1c9bdcd74fa793356ba3938f21c56405f3261e39`（2026-08-30 fresh remote check）
+- Deferred capability clusters: `iOS capability cluster only — Xcode compile, simulator/device shared flows, Keychain at-rest runtime, signing/archive/TestFlight/App Store evidence. E-08 and H-10 remain DEFERRED / Not Complete on the current Windows host.`
+- Blocking issue: `fresh H-GATE probe found xcodebuild/xcrun/codesign/simctl unavailable and 0 online macOS Tailscale peers; full cross-platform Goal remains Not Complete until real Apple capability exists.`
+
+### DEFERRED GATE EVIDENCE — H-GATE
+
+- 2026-08-30 fresh milestone inventory before updating the gate contained 71 DONE / 2 DEFERRED / 1 TODO; the two deferred rows were exactly E-08 and H-10, both representing the remaining Apple/iOS execution boundary. E-06/E-07 Android capability has now closed with real Android 16 evidence.
+- H-11 accepted backend/runtime baseline remains applicable: `eaab88a7…HEAD` contains no PHP app/route/database/migration changes. Current Android delta is `5448554e`; Mobile 42/42, production build, Android debug assemble and final JS 477/477 all PASS. M9 iOS source/release guard PASS; H-08 release-rights guard PASS over 2071 tracked paths.
+- Fresh current-host probe: Windows/x86_64; `xcodebuild`, `xcrun`, `codesign`, `simctl` all missing; online macOS Tailscale peers=0. Therefore real Xcode build, iOS simulator/device, Keychain runtime, signing/archive and TestFlight evidence cannot be produced honestly on this host.
+- Final DoD conditions 1/2/6/10 remain unsatisfied only because that final-required iOS cluster is not cleared. H-GATE audit is therefore `DEFERRED / Not Complete`, while all currently runnable Windows/Web/Android work is stage-accepted. Full evidence: `docs/testing/h-gate-final-goal-completion-audit-2026-08-30.md`.
 
 ### CLOSED MILESTONE EVIDENCE — H-07
 
