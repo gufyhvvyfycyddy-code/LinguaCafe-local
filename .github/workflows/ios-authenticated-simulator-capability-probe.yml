@@ -130,6 +130,29 @@ jobs:
             php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); app(App\Services\UserService::class)->createUser("iOS CI", getenv("LC_TEST_EMAIL"), getenv("LC_TEST_PASSWORD"), true, true);'
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM users WHERE email='$LC_TEST_EMAIL';")" = "1"
 
+      - name: Prepare deterministic Sense Review fixtures
+        run: |
+          set -euo pipefail
+          export LC_REVIEW_MARKER_A="ios_ci_review_a_$(openssl rand -hex 6)"
+          export LC_REVIEW_MARKER_B="ios_ci_review_b_$(openssl rand -hex 6)"
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-ios-review-fixture-a --wait-ms=0 -- \
+            php artisan smoke:sense-review-data --email="$LC_TEST_EMAIL" --marker="$LC_REVIEW_MARKER_A" --json
+          sleep 1
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-ios-review-fixture-b --wait-ms=0 -- \
+            php artisan smoke:sense-review-data --email="$LC_TEST_EMAIL" --marker="$LC_REVIEW_MARKER_B" --json
+          export LC_REVIEW_A_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT rc.id FROM review_cards rc JOIN word_senses ws ON ws.id=rc.target_id JOIN users u ON u.id=rc.user_id WHERE u.email='$LC_TEST_EMAIL' AND rc.target_type='sense' AND ws.lemma='${LC_REVIEW_MARKER_A}_review' LIMIT 1;")"
+          export LC_REVIEW_B_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT rc.id FROM review_cards rc JOIN word_senses ws ON ws.id=rc.target_id JOIN users u ON u.id=rc.user_id WHERE u.email='$LC_TEST_EMAIL' AND rc.target_type='sense' AND ws.lemma='${LC_REVIEW_MARKER_B}_review' LIMIT 1;")"
+          test -n "$LC_REVIEW_A_CARD_ID"
+          test -n "$LC_REVIEW_B_CARD_ID"
+          LC_REVIEW_A_BEFORE_FINGERPRINT="$(php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); $card=App\Models\ReviewCard::findOrFail((int)getenv("LC_REVIEW_A_CARD_ID")); $snap=app(App\Services\ReviewCardFsrsSnapshotService::class); echo $snap->fingerprint($snap->capture($card));')"
+          echo "LC_REVIEW_MARKER_A=$LC_REVIEW_MARKER_A" >> "$GITHUB_ENV"
+          echo "LC_REVIEW_MARKER_B=$LC_REVIEW_MARKER_B" >> "$GITHUB_ENV"
+          echo "LC_REVIEW_A_CARD_ID=$LC_REVIEW_A_CARD_ID" >> "$GITHUB_ENV"
+          echo "LC_REVIEW_B_CARD_ID=$LC_REVIEW_B_CARD_ID" >> "$GITHUB_ENV"
+          echo "LC_REVIEW_A_BEFORE_FINGERPRINT=$LC_REVIEW_A_BEFORE_FINGERPRINT" >> "$GITHUB_ENV"
+
       - name: Install mobile dependencies and verify mobile contracts
         working-directory: mobile
         run: |
@@ -281,6 +304,52 @@ jobs:
             exit 1
           fi
           rm "$RUNNER_TEMP/ios-preferences.txt"
+
+      - name: Rate and undo a Sense card through rendered iOS UI
+        run: |
+          set -euo pipefail
+          FLOW="$RUNNER_TEMP/ios-review-rating-undo.yaml"
+          printf '%s\n' \
+            'appId: com.linguacafe.mobile' \
+            '---' \
+            '- launchApp' \
+            '- extendedWaitUntil:' \
+            '    visible: "首页"' \
+            '    timeout: 60000' \
+            '- tapOn: "复习"' \
+            '- extendedWaitUntil:' \
+            '    visible: "${REVIEW_A}_review"' \
+            '    timeout: 60000' \
+            '- tapOn: "显示答案"' \
+            '- assertVisible: "smoke review meaning"' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "良好"' \
+            '    direction: DOWN' \
+            '- tapOn: "良好"' \
+            '- extendedWaitUntil:' \
+            '    visible: "${REVIEW_B}_review"' \
+            '    timeout: 60000' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "撤回上一次评分"' \
+            '    direction: DOWN' \
+            '- tapOn: "撤回上一次评分"' \
+            '- extendedWaitUntil:' \
+            '    visible: "${REVIEW_A}_review"' \
+            '    timeout: 60000' \
+            '- assertVisible: "显示答案"' \
+            > "$FLOW"
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
+            -e REVIEW_A="$LC_REVIEW_MARKER_A" -e REVIEW_B="$LC_REVIEW_MARKER_B" "$FLOW"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_A_CARD_ID AND source='sense_review';")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_A_CARD_ID AND source='sense_review' AND rating='good' AND undone_at IS NOT NULL;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE review_card_id=$LC_REVIEW_B_CARD_ID;")" = "0"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM operations WHERE review_card_id=$LC_REVIEW_A_CARD_ID AND operation_type='sense_review.rating' AND status='undone' AND version=2;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM operation_changes oc JOIN operations o ON o.id=oc.operation_record_id WHERE o.review_card_id=$LC_REVIEW_A_CARD_ID AND o.operation_type='sense_review.rating';")" = "2"
+          export LC_REVIEW_A_CARD_ID
+          LC_REVIEW_A_AFTER_FINGERPRINT="$(php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); $card=App\Models\ReviewCard::findOrFail((int)getenv("LC_REVIEW_A_CARD_ID")); $snap=app(App\Services\ReviewCardFsrsSnapshotService::class); echo $snap->fingerprint($snap->capture($card));')"
+          test "$LC_REVIEW_A_AFTER_FINGERPRINT" = "$LC_REVIEW_A_BEFORE_FINGERPRINT"
 
       - name: Revoke device through rendered UI and prove token clearing
         run: |
