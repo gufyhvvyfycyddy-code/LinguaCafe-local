@@ -297,10 +297,21 @@ jobs:
             '- extendedWaitUntil:' \
             '    visible: "已连接"' \
             '    timeout: 30000' \
-            '- scrollUntilVisible:' \
-            '    element:' \
-            '      text: "撤销此设备并退出"' \
-            '    direction: DOWN' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- swipe:' \
+            '    direction: UP' \
+            '- extendedWaitUntil:' \
+            '    visible: "撤销此设备并退出"' \
+            '    timeout: 30000' \
             '- tapOn: "撤销此设备并退出"' \
             '- assertVisible: "安全登录"' \
             '- launchApp' \
