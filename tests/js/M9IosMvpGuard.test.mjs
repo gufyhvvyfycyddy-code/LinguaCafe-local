@@ -153,6 +153,12 @@ assert.match(xcodeCapabilityWorkflow, /xcodebuild -resolvePackageDependencies/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl list devices available/);
 assert.match(xcodeCapabilityWorkflow, /generic\/platform=iOS Simulator/);
 assert.match(xcodeCapabilityWorkflow, /CODE_SIGNING_ALLOWED=NO/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl bootstatus/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl install/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl launch/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl terminate/);
+assert.match(xcodeCapabilityWorkflow, /xcrun simctl shutdown/);
 assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|xcodebuild\s+archive/);
 
 console.log('M9 iOS MVP source and release guard passed.');
