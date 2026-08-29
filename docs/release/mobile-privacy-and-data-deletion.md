@@ -1,10 +1,13 @@
 # LinguaCafe mobile privacy and data deletion
 
-Version: 2026-08-01 release candidate
+Version: 2026-08-29 Android/iOS release-preparation candidate
 
 This text is the source for the public privacy/support pages of a LinguaCafe
-mobile release. The deployment owner must publish it at stable HTTPS URLs and
-replace deployment-specific contact details before App Store submission.
+mobile release. The mobile app also carries a concise in-app copy so privacy
+information remains available from the application itself. Before any Google
+Play or App Store submission, the deployment owner must publish the complete
+policy at a stable, public, non-editable HTTPS URL and add the same developer
+identity plus a real privacy-contact mechanism used by the store listing.
 
 ## Data handled
 
@@ -81,4 +84,4 @@ than treating device revocation as account deletion.
 - Haptics/audio: rating feedback and pronunciation playback.
 
 No camera, microphone, contacts, location, advertising identifier or photo
-library permission is requested by the M9 client.
+library permission is requested by the current mobile client.

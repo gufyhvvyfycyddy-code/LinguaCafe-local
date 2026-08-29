@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+def releaseSigning = [
+    storePath: System.getenv('LINGUACAFE_ANDROID_KEYSTORE_PATH'),
+    storePassword: System.getenv('LINGUACAFE_ANDROID_KEYSTORE_PASSWORD'),
+    keyAlias: System.getenv('LINGUACAFE_ANDROID_KEY_ALIAS'),
+    keyPassword: System.getenv('LINGUACAFE_ANDROID_KEY_PASSWORD'),
+]
+def releaseSigningValues = releaseSigning.values().findAll { it != null && !it.trim().isEmpty() }
+def releaseSigningConfigured = releaseSigningValues.size() == releaseSigning.size()
+if (!releaseSigningConfigured && !releaseSigningValues.isEmpty()) {
+    throw new GradleException('Android release signing is partially configured. Set all LINGUACAFE_ANDROID_KEYSTORE_* variables or none of them.')
+}
+
 android {
     namespace = "com.linguacafe.mobile"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +28,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile new File(releaseSigning.storePath)
+                storePassword releaseSigning.storePassword
+                keyAlias releaseSigning.keyAlias
+                keyPassword releaseSigning.keyPassword
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
@@ -43,6 +68,21 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+def verifyReleaseSigning = tasks.register('verifyReleaseSigning') {
+    doLast {
+        if (!releaseSigningConfigured) {
+            throw new GradleException('Android release signing is not configured. Set all four LINGUACAFE_ANDROID_KEYSTORE_* variables before building a release artifact.')
+        }
+        if (!new File(releaseSigning.storePath).isFile()) {
+            throw new GradleException('Android release keystore path does not point to a file.')
+        }
+    }
+}
+
+tasks.matching { it.name == 'bundleRelease' || it.name == 'assembleRelease' }.configureEach {
+    dependsOn verifyReleaseSigning
+}
 
 try {
     def servicesJSON = file('google-services.json')

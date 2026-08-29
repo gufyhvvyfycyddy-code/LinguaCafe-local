@@ -76,6 +76,11 @@ input:focus, select:focus, button:focus-visible { outline: 3px solid rgba(49,91,
 .danger-outline { border: 1px solid var(--red); color: var(--red); background: transparent; }
 .large { width: 100%; min-height: 54px; }
 .privacy-note { margin: 18px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.privacy-policy { margin-top: 18px; padding: 14px 15px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); color: var(--ink); }
+.privacy-policy summary { cursor: pointer; color: var(--green); font-size: 13px; font-weight: 800; }
+.privacy-policy-copy { padding-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.65; }
+.privacy-policy-copy h2 { margin: 0 0 8px; color: var(--ink); font-size: 16px; font-family: inherit; }
+.privacy-policy-copy p { margin: 8px 0 0; }
 .alert { margin: 14px 0; padding: 12px 14px; border-radius: 12px; font-size: 13px; }
 .alert.error { color: #7d3028; background: #f8e4df; }
 

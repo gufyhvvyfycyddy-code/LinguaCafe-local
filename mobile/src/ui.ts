@@ -32,6 +32,7 @@ import type {
 } from './types';
 import { MediaCache } from './mediaCache';
 import { OfflineRepository } from './offlineRepository';
+import { mobilePrivacyPolicyHtml } from './privacy';
 import {
   movedBeyondReaderTap,
   readerPhrase,
@@ -267,6 +268,7 @@ export class LinguaCafeApp {
             <button class="primary large" type="submit">安全登录</button>
           </form>
           <p class="privacy-note">设备令牌由系统 ${secureStorageLabel()} 保护；应用不会保存密码。</p>
+          ${mobilePrivacyPolicyHtml()}
         </section>
       </main>`;
 
@@ -1371,6 +1373,7 @@ export class LinguaCafeApp {
           <button class="secondary" type="submit">导入到服务器</button>
         </form>` : ''}
         <div class="settings-card"><h2>服务器</h2><p class="server-url">${escapeHtml(serverUrl)}</p></div>
+        ${mobilePrivacyPolicyHtml()}
         <button class="danger-outline large" id="logout">撤销此设备并退出</button>
       </section>`;
     this.screenElement().querySelector<HTMLFormElement>('#reminder-form')?.addEventListener('submit', event => {
