@@ -666,7 +666,7 @@ class FsrsReschedulePreviewService
     private function extensionAvailable(): bool
     {
         return extension_loaded('fsrs-rs-php')
-            && class_exists('\fsrs\FSRS')
+            && class_exists(\fsrs\FSRS::class)
             && function_exists('get_default_parameters');
     }
 

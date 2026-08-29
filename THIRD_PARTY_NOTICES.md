@@ -56,6 +56,16 @@ The H-08 inventory checked the packages actually installed in the production tok
 
 The production image was inspected directly. spaCy, the English model, LemmInflect, pykakasi, pinyin, PySubParser, EbookLib, youtube-transcript-api, Bottle, lxml, and lxml_html_clean retain license/copyright files in their installed distribution metadata. newspaper3k 0.2.8 is the observed exception and is covered explicitly above. The Dockerfile installs these packages from their normal package/project distribution sources rather than copying undocumented local binaries.
 
+## Native FSRS PHP extension
+
+The production PHP image builds `fsrs-rs-php` from Open Spaced Repetition commit `122299bc273ebecc07f5022b91939380951b5688` and applies the repository-tracked PHP 8.4 / `ext-php-rs` compatibility patch before compiling the native shared library. No prebuilt FSRS binary is committed to LinguaCafe.
+
+- `fsrs-rs-php` 0.1.0 — MIT; Copyright (c) 2025 Open Spaced Repetition. License text: `LICENSES/MIT.txt`.
+- `fsrs-rs` commit `9b2f2f72f68e7fbddf1aff3ca0271d6ee26702e6` — BSD 3-Clause; Copyright (c) 2023 Open Spaced Repetition. License text: `LICENSES/FSRS-BSD-3-Clause.txt`.
+- `ext-php-rs` 0.15.15 — dual Apache-2.0 / MIT; LinguaCafe redistributes it under the MIT option. License text: `LICENSES/MIT.txt`.
+
+The Docker build pins the FSRS binding source commit, Rust toolchain image, and direct `ext-php-rs` version, then verifies the generated Cargo lockfile against a fixed SHA-256 before compiling. The resulting `.so` is loaded by the PHP 8.4 image and a real FSRS scheduling call is validated during image construction before the application layer is copied in.
+
 ## JMdict / JMdictDB compatibility assets
 
 `tools/jmdict_conjugation/conj.py` contains the original Stuart McGraw copyright header and grants GNU GPL version 2 or any later version. `tools/jmdict_conjugation/data/README.txt` records that the conjugation CSV files are exact copies from JMdictDB revision `hg-20180525-61238f`. These files remain only because current compatibility contracts still preserve lower JMDict/Kanji owners.

@@ -205,6 +205,7 @@
                         @mark-unfamiliar="onMarkUnfamiliar"
                         @unfamiliar-mark-rejected="onUnfamiliarMarkRejected"
                         @reader-occurrence-opened="onReaderOccurrenceOpened"
+                        @ensure-reader-manual-sense-context="ensureReaderManualSenseContext"
                         @increase-font-size="increaseFontSize"
                         @decrease-font-size="decreaseFontSize"
                         @toggle-plain-text-mode="togglePlainTextMode"
@@ -516,6 +517,7 @@
                 assistVerificationItems: [],
                 unfamiliarMarkMode: false,
                 unfamiliarMarkSaving: false,
+                unfamiliarMarkPromise: null,
                 markedUnfamiliarTargets: [],
                 markedUnfamiliarSnapshotVersion: '',
                 readingSenseVerificationDialog: false,
@@ -1114,6 +1116,87 @@
                         return false;
                     });
             },
+            ensureUnfamiliarTarget(target) {
+                if (this.readingSourceStale || !target || !this.chapterId) {
+                    return Promise.resolve(false);
+                }
+                if (this.unfamiliarMarkSaving) {
+                    return this.unfamiliarMarkPromise
+                        ? this.unfamiliarMarkPromise.then(() => this.ensureUnfamiliarTarget(target))
+                        : Promise.resolve(false);
+                }
+
+                const key = readerUnfamiliarTargetKey(target);
+                const existing = this.markedUnfamiliarTargets.find(item => readerUnfamiliarTargetKey(item) === key);
+                if (existing && existing.occurrence_id) {
+                    return this.refreshReadingSessionTargets().then((sessionOk) => {
+                        if (!sessionOk) return false;
+                        this.onReaderOccurrenceOpened(target);
+                        return Boolean(this.$store.state.vocabularyBox.readingContext?.occurrenceId);
+                    });
+                }
+
+                this.unfamiliarMarkSaving = true;
+                const request = axios.post('/chapters/' + this.chapterId + '/reading-unfamiliar-targets', {
+                    kind: target.kind,
+                    start_word_index: Number(target.start_word_index),
+                    end_word_index: Number(target.end_word_index),
+                }).then(() => Promise.all([
+                    this.loadUnfamiliarTargets(),
+                    this.refreshReadingSessionTargets(),
+                ])).then(([snapshotOk, sessionOk]) => {
+                    if (!snapshotOk || !sessionOk) return false;
+                    const canonicalTarget = findReadingTargetForOpenedSelection(this.readingTargets, target);
+                    if (!canonicalTarget || !canonicalTarget.occurrence_id) return false;
+                    this.onReaderOccurrenceOpened(target);
+                    return Boolean(this.$store.state.vocabularyBox.readingContext?.occurrenceId);
+                }).finally(() => {
+                    this.unfamiliarMarkSaving = false;
+                    if (this.unfamiliarMarkPromise === request) this.unfamiliarMarkPromise = null;
+                });
+                this.unfamiliarMarkPromise = request;
+                return request;
+            },
+            ensureReaderManualSenseContext(request) {
+                const done = request && typeof request.done === 'function' ? request.done : () => {};
+                const target = request && request.target;
+                const fingerprint = this.currentReadingSelectionFingerprint;
+                const sameSelection = Boolean(
+                    target
+                    && fingerprint
+                    && fingerprint.startWordIndex === target.start_word_index
+                    && fingerprint.endWordIndex === target.end_word_index,
+                );
+                if (!sameSelection || this.readingSourceStale) {
+                    done(false);
+                    return Promise.resolve(false);
+                }
+
+                const finish = (ready) => {
+                    const context = this.$store.state.vocabularyBox.readingContext;
+                    const complete = Boolean(
+                        ready
+                        && context
+                        && context.startWordIndex === target.start_word_index
+                        && context.endWordIndex === target.end_word_index
+                        && context.readingSessionId === this.readingSessionId
+                        && context.sourceRevision === this.readingSourceRevision
+                        && context.occurrenceId,
+                    );
+                    done(complete);
+                    return complete;
+                };
+
+                const existingTarget = findReadingTargetForOpenedSelection(this.readingTargets, target);
+                if (existingTarget && existingTarget.kind === 'word' && existingTarget.occurrence_id) {
+                    this.onReaderOccurrenceOpened(target);
+                    return Promise.resolve(finish(true));
+                }
+
+                return this.ensureUnfamiliarTarget(target)
+                    .then(finish)
+                    .catch(() => finish(false));
+            },
             onMarkUnfamiliar(target) {
                 if (this.readingSourceStale) {
                     this.setReaderNotice('文章内容已经变化，请先刷新本章，再继续标记不认识目标。', 'warning');
@@ -1122,33 +1205,47 @@
                 if (!target || !this.chapterId || this.unfamiliarMarkSaving) return;
                 const key = readerUnfamiliarTargetKey(target);
                 const existing = this.markedUnfamiliarTargets.find(item => readerUnfamiliarTargetKey(item) === key);
-                this.unfamiliarMarkSaving = true;
-                const isAdding = !(existing && existing.occurrence_id);
-                const request = !isAdding
-                    ? axios.delete('/chapters/' + this.chapterId + '/reading-unfamiliar-targets/' + encodeURIComponent(existing.occurrence_id))
-                    : axios.post('/chapters/' + this.chapterId + '/reading-unfamiliar-targets', {
-                        kind: target.kind,
-                        start_word_index: Number(target.start_word_index),
-                        end_word_index: Number(target.end_word_index),
-                    });
+                if (!(existing && existing.occurrence_id)) {
+                    return this.ensureUnfamiliarTarget(target)
+                        .then((ok) => {
+                            this.setReaderNotice(
+                                ok
+                                    ? '本章当前有 ' + this.markedUnfamiliarTargets.length + ' 个服务器确认的不认识目标。'
+                                    : '服务器已收到标记操作，但页面状态没有完整刷新。请稍后刷新本章再继续 AI 或完成结算。',
+                                ok ? 'info' : 'warning',
+                            );
+                            return ok;
+                        })
+                        .catch((error) => {
+                            this.setReaderNotice(requestErrorMessage(error, '标记没有得到服务器确认，请重试。'), 'warning');
+                            return false;
+                        });
+                }
 
-                return request.then(() => Promise.all([
-                    isAdding ? this.recordReadingInteraction('marked_unknown', target) : Promise.resolve(true),
-                    this.loadUnfamiliarTargets(),
-                    this.refreshReadingSessionTargets(),
-                ])).then(([interactionOk, snapshotOk, sessionOk]) => {
-                    if (!interactionOk || !snapshotOk || !sessionOk) {
-                        this.setReaderNotice('服务器已收到标记操作，但页面状态没有完整刷新。请稍后刷新本章再继续 AI 或完成结算。', 'warning');
+                this.unfamiliarMarkSaving = true;
+                const request = axios.delete('/chapters/' + this.chapterId + '/reading-unfamiliar-targets/' + encodeURIComponent(existing.occurrence_id))
+                    .then(() => Promise.all([
+                        this.loadUnfamiliarTargets(),
+                        this.refreshReadingSessionTargets(),
+                    ]))
+                    .then(([snapshotOk, sessionOk]) => {
+                        if (!snapshotOk || !sessionOk) {
+                            this.setReaderNotice('服务器已收到标记操作，但页面状态没有完整刷新。请稍后刷新本章再继续 AI 或完成结算。', 'warning');
+                            return false;
+                        }
+                        this.setReaderNotice('本章当前有 ' + this.markedUnfamiliarTargets.length + ' 个服务器确认的不认识目标。', 'info');
+                        return true;
+                    })
+                    .catch((error) => {
+                        this.setReaderNotice(requestErrorMessage(error, '标记没有得到服务器确认，请重试。'), 'warning');
                         return false;
-                    }
-                    this.setReaderNotice('本章当前有 ' + this.markedUnfamiliarTargets.length + ' 个服务器确认的不认识目标。', 'info');
-                    return true;
-                }).catch((error) => {
-                    this.setReaderNotice(requestErrorMessage(error, '标记没有得到服务器确认，请重试。'), 'warning');
-                    return false;
-                }).finally(() => {
-                    this.unfamiliarMarkSaving = false;
-                });
+                    })
+                    .finally(() => {
+                        this.unfamiliarMarkSaving = false;
+                        if (this.unfamiliarMarkPromise === request) this.unfamiliarMarkPromise = null;
+                    });
+                this.unfamiliarMarkPromise = request;
+                return request;
             },
             mergeReadingVerificationState() {
                 this.readingSenseVerificationItems = mergeReadingSenseVerificationItems({

@@ -138,6 +138,7 @@
                     :legacy-translation="translationText"
                     compact
                     @word-learning-updated="$emit('word-learning-updated', $event)"
+                    @ensure-reading-context="$emit('ensure-reading-context', $event)"
                 />
 
                 <!-- Unified 添加新释义 panel -->

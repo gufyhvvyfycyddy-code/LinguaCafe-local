@@ -152,7 +152,7 @@ class FsrsSchedulingService
      */
     public function activeEngine(): string
     {
-        if (extension_loaded('fsrs-rs-php') && class_exists('\fsrs\FSRS') && function_exists('get_default_parameters')) {
+        if (extension_loaded('fsrs-rs-php') && class_exists(\fsrs\FSRS::class) && function_exists('get_default_parameters')) {
             return 'fsrs';
         }
 
@@ -161,7 +161,7 @@ class FsrsSchedulingService
 
     private function extensionItemState(ReviewCard $card, string $rating, Carbon $reviewedAt): ?array
     {
-        if (!extension_loaded('fsrs-rs-php') || !class_exists('\fsrs\FSRS') || !function_exists('get_default_parameters')) {
+        if (!extension_loaded('fsrs-rs-php') || !class_exists(\fsrs\FSRS::class) || !function_exists('get_default_parameters')) {
             return null;
         }
 

@@ -14,6 +14,14 @@ const tokenizerStop = read('scripts/windows/tokenizer-stop.bat');
 const linguacafeStart = read('scripts/windows/linguacafe-start.bat');
 const linguacafeStop = read('scripts/windows/linguacafe-stop.bat');
 
+test('Windows workflow config refuses an older PATH PHP and resolves the supported PHP 8.4 runtime', () => {
+  assert.match(config, /version_compare\(PHP_VERSION, '8\.4\.0', '>='\)/);
+  assert.match(config, /where \/r "%LOCALAPPDATA%\\Microsoft\\WinGet\\Packages" php\.exe/);
+  assert.match(config, /where \/r "%LOCALAPPDATA%\\Microsoft\\WinGet\\Links" php\.exe/);
+  assert.match(config, /Do not silently accept an older PHP earlier on PATH/);
+  assert.match(config, /PHP 8\.4\+ was not found/);
+});
+
 test('tokenizer startup is owned by a self-healing scheduled task with readiness evidence', () => {
   assert.match(config, /TOKENIZER_PROCESS_SCRIPT=.*tokenizer-process\.ps1/i);
   assert.match(config, /TOKENIZER_RUNTIME_DIR=/i);

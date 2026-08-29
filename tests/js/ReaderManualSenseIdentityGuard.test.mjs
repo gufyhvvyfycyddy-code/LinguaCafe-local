@@ -3,6 +3,10 @@ import fs from 'node:fs';
 
 const reader = fs.readFileSync('resources/js/components/TextReader/TextReader.vue', 'utf8');
 const senses = fs.readFileSync('resources/js/components/Text/WordSensesList.vue', 'utf8');
+const vocabularyBox = fs.readFileSync('resources/js/components/Text/VocabularyBox.vue', 'utf8');
+const vocabularySideBox = fs.readFileSync('resources/js/components/Text/VocabularySideBox.vue', 'utf8');
+const textBlockGroup = fs.readFileSync('resources/js/components/Text/TextBlockGroup.vue', 'utf8');
+const vocabularyBottomSheet = fs.readFileSync('resources/js/components/Text/VocabularyBottomSheet.vue', 'utf8');
 const storeSource = fs.readFileSync('resources/js/vuex/VocabularyBox.js', 'utf8');
 const storeModule = await import(`data:text/javascript;base64,${Buffer.from(storeSource).toString('base64')}`);
 
@@ -63,7 +67,34 @@ const createStart = senses.indexOf('        createSense() {');
 const createBlock = senses.slice(createStart, senses.indexOf('        saveEdit(', createStart));
 assert.match(createBlock, /const payload = this\.createPayload\(this\.newForm\)/);
 assert.match(createBlock, /if \(!payload\)/);
-assert.match(createBlock, /阅读会话仍在初始化/);
+assert.match(createBlock, /this\.requestReadingContextForCreate\(\)/);
 assert.match(createBlock, /axios\.post\('\/senses\/manual', payload\)/);
+
+assert.match(senses, /\$emit\('ensure-reading-context', \{/);
+assert.match(senses, /startWordIndex:\s*snapshotContext\.startWordIndex/);
+assert.match(senses, /endWordIndex:\s*snapshotContext\.endWordIndex/);
+assert.match(senses, /done:\s*\(ready\) =>/);
+assert.match(senses, /this\.\$nextTick\(\(\) => this\.createSense\(\)\)/);
+assert.match(vocabularyBox, /@ensure-reading-context="\$emit\('ensure-reading-context', \$event\)"/);
+assert.match(vocabularySideBox, /@ensure-reading-context="\$emit\('ensure-reading-context', \$event\)"/);
+assert.match(textBlockGroup, /@ensure-reading-context="ensureManualSenseReadingContext"/);
+assert.match(textBlockGroup, /ensureManualSenseReadingContext\(request\)/);
+assert.match(textBlockGroup, /result\.target\.start_word_index !== request\?\.startWordIndex/);
+assert.match(textBlockGroup, /\$emit\('ensure-reader-manual-sense-context', \{/);
+assert.match(reader, /@ensure-reader-manual-sense-context="ensureReaderManualSenseContext"/);
+assert.match(reader, /ensureUnfamiliarTarget\(target\)/);
+assert.match(reader, /axios\.post\('\/chapters\/' \+ this\.chapterId \+ '\/reading-unfamiliar-targets'/);
+assert.match(reader, /findReadingTargetForOpenedSelection\(this\.readingTargets, target\)/);
+assert.doesNotMatch(reader, /recordReadingInteraction\('marked_unknown'/);
+assert.match(reader, /const canonicalTarget = findReadingTargetForOpenedSelection\(this\.readingTargets, target\)/);
+assert.match(reader, /this\.onReaderOccurrenceOpened\(target\)/);
+assert.match(reader, /unfamiliarMarkPromise:\s*null/);
+assert.match(reader, /this\.unfamiliarMarkPromise\.then\(\(\) => this\.ensureUnfamiliarTarget\(target\)\)/);
+assert.match(reader, /this\.unfamiliarMarkPromise = request/);
+assert.match(reader, /if \(this\.unfamiliarMarkPromise === request\) this\.unfamiliarMarkPromise = null/);
+assert.doesNotMatch(vocabularyBottomSheet, /word-senses-list|WordSensesList|添加新释义/);
+assert.match(reader, /ensureReaderManualSenseContext\(request\)/);
+assert.match(reader, /fingerprint\.startWordIndex === target\.start_word_index/);
+assert.match(reader, /context\.occurrenceId/);
 
 console.log('Reader manual Sense identity guard passed.');

@@ -143,6 +143,7 @@
             @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
             @word-learning-updated="onWordLearningUpdated"
+            @ensure-reading-context="ensureManualSenseReadingContext"
         ></vocabulary-box>
 
         <!-- Vocabulary bottom sheet -->
@@ -191,6 +192,7 @@
             @deleteWord="deleteWord"
             @addSelectedWordToAnki="addSelectedWordToAnki"
             @word-learning-updated="onWordLearningUpdated"
+            @ensure-reading-context="ensureManualSenseReadingContext"
         ></vocabulary-side-box>
     </div>
 </template>
@@ -825,6 +827,24 @@
                     ...result.target,
                     lemma: unique.base_word || unique.word || result.target.surface,
                     surface: result.target.surface,
+                });
+            },
+            ensureManualSenseReadingContext(request) {
+                const done = request && typeof request.done === 'function' ? request.done : () => {};
+                const result = resolveReaderUnfamiliarTarget({
+                    selection: this.selection,
+                    words: this.words,
+                });
+                if (!result.ok || result.target.kind !== 'word' || this.selection.length !== 1
+                    || result.target.start_word_index !== request?.startWordIndex
+                    || result.target.end_word_index !== request?.endWordIndex) {
+                    done(false);
+                    return;
+                }
+
+                this.$emit('ensure-reader-manual-sense-context', {
+                    target: result.target,
+                    done,
                 });
             },
             finishUnfamiliarMarkSelection() {

@@ -1,0 +1,164 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index 86012ca..be857d9 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -7,7 +7,7 @@ edition = "2024"
+ crate-type = ["cdylib"]
+
+ [dependencies]
+-ext-php-rs = "0.13.1"
++ext-php-rs = "=0.15.15"
+
+ [dependencies.fsrs]
+ # version = "2.0.4"
+diff --git a/src/lib.rs b/src/lib.rs
+index 0693ca6..dc94c79 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,3 +1,5 @@
++#![cfg_attr(windows, feature(abi_vectorcall))]
++
+ use ext_php_rs::prelude::*;
+ use fsrs::ComputeParametersInput;
+ use std::sync::Mutex;
+@@ -6,10 +8,12 @@ use std::sync::Mutex;
+ //  You'd need `fsrs = { path = "../path/to/fsrs" }` in your `Cargo.toml`.
+
+ // FSRS 主结构体
+-#[php_class(name = "fsrs\\FSRS")]
++#[php_class]
++#[php(name = "fsrs\\FSRS")]
+ pub struct FSRS(Mutex<fsrs::FSRS>);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl FSRS {
+     pub fn __construct(parameters: Vec<f32>) -> Self {
+         Self(fsrs::FSRS::new(Some(&parameters)).unwrap().into())
+@@ -87,11 +91,13 @@ impl FSRS {
+ }
+
+ // MemoryState 结构体
+-#[php_class(name = "fsrs\\MemoryState")]
++#[php_class]
++#[php(name = "fsrs\\MemoryState")]
+ #[derive(Debug, Clone)]
+ pub struct MemoryState(fsrs::MemoryState);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl MemoryState {
+     pub fn __construct(stability: f32, difficulty: f32) -> Self {
+         Self(fsrs::MemoryState {
+@@ -114,11 +120,13 @@ impl MemoryState {
+ }
+
+ // NextStates 结构体
+-#[php_class(name = "fsrs\\NextStates")]
++#[php_class]
++#[php(name = "fsrs\\NextStates")]
+ #[derive(Debug, Clone)]
+ pub struct NextStates(fsrs::NextStates);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl NextStates {
+     pub fn get_hard(&self) -> ItemState {
+         ItemState(self.0.hard.clone())
+@@ -138,11 +146,13 @@ impl NextStates {
+ }
+
+ // ItemState 结构体
+-#[php_class(name = "fsrs\\ItemState")]
++#[php_class]
++#[php(name = "fsrs\\ItemState")]
+ #[derive(Debug, Clone)]
+ pub struct ItemState(fsrs::ItemState);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl ItemState {
+     pub fn get_memory(&self) -> MemoryState {
+         MemoryState(self.0.memory)
+@@ -158,11 +168,13 @@ impl ItemState {
+ }
+
+ // FSRSItem 结构体
+-#[php_class(name = "fsrs\\FSRSItem")]
++#[php_class]
++#[php(name = "fsrs\\FSRSItem")]
+ #[derive(Debug, Clone)]
+ pub struct FSRSItem(fsrs::FSRSItem);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl FSRSItem {
+     pub fn __construct(reviews: Vec<&FSRSReview>) -> Self {
+         Self(fsrs::FSRSItem {
+@@ -192,11 +204,13 @@ impl FSRSItem {
+ }
+
+ // FSRSReview 结构体
+-#[php_class(name = "fsrs\\FSRSReview")]
++#[php_class]
++#[php(name = "fsrs\\FSRSReview")]
+ #[derive(Debug, Clone, Copy)]
+ pub struct FSRSReview(fsrs::FSRSReview);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl FSRSReview {
+     pub fn __construct(rating: u32, delta_t: u32) -> Self {
+         Self(fsrs::FSRSReview { rating, delta_t })
+@@ -216,10 +230,12 @@ impl FSRSReview {
+ }
+
+ // SimulationResult 结构体
+-#[php_class(name = "fsrs\\SimulationResult")]
++#[php_class]
++#[php(name = "fsrs\\SimulationResult")]
+ pub struct SimulationResult(fsrs::SimulationResult);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl SimulationResult {
+     pub fn get_memorized_cnt_per_day(&self) -> Vec<f32> {
+         self.0.memorized_cnt_per_day.clone()
+@@ -243,10 +259,12 @@ impl SimulationResult {
+ }
+
+ // SimulatorConfig 结构体（需要创建一个基本的配置）
+-#[php_class(name = "fsrs\\SimulatorConfig")]
++#[php_class]
++#[php(name = "fsrs\\SimulatorConfig")]
+ pub struct SimulatorConfig(fsrs::SimulatorConfig);
+
+-#[php_impl(rename_methods = "none")]
++#[php_impl]
++#[php(change_method_case = "none")]
+ impl SimulatorConfig {
+     pub fn __construct() -> Self {
+         Self(fsrs::SimulatorConfig::default())
+@@ -287,4 +305,15 @@ pub fn get_default_parameters() -> Vec<f32> {
+ #[php_module]
+ pub fn get_module(module: ModuleBuilder) -> ModuleBuilder {
+     module
++        .class::<FSRS>()
++        .class::<MemoryState>()
++        .class::<NextStates>()
++        .class::<ItemState>()
++        .class::<FSRSItem>()
++        .class::<FSRSReview>()
++        .class::<SimulationResult>()
++        .class::<SimulatorConfig>()
++        .function(wrap_function!(simulate))
++        .function(wrap_function!(default_simulator_config))
++        .function(wrap_function!(get_default_parameters))
+ }

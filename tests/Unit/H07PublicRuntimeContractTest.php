@@ -23,6 +23,29 @@ class H07PublicRuntimeContractTest extends TestCase
         $this->assertStringNotContainsString('docker-php-ext-install pdo pdo_mysql fileinfo', $developmentDockerfile);
     }
 
+    public function test_production_php_image_builds_and_enables_the_native_fsrs_extension(): void
+    {
+        $dockerfile = file_get_contents(base_path('docker/PhpDockerfile'));
+
+        $this->assertStringContainsString('FROM rust:1.98.0-trixie AS fsrs_rust', $dockerfile);
+        $this->assertStringContainsString('122299bc273ebecc07f5022b91939380951b5688', $dockerfile);
+        $this->assertStringContainsString('fsrs-rs-php-php84.patch', $dockerfile);
+        $this->assertStringContainsString('cargo update -p ext-php-rs --precise 0.15.15', $dockerfile);
+        $this->assertStringContainsString('5fd0d9ce977385f4dd5039161f9568c72a9f5ee8343272648e3167a2973236c9', $dockerfile);
+        $this->assertStringContainsString('sha256sum -c -', $dockerfile);
+        $this->assertStringContainsString('cargo build --release --locked', $dockerfile);
+        $this->assertStringContainsString('libfsrs_rs_php.so', $dockerfile);
+        $this->assertStringContainsString("extension=/usr/local/lib/linguacafe/fsrs_rs_php.so", $dockerfile);
+        $this->assertStringContainsString('get_default_parameters()', $dockerfile);
+        $this->assertStringContainsString('next_states(null, 0.9, 0)', $dockerfile);
+        $this->assertStringContainsString('count($p) === 19', $dockerfile);
+
+        $dockerignore = file_get_contents(base_path('.dockerignore'));
+        foreach (['mobile', 'storage/app', 'storage/backup', 'storage/framework', 'storage/logs', 'storage/media'] as $excludedPath) {
+            $this->assertMatchesRegularExpression('/^'.preg_quote($excludedPath, '/').'$/m', $dockerignore, $excludedPath);
+        }
+    }
+
     public function test_tokenizer_images_include_only_the_supported_english_spacy_runtime(): void
     {
         foreach (['docker/PythonDockerfile', 'docker/PythonDockerfileDev'] as $path) {

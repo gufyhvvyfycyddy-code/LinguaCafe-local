@@ -43,6 +43,7 @@ const requiredLicenseTexts = new Map([
     ['LICENSES/CC-BY-4.0.txt', 'Creative Commons Attribution 4.0 International Public License'],
     ['LICENSES/GPL-2.0-or-later.txt', 'Version 2, June 1991'],
     ['LICENSES/MIT.txt', 'Permission is hereby granted, free of charge'],
+    ['LICENSES/FSRS-BSD-3-Clause.txt', 'Redistribution and use in source and binary forms'],
 ]);
 for (const [relativePath, marker] of requiredLicenseTexts) {
     const absolutePath = path.join(root, relativePath);

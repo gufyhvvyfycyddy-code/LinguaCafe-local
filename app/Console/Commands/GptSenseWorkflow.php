@@ -159,7 +159,7 @@ class GptSenseWorkflow extends Command
             true
         );
         $this->doctorLine(
-            extension_loaded('fsrs-rs-php') && class_exists('\fsrs\FSRS') && function_exists('get_default_parameters'),
+            extension_loaded('fsrs-rs-php') && class_exists(\fsrs\FSRS::class) && function_exists('get_default_parameters'),
             'fsrs-rs-php native extension loaded',
             'Build and load fsrs-rs-php. Use fallback only for local tests.',
             $failed,

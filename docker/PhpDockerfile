@@ -1,3 +1,39 @@
+FROM rust:1.98.0-trixie AS fsrs_rust
+
+FROM php:8.4-cli-trixie AS fsrs_build
+
+COPY --from=fsrs_rust /usr/local/cargo /usr/local/cargo
+COPY --from=fsrs_rust /usr/local/rustup /usr/local/rustup
+ENV CARGO_HOME=/usr/local/cargo \
+    RUSTUP_HOME=/usr/local/rustup \
+    PATH=/usr/local/cargo/bin:${PATH} \
+    LIBCLANG_PATH=/usr/lib/llvm-19/lib
+
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        build-essential \
+        ca-certificates \
+        clang \
+        git \
+        libclang-dev \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+RUN git init fsrs-rs-php \
+    && cd fsrs-rs-php \
+    && git remote add origin https://github.com/open-spaced-repetition/fsrs-rs-php.git \
+    && git fetch --depth 1 origin 122299bc273ebecc07f5022b91939380951b5688 \
+    && git checkout --detach FETCH_HEAD
+COPY docker/fsrs-rs-php-php84.patch /tmp/fsrs-rs-php-php84.patch
+RUN cd /build/fsrs-rs-php \
+    && git apply --check /tmp/fsrs-rs-php-php84.patch \
+    && git apply /tmp/fsrs-rs-php-php84.patch \
+    && cargo update -p ext-php-rs --precise 0.15.15 \
+    && printf '%s  %s\n' '5fd0d9ce977385f4dd5039161f9568c72a9f5ee8343272648e3167a2973236c9' 'Cargo.lock' | sha256sum -c - \
+    && cargo build --release --locked \
+    && test -f target/release/libfsrs_rs_php.so
+
 FROM node:20-alpine AS node_build
 
 WORKDIR /build
@@ -37,6 +73,10 @@ RUN apt-get update \
 RUN docker-php-ext-configure gd \
     && docker-php-ext-install "-j$(nproc)" gd pdo_mysql mysqli zip pcntl \
     && docker-php-source delete
+
+COPY --from=fsrs_build /build/fsrs-rs-php/target/release/libfsrs_rs_php.so /usr/local/lib/linguacafe/fsrs_rs_php.so
+RUN printf 'extension=/usr/local/lib/linguacafe/fsrs_rs_php.so\n' > /usr/local/etc/php/conf.d/20-fsrs.ini \
+    && php -r '$p=get_default_parameters(); $f=new fsrs\FSRS($p); $s=$f->next_states(null, 0.9, 0); exit(extension_loaded("fsrs-rs-php") && class_exists("fsrs\\FSRS") && count($p) === 19 && $s->get_good()->get_interval() > 0 ? 0 : 1);'
 
 #php config
 RUN printf 'max_execution_time = 600\n' >> /usr/local/etc/php/conf.d/uploads.ini \

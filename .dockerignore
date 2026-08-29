@@ -2,6 +2,11 @@
 .env
 .env.*
 node_modules
+mobile
 vendor
+storage/app
+storage/backup
+storage/framework
 storage/logs
+storage/media
 public/images/flags

@@ -29,24 +29,29 @@ set "INPUT_FILE=%WORKFLOW_DIR%\input\new-material.txt"
 
 if /i "%PHP_EXE%"=="php" (
     where php >nul 2>&1
-    if errorlevel 1 (
-        for /d %%D in ("%LOCALAPPDATA%\Microsoft\WinGet\Packages\PHP.PHP*") do (
-            if exist "%%D\php.exe" (
-                set "PHP_EXE=%%D\php.exe"
-                goto linguacafe_php_found
-            )
-        )
-        for /d %%D in ("%LOCALAPPDATA%\Microsoft\WinGet\Links\PHP*") do (
-            if exist "%%D\php.exe" (
-                set "PHP_EXE=%%D\php.exe"
-                goto linguacafe_php_found
-            )
-        )
-        for /f "delims=" %%P in ('where /r "%LOCALAPPDATA%\Microsoft\WinGet\Packages" php.exe 2^>nul') do (
+    if not errorlevel 1 (
+        php -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>&1
+        if not errorlevel 1 goto linguacafe_php_found
+    )
+
+    rem LinguaCafe's supported runtime is PHP 8.4+. Do not silently accept an older PHP earlier on PATH.
+    set "PHP_EXE="
+    for /f "delims=" %%P in ('where /r "%LOCALAPPDATA%\Microsoft\WinGet\Packages" php.exe 2^>nul') do (
+        "%%P" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>&1
+        if not errorlevel 1 (
             set "PHP_EXE=%%P"
             goto linguacafe_php_found
         )
     )
+    for /f "delims=" %%P in ('where /r "%LOCALAPPDATA%\Microsoft\WinGet\Links" php.exe 2^>nul') do (
+        "%%P" -r "exit(version_compare(PHP_VERSION, '8.4.0', '>=') ? 0 : 1);" >nul 2>&1
+        if not errorlevel 1 (
+            set "PHP_EXE=%%P"
+            goto linguacafe_php_found
+        )
+    )
+
+    echo [LinguaCafe] PHP 8.4+ was not found. Install a supported PHP runtime or set PHP_EXE explicitly.
 )
 :linguacafe_php_found
 

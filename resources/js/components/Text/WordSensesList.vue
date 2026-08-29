@@ -664,6 +664,32 @@ export default {
                 keep_new: form.keep_new === true,
             };
         },
+        requestReadingContextForCreate() {
+            const snapshotContext = this.snapshot.readingContext;
+            if (!snapshotContext
+                || !Number.isInteger(snapshotContext.startWordIndex)
+                || !Number.isInteger(snapshotContext.endWordIndex)) {
+                this.saveError = '阅读会话仍在初始化，或当前选择已经变化。请稍后重试或重新点选这个词。';
+                return;
+            }
+
+            const createFormSession = this.createFormSession;
+            this.saving = true;
+            this.saveError = '';
+            this.$emit('ensure-reading-context', {
+                startWordIndex: snapshotContext.startWordIndex,
+                endWordIndex: snapshotContext.endWordIndex,
+                done: (ready) => {
+                    if (createFormSession !== this.createFormSession || !this.showAddForm) return;
+                    this.saving = false;
+                    if (!ready) {
+                        this.saveError = '阅读会话仍在初始化，或当前选择已经变化。请稍后重试或重新点选这个词。';
+                        return;
+                    }
+                    this.$nextTick(() => this.createSense());
+                },
+            });
+        },
         createSense() {
             this.createValidation = validateManualSenseForm(this.newForm);
             if (this.hasValidationErrors(this.createValidation)) {
@@ -672,7 +698,7 @@ export default {
 
             const payload = this.createPayload(this.newForm);
             if (!payload) {
-                this.saveError = '阅读会话仍在初始化，或当前选择已经变化。请稍后重试或重新点选这个词。';
+                this.requestReadingContextForCreate();
                 return;
             }
 

@@ -93,7 +93,7 @@ class FsrsOptimizationSettingsService
         }
 
         try {
-            if (!extension_loaded('fsrs-rs-php') || !class_exists('\\fsrs\\FSRS')) {
+            if (!extension_loaded('fsrs-rs-php') || !class_exists(\fsrs\FSRS::class)) {
                 return $this->unavailablePreview($status, 'FSRS 扩展未加载，无法进行参数优化。', 'EXTENSION_NOT_LOADED');
             }
 

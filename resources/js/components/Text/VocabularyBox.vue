@@ -156,7 +156,7 @@
                         ></vocabulary-search-box>
 
                         <!-- Saved word senses -->
-                        <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" @word-learning-updated="$emit('word-learning-updated', $event)" />
+                        <word-senses-list ref="wordSensesList" v-if="type === 'word'" :study-base="studyBase" :base-word="baseWord" :lemma="baseWord || word" :surface="word" :word="word" :language="$props.language" :legacy-translation="translationText" @word-learning-updated="$emit('word-learning-updated', $event)" @ensure-reading-context="$emit('ensure-reading-context', $event)" />
                     </v-card-text>
 
                     <v-card-actions v-if="type !== 'word'" class="mt-2 pl-0">
