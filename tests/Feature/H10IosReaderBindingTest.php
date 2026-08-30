@@ -76,7 +76,9 @@ class H10IosReaderBindingTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.word_sense.lemma', 'bank');
 
-        $sense = WordSense::findOrFail($response->json('data.word_sense.sense_id'));
+        $sense = WordSense::with('reviewCard')->findOrFail($response->json('data.word_sense.sense_id'));
+        $this->assertNotNull($sense->reviewCard);
+        $this->assertSame($sense->reviewCard->id, $response->json('data.word_sense.review_card_id'));
         $source = WordSenseOccurrence::query()
             ->where('user_id', $this->user->id)
             ->where('language_id', 'english')

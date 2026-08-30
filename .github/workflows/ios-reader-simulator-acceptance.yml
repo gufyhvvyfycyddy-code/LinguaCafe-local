@@ -161,19 +161,6 @@ jobs:
           python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); assert d["application-identifier"] == "FAKETEAMID.com.linguacafe.mobile"; assert d["keychain-access-groups"] == ["FAKETEAMID.com.linguacafe.mobile"]' "$SIM_XCENT"
           codesign --verify --deep --strict "$APP_PATH"
 
-      - name: Install pinned Maestro CLI
-        run: |
-          set -euo pipefail
-          curl -fL "https://github.com/mobile-dev-inc/Maestro/releases/download/cli-2.7.0/maestro.zip" -o "$RUNNER_TEMP/maestro.zip"
-          echo "a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5  $RUNNER_TEMP/maestro.zip" | shasum -a 256 -c -
-          mkdir -p "$RUNNER_TEMP/maestro"
-          unzip -q "$RUNNER_TEMP/maestro.zip" -d "$RUNNER_TEMP/maestro"
-          MAESTRO_BIN="$(find "$RUNNER_TEMP/maestro" -type f -path '*/bin/maestro' | head -1)"
-          test -n "$MAESTRO_BIN"
-          chmod +x "$MAESTRO_BIN"
-          echo "MAESTRO_BIN=$MAESTRO_BIN" >> "$GITHUB_ENV"
-          "$MAESTRO_BIN" --version
-
       - name: Start PAB-bound Reader backend and fixture
         run: |
           set -euo pipefail
@@ -210,120 +197,38 @@ jobs:
           printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
           grep -q 'IOS_READER_PAB_FIXTURE_READY' "$PAB_LOG"
 
-      - name: Install current app and open Reader in portrait
+      - name: Prove Reader UI with native XCUITest
         run: |
           set -euo pipefail
           xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
-          APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
-          xcrun simctl install "$LC_IOS_SIM_UDID" "$APP_PATH"
-
-          FLOW="$RUNNER_TEMP/ios-reader-portrait.yaml"
-          printf '%s\n' \
-            'appId: com.linguacafe.mobile' \
-            '---' \
-            '- launchApp:' \
-            '    clearState: true' \
-            '    clearKeychain: true' \
-            '- extendedWaitUntil:' \
-            '    visible: "IOS · CONNECTED MVP"' \
-            '    timeout: 120000' \
-            '- tapOn: "https://learn.example.com"' \
-            '- inputText: "http://127.0.0.1:8878"' \
-            '- tapOn: "邮箱"' \
-            '- inputText: ${TEST_EMAIL}' \
-            '- tapOn: "密码"' \
-            '- inputText: ${TEST_PASSWORD}' \
-            '- tapOn: "安全登录"' \
-            '- extendedWaitUntil:' \
-            '    visible: "首页"' \
-            '    timeout: 60000' \
-            '- tapOn: "阅读"' \
-            '- extendedWaitUntil:' \
-            '    visible: ".*H10 iOS Reader ${READER_MARKER}.*"' \
-            '    timeout: 60000' \
-            '- tapOn: ".*H10 iOS Reader ${READER_MARKER}.*"' \
-            '- tapOn: "Reader touch source binding"' \
-            '- setOrientation: PORTRAIT' \
-            '- assertVisible: "Reader touch source binding"' \
-            '- assertVisible: "bank"' \
-            '- assertVisible: "account"' \
-            '- tapOn: "bank"' \
-            '- extendedWaitUntil:' \
-            '    visible: "创建学习词义"' \
-            '    timeout: 30000' \
-            '- tapOn: "输入你确认的中文词义"' \
-            '- inputText: "testing bank meaning"' \
-            '- tapOn: "确认并创建"' \
-            '- extendedWaitUntil:' \
-            '    visible: "词义已创建，将进入正式复习队列"' \
-            '    timeout: 30000' \
-            '- tapOn: "bank"' \
-            '- extendedWaitUntil:' \
-            '    visible: "先回想这个词在这里的意思，再选择你的真实情况。"' \
-            '    timeout: 30000' \
-            '- assertNotVisible: "创建学习词义"' \
-            '- tapOn: "关闭"' \
-            > "$FLOW"
+          RESULT_BUNDLE="$RUNNER_TEMP/ios-reader-xcuitest.xcresult"
+          rm -rf "$RESULT_BUNDLE"
           set +e
-          php tests/Support/run-command-with-timeout.php --seconds=300 -- \
-            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
-            -e TEST_EMAIL="$LC_TEST_EMAIL" \
-            -e TEST_PASSWORD="$LC_TEST_PASSWORD" \
-            -e READER_MARKER="$LC_READER_MARKER" \
-            "$FLOW"
+          TEST_RUNNER_LC_SERVER_URL="http://127.0.0.1:8878" \
+          TEST_RUNNER_LC_TEST_EMAIL="$LC_TEST_EMAIL" \
+          TEST_RUNNER_LC_TEST_PASSWORD="$LC_TEST_PASSWORD" \
+          TEST_RUNNER_LC_READER_MARKER="$LC_READER_MARKER" \
+          php tests/Support/run-command-with-timeout.php --seconds=600 -- \
+            xcodebuild \
+              -project mobile/ios/App/App.xcodeproj \
+              -scheme App \
+              -configuration Debug \
+              -destination "platform=iOS Simulator,id=$LC_IOS_SIM_UDID" \
+              -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
+              -resultBundlePath "$RESULT_BUNDLE" \
+              -only-testing:AppUITests/ReaderAcceptanceUITests/testReaderSourceBindingAndPhraseGesture \
+              test
           STATUS=$?
           set -e
           if [ "$STATUS" -ne 0 ]; then
-            php tests/Support/run-command-with-timeout.php --seconds=30 -- \
-              "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            if [ -d "$RESULT_BUNDLE" ]; then
+              xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+            fi
+            xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/ios-reader-xcuitest-failure.png" || true
             grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
             exit "$STATUS"
           fi
-
-          xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/ios-reader-portrait.png"
-          PORTRAIT_W="$(sips -g pixelWidth "$RUNNER_TEMP/ios-reader-portrait.png" | awk '/pixelWidth/{print $2}')"
-          PORTRAIT_H="$(sips -g pixelHeight "$RUNNER_TEMP/ios-reader-portrait.png" | awk '/pixelHeight/{print $2}')"
-          test "$PORTRAIT_H" -gt "$PORTRAIT_W"
-
-      - name: Prove one continuous landscape phrase gesture
-        run: |
-          set -euo pipefail
-          FLOW="$RUNNER_TEMP/ios-reader-landscape-phrase.yaml"
-          printf '%s\n' \
-            'appId: com.linguacafe.mobile' \
-            '---' \
-            '- setOrientation: LANDSCAPE_RIGHT' \
-            '- extendedWaitUntil:' \
-            '    visible: "bank"' \
-            '    timeout: 30000' \
-            '- swipe:' \
-            '    from:' \
-            '      text: "bank"' \
-            '    direction: RIGHT' \
-            '    duration: 60000' \
-            '- extendedWaitUntil:' \
-            '    visible: "bank account"' \
-            '    timeout: 30000' \
-            '- assertVisible: "LOCAL DICTIONARY"' \
-            '- assertVisible: "创建学习词义"' \
-            '- assertNotVisible: "先回想这个词在这里的意思，再选择你的真实情况。"' \
-            > "$FLOW"
-          set +e
-          php tests/Support/run-command-with-timeout.php --seconds=180 -- \
-            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
-          STATUS=$?
-          set -e
-          if [ "$STATUS" -ne 0 ]; then
-            php tests/Support/run-command-with-timeout.php --seconds=30 -- \
-              "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
-            grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
-            exit "$STATUS"
-          fi
-
-          xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/ios-reader-landscape.png"
-          LANDSCAPE_W="$(sips -g pixelWidth "$RUNNER_TEMP/ios-reader-landscape.png" | awk '/pixelWidth/{print $2}')"
-          LANDSCAPE_H="$(sips -g pixelHeight "$RUNNER_TEMP/ios-reader-landscape.png" | awk '/pixelHeight/{print $2}')"
-          test "$LANDSCAPE_W" -gt "$LANDSCAPE_H"
+          xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE"
 
       - name: Corroborate canonical Reader source binding in MySQL and PAB
         run: |
@@ -337,6 +242,7 @@ jobs:
           test -n "$CHAPTER_ID"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_unfamiliar_targets WHERE user_id=$USER_ID AND chapter_id=$CHAPTER_ID AND kind='word' AND start_word_index=2 AND end_word_index=2;")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_senses WHERE user_id=$USER_ID AND language_id='english' AND lemma='bank' AND learning_started_origin='reading' AND learning_started_source_occurrence_id IS NOT NULL;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.user_id=$USER_ID AND s.language_id='english' AND s.lemma='bank';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_sense_occurrences o JOIN word_senses s ON s.id=o.word_sense_id WHERE o.user_id=$USER_ID AND o.chapter_id=$CHAPTER_ID AND o.source='reading_occurrence' AND s.lemma='bank' AND s.learning_started_source_occurrence_id=o.id;")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_occurrence_sense_evidence e JOIN reading_unfamiliar_targets t ON t.user_id=e.user_id AND t.chapter_id=e.chapter_id AND t.source_revision=e.source_revision AND t.occurrence_id=e.occurrence_id WHERE e.user_id=$USER_ID AND e.chapter_id=$CHAPTER_ID AND e.resolution='new_sense';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID;")" = "0"
