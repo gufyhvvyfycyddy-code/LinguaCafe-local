@@ -258,7 +258,8 @@ jobs:
             '    visible: "词义已创建，将进入正式复习队列"' \
             '    timeout: 30000' \
             > "$FLOW"
-          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
+          php tests/Support/run-command-with-timeout.php --seconds=300 -- \
+            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
             -e TEST_EMAIL="$LC_TEST_EMAIL" \
             -e TEST_PASSWORD="$LC_TEST_PASSWORD" \
             -e READER_MARKER="$LC_READER_MARKER" \
@@ -293,11 +294,13 @@ jobs:
             '- assertNotVisible: "先回想这个词在这里的意思，再选择你的真实情况。"' \
             > "$FLOW"
           set +e
-          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
+          php tests/Support/run-command-with-timeout.php --seconds=180 -- \
+            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
           STATUS=$?
           set -e
           if [ "$STATUS" -ne 0 ]; then
-            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            php tests/Support/run-command-with-timeout.php --seconds=30 -- \
+              "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
             grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
             exit "$STATUS"
           fi

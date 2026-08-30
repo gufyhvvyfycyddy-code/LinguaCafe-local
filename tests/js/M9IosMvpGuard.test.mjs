@@ -35,6 +35,7 @@ const generatedWebIntegrity = read('mobile', 'scripts', 'ios-generated-web-integ
 const xcodeCapabilityWorkflow = read('.github', 'workflows', 'ios-xcode-capability-probe.yml');
 const readerAcceptanceWorkflow = read('.github', 'workflows', 'ios-reader-simulator-acceptance.yml');
 const readerPabServer = read('tests', 'Support', 'start-ios-reader-pab-server.php');
+const commandTimeoutHarness = read('tests', 'Support', 'run-command-with-timeout.php');
 const readerSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileReaderSmokeData.php');
 
 assert.equal(pkg.dependencies['@capacitor/core'], '8.4.2');
@@ -214,6 +215,8 @@ assert.match(readerAcceptanceWorkflow, /__testing\/acceptance-sentinel/);
 assert.match(readerAcceptanceWorkflow, /setOrientation: PORTRAIT/);
 assert.match(readerAcceptanceWorkflow, /setOrientation: LANDSCAPE_RIGHT/);
 assert.match(readerAcceptanceWorkflow, /duration: 60000/);
+assert.match(readerAcceptanceWorkflow, /run-command-with-timeout\.php --seconds=300/);
+assert.match(readerAcceptanceWorkflow, /run-command-with-timeout\.php --seconds=180/);
 assert.match(readerAcceptanceWorkflow, /READING_TARGET_STALE_SOURCE|reading-unfamiliar-targets/);
 assert.match(readerAcceptanceWorkflow, /learning_started_origin='reading'/);
 assert.match(readerAcceptanceWorkflow, /source='reading_occurrence'/);
@@ -225,6 +228,9 @@ assert.match(readerPabServer, /LINGUACAFE_TEST_SENTINEL/);
 assert.match(readerPabServer, /H10IosReaderBindingTest\.php/);
 assert.match(readerPabServer, /IOS_READER_PAB_FOCUSED_TEST_FAILED/);
 assert.match(readerPabServer, /smoke:mobile-reader-data/);
+assert.match(commandTimeoutHarness, /Symfony\\Component\\Process\\Process/);
+assert.match(commandTimeoutHarness, /ProcessTimedOutException/);
+assert.match(commandTimeoutHarness, /COMMAND_TIMEOUT_EXCEEDED/);
 assert.match(readerSmokeCommand, /app\(\)->environment\('testing'\)/);
 assert.match(readerSmokeCommand, /LINGUACAFE_TEST_SENTINEL/);
 assert.match(readerSmokeCommand, /__testing_acceptance_sentinel_/);
