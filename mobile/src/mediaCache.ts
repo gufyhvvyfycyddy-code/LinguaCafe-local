@@ -77,13 +77,14 @@ export class MediaCache {
     for (const assetId of selectEvictions(withoutCurrent, this.maxBytes, blob.size)) {
       await this.delete(database, assetId);
     }
+    const bytes = await blob.arrayBuffer();
     await this.request(database.transaction('media', 'readwrite').objectStore('media').put({
       assetId: reference.asset_id,
       sha256: reference.sha256,
       mimeType: reference.mime_type,
       sizeBytes: blob.size,
       lastAccessedAt: Date.now(),
-      bytes: await blob.arrayBuffer(),
+      bytes,
     } satisfies StoredMedia));
   }
 
