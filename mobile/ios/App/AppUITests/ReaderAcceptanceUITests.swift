@@ -71,6 +71,57 @@ final class ReaderAcceptanceUITests: XCTestCase {
         closeButton.tap()
     }
 
+    func testTextImportThroughSystemFilesPicker() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let bookName = "H10 iOS Import \(marker)"
+        let invalidExtension = "lc-\(marker)-invalid.pdf"
+        let invalidUtf8 = "lc-\(marker)-invalid-utf8.txt"
+        let oversized = "lc-\(marker)-oversize.txt"
+        let valid = "lc-\(marker)-valid.txt"
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        app.buttons["我的"].tap()
+
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        scrollUntilHittable(fileButton, in: app)
+        XCTAssertTrue(fileButton.isHittable)
+        let bookField = app.textFields["导入资料名称"].firstMatch
+        XCTAssertTrue(bookField.waitForExistence(timeout: 15))
+        bookField.tap()
+        bookField.typeText(bookName)
+
+        fileButton.tap()
+        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        XCTAssertTrue(files.wait(for: .runningForeground, timeout: 30))
+        let rejectedExtension = files.staticTexts[invalidExtension].firstMatch
+        if rejectedExtension.exists {
+            XCTAssertFalse(rejectedExtension.isHittable && rejectedExtension.isEnabled)
+        }
+        let cancel = files.buttons["Cancel"].firstMatch
+        XCTAssertTrue(cancel.waitForExistence(timeout: 15))
+        cancel.tap()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        try chooseFile(named: invalidUtf8, app: app)
+        app.buttons["导入到服务器"].tap()
+        XCTAssertTrue(app.staticTexts["文本文件必须使用 UTF-8 编码"].waitForExistence(timeout: 20))
+
+        try chooseFile(named: oversized, app: app)
+        app.buttons["导入到服务器"].tap()
+        XCTAssertTrue(app.staticTexts["文件需为 1–200 KB，且资料和章节名称不能为空"].waitForExistence(timeout: 20))
+
+        try chooseFile(named: valid, app: app)
+        app.buttons["导入到服务器"].tap()
+        let importedBook = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            bookName
+        )).firstMatch
+        XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
+    }
+
     func testReaderLandscapePhraseGesture() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
@@ -120,6 +171,34 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(chapter.waitForExistence(timeout: 30))
         chapter.tap()
         XCTAssertTrue(app.staticTexts["Reader touch source binding"].waitForExistence(timeout: 30))
+    }
+
+    private func chooseFile(named fileName: String, app: XCUIApplication) throws {
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        scrollUntilHittable(fileButton, in: app)
+        XCTAssertTrue(fileButton.isHittable)
+        fileButton.tap()
+
+        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        XCTAssertTrue(files.wait(for: .runningForeground, timeout: 30))
+        let file = files.staticTexts[fileName].firstMatch
+        if !file.waitForExistence(timeout: 20) {
+            print(files.debugDescription)
+            XCTFail("Files picker did not expose staged fixture: \(fileName)")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Missing staged Files fixture: \(fileName)"]
+            )
+        }
+        file.tap()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+    }
+
+    private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        for _ in 0..<6 where !element.isHittable {
+            app.swipeUp()
+        }
     }
 
     private func requiredEnvironment(
