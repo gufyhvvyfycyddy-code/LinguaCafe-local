@@ -26,6 +26,7 @@ on:
 
 jobs:
   schedule-next-attempt:
+    if: ${{ (inputs.issue_number || github.event.inputs.issue_number) != '0' || (inputs.attempt || github.event.inputs.attempt) != 'reader' }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -263,3 +264,7 @@ jobs:
             --field "body=$NEXT_COMMAND"
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
+
+  reader-acceptance:
+    if: ${{ (inputs.issue_number || github.event.inputs.issue_number) == '0' && (inputs.attempt || github.event.inputs.attempt) == 'reader' }}
+    uses: ./.github/workflows/ios-reader-simulator-acceptance.yml
