@@ -150,9 +150,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 60))
         let wordAudio = app.buttons["🔊 词发音"].firstMatch
         XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
-        scrollUntilHittable(wordAudio, in: app)
-        XCTAssertTrue(wordAudio.isHittable)
-        wordAudio.tap()
+        try tapReviewControl(wordAudio, in: app)
         XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
     }
 
@@ -188,20 +186,14 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 30))
         let wordAudio = app.buttons["🔊 词发音"].firstMatch
         XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
-        scrollUntilHittable(wordAudio, in: app)
-        XCTAssertTrue(wordAudio.isHittable)
-        wordAudio.tap()
+        try tapReviewControl(wordAudio, in: app)
         XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
         let reveal = app.buttons["显示答案"].firstMatch
         XCTAssertTrue(reveal.waitForExistence(timeout: 20))
-        scrollUntilHittable(reveal, in: app)
-        XCTAssertTrue(reveal.isHittable)
-        reveal.tap()
+        try tapReviewControl(reveal, in: app)
         let good = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "良好")).firstMatch
         XCTAssertTrue(good.waitForExistence(timeout: 20))
-        scrollUntilHittable(good, in: app)
-        XCTAssertTrue(good.isHittable)
-        good.tap()
+        try tapReviewControl(good, in: app)
 
         let settings = app.buttons["我的"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 20))
@@ -397,6 +389,30 @@ final class ReaderAcceptanceUITests: XCTestCase {
     private func attachPickerDiagnostics(app: XCUIApplication, named name: String) {
         print(app.debugDescription)
         attachScreenshot(XCUIScreen.main.screenshot(), named: name)
+    }
+
+    private func tapReviewControl(_ element: XCUIElement, in app: XCUIApplication) throws {
+        let webView = app.webViews.firstMatch
+        let scrollTarget = webView.exists ? webView : app
+        for _ in 0..<10 {
+            let frame = element.frame
+            let appFrame = app.frame
+            if !frame.isEmpty && appFrame.contains(CGPoint(x: frame.midX, y: frame.midY)) {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+                    .withOffset(CGVector(dx: frame.midX - appFrame.minX, dy: frame.midY - appFrame.minY))
+                    .tap()
+                return
+            }
+            scrollTarget.swipeUp()
+        }
+        print(app.debugDescription)
+        attachScreenshot(XCUIScreen.main.screenshot(), named: "offline-review-control-offscreen")
+        XCTFail("Offline review control never entered the app's visible frame")
+        throw NSError(
+            domain: "LinguaCafeOfflineAcceptance",
+            code: 7,
+            userInfo: [NSLocalizedDescriptionKey: "Offline review control remained offscreen"]
+        )
     }
 
     private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
