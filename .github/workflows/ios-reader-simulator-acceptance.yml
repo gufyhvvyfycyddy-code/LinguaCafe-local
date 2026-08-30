@@ -73,14 +73,19 @@ jobs:
           mysqladmin ping -uroot --silent
           mysql -uroot -e "CREATE DATABASE linguacafe_fsrs_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-      - name: Install project dependencies with runner Composer
+      - name: Install verified Composer and project dependencies
         run: |
           set -euo pipefail
           APP_KEY_VALUE="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
           echo "::add-mask::$APP_KEY_VALUE"
           echo "APP_KEY=$APP_KEY_VALUE" >> "$GITHUB_ENV"
-          composer --no-ansi --version | grep -E '^Composer version 2\.'
-          composer install --no-interaction --prefer-dist --no-progress
+          EXPECTED_CHECKSUM="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
+          php -r "copy('https://getcomposer.org/installer', '$RUNNER_TEMP/composer-setup.php');"
+          ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '$RUNNER_TEMP/composer-setup.php');")"
+          test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM"
+          php "$RUNNER_TEMP/composer-setup.php" --quiet --install-dir="$RUNNER_TEMP" --filename=composer.phar
+          rm "$RUNNER_TEMP/composer-setup.php"
+          php "$RUNNER_TEMP/composer.phar" install --no-interaction --prefer-dist --no-progress
 
       - name: Build and load pinned native FSRS extension
         run: |

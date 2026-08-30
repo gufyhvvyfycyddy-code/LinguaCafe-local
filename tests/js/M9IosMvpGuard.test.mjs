@@ -226,8 +226,10 @@ assert.match(readerAcceptanceWorkflow, /run-command-with-timeout\.php --seconds=
 assert.match(readerAcceptanceWorkflow, /grep -E '\(\/api\/v1\/mobile\|\/__testing\/acceptance-sentinel\)'/);
 assert.match(readerAcceptanceWorkflow, /rustup toolchain install 1\.98\.0 --profile minimal --no-self-update/);
 assert.match(readerAcceptanceWorkflow, /RUSTUP_TOOLCHAIN=1\.98\.0/);
-assert.match(readerAcceptanceWorkflow, /composer install --no-interaction --prefer-dist --no-progress/);
-assert.doesNotMatch(readerAcceptanceWorkflow, /getcomposer\.org\/installer|composer-setup\.php/);
+assert.match(readerAcceptanceWorkflow, /composer\.github\.io\/installer\.sig/);
+assert.match(readerAcceptanceWorkflow, /getcomposer\.org\/installer/);
+assert.match(readerAcceptanceWorkflow, /hash_file\('sha384'/);
+assert.match(readerAcceptanceWorkflow, /composer\.phar.*install --no-interaction --prefer-dist --no-progress/);
 assert.match(readerAcceptanceWorkflow, /READING_TARGET_STALE_SOURCE|reading-unfamiliar-targets/);
 assert.match(readerAcceptanceWorkflow, /learning_started_origin='reading'/);
 assert.match(readerAcceptanceWorkflow, /source='reading_occurrence'/);
