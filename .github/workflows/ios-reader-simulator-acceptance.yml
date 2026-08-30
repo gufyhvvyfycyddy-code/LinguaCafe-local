@@ -234,9 +234,9 @@ jobs:
             '    timeout: 60000' \
             '- tapOn: "阅读"' \
             '- extendedWaitUntil:' \
-            '    visible: "H10 iOS Reader ${READER_MARKER}"' \
+            '    visible: ".*H10 iOS Reader ${READER_MARKER}.*"' \
             '    timeout: 60000' \
-            '- tapOn: "H10 iOS Reader ${READER_MARKER}"' \
+            '- tapOn: ".*H10 iOS Reader ${READER_MARKER}.*"' \
             '- tapOn: "Reader touch source binding"' \
             '- setOrientation: PORTRAIT' \
             '- assertVisible: "Reader touch source binding"' \
@@ -259,12 +259,21 @@ jobs:
             '- assertNotVisible: "创建学习词义"' \
             '- tapOn: "关闭"' \
             > "$FLOW"
+          set +e
           php tests/Support/run-command-with-timeout.php --seconds=300 -- \
             "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
             -e TEST_EMAIL="$LC_TEST_EMAIL" \
             -e TEST_PASSWORD="$LC_TEST_PASSWORD" \
             -e READER_MARKER="$LC_READER_MARKER" \
             "$FLOW"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            php tests/Support/run-command-with-timeout.php --seconds=30 -- \
+              "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
+            exit "$STATUS"
+          fi
 
           xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/ios-reader-portrait.png"
           PORTRAIT_W="$(sips -g pixelWidth "$RUNNER_TEMP/ios-reader-portrait.png" | awk '/pixelWidth/{print $2}')"
