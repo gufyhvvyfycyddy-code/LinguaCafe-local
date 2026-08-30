@@ -151,7 +151,13 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let wordAudio = app.buttons["🔊 词发音"].firstMatch
         XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
         try tapReviewControl(wordAudio, in: app)
-        XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
+        Thread.sleep(forTimeInterval: 1.0)
+        let playbackStatus = app.staticTexts["正在播放词发音"].firstMatch
+        if !playbackStatus.exists {
+            print("AUDIO_PLAYBACK_DIAGNOSTICS\n\(app.debugDescription)")
+            attachScreenshot(XCUIScreen.main.screenshot(), named: "offline-audio-playback-diagnostics")
+        }
+        XCTAssertTrue(playbackStatus.waitForExistence(timeout: 20))
     }
 
     func testOfflineCachedContentAndQueuesGood() throws {
