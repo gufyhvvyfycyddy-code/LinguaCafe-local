@@ -94,6 +94,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         bookField.typeText(bookName)
 
         fileButton.tap()
+        try openLocalFilesLocation(app: app)
         let rejectedExtension = pickerElement(label: invalidExtension, in: app)
         if rejectedExtension.waitForExistence(timeout: 5)
             && rejectedExtension.isHittable
@@ -180,6 +181,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         scrollUntilHittable(fileButton, in: app)
         XCTAssertTrue(fileButton.isHittable)
         fileButton.tap()
+        try openLocalFilesLocation(app: app)
 
         let file = pickerElement(label: fileName, in: app)
         if !file.waitForExistence(timeout: 20) {
@@ -199,6 +201,41 @@ final class ReaderAcceptanceUITests: XCTestCase {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@", label))
             .firstMatch
+    }
+
+    private func openLocalFilesLocation(app: XCUIApplication) throws {
+        let localTitle = app.navigationBars.staticTexts["On My iPhone"].firstMatch
+        if localTitle.exists {
+            return
+        }
+
+        let browse = app.tabBars.buttons["Browse"].firstMatch
+        if !browse.waitForExistence(timeout: 10) {
+            attachPickerDiagnostics(app: app, named: "import-picker-browse-missing")
+            XCTFail("System document picker did not expose Browse")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Missing Browse control"]
+            )
+        }
+        browse.tap()
+        if localTitle.waitForExistence(timeout: 5) {
+            return
+        }
+
+        let localFiles = app.staticTexts["On My iPhone"].firstMatch
+        if !localFiles.waitForExistence(timeout: 15) || !localFiles.isHittable {
+            attachPickerDiagnostics(app: app, named: "import-picker-local-location-missing")
+            XCTFail("System document picker did not expose On My iPhone")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Missing On My iPhone location"]
+            )
+        }
+        localFiles.tap()
+        XCTAssertTrue(localTitle.waitForExistence(timeout: 15))
     }
 
     private func cancelDocumentPicker(app: XCUIApplication) throws {
