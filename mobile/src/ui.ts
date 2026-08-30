@@ -1426,13 +1426,13 @@ export class LinguaCafeApp {
           <h2>从“文件”导入英文文本</h2>
           <p class="muted">选择一个 UTF-8 .txt 文件（不超过 200 KB）。导入内容仍由服务器处理和保存。</p>
           <label>文本文件
-            <input name="document" type="file" accept=".txt,text/plain" required />
+            <input name="document" type="file" accept=".txt,text/plain" aria-label="选择文本文件" required />
           </label>
           <label>资料名称
-            <input name="book_name" type="text" maxlength="255" required />
+            <input name="book_name" type="text" maxlength="255" aria-label="导入资料名称" required />
           </label>
           <label>章节名称
-            <input name="chapter_name" type="text" maxlength="255" value="导入文本" required />
+            <input name="chapter_name" type="text" maxlength="255" value="导入文本" aria-label="导入章节名称" required />
           </label>
           <button class="secondary" type="submit">导入到服务器</button>
         </form>` : ''}
@@ -1496,7 +1496,12 @@ export class LinguaCafeApp {
     if (submit) submit.disabled = true;
     try {
       const bytes = await file.arrayBuffer();
-      const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      let content: string;
+      try {
+        content = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      } catch {
+        throw new Error('文本文件必须使用 UTF-8 编码');
+      }
       if (!content.trim()) throw new Error('文本文件不能为空');
       const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)))
         .map(value => value.toString(16).padStart(2, '0')).join('');

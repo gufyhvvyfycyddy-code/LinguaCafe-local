@@ -71,6 +71,49 @@ final class ReaderAcceptanceUITests: XCTestCase {
         closeButton.tap()
     }
 
+    func testTextImportThroughSystemFilesPicker() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let invalidExtension = "lc-\(marker)-invalid.pdf"
+        let invalidUtf8 = "lc-\(marker)-invalid-utf8.txt"
+        let oversized = "lc-\(marker)-oversize.txt"
+        let valid = "lc-\(marker)-valid.txt"
+        let validBookName = valid.replacingOccurrences(of: ".txt", with: "")
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        try openTextImportSettings(app: app)
+
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        fileButton.tap()
+        try openLocalFilesLocation(app: app)
+        let rejectedExtension = pickerFileCell(named: invalidExtension, in: app)
+        XCTAssertTrue(rejectedExtension.waitForExistence(timeout: 10))
+        XCTAssertFalse(rejectedExtension.isEnabled)
+        try cancelDocumentPicker(app: app)
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+
+        try openTextImportSettings(app: app)
+        try chooseFile(named: invalidUtf8, app: app)
+        app.buttons["导入到服务器"].tap()
+        XCTAssertTrue(app.staticTexts["文本文件必须使用 UTF-8 编码"].waitForExistence(timeout: 20))
+
+        try openTextImportSettings(app: app)
+        try chooseFile(named: oversized, app: app)
+        app.buttons["导入到服务器"].tap()
+        XCTAssertTrue(app.staticTexts["文件需为 1–200 KB，且资料和章节名称不能为空"].waitForExistence(timeout: 20))
+
+        try openTextImportSettings(app: app)
+        try chooseFile(named: valid, app: app)
+        app.buttons["导入到服务器"].tap()
+        let importedBook = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            validBookName
+        )).firstMatch
+        XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
+    }
+
     func testReaderLandscapePhraseGesture() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
@@ -120,6 +163,117 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(chapter.waitForExistence(timeout: 30))
         chapter.tap()
         XCTAssertTrue(app.staticTexts["Reader touch source binding"].waitForExistence(timeout: 30))
+    }
+
+    private func openTextImportSettings(app: XCUIApplication) throws {
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        settings.tap()
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        XCTAssertTrue(fileButton.waitForExistence(timeout: 15))
+        scrollUntilHittable(fileButton, in: app)
+        if !fileButton.isHittable {
+            attachPickerDiagnostics(app: app, named: "text-import-file-button-not-hittable")
+            XCTFail("Text import file button remained offscreen")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Text import file button remained offscreen"]
+            )
+        }
+    }
+
+    private func chooseFile(named fileName: String, app: XCUIApplication) throws {
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        scrollUntilHittable(fileButton, in: app)
+        XCTAssertTrue(fileButton.isHittable)
+        fileButton.tap()
+        try openLocalFilesLocation(app: app)
+
+        let file = pickerFileCell(named: fileName, in: app)
+        if !file.waitForExistence(timeout: 20) {
+            attachPickerDiagnostics(app: app, named: "import-picker-file-missing")
+            XCTFail("Files picker did not expose staged fixture: \(fileName)")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 2,
+                userInfo: [NSLocalizedDescriptionKey: "Missing staged Files fixture: \(fileName)"]
+            )
+        }
+        file.tap()
+        XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
+    }
+
+    private func pickerFileCell(named fileName: String, in app: XCUIApplication) -> XCUIElement {
+        let url = URL(fileURLWithPath: fileName)
+        let stem = url.deletingPathExtension().lastPathComponent
+        let fileExtension = url.pathExtension
+        return app.cells.matching(identifier: "\(stem), \(fileExtension)").firstMatch
+    }
+
+    private func openLocalFilesLocation(app: XCUIApplication) throws {
+        let localTitle = app.navigationBars.staticTexts["On My iPhone"].firstMatch
+        if localTitle.exists {
+            return
+        }
+
+        let browse = app.tabBars.buttons["Browse"].firstMatch
+        if !browse.waitForExistence(timeout: 10) {
+            attachPickerDiagnostics(app: app, named: "import-picker-browse-missing")
+            XCTFail("System document picker did not expose Browse")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 4,
+                userInfo: [NSLocalizedDescriptionKey: "Missing Browse control"]
+            )
+        }
+        browse.tap()
+        if localTitle.waitForExistence(timeout: 5) {
+            return
+        }
+
+        let localFiles = app.staticTexts["On My iPhone"].firstMatch
+        if !localFiles.waitForExistence(timeout: 15) || !localFiles.isHittable {
+            attachPickerDiagnostics(app: app, named: "import-picker-local-location-missing")
+            XCTFail("System document picker did not expose On My iPhone")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "Missing On My iPhone location"]
+            )
+        }
+        localFiles.tap()
+        XCTAssertTrue(localTitle.waitForExistence(timeout: 15))
+    }
+
+    private func cancelDocumentPicker(app: XCUIApplication) throws {
+        let cancel = app.buttons.matching(NSPredicate(
+            format: "label IN %@",
+            ["Cancel", "取消"]
+        )).firstMatch
+        if !cancel.waitForExistence(timeout: 15) {
+            attachPickerDiagnostics(app: app, named: "import-picker-cancel-missing")
+            XCTFail("System document picker did not expose a cancel control")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Missing document picker cancel control"]
+            )
+        }
+        cancel.tap()
+    }
+
+    private func attachPickerDiagnostics(app: XCUIApplication, named name: String) {
+        print(app.debugDescription)
+        attachScreenshot(XCUIScreen.main.screenshot(), named: name)
+    }
+
+    private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
+        let webView = app.webViews.firstMatch
+        let scrollTarget = webView.exists ? webView : app
+        for _ in 0..<10 where !element.isHittable {
+            scrollTarget.swipeUp()
+        }
     }
 
     private func requiredEnvironment(
