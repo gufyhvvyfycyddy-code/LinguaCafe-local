@@ -28,8 +28,18 @@ if (!$sentinelReady) {
 $email = trim((string) (getenv('LC_TEST_EMAIL') ?: ''));
 $password = (string) (getenv('LC_TEST_PASSWORD') ?: '');
 $marker = trim((string) (getenv('LC_READER_MARKER') ?: 'h10_ios_reader'));
-if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 12) {
+$offlineAudioPath = trim((string) (getenv('LC_OFFLINE_AUDIO_PATH') ?: ''));
+$backendPort = filter_var(
+    getenv('LC_BACKEND_PORT') ?: '8878',
+    FILTER_VALIDATE_INT,
+    ['options' => ['min_range' => 1024, 'max_range' => 65535]],
+);
+if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($password) < 12 || $backendPort === false) {
     fwrite(STDERR, "IOS_READER_PAB_IDENTITY_INVALID\n");
+    exit(64);
+}
+if ($offlineAudioPath !== '' && (!is_file($offlineAudioPath) || !is_readable($offlineAudioPath))) {
+    fwrite(STDERR, "IOS_READER_PAB_OFFLINE_AUDIO_INVALID\n");
     exit(64);
 }
 
@@ -54,6 +64,19 @@ if ($exitCode !== 0) {
     fwrite(STDERR, "IOS_READER_PAB_FIXTURE_FAILED\n");
     exit($exitCode);
 }
+if ($offlineAudioPath !== '') {
+    $offlineExitCode = Artisan::call('smoke:mobile-offline-data', [
+        '--email' => $email,
+        '--marker' => $marker,
+        '--audio-path' => $offlineAudioPath,
+        '--json' => true,
+    ]);
+    if ($offlineExitCode !== 0) {
+        fwrite(STDERR, "IOS_READER_PAB_OFFLINE_FIXTURE_FAILED\n");
+        exit($offlineExitCode);
+    }
+    fwrite(STDOUT, "IOS_READER_PAB_OFFLINE_FIXTURE_READY\n");
+}
 
 fwrite(STDOUT, "IOS_READER_PAB_FIXTURE_READY\n");
 if (!function_exists('pcntl_exec')) {
@@ -65,7 +88,7 @@ pcntl_exec(PHP_BINARY, [
     'artisan',
     'serve',
     '--host=127.0.0.1',
-    '--port=8878',
+    '--port='.(string) $backendPort,
     '--no-reload',
 ]);
 

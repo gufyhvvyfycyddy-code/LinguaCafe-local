@@ -1309,6 +1309,7 @@ export class LinguaCafeApp {
       audio.addEventListener('error', cleanup, { once: true });
       try {
         await audio.play();
+        this.showToast(role === 'word_pronunciation' ? '正在播放词发音' : '正在播放例句');
       } catch (error) {
         cleanup();
         throw error;

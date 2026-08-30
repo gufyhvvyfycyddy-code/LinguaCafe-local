@@ -114,6 +114,129 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
     }
 
+    func testOfflineWarmCaches() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let offlineLemma = "offline_\(marker)"
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+
+        let reading = app.buttons["阅读"].firstMatch
+        XCTAssertTrue(reading.waitForExistence(timeout: 20))
+        reading.tap()
+        let book = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "H10 iOS Reader \(marker)"
+        )).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 60))
+        book.tap()
+        let download = app.buttons["下载整套"].firstMatch
+        XCTAssertTrue(download.waitForExistence(timeout: 30))
+        download.tap()
+        XCTAssertTrue(app.staticTexts["整套已下载，可离线打开"].waitForExistence(timeout: 60))
+        let chapter = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Reader touch source binding"
+        )).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
+        chapter.tap()
+        XCTAssertTrue(app.buttons["bank"].firstMatch.waitForExistence(timeout: 30))
+
+        let review = app.buttons["复习"].firstMatch
+        XCTAssertTrue(review.waitForExistence(timeout: 20))
+        review.tap()
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 60))
+        let wordAudio = app.buttons["🔊 词发音"].firstMatch
+        XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        wordAudio.tap()
+        XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
+    }
+
+    func testOfflineCachedContentAndQueuesGood() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let offlineLemma = "offline_\(marker)"
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["服务器不可达"].waitForExistence(timeout: 60))
+
+        app.buttons["阅读"].firstMatch.tap()
+        let book = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "H10 iOS Reader \(marker)"
+        )).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 30))
+        book.tap()
+        XCTAssertTrue(app.staticTexts["离线文章包"].waitForExistence(timeout: 30))
+        let chapter = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Reader touch source binding"
+        )).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
+        chapter.tap()
+        XCTAssertTrue(app.staticTexts["离线文章包"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["bank"].firstMatch.waitForExistence(timeout: 30))
+
+        app.buttons["复习"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["离线复习包 · 评分会排队同步"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 30))
+        let wordAudio = app.buttons["🔊 词发音"].firstMatch
+        XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        wordAudio.tap()
+        XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
+        let reveal = app.buttons["显示答案"].firstMatch
+        XCTAssertTrue(reveal.waitForExistence(timeout: 20))
+        reveal.tap()
+        let good = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "良好")).firstMatch
+        XCTAssertTrue(good.waitForExistence(timeout: 20))
+        good.tap()
+
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["1 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 30))
+    }
+
+    func testOfflinePendingSurvivesRelaunch() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["服务器不可达"].waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["1 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 30))
+    }
+
+    func testOfflineReconnectAutomaticallySyncs() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["在线"].waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["0 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 60))
+    }
+
+    func testOfflineReconnectEmptyQueueRemainsStable() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["在线"].waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["0 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 60))
+    }
+
     func testReaderLandscapePhraseGesture() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
