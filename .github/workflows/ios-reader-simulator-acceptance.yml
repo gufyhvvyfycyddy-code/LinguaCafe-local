@@ -2,7 +2,22 @@ name: iOS Reader simulator acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: 'Test focus: full (all tests) or offline (skip accepted reader tests, run offline/reconnect)'
+        required: false
+        type: choice
+        options:
+          - full
+          - offline
+        default: full
   workflow_call:
+    inputs:
+      focus:
+        description: 'Test focus: full (all tests) or offline (skip accepted reader tests, run offline/reconnect)'
+        required: false
+        type: string
+        default: full
 
 permissions:
   contents: read
@@ -293,10 +308,18 @@ jobs:
             xcrun xcresulttool get test-results summary --path "$result_bundle"
           }
 
+          LC_FOCUS="${{ inputs.focus }}"
           run_ui_test testLoginPersistsAuthenticatedSession 240
-          run_ui_test testReaderPortraitSourceBinding 300
-          run_ui_test testReaderLandscapePhraseGesture 240
-          run_ui_test testTextImportThroughSystemFilesPicker 360
+          if [ "$LC_FOCUS" = "full" ]; then
+            run_ui_test testReaderPortraitSourceBinding 300
+            run_ui_test testReaderLandscapePhraseGesture 240
+            run_ui_test testTextImportThroughSystemFilesPicker 360
+          elif [ "$LC_FOCUS" = "offline" ]; then
+            echo "Focus=offline: skipping already accepted Reader and Files tests."
+          else
+            echo "Unsupported iOS acceptance focus: $LC_FOCUS" >&2
+            exit 2
+          fi
           run_ui_test testOfflineWarmCaches 300
 
           USER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM users WHERE email='$LC_TEST_EMAIL' LIMIT 1;")"

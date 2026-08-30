@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       attempt:
-        description: 'Compatibility carrier input; unused by iOS acceptance'
+        description: 'Compatibility carrier input; offline maps to offline focus, anything else to full'
         required: true
         type: string
 
@@ -18,3 +18,5 @@ permissions:
 jobs:
   ios-reader-offline-acceptance:
     uses: ./.github/workflows/ios-reader-simulator-acceptance.yml
+    with:
+      focus: ${{ inputs.attempt == 'offline' && 'offline' || 'full' }}
