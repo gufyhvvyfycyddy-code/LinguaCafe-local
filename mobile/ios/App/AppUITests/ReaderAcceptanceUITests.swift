@@ -14,7 +14,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let password = try requiredEnvironment("LC_TEST_PASSWORD", environment)
 
         app.launch()
-        XCTAssertEqual(app.wait(for: .runningForeground, timeout: 30), .runningForeground)
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(app.staticTexts["IOS · CONNECTED MVP"].waitForExistence(timeout: 60))
 
         let serverField = app.textFields.element(boundBy: 0)
@@ -99,7 +99,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
     private func launchAuthenticatedReader(app: XCUIApplication, marker: String) throws {
         app.launch()
-        XCTAssertEqual(app.wait(for: .runningForeground, timeout: 30), .runningForeground)
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
 
         let readerTab = app.buttons["阅读"]
