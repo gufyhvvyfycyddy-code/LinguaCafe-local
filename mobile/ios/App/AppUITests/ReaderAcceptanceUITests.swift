@@ -19,18 +19,15 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         let serverField = app.textFields.element(boundBy: 0)
         XCTAssertTrue(serverField.waitForExistence(timeout: 30))
-        serverField.tap()
-        serverField.typeText(serverURL)
+        try focusAndType(serverURL, into: serverField, in: app)
 
         let emailField = app.textFields.element(boundBy: 1)
         XCTAssertTrue(emailField.waitForExistence(timeout: 15))
-        emailField.tap()
-        emailField.typeText(email)
+        try focusAndType(email, into: emailField, in: app)
 
         let passwordField = app.secureTextFields.element(boundBy: 0)
         XCTAssertTrue(passwordField.waitForExistence(timeout: 15))
-        passwordField.tap()
-        passwordField.typeText(password)
+        try focusAndType(password, into: passwordField, in: app)
 
         let loginButton = app.buttons["安全登录"]
         XCTAssertTrue(loginButton.waitForExistence(timeout: 15))
@@ -427,6 +424,20 @@ final class ReaderAcceptanceUITests: XCTestCase {
         for _ in 0..<10 where !element.isHittable {
             scrollTarget.swipeUp()
         }
+    }
+
+    private func focusAndType(
+        _ text: String,
+        into element: XCUIElement,
+        in app: XCUIApplication
+    ) throws {
+        element.tap()
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.waitForExistence(timeout: 5) {
+            element.tap()
+            XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        }
+        app.typeText(text)
     }
 
     private func requiredEnvironment(
