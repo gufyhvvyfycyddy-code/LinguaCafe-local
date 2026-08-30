@@ -32,7 +32,13 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let loginButton = app.buttons["安全登录"]
         XCTAssertTrue(loginButton.waitForExistence(timeout: 15))
         loginButton.tap()
-        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        Thread.sleep(forTimeInterval: 2.0)
+        let homeButton = app.buttons["首页"].firstMatch
+        if !homeButton.exists {
+            print("LOGIN_DIAGNOSTICS\n\(app.debugDescription)")
+            attachScreenshot(XCUIScreen.main.screenshot(), named: "login-diagnostics")
+        }
+        XCTAssertTrue(homeButton.waitForExistence(timeout: 60))
     }
 
     func testReaderPortraitSourceBinding() throws {

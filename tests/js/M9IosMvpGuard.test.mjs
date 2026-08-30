@@ -266,6 +266,7 @@ assert.equal((readerUiTest.match(/let app = XCUIApplication\(\)/g) ?? []).length
 assert.doesNotMatch(readerUiTest, /private let app = XCUIApplication\(\)/);
 assert.match(readerUiTest, /private func tapReviewControl\(/);
 assert.match(readerUiTest, /AUDIO_PLAYBACK_DIAGNOSTICS/);
+assert.match(readerUiTest, /LOGIN_DIAGNOSTICS/);
 const offlineReviewTapHelper = readerUiTest.match(/private func tapReviewControl[\s\S]*?private func scrollUntilHittable/)?.[0] ?? '';
 assert.doesNotMatch(offlineReviewTapHelper, /isHittable/);
 assert.match(readerUiTest, /press\(\s*forDuration: 0\.7,\s*thenDragTo: landscapeAccount/);
