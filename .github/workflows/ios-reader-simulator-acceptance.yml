@@ -47,7 +47,7 @@ jobs:
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
 
-      - name: Install PHP 8.4 and MySQL 8.4; verify runner Rust
+      - name: Install PHP 8.4 and MySQL 8.4; pin Rust 1.98
         run: |
           set -euo pipefail
           brew install php@8.4 mysql@8.4
@@ -57,8 +57,8 @@ jobs:
           "$PHP_PREFIX/bin/php" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 80500 ? 0 : 1);'
           "$PHP_PREFIX/bin/php" -r 'exit(function_exists("pcntl_exec") ? 0 : 1);'
           "$MYSQL_PREFIX/bin/mysql" --version
-          test "$(rustc --version | awk '{print $2}')" = "1.98.0"
-          test "$(cargo --version | awk '{print $2}')" = "1.98.0"
+          rustup toolchain install 1.98.0 --profile minimal --no-self-update
+          echo "RUSTUP_TOOLCHAIN=1.98.0" >> "$GITHUB_ENV"
 
       - name: Start MySQL and create isolated testing database
         run: |
