@@ -296,6 +296,8 @@ jobs:
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT fsrs_reps FROM review_cards WHERE id=$OFFLINE_CARD_ID;")" = "0"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
           echo "OFFLINE_CARD_ID=$OFFLINE_CARD_ID" >> "$GITHUB_ENV"
+          SYNC_REQUESTS_BEFORE_OFFLINE="$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)"
+          echo "SYNC_REQUESTS_BEFORE_OFFLINE=$SYNC_REQUESTS_BEFORE_OFFLINE" >> "$GITHUB_ENV"
 
           kill "$RELAY_PID"
           for attempt in $(seq 1 30); do
@@ -315,10 +317,12 @@ jobs:
           run_ui_test testOfflineCachedContentAndQueuesGood 300
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='sense_review.rating';")" = "0"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$SYNC_REQUESTS_BEFORE_OFFLINE"
 
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
           run_ui_test testOfflinePendingSurvivesRelaunch 180
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$SYNC_REQUESTS_BEFORE_OFFLINE"
 
           SOCAT_BIN="$(brew --prefix socat)/bin/socat"
           "$SOCAT_BIN" TCP-LISTEN:8878,bind=127.0.0.1,reuseaddr,fork TCP:127.0.0.1:8879 \
@@ -340,8 +344,12 @@ jobs:
 
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
           run_ui_test testOfflineReconnectAutomaticallySyncs 240
+          EXPECTED_SYNC_REQUESTS=$((SYNC_REQUESTS_BEFORE_OFFLINE + 1))
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
+          echo "EXPECTED_SYNC_REQUESTS=$EXPECTED_SYNC_REQUESTS" >> "$GITHUB_ENV"
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
           run_ui_test testOfflineReconnectEmptyQueueRemainsStable 180
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
 
       - name: Corroborate canonical Reader source binding in MySQL and PAB
         run: |
@@ -380,7 +388,7 @@ jobs:
           grep -q 'api/v1/mobile/word-senses' "$PAB_LOG"
           test "$(grep -c 'api/v1/mobile/imports/text' "$PAB_LOG")" = "1"
           test "$(grep -c 'api/v1/mobile/media/assets/' "$PAB_LOG")" = "1"
-          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG")" = "1"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
 
       - name: Cleanup PAB, lease, database service, and simulator
         if: always()
