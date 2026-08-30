@@ -110,6 +110,9 @@ assert.match(mediaCache, /new Blob\(\[entry\.bytes\], \{ type: entry\.mimeType \
 assert.match(mediaCache, /bytes: await blob\.arrayBuffer\(\)/);
 assert.doesNotMatch(mediaCache, /\n\s+blob: Blob;/);
 assert.match(ui, /正在播放词发音/);
+assert.match(ui, /Capacitor\.getPlatform\(\) === 'ios'/);
+assert.match(ui, /reader\.readAsDataURL\(blob\)/);
+assert.match(ui, /playableAudioSource\(blob\)/);
 assert.match(styles, /safe-area-inset-top/);
 assert.match(styles, /safe-area-inset-bottom/);
 
