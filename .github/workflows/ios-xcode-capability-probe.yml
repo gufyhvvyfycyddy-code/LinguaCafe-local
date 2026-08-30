@@ -2,6 +2,12 @@ name: iOS Xcode capability probe
 
 on:
   workflow_dispatch:
+    inputs:
+      reader_acceptance:
+        description: Run the temporary H-10 Reader acceptance carrier on this ref
+        required: false
+        default: false
+        type: boolean
   workflow_call:
 
 permissions:
@@ -9,6 +15,7 @@ permissions:
 
 jobs:
   unsigned-ios-compile:
+    if: ${{ github.event_name != 'workflow_dispatch' || github.event.inputs.reader_acceptance != 'true' }}
     runs-on: macos-26
     timeout-minutes: 30
     env:
@@ -132,3 +139,7 @@ jobs:
             xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile || true
             xcrun simctl shutdown "$LC_IOS_SIM_UDID" || true
           fi
+
+  reader-acceptance:
+    if: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.reader_acceptance == 'true' }}
+    uses: ./.github/workflows/ios-reader-simulator-acceptance.yml
