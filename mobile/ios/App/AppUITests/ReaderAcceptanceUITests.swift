@@ -209,6 +209,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let good = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "良好")).firstMatch
         XCTAssertTrue(good.waitForExistence(timeout: 20))
         try tapReviewControl(good, in: app)
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForNonExistence(timeout: 30))
 
         let settings = app.buttons["我的"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 20))
@@ -416,27 +417,50 @@ final class ReaderAcceptanceUITests: XCTestCase {
         attachScreenshot(XCUIScreen.main.screenshot(), named: name)
     }
 
+    private func reviewTapSafeVerticalBounds(in app: XCUIApplication) -> (top: CGFloat, bottom: CGFloat) {
+        let appFrame = app.frame
+        let topbarHome = app.buttons["首页"].firstMatch
+        let safeTop = topbarHome.exists && !topbarHome.frame.isEmpty
+            ? max(appFrame.minY, topbarHome.frame.maxY + 8)
+            : appFrame.minY
+        let navLabels = ["阅读", "复习", "生词", "我的"]
+        let navTop = navLabels.compactMap { label -> CGFloat? in
+            let button = app.buttons[label].firstMatch
+            return button.exists && !button.frame.isEmpty ? button.frame.minY : nil
+        }.min() ?? appFrame.maxY
+        return (safeTop, min(appFrame.maxY, navTop - 8))
+    }
+
     private func tapReviewControl(_ element: XCUIElement, in app: XCUIApplication) throws {
         let webView = app.webViews.firstMatch
         let scrollTarget = webView.exists ? webView : app
         for _ in 0..<10 {
             let frame = element.frame
             let appFrame = app.frame
-            if !frame.isEmpty && appFrame.contains(CGPoint(x: frame.midX, y: frame.midY)) {
+            let safeBounds = reviewTapSafeVerticalBounds(in: app)
+            if !frame.isEmpty,
+               frame.minX >= appFrame.minX,
+               frame.maxX <= appFrame.maxX,
+               frame.minY >= safeBounds.top,
+               frame.maxY <= safeBounds.bottom {
                 app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
                     .withOffset(CGVector(dx: frame.midX - appFrame.minX, dy: frame.midY - appFrame.minY))
                     .tap()
                 return
             }
-            scrollTarget.swipeUp()
+            if !frame.isEmpty && frame.minY < safeBounds.top {
+                scrollTarget.swipeDown()
+            } else {
+                scrollTarget.swipeUp()
+            }
         }
         print(app.debugDescription)
         attachScreenshot(XCUIScreen.main.screenshot(), named: "offline-review-control-offscreen")
-        XCTFail("Offline review control never entered the app's visible frame")
+        XCTFail("Offline review control never entered the unobstructed area between fixed navigation bars")
         throw NSError(
             domain: "LinguaCafeOfflineAcceptance",
             code: 7,
-            userInfo: [NSLocalizedDescriptionKey: "Offline review control remained offscreen"]
+            userInfo: [NSLocalizedDescriptionKey: "Offline review control remained offscreen or under fixed navigation"]
         )
     }
 
