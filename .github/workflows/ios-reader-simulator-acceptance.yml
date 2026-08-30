@@ -47,7 +47,7 @@ jobs:
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
 
-      - name: Install PHP 8.4 and MySQL 8.4; pin Rust 1.98
+      - name: Install PHP 8.4 and MySQL 8.4; verify runner Rust
         run: |
           set -euo pipefail
           brew install php@8.4 mysql@8.4
@@ -57,8 +57,8 @@ jobs:
           "$PHP_PREFIX/bin/php" -r 'exit(PHP_VERSION_ID >= 80400 && PHP_VERSION_ID < 80500 ? 0 : 1);'
           "$PHP_PREFIX/bin/php" -r 'exit(function_exists("pcntl_exec") ? 0 : 1);'
           "$MYSQL_PREFIX/bin/mysql" --version
-          rustup toolchain install 1.98.0 --profile minimal --no-self-update
-          echo "RUSTUP_TOOLCHAIN=1.98.0" >> "$GITHUB_ENV"
+          test "$(rustc --version | awk '{print $2}')" = "1.98.0"
+          test "$(cargo --version | awk '{print $2}')" = "1.98.0"
 
       - name: Start MySQL and create isolated testing database
         run: |
@@ -73,19 +73,14 @@ jobs:
           mysqladmin ping -uroot --silent
           mysql -uroot -e "CREATE DATABASE linguacafe_fsrs_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-      - name: Install verified Composer and project dependencies
+      - name: Install project dependencies with runner Composer
         run: |
           set -euo pipefail
           APP_KEY_VALUE="base64:$(php -r 'echo base64_encode(random_bytes(32));')"
           echo "::add-mask::$APP_KEY_VALUE"
           echo "APP_KEY=$APP_KEY_VALUE" >> "$GITHUB_ENV"
-          EXPECTED_CHECKSUM="$(php -r 'copy("https://composer.github.io/installer.sig", "php://stdout");')"
-          php -r "copy('https://getcomposer.org/installer', '$RUNNER_TEMP/composer-setup.php');"
-          ACTUAL_CHECKSUM="$(php -r "echo hash_file('sha384', '$RUNNER_TEMP/composer-setup.php');")"
-          test "$EXPECTED_CHECKSUM" = "$ACTUAL_CHECKSUM"
-          php "$RUNNER_TEMP/composer-setup.php" --quiet --install-dir="$RUNNER_TEMP" --filename=composer.phar
-          rm "$RUNNER_TEMP/composer-setup.php"
-          php "$RUNNER_TEMP/composer.phar" install --no-interaction --prefer-dist --no-progress
+          composer --no-ansi --version | grep -E '^Composer version 2\.'
+          composer install --no-interaction --prefer-dist --no-progress
 
       - name: Build and load pinned native FSRS extension
         run: |
