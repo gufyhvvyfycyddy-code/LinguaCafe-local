@@ -121,6 +121,9 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCUIDevice.shared.orientation = .portrait
+        let portraitState = XCUIScreen.main.screenshot()
+        XCTAssertGreaterThan(portraitState.image.size.height, portraitState.image.size.width)
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
 
         let reading = app.buttons["阅读"].firstMatch
@@ -161,6 +164,9 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCUIDevice.shared.orientation = .portrait
+        let portraitState = XCUIScreen.main.screenshot()
+        XCTAssertGreaterThan(portraitState.image.size.height, portraitState.image.size.width)
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
         XCTAssertTrue(app.staticTexts["服务器不可达"].waitForExistence(timeout: 60))
 
