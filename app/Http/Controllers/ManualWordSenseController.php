@@ -2,16 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\ReadingOccurrenceSenseEvidence;
 use App\Models\WordSense;
-use App\Services\ReadingOccurrenceSenseEvidenceService;
+use App\Services\ReadingManualSenseCreationService;
 use App\Services\ReadingSessionService;
 use App\Services\SenseOccurrencePayloadSerializerService;
-use App\Services\WordSenseOccurrenceService;
 use App\Services\WordSenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class ManualWordSenseController extends Controller
@@ -29,9 +26,7 @@ class ManualWordSenseController extends Controller
     public function __construct(
         private WordSenseService $wordSenseService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
-        private ReadingSessionService $readingSessionService,
-        private ReadingOccurrenceSenseEvidenceService $readingEvidenceService,
-        private WordSenseOccurrenceService $wordSenseOccurrenceService,
+        private ReadingManualSenseCreationService $readingManualSenseCreationService,
     )
     {
     }
@@ -65,47 +60,11 @@ class ManualWordSenseController extends Controller
         $user = Auth::user();
         try {
             if (!empty($data['reading_session_id'])) {
-                $result = DB::transaction(function () use ($data, $user) {
-                    $target = $this->readingSessionService->lockManualSenseCreationContext(
-                        $user->id,
-                        $user->selected_language,
-                        $data['reading_session_id'],
-                        (int) $data['chapter_id'],
-                        $data['source_revision'],
-                        $data['occurrence_id'],
-                    );
-                    if (!$this->sameText($data['lemma'], $target['lemma'] ?? '')
-                        || !$this->sameText($data['surface_form'] ?? $data['lemma'], $target['surface'] ?? '')) {
-                        throw new \InvalidArgumentException(ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID);
-                    }
-
-                    $data['sentence_id'] = (string) $target['sentence_index'];
-                    $data['sentence_en'] = $target['source_sentence'];
-                    $data['sentence_zh'] = null;
-                    $evidence = $this->readingEvidenceService->storeUserDecision(
-                        $user->id,
-                        $user->selected_language,
-                        (int) $data['chapter_id'],
-                        $data['occurrence_id'],
-                        ReadingOccurrenceSenseEvidence::RESOLUTION_NEW_SENSE,
-                        null,
-                    );
-                    $sourceOccurrence = $this->wordSenseOccurrenceService->readingOccurrenceForEvidence($evidence);
-                    if (!$sourceOccurrence) {
-                        throw new \InvalidArgumentException('Reading source occurrence does not exist.');
-                    }
-                    $result = $this->wordSenseService->createManualSense(
-                        $user->id,
-                        $user->selected_language,
-                        $data,
-                        false,
-                        WordSense::LEARNING_ORIGIN_READING,
-                        $sourceOccurrence,
-                    );
-                    $this->wordSenseOccurrenceService->bindReadingEvidenceToSense($evidence, $result['sense']);
-
-                    return $result;
-                });
+                $result = $this->readingManualSenseCreationService->create(
+                    $user->id,
+                    $user->selected_language,
+                    $data,
+                );
             } else {
                 $result = $this->wordSenseService->createManualSense(
                     $user->id,
@@ -169,11 +128,6 @@ class ManualWordSenseController extends Controller
         $normalized = strtolower(trim($pos));
 
         return self::POS_ALIASES[$normalized] ?? $normalized;
-    }
-
-    private function sameText(mixed $left, mixed $right): bool
-    {
-        return mb_strtolower(trim((string) $left)) === mb_strtolower(trim((string) $right));
     }
 
     private function readingContractError(\InvalidArgumentException $exception)

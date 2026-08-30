@@ -6,13 +6,13 @@
 
 The 2026-08-29 H-10 probe correctly recorded that the local Windows host had no Xcode, Apple signing or connected macOS peer. On 2026-08-30 a different, bounded capability became available: the actual `origin` repository was freshly verified as public, so LinguaCafe could use a standard GitHub-hosted `macos-26` runner without introducing a paid larger runner or Apple credential path.
 
-This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, and authenticated Simulator credential lifecycle evidence. It does **not** close the remaining Reader/Review/import/offline Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
+This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, authenticated Simulator credential lifecycle, formal Sense Review Good/Undo, and rendered Reader touch/source-binding evidence. It does **not** close the remaining `.txt` import/offline/reconnect Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
 
 ## Authority and safety boundary
 
 The work keeps the existing M9/H-10 architecture and release boundary:
 
-- no product API, database, FSRS, Reader, Review or synchronization semantics changed;
+- the accepted Reader slice changes only the existing Mobile Reader integration boundary: it exposes the canonical reading-unfamiliar target endpoint to Mobile, reuses one shared Reader manual-Sense creation owner across Web/Mobile, and carries authoritative reading session/source/occurrence identity into Mobile manual Sense creation; no database schema, FSRS scheduler/rating semantics, ReviewLog semantics, offline-sync contract or second Reader truth source was added;
 - no Apple password, certificate, private key, provisioning profile, App Store Connect credential or signing secret was requested or read;
 - no `.env` file was read or modified;
 - no archive, IPA, upload, TestFlight submission or App Store submission was created;
@@ -225,6 +225,24 @@ The testing database then proved exactly one `sense_review` ReviewLog for card A
 
 This accepts the Simulator formal **Good → next card → Undo → exact FSRS restoration** path without introducing a second rating or scheduler owner. Physical-device haptics remain a separate device gate.
 
+## Rendered Reader touch / source-binding continuation
+
+GitHub Actions run `33301226295` completed **SUCCESS** on head `15eec00ad9a4f7570b83c150a4afb43f1c159b42` using the same dedicated testing MySQL/native-FSRS/PAB backend and iPhone 17 Pro Simulator. The final run repeated the complete environment, dependency, schema, Mobile, SwiftPM and `build-for-testing` gates, then executed three short native XCUITest sessions with `test-without-building`.
+
+The rendered flow proved:
+
+1. authenticated login persists into the native Mobile shell;
+2. portrait Reader opens the task book/chapter and exposes the real `bank` / `account` token controls;
+3. tapping `bank`, entering a confirmed Chinese meaning and tapping `确认并创建` creates the reading-origin WordSense through the canonical shared creation owner;
+4. reopening the same token shows the existing-Sense controls `认识 / 记得` and `不认识` instead of the new-Sense form;
+5. landscape Reader accepts a real long-press/drag from `bank` to `account`, exposes `bank account` in the lookup sheet, and keeps the phrase flow outside the single-token recognition-rating path;
+6. MySQL corroboration proves exactly one matching reading-unfamiliar target, one reading-origin WordSense, one Sense ReviewCard, one canonical `reading_occurrence` source binding and one `new_sense` evidence row, while ReviewLog count remains zero for the creation flow;
+7. PAB observes the real Mobile marker and WordSense API paths; testing lease/sentinel, MySQL service and Simulator cleanup all return clean.
+
+The same final head also replaces a fragile Mobile 404 check that compared exception prose with the stable `ReadingChapterTextService::ERROR_CHAPTER_NOT_FOUND` code. That change does not add a second Reader truth source; it only keeps the public Mobile error mapping stable if human-readable exception wording changes later.
+
+This accepts the Simulator Reader **portrait token → canonical new Sense/source binding → existing-Sense recognition controls** and **landscape phrase gesture** paths. Physical-device notch/Dynamic-Island/home-indicator safe-area behavior remains a separate device gate.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -245,13 +263,16 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - absence of the Web session-token key from ordinary iOS Preferences;
 - rendered device revoke/logout, server token deletion, Keychain clear, and relaunch-to-login boundary;
 - rendered Sense Review answer reveal, formal Good rating, next-card transition and canonical Undo;
-- ReviewLog / operation-ledger exactly-once facts plus exact post-Undo FSRS fingerprint restoration.
+- ReviewLog / operation-ledger exactly-once facts plus exact post-Undo FSRS fingerprint restoration;
+- rendered portrait Reader token interaction and canonical reading-origin new-Sense/source binding;
+- existing-Sense `认识 / 记得` and `不认识` controls after the canonical source-bound creation;
+- rendered landscape long-press/drag phrase selection for `bank account` without entering the single-token recognition path.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. the remaining authenticated Simulator content matrix: Reader touch/safe-area, `.txt` import, article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
+1. the remaining authenticated Simulator content matrix: `.txt` import, article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
 2. physical-iPhone installation with real Apple signing;
 3. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
 4. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
@@ -268,7 +289,7 @@ A cloud simulator is useful for compile/runtime capability but cannot substitute
 
 The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The remaining Simulator work should continue on that single testing stack for Reader/import/offline/sync evidence; formal Sense Review Good/Undo is already accepted by run `33282205923`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
+The remaining Simulator work should continue on that single testing stack for `.txt` import/offline/reconnect evidence; formal Sense Review Good/Undo is accepted by run `33282205923`, and rendered Reader touch/source binding is accepted by run `33301226295`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -279,6 +300,6 @@ The remaining Simulator work should continue on that single testing stack for Re
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo: Accepted.**
+**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding: Accepted.**
 
 **Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining authenticated Simulator content matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.

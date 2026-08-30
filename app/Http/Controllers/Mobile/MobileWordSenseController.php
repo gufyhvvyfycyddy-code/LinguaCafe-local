@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Mobile;
 use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
 use App\Models\Chapter;
+use App\Services\ReadingManualSenseCreationService;
+use App\Services\ReadingSessionService;
 use App\Services\SenseOccurrencePayloadSerializerService;
 use App\Services\WordSenseLibraryQueryService;
 use App\Services\WordSenseService;
@@ -27,6 +29,7 @@ class MobileWordSenseController extends Controller
 
     public function __construct(
         private WordSenseService $wordSenseService,
+        private ReadingManualSenseCreationService $readingManualSenseCreationService,
         private SenseOccurrencePayloadSerializerService $payloadSerializer,
         private WordSenseLibraryQueryService $queryService,
     ) {
@@ -78,17 +81,23 @@ class MobileWordSenseController extends Controller
             'sentence_en',
             'sentence_zh',
             'keep_new',
+            'reading_session_id',
+            'source_revision',
+            'occurrence_id',
         ]), [
             'lemma' => ['required', 'string', 'max:100'],
             'surface_form' => ['nullable', 'string', 'max:100'],
             'pos' => ['required', Rule::in(self::POS_OPTIONS)],
             'sense_zh' => ['required', 'string', 'max:1000'],
             'sense_en' => ['nullable', 'string', 'max:1000'],
-            'chapter_id' => ['nullable', 'integer'],
+            'chapter_id' => ['nullable', 'required_with:reading_session_id', 'integer'],
             'sentence_id' => ['nullable'],
             'sentence_en' => ['nullable', 'string', 'max:5000'],
             'sentence_zh' => ['nullable', 'string', 'max:5000'],
             'keep_new' => ['nullable', 'boolean'],
+            'reading_session_id' => ['nullable', 'required_with:source_revision,occurrence_id', 'uuid'],
+            'source_revision' => ['nullable', 'required_with:reading_session_id,occurrence_id', 'string'],
+            'occurrence_id' => ['nullable', 'required_with:reading_session_id,source_revision', 'string', 'max:255'],
         ]);
         if ($validator->fails()) {
             return MobileApiResponse::error(
@@ -124,15 +133,47 @@ class MobileWordSenseController extends Controller
 
         $data['aliases_zh'] = [];
         $data['collocations'] = [];
-        $result = $this->wordSenseService->createManualSense(
-            $user->id,
-            $user->selected_language,
-            $data,
-        );
+        try {
+            $result = !empty($data['reading_session_id'])
+                ? $this->readingManualSenseCreationService->create(
+                    $user->id,
+                    $user->selected_language,
+                    $data,
+                )
+                : $this->wordSenseService->createManualSense(
+                    $user->id,
+                    $user->selected_language,
+                    $data,
+                );
+        } catch (\InvalidArgumentException $exception) {
+            return $this->readingContractError($exception);
+        }
 
         $sense = $this->payloadSerializer->serializeSense($result['sense']);
         $sense['updated_word'] = $result['updated_word'];
 
         return MobileApiResponse::success(['word_sense' => $sense], 201);
+    }
+
+    private function readingContractError(\InvalidArgumentException $exception)
+    {
+        $code = $exception->getMessage();
+        $statuses = [
+            ReadingSessionService::ERROR_SESSION_NOT_FOUND => 404,
+            ReadingSessionService::ERROR_SESSION_NOT_ACTIVE => 409,
+            ReadingSessionService::ERROR_SESSION_CHAPTER_MISMATCH => 409,
+            ReadingSessionService::ERROR_SESSION_STALE_SOURCE => 409,
+            ReadingSessionService::ERROR_OCCURRENCE_STALE => 409,
+            ReadingSessionService::ERROR_EXPLICIT_CONTEXT_INVALID => 422,
+        ];
+        if (!isset($statuses[$code])) {
+            throw $exception;
+        }
+
+        return MobileApiResponse::error(
+            $code,
+            'The reading request conflicts with the current server state.',
+            $statuses[$code],
+        );
     }
 }

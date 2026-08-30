@@ -207,6 +207,61 @@ describe('MobileApiClient', () => {
     });
   });
 
+  it('marks a canonical Reader target before submitting Reader-bound Sense identity', async () => {
+    const fetcher = vi
+      .fn()
+      .mockResolvedValueOnce(envelope({
+        target: {
+          occurrence_id: 'occ2_bank',
+          kind: 'word',
+          start_word_index: 10,
+          end_word_index: 10,
+          source_revision: 'sha256:revision',
+        },
+      }, 201))
+      .mockResolvedValueOnce(envelope({
+        word_sense: { sense_id: 7, lemma: 'bank', sense_zh: '银行' },
+      }, 201));
+    const client = new MobileApiClient('https://example.com', fetcher as unknown as typeof fetch);
+    client.setToken('secret');
+
+    await client.markReadingUnfamiliarTarget(9, {
+      kind: 'word',
+      start_word_index: 10,
+      end_word_index: 10,
+      source_revision: 'sha256:revision',
+    });
+    await client.createSense({
+      lemma: 'bank',
+      surface_form: 'bank',
+      pos: 'noun',
+      sense_zh: '银行',
+      chapter_id: 9,
+      sentence_id: 2,
+      sentence_en: 'The bank reopened.',
+      reading_session_id: 'session-id',
+      source_revision: 'sha256:revision',
+      occurrence_id: 'occ2_bank',
+    });
+
+    expect(fetcher.mock.calls[0][0]).toBe(
+      'https://example.com/api/v1/mobile/chapters/9/reading-unfamiliar-targets',
+    );
+    expect(JSON.parse(String(fetcher.mock.calls[0][1].body))).toEqual({
+      kind: 'word',
+      start_word_index: 10,
+      end_word_index: 10,
+      source_revision: 'sha256:revision',
+    });
+    expect(fetcher.mock.calls[1][0]).toBe('https://example.com/api/v1/mobile/word-senses');
+    expect(JSON.parse(String(fetcher.mock.calls[1][1].body))).toMatchObject({
+      reading_session_id: 'session-id',
+      source_revision: 'sha256:revision',
+      occurrence_id: 'occ2_bank',
+      keep_new: true,
+    });
+  });
+
   it('starts and finishes reading only through the server reading contracts', async () => {
     const fetcher = vi.fn(async () => envelope({
       reading_session_id: 'session-id',

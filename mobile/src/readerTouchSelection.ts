@@ -30,6 +30,7 @@ export function readerPhrase(tokens: ReaderToken[], startIndex: number, endIndex
     word: join(token => token.word),
     lemma: join(token => token.lemma || token.word),
     pos: 'phrase',
+    selection_kind: 'phrase',
     source_sentence_identity: first.source_sentence_identity,
     is_structure: false,
     space_after: last.space_after,

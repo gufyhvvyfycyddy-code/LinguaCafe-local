@@ -6,6 +6,8 @@ use App\Models\Chapter;
 
 class ReadingChapterTextService
 {
+    public const ERROR_CHAPTER_NOT_FOUND = 'READING_CHAPTER_NOT_FOUND';
+
     public function chapterForUser(int $userId, string $language, int $chapterId): Chapter
     {
         $chapter = Chapter::query()
@@ -15,7 +17,7 @@ class ReadingChapterTextService
             ->first();
 
         if (!$chapter) {
-            throw new \InvalidArgumentException('Chapter does not exist in the current user and language scope.');
+            throw new \InvalidArgumentException(self::ERROR_CHAPTER_NOT_FOUND);
         }
 
         return $chapter;
@@ -31,7 +33,7 @@ class ReadingChapterTextService
             ->first();
 
         if (!$chapter) {
-            throw new \InvalidArgumentException('Chapter does not exist in the current user and language scope.');
+            throw new \InvalidArgumentException(self::ERROR_CHAPTER_NOT_FOUND);
         }
 
         return $chapter;

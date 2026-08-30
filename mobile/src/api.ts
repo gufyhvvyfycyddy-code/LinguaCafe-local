@@ -276,6 +276,29 @@ export class MobileApiClient {
     });
   }
 
+  markReadingUnfamiliarTarget(
+    chapterId: number,
+    payload: {
+      kind: 'word' | 'phrase';
+      start_word_index: number;
+      end_word_index: number;
+      source_revision: string;
+    },
+  ): Promise<{
+    target: {
+      occurrence_id: string;
+      kind: 'word' | 'phrase';
+      start_word_index: number;
+      end_word_index: number;
+      source_revision: string;
+    };
+  }> {
+    return this.request(`/chapters/${chapterId}/reading-unfamiliar-targets`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  }
+
   finishReadingSession(
     chapterId: number,
     readingSessionId: string,
@@ -295,7 +318,17 @@ export class MobileApiClient {
     chapter_id?: number;
     sentence_id?: number | string | null;
     sentence_en?: string;
-  }): Promise<{ word_sense: { sense_id: number; lemma: string; sense_zh: string } }> {
+    reading_session_id?: string;
+    source_revision?: string;
+    occurrence_id?: string;
+  }): Promise<{ word_sense: {
+    sense_id: number;
+    lemma: string;
+    pos: string | null;
+    sense_zh: string;
+    sense_en: string | null;
+    review_card_id: number | null;
+  } }> {
     return this.request('/word-senses', {
       method: 'POST',
       body: JSON.stringify({ ...payload, keep_new: true }),
