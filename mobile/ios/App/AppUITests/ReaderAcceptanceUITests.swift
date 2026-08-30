@@ -95,19 +95,16 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         fileButton.tap()
         let rejectedExtension = pickerElement(label: invalidExtension, in: app)
-        if rejectedExtension.exists {
-            XCTAssertFalse(rejectedExtension.isHittable && rejectedExtension.isEnabled)
+        if rejectedExtension.waitForExistence(timeout: 5)
+            && rejectedExtension.isHittable
+            && rejectedExtension.isEnabled {
+            rejectedExtension.tap()
+            XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
+            app.buttons["导入到服务器"].tap()
+            XCTAssertTrue(app.staticTexts["请选择 .txt 文件"].waitForExistence(timeout: 20))
+        } else {
+            try cancelDocumentPicker(app: app)
         }
-        let cancel = app.buttons.matching(NSPredicate(
-            format: "label IN %@",
-            ["Cancel", "取消"]
-        )).firstMatch
-        if !cancel.waitForExistence(timeout: 15) {
-            attachPickerDiagnostics(app: app, named: "import-picker-cancel-missing")
-            XCTFail("System document picker did not expose a cancel control")
-            return
-        }
-        cancel.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
 
         try chooseFile(named: invalidUtf8, app: app)
@@ -202,6 +199,23 @@ final class ReaderAcceptanceUITests: XCTestCase {
         app.descendants(matching: .any)
             .matching(NSPredicate(format: "label == %@", label))
             .firstMatch
+    }
+
+    private func cancelDocumentPicker(app: XCUIApplication) throws {
+        let cancel = app.buttons.matching(NSPredicate(
+            format: "label IN %@",
+            ["Cancel", "取消"]
+        )).firstMatch
+        if !cancel.waitForExistence(timeout: 15) {
+            attachPickerDiagnostics(app: app, named: "import-picker-cancel-missing")
+            XCTFail("System document picker did not expose a cancel control")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 3,
+                userInfo: [NSLocalizedDescriptionKey: "Missing document picker cancel control"]
+            )
+        }
+        cancel.tap()
     }
 
     private func attachPickerDiagnostics(app: XCUIApplication, named name: String) {
