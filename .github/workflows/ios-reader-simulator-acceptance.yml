@@ -196,7 +196,30 @@ jobs:
           printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
           grep -q 'IOS_READER_PAB_FIXTURE_READY' "$PAB_LOG"
 
-      - name: Prove Reader UI in short native XCUITest sessions
+      - name: Stage txt fixture in Simulator Files local storage
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
+          xcrun simctl listapps "$LC_IOS_SIM_UDID" | grep -q 'com.apple.DocumentsApp'
+          FILES_GROUP="$(xcrun simctl get_app_container "$LC_IOS_SIM_UDID" com.apple.DocumentsApp groups | awk '$1 == "group.com.apple.FileProvider.LocalStorage" {print $2; exit}')"
+          test -n "$FILES_GROUP"
+          FILES_STORAGE="$FILES_GROUP/File Provider Storage"
+          mkdir -p "$FILES_STORAGE"
+          LC_IMPORT_FILE_NAME="linguacafe-ios-import-${GITHUB_RUN_ID}.txt"
+          LC_IMPORT_BOOK_NAME="${LC_IMPORT_FILE_NAME%.txt}"
+          LC_IMPORT_CHAPTER_NAME="iOS Files picker import"
+          LC_IMPORT_CONTENT="LinguaCafe imports this English text through the real iOS Files picker."
+          printf '%s' "$LC_IMPORT_CONTENT" > "$FILES_STORAGE/$LC_IMPORT_FILE_NAME"
+          test -s "$FILES_STORAGE/$LC_IMPORT_FILE_NAME"
+          printf '%s\n' \
+            "LC_FILES_STORAGE=$FILES_STORAGE" \
+            "LC_IMPORT_FILE_NAME=$LC_IMPORT_FILE_NAME" \
+            "LC_IMPORT_BOOK_NAME=$LC_IMPORT_BOOK_NAME" \
+            "LC_IMPORT_CHAPTER_NAME=$LC_IMPORT_CHAPTER_NAME" \
+            "LC_IMPORT_CONTENT=$LC_IMPORT_CONTENT" \
+            >> "$GITHUB_ENV"
+
+      - name: Prove Reader and txt import UI in short native XCUITest sessions
         run: |
           set -euo pipefail
           xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
@@ -211,6 +234,8 @@ jobs:
             TEST_RUNNER_LC_TEST_EMAIL="$LC_TEST_EMAIL" \
             TEST_RUNNER_LC_TEST_PASSWORD="$LC_TEST_PASSWORD" \
             TEST_RUNNER_LC_READER_MARKER="$LC_READER_MARKER" \
+            TEST_RUNNER_LC_IMPORT_FILE_NAME="${LC_IMPORT_FILE_NAME:-}" \
+            TEST_RUNNER_LC_IMPORT_BOOK_NAME="${LC_IMPORT_BOOK_NAME:-}" \
             php tests/Support/run-command-with-timeout.php --seconds="$timeout_seconds" -- \
               xcodebuild \
                 -project mobile/ios/App/App.xcodeproj \
@@ -235,6 +260,7 @@ jobs:
           }
 
           run_ui_test testLoginPersistsAuthenticatedSession 240
+          run_ui_test testTextImportThroughSystemFilesPicker 300
           run_ui_test testReaderPortraitSourceBinding 300
           run_ui_test testReaderLandscapePhraseGesture 240
 
@@ -254,6 +280,11 @@ jobs:
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_sense_occurrences o JOIN word_senses s ON s.id=o.word_sense_id WHERE o.user_id=$USER_ID AND o.chapter_id=$CHAPTER_ID AND o.source='reading_occurrence' AND s.lemma='bank' AND s.learning_started_source_occurrence_id=o.id;")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_occurrence_sense_evidence e JOIN reading_unfamiliar_targets t ON t.user_id=e.user_id AND t.chapter_id=e.chapter_id AND t.source_revision=e.source_revision AND t.occurrence_id=e.occurrence_id WHERE e.user_id=$USER_ID AND e.chapter_id=$CHAPTER_ID AND e.resolution='new_sense';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID;")" = "0"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM books WHERE user_id=$USER_ID AND language='english' AND name='$LC_IMPORT_BOOK_NAME';")" = "1"
+          IMPORT_BOOK_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM books WHERE user_id=$USER_ID AND language='english' AND name='$LC_IMPORT_BOOK_NAME' LIMIT 1;")"
+          test -n "$IMPORT_BOOK_ID"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE user_id=$USER_ID AND language='english' AND book_id=$IMPORT_BOOK_ID AND name='$LC_IMPORT_CHAPTER_NAME' AND raw_text='$LC_IMPORT_CONTENT';")" = "1"
+          grep -q 'api/v1/mobile/imports/text' "$PAB_LOG"
           grep -q 'api/v1/mobile/chapters/.*/reading-unfamiliar-targets' "$PAB_LOG"
           grep -q 'api/v1/mobile/word-senses' "$PAB_LOG"
 
@@ -278,6 +309,9 @@ jobs:
             if mysqladmin ping -uroot --silent 2>/dev/null; then
               test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"
             fi
+          fi
+          if [ -n "${LC_FILES_STORAGE:-}" ] && [ -n "${LC_IMPORT_FILE_NAME:-}" ]; then
+            rm -f "$LC_FILES_STORAGE/$LC_IMPORT_FILE_NAME" 2>/dev/null || true
           fi
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
           xcrun simctl shutdown "$LC_IOS_SIM_UDID" 2>/dev/null || true

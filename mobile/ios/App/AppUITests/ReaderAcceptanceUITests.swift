@@ -38,6 +38,58 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
     }
 
+    func testTextImportThroughSystemFilesPicker() throws {
+        let app = XCUIApplication()
+        let environment = ProcessInfo.processInfo.environment
+        let fileName = try requiredEnvironment("LC_IMPORT_FILE_NAME", environment)
+        let bookName = try requiredEnvironment("LC_IMPORT_BOOK_NAME", environment)
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+
+        let settingsTab = app.buttons["我的"]
+        XCTAssertTrue(settingsTab.waitForExistence(timeout: 30))
+        settingsTab.tap()
+
+        let importHeading = app.staticTexts["从“文件”导入英文文本"]
+        for _ in 0..<6 where !importHeading.exists {
+            app.swipeUp()
+        }
+        XCTAssertTrue(importHeading.waitForExistence(timeout: 15))
+
+        let fileInput = app.descendants(matching: .any).matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "文本文件"
+        )).firstMatch
+        XCTAssertTrue(fileInput.waitForExistence(timeout: 15))
+        fileInput.tap()
+
+        let filesApp = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
+        let fixture = filesApp.descendants(matching: .any).matching(NSPredicate(
+            format: "label == %@",
+            fileName
+        )).firstMatch
+        if !fixture.waitForExistence(timeout: 30) {
+            print("FILES_PICKER_TREE\n\(filesApp.debugDescription)")
+            attachScreenshot(XCUIScreen.main.screenshot(), named: "txt-import-picker-failure")
+            XCTFail("Staged txt fixture was not visible in the system Files picker")
+            return
+        }
+        fixture.tap()
+
+        let importButton = app.buttons["导入到服务器"]
+        XCTAssertTrue(importButton.waitForExistence(timeout: 30))
+        importButton.tap()
+
+        let importedBook = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            bookName
+        )).firstMatch
+        XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
+        attachScreenshot(XCUIScreen.main.screenshot(), named: "txt-import-library")
+    }
+
     func testReaderPortraitSourceBinding() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
