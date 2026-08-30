@@ -247,6 +247,8 @@ assert.match(readerUiTest, /XCTAssertGreaterThan\(landscapeScreenshot\.image\.si
 assert.match(readerUiTest, /app\.tabBars\.buttons\["Browse"\]/);
 assert.match(readerUiTest, /navigationBars\.staticTexts\["On My iPhone"\]/);
 assert.match(readerUiTest, /app\.staticTexts\["On My iPhone"\]/);
+assert.match(readerUiTest, /app\.webViews\.firstMatch/);
+assert.match(readerUiTest, /func openTextImportSettings\(app: XCUIApplication\) throws/);
 assert.match(readerUiTest, /Missing required UI-test environment variable/);
 assert.doesNotMatch(readerUiTest, /XCTSkip/);
 assert.match(readerAcceptanceWorkflow, /TEST_RUNNER_LC_SERVER_URL="http:\/\/127\.0\.0\.1:8878"/);
@@ -265,6 +267,7 @@ assert.match(readerAcceptanceWorkflow, /File Provider Storage/);
 assert.match(readerAcceptanceWorkflow, /invalid-utf8\.txt/);
 assert.match(readerAcceptanceWorkflow, /oversize\.txt/);
 assert.match(readerAcceptanceWorkflow, /action_type='library\.text_import'/);
+assert.match(readerAcceptanceWorkflow, /IMPORT_BOOK_NAME="lc-\$LC_READER_MARKER-valid"/);
 assert.match(readerAcceptanceWorkflow, /grep -c 'api\/v1\/mobile\/imports\/text'/);
 assert.doesNotMatch(readerAcceptanceWorkflow, /testReaderSourceBindingAndPhraseGesture/);
 assert.match(readerAcceptanceWorkflow, /xcresulttool get test-results summary/);

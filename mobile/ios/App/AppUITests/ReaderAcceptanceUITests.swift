@@ -74,25 +74,18 @@ final class ReaderAcceptanceUITests: XCTestCase {
     func testTextImportThroughSystemFilesPicker() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
-        let bookName = "H10 iOS Import \(marker)"
         let invalidExtension = "lc-\(marker)-invalid.pdf"
         let invalidUtf8 = "lc-\(marker)-invalid-utf8.txt"
         let oversized = "lc-\(marker)-oversize.txt"
         let valid = "lc-\(marker)-valid.txt"
+        let validBookName = valid.replacingOccurrences(of: ".txt", with: "")
 
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
-        app.buttons["我的"].tap()
+        try openTextImportSettings(app: app)
 
         let fileButton = app.buttons["选择文本文件"].firstMatch
-        scrollUntilHittable(fileButton, in: app)
-        XCTAssertTrue(fileButton.isHittable)
-        let bookField = app.textFields["导入资料名称"].firstMatch
-        XCTAssertTrue(bookField.waitForExistence(timeout: 15))
-        bookField.tap()
-        bookField.typeText(bookName)
-
         fileButton.tap()
         try openLocalFilesLocation(app: app)
         let rejectedExtension = pickerElement(label: invalidExtension, in: app)
@@ -108,19 +101,22 @@ final class ReaderAcceptanceUITests: XCTestCase {
         }
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
 
+        try openTextImportSettings(app: app)
         try chooseFile(named: invalidUtf8, app: app)
         app.buttons["导入到服务器"].tap()
         XCTAssertTrue(app.staticTexts["文本文件必须使用 UTF-8 编码"].waitForExistence(timeout: 20))
 
+        try openTextImportSettings(app: app)
         try chooseFile(named: oversized, app: app)
         app.buttons["导入到服务器"].tap()
         XCTAssertTrue(app.staticTexts["文件需为 1–200 KB，且资料和章节名称不能为空"].waitForExistence(timeout: 20))
 
+        try openTextImportSettings(app: app)
         try chooseFile(named: valid, app: app)
         app.buttons["导入到服务器"].tap()
         let importedBook = app.buttons.matching(NSPredicate(
             format: "label CONTAINS %@",
-            bookName
+            validBookName
         )).firstMatch
         XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
     }
@@ -174,6 +170,24 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(chapter.waitForExistence(timeout: 30))
         chapter.tap()
         XCTAssertTrue(app.staticTexts["Reader touch source binding"].waitForExistence(timeout: 30))
+    }
+
+    private func openTextImportSettings(app: XCUIApplication) throws {
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 15))
+        settings.tap()
+        let fileButton = app.buttons["选择文本文件"].firstMatch
+        XCTAssertTrue(fileButton.waitForExistence(timeout: 15))
+        scrollUntilHittable(fileButton, in: app)
+        if !fileButton.isHittable {
+            attachPickerDiagnostics(app: app, named: "text-import-file-button-not-hittable")
+            XCTFail("Text import file button remained offscreen")
+            throw NSError(
+                domain: "LinguaCafeTextImportAcceptance",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Text import file button remained offscreen"]
+            )
+        }
     }
 
     private func chooseFile(named fileName: String, app: XCUIApplication) throws {
@@ -261,8 +275,10 @@ final class ReaderAcceptanceUITests: XCTestCase {
     }
 
     private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
-        for _ in 0..<6 where !element.isHittable {
-            app.swipeUp()
+        let webView = app.webViews.firstMatch
+        let scrollTarget = webView.exists ? webView : app
+        for _ in 0..<10 where !element.isHittable {
+            scrollTarget.swipeUp()
         }
     }
 
