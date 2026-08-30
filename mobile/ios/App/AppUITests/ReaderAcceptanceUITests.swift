@@ -94,14 +94,19 @@ final class ReaderAcceptanceUITests: XCTestCase {
         bookField.typeText(bookName)
 
         fileButton.tap()
-        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
-        XCTAssertTrue(files.wait(for: .runningForeground, timeout: 30))
-        let rejectedExtension = files.staticTexts[invalidExtension].firstMatch
+        let rejectedExtension = pickerElement(label: invalidExtension, in: app)
         if rejectedExtension.exists {
             XCTAssertFalse(rejectedExtension.isHittable && rejectedExtension.isEnabled)
         }
-        let cancel = files.buttons["Cancel"].firstMatch
-        XCTAssertTrue(cancel.waitForExistence(timeout: 15))
+        let cancel = app.buttons.matching(NSPredicate(
+            format: "label IN %@",
+            ["Cancel", "取消"]
+        )).firstMatch
+        if !cancel.waitForExistence(timeout: 15) {
+            attachPickerDiagnostics(app: app, named: "import-picker-cancel-missing")
+            XCTFail("System document picker did not expose a cancel control")
+            return
+        }
         cancel.tap()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
 
@@ -179,11 +184,9 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(fileButton.isHittable)
         fileButton.tap()
 
-        let files = XCUIApplication(bundleIdentifier: "com.apple.DocumentsApp")
-        XCTAssertTrue(files.wait(for: .runningForeground, timeout: 30))
-        let file = files.staticTexts[fileName].firstMatch
+        let file = pickerElement(label: fileName, in: app)
         if !file.waitForExistence(timeout: 20) {
-            print(files.debugDescription)
+            attachPickerDiagnostics(app: app, named: "import-picker-file-missing")
             XCTFail("Files picker did not expose staged fixture: \(fileName)")
             throw NSError(
                 domain: "LinguaCafeTextImportAcceptance",
@@ -192,7 +195,18 @@ final class ReaderAcceptanceUITests: XCTestCase {
             )
         }
         file.tap()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
+    }
+
+    private func pickerElement(label: String, in app: XCUIApplication) -> XCUIElement {
+        app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", label))
+            .firstMatch
+    }
+
+    private func attachPickerDiagnostics(app: XCUIApplication, named name: String) {
+        print(app.debugDescription)
+        attachScreenshot(XCUIScreen.main.screenshot(), named: name)
     }
 
     private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
