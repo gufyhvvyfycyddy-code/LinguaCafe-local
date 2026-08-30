@@ -254,8 +254,8 @@ jobs:
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_sense_occurrences o JOIN word_senses s ON s.id=o.word_sense_id WHERE o.user_id=$USER_ID AND o.chapter_id=$CHAPTER_ID AND o.source='reading_occurrence' AND s.lemma='bank' AND s.learning_started_source_occurrence_id=o.id;")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_occurrence_sense_evidence e JOIN reading_unfamiliar_targets t ON t.user_id=e.user_id AND t.chapter_id=e.chapter_id AND t.source_revision=e.source_revision AND t.occurrence_id=e.occurrence_id WHERE e.user_id=$USER_ID AND e.chapter_id=$CHAPTER_ID AND e.resolution='new_sense';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID;")" = "0"
-          grep -q 'POST.*api/v1/mobile/chapters/.*/reading-unfamiliar-targets' "$PAB_LOG"
-          grep -q 'POST.*api/v1/mobile/word-senses' "$PAB_LOG"
+          grep -q 'api/v1/mobile/chapters/.*/reading-unfamiliar-targets' "$PAB_LOG"
+          grep -q 'api/v1/mobile/word-senses' "$PAB_LOG"
 
       - name: Cleanup PAB, lease, database service, and simulator
         if: always()

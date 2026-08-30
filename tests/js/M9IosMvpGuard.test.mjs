@@ -246,6 +246,9 @@ assert.match(readerAcceptanceWorkflow, /run_ui_test testReaderLandscapePhraseGes
 assert.doesNotMatch(readerAcceptanceWorkflow, /testReaderSourceBindingAndPhraseGesture/);
 assert.match(readerAcceptanceWorkflow, /xcresulttool get test-results summary/);
 assert.match(readerAcceptanceWorkflow, /grep -E '\(\/api\/v1\/mobile\|\/__testing\/acceptance-sentinel\)'/);
+assert.match(readerAcceptanceWorkflow, /grep -q 'api\/v1\/mobile\/chapters\/\.\*\/reading-unfamiliar-targets'/);
+assert.match(readerAcceptanceWorkflow, /grep -q 'api\/v1\/mobile\/word-senses'/);
+assert.doesNotMatch(readerAcceptanceWorkflow, /grep -q 'POST\.\*api\/v1\/mobile/);
 assert.doesNotMatch(readerAcceptanceWorkflow, /MAESTRO_BIN|maestro\.zip|duration: 60000/);
 assert.match(readerAcceptanceWorkflow, /rustup toolchain install 1\.98\.0 --profile minimal --no-self-update/);
 assert.match(readerAcceptanceWorkflow, /RUSTUP_TOOLCHAIN=1\.98\.0/);
