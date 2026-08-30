@@ -47,6 +47,16 @@ jobs:
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
 
+      - name: Verify hosted runner audio output before audio acceptance
+        run: |
+          set -euo pipefail
+          AUDIO_PROFILE="$(system_profiler SPAudioDataType)"
+          printf '%s\n' "$AUDIO_PROFILE"
+          if ! printf '%s\n' "$AUDIO_PROFILE" | grep -q 'Default Output Device: Yes'; then
+            echo 'IOS_SIM_AUDIO_DEVICE_UNAVAILABLE: hosted macOS runner has no default audio output device.' >&2
+            exit 78
+          fi
+
       - name: Install PHP 8.4, MySQL 8.4 and testing relay; pin Rust 1.98
         run: |
           set -euo pipefail

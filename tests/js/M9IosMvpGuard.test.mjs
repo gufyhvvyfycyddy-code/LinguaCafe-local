@@ -224,6 +224,9 @@ assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlig
 assert.match(readerAcceptanceWorkflow, /workflow_dispatch:/);
 assert.match(readerAcceptanceWorkflow, /workflow_call:/);
 assert.match(readerAcceptanceWorkflow, /runs-on: macos-26/);
+assert.match(readerAcceptanceWorkflow, /system_profiler SPAudioDataType/);
+assert.match(readerAcceptanceWorkflow, /Default Output Device: Yes/);
+assert.match(readerAcceptanceWorkflow, /IOS_SIM_AUDIO_DEVICE_UNAVAILABLE/);
 assert.match(readerAcceptanceWorkflow, /APP_ENV: testing/);
 assert.match(readerAcceptanceWorkflow, /DB_CONNECTION: mysql/);
 assert.match(readerAcceptanceWorkflow, /TestingDatabaseHealthTest\.php/);
