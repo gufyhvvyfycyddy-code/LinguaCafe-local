@@ -63,8 +63,8 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         XCTAssertTrue(app.buttons["bank"].firstMatch.waitForExistence(timeout: 30))
         app.buttons["bank"].firstMatch.tap()
-        let recognitionPrompt = app.staticTexts["先回想这个词在这里的意思，再选择你的真实情况。"]
-        XCTAssertTrue(recognitionPrompt.waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["认识 / 记得"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["不认识"].exists)
         XCTAssertFalse(app.staticTexts["创建学习词义"].exists)
         let closeButton = app.buttons["关闭"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 15))

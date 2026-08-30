@@ -225,6 +225,8 @@ assert.match(readerUiTest, /func testReaderLandscapePhraseGesture\(\)/);
 assert.match(readerUiTest, /XCUIDevice\.shared\.orientation = \.portrait/);
 assert.match(readerUiTest, /XCUIDevice\.shared\.orientation = \.landscapeRight/);
 assert.match(readerUiTest, /app\.wait\(for: \.runningForeground/);
+assert.match(readerUiTest, /app\.buttons\["认识 \/ 记得"\]\.waitForExistence/);
+assert.match(readerUiTest, /app\.buttons\["不认识"\]\.exists/);
 assert.equal((readerUiTest.match(/let app = XCUIApplication\(\)/g) ?? []).length, 3);
 assert.doesNotMatch(readerUiTest, /private let app = XCUIApplication\(\)/);
 assert.match(readerUiTest, /press\(\s*forDuration: 0\.7,\s*thenDragTo: landscapeAccount/);
