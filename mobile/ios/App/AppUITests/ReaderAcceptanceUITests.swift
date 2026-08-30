@@ -222,7 +222,11 @@ final class ReaderAcceptanceUITests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
-        XCTAssertTrue(app.staticTexts["服务器不可达"].waitForExistence(timeout: 60))
+        let unreachable = app.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@",
+            "服务器不可达"
+        )).firstMatch
+        XCTAssertTrue(unreachable.waitForExistence(timeout: 60))
         let settings = app.buttons["我的"].firstMatch
         XCTAssertTrue(settings.waitForExistence(timeout: 20))
         settings.tap()
