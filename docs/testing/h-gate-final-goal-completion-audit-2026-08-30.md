@@ -6,7 +6,7 @@
 
 **H-GATE = DEFERRED / Not Complete.**
 
-The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires the complete Apple/iOS capability cluster when iOS is part of the final target. A 2026-08-30 continuation has since recovered real macOS/Xcode/SwiftPM/iOS Simulator capability through a standard GitHub-hosted `macos-26` runner, including rendered authenticated login, Simulator Keychain save/load across relaunch, server token/device ownership and rendered revoke/logout, formal Sense Review Good/Undo, and Reader touch/source-binding. The remaining Simulator `.txt` import and offline/reconnect-sync matrix plus physical-device, signing/archive and TestFlight/App Store evidence remain unaccepted.
+The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires the complete Apple/iOS capability cluster when iOS is part of the final target. A 2026-08-30 continuation has since recovered real macOS/Xcode/SwiftPM/iOS Simulator capability through a standard GitHub-hosted `macos-26` runner, including rendered authenticated login, Simulator Keychain save/load across relaunch, server token/device ownership and rendered revoke/logout, formal Sense Review Good/Undo, Reader touch/source-binding, and real-system-Files `.txt` import. The remaining Simulator offline/reconnect-sync matrix plus physical-device, signing/archive and TestFlight/App Store evidence remain unaccepted.
 
 This is a narrowed external capability boundary, not a newly discovered LinguaCafe product-code regression.
 
@@ -124,7 +124,7 @@ After the H-GATE row update, the mechanical milestone inventory is **71 DONE / 3
 
 The original H-GATE probe correctly found that the local host remains Windows/x86_64, with no local `xcodebuild`, `xcrun`, `codesign` or `simctl`, and no online macOS Tailscale peer. That local-host fact remains true.
 
-After that audit, the actual `origin` repository was freshly confirmed public and a bounded standard GitHub-hosted `macos-26` lane was added. The first three real runs `33264818165`, `33264963006` and `33265308947` established Xcode/SwiftPM/unsigned build and Simulator boot/install/launch. Later runs `33268124499` and `33268819125` both succeeded with a rendered iOS login-shell smoke; the latter also overlapped Simulator cold boot with build work without changing the result. Run `33279140695` then completed the authenticated lifecycle against a same-runner testing MySQL/native-FSRS/PAB backend, run `33282205923` completed rendered Sense Review Good/Undo with exact ReviewLog/operation/FSRS restoration evidence, and run `33301226295` completed rendered Reader token/Sense/source-binding plus landscape phrase-gesture evidence with MySQL/PAB corroboration and clean teardown.
+After that audit, the actual `origin` repository was freshly confirmed public and a bounded standard GitHub-hosted `macos-26` lane was added. The first three real runs `33264818165`, `33264963006` and `33265308947` established Xcode/SwiftPM/unsigned build and Simulator boot/install/launch. Later runs `33268124499` and `33268819125` both succeeded with a rendered iOS login-shell smoke; the latter also overlapped Simulator cold boot with build work without changing the result. Run `33279140695` then completed the authenticated lifecycle against a same-runner testing MySQL/native-FSRS/PAB backend, run `33282205923` completed rendered Sense Review Good/Undo with exact ReviewLog/operation/FSRS restoration evidence, run `33301226295` completed rendered Reader token/Sense/source-binding plus landscape phrase-gesture evidence, and run `33308079898` completed real iOS Files `.txt` import including disabled unsupported extension, invalid UTF-8, oversize rejection, successful valid import and exactly-one MySQL/PAB action/request evidence. The stable import result was re-extracted from fresh Goal and pushed as `6028453a899bdaf03f743d9c8b918ea4e4cbd236` without the temporary dispatch carrier.
 
 The continuation now proves:
 
@@ -148,18 +148,19 @@ The continuation now proves:
 - testing DB proves exactly one undone `sense_review` Good ReviewLog, one version-2 undone rating operation with two operation changes, zero rating on the next card, and exact pre/post-Undo FSRS fingerprint equality;
 - rendered Reader in portrait opens a real `bank` token, creates a canonical reading-origin Sense/source binding, then reopens it through the existing-Sense path with `认识 / 记得` and `不认识` controls;
 - rendered Reader in landscape long-press-drags `bank` to `account` and resolves the real `bank account` phrase flow;
-- PAB records the canonical Reader mobile endpoints, MySQL corroborates the resulting source binding, and TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean.
+- PAB records the canonical Reader mobile endpoints, MySQL corroborates the resulting source binding, and TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean;
+- the real system Files picker exposes only eligible `.txt` input as selectable, rejects invalid UTF-8 and oversize `.txt` through rendered UI, imports one valid UTF-8 English file, and leaves exactly one `library.text_import` action plus one import endpoint request.
 
 The following completion-required evidence still does not exist and must not be inferred from that rendered login-shell smoke:
 
-- the remaining authenticated Simulator content matrix: `.txt` file import through the real system file picker, article/review/audio offline restart, queued offline rating and exactly-once reconnect sync;
+- the remaining authenticated Simulator content matrix: article/review/audio offline restart, queued offline rating and exactly-once reconnect sync;
 - signed physical-iPhone installation plus physical-device Keychain confirmation and physical haptics/notification/audio/safe-area behavior;
 - Apple team/provisioning and signed archive validation;
 - App Store Connect processing, TestFlight install and App Review evidence.
 
 Full continuation evidence: `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
 
-The authenticated login/Keychain/logout, formal Sense Review Good/Undo, and Reader touch/source-binding lanes are now real and server-bound, but they do not retroactively complete H-11's remaining iOS content-flow scope. H-11's iOS `.txt` import and offline/reconnect-sync paths still require rendered UI/user-event evidence on the accepted testing backend before H-GATE can pass.
+The authenticated login/Keychain/logout, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import lanes are now real and server-bound, but they do not retroactively complete H-11's remaining iOS content-flow scope. H-11's iOS offline/reconnect-sync path still requires rendered UI/user-event evidence on the accepted testing backend before H-GATE can pass.
 
 ## Definition of Done audit
 
@@ -172,7 +173,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/Simulator compile+launch, rendered authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo and Reader touch/source-binding PASS; remaining Simulator `.txt` import/offline/reconnect sync, physical device, real Apple signing and TestFlight remain FAIL / unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/Simulator compile+launch, rendered authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import PASS; remaining Simulator offline/reconnect sync, physical device, real Apple signing and TestFlight remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;
@@ -206,7 +207,7 @@ H-GATE remains open only on the portion of the Apple capability cluster that the
 
 The minimum remaining work is:
 
-1. complete the remaining server-bound Simulator content matrix: real-system-picker `.txt` import, offline packages/audio and reconnect sync;
+1. complete the remaining server-bound Simulator content matrix: offline packages/audio and reconnect sync;
 2. repeat the critical matrix on a signed physical iPhone, including physical Keychain confirmation and haptics/notification/audio/safe-area behavior;
 3. perform Apple team/provisioning and signed archive validation;
 4. obtain TestFlight/App Store Connect evidence if the final Goal still requires store readiness;
@@ -214,4 +215,4 @@ The minimum remaining work is:
 
 Until then, the accurate project status is:
 
-**Windows/Web/Android program plus iOS Xcode/Simulator/rendered authenticated Keychain lifecycle, formal Sense Review Good/Undo and Reader touch/source-binding: Accepted. Full cross-platform A–H Goal: DEFERRED / Not Complete due to the remaining Simulator `.txt` import/offline-sync content flow, physical-device and distribution Apple capability.**
+**Windows/Web/Android program plus iOS Xcode/Simulator/rendered authenticated Keychain lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import: Accepted. Full cross-platform A–H Goal: DEFERRED / Not Complete due to the remaining Simulator offline-sync content flow, physical-device and distribution Apple capability.**

@@ -6,7 +6,7 @@
 
 The 2026-08-29 H-10 probe correctly recorded that the local Windows host had no Xcode, Apple signing or connected macOS peer. On 2026-08-30 a different, bounded capability became available: the actual `origin` repository was freshly verified as public, so LinguaCafe could use a standard GitHub-hosted `macos-26` runner without introducing a paid larger runner or Apple credential path.
 
-This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, authenticated Simulator credential lifecycle, formal Sense Review Good/Undo, and rendered Reader touch/source-binding evidence. It does **not** close the remaining `.txt` import/offline/reconnect Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
+This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, authenticated Simulator credential lifecycle, formal Sense Review Good/Undo, rendered Reader touch/source-binding, and real-system-Files `.txt` import evidence. It does **not** close the remaining offline/reconnect Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
 
 ## Authority and safety boundary
 
@@ -243,6 +243,25 @@ The same final head also replaces a fragile Mobile 404 check that compared excep
 
 This accepts the Simulator Reader **portrait token → canonical new Sense/source binding → existing-Sense recognition controls** and **landscape phrase gesture** paths. Physical-device notch/Dynamic-Island/home-indicator safe-area behavior remains a separate device gate.
 
+## Real iOS Files `.txt` import continuation
+
+GitHub Actions run `33308079898` completed **SUCCESS** on head `f89351c740957b0275696456bd6c8ea0597a0203`; the stable four-file result was then re-extracted from fresh live Goal and fast-forward pushed as `6028453a899bdaf03f743d9c8b918ea4e4cbd236` without the temporary dispatch carrier.
+
+The same iPhone 17 Pro Simulator and testing MySQL/native-FSRS/PAB stack proved the real system document-picker path rather than substituting an API upload. XCUITest opened `我的`, scrolled the actual WKWebView until `选择文本文件` was hittable, entered the system Files picker, navigated through Browse to **On My iPhone**, and selected files through the Files accessibility hierarchy. The final iOS 26 hierarchy exposed file cells by identifiers such as `basename, txt`; the unsupported PDF cell was present but disabled by the system picker.
+
+The rendered flow proved all four required cases:
+
+1. an unsupported `.pdf` fixture was visible but disabled by the system picker and could not be selected as import input;
+2. a `.txt` containing invalid UTF-8 bytes was selected through Files and rejected by the app with `文本文件必须使用 UTF-8 编码`;
+3. a 200001-byte `.txt` was selected through Files and rejected by the existing 200 KB product boundary;
+4. a valid UTF-8 English `.txt` was selected through Files, imported through the normal `MobileTextImportController → MobileIdempotencyService → ImportService` path, and appeared as the new material in the rendered library.
+
+MySQL/PAB corroboration proved exactly one matching imported Book, one `导入文本` Chapter, one `library.text_import` mobile client action and one `/api/v1/mobile/imports/text` request. The workflow then removed only its exact marker files, shut down the Simulator and MySQL service, and verified `TestingDatabaseLease active=false / stale_metadata=false` with zero remaining testing sentinel rows.
+
+The stable product delta is deliberately narrow: the existing iOS import fields now carry explicit accessibility labels and fatal UTF-8 decoding maps to one deterministic user-facing error. No new endpoint, schema, upload path, dependency or import authority was added.
+
+This accepts the Simulator **real Files picker → reject wrong type/encoding/size → import valid UTF-8 English `.txt` → server/MySQL idempotency evidence** path.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -266,13 +285,14 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - ReviewLog / operation-ledger exactly-once facts plus exact post-Undo FSRS fingerprint restoration;
 - rendered portrait Reader token interaction and canonical reading-origin new-Sense/source binding;
 - existing-Sense `认识 / 记得` and `不认识` controls after the canonical source-bound creation;
-- rendered landscape long-press/drag phrase selection for `bank account` without entering the single-token recognition path.
+- rendered landscape long-press/drag phrase selection for `bank account` without entering the single-token recognition path;
+- rendered system Files picker `.txt` import, including disabled unsupported extension, invalid UTF-8 rejection, oversize rejection, successful valid English import and exactly-one server action/request evidence.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. the remaining authenticated Simulator content matrix: `.txt` import, article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
+1. the remaining authenticated Simulator content matrix: article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
 2. physical-iPhone installation with real Apple signing;
 3. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
 4. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
@@ -289,7 +309,7 @@ A cloud simulator is useful for compile/runtime capability but cannot substitute
 
 The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The remaining Simulator work should continue on that single testing stack for `.txt` import/offline/reconnect evidence; formal Sense Review Good/Undo is accepted by run `33282205923`, and rendered Reader touch/source binding is accepted by run `33301226295`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
+The remaining Simulator work should continue on that single testing stack for offline/reconnect evidence; formal Sense Review Good/Undo is accepted by run `33282205923`, rendered Reader touch/source binding by run `33301226295`, and real-system-Files `.txt` import by run `33308079898`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -300,6 +320,6 @@ The remaining Simulator work should continue on that single testing stack for `.
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding: Accepted.**
+**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding + real Files `.txt` import: Accepted.**
 
-**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining authenticated Simulator content matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.
+**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining Simulator offline/reconnect matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.
