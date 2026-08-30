@@ -88,17 +88,10 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let fileButton = app.buttons["选择文本文件"].firstMatch
         fileButton.tap()
         try openLocalFilesLocation(app: app)
-        let rejectedExtension = pickerElement(label: invalidExtension, in: app)
-        if rejectedExtension.waitForExistence(timeout: 5)
-            && rejectedExtension.isHittable
-            && rejectedExtension.isEnabled {
-            rejectedExtension.tap()
-            XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
-            app.buttons["导入到服务器"].tap()
-            XCTAssertTrue(app.staticTexts["请选择 .txt 文件"].waitForExistence(timeout: 20))
-        } else {
-            try cancelDocumentPicker(app: app)
-        }
+        let rejectedExtension = pickerFileCell(named: invalidExtension, in: app)
+        XCTAssertTrue(rejectedExtension.waitForExistence(timeout: 10))
+        XCTAssertFalse(rejectedExtension.isEnabled)
+        try cancelDocumentPicker(app: app)
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
 
         try openTextImportSettings(app: app)
@@ -197,7 +190,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
         fileButton.tap()
         try openLocalFilesLocation(app: app)
 
-        let file = pickerElement(label: fileName, in: app)
+        let file = pickerFileCell(named: fileName, in: app)
         if !file.waitForExistence(timeout: 20) {
             attachPickerDiagnostics(app: app, named: "import-picker-file-missing")
             XCTFail("Files picker did not expose staged fixture: \(fileName)")
@@ -211,10 +204,11 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
     }
 
-    private func pickerElement(label: String, in app: XCUIApplication) -> XCUIElement {
-        app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label == %@", label))
-            .firstMatch
+    private func pickerFileCell(named fileName: String, in app: XCUIApplication) -> XCUIElement {
+        let url = URL(fileURLWithPath: fileName)
+        let stem = url.deletingPathExtension().lastPathComponent
+        let fileExtension = url.pathExtension
+        return app.cells.matching(identifier: "\(stem), \(fileExtension)").firstMatch
     }
 
     private func openLocalFilesLocation(app: XCUIApplication) throws {
