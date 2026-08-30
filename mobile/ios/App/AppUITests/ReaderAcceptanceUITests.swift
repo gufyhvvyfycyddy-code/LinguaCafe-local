@@ -339,7 +339,17 @@ final class ReaderAcceptanceUITests: XCTestCase {
             )
         }
         file.tap()
-        XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        let stem = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        let selectedName = app.textFields.matching(NSPredicate(
+            format: "label == %@ AND value == %@",
+            "导入资料名称",
+            stem
+        )).firstMatch
+        if !selectedName.waitForExistence(timeout: 30) {
+            attachPickerDiagnostics(app: app, named: "import-name-not-auto-filled")
+        }
+        XCTAssertTrue(selectedName.exists)
     }
 
     private func pickerFileCell(named fileName: String, in app: XCUIApplication) -> XCUIElement {
