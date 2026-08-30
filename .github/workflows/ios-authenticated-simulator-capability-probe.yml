@@ -167,8 +167,10 @@ jobs:
           LC_READER_CHAPTER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM chapters c WHERE c.book_id=$LC_READER_BOOK_ID AND c.name='$LC_READER_CHAPTER' AND c.language='english' LIMIT 1;")"
           test -n "$LC_READER_BOOK_ID"
           test -n "$LC_READER_CHAPTER_ID"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT processing_status FROM chapters WHERE id=$LC_READER_CHAPTER_ID;")" = "processed"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE id=$LC_READER_CHAPTER_ID AND processed_text LIKE '%quasar%';")" = "1"
+          LC_READER_STATUS="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT processing_status FROM chapters WHERE id=$LC_READER_CHAPTER_ID;")"
+          printf 'reader-fixture-status=%s\n' "$LC_READER_STATUS"
+          test "$LC_READER_STATUS" = "processed"
+          LC_READER_CHAPTER_ID="$LC_READER_CHAPTER_ID" php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); $chapter=App\Models\Chapter::findOrFail((int)getenv("LC_READER_CHAPTER_ID")); $decoded=json_encode($chapter->getProcessedText(), JSON_UNESCAPED_UNICODE); if (!str_contains(strtolower($decoded ?: ""), "quasar")) { fwrite(STDERR, "Reader fixture processed payload is missing the marker.\n"); exit(1); }'
           echo "LC_READER_MARKER=$LC_READER_MARKER" >> "$GITHUB_ENV"
           echo "LC_READER_BOOK=$LC_READER_BOOK" >> "$GITHUB_ENV"
           echo "LC_READER_CHAPTER=$LC_READER_CHAPTER" >> "$GITHUB_ENV"
