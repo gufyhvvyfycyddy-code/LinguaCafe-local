@@ -150,6 +150,8 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 60))
         let wordAudio = app.buttons["🔊 词发音"].firstMatch
         XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        scrollUntilHittable(wordAudio, in: app)
+        XCTAssertTrue(wordAudio.isHittable)
         wordAudio.tap()
         XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
     }
@@ -186,13 +188,19 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 30))
         let wordAudio = app.buttons["🔊 词发音"].firstMatch
         XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        scrollUntilHittable(wordAudio, in: app)
+        XCTAssertTrue(wordAudio.isHittable)
         wordAudio.tap()
         XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
         let reveal = app.buttons["显示答案"].firstMatch
         XCTAssertTrue(reveal.waitForExistence(timeout: 20))
+        scrollUntilHittable(reveal, in: app)
+        XCTAssertTrue(reveal.isHittable)
         reveal.tap()
         let good = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "良好")).firstMatch
         XCTAssertTrue(good.waitForExistence(timeout: 20))
+        scrollUntilHittable(good, in: app)
+        XCTAssertTrue(good.isHittable)
         good.tap()
 
         let settings = app.buttons["我的"].firstMatch
