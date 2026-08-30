@@ -1,21 +1,20 @@
 import XCTest
 
 final class ReaderAcceptanceUITests: XCTestCase {
-    private let app = XCUIApplication()
-
     override func setUpWithError() throws {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
     }
 
-    func testReaderSourceBindingAndPhraseGesture() throws {
+    func testLoginPersistsAuthenticatedSession() throws {
+        let app = XCUIApplication()
         let environment = ProcessInfo.processInfo.environment
         let serverURL = try requiredEnvironment("LC_SERVER_URL", environment)
         let email = try requiredEnvironment("LC_TEST_EMAIL", environment)
         let password = try requiredEnvironment("LC_TEST_PASSWORD", environment)
-        let marker = try requiredEnvironment("LC_READER_MARKER", environment)
 
         app.launch()
+        XCTAssertEqual(app.wait(for: .runningForeground, timeout: 30), .runningForeground)
         XCTAssertTrue(app.staticTexts["IOS · CONNECTED MVP"].waitForExistence(timeout: 60))
 
         let serverField = app.textFields.element(boundBy: 0)
@@ -36,27 +35,14 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let loginButton = app.buttons["安全登录"]
         XCTAssertTrue(loginButton.waitForExistence(timeout: 15))
         loginButton.tap()
-
         XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
-        let readerTab = app.buttons["阅读"]
-        XCTAssertTrue(readerTab.waitForExistence(timeout: 30))
-        readerTab.tap()
+    }
 
-        let book = app.buttons.matching(NSPredicate(
-            format: "label CONTAINS %@",
-            "H10 iOS Reader \(marker)"
-        )).firstMatch
-        XCTAssertTrue(book.waitForExistence(timeout: 60))
-        book.tap()
+    func testReaderPortraitSourceBinding() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        try launchAuthenticatedReader(app: app, marker: marker)
 
-        let chapter = app.buttons.matching(NSPredicate(
-            format: "label CONTAINS %@",
-            "Reader touch source binding"
-        )).firstMatch
-        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
-        chapter.tap()
-
-        XCTAssertTrue(app.staticTexts["Reader touch source binding"].waitForExistence(timeout: 30))
         let bank = app.buttons["bank"].firstMatch
         let account = app.buttons["account"].firstMatch
         XCTAssertTrue(bank.waitForExistence(timeout: 30))
@@ -83,6 +69,12 @@ final class ReaderAcceptanceUITests: XCTestCase {
         let closeButton = app.buttons["关闭"]
         XCTAssertTrue(closeButton.waitForExistence(timeout: 15))
         closeButton.tap()
+    }
+
+    func testReaderLandscapePhraseGesture() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        try launchAuthenticatedReader(app: app, marker: marker)
 
         XCUIDevice.shared.orientation = .landscapeRight
         let landscapeBank = app.buttons["bank"].firstMatch
@@ -99,10 +91,35 @@ final class ReaderAcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["bank account"].waitForExistence(timeout: 30))
         XCTAssertTrue(app.staticTexts["LOCAL DICTIONARY"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.staticTexts["创建学习词义"].waitForExistence(timeout: 15))
-        XCTAssertFalse(recognitionPrompt.exists)
+        XCTAssertFalse(app.staticTexts["先回想这个词在这里的意思，再选择你的真实情况。"].exists)
         let landscapeScreenshot = XCUIScreen.main.screenshot()
         XCTAssertGreaterThan(landscapeScreenshot.image.size.width, landscapeScreenshot.image.size.height)
         attachScreenshot(landscapeScreenshot, named: "reader-landscape")
+    }
+
+    private func launchAuthenticatedReader(app: XCUIApplication, marker: String) throws {
+        app.launch()
+        XCTAssertEqual(app.wait(for: .runningForeground, timeout: 30), .runningForeground)
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+
+        let readerTab = app.buttons["阅读"]
+        XCTAssertTrue(readerTab.waitForExistence(timeout: 30))
+        readerTab.tap()
+
+        let book = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "H10 iOS Reader \(marker)"
+        )).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 60))
+        book.tap()
+
+        let chapter = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Reader touch source binding"
+        )).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
+        chapter.tap()
+        XCTAssertTrue(app.staticTexts["Reader touch source binding"].waitForExistence(timeout: 30))
     }
 
     private func requiredEnvironment(

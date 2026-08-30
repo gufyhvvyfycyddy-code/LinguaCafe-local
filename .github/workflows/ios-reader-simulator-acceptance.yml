@@ -136,7 +136,7 @@ jobs:
           cd mobile/ios/App
           xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
 
-      - name: Compile locally signed iOS Simulator app
+      - name: Build iOS app and UI tests once for testing
         working-directory: mobile/ios/App
         run: |
           set -euo pipefail
@@ -147,13 +147,12 @@ jobs:
             -project App.xcodeproj \
             -scheme App \
             -configuration Debug \
-            -sdk iphonesimulator \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "platform=iOS Simulator,id=$LC_IOS_SIM_UDID" \
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
             CODE_SIGN_ENTITLEMENTS="$SIM_ENTITLEMENTS" \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=YES \
             ENTITLEMENTS_REQUIRED=YES \
-            build
+            build-for-testing
           APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
           SIM_XCENT="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Intermediates.noindex/App.build/Debug-iphonesimulator/App.build/App.app-Simulated.xcent"
           test -d "$APP_PATH"
@@ -197,38 +196,47 @@ jobs:
           printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
           grep -q 'IOS_READER_PAB_FIXTURE_READY' "$PAB_LOG"
 
-      - name: Prove Reader UI with native XCUITest
+      - name: Prove Reader UI in short native XCUITest sessions
         run: |
           set -euo pipefail
           xcrun simctl bootstatus "$LC_IOS_SIM_UDID" -b
-          RESULT_BUNDLE="$RUNNER_TEMP/ios-reader-xcuitest.xcresult"
-          rm -rf "$RESULT_BUNDLE"
-          set +e
-          TEST_RUNNER_LC_SERVER_URL="http://127.0.0.1:8878" \
-          TEST_RUNNER_LC_TEST_EMAIL="$LC_TEST_EMAIL" \
-          TEST_RUNNER_LC_TEST_PASSWORD="$LC_TEST_PASSWORD" \
-          TEST_RUNNER_LC_READER_MARKER="$LC_READER_MARKER" \
-          php tests/Support/run-command-with-timeout.php --seconds=600 -- \
-            xcodebuild \
-              -project mobile/ios/App/App.xcodeproj \
-              -scheme App \
-              -configuration Debug \
-              -destination "platform=iOS Simulator,id=$LC_IOS_SIM_UDID" \
-              -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
-              -resultBundlePath "$RESULT_BUNDLE" \
-              -only-testing:AppUITests/ReaderAcceptanceUITests/testReaderSourceBindingAndPhraseGesture \
-              test
-          STATUS=$?
-          set -e
-          if [ "$STATUS" -ne 0 ]; then
-            if [ -d "$RESULT_BUNDLE" ]; then
-              xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" || true
+
+          run_ui_test() {
+            local test_name="$1"
+            local timeout_seconds="$2"
+            local result_bundle="$RUNNER_TEMP/${test_name}.xcresult"
+            rm -rf "$result_bundle"
+            set +e
+            TEST_RUNNER_LC_SERVER_URL="http://127.0.0.1:8878" \
+            TEST_RUNNER_LC_TEST_EMAIL="$LC_TEST_EMAIL" \
+            TEST_RUNNER_LC_TEST_PASSWORD="$LC_TEST_PASSWORD" \
+            TEST_RUNNER_LC_READER_MARKER="$LC_READER_MARKER" \
+            php tests/Support/run-command-with-timeout.php --seconds="$timeout_seconds" -- \
+              xcodebuild \
+                -project mobile/ios/App/App.xcodeproj \
+                -scheme App \
+                -configuration Debug \
+                -destination "platform=iOS Simulator,id=$LC_IOS_SIM_UDID" \
+                -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
+                -resultBundlePath "$result_bundle" \
+                -only-testing:"AppUITests/ReaderAcceptanceUITests/$test_name" \
+                test-without-building
+            local status=$?
+            set -e
+            if [ "$status" -ne 0 ]; then
+              if [ -d "$result_bundle" ]; then
+                xcrun xcresulttool get test-results summary --path "$result_bundle" || true
+              fi
+              xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/${test_name}-failure.png" || true
+              grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
+              return "$status"
             fi
-            xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$RUNNER_TEMP/ios-reader-xcuitest-failure.png" || true
-            grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
-            exit "$STATUS"
-          fi
-          xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE"
+            xcrun xcresulttool get test-results summary --path "$result_bundle"
+          }
+
+          run_ui_test testLoginPersistsAuthenticatedSession 240
+          run_ui_test testReaderPortraitSourceBinding 300
+          run_ui_test testReaderLandscapePhraseGesture 240
 
       - name: Corroborate canonical Reader source binding in MySQL and PAB
         run: |
