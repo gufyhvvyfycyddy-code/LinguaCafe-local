@@ -341,6 +341,9 @@ assert.match(offlineSmokeCommand, /WordSenseService/);
 assert.match(offlineSmokeCommand, /enrollConfirmedSense/);
 assert.match(offlineSmokeCommand, /MediaAssetService/);
 assert.match(offlineSmokeCommand, /ROLE_WORD_PRONUNCIATION/);
+assert.match(offlineSmokeCommand, /\$lemma = 'offline';/);
+assert.match(readerUiTest, /let offlineLemma = "offline"/);
+assert.match(readerAcceptanceWorkflow, /OFFLINE_LEMMA="offline"/);
 assert.match(offlineSmokeCommand, /initial_fsrs_reps/);
 
 console.log('M9 iOS MVP source and release guard passed.');

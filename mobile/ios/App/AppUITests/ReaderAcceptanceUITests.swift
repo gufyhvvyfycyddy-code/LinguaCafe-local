@@ -114,7 +114,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
     func testOfflineWarmCaches() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
-        let offlineLemma = "offline_\(marker)"
+        let offlineLemma = "offline"
 
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
@@ -157,7 +157,7 @@ final class ReaderAcceptanceUITests: XCTestCase {
     func testOfflineCachedContentAndQueuesGood() throws {
         let app = XCUIApplication()
         let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
-        let offlineLemma = "offline_\(marker)"
+        let offlineLemma = "offline"
 
         app.launch()
         XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))

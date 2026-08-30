@@ -59,7 +59,7 @@ class PrepareMobileOfflineSmokeData extends Command
         }
 
         $marker = $this->normalizeMarker((string) ($this->option('marker') ?: 'h10_ios_offline'));
-        $lemma = "offline_{$marker}";
+        $lemma = 'offline';
 
         $result = DB::transaction(function () use (
             $user,

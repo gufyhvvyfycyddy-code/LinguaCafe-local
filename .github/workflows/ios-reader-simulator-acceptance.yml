@@ -290,7 +290,7 @@ jobs:
           run_ui_test testOfflineWarmCaches 300
 
           USER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM users WHERE email='$LC_TEST_EMAIL' LIMIT 1;")"
-          OFFLINE_LEMMA="offline_$LC_READER_MARKER"
+          OFFLINE_LEMMA="offline"
           OFFLINE_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.lemma='$OFFLINE_LEMMA' LIMIT 1;")"
           test -n "$OFFLINE_CARD_ID"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT fsrs_reps FROM review_cards WHERE id=$OFFLINE_CARD_ID;")" = "0"
@@ -376,7 +376,7 @@ jobs:
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE user_id=$USER_ID AND book_id=$IMPORT_BOOK_ID AND name='导入文本';")" = "1"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='library.text_import';")" = "1"
 
-          OFFLINE_LEMMA="offline_$LC_READER_MARKER"
+          OFFLINE_LEMMA="offline"
           OFFLINE_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.lemma='$OFFLINE_LEMMA' LIMIT 1;")"
           test -n "$OFFLINE_CARD_ID"
           test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT fsrs_reps FROM review_cards WHERE id=$OFFLINE_CARD_ID;")" = "1"
