@@ -1100,7 +1100,7 @@ export class LinguaCafeApp {
     }
     try {
       const readingContext = await this.ensureReadingSenseContext(this.lookupToken);
-      await this.api.createSense({
+      const result = await this.api.createSense({
         lemma: this.lookupToken.lemma || this.lookupToken.word,
         surface_form: this.lookupToken.word,
         pos: String(form.get('pos') || 'other'),
@@ -1110,6 +1110,22 @@ export class LinguaCafeApp {
         sentence_en: this.sentenceForToken(this.lookupToken),
         ...(readingContext ?? {}),
       });
+      if (readingContext) {
+        const target = this.readerPackage?.reading_session?.reading_targets.find(
+          item => item.occurrence_id === readingContext.occurrence_id,
+        );
+        if (target && !target.candidate_word_senses.some(
+          candidate => candidate.word_sense_id === result.word_sense.sense_id,
+        )) {
+          target.candidate_word_senses.push({
+            word_sense_id: result.word_sense.sense_id,
+            review_card_id: result.word_sense.review_card_id,
+            sense_zh: result.word_sense.sense_zh,
+            sense_en: result.word_sense.sense_en,
+            pos: result.word_sense.pos,
+          });
+        }
+      }
       this.setServerReachable(true);
       this.closeLookupSheet(panel);
       this.showToast('词义已创建，将进入正式复习队列');

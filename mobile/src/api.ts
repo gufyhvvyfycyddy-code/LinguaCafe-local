@@ -321,7 +321,14 @@ export class MobileApiClient {
     reading_session_id?: string;
     source_revision?: string;
     occurrence_id?: string;
-  }): Promise<{ word_sense: { sense_id: number; lemma: string; sense_zh: string } }> {
+  }): Promise<{ word_sense: {
+    sense_id: number;
+    lemma: string;
+    pos: string | null;
+    sense_zh: string;
+    sense_en: string | null;
+    review_card_id: number | null;
+  } }> {
     return this.request('/word-senses', {
       method: 'POST',
       body: JSON.stringify({ ...payload, keep_new: true }),

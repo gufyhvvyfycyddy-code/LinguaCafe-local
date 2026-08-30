@@ -252,6 +252,12 @@ jobs:
             '- extendedWaitUntil:' \
             '    visible: "词义已创建，将进入正式复习队列"' \
             '    timeout: 30000' \
+            '- tapOn: "bank"' \
+            '- extendedWaitUntil:' \
+            '    visible: "先回想这个词在这里的意思，再选择你的真实情况。"' \
+            '    timeout: 30000' \
+            '- assertNotVisible: "创建学习词义"' \
+            '- tapOn: "关闭"' \
             > "$FLOW"
           php tests/Support/run-command-with-timeout.php --seconds=300 -- \
             "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
