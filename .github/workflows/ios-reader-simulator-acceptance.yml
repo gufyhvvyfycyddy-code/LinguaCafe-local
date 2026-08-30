@@ -180,6 +180,7 @@ jobs:
           LC_TEST_EMAIL="ios-reader-$(uuidgen | tr '[:upper:]' '[:lower:]')@example.test"
           LC_TEST_PASSWORD="Aa1$(openssl rand -hex 12)"
           LC_READER_MARKER="h10_ios_reader_$(openssl rand -hex 6)"
+          export LC_TEST_EMAIL LC_TEST_PASSWORD LC_READER_MARKER
           echo "::add-mask::$LC_TEST_PASSWORD"
           printf '%s\n' \
             "LC_TEST_EMAIL=$LC_TEST_EMAIL" \
