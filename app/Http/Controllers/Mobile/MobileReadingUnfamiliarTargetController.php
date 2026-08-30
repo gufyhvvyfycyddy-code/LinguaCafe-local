@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Mobile;
 
 use App\Http\Controllers\Controller;
 use App\Http\Responses\MobileApiResponse;
+use App\Services\ReadingChapterTextService;
 use App\Services\ReadingUnfamiliarTargetService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
@@ -50,7 +51,7 @@ class MobileReadingUnfamiliarTargetController extends Controller
             );
         } catch (\InvalidArgumentException $exception) {
             $code = $exception->getMessage();
-            $missingChapter = $code === 'Chapter does not exist in the current user and language scope.';
+            $missingChapter = $code === ReadingChapterTextService::ERROR_CHAPTER_NOT_FOUND;
             $staleSource = $code === ReadingUnfamiliarTargetService::ERROR_STALE_SOURCE;
 
             return MobileApiResponse::error(
