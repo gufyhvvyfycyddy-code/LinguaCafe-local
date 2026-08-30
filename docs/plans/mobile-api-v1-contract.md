@@ -125,9 +125,9 @@ a native client already has local persistence or background synchronization.
 
 Errors: `401 UNAUTHENTICATED`, `401 DEVICE_REVOKED`.
 
-## M7 connected Android seams
+## M7 connected Mobile seams
 
-All M7 endpoints remain connected-only and require the active device token.
+All M7 endpoints remain connected-only and require the active device token. Android and iOS reuse the same server owners; native clients do not maintain a second Reader target or WordSense provenance model.
 
 ### `GET /dictionary/lookup`
 
@@ -146,16 +146,19 @@ unique definitions from enabled local dictionaries:
 This endpoint never calls an external dictionary/AI provider and never writes
 WordSense, ReviewCard, ReviewLog or FSRS data.
 
+### `POST /chapters/{chapter}/reading-unfamiliar-targets`
+
+Creates or reuses the current-revision Reader task marker through the existing `ReadingUnfamiliarTargetService`. Required fields are `kind` (`word|phrase`), `start_word_index`, `end_word_index` and the article package `source_revision`; the indexes are the article package `canonical_token_index` / server `word_index` identities. The server locks the current chapter and rejects a stale source revision with `409 READING_TARGET_STALE_SOURCE` before writing. It derives the occurrence id, surface, lemma, sentence and ownership. Success is `201` with the canonical target. A same-current-revision retry is idempotent through the existing unique task-marker identity.
+
+This endpoint does not create WordSense, ReviewCard or ReviewLog rows and does not rate or reschedule a card.
+
 ### `POST /word-senses`
 
-Creates one deliberate manual WordSense through the existing
-`WordSenseService::createManualSense` owner. Required fields are `lemma`, `pos`
-and `sense_zh`; optional surface, English meaning and chapter/sentence context
-use the same meanings as the existing Web manual-sense flow. Success is `201`
-with `word_sense` in the common data envelope.
+Creates one deliberate manual WordSense through the existing `WordSenseService::createManualSense` owner. Required fields are `lemma`, `pos` and `sense_zh`; optional surface, English meaning and chapter/sentence context use the same meanings as the existing Web manual-sense flow. Success is `201` with `word_sense` in the common data envelope.
 
-The server derives user and language from the authenticated token. The client
-cannot submit ownership, status, ReviewCard or FSRS fields.
+When the deliberate creation comes from a current Reader word task-marker, the client additionally sends the complete tuple `reading_session_id + source_revision + occurrence_id` together with `chapter_id`. The server revalidates that tuple through the same canonical `ReadingManualSenseCreationService` used by Web Reader manual creation. Client sentence text is not authoritative: the current chapter target supplies the stored sentence/source identity, a real `SOURCE_READING_OCCURRENCE` is reused, and the new Sense learning origin is `reading`. Stale session/source/occurrence identity fails closed and cannot fall back to a generic manual occurrence.
+
+The server derives user and language from the authenticated token. The client cannot submit ownership, status, ReviewCard or FSRS fields. Reader task-marker creation/source binding writes no ReviewLog and does not perform a formal FSRS rating.
 
 ### `GET /summary`
 

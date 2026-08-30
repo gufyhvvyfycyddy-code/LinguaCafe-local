@@ -48,6 +48,7 @@ export interface ReaderToken {
   word: string;
   lemma: string | null;
   pos: string | null;
+  selection_kind?: 'phrase';
   source_sentence_identity: number | string | null;
   is_structure: boolean;
   space_after: boolean;

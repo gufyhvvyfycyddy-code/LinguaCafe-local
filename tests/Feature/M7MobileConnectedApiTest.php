@@ -216,6 +216,9 @@ class M7MobileConnectedApiTest extends TestCase
         $this->postJson('/api/v1/mobile/word-senses', [])
             ->assertUnauthorized()
             ->assertJsonPath('error.code', 'UNAUTHENTICATED');
+        $this->postJson('/api/v1/mobile/chapters/1/reading-unfamiliar-targets', [])
+            ->assertUnauthorized()
+            ->assertJsonPath('error.code', 'UNAUTHENTICATED');
         $this->getJson('/api/v1/mobile/word-senses')
             ->assertUnauthorized()
             ->assertJsonPath('error.code', 'UNAUTHENTICATED');

@@ -9,6 +9,8 @@ use Illuminate\Validation\ValidationException;
 
 class ReadingUnfamiliarTargetService
 {
+    public const ERROR_STALE_SOURCE = 'READING_TARGET_STALE_SOURCE';
+
     public function __construct(
         private ReadingChapterTextService $chapterTextService,
     ) {
@@ -44,17 +46,23 @@ class ReadingUnfamiliarTargetService
         int $chapterId,
         string $kind,
         int $startWordIndex,
-        int $endWordIndex
-    ): void {
-        DB::transaction(function () use (
+        int $endWordIndex,
+        ?string $expectedSourceRevision = null,
+    ): array {
+        return DB::transaction(function () use (
             $userId,
             $language,
             $chapterId,
             $kind,
             $startWordIndex,
-            $endWordIndex
+            $endWordIndex,
+            $expectedSourceRevision,
         ) {
             $chapter = $this->chapterTextService->lockChapterForUser($userId, $language, $chapterId);
+            $currentSourceRevision = $this->chapterTextService->sourceRevision($chapter);
+            if ($expectedSourceRevision !== null && !hash_equals($currentSourceRevision, $expectedSourceRevision)) {
+                throw new \InvalidArgumentException(self::ERROR_STALE_SOURCE);
+            }
             $canonical = $this->chapterTextService->canonicalSpan(
                 $chapter,
                 $userId,
@@ -64,7 +72,7 @@ class ReadingUnfamiliarTargetService
                 $endWordIndex
             );
 
-            ReadingUnfamiliarTarget::query()->updateOrCreate(
+            $target = ReadingUnfamiliarTarget::query()->updateOrCreate(
                 [
                     'user_id' => $canonical['user_id'],
                     'language_id' => $canonical['language_id'],
@@ -83,6 +91,10 @@ class ReadingUnfamiliarTargetService
                     'source_sentence' => $canonical['source_sentence'],
                 ]
             );
+
+            return $this->serializeTarget($target) + [
+                'source_revision' => $canonical['source_revision'],
+            ];
         });
     }
 

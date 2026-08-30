@@ -23,6 +23,7 @@ describe('reader touch selection', () => {
     expect(readerPhrase(tokens, 0, 1)?.word).toBe('New York');
     expect(readerPhrase(tokens, 1, 0)?.lemma).toBe('new york');
     expect(readerPhrase(tokens, 0, 1)?.pos).toBe('phrase');
+    expect(readerPhrase(tokens, 0, 1)?.selection_kind).toBe('phrase');
   });
 
   it('keeps a single token and rejects cross-sentence phrases', () => {

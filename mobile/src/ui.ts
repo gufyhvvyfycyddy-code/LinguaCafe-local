@@ -945,7 +945,7 @@ export class LinguaCafeApp {
   }
 
   private readingTargetForToken(token: ReaderToken) {
-    if (token.canonical_token_index === null) return undefined;
+    if (token.canonical_token_index === null || token.selection_kind === 'phrase') return undefined;
     return this.readerPackage?.reading_session?.reading_targets.find(target => (
       token.canonical_token_index! >= target.start_word_index
       && token.canonical_token_index! <= target.end_word_index
@@ -1045,6 +1045,52 @@ export class LinguaCafeApp {
     }
   }
 
+  private async ensureReadingSenseContext(token: ReaderToken): Promise<{
+    reading_session_id: string;
+    source_revision: string;
+    occurrence_id: string;
+  } | null> {
+    const chapterId = this.selectedChapter?.chapter_id;
+    const session = this.readerPackage?.reading_session;
+    if (
+      !this.api
+      || !this.readerPackage
+      || !chapterId
+      || !session
+      || token.canonical_token_index === null
+      || token.selection_kind === 'phrase'
+    ) return null;
+
+    let target = this.readingTargetForToken(token);
+    if (!target) {
+      await this.api.markReadingUnfamiliarTarget(chapterId, {
+        kind: 'word',
+        start_word_index: token.canonical_token_index,
+        end_word_index: token.canonical_token_index,
+        source_revision: this.readerPackage.source_revision,
+      });
+      this.readerPackage.reading_session = await this.api.startReadingSession(
+        chapterId,
+        session.reading_session_id,
+      );
+      target = this.readingTargetForToken(token);
+    }
+    if (!target || target.kind !== 'word') {
+      throw new Error('服务器没有返回当前单词的阅读标记，请刷新文章后重试。');
+    }
+
+    const refreshedSession = this.readerPackage.reading_session;
+    if (!refreshedSession) {
+      throw new Error('阅读会话已经失效，请重新打开文章。');
+    }
+
+    return {
+      reading_session_id: refreshedSession.reading_session_id,
+      source_revision: refreshedSession.source_revision,
+      occurrence_id: target.occurrence_id,
+    };
+  }
+
   private async createSense(form: FormData, panel: HTMLElement): Promise<void> {
     if (!this.api || !this.lookupToken) return;
     const button = panel.querySelector<HTMLButtonElement>('button[type=submit]');
@@ -1053,6 +1099,7 @@ export class LinguaCafeApp {
       button.textContent = '正在创建…';
     }
     try {
+      const readingContext = await this.ensureReadingSenseContext(this.lookupToken);
       await this.api.createSense({
         lemma: this.lookupToken.lemma || this.lookupToken.word,
         surface_form: this.lookupToken.word,
@@ -1061,6 +1108,7 @@ export class LinguaCafeApp {
         chapter_id: this.selectedChapter?.chapter_id,
         sentence_id: this.lookupToken.source_sentence_identity,
         sentence_en: this.sentenceForToken(this.lookupToken),
+        ...(readingContext ?? {}),
       });
       this.setServerReachable(true);
       this.closeLookupSheet(panel);
