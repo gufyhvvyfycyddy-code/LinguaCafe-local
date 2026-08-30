@@ -208,6 +208,23 @@ The successful rerun also resolved two test-tool false negatives without product
 
 This evidence accepts Simulator Keychain **save → load after relaunch → clear on rendered logout** without exposing the bearer token value. Physical-iPhone Keychain behavior remains a separate device gate.
 
+## Formal Sense Review rating / Undo continuation
+
+GitHub Actions run `33282205923` completed **SUCCESS** on head `1dd45ebad3e826375062962f5ccd56cc926d1a8f` using the same testing MySQL/native-FSRS/PAB backend and iPhone 17 Pro Simulator.
+
+The run prepared two deterministic Sense Review cards through the existing testing smoke-data owner under `TestingDatabaseLease`, captured card A's authoritative FSRS fingerprint, then used rendered iOS UI/user events to execute:
+
+1. open `复习` and wait for card A;
+2. tap `显示答案` and observe the persisted smoke meaning;
+3. scroll to and tap the real `良好` control;
+4. observe card B as the next card;
+5. scroll to and tap `撤回上一次评分`;
+6. observe card A restored with `显示答案` again.
+
+The testing database then proved exactly one `sense_review` ReviewLog for card A, rating `good`, with `undone_at` populated; card B had zero ReviewLogs; the card-A operation ledger contained exactly one `sense_review.rating` operation in `undone` status at version 2 with exactly two operation changes; and the post-Undo FSRS fingerprint exactly matched the pre-rating fingerprint. The same run then repeated rendered device revoke/logout and clean testing teardown.
+
+This accepts the Simulator formal **Good → next card → Undo → exact FSRS restoration** path without introducing a second rating or scheduler owner. Physical-device haptics remain a separate device gate.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -226,13 +243,15 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - rendered authenticated login through the real Mobile API;
 - Simulator Keychain token save and relaunch load, corroborated by `/bootstrap` and server token/device ownership;
 - absence of the Web session-token key from ordinary iOS Preferences;
-- rendered device revoke/logout, server token deletion, Keychain clear, and relaunch-to-login boundary.
+- rendered device revoke/logout, server token deletion, Keychain clear, and relaunch-to-login boundary;
+- rendered Sense Review answer reveal, formal Good rating, next-card transition and canonical Undo;
+- ReviewLog / operation-ledger exactly-once facts plus exact post-Undo FSRS fingerprint restoration.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. the remaining authenticated Simulator content matrix: Reader touch/safe-area, formal Review/undo, `.txt` import, article/review/audio package offline restart, queued rating and exactly-once reconnect sync;
+1. the remaining authenticated Simulator content matrix: Reader touch/safe-area, `.txt` import, article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
 2. physical-iPhone installation with real Apple signing;
 3. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
 4. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
@@ -249,7 +268,7 @@ A cloud simulator is useful for compile/runtime capability but cannot substitute
 
 The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The remaining Simulator work should continue on that single testing stack for Reader/Review/import/offline/sync evidence. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
+The remaining Simulator work should continue on that single testing stack for Reader/import/offline/sync evidence; formal Sense Review Good/Undo is already accepted by run `33282205923`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -260,6 +279,6 @@ The remaining Simulator work should continue on that single testing stack for Re
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle: Accepted.**
+**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo: Accepted.**
 
 **Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining authenticated Simulator content matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.

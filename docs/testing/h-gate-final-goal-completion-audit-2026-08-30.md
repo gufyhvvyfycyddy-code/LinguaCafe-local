@@ -124,7 +124,7 @@ After the H-GATE row update, the mechanical milestone inventory is **71 DONE / 3
 
 The original H-GATE probe correctly found that the local host remains Windows/x86_64, with no local `xcodebuild`, `xcrun`, `codesign` or `simctl`, and no online macOS Tailscale peer. That local-host fact remains true.
 
-After that audit, the actual `origin` repository was freshly confirmed public and a bounded standard GitHub-hosted `macos-26` lane was added. The first three real runs `33264818165`, `33264963006` and `33265308947` established Xcode/SwiftPM/unsigned build and Simulator boot/install/launch. Later runs `33268124499` and `33268819125` both succeeded with a rendered iOS login-shell smoke; the latter also overlapped Simulator cold boot with build work without changing the result. Run `33279140695` then completed the authenticated lifecycle against a same-runner testing MySQL/native-FSRS/PAB backend.
+After that audit, the actual `origin` repository was freshly confirmed public and a bounded standard GitHub-hosted `macos-26` lane was added. The first three real runs `33264818165`, `33264963006` and `33265308947` established Xcode/SwiftPM/unsigned build and Simulator boot/install/launch. Later runs `33268124499` and `33268819125` both succeeded with a rendered iOS login-shell smoke; the latter also overlapped Simulator cold boot with build work without changing the result. Run `33279140695` then completed the authenticated lifecycle against a same-runner testing MySQL/native-FSRS/PAB backend, and run `33282205923` completed rendered Sense Review Good/Undo with exact ReviewLog/operation/FSRS restoration evidence.
 
 The continuation now proves:
 
@@ -144,18 +144,20 @@ The continuation now proves:
 - the server owns exactly one active iOS device/token relationship after login;
 - the ordinary Preferences plist contains no `linguacafe-session-token` Web token key;
 - rendered `撤销此设备并退出` revokes the device, deletes the personal access token, clears the Simulator Keychain credential and returns to login after relaunch;
+- rendered Sense Review performs answer reveal → Good → next card → Undo and restores the original card;
+- testing DB proves exactly one undone `sense_review` Good ReviewLog, one version-2 undone rating operation with two operation changes, zero rating on the next card, and exact pre/post-Undo FSRS fingerprint equality;
 - PAB, TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean.
 
 The following completion-required evidence still does not exist and must not be inferred from that rendered login-shell smoke:
 
-- the remaining authenticated Simulator content matrix: Reader touch/safe-area, Review/undo, text import, article/review/audio offline restart and exactly-once reconnect sync;
+- the remaining authenticated Simulator content matrix: Reader touch/safe-area, text import, article/review/audio offline restart, queued offline rating and exactly-once reconnect sync;
 - signed physical-iPhone installation plus physical-device Keychain confirmation and physical haptics/notification/audio/safe-area behavior;
 - Apple team/provisioning and signed archive validation;
 - App Store Connect processing, TestFlight install and App Review evidence.
 
 Full continuation evidence: `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
 
-The authenticated login/Keychain/logout lane is now real and server-bound, but it does not retroactively complete H-11's remaining iOS content-flow scope. H-11's iOS Reader/Review/import/offline/sync paths still require rendered UI/user-event evidence on the accepted testing backend before H-GATE can pass.
+The authenticated login/Keychain/logout and formal Sense Review Good/Undo lanes are now real and server-bound, but they do not retroactively complete H-11's remaining iOS content-flow scope. H-11's iOS Reader/import/offline/sync paths still require rendered UI/user-event evidence on the accepted testing backend before H-GATE can pass.
 
 ## Definition of Done audit
 
@@ -168,7 +170,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/Simulator compile+launch, rendered authenticated login, Simulator Keychain save/load/revoke lifecycle PASS; remaining Simulator Reader/Review/import/offline/sync, physical device, real Apple signing and TestFlight remain FAIL / unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/Simulator compile+launch, rendered authenticated login, Simulator Keychain save/load/revoke lifecycle and formal Sense Review Good/Undo PASS; remaining Simulator Reader/import/offline/sync, physical device, real Apple signing and TestFlight remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;
@@ -202,7 +204,7 @@ H-GATE remains open only on the portion of the Apple capability cluster that the
 
 The minimum remaining work is:
 
-1. complete the remaining server-bound Simulator content matrix: Reader, Review/undo, `.txt` import, offline packages/audio and reconnect sync;
+1. complete the remaining server-bound Simulator content matrix: Reader, `.txt` import, offline packages/audio and reconnect sync;
 2. repeat the critical matrix on a signed physical iPhone, including physical Keychain confirmation and haptics/notification/audio/safe-area behavior;
 3. perform Apple team/provisioning and signed archive validation;
 4. obtain TestFlight/App Store Connect evidence if the final Goal still requires store readiness;
