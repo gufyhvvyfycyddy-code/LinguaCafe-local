@@ -118,7 +118,7 @@ jobs:
           set -euo pipefail
           php tests/Support/run-with-testing-db-lease.php \
             --label=macos-ios-auth-migrate --wait-ms=0 -- \
-            php artisan migrate --env=testing --force
+            php artisan migrate --env=testing
           php vendor/bin/phpunit tests/Feature/TestingDatabaseHealthTest.php
           export LC_TEST_EMAIL="ios-ci-$(uuidgen | tr '[:upper:]' '[:lower:]')@example.test"
           export LC_TEST_PASSWORD="Aa1$(openssl rand -hex 12)"
@@ -152,6 +152,28 @@ jobs:
           echo "LC_REVIEW_A_CARD_ID=$LC_REVIEW_A_CARD_ID" >> "$GITHUB_ENV"
           echo "LC_REVIEW_B_CARD_ID=$LC_REVIEW_B_CARD_ID" >> "$GITHUB_ENV"
           echo "LC_REVIEW_A_BEFORE_FINGERPRINT=$LC_REVIEW_A_BEFORE_FINGERPRINT" >> "$GITHUB_ENV"
+
+      - name: Prepare deterministic Reader fixture through canonical import owner
+        run: |
+          set -euo pipefail
+          export LC_READER_MARKER="ios_ci_reader_$(openssl rand -hex 6)"
+          export LC_READER_BOOK="iOS Reader $LC_READER_MARKER"
+          export LC_READER_CHAPTER="Touch Chapter $LC_READER_MARKER"
+          export LC_READER_TEXT="A quasar shines beside the quiet harbor. The lantern rests near the river bank."
+          php tests/Support/run-with-testing-db-lease.php \
+            --label=macos-ios-reader-fixture --wait-ms=0 -- \
+            php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); $user=App\Models\User::where("email", getenv("LC_TEST_EMAIL"))->firstOrFail(); Illuminate\Support\Facades\Auth::login($user); app(App\Services\ImportService::class)->importText($user->id, $user->uuid, 3000, "detailed", getenv("LC_READER_TEXT"), -1, getenv("LC_READER_BOOK"), getenv("LC_READER_CHAPTER"));'
+          LC_READER_BOOK_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT b.id FROM books b JOIN users u ON u.id=b.user_id WHERE u.email='$LC_TEST_EMAIL' AND b.name='$LC_READER_BOOK' AND b.language='english' LIMIT 1;")"
+          LC_READER_CHAPTER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM chapters c WHERE c.book_id=$LC_READER_BOOK_ID AND c.name='$LC_READER_CHAPTER' AND c.language='english' LIMIT 1;")"
+          test -n "$LC_READER_BOOK_ID"
+          test -n "$LC_READER_CHAPTER_ID"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT processing_status FROM chapters WHERE id=$LC_READER_CHAPTER_ID;")" = "processed"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE id=$LC_READER_CHAPTER_ID AND processed_text LIKE '%quasar%';")" = "1"
+          echo "LC_READER_MARKER=$LC_READER_MARKER" >> "$GITHUB_ENV"
+          echo "LC_READER_BOOK=$LC_READER_BOOK" >> "$GITHUB_ENV"
+          echo "LC_READER_CHAPTER=$LC_READER_CHAPTER" >> "$GITHUB_ENV"
+          echo "LC_READER_BOOK_ID=$LC_READER_BOOK_ID" >> "$GITHUB_ENV"
+          echo "LC_READER_CHAPTER_ID=$LC_READER_CHAPTER_ID" >> "$GITHUB_ENV"
 
       - name: Install mobile dependencies and verify mobile contracts
         working-directory: mobile
@@ -360,6 +382,80 @@ jobs:
           export LC_REVIEW_A_CARD_ID
           LC_REVIEW_A_AFTER_FINGERPRINT="$(php -r 'require "vendor/autoload.php"; $app=require "bootstrap/app.php"; $kernel=$app->make(Illuminate\Contracts\Console\Kernel::class); $kernel->bootstrap(); $card=App\Models\ReviewCard::findOrFail((int)getenv("LC_REVIEW_A_CARD_ID")); $snap=app(App\Services\ReviewCardFsrsSnapshotService::class); echo $snap->fingerprint($snap->capture($card));')"
           test "$LC_REVIEW_A_AFTER_FINGERPRINT" = "$LC_REVIEW_A_BEFORE_FINGERPRINT"
+
+      - name: Open Reader, rotate, touch lookup, and create one Sense through rendered iOS UI
+        run: |
+          set -euo pipefail
+          FLOW="$RUNNER_TEMP/ios-reader-touch.yaml"
+          printf '%s\n' \
+            'appId: com.linguacafe.mobile' \
+            '---' \
+            '- launchApp' \
+            '- extendedWaitUntil:' \
+            '    visible: "首页"' \
+            '    timeout: 60000' \
+            '- tapOn: "阅读"' \
+            '- extendedWaitUntil:' \
+            '    visible: "${READER_BOOK}"' \
+            '    timeout: 60000' \
+            '- tapOn: "${READER_BOOK}"' \
+            '- extendedWaitUntil:' \
+            '    visible: "${READER_CHAPTER}"' \
+            '    timeout: 60000' \
+            '- tapOn: "${READER_CHAPTER}"' \
+            '- extendedWaitUntil:' \
+            '    visible: "quasar"' \
+            '    timeout: 60000' \
+            '- setOrientation: LANDSCAPE_LEFT' \
+            '- assertVisible: "${READER_CHAPTER}"' \
+            '- assertVisible: "quasar"' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "完成阅读"' \
+            '    direction: DOWN' \
+            '- assertVisible: "完成阅读"' \
+            '- setOrientation: PORTRAIT' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "quasar"' \
+            '    direction: UP' \
+            '- assertVisible: "${READER_CHAPTER}"' \
+            '- assertVisible: "quasar"' \
+            '- tapOn: "quasar"' \
+            '- extendedWaitUntil:' \
+            '    visible: "LOCAL DICTIONARY"' \
+            '    timeout: 30000' \
+            '- assertVisible: "quasar"' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "输入你确认的中文词义"' \
+            '    direction: DOWN' \
+            '- tapOn: "输入你确认的中文词义"' \
+            '- inputText: "类星体"' \
+            '- scrollUntilVisible:' \
+            '    element:' \
+            '      text: "确认并创建"' \
+            '    direction: DOWN' \
+            '- tapOn: "确认并创建"' \
+            '- extendedWaitUntil:' \
+            '    visible: "quasar"' \
+            '    timeout: 30000' \
+            > "$FLOW"
+          set +e
+          "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test \
+            -e READER_BOOK="$LC_READER_BOOK" -e READER_CHAPTER="$LC_READER_CHAPTER" "$FLOW"
+          STATUS=$?
+          set -e
+          if [ "$STATUS" -ne 0 ]; then
+            "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" hierarchy || true
+            grep -E '(/api/v1/mobile|/__testing/acceptance-sentinel)' "$PAB_LOG" | tail -n 100 || true
+            exit "$STATUS"
+          fi
+          LC_READER_SENSE_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT ws.id FROM word_senses ws JOIN users u ON u.id=ws.user_id WHERE u.email='$LC_TEST_EMAIL' AND ws.language='english' AND ws.lemma='quasar' AND ws.sense_zh='类星体' ORDER BY ws.id DESC LIMIT 1;")"
+          test -n "$LC_READER_SENSE_ID"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_cards rc WHERE rc.user_id=(SELECT id FROM users WHERE email='$LC_TEST_EMAIL') AND rc.target_type='sense' AND rc.target_id=$LC_READER_SENSE_ID;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs rl JOIN review_cards rc ON rc.id=rl.review_card_id WHERE rc.target_type='sense' AND rc.target_id=$LC_READER_SENSE_ID;")" = "0"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_sessions WHERE user_id=(SELECT id FROM users WHERE email='$LC_TEST_EMAIL') AND chapter_id=$LC_READER_CHAPTER_ID;")" = "1"
 
       - name: Revoke device through rendered UI and prove token clearing
         run: |
