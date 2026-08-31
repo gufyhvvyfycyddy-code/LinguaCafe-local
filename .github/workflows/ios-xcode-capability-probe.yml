@@ -100,8 +100,16 @@ jobs:
           }
           if actual != expected:
               raise SystemExit(f'Unexpected bundled privacy data types: {sorted(actual)}')
+          expected_accessed_apis = [{
+              'NSPrivacyAccessedAPIType': 'NSPrivacyAccessedAPICategoryUserDefaults',
+              'NSPrivacyAccessedAPITypeReasons': ['CA92.1'],
+          }]
+          if privacy.get('NSPrivacyAccessedAPITypes') != expected_accessed_apis:
+              raise SystemExit(f"Unexpected bundled required-reason APIs: {privacy.get('NSPrivacyAccessedAPITypes')}")
           if privacy.get('NSPrivacyTracking') is not False:
               raise SystemExit('Bundled privacy manifest must keep tracking disabled')
+          if privacy.get('NSPrivacyTrackingDomains') != []:
+              raise SystemExit('Bundled privacy manifest must keep tracking domains empty')
           PY
 
       - name: Install pinned Maestro CLI for rendered smoke
