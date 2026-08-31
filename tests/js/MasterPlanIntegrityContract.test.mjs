@@ -144,7 +144,7 @@ assert.match(productHistory, /ADR-0061/);
 assert.match(productHistory, /Historical \/ Superseded for forward product behavior on 2026-08-18/);
 
 // The minimal context and documentation router must lead new tasks to current authority first.
-assert.match(currentContext, /2026-08-31 current overlay/);
+assert.match(currentContext, /2026-09-01 current overlay/);
 assert.match(currentContext, /Goal plan 已完成 Phase G\/G-GATE/);
 assert.match(currentContext, /H-00[\s\S]*H-09/);
 assert.match(currentContext, /H-10 iOS capability cluster[^\n]*DEFERRED \/ Not Complete/);
