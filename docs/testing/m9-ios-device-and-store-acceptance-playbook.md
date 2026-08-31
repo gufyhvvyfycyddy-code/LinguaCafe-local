@@ -197,9 +197,11 @@ and the required 13-inch iPad screenshots. Repository-side rendered iPad smoke i
 proven by GitHub Actions run `33355499203` on `iPad Pro 13-inch (M5)`, including a
 `2064x2752` screenshot. The release-capability workflow also requires an `iPhone 17 Pro Max`
 rendered screenshot to match one of Apple's accepted 6.9-inch portrait sizes
-(`1260x2736`, `1290x2796`, or `1320x2868`). Final App Store screenshots still need
-deployment-owner review and upload; these Simulator screenshots are only release-preparation
-size/rendering gates. If iPad support is intentionally removed, that must be an explicit
+(`1260x2736`, `1290x2796`, or `1320x2868`). When the UI is unchanged across smaller
+sizes, prepare only the highest-resolution 6.9-inch-iPhone and 13-inch-iPad sets for
+that localization and let App Store Connect scale them down. Final App Store screenshots
+still need deployment-owner review and upload; these Simulator screenshots are only
+release-preparation size/rendering gates. If iPad support is intentionally removed, that must be an explicit
 product change before archive rather than a store-metadata workaround.
 
 Repository-side privacy preparation is now an executable candidate rather than source-only prose: run `33359184066` passed the compiled export-compliance declaration; runs `33361617463` and final `33362427450` passed the built-app Privacy Manifest checks, with `33362427450` covering the exact six collected-data categories, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and the serial iPhone+iPad smoke. Use the candidate in `docs/release/m9-ios-app-store-materials.md`, but re-confirm it against the actual production server, partners and retention behavior at submission time.

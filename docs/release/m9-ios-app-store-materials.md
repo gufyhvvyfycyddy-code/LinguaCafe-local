@@ -33,6 +33,9 @@ requirements:
   of Apple's accepted 6.9-inch portrait sizes (`1260x2736`, `1290x2796`, or
   `1320x2868`). These checks prove repository-side device-size compatibility,
   not final App Store screenshot selection, marketing approval, or physical-device readiness.
+  When the UI is unchanged across smaller device sizes, use the highest-resolution
+  6.9-inch iPhone and 13-inch iPad sets for each submitted localization and let
+  App Store Connect scale them down rather than producing redundant smaller-size sets.
 
 Description:
 
