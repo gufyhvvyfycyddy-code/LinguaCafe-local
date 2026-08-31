@@ -75,6 +75,19 @@ The `PrivacyInfo.xcprivacy` required-reason entry is
 `NSPrivacyAccessedAPICategoryUserDefaults / CA92.1`, matching the official
 Capacitor Preferences guidance. It declares no tracking domains.
 
+## Export-compliance repository classification
+
+The current iOS bundle sets `ITSAppUsesNonExemptEncryption = NO`. The repository-side
+review found no proprietary or third-party encryption implementation in the iOS app:
+LinguaCafe uses Apple Keychain through `Security.framework`, system HTTPS/WebView
+networking, Web Crypto SHA-256 for integrity checks, and Capacitor's Apple
+`CommonCrypto` SHA-256 helper for its app UUID. Under Apple's current guidance these
+are Apple operating-system encryption/security facilities or otherwise exempt
+cryptographic uses, so no App Store Connect encryption-document upload is expected for this dependency
+set. Re-run this determination before release if any native/network/security dependency
+changes; the deployment owner remains responsible for the final export-compliance
+answers and any jurisdiction-specific reporting requirement.
+
 ## Required external values and evidence before submission
 
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;

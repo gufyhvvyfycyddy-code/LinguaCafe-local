@@ -77,6 +77,9 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
+          APP_PLIST="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app/Info.plist"
+          test -f "$APP_PLIST"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP_PLIST")" = "false"
 
       - name: Install pinned Maestro CLI for rendered smoke
         run: |

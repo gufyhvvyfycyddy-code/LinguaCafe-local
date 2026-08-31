@@ -77,6 +77,8 @@ assert.match(infoPlist, /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAl
 assert.match(infoPlist, /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*本地学习服务器[^<]*<\/string>/);
 assert.match(infoPlist, /<key>UIRequiredDeviceCapabilities<\/key>\s*<array>\s*<string>arm64<\/string>\s*<\/array>/);
 assert.doesNotMatch(infoPlist, /<string>armv7<\/string>/);
+assert.match(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/);
+assert.doesNotMatch(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<true\/>/);
 assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 assert.match(project, /TARGETED_DEVICE_FAMILY = "1,2";/);
 
@@ -163,6 +165,8 @@ assert.ok(Buffer.byteLength(keywords, 'utf8') > 0 && Buffer.byteLength(keywords,
 assert.match(storeMaterials, /required 13-inch iPad screenshots/);
 assert.match(storeMaterials, /final in-app link to that exact policy/);
 assert.match(storeMaterials, /support HTTPS URL with real deployment-owner contact information/);
+assert.match(storeMaterials, /ITSAppUsesNonExemptEncryption/);
+assert.match(storeMaterials, /Apple operating-system encryption/);
 assert.match(mobilePrivacy, /正式应用商店商品页/);
 assert.doesNotMatch(mobilePrivacy, /Google Play 商品页/);
 assert.match(privacyNotice, /does not track users across apps or websites/);
@@ -198,6 +202,8 @@ for (const safeguard of ['正式移动端仅允许 HTTPS', '服务器分页信�
 assert.match(devicePlaybook, /testing environment and dedicated testing database/);
 assert.match(devicePlaybook, /Never print or screenshot the bearer token itself/);
 assert.match(devicePlaybook, /iOS 26\s+SDK or later/);
+assert.match(devicePlaybook, /ITSAppUsesNonExemptEncryption = NO/);
+assert.match(devicePlaybook, /Apple operating-system encryption \/ security facilities/);
 assert.match(devicePlaybook, /prefer Xcode Cloud/);
 assert.match(devicePlaybook, /required 13-inch iPad screenshots/);
 assert.match(devicePlaybook, /easy-to-find link to the published\s+privacy policy/);
@@ -227,6 +233,8 @@ assert.match(xcodeCapabilityWorkflow, /xcodebuild -resolvePackageDependencies/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl list devices available/);
 assert.match(xcodeCapabilityWorkflow, /generic\/platform=iOS Simulator/);
 assert.match(xcodeCapabilityWorkflow, /CODE_SIGNING_ALLOWED=NO/);
+assert.match(xcodeCapabilityWorkflow, /Print :ITSAppUsesNonExemptEncryption/);
+assert.match(xcodeCapabilityWorkflow, /= "false"/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';

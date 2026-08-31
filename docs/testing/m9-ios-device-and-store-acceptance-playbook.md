@@ -159,11 +159,22 @@ this public GitHub repository. Xcode Cloud integrates automatic signing, archive
 TestFlight/App Store Connect; its account/workflow setup is an external Apple action
 and is not represented as complete by repository configuration alone.
 
+The current repository-side export-compliance classification is
+`ITSAppUsesNonExemptEncryption = NO`. That classification is based on the current iOS
+dependency set using Apple operating-system encryption / security facilities plus
+SHA-256 integrity hashing, with no proprietary or non-Apple crypto implementation
+found in the linked iOS code. Re-run the dependency/code review if native,
+network/security, or cryptography dependencies change. This repository value avoids
+repeating the upload questionnaire for the current exempt dependency set; it does not
+remove the deployment owner's responsibility for the final App Store Connect answers
+or any applicable jurisdiction-specific reporting.
+
 After the deployment owner authorizes upload:
 
 1. upload the validated archive to the matching App Store Connect app record;
 2. confirm processing succeeds and record the build/version identity;
-3. complete export-compliance answers factually;
+3. confirm the build reports `ITSAppUsesNonExemptEncryption = NO` and answer any
+   remaining export-compliance prompts from the actual submitted dependency set;
 4. add an internal TestFlight group and the frozen testing notes;
 5. install through TestFlight on the physical device and repeat the critical matrix;
 6. record sessions/crashes and resolve every release-blocking issue.
