@@ -19,23 +19,26 @@ final class ReaderAcceptanceUITests: XCTestCase {
 
         let serverField = app.textFields.element(boundBy: 0)
         XCTAssertTrue(serverField.waitForExistence(timeout: 30))
-        serverField.tap()
-        serverField.typeText(serverURL)
+        try focusAndType(serverURL, into: serverField, in: app)
 
         let emailField = app.textFields.element(boundBy: 1)
         XCTAssertTrue(emailField.waitForExistence(timeout: 15))
-        emailField.tap()
-        emailField.typeText(email)
+        try focusAndType(email, into: emailField, in: app)
 
         let passwordField = app.secureTextFields.element(boundBy: 0)
         XCTAssertTrue(passwordField.waitForExistence(timeout: 15))
-        passwordField.tap()
-        passwordField.typeText(password)
+        try focusAndType(password, into: passwordField, in: app)
 
         let loginButton = app.buttons["安全登录"]
         XCTAssertTrue(loginButton.waitForExistence(timeout: 15))
         loginButton.tap()
-        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        Thread.sleep(forTimeInterval: 2.0)
+        let homeButton = app.buttons["首页"].firstMatch
+        if !homeButton.exists {
+            print("LOGIN_DIAGNOSTICS\n\(app.debugDescription)")
+            attachScreenshot(XCUIScreen.main.screenshot(), named: "login-diagnostics")
+        }
+        XCTAssertTrue(homeButton.waitForExistence(timeout: 60))
     }
 
     func testReaderPortraitSourceBinding() throws {
@@ -112,6 +115,146 @@ final class ReaderAcceptanceUITests: XCTestCase {
             validBookName
         )).firstMatch
         XCTAssertTrue(importedBook.waitForExistence(timeout: 60))
+    }
+
+    func testOfflineWarmCaches() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let offlineLemma = "offline"
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCUIDevice.shared.orientation = .portrait
+        let portraitState = XCUIScreen.main.screenshot()
+        XCTAssertGreaterThan(portraitState.image.size.height, portraitState.image.size.width)
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+
+        let reading = app.buttons["阅读"].firstMatch
+        XCTAssertTrue(reading.waitForExistence(timeout: 20))
+        reading.tap()
+        let book = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "H10 iOS Reader \(marker)"
+        )).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 60))
+        book.tap()
+        let download = app.buttons["下载整套"].firstMatch
+        XCTAssertTrue(download.waitForExistence(timeout: 30))
+        download.tap()
+        XCTAssertTrue(app.staticTexts["整套已下载，可离线打开"].waitForExistence(timeout: 60))
+        let chapter = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Reader touch source binding"
+        )).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
+        chapter.tap()
+        XCTAssertTrue(app.buttons["bank"].firstMatch.waitForExistence(timeout: 30))
+
+        let review = app.buttons["复习"].firstMatch
+        XCTAssertTrue(review.waitForExistence(timeout: 20))
+        review.tap()
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 60))
+        let wordAudio = app.buttons["🔊 词发音"].firstMatch
+        XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        try tapReviewControl(wordAudio, in: app)
+        Thread.sleep(forTimeInterval: 1.0)
+        let playbackStatus = app.staticTexts["正在播放词发音"].firstMatch
+        if !playbackStatus.exists {
+            print("AUDIO_PLAYBACK_DIAGNOSTICS\n\(app.debugDescription)")
+            attachScreenshot(XCUIScreen.main.screenshot(), named: "offline-audio-playback-diagnostics")
+        }
+        XCTAssertTrue(playbackStatus.waitForExistence(timeout: 20))
+    }
+
+    func testOfflineCachedContentAndQueuesGood() throws {
+        let app = XCUIApplication()
+        let marker = try requiredEnvironment("LC_READER_MARKER", ProcessInfo.processInfo.environment)
+        let offlineLemma = "offline"
+
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCUIDevice.shared.orientation = .portrait
+        let portraitState = XCUIScreen.main.screenshot()
+        XCTAssertGreaterThan(portraitState.image.size.height, portraitState.image.size.width)
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["服务器不可达"].waitForExistence(timeout: 60))
+
+        app.buttons["阅读"].firstMatch.tap()
+        let book = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "H10 iOS Reader \(marker)"
+        )).firstMatch
+        XCTAssertTrue(book.waitForExistence(timeout: 30))
+        book.tap()
+        XCTAssertTrue(app.staticTexts["离线文章包"].waitForExistence(timeout: 30))
+        let chapter = app.buttons.matching(NSPredicate(
+            format: "label CONTAINS %@",
+            "Reader touch source binding"
+        )).firstMatch
+        XCTAssertTrue(chapter.waitForExistence(timeout: 30))
+        chapter.tap()
+        XCTAssertTrue(app.staticTexts["离线文章包"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["bank"].firstMatch.waitForExistence(timeout: 30))
+
+        app.buttons["复习"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["离线复习包 · 评分会排队同步"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForExistence(timeout: 30))
+        let wordAudio = app.buttons["🔊 词发音"].firstMatch
+        XCTAssertTrue(wordAudio.waitForExistence(timeout: 20))
+        try tapReviewControl(wordAudio, in: app)
+        XCTAssertTrue(app.staticTexts["正在播放词发音"].waitForExistence(timeout: 20))
+        let reveal = app.buttons["显示答案"].firstMatch
+        XCTAssertTrue(reveal.waitForExistence(timeout: 20))
+        try tapReviewControl(reveal, in: app)
+        let good = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "良好")).firstMatch
+        XCTAssertTrue(good.waitForExistence(timeout: 20))
+        try tapReviewControl(good, in: app)
+        XCTAssertTrue(app.staticTexts[offlineLemma].waitForNonExistence(timeout: 30))
+
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["1 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 30))
+    }
+
+    func testOfflinePendingSurvivesRelaunch() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        let unreachable = app.staticTexts.matching(NSPredicate(
+            format: "label BEGINSWITH %@",
+            "服务器不可达"
+        )).firstMatch
+        XCTAssertTrue(unreachable.waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["1 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 30))
+    }
+
+    func testOfflineReconnectAutomaticallySyncs() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["在线"].waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["0 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 60))
+    }
+
+    func testOfflineReconnectEmptyQueueRemainsStable() throws {
+        let app = XCUIApplication()
+        app.launch()
+        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
+        XCTAssertTrue(app.buttons["首页"].waitForExistence(timeout: 60))
+        XCTAssertTrue(app.staticTexts["在线"].waitForExistence(timeout: 60))
+        let settings = app.buttons["我的"].firstMatch
+        XCTAssertTrue(settings.waitForExistence(timeout: 20))
+        settings.tap()
+        XCTAssertTrue(app.staticTexts["0 个操作待同步；0 个操作需要处理。"].waitForExistence(timeout: 60))
     }
 
     func testReaderLandscapePhraseGesture() throws {
@@ -200,8 +343,22 @@ final class ReaderAcceptanceUITests: XCTestCase {
                 userInfo: [NSLocalizedDescriptionKey: "Missing staged Files fixture: \(fileName)"]
             )
         }
+        let stem = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
+        let selectedName = app.textFields.matching(NSPredicate(
+            format: "label == %@ AND value == %@",
+            "导入资料名称",
+            stem
+        )).firstMatch
+
         file.tap()
-        XCTAssertTrue(app.buttons["导入到服务器"].waitForExistence(timeout: 30))
+        if !selectedName.waitForExistence(timeout: 10), file.exists, file.isHittable {
+            print("FILES_PICKER_SELECTION_RETRY: \(fileName)")
+            file.tap()
+        }
+        if !selectedName.waitForExistence(timeout: 30) {
+            attachPickerDiagnostics(app: app, named: "import-name-not-auto-filled")
+        }
+        XCTAssertTrue(selectedName.exists)
     }
 
     private func pickerFileCell(named fileName: String, in app: XCUIApplication) -> XCUIElement {
@@ -268,12 +425,73 @@ final class ReaderAcceptanceUITests: XCTestCase {
         attachScreenshot(XCUIScreen.main.screenshot(), named: name)
     }
 
+    private func reviewTapSafeVerticalBounds(in app: XCUIApplication) -> (top: CGFloat, bottom: CGFloat) {
+        let appFrame = app.frame
+        let topbarHome = app.buttons["首页"].firstMatch
+        let safeTop = topbarHome.exists && !topbarHome.frame.isEmpty
+            ? max(appFrame.minY, topbarHome.frame.maxY + 8)
+            : appFrame.minY
+        let navLabels = ["阅读", "复习", "生词", "我的"]
+        let navTop = navLabels.compactMap { label -> CGFloat? in
+            let button = app.buttons[label].firstMatch
+            return button.exists && !button.frame.isEmpty ? button.frame.minY : nil
+        }.min() ?? appFrame.maxY
+        return (safeTop, min(appFrame.maxY, navTop - 8))
+    }
+
+    private func tapReviewControl(_ element: XCUIElement, in app: XCUIApplication) throws {
+        let webView = app.webViews.firstMatch
+        let scrollTarget = webView.exists ? webView : app
+        for _ in 0..<10 {
+            let frame = element.frame
+            let appFrame = app.frame
+            let safeBounds = reviewTapSafeVerticalBounds(in: app)
+            if !frame.isEmpty,
+               frame.minX >= appFrame.minX,
+               frame.maxX <= appFrame.maxX,
+               frame.minY >= safeBounds.top,
+               frame.maxY <= safeBounds.bottom {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+                    .withOffset(CGVector(dx: frame.midX - appFrame.minX, dy: frame.midY - appFrame.minY))
+                    .tap()
+                return
+            }
+            if !frame.isEmpty && frame.minY < safeBounds.top {
+                scrollTarget.swipeDown()
+            } else {
+                scrollTarget.swipeUp()
+            }
+        }
+        print(app.debugDescription)
+        attachScreenshot(XCUIScreen.main.screenshot(), named: "offline-review-control-offscreen")
+        XCTFail("Offline review control never entered the unobstructed area between fixed navigation bars")
+        throw NSError(
+            domain: "LinguaCafeOfflineAcceptance",
+            code: 7,
+            userInfo: [NSLocalizedDescriptionKey: "Offline review control remained offscreen or under fixed navigation"]
+        )
+    }
+
     private func scrollUntilHittable(_ element: XCUIElement, in app: XCUIApplication) {
         let webView = app.webViews.firstMatch
         let scrollTarget = webView.exists ? webView : app
         for _ in 0..<10 where !element.isHittable {
             scrollTarget.swipeUp()
         }
+    }
+
+    private func focusAndType(
+        _ text: String,
+        into element: XCUIElement,
+        in app: XCUIApplication
+    ) throws {
+        element.tap()
+        let keyboard = app.keyboards.firstMatch
+        if !keyboard.waitForExistence(timeout: 5) {
+            element.tap()
+            XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        }
+        app.typeText(text)
     }
 
     private func requiredEnvironment(

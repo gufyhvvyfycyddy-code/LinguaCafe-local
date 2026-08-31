@@ -34,6 +34,7 @@ jobs:
       pull-requests: write
 
     env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       ISSUE_NUMBER: ${{ inputs.issue_number || github.event.inputs.issue_number }}
       PREV_ATTEMPT: ${{ inputs.attempt || github.event.inputs.attempt }}
 

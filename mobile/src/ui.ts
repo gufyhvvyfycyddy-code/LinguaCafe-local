@@ -53,6 +53,29 @@ function apiPlatform(): 'android' | 'ios' | 'web' {
   return platform === 'android' || platform === 'ios' ? platform : 'web';
 }
 
+function blobDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+        return;
+      }
+      reject(new Error('无法准备 iOS 离线音频'));
+    };
+    reader.onerror = () => reject(reader.error ?? new Error('无法准备 iOS 离线音频'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function playableAudioSource(blob: Blob): Promise<{ url: string; cleanup: () => void }> {
+  if (Capacitor.getPlatform() === 'ios') {
+    return { url: await blobDataUrl(blob), cleanup: () => undefined };
+  }
+  const url = URL.createObjectURL(blob);
+  return { url, cleanup: () => URL.revokeObjectURL(url) };
+}
+
 function platformLabel(): string {
   if (Capacitor.getPlatform() === 'ios') return 'IOS';
   if (Capacitor.getPlatform() === 'android') return 'ANDROID';
@@ -1302,15 +1325,15 @@ export class LinguaCafeApp {
         blob = await this.api.downloadMedia(reference.asset_id);
         await this.mediaCache.put(reference, blob);
       }
-      const url = URL.createObjectURL(blob);
-      const audio = new Audio(url);
-      const cleanup = () => URL.revokeObjectURL(url);
-      audio.addEventListener('ended', cleanup, { once: true });
-      audio.addEventListener('error', cleanup, { once: true });
+      const source = await playableAudioSource(blob);
+      const audio = new Audio(source.url);
+      audio.addEventListener('ended', source.cleanup, { once: true });
+      audio.addEventListener('error', source.cleanup, { once: true });
       try {
         await audio.play();
+        this.showToast(role === 'word_pronunciation' ? '正在播放词发音' : '正在播放例句');
       } catch (error) {
-        cleanup();
+        source.cleanup();
         throw error;
       }
     } catch (error) {

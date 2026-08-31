@@ -2,7 +2,22 @@ name: iOS Reader simulator acceptance
 
 on:
   workflow_dispatch:
+    inputs:
+      focus:
+        description: 'Test focus: full (all tests) or offline (skip accepted reader tests, run offline/reconnect)'
+        required: false
+        type: choice
+        options:
+          - full
+          - offline
+        default: full
   workflow_call:
+    inputs:
+      focus:
+        description: 'Test focus: full (all tests) or offline (skip accepted reader tests, run offline/reconnect)'
+        required: false
+        type: string
+        default: full
 
 permissions:
   contents: read
@@ -47,10 +62,20 @@ jobs:
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
 
-      - name: Install PHP 8.4 and MySQL 8.4; pin Rust 1.98
+      - name: Verify hosted runner audio output before audio acceptance
         run: |
           set -euo pipefail
-          brew install php@8.4 mysql@8.4
+          AUDIO_PROFILE="$(system_profiler SPAudioDataType)"
+          printf '%s\n' "$AUDIO_PROFILE"
+          if ! printf '%s\n' "$AUDIO_PROFILE" | grep -q 'Default Output Device: Yes'; then
+            echo 'IOS_SIM_AUDIO_DEVICE_UNAVAILABLE: hosted macOS runner has no default audio output device.' >&2
+            exit 78
+          fi
+
+      - name: Install PHP 8.4, MySQL 8.4 and testing relay; pin Rust 1.98
+        run: |
+          set -euo pipefail
+          brew install php@8.4 mysql@8.4 socat
           PHP_PREFIX="$(brew --prefix php@8.4)"
           MYSQL_PREFIX="$(brew --prefix mysql@8.4)"
           printf '%s\n' "$PHP_PREFIX/bin" "$PHP_PREFIX/sbin" "$MYSQL_PREFIX/bin" >> "$GITHUB_PATH"
@@ -186,8 +211,23 @@ jobs:
           python3 -c 'from pathlib import Path; import sys; Path(sys.argv[1]).write_bytes(b"a" * 200001)' "$LC_FILES_STORAGE/lc-$LC_READER_MARKER-oversize.txt"
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.apple.DocumentsApp 2>/dev/null || true
 
+          AUDIO_WAV="$RUNNER_TEMP/h10-ios-offline.wav"
+          LC_OFFLINE_AUDIO_PATH="$RUNNER_TEMP/h10-ios-offline.m4a"
+          python3 -c 'import sys,wave; out=wave.open(sys.argv[1], "wb"); out.setnchannels(1); out.setsampwidth(2); out.setframerate(44100); out.writeframes(b"\0\0" * 22050); out.close()' "$AUDIO_WAV"
+          test -x /usr/bin/afconvert
+          /usr/bin/afconvert -f m4af -d aac -b 64000 "$AUDIO_WAV" "$LC_OFFLINE_AUDIO_PATH"
+          test -s "$LC_OFFLINE_AUDIO_PATH"
+          LC_BACKEND_PORT=8879
+          export LC_OFFLINE_AUDIO_PATH LC_BACKEND_PORT
+          printf '%s\n' \
+            "LC_OFFLINE_AUDIO_PATH=$LC_OFFLINE_AUDIO_PATH" \
+            "LC_BACKEND_PORT=$LC_BACKEND_PORT" \
+            >> "$GITHUB_ENV"
+
           PAB_LOG="$RUNNER_TEMP/pab-ios-reader.log"
+          RELAY_LOG="$RUNNER_TEMP/ios-reader-relay.log"
           echo "PAB_LOG=$PAB_LOG" >> "$GITHUB_ENV"
+          echo "RELAY_LOG=$RELAY_LOG" >> "$GITHUB_ENV"
           APP_ENV=testing php tests/Support/run-pab-r3-browser-acceptance.php \
             --label=macos-ios-reader-pab --wait-ms=0 -- \
             php tests/Support/start-ios-reader-pab-server.php \
@@ -195,9 +235,9 @@ jobs:
           PAB_PID=$!
           echo "PAB_PID=$PAB_PID" >> "$GITHUB_ENV"
 
-          SENTINEL_JSON=''
+          BACKEND_SENTINEL=''
           for attempt in $(seq 1 120); do
-            if SENTINEL_JSON="$(curl -fsS http://127.0.0.1:8878/__testing/acceptance-sentinel 2>/dev/null)"; then
+            if BACKEND_SENTINEL="$(curl -fsS http://127.0.0.1:8879/__testing/acceptance-sentinel 2>/dev/null)"; then
               break
             fi
             if ! kill -0 "$PAB_PID" 2>/dev/null; then
@@ -206,8 +246,29 @@ jobs:
             fi
             sleep 1
           done
-          printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
+          printf '%s' "$BACKEND_SENTINEL" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
           grep -q 'IOS_READER_PAB_FIXTURE_READY' "$PAB_LOG"
+          grep -q 'IOS_READER_PAB_OFFLINE_FIXTURE_READY' "$PAB_LOG"
+
+          SOCAT_BIN="$(brew --prefix socat)/bin/socat"
+          test -x "$SOCAT_BIN"
+          "$SOCAT_BIN" TCP-LISTEN:8878,bind=127.0.0.1,reuseaddr,fork TCP:127.0.0.1:8879 \
+            > "$RELAY_LOG" 2>&1 &
+          RELAY_PID=$!
+          echo "RELAY_PID=$RELAY_PID" >> "$GITHUB_ENV"
+
+          SENTINEL_JSON=''
+          for attempt in $(seq 1 60); do
+            if SENTINEL_JSON="$(curl -fsS http://127.0.0.1:8878/__testing/acceptance-sentinel 2>/dev/null)"; then
+              break
+            fi
+            if ! kill -0 "$RELAY_PID" 2>/dev/null; then
+              cat "$RELAY_LOG"
+              exit 1
+            fi
+            sleep 1
+          done
+          printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
 
       - name: Prove Reader UI in short native XCUITest sessions
         run: |
@@ -247,10 +308,81 @@ jobs:
             xcrun xcresulttool get test-results summary --path "$result_bundle"
           }
 
-          run_ui_test testLoginPersistsAuthenticatedSession 240
-          run_ui_test testReaderPortraitSourceBinding 300
-          run_ui_test testReaderLandscapePhraseGesture 240
-          run_ui_test testTextImportThroughSystemFilesPicker 360
+          LC_FOCUS="${{ inputs.focus }}"
+          run_ui_test testLoginPersistsAuthenticatedSession 360
+          if [ "$LC_FOCUS" = "full" ]; then
+            run_ui_test testReaderPortraitSourceBinding 300
+            run_ui_test testReaderLandscapePhraseGesture 240
+            run_ui_test testTextImportThroughSystemFilesPicker 360
+          elif [ "$LC_FOCUS" = "offline" ]; then
+            echo "Focus=offline: skipping already accepted Reader and Files tests."
+          else
+            echo "Unsupported iOS acceptance focus: $LC_FOCUS" >&2
+            exit 2
+          fi
+          run_ui_test testOfflineWarmCaches 300
+
+          USER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM users WHERE email='$LC_TEST_EMAIL' LIMIT 1;")"
+          OFFLINE_LEMMA="offline"
+          OFFLINE_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.lemma='$OFFLINE_LEMMA' LIMIT 1;")"
+          test -n "$OFFLINE_CARD_ID"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT fsrs_reps FROM review_cards WHERE id=$OFFLINE_CARD_ID;")" = "0"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
+          echo "OFFLINE_CARD_ID=$OFFLINE_CARD_ID" >> "$GITHUB_ENV"
+          SYNC_REQUESTS_BEFORE_OFFLINE="$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)"
+          echo "SYNC_REQUESTS_BEFORE_OFFLINE=$SYNC_REQUESTS_BEFORE_OFFLINE" >> "$GITHUB_ENV"
+
+          kill "$RELAY_PID"
+          for attempt in $(seq 1 30); do
+            if ! kill -0 "$RELAY_PID" 2>/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          if curl -fsS --max-time 2 http://127.0.0.1:8878/__testing/acceptance-sentinel >/dev/null 2>&1; then
+            echo 'App-facing relay unexpectedly remained reachable after shutdown.' >&2
+            exit 1
+          fi
+          BACKEND_SENTINEL="$(curl -fsS http://127.0.0.1:8879/__testing/acceptance-sentinel)"
+          printf '%s' "$BACKEND_SENTINEL" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
+
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          run_ui_test testOfflineCachedContentAndQueuesGood 300
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='sense_review.rating';")" = "0"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$SYNC_REQUESTS_BEFORE_OFFLINE"
+
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          run_ui_test testOfflinePendingSurvivesRelaunch 180
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID;")" = "0"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$SYNC_REQUESTS_BEFORE_OFFLINE"
+
+          SOCAT_BIN="$(brew --prefix socat)/bin/socat"
+          "$SOCAT_BIN" TCP-LISTEN:8878,bind=127.0.0.1,reuseaddr,fork TCP:127.0.0.1:8879 \
+            > "$RELAY_LOG" 2>&1 &
+          RELAY_PID=$!
+          echo "RELAY_PID=$RELAY_PID" >> "$GITHUB_ENV"
+          SENTINEL_JSON=''
+          for attempt in $(seq 1 60); do
+            if SENTINEL_JSON="$(curl -fsS http://127.0.0.1:8878/__testing/acceptance-sentinel 2>/dev/null)"; then
+              break
+            fi
+            if ! kill -0 "$RELAY_PID" 2>/dev/null; then
+              cat "$RELAY_LOG"
+              exit 1
+            fi
+            sleep 1
+          done
+          printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
+
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          run_ui_test testOfflineReconnectAutomaticallySyncs 240
+          EXPECTED_SYNC_REQUESTS=$((SYNC_REQUESTS_BEFORE_OFFLINE + 1))
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
+          echo "EXPECTED_SYNC_REQUESTS=$EXPECTED_SYNC_REQUESTS" >> "$GITHUB_ENV"
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
+          run_ui_test testOfflineReconnectEmptyQueueRemainsStable 180
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
 
       - name: Corroborate canonical Reader source binding in MySQL and PAB
         run: |
@@ -259,32 +391,56 @@ jobs:
           printf '%s' "$SENTINEL_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data == {"environment":"testing","database_is_testing":True,"sentinel_present":True}'
 
           USER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM users WHERE email='$LC_TEST_EMAIL' LIMIT 1;")"
-          CHAPTER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM chapters WHERE user_id=$USER_ID AND name='Reader touch source binding' LIMIT 1;")"
           test -n "$USER_ID"
-          test -n "$CHAPTER_ID"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_unfamiliar_targets WHERE user_id=$USER_ID AND chapter_id=$CHAPTER_ID AND kind='word' AND start_word_index=2 AND end_word_index=2;")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_senses WHERE user_id=$USER_ID AND language_id='english' AND lemma='bank' AND learning_started_origin='reading' AND learning_started_source_occurrence_id IS NOT NULL;")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.user_id=$USER_ID AND s.language_id='english' AND s.lemma='bank';")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_sense_occurrences o JOIN word_senses s ON s.id=o.word_sense_id WHERE o.user_id=$USER_ID AND o.chapter_id=$CHAPTER_ID AND o.source='reading_occurrence' AND s.lemma='bank' AND s.learning_started_source_occurrence_id=o.id;")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_occurrence_sense_evidence e JOIN reading_unfamiliar_targets t ON t.user_id=e.user_id AND t.chapter_id=e.chapter_id AND t.source_revision=e.source_revision AND t.occurrence_id=e.occurrence_id WHERE e.user_id=$USER_ID AND e.chapter_id=$CHAPTER_ID AND e.resolution='new_sense';")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID;")" = "0"
-          IMPORT_BOOK_NAME="lc-$LC_READER_MARKER-valid"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM books WHERE user_id=$USER_ID AND name='$IMPORT_BOOK_NAME';")" = "1"
-          IMPORT_BOOK_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM books WHERE user_id=$USER_ID AND name='$IMPORT_BOOK_NAME' LIMIT 1;")"
-          test -n "$IMPORT_BOOK_ID"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE user_id=$USER_ID AND book_id=$IMPORT_BOOK_ID AND name='导入文本';")" = "1"
-          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='library.text_import';")" = "1"
-          grep -q 'api/v1/mobile/chapters/.*/reading-unfamiliar-targets' "$PAB_LOG"
-          grep -q 'api/v1/mobile/word-senses' "$PAB_LOG"
-          test "$(grep -c 'api/v1/mobile/imports/text' "$PAB_LOG")" = "1"
+          LC_FOCUS="${{ inputs.focus }}"
+          if [ "$LC_FOCUS" = "full" ]; then
+            CHAPTER_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM chapters WHERE user_id=$USER_ID AND name='Reader touch source binding' LIMIT 1;")"
+            test -n "$CHAPTER_ID"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_unfamiliar_targets WHERE user_id=$USER_ID AND chapter_id=$CHAPTER_ID AND kind='word' AND start_word_index=2 AND end_word_index=2;")" = "1"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_senses WHERE user_id=$USER_ID AND language_id='english' AND lemma='bank' AND learning_started_origin='reading' AND learning_started_source_occurrence_id IS NOT NULL;")" = "1"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.user_id=$USER_ID AND s.language_id='english' AND s.lemma='bank';")" = "1"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM word_sense_occurrences o JOIN word_senses s ON s.id=o.word_sense_id WHERE o.user_id=$USER_ID AND o.chapter_id=$CHAPTER_ID AND o.source='reading_occurrence' AND s.lemma='bank' AND s.learning_started_source_occurrence_id=o.id;")" = "1"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM reading_occurrence_sense_evidence e JOIN reading_unfamiliar_targets t ON t.user_id=e.user_id AND t.chapter_id=e.chapter_id AND t.source_revision=e.source_revision AND t.occurrence_id=e.occurrence_id WHERE e.user_id=$USER_ID AND e.chapter_id=$CHAPTER_ID AND e.resolution='new_sense';")" = "1"
+            BANK_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.lemma='bank' LIMIT 1;")"
+            test -n "$BANK_CARD_ID"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$BANK_CARD_ID;")" = "0"
+            IMPORT_BOOK_NAME="lc-$LC_READER_MARKER-valid"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM books WHERE user_id=$USER_ID AND name='$IMPORT_BOOK_NAME';")" = "1"
+            IMPORT_BOOK_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT id FROM books WHERE user_id=$USER_ID AND name='$IMPORT_BOOK_NAME' LIMIT 1;")"
+            test -n "$IMPORT_BOOK_ID"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM chapters WHERE user_id=$USER_ID AND book_id=$IMPORT_BOOK_ID AND name='导入文本';")" = "1"
+            test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='library.text_import';")" = "1"
+            grep -q 'api/v1/mobile/chapters/.*/reading-unfamiliar-targets' "$PAB_LOG"
+            grep -q 'api/v1/mobile/word-senses' "$PAB_LOG"
+            test "$(grep -c 'api/v1/mobile/imports/text' "$PAB_LOG")" = "1"
+          fi
+
+          OFFLINE_LEMMA="offline"
+          OFFLINE_CARD_ID="$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT c.id FROM review_cards c JOIN word_senses s ON s.id=c.target_id WHERE c.user_id=$USER_ID AND c.target_type='sense' AND s.lemma='$OFFLINE_LEMMA' LIMIT 1;")"
+          test -n "$OFFLINE_CARD_ID"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT fsrs_reps FROM review_cards WHERE id=$OFFLINE_CARD_ID;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM review_logs WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID AND rating='good' AND source='sense_review' AND undone_at IS NULL;")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM mobile_client_actions WHERE user_id=$USER_ID AND action_type='sense_review.rating' AND status='completed';")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM operations WHERE user_id=$USER_ID AND review_card_id=$OFFLINE_CARD_ID AND operation_type='sense_review.rating' AND status='applied';")" = "1"
+          test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM operation_changes oc JOIN operations o ON o.id=oc.operation_record_id WHERE o.user_id=$USER_ID AND o.review_card_id=$OFFLINE_CARD_ID AND o.operation_type='sense_review.rating' AND oc.transition='apply';")" = "1"
+          test "$(grep -c 'api/v1/mobile/media/assets/' "$PAB_LOG")" = "1"
+          test "$(grep -c 'api/v1/mobile/sync/actions' "$PAB_LOG" || true)" = "$EXPECTED_SYNC_REQUESTS"
 
       - name: Cleanup PAB, lease, database service, and simulator
         if: always()
         run: |
           set +e
-          SERVER_PID="$(lsof -tiTCP:8878 -sTCP:LISTEN 2>/dev/null | head -1)"
-          if [ -n "$SERVER_PID" ]; then
-            kill "$SERVER_PID" 2>/dev/null || true
+          cleanup_status=0
+          if [ -n "${RELAY_PID:-}" ]; then
+            kill "$RELAY_PID" 2>/dev/null || true
+          fi
+          RELAY_LISTENER_PID="$(lsof -tiTCP:8878 -sTCP:LISTEN 2>/dev/null | head -1)"
+          if [ -n "$RELAY_LISTENER_PID" ]; then
+            kill "$RELAY_LISTENER_PID" 2>/dev/null || true
+          fi
+          BACKEND_PID="$(lsof -tiTCP:${LC_BACKEND_PORT:-8879} -sTCP:LISTEN 2>/dev/null | head -1)"
+          if [ -n "$BACKEND_PID" ]; then
+            kill "$BACKEND_PID" 2>/dev/null || true
           fi
           if [ -n "${PAB_PID:-}" ]; then
             for attempt in $(seq 1 30); do
@@ -295,9 +451,15 @@ jobs:
             done
           fi
           if [ -f vendor/autoload.php ]; then
-            php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'
+            if ! php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'; then
+              echo 'Testing database lease cleanup verification failed.' >&2
+              cleanup_status=1
+            fi
             if mysqladmin ping -uroot --silent 2>/dev/null; then
-              test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"
+              if ! test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"; then
+                echo 'Testing acceptance sentinel cleanup verification failed.' >&2
+                cleanup_status=1
+              fi
             fi
           fi
           if [ -n "${LC_FILES_STORAGE:-}" ] && [ -d "$LC_FILES_STORAGE" ]; then
@@ -306,7 +468,9 @@ jobs:
               "$LC_FILES_STORAGE/lc-${LC_READER_MARKER:-h10}-invalid-utf8.txt" \
               "$LC_FILES_STORAGE/lc-${LC_READER_MARKER:-h10}-oversize.txt"
           fi
+          rm -f "${LC_OFFLINE_AUDIO_PATH:-$RUNNER_TEMP/h10-ios-offline.m4a}" "$RUNNER_TEMP/h10-ios-offline.wav"
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile 2>/dev/null || true
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.apple.DocumentsApp 2>/dev/null || true
           xcrun simctl shutdown "$LC_IOS_SIM_UDID" 2>/dev/null || true
           brew services stop mysql@8.4 || true
+          exit "$cleanup_status"

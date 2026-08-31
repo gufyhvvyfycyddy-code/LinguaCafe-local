@@ -37,7 +37,7 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-      actions: read
+      actions: write
       id-token: write
 
     steps:
@@ -100,6 +100,9 @@ jobs:
         with:
           node-version: '22'
 
+      - name: Validate auto-fix workflow contract
+        run: node tests/js/AutoFixWorkflowContract.test.mjs
+
       # -------------------------------------------------------
       # Step 5: Install OpenCode
       # -------------------------------------------------------
@@ -137,6 +140,8 @@ jobs:
       # -------------------------------------------------------
       - name: Determine attempt number
         id: attempt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           LABELS_JSON=$(gh api "/repos/${{ github.repository }}/issues/${{ github.event.issue.number }}/labels" \
             --jq '.[].name' 2>/dev/null || echo "")
@@ -261,6 +266,8 @@ jobs:
       # -------------------------------------------------------
       - name: Create Pull Request
         id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd "${{ github.workspace }}"
 
@@ -447,7 +454,6 @@ jobs:
             gh workflow run auto-fix-scheduler.yml \
               --ref master \
               --field issue_number=${{ github.event.issue.number }} \
-              --field repository=${{ github.repository }} \
               --field attempt=$ATTEMPT
           else
             echo "Tests failed on attempt $ATTEMPT (max). Adding needs-human-review label."

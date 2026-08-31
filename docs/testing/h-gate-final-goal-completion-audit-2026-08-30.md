@@ -2,11 +2,11 @@
 
 ## Verdict
 
-**Stage Accept for every currently runnable Windows / Web / Android requirement.**
+**Stage Accept for Windows / Web / Android plus the full required iOS Simulator capability cluster.**
 
 **H-GATE = DEFERRED / Not Complete.**
 
-The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires the complete Apple/iOS capability cluster when iOS is part of the final target. A 2026-08-30 continuation has since recovered real macOS/Xcode/SwiftPM/iOS Simulator capability through a standard GitHub-hosted `macos-26` runner, including rendered authenticated login, Simulator Keychain save/load across relaunch, server token/device ownership and rendered revoke/logout, formal Sense Review Good/Undo, Reader touch/source-binding, and real-system-Files `.txt` import. The remaining Simulator offline/reconnect-sync matrix plus physical-device, signing/archive and TestFlight/App Store evidence remain unaccepted.
+The audit itself is complete. The full A–H Goal is not complete because the final Definition of Done explicitly requires the complete Apple/iOS capability cluster when iOS is part of the final target. The 2026-08-30/31 continuation recovered real macOS/Xcode/SwiftPM/iOS Simulator capability through a standard GitHub-hosted `macos-26` runner, including rendered authenticated login, Simulator Keychain save/load across relaunch, server token/device ownership and rendered revoke/logout, formal Sense Review Good/Undo, Reader touch/source-binding, real-system-Files `.txt` import, and the full offline article/review/audio → queued Good → relaunch persistence → reconnect exactly-once sync matrix. The Simulator capability cluster is now Stage Accepted; physical-device, signing/archive and TestFlight/App Store/App Review evidence remain unaccepted.
 
 This is a narrowed external capability boundary, not a newly discovered LinguaCafe product-code regression.
 
@@ -151,16 +151,17 @@ The continuation now proves:
 - PAB records the canonical Reader mobile endpoints, MySQL corroborates the resulting source binding, and TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean;
 - the real system Files picker exposes only eligible `.txt` input as selectable, rejects invalid UTF-8 and oversize `.txt` through rendered UI, imports one valid UTF-8 English file, and leaves exactly one `library.text_import` action plus one import endpoint request.
 
-The following completion-required evidence still does not exist and must not be inferred from that rendered login-shell smoke:
+Final full run `33350591521` has since closed the authenticated Simulator content matrix: cached article/review/audio survived the offline phase, one rendered Good queued locally and survived relaunch, reconnect synchronized exactly once, the empty queue remained stable, MySQL/PAB corroboration passed, and strict lease/sentinel cleanup passed. Release-capability run `33355499203` then revalidated Xcode 26.6 with `UIRequiredDeviceCapabilities = arm64`, passed the rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`, and produced a `2064x2752` 13-inch iPad screenshot.
 
-- the remaining authenticated Simulator content matrix: article/review/audio offline restart, queued offline rating and exactly-once reconnect sync;
+The following completion-required evidence still does not exist and must not be inferred from Simulator evidence:
+
 - signed physical-iPhone installation plus physical-device Keychain confirmation and physical haptics/notification/audio/safe-area behavior;
 - Apple team/provisioning and signed archive validation;
 - App Store Connect processing, TestFlight install and App Review evidence.
 
 Full continuation evidence: `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
 
-The authenticated login/Keychain/logout, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import lanes are now real and server-bound, but they do not retroactively complete H-11's remaining iOS content-flow scope. H-11's iOS offline/reconnect-sync path still requires rendered UI/user-event evidence on the accepted testing backend before H-GATE can pass.
+The authenticated login/Keychain/logout, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import and offline/reconnect lanes are now real and server-bound. This 2026-08-31 continuation supplies the previously missing iOS Simulator content evidence for the current H-GATE audit without rewriting H-11's historical 2026-08-29 report.
 
 ## Definition of Done audit
 
@@ -173,7 +174,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/Simulator compile+launch, rendered authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import PASS; remaining Simulator offline/reconnect sync, physical device, real Apple signing and TestFlight remain FAIL / unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/full Simulator content matrix PASS, including authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import, offline/reconnect exactly-once sync, corrected `arm64` release capability, and serial iPhone + 13-inch iPad rendered smoke; physical device, real Apple signing/archive, TestFlight/App Store, and final public Privacy/Support URL evidence remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;
@@ -203,16 +204,17 @@ It is **not a complete cross-platform A–H Goal release** and is **not App Stor
 
 ## Reopen condition
 
-H-GATE remains open only on the portion of the Apple capability cluster that the new public macOS runner cannot honestly close.
+H-GATE remains open only on the physical-device and Apple distribution portion of the capability cluster; the public macOS runner has now honestly closed the required Simulator content matrix.
 
 The minimum remaining work is:
 
-1. complete the remaining server-bound Simulator content matrix: offline packages/audio and reconnect sync;
-2. repeat the critical matrix on a signed physical iPhone, including physical Keychain confirmation and haptics/notification/audio/safe-area behavior;
-3. perform Apple team/provisioning and signed archive validation;
-4. obtain TestFlight/App Store Connect evidence if the final Goal still requires store readiness;
-5. rerun H-GATE and mark DONE only if the deferred cluster is fully cleared.
+1. repeat the critical matrix on a signed physical iPhone, including physical Keychain confirmation and haptics/notification/audio/safe-area behavior;
+2. perform Apple team/provisioning and signed archive validation;
+3. obtain TestFlight/App Store Connect processing and physical install evidence if the final Goal still requires store readiness;
+4. complete final public privacy/support URLs and App Store Connect privacy answers;
+5. obtain the real App Review result;
+6. rerun H-GATE and mark DONE only if the deferred cluster is fully cleared.
 
 Until then, the accurate project status is:
 
-**Windows/Web/Android program plus iOS Xcode/Simulator/rendered authenticated Keychain lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding and real Files `.txt` import: Accepted. Full cross-platform A–H Goal: DEFERRED / Not Complete due to the remaining Simulator offline-sync content flow, physical-device and distribution Apple capability.**
+**Windows/Web/Android program plus the full required iOS Simulator cluster: Stage Accepted. Full cross-platform A–H Goal: DEFERRED / Not Complete only due to physical-device and Apple distribution capability.**

@@ -2,11 +2,11 @@
 
 ## Verdict
 
-**Partial capability recovery accepted. H-10 remains DEFERRED / Not Complete.**
+**Simulator capability cluster Stage Accepted. H-10 remains DEFERRED / Not Complete only for physical-device and Apple distribution capability.**
 
 The 2026-08-29 H-10 probe correctly recorded that the local Windows host had no Xcode, Apple signing or connected macOS peer. On 2026-08-30 a different, bounded capability became available: the actual `origin` repository was freshly verified as public, so LinguaCafe could use a standard GitHub-hosted `macos-26` runner without introducing a paid larger runner or Apple credential path.
 
-This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, authenticated Simulator credential lifecycle, formal Sense Review Good/Undo, rendered Reader touch/source-binding, and real-system-Files `.txt` import evidence. It does **not** close the remaining offline/reconnect Simulator matrix, physical-device behavior, Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
+This continuation now closes the previously missing native macOS/Xcode compile, iOS Simulator install/launch, rendered login shell, authenticated Simulator credential lifecycle, formal Sense Review Good/Undo, rendered Reader touch/source-binding, real-system-Files `.txt` import, and the authenticated offline/reconnect Simulator content matrix. It does **not** close physical-device behavior, real Apple signing/archive, TestFlight/App Store Connect, or App Review portions of H-10.
 
 ## Authority and safety boundary
 
@@ -262,6 +262,28 @@ The stable product delta is deliberately narrow: the existing iOS import fields 
 
 This accepts the Simulator **real Files picker → reject wrong type/encoding/size → import valid UTF-8 English `.txt` → server/MySQL idempotency evidence** path.
 
+## Offline / reconnect Simulator matrix closure — 2026-08-31
+
+The remaining authenticated Simulator content matrix is now closed. Focused run `33346226130` first completed the offline-only lane. Final full GitHub Actions run `33350591521` then completed **SUCCESS** on head `6209dbc5b9d584c698eee6ba4b2e5743a01d9736`, re-running login, portrait Reader source binding, landscape phrase gesture, real system Files import and the entire offline/reconnect sequence on the same iPhone 17 Pro Simulator and testing MySQL/native-FSRS/PAB stack.
+
+The final full run proved through real XCUITest sessions:
+
+1. `testOfflineWarmCaches` — article/review data and the actual media asset were warmed and the cached word audio played;
+2. `testOfflineCachedContentAndQueuesGood` — after the app-facing relay was shut down, cached content remained usable and one rendered `Good` was queued locally;
+3. `testOfflinePendingSurvivesRelaunch` — terminating and relaunching the app preserved exactly one pending offline action;
+4. `testOfflineReconnectAutomaticallySyncs` — restoring the relay automatically synchronized that action and returned the local queue to zero;
+5. `testOfflineReconnectEmptyQueueRemainsStable` — another relaunch/reconnect with an empty queue did not create a duplicate rating or a second sync application.
+
+Server-side corroboration then proved `fsrs_reps=1`, exactly one non-undone `good` Sense ReviewLog, exactly one completed `sense_review.rating` mobile client action, exactly one applied rating operation with one `apply` operation change, and exactly one media asset request. PAB recorded one sync request before the offline phase and exactly one additional sync request after reconnect (`SYNC_REQUESTS_BEFORE_OFFLINE=1`, `EXPECTED_SYNC_REQUESTS=2`), so reconnect was exactly-once rather than repeated polling or duplicate submission.
+
+The same final full run also re-passed the complete system Files matrix. A prior iOS 26 Simulator run had intermittently synthesized a tap on a Files cell without the system picker completing the selection, leaving the Web file input at `no file selected`. The bounded UI-test guard now retries once only when the same Files cell still exists and remains hittable after the app has not received the selected filename. The successful final run did **not** emit `FILES_PICKER_SELECTION_RETRY`, so its Files proof completed on the normal first-tap path; the retry remains only as a narrow harness protection for the observed Simulator defect and does not hide an app-side document callback failure.
+
+The strengthened cleanup gate also passed: the testing database lease ended with `active=false / stale_metadata=false`, the testing acceptance sentinel count returned to zero, exact Files/audio fixtures were removed, PAB/relay processes and the Simulator were stopped, and MySQL 8.4 shut down cleanly. Cleanup failure can no longer be masked by the best-effort teardown commands.
+
+The run head contained a temporary branch-only workflow-dispatch carrier used only because the Reader acceptance workflow is not yet registered on the default branch. The carrier was removed immediately after dispatch in follow-up commit `1bf2016873492c0b641dbab0891fcce0465ec6e3`; the stable candidate lineage therefore restores the production `auto-fix-scheduler.yml` and keeps the successful run's product/test content unchanged apart from later documentation/guard closeout.
+
+This accepts the Simulator **cached article/review/audio → offline restart → queued Good → relaunch persistence → reconnect exactly-once sync → stable empty queue** path.
+
 ## What is now genuinely closed
 
 The H-10 capability list can now mark these items as proven on real macOS/Xcode infrastructure:
@@ -286,22 +308,25 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - rendered portrait Reader token interaction and canonical reading-origin new-Sense/source binding;
 - existing-Sense `认识 / 记得` and `不认识` controls after the canonical source-bound creation;
 - rendered landscape long-press/drag phrase selection for `bank account` without entering the single-token recognition path;
-- rendered system Files picker `.txt` import, including disabled unsupported extension, invalid UTF-8 rejection, oversize rejection, successful valid English import and exactly-one server action/request evidence.
+- rendered system Files picker `.txt` import, including disabled unsupported extension, invalid UTF-8 rejection, oversize rejection, successful valid English import and exactly-one server action/request evidence;
+- authenticated Simulator offline content and media cache use across relay shutdown, one queued Good surviving app relaunch, automatic reconnect exactly-once sync, and stable zero-pending state after the queue is empty;
+- current 64-bit release capability declaration (`UIRequiredDeviceCapabilities = arm64`) under Xcode 26.6;
+- the same generated app rendering the login shell on both iPhone 17 Pro and `iPad Pro 13-inch (M5)` Simulator after serializing the two Simulator sessions on the standard hosted Mac;
+- 13-inch iPad screenshot output at `2064x2752`, matching the current App Store Connect 13-inch portrait screenshot requirement.
 
 ## What remains unavailable / unaccepted
 
 H-10 remains DEFERRED because the following still lack the required evidence:
 
-1. the remaining authenticated Simulator content matrix: article/review/audio package offline restart, queued offline rating and exactly-once reconnect sync;
-2. physical-iPhone installation with real Apple signing;
-3. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
-4. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
-5. Apple team/provisioning/bundle registration;
-6. signed archive and Organizer validation;
-7. App Store Connect upload/processing;
-8. TestFlight install and critical-flow rerun on a physical iPhone;
-9. final public privacy/support URLs and App Store Connect privacy answers;
-10. App Review result.
+1. physical-iPhone installation with real Apple signing;
+2. physical haptics, notification behavior, audio focus/interruption and real notch/Dynamic-Island/home-indicator behavior;
+3. physical-device Keychain lifecycle confirmation under the real team/provisioning identity;
+4. Apple team/provisioning/bundle registration;
+5. signed archive and Organizer validation;
+6. App Store Connect upload/processing;
+7. TestFlight install and critical-flow rerun on a physical iPhone;
+8. final public privacy/support URLs and App Store Connect privacy answers;
+9. App Review result.
 
 A cloud simulator is useful for compile/runtime capability but cannot substitute for physical-device and Apple-account distribution evidence.
 
@@ -309,7 +334,7 @@ A cloud simulator is useful for compile/runtime capability but cannot substitute
 
 The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The remaining Simulator work should continue on that single testing stack for offline/reconnect evidence; formal Sense Review Good/Undo is accepted by run `33282205923`, rendered Reader touch/source binding by run `33301226295`, and real-system-Files `.txt` import by run `33308079898`. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
+The Simulator lane is now stage-accepted on that single testing stack: formal Sense Review Good/Undo is accepted by run `33282205923`, rendered Reader touch/source binding by run `33301226295`, real-system-Files `.txt` import by run `33308079898`, and the final full offline/reconnect matrix by run `33350591521`. Release-capability run `33355499203` additionally revalidated the Xcode 26.6 unsigned build with the corrected `arm64` requirement and passed the same rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`; the captured iPad screenshot was `2064x2752`. Do not create more Simulator work unless a regression or a new product requirement appears. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -320,6 +345,6 @@ The remaining Simulator work should continue on that single testing stack for of
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding + real Files `.txt` import: Accepted.**
+**Native macOS/Xcode/SwiftPM + corrected `arm64` release capability + rendered iPhone/13-inch-iPad shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding + real Files `.txt` import + offline/reconnect content matrix: Stage Accepted.**
 
-**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to the remaining Simulator offline/reconnect matrix plus physical-device behavior, real Apple signing/archive, TestFlight and App Store capability described above.
+**Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to physical-device behavior, real Apple signing/archive, TestFlight, App Store Connect and App Review capability described above.

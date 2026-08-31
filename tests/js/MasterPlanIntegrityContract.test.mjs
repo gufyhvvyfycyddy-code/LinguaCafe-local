@@ -26,7 +26,7 @@ const fullExamplePoolAdr = read('docs/adr/ADR-0064-unbounded-real-example-random
 const recoveryMilestone = JSON.parse(read('docs/execution/CURRENT_MILESTONE.json'));
 
 // Current authority must be explicit and must not make the old Anki roadmap current again.
-assert.match(master, /Current authority — 2026-08-30/);
+assert.match(master, /Current authority — 2026-08-31/);
 assert.match(master, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18\.md/);
 assert.match(master, /Current Phase \|[^\n]*H-09[^\n]*H-11[^\n]*DONE[^\n]*H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(master, /`H-00`–`H-09`、`H-11` 均已 DONE/);
@@ -34,7 +34,8 @@ assert.match(master, /public GitHub `macos-26` runner[^\n]*Xcode 26\.6\/SwiftPM\
 assert.match(master, /authenticated login[^\n]*Keychain save\/load[^\n]*UI revoke[^\n]*token clear/);
 assert.match(master, /33282205923[^\n]*Sense Review Good[^\n]*exact FSRS restoration/);
 assert.match(master, /33301226295[^\n]*Reader[^\n]*source binding/);
-assert.match(master, /Simulator `\.txt` import[^\n]*offline\/reconnect sync[^\n]*physical device[^\n]*TestFlight\/App Store capability[^\n]*尚未完成/);
+assert.match(master, /33350591521[^\n]*Simulator capability cluster 已 Stage Accepted/);
+assert.match(master, /signed physical device[^\n]*Apple signing\/archive[^\n]*TestFlight\/App Store\/App Review/);
 assert.match(master, /H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(master, /ADR-0061-reading-early-review-minimum-spacing-boundary\.md/);
 assert.match(master, /ADR-0062-reading-ai-matched-existing-source-example-binding\.md/);
@@ -143,24 +144,24 @@ assert.match(productHistory, /ADR-0061/);
 assert.match(productHistory, /Historical \/ Superseded for forward product behavior on 2026-08-18/);
 
 // The minimal context and documentation router must lead new tasks to current authority first.
-assert.match(currentContext, /2026-08-30 current overlay/);
+assert.match(currentContext, /2026-08-31 current overlay/);
 assert.match(currentContext, /Goal plan 已完成 Phase G\/G-GATE/);
 assert.match(currentContext, /H-00[\s\S]*H-09/);
 assert.match(currentContext, /H-10 iOS capability cluster[^\n]*DEFERRED \/ Not Complete/);
 assert.match(currentContext, /Xcode 26\.6[^\n]*SwiftPM/);
-assert.match(currentContext, /Simulator compile\+launch \+ rendered login-shell \+ authenticated Keychain session lifecycle \+ formal Sense Review Good\/Undo \+ Reader touch\/source-binding accepted/);
+assert.match(currentContext, /Simulator subset 已 Stage Accepted/);
 assert.match(currentContext, /33279140695/);
 assert.match(currentContext, /Keychain token save\/load[^\n]*UI 设备撤销[^\n]*token clear/);
 assert.match(currentContext, /33282205923[^\n]*Sense Review[^\n]*FSRS fingerprint/);
 assert.match(currentContext, /33301226295[^\n]*Reader[^\n]*source binding/);
-assert.match(currentContext, /Simulator `\.txt` import[^\n]*offline\/reconnect sync/);
+assert.match(currentContext, /33350591521[^\n]*reconnect exactly-once sync/);
 assert.match(currentContext, /H-11 final Web \+ Android regression/);
 assert.match(currentContext, /H-GATE[^\n]*DEFERRED \/ Not Complete/);
 assert.match(index, /h04-backup-restore-drill-acceptance-2026-08-28\.md/);
 assert.match(index, /h05-isolation-privacy-boundary-acceptance-2026-08-28\.md/);
 assert.match(index, /e06-e07-native-android-capability-closure-2026-08-30\.md/);
 assert.match(index, /h10-macos-xcode-simulator-capability-continuation-2026-08-30\.md/);
-assert.match(index, /33301226295[^\n]*Reader[^\n]*source binding/);
+assert.match(index, /33350591521[^\n]*offline\/reconnect exactly-once sync/);
 assert.match(index, /h-gate-final-goal-completion-audit-2026-08-30\.md/);
 assert.match(currentContext, /单窗口直接执行/);
 assert.match(currentContext, /ADR-0061/);
@@ -171,19 +172,21 @@ assert.match(index, /当前产品权威/);
 assert.match(index, /LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18\.md/);
 assert.match(index, /Reader 提前复习 \/ 24h 最小正向间隔 \/ 静默 non-scoring \/ 单次计分 \/ 不认识→Again/);
 assert.match(index, /AI 阅读 matched-existing 真实来源例句绑定 \/ 无上限真实例句池 \/ 随机不连续重复轮换/);
-assert.match(handoff, /Current authority — 2026-08-30/);
+assert.match(handoff, /Current authority — 2026-08-31/);
 assert.match(handoff, /CURRENT_MILESTONE\.json[^\n]*历史状态[^\n]*不再是当前 Goal 授权入口/);
 assert.match(handoff, /macos-26[^\n]*Xcode 26\.6[^\n]*Simulator boot\/install\/launch[^\n]*rendered login-shell/);
 assert.match(handoff, /33279140695[^\n]*Keychain save\/load[^\n]*UI revoke\/token clear/);
 assert.match(handoff, /33282205923[^\n]*Sense Review Good[^\n]*FSRS fingerprint restoration/);
 assert.match(handoff, /33301226295[^\n]*Reader[^\n]*source binding/);
+assert.match(handoff, /33350591521[^\n]*Simulator capability cluster[^\n]*Stage Accepted/);
 assert.match(handoff, /H-10\/E-08[^\n]*继续 DEFERRED/);
 assert.match(goal, /33301226295[^\n]*Reader[^\n]*source binding/);
-assert.match(goal, /剩余 Simulator \.txt import、offline\/reconnect sync/);
+assert.match(goal, /33350591521[^\n]*Simulator capability cluster[^\n]*Stage Accepted/);
 assert.match(h10Continuation, /33301226295[^\n]*SUCCESS/);
-assert.match(h10Continuation, /remaining authenticated Simulator content matrix: `\.txt` import/);
-assert.match(hGateAudit, /Reader touch\/source-binding[^\n]*PASS/);
-assert.match(hGateAudit, /remaining Simulator `\.txt` import\/offline\/reconnect sync/);
+assert.match(h10Continuation, /33350591521[^\n]*SUCCESS/);
+assert.match(h10Continuation, /Simulator capability cluster[^\n]*Stage Accepted/);
+assert.match(hGateAudit, /33350591521[^\n]*authenticated Simulator content matrix|final full run `33350591521`/);
+assert.match(hGateAudit, /full required iOS Simulator cluster: Stage Accepted|full required iOS Simulator cluster/i);
 
 // The old recovery milestone remains valid history, but it must not be advertised as current Phase G authority.
 assert.equal(recoveryMilestone.active_task, 'NONE');
