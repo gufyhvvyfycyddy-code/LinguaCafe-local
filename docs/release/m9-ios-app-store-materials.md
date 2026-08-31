@@ -44,9 +44,14 @@ Description:
 ## Review notes draft
 
 LinguaCafe requires a reachable compatible server and an existing test account;
-the iOS app does not create an account. The review account must be least
-privilege, contain only review-safe fixture data and must not expire during App
-Review. Credentials must be entered in App Store Connect, never committed here.
+the iOS app does not create an account. Login is required because the app's core
+features are the user's server-backed library, WordSense/review state and sync;
+the app authenticates directly against that selected LinguaCafe server with the
+existing email/password account and does not integrate a third-party or social
+login service. Permanent server-account deletion remains available from that
+server's Web account settings. The review account must be least privilege,
+contain only review-safe fixture data and must not expire during App Review.
+Credentials must be entered in App Store Connect, never committed here.
 
 Suggested review path:
 

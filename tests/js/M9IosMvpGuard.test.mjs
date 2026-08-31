@@ -198,6 +198,9 @@ assert.ok(description.length > 0 && description.length <= 4000, `App Store descr
 assert.ok(Buffer.byteLength(keywords, 'utf8') > 0 && Buffer.byteLength(keywords, 'utf8') <= 100, `App Store keywords must be 1-100 UTF-8 bytes, got ${Buffer.byteLength(keywords, 'utf8')}`);
 assert.ok(Buffer.byteLength(reviewNotes, 'utf8') > 0 && Buffer.byteLength(reviewNotes, 'utf8') <= 4000, `App Review notes must be 1-4000 UTF-8 bytes, got ${Buffer.byteLength(reviewNotes, 'utf8')}`);
 assert.match(storeMaterials, /reachable compatible server/);
+assert.match(storeMaterials, /core\s+features are the user's server-backed library, WordSense\/review state and sync/);
+assert.match(storeMaterials, /does not integrate a third-party or social\s+login service/);
+assert.match(storeMaterials, /Permanent server-account deletion remains available from that\s+server's Web account settings/);
 assert.match(storeMaterials, /review account/);
 assert.match(storeMaterials, /must not expire during App\s+Review/);
 assert.match(storeMaterials, /required 13-inch iPad screenshots/);
