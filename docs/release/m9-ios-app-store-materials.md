@@ -6,11 +6,13 @@ Status: release candidate; not submitted
 
 - App name: `LinguaCafe`
 - Subtitle: `Read, look up, review English`
+- Version candidate: `1.0`
+- Build candidate: `1`
 - Primary category: Education
 - Secondary category: Reference
 - Primary language: publisher-owned App Store Connect value; must be chosen before submission
 - Promotional text: `Continue your LinguaCafe English reading and sense-based
-  reviews on iPhone, with short-term offline access and local reminders.`
+  reviews on iPhone and iPad, with short-term offline access and local reminders.`
 - Keywords: `English,reading,vocabulary,FSRS,review,dictionary,offline`
 
 Current App Store metadata guardrails, rechecked against Apple's 2026-08-31
