@@ -262,6 +262,14 @@ assert.match(storeMaterials, /publisher-owned App Store app-record values[\s\S]*
 assert.match(storeMaterials, /Digital Services Act trader status/);
 assert.match(storeMaterials, /South Korea, China mainland, or Vietnam fields/);
 assert.match(storeMaterials, /content-frequency questions[\s\S]*actual release server\/content inventory/);
+assert.match(storeMaterials, /Parental Controls: `No`/);
+assert.match(storeMaterials, /Age Assurance: `No`/);
+assert.match(storeMaterials, /Unrestricted Web Access: `No`/);
+assert.match(storeMaterials, /User-Generated Content: `No`/);
+assert.match(storeMaterials, /Messaging and Chat: `No`/);
+assert.match(storeMaterials, /Advertising: `No`/);
+assert.match(storeMaterials, /broad-distribution definition[\s\S]*private per-account learning text and meanings[\s\S]*does not broadly distribute/);
+assert.match(storeMaterials, /server URL is not a general-purpose browser surface/);
 assert.match(storeMaterials, /Social Media capability: `No`/);
 assert.match(storeMaterials, /As of September 2026[\s\S]*required when submitting new apps or updates/);
 assert.doesNotMatch(api, /\/(?:social|feeds?|posts?|comments?|reactions?|reposts?|likes?|shares?)\b/i);
