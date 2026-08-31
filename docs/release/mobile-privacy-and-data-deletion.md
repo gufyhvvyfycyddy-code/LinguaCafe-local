@@ -14,19 +14,25 @@ identity plus a real privacy-contact mechanism used by the store listing.
 LinguaCafe is a client for a user-selected LinguaCafe server. It does not use an
 advertising SDK and does not track users across apps or websites.
 
-The selected server receives and stores data needed to provide the learning
-service:
+The selected server stores the existing account profile and receives data needed
+to provide the learning service. The current mobile client sends the account email
+at sign-in but does not upload the account name or numeric/UUID user id as separate
+profile fields. It also sends or persists through the selected server:
 
-- account name and email address;
-- a random app installation identifier and device/app version;
+- a random app installation identifier, device name/platform and app version;
 - imported English learning material and user-created meanings;
-- review ratings, timing, scheduling state, markers, tags and progress;
+- review ratings, timing, scheduling state, markers, tags and reading progress;
 - queued offline actions when connectivity returns;
-- user-selected audio/media and ordinary server security/diagnostic logs.
+- user-selected audio/media references needed to deliver the learning content.
 
-These data are linked to the signed-in account because that is required to keep
-each user's library, review history and schedule isolated. LinguaCafe does not
-sell the data or use it for third-party advertising.
+The standard public deployment also uses Apache combined access logs. A dictionary
+lookup places the searched term in the request URL, so the access log can retain that
+search term together with ordinary request and client-IP diagnostic metadata after the
+request completes. A custom server operator can choose a different retention policy.
+Account/device/learning records are linked to the signed-in account; access-log search
+and diagnostic data are conservatively disclosed as linked because the selected server
+can correlate authenticated service activity. LinguaCafe does not sell these data, use
+them for third-party advertising, or use them to track users across apps or websites.
 
 ## On-device data
 

@@ -77,9 +77,32 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/LinguaCafeDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             build
-          APP_PLIST="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app/Info.plist"
+          APP_BUNDLE="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          APP_PLIST="$APP_BUNDLE/Info.plist"
+          PRIVACY_PLIST="$APP_BUNDLE/PrivacyInfo.xcprivacy"
           test -f "$APP_PLIST"
+          test -f "$PRIVACY_PLIST"
           test "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$APP_PLIST")" = "false"
+          python3 - "$PRIVACY_PLIST" <<'PY'
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], 'rb') as handle:
+              privacy = plistlib.load(handle)
+          actual = {item['NSPrivacyCollectedDataType'] for item in privacy['NSPrivacyCollectedDataTypes']}
+          expected = {
+              'NSPrivacyCollectedDataTypeEmailAddress',
+              'NSPrivacyCollectedDataTypeDeviceID',
+              'NSPrivacyCollectedDataTypeOtherUserContent',
+              'NSPrivacyCollectedDataTypeProductInteraction',
+              'NSPrivacyCollectedDataTypeSearchHistory',
+              'NSPrivacyCollectedDataTypeOtherDiagnosticData',
+          }
+          if actual != expected:
+              raise SystemExit(f'Unexpected bundled privacy data types: {sorted(actual)}')
+          if privacy.get('NSPrivacyTracking') is not False:
+              raise SystemExit('Bundled privacy manifest must keep tracking disabled')
+          PY
 
       - name: Install pinned Maestro CLI for rendered smoke
         run: |
