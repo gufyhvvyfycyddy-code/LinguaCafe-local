@@ -233,6 +233,12 @@ assert.match(storeMaterials, /South Korea, China mainland, or Vietnam fields/);
 assert.match(storeMaterials, /content-frequency questions[\s\S]*actual release server\/content inventory/);
 assert.match(storeMaterials, /Content Rights declaration must additionally account for material served by the actual release server/);
 assert.match(storeMaterials, /does not hard-code or claim a numeric\/label age rating/);
+assert.match(storeMaterials, /no StoreKit integration, in-app purchase or subscription UI, payment SDK, checkout flow/);
+assert.match(storeMaterials, /publisher must confirm the actual business model/);
+assert.doesNotMatch(JSON.stringify(pkg.dependencies), /storekit|revenuecat|stripe|paypal/i);
+for (const purchaseSurfaceSource of [ui, api, project, iosPackage]) {
+  assert.doesNotMatch(purchaseSurfaceSource, /\bStoreKit\b|RevenueCat|Stripe|PayPal/);
+}
 assert.match(storeMaterials, /ITSAppUsesNonExemptEncryption/);
 assert.match(storeMaterials, /Apple operating-system encryption/);
 assert.match(storeMaterials, /Search history: dictionary lookup terms/);

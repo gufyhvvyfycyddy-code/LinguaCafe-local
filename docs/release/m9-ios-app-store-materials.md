@@ -122,6 +122,10 @@ The privacy/export-compliance candidate is now executable evidence rather than s
 
 These checks establish the repository-side candidate. The deployment owner still has to answer App Store Connect against the actual production server/partners at submission time.
 
+## Business-model factual boundary
+
+The current iOS/mobile client contains no StoreKit integration, in-app purchase or subscription UI, payment SDK, checkout flow, or call to action that sends the user to an external purchase mechanism. This is a binary/repository fact, not a claim that the deployment or server is free. Before submission, the publisher must confirm the actual business model against the storefronts where the app will be distributed. If a release sells or unlocks digital content/features, adds an external-purchase call to action, or introduces StoreKit/payment code, re-review App Review Guideline 3.1 and update the metadata/review notes before submission.
+
 ## Age-rating and content-rights factual boundary
 
 Repository evidence can pre-answer only capability facts, not the final rating or legal declaration:
