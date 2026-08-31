@@ -62,14 +62,28 @@ Suggested review path:
 
 - Tracking: No.
 - Third-party advertising: No.
-- Contact info / email: collected by the selected server, linked to user, app
-  functionality and account authentication.
-- User ID/device ID: collected, linked to user, app functionality/security.
-- User content: collected, linked to user, app functionality.
-- Product interaction/review activity: collected, linked to user, app
-  functionality and scheduling.
-- Diagnostics: deployment-dependent ordinary server logs; disclose if the
-  production operator retains them.
+- Contact info / email: the mobile sign-in request sends the account email to the
+  selected server; it is linked to the account and used for authentication/app functionality.
+- Device ID: the random app-installation UUID plus device/platform/app-version metadata
+  are retained by the selected server, linked to the account, for app functionality/security.
+- User content: imported learning text and user-created meanings are collected, linked
+  to the account, for app functionality.
+- Product interaction/review activity: reading progress, review ratings/timing and
+  queued actions are collected, linked to the account, for app functionality/scheduling.
+- Search history: dictionary lookup terms can be retained in the standard Apache
+  combined access log; disclose as linked, not tracking, for app functionality/security.
+- Other diagnostic data: ordinary request/client-IP access-log metadata can be retained
+  by the standard deployment; disclose as linked, not tracking, for app functionality/security.
+- Name and User ID are not separate device-origin collected data types in the current
+  mobile flow: bootstrap returns the existing server profile to the app, but the app
+  does not upload those profile fields. Custom-server log retention can vary.
+
+The current `PrivacyInfo.xcprivacy` / App Store privacy-answer candidate therefore uses
+this exact collected-data set: Email Address, Device ID, Other User Content, Product
+Interaction, Search History, and Other Diagnostic Data. All six are declared as linked
+to the user, not used for tracking, and used only for App Functionality. Any future
+change to authentication fields, dictionary transport, access-log retention, analytics,
+or diagnostics requires this classification to be reviewed again.
 
 The `PrivacyInfo.xcprivacy` required-reason entry is
 `NSPrivacyAccessedAPICategoryUserDefaults / CA92.1`, matching the official

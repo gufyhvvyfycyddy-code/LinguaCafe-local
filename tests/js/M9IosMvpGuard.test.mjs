@@ -40,6 +40,7 @@ const readerUiTest = read('mobile', 'ios', 'App', 'AppUITests', 'ReaderAcceptanc
 const appScheme = read('mobile', 'ios', 'App', 'App.xcodeproj', 'xcshareddata', 'xcschemes', 'App.xcscheme');
 const readerPabServer = read('tests', 'Support', 'start-ios-reader-pab-server.php');
 const commandTimeoutHarness = read('tests', 'Support', 'run-command-with-timeout.php');
+const apacheVhost = read('docker', 'vhost.conf');
 const readerSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileReaderSmokeData.php');
 const offlineSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileOfflineSmokeData.php');
 
@@ -69,9 +70,21 @@ assert.match(storyboard, /customModule="App"/);
 assert.match(project, /PrivacyInfo\.xcprivacy in Resources/);
 assert.match(privacy, /NSPrivacyAccessedAPICategoryUserDefaults/);
 assert.match(privacy, /CA92\.1/);
-for (const dataType of ['Name', 'EmailAddress', 'UserID', 'DeviceID', 'OtherUserContent', 'ProductInteraction']) {
-  assert.match(privacy, new RegExp(`NSPrivacyCollectedDataType${dataType}`));
-}
+const collectedPrivacyDataTypes = new Set(
+  [...privacy.matchAll(/<string>NSPrivacyCollectedDataType(?!Purpose)([A-Za-z0-9]+)<\/string>/g)].map(match => match[1]),
+);
+assert.deepEqual(collectedPrivacyDataTypes, new Set([
+  'EmailAddress',
+  'DeviceID',
+  'OtherUserContent',
+  'ProductInteraction',
+  'SearchHistory',
+  'OtherDiagnosticData',
+]));
+assert.equal((privacy.match(/<key>NSPrivacyCollectedDataTypeLinked<\/key>\s*<true\/>/g) ?? []).length, 6);
+assert.equal((privacy.match(/<key>NSPrivacyCollectedDataTypeTracking<\/key>\s*<false\/>/g) ?? []).length, 6);
+assert.equal((privacy.match(/<string>NSPrivacyCollectedDataTypePurposeAppFunctionality<\/string>/g) ?? []).length, 6);
+assert.match(privacy, /<key>NSPrivacyTrackingDomains<\/key>\s*<array\/>/);
 assert.match(privacy, /<key>NSPrivacyTracking<\/key>\s*<false\/>/);
 assert.match(infoPlist, /<key>NSAppTransportSecurity<\/key>\s*<dict>\s*<key>NSAllowsLocalNetworking<\/key>\s*<true\/>\s*<\/dict>/);
 assert.match(infoPlist, /<key>NSLocalNetworkUsageDescription<\/key>\s*<string>[^<]*本地学习服务器[^<]*<\/string>/);
@@ -83,6 +96,8 @@ assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 assert.match(project, /TARGETED_DEVICE_FAMILY = "1,2";/);
 
 assert.match(api, /platform: 'android' \| 'ios' \| 'web'/);
+assert.match(api, /dictionary\(term: string\)[\s\S]*?\/dictionary\/lookup\?term=\$\{encodeURIComponent\(term\)\}/);
+assert.match(apacheVhost, /CustomLog \$\{APACHE_LOG_DIR\}\/access\.log combined/);
 assert.doesNotMatch(api, /\.\.\.payload, platform: 'android'/);
 assert.match(api, /markReadingUnfamiliarTarget/);
 assert.match(api, /reading_session_id\?: string/);
@@ -167,9 +182,15 @@ assert.match(storeMaterials, /final in-app link to that exact policy/);
 assert.match(storeMaterials, /support HTTPS URL with real deployment-owner contact information/);
 assert.match(storeMaterials, /ITSAppUsesNonExemptEncryption/);
 assert.match(storeMaterials, /Apple operating-system encryption/);
+assert.match(storeMaterials, /Search history: dictionary lookup terms/);
+assert.match(storeMaterials, /Other diagnostic data: ordinary request\/client-IP access-log metadata/);
+assert.match(storeMaterials, /Name and User ID are not separate device-origin collected data types/);
 assert.match(mobilePrivacy, /正式应用商店商品页/);
 assert.doesNotMatch(mobilePrivacy, /Google Play 商品页/);
 assert.match(privacyNotice, /does not track users across apps or websites/);
+assert.match(privacyNotice, /standard public deployment also uses Apache combined access logs/);
+assert.match(privacyNotice, /dictionary\s+lookup places the searched term in the request URL/);
+assert.match(privacyNotice, /client-IP diagnostic metadata/);
 assert.match(privacyNotice, /## Server data deletion/);
 assert.match(privacyNotice, /do not offer or link to account creation/);
 assert.match(privacyNotice, /future mobile release\s+adds or links to mobile account creation/);
@@ -235,6 +256,14 @@ assert.match(xcodeCapabilityWorkflow, /generic\/platform=iOS Simulator/);
 assert.match(xcodeCapabilityWorkflow, /CODE_SIGNING_ALLOWED=NO/);
 assert.match(xcodeCapabilityWorkflow, /Print :ITSAppUsesNonExemptEncryption/);
 assert.match(xcodeCapabilityWorkflow, /= "false"/);
+assert.match(xcodeCapabilityWorkflow, /PrivacyInfo\.xcprivacy/);
+assert.match(xcodeCapabilityWorkflow, /NSPrivacyCollectedDataTypes/);
+assert.match(xcodeCapabilityWorkflow, /Unexpected bundled privacy data types/);
+assert.match(xcodeCapabilityWorkflow, /NSPrivacyAccessedAPICategoryUserDefaults/);
+assert.match(xcodeCapabilityWorkflow, /CA92\.1/);
+assert.match(xcodeCapabilityWorkflow, /Unexpected bundled required-reason APIs/);
+assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking disabled/);
+assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking domains empty/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';
