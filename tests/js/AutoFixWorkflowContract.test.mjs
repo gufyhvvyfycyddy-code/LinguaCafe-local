@@ -26,10 +26,10 @@ assert.match(executorPermissionBlock, /actions: write/);
 const schedulerJobEnv = scheduler.match(/    env:[\s\S]*?    steps:/)?.[0] ?? '';
 assert.match(schedulerJobEnv, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 
-const attemptStep = executor.match(/- name: Determine attempt number[\s\S]*?# Step 8:/)?.[0] ?? '';
+const attemptStep = executor.match(/- name: Determine attempt number[\s\S]*?(?=\n      - name:)/)?.[0] ?? '';
 assert.match(attemptStep, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 
-const createPrStep = executor.match(/- name: Create Pull Request[\s\S]*?# Step 11:/)?.[0] ?? '';
+const createPrStep = executor.match(/- name: Create Pull Request[\s\S]*?(?=\n      - name:)/)?.[0] ?? '';
 assert.match(createPrStep, /GH_TOKEN: \$\{\{ secrets\.GITHUB_TOKEN \}\}/);
 
 const schedulerTriggerStep = executor.match(/- name: Trigger auto-fix scheduler on failure[\s\S]*$/)?.[0] ?? '';
