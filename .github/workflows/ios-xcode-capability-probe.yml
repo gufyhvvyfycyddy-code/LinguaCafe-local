@@ -134,7 +134,21 @@ jobs:
           test -f "$ARCHIVE_APP/PrivacyInfo.xcprivacy"
           test "$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PLIST")" = "com.linguacafe.mobile"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$ARCHIVE_APP/Info.plist")" = "com.linguacafe.mobile"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$ARCHIVE_APP/Info.plist")" = "LinguaCafe"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ARCHIVE_APP/Info.plist")" = "1.0"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ARCHIVE_APP/Info.plist")" = "1"
           test "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$ARCHIVE_APP/Info.plist")" = "false"
+          python3 - "$ARCHIVE_APP/PrivacyInfo.xcprivacy" "App/PrivacyInfo.xcprivacy" <<'PY'
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], 'rb') as handle:
+              archived = plistlib.load(handle)
+          with open(sys.argv[2], 'rb') as handle:
+              source = plistlib.load(handle)
+          if archived != source:
+              raise SystemExit('Archived PrivacyInfo.xcprivacy differs semantically from source')
+          PY
 
       - name: Install pinned Maestro CLI for rendered smoke
         run: |
