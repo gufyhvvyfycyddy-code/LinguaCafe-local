@@ -39,7 +39,6 @@ jobs:
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
           echo "LC_IOS_IPAD_SIM_UDID=$IPAD_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
-          xcrun simctl boot "$IPAD_UDID"
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -133,6 +132,9 @@ jobs:
       - name: Run rendered 13-inch iPad login-shell smoke
         run: |
           set -euo pipefail
+          xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile || true
+          xcrun simctl shutdown "$LC_IOS_SIM_UDID"
+          xcrun simctl boot "$LC_IOS_IPAD_SIM_UDID"
           xcrun simctl bootstatus "$LC_IOS_IPAD_SIM_UDID" -b
           APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
           test -d "$APP_PATH"
