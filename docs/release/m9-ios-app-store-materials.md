@@ -109,6 +109,7 @@ The privacy/export-compliance candidate is now executable evidence rather than s
 - run `33359184066` on Xcode 26.6 passed the compiled `App.app/Info.plist` check for `ITSAppUsesNonExemptEncryption = NO` and the serial iPhone + 13-inch-iPad rendered smoke;
 - run `33361617463` passed the first compiled-bundle six-category Privacy Manifest check plus the same rendered device smoke and cleanup;
 - final run `33362427450` passed the stricter compiled-bundle check for the exact six collected-data types, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and `ITSAppUsesNonExemptEncryption = NO`, then passed iPhone + 13-inch-iPad rendered smoke and shutdown;
+- Capacitor 8.4.2 is an Apple-listed SDK that must carry its own privacy manifest. The release archive gate therefore also requires valid `PrivacyInfo.xcprivacy` resources inside the archived `Capacitor.framework` and `Cordova.framework`; the app-level manifest is not treated as a substitute for those SDK manifests;
 - the carrier commits used only to dispatch branch workflows are excluded from Goal history; the accepted privacy net change is integrated in Goal commit `330caf569d63199047d2f0ef54573e7c47c6795e`.
 
 These checks establish the repository-side candidate. The deployment owner still has to answer App Store Connect against the actual production server/partners at submission time.
