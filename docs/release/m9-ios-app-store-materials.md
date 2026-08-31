@@ -149,6 +149,14 @@ Repository evidence can pre-answer only capability facts, not the final rating o
 - H-08 already accepted the supported public package/content-rights boundary, including SPDX/REUSE-style notices, bundled third-party license texts and exclusion of unresolved-provenance flag PNGs from supported Docker/`git archive` releases. That evidence supports the packaged-app rights review, but the App Store Content Rights declaration must additionally account for material served by the actual release server and the territories where the app is distributed;
 - App Store Connect must calculate the final age rating from its current questionnaire. The repository does not hard-code or claim a numeric/label age rating.
 
+## iOS 27 lifecycle and launch-screen readiness
+
+Apple's iOS 27 SDK lifecycle boundary is now covered by repository and Simulator evidence. Goal commit `d79a3bdcfc908cfe8f9ff6c47548ac6a3e272a22` upgrades the Capacitor core iOS/Android/CLI line to `8.5.0`, adds the UIScene manifest/AppDelegate/SceneDelegate path, and preserves LinguaCafe's custom `MyViewController` so `SecureTokenPlugin` remains registered through its existing `capacitorDidLoad()` owner. The tracked SwiftPM dependency is also pinned to Capacitor `8.5.0`.
+
+Validation run `33421292052` passed the existing Xcode 26.6 unsigned compile/archive and rendered iPhone + 13-inch-iPad release lane. Validation run `33421932881` then used Xcode `27.0` with iPhoneOS SDK `27.0`, compiled the current candidate, verified the built scene manifest and `UILaunchStoryboardName=LaunchScreen`, and booted an iOS 27 iPhone 17 Pro Simulator where `com.linguacafe.mobile` installed, launched and remained alive until the validation step terminated it. The temporary dispatch carriers were restored immediately and are not part of Goal history.
+
+This is repository/Simulator compatibility evidence only. The final submitted binary still needs the Apple-team signed/archive/TestFlight/App Store checks listed below, and future changes to the scene lifecycle or launch screen must re-run the release guard and native validation lane.
+
 ## Required external values and evidence before submission
 
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;

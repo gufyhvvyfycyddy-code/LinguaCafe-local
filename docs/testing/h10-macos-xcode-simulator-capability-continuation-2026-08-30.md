@@ -348,6 +348,19 @@ The canonical `cap:sync:ios` entry now runs `mobile/scripts/normalize-ios-spm-pa
 
 The repaired Windows flow was executed end-to-end: Capacitor regenerated the iOS package file, the normalizer repaired the host-specific paths, generated-Web integrity remained green with zero sourcemaps, and the final tracked `Package.swift` had zero semantic diff from Goal. This hardening prevents Windows development from contaminating the later macOS/Xcode SwiftPM path. It does **not** add physical-device, Apple-team signing, signed archive, TestFlight, App Store Connect or App Review evidence, so H-10/E-08/H-GATE remain DEFERRED exactly as above.
 
+## Capacitor 8.5 UIScene / iOS 27 lifecycle closure — 2026-09-01
+
+Apple's current lifecycle requirement makes UIScene adoption a launch-compatibility boundary for apps built with the iOS 27 SDK. The Goal candidate therefore upgraded the Capacitor core iOS/Android/CLI line from `8.4.2` to `8.5.0` and used Capacitor's shipped UIScene migration path. LinguaCafe keeps its existing `MyViewController : CAPBridgeViewController` extension because that class owns registration of `SecureTokenPlugin`; the generated `SceneDelegate` consequently instantiates `MyViewController()` rather than bypassing it with a plain `CAPBridgeViewController()`.
+
+Accepted Goal commit: `d79a3bdcfc908cfe8f9ff6c47548ac6a3e272a22` (`fix: adopt Capacitor UIScene lifecycle`). The tracked iOS SwiftPM package now pins `capacitor-swift-pm` `8.5.0`; the existing Windows `normalize-ios-spm-paths.mjs` post-sync owner remained green, so the lifecycle upgrade does not reintroduce host-specific backslash package paths. The same dependency line also completed the existing Android debug build locally without a semantic Android project diff.
+
+GitHub-hosted validation used two isolated branch-only workflow carriers; both carriers were restored immediately after dispatch and their history is excluded from Goal:
+
+- run `33421292052` on Xcode `26.6` passed Mobile tests, Capacitor `8.5` iOS sync, generated-Web integrity, M9 source/release guard, SwiftPM resolution, unsigned Simulator build, unsigned Release archive, iPhone rendered login-shell smoke and 13-inch iPad rendered login-shell smoke. The screenshots remained `1320x2868` and `2064x2752`, JPEG with no alpha;
+- run `33421932881` on the GitHub `xcode-27` preview runner reported Xcode `27.0` and iPhoneOS SDK `27.0`, then passed Mobile tests, Capacitor sync, generated-Web integrity, M9 guard, SwiftPM resolution and an unsigned iOS 27 Simulator build. The built `App.app/Info.plist` was checked for `UIApplicationSceneManifest`, `$(PRODUCT_MODULE_NAME).SceneDelegate`, `Main` scene storyboard and `UILaunchStoryboardName=LaunchScreen`. An available iOS 27 iPhone 17 Pro Simulator then booted, installed `com.linguacafe.mobile`, launched it successfully and later terminated the still-running process normally.
+
+This closes the repository/Simulator UIScene launch-compatibility regression introduced by Apple's iOS 27 lifecycle requirement. It does not add Apple-team signing, physical-device, TestFlight, App Store Connect or App Review evidence, so the external H-10 capability cluster below remains deferred.
+
 ## Official environment references
 
 - GitHub Actions billing: https://docs.github.com/en/billing/concepts/product-billing/github-actions
