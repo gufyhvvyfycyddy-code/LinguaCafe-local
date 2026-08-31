@@ -99,8 +99,8 @@ assert.match(acceptance, /recorded explicit platform\s+prohibition/);
 for (const source of [agents, adr34, roadmap, collaboration, acceptance]) {
   assert.match(source, /Acceptance Deferred — Not Complete/);
 }
-assert.match(current, /当前唯一未完成的产品能力簇仍是 M9 iOS sync\/Xcode\/签名\/模拟器\/真机\/TestFlight\/App Store/);
-assert.match(current, /sync 前必须清除旧 generated bundle 与 sourcemap/);
+assert.match(current, /当前唯一未完成的产品能力簇已收窄为 signed physical iPhone[\s\S]{0,260}publisher-owned final store answers/);
+assert.match(current, /final privacy run=`33362427450`[\s\S]{0,120}Goal integration=`330caf56`/);
 assert.match(adr34, /不是 Accept、Closed、Completed/);
 assert.match(adr34, /不使用“每条路径最多一个 deferred”的机械预算/);
 assert.match(adr34, /不能消费或假设缺失行为正确/);

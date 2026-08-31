@@ -197,8 +197,11 @@ and the required 13-inch iPad screenshots. Repository-side rendered iPad smoke i
 proven by GitHub Actions run `33355499203` on `iPad Pro 13-inch (M5)`, including a
 `2064x2752` screenshot. Final App Store screenshots still need deployment-owner review
 and upload; the Simulator smoke is only a release-preparation gate. If iPad support is intentionally removed, that must be an explicit
-product change before archive rather than a store-metadata workaround. Answer privacy
-questions from observed data flow rather than marketing intent.
+product change before archive rather than a store-metadata workaround.
+
+Repository-side privacy preparation is now an executable candidate rather than source-only prose: run `33359184066` passed the compiled export-compliance declaration; runs `33361617463` and final `33362427450` passed the built-app Privacy Manifest checks, with `33362427450` covering the exact six collected-data categories, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and the serial iPhone+iPad smoke. Use the candidate in `docs/release/m9-ios-app-store-materials.md`, but re-confirm it against the actual production server, partners and retention behavior at submission time.
+
+For Age Rating, answer client capability questions from the current implementation, but answer content-frequency questions from the actual release server/content inventory; do not infer `None` from the client alone. For Content Rights, use the accepted H-08 public-package rights evidence for bundled/released assets, then separately confirm rights for material supplied by the actual release server and the territories selected in App Store Connect.
 
 Submission is a separate external action. Only after actual App Store Connect review
 shows approval may M9 be changed from `Not Complete` to `Accepted / Closed`.
@@ -212,7 +215,7 @@ Update the M9 acceptance report with:
 - testing sentinel and cleanup evidence;
 - Keychain boolean/status evidence without token material;
 - archive validation, TestFlight build and device results;
-- public privacy/support URLs and App Store Connect privacy-answer review;
+- public Privacy Policy / Support URLs plus deployment-owner review of the prepared privacy candidate, Age Rating questionnaire, Content Rights declaration and other publisher-owned store metadata;
 - actual review state.
 
 Then rerun the M0–M18 completion audit. No source inspection, Android evidence or

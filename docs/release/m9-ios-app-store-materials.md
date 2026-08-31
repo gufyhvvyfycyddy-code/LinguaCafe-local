@@ -102,10 +102,32 @@ set. Re-run this determination before release if any native/network/security dep
 changes; the deployment owner remains responsible for the final export-compliance
 answers and any jurisdiction-specific reporting requirement.
 
+## Repository-side privacy validation evidence
+
+The privacy/export-compliance candidate is now executable evidence rather than source-only prose:
+
+- run `33359184066` on Xcode 26.6 passed the compiled `App.app/Info.plist` check for `ITSAppUsesNonExemptEncryption = NO` and the serial iPhone + 13-inch-iPad rendered smoke;
+- run `33361617463` passed the first compiled-bundle six-category Privacy Manifest check plus the same rendered device smoke and cleanup;
+- final run `33362427450` passed the stricter compiled-bundle check for the exact six collected-data types, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and `ITSAppUsesNonExemptEncryption = NO`, then passed iPhone + 13-inch-iPad rendered smoke and shutdown;
+- the carrier commits used only to dispatch branch workflows are excluded from Goal history; the accepted privacy net change is integrated in Goal commit `330caf569d63199047d2f0ef54573e7c47c6795e`.
+
+These checks establish the repository-side candidate. The deployment owner still has to answer App Store Connect against the actual production server/partners at submission time.
+
+## Age-rating and content-rights factual boundary
+
+Repository evidence can pre-answer only capability facts, not the final rating or legal declaration:
+
+- the current mobile client has no advertising SDK, chat/messaging or social feed, gambling/loot-box flow, unrestricted Web browser, camera/microphone/contact/location/advertising-ID access, or public user-to-user content publishing surface;
+- LinguaCafe displays English learning material supplied by the server selected for the release. Therefore content-frequency questions such as profanity, violence, medical or sexual content must be answered from the actual release server/content inventory; do not infer `None` solely from client source;
+- H-08 already accepted the supported public package/content-rights boundary, including SPDX/REUSE-style notices, bundled third-party license texts and exclusion of unresolved-provenance flag PNGs from supported Docker/`git archive` releases. That evidence supports the packaged-app rights review, but the App Store Content Rights declaration must additionally account for material served by the actual release server and the territories where the app is distributed;
+- App Store Connect must calculate the final age rating from its current questionnaire. The repository does not hard-code or claim a numeric/label age rating.
+
 ## Required external values and evidence before submission
 
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;
 - public support HTTPS URL with real deployment-owner contact information;
+- publisher-owned App Store app-record values that cannot be inferred from source: SKU, copyright owner/year, availability/territories and any region-specific declarations that apply;
+- App Review contact name/email/international-format phone plus a non-expiring least-privilege review account and reachable review server;
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;
 - Apple Developer team/bundle ownership and signing profiles;
