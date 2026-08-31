@@ -1,13 +1,14 @@
 # LinguaCafe mobile privacy and data deletion
 
-Version: 2026-08-29 Android/iOS release-preparation candidate
+Version: 2026-08-31 public Android/iOS mobile privacy policy
 
-This text is the source for the public privacy/support pages of a LinguaCafe
-mobile release. The mobile app also carries a concise in-app copy so privacy
-information remains available from the application itself. Before any Google
-Play or App Store submission, the deployment owner must publish the complete
-policy at a stable, public, non-editable HTTPS URL and add the same developer
-identity plus a real privacy-contact mechanism used by the store listing.
+This policy describes the current LinguaCafe Android and iOS mobile clients.
+The mobile app also carries a concise in-app copy so privacy information remains
+available before and after sign-in. Privacy requests about data held by a selected
+LinguaCafe server should be directed to that server operator. Privacy requests
+about the distributed mobile app should use the publisher contact mechanism on
+the store Support URL. The publisher must keep the public policy, store privacy
+disclosures, and actual release-server data practices aligned.
 
 ## Data handled
 
@@ -33,6 +34,14 @@ Account/device/learning records are linked to the signed-in account; access-log 
 and diagnostic data are conservatively disclosed as linked because the selected server
 can correlate authenticated service activity. LinguaCafe does not sell these data, use
 them for third-party advertising, or use them to track users across apps or websites.
+
+The mobile client does not directly integrate an advertising network, analytics SDK,
+or social-login provider. A LinguaCafe server operator can separately configure
+external AI, translation, dictionary, or other processing services. When such a
+processor is enabled, that operator controls which server-side data is sent to it and
+must disclose the processor and purpose in the operator's public privacy information
+and require protection consistent with this policy and applicable law. The mobile
+client's learning/API requests continue to go to the user-selected LinguaCafe server.
 
 ## On-device data
 
