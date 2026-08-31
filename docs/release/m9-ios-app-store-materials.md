@@ -45,8 +45,8 @@ Description:
 
 LinguaCafe requires a reachable compatible server and an existing test account;
 the iOS app does not create an account. The review account must be least
-privilege, contain only review-safe fixture data and remain valid for the review
-window. Credentials must be entered in App Store Connect, never committed here.
+privilege, contain only review-safe fixture data and must not expire during App
+Review. Credentials must be entered in App Store Connect, never committed here.
 
 Suggested review path:
 

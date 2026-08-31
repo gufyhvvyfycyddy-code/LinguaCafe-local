@@ -112,6 +112,44 @@ jobs:
               raise SystemExit('Bundled privacy manifest must keep tracking domains empty')
           PY
 
+      - name: Compile unsigned Release iOS archive
+        working-directory: mobile/ios/App
+        run: |
+          set -euo pipefail
+          ARCHIVE_PATH="$RUNNER_TEMP/LinguaCafeUnsigned.xcarchive"
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/LinguaCafeArchiveDerivedData" \
+            -archivePath "$ARCHIVE_PATH" \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
+          ARCHIVE_PLIST="$ARCHIVE_PATH/Info.plist"
+          ARCHIVE_APP="$ARCHIVE_PATH/Products/Applications/App.app"
+          test -f "$ARCHIVE_PLIST"
+          test -d "$ARCHIVE_APP"
+          test -f "$ARCHIVE_APP/Info.plist"
+          test -f "$ARCHIVE_APP/PrivacyInfo.xcprivacy"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ApplicationProperties:CFBundleIdentifier' "$ARCHIVE_PLIST")" = "com.linguacafe.mobile"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$ARCHIVE_APP/Info.plist")" = "com.linguacafe.mobile"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$ARCHIVE_APP/Info.plist")" = "LinguaCafe"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$ARCHIVE_APP/Info.plist")" = "1.0"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$ARCHIVE_APP/Info.plist")" = "1"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :ITSAppUsesNonExemptEncryption' "$ARCHIVE_APP/Info.plist")" = "false"
+          python3 - "$ARCHIVE_APP/PrivacyInfo.xcprivacy" "App/PrivacyInfo.xcprivacy" <<'PY'
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], 'rb') as handle:
+              archived = plistlib.load(handle)
+          with open(sys.argv[2], 'rb') as handle:
+              source = plistlib.load(handle)
+          if archived != source:
+              raise SystemExit('Archived PrivacyInfo.xcprivacy differs semantically from source')
+          PY
+
       - name: Install pinned Maestro CLI for rendered smoke
         run: |
           set -euo pipefail
