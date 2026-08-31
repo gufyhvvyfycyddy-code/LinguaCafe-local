@@ -19,6 +19,8 @@ const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.story
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
 const infoPlist = read('mobile', 'ios', 'App', 'App', 'Info.plist');
 const project = read('mobile', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
+const appIconContents = JSON.parse(read('mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'Contents.json'));
+const appIcon = fs.readFileSync(join(root, 'mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-512@2x.png'));
 const iosPackage = read('mobile', 'ios', 'App', 'CapApp-SPM', 'Package.swift');
 const route = read('routes', 'api.php');
 const controller = read('app', 'Http', 'Controllers', 'Mobile', 'MobileTextImportController.php');
@@ -94,6 +96,18 @@ assert.match(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/)
 assert.doesNotMatch(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<true\/>/);
 assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 assert.match(project, /TARGETED_DEVICE_FAMILY = "1,2";/);
+assert.equal(appIconContents.images?.length, 1);
+assert.deepEqual(appIconContents.images?.[0], {
+  filename: 'AppIcon-512@2x.png',
+  idiom: 'universal',
+  platform: 'ios',
+  size: '1024x1024',
+});
+assert.deepEqual([...appIcon.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+assert.equal(appIcon.readUInt32BE(16), 1024);
+assert.equal(appIcon.readUInt32BE(20), 1024);
+assert.equal(appIcon[24], 8, 'App Store icon must remain 8-bit PNG');
+assert.equal(appIcon[25], 2, 'App Store icon must remain RGB PNG without alpha');
 
 assert.match(api, /platform: 'android' \| 'ios' \| 'web'/);
 assert.match(api, /dictionary\(term: string\)[\s\S]*?\/dictionary\/lookup\?term=\$\{encodeURIComponent\(term\)\}/);
@@ -290,6 +304,7 @@ assert.match(unsignedArchiveBlock, /CODE_SIGNING_ALLOWED=NO[\s\S]*?archive/);
 assert.doesNotMatch(unsignedArchiveBlock, /-exportArchive|-allowProvisioningUpdates|DEVELOPMENT_TEAM|PROVISIONING_PROFILE|secrets\./i);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
+assert.match(xcodeCapabilityWorkflow, /LC_IOS_STORE_IPHONE_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';
 assert.doesNotMatch(simulatorBootBlock, /xcrun simctl boot "\$IPAD_UDID"/);
 assert.match(xcodeCapabilityWorkflow, /iPad Pro 13-inch/);
@@ -300,6 +315,16 @@ assert.match(ipadSmokeBlock, /xcrun simctl boot "\$LC_IOS_IPAD_SIM_UDID"/);
 assert.ok(ipadSmokeBlock.indexOf('shutdown "$LC_IOS_SIM_UDID"') < ipadSmokeBlock.indexOf('boot "$LC_IOS_IPAD_SIM_UDID"'));
 assert.match(xcodeCapabilityWorkflow, /2064x2752\|2048x2732/);
 assert.match(xcodeCapabilityWorkflow, /ipad-login-shell\.png/);
+assert.ok((xcodeCapabilityWorkflow.match(/sips -g hasAlpha/g) ?? []).length >= 2, 'App Store screenshot smokes must reject alpha-enabled PNGs');
+assert.ok((xcodeCapabilityWorkflow.match(/test "\$ALPHA" = "no"/g) ?? []).length >= 2, 'App Store screenshot smokes must require alpha=no');
+assert.match(xcodeCapabilityWorkflow, /iPhone 17 Pro Max/);
+assert.match(xcodeCapabilityWorkflow, /Run rendered 6\.9-inch iPhone screenshot smoke/);
+const storeIphoneSmokeBlock = xcodeCapabilityWorkflow.match(/- name: Run rendered 6\.9-inch iPhone screenshot smoke[\s\S]*?- name: Shut down simulators/)?.[0] ?? '';
+assert.match(storeIphoneSmokeBlock, /xcrun simctl shutdown "\$LC_IOS_IPAD_SIM_UDID"/);
+assert.match(storeIphoneSmokeBlock, /xcrun simctl boot "\$LC_IOS_STORE_IPHONE_SIM_UDID"/);
+assert.ok(storeIphoneSmokeBlock.indexOf('shutdown "$LC_IOS_IPAD_SIM_UDID"') < storeIphoneSmokeBlock.indexOf('boot "$LC_IOS_STORE_IPHONE_SIM_UDID"'));
+assert.match(storeIphoneSmokeBlock, /1260x2736\|1290x2796\|1320x2868/);
+assert.match(storeIphoneSmokeBlock, /iphone-6\.9-login-shell\.png/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl bootstatus/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl install/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl launch/);
@@ -310,6 +335,7 @@ assert.match(xcodeCapabilityWorkflow, /mobile-dev-inc\/Maestro\/releases\/downlo
 assert.match(xcodeCapabilityWorkflow, /a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5/);
 assert.match(xcodeCapabilityWorkflow, /shasum -a 256 -c -/);
 assert.match(xcodeCapabilityWorkflow, /Run rendered iOS login-shell smoke/);
+assert.match(xcodeCapabilityWorkflow, /extendedWaitUntil:[\s\S]*?visible: "IOS · CONNECTED MVP"[\s\S]*?timeout: 30000/);
 assert.match(xcodeCapabilityWorkflow, /IOS · CONNECTED MVP/);
 assert.match(xcodeCapabilityWorkflow, /设备令牌由系统 Keychain 保护；应用不会保存密码。/);
 assert.match(xcodeCapabilityWorkflow, /inputText: "http:\/\/127\.0\.0\.1:8878"/);
