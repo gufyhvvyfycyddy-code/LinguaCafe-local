@@ -26,7 +26,6 @@ on:
 
 jobs:
   schedule-next-attempt:
-    if: ${{ !(inputs.issue_number == '0' && inputs.attempt == 'xcode') }}
     runs-on: ubuntu-latest
 
     permissions:
@@ -265,7 +264,3 @@ jobs:
             --field "body=$NEXT_COMMAND"
 
           echo "Done. /opencode command posted for attempt ${{ env.NEXT_ATTEMPT }}."
-
-  h10-xcode-capability:
-    if: ${{ inputs.issue_number == '0' && inputs.attempt == 'xcode' }}
-    uses: ./.github/workflows/ios-xcode-capability-probe.yml
