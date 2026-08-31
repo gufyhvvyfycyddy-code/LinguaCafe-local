@@ -171,11 +171,18 @@ assert.match(storeMaterials, /Status: release candidate; not submitted/);
 assert.match(storeMaterials, /Tracking: No/);
 assert.match(storeMaterials, /Required external values and evidence before submission/);
 const listingValue = label => storeMaterials.match(new RegExp('^- ' + label + ': `([^`]+)`', 'm'))?.[1] ?? '';
+const appName = listingValue('App name');
 const subtitle = listingValue('Subtitle');
 const keywords = listingValue('Keywords');
 const promotionalText = storeMaterials.match(/^- Promotional text: `([\s\S]*?)`/m)?.[1].replace(/\s+/g, ' ').trim() ?? '';
+const description = storeMaterials.match(/Description:\s*\n([\s\S]*?)\n## Review notes draft/)?.[1]
+  .replace(/^> ?/gm, '')
+  .replace(/\s+/g, ' ')
+  .trim() ?? '';
+assert.ok(appName.length > 0 && appName.length <= 30, `App Store name must be 1-30 characters, got ${appName.length}`);
 assert.ok(subtitle.length > 0 && subtitle.length <= 30, `App Store subtitle must be 1-30 characters, got ${subtitle.length}`);
 assert.ok(promotionalText.length > 0 && promotionalText.length <= 170, `App Store promotional text must be 1-170 characters, got ${promotionalText.length}`);
+assert.ok(description.length > 0 && description.length <= 4000, `App Store description must be 1-4000 characters, got ${description.length}`);
 assert.ok(Buffer.byteLength(keywords, 'utf8') > 0 && Buffer.byteLength(keywords, 'utf8') <= 100, `App Store keywords must be 1-100 UTF-8 bytes, got ${Buffer.byteLength(keywords, 'utf8')}`);
 assert.match(storeMaterials, /required 13-inch iPad screenshots/);
 assert.match(storeMaterials, /final in-app link to that exact policy/);
