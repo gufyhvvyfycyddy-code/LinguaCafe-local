@@ -25,12 +25,7 @@ on:
         type: string
 
 jobs:
-  h10-xcode27-uiscene-carrier:
-    if: inputs.issue_number == '0' && inputs.attempt == 'xcode27'
-    uses: ./.github/workflows/ios-xcode27-uiscene-validation.yml
-
   schedule-next-attempt:
-    if: inputs.issue_number != '0' || inputs.attempt != 'xcode27'
     runs-on: ubuntu-latest
 
     permissions:
