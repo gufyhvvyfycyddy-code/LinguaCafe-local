@@ -15,6 +15,9 @@ const mobilePrivacy = read('mobile', 'src', 'privacy.ts');
 const mediaCache = read('mobile', 'src', 'mediaCache.ts');
 const styles = read('mobile', 'src', 'styles.css');
 const swift = read('mobile', 'ios', 'App', 'App', 'SecureTokenPlugin.swift');
+const appDelegate = read('mobile', 'ios', 'App', 'App', 'AppDelegate.swift');
+const sceneDelegatePath = join(root, 'mobile', 'ios', 'App', 'App', 'SceneDelegate.swift');
+const sceneDelegate = fs.existsSync(sceneDelegatePath) ? fs.readFileSync(sceneDelegatePath, 'utf8') : '';
 const viewController = read('mobile', 'ios', 'App', 'App', 'MyViewController.swift');
 const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.storyboard');
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
@@ -47,8 +50,10 @@ const apacheVhost = read('docker', 'vhost.conf');
 const readerSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileReaderSmokeData.php');
 const offlineSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileOfflineSmokeData.php');
 
-assert.equal(pkg.dependencies['@capacitor/core'], '8.4.2');
-assert.equal(pkg.dependencies['@capacitor/ios'], '8.4.2');
+assert.equal(pkg.dependencies['@capacitor/core'], '8.5.0');
+assert.equal(pkg.dependencies['@capacitor/ios'], '8.5.0');
+assert.equal(pkg.dependencies['@capacitor/android'], '8.5.0');
+assert.equal(pkg.devDependencies['@capacitor/cli'], '8.5.0');
 assert.match(pkg.scripts['cap:sync:ios'], /cap sync ios/);
 assert.match(pkg.scripts['cap:sync:ios'], /normalize-ios-spm-paths\.mjs/);
 assert.match(pkg.scripts['ios:generated-web-integrity'], /ios-generated-web-integrity\.mjs/);
@@ -73,7 +78,7 @@ assert.throws(
   () => normalizeIosSpmLocalPackagePaths('.package(\n  path: "../../../node_modules/@capacitor/haptics"\n)'),
   /unsupported local package declaration/,
 );
-const remoteSpmFixture = '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.4.2")';
+const remoteSpmFixture = '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.5.0")';
 assert.equal(normalizeIosSpmLocalPackagePaths(remoteSpmFixture), remoteSpmFixture);
 const portableSpmFixture = '.package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics")';
 assert.equal(normalizeIosSpmLocalPackagePaths(portableSpmFixture), portableSpmFixture);
@@ -84,6 +89,7 @@ for (const plugin of ['haptics', 'local-notifications', 'preferences']) {
   assert.match(iosPackage, new RegExp(`\.\./\.\./\.\./node_modules/@capacitor/${plugin}`));
 }
 assert.doesNotMatch(iosPackage, /\\node_modules\\/);
+assert.match(iosPackage, /capacitor-swift-pm\.git", exact: "8\.5\.0"/);
 
 assert.match(storage, /platform === 'android' \|\| platform === 'ios'/);
 assert.match(swift, /kSecClassGenericPassword/);
@@ -91,6 +97,13 @@ assert.match(swift, /kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly/);
 assert.doesNotMatch(swift, /UserDefaults|print\(/);
 assert.match(project, /SecureTokenPlugin\.swift in Sources/);
 assert.match(project, /MyViewController\.swift in Sources/);
+assert.match(project, /SceneDelegate\.swift in Sources/);
+assert.match(appDelegate, /configurationForConnecting[\s\S]*UISceneConfiguration/);
+assert.match(appDelegate, /config\.delegateClass = SceneDelegate\.self/);
+assert.match(sceneDelegate, /class SceneDelegate: UIResponder, UIWindowSceneDelegate/);
+assert.match(sceneDelegate, /rootViewController = MyViewController\(\)/);
+assert.match(sceneDelegate, /SceneDelegateProxy\.shared\.scene/);
+assert.match(infoPlist, /<key>UIApplicationSceneManifest<\/key>[\s\S]*<key>UISceneConfigurations<\/key>[\s\S]*<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>[\s\S]*<key>UISceneStoryboardFile<\/key>\s*<string>Main<\/string>/);
 assert.match(viewController, /class MyViewController: CAPBridgeViewController/);
 assert.match(viewController, /capacitorDidLoad\(\)/);
 assert.match(viewController, /bridge\?\.registerPluginInstance\(SecureTokenPlugin\(\)\)/);
