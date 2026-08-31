@@ -151,13 +151,13 @@ The continuation now proves:
 - PAB records the canonical Reader mobile endpoints, MySQL corroborates the resulting source binding, and TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean;
 - the real system Files picker exposes only eligible `.txt` input as selectable, rejects invalid UTF-8 and oversize `.txt` through rendered UI, imports one valid UTF-8 English file, and leaves exactly one `library.text_import` action plus one import endpoint request.
 
-Final full run `33350591521` has since closed the authenticated Simulator content matrix: cached article/review/audio survived the offline phase, one rendered Good queued locally and survived relaunch, reconnect synchronized exactly once, the empty queue remained stable, MySQL/PAB corroboration passed, and strict lease/sentinel cleanup passed. Release-capability run `33355499203` then revalidated Xcode 26.6 with `UIRequiredDeviceCapabilities = arm64`, passed the rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`, and produced a `2064x2752` 13-inch iPad screenshot. Repository-side export-compliance run `33359184066` proved `ITSAppUsesNonExemptEncryption = NO` in the compiled bundle. Privacy runs `33361617463` and final `33362427450` then proved the revised collected-data declaration plus `UserDefaults / CA92.1`, non-tracking semantics and empty tracking domains in the built `App.app`; final run `33362427450` also passed the serial iPhone/iPad rendered smoke and cleanup.
+Final full run `33350591521` has since closed the authenticated Simulator content matrix: cached article/review/audio survived the offline phase, one rendered Good queued locally and survived relaunch, reconnect synchronized exactly once, the empty queue remained stable, MySQL/PAB corroboration passed, and strict lease/sentinel cleanup passed. Release-capability run `33355499203` then revalidated Xcode 26.6 with `UIRequiredDeviceCapabilities = arm64` and passed the rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`. Repository-side export-compliance run `33359184066` proved `ITSAppUsesNonExemptEncryption = NO` in the compiled bundle. Privacy runs `33361617463` and final `33362427450` then proved the revised collected-data declaration plus `UserDefaults / CA92.1`, non-tracking semantics and empty tracking domains in the built `App.app`; final run `33362427450` also passed the serial iPhone/iPad rendered smoke and cleanup. Later run `33366809125` produced a real unsigned Xcode 26.6 Release `.xcarchive`; run `33383576886` repeated that archive gate while verifying archived App identity/version/privacy plus valid Capacitor/Cordova framework privacy manifests; run `33386931423` repeated the release/archive lane and produced App Store-sized, non-alpha JPEG evidence at 6.9-inch iPhone `1320x2868` and 13-inch iPad `2064x2752`.
 
 The following completion-required evidence still does not exist and must not be inferred from Simulator evidence:
 
 - signed physical-iPhone installation plus physical-device Keychain confirmation and physical haptics/notification/audio/safe-area behavior;
-- Apple team/provisioning and signed archive validation;
-- App Store Connect processing, TestFlight install and App Review evidence.
+- Apple team/provisioning plus a signed Release archive and Organizer `Validate App`; the unsigned archive structure is already proven;
+- App Store Connect processing, final marketing screenshot selection/upload, TestFlight install and App Review evidence.
 
 Full continuation evidence: `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`.
 
@@ -174,7 +174,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/full Simulator content matrix PASS, including authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import, offline/reconnect exactly-once sync, corrected `arm64` release capability, serial iPhone + 13-inch iPad rendered smoke, compiled-bundle export-compliance declaration and compiled-bundle Privacy Manifest/required-reason checks; physical device, real Apple signing/archive, TestFlight/App Store processing, public Privacy/Support URLs and publisher-owned final store answers remain FAIL / unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/full Simulator content matrix PASS, including authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import, offline/reconnect exactly-once sync, corrected `arm64` release capability, compiled-bundle export/privacy checks, real unsigned Release `.xcarchive`, archived SDK privacy manifests and accepted 6.9-inch-iPhone/13-inch-iPad screenshot technical classes; physical device, Apple-team signed archive + Organizer `Validate App`, TestFlight/App Store processing, final marketing screenshot selection/upload, public Privacy/Support URLs and publisher-owned final store answers remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;
@@ -211,8 +211,8 @@ H-GATE remains open only on the physical-device and Apple distribution portion o
 The minimum remaining work is:
 
 1. repeat the critical matrix on a signed physical iPhone, including physical Keychain confirmation and haptics/notification/audio/safe-area behavior;
-2. perform Apple team/provisioning and signed archive validation;
-3. obtain TestFlight/App Store Connect processing and physical install evidence if the final Goal still requires store readiness;
+2. perform Apple team/provisioning, create the signed Release archive and run Organizer `Validate App`;
+3. obtain TestFlight/App Store Connect processing, final marketing screenshot selection/upload and physical install evidence if the final Goal still requires store readiness;
 4. publish the final Privacy Policy / Support URLs and have the deployment owner confirm the prepared privacy, age-rating, content-rights and other publisher-owned App Store Connect answers against the actual release server/content;
 5. obtain the real App Review result;
 6. rerun H-GATE and mark DONE only if the deferred cluster is fully cleared.

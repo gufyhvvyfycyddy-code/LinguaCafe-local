@@ -100,7 +100,9 @@ for (const source of [agents, adr34, roadmap, collaboration, acceptance]) {
   assert.match(source, /Acceptance Deferred — Not Complete/);
 }
 assert.match(current, /当前唯一未完成的产品能力簇已收窄为 signed physical iPhone[\s\S]{0,260}publisher-owned final store answers/);
-assert.match(current, /final privacy run=`33362427450`[\s\S]{0,120}Goal integration=`330caf56`/);
+assert.match(current, /final privacy run=`33362427450`[\s\S]{0,120}privacy integration=`330caf56`/);
+assert.match(current, /33366809125[\s\S]{0,120}33383576886[\s\S]{0,160}33386931423/);
+assert.match(current, /Goal baseline=`8e882b75`[\s\S]{0,100}fresh Git preflight/);
 assert.match(adr34, /不是 Accept、Closed、Completed/);
 assert.match(adr34, /不使用“每条路径最多一个 deferred”的机械预算/);
 assert.match(adr34, /不能消费或假设缺失行为正确/);

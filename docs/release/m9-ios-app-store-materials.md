@@ -124,6 +124,8 @@ The privacy/export-compliance candidate is now executable evidence rather than s
 
 These checks establish the repository-side candidate. The deployment owner still has to answer App Store Connect against the actual production server/partners at submission time.
 
+A 2026-08-31 anonymous HTTPS probe also confirmed that the public GitHub repository can serve the commit-pinned privacy-policy Markdown page without GitHub authentication (`HTTP 200`). That proves a technically public candidate exists; it does **not** select the final App Store Privacy Policy URL. The final URL must remain stable for the publisher's release process, represent the actual publishing entity/data practices, and be linked from the submitted app/store metadata. Enabling GitHub Pages or another public deployment remains an explicit deployment action, not an automatic repository-side step.
+
 ## Business-model factual boundary
 
 The current iOS/mobile client contains no StoreKit integration, in-app purchase or subscription UI, payment SDK, checkout flow, or call to action that sends the user to an external purchase mechanism. This is a binary/repository fact, not a claim that the deployment or server is free. Before submission, the publisher must confirm the actual business model against the storefronts where the app will be distributed. If a release sells or unlocks digital content/features, adds an external-purchase call to action, or introduces StoreKit/payment code, re-review App Review Guideline 3.1 and update the metadata/review notes before submission.
