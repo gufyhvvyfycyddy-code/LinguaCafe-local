@@ -149,6 +149,29 @@ jobs:
           if archived != source:
               raise SystemExit('Archived PrivacyInfo.xcprivacy differs semantically from source')
           PY
+          python3 - \
+            "$ARCHIVE_APP/Frameworks/Capacitor.framework/PrivacyInfo.xcprivacy" \
+            "$ARCHIVE_APP/Frameworks/Cordova.framework/PrivacyInfo.xcprivacy" <<'PY'
+          import plistlib
+          import sys
+
+          required_keys = {
+              'NSPrivacyAccessedAPITypes',
+              'NSPrivacyCollectedDataTypes',
+              'NSPrivacyTrackingDomains',
+              'NSPrivacyTracking',
+          }
+          for path in sys.argv[1:]:
+              with open(path, 'rb') as handle:
+                  manifest = plistlib.load(handle)
+              if not required_keys.issubset(manifest):
+                  raise SystemExit(f'SDK privacy manifest missing required keys: {path}')
+              if manifest['NSPrivacyTracking'] is not False:
+                  raise SystemExit(f'SDK privacy manifest must keep tracking disabled: {path}')
+              for key in ('NSPrivacyAccessedAPITypes', 'NSPrivacyCollectedDataTypes', 'NSPrivacyTrackingDomains'):
+                  if not isinstance(manifest[key], list):
+                      raise SystemExit(f'SDK privacy manifest key must be an array: {path} {key}')
+          PY
 
       - name: Install pinned Maestro CLI for rendered smoke
         run: |
