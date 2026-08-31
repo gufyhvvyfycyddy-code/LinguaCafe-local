@@ -186,19 +186,21 @@ Because conditions 1, 2, 6 and 10 are not satisfied, the full Goal cannot be mar
 
 ## Code review conclusion
 
-The final post-H-11 product-code delta is limited to Android Back integration. Five-axis review found no Critical or Required issue:
+The current Goal branch now also includes the Stage Accepted H-10 iOS net change through squash integration commit `c2ef3da94a9b9437a7d796e625ab963266e92e6f`. Five-axis review found no Critical or Required issue in that integrated delta:
 
-- correctness: real Android 16 verified both WebView-history Back and root back-to-home;
-- readability: one local callback and one Capacitor WebViewClient subclass in `MainActivity`;
-- architecture: WebView remains the single history owner; no second router/plugin/store/scheduler was added;
-- security: no auth/input/secret/public-interface change;
-- performance: only `canGoBack()` + callback enablement on visited-history updates.
+- correctness: final iPhone full run `33350591521` passed all nine native XCUITest sessions with MySQL/PAB exactly-once corroboration and strict cleanup; release-capability run `33355499203` then passed the corrected `arm64` unsigned build plus serial iPhone and 13-inch-iPad rendered smoke;
+- readability: the Mobile media-cache/playback changes remain local to the existing cache/player path, and the acceptance workflows expose explicit focus/device steps rather than a second runtime owner;
+- architecture: Mobile continues to use the existing Media API, offline repository and FSRS owners; the new smoke-data command is testing-only, and the temporary workflow-dispatch carrier history was excluded from the squash integration;
+- security: no Apple credential, signing key, public write API or production database path was added; the Auto-Fix workflow repair only supplies required GitHub token scope to the already-existing automation path;
+- performance: the media migration only recreates disposable cache state, iOS data-URL conversion is scoped to the current audio item, and iPhone/iPad Simulator sessions are serialized to avoid hosted-Mac resource contention.
 
-The stale `MasterPlanIntegrityContract` was a necessary project-validation-tool defect: it asserted H-11 ACTIVE after the committed Goal plan already said H-11 DONE/H-GATE TODO. Its repair updated the expected current facts and did not weaken or skip the guard.
+The integration also exposed one Windows portability defect in `AutoFixWorkflowContract.test.mjs`: its scheduler-input regex accepted LF only. The guard now accepts `\r?\n`, preserving the exact `issue_number`/`attempt` contract while passing a fresh CRLF checkout. Fresh integration verification passed Mobile 43/43 + production build, all 478 JS contract tests, workflow/YAML guards and PHP support-file syntax checks.
+
+The earlier `MasterPlanIntegrityContract` repair remains a necessary project-validation-tool correction; it updates current facts without weakening or skipping the guard.
 
 ## Merge / release readiness
 
-The current Goal branch is **merge-ready for the audited Windows / Web / Android work as code**, subject to the project's normal merge process.
+The current Goal branch is **merge-ready for the audited Windows / Web / Android work and the Stage Accepted iOS Simulator/repository-side release-preparation code**, subject to the project's normal merge process.
 
 It is **not a complete cross-platform A–H Goal release** and is **not App Store / TestFlight ready**. No production deploy, Play submission or Apple store action is authorized by this audit.
 

@@ -282,6 +282,8 @@ The strengthened cleanup gate also passed: the testing database lease ended with
 
 The run head contained a temporary branch-only workflow-dispatch carrier used only because the Reader acceptance workflow is not yet registered on the default branch. The carrier was removed immediately after dispatch in follow-up commit `1bf2016873492c0b641dbab0891fcce0465ec6e3`; the stable candidate lineage therefore restores the production `auto-fix-scheduler.yml` and keeps the successful run's product/test content unchanged apart from later documentation/guard closeout.
 
+After the Simulator and release-capability evidence converged, the final H-10 tree was re-applied to a clean worktree based on fresh Goal `4bcd32a6cb7478e7d475a27df791b78ab7956607`, verified there, and squash-integrated as `c2ef3da94a9b9437a7d796e625ab963266e92e6f` (`feat: integrate accepted H10 iOS capability`). That integration carries only the final 23-file net change plus the CRLF-portable Auto-Fix contract guard; the temporary dispatch/restore carrier commits do not enter Goal history.
+
 This accepts the Simulator **cached article/review/audio → offline restart → queued Good → relaunch persistence → reconnect exactly-once sync → stable empty queue** path.
 
 ## What is now genuinely closed
