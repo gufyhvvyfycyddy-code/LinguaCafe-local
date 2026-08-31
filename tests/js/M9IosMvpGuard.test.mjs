@@ -235,6 +235,10 @@ assert.ok(appName.length >= 2 && appName.length <= 30, `App Store app name must 
 assert.ok(subtitle.length > 0 && subtitle.length <= 30, `App Store subtitle must be 1-30 characters, got ${subtitle.length}`);
 assert.equal(versionCandidate, '1.0');
 assert.equal(buildCandidate, '1');
+assert.match(storeMaterials, /Version release setting: publisher-owned App Store Connect value/);
+assert.match(storeMaterials, /`Manual`/);
+assert.match(storeMaterials, /`Automatic`/);
+assert.match(storeMaterials, /`Automatic, no earlier than`/);
 assert.match(project, /MARKETING_VERSION = 1\.0;/);
 assert.match(project, /CURRENT_PROJECT_VERSION = 1;/);
 assert.ok(promotionalText.length > 0 && promotionalText.length <= 170, `App Store promotional text must be 1-170 characters, got ${promotionalText.length}`);

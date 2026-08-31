@@ -11,16 +11,21 @@ Status: release candidate; not submitted
 - Primary category: Education
 - Secondary category: Reference
 - Primary language: publisher-owned App Store Connect value; must be chosen before submission
+- Version release setting: publisher-owned App Store Connect value; choose one before
+  submission: `Manual`, `Automatic`, or `Automatic, no earlier than`
 - Promotional text: `Continue your LinguaCafe English reading and sense-based
   reviews on iPhone and iPad, with short-term offline access and local reminders.`
 - Keywords: `English,reading,vocabulary,FSRS,review,dictionary,offline`
 
-Current App Store metadata guardrails, rechecked against Apple's 2026-08-31
+Current App Store metadata guardrails, rechecked against Apple's 2026-09-01
 requirements:
 
 - app name and subtitle: at most 30 characters each;
 - promotional text: at most 170 characters;
 - keywords: at most 100 UTF-8 bytes;
+- Version Release Settings are selected per app version in App Store Connect and
+  control when an approved version becomes public; the repository records the three
+  current Apple choices but does not select one for the publisher;
 - Support URL: must resolve to a page with real contact information;
 - Privacy Policy URL: required for iOS, with an easy-to-find in-app link to the
   published policy before submission;
@@ -144,6 +149,8 @@ Repository evidence can pre-answer only capability facts, not the final rating o
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;
 - public support HTTPS URL with real deployment-owner contact information;
 - publisher-owned App Store app-record values that cannot be inferred from source: Primary Language, SKU, copyright owner/year, price/tax category, availability/territories, Digital Services Act trader status, and any region-specific declarations that apply (including conditional South Korea, China mainland, or Vietnam fields);
+- publisher-owned Version Release Setting for this app version: `Manual`,
+  `Automatic`, or `Automatic, no earlier than`;
 - App Review contact name/email/international-format phone plus a non-expiring least-privilege review account and reachable review server;
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;
