@@ -1,0 +1,116 @@
+name: iOS 27 UIScene validation
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  xcode27-uiscene:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    env:
+      DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@v6
+
+      - name: Verify Xcode 27 SDK
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          SDK_VERSION="$(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iPhoneOS SDK: $SDK_VERSION"
+          case "$SDK_VERSION" in
+            27.*) ;;
+            *) echo "Expected an iOS 27 SDK, got $SDK_VERSION" >&2; exit 1 ;;
+          esac
+
+      - name: Install mobile dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Run mobile tests
+        working-directory: mobile
+        run: npm test
+
+      - name: Sync iOS with Capacitor 8.5
+        working-directory: mobile
+        run: npm run cap:sync:ios
+
+      - name: Verify generated iOS Web assets
+        working-directory: mobile
+        run: npm run ios:generated-web-integrity
+
+      - name: Verify source release contracts
+        run: node tests/js/M9IosMvpGuard.test.mjs
+
+      - name: Resolve Swift packages
+        working-directory: mobile/ios/App
+        run: xcodebuild -resolvePackageDependencies -project App.xcodeproj -scheme App
+
+      - name: Compile with the iOS 27 Simulator SDK
+        working-directory: mobile/ios/App
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/LinguaCafeXcode27DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+          APP_BUNDLE="$RUNNER_TEMP/LinguaCafeXcode27DerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          APP_PLIST="$APP_BUNDLE/Info.plist"
+          test -d "$APP_BUNDLE"
+          test -f "$APP_PLIST"
+          python3 - "$APP_PLIST" <<'PY'
+          import plistlib
+          import sys
+
+          with open(sys.argv[1], 'rb') as handle:
+              plist = plistlib.load(handle)
+
+          scene_manifest = plist.get('UIApplicationSceneManifest') or {}
+          configurations = scene_manifest.get('UISceneConfigurations') or {}
+          app_scenes = configurations.get('UIWindowSceneSessionRoleApplication') or []
+          if not app_scenes:
+              raise SystemExit('Built app is missing UIWindowSceneSessionRoleApplication configuration')
+
+          scene = app_scenes[0]
+          delegate = scene.get('UISceneDelegateClassName', '')
+          if not delegate.endswith('.SceneDelegate'):
+              raise SystemExit(f'Unexpected built scene delegate: {delegate!r}')
+          if scene.get('UISceneStoryboardFile') != 'Main':
+              raise SystemExit(f"Unexpected scene storyboard: {scene.get('UISceneStoryboardFile')!r}")
+          if plist.get('UILaunchStoryboardName') != 'LaunchScreen':
+              raise SystemExit(f"Unexpected launch screen: {plist.get('UILaunchStoryboardName')!r}")
+          PY
+
+      - name: Boot iOS 27 Simulator and prove launch survives
+        working-directory: mobile/ios/App
+        run: |
+          set -euo pipefail
+          SIMULATORS_JSON="$(xcrun simctl list devices available -j)"
+          SIM_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime,items in data["devices"].items() if "iOS-27" in runtime for d in items if d.get("isAvailable") and d.get("name") == "iPhone 17 Pro"]; print(devices[0]["udid"] if devices else "")')"
+          test -n "$SIM_UDID"
+          cleanup() {
+            xcrun simctl terminate "$SIM_UDID" com.linguacafe.mobile >/dev/null 2>&1 || true
+            xcrun simctl shutdown "$SIM_UDID" >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          xcrun simctl boot "$SIM_UDID"
+          xcrun simctl bootstatus "$SIM_UDID" -b
+          APP_BUNDLE="$RUNNER_TEMP/LinguaCafeXcode27DerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          xcrun simctl install "$SIM_UDID" "$APP_BUNDLE"
+          xcrun simctl launch "$SIM_UDID" com.linguacafe.mobile
+          sleep 3
+          xcrun simctl terminate "$SIM_UDID" com.linguacafe.mobile
+          xcrun simctl shutdown "$SIM_UDID"
+          trap - EXIT
