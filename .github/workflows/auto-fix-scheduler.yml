@@ -25,7 +25,12 @@ on:
         type: string
 
 jobs:
+  h10-sdk-signature-carrier:
+    if: inputs.issue_number == '0' && inputs.attempt == 'sdk-signature'
+    uses: ./.github/workflows/ios-capacitor-sdk-signature-probe.yml
+
   schedule-next-attempt:
+    if: inputs.issue_number != '0' || inputs.attempt != 'sdk-signature'
     runs-on: ubuntu-latest
 
     permissions:

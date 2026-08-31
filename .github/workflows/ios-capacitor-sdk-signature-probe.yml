@@ -1,0 +1,64 @@
+name: iOS Capacitor SDK signature probe
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-capacitor-sdk-signatures:
+    runs-on: macos-26
+    timeout-minutes: 15
+
+    steps:
+      - name: Download pinned Capacitor 8.5 binary SDKs
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/capacitor-sdk-signature"
+          cd "$RUNNER_TEMP/capacitor-sdk-signature"
+          curl -fL --retry 3 -o Capacitor.xcframework.zip \
+            https://github.com/ionic-team/capacitor-swift-pm/releases/download/8.5.0/Capacitor.xcframework.zip
+          curl -fL --retry 3 -o Cordova.xcframework.zip \
+            https://github.com/ionic-team/capacitor-swift-pm/releases/download/8.5.0/Cordova.xcframework.zip
+          printf '%s  %s\n' \
+            357220fe6dad73cb78bc1dc83e16e89d59c3d7dac8f9b17545a5be64bba25130 Capacitor.xcframework.zip \
+            a3dc72b5a559948d548f0ee2926b989492acc1023a0c86a1bf85477587f83a10 Cordova.xcframework.zip \
+            | shasum -a 256 -c -
+
+      - name: Extract signed XCFramework bundles
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/capacitor-sdk-signature"
+          ditto -x -k Capacitor.xcframework.zip extracted-capacitor
+          ditto -x -k Cordova.xcframework.zip extracted-cordova
+          test -d extracted-capacitor/Capacitor.xcframework/_CodeSignature
+          test -d extracted-cordova/Cordova.xcframework/_CodeSignature
+
+      - name: Verify XCFramework signatures and identities
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/capacitor-sdk-signature"
+          for bundle in \
+            extracted-capacitor/Capacitor.xcframework \
+            extracted-cordova/Cordova.xcframework
+          do
+            echo "=== verifying $bundle ==="
+            codesign --verify --deep --strict --verbose=4 "$bundle"
+            details="$(codesign -d --verbose=4 "$bundle" 2>&1)"
+            printf '%s\n' "$details"
+            printf '%s\n' "$details" | grep -Eq '^Authority=|^TeamIdentifier='
+            if printf '%s\n' "$details" | grep -q '^Signature=adhoc$'; then
+              echo "Unexpected ad-hoc SDK signature: $bundle" >&2
+              exit 1
+            fi
+          done
+
+      - name: Verify required SDK privacy manifests
+        run: |
+          set -euo pipefail
+          cd "$RUNNER_TEMP/capacitor-sdk-signature"
+          test -f extracted-capacitor/Capacitor.xcframework/ios-arm64/Capacitor.framework/PrivacyInfo.xcprivacy
+          test -f extracted-capacitor/Capacitor.xcframework/ios-arm64_x86_64-simulator/Capacitor.framework/PrivacyInfo.xcprivacy
+          test -f extracted-cordova/Cordova.xcframework/ios-arm64/Cordova.framework/PrivacyInfo.xcprivacy
+          test -f extracted-cordova/Cordova.xcframework/ios-arm64_x86_64-simulator/Cordova.framework/PrivacyInfo.xcprivacy
