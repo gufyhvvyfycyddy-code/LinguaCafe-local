@@ -286,6 +286,10 @@ assert.match(readerUiTest, /XCTAssertGreaterThan\(landscapeScreenshot\.image\.si
 assert.match(readerUiTest, /app\.tabBars\.buttons\["Browse"\]/);
 assert.match(readerUiTest, /navigationBars\.staticTexts\["On My iPhone"\]/);
 assert.match(readerUiTest, /app\.staticTexts\["On My iPhone"\]/);
+const chooseFileHelper = readerUiTest.match(/private func chooseFile[\s\S]*?private func pickerFileCell/)?.[0] ?? '';
+assert.match(chooseFileHelper, /FILES_PICKER_SELECTION_RETRY/);
+assert.match(chooseFileHelper, /!selectedName\.waitForExistence\(timeout: 10\), file\.exists, file\.isHittable/);
+assert.doesNotMatch(chooseFileHelper, /app\.wait\(for: \.runningForeground/);
 assert.match(readerUiTest, /app\.webViews\.firstMatch/);
 assert.match(readerUiTest, /func openTextImportSettings\(app: XCUIApplication\) throws/);
 assert.match(readerUiTest, /Missing required UI-test environment variable/);

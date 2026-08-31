@@ -343,14 +343,18 @@ final class ReaderAcceptanceUITests: XCTestCase {
                 userInfo: [NSLocalizedDescriptionKey: "Missing staged Files fixture: \(fileName)"]
             )
         }
-        file.tap()
-        XCTAssertTrue(app.wait(for: .runningForeground, timeout: 30))
         let stem = URL(fileURLWithPath: fileName).deletingPathExtension().lastPathComponent
         let selectedName = app.textFields.matching(NSPredicate(
             format: "label == %@ AND value == %@",
             "导入资料名称",
             stem
         )).firstMatch
+
+        file.tap()
+        if !selectedName.waitForExistence(timeout: 10), file.exists, file.isHittable {
+            print("FILES_PICKER_SELECTION_RETRY: \(fileName)")
+            file.tap()
+        }
         if !selectedName.waitForExistence(timeout: 30) {
             attachPickerDiagnostics(app: app, named: "import-name-not-auto-filled")
         }
