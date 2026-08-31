@@ -59,8 +59,10 @@ test('H-09 Android release configuration keeps the current Play boundary', () =>
   ]) {
     assert.match(privacy, new RegExp(text));
   }
-  assert.match(privacyDoc, /2026-08-31 public Android\/iOS mobile privacy policy/);
+  assert.match(privacyDoc, /2026-08-31 Android\/iOS mobile privacy policy publication source/);
+  assert.match(privacyDoc, /not evidence that a public\s+Privacy Policy URL has already been deployed/);
+  assert.match(privacyDoc, /must publish this policy at a stable public HTTPS URL/);
   assert.match(privacyDoc, /Privacy requests\s+about the distributed mobile app[\s\S]*store Support URL/);
   assert.match(privacyDoc, /does not directly integrate an advertising network, analytics SDK,[\s\S]*social-login provider/);
-  assert.doesNotMatch(privacyDoc, /release-preparation candidate/);
+  assert.doesNotMatch(privacyDoc, /Version: .*public Android\/iOS mobile privacy policy/);
 });

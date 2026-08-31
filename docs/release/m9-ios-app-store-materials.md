@@ -117,8 +117,10 @@ The privacy/export-compliance candidate is now executable evidence rather than s
 - run `33359184066` on Xcode 26.6 passed the compiled `App.app/Info.plist` check for `ITSAppUsesNonExemptEncryption = NO` and the serial iPhone + 13-inch-iPad rendered smoke;
 - run `33361617463` passed the first compiled-bundle six-category Privacy Manifest check plus the same rendered device smoke and cleanup;
 - final run `33362427450` passed the stricter compiled-bundle check for the exact six collected-data types, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and `ITSAppUsesNonExemptEncryption = NO`, then passed iPhone + 13-inch-iPad rendered smoke and shutdown;
-- Capacitor 8.4.2 is an Apple-listed SDK that must carry its own privacy manifest. The release archive gate therefore also requires valid `PrivacyInfo.xcprivacy` resources inside the archived `Capacitor.framework` and `Cordova.framework`; the app-level manifest is not treated as a substitute for those SDK manifests;
-- the carrier commits used only to dispatch branch workflows are excluded from Goal history; the accepted privacy net change is integrated in Goal commit `330caf569d63199047d2f0ef54573e7c47c6795e`.
+- run `33366809125` passed a real Xcode 26.6 unsigned Release `.xcarchive` build and verified the archived app bundle identity/release metadata plus the app-level privacy/export declarations;
+- run `33383576886` passed the stricter unsigned archive gate that also requires valid `PrivacyInfo.xcprivacy` resources inside the archived `Capacitor.framework` and `Cordova.framework`; the app-level manifest is not treated as a substitute for those SDK manifests;
+- run `33386931423` re-ran the Release archive gate and then captured App Store-sized, non-alpha JPEG evidence from the rendered app: 6.9-inch iPhone `1320x2868` and 13-inch iPad `2064x2752`;
+- the carrier commits used only to dispatch branch workflows are excluded from Goal history; the accepted privacy net change is integrated in Goal commit `330caf569d63199047d2f0ef54573e7c47c6795e`, and the later archive/layout guards are present in the current Goal tree.
 
 These checks establish the repository-side candidate. The deployment owner still has to answer App Store Connect against the actual production server/partners at submission time.
 
@@ -144,9 +146,8 @@ Repository evidence can pre-answer only capability facts, not the final rating o
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;
 - Apple Developer team/bundle ownership and signing profiles;
-- Xcode archive validation and signed TestFlight build;
-- required iPhone screenshots and, while iPad remains a supported destination,
-  required 13-inch iPad screenshots for localized metadata;
+- real Apple-team signing, a signed Release archive plus Organizer `Validate App`, and a signed TestFlight build; the repository-side unsigned archive structure is already proven by runs `33366809125`, `33383576886`, and `33386931423`;
+- final localized App Store screenshot selection/upload. The repository-side capture gate already proves accepted 6.9-inch iPhone and 13-inch iPad pixel classes, JPEG format and no alpha, but it does not choose marketing screenshots or upload them;
 - real iOS acceptance report for Keychain, file picker/import, notifications,
   haptics, safe areas, offline restart/sync and audio;
 - reviewer fixture server/account and deletion/cleanup record;

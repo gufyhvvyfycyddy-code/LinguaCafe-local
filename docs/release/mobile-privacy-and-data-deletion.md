@@ -1,14 +1,18 @@
 # LinguaCafe mobile privacy and data deletion
 
-Version: 2026-08-31 public Android/iOS mobile privacy policy
+Version: 2026-08-31 Android/iOS mobile privacy policy publication source
 
-This policy describes the current LinguaCafe Android and iOS mobile clients.
-The mobile app also carries a concise in-app copy so privacy information remains
-available before and after sign-in. Privacy requests about data held by a selected
-LinguaCafe server should be directed to that server operator. Privacy requests
-about the distributed mobile app should use the publisher contact mechanism on
-the store Support URL. The publisher must keep the public policy, store privacy
-disclosures, and actual release-server data practices aligned.
+This policy describes the current LinguaCafe Android and iOS mobile clients and is
+the repository source for the final public policy. It is not evidence that a public
+Privacy Policy URL has already been deployed. Before store submission, the publisher
+must publish this policy at a stable public HTTPS URL and expose the matching policy
+from the app/store listing. The mobile app also carries a concise in-app copy so
+privacy information remains available before and after sign-in. Privacy requests
+about data held by a selected LinguaCafe server should be directed to that server
+operator. Privacy requests about the distributed mobile app should use the real
+publisher contact mechanism on the store Support URL. The publisher must keep the
+published policy, store privacy disclosures, and actual release-server data practices
+aligned.
 
 ## Data handled
 
