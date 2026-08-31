@@ -95,6 +95,17 @@ assert.doesNotMatch(infoPlist, /<string>armv7<\/string>/);
 assert.match(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/);
 assert.doesNotMatch(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<true\/>/);
 assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
+for (const unusedProtectedResourceKey of [
+  'NSCameraUsageDescription',
+  'NSMicrophoneUsageDescription',
+  'NSLocationWhenInUseUsageDescription',
+  'NSLocationAlwaysAndWhenInUseUsageDescription',
+  'NSPhotoLibraryUsageDescription',
+  'NSContactsUsageDescription',
+  'NSUserTrackingUsageDescription',
+]) {
+  assert.doesNotMatch(infoPlist, new RegExp(unusedProtectedResourceKey));
+}
 assert.match(project, /TARGETED_DEVICE_FAMILY = "1,2";/);
 assert.equal(appIconContents.images?.length, 1);
 assert.deepEqual(appIconContents.images?.[0], {
