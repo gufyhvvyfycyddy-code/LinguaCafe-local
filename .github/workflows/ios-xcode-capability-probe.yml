@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           SIMULATORS_JSON="$(xcrun simctl list devices available -j)"
-          SIM_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          SIM_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name") == "iPhone 17 Pro Max"]; print(devices[0]["udid"] if devices else "")')"
           IPAD_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPad Pro 13-inch")]; print(devices[0]["udid"] if devices else "")')"
           test -n "$SIM_UDID"
           test -n "$IPAD_UDID"
@@ -162,6 +162,15 @@ jobs:
             '- assertVisible: "仅用于本地调试；Android/iOS 正式版可能拒绝明文连接；正式使用应配置 HTTPS。"' \
             > "$FLOW"
           "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
+          IPHONE_SCREENSHOT="$RUNNER_TEMP/iphone-login-shell.png"
+          xcrun simctl io "$LC_IOS_SIM_UDID" screenshot "$IPHONE_SCREENSHOT"
+          WIDTH="$(sips -g pixelWidth "$IPHONE_SCREENSHOT" | awk '/pixelWidth/ {print $2}')"
+          HEIGHT="$(sips -g pixelHeight "$IPHONE_SCREENSHOT" | awk '/pixelHeight/ {print $2}')"
+          printf '6.9-inch iPhone screenshot: %sx%s\n' "$WIDTH" "$HEIGHT"
+          case "${WIDTH}x${HEIGHT}" in
+            1260x2736|1290x2796|1320x2868) ;;
+            *) echo 'Unexpected 6.9-inch iPhone screenshot size.' >&2; exit 1 ;;
+          esac
 
       - name: Run rendered 13-inch iPad login-shell smoke
         run: |

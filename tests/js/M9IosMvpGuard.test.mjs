@@ -265,6 +265,7 @@ assert.match(xcodeCapabilityWorkflow, /Unexpected bundled required-reason APIs/)
 assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking disabled/);
 assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking domains empty/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
+assert.match(xcodeCapabilityWorkflow, /iPhone 17 Pro Max/);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';
 assert.doesNotMatch(simulatorBootBlock, /xcrun simctl boot "\$IPAD_UDID"/);
@@ -274,6 +275,9 @@ const ipadSmokeBlock = xcodeCapabilityWorkflow.match(/- name: Run rendered 13-in
 assert.match(ipadSmokeBlock, /xcrun simctl shutdown "\$LC_IOS_SIM_UDID"/);
 assert.match(ipadSmokeBlock, /xcrun simctl boot "\$LC_IOS_IPAD_SIM_UDID"/);
 assert.ok(ipadSmokeBlock.indexOf('shutdown "$LC_IOS_SIM_UDID"') < ipadSmokeBlock.indexOf('boot "$LC_IOS_IPAD_SIM_UDID"'));
+assert.match(xcodeCapabilityWorkflow, /1260x2736\|1290x2796\|1320x2868/);
+assert.match(xcodeCapabilityWorkflow, /iphone-login-shell\.png/);
+assert.match(xcodeCapabilityWorkflow, /6\.9-inch iPhone screenshot/);
 assert.match(xcodeCapabilityWorkflow, /2064x2752\|2048x2732/);
 assert.match(xcodeCapabilityWorkflow, /ipad-login-shell\.png/);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl bootstatus/);

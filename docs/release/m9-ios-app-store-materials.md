@@ -28,8 +28,11 @@ requirements:
 - GitHub Actions run `33355499203` on Xcode 26.6 revalidated the unsigned app with
   `UIRequiredDeviceCapabilities = arm64`, rendered the same login-shell flow on
   iPhone 17 Pro and `iPad Pro 13-inch (M5)` Simulator, and produced a
-  `2064x2752` iPad screenshot. This proves repository-side universal rendering,
-  not final App Store screenshot selection or physical-device readiness.
+  `2064x2752` iPad screenshot. The current release-capability lane additionally
+  targets `iPhone 17 Pro Max` and requires its rendered screenshot to match one
+  of Apple's accepted 6.9-inch portrait sizes (`1260x2736`, `1290x2796`, or
+  `1320x2868`). These checks prove repository-side device-size compatibility,
+  not final App Store screenshot selection, marketing approval, or physical-device readiness.
 
 Description:
 
