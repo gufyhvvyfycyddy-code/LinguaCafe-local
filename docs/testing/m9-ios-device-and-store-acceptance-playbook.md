@@ -182,8 +182,10 @@ The iOS Privacy Policy URL is mandatory, the Support URL must expose real contac
 information, and the submitted app must contain an easy-to-find link to the published
 privacy policy. The current target supports both iPhone and iPad; while
 `TARGETED_DEVICE_FAMILY = "1,2"` remains true, provide the required iPhone screenshots
-and the required 13-inch iPad screenshots, and run a rendered iPad smoke before using
-those screenshots. If iPad support is intentionally removed, that must be an explicit
+and the required 13-inch iPad screenshots. Repository-side rendered iPad smoke is now
+proven by GitHub Actions run `33355499203` on `iPad Pro 13-inch (M5)`, including a
+`2064x2752` screenshot. Final App Store screenshots still need deployment-owner review
+and upload; the Simulator smoke is only a release-preparation gate. If iPad support is intentionally removed, that must be an explicit
 product change before archive rather than a store-metadata workaround. Answer privacy
 questions from observed data flow rather than marketing intent.
 

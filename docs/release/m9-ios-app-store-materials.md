@@ -24,7 +24,12 @@ requirements:
 - the current Xcode target supports both iPhone and iPad
   (`TARGETED_DEVICE_FAMILY = "1,2"`), so store assets need the required iPhone
   screenshots and required 13-inch iPad screenshots unless that product scope is
-  explicitly changed before release.
+  explicitly changed before release;
+- GitHub Actions run `33355499203` on Xcode 26.6 revalidated the unsigned app with
+  `UIRequiredDeviceCapabilities = arm64`, rendered the same login-shell flow on
+  iPhone 17 Pro and `iPad Pro 13-inch (M5)` Simulator, and produced a
+  `2064x2752` iPad screenshot. This proves repository-side universal rendering,
+  not final App Store screenshot selection or physical-device readiness.
 
 Description:
 

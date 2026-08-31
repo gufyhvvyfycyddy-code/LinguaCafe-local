@@ -151,7 +151,7 @@ The continuation now proves:
 - PAB records the canonical Reader mobile endpoints, MySQL corroborates the resulting source binding, and TestingDatabaseLease/sentinel, MySQL service and Simulator cleanup all return clean;
 - the real system Files picker exposes only eligible `.txt` input as selectable, rejects invalid UTF-8 and oversize `.txt` through rendered UI, imports one valid UTF-8 English file, and leaves exactly one `library.text_import` action plus one import endpoint request.
 
-Final full run `33350591521` has since closed the authenticated Simulator content matrix: cached article/review/audio survived the offline phase, one rendered Good queued locally and survived relaunch, reconnect synchronized exactly once, the empty queue remained stable, MySQL/PAB corroboration passed, and strict lease/sentinel cleanup passed.
+Final full run `33350591521` has since closed the authenticated Simulator content matrix: cached article/review/audio survived the offline phase, one rendered Good queued locally and survived relaunch, reconnect synchronized exactly once, the empty queue remained stable, MySQL/PAB corroboration passed, and strict lease/sentinel cleanup passed. Release-capability run `33355499203` then revalidated Xcode 26.6 with `UIRequiredDeviceCapabilities = arm64`, passed the rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`, and produced a `2064x2752` 13-inch iPad screenshot.
 
 The following completion-required evidence still does not exist and must not be inferred from Simulator evidence:
 
@@ -174,7 +174,7 @@ Current result:
 3. rating / Finish / offline sync / migration / restore integrity evidence — PASS;
 4. Web real-browser evidence — PASS;
 5. Android real device/emulator evidence — PASS;
-6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/full Simulator content matrix PASS, including authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import and offline/reconnect exactly-once sync; physical device, real Apple signing/archive and TestFlight/App Store remain FAIL / unavailable**;
+6. required iOS real macOS/Xcode/device/TestFlight evidence — **PARTIAL: macOS/Xcode/SwiftPM/full Simulator content matrix PASS, including authenticated login, Simulator Keychain save/load/revoke lifecycle, formal Sense Review Good/Undo, Reader touch/source-binding, real Files `.txt` import, offline/reconnect exactly-once sync, corrected `arm64` release capability, and serial iPhone + 13-inch iPad rendered smoke; physical device, real Apple signing/archive, TestFlight/App Store, and final public Privacy/Support URL evidence remain FAIL / unavailable**;
 7. testing DB / lease / sentinel / server clean — PASS;
 8. no unexplained skipped / incomplete / false-green — PASS for runnable work; H-11's 14 skips are recorded capability/test metadata rather than hidden failures, and the stale MasterPlan false-negative guard was repaired explicitly;
 9. no unknown blocker — PASS; the remaining blocker is known and named;

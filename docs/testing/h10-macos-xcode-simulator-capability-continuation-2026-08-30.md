@@ -309,7 +309,10 @@ The H-10 capability list can now mark these items as proven on real macOS/Xcode 
 - existing-Sense `认识 / 记得` and `不认识` controls after the canonical source-bound creation;
 - rendered landscape long-press/drag phrase selection for `bank account` without entering the single-token recognition path;
 - rendered system Files picker `.txt` import, including disabled unsupported extension, invalid UTF-8 rejection, oversize rejection, successful valid English import and exactly-one server action/request evidence;
-- authenticated Simulator offline content and media cache use across relay shutdown, one queued Good surviving app relaunch, automatic reconnect exactly-once sync, and stable zero-pending state after the queue is empty.
+- authenticated Simulator offline content and media cache use across relay shutdown, one queued Good surviving app relaunch, automatic reconnect exactly-once sync, and stable zero-pending state after the queue is empty;
+- current 64-bit release capability declaration (`UIRequiredDeviceCapabilities = arm64`) under Xcode 26.6;
+- the same generated app rendering the login shell on both iPhone 17 Pro and `iPad Pro 13-inch (M5)` Simulator after serializing the two Simulator sessions on the standard hosted Mac;
+- 13-inch iPad screenshot output at `2064x2752`, matching the current App Store Connect 13-inch portrait screenshot requirement.
 
 ## What remains unavailable / unaccepted
 
@@ -331,7 +334,7 @@ A cloud simulator is useful for compile/runtime capability but cannot substitute
 
 The same-runner testing backend is now proven useful and production-aligned: it reuses the real Laravel/MySQL/native-FSRS/PAB owners and therefore avoids a mock server, SQLite substitute, public tunnel or second scheduler. The scoped iOS local-network declaration permits the explicit loopback testing path without enabling arbitrary HTTP loads.
 
-The Simulator lane is now stage-accepted on that single testing stack: formal Sense Review Good/Undo is accepted by run `33282205923`, rendered Reader touch/source binding by run `33301226295`, real-system-Files `.txt` import by run `33308079898`, and the final full offline/reconnect matrix by run `33350591521`. Do not create more Simulator work unless a regression or a new product requirement appears. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
+The Simulator lane is now stage-accepted on that single testing stack: formal Sense Review Good/Undo is accepted by run `33282205923`, rendered Reader touch/source binding by run `33301226295`, real-system-Files `.txt` import by run `33308079898`, and the final full offline/reconnect matrix by run `33350591521`. Release-capability run `33355499203` additionally revalidated the Xcode 26.6 unsigned build with the corrected `arm64` requirement and passed the same rendered login-shell flow serially on iPhone 17 Pro and `iPad Pro 13-inch (M5)`; the captured iPad screenshot was `2064x2752`. Do not create more Simulator work unless a regression or a new product requirement appears. Physical-device haptics, notifications, audio interruption, real safe areas and all Apple distribution actions stay outside this lane and must not be inferred from Simulator results.
 
 ## Official environment references
 
@@ -342,6 +345,6 @@ The Simulator lane is now stage-accepted on that single testing stack: formal Se
 
 ## Current H-10 conclusion
 
-**Native macOS/Xcode/SwiftPM + rendered shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding + real Files `.txt` import + offline/reconnect content matrix: Stage Accepted.**
+**Native macOS/Xcode/SwiftPM + corrected `arm64` release capability + rendered iPhone/13-inch-iPad shell + authenticated Simulator Keychain/session lifecycle + formal Sense Review Good/Undo + rendered Reader touch/source binding + real Files `.txt` import + offline/reconnect content matrix: Stage Accepted.**
 
 **Full H-10 / E-08 / H-GATE: still DEFERRED / Not Complete**, now narrowed to physical-device behavior, real Apple signing/archive, TestFlight, App Store Connect and App Review capability described above.
