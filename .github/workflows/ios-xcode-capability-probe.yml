@@ -31,10 +31,15 @@ jobs:
       - name: Start simulator boot
         run: |
           set -euo pipefail
-          SIM_UDID="$(xcrun simctl list devices available -j | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          SIMULATORS_JSON="$(xcrun simctl list devices available -j)"
+          SIM_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPhone")]; print(devices[0]["udid"] if devices else "")')"
+          IPAD_UDID="$(printf '%s' "$SIMULATORS_JSON" | python3 -c 'import json,sys; data=json.load(sys.stdin); devices=[d for runtime in data["devices"].values() for d in runtime if d.get("isAvailable") and d.get("name", "").startswith("iPad Pro 13-inch")]; print(devices[0]["udid"] if devices else "")')"
           test -n "$SIM_UDID"
+          test -n "$IPAD_UDID"
           echo "LC_IOS_SIM_UDID=$SIM_UDID" >> "$GITHUB_ENV"
+          echo "LC_IOS_IPAD_SIM_UDID=$IPAD_UDID" >> "$GITHUB_ENV"
           xcrun simctl boot "$SIM_UDID"
+          xcrun simctl boot "$IPAD_UDID"
 
       - name: Install mobile dependencies
         working-directory: mobile
@@ -125,10 +130,33 @@ jobs:
             > "$FLOW"
           "$MAESTRO_BIN" --device="$LC_IOS_SIM_UDID" test "$FLOW"
 
-      - name: Shut down simulator
+      - name: Run rendered 13-inch iPad login-shell smoke
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$LC_IOS_IPAD_SIM_UDID" -b
+          APP_PATH="$RUNNER_TEMP/LinguaCafeDerivedData/Build/Products/Debug-iphonesimulator/App.app"
+          test -d "$APP_PATH"
+          xcrun simctl install "$LC_IOS_IPAD_SIM_UDID" "$APP_PATH"
+          xcrun simctl launch "$LC_IOS_IPAD_SIM_UDID" com.linguacafe.mobile
+          "$MAESTRO_BIN" --device="$LC_IOS_IPAD_SIM_UDID" test "$RUNNER_TEMP/ios-login-shell.yaml"
+          IPAD_SCREENSHOT="$RUNNER_TEMP/ipad-login-shell.png"
+          xcrun simctl io "$LC_IOS_IPAD_SIM_UDID" screenshot "$IPAD_SCREENSHOT"
+          WIDTH="$(sips -g pixelWidth "$IPAD_SCREENSHOT" | awk '/pixelWidth/ {print $2}')"
+          HEIGHT="$(sips -g pixelHeight "$IPAD_SCREENSHOT" | awk '/pixelHeight/ {print $2}')"
+          printf '13-inch iPad screenshot: %sx%s\n' "$WIDTH" "$HEIGHT"
+          case "${WIDTH}x${HEIGHT}" in
+            2064x2752|2048x2732) ;;
+            *) echo 'Unexpected 13-inch iPad screenshot size.' >&2; exit 1 ;;
+          esac
+
+      - name: Shut down simulators
         if: always()
         run: |
           if [ -n "${LC_IOS_SIM_UDID:-}" ]; then
             xcrun simctl terminate "$LC_IOS_SIM_UDID" com.linguacafe.mobile || true
             xcrun simctl shutdown "$LC_IOS_SIM_UDID" || true
+          fi
+          if [ -n "${LC_IOS_IPAD_SIM_UDID:-}" ]; then
+            xcrun simctl terminate "$LC_IOS_IPAD_SIM_UDID" com.linguacafe.mobile || true
+            xcrun simctl shutdown "$LC_IOS_IPAD_SIM_UDID" || true
           fi

@@ -5,12 +5,26 @@ Status: release candidate; not submitted
 ## Listing draft
 
 - App name: `LinguaCafe`
-- Subtitle: `Read, look up, and review English`
+- Subtitle: `Read, look up, review English`
 - Primary category: Education
 - Secondary category: Reference
 - Promotional text: `Continue your LinguaCafe English reading and sense-based
   reviews on iPhone, with short-term offline access and local reminders.`
 - Keywords: `English,reading,vocabulary,FSRS,review,dictionary,offline`
+
+Current App Store metadata guardrails, rechecked against Apple's 2026-08-31
+requirements:
+
+- app name and subtitle: at most 30 characters each;
+- promotional text: at most 170 characters;
+- keywords: at most 100 UTF-8 bytes;
+- Support URL: must resolve to a page with real contact information;
+- Privacy Policy URL: required for iOS, with an easy-to-find in-app link to the
+  published policy before submission;
+- the current Xcode target supports both iPhone and iPad
+  (`TARGETED_DEVICE_FAMILY = "1,2"`), so store assets need the required iPhone
+  screenshots and required 13-inch iPad screenshots unless that product scope is
+  explicitly changed before release.
 
 Description:
 
@@ -58,13 +72,14 @@ Capacitor Preferences guidance. It declares no tracking domains.
 
 ## Required external values and evidence before submission
 
-- public privacy-policy HTTPS URL;
-- public support HTTPS URL and deployment-owner contact;
+- public privacy-policy HTTPS URL plus the final in-app link to that exact policy;
+- public support HTTPS URL with real deployment-owner contact information;
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;
 - Apple Developer team/bundle ownership and signing profiles;
 - Xcode archive validation and signed TestFlight build;
-- iPhone screenshots for required display sizes and localized metadata;
+- required iPhone screenshots and, while iPad remains a supported destination,
+  required 13-inch iPad screenshots for localized metadata;
 - real iOS acceptance report for Keychain, file picker/import, notifications,
   haptics, safe areas, offline restart/sync and audio;
 - reviewer fixture server/account and deletion/cleanup record;

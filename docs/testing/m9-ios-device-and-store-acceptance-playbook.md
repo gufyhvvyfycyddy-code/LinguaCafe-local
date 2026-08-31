@@ -145,8 +145,19 @@ No simulator observation substitutes for these physical haptic/device checks.
 
 In Xcode, assign the deployment owner's team, verify the final bundle id, version,
 build number, app icon, launch screen and supported destinations, then create an
-archive. Use Organizer **Validate App** before any upload. Preserve validation output
-and the archive outside the repository.
+archive. Keep automatic signing as the default unless the deployment owner has a
+specific manual-signing requirement; do not hard-code a deployment team or signing
+credential into the repository. Recheck Apple's current upload SDK requirement before
+each release; as of 2026-08-31, iOS/iPadOS submissions must be built with the iOS 26
+SDK or later, which the existing Xcode 26.6 capability lane satisfies. Use Organizer
+**Validate App** before any upload. Preserve validation output and the archive outside
+the repository.
+
+For recurring archive/TestFlight work after Apple Developer Program access exists,
+prefer Xcode Cloud over storing long-lived certificate/P12/provisioning secrets in
+this public GitHub repository. Xcode Cloud integrates automatic signing, archive and
+TestFlight/App Store Connect; its account/workflow setup is an external Apple action
+and is not represented as complete by repository configuration alone.
 
 After the deployment owner authorizes upload:
 
@@ -167,8 +178,14 @@ are visible in App Store Connect.
 Use `docs/release/m9-ios-app-store-materials.md` and
 `docs/release/mobile-privacy-and-data-deletion.md` as drafts. Replace every placeholder
 with an externally hosted, publicly reachable value owned by the deployment owner.
-Verify screenshots on the submitted build and answer privacy questions from observed
-data flow rather than marketing intent.
+The iOS Privacy Policy URL is mandatory, the Support URL must expose real contact
+information, and the submitted app must contain an easy-to-find link to the published
+privacy policy. The current target supports both iPhone and iPad; while
+`TARGETED_DEVICE_FAMILY = "1,2"` remains true, provide the required iPhone screenshots
+and the required 13-inch iPad screenshots, and run a rendered iPad smoke before using
+those screenshots. If iPad support is intentionally removed, that must be an explicit
+product change before archive rather than a store-metadata workaround. Answer privacy
+questions from observed data flow rather than marketing intent.
 
 Submission is a separate external action. Only after actual App Store Connect review
 shows approval may M9 be changed from `Not Complete` to `Accepted / Closed`.
