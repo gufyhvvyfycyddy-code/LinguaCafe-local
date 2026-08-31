@@ -264,6 +264,15 @@ assert.match(xcodeCapabilityWorkflow, /CA92\.1/);
 assert.match(xcodeCapabilityWorkflow, /Unexpected bundled required-reason APIs/);
 assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking disabled/);
 assert.match(xcodeCapabilityWorkflow, /Bundled privacy manifest must keep tracking domains empty/);
+const unsignedArchiveBlock = xcodeCapabilityWorkflow.match(/- name: Compile unsigned Release iOS archive[\s\S]*?- name: Install pinned Maestro CLI/)?.[0] ?? '';
+assert.match(unsignedArchiveBlock, /-configuration Release/);
+assert.match(unsignedArchiveBlock, /generic\/platform=iOS'/);
+assert.match(unsignedArchiveBlock, /LinguaCafeUnsigned\.xcarchive/);
+assert.match(unsignedArchiveBlock, /Products\/Applications\/App\.app/);
+assert.match(unsignedArchiveBlock, /ApplicationProperties:CFBundleIdentifier/);
+assert.match(unsignedArchiveBlock, /Print :CFBundleIdentifier/);
+assert.match(unsignedArchiveBlock, /CODE_SIGNING_ALLOWED=NO[\s\S]*?archive/);
+assert.doesNotMatch(unsignedArchiveBlock, /-exportArchive|-allowProvisioningUpdates|DEVELOPMENT_TEAM|PROVISIONING_PROFILE|secrets\./i);
 assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';
@@ -292,7 +301,7 @@ assert.match(xcodeCapabilityWorkflow, /inputText: "http:\/\/127\.0\.0\.1:8878"/)
 assert.match(xcodeCapabilityWorkflow, /仅用于本地调试；Android\/iOS 正式版可能拒绝明文连接；正式使用应配置 HTTPS。/);
 assert.ok(xcodeCapabilityWorkflow.indexOf('Start simulator boot') < xcodeCapabilityWorkflow.indexOf('Install mobile dependencies'));
 assert.ok(xcodeCapabilityWorkflow.indexOf('Install mobile dependencies') < xcodeCapabilityWorkflow.indexOf('Wait for simulator and launch app'));
-assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|xcodebuild\s+archive|maestro\s+cloud|MAESTRO_CLOUD|API_KEY/i);
+assert.doesNotMatch(xcodeCapabilityWorkflow, /secrets\.|upload-artifact|TestFlight|-exportArchive|-allowProvisioningUpdates|maestro\s+cloud|MAESTRO_CLOUD|API_KEY/i);
 
 assert.match(readerAcceptanceWorkflow, /workflow_dispatch:/);
 assert.match(readerAcceptanceWorkflow, /workflow_call:/);
