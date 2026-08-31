@@ -155,6 +155,8 @@ Apple's iOS 27 SDK lifecycle boundary is now covered by repository and Simulator
 
 Validation run `33421292052` passed the existing Xcode 26.6 unsigned compile/archive and rendered iPhone + 13-inch-iPad release lane. Validation run `33421932881` then used Xcode `27.0` with iPhoneOS SDK `27.0`, compiled the current candidate, verified the built scene manifest and `UILaunchStoryboardName=LaunchScreen`, and booted an iOS 27 iPhone 17 Pro Simulator where `com.linguacafe.mobile` installed, launched and remained alive until the validation step terminated it. The temporary dispatch carriers were restored immediately and are not part of Goal history.
 
+For Apple's current iPad resizable-scene guidance, the tracked configuration also keeps all four iPad interface orientations and contains neither `UIRequiresFullScreen` nor the corresponding generated Info.plist build setting. The production native Swift layer has no `UIScreen.main`, `userInterfaceIdiom`, or interface-orientation layout branch. These are repository-side adaptivity preconditions; they do not claim that every arbitrary resized window geometry has been visually accepted.
+
 This is repository/Simulator compatibility evidence only. The final submitted binary still needs the Apple-team signed/archive/TestFlight/App Store checks listed below, and future changes to the scene lifecycle or launch screen must re-run the release guard and native validation lane.
 
 ## Required external values and evidence before submission

@@ -19,6 +19,7 @@ const appDelegate = read('mobile', 'ios', 'App', 'App', 'AppDelegate.swift');
 const sceneDelegatePath = join(root, 'mobile', 'ios', 'App', 'App', 'SceneDelegate.swift');
 const sceneDelegate = fs.existsSync(sceneDelegatePath) ? fs.readFileSync(sceneDelegatePath, 'utf8') : '';
 const viewController = read('mobile', 'ios', 'App', 'App', 'MyViewController.swift');
+const nativeAppSwift = [swift, appDelegate, sceneDelegate, viewController].join('\n');
 const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.storyboard');
 const launchStoryboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'LaunchScreen.storyboard');
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
@@ -27,6 +28,7 @@ const project = read('mobile', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj')
 const appIconContents = JSON.parse(read('mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'Contents.json'));
 const appIcon = fs.readFileSync(join(root, 'mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-512@2x.png'));
 const iosPackage = read('mobile', 'ios', 'App', 'CapApp-SPM', 'Package.swift');
+const iosDebugConfig = read('mobile', 'ios', 'debug.xcconfig');
 const route = read('routes', 'api.php');
 const controller = read('app', 'Http', 'Controllers', 'Mobile', 'MobileTextImportController.php');
 const mobileWordSenseController = read('app', 'Http', 'Controllers', 'Mobile', 'MobileWordSenseController.php');
@@ -108,6 +110,14 @@ assert.match(infoPlist, /<key>UIApplicationSceneManifest<\/key>[\s\S]*<key>UISce
 assert.match(infoPlist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
 assert.match(project, /LaunchScreen\.storyboard in Resources/);
 assert.match(launchStoryboard, /launchScreen="YES"/);
+assert.doesNotMatch(infoPlist, /<key>UIRequiresFullScreen<\/key>/);
+assert.doesNotMatch(project, /INFOPLIST_KEY_UIRequiresFullScreen/);
+assert.doesNotMatch(iosDebugConfig, /(?:INFOPLIST_KEY_)?UIRequiresFullScreen/);
+assert.doesNotMatch(nativeAppSwift, /UIScreen\.main|userInterfaceIdiom|interfaceOrientation/);
+const ipadOrientationBlock = infoPlist.match(/<key>UISupportedInterfaceOrientations~ipad<\/key>\s*<array>([\s\S]*?)<\/array>/)?.[1] ?? '';
+for (const orientation of ['Portrait', 'PortraitUpsideDown', 'LandscapeLeft', 'LandscapeRight']) {
+  assert.match(ipadOrientationBlock, new RegExp(`UIInterfaceOrientation${orientation}`));
+}
 assert.match(viewController, /class MyViewController: CAPBridgeViewController/);
 assert.match(viewController, /capacitorDidLoad\(\)/);
 assert.match(viewController, /bridge\?\.registerPluginInstance\(SecureTokenPlugin\(\)\)/);
