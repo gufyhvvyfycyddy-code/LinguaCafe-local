@@ -430,6 +430,7 @@ jobs:
         if: always()
         run: |
           set +e
+          cleanup_status=0
           if [ -n "${RELAY_PID:-}" ]; then
             kill "$RELAY_PID" 2>/dev/null || true
           fi
@@ -450,9 +451,15 @@ jobs:
             done
           fi
           if [ -f vendor/autoload.php ]; then
-            php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'
+            if ! php tests/Support/run-with-testing-db-lease.php --status | python3 -c 'import json,sys; data=json.load(sys.stdin); assert data["active"] is False and data["stale_metadata"] is False'; then
+              echo 'Testing database lease cleanup verification failed.' >&2
+              cleanup_status=1
+            fi
             if mysqladmin ping -uroot --silent 2>/dev/null; then
-              test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"
+              if ! test "$(mysql -N -B -uroot linguacafe_fsrs_test -e "SELECT COUNT(*) FROM migrations WHERE migration LIKE '__testing_acceptance_sentinel_%';")" = "0"; then
+                echo 'Testing acceptance sentinel cleanup verification failed.' >&2
+                cleanup_status=1
+              fi
             fi
           fi
           if [ -n "${LC_FILES_STORAGE:-}" ] && [ -d "$LC_FILES_STORAGE" ]; then
@@ -466,3 +473,4 @@ jobs:
           xcrun simctl terminate "$LC_IOS_SIM_UDID" com.apple.DocumentsApp 2>/dev/null || true
           xcrun simctl shutdown "$LC_IOS_SIM_UDID" 2>/dev/null || true
           brew services stop mysql@8.4 || true
+          exit "$cleanup_status"

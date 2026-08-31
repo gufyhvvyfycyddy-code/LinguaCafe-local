@@ -334,6 +334,11 @@ const corroborationBlock = readerAcceptanceWorkflow.match(/- name: Corroborate c
 assert.match(corroborationBlock, /LC_FOCUS="\$\{\{ inputs\.focus \}\}"/);
 assert.match(corroborationBlock, /if \[ "\$LC_FOCUS" = "full" \]; then[\s\S]*IMPORT_BOOK_NAME=[\s\S]*grep -q 'api\/v1\/mobile\/word-senses'[\s\S]*fi[\s\S]*OFFLINE_LEMMA="offline"/);
 assert.match(corroborationBlock, /OFFLINE_LEMMA="offline"[\s\S]*action_type='sense_review\.rating'[\s\S]*grep -c 'api\/v1\/mobile\/sync\/actions'/);
+const cleanupBlock = readerAcceptanceWorkflow.match(/- name: Cleanup PAB, lease, database service, and simulator[\s\S]*$/)?.[0] ?? '';
+assert.match(cleanupBlock, /cleanup_status=0/);
+assert.match(cleanupBlock, /Testing database lease cleanup verification failed\.[\s\S]*cleanup_status=1/);
+assert.match(cleanupBlock, /Testing acceptance sentinel cleanup verification failed\.[\s\S]*cleanup_status=1/);
+assert.match(cleanupBlock, /exit "\$cleanup_status"/);
 assert.match(readerAcceptanceWorkflow, /action_type='sense_review\.rating'/);
 assert.match(readerAcceptanceWorkflow, /operation_type='sense_review\.rating'/);
 assert.match(readerAcceptanceWorkflow, /oc\.transition='apply'/);
