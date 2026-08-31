@@ -19,6 +19,8 @@ const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.story
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
 const infoPlist = read('mobile', 'ios', 'App', 'App', 'Info.plist');
 const project = read('mobile', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
+const appIconContents = JSON.parse(read('mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'Contents.json'));
+const appIcon = fs.readFileSync(join(root, 'mobile', 'ios', 'App', 'App', 'Assets.xcassets', 'AppIcon.appiconset', 'AppIcon-512@2x.png'));
 const iosPackage = read('mobile', 'ios', 'App', 'CapApp-SPM', 'Package.swift');
 const route = read('routes', 'api.php');
 const controller = read('app', 'Http', 'Controllers', 'Mobile', 'MobileTextImportController.php');
@@ -94,6 +96,18 @@ assert.match(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/)
 assert.doesNotMatch(infoPlist, /<key>ITSAppUsesNonExemptEncryption<\/key>\s*<true\/>/);
 assert.doesNotMatch(infoPlist, /NSAllowsArbitraryLoads(?:InWebContent)?/);
 assert.match(project, /TARGETED_DEVICE_FAMILY = "1,2";/);
+assert.equal(appIconContents.images?.length, 1);
+assert.deepEqual(appIconContents.images?.[0], {
+  filename: 'AppIcon-512@2x.png',
+  idiom: 'universal',
+  platform: 'ios',
+  size: '1024x1024',
+});
+assert.deepEqual([...appIcon.subarray(0, 8)], [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+assert.equal(appIcon.readUInt32BE(16), 1024);
+assert.equal(appIcon.readUInt32BE(20), 1024);
+assert.equal(appIcon[24], 8, 'App Store icon must remain 8-bit PNG');
+assert.equal(appIcon[25], 2, 'App Store icon must remain RGB PNG without alpha');
 
 assert.match(api, /platform: 'android' \| 'ios' \| 'web'/);
 assert.match(api, /dictionary\(term: string\)[\s\S]*?\/dictionary\/lookup\?term=\$\{encodeURIComponent\(term\)\}/);
@@ -310,6 +324,7 @@ assert.match(xcodeCapabilityWorkflow, /mobile-dev-inc\/Maestro\/releases\/downlo
 assert.match(xcodeCapabilityWorkflow, /a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5/);
 assert.match(xcodeCapabilityWorkflow, /shasum -a 256 -c -/);
 assert.match(xcodeCapabilityWorkflow, /Run rendered iOS login-shell smoke/);
+assert.match(xcodeCapabilityWorkflow, /extendedWaitUntil:[\s\S]{0,120}visible: "IOS · CONNECTED MVP"[\s\S]{0,80}timeout: 30000/);
 assert.match(xcodeCapabilityWorkflow, /IOS · CONNECTED MVP/);
 assert.match(xcodeCapabilityWorkflow, /设备令牌由系统 Keychain 保护；应用不会保存密码。/);
 assert.match(xcodeCapabilityWorkflow, /inputText: "http:\/\/127\.0\.0\.1:8878"/);

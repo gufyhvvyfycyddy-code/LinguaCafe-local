@@ -187,6 +187,9 @@ jobs:
             '    clearState: true' \
             '    clearKeychain: true' \
             '- assertVisible: "LinguaCafe"' \
+            '- extendedWaitUntil:' \
+            '    visible: "IOS · CONNECTED MVP"' \
+            '    timeout: 30000' \
             '- assertVisible: "IOS · CONNECTED MVP"' \
             '- assertVisible: "继续学习"' \
             '- assertVisible: "服务器地址"' \
