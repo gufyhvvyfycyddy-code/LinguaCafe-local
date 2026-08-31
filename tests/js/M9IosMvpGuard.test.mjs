@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { normalizeIosSpmLocalPackagePaths } from '../../mobile/scripts/normalize-ios-spm-paths.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const read = (...parts) => fs.readFileSync(join(root, ...parts), 'utf8');
@@ -49,7 +50,33 @@ const offlineSmokeCommand = read('app', 'Console', 'Commands', 'PrepareMobileOff
 assert.equal(pkg.dependencies['@capacitor/core'], '8.4.2');
 assert.equal(pkg.dependencies['@capacitor/ios'], '8.4.2');
 assert.match(pkg.scripts['cap:sync:ios'], /cap sync ios/);
+assert.match(pkg.scripts['cap:sync:ios'], /normalize-ios-spm-paths\.mjs/);
 assert.match(pkg.scripts['ios:generated-web-integrity'], /ios-generated-web-integrity\.mjs/);
+const windowsSpmFixture = '.package(name: "CapacitorHaptics", path: "..\\..\\..\\node_modules\\@capacitor\\haptics")';
+assert.equal(
+  normalizeIosSpmLocalPackagePaths(windowsSpmFixture),
+  '.package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics")',
+);
+assert.throws(
+  () => normalizeIosSpmLocalPackagePaths('.package(name: "Unsafe", path: "C:\\temp\\plugin")'),
+  /unsafe local package path/,
+);
+assert.throws(
+  () => normalizeIosSpmLocalPackagePaths('.package(name: "Unsafe", path: "../../../../outside/plugin")'),
+  /unsafe local package path/,
+);
+assert.throws(
+  () => normalizeIosSpmLocalPackagePaths('.package(path: "../../../node_modules/@capacitor/haptics")'),
+  /unsupported local package declaration/,
+);
+assert.throws(
+  () => normalizeIosSpmLocalPackagePaths('.package(\n  path: "../../../node_modules/@capacitor/haptics"\n)'),
+  /unsupported local package declaration/,
+);
+const remoteSpmFixture = '.package(url: "https://github.com/ionic-team/capacitor-swift-pm.git", exact: "8.4.2")';
+assert.equal(normalizeIosSpmLocalPackagePaths(remoteSpmFixture), remoteSpmFixture);
+const portableSpmFixture = '.package(name: "CapacitorHaptics", path: "../../../node_modules/@capacitor/haptics")';
+assert.equal(normalizeIosSpmLocalPackagePaths(portableSpmFixture), portableSpmFixture);
 for (const dependency of ['Capacitor', 'CapacitorHaptics', 'CapacitorLocalNotifications', 'CapacitorPreferences']) {
   assert.match(iosPackage, new RegExp(dependency));
 }
