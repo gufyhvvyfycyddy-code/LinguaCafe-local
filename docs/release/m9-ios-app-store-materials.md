@@ -6,7 +6,7 @@ Status: release candidate; not submitted
 
 - App name: `LinguaCafe`
 - Subtitle: `Read, look up, review English`
-- Version candidate: `1.0`
+- Version candidate: `1.0.0`
 - Build candidate: `1`
 - Primary category: Education
 - Secondary category: Reference
@@ -21,6 +21,8 @@ requirements:
 - app name and subtitle: at most 30 characters each;
 - promotional text: at most 170 characters;
 - keywords: at most 100 UTF-8 bytes;
+- version candidate `1.0.0` matches the current `CFBundleShortVersionString`; build candidate `1` matches `CFBundleVersion`;
+- increment the build number before any later upload that reuses version `1.0.0`;
 - Support URL: must resolve to a page with real contact information;
 - Privacy Policy URL: required for iOS, with an easy-to-find in-app link to the
   published policy before submission;
