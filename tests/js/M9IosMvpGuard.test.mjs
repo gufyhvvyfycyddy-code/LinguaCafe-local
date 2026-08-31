@@ -262,6 +262,12 @@ assert.match(storeMaterials, /publisher-owned App Store app-record values[\s\S]*
 assert.match(storeMaterials, /Digital Services Act trader status/);
 assert.match(storeMaterials, /South Korea, China mainland, or Vietnam fields/);
 assert.match(storeMaterials, /content-frequency questions[\s\S]*actual release server\/content inventory/);
+assert.match(storeMaterials, /Social Media capability: `No`/);
+assert.match(storeMaterials, /As of September 2026[\s\S]*required when submitting new apps or updates/);
+assert.doesNotMatch(api, /\/(?:social|feeds?|posts?|comments?|reactions?|reposts?|likes?|shares?)\b/i);
+assert.match(storeMaterials, /Regulated Medical Device declaration is conditional/);
+assert.match(storeMaterials, /Health & Fitness or Medical[\s\S]*frequent[\s\S]*Medical or Treatment Information/);
+assert.match(storeMaterials, /publisher must confirm the final regulated-medical-device declaration[\s\S]*submission time/);
 assert.match(storeMaterials, /Content Rights declaration must additionally account for material served by the actual release server/);
 assert.match(storeMaterials, /does not hard-code or claim a numeric\/label age rating/);
 assert.match(storeMaterials, /no StoreKit integration, in-app purchase or subscription UI, payment SDK, checkout flow/);
