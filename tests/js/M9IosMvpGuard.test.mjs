@@ -292,6 +292,7 @@ assert.match(xcodeCapabilityWorkflow, /xcrun simctl boot /);
 assert.match(xcodeCapabilityWorkflow, /LC_IOS_IPAD_SIM_UDID/);
 const simulatorBootBlock = xcodeCapabilityWorkflow.match(/- name: Start simulator boot[\s\S]*?- name: Install mobile dependencies/)?.[0] ?? '';
 assert.doesNotMatch(simulatorBootBlock, /xcrun simctl boot "\$IPAD_UDID"/);
+assert.match(simulatorBootBlock, /iPhone 17 Pro Max/);
 assert.match(xcodeCapabilityWorkflow, /iPad Pro 13-inch/);
 assert.match(xcodeCapabilityWorkflow, /Run rendered 13-inch iPad login-shell smoke/);
 const ipadSmokeBlock = xcodeCapabilityWorkflow.match(/- name: Run rendered 13-inch iPad login-shell smoke[\s\S]*?- name: Shut down simulators/)?.[0] ?? '';
@@ -310,6 +311,10 @@ assert.match(xcodeCapabilityWorkflow, /mobile-dev-inc\/Maestro\/releases\/downlo
 assert.match(xcodeCapabilityWorkflow, /a4ccab6b604617e7aef6db4f885666056eabe5cfa32befaa3bc994041b8fcbb5/);
 assert.match(xcodeCapabilityWorkflow, /shasum -a 256 -c -/);
 assert.match(xcodeCapabilityWorkflow, /Run rendered iOS login-shell smoke/);
+const iphoneSmokeBlock = xcodeCapabilityWorkflow.match(/- name: Run rendered iOS login-shell smoke[\s\S]*?- name: Run rendered 13-inch iPad login-shell smoke/)?.[0] ?? '';
+assert.match(iphoneSmokeBlock, /iphone-6\.9-login-shell\.png/);
+assert.match(iphoneSmokeBlock, /1260x2736\|1290x2796\|1320x2868/);
+assert.match(iphoneSmokeBlock, /Unexpected 6\.9-inch iPhone screenshot size/);
 assert.match(xcodeCapabilityWorkflow, /IOS · CONNECTED MVP/);
 assert.match(xcodeCapabilityWorkflow, /设备令牌由系统 Keychain 保护；应用不会保存密码。/);
 assert.match(xcodeCapabilityWorkflow, /inputText: "http:\/\/127\.0\.0\.1:8878"/);
