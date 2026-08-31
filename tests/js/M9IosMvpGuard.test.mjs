@@ -20,6 +20,7 @@ const sceneDelegatePath = join(root, 'mobile', 'ios', 'App', 'App', 'SceneDelega
 const sceneDelegate = fs.existsSync(sceneDelegatePath) ? fs.readFileSync(sceneDelegatePath, 'utf8') : '';
 const viewController = read('mobile', 'ios', 'App', 'App', 'MyViewController.swift');
 const storyboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'Main.storyboard');
+const launchStoryboard = read('mobile', 'ios', 'App', 'App', 'Base.lproj', 'LaunchScreen.storyboard');
 const privacy = read('mobile', 'ios', 'App', 'App', 'PrivacyInfo.xcprivacy');
 const infoPlist = read('mobile', 'ios', 'App', 'App', 'Info.plist');
 const project = read('mobile', 'ios', 'App', 'App.xcodeproj', 'project.pbxproj');
@@ -104,6 +105,9 @@ assert.match(sceneDelegate, /class SceneDelegate: UIResponder, UIWindowSceneDele
 assert.match(sceneDelegate, /rootViewController = MyViewController\(\)/);
 assert.match(sceneDelegate, /SceneDelegateProxy\.shared\.scene/);
 assert.match(infoPlist, /<key>UIApplicationSceneManifest<\/key>[\s\S]*<key>UISceneConfigurations<\/key>[\s\S]*<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>[\s\S]*<key>UISceneStoryboardFile<\/key>\s*<string>Main<\/string>/);
+assert.match(infoPlist, /<key>UILaunchStoryboardName<\/key>\s*<string>LaunchScreen<\/string>/);
+assert.match(project, /LaunchScreen\.storyboard in Resources/);
+assert.match(launchStoryboard, /launchScreen="YES"/);
 assert.match(viewController, /class MyViewController: CAPBridgeViewController/);
 assert.match(viewController, /capacitorDidLoad\(\)/);
 assert.match(viewController, /bridge\?\.registerPluginInstance\(SecureTokenPlugin\(\)\)/);
