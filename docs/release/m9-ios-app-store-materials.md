@@ -8,6 +8,7 @@ Status: release candidate; not submitted
 - Subtitle: `Read, look up, review English`
 - Primary category: Education
 - Secondary category: Reference
+- Primary language: publisher-owned App Store Connect value; must be chosen before submission
 - Promotional text: `Continue your LinguaCafe English reading and sense-based
   reviews on iPhone, with short-term offline access and local reminders.`
 - Keywords: `English,reading,vocabulary,FSRS,review,dictionary,offline`
@@ -132,7 +133,7 @@ Repository evidence can pre-answer only capability facts, not the final rating o
 
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;
 - public support HTTPS URL with real deployment-owner contact information;
-- publisher-owned App Store app-record values that cannot be inferred from source: SKU, copyright owner/year, availability/territories and any region-specific declarations that apply;
+- publisher-owned App Store app-record values that cannot be inferred from source: Primary Language, SKU, copyright owner/year, availability/territories and any region-specific declarations that apply;
 - App Review contact name/email/international-format phone plus a non-expiring least-privilege review account and reachable review server;
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;
