@@ -133,7 +133,7 @@ Repository evidence can pre-answer only capability facts, not the final rating o
 
 - public privacy-policy HTTPS URL plus the final in-app link to that exact policy;
 - public support HTTPS URL with real deployment-owner contact information;
-- publisher-owned App Store app-record values that cannot be inferred from source: Primary Language, SKU, copyright owner/year, availability/territories and any region-specific declarations that apply;
+- publisher-owned App Store app-record values that cannot be inferred from source: Primary Language, SKU, copyright owner/year, price/tax category, availability/territories, Digital Services Act trader status, and any region-specific declarations that apply (including conditional South Korea, China mainland, or Vietnam fields);
 - App Review contact name/email/international-format phone plus a non-expiring least-privilege review account and reachable review server;
 - confirmation that the submitted iOS build still has no account-creation flow;
   if one is added, in-app account-deletion initiation is also required;

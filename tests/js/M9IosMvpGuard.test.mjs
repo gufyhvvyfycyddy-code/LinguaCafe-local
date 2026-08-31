@@ -210,6 +210,8 @@ assert.match(storeMaterials, /final in-app link to that exact policy/);
 assert.match(storeMaterials, /support HTTPS URL with real deployment-owner contact information/);
 assert.match(storeMaterials, /Primary language: publisher-owned App Store Connect value/);
 assert.match(storeMaterials, /publisher-owned App Store app-record values[\s\S]*Primary Language[\s\S]*SKU/);
+assert.match(storeMaterials, /Digital Services Act trader status/);
+assert.match(storeMaterials, /South Korea, China mainland, or Vietnam fields/);
 assert.match(storeMaterials, /content-frequency questions[\s\S]*actual release server\/content inventory/);
 assert.match(storeMaterials, /Content Rights declaration must additionally account for material served by the actual release server/);
 assert.match(storeMaterials, /does not hard-code or claim a numeric\/label age rating/);
