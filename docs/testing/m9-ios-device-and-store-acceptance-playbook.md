@@ -195,9 +195,15 @@ privacy policy. The current target supports both iPhone and iPad; while
 `TARGETED_DEVICE_FAMILY = "1,2"` remains true, provide the required iPhone screenshots
 and the required 13-inch iPad screenshots. Repository-side rendered iPad smoke is now
 proven by GitHub Actions run `33355499203` on `iPad Pro 13-inch (M5)`, including a
-`2064x2752` screenshot. Final App Store screenshots still need deployment-owner review
-and upload; the Simulator smoke is only a release-preparation gate. If iPad support is intentionally removed, that must be an explicit
-product change before archive rather than a store-metadata workaround.
+`2064x2752` screenshot. The release-preparation lane treats raw `simctl` PNG output only
+as a temporary capture: run `33373914848` proved that a correctly sized Simulator PNG
+can still report `hasAlpha=yes`, which App Store screenshots do not permit. Normalize
+store screenshot candidates to JPEG with the existing macOS `sips` tool, then require
+the Apple-accepted dimensions, JPEG format and `hasAlpha=no` before treating the file
+as a store-material candidate. Final App Store screenshots still need deployment-owner
+review and upload; the Simulator smoke is only a release-preparation gate. If iPad
+support is intentionally removed, that must be an explicit product change before
+archive rather than a store-metadata workaround.
 
 Repository-side privacy preparation is now an executable candidate rather than source-only prose: run `33359184066` passed the compiled export-compliance declaration; runs `33361617463` and final `33362427450` passed the built-app Privacy Manifest checks, with `33362427450` covering the exact six collected-data categories, linked/non-tracking/App-Functionality semantics, `UserDefaults / CA92.1`, empty tracking domains and the serial iPhone+iPad smoke. Use the candidate in `docs/release/m9-ios-app-store-materials.md`, but re-confirm it against the actual production server, partners and retention behavior at submission time.
 
