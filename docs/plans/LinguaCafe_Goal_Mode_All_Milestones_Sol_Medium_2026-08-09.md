@@ -394,6 +394,26 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 
 ---
 
+## Phase I — Windows PC 测试版 + 产品设计者持续反馈
+
+> 2026-09-01 新增。A–H 当前已经到达 Apple physical/signing/distribution 外部能力边界；Phase I 是独立的 Windows 产品体验验证通道，不把 E-08/H-10/H-GATE 的 DEFERRED 改写成 DONE。详细契约见 `docs/plans/windows-pc-test-build-plan-2026-09-01.md`，持续反馈唯一台账见 `docs/testing/windows-pc-test-feedback-log.md`。
+>
+> PC 测试版必须复用同一套 Laravel/Vue/FSRS/Reader 业务 owner，不建设第二套桌面业务。测试数据使用独立持久化 MySQL/Redis/storage，不读取或写入普通开发、验收、预发布或生产数据库。用户体验上不展示登录流程，但桌面壳只能通过既有 `/setup` + `/login` 正式认证路径自动建立专用管理员会话，不增加生产认证绕过路由。
+
+| ID | 状态 | Outcome | Reuse first | Exit evidence |
+|---|---|---|---|---|
+| I-00 | DONE | 冻结 Windows PC 测试版的数据隔离、认证、反馈和打包边界 | existing Laravel/Vue + Docker + Windows environment | PC plan 已记录：独立数据卷、loopback-only runtime、隐藏正式 setup/login、无 auth bypass、feedback log 单一 owner |
+| I-01 | DONE | 建立可长期保留的 Windows PC 独立测试运行时 | production Web/Python Dockerfiles + MySQL 8.4 + Redis 7.2 | `HANDOFF-02-ISOLATED-PC-RUNTIME-2026-09-02.md`：专用 `linguacafe_pc_test` 完成正常 migrate/seed；ECDICT=768,739/HEALTHY；Web=127.0.0.1:9391 HTTP 200；DB/Redis 不暴露宿主端口；既有 H-07 containers 未受影响 |
+| I-02 | DONE | 生成 Windows `.exe` 测试壳，启动后直接进入管理员工作区 | .NET 8 WPF + Microsoft WebView2 + existing `/setup`/`/login` | `HANDOFF-04-WEBVIEW2-AUTO-ADMIN-READY-2026-09-02.md`：console session 1 真实启动；专用 admin `is_admin=1`；`AdminProvisioned=true`；startup log 到达 `PC 测试版已就绪：/` |
+| I-03 | ACTIVE | 把 exact Goal snapshot 与桌面壳封装并创建桌面快捷方式 | `git archive HEAD` + Windows shortcut owner | `%LOCALAPPDATA%/LinguaCafePCTest/app` 有 exe/runtime snapshot/commit marker；桌面 `LinguaCafe PC Test.lnk` 可启动 exact build |
+| I-04 | TODO | PC 真实主流程 smoke | existing Web main flows | 真窗口/真实 DOM：Home→Library→导入/Reader→Sense Review→WordSense→Admin/settings；Console/HTTP/DB 可观察结果一致 |
+| I-05 | ACTIVE | 产品设计者持续体验反馈闭环 | `windows-pc-test-feedback-log.md` | 每条用户反馈先记录 build + 实际/预期，再修；完成自动验收后为 `FIXED_AWAITING_RETEST`；只有用户重测/明确接受才 CLOSED |
+| I-GATE | TODO | PC 测试版达到当前一轮可持续日常试用状态 | I-01…I-05 + owner feedback | 无当前要求中的 blocking PC defect；桌面 shortcut 指向最新 accepted build；feedback log 与用户最近一次重测一致 |
+
+明确不在 Phase I 第一版处理：公开 Windows installer/update channel、Windows code signing/SmartScreen reputation、把 Docker/MySQL/Redis/PHP/Python 全部改造成另一套 bundled runtime、完整桌面离线 authority、多用户公开认证重设计，以及 Apple H-10/H-GATE 外部能力。
+
+---
+
 ## 8. Phase Gate 与人工调度规则
 
 当前 LinguaCafe 使用“主窗口验收 → 生成下一轮 DIRECT → 用户启动并行窗口”的受控推进方式。

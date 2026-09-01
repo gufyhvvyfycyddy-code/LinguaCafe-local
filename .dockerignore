@@ -3,6 +3,7 @@
 .env.*
 node_modules
 mobile
+/desktop
 vendor
 storage/app
 storage/backup

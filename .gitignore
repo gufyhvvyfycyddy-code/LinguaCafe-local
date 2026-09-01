@@ -67,3 +67,7 @@ yarn-error.log
 /.tmp-extract-goal/
 /LinguaCafe_M6B_plan_correction.patch
 /LinguaCafe_M6B_final_governance_correction.patch
+
+# Windows PC test build outputs
+/desktop/windows-pc-test/bin/
+/desktop/windows-pc-test/obj/

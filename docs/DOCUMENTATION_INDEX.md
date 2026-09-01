@@ -22,7 +22,8 @@
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
 - 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
-- 当前 Goal / Phase H 执行顺序（Phase G/G-GATE、H-00–H-09、H-11 已关闭；E-06/E-07 Android capability 已于 2026-08-30 补齐；E-08/H-10 iOS capability DEFERRED；H-GATE 已审计并 DEFERRED / Not Complete）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 当前 Goal 执行顺序（Phase G/G-GATE、H-00–H-09、H-11 已关闭；E-08/H-10/H-GATE 仍停在 Apple 外部 capability；2026-09-01 新增独立 Phase I Windows PC 测试版/产品反馈通道）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- Windows PC 测试版架构/打包/验收计划：`docs/plans/windows-pc-test-build-plan-2026-09-01.md`；产品设计者持续反馈唯一台账：`docs/testing/windows-pc-test-feedback-log.md`
 - H-02 representative 100-user load 验收：`docs/testing/h02-representative-load-acceptance-2026-08-28.md`
 - H-03 bottleneck diagnostics 验收：`docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`；主流程 flow latency 已证明健康，fresh Apache prefork cold-burst deployment 问题留 H-07
 - H-04 backup/restore drill 验收：`docs/testing/h04-backup-restore-drill-acceptance-2026-08-28.md`；真实 MySQL backup→restore、write fence、automatic safety rollback 与 zero-residue 已证明
@@ -106,6 +107,7 @@
 | M7 Android Connected MVP | `docs/adr/ADR-0044-m7-android-connected-mvp.md`、`docs/plans/m7-android-connected-mvp-plan.md`、`docs/testing/m7-android-connected-mvp-acceptance-2026-08-01.md`、`docs/testing/m7-android-connected-mvp-interim-2026-07-29.md`（历史 deferred 记录） |
 | M8 Limited Offline MVP | `docs/adr/ADR-0051-m8-limited-offline-mvp.md`、`docs/plans/m8-limited-offline-mvp-plan.md`、`docs/testing/m8-limited-offline-mvp-acceptance-2026-08-01.md` |
 | M9 iOS MVP 与发布准备 | `docs/adr/ADR-0054-m9-ios-mvp-and-release-readiness.md`、`docs/plans/m9-ios-mvp-release-plan.md`、`docs/testing/m9-ios-mvp-release-acceptance-2026-08-01.md`、`docs/testing/m9-ios-device-and-store-acceptance-playbook.md`、`docs/release/m9-ios-app-store-materials.md`、`docs/release/mobile-privacy-and-data-deletion.md` |
+| Windows PC 测试版 / `.exe` / 产品设计者持续反馈 | `docs/plans/windows-pc-test-build-plan-2026-09-01.md`、`docs/testing/windows-pc-test-feedback-log.md` |
 | Goal-mode deferred capability clusters | `docs/adr/ADR-0052-goal-mode-deferred-evidence-clusters.md` |
 | Testing emulator credential transport | `docs/adr/ADR-0053-testing-emulator-credential-transport.md` |
 

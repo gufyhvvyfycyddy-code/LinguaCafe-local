@@ -1,0 +1,106 @@
+name: linguacafe-pc-test
+
+networks:
+  pc-test:
+    driver: bridge
+
+volumes:
+  mysql-data:
+  redis-data:
+  storage-data:
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: linguacafe_pc_test
+      MYSQL_USER: linguacafe_pc_test
+      MYSQL_PASSWORD: pc-test-only
+      MYSQL_ROOT_PASSWORD: pc-test-root-only
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 2s
+      timeout: 2s
+      retries: 60
+      start_period: 10s
+    volumes:
+      - mysql-data:/var/lib/mysql
+    networks:
+      - pc-test
+
+  redis:
+    image: redis:7.2-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    networks:
+      - pc-test
+
+  python:
+    build:
+      context: ../..
+      dockerfile: docker/PythonDockerfile
+    image: linguacafe-pc-test-python:${PC_TEST_RUNTIME_VERSION:-dev}
+    restart: unless-stopped
+    command: ["python3", "/app/tokenizer.py"]
+    networks:
+      - pc-test
+
+  web:
+    build:
+      context: ../..
+      dockerfile: docker/PhpDockerfile
+    image: linguacafe-pc-test-web:${PC_TEST_RUNTIME_VERSION:-dev}
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      python:
+        condition: service_started
+    environment:
+      APP_ENV: local
+      APP_DEBUG: "false"
+      APP_KEY: base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      APP_URL: http://127.0.0.1:9391
+      ALLOW_WEB_REGISTER: "false"
+      DB_CONNECTION: mysql
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_DATABASE: linguacafe_pc_test
+      DB_USERNAME: linguacafe_pc_test
+      DB_PASSWORD: pc-test-only
+      SESSION_DRIVER: file
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_CLIENT: predis
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      REDIS_CACHE_DB: "1"
+      PYTHON_CONTAINER_NAME: python
+      BROADCAST_CONNECTION: pusher
+      PUSHER_APP_ID: linguacafe-pc-test
+      PUSHER_APP_KEY: wjp2pou6ebgibtwccqsj
+      PUSHER_APP_SECRET: pc-test-reverb-only
+      REVERB_APP_ID: linguacafe-pc-test
+      REVERB_APP_KEY: wjp2pou6ebgibtwccqsj
+      REVERB_APP_SECRET: pc-test-reverb-only
+      REVERB_HOST: 127.0.0.1
+      REVERB_PORT: "6001"
+      REVERB_SCHEME: http
+      BACKUP_RESTORE_VALIDATION_HOST: mysql
+      BACKUP_RESTORE_VALIDATION_PORT: "3306"
+      BACKUP_RESTORE_VALIDATION_USERNAME: root
+      BACKUP_RESTORE_VALIDATION_PASSWORD: pc-test-root-only
+      LOG_CHANNEL: stderr
+    ports:
+      - "127.0.0.1:9391:80"
+      - "127.0.0.1:6001:6001"
+    volumes:
+      - storage-data:/var/www/html/storage
+      - "${PC_TEST_ECDICT_CSV:-./empty-ecdict.csv}:/pc-test/ecdict.csv:ro"
+    networks:
+      - pc-test
