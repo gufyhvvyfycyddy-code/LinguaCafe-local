@@ -43,6 +43,17 @@ try {
     }
     Set-Content -LiteralPath (Join-Path $stagingDir "runtime-version.txt") -Value $commit -Encoding ascii -NoNewline
 
+    Write-Host "Prebuilding exact LinguaCafe PC Test runtime images..."
+    $env:PC_TEST_RUNTIME_VERSION = $commit
+    docker compose -p linguacafe-pc-test -f "desktop\windows-pc-test\docker-compose.pc-test.yml" build web python
+    if ($LASTEXITCODE -ne 0) {
+        throw "PC test Docker image build failed."
+    }
+    docker image inspect "linguacafe-pc-test-web:$commit" "linguacafe-pc-test-python:$commit" | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "PC test exact-tag Docker images are missing after build."
+    }
+
     if (Test-Path $installDir) {
         Remove-Item -Recurse -Force $installDir
     }

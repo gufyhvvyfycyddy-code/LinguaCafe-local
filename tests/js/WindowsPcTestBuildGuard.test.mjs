@@ -65,6 +65,8 @@ assert.doesNotMatch(installer, /git diff --quiet|git diff --cached --quiet/);
 assert.match(installer, /app-staging/);
 assert.match(installer, /dotnet publish[\s\S]*-o \$stagingDir/);
 assert.match(installer, /git archive --format=zip --output=\$runtimeZip HEAD/);
+assert.match(installer, /\$env:PC_TEST_RUNTIME_VERSION = \$commit/);
+assert.match(installer, /docker compose[\s\S]*build web python/);
 assert.match(installer, /Move-Item -LiteralPath \$stagingDir -Destination \$installDir/);
 assert.match(installer, /runtime-version\.txt/);
 assert.match(installer, /LinguaCafe PC Test\.lnk/);
