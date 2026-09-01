@@ -5,6 +5,7 @@
 CHANGELOG.md export-ignore
 /public/images/flags/** export-ignore
 
-# make sure executables have the right line endings
+# make sure executable/build-control text has the right line endings
 *.sh text eol=lf
+*.patch text eol=lf
 ./tools/django_server/manage.py text eol=lf

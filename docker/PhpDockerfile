@@ -26,11 +26,11 @@ RUN git init fsrs-rs-php \
     && git fetch --depth 1 origin 122299bc273ebecc07f5022b91939380951b5688 \
     && git checkout --detach FETCH_HEAD
 COPY docker/fsrs-rs-php-php84.patch /tmp/fsrs-rs-php-php84.patch
+COPY docker/fsrs-rs-php-php84.Cargo.lock /tmp/fsrs-rs-php-php84.Cargo.lock
 RUN cd /build/fsrs-rs-php \
     && git apply --check /tmp/fsrs-rs-php-php84.patch \
     && git apply /tmp/fsrs-rs-php-php84.patch \
-    && cargo update -p ext-php-rs --precise 0.15.15 \
-    && printf '%s  %s\n' '5fd0d9ce977385f4dd5039161f9568c72a9f5ee8343272648e3167a2973236c9' 'Cargo.lock' | sha256sum -c - \
+    && cp /tmp/fsrs-rs-php-php84.Cargo.lock Cargo.lock \
     && cargo build --release --locked \
     && test -f target/release/libfsrs_rs_php.so
 
