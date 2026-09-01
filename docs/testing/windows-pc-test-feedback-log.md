@@ -14,7 +14,7 @@
 
 | Build | Goal commit | Installed executable | Result |
 |---|---|---|---|
-| PC-TEST-0.1 | pending | pending | first WPF/WebView2 + isolated Docker build in progress |
+| PC-TEST-0.1 | `1fe0fae9d6308118bcf20af7674853d74112aa6a` | `%LOCALAPPDATA%/LinguaCafePCTest/app/LinguaCafe PC Test.exe` + desktop `LinguaCafe PC Test.lnk` | installed and desktop-launch READY; I-04 functional smoke pending |
 
 ## Feedback
 

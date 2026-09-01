@@ -13,8 +13,9 @@ This lane gives the product owner a real Windows desktop executable for daily ha
 - First-run admin DOM selector was corrected after adversarial review; Compose startup now uses health-aware `--wait` instead of racing MySQL readiness.
 - I-01 is DONE: dedicated MySQL/Redis/storage were initialized, all normal migrations/seeds completed against `linguacafe_pc_test`, ECDICT is healthy at 768,739 rows, and the loopback Web runtime returns HTTP 200 without touching existing H-07 containers.
 - I-02 is DONE: the WPF/WebView2 shell was launched in the real interactive Windows console session, created the dedicated administrator through canonical `/setup`, logged in through canonical `/login`, and reached ready path `/`.
-- I-03 packaging hardening is ACTIVE: packaging now rejects any tracked or untracked Git source change, stages the complete new build before replacing the previous installed app, and uses a repository-local empty ECDICT placeholder when no real CSV is available instead of a user-specific hard-coded path.
-- Step handoffs: `HANDOFF-01` through `HANDOFF-04` under `docs/handoffs/windows-pc-test/` record each completed checkpoint.
+- I-03 is DONE: exact build `1fe0fae9d6308118bcf20af7674853d74112aa6a` is installed under `%LOCALAPPDATA%/LinguaCafePCTest/app`; the desktop shortcut launches the installed executable; Web/Python images are prebuilt with the same commit tag so ordinary launch reuses the runtime instead of compiling FSRS.
+- Packaging rejects tracked or untracked Git source changes, stages the complete new build before replacing the previous installed app, and uses a repository-local empty ECDICT placeholder when no real CSV is available instead of a user-specific hard-coded path.
+- Step handoffs: `HANDOFF-01` through `HANDOFF-05` under `docs/handoffs/windows-pc-test/` record each completed checkpoint.
 
 ## Product contract
 
@@ -72,7 +73,7 @@ The installed build is deliberately a test build for the current Windows PC. Cod
 | I-00 | DONE | Freeze PC-test isolation/auth/feedback contract | This plan + adversarial architecture review |
 | I-01 | DONE | Dedicated persistent PC Docker runtime | Compose health wait; normal migrate/seed against `linguacafe_pc_test`; ECDICT 768,739 / HEALTHY; loopback HTTP 200; existing H-07 containers unchanged |
 | I-02 | DONE | Windows executable shell + hidden normal admin setup/login | `HANDOFF-04-WEBVIEW2-AUTO-ADMIN-READY-2026-09-02.md`; real console-session WebView2 launch; dedicated `is_admin=1`; `AdminProvisioned=true`; startup log reaches `PC 测试版已就绪：/` |
-| I-03 | ACTIVE | Package current Goal snapshot and desktop shortcut | installed `.exe`, `runtime-source.zip`, commit marker, real desktop `.lnk` |
+| I-03 | DONE | Package current Goal snapshot and desktop shortcut | `HANDOFF-05-EXACT-BUILD-DESKTOP-SHORTCUT-2026-09-02.md`; exact build `1fe0fae9...`; installed `.exe` + `runtime-source.zip` + commit marker + commit-tagged Web/Python images; real desktop `.lnk` reaches ready path `/` without rebuilding FSRS |
 | I-04 | TODO | Real PC smoke | Home → Library → Reader/import → Sense Review → WordSense → Admin/settings, using real DOM/user actions |
 | I-05 | ACTIVE | Product-owner feedback loop | every reported issue recorded with build, expected/actual, disposition, fix commit and retest status |
 | I-GATE | TODO | Product owner says the PC test build is stable enough for the next packaging decision | no unresolved blocker chosen as required for current PC test; feedback log reflects owner retest |
