@@ -1,6 +1,6 @@
 # LinguaCafe Documentation Index
 
-> 当前入口：2026-08-31。本文只负责路由，不保存任务历史、长篇状态或重复契约。
+> 当前入口：2026-09-02。本文只负责路由，不保存任务历史、长篇状态或重复契约。
 
 ## 1. 新任务读取顺序
 
@@ -22,7 +22,7 @@
 - 工作区只读盘点与稳定化：`docs/plans/workspace-stabilization-plan-2026-08-03.md`；运行 `node scripts/workspace-inventory.mjs`
 - 当前工作台与任务追溯：`docs/plans/current-working-handoff.md`
 - 当前产品权威：`docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`
-- 当前 Goal 执行顺序（Phase G/G-GATE、H-00–H-09、H-11 已关闭；E-08/H-10/H-GATE 仍停在 Apple 外部 capability；2026-09-01 新增独立 Phase I Windows PC 测试版/产品反馈通道）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
+- 当前 Goal 执行顺序（Phase G/G-GATE、H-00–H-09、H-11 已关闭；E-08/H-10/H-GATE 仍停在 Apple 外部 capability；Phase I Windows PC 测试版已完成 I-00–I-04，I-05 产品设计者反馈 ACTIVE，I-GATE TODO）：`docs/plans/LinguaCafe_Goal_Mode_All_Milestones_Sol_Medium_2026-08-09.md`
 - Windows PC 测试版架构/打包/验收计划：`docs/plans/windows-pc-test-build-plan-2026-09-01.md`；产品设计者持续反馈唯一台账：`docs/testing/windows-pc-test-feedback-log.md`
 - H-02 representative 100-user load 验收：`docs/testing/h02-representative-load-acceptance-2026-08-28.md`
 - H-03 bottleneck diagnostics 验收：`docs/testing/h03-bottleneck-diagnostics-acceptance-2026-08-28.md`；主流程 flow latency 已证明健康，fresh Apache prefork cold-burst deployment 问题留 H-07

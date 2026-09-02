@@ -15,6 +15,7 @@ This lane gives the product owner a real Windows desktop executable for daily ha
 - I-02 is DONE: the WPF/WebView2 shell was launched in the real interactive Windows console session, created the dedicated administrator through canonical `/setup`, logged in through canonical `/login`, and reached ready path `/`.
 - I-03 is DONE: exact build `1fe0fae9d6308118bcf20af7674853d74112aa6a` is installed under `%LOCALAPPDATA%/LinguaCafePCTest/app`; the desktop shortcut launches the installed executable; Web/Python images are prebuilt with the same commit tag so ordinary launch reuses the runtime instead of compiling FSRS.
 - I-04 is DONE: installed PC-test runtime completed real Home -> Library/import -> Reader/ECDICT -> WordSense -> Sense Review Good -> User Settings -> Admin smoke; browser/API/database evidence agrees and no console warning/error was observed.
+- I-05 is the only active PC lane: no product-owner runtime feedback has been reported yet. Until there is real hands-on feedback, do not manufacture defects, repeat the accepted main-flow smoke, or expand into public Windows installer/signing/update work.
 - Packaging rejects tracked or untracked Git source changes, stages the complete new build before replacing the previous installed app, and uses a repository-local empty ECDICT placeholder when no real CSV is available instead of a user-specific hard-coded path.
 - Step handoffs: `HANDOFF-01` through `HANDOFF-06` under `docs/handoffs/windows-pc-test/` record each completed checkpoint.
 

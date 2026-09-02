@@ -1,8 +1,10 @@
 # LinguaCafe 当前 AI 最小上下文
 
 > 状态：Current / Minimal Context
-> 日期：2026-09-01
+> 日期：2026-09-02
 > 用途：新任务先读本文件，再按 `docs/DOCUMENTATION_INDEX.md` 加载一个相关模块。不要默认读取完整 master plan、handoff、热点审计、全部 ADR 或全部字幕。
+>
+> **2026-09-02 current overlay**：fresh remote Goal=`7074f6f0171fe51eb0ba55f7a52777f707eaec3e`。独立 Phase I Windows PC 测试版已完成 `I-00`–`I-04`：PC-TEST-0.1 产品 build=`1fe0fae9d6308118bcf20af7674853d74112aa6a` 已安装到 `%LOCALAPPDATA%/LinguaCafePCTest/app`，桌面 `LinguaCafe PC Test.lnk` 可启动 exact build；真实 PC smoke 已通过 Home → Library/import → Reader/ECDICT → WordSense → Sense Review Good → User Settings → Admin，并以 UI/API/`linguacafe_pc_test` 数据库证据对账。当前 PC lane 只有 `I-05=ACTIVE`（产品设计者实际使用反馈）与 `I-GATE=TODO`；尚无产品设计者反馈，不得为了继续工作而虚构缺陷、重复打包或重复主流程 smoke。A–H 仍有 `E-08/H-10/H-GATE=DEFERRED`，只剩 Apple physical/signing/distribution/publisher 外部能力，不得把 PC lane 或 Simulator 证据冒充其完成。
 >
 > **2026-09-01 current overlay**：当前工作不再由旧 recovery `CURRENT_MILESTONE.json` 或旧 Anki-aligned roadmap 决定。当前产品权威仍是 `docs/product/LinguaCafe_Product_Rebaseline_English_Reading_First_2026-08-18.md`。Goal plan 已完成 Phase G/G-GATE、`H-00`–`H-09` 与 **H-11 final Web + Android regression**；H-11 backend/runtime repair commit=`eaab88a7a7d96d2c1078b4b5243210430a305970`，报告见 `docs/testing/h11-final-web-android-regression-acceptance-2026-08-29.md`。2026-08-30 用真实 Android 16 / API 36 补齐 E-06/E-07 原生 capability gap，closure commit=`5448554e10fe6df093ac8fa1dd3832a35e312359`，报告见 `docs/testing/e06-e07-native-android-capability-closure-2026-08-30.md`。随后通过 public `origin` 的标准 GitHub-hosted `macos-26` runner 持续执行 H-10 continuation：Xcode 26.6、Mobile 42/42、Capacitor iOS sync、generated-Web integrity、M9 guard、SwiftPM、Simulator build 与 iPhone 17 Pro Simulator boot/install/launch 均已真实 PASS；run `33268124499` 完成 rendered login-shell / Accessibility / tap+input / local-HTTP warning 黑盒验收，run `33268819125` 在保持同一 smoke PASS 的同时把 Simulator cold boot 与 build 工作重叠。随后 run `33279140695` 在 same-runner testing MySQL + native FSRS + PAB sentinel 下完整通过 rendered 登录、Keychain token save/load、relaunch 自动恢复、server token/device owner、普通 Preferences 无 Web session token、UI 设备撤销、token clear 与再次 relaunch 回登录页；run `33282205923` 又通过真实 iOS Sense Review `显示答案 → 良好 → 下一卡 → Undo → 原卡恢复`，testing DB 证明 ReviewLog/operation ledger exactly-once 且 Undo 后 FSRS fingerprint 与评分前精确相同；run `33301226295` 随后通过真实 iOS Reader 竖屏 token→canonical reading-origin new Sense/source binding→existing-Sense `认识 / 记得`/`不认识`，以及横屏 `bank account` 长按拖选词组；run `33308079898` 又通过真实系统 Files picker 的 `.txt` import，覆盖 unsupported extension disabled、invalid UTF-8、oversize、valid UTF-8 import、exactly-one server action/request、MySQL/PAB 与 cleanup。稳定四文件结果已从 fresh Goal 重新提取并以 `6028453a899bdaf03f743d9c8b918ea4e4cbd236` fast-forward 推送。2026-08-31 final full run `33350591521` 又在同一 iPhone 17 Pro Simulator + testing MySQL/native-FSRS/PAB 栈上完整通过登录、Reader、横屏词组、真实 Files 导入、offline article/review/audio cache、离线 Good 入队、重启保留、reconnect exactly-once sync、MySQL/PAB corroboration 与严格 cleanup；final run 的 sync 请求从 1 精确变成 2，且所有 9 个 XCUITest session 均 PASS。随后 release-capability run `33355499203` 又在 Xcode 26.6 下验证 `arm64` capability、iPhone 17 Pro 与 `iPad Pro 13-inch (M5)` 串行 rendered login-shell smoke，并生成 `2064x2752` 的 13-inch iPad 截图；这关闭 universal Simulator 渲染缺口，但不替代真机/签名/商店证据。上述 Stage Accepted H-10 净变化已从 fresh Goal `4bcd32a6` 以 squash integration commit `c2ef3da94a9b9437a7d796e625ab963266e92e6f` 正常推送到 `goal/linguacafe-a-h-sol-medium-20260809`；一次性 workflow carrier 历史没有进入 Goal。见 `docs/testing/h10-macos-xcode-simulator-capability-continuation-2026-08-30.md`。2026-09-01 又以 Goal commit `d79a3bdcfc908cfe8f9ff6c47548ac6a3e272a22` 升级 Capacitor `8.4.2 → 8.5.0` 并采用 UIScene 生命周期，同时保留 `MyViewController → SecureTokenPlugin` 的 Keychain 注册 seam；Xcode 26.6 run `33421292052` 完整重跑现有 compile/archive/iPhone+iPad rendered smoke，Xcode 27.0 / iOS 27.0 SDK run `33421932881` 又真实通过 SwiftPM、编译、SceneManifest/LaunchScreen 检查及 iOS 27 Simulator install/launch/terminate，临时 workflow carrier 历史均未进入 Goal。**H-GATE 仍为 DEFERRED / Not Complete**：Simulator capability cluster 已 Stage Accepted，不再有已知 Simulator blocker；剩余缺口只在 signed physical iPhone、physical haptics/notification/audio/safe-area、physical Keychain、Apple signing/archive、TestFlight/App Store/App Review。用户已明确启用单窗口直接执行；fixed DIRECT/四窗口流程仅在用户重新启用并行模式时恢复。Reader 的机会式提前 Good、跨文章/跨 session 的完整 24h 正向最小间隔、同 session/card 单次计分、existing-Sense“不认识”→Again 继续以 ADR-0061 与 ADR-0063 为准；AI matched-existing source binding/full-pool rotation 继续以 ADR-0062 与 ADR-0064 为准。
 
@@ -181,15 +183,13 @@ Anki 兼容扩展已细化为 M10–M18：统一查询/标签/Browser、手动�
 
 ## 8. 当前执行方式与 Guard 收敛状态
 
-当前 LinguaCafe 使用 fixed DIRECT 并行闭环：
+当前用户明确启用 **单窗口直接执行**：
 
-1. 主窗口负责 fresh Git/报告验收、产品/架构判断和下一批 4 份 DIRECT。
-2. 四个 GPT-5.6 Sol 执行窗口按真实依赖图并行；无依赖立即工作，只有真实 predecessor 才等待。
-3. OpenCode 是免费辅助层：`opencode/deepseek-v4-flash-free` → `opencode/mimo-v2.5-free`；两个 free 都不足且确需更强独立审查时，才允许 Reasonix `opencode-go/mimo-v2.5`。
-4. Codex 新任务只有用户当前明确点名授权才可创建；已授权运行中的 Codex 可以监督/复核。
-5. FastCtx/DevSpace 是本地文件/Git/命令首选；本地 Agent 运行时 owner 继续做独立工作，不空等。
-6. 每个执行窗口完成当前 DIRECT 后停止，不自动领取下一任务；主窗口验收后只生成下一批提示词，用户启动后才进入下一实现批次。
-7. 同文件 writer、正式 ReviewLog/FSRS 写链、shared testing DB writer、Git integration owner 仍必须事实串行。
+1. 当前网页端主窗口自己负责 fresh Git、产品/架构判断、代码/文档修改、测试、真实验收、commit/push/postflight。
+2. 不主动创建 OpenCode / CodeBuddy / WorkBuddy / Codex 执行任务；只有用户当前重新点名某个 Agent 或并行模式时才切换。
+3. FastCtx/DevSpace 是本地文件、Git 和命令首选；可见 Web/Reader/Review/import 仍必须使用真实浏览器工具取得 DOM/用户事件证据。
+4. 同文件 writer、正式 ReviewLog/FSRS 写链、shared testing DB writer、Git integration owner 仍必须事实串行。
+5. fixed DIRECT / 四窗口规则仍保留在协作文档中，作为用户重新启用并行模式时的备用协议，不再作为当前会话的执行方式。
 
 CodeBuddy / WorkBuddy 旧固定接力不是当前默认流程；只有用户以后明确重新启用时才按当轮授权处理。
 
@@ -217,10 +217,11 @@ CodeBuddy / WorkBuddy 旧固定接力不是当前默认流程；只有用户以�
 ## 10. 历史 roadmap 状态与当前停止点
 
 - 历史持续目标按云端主导、有限离线路线推进 M0–M18；这是已完成工作的路线记录，不是当前 Phase H 的执行顺序。
-- 当前执行边界以 Goal Phase G + fixed DIRECT 为准。主窗口可以规划下一 milestone，但执行窗口不能自行 auto-advance；任何新实现批次都由用户实际启动对应 DIRECT。
+- 当前执行边界以 fresh Goal + 用户当前单窗口授权为准。主窗口可连续完成当前已授权 roadmap 中仍可独立执行的切片；如果只剩用户本人体验反馈或 Apple 外部能力，就停止扩代码并如实保留 `ACTIVE` / `TODO` / `DEFERRED`。
 - M1–M8、M10–M16 已 Accepted / Closed；M17 Web slice 已关闭，Android Haptics/Local Notifications 证据由 M7 平台验收持有；M18 共享实现与 Web/Android 离线音频证据已关闭。M9 source/config 与发布材料为 Implementation Accepted。
 - M5 testing-bound 真实 `/reviews/senses` 页面评分已清零 M1 deferred seam。
-- 2026-08-01 booted Android 12 模拟器完成了 M7/M8 以及相关 Haptics/Notifications/离线音频平台证据；2026-08-30/31 已补齐 M9/H-10 的 Xcode 26.6、full Simulator、iPhone+iPad rendered smoke、offline/reconnect、export-compliance 与 Privacy Manifest compiled-bundle 证据。当前唯一未完成的产品能力簇已收窄为 signed physical iPhone、real Apple team/provisioning + archive、physical Keychain/haptics/notifications/audio/safe-area、TestFlight/App Store processing/App Review、public Privacy/Support URLs 与 publisher-owned final store answers。
+- 2026-08-01 booted Android 12 模拟器完成了 M7/M8 以及相关 Haptics/Notifications/离线音频平台证据；2026-08-30/31 已补齐 M9/H-10 的 Xcode 26.6、full Simulator、iPhone+iPad rendered smoke、offline/reconnect、export-compliance 与 Privacy Manifest compiled-bundle 证据。当前唯一未完成的产品能力簇已收窄为 signed physical iPhone、real Apple team/provisioning + archive、physical Keychain/haptics/notifications/audio/safe-area、TestFlight/App Store processing/App Review、public Privacy/Support URLs 与 publisher-owned final store answers；这里指 A–H 主 Goal 的 Apple 外部能力边界。
+- 2026-09-02 Phase I Windows PC 测试 lane：`I-00`–`I-04` 已 DONE，`I-05` 仅等待产品设计者实际使用反馈，`I-GATE` 仍 TODO。PC Test 主流程已有真实 UI/API/数据库一致证据；在产品设计者给出新反馈前，不重复打包、重复主流程 smoke 或自行扩展公开 Windows installer/signing/update 范围。
 - M0–M18 最终审计见
   `docs/testing/m0-m18-goal-completion-audit-2026-08-01.md`：仓库内实现切片已经清零，
   整体目标在上述 iOS 能力簇取得真实证据前仍为 `Not Complete`。

@@ -407,7 +407,7 @@ Sol Medium 每次只完成一个 milestone 的完整闭环，不一次吞掉整�
 | I-02 | DONE | 生成 Windows `.exe` 测试壳，启动后直接进入管理员工作区 | .NET 8 WPF + Microsoft WebView2 + existing `/setup`/`/login` | `HANDOFF-04-WEBVIEW2-AUTO-ADMIN-READY-2026-09-02.md`：console session 1 真实启动；专用 admin `is_admin=1`；`AdminProvisioned=true`；startup log 到达 `PC 测试版已就绪：/` |
 | I-03 | DONE | 把 exact Goal snapshot 与桌面壳封装并创建桌面快捷方式 | `git archive HEAD` + Windows shortcut owner | `HANDOFF-05-EXACT-BUILD-DESKTOP-SHORTCUT-2026-09-02.md`：exact build=`1fe0fae9...`；exe/runtime snapshot/commit marker/Web+Python image tag 同 commit；桌面 `LinguaCafe PC Test.lnk` 真实启动后直接复用 runtime 并到达 ready `/` |
 | I-04 | DONE | PC 真实主流程 smoke | existing Web main flows | `HANDOFF-06-REAL-PC-MAIN-FLOW-SMOKE-2026-09-02.md`：真实 DOM 完成 Home→Library/导入→Reader/ECDICT→WordSense→Sense Review Good→User Settings→Admin；66 个观测 XHR/fetch 全部 200、Console warn/error=0；DB 对账为 1 book/1 chapter/1 sense/1 card/1 log/1 occurrence |
-| I-05 | ACTIVE | 产品设计者持续体验反馈闭环 | `windows-pc-test-feedback-log.md` | 每条用户反馈先记录 build + 实际/预期，再修；完成自动验收后为 `FIXED_AWAITING_RETEST`；只有用户重测/明确接受才 CLOSED |
+| I-05 | ACTIVE | 产品设计者持续体验反馈闭环 | `windows-pc-test-feedback-log.md` | PC-TEST-0.1 已完成 I-04 主流程自动验收；当前尚无产品设计者 runtime feedback。每条用户反馈先记录 build + 实际/预期，再修；完成自动验收后为 `FIXED_AWAITING_RETEST`；只有用户重测/明确接受才 CLOSED；无真实反馈时不制造缺陷或重复打包/smoke |
 | I-GATE | TODO | PC 测试版达到当前一轮可持续日常试用状态 | I-01…I-05 + owner feedback | 无当前要求中的 blocking PC defect；桌面 shortcut 指向最新 accepted build；feedback log 与用户最近一次重测一致 |
 
 明确不在 Phase I 第一版处理：公开 Windows installer/update channel、Windows code signing/SmartScreen reputation、把 Docker/MySQL/Redis/PHP/Python 全部改造成另一套 bundled runtime、完整桌面离线 authority、多用户公开认证重设计，以及 Apple H-10/H-GATE 外部能力。
