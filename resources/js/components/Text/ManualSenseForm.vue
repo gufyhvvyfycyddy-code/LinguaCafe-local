@@ -151,7 +151,7 @@ export default {
     methods: {
         buildLocalForm(source) {
             return {
-                pos: (source && source.pos) || 'verb',
+                pos: (source && source.pos) || '',
                 sense_zh: (source && source.sense_zh) || '',
                 sense_en: (source && source.sense_en) || '',
                 aliases_zh: (source && source.aliases_zh) || '',

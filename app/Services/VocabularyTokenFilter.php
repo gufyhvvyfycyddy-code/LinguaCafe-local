@@ -34,6 +34,24 @@ class VocabularyTokenFilter
 
         $lowerToken = mb_strtolower($token, 'UTF-8');
 
+        // URLs, email addresses and file-system paths are source metadata,
+        // not vocabulary. Keep the policy conservative so linguistic slash
+        // compounds such as "and/or" and "he/she" remain learnable.
+        if (filter_var($token, FILTER_VALIDATE_EMAIL) !== false) {
+            return true;
+        }
+
+        if (preg_match('~^[a-z][a-z0-9+.-]*://~iu', $token)
+            || preg_match('~^www\\.[^\\s]+$~iu', $token)
+            || preg_match('~^[\\pL\\pN](?:[\\pL\\pN-]*\\.)+[\\pL]{2,}(?:[/:?#].*)?$~u', $token)) {
+            return true;
+        }
+
+        if (preg_match('~^(?:[A-Za-z]:[\\\\/]|/|\\./|\\.\\./|\\x7E/)[^\\s]+$~u', $token)
+            || preg_match('~^[^\\s/\\\\]+(?:[/\\\\][^\\s/\\\\]+)+\\.[A-Za-z0-9]{1,12}$~u', $token)) {
+            return true;
+        }
+
         if (in_array($lowerToken, self::CONTRACTION_FRAGMENTS, true)) {
             return true;
         }
