@@ -467,9 +467,9 @@ def subtitleTokenizer():
         ## add tokenized text to processed chunk
         tokenizedText = tokenizedText + tokenizedSubtitle
 
-    # JSON-only API. Content-Type is application/json and nosniff prevents HTML interpretation.
-    # codeql[py/reflective-xss]
-    return {'tokenizedText': tokenizedText, 'timeStamps': timeStamps}
+    payload = json.dumps({'tokenizedText': tokenizedText, 'timeStamps': timeStamps})
+    payload = html.escape(payload, quote=False)
+    return payload.replace('&amp;', '\\u0026').replace('&lt;', '\\u003c').replace('&gt;', '\\u003e')
 
 # returns a raw text and a tokenized text 
 # of n .epub file cut into chunks
@@ -561,9 +561,9 @@ def importSubtitles():
         chunks[-1].append(subtitle)
 
     print(chunks)
-    # JSON-only API. Content-Type is application/json and nosniff prevents HTML interpretation.
-    # codeql[py/reflective-xss]
-    return chunks
+    payload = json.dumps(chunks)
+    payload = html.escape(payload, quote=False)
+    return payload.replace('&amp;', '\\u0026').replace('&lt;', '\\u003c').replace('&gt;', '\\u003e')
 
 @route('/tokenizer/get-youtube-subtitle-list', method='POST')
 def getYoutubeSubtitles():
