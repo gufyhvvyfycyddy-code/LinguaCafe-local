@@ -64,6 +64,20 @@ export function buildAiSuggestionLookupKey(context) {
 }
 
 /**
+ * Suppress only a duplicate lookup that is already in flight.
+ *
+ * A completed lookup is intentionally allowed to run again later so reopening
+ * the same word can refresh candidate data.
+ */
+export function shouldSkipDuplicateAiSuggestionLookup({ currentLookupKey, nextLookupKey, isLoading }) {
+    return Boolean(
+        isLoading
+        && nextLookupKey
+        && currentLookupKey === nextLookupKey
+    );
+}
+
+/**
  * Issue the AI suggestion lookup request and shape the response.
  *
  * The service does NOT touch Vuex; it only returns a normalized result so the
