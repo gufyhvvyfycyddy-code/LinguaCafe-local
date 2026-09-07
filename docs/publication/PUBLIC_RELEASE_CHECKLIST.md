@@ -4,8 +4,9 @@
 
 - [x] One current source-of-truth repository is named.
 - [x] Architecture and product-launch review repositories exist and are public.
-- [ ] Architecture/product status pages are refreshed for source PR #30/#31/#32 and closed issues #25/#26.
-- [ ] Historical `LinguaCafe-dev-main` is visibly marked as historical on GitHub.
+- [x] Architecture/product status pages are refreshed for source PR #30/#31/#32/#34 and closed issues #25/#26 (architecture PR #30; product PR #17).
+- [x] Historical `LinguaCafe-dev-main` is visibly marked as historical on GitHub (historical-repo PR #1).
+- [x] Exact duplicate source Issues #12–#18 are closed as duplicates while canonical Issues #5–#11 remain open.
 
 ## Worktree safety
 
