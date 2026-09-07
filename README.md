@@ -2,7 +2,7 @@
 
 > Current public source-of-truth for this LinguaCafe project. Shared Web/PC + Android + iOS repository.
 >
-> Frozen application-code review baseline: `bd95b6a8308de8e9663fab344c3ffccefa71e9d3`
+> Frozen application-code review baseline: `bbfd3426e089008fb19e5920850e4b9c4bda5ab8`
 >
 > Architecture / technical-debt review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review
 >
