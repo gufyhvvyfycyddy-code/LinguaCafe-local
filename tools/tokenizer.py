@@ -434,7 +434,8 @@ def tokenizer():
 
 @route('/tokenizer/subtitle', method='POST')
 def subtitleTokenizer():
-    response.headers['Content-Type'] = 'application/json'
+    response.content_type = 'application/json'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     subtitles = json.loads(request.json.get('subtitles'))
     language = request.json.get('language')
 
@@ -533,7 +534,8 @@ def importText():
 # cuts the text given in post data into chunks
 @route('/tokenizer/import-subtitles', method='POST')
 def importSubtitles():
-    response.headers['Content-Type'] = 'application/json'
+    response.content_type = 'application/json'
+    response.headers['X-Content-Type-Options'] = 'nosniff'
     chunkSize = request.json.get('chunkSize')
     subtitles = json.loads(request.json.get('subtitles'))
     language = request.json.get('language')
