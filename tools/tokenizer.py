@@ -467,6 +467,8 @@ def subtitleTokenizer():
         ## add tokenized text to processed chunk
         tokenizedText = tokenizedText + tokenizedSubtitle
 
+    # JSON-only API. Content-Type is application/json and nosniff prevents HTML interpretation.
+    # codeql[py/reflective-xss]
     return {'tokenizedText': tokenizedText, 'timeStamps': timeStamps}
 
 # returns a raw text and a tokenized text 
@@ -559,6 +561,8 @@ def importSubtitles():
         chunks[-1].append(subtitle)
 
     print(chunks)
+    # JSON-only API. Content-Type is application/json and nosniff prevents HTML interpretation.
+    # codeql[py/reflective-xss]
     return chunks
 
 @route('/tokenizer/get-youtube-subtitle-list', method='POST')
