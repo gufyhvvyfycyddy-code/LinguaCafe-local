@@ -29,6 +29,7 @@
 - 体验、Bug、架构和治理总台账：`docs/plans/local-experience-bug-optimization-ledger-2026-07-23.md`
 - Reasonix 监督、Playwright/WinApp 桥、mid-turn steer 与 workaround 根治台账：`docs/plans/reasonix-supervision-toolchain-bug-ledger-2026-08-05.md`
 - 当前执行方式与未来 Codex++ 并行方向：`docs/plans/vibe-coding-collaboration-rules.md` §1.5、`docs/CURRENT_AI_CONTEXT.md` §8；当前 guard 为 `tests/js/CurrentExecutionWorkflowDocsGuard.test.mjs`
+- 公开审查/发布状态：`docs/publication/CURRENT_PUBLICATION_STATE.md`；工作区保全、安全审查、仓库权威、allow/deny 与发布清单均在 `docs/publication/`
 - 当前 M0–M18 goal audit: `docs/testing/m0-m18-goal-completion-audit-2026-08-01.md`
 - 旧架构阶段 completion audit（历史）：`docs/testing/goal-mode-roadmap-completion-audit-2026-07-23.md`
 - 历史索引：`docs/HISTORY_INDEX.md`

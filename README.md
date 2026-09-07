@@ -4,6 +4,8 @@
 >
 > Frozen application-code review baseline: `6989ed27c933716f9069bb9b14fba92624081fc4`
 >
+> Publication/security review synchronized through source commit: `2d8f062fcc453fa609abbed228df371dd192ec57`
+>
 > Architecture / technical-debt review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review
 >
 > Product launch / hosting / app-store / growth review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-product-launch
