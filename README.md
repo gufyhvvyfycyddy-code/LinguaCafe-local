@@ -2,13 +2,15 @@
 
 > Current public source-of-truth for this LinguaCafe project. Shared Web/PC + Android + iOS repository.
 >
-> External-review baseline: `190e7ab95e9415af23c9799cbc276714dcdd6ed5`
+> Frozen application-code review baseline: `bd95b6a8308de8e9663fab344c3ffccefa71e9d3`
 >
 > Architecture / technical-debt review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review
 >
 > Product launch / hosting / app-store / growth review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-product-launch
 >
-> Current limits: public-repository hygiene still has an open P0 review; Android Play Store readiness is not yet proven on the current baseline; iOS still lacks final macOS/Xcode/signing/device/TestFlight/App Store evidence.
+> Final external-review handoff: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review/blob/main/FINAL_REVIEW_HANDOFF.md
+>
+> Current limits: public-repository environment hygiene and production dependency security remain open P0s; Android Play Store readiness is not yet proven; iOS still lacks final macOS/Xcode/signing/device/TestFlight/App Store evidence.
 
 The upstream project history and original README are preserved below for attribution and historical context.
 
