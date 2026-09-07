@@ -2,7 +2,7 @@
 
 > Current public source-of-truth for this LinguaCafe project. Shared Web/PC + Android + iOS repository.
 >
-> Frozen application-code review baseline: `bbfd3426e089008fb19e5920850e4b9c4bda5ab8`
+> Frozen application-code review baseline: `6989ed27c933716f9069bb9b14fba92624081fc4`
 >
 > Architecture / technical-debt review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review
 >
@@ -10,7 +10,7 @@
 >
 > Final external-review handoff: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review/blob/main/FINAL_REVIEW_HANDOFF.md
 >
-> Current limits: public-repository environment hygiene and production dependency security remain open P0s; Android Play Store readiness is not yet proven; iOS still lacks final macOS/Xcode/signing/device/TestFlight/App Store evidence.
+> Current evidence: the frozen Web/PC baseline has a real Chrome Reader → WordSense → sense Review smoke on the reproducible production Web image with native `fsrs-rs-php`. Current limits: public-repository environment hygiene remains P0; dependency triage and Python-tokenizer clean-build reproducibility remain open; Android Play Store readiness is not yet proven; iOS still lacks final macOS/Xcode/signing/device/TestFlight/App Store evidence.
 
 The upstream project history and original README are preserved below for attribution and historical context.
 
