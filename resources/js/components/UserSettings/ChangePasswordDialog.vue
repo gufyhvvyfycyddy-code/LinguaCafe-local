@@ -54,7 +54,7 @@
                     border="left"
                     dark
                 >
-                    <div v-html="saveResult"></div>
+                    <div style="white-space: pre-line;">{{ saveResult }}</div>
                 </v-alert>
 
                 <v-alert
@@ -91,6 +91,8 @@
 </template>
 
 <script>
+    import { requestValidationErrorMessage } from '../../services/UiTextService';
+
     export default {
         props: {
             value : Boolean
@@ -143,19 +145,7 @@
                     }, 1000);
                 }).catch((error) => {
                     this.saving = false;
-                    this.saveResult = '';
-
-                    // add all error messages to the save result
-                    var index = 0;
-                    for (const [key, value] of Object.entries(error.response.data.errors)) {
-                        if (index) {
-                            this.saveResult += '<br>';
-                        }
-
-                        this.saveResult += value.join('<br>');
-
-                        index ++;
-                    }
+                    this.saveResult = requestValidationErrorMessage(error, '密码修改失败，请稍后重试。');
                 });
             },
             close() {

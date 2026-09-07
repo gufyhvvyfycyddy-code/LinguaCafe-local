@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 // form requests
@@ -28,10 +29,13 @@ class ImageController extends Controller
 
         try {
             $imagePath = $this->imageService->getBookImage($userId, $language, $fileName);
-        } catch (NotFoundHttpException $e) {
-            throw $e;
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (NotFoundHttpException $exception) {
+            throw $exception;
+        } catch (\Exception $exception) {
+            Log::error('book_image_load_failed', [
+                'exception' => $exception::class,
+            ]);
+            abort(500, 'Book image could not be loaded.');
         }
         
         return response()->file($imagePath);

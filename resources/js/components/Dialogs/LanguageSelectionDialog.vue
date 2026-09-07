@@ -4,7 +4,7 @@
             <v-card-title>
                 <span class="text-h5">学习语言</span>
                 <v-spacer></v-spacer>
-                <v-btn icon @click="close">
+                <v-btn icon @click="close" :disabled="loading">
                     <v-icon>mdi-close</v-icon>
                 </v-btn>
             </v-card-title>
@@ -51,13 +51,14 @@
                 </v-alert>
 
                 <!-- List of supported and installed languages -->
-                <div id="language-buttons" class="d-flex flex-wrap mt-2" v-if="!loading">
+                <div id="language-buttons" class="d-flex flex-wrap mt-2">
                     <v-btn 
                         v-for="(language, index) in supportedLanguages"
                         rounded
                         depressed
                         :key="index"
                         class="language-button my-1 mx-1" 
+                        :disabled="loading"
                         @click="selectLanguage(language)" 
                     >
                         <v-img 
@@ -73,7 +74,7 @@
             </v-card-text>
             <v-card-actions>
                 <v-spacer></v-spacer>
-                <v-btn rounded text @click="close">取消</v-btn>
+                <v-btn rounded text @click="close" :disabled="loading">取消</v-btn>
             </v-card-actions>
         </v-card>
     </v-dialog>
@@ -130,13 +131,23 @@
                 });
             },
             selectLanguage(newLanguage) {
+                if (this.loading) {
+                    return;
+                }
+
                 this.loading = true;
                 this.error = '';
                 var language = newLanguage.toLowerCase();
-                axios.get('/languages/select/' + language).then(function (response) {
+                axios.put('/languages/select/' + language).then(function (response) {
                     document.location.href = '/';
                 }.bind(this)).catch((error) => {
-                    this.error = requestErrorMessage(error, '学习语言切换失败。');
+                    if (error?.response?.status === 419) {
+                        this.error = '页面验证已过期，请刷新页面后重试。';
+                    } else if (error?.response?.status === 503) {
+                        this.error = '数据库正在恢复，暂时无法切换学习语言。';
+                    } else {
+                        this.error = requestErrorMessage(error, '学习语言切换失败，请稍后重试。');
+                    }
                 }).finally(() => {
                     this.loading = false;
                 });

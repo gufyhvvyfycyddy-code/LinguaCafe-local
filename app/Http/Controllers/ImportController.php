@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 // services
 use App\Services\ImportService;
@@ -44,6 +46,7 @@ class ImportController extends Controller {
         $chapterName = $request->post('chapterName');
         $chunkSize = intval($request->post('maximumCharactersPerChapter'));
         $importMethod = $this->importMethods[$importType];
+        $fileName = null;
 
         if ($importMethod == 'e-book') {
             $importFile = $request->file('importFile');
@@ -53,12 +56,16 @@ class ImportController extends Controller {
             $importSubtitles = $request->post('importSubtitles');
         }
         
-        // move file to temp folder
         if (isset($importFile)) {
             try {
                 $fileName = $this->tempFileService->moveFileToTempFolder($userId, $importFile);
-            } catch (\Exception $e) {
-                abort(500, $e->getMessage());
+            } catch (\Exception $exception) {
+                Log::warning('content_import_failed', [
+                    'stage' => 'store',
+                    'exception' => $exception::class,
+                ]);
+
+                return $this->contentImportFailureResponse();
             }
         }
 
@@ -74,19 +81,18 @@ class ImportController extends Controller {
                 // text
                 $processingMode = $this->importService->importSubtitles($userId, $userUuid, $chunkSize, $textProcessingMethod, $importSubtitles, $bookId, $bookName, $chapterName);
             }
-        } catch (\Exception $e) {
-            // delete temp file
-            if (isset($importFile)) {
-                $this->tempFileService->deleteTempFile($fileName);
-            }
+        } catch (\Exception $exception) {
+            $this->deleteContentImportTempFileQuietly($fileName);
 
-            abort(500, $e->getMessage());
+            Log::warning('content_import_failed', [
+                'stage' => 'process',
+                'exception' => $exception::class,
+            ]);
+
+            return $this->contentImportFailureResponse();
         }
 
-        // delete temp file
-        if (isset($importFile)) {
-            $this->tempFileService->deleteTempFile($fileName);
-        }
+        $this->deleteContentImportTempFileQuietly($fileName);
 
         return response()->json([
             'message' => '导入成功。',
@@ -94,48 +100,115 @@ class ImportController extends Controller {
         ], 200);
     }
 
+    private function contentImportFailureResponse(): JsonResponse
+    {
+        return new JsonResponse([
+            'error' => [
+                'code' => 'CONTENT_IMPORT_FAILED',
+                'message' => '导入失败，请稍后重试。',
+            ],
+        ], 500);
+    }
+
+    private function deleteContentImportTempFileQuietly(?string $fileName): void
+    {
+        if ($fileName === null) {
+            return;
+        }
+
+        try {
+            $this->tempFileService->deleteTempFile($fileName);
+        } catch (\Throwable $cleanupException) {
+            Log::warning('content_import_temp_cleanup_failed', [
+                'exception' => $cleanupException::class,
+            ]);
+        }
+    }
+
     public function getYoutubeSubtitles(GetYoutubeSubtitlesRequest $request) {
         $url = $request->post('url');
 
         try {
             $subtitleList = $this->importService->getYoutubeSubtitles($url);
-        } catch (\Exception $e) {
-            return $e->getMessage();
+        } catch (\Exception $exception) {
+            Log::warning('youtube_subtitle_lookup_failed', [
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'YOUTUBE_SUBTITLE_SERVICE_UNAVAILABLE',
+                    'message' => '暂时无法获取 YouTube 字幕，请稍后重试。',
+                ],
+            ], 503);
         }
 
-        return response()->json($subtitleList, 200);
+        return new JsonResponse($subtitleList, 200);
     }
 
     public function getSubtitleFileContent(GetSubtitleFileContentRequest $request) {
         $subtitleFile = $request->file('subtitleFile');
         $userId = Auth::user()->id;
+        $fileName = null;
 
-        // move file to temp folder
         try {
             $fileName = $this->tempFileService->moveFileToTempFolder($userId, $subtitleFile);
-            
-            // get subtitle content
-            $subtitleContent = $this->importService->getSubtitleFileContent(storage_path('app/temp') . '/' . $fileName);
-        } catch (\Exception $e) {
-            $this->tempFileService->deleteTempFile($fileName);
-            abort(500, $e->getMessage());
+            $subtitleContent = $this->importService->getSubtitleFileContent(
+                storage_path('app/temp') . '/' . $fileName,
+            );
+        } catch (\Exception $exception) {
+            if (is_string($fileName)) {
+                try {
+                    $this->tempFileService->deleteTempFile($fileName);
+                } catch (\Throwable $cleanupException) {
+                    Log::warning('subtitle_temp_cleanup_failed', [
+                        'exception' => $cleanupException::class,
+                    ]);
+                }
+            }
+
+            Log::warning('subtitle_file_read_failed', [
+                'stage' => $fileName === null ? 'store' : 'parse',
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'SUBTITLE_FILE_READ_FAILED',
+                    'message' => '暂时无法读取字幕文件，请重试。',
+                ],
+            ], 500);
         }
 
-        // delete temp file
-        $this->tempFileService->deleteTempFile($fileName);
+        try {
+            $this->tempFileService->deleteTempFile($fileName);
+        } catch (\Throwable $cleanupException) {
+            Log::warning('subtitle_temp_cleanup_failed', [
+                'exception' => $cleanupException::class,
+            ]);
+        }
 
-        return response()->json($subtitleContent, 200);
+        return new JsonResponse($subtitleContent, 200);
     }
 
     public function getWebsiteText(GetWebsiteTextRequest $request) {
         $url = $request->post('url');
-        
+
         try {
             $websiteText = $this->importService->getWebsiteText($url);
-        } catch(\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\Exception $exception) {
+            Log::warning('website_text_lookup_failed', [
+                'exception' => $exception::class,
+            ]);
+
+            return new JsonResponse([
+                'error' => [
+                    'code' => 'WEBSITE_TEXT_SERVICE_UNAVAILABLE',
+                    'message' => '暂时无法获取网页内容，请稍后重试。',
+                ],
+            ], 503);
         }
 
-        return response()->json($websiteText, 200);
+        return new JsonResponse($websiteText, 200);
     }
 }

@@ -33,7 +33,14 @@
                                 <v-btn icon v-bind="attrs" v-on="on"><v-icon>mdi-dots-horizontal</v-icon></v-btn>
                             </template>
                             <v-btn class="menu-button" tile color="white" @click="loadBookWordCounts()">加载词数</v-btn>
-                            <v-btn class="menu-button" tile color="white" @click="retryFailedImports()">重试失败导入</v-btn>
+                            <v-btn
+                                class="menu-button"
+                                tile
+                                color="white"
+                                :disabled="retryFailedImportsLoading"
+                                :loading="retryFailedImportsLoading"
+                                @click="retryFailedImports()"
+                            >重试失败导入</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showEditBookDialog()">编辑</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showStartReviewDialog()">复习</v-btn>
                             <v-btn class="menu-button" tile color="white" @click="showDeleteBookDialog()">删除</v-btn>
@@ -49,6 +56,9 @@
                     </div>
                     <v-alert v-if="wordCountError" dense outlined type="error" class="mx-3">
                         {{ wordCountError }}
+                    </v-alert>
+                    <v-alert v-if="retryFailedImportsError" dense outlined type="error" class="mx-3">
+                        {{ retryFailedImportsError }}
                     </v-alert>
 
                     <!-- Word counts -->
@@ -166,6 +176,8 @@
             return {
                 wordCountDisplayType: DefaultLocalStorageManager.loadSetting('word-count-display-type') || 0,
                 wordCountError: '',
+                retryFailedImportsError: '',
+                retryFailedImportsLoading: false,
                 editBookChapterDialog: {
                     active: false,
                     bookId: -1,
@@ -181,19 +193,46 @@
         },
         methods: {
             retryFailedImports() {
-                let isAnyChapterFailed = false;
-                this.$refs.bookChapters.chapters.forEach((chapter) => {
-                    if (chapter.processing_status === 'failed') {
-                        isAnyChapterFailed = true;
+                if (this.retryFailedImportsLoading) {
+                    return;
+                }
 
-                        chapter.processing_status = 'unprocessed';
-                        chapter.wordCountsLoaded = false;
+                const failedChapterSnapshots = [];
+                this.retryFailedImportsError = '';
+
+                this.$refs.bookChapters.chapters.forEach((chapter) => {
+                    if (chapter.processing_status !== 'failed') {
+                        return;
                     }
+
+                    failedChapterSnapshots.push({
+                        chapter,
+                        processingStatus: chapter.processing_status,
+                        wordCountsLoaded: chapter.wordCountsLoaded,
+                    });
+                    chapter.processing_status = 'unprocessed';
+                    chapter.wordCountsLoaded = false;
                 });
 
-                if (isAnyChapterFailed) {
-                    axios.get(`/chapters/retry-failed-chapters/${this.$props.book.id}`);
+                if (failedChapterSnapshots.length === 0) {
+                    return;
                 }
+
+                this.retryFailedImportsLoading = true;
+                axios.post(`/chapters/retry-failed-chapters/${this.$props.book.id}`)
+                    .catch((error) => {
+                        failedChapterSnapshots.forEach((snapshot) => {
+                            snapshot.chapter.processing_status = snapshot.processingStatus;
+                            snapshot.chapter.wordCountsLoaded = snapshot.wordCountsLoaded;
+                        });
+                        this.retryFailedImportsError = requestErrorMessage(
+                            error,
+                            '重试失败章节时发生错误。',
+                        );
+                    })
+                    .finally(() => {
+                        this.retryFailedImportsLoading = false;
+                    });
             },
             saveWordCountDisplayType() {
                 DefaultLocalStorageManager.saveSetting('word-count-display-type', this.wordCountDisplayType);

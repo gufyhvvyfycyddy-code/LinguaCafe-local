@@ -130,7 +130,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
 
     // languages
     Route::get('/languages/get-language-selection-dialog-data', [App\Http\Controllers\LanguageController::class, 'getLanguageSelectionDialogData']);
-    Route::get('/languages/select/{language}', [App\Http\Controllers\LanguageController::class, 'selectLanguage']);
+    Route::put('/languages/select/{language}', [App\Http\Controllers\LanguageController::class, 'selectLanguage']);
 
     // users
     Route::post('/users/update-password', [App\Http\Controllers\UserController::class, 'updatePassword']);
@@ -368,7 +368,7 @@ Route::group(['middleware' => ['auth', 'auth.session', 'web']], function () {
     Route::post('/chapters/finish', [App\Http\Controllers\ChapterController::class, 'finishChapter']);
     Route::post('/chapters/update', [App\Http\Controllers\ChapterController::class, 'updateChapter']);
     Route::post('/chapters/create', [App\Http\Controllers\ChapterController::class, 'createChapter']);
-    Route::get('/chapters/retry-failed-chapters/{bookId}', [App\Http\Controllers\ChapterController::class, 'retryFailedChapters']);
+    Route::post('/chapters/retry-failed-chapters/{bookId}', [App\Http\Controllers\ChapterController::class, 'retryFailedChapters']);
 
     // AI reading assist
     Route::post('/chapters/ai-assist/source', [App\Http\Controllers\AiReadingAssistController::class, 'source']);
