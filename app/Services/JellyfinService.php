@@ -14,10 +14,10 @@ class JellyfinService {
     public function __construct() {
         $this->jellyfinLanguageCodes = config('linguacafe.languages.jellyfin_language_codes');
 
-        $setting = Setting::where('name', 'jellyfinApiKey')->first();
-        $this->apiKey = json_decode($setting->value);
-        $setting = Setting::where('name', 'jellyfinHost')->first();
-        $this->apiHost = json_decode($setting->value);
+        $apiKeySetting = Setting::where('name', 'jellyfinApiKey')->first();
+        $hostSetting = Setting::where('name', 'jellyfinHost')->first();
+        $this->apiKey = $apiKeySetting ? json_decode($apiKeySetting->value) : null;
+        $this->apiHost = $hostSetting ? json_decode($hostSetting->value) : null;
     }
 
     public function makeRequest($method, $url) {
@@ -39,6 +39,10 @@ class JellyfinService {
     }
 
     public function getJellyfinCurrentlyPlayedSubtitles () {
+        if (!$this->isConfigured()) {
+            return [];
+        }
+
         $calculatedSessions = [];
         $sessions = $this->makeRequest('GET', '/Sessions');
         for ($sessionCounter = 0; $sessionCounter < count($sessions); $sessionCounter++) {
@@ -111,5 +115,13 @@ class JellyfinService {
         }
 
         return $calculatedSessions;
+    }
+
+    private function isConfigured(): bool
+    {
+        return is_string($this->apiHost)
+            && trim($this->apiHost) !== ''
+            && is_string($this->apiKey)
+            && trim($this->apiKey) !== '';
     }
 }
