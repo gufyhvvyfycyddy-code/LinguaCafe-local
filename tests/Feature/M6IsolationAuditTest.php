@@ -96,10 +96,14 @@ class M6IsolationAuditTest extends TestCase
     {
         $user = $this->user('m6d-manual@example.test');
 
-        $this->actingAs($user)
+        $response = $this->actingAs($user)
             ->get('/manual/get-manual-file/Home')
-            ->assertOk()
-            ->assertHeader('content-type', 'text/plain; charset=UTF-8');
+            ->assertOk();
+
+        $this->assertSame(
+            'text/plain; charset=utf-8',
+            strtolower((string) $response->headers->get('content-type'))
+        );
     }
 
     public function test_encoded_backslash_traversal_is_rejected_by_every_public_file_route(): void
