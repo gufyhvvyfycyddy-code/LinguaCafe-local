@@ -2,7 +2,7 @@
 
 > Current public source-of-truth for this LinguaCafe project. Shared Web/PC + Android + iOS repository.
 >
-> External-review baseline: `89bc5cbabc6d8ff9b345d109e2eb54a4d8ba92d3`
+> External-review baseline: `190e7ab95e9415af23c9799cbc276714dcdd6ed5`
 >
 > Architecture / technical-debt review: https://github.com/gufyhvvyfycyddy-code/LinguaCafe-architecture-review
 >
