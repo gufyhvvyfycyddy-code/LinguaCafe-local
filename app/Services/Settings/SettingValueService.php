@@ -36,10 +36,10 @@ class SettingValueService
             ->first();
 
         if (!$setting) {
-            throw new \Exception('Missing jellyfinEnabled setting. This should never occur.');
+            return false;
         }
 
-        return json_decode($setting->value);
+        return (bool) json_decode($setting->value);
     }
 
     public function getAnkiSettings()
@@ -51,11 +51,10 @@ class SettingValueService
             ->keyBy('name')
             ->map(fn ($item) => json_decode($item->value));
 
-        if ($settings->isEmpty()) {
-            throw new \Exception('Missing anki settings. This should never occur.');
-        }
-
-        return $settings;
+        return [
+            'ankiAutoAddCards' => (bool) ($settings->get('ankiAutoAddCards') ?? false),
+            'ankiShowNotifications' => (bool) ($settings->get('ankiShowNotifications') ?? false),
+        ];
     }
 
     public function getGlobalSettingsByName($settingNames, ?int $userId = null, ?string $language = null)

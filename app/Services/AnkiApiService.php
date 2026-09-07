@@ -12,14 +12,18 @@ class AnkiApiService {
     public function __construct() {
         $ankiHostSetting = Setting::where('name', 'ankiConnectHost')->first();
         $ankiUpdateCardsSetting = Setting::where('name', 'ankiUpdateCards')->first();
-        $this->ankiHost = json_decode($ankiHostSetting->value);
-        $this->updateCards = json_decode($ankiUpdateCardsSetting->value);
+        $this->ankiHost = $ankiHostSetting ? (string) json_decode($ankiHostSetting->value) : '';
+        $this->updateCards = $ankiUpdateCardsSetting ? (bool) json_decode($ankiUpdateCardsSetting->value) : false;
     }
 
     /*
         Adds or updates a card in anki.
     */
     public function addWord($language, $word, $reading, $translation, $exampleSentence) {
+        if (trim($this->ankiHost) === '') {
+            throw new \RuntimeException('AnkiConnect is not configured.');
+        }
+
         // try to insert word into anki with api
         $firstInsertResult = $this->insertNote($language, $word, $reading, $translation, $exampleSentence);
 

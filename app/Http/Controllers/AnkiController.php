@@ -26,8 +26,14 @@ class AnkiController extends Controller
 
         try {
             $testResult = $this->ankiApiService->addWord($language, $word, $reading, $translation, $exampleSentence);
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'error' => [
+                    'code' => 'ANKI_UNAVAILABLE',
+                    'message' => 'AnkiConnect is unavailable or not configured.',
+                ],
+            ], 503);
         }
         
         return response()->json($testResult, 200);

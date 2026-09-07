@@ -15,8 +15,14 @@ class JellyfinController extends Controller
     public function getJellyfinCurrentlyPlayedSubtitles () {
         try {
             $subtitles = $this->jellyfinService->getJellyfinCurrentlyPlayedSubtitles();
-        } catch (\Exception $e) {
-            abort(500, $e->getMessage());
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json([
+                'error' => [
+                    'code' => 'JELLYFIN_UNAVAILABLE',
+                    'message' => 'Jellyfin is temporarily unavailable.',
+                ],
+            ], 503);
         }
 
         return response()->json($subtitles, 200);
