@@ -1427,18 +1427,7 @@
                     };
                 }
 
-                axios.post('/anki/add-card', data).catch((error) => {
-                        if (!this.ankiShowNotifications) {
-                            return;
-                        }
-
-                        this.snackBars.push({id: this.snackbarId, content: data.word + ': ' + error.response.data.message, type: 'error'});
-                        var snackbarToRemove = this.snackbarId;
-                        this.snackbarId ++;
-                        setTimeout(() => {
-                            this.removeSnackbar(snackbarToRemove);
-                        }, 5000);
-                }).then((response) => {
+                axios.post('/anki/add-card', data).then((response) => {
                     if (response.status !== 200) {
                          return;
                     }
@@ -1449,6 +1438,20 @@
 
                     this.snackBars.push({id: this.snackbarId, content: data.word, type: response.data});
 
+                    var snackbarToRemove = this.snackbarId;
+                    this.snackbarId ++;
+                    setTimeout(() => {
+                        this.removeSnackbar(snackbarToRemove);
+                    }, 5000);
+                }).catch((error) => {
+                    if (!this.ankiShowNotifications) {
+                        return;
+                    }
+
+                    const message = error?.response?.data?.error?.message
+                        || error?.response?.data?.message
+                        || 'AnkiConnect is unavailable.';
+                    this.snackBars.push({id: this.snackbarId, content: data.word + ': ' + message, type: 'error'});
                     var snackbarToRemove = this.snackbarId;
                     this.snackbarId ++;
                     setTimeout(() => {
