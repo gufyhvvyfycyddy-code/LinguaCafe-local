@@ -54,6 +54,20 @@ describe('OfflineRepository', () => {
     expect(await repository.pendingCardIds()).toEqual(new Set([10, 11]));
   });
 
+  it('rehydrates queued actions across repository restart and keeps sequence monotonic', async () => {
+    const store = new MemoryStore();
+    const firstSession = new OfflineRepository(7, 'English', store);
+    const first = await firstSession.enqueueRating(10, 'good', 100, new Date('2026-08-01T00:00:00Z'));
+
+    const restarted = new OfflineRepository(7, 'English', store);
+    expect((await restarted.queuedActions()).map(item => item.client_action_id))
+      .toEqual([first.client_action_id]);
+    expect(await restarted.pendingCardIds()).toEqual(new Set([10]));
+
+    const second = await restarted.enqueueRating(11, 'hard', 200, new Date('2026-08-01T00:00:01Z'));
+    expect([first.sequence, second.sequence]).toEqual([1, 2]);
+  });
+
   it('removes successes, retains retryable actions and records terminal issues', async () => {
     const repository = new OfflineRepository(7, 'English', new MemoryStore());
     const applied = await repository.enqueueRating(10, 'good', 100);
