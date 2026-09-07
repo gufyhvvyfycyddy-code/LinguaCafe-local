@@ -466,7 +466,7 @@ def subtitleTokenizer():
         ## add tokenized text to processed chunk
         tokenizedText = tokenizedText + tokenizedSubtitle
 
-    return json.dumps({'tokenizedText': tokenizedText, 'timeStamps': timeStamps})
+    return {'tokenizedText': tokenizedText, 'timeStamps': timeStamps}
 
 # returns a raw text and a tokenized text 
 # of n .epub file cut into chunks
@@ -557,7 +557,7 @@ def importSubtitles():
         chunks[-1].append(subtitle)
 
     print(chunks)
-    return json.dumps(chunks)
+    return chunks
 
 @route('/tokenizer/get-youtube-subtitle-list', method='POST')
 def getYoutubeSubtitles():
@@ -708,9 +708,9 @@ def language_health(lang, lightweight=True):
             nlp = spacy.load(model_name)
             result['available'] = True
             result['status'] = 'available'
-    except Exception as e:
+    except Exception:
         result['status'] = 'failed'
-        result['error'] = str(e)
+        result['error'] = 'spaCy model health check failed'
     return result
 
 
@@ -821,8 +821,8 @@ def english_lemma_health():
                     lemma = override
             check['actual'] = lemma
             check['passed'] = (lemma == expected)
-        except Exception as e:
-            check['error'] = str(e)
+        except Exception:
+            check['error'] = 'lemma health check failed'
             check['actual'] = None
         results.append(check)
     return results
@@ -876,10 +876,10 @@ def health_check():
             doc = nlp(' '.join(test_words))
             for token in doc:
                 result['tests'][token.text] = token.lemma_
-        except Exception as e:
+        except Exception:
             result['spacy_available'] = False
-            result['spacy_error'] = str(e)
-            result['checks']['spacy_lemmas'] = {'passed': False, 'error': str(e)}
+            result['spacy_error'] = 'spaCy lemma health check failed'
+            result['checks']['spacy_lemmas'] = {'passed': False, 'error': 'spaCy lemma health check failed'}
 
     # Check LemmInflect
     try:
@@ -894,8 +894,8 @@ def health_check():
         result['lemminflect_available'] = False
         result['english']['lemminflect_available'] = False
         result['checks']['lemminflect'] = {'passed': False, 'error': 'lemminflect not installed'}
-    except Exception as e:
-        result['checks']['lemminflect'] = {'passed': False, 'error': str(e)}
+    except Exception:
+        result['checks']['lemminflect'] = {'passed': False, 'error': 'LemmInflect health check failed'}
 
     # English irregular lemma check (replicate full tokenizeText pipeline).
     # lemma_results includes irregular + philosophy + philosophy_guard cases,
@@ -949,7 +949,7 @@ def health_check():
     )
     result['status'] = 'healthy' if all_ok else 'degraded'
 
-    return json.dumps(result)
+    return result
 
 @route('/models/install', method = 'POST')
 def model_install():
