@@ -46,6 +46,31 @@ class TextBlockFallbackTokenizerTest extends TestCase
         $this->assertSame('PUNCT', $punctuation->pos);
     }
 
+    public function test_fallback_structure_markers_restore_explicit_structure_tokens(): void
+    {
+        $service = new TextBlockService(1, 'english');
+        $reflection = new \ReflectionClass($service);
+
+        $tokenize = $reflection->getMethod('fallbackEnglishTokenize');
+        $tokenize->setAccessible(true);
+        $mapStructure = $reflection->getMethod('mapStructuralTokens');
+        $mapStructure->setAccessible(true);
+
+        $tokens = $tokenize->invoke($service, 'Alpha ZZNEWLZZ Beta ZZPARAZZ ZZSECTAZ Gamma.');
+        $tokens = $mapStructure->invoke($service, $tokens);
+
+        $this->assertSame(
+            ['Alpha', 'NEWLINE', 'Beta', 'PARAGRAPH_BREAK', '[A]', 'Gamma', '.'],
+            array_map(fn (\stdClass $token) => $token->w, $tokens),
+        );
+
+        foreach (['NEWLINE', 'PARAGRAPH_BREAK', '[A]'] as $surface) {
+            $token = $this->tokenBySurface($tokens, $surface);
+            $this->assertSame('STRUCT', $token->pos);
+            $this->assertSame($surface, $token->l);
+        }
+    }
+
     public function test_fallback_tokenizer_throws_for_blank_text(): void
     {
         $this->expectException(\Exception::class);
