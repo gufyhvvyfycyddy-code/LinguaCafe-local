@@ -29,6 +29,9 @@ env:
   REGISTRY: ghcr.io
   # IMAGE_NAME: ${{ github.repository }}
 
+permissions:
+  contents: read
+
 jobs:
   # define the job to build and publish docker images
   build-and-push-docker-images:
