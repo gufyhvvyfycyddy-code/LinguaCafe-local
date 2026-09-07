@@ -62,6 +62,10 @@ jobs:
         if: matrix.language == 'java-kotlin'
         run: npm run cap:sync --prefix mobile
 
+      - name: Sync iOS native project
+        if: matrix.language == 'swift'
+        run: npm run cap:sync:ios --prefix mobile
+
       - name: Set up Java for Android analysis
         if: matrix.language == 'java-kotlin'
         uses: actions/setup-java@v4
