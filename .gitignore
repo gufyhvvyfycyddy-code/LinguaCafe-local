@@ -21,6 +21,8 @@ yarn-error.log
 /docker/mysql/*
 /tools/django_server/django_server/__pycache__
 /tools/django_server/tokenizer/__pycache__
+__pycache__/
+*.py[cod]
 /package-lock.json
 /public/mix-manifest.json
 /public/fonts/vendor/@mdi/*
