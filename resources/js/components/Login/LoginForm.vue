@@ -136,20 +136,69 @@ const AccountForm = {
         disabled: Boolean,
     },
     template: `
-        <v-form :value="value" @input="$emit('input', $event)">
+        <v-form ref="form" v-model="baseFormValid">
             <label class="font-weight-bold">邮箱</label>
             <v-text-field :value="email" @input="$emit('update:email', $event)" rounded filled dense placeholder="邮箱" :rules="[rules.email]" :disabled="disabled" />
 
             <label class="font-weight-bold">密码</label>
-            <v-text-field :value="password" @input="$emit('update:password', $event)" rounded filled dense type="password" placeholder="密码" :rules="[rules.password]" :disabled="disabled" />
+            <v-text-field :value="livePassword" @input="updatePassword" rounded filled dense type="password" placeholder="密码" :rules="[rules.password]" :disabled="disabled" />
 
             <label class="font-weight-bold">确认密码</label>
-            <v-text-field :value="passwordConfirmation" @input="$emit('update:passwordConfirmation', $event)" rounded filled dense type="password" placeholder="确认密码" :rules="[rules.passwordMatch(password)]" :disabled="disabled" @keyup.enter="$emit('submit')" />
+            <v-text-field :value="livePasswordConfirmation" @input="updatePasswordConfirmation" rounded filled dense type="password" placeholder="确认密码" :rules="[rules.requiredPassword]" :error-messages="passwordConfirmationError" :disabled="disabled" @keyup.enter="$emit('submit')" />
         </v-form>
     `,
+    data() {
+        return {
+            baseFormValid: false,
+            livePassword: this.password,
+            livePasswordConfirmation: this.passwordConfirmation,
+        };
+    },
+    watch: {
+        baseFormValid() {
+            this.emitValidity();
+        },
+        password(value) {
+            this.livePassword = value;
+            this.emitValidity();
+        },
+        passwordConfirmation(value) {
+            this.livePasswordConfirmation = value;
+            this.emitValidity();
+        },
+    },
+    computed: {
+        passwordsMatch() {
+            return this.livePasswordConfirmation === this.livePassword;
+        },
+        passwordConfirmationError() {
+            if (this.livePasswordConfirmation === '' || this.passwordsMatch) {
+                return [];
+            }
+
+            return ['两次输入的密码不一致。'];
+        },
+    },
     methods: {
+        updatePassword(value) {
+            this.livePassword = value;
+            this.$emit('update:password', value);
+            this.emitValidity();
+        },
+        updatePasswordConfirmation(value) {
+            this.livePasswordConfirmation = value;
+            this.$emit('update:passwordConfirmation', value);
+            this.emitValidity();
+        },
+        emitValidity() {
+            this.$nextTick(() => {
+                this.$emit('input', Boolean(this.baseFormValid && this.passwordsMatch));
+            });
+        },
         validate() {
-            return this.$children[0].validate();
+            const baseValid = this.$refs.form.validate();
+            this.emitValidity();
+            return Boolean(baseValid && this.passwordsMatch);
         },
     },
 };
@@ -188,7 +237,6 @@ export default {
             rules: {
                 requiredPassword: value => value.length > 0 || '请输入密码。',
                 password: value => (value.length >= 8 && value.length <= 32) || '密码长度必须在 8 到 32 个字符之间。',
-                passwordMatch: password => value => value == password || '两次输入的密码不一致。',
                 email: value => {
                     const pattern = /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
                     return pattern.test(value) || '请输入有效邮箱。';
