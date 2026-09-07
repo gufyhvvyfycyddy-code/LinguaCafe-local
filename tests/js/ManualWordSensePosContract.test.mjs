@@ -64,6 +64,11 @@ assert.equal(
     'fallback',
 );
 
+const manualForm = fs.readFileSync(path.join(root, 'resources/js/components/Text/ManualSenseForm.vue'), 'utf8');
+const buildLocalForm = methodBody(manualForm, '        buildLocalForm(source) {');
+assert.match(buildLocalForm, /pos:\s*\(source && source\.pos\)\s*\|\|\s*''/, 'manual creation must keep POS neutral when no source POS exists');
+assert.doesNotMatch(buildLocalForm, /pos:[^\n]*\|\|\s*['\"]verb['\"]/, 'manual creation must not guess verb as a default POS');
+
 const component = fs.readFileSync(path.join(root, 'resources/js/components/Text/WordSensesList.vue'), 'utf8');
 assert.match(component, /normalizeWordSensePos/, 'AI, dictionary, create, and edit paths must use the shared POS normalizer');
 assert.match(component, /manualSenseValidationState/, 'create and edit catches must use structured validation errors');
