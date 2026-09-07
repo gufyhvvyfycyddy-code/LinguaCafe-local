@@ -4,7 +4,7 @@ Updated: 2026-09-07
 
 ## Status
 
-**Incomplete for real-user release.** Public review can continue, but release should not proceed until the environment-hygiene blocker and remaining security findings are resolved or explicitly accepted.
+**Incomplete for real-user release.** Public review can continue. Current CodeQL findings are closed and dependency Highs are explicitly dispositioned; release still requires environment-hygiene remediation plus the remaining platform/operations gates.
 
 ## Current-tree path audit
 
@@ -28,13 +28,18 @@ Environment-file history was not content-scanned because project rules forbid re
 
 ## Repository hygiene already visible on current master
 
-Current default branch no longer tracks the historical Playwright CLI logs/page dumps and tokenizer Python bytecode that were present in earlier review snapshots. Restricted workflow token permissions and the public security-reporting policy are present on current master.
+Current default branch no longer tracks the historical Playwright CLI logs/page dumps, tokenizer Python bytecode, or the unused experimental `resources/vue3` prototype. Restricted workflow token permissions and the public security-reporting policy are present on current master.
+
+Current default-branch security status after source PR #40:
+- CodeQL open alerts: 0;
+- Dependabot: 28 open total — 0 Critical / 6 High / 18 Medium / 4 Low;
+- the six High alerts have explicit current reachability/accepted-risk/upgrade-gate dispositions in the architecture review repository.
 
 ## Remaining security work
 
 - environment-file remediation and any required credential rotation;
-- dependency vulnerability reachability/compatibility triage;
-- remaining CodeQL findings;
+- authorized environment-file history review where permitted;
+- medium/low dependency maintenance plus planned Laravel 12 and Vue3/Vuetify3 modernization;
 - Android/iOS release-security evidence;
 - production hosting, HTTPS, backup, monitoring, privacy/support and account-deletion evidence.
 

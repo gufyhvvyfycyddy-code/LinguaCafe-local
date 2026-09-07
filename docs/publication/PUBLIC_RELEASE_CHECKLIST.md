@@ -4,7 +4,7 @@
 
 - [x] One current source-of-truth repository is named.
 - [x] Architecture and product-launch review repositories exist and are public.
-- [x] Architecture/product status pages are refreshed for source PR #30/#31/#32/#34 and closed issues #25/#26 (architecture PR #30; product PR #17).
+- [x] Architecture/product status pages are refreshed through source PR #40 and closed dependency/security issues #23/#25/#26/#28/#29 (architecture PR #31; product PR #18).
 - [x] Historical `LinguaCafe-dev-main` is visibly marked as historical on GitHub (historical-repo PR #1).
 - [x] Exact duplicate source Issues #12–#18 are closed as duplicates while canonical Issues #5–#11 remain open.
 
@@ -24,7 +24,7 @@
 - [ ] Tracked private runtime-configuration paths are remediated under explicit authorization.
 - [ ] Any historically valid exposed credential is rotated/revoked.
 - [ ] Authorized history review/remediation is completed.
-- [ ] Remaining dependency and CodeQL launch blockers are triaged.
+- [x] Dependency High and current CodeQL findings are triaged: 0 Critical, 6 High with explicit dispositions, and 0 open CodeQL alerts on current default branch.
 
 ## Platform evidence
 
