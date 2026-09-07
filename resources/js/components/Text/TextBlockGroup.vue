@@ -106,6 +106,11 @@
                     --><template v-else>{{ word.word }}</template><!--
                     --><template v-if="plainTextMode && word.spaceAfter">&nbsp;</template><!--
                 --></span><!--
+                --><span
+                    v-if="!plainTextMode && !usesSpacelessLanguage() && word.spaceAfter"
+                    :key="'semantic-space-' + wordIndex"
+                    class="reader-semantic-space"
+                >{{ ' ' }}</span><!--
                 --><div
                     v-if="showAiTranslations && !word.is_structure && isLastWordOfSentence(wordIndex) && getAiTranslation(word.sentence_index)"
                     :key="'ai-t-' + wordIndex"
