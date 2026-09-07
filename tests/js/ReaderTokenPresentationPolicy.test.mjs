@@ -16,6 +16,7 @@ import {
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const textBlockSource = fs.readFileSync(path.join(root, 'resources/js/components/Text/TextBlockGroup.vue'), 'utf8');
+const interactiveTextStyles = fs.readFileSync(path.join(root, 'resources/sass/Text/InteractiveTextStyling.scss'), 'utf8');
 
 test('applies spaceless layout only to the established languages', () => {
     assert.equal(usesReaderSpacelessLanguage('chinese'), true);
@@ -239,4 +240,8 @@ test('TextBlockGroup delegates presentation while retaining the token DOM bounda
     assert.equal(textBlockSource.includes('@mousedown.stop="startSelectionMouseEvent"'), true);
     assert.equal(textBlockSource.includes('@mouseup.stop="finishSelection"'), true);
     assert.equal(textBlockSource.includes('<template v-for="(word, wordIndex) in words"><!--'), true);
+    assert.equal(textBlockSource.includes('v-if="!plainTextMode && !usesSpacelessLanguage() && word.spaceAfter"'), true);
+    assert.equal(textBlockSource.includes('class="reader-semantic-space"'), true);
+    assert.equal(textBlockSource.includes(">{{ ' ' }}</span><!--"), true);
+    assert.match(interactiveTextStyles, /\.reader-semantic-space\s*\{[\s\S]*font-size:\s*0;[\s\S]*user-select:\s*text;/);
 });

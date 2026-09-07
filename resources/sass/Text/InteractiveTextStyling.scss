@@ -3,6 +3,12 @@
 */
 
 .sample-text, .text-block-group {
+    .reader-semantic-space {
+        font-size: 0;
+        line-height: 0;
+        user-select: text;
+    }
+
     .word {
         display: inline-block;
         box-sizing: border-box;
