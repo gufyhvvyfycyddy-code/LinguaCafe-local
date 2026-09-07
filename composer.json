@@ -8,7 +8,7 @@
         "php": "^8.2",
         "laravel/framework": "^11.9",
         "laravel/horizon": "^5.25",
-        "laravel/reverb": "@beta",
+        "laravel/reverb": "^1.11",
         "laravel/sanctum": "^4.0",
         "laravel/tinker": "^2.9",
         "laravel/ui": "^4.5",
