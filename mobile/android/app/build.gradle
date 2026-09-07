@@ -1,5 +1,24 @@
 apply plugin: 'com.android.application'
 
+def releaseSigningValue = { String name ->
+    def value = System.getenv(name)
+    if (value == null || value.toString().isEmpty()) {
+        value = project.findProperty(name)
+    }
+    return value == null ? '' : value.toString()
+}
+
+def releaseKeystorePath = releaseSigningValue('LINGUACAFE_ANDROID_KEYSTORE_PATH')
+def releaseStorePassword = releaseSigningValue('LINGUACAFE_ANDROID_STORE_PASSWORD')
+def releaseKeyAlias = releaseSigningValue('LINGUACAFE_ANDROID_KEY_ALIAS')
+def releaseKeyPassword = releaseSigningValue('LINGUACAFE_ANDROID_KEY_PASSWORD')
+def releaseSigningConfigured = [
+    releaseKeystorePath,
+    releaseStorePassword,
+    releaseKeyAlias,
+    releaseKeyPassword,
+].every { !it.trim().isEmpty() }
+
 android {
     namespace = "com.linguacafe.mobile"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,11 +35,35 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (releaseSigningConfigured) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
+            if (releaseSigningConfigured) {
+                signingConfig signingConfigs.release
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    def releaseDistributionRequested = graph.hasTask(':app:bundleRelease') || graph.hasTask(':app:assembleRelease')
+    if (releaseDistributionRequested && !releaseSigningConfigured) {
+        throw new GradleException(
+            'Release signing is not configured. Set LINGUACAFE_ANDROID_KEYSTORE_PATH, '
+                + 'LINGUACAFE_ANDROID_STORE_PASSWORD, LINGUACAFE_ANDROID_KEY_ALIAS, and '
+                + 'LINGUACAFE_ANDROID_KEY_PASSWORD before building a release artifact.'
+        )
     }
 }
 

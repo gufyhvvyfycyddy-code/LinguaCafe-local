@@ -9,7 +9,8 @@
     "test": "vitest run",
     "cap:sync": "npm run build && cap sync android",
     "cap:sync:ios": "npm run build && cap sync ios",
-    "android:debug": "npm run cap:sync && cd android && gradlew.bat assembleDebug"
+    "android:debug": "npm run cap:sync && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run cap:sync && cd android && gradlew.bat bundleRelease"
   },
   "dependencies": {
     "@capacitor/android": "8.4.2",
