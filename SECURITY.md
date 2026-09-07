@@ -4,8 +4,13 @@
 
 Security reports for this public project should be checked against the current `master` branch.
 
-Current external-review baseline at the time this policy was created:
-`190e7ab95e9415af23c9799cbc276714dcdd6ed5`
+Frozen functional external-review baseline:
+`6989ed27c933716f9069bb9b14fba92624081fc4`
+
+Publication/security review is synchronized through source commit:
+`2d8f062fcc453fa609abbed228df371dd192ec57`
+
+The frozen functional baseline and the later security/dependency fixes are intentionally reported separately.
 
 ## Reporting a vulnerability
 
