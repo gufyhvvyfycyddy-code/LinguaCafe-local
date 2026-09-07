@@ -2,7 +2,30 @@ FROM node:20-alpine as node_build
 
 WORKDIR /build
 COPY ./ /build
-RUN npm install && npm run prod
+# Laravel Mix 6 requires the compatible webpack line pinned in package-lock.json.
+RUN npm ci && npm run prod
+
+# Build the native FSRS PHP extension separately so Rust/clang never enter the runtime image.
+FROM php:8.2-cli AS fsrs_build
+ARG FSRS_RS_PHP_COMMIT=122299bc273ebecc07f5022b91939380951b5688
+ARG FSRS_RUST_VERSION=1.98.1
+RUN apt-get update \
+    && apt-get install --no-install-recommends -y \
+        build-essential \
+        ca-certificates \
+        clang \
+        curl \
+        git \
+        libclang-dev \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --profile minimal --default-toolchain "${FSRS_RUST_VERSION}"
+ENV PATH=/root/.cargo/bin:$PATH
+RUN git clone https://github.com/open-spaced-repetition/fsrs-rs-php.git /src/fsrs-rs-php \
+    && cd /src/fsrs-rs-php \
+    && git checkout "${FSRS_RS_PHP_COMMIT}" \
+    && cargo build --release --locked
 
 FROM php:8.2-apache
 
@@ -46,6 +69,9 @@ COPY ./docker/vhost.conf /etc/apache2/sites-available/000-default.conf
 RUN a2enmod rewrite
     # install composer
 COPY --from=composer:latest /usr/bin/composer /usr/local/bin/composer
+COPY --from=fsrs_build /src/fsrs-rs-php/target/release/libfsrs_rs_php.so /usr/local/lib/libfsrs_rs_php.so
+RUN echo 'extension=/usr/local/lib/libfsrs_rs_php.so' > /usr/local/etc/php/conf.d/fsrs-rs-php.ini \
+    && php -r "exit(extension_loaded('fsrs-rs-php') && class_exists('\\\\fsrs\\\\FSRS') ? 0 : 1);"
 
 # for some reason i have to install this manually,
 # despite being in the composer.json
@@ -59,7 +85,8 @@ RUN addgroup --gid 1000 laravel \
     && chown -R laravel /var/www/html
 USER laravel
 
-RUN composer install --optimize-autoloader --no-dev
+# Package discovery must not depend on secrets copied from a local .env file.
+RUN BROADCAST_DRIVER=null composer install --optimize-autoloader --no-dev
 
 ENTRYPOINT ["/var/www/html/entrypoint.sh"]
 CMD ["supervisord", "--configuration=/var/www/html/config/supervisord.conf", "--nodaemon"]
