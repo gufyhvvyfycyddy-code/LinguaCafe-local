@@ -4,6 +4,7 @@
 
 - [x] One current source-of-truth repository is named.
 - [x] Architecture and product-launch review repositories exist and are public.
+- [ ] Architecture/product status pages are refreshed for source PR #30/#31/#32 and closed issues #25/#26.
 - [ ] Historical `LinguaCafe-dev-main` is visibly marked as historical on GitHub.
 
 ## Worktree safety
