@@ -181,7 +181,7 @@ export default {
             state.searchField += value;
         },
         appendReading (state, value) {
-            state.appendReading += value;
+            state.reading += value;
         },
     },
     getters: { }
