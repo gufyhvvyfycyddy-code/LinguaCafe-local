@@ -80,5 +80,62 @@ class AppServiceProvider extends ServiceProvider
                 );
             }
         });
+
+        // Source #55 (stage A): fail-closed containment. Refuse destructive
+        // schema-reset commands (e.g. RefreshDatabase's migrate:fresh) unless
+        // they target a unique per-run, process-owned disposable database, so a
+        // test run can never reset a shared/long-lived testing database.
+        Event::listen(CommandStarting::class, function (CommandStarting $event): void {
+            if (! \App\Services\DisposableTestDatabaseGuard::isGuardedCommand($event->command)) {
+                return;
+            }
+
+            $connectionName = null;
+            $input = $event->input;
+            if ($input !== null) {
+                try {
+                    if ($input->hasOption('database')) {
+                        $option = $input->getOption('database');
+                        if (is_string($option) && $option !== '') {
+                            $connectionName = $option;
+                        }
+                    }
+                } catch (\Throwable) {
+                    // Option not bound yet; fall back to the default connection.
+                }
+            }
+
+            $this->app->make(\App\Services\DisposableTestDatabaseGuard::class)
+                ->assertDestructiveResetAllowed($event->command, $connectionName);
+        });
+
+        // Source #55 (stage A): reliable connection-layer backstop. Console
+        // events are not dispatched for programmatic Kernel::call (e.g.
+        // RefreshDatabase's migrate:fresh), so also refuse destructive schema
+        // statements at execution time — before the first drop runs — unless the
+        // connection's database is a sanctioned disposable run database.
+        if ($this->app->environment('testing')) {
+            $installDisposableDbGuard = function (Connection $connection) use (&$guardedConnections): void {
+                $guardKey = 'testdb:' . spl_object_id($connection);
+                if (isset($guardedConnections[$guardKey])) {
+                    return;
+                }
+                $guardedConnections[$guardKey] = true;
+                $connection->beforeExecuting(function (string $query) use ($connection): void {
+                    $this->app->make(\App\Services\DisposableTestDatabaseGuard::class)
+                        ->assertQueryAllowed($query, (string) $connection->getDatabaseName());
+                });
+            };
+
+            Event::listen(
+                ConnectionEstablished::class,
+                function (ConnectionEstablished $event) use ($installDisposableDbGuard): void {
+                    $installDisposableDbGuard($event->connection);
+                },
+            );
+            foreach ($this->app->make('db')->getConnections() as $connection) {
+                $installDisposableDbGuard($connection);
+            }
+        }
     }
 }
