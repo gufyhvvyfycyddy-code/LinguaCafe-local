@@ -71,11 +71,21 @@ return Application::configure(basePath: dirname(__DIR__))
         });
 
         $exceptions->render(function (HttpExceptionInterface $exception, Request $request) use ($isMobileRequest) {
+            $status = $exception->getStatusCode();
+
             if (! $isMobileRequest($request)) {
-                return null;
+                if ($request->expectsJson() || ! in_array($status, [403, 404, 405], true)) {
+                    return null;
+                }
+
+                return response()->view(
+                    "errors.{$status}",
+                    [],
+                    $status,
+                    $exception->getHeaders(),
+                );
             }
 
-            $status = $exception->getStatusCode();
             $code = match ($status) {
                 404 => 'NOT_FOUND',
                 405 => 'METHOD_NOT_ALLOWED',
