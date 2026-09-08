@@ -28,7 +28,14 @@ return new class extends Migration
         Schema::create('reading_inline_sense_confirmations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('user_id')->index();
-            $table->string('language')->index();
+            // #54: language takes part in the composite unique index below
+            // alongside the surface/lemma word forms. At the default
+            // VARCHAR(255) under utf8mb4 the index key exceeds InnoDB's
+            // 3072-byte limit and a clean build fails. A language identifier is
+            // short, so the canonical schema bounds it to 64 (the same bound the
+            // long-running schema applies to language identifiers elsewhere),
+            // which keeps the full-value unique constraint intact.
+            $table->string('language', 64)->index();
             $table->unsignedBigInteger('chapter_id')->nullable()->index();
             $table->integer('sentence_index')->nullable();
             $table->string('sentence_hash')->nullable();
