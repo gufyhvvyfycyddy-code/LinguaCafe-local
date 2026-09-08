@@ -296,6 +296,7 @@
     import {
         buildAiSuggestionLookupContext,
         buildAiSuggestionLookupKey,
+        shouldSkipDuplicateAiSuggestionLookup,
         fetchAiSuggestions,
         buildAiVocabSensePayload,
         buildAiPhraseSensePayload,
@@ -452,6 +453,13 @@
                     return;
                 }
                 const lookupKey = buildAiSuggestionLookupKey(context);
+                if (shouldSkipDuplicateAiSuggestionLookup({
+                    currentLookupKey: this.latestAiLookupKey,
+                    nextLookupKey: lookupKey,
+                    isLoading: this.aiLookupLoading,
+                })) {
+                    return;
+                }
                 this.latestAiLookupKey = lookupKey;
                 this.$store.commit('vocabularyBox/setAiLookupLoading', true);
                 this.$store.commit('vocabularyBox/setAiLookupError', '');
