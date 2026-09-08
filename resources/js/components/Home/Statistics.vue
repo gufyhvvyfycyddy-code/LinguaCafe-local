@@ -126,6 +126,7 @@
 
 <script>
 import StatisticsMiniChart from './StatisticsMiniChart.vue';
+import { FSRS_STATES, FSRS_STATE_LABELS } from '../../services/FsrsStateLabel.js';
 
 export default {
     components: { StatisticsMiniChart },
@@ -158,8 +159,7 @@ export default {
         },
         stateRows() {
             if (!this.report) return [];
-            const labels = { new: '新卡', learning: '学习中', review: '复习', relearning: '重学' };
-            return Object.keys(labels).map(key => ({ label: labels[key], value: this.report.card_states[key] || 0 }));
+            return FSRS_STATES.map(key => ({ label: FSRS_STATE_LABELS[key], value: this.report.card_states[key] || 0 }));
         },
     },
     mounted() {

@@ -209,6 +209,7 @@ import ReviewCardLifecycleMutationSurface from './ReviewCardLifecycleMutationSur
 import ReviewCardDeleteMutationSurface from './ReviewCardDeleteMutationSurface.vue';
 import ReviewCardLeechGovernanceMutationSurface from './ReviewCardLeechGovernanceMutationSurface.vue';
 import KnowledgeHygienePanel from './KnowledgeHygienePanel.vue';
+import { FSRS_STATES, FSRS_STATE_LABELS } from '../../services/FsrsStateLabel.js';
 import PortableDataPanel from './PortableDataPanel.vue';
 
 export default {
@@ -338,10 +339,7 @@ export default {
                 { label: '已暂停', value: this.fsrsStats.suspended || 0 },
                 { label: '已归档', value: this.fsrsStats.archived || 0 },
                 { label: '当前到期', value: this.fsrsStats.due },
-                { label: '新卡', value: this.fsrsStats.by_state.new },
-                { label: '学习中', value: this.fsrsStats.by_state.learning },
-                { label: '复习中', value: this.fsrsStats.by_state.review },
-                { label: '重新学习', value: this.fsrsStats.by_state.relearning },
+                ...FSRS_STATES.map(state => ({ label: FSRS_STATE_LABELS[state], value: this.fsrsStats.by_state[state] })),
                 { label: '今日已复习', value: this.fsrsStats.reviewed_today },
                 { label: '今日重置', value: this.fsrsStats.reset_count },
             ];

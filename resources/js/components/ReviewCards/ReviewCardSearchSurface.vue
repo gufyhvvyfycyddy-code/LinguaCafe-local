@@ -200,6 +200,7 @@
 <script>
 import ReviewCardSavedSearchPanel from './ReviewCardSavedSearchPanel.vue';
 import WordSenseTagManager from './WordSenseTagManager.vue';
+import { fsrsStateOptions } from '../../services/FsrsStateLabel.js';
 import {
     applyReviewCardManageFilterState,
     buildReviewCardManageFilterState,
@@ -231,12 +232,7 @@ export default {
                 lapsesMin: null,
                 tagIds: [],
             },
-            fsrsStateOptions: [
-                { label: '新卡', value: 'new' },
-                { label: '学习中', value: 'learning' },
-                { label: '复习中', value: 'review' },
-                { label: '重新学习', value: 'relearning' },
-            ],
+            fsrsStateOptions: fsrsStateOptions(),
             dueRangeOptions: [
                 { text: '全部', value: 'all' },
                 { text: '已逾期', value: 'overdue' },
