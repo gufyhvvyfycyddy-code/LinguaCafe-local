@@ -66,4 +66,20 @@ if (strtolower($appEnv) === 'testing') {
             @fclose($lockFp);
         }
     });
+
+    // #55 stage C: provision a unique, process-owned disposable database for
+    // this run and repoint the connection at it, so destructive schema resets
+    // (RefreshDatabase / migrate:fresh) can only ever touch a throwaway DB and
+    // never a shared / long-lived / recovery testing database. If no server
+    // connection is configured this is a no-op and the guard fails closed.
+    try {
+        $disposableDb = \Tests\Support\DisposableTestDatabase::activate();
+        if ($disposableDb !== null) {
+            register_shutdown_function(static function (): void {
+                \Tests\Support\DisposableTestDatabase::dropAllCreated();
+            });
+        }
+    } catch (\Throwable $e) {
+        fwrite(STDERR, '[bootstrap] Could not provision a disposable test database: ' . $e->getMessage() . "\n");
+    }
 }

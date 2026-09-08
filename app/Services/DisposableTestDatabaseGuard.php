@@ -150,13 +150,24 @@ class DisposableTestDatabaseGuard
      * known protected database, matches the unique per-run pattern, and is the
      * exact database named by this run's ownership marker.
      */
-    public function isDisposableRunDatabase(string $database): bool
+    /**
+     * A name is disposable-shaped when it is not a known protected database and
+     * matches the unique per-run pattern. This is the necessary structural
+     * condition (no ownership proof) — reused by the per-run runner to decide
+     * which databases it is ever allowed to drop.
+     */
+    public static function matchesDisposablePattern(string $database): bool
     {
         if (in_array($database, self::PROTECTED_DATABASES, true)) {
             return false;
         }
 
-        if (preg_match(self::DISPOSABLE_PATTERN, $database) !== 1) {
+        return preg_match(self::DISPOSABLE_PATTERN, $database) === 1;
+    }
+
+    public function isDisposableRunDatabase(string $database): bool
+    {
+        if (! self::matchesDisposablePattern($database)) {
             return false;
         }
 
