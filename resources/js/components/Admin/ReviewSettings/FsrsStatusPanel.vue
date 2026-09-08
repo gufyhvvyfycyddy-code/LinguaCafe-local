@@ -41,6 +41,7 @@
 
 <script>
 import * as AdminReviewSettingsApi from '../../../services/AdminReviewSettingsApi';
+import { FSRS_STATES, FSRS_STATE_LABELS } from '../../../services/FsrsStateLabel.js';
 
 const emptyStats = () => ({
     total: 0,
@@ -80,12 +81,7 @@ export default {
         },
         stateItems() {
             const states = this.stats.by_state || emptyStats().by_state;
-            return [
-                { label: '新卡', value: states.new },
-                { label: '学习中', value: states.learning },
-                { label: '复习中', value: states.review },
-                { label: '重新学习', value: states.relearning },
-            ];
+            return FSRS_STATES.map(state => ({ label: FSRS_STATE_LABELS[state], value: states[state] }));
         },
         metricItems() {
             return [

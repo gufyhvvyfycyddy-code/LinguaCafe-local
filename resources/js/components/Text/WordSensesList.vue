@@ -214,6 +214,7 @@
 import { mapState } from 'vuex';
 import ManualSenseForm from './ManualSenseForm.vue';
 import InlineSensePreviewPanel from './InlineSensePreviewPanel.vue';
+import { fsrsStateLabel } from '../../services/FsrsStateLabel.js';
 import {
     buildWordSenseCandidateLookupContext,
     buildWordSenseCandidateLookupKey,
@@ -793,19 +794,7 @@ export default {
                 return '已暂停';
             }
 
-            if (sense.fsrs_state === 'new') {
-                return '新卡';
-            }
-
-            if (sense.fsrs_state === 'review') {
-                return '学习中';
-            }
-
-            if (sense.fsrs_state === 'learning' || sense.fsrs_state === 'relearning') {
-                return '学习中';
-            }
-
-            return sense.fsrs_state || '学习中';
+            return fsrsStateLabel(sense.fsrs_state);
         },
     },
 };
