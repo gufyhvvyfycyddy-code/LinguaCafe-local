@@ -9,6 +9,7 @@ use App\Models\Radical;
 use App\Models\Dictionary;
 use App\Models\VocabularyJmdict;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\VocabularyJmdictWord;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
@@ -19,6 +20,27 @@ use Illuminate\Database\Schema\Blueprint;
 class DictionaryImportService {
 
     public function __construct() {
+    }
+
+    /**
+     * Broadcast dictionary import progress without letting an optional
+     * broadcast integration (e.g. an unconfigured or unreachable Pusher) abort
+     * the import request. DictionaryImportProgressedEvent is a ShouldBroadcastNow
+     * event, so it broadcasts synchronously inside the import HTTP request; a
+     * failing driver would otherwise throw and stop the import mid-file. This
+     * mirrors the fail-soft guard already used for chapter broadcasts
+     * (ChapterService, ProcessChapter). Progress push is best-effort only.
+     */
+    private function broadcastImportProgress($userUuid, $index): void {
+        try {
+            event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+        } catch (\Throwable $e) {
+            Log::warning('Dictionary import progress broadcast failed.', [
+                'user_uuid' => $userUuid,
+                'index' => $index,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     private function deleteTempDictionaryFiles() {
@@ -479,7 +501,7 @@ class DictionaryImportService {
                             if ($index % 1000 === 0) {
                                 DB::commit();
                                 DB::beginTransaction();
-                                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                                $this->broadcastImportProgress($userUuid, $index);
                             }
 
                             $index++;
@@ -547,7 +569,7 @@ class DictionaryImportService {
                 DB::beginTransaction();
 
                 // send progress through websockets
-                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                $this->broadcastImportProgress($userUuid, $index);
             }
             
             $index ++;
@@ -622,7 +644,7 @@ class DictionaryImportService {
                 DB::beginTransaction();
 
                 // send progress through websockets
-                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                $this->broadcastImportProgress($userUuid, $index);
             }
             
             $index ++;
@@ -691,7 +713,7 @@ class DictionaryImportService {
                 DB::beginTransaction();
 
                 // send progress through websockets
-                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                $this->broadcastImportProgress($userUuid, $index);
             }
             
             $index ++;
@@ -783,7 +805,7 @@ class DictionaryImportService {
                 DB::beginTransaction();
 
                 // send progress through websockets
-                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                $this->broadcastImportProgress($userUuid, $index);
             }
             
             $index ++;
@@ -1187,7 +1209,7 @@ class DictionaryImportService {
                 DB::beginTransaction();
 
                 // send progress through websockets
-                event(new \App\Events\DictionaryImportProgressedEvent($userUuid, $index));
+                $this->broadcastImportProgress($userUuid, $index);
             }
             
             $index ++;
