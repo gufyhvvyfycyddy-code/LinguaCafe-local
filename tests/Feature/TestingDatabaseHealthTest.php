@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Services\DisposableTestDatabaseGuard;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -26,14 +27,24 @@ class TestingDatabaseHealthTest extends TestCase
         );
     }
 
-    public function test_database_name_contains_test(): void
+    public function test_database_name_is_a_recognised_testing_database(): void
     {
         $dbName = Config::get('database.connections.mysql.database');
 
         $this->assertNotNull($dbName, 'No database name configured for mysql connection in testing env.');
-        $this->assertStringContainsString('test', strtolower($dbName),
+
+        // Since #55/#67 the test run executes against a per-run, process-owned
+        // disposable database named `linguacafe_disposable_<run>_<id>` (which does
+        // not contain the literal "test"). Accept either that disposable shape or
+        // a legacy name containing "test"; anything else (e.g. a real/shared DB)
+        // still fails, preserving the original "protect real data" intent.
+        $isDisposable = DisposableTestDatabaseGuard::matchesDisposablePattern($dbName);
+        $looksLikeTest = str_contains(strtolower($dbName), 'test');
+
+        $this->assertTrue($isDisposable || $looksLikeTest,
             "Database '{$dbName}' does not look like a testing database " .
-            '(expected name containing "test"). Aborting to protect real data.'
+            '(expected a disposable run database or a name containing "test"). ' .
+            'Aborting to protect real data.'
         );
     }
 

@@ -18,6 +18,11 @@
         </include>
     </source>
     <php>
+        <!-- #67: the full feature suite exceeds PHP's default 128M limit and
+             aborts mid-run with "Allowed memory size exhausted". Raise the limit
+             for the PHPUnit process so the whole suite can run in one pass
+             regardless of the invoking php.ini. -->
+        <ini name="memory_limit" value="1G"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
