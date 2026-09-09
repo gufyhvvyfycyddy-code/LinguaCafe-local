@@ -11,8 +11,9 @@
  *
  * Design constraints:
  *  - Does NOT read .env or .env.testing.
- *  - Does NOT connect to any database.
- *  - Does NOT run migrations.
+ *  - Touches a database only to provision + forward-migrate the process-owned
+ *    disposable database (#55/#67); never a shared / long-lived / real DB, and
+ *    never a destructive schema reset.
  *  - Does NOT delete any data.
  *  - Safe to run during normal application bootstrap in testing environment.
  */
@@ -69,7 +70,7 @@ if (strtolower($appEnv) === 'testing') {
 
     // #55 stage C: provision a unique, process-owned disposable database for
     // this run and repoint the connection at it, so destructive schema resets
-    // (RefreshDatabase / migrate:fresh) can only ever touch a throwaway DB and
+    // triggered by RefreshDatabase can only ever touch a throwaway DB and
     // never a shared / long-lived / recovery testing database. If no server
     // connection is configured this is a no-op and the guard fails closed.
     try {
@@ -78,6 +79,36 @@ if (strtolower($appEnv) === 'testing') {
             register_shutdown_function(static function (): void {
                 \Tests\Support\DisposableTestDatabase::dropAllCreated();
             });
+
+            // #67: the disposable database provisioned above is created empty.
+            // Tests using RefreshDatabase migrate it themselves, but tests that
+            // rely on an already-migrated schema (no RefreshDatabase trait — e.g.
+            // the dictionary import tests that create/drop their own helper tables
+            // and assert transaction behavior) previously depended on the shared
+            // testing database being pre-migrated out of band. Migrate the
+            // disposable database once here so it faithfully replaces that
+            // pre-migrated shared database for every test regardless of trait.
+            //
+            // The migration runs in a SEPARATE process so booting a Laravel
+            // application (which installs error/exception handlers, container and
+            // facade bindings via its bootstrappers) never pollutes the PHPUnit
+            // process — doing it in-process would leave every subsequent test
+            // flagged risky for "removed error handlers". The disposable database
+            // name and ownership marker were exported with putenv() in activate(),
+            // so the child artisan process inherits them and targets exactly the
+            // same throwaway database. The plain forward-only migrate command is
+            // used (never a destructive reset): it only applies pending migrations
+            // and never wipes a populated database.
+            $migrateCommand = escapeshellarg(PHP_BINARY)
+                . ' ' . escapeshellarg(__DIR__ . '/../artisan')
+                . ' migrate --no-interaction 2>&1';
+            $migrateOutput = [];
+            $migrateStatus = 1;
+            exec($migrateCommand, $migrateOutput, $migrateStatus);
+            if ($migrateStatus !== 0) {
+                fwrite(STDERR, "[bootstrap] WARNING: disposable database migration exited with status "
+                    . "{$migrateStatus}:\n" . implode("\n", $migrateOutput) . "\n");
+            }
         }
     } catch (\Throwable $e) {
         fwrite(STDERR, '[bootstrap] Could not provision a disposable test database: ' . $e->getMessage() . "\n");
