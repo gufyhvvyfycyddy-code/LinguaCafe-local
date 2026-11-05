@@ -1184,3 +1184,26 @@ Anki 桌面端支持无密码 Profile 选择，每个 Profile 有独立 collecti
 11. 单独进行 Anki 导出产品设计，不在当前修复阶段强行决定。
 
 本台账不代表以上任务已经修复。任何后续实现都应按单一小阶段执行，完成代码、测试和真实浏览器验收后再进入下一项。
+
+## 十、2026-11-06 K01：按 GitHub 最新 master 重新分流（未实施产品代码修改）
+
+> 本节补充 2026-07-23 的历史现场，不删原始复现与原因。代码事实基于 `LinguaCafe-local` `master=6e53927ee2cde27210a0850bffe30fceed89c324` 与隔离 PC Test 真实运行（仅限专用测试环境）；未做完整学习 GUI。**FIXED-WAITING-VERIFY 不代表 CLOSED**。本节是修复优先级与反重复派单证据，不授权自动改数据库或主工作树。
+
+| 既有编号 | 当下状态 | Fresh 代码/运行证据与下一验收 |
+|---|---|---|
+| B-001 P0 tokenizer | UNKNOWN（原宿主入口） | PC Test 独立容器可启动 Python，但不能证明原 Windows 8678 启动、健康检查或导入走高级分词。真正导入时核 /models/list、词形与 fallback 提示。 |
+| B-002 P1 首登统计 | FIXED-WAITING-VERIFY | `app/Services/StatisticsService.php::readingConversion()` 目前使用 `->value('id')` 且 goal 缺失返回 0，不再直接解引用空目标；尚缺新测试用户首次真实 GUI/并发回归。 |
+| B-003 P1 空白悬浮 | OPEN（源码仍有可复现缺口） | `VocabularyHoverBox.vue` 仅对用户、词典、API 命中或 loading 渲染；全为空时未见 empty-state。无真实 GUI 前不声称用户已复现于新版本。 |
+| B-004 P1 默认动词 | OPEN（部分路径已改善） | `ManualSenseForm.vue::buildLocalForm()` 缺词性时现为 `''`；但 `WordSensesList.vue::emptyForm()` 仍是 `pos: 'verb'`，先检查该路径真实是否仍对用户可达，再做单点修复。 |
+| B-005 P1 URL 污染 | OPEN（静态链路可疑，待真实导入确认） | `VocabularyTokenFilter::shouldSkip()` 已能跳过完整 URL/邮件/路径；`EnglishFallbackTokenizerService::tokenize()` 仍按字母分词，可能先把 URL 拆成普通词再过滤。用测试文章走失败降级导入，读回 EncounteredWord 前先核测试库身份。 |
+| B-006 P1 fallback 长句 | OPEN（静态分句依据） | `EnglishFallbackTokenizerService::tokenize()` 仍用 `/(?<=[.!?])\\s+/` 分句，不单独识别段落结构标记；用含段落标题的英文小样核句子归属。 |
+| B-007 P1 DOM 空格 | FIXED-WAITING-VERIFY | `TextBlockGroup.vue` 普通模式现有 `reader-semantic-space` 元素及真实空格文本；待真实页面验证 DOM、复制、查找和逐词点击没有回归。 |
+| B-008 P1 Jellyfin 500 | FIXED-WAITING-VERIFY | `app/Services/Settings/SettingValueService.php::isJellyfinEnabled()` 在缺配置时现返回 `false`；待本机没有 Jellyfin 配置的普通导入窗口 GUI/Network 验证。 |
+| B-009 P2 字符数输入 | OPEN（仅源码） | `ImportOptions.vue` 仍仅 `@keyup` 与 `@click` 通知父层，缺标准 `@input/@change`；可在 P0 主路径后做真实粘贴数值验证。 |
+| B-010 P2 登录字体 401 | UNKNOWN | 尚无新登录页 Network 证据；旧版 HTTP 401 不自动算仍在新版本复现。 |
+| B-011 P2 reviewIntervals | UNKNOWN | 未重新核当前 testing-only doctor/旧 stage 路径；不得据历史记录清理设置或 FSRS。 |
+| B-012 P0 Reasonix 监督 | OPEN（工具链专项独立） | 历史标明 `Workaround Active / Root Fix Required`，须由原 `reasonix-supervision-toolchain-bug-ledger-2026-08-05.md` 管事实；未获真实新链路验收，不重报已修。当前真实学习 GUI 能使用其他合规通道时，不把工具链单一失败误判产品不可用。 |
+
+**跨工具现存阻断关联（不新造重复 B 编号）：** 学习整合主 MASTER `B04/R08` 为 PC Test Web 旧 provider 缓存（隔离镜像已修且 /login 从 HTTP500 到 200）及**20 个**仍 Pending 的迁移：当前隔离测试库为36表、85条已登记迁移，`ai_study_card_pending_items` 已存在但0行且只有 PRIMARY 索引；安装包内该迁移仍使用 `language_id/status VARCHAR(255)`，现役 master/Goal 已改为64/32，因此不能简单补迁移账本。真实数据库/学习记录未修改。整合主 MASTER `I05/R10` 为远端 Git 分支上被跟踪的根环境文件：两个独立安全修复分支已 push，原始 master/Goal 未合并；正式源 ZIP 候选 1964/2389 项、文件名扫描0项敏感候选、ZIP格式校验通过，但发布旧包与 Git 历史风险仍需检查、撤销/轮换凭据。以上只作为本台账索引引用，详细证据保留唯一工作流 MASTER LIVE；不得在台账复制密钥或新建第三套 Bug 清单。
+
+**本轮优先序**：先 B04 隔离测试库/GUI 启动、I05 安全分支审查合并与已暴露凭据治理；接着 B-004、B-003、B-005、B-006 等实际影响词义质量/阅读的 P1；B-002/B-007/B-008 只补相称真实 GUI 验收，避免重复重写已经实现的代码。P2 可后置。K01 完成条件是这些事实在唯一台账通过审核并纳入当前主线；主线修复或 GUI 未通过不能标 K02/CLOSED。
